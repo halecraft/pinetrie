@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pineta — walking skeleton</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0; padding: 2rem; max-width: 46rem; margin-inline: auto;
+        font: 15px/1.55 ui-sans-serif, system-ui, sans-serif;
+        background: #14161a; color: #e6e6e6;
+      }
+      h1 { font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: #8b93a1; margin: 0 0 .25rem; }
+      .meta { font-size: 12px; color: #6f7784; margin-bottom: 1.5rem; }
+      .meta code { color: #9ecbff; }
+      .msg { margin: 0 0 1rem; }
+      .role { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: #6f7784; }
+      .msg.user .role { color: #7bd88f; }
+      .msg.assistant .role { color: #9ecbff; }
+      .text { white-space: pre-wrap; margin-top: .2rem; }
+      #streaming { opacity: .75; border-left: 2px solid #9ecbff; padding-left: .75rem; margin-bottom: 1rem; }
+      form { display: flex; gap: .5rem; margin-top: 1.5rem; }
+      input {
+        flex: 1; padding: .6rem .75rem; border-radius: 6px;
+        border: 1px solid #2c313a; background: #1b1e24; color: inherit; font: inherit;
+      }
+      button { padding: .6rem 1rem; border-radius: 6px; border: 0; background: #2f6feb; color: #fff; font: inherit; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <h1>Pineta — walking skeleton</h1>
+    <div class="meta">
+      status <code id="status">connecting…</code> ·
+      lane <code id="lane">—</code> ·
+      entries <code id="count">0</code>
+    </div>
+
+    <div id="transcript"></div>
+    <div id="streaming" hidden><div class="role">assistant · streaming</div><div class="text" id="streamText"></div></div>
+
+    <form id="form">
+      <input id="input" placeholder="Say exactly: PINETA-OK" autocomplete="off" />
+      <button type="submit">Send</button>
+    </form>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

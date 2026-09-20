@@ -1,0 +1,25 @@
+{
+  "name": "pineta",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Collaborative agentic harness — pi's agent core on Kyneta's CRDT substrate. Walking skeleton.",
+  "scripts": {
+    "relink": "./relink.sh",
+    "check": "node scripts/check-boundaries.mjs",
+    "sanity": "node scripts/sanity.mjs",
+    "test": "node --test test/*.test.mjs",
+    "build:client": "node scripts/build-client.mjs",
+    "host": "node host/server.mjs",
+    "e2e": "node e2e/e2e.mjs",
+    "e2e:live": "PINETA_LIVE=1 node e2e/e2e.mjs",
+    "conformance": "node conformance/run-conformance.mjs kyneta && node conformance/run-conformance.mjs memory"
+  },
+  "dependencies": {
+    "loro-crdt": "^1.16.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

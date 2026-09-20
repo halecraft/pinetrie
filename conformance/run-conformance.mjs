@@ -1,0 +1,80 @@
+// SPIKE S2 runner: runs pi's own Storage conformance suite against an
+// implementation, prints a per-case pass/fail table and a failure taxonomy.
+//
+//   node run-conformance.mjs kyneta   (default)
+//   node run-conformance.mjs memory   (control / baseline)
+
+const PAC =
+  "/Users/duane/.local/share/fnm/node-versions/v24.19.0/installation/lib/node_modules/@halecraft/pi/node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core"
+
+const { createStorageConformance } = await import(
+  `${PAC}/dist/harness/session/testing/conformance/storage.js`
+)
+
+const target = process.argv[2] ?? "kyneta"
+
+let factory
+if (target === "memory") {
+  const { MemoryStorage } = await import(`${PAC}/dist/harness/session/memory.js`)
+  factory = async () => {
+    const storage = new MemoryStorage()
+    return { storage, async [Symbol.asyncDispose]() {} }
+  }
+} else {
+  const { KynetaStorage } = await import("../storage/kyneta-storage.mjs")
+  factory = async () => {
+    const storage = new KynetaStorage()
+    return { storage, async [Symbol.asyncDispose]() {} }
+  }
+}
+
+const cases = createStorageConformance(factory)
+const results = []
+
+for (const c of cases) {
+  const started = performance.now()
+  try {
+    await c.run()
+    results.push({ group: c.group, name: c.name, ok: true, ms: performance.now() - started })
+  } catch (error) {
+    results.push({
+      group: c.group,
+      name: c.name,
+      ok: false,
+      ms: performance.now() - started,
+      error,
+    })
+  }
+}
+
+console.log(`\n=== Storage conformance: ${target} ===\n`)
+let group = ""
+for (const r of results) {
+  if (r.group !== group) {
+    group = r.group
+    console.log(`  [${group}]`)
+  }
+  console.log(`    ${r.ok ? "PASS" : "FAIL"}  ${r.name}  (${r.ms.toFixed(0)}ms)`)
+}
+
+const passed = results.filter((r) => r.ok).length
+const failed = results.filter((r) => !r.ok)
+console.log(`\n  TOTAL: ${passed}/${results.length} passed, ${failed.length} failed\n`)
+
+if (failed.length > 0) {
+  console.log("=== failure detail ===\n")
+  for (const r of failed) {
+    console.log(`--- ${r.group} / ${r.name}`)
+    const message = r.error instanceof Error ? (r.error.stack ?? r.error.message) : String(r.error)
+    console.log(
+      message
+        .split("\n")
+        .slice(0, 14)
+        .map((l) => `    ${l}`)
+        .join("\n"),
+    )
+    console.log()
+  }
+}
+
+process.exit(failed.length === 0 ? 0 : 1)
