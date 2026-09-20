@@ -1,0 +1,14 @@
+# tools
+.jj
+.git
+
+# work
+sandbox/
+
+# junk
+.DS_Store
+
+# build
+node_modules/
+client/app.bundle.js
+client/loro_wasm_bg.wasm
