@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "noEmit": true,
+
+    // Node 24 strips types natively, so we run .ts directly and imports must
+    // name the real file. `allowImportingTsExtensions` makes tsc agree.
+    "allowImportingTsExtensions": true,
+
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["packages", "host", "client", "e2e", "test", "scripts"],
+  "exclude": ["node_modules", "sandbox", "client/app.bundle.js"]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@pineta/pi",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@pineta/core": "workspace:*",
+    "@pineta/schema": "workspace:*",
+    "@earendil-works/pi-agent-core": "0.87.1",
+    "@earendil-works/pi-ai": "0.87.1",
+    "@earendil-works/pi-coding-agent": "0.87.1",
+    "@kyneta/schema": "link:../../../kyneta/packages/schema",
+    "@kyneta/loro-schema": "link:../../../kyneta/packages/schema/backends/loro",
+    "loro-crdt": "^1.16.0"
+  }
+}

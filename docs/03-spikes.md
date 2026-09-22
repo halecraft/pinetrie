@@ -1,0 +1,650 @@
+# Spikes
+
+**Rule:** every spike states a *question*, a *kill criterion*, and what gets
+*thrown away*. A spike without a decision output is piecemealing with better
+branding. Code written in a spike is disposable by default.
+
+When a spike resolves → write the ADR, strike it from this list.
+
+## Priority
+
+Order by information gained per unit cost, weighted by blast radius if wrong:
+
+> ~~S1~~ ~~S2~~ ~~S3~~ ~~S5~~ ~~S7~~ ~~S8~~ ~~S11~~ ~~S12~~ ~~S13~~ ~~S14~~ ✅
+> **ALL TWELVE RESOLVED. No blocker, nothing in flight.**
+> Remaining, none blocking: **S16 → S15 → S10 → S6**
+>
+> The gate is fully discharged. **The walking skeleton is unblocked.**
+
+> ✅ **Evidence base re-validated (S14).** All prior spikes ran on
+> `loro-crdt@1.10.8` + npm `@kyneta/*` 3.0.0 — both below the supported floor.
+> Re-run against local fixed Kyneta + `loro-crdt@1.16.1`: **every correctness
+> suite passes with byte-identical entry totals**, and performance improves a
+> further ~20× beyond S11's projection. Nothing regressed.
+
+**S1 is now the single remaining storage-level blocker.** S3 promoted it from
+theory to a reproducible defect: 3 `seq` collisions per 6 partitioned writes,
+and an entry present in the document made **silently unreachable** through the
+paginated read path. Lane-per-writer (ADR-0011) does **not** help.
+
+- **S5** is the cheapest and de-risks the *product*, not the plumbing. Product
+  risk cannot be engineered away later. Run it first.
+- **S2 and S3** are the assumption-killers — the only two that can invalidate
+  ADR-0001/0003.
+- **S7** is ~an hour and directly validates ADR-0008.
+
+---
+
+## ~~S5~~ — RESOLVED ✅ → `findings/S5-fold-quality.md`, ADR-0010
+
+**Size:** S · **Depends on:** nothing
+
+**Question.** Given base/`ours`/`theirs`, does a strong model produce a summary
+of `theirs` that is genuinely useful at the destination — specific, non-redundant,
+and correctly scoped?
+
+**Method.** Generate a real branched session in pi's TUI (`/tree`, Esc-Esc).
+Hand-construct the three-way prompt. No infrastructure. Vary: short aside vs
+long scout; related vs unrelated tangent; contradictory branches.
+
+**Kill criterion.** If output is generic mush, or reliably smuggles in
+irrelevant context, or cannot tell common ground from divergence, the product
+thesis needs rework before any architecture is committed.
+
+**Throw away.** Everything. Keep the prompt and a written judgement.
+
+---
+
+## ~~S2~~ — RESOLVED ✅ → `findings/S2-storage-conformance.md`, spawned S11
+
+**Size:** M · **Depends on:** nothing
+
+**Question.** Can `Storage`'s 10 methods be satisfied over a Kyneta/Loro
+document? Single-writer, in-memory is fine for this spike.
+
+**Method.** Stub `KynetaStorage`, point
+`pi-agent-core/harness/session/testing/conformance/storage.js` at it, count
+failures and classify them.
+
+**Kill criterion.** Binary. Systematic failure ⇒ ADR-0003 is wrong and the plan
+changes shape.
+
+**Throw away.** The implementation. Keep the failure taxonomy — it *is* the
+implementation plan.
+
+---
+
+## ~~S7~~ — RESOLVED ✅ → see `findings/S7-branch-convergence.md`, ADR-0009
+
+**Size:** S · **Depends on:** nothing
+
+**Question.** Two peers, one Kyneta document, concurrent entry appends under
+*different* parents. Do both branches survive as distinct siblings and converge
+as a tree — with no interleaving and no auto-merge?
+
+**Method.** Direct `@kyneta/schema` + Loro test. No pi involved.
+
+**Kill criterion.** Any interleaving or collapse means our document shape is
+wrong (not that ADR-0008 is wrong — that would mean we modelled the tree in a
+substrate-merged container by mistake).
+
+**Throw away.** The harness; promote the assertion into the permanent
+convergence property test.
+
+---
+
+## ~~S3~~ — RESOLVED ✅ → `findings/S3-harness-foreign-writes.md`, ADR-0011
+
+**Size:** M · **Depends on:** S2
+
+**Question.** Two harness instances against one Kyneta doc, appending on
+different tips. Does the harness cope with `scanBranch`/`getEntries` returning
+entries that appeared from another peer mid-run?
+
+**Why it matters.** `SessionMutation` is documented as an *"exclusive keyless
+mutation barrier for one Session"* — a per-process mutex. It may assume a
+private world. Measured behaviour today: two clients on one lane **serialize**.
+
+**Kill criterion.** If the harness caches, assumes monotonic local growth, or
+corrupts on foreign entries, multi-writer needs *harness* changes, not just
+storage — a materially larger project.
+
+**Throw away.** The driver. Keep a written list of every assumption violated.
+
+---
+
+## ~~S1~~ — RESOLVED ✅ → `findings/S1-seq-dissolution.md`, ADR-0013
+
+**Size:** S · **Depends on:** S2's failure taxonomy
+
+**Question.** `EntryScan{fromSeq,toSeq}` requires **range scans**, and
+`EntryCursor`/`ListCursor` require stable pagination. Can these be served by
+Lamport+peer ordering plus a local index, without a dense global counter?
+
+**Kill criterion.** If range scans genuinely require density, we need a
+materialized local index per replica — acceptable, but it must be designed, and
+it means `seq` becomes a *derived local view*, not stored state.
+
+**Output.** If the answer is clean, write it as an **upstream proposal**, not a
+private workaround: *"replace a global commit counter with per-op causal
+metadata so the log can merge."*
+
+---
+
+## ~~S4~~ — RESOLVED ✅ → `findings/S4-browser-transport.md`, ADR-0014
+
+**Size:** M · **Depends on:** nothing (cheap now that ADR-0007 fixes the design)
+
+**Question.** Does a Line over `@kyneta/websocket-transport` carry command
+traffic and replicated transcript state to a browser at streaming rates
+(~50 token-deltas/sec)?
+
+**Sub-question.** Should token deltas ride ephemeral presence or the durable
+doc? pi already separates these (`message_update` vs `entry_appended`;
+`pi.pending.assistant_frame` list ops are appended then deleted on commit).
+
+**Kill criterion.** If delta rates saturate the doc layer, streaming moves to
+presence and the durable doc only receives committed entries.
+
+---
+
+## S6 — Do `file-range` references survive a jj change?
+
+**Size:** S · **Depends on:** nothing · **Lowest priority** (v1 has no Worktree branches)
+
+**Question.** Is content addressing (blob hash / jj change ID) sufficient to
+keep file references valid — or at least *knowably stale* — across edits?
+
+**Kill criterion.** If references cannot reliably detect staleness, file
+references must be advisory-only in the UI.
+
+---
+
+## ~~S8~~ — RESOLVED ✅ → `findings/S8-branch-tip-contention.md`, ADR-0011
+
+**Size:** S · **Depends on:** nothing · **Raised by:** S7 residual #4
+
+**Question.** S7 only modelled the `entries` collection. `pi.branch.tip` is a
+**genuinely contended** LWW register — two peers moving the same lane tip
+concurrently is exactly the silent-clobber case S7 §3.4 demonstrated. What are
+the correct semantics?
+
+**Hypothesis to test.** Per `00-vision.md`, tips should be **per-peer presence**,
+not shared session state — which would dissolve the contention entirely. But pi
+models `pi.branch.tip` as keyed-by-lane *shared* state, and `AgentLane.getTipId`
+assumes it. Do these reconcile, or does per-peer tip require a lane per peer?
+
+**Kill criterion.** If per-peer tips cannot be reconciled with pi's lane model,
+concurrent branch navigation needs a design we do not have, and it lands on the
+critical path for the v1 demo.
+
+**Priority.** High — this is the one unexamined case that is *known* to be
+contended, and the v1 demo depends on it.
+
+---
+
+## ~~S9~~ — RESOLVED ✅ → `findings/S9-idgenerator-collisions.md`
+
+**Size:** S · **Depends on:** nothing · **Raised by:** S7 residual #7
+
+**Question.** ADR-0009 makes id uniqueness safety-critical. S7 used its *own*
+UUIDv7 implementation. pi ships an injectable `IdGenerator`. Does pi's produce
+collisions across peers — same millisecond, same process, forked processes?
+
+**Kill criterion.** Any collision path means we must supply our own generator
+rather than use pi's default. Cheap to check, expensive to discover later:
+failure is *silent data loss*.
+
+---
+
+## S10 — Does the document shape scale?
+
+**Size:** M · **Depends on:** S2 · **Raised by:** S7 residual #2
+
+**Question.** S7's largest trial was ~40 entries. Real sessions run to tens of
+thousands. How do `exportSince` size, snapshot time, and memory behave for a
+`Schema.record` with 10k+ entries and large tool-result blobs?
+
+**Kill criterion.** If snapshots or sync payloads grow unacceptably, we need
+per-entry document granularity or shallow snapshots — a document-shape change,
+so better known before the adapter is built on the current shape.
+
+---
+
+## ~~S11~~ — RESOLVED ✅ → `findings/S11-schema-write-perf.md`
+
+**Size:** M · **Depends on:** nothing · **Raised by:** S2 §3.4
+
+**Question.** S2 measured `@kyneta/schema` write throughput as **O(n²) in
+container size**, against raw `loro-crdt`'s O(n) — **~650× slower at n=8000**.
+Independently reproduced: 138 / 515 / 1965 / 7743 ms for 1k/2k/4k/8k (≈ 4× per
+doubling) vs raw Loro 2 / 3 / 6 / 12 ms (≈ 2×). Why?
+
+**What is already ruled out.** Batch size (chunking into 100-write batches
+changes nothing — it is quadratic in *container* size). The Loro binding (the
+plain-JS substrate shows the same curve, so it is **`@kyneta/schema` core**).
+`.at()` navigation overhead (hoisting it out of the loop changes nothing).
+
+**Suspects, unverified:** changefeed materialisation per op; per-op path/address
+construction.
+
+**Why this is top priority.** It is *first-party code you own and can fix*, and
+it sits directly under Pineta's two unbounded containers — the session entry
+record and `pi.pending.assistant_frame`. Every later design decision about
+document granularity depends on whether this is a bug or a law.
+
+**Mitigating fact:** the realistic streaming shape is fine *today* — 1 000
+separate single-append commits took 247ms (≈0.25ms/commit). Reads are also cheap
+(42ms to materialise 10 001 elements). This bites on bulk load, replay, and
+long sessions, not on interactive use.
+
+**Kill criterion.** If it is inherent to the schema algebra rather than an
+implementation defect, Pineta needs per-entry document granularity — a
+document-shape change, so it must be known **before** the production adapter is
+built on the current shape. (Supersedes part of S10.)
+
+---
+
+## ~~S12~~ — RESOLVED ✅ → `findings/S12-trunk-semantics.md`, ADR-0012
+
+**Size:** S · **Depends on:** nothing · **Raised by:** S8 residual #1 + ADR-0011
+
+**Question.** Under ADR-0011 every writer owns a lane, so no lane is canonical.
+But the product has a *trunk* — `00-vision.md` is built on "fold an exploration
+back into the trunk." What represents it?
+
+**Candidates (none evaluated):** a designated lane name; a label on an entry; a
+separate `pi.session.*` pointer; simply the path to a designated leaf.
+
+**Why it matters beyond naming.** It interacts directly with fold: ADR-0010
+establishes a fold is **destination-relative** — so "fold into the trunk" needs
+a well-defined destination *tip*. If the trunk is a lane, whose lane is it, and
+who may write it? If it is a pointer, it is a contended LWW register and
+ADR-0011's reasoning applies to it too.
+
+**Kill criterion.** If the trunk cannot be expressed without reintroducing a
+shared-writer register, we have moved the ADR-0011 hazard rather than removed
+it.
+
+---
+
+## ~~S13~~ — RESOLVED ✅ CONFIRMED by S14 §4.3
+
+**It was not the Kyneta→Loro binding.** Kyneta `da978ec` attributes it to
+`loro-crdt` itself: *"`loro-crdt` built a commit's event in O(keys²) whenever a
+subscriber was attached, which for this substrate is always — bisected to 1.13.3,
+fixed in 1.13.4, hence the peer floor."* S11 correctly localised it to wasm frames
+and correctly declined to guess further. **S14 must confirm the residual ×3.5 is
+gone on `>=1.13.4`.**
+
+**Size:** S–M · **Depends on:** S11 · **Raised by:** S11 §3.9
+
+**Question.** After both S11 fixes, Loro `record.set` remains superlinear (×3.5–3.6
+per doubling) while raw `loro-crdt` map-set is linear. Profiling puts the cost in
+**wasm frames**, and it is shape-independent (`record(any)`, `record(struct.json)`,
+and `record(struct)` all behave alike) — so it is something the Kyneta→Loro
+**binding** does per key, not a `LoroMap` limitation.
+
+**Why not urgent.** ~20× smaller than the two defects already fixed, and it does
+not threaten any kill criterion. This is the next lever only if 10k-entry bulk
+writes need to drop below ~2 s.
+
+---
+
+## S15 — Should the trunk winner rule be causal rather than wall-clock?
+
+**Size:** S · **Depends on:** S12 · **Raised by:** S12 residual #1
+
+> ⚠️ **S12's hope that this shares S1's Lamport work is DEAD.** S1 deliberately
+> built **no** causal clock — it refuted convergent ordering for cursors and
+> chose replica-local arrival order instead. S15 would introduce one from
+> scratch. The two uses are unrelated: S15 needs a *total order over promotions*
+> (convergent is exactly right there); S1 needed *cursor stability* (where
+> convergent is exactly wrong).
+
+**Question.** ADR-0012 resolves a trunk fork with a total order `(ts, peer, id)`.
+Convergence does **not** depend on the rule — only on it being *total*. But
+*which* fold wins does, and `ts` is wall-clock: **clock skew across devices is
+adversarial**, and the "winner" may not be the causally later fold.
+
+**Evaluate:** Lamport / causal-length ordering instead. **Plausibly shares
+S1's Lamport work** — if S1 lands a causal clock for `seq`, S15 is nearly free.
+
+**Not urgent:** replicas converge either way; this is about picking the *right*
+winner, not a correct one.
+
+## S16 — Can a disposable per-message doc remove the streaming residue?
+
+**Size:** S–M · **Depends on:** S4 · **Raised by:** ADR-0014's accepted tradeoff
+
+> **Motivation reduced.** The original premise bundled two costs: history
+> residue *and* a 6.9× wire cost. **The wire cost is gone** — it was our use of
+> `Schema.string()`, not a substrate property; durable `Schema.text()` is linear
+> (18 131 B vs 144 582 B). Re-measured residue is **~5.6 KB per message**
+> (late-joiner 11 436 B vs 5 834 B control), not 9.6 KB. S16 is now purely about
+> residue, and is **lower priority** than when filed.
+
+**Question.** ADR-0014 streams deltas through the durable doc and accepts
+**~5.6 KB of unreclaimable history per message**, paid by every future late
+joiner. `exchange.compact()` **throws on a live Loro substrate** (still open,
+re-verified), so it cannot be reclaimed.
+
+**Hypothesis.** Keep pending assistant frames in a **separate, disposable Loro
+doc per message**, destroyed on commit — residue never enters the session doc.
+Preserves ADR-0014's correctness with none of its cost.
+
+**Method.** S4 §3.5's control-vs-streamed byte accounting is a ready-made
+measurement: late-joiner download for never-streamed / streamed /
+streamed-with-disposable-doc.
+
+**Also test:** does a mid-stream joiner still hydrate exactly when pending frames
+live in a doc it must *discover and subscribe to*? That is the correctness risk
+the split introduces.
+
+**Kill criterion:** if a per-message doc cannot be discovered and subscribed fast
+enough for a late joiner to hydrate exactly, ADR-0014's residue stands and the
+answer is to await Loro compaction.
+
+---
+
+## Resolved
+
+### S9 — pi's `IdGenerator` ✅ PASS — safe *structurally*, not statistically
+
+`findings/S9-idgenerator-collisions.md`. 41 assertions, zero failures.
+Independently re-verified: the pinned-millisecond test, the fork test, and the
+end-to-end ADR-0009 test with its control.
+
+- **pi's `uuidv7` is not stock RFC 9562.** A 41-bit monotonic counter (seeded
+  once per module instance from 40 CSPRNG bits, never reset per ms) + 33 fresh
+  bits. Intra-process collision probability is **exactly 0**, not 2⁻⁷⁴.
+- **Answered "why is it safe", not "no collisions in N trials"** — which is what
+  the brief demanded, and it ran the brute-force volume test *last*, noting it
+  "can only fail to disprove" the arithmetic.
+- **Imported pi's real module** rather than reimplementing it, and verified the
+  bundled TUI copy is semantically identical.
+- **Proved the field layout** by lossless decode→re-encode over 2 000 ids — all
+  128 bits accounted for — before drawing any conclusion from it.
+- **Distinguished sampling noise from signal:** r(pid, seed) read 0.25 at n=64,
+  so it re-ran at n=256 where it collapsed to −0.08.
+- **Checked its own read-only compliance carefully**, and correctly identified
+  recent `~/.pi` writes as the *orchestrating* session's own transcripts rather
+  than its doing.
+- Spawns nothing. Bonus for S1: pi's per-id `sequence` is already a per-peer
+  monotonic ordering key, recoverable via its `decode.mjs`.
+
+### S4 — Browser ↔ host over a Kyneta Line ✅ PASS (and it inverted the hypothesis)
+
+`findings/S4-browser-transport.md` → **ADR-0014**. Re-verified: E2's table and
+E3's 2701/2702 reproduce exactly.
+
+- **ADR-0007 confirmed** over a real websocket: 7 command kinds in order,
+  p50 **1.67 ms**, ~1 050 cmd/s, 2 000 commands at **1.01×** outbox growth.
+- **Used a REAL captured pi stream**, not a synthetic one — and found the real
+  rate is **202.6 deltas/sec, 4× the 50/s** the brief assumed.
+- **The design question resolved AGAINST the brief's hypothesis** — durable, not
+  presence. See ADR-0014.
+- **Honest about scope:** the browser *module* was exercised under Node over a
+  real socket; **no browser runtime was run**, and it says so unambiguously.
+  Host and client share a process, so latencies are a floor, not a forecast.
+- **Explained its own outlier** instead of just reporting it: the p99 157 ms was
+  sample #0 only — a one-time post-burst outbox prune; a clean run has no tail.
+- Spawned **S16**; gave **S10** a concrete measurement method.
+
+### S1 — `seq` dissolution ✅ SOLVED, no upstream renegotiation needed
+
+`findings/S1-seq-dissolution.md` → **ADR-0013**. The top blocker is cleared.
+Independently re-verified: conformance 21/21 (+ `memory` control), fresh-seed
+property 100/100, control 0/40, S3's reproduction showing 0 collisions and 0
+skipped entries.
+
+- **Refuted the architecture doc's own plan.** "Replay order → Lamport + peer
+  tiebreak, inherited free from Loro" cannot work: **a convergent order and
+  stable integer cursors are mutually exclusive.** Only arrival order — where
+  new observations always land at the end — keeps `cursor.seq + 1` sound.
+- **Also refuted the S2/T7 "API-visible break."** `ListReadOptions` is unchanged;
+  no Loro `Cursor` required.
+- **Found pi's own proof that density was never required:** a conformance fixture
+  named `"sequence gap"` (`conformance/storage.js:522`).
+- **Wrote its own property wrong first and let the test correct it** — an initial
+  "seq is gapless" assertion failed immediately, correctly.
+- **Instrumented its own dead code:** the causal-delivery fallback was made to
+  `throw` and never fired across 400 trials + conformance — so it reports that
+  path as *untested* rather than claiming coverage.
+- Cost: cold index rebuild **57 ms @ n=10 000**; incremental reconcile **O(δ),
+  0 ms** at both 10 000 and 50 000 entries. Linear to n=50 000.
+- **Supersedes the roadmap's deliberately-failing fitness function** — "no two
+  entries share a `seq` after a partition heal" now **passes**.
+
+### S12 — Trunk semantics ✅ kill criterion NOT met
+
+`findings/S12-trunk-semantics.md`. The trunk **can** be expressed without a
+shared-writer register → **ADR-0012**. 1000/1000 property trials; **0/600** on
+two independent controls; re-verified at a fresh seed.
+
+- **Reframed the question.** Two concurrent folds onto one trunk tip are a
+  *semantic* conflict in every representation — a linear path holds one of two
+  siblings. All five candidates scored 1/2 or 0/2 on "folds on the trunk path."
+  The real question is **loud vs. silent failure**, not contention avoidance.
+- **The idiomatic-looking option fails.** Candidate (c), a keyless
+  `pi.session.trunk` register, has real precedent — pi ships
+  `sessionName = value("pi.session.name")` at `values.js:79`. It loses folds
+  silently, 0/600. Exactly why it needed measuring rather than reasoning about.
+- **The experiment corrected the design.** Single-`prev` promotions leave losers
+  as permanent leaves ⇒ permanent false-positive fork detection. `prev` must be
+  a **list** (merge-commit shaped). Caught by `refold.mjs` failing, then passing.
+- **ADR-0010 pays off twice:** fold destination-relativity makes fork repair
+  *free* — re-fold the source at the new tip; the stale merge node survives as
+  immutable provenance.
+- **Wiring note:** `link:` is a pnpm/yarn protocol — npm rejects it
+  (`EUNSUPPORTEDPROTOCOL`), and `pnpm --ignore-workspace` couldn't reach the
+  registry. The agent **symlinked the local packages into `node_modules/@kyneta/`**
+  instead, which is a *truer* link than S14's dist overlay: the real local
+  `package.json` and its `exports` are used. `workspace:^` never has to resolve
+  because npm is never asked to install those packages.
+- **Noticed a concurrent rebuild** of `~/halecraft/kyneta` mid-spike (not its own
+  doing — your team's), and **re-ran the entire scorecard afterwards**; results
+  identical before and after.
+- Spawned **S15**.
+
+### S14 — Re-validation on fixed Kyneta + new loro floor ✅ NOTHING REGRESSED
+
+`findings/S14-revalidate-fixed-kyneta.md`. A 2×2 factorial (kyneta npm/local ×
+loro 1.10.8/1.16.1) — the agent added config D itself, correctly noting the
+factorial was incomplete without it and that S13 could not otherwise be answered.
+
+- **Correctness invariant across all four configs.** S2 21/21; S7 900/900; S8
+  1000/1000; S3 step1 12/12, step7 10/10. **Every entry total byte-identical to
+  published figures** — behaviour unperturbed, not merely "still passing." Both
+  negative controls still fail as designed.
+- **Performance, Pineta shape n=10 000:** entries **38 444 → 93 ms (413×)**,
+  lists **12 731 → 92 ms (138×)**. Linear to **n=50 000**. Independently
+  re-verified at n=8 000: entries `26 234 → 75 ms`, ×4.54 → ×1.75.
+- **The factorial is the interesting part.** Lists need only the Kyneta fix
+  (loro version irrelevant). **Maps need BOTH**: Kyneta alone takes 24 316 →
+  1 159 ms but leaves ×3.77; the loro bump then takes it to 67 ms and ×1.83.
+  **The loro fix alone buys ~4%** — the Kyneta defects mask it entirely.
+- **S10 partially discharged** — linearity confirmed to n=50 000. Snapshot-size
+  and sync-payload questions remain.
+- **Flagged for you:** `da978ec` is **not an ancestor of git `HEAD`** in the
+  colocated repo (`HEAD` = `c84a5ca`, a datalog line). The *working copy* carries
+  the fix and the dist is built from it, but anyone rebuilding from git `HEAD`
+  would not get it. A jj/git bookkeeping question, not a code one.
+
+### S13 — Loro map-write superlinearity ✅ CONFIRMED: upstream, not Kyneta
+
+Demonstrated in **raw `loro-crdt` with zero Kyneta imports**, toggling one no-op
+`doc.subscribe(() => {})` (independently re-run):
+
+| loro | no subscriber @ n=8 000 | subscriber attached | penalty |
+|---|---|---|---|
+| **1.10.8** | 19 ms (×1.82) | **1 166 ms (×3.80)** | **61×** |
+| **1.16.1** | 17 ms (×1.75) | 28 ms (×1.98) | 1.6× |
+
+Subscriber-gated, superlinear when attached, fixed by the version bump — every
+part of the commit message's claim confirmed as a black box.
+
+> **Why S11 missed it, and the lesson.** S11's raw-loro control ran **without a
+> subscriber**, so it measured a different code path from the one the substrate
+> uses — the Kyneta Loro substrate *always* attaches one. S11 §3.9's conclusion
+> (*"something the Kyneta→Loro binding does per key"*) is **wrong**, and the
+> report should be corrected in place. **A control must exercise the same
+> configuration as the subject.**
+
+> Not verified: that the mechanism is literally an O(keys²) event build, or that
+> the boundary is exactly 1.13.3/1.13.4. Effect verified; mechanism taken from
+> the commit message.
+
+### S11 — Quadratic writes ✅ DEFECT, not inherent — both causes fixed
+
+> **✅ FIXED UPSTREAM — `da978ec perf(schema,machine)!: writes cost O(δ), not O(σ)`
+> (2026-09-19).** Kyneta took the *systematic* route S11 raised as §6 item 4
+> rather than its call-site patch: `step` is now `copy ∘ core`, `stepInPlace` is
+> the core, `applyChange` uses the dual. S11's `fixB-reader.patch` is **superseded**.
+>
+> **Three further causes S11 did not find**, per the commit message:
+> 1. `createDispatcher` walked the stack on every write to decorate an error —
+>    now late and lazy (`@kyneta/machine`).
+> 2. **`loro-crdt` built a commit's event in O(keys²)** when a subscriber is
+>    attached — always, for this substrate. Bisected to 1.13.3, fixed in 1.13.4.
+>    **This is the S13 residual.**
+> 3. `stepSequence` silently dropped `undefined` elements — the exact hazard S11
+>    guarded against in its fast path. Now fixed, so the guard is unnecessary.
+>
+> S11's cause-A finding stands and is called out in the commit as still
+> actionable: *"the published `@kyneta/schema@3.0.0` dist predates `a5e2c8f` …
+> Republishing is most of the win for anyone installing from npm."*
+
+`findings/S11-schema-write-perf.md`. **Kill criterion not met: Pineta does not
+need per-entry document granularity for write-throughput reasons.** The shape S7
+settled stands.
+
+- **Cause A — already fixed in your source, never published.** The published dist
+  does `deepClonePlain(path.read(doc))` on *every* write; `path.read` resolves to
+  the **whole container**, so it is O(n) per op ⇒ O(n²) per batch. Kyneta `main`
+  replaced it with "Read, don't copy" in **`a5e2c8f` (2026-09-06)** — but
+  `@kyneta/schema@3.0.0` was published **2026-08-18**. *Independently verified:
+  the clone is present in the pristine published dist of both `@kyneta/schema`
+  and `@kyneta/loro-schema`, and absent from source.* **Every measurement in S2
+  was taken against code `main` had already fixed.**
+- **Cause B — `step` rebuilds the whole container per op.** `step` is a pure
+  arrow, which is right for the algebra; but `applyChange` materialises every
+  intermediate state. Fixed with in-place fast paths for map set/delete and pure
+  append; everything else falls through to the existing path. Argued safe from
+  the documented liveness invariant plus `invert`-before-`applyChange` ordering.
+- **Verification:** Kyneta's own **2062 tests pass unchanged** (84 files, patched
+  and unpatched); S2's conformance **21/21** on the patched build; S7's
+  convergence property **400 trials with entry counts byte-identical** to S7's
+  published figures; negative control still fails.
+- **Measured (re-verified independently):** n=8000 list `7793 → 142 ms`,
+  record `18976 → 1205 ms`. Pineta shape at n=10 000: entries
+  `41 270 → 1 904 ms` (22×), pending list `13 106 → 185 ms` (71×). S2's slowest
+  conformance case dropped `12 198 → 267 ms`.
+- **Methodological note worth keeping:** the first CPU profile was *misleading* —
+  92.8% self-time collapsed into `prepare` with `applyChange` absent entirely.
+  The agent stopped trusting it and bisected instead. On bundled ESM builds V8
+  attribution localised the statement group correctly but named the wrong
+  function.
+- **Not verified:** `tsc --noEmit` OOM'd, so the patch's two `as` casts are
+  type-unchecked. `@kyneta/react` and `@kyneta/devtools` were never exercised —
+  they are the most likely holders of an object-identity assumption that in-place
+  mutation could break.
+- Spawned **S13**.
+
+### S3 — Harness tolerance of foreign writes ✅ (kill criterion met; mitigated by design)
+
+`findings/S3-harness-foreign-writes.md`. **Closed S2 residual #5: a real
+`AgentHarness` runs over `KynetaStorage`** (step1 12/12, re-verified).
+
+- **Confirmed:** the harness **caches** and **assumes monotonic local growth**.
+  It does **not** crash or corrupt. `StorageBackedSession` does *not* cache —
+  **`Lane` does** (`lane.js:128-131`, `getTipId` ignores its context param).
+- **Mitigation proven:** lane-per-writer → 10/10, re-verified, zero orphans,
+  producing exactly the branched tree Pineta wants from two partitioned writers
+  with zero coordination.
+- **T5 answered: yes, the mutex can be per-replica.** The question was aimed at
+  the wrong object — no probe produced a `Storage`-contract violation. The real
+  coupling is the shared `branchTip` register and the global `seq`.
+- **Itemised 10 exclusive-ownership assumptions (A1–A10) with file:line
+  evidence**, plus 5 escape hatches (P1–P5) — notably `MutationLine` is
+  *injectable*, so a distributed barrier is possible without forking.
+- **Net: multi-writer Pineta stays a STORAGE project**, conditional on ADR-0011.
+- Model layer was **stubbed**; the drive/inference loop is untested (residual #1).
+
+### S8 — `pi.branch.tip` contention ✅ PASS
+
+`findings/S8-branch-tip-contention.md`. 1000/1000 property trials for
+lane-per-writer across 5 seeds; **0/300 for the shared-lane control**; both
+re-verified at a fresh seed.
+
+- **It is not one register, it is three.** `pi.lane.state` carries the steering
+  **inbox**, so a clobber drops queued user messages too.
+- 12 non-test `setValue(branchTip(...))` sites — the tip is rewritten on
+  essentially **every commit in the drive loop**, not once per turn.
+- Evaluated 4 designs under one workload; (b) key-rewriting **leaks** through
+  pi's prefix scan; (d) `Schema.set` **rejected at runtime**.
+- **v1 is not exposed** — the hazard needs ≥2 harness processes.
+- **Caught its own bad invariant.** Its first property was "every entry is
+  reachable from some tip" — which failed 169/200 *even for the correct design*,
+  because `navigateTree` **intentionally** orphans entries. Abandoning a branch
+  is what branching *is* (ADR-0004). See the fitness-function correction below.
+- Spawned **S12**.
+
+### S5 — Destination-aware three-way fold ✅ PASS
+
+`findings/S5-fold-quality.md`. Four scenarios (aside / scout / contradict /
+irrelevant control) plus a three-way ablation, on a genuinely branched session
+(verified: all four `theirs` files share real entry-id `lca=7ffc796c`).
+
+- **The ablation is the result.** Labelled three-way (254 words, finds a
+  cross-leg implication) > `theirs`-only (221 words, confidently recommends a
+  design the destination already rejected) > **same bytes unlabelled (167 words,
+  *worst* — state confusion).** The lift comes from the *partition*, not the
+  model.
+- Irrelevant control dismissed in one line — directly refutes the
+  "smuggles in irrelevant context" kill condition.
+- Naive concatenate-and-summarise is 2–4× longer and is the **wrong artifact**
+  (a whole-conversation summary, not a fold).
+- Token saving is exactly one base leg (16–27%) — real but **secondary**; the
+  semantic argument carries the design.
+- Produced **ADR-0010**. Prompt kept at `out/*.foldprompt.txt`.
+- **Incidental pi finding:** `get_last_assistant_text` returns `{"data":{}}`
+  despite `docs/rpc.md` documenting `{"text": "..."}`. Read `message_end` events
+  instead.
+- **Method note:** pi RPC has *no* in-place tree navigation (no `navigate_tree`,
+  `branch`, or `set_leaf`); `/tree` is TUI-only. Branching headlessly required
+  snapshotting the session file and extending copies.
+
+### S2 — `KynetaStorage` conformance ✅ PASS (21/21)
+
+`findings/S2-storage-conformance.md`. Passed **first execution**, stable over
+three runs, independently re-verified. `MemoryStorage` control also 21/21.
+Adapter is ~305 lines.
+
+- **ADR-0003 confirmed.** Third-party `Storage` backends are a genuinely
+  supported extension point.
+- **ADR-0002 supported:** full export → fresh replica → re-read with byte
+  fidelity, including `\u0000`-separated and astral-plane keys.
+- **No shadow index** — every read materialises from the Loro doc, so the
+  document really is the source of truth.
+- pi supplies far more than the interface: `prepareStorageCommit`,
+  `validateCommittedWrites`, `resolveListReadOptions`, `addUsage`, and
+  `MemoryStorage` as a reference state machine. This is why it passed first try.
+- **Spawned S11** (the quadratic-write finding).
+
+### S7 — Divergent branches persist distinctly ✅ PASS
+
+`findings/S7-branch-convergence.md`. 34/34 assertions, 900 property trials,
+~15.9k entries, zero failures. Independently re-verified at a fresh seed.
+
+- Settled the document shape: `Schema.record(Schema.struct.json({...}))`
+- Produced **ADR-0009** (id uniqueness as a safety invariant)
+- Reproduced the ADR-0008 failure mode locally (§3.5)
+- Delivered `convergence.property.mjs` + `negative-control.mjs`, ready to promote
+  to a permanent fitness function
+- Spawned S8, S9, S10 from its residuals
+
+**One claim in the report is wrong:** it states it is "correcting"
+`01-architecture.md` regarding `Schema.set` type-level rejection. Our docs never
+mentioned `Schema.set`. The underlying finding (runtime rejection) is retained;
+the attribution was invented and no correction was applied.

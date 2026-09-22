@@ -29,21 +29,7 @@
     </style>
   </head>
   <body>
-    <h1>Pineta — walking skeleton</h1>
-    <div class="meta">
-      status <code id="status">connecting…</code> ·
-      lane <code id="lane">—</code> ·
-      entries <code id="count">0</code>
-    </div>
-
-    <div id="transcript"></div>
-    <div id="streaming" hidden><div class="role">assistant · streaming</div><div class="text" id="streamText"></div></div>
-
-    <form id="form">
-      <input id="input" placeholder="Say exactly: PINETA-OK" autocomplete="off" />
-      <button type="submit">Send</button>
-    </form>
-
-    <script type="module" src="/app.js"></script>
+    <div id="root"></div>
+    <script type="module" src="/app.tsx"></script>
   </body>
 </html>

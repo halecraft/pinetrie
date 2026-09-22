@@ -1,0 +1,13 @@
+{
+  "name": "@pineta/conformance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "conformance": "node run-conformance.ts kyneta && node run-conformance.ts memory"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "0.87.1",
+    "@pineta/pi": "workspace:*"
+  }
+}

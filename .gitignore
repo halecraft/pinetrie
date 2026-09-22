@@ -12,3 +12,18 @@ sandbox/
 node_modules/
 client/app.bundle.js
 client/loro_wasm_bg.wasm
+
+# pnpm's content-addressable store falls back into the repo because the
+# default global location (~/Library/pnpm/store) is outside pi-jail's
+# allowWrite set. See docs/05-stack.md § sandbox.
+.pnpm-store/
+
+# Playwright browsers, redirected here for the same reason.
+.playwright-browsers/
+
+# Browser e2e artifact (regenerated each run)
+e2e/browser-screenshot.png
+
+# vite production build output
+dist/
+client/dist/
