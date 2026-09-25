@@ -22,7 +22,6 @@
 // Override the endpoint with PW_SERVER if you used a different port.
 
 import { projectTranscript } from "@pineta/core"
-import { writeEntry } from "@pineta/schema"
 import { type Browser, chromium } from "@playwright/test"
 import { readRenderableEntries } from "../client/projection.ts"
 import { startHost } from "../host/index.ts"
@@ -52,7 +51,9 @@ console.log(`\n=== Pineta — real browser against a real host ===`)
 console.log(`  playwright server : ${PW_SERVER}`)
 console.log(`  browser           : ${browser.version()}\n`)
 
-const host = await startHost({ log: () => {} })
+const host = await startHost({
+  log: (m: string) => console.log("    [host]", m),
+})
 console.log(`  host              : ${host.httpUrl}\n`)
 
 const page = await browser.newPage()
@@ -125,16 +126,17 @@ try {
     projectTranscript(readRenderableEntries(host.doc), tip).at(-2)?.id ?? null
   ok(parentId !== null, "found a parent to fork from")
   if (parentId !== null) {
-    writeEntry(host.doc, {
-      id: `aside-${Math.random().toString(36).slice(2, 10)}`,
-      parentId,
-      type: "message",
-      timestamp: Date.now(),
-      fromId: null,
-      payload: {
-        message: { role: "user", content: "an aside", timestamp: Date.now() },
-      },
-    })
+    // Created THROUGH THE HARNESS, not written into the document. A
+    // foreign-written entry is refused by `navigateTree` with
+    // `unknown_target`: pi's session index never saw it created, so its tree
+    // navigation cannot reach it. The Node e2e covers the foreign-write (S3)
+    // path; this suite needs a branch a user can actually navigate into.
+    const trunkTip = await host.agent.tipId()
+    await host.agent.run("an aside", parentId)
+    // `run` navigates and STAYS, so put the lane back on the trunk. Otherwise
+    // the aside becomes the lane and the spine the browser renders is the
+    // branch, not the trunk it forked from.
+    await host.agent.navigate(trunkTip)
 
     await page.waitForFunction(
       () => document.querySelectorAll(".fork").length > 0,
@@ -147,7 +149,8 @@ try {
     // rendered the literal characters `\u2442` and `\u00b7`, because JSX text
     // does not process escapes. The screenshot caught it; this now would.
     ok(
-      summary.trim() === "⑂ 1 branch · 1 message",
+      // Two, because the aside is a real turn: the user entry and the reply.
+      summary.trim() === "⑂ 1 branch · 2 messages",
       `the marker summarises the branch: "${summary.trim()}"`,
     )
 
@@ -167,6 +170,44 @@ try {
       `the branch does NOT join the spine (${spineNodes} spine nodes)`,
     )
   }
+
+  // The first end-to-end proof that a USER can fork a conversation: read a
+  // branch, type into it, and the turn attaches there rather than at the lane
+  // tip they navigated away from.
+  await page.click(".branch button")
+  await page.click(".fork button") // collapse the preview
+  const offLane = await page.$eval("#offLane", n => n.textContent ?? "")
+  ok(
+    offLane.includes("fork from here"),
+    `reading a branch says sending will fork: "${offLane.trim().slice(0, 48)}"`,
+  )
+  const sendLabel = await page.$eval("#send", n => n.textContent ?? "")
+  ok(
+    sendLabel.trim() === "branch from here",
+    `the composer offers to branch, not to refuse: "${sendLabel.trim()}"`,
+  )
+
+  await page.fill("#input", "BRANCH-FROM-BROWSER")
+  await page.click("#send")
+  // The reply is the ACCEPTANCE, not the completion, so wait for the entry to
+  // commit and replicate rather than for the status to settle.
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll("#transcript .text")].some(n =>
+        n.textContent?.includes("BRANCH-FROM-BROWSER"),
+      ),
+    undefined,
+    { timeout: 60_000 },
+  )
+  ok(true, "the branch turn ran and the spine re-rooted")
+
+  const rendered = await page.$$eval("#transcript .text", ns =>
+    ns.map(n => n.textContent ?? ""),
+  )
+  ok(
+    rendered.some(t => t.includes("BRANCH-FROM-BROWSER")),
+    "the branched message renders on the new spine",
+  )
 
   ok(
     errors.length === 0,

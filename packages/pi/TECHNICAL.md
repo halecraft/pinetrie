@@ -42,6 +42,50 @@ Three rules hold them together:
 ADR-0003 exists to hold. `vitest.config.mjs` includes `packages/*/*.test.ts`
 for this reason.
 
+### Branching is `navigateTree` then `prompt`
+
+`lane.prompt` has no parent parameter: pi always appends at the lane tip. So a
+branch is "move the tip, then prompt", and pi supports exactly that through
+`lane.navigateTree(targetId, options, context)`. We do not reimplement a tree
+operation pi owns.
+
+`Agent.run(text, parentId)` is one method rather than a separate `branch()`:
+both map pi's `RunResult` the same way, and a duplicated mapping is where
+"navigation succeeded but the prompt failed" gets handled in one copy and not
+the other. `Agent.navigate(targetId)` moves the tip without running a turn.
+
+`navigationErrCode(tag)` is pure, so pi's error union can be mapped to our
+`ErrCode` without a harness. `agent.test.ts` covers it, including that an
+unrecognised tag falls back rather than throwing: pi may add error tags, and
+reporting the wrong navigation code is recoverable while throwing inside the
+host's reply path is not.
+
+**`Agent.navigate` has no command wired to it yet.** It is currently reached
+only by a test fixture, which is a smell with a cause: `navigateTree` moves
+the lane onto a branch and nothing moves it back, so a branch is one-way and
+"return to your lane" returns to the branch. Wiring a `navigate` command is
+what completes step 2. It is NOT a run — no runId, no stream — so it needs its
+own decision rather than the `run` variant a branch shares with a prompt.
+
+**A foreign-written entry is NOT navigable.** An entry written straight into
+the document with `writeEntry` is refused by `navigateTree` with
+`unknown_target`: pi's session index never saw it created, so its tree
+navigation cannot reach it. This is why the browser suite creates its branch
+fixture through `agent.run` while the Node suite keeps a `writeEntry` fixture
+for the S3 foreign-write scenario. They exercise different halves, and only
+one of them is navigable.
+
+**A run's outcome cannot travel back as a rejection.** The host replies with
+the ACCEPTANCE before the run starts, so a refusal from pi (an unknown
+navigation target, say) arrives after the reply has gone. The host logs
+`run … REFUSED: …`; the client never learns. Carrying it back needs a second
+message on the Line, which the protocol does not have yet.
+
+**`NavigateOptions.summarize` emits a `branch_summary` entry.** That is
+ADR-0010's fold, unused for now. Note the hazard before reaching for it:
+`projectSpine` drops non-message entries, so a `branch_summary` would vanish
+from the spine silently.
+
 ### `seq` is derived, not stored
 
 `#reconcile` assigns arrival order. The ordering itself is

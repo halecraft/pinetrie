@@ -89,6 +89,58 @@ test("planCommand/turnFinished: busy round-trips", () => {
   assert.equal(turnFinished(running).busy, false)
 })
 
+test("planCommand: a branch carries its parent into the decision", () => {
+  const decision = planCommand(
+    READY,
+    { kind: "branch", text: "an aside", parentId: "e-42" },
+    "run-9",
+  )
+  assert.equal(decision.kind, "run")
+  // One decision variant: a branch is a run with an attachment point.
+  assert.equal(decision.kind === "run" ? decision.parentId : "", "e-42")
+  assert.equal(decision.kind === "run" ? decision.text : "", "an aside")
+})
+
+test("planCommand: a prompt has no parent, so it appends at the tip", () => {
+  const decision = planCommand(READY, { kind: "prompt", text: "hi" }, "r")
+  assert.equal(decision.kind === "run" ? decision.parentId : "unset", null)
+})
+
+test("planCommand: a branch without a parent is rejected, not run", () => {
+  assert.equal(
+    rejection(planCommand(READY, { kind: "branch", text: "x" }, "r")).code,
+    ERR.NO_PARENT,
+  )
+  assert.equal(
+    rejection(
+      planCommand(READY, { kind: "branch", text: "x", parentId: "  " }, "r"),
+    ).code,
+    ERR.NO_PARENT,
+  )
+})
+
+test("planCommand: an empty branch prompt reports the EMPTY prompt", () => {
+  // Order matters: an empty prompt is reported as such even when the parent is
+  // also missing, so the user is told the first thing that is wrong.
+  assert.equal(
+    rejection(planCommand(READY, { kind: "branch", text: "  " }, "r")).code,
+    ERR.EMPTY_PROMPT,
+  )
+})
+
+test("planCommand: a branch is refused while a turn is running", () => {
+  assert.equal(
+    rejection(
+      planCommand(
+        { ready: true, busy: true },
+        { kind: "branch", text: "x", parentId: "e-1" },
+        "r",
+      ),
+    ).code,
+    ERR.BUSY,
+  )
+})
+
 test("laneNameForWriter: ADR-0011 — never 'main', always writer-derived", () => {
   assert.equal(laneNameForWriter("abc"), "w-abc")
   assert.notEqual(laneNameForWriter("abc"), "main")

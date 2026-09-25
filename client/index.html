@@ -18,6 +18,7 @@
       .role { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: #6f7784; }
       .msg.user .role { color: #7bd88f; }
       .msg.assistant .role { color: #9ecbff; }
+      button { padding: .6rem 1rem; border-radius: 6px; border: 0; background: #2f6feb; color: #fff; font: inherit; cursor: pointer; }
       /* The spine is what is in context, so it stays at full contrast.
          Branches are dimmed AND labelled: dimming alone would not survive
          greyscale or low vision. */
@@ -30,7 +31,7 @@
       .outside { color: #d0a15f; font-style: italic; margin-bottom: 0.35rem; }
       .branch { display: flex; gap: 0.6rem; align-items: center;
         margin-bottom: 0.25rem; }
-      .branch-id { font-family: monospace; color: #888; }
+      .branch .branch-id { font-family: monospace; color: #888; }
       #offLane { margin: 0 0 1rem; color: #d0a15f; font-size: 0.85rem; }
       .text { white-space: pre-wrap; margin-top: .2rem; }
       #streaming { opacity: .75; border-left: 2px solid #9ecbff; padding-left: .75rem; margin-bottom: 1rem; }
@@ -39,7 +40,6 @@
         flex: 1; padding: .6rem .75rem; border-radius: 6px;
         border: 1px solid #2c313a; background: #1b1e24; color: inherit; font: inherit;
       }
-      button { padding: .6rem 1rem; border-radius: 6px; border: 0; background: #2f6feb; color: #fff; font: inherit; cursor: pointer; }
     </style>
   </head>
   <body>

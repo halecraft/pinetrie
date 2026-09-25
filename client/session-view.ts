@@ -62,7 +62,11 @@ export interface SessionClient {
   readonly doc: SessionDocHandle
   view(): SessionView
   /** Send a prompt; resolves with the host's Reply. */
-  prompt(text: string): Promise<Reply>
+  /**
+   * Send a prompt. `parentId` null appends at the lane tip; a string forks
+   * from that entry (the host navigates there first).
+   */
+  prompt(text: string, parentId?: string | null): Promise<Reply>
   readonly replies: readonly Reply[]
   close(): Promise<void>
 }
@@ -116,12 +120,19 @@ export async function connectSession(
     exchange,
     doc,
     view,
-    prompt(text: string): Promise<Reply> {
+    /**
+     * Send a prompt. `parentId` null appends at the lane tip; a string forks
+     * from that entry (the host navigates there first).
+     */
+    prompt(text: string, parentId?: string | null): Promise<Reply> {
       const id = `c-${Math.random().toString(36).slice(2, 10)}`
       const settled = new Promise<Reply>(resolve =>
         replyWaiters.set(id, resolve),
       )
-      const outgoing: Command = command({ id, kind: "prompt", text })
+      const outgoing: Command =
+        parentId === null || parentId === undefined
+          ? command({ id, kind: "prompt", text })
+          : command({ id, kind: "branch", text, parentId })
       sender.send(outgoing)
       return settled
     },

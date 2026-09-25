@@ -20,6 +20,14 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["packages", "host", "client", "e2e", "test", "scripts"],
+  "include": [
+    "packages",
+    "protocol",
+    "host",
+    "client",
+    "e2e",
+    "test",
+    "scripts"
+  ],
   "exclude": ["node_modules", "sandbox", "client/app.bundle.js"]
 }

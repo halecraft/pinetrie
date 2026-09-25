@@ -16,7 +16,17 @@ export const SESSION_DOC_ID = "pineta:session"
  */
 export const HOST_PEER_ID = "host"
 
-export const COMMAND_KINDS = ["prompt"] as const
+/**
+ * The verbs. `protocol/line.ts` spreads this into a constrained schema
+ * literal, so this array is the only place a kind is declared \u2014 adding one
+ * here reaches the wire, and nothing else needs editing.
+ *
+ *   - `prompt` appends at the lane tip.
+ *   - `branch` moves the lane tip to `parentId` first, so the turn forks from
+ *     there (ADR-0011: the lane carries writer identity, so this moves only
+ *     the sending writer's lane).
+ */
+export const COMMAND_KINDS = ["prompt", "branch"] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
 /**
@@ -32,6 +42,8 @@ export interface Command {
   readonly id: string
   readonly kind: CommandKind
   readonly text: string
+  /** The entry to fork from. Meaningful only for `kind: "branch"`. */
+  readonly parentId: string
 }
 
 export interface Reply {
@@ -51,6 +63,7 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   id: "",
   kind: "prompt",
   text: "",
+  parentId: "",
 })
 
 export const EMPTY_REPLY: Reply = Object.freeze({

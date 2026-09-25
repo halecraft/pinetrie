@@ -483,6 +483,12 @@ backend (verified twice, independently).
 
 ---
 
+**Addendum (step 2, branch write).** `navigateTree` moves **this writer's**
+lane tip. That is what makes an Aside private: the writer goes to the branch
+and no other writer's lane is touched. Two writers branching concurrently
+touch different lanes, so there is no contention on `pi.branch.tip` — but that
+is exactly what step 3 must test rather than assume.
+
 ## ADR-0012 — The trunk is a derived value over an append-only promotion DAG
 
 **Status:** Accepted (from S12)

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Collaborative agentic harness \u2014 pi's agent core on Kyneta's CRDT substrate. Walking skeleton.",
+  "description": "Collaborative agentic harness — pi's agent core on Kyneta's CRDT substrate. Walking skeleton.",
   "scripts": {
     "format": "biome format . --write",
     "lint": "biome check .",
@@ -17,7 +17,7 @@
     "e2e": "node e2e/e2e.ts",
     "e2e:live": "PINETA_LIVE=1 node e2e/e2e.ts",
     "e2e:browser": "node e2e/browser.ts",
-    "verify": "pnpm run lint && pnpm run check && pnpm run sanity && pnpm test && pnpm run conformance && pnpm run e2e",
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run check && pnpm run sanity && pnpm test && pnpm run conformance && pnpm run e2e",
     "verify:all": "pnpm run verify && pnpm run e2e:live && pnpm run e2e:browser",
     "typecheck": "tsc --noEmit",
     "build": "vite build"

@@ -155,10 +155,21 @@ export async function startHost({
     activeRunId = decision.runId
     beginStream(doc, decision.runId)
     log(
-      `[host] run ${decision.runId.slice(-8)} <- ${JSON.stringify(decision.text.slice(0, 60))}`,
+      `[host] run ${decision.runId.slice(-8)}${
+        decision.parentId === null
+          ? ""
+          : ` branch<-${decision.parentId.slice(-8)}`
+      } <- ${JSON.stringify(decision.text.slice(0, 60))}`,
     )
     try {
-      await agent.prompt(decision.text)
+      // The reply above was the ACCEPTANCE; the run happens after it. A run pi
+      // refuses (a navigation to an unknown target, say) therefore cannot
+      // travel back as a rejection, so it must at least be visible here rather
+      // than being swallowed by the "done" line below.
+      const outcome = await agent.run(decision.text, decision.parentId)
+      if (!outcome.ok) {
+        log(`[host] run ${decision.runId.slice(-8)} REFUSED: ${outcome.status}`)
+      }
     } catch (error) {
       log(
         `[host] run failed: ${error instanceof Error ? error.message : String(error)}`,

@@ -145,6 +145,15 @@ Dependency direction is physical: `core → schema → pi → app`. A package ca
 reach up into the app, which is what forced `core` and `schema` to become
 packages — pi depends on them.
 
+### Branching
+
+A branch command names a parent. The host navigates the lane there with pi's
+`navigateTree`, then prompts, so the turn forks from that entry. pi owns the
+tree operation; we do not reimplement it. One `run` decision carries
+`parentId: string | null` — a branch is a run with a different attachment
+point, so there is no second decision variant. See `packages/pi/TECHNICAL.md`
+for the limits, including that a foreign-written entry is not navigable.
+
 ### Two projections over the same `parentId` edges
 
 `projectTranscript(entries, tipId)` returns the **tip path**: exactly what the

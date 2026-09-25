@@ -30,6 +30,12 @@ export const ERR = {
   EMPTY_PROMPT: "empty_prompt",
   BUSY: "busy",
   NOT_READY: "not_ready",
+  /** A branch named no parent to fork from. */
+  NO_PARENT: "no_parent",
+  /** pi refused the navigation: the target is not in this conversation. */
+  UNKNOWN_TARGET: "unknown_target",
+  /** pi refused the navigation as invalid, e.g. a cycle. */
+  INVALID_NAVIGATION: "invalid_navigation",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -40,13 +46,27 @@ export interface TurnState {
 }
 
 export interface InboundCommand {
+  /** Set only for a branch: the entry to fork from. */
+  readonly parentId?: string
   readonly id?: string
   readonly kind?: string
   readonly text?: string
 }
 
 export type CommandDecision =
-  | { kind: "run"; runId: string; text: string; next: TurnState }
+  /**
+   * A branch is a run with a different attachment point, so there is ONE run
+   * decision rather than two. `parentId` null means "append at the lane tip";
+   * a string means "navigate there first". Two command kinds in, one decision
+   * out: the validation differs, the execution does not.
+   */
+  | {
+      kind: "run"
+      runId: string
+      text: string
+      parentId: string | null
+      next: TurnState
+    }
   | { kind: "reject"; code: ErrCode; message: string; next: TurnState }
 
 /** Decide what to do with an inbound command. Pure: (state, command) -> decision. */
@@ -62,11 +82,12 @@ export function planCommand(
     next: state,
   })
 
-  if (command?.kind !== "prompt") {
-    return reject(
-      ERR.UNKNOWN_KIND,
-      `unsupported command kind: ${String(command?.kind)}`,
-    )
+  if (command === null || command === undefined) {
+    return reject(ERR.UNKNOWN_KIND, "no command")
+  }
+  const kind = command.kind
+  if (kind !== "prompt" && kind !== "branch") {
+    return reject(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
   }
   if (!state.ready) {
     return reject(ERR.NOT_READY, "host is not ready")
@@ -79,7 +100,20 @@ export function planCommand(
     // The skeleton runs one turn at a time. Concurrency is out of scope.
     return reject(ERR.BUSY, "a turn is already running")
   }
-  return { kind: "run", runId, text, next: { ...state, busy: true } }
+  // Validated last, so a branch with an empty prompt is still reported as an
+  // empty prompt rather than as a missing parent.
+  const parentId = kind === "branch" ? (command.parentId ?? "").trim() : ""
+  if (kind === "branch" && parentId.length === 0) {
+    return reject(ERR.NO_PARENT, "a branch must name a parent entry")
+  }
+
+  return {
+    kind: "run",
+    runId,
+    text,
+    parentId: kind === "branch" ? parentId : null,
+    next: { ...state, busy: true },
+  }
 }
 
 /** Pure state transition for turn completion. */

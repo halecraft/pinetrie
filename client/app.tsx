@@ -119,15 +119,21 @@ function Streaming({ doc }: { doc: SessionDocHandle }) {
 /**
  * Naming the parent is a correctness affordance, not decoration. Selection is
  * client-local, so reading a branch and then prompting would otherwise append
- * silently to a lane tip you navigated away from. Step 2 (branch write)
- * replaces the refusal with "branch from here".
+ * silently to a lane tip you navigated away from.
+ *
+ * Off-lane the composer BRANCHES from the selected entry rather than refusing:
+ * the host navigates there first, so the turn forks from what you are reading.
  */
 function Composer({
   session,
   onLane,
+  selectedTipId,
+  onBranched,
 }: {
   session: SessionClient
   onLane: boolean
+  selectedTipId: string | null
+  onBranched: () => void
 }) {
   const [text, setText] = useState("")
   const [status, setStatus] = useState("connected")
@@ -140,25 +146,31 @@ function Composer({
         const prompt = text.trim()
         if (prompt === "") return
         setText("")
-        setStatus("running…")
-        const reply = await session.prompt(prompt)
+        setStatus(onLane ? "running…" : "branching…")
+        const reply = await session.prompt(
+          prompt,
+          onLane ? null : selectedTipId,
+        )
         setStatus(
           reply.accepted
             ? "connected"
             : `rejected: ${reply.errorCode} — ${reply.errorMessage}`,
         )
+        // The lane tip has moved onto the new entry, so drop the local
+        // selection and let the spine follow the lane again. A stale selection
+        // would show a path we are no longer appending to.
+        if (reply.accepted && !onLane) onBranched()
       }}
     >
       <input
         autoComplete="off"
-        disabled={!onLane}
         id="input"
         onChange={e => setText(e.target.value)}
-        placeholder={onLane ? "say something…" : "return to your lane to reply"}
+        placeholder={onLane ? "say something…" : "branch from here…"}
         value={text}
       />
-      <button disabled={!onLane} type="submit">
-        send
+      <button id="send" type="submit">
+        {onLane ? "send" : "branch from here"}
       </button>
       <span id="status">{status}</span>
     </form>
@@ -191,14 +203,19 @@ function App({ session }: { session: SessionClient }) {
       <Spine doc={doc} onRead={setSelected} selectedTipId={selectedTipId} />
       {onLane ? null : (
         <div id="offLane">
-          reading a branch, not your lane{" "}
+          reading a branch · sending will fork from here{" "}
           <button onClick={() => setSelected(null)} type="button">
             return to your lane
           </button>
         </div>
       )}
       <Streaming doc={doc} />
-      <Composer onLane={onLane} session={session} />
+      <Composer
+        onBranched={() => setSelected(null)}
+        onLane={onLane}
+        selectedTipId={selectedTipId}
+        session={session}
+      />
     </>
   )
 }

@@ -13,7 +13,7 @@ import {
   StorageBackedSession,
   uuidv7,
 } from "@earendil-works/pi-agent-core"
-import type { LaneName } from "@pineta/core"
+import { ERR, type ErrCode, type LaneName } from "@pineta/core"
 import type { SessionDocHandle } from "@pineta/schema"
 import { createAgentHarness, ModelRuntime } from "./deep.ts"
 import { KynetaStorage } from "./storage.ts"
@@ -66,6 +66,24 @@ export interface CreateAgentOptions {
  * signature instead of a convention: every member below is a string, a
  * promise of our own shapes, or void.
  */
+/**
+ * pi's navigation error -> our `ErrCode`, as a value.
+ *
+ * Pure, so it is unit-testable without a harness, a model, or a document. Same
+ * extraction as `orderNewEntries` and `toStoredRow`: the calculation leaves
+ * the shell. pi's errors are TaggedError classes and `_tag` is the
+ * discriminant.
+ */
+export function navigationErrCode(tag: string): ErrCode {
+  if (tag === "UnknownTarget") return ERR.UNKNOWN_TARGET
+  if (tag === "InvalidNavigation") return ERR.INVALID_NAVIGATION
+  if (tag === "LaneBusy") return ERR.BUSY
+  return ERR.INVALID_NAVIGATION
+}
+
+const navigationStatus = (error: { _tag: string }): string =>
+  `rejected:${navigationErrCode(error._tag)}`
+
 export interface Agent {
   readonly laneName: LaneName
   readonly modelLabel: string
@@ -78,7 +96,27 @@ export interface Agent {
    * not exist on `RunResult` \u2014 so it reported `"unknown"` on every single
    * turn, including failures. See the note in the implementation.
    */
-  prompt(text: string): Promise<{ ok: boolean; status: string }>
+  /**
+   * Run a turn. `parentId` null appends at the lane tip; a string navigates
+   * there first, so the turn forks from that entry.
+   *
+   * One method rather than a separate `branch()`: both map pi's `RunResult`
+   * the same way, and a duplicated mapping is where "navigation succeeded but
+   * the prompt failed" gets handled in one copy and not the other.
+   */
+  run(
+    text: string,
+    parentId: string | null,
+  ): Promise<{ ok: boolean; status: string }>
+
+  /**
+   * Move the lane tip without running a turn.
+   *
+   * pi treats tree navigation as an operation in its own right; wrapping only
+   * the navigate-then-prompt half was arbitrary. Moving back to a previous tip
+   * is a navigation with no prompt, and a lane that has branched needs it.
+   */
+  navigate(targetId: string | null): Promise<{ ok: boolean; status: string }>
   tipId(): Promise<string | null>
   stats(): Promise<{ messageCount: number }>
   close(): Promise<void>
@@ -134,7 +172,16 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     laneName,
     modelLabel: `${resolved.provider ?? provider}/${resolved.id}`,
 
-    async prompt(text: string) {
+    async run(text: string, parentId: string | null) {
+      if (parentId !== null) {
+        // pi owns the tree operation. `lane.prompt` has no parent parameter —
+        // it always appends at the lane tip — so branching is "move the tip,
+        // then prompt", which is exactly what navigateTree is for.
+        const moved = await lane.navigateTree(parentId, {}, CTX)
+        if (!moved.ok) {
+          return { ok: false, status: navigationStatus(moved.error) }
+        }
+      }
       // `RunResult` is a Result union — `{ ok: true, value } | { ok: false,
       // error }` — where `value` is an OperationResultRecord or a SuspendedRun.
       // There is no `stopReason` on any branch, which is why the previous
@@ -145,6 +192,13 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         return { ok: false, status: `rejected:${result.error._tag}` }
       }
       return { ok: true, status: result.value.status }
+    },
+
+    async navigate(targetId: string | null) {
+      const moved = await lane.navigateTree(targetId, {}, CTX)
+      return moved.ok
+        ? { ok: true, status: "navigated" }
+        : { ok: false, status: navigationStatus(moved.error) }
     },
 
     async tipId() {

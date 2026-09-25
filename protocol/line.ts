@@ -8,12 +8,18 @@
 
 import { Line } from "@kyneta/exchange"
 import { Schema } from "@kyneta/schema"
-import { CONTROL_TOPIC } from "./messages.ts"
+import { COMMAND_KINDS, CONTROL_TOPIC } from "./messages.ts"
 
+// `kind` is a CONSTRAINED literal, so a kind outside the list is refused at
+// the wire boundary. Spreading COMMAND_KINDS rather than restating it keeps
+// that constraint and the type in `messages.ts` from drifting: a kind added in
+// one place only would be accepted by the type and dropped by the wire.
 const Command = Schema.struct({
   id: Schema.string(),
-  kind: Schema.string(...["prompt"]),
+  kind: Schema.string(...COMMAND_KINDS),
   text: Schema.string(),
+  /** Set only for `kind: "branch"`; "" otherwise (schemas are total). */
+  parentId: Schema.string(),
 })
 
 const Reply = Schema.struct({

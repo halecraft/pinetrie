@@ -58,7 +58,21 @@ Roughly in dependency order, each independently shippable:
    branched data, so the e2e fixture writes a fork as a foreign write (S3);
    and **navigation turned out to be free**, because the selected tip is
    client-local state rather than a write.
-2. **Branch write** — create a branch from any entry; Aside kind first
+2. **Branch write** — creating a branch works; **returning from one does not.**
+   A `branch` command names a parent and the host navigates there with pi's
+   `navigateTree`, then prompts. Three findings:
+   - **A branch is one-way.** `navigateTree` moves the lane onto the branch and
+     nothing moves it back, so "return to your lane" returns to the branch. The
+     trunk is readable but prompting there forks again. An Aside you cannot
+     come back from is not an Aside. `Agent.navigate(targetId)` exists and does
+     exactly the right thing; it has no command wired to it, so it is used only
+     by a test fixture. **Completing step 2 means adding a `navigate` command
+     kind.** Note it is not a run: no runId, no stream, so it needs its own
+     decision rather than the `run` variant a branch shares.
+   - A foreign-written entry is NOT navigable (`unknown_target`): pi's session
+     index never saw it created.
+   - A run's outcome cannot travel back as a rejection, because the host
+     replies with the acceptance before the run starts.
 3. **Concurrent lanes** — two branches running at once (this is where S3's
    answer gets cashed)
 4. **References** — entry and entry-span kinds; backlinks

@@ -170,13 +170,66 @@ ok(
   `host and client project the same transcript (${hostTranscript.length} messages)`,
 )
 
-// --- a fork, written as another replica would write it ---------------------
+// --- a fork created THROUGH THE PROTOCOL -----------------------------------
+//
+// The user-facing path: a branch command names a parent, the host navigates
+// there, and the turn forks from it. Distinct from the foreign write below,
+// which simulates a branch arriving from another replica (S3). Both matter;
+// they exercise different halves.
+{
+  const trunkBefore = projectTranscript(
+    readRenderableEntries(host.doc),
+    await host.agent.tipId(),
+  )
+  const forkFrom = trunkBefore[0]?.id ?? null
+  ok(forkFrom !== null, "found an entry to branch from")
+  if (forkFrom !== null) {
+    const reply = await client.prompt("BRANCH-OK", forkFrom)
+    ok(
+      reply.accepted,
+      `branch command accepted${reply.accepted ? "" : `: ${reply.errorCode}`}`,
+    )
+
+    const movedTip = await host.agent.tipId()
+    ok(
+      movedTip !== null && movedTip !== trunkBefore.at(-1)?.id,
+      "the lane tip moved onto the branch",
+    )
+
+    // THE assertion. Everything softer than this passes for a plain prompt
+    // too: appending at the tip also moves the tip, and projectSpine from an
+    // OLD tip reports any later append as a branch, because those entries are
+    // children of that tip but not on its path. Only parentage distinguishes
+    // "forked from the entry I named" from "appended where it always would".
+    const after = readRenderableEntries(host.doc)
+    const parentOfNew = Object.values(after)
+      .filter(e => !trunkBefore.some(t => t.id === e.id))
+      .map(e => e.parentId)
+    ok(
+      parentOfNew.includes(forkFrom),
+      `the new turn attaches to the entry we named, not the lane tip (${JSON.stringify(parentOfNew)} contains ${forkFrom})`,
+    )
+
+    const trunkTip = trunkBefore.at(-1)?.id ?? null
+    const { spine } = projectSpine(readRenderableEntries(host.doc), trunkTip)
+    ok(
+      spine.length === trunkBefore.length,
+      `the trunk transcript is unchanged (${spine.length} vs ${trunkBefore.length})`,
+    )
+  }
+}
+
+// --- a fork, written as another replica would write it (S3) ----------------
 //
 // The only command today is `prompt`, so a branch cannot be created through
 // the protocol. Writing the entry directly is not a contrivance: it is exactly
 // the S3 foreign-write scenario, which is what a branch from another device
 // looks like on arrival. The parent must exist, or KynetaStorage's reconcile
 // takes its unresolved-parents path and throws.
+const branchesBefore = projectSpine(
+  readRenderableEntries(host.doc),
+  hostTip,
+).spine.reduce((n, node) => n + node.branches.length, 0)
 const forkParent = hostTranscript.at(-2)?.id ?? hostTranscript[0]?.id ?? null
 ok(forkParent !== null, "found a parent to fork from")
 if (forkParent !== null) {
@@ -192,14 +245,20 @@ if (forkParent !== null) {
   })
 
   const { spine } = projectSpine(readRenderableEntries(host.doc), hostTip)
-  const forked = spine.filter(n => n.branches.length > 0)
+  // A DELTA, and counting BRANCHES rather than branched nodes: the protocol
+  // branch above already forked from this same parent, so a per-node count
+  // would not move when a second branch joins the same node.
+  const branchesAfter = spine.reduce((n, node) => n + node.branches.length, 0)
   ok(
-    forked.length === 1,
-    `exactly one spine node reports a branch (${forked.length})`,
+    branchesAfter === branchesBefore + 1,
+    `the foreign write adds one more branch (${branchesBefore} -> ${branchesAfter})`,
   )
+  const foreign = spine
+    .flatMap(n => n.branches)
+    .find(b => b.rootId.startsWith("aside-"))
   ok(
-    forked[0]?.branches[0]?.messageCount === 1,
-    `the branch summarises its subtree (${forked[0]?.branches[0]?.messageCount} message)`,
+    foreign?.messageCount === 1,
+    `the foreign branch summarises its subtree (${foreign?.messageCount} message)`,
   )
   ok(
     spine.length === hostTranscript.length,
