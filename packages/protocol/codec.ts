@@ -17,8 +17,11 @@ import {
   entryId,
   type Intent,
   type Position,
+  type ReferenceId,
+  type ReferenceTarget,
   ROOT,
   type RunId,
+  referenceId,
   runId,
 } from "@pineta/core"
 import { type Command, command, type Reply, reply } from "./messages.ts"
@@ -33,6 +36,7 @@ export interface Refusal {
 export type Outcome =
   | { readonly kind: "started"; readonly runId: RunId }
   | { readonly kind: "navigated" }
+  | { readonly kind: "referenced"; readonly id: ReferenceId }
   | Refusal
 
 /**
@@ -66,6 +70,32 @@ export function decodeCommand(
   const kind = wire?.kind
   const parent = text(wire?.parentId)
 
+  if (kind === "reference") {
+    const target = text(wire?.targetId)
+    if (target === "") {
+      return refuse(ERR.UNKNOWN_TARGET, "a reference must name a target")
+    }
+    const start = wire?.spanStart
+    const end = wire?.spanEnd
+    // -1 on both is the wire's "whole entry"; only the codec knows that.
+    if (start === -1 && end === -1) {
+      return { kind: "reference", to: { kind: "entry", id: entryId(target) } }
+    }
+    if (
+      typeof start !== "number" ||
+      typeof end !== "number" ||
+      !Number.isInteger(start) ||
+      !Number.isInteger(end) ||
+      start < 0 ||
+      end <= start
+    ) {
+      return refuse(ERR.INVALID_SPAN, "a span must satisfy 0 <= start < end")
+    }
+    return {
+      kind: "reference",
+      to: { kind: "span", id: entryId(target), start, end },
+    }
+  }
   if (kind === "navigate") {
     return {
       kind: "navigate",
@@ -104,6 +134,8 @@ export function encodeIntent(id: string, intent: Intent): Command {
         kind: "navigate",
         parentId: positionToWire(intent.to),
       })
+    case "reference":
+      return command({ id, kind: "reference", ...targetToWire(intent.to) })
   }
 }
 
@@ -114,6 +146,8 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, accepted: true, runId: outcome.runId })
     case "navigated":
       return reply({ id, accepted: true })
+    case "referenced":
+      return reply({ id, accepted: true, referenceId: outcome.id })
     case "refused":
       return reply({
         id,
@@ -129,12 +163,20 @@ export function decodeReply(wire: Reply): Outcome {
   if (!wire.accepted) {
     return refuse(asErrCode(wire.errorCode), wire.errorMessage)
   }
+  if (wire.referenceId !== "") {
+    return { kind: "referenced", id: referenceId(wire.referenceId) }
+  }
   return wire.runId === ""
     ? { kind: "navigated" }
     : { kind: "started", runId: runId(wire.runId) }
 }
 
 const positionToWire = (p: Position): string => (p.kind === "root" ? "" : p.id)
+
+const targetToWire = (t: ReferenceTarget) =>
+  t.kind === "entry"
+    ? { targetId: t.id, spanStart: -1, spanEnd: -1 }
+    : { targetId: t.id, spanStart: t.start, spanEnd: t.end }
 
 const ERR_CODES: ReadonlySet<string> = new Set(Object.values(ERR))
 

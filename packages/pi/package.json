@@ -7,13 +7,14 @@
     ".": "./index.ts"
   },
   "dependencies": {
-    "@pineta/core": "workspace:*",
-    "@pineta/schema": "workspace:*",
     "@earendil-works/pi-agent-core": "0.87.1",
     "@earendil-works/pi-ai": "0.87.1",
     "@earendil-works/pi-coding-agent": "0.87.1",
-    "@kyneta/schema": "link:../../../kyneta/packages/schema",
     "@kyneta/loro-schema": "link:../../../kyneta/packages/schema/backends/loro",
+    "@kyneta/schema": "link:../../../kyneta/packages/schema",
+    "@pineta/core": "workspace:*",
+    "@pineta/references": "workspace:*",
+    "@pineta/schema": "workspace:*",
     "loro-crdt": "^1.16.0"
   }
 }

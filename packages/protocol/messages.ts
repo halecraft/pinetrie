@@ -25,10 +25,17 @@ export const HOST_PEER_ID = "host"
  *   - `branch` moves the lane tip to `parentId` first, so the turn forks from
  *     there (ADR-0011: the lane carries writer identity, so this moves only
  *     the sending writer's lane).
+ *   - `reference` cites `targetId`, or a span of it, from the sender's lane tip.
+ *     It writes one value and runs nothing.
  *   - `navigate` moves the lane tip to `parentId` and runs nothing. It is how
  *     you come back from an Aside: without it a branch is one-way.
  */
-export const COMMAND_KINDS = ["prompt", "branch", "navigate"] as const
+export const COMMAND_KINDS = [
+  "prompt",
+  "branch",
+  "navigate",
+  "reference",
+] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
 /**
@@ -50,6 +57,11 @@ export interface Command {
    * interprets this; nothing past it sees `""`.
    */
   readonly parentId: string
+  /** `reference`: the entry cited. Separate from `parentId` on purpose. */
+  readonly targetId: string
+  /** `reference`: a span's bounds, or -1 for the whole entry (the wire is total). */
+  readonly spanStart: number
+  readonly spanEnd: number
 }
 
 export interface Reply {
@@ -58,6 +70,8 @@ export interface Reply {
   readonly runId: string
   readonly errorCode: string
   readonly errorMessage: string
+  /** Set only when a reference was written: its id. */
+  readonly referenceId: string
 }
 
 /**
@@ -70,6 +84,9 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   kind: "prompt",
   text: "",
   parentId: "",
+  targetId: "",
+  spanStart: -1,
+  spanEnd: -1,
 })
 
 export const EMPTY_REPLY: Reply = Object.freeze({
@@ -78,6 +95,7 @@ export const EMPTY_REPLY: Reply = Object.freeze({
   runId: "",
   errorCode: "",
   errorMessage: "",
+  referenceId: "",
 })
 
 export const command = (fields: Partial<Command>): Command => ({

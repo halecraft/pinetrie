@@ -286,6 +286,47 @@ try {
       joinedSend.trim() === "branch from here",
       `a joining window is off-lane, so it branches: "${joinedSend.trim()}"`,
     )
+
+    // The v1 demo, completed: B asks from its own branch, then cites A's
+    // message. A sees the backlink; A's spine is unchanged.
+    await second.fill("#input", "B asks about this")
+    await second.click("#send")
+    await second.waitForFunction(
+      () =>
+        [...document.querySelectorAll("#transcript .text")].some(n =>
+          n.textContent?.includes("B asks about this"),
+        ),
+      undefined,
+      { timeout: 60_000 },
+    )
+    const spineBefore = await page.$$eval(
+      "#transcript > div > .msg",
+      n => n.length,
+    )
+    await second.click("#transcript > div:first-child .cite")
+    const shown = await page
+      .waitForFunction(
+        () => document.querySelector(".cited-by") !== null,
+        undefined,
+        { timeout: 15_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(shown, "B's citation appears live in A's window as a backlink")
+    const marker = await page
+      .$eval(".cited-by", n => n.textContent ?? "")
+      .catch(() => "")
+    ok(marker.includes("cited by 1"), `A sees "${marker.trim()}"`)
+    const spineAfter = await page.$$eval(
+      "#transcript > div > .msg",
+      n => n.length,
+    )
+    ok(
+      spineAfter === spineBefore,
+      `A's spine is unchanged by the citation (${spineBefore} -> ${spineAfter})`,
+    )
   } finally {
     await second.close().catch(() => {})
   }

@@ -219,11 +219,42 @@ export function readLaneTip(
  * `key` properties, never by splitting the record key.
  */
 export function readLaneNames(doc: SessionDocHandle): string[] {
-  const names: string[] = []
+  return readValues(doc, LANE_TIP).map(v => v.key)
+}
+
+/**
+ * Every value in `namespace`, read from each value's own `namespace` and `key`
+ * properties. Never parses a record key: the key is an identity (ADR-0016).
+ */
+export function readValues(
+  doc: SessionDocHandle,
+  namespace: string,
+): { readonly key: string; readonly value: unknown }[] {
+  const out: { key: string; value: unknown }[] = []
   for (const stored of Object.values(doc.values())) {
     const s = asStored(stored)
-    if (s?.namespace === LANE_TIP && typeof s.key === "string")
-      names.push(s.key)
+    if (s?.namespace === namespace && typeof s.key === "string")
+      out.push({ key: s.key, value: s.value })
   }
-  return names
+  return out
 }
+
+/**
+ * An entry's message, lifted out of its sealed `payload` (ADR-0015), or
+ * undefined if the entry is absent or carries none. The one definition of
+ * where a message lives in a stored row; the client's projection and the
+ * host both read through it.
+ */
+export function readEntryMessage(
+  doc: SessionDocHandle,
+  id: string,
+): { present: false } | { present: true; message: unknown } {
+  const row = doc.entries.get(id)
+  return row === undefined || row === null
+    ? { present: false }
+    : { present: true, message: rowMessage(row) }
+}
+
+/** A row's message, lifted out of its sealed `payload`. Pure; no lookup. */
+export const rowMessage = (row: StoredEntryRow): unknown =>
+  (row.payload as { message?: unknown } | null)?.message

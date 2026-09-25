@@ -20,6 +20,9 @@ const Command = Schema.struct({
   text: Schema.string(),
   /** Set only for `kind: "branch"`; "" otherwise (schemas are total). */
   parentId: Schema.string(),
+  targetId: Schema.string(),
+  spanStart: Schema.number(),
+  spanEnd: Schema.number(),
 })
 
 const Reply = Schema.struct({
@@ -28,6 +31,7 @@ const Reply = Schema.struct({
   runId: Schema.string(),
   errorCode: Schema.string(),
   errorMessage: Schema.string(),
+  referenceId: Schema.string(),
 })
 
 /** Asymmetric: client sends Command, host sends Reply. */

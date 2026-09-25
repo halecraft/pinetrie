@@ -108,6 +108,7 @@ packages/core/         @pineta/core         declares NOTHING
 packages/schema/       @pineta/schema       Kyneta only; the document shape
 packages/pi/           @pineta/pi           THE pi boundary
 packages/protocol/     @pineta/protocol     the wire contract and its codec
+packages/references/   @pineta/references   citations as pi values (ADR-0017)
 packages/client/       @pineta/client       browser UI; owns its Vite build
 (root)                                      development tooling only
 ```
@@ -294,13 +295,13 @@ string union `"pending" | "empty" | "populated"`, not an object.
 `useText` is **not yet used** — the composer is still local `useState`. Wiring
 it to a `Schema.text()` is step 5 and the first genuinely collaborative edit.
 
-**Steps 1–3 are done.** Now continue thickening (`docs/04-roadmap.md`), each step
+**Steps 1–4 are done.** Now continue thickening (`docs/04-roadmap.md`), each step
 independently shippable:
 
 1. ~~tree read~~ — done: `projectSpine`, spine + branch markers, navigation is client-local state
 2. branch write — create a branch from any entry; Aside first
 3. ~~concurrent lanes~~ — done: a lane and a turn per writer, keyed by transport identity
-4. references (ADR-0006) — entry and entry-span kinds, with backlinks
+4. ~~references~~ — done: pi values in `pineta.reference`, derived backlinks (ADR-0017)
 5. multi-writer composer — `Schema.text()`
 6. Scout — read-only tools
 7. fold — three-way merge producing a `fromId` node

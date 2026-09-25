@@ -79,7 +79,9 @@ Roughly in dependency order, each independently shippable:
    `createAt` for a lane that exists and throws for an unknown one; and pi
    records a lane on creation, which is what lets the document tell "no lane"
    from "a lane at the root".
-4. **References** — entry and entry-span kinds; backlinks
+4. ~~**References**~~ — **done.** Stored as pi values in `pineta.reference`
+   (ADR-0017); backlinks derived; attached at the author's lane tip. The v1
+   demo runs in a real browser, minus presence.
 5. **Multi-writer composer** — `Schema.text()`; the visceral multiplayer win
 6. **Scout kind** — read-only tools, shared workspace
 7. **Fold** — three-way merge producing a `fromId` node

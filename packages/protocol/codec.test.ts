@@ -86,6 +86,7 @@ test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
     runId: "",
     errorCode: "made-up",
     errorMessage: "",
+    referenceId: "",
   }
   const out = decodeReply(wire)
   assert.equal(out.kind === "refused" ? out.code : "", ERR.UNKNOWN_KIND)

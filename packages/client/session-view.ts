@@ -14,6 +14,7 @@ import {
   laneNameForWriter,
   type Position,
   type projectTranscript,
+  type ReferenceTarget,
 } from "@pineta/core"
 import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
@@ -79,6 +80,8 @@ export interface SessionClient {
   prompt(text: string, from?: EntryId): Promise<Outcome>
   /** Move this writer's lane to `to`, running nothing. */
   navigate(to: Position): Promise<Outcome>
+  /** Cite an entry or a span of one, from this writer's lane tip. */
+  cite(to: ReferenceTarget): Promise<Outcome>
   /** Every reply as it arrived on the wire, for wire-level checks. */
   readonly replies: readonly Reply[]
   close(): Promise<void>
@@ -153,6 +156,9 @@ export async function connectSession(
     },
     navigate(to: Position): Promise<Outcome> {
       return send({ kind: "navigate", to })
+    },
+    cite(to: ReferenceTarget): Promise<Outcome> {
+      return send({ kind: "reference", to })
     },
     replies,
     async close() {

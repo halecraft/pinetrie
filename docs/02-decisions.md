@@ -166,6 +166,9 @@ earlier message, a file range, an image region, a URL, another branch.
 **Decision.** A discriminated union of reference kinds, stored in a dedicated
 namespace rather than as fields on entries.
 
+**Realised by ADR-0017:** the dedicated namespace is pi's `pineta.reference`
+value namespace.
+
 **Consequences.** Backlinks are queryable in both directions for free. Two
 orthogonal graphs over the same nodes: `parentId` is causal, references are
 semantic. New reference kinds are additive. Anchor stability splits by target
@@ -903,3 +906,48 @@ every time, with no error. Once it exists, merging inside it is fine.
   single key.
 - *Pre-create every namespace at document creation.* Works only for a closed
   set, and pi's is open.
+
+---
+
+## ADR-0017 — References are pi values in a Pineta namespace
+
+**Status:** Accepted. Realises ADR-0006. Roadmap step 4.
+
+**Context.** ADR-0006 fixed a reference as a semantic pointer, stored apart
+from the causal `parentId` graph. The question was where. pi has no reference
+concept, but it has two extensible places: custom entries and namespaced values.
+Checked in pi's source: namespaces are open (only empty or NUL is rejected);
+`Session.setValue` is public and usable outside a turn; JSONL storage appends
+every write, values included; and only custom entries can enter a model's
+context, through a registered `entryProjectors[customType]`.
+
+**Decision.** A reference is a pi **value** in `pineta.reference`, keyed by its
+own id, written only through `Agent.addReference`.
+
+- **Values, not custom entries.** A custom entry has a `parentId`, so it would
+  join the causal graph, contradicting ADR-0006, and appending one would move
+  the author's lane tip. Values stay out of the causal graph and out of every
+  model's context.
+- **One schema, TypeBox, in `packages/references`.** Pineta owns the reference
+  shape, so this schema is the single authority, not a mirror of pi's. It is
+  the TypeBox version pi pins, so one copy is installed. Decoding is total: a
+  malformed value is dropped, never thrown.
+- **Backlinks are derived** by `indexReferences`, one pass in both directions.
+  A stored backlink list per target is the S18 shape.
+- **Attached at the author's lane tip, authored by the transport's peer id.**
+  The host reads both; neither can be forged by a message. Refused while the
+  author's turn runs, since a moving tip makes the attachment point ambiguous.
+- **Spans are UTF-16 code units over `messageText`**, which is what the client
+  renders. Only committed entries are citable.
+
+**Consequences.** References travel in pi's JSONL. A pi extension can reach
+them once Pineta supplies an API through the embedder-provided `toolContext`;
+that is added with the first extension that needs it. TypeBox ships to the
+browser: +42 kB raw, +12 kB gzipped. Proven: two writers citing one entry
+concurrently both survive, and keying by target id instead loses one.
+
+**Alternatives rejected.** A Pineta-owned document field (invisible to pi); pi
+custom entries (causal graph, lane tip); a stored backlink list (S18); Zod
+(TypeBox matches pi's tool parameters). Deferred: routing the namespace to a
+typed Kyneta row inside `KynetaStorage`, the ADR-0015 pattern, until references
+need more than backlinks.

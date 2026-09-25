@@ -12,8 +12,14 @@ import {
   BACKGROUND_CONTEXT,
   StorageBackedSession,
   uuidv7,
+  value,
 } from "@earendil-works/pi-agent-core"
 import { ERR, type ErrCode, type LaneName, type Position } from "@pineta/core"
+import {
+  encodeReference,
+  REFERENCE_NAMESPACE,
+  type Reference,
+} from "@pineta/references"
 import { hasLaneRecord, type SessionDocHandle } from "@pineta/schema"
 import { createAgentHarness, ModelRuntime } from "./deep.ts"
 import { KynetaStorage } from "./storage.ts"
@@ -115,6 +121,11 @@ export interface WriterLane {
 export interface Agent {
   readonly modelLabel: string
   lane(name: LaneName): WriterLane
+  /**
+   * Store a reference as a pi value in `pineta.reference`, keyed by its own id
+   * (ADR-0016, ADR-0017). The only writer of that namespace.
+   */
+  addReference(reference: Reference): Promise<LaneOutcome>
   stats(): Promise<{ messageCount: number }>
   close(): Promise<void>
 }
@@ -220,6 +231,15 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   return {
     modelLabel: `${resolved.provider ?? provider}/${resolved.id}`,
     lane: writerLane,
+
+    async addReference(reference) {
+      await session.setValue(
+        value(REFERENCE_NAMESPACE, reference.id),
+        encodeReference(reference),
+        CTX,
+      )
+      return { kind: "ok" }
+    },
 
     async stats() {
       return session.getStats(CTX)

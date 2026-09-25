@@ -30,6 +30,7 @@ export type LaneName = string & { readonly [laneNameBrand]: true }
 
 declare const entryIdBrand: unique symbol
 declare const runIdBrand: unique symbol
+declare const referenceIdBrand: unique symbol
 /**
  * Entry ids and run ids are both uuidv7 strings and cannot be told apart at
  * runtime. Navigation takes an entry id; `activeRuns` and `pendingText` are
@@ -41,6 +42,9 @@ export type EntryId = string & { readonly [entryIdBrand]: true }
 export type RunId = string & { readonly [runIdBrand]: true }
 export const entryId = (id: string): EntryId => id as EntryId
 export const runId = (id: string): RunId => id as RunId
+/** A reference's id: the key of its stored value, so it must be unique (ADR-0016). */
+export type ReferenceId = string & { readonly [referenceIdBrand]: true }
+export const referenceId = (id: string): ReferenceId => id as ReferenceId
 
 // --- positions --------------------------------------------------------------
 
@@ -87,6 +91,10 @@ export const ERR = {
   INVALID_NAVIGATION: "invalid_navigation",
   /** pi refused for a reason with no more specific code here. */
   REFUSED: "refused",
+  /** A reference needs an entry to attach at, and this writer has none. */
+  NO_LANE: "no_lane",
+  /** A span is empty, out of bounds, or on an entry with no text. */
+  INVALID_SPAN: "invalid_span",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -101,7 +109,18 @@ export interface TurnState {
  * produces it; it owns every shape rule (a kind we know, non-empty text, a
  * named parent), so this type cannot express a malformed command.
  */
+/** What a reference points at. Spans are UTF-16 code units into messageText. */
+export type ReferenceTarget =
+  | { readonly kind: "entry"; readonly id: EntryId }
+  | {
+      readonly kind: "span"
+      readonly id: EntryId
+      readonly start: number
+      readonly end: number
+    }
+
 export type Intent =
+  | { readonly kind: "reference"; readonly to: ReferenceTarget }
   | { readonly kind: "prompt"; readonly text: string }
   | { readonly kind: "branch"; readonly text: string; readonly from: EntryId }
   | { readonly kind: "navigate"; readonly to: Position }
@@ -125,6 +144,12 @@ export type CommandDecision =
    * lane does not become busy.
    */
   | { kind: "navigate"; to: Position; next: TurnState }
+  /**
+   * A citation. Not a run and not a move: it writes one value. Refused while
+   * the author's turn runs, because it is attached at the lane tip, and a tip
+   * that moves mid-turn makes "where was this attached" ambiguous.
+   */
+  | { kind: "reference"; to: ReferenceTarget; next: TurnState }
   | { kind: "reject"; code: ErrCode; message: string; next: TurnState }
 
 /**
@@ -160,6 +185,8 @@ export function planCommand(
   switch (intent.kind) {
     case "navigate":
       return { kind: "navigate", to: intent.to, next: state }
+    case "reference":
+      return { kind: "reference", to: intent.to, next: state }
     case "prompt":
       return {
         kind: "run",

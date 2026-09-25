@@ -7,13 +7,19 @@
 // `useText` gives us the composer itself.
 
 import { ExchangeProvider, useDocStatus, useTracked } from "@kyneta/react"
-import { atEntry, type BranchSummary, entryId } from "@pineta/core"
+import {
+  atEntry,
+  type BranchSummary,
+  entryId,
+  type ReferenceTarget,
+} from "@pineta/core"
 import { readLaneTip, type SessionDocHandle } from "@pineta/schema"
 import { StrictMode, useState } from "react"
 import { createRoot } from "react-dom/client"
 import {
   readDefaultViewTip,
   readEntryCount,
+  readReferences,
   readSpine,
   readStreaming,
 } from "./projection.ts"
@@ -35,29 +41,95 @@ function Spine({
   doc,
   selectedTipId,
   onRead,
+  onCite,
 }: {
   doc: SessionDocHandle
   selectedTipId: string | null
   onRead: (tipId: string) => void
+  onCite: (to: ReferenceTarget) => void
 }) {
   const { spine } = useTracked(() => readSpine(doc, selectedTipId))
+  const refs = useTracked(() => readReferences(doc))
 
   return (
     <div id="transcript">
-      {spine.map(node => (
-        <div key={node.id}>
-          <div className={`msg ${node.role}`}>
-            <span className="role">{node.role}</span>
-            {/* JSX escapes by default, so model output is never HTML. */}
-            <div className="text">{node.text}</div>
+      {spine.map(node => {
+        const id = entryId(node.id)
+        const cites = refs.from.get(id) ?? []
+        const citedBy = refs.to.get(id) ?? []
+        return (
+          <div key={node.id}>
+            <div className={`msg ${node.role}`} data-entry={node.id}>
+              <span className="role">{node.role}</span>
+              {/* JSX escapes by default, so model output is never HTML. */}
+              <div className="text">{node.text}</div>
+              <div className="refs">
+                <button
+                  className="cite"
+                  // Keep the text selection alive through the click.
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={e => {
+                    const text = e.currentTarget
+                      .closest(".msg")
+                      ?.querySelector(".text")
+                    const span = text ? selectedSpan(text) : null
+                    onCite(
+                      span === null
+                        ? { kind: "entry", id }
+                        : { kind: "span", id, ...span },
+                    )
+                  }}
+                  type="button"
+                >
+                  cite
+                </button>
+                {cites.length > 0 && (
+                  <span className="cites" data-cites={cites.length}>
+                    ↗ cites {cites.length}
+                  </span>
+                )}
+                {citedBy.length > 0 && (
+                  <span
+                    className="cited-by"
+                    data-cited-by={citedBy.length}
+                    title={citedBy.map(r => r.author).join(", ")}
+                  >
+                    ↙ cited by {citedBy.length}
+                  </span>
+                )}
+              </div>
+            </div>
+            {node.branches.length > 0 && (
+              <BranchMarker branches={node.branches} onRead={onRead} />
+            )}
           </div>
-          {node.branches.length > 0 && (
-            <BranchMarker branches={node.branches} onRead={onRead} />
-          )}
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
+}
+
+/**
+ * The selection inside `text`, as UTF-16 offsets into its rendered string, or
+ * null if nothing inside it is selected. The element renders exactly
+ * `messageText`, so these are the offsets a span reference means.
+ */
+function selectedSpan(text: Element): { start: number; end: number } | null {
+  const selection = window.getSelection()
+  if (selection === null || selection.isCollapsed || selection.rangeCount === 0)
+    return null
+  const range = selection.getRangeAt(0)
+  if (
+    !text.contains(range.startContainer) ||
+    !text.contains(range.endContainer)
+  )
+    return null
+  const before = document.createRange()
+  before.selectNodeContents(text)
+  before.setEnd(range.startContainer, range.startOffset)
+  const start = before.toString().length
+  const end = start + range.toString().length
+  return end > start ? { start, end } : null
 }
 
 function BranchMarker({
@@ -204,7 +276,12 @@ function App({ session }: { session: SessionClient }) {
           {status === "pending" ? "syncing…" : status}
         </div>
       </header>
-      <Spine doc={doc} onRead={setSelected} selectedTipId={selectedTipId} />
+      <Spine
+        doc={doc}
+        onCite={to => void session.cite(to)}
+        onRead={setSelected}
+        selectedTipId={selectedTipId}
+      />
       {onLane ? null : (
         <div id="offLane">
           reading a branch · sending will fork from here{" "}

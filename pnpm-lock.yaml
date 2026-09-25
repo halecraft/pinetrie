@@ -56,6 +56,9 @@ importers:
       '@pineta/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@pineta/references':
+        specifier: workspace:*
+        version: link:../../packages/references
       '@pineta/schema':
         specifier: workspace:*
         version: link:../../packages/schema
@@ -108,6 +111,9 @@ importers:
       '@pineta/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@pineta/references':
+        specifier: workspace:*
+        version: link:../references
       '@pineta/schema':
         specifier: workspace:*
         version: link:../schema
@@ -156,6 +162,9 @@ importers:
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
+      '@pineta/references':
+        specifier: workspace:*
+        version: link:../references
       '@pineta/schema':
         specifier: workspace:*
         version: link:../schema
@@ -174,6 +183,15 @@ importers:
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/references:
+    dependencies:
+      '@pineta/core':
+        specifier: workspace:*
+        version: link:../core
+      typebox:
+        specifier: 1.3.27
+        version: 1.3.27
 
   packages/schema:
     dependencies:

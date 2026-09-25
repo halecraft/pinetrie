@@ -32,6 +32,12 @@
       .branch { display: flex; gap: 0.6rem; align-items: center;
         margin-bottom: 0.25rem; }
       .branch .branch-id { font-family: monospace; color: #888; }
+      /* References: a semantic link, shown beside the causal spine. */
+      .refs { display: flex; gap: 0.5rem; align-items: center;
+        margin-top: 0.25rem; font-size: 0.8rem; }
+      .refs .cite { background: none; border: 1px solid #444; color: #aaa;
+        padding: 0.05rem 0.45rem; border-radius: 3px; cursor: pointer; }
+      .cites, .cited-by { color: #9ecbff; }
       #offLane { margin: 0 0 1rem; color: #d0a15f; font-size: 0.85rem; }
       .text { white-space: pre-wrap; margin-top: .2rem; }
       #streaming { opacity: .75; border-left: 2px solid #9ecbff; padding-left: .75rem; margin-bottom: 1rem; }

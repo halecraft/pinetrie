@@ -13,15 +13,18 @@ import {
   wrapNodeWebsocket,
 } from "@kyneta/websocket-transport/server"
 import {
+  type AgentMessageLike,
   type Attach,
   atEntry,
   checkEnvironment,
   entryId,
   type LaneName,
   laneNameForWriter,
+  messageText,
   planAttach,
   planCommand,
   ROOT,
+  referenceId,
   runId,
   type Target,
   type TurnState,
@@ -37,12 +40,14 @@ import {
 } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
 import { HOST_PEER_ID, SESSION_DOC_ID } from "@pineta/protocol/messages"
+import { type CitedEntry, planReference } from "@pineta/references"
 import {
   appendStream,
   beginStream,
   endStream,
   hasLaneRecord,
   readActiveRun,
+  readEntryMessage,
   readLaneTip,
   SessionDoc,
   type SessionDocHandle,
@@ -200,6 +205,47 @@ export async function startHost({
         message: decision.message,
       })
     }
+    if (decision.kind === "reference") {
+      // gather: the author's lane (already gathered as `at`) and the cited
+      // entry. Absent and textless are different facts (CitedEntry).
+      const found = readEntryMessage(doc, decision.to.id)
+      const cited: CitedEntry = found.present
+        ? {
+            kind: "entry",
+            text:
+              found.message === undefined
+                ? undefined
+                : messageText(found.message as AgentMessageLike),
+          }
+        : { kind: "absent" }
+      // plan (pure)
+      const planned = planReference({
+        author: lane,
+        lane: at,
+        target: decision.to,
+        cited,
+        newId: referenceId(newId()),
+      })
+      if (planned.kind === "refused") {
+        return respond({
+          kind: "refused",
+          code: planned.code,
+          message: "reference refused",
+        })
+      }
+      // execute
+      const wrote = await agent.addReference(planned.reference)
+      if (wrote.kind === "refused") {
+        return respond({
+          kind: "refused",
+          code: wrote.code,
+          message: "pi refused the reference",
+        })
+      }
+      log(`[host] ${lane.slice(-8)} cited ${decision.to.id.slice(-8)}`)
+      return respond({ kind: "referenced", id: planned.reference.id })
+    }
+
     const target: Target =
       decision.kind === "navigate" ? decision.to : decision.from
     const plan = planAttach(at, target)

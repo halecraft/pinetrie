@@ -17,11 +17,20 @@ import {
   type SpineProjection,
 } from "@pineta/core"
 import {
+  decodeReference,
+  indexReferences,
+  REFERENCE_NAMESPACE,
+  type Reference,
+  type ReferenceIndex,
+} from "@pineta/references"
+import {
   readActiveRun,
   readEntries,
   readLaneNames,
   readLaneTip,
   readStream,
+  readValues,
+  rowMessage,
   type SessionDocHandle,
 } from "@pineta/schema"
 
@@ -60,10 +69,10 @@ export function readTranscript(
 /**
  * Stored rows -> the shape the projections render (ADR-0015).
  *
- * `id`, `parentId` and `type` are typed columns now, so they are read straight
- * off the row. `message` is pi's variant data and lives in the sealed
- * `payload`, so it is lifted here. One place puts the two halves of a stored
- * entry back together for rendering.
+ * `id`, `parentId` and `type` are typed columns, read straight off the row.
+ * `message` is pi's variant data in the sealed `payload`; it is lifted by
+ * `rowMessage` in `packages/schema`, the one definition of where a message
+ * lives in a row. The host reaches it through `readEntryMessage`.
  */
 export function readRenderableEntries(
   doc: SessionDocHandle,
@@ -74,7 +83,7 @@ export function readRenderableEntries(
       id: row.id,
       parentId: row.parentId,
       type: row.type,
-      message: (row.payload as { message?: EntryLike["message"] }).message,
+      message: rowMessage(row) as EntryLike["message"],
     }
   }
   return out
@@ -109,4 +118,18 @@ export function readStreaming(
 
 export function readEntryCount(doc: SessionDocHandle): number {
   return Object.keys(readEntries(doc)).length
+}
+
+/**
+ * Every reference in the document, indexed both ways (ADR-0017). Values are
+ * decoded totally: a malformed one is skipped, so it cannot break a render.
+ * The single read path for references; the host's e2e uses it too.
+ */
+export function readReferences(doc: SessionDocHandle): ReferenceIndex {
+  const refs: Reference[] = []
+  for (const { value } of readValues(doc, REFERENCE_NAMESPACE)) {
+    const r = decodeReference(value)
+    if (r !== undefined) refs.push(r)
+  }
+  return indexReferences(refs)
 }

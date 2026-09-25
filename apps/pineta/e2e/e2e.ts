@@ -8,7 +8,10 @@
 //   node e2e/e2e.mjs              offline: transport + docs + protocol, no model call
 //   PINETA_LIVE=1 node e2e/e2e.mjs   also drives a REAL turn against a real model
 
-import { readRenderableEntries } from "@pineta/client/projection"
+import {
+  readReferences,
+  readRenderableEntries,
+} from "@pineta/client/projection"
 import { connectSession } from "@pineta/client/session"
 import {
   atEntry,
@@ -445,6 +448,90 @@ if (forkParent !== null) {
   )
 
   await Promise.all([a.close(), b.close(), c.close(), d.close()])
+}
+
+// --- references (ADR-0017) ---------------------------------------------------
+{
+  const pw = await connectSession({
+    url: host.wsUrl,
+    WebSocket,
+    peerId: "ref-p",
+  })
+  const qw = await connectSession({
+    url: host.wsUrl,
+    WebSocket,
+    peerId: "ref-q",
+  })
+  const idle = () =>
+    waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+
+  await pw.prompt("P's message, to be cited")
+  await idle()
+  const pTip = tipOf(pw.laneName)
+  const pPath = projectTranscript(readRenderableEntries(host.doc), pTip)
+  const cited = pPath.at(-2)?.id ?? pPath[0]?.id ?? null
+  ok(cited !== null, "P has a message to cite")
+  if (cited !== null) {
+    // Q needs a lane at an entry to attach a reference to: it forks from P.
+    await qw.prompt("Q asks about it", entryId(cited))
+    await idle()
+    const qTip = tipOf(qw.laneName)
+    const pBefore = projectTranscript(
+      readRenderableEntries(host.doc),
+      tipOf(pw.laneName),
+    )
+
+    const r = await qw.cite({ kind: "entry", id: entryId(cited) })
+    ok(
+      r.kind === "referenced",
+      `Q's citation is written (${codeOf(r) || r.kind})`,
+    )
+    const back = readReferences(host.doc).to.get(entryId(cited)) ?? []
+    ok(
+      back.length === 1 && back[0]?.author === qw.laneName,
+      `P's message shows one backlink, authored by Q (${back.length})`,
+    )
+    ok(
+      back[0]?.from === qTip,
+      "the reference is attached at Q's lane tip, not P's",
+    )
+    const pAfter = projectTranscript(
+      readRenderableEntries(host.doc),
+      tipOf(pw.laneName),
+    )
+    ok(
+      JSON.stringify(pAfter) === JSON.stringify(pBefore),
+      "P's transcript is unchanged: no token entered P's context",
+    )
+
+    // ADR-0016: two writers citing the SAME entry at once both survive.
+    const [x, y] = await Promise.all([
+      pw.cite({ kind: "entry", id: entryId(cited) }),
+      qw.cite({ kind: "entry", id: entryId(cited) }),
+    ])
+    const after = readReferences(host.doc).to.get(entryId(cited)) ?? []
+    ok(
+      x.kind === "referenced" && y.kind === "referenced" && after.length === 3,
+      `two concurrent citations of one entry both survive (${after.length} backlinks)`,
+    )
+
+    const lost = await qw.cite({ kind: "entry", id: entryId("no-such-entry") })
+    ok(
+      codeOf(lost) === ERR.UNKNOWN_TARGET,
+      `an unknown target is refused (${codeOf(lost)})`,
+    )
+    const wide = await qw.cite({
+      kind: "span",
+      id: entryId(cited),
+      start: 0,
+      end: 100_000,
+    })
+    ok(
+      codeOf(wide) === ERR.INVALID_SPAN,
+      `an out-of-bounds span is refused (${codeOf(wide)})`,
+    )
+  }
+  await Promise.all([pw.close(), qw.close()])
 }
 
 // --- LIVE assertion -------------------------------------------------------

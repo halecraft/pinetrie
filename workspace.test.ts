@@ -70,6 +70,13 @@ test("the protocol declares only Kyneta and core", () => {
   assert.deepEqual(extra, [])
 })
 
+test("references declare only TypeBox and core", () => {
+  assert.deepEqual(deps(read("packages/references")).sort(), [
+    "@pineta/core",
+    "typebox",
+  ])
+})
+
 test("the client declares no server package and no app", () => {
   const client = deps(read("packages/client"))
   for (const forbidden of ["ws", "vite", "@pineta/app", "@pineta/pi"]) {

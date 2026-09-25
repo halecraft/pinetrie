@@ -105,6 +105,12 @@ One `TurnState` per writer, in a map the host keeps for the life of the
 process. A small record per writer that ever connected is never removed, which
 is acceptable for v1.
 
+### References
+
+`Agent.addReference` is the only writer of the `pineta.reference` value
+namespace, through `Session.setValue` (ADR-0017). It uses the generic value
+path, so conformance continues to cover the storage shape.
+
 ### `seq` is derived, not stored
 
 `#reconcile` assigns arrival order. The ordering itself is
