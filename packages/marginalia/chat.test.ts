@@ -3,6 +3,7 @@ import {
   atEntry,
   ERR,
   entryId,
+  indexTree,
   type LaneName,
   laneNameForWriter,
   NOBODY,
@@ -19,6 +20,7 @@ import {
   entryText,
   planChat,
   renderableMessage,
+  rulesAlong,
   threadDefaults,
 } from "./index.ts"
 
@@ -111,17 +113,21 @@ const parents: Record<string, string | null> = {
   "e-2": "e-1",
   "e-3": "e-2",
 }
-const parentOf = (id: typeof E1) => {
-  const p = parents[id]
-  return p === null || p === undefined ? null : entryId(p)
-}
+const index = indexTree(
+  Object.fromEntries(
+    Object.entries(parents).map(([id, parentId]) => [
+      id,
+      { id, parentId, type: "message" },
+    ]),
+  ),
+)
 
 test("effectiveDefault: unset means the root's working session", () => {
   assert.deepEqual(
-    effectiveDefault(atEntry(entryId("e-3")), parentOf, new Map()),
+    effectiveDefault(atEntry(entryId("e-3")), index, new Map()),
     AGENT,
   )
-  assert.deepEqual(effectiveDefault(ROOT, parentOf, new Map()), AGENT)
+  assert.deepEqual(effectiveDefault(ROOT, index, new Map()), AGENT)
 })
 
 test("effectiveDefault: the nearest ancestor's default wins", () => {
@@ -131,11 +137,11 @@ test("effectiveDefault: the nearest ancestor's default wins", () => {
   ])
   // e-2 sets a conversation inside e-1's working session.
   assert.deepEqual(
-    effectiveDefault(atEntry(entryId("e-3")), parentOf, defaults),
+    effectiveDefault(atEntry(entryId("e-3")), index, defaults),
     NOBODY,
   )
   // e-1's own default applies at e-1 itself.
-  assert.deepEqual(effectiveDefault(atEntry(E1), parentOf, defaults), AGENT)
+  assert.deepEqual(effectiveDefault(atEntry(E1), index, defaults), AGENT)
 })
 
 test("threadDefaults: a malformed stored default is skipped", () => {
@@ -182,4 +188,13 @@ test("renderableMessage: a chat renders as role chat with its author", () => {
     author: "Alice",
     compelled: false,
   })
+})
+
+test("rulesAlong: each message carries the rule set there, or the one above", () => {
+  const defaults = new Map([[E2, NOBODY]])
+  assert.deepEqual(rulesAlong(["e-1", "e-2", "e-3"], AGENT, defaults), [
+    AGENT,
+    NOBODY,
+    NOBODY,
+  ])
 })

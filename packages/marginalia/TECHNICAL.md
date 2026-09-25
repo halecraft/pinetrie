@@ -35,10 +35,12 @@ or reads the shape.
 # Threads (`thread.ts`)
 
 A thread's default is a `Responder` stored in `pineta.thread`, keyed by the
-entry it is set at. `effectiveDefault` walks `parentId` from where a message
-attaches and takes the nearest setting; with none, `ROOT_DEFAULT`, a working
-session. The client's composer and the host both call it, so the label cannot
-promise a reply the host will not start.
+entry it is set at. `effectiveDefault` takes the `TreeIndex` (`@pineta/core`),
+walks `ancestry` from where a message attaches, and takes the nearest setting;
+with none, `ROOT_DEFAULT`, a working session. The client's composer and the host
+both call it with an index of the same document, so the label cannot promise a
+reply the host will not start. `rulesAlong` gives each message on a path its
+rule in one pass, for columns that draw many messages.
 
 # References
 

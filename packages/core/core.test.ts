@@ -12,6 +12,7 @@ import {
   entryId,
   findSeqKeys,
   type Intent,
+  indexTree,
   laneNameForWriter,
   latestTip,
   messageText,
@@ -191,7 +192,7 @@ test("projectTranscript: order comes from the parentId walk, not insertion or se
       message: { role: "user", content: "two" },
     },
   }
-  const out = projectTranscript(entries, "c")
+  const out = projectTranscript(indexTree(entries), "c")
   assert.deepEqual(
     out.map(m => m.text),
     ["one", "two", "three"],
@@ -220,7 +221,7 @@ test("projectTranscript: an abandoned branch is not on the tip's path", () => {
     },
   }
   assert.deepEqual(
-    projectTranscript(entries, "b").map(m => m.text),
+    projectTranscript(indexTree(entries), "b").map(m => m.text),
     ["root", "kept"],
   )
 })
@@ -242,7 +243,7 @@ test("projectTranscript: non-message entries and unknown roles are dropped", () 
     },
   }
   assert.deepEqual(
-    projectTranscript(entries, "s").map(m => m.role),
+    projectTranscript(indexTree(entries), "s").map(m => m.role),
     ["user"],
   )
 })
@@ -262,7 +263,7 @@ test("projectTranscript: a cycle is reported, not spun on", () => {
       message: { role: "user", content: "b" },
     },
   }
-  assert.throws(() => projectTranscript(entries, "a"), /cycle/)
+  assert.throws(() => projectTranscript(indexTree(entries), "a"), /cycle/)
 })
 
 test("messageText: flattens pi's content parts", () => {

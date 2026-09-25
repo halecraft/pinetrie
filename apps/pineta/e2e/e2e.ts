@@ -12,6 +12,7 @@ import {
   readParticipantNames,
   readReferences,
   readRenderableEntries,
+  readTreeIndex,
 } from "@pineta/client/projection"
 import { connectSession } from "@pineta/client/session"
 import {
@@ -179,10 +180,7 @@ ok(hostTip !== null, "the client's lane has a tip in the host's document")
 // Project through the SAME reader the client uses. `rawEntries` is the stored
 // form (typed columns + sealed payload, ADR-0015); it is right for the seq
 // scan above and wrong for rendering, because `message` lives in the payload.
-const hostTranscript = projectTranscript(
-  readRenderableEntries(host.doc),
-  hostTip,
-)
+const hostTranscript = projectTranscript(readTreeIndex(host.doc), hostTip)
 ok(
   hostTranscript.length === view.transcript.length,
   `host and client project the same transcript (${hostTranscript.length} messages)`,
@@ -196,7 +194,7 @@ ok(
 // they exercise different halves.
 {
   const trunkBefore = projectTranscript(
-    readRenderableEntries(host.doc),
+    readTreeIndex(host.doc),
     tipOf(client.laneName),
   )
   const forkFrom = trunkBefore[0]?.id ?? null
@@ -229,7 +227,7 @@ ok(
     )
 
     const trunkTip = trunkBefore.at(-1)?.id ?? null
-    const { spine } = projectSpine(readRenderableEntries(host.doc), trunkTip)
+    const { spine } = projectSpine(readTreeIndex(host.doc), trunkTip)
     ok(
       spine.length === trunkBefore.length,
       `the trunk transcript is unchanged (${spine.length} vs ${trunkBefore.length})`,
@@ -287,7 +285,7 @@ ok(
 // looks like on arrival. The parent must exist, or KynetaStorage's reconcile
 // takes its unresolved-parents path and throws.
 const branchesBefore = projectSpine(
-  readRenderableEntries(host.doc),
+  readTreeIndex(host.doc),
   hostTip,
 ).spine.reduce((n, node) => n + node.branches.length, 0)
 const forkParent = hostTranscript.at(-2)?.id ?? hostTranscript[0]?.id ?? null
@@ -304,7 +302,7 @@ if (forkParent !== null) {
     },
   })
 
-  const { spine } = projectSpine(readRenderableEntries(host.doc), hostTip)
+  const { spine } = projectSpine(readTreeIndex(host.doc), hostTip)
   // A DELTA, and counting BRANCHES rather than branched nodes: the protocol
   // branch above already forked from this same parent, so a per-node count
   // would not move when a second branch joins the same node.
@@ -372,10 +370,16 @@ if (forkParent !== null) {
     `each window streamed only its own run (A saw ${seenBy.a.size}, B saw ${seenBy.b.size})`,
   )
 
-  // Each turn attached to its own lane, proven by parentage.
-  const rows = readRenderableEntries(host.doc)
-  const pathA = projectTranscript(rows, tipOf(a.laneName)).map(m => m.text)
-  const pathB = projectTranscript(rows, tipOf(b.laneName)).map(m => m.text)
+  // Each turn attached to its own lane, proven by parentage. Only what the
+  // writers sent is compared: a model's reply may echo either token, and
+  // whether it does says nothing about which lane a turn attached to.
+  const tree = readTreeIndex(host.doc)
+  const sent = (tip: string | null) =>
+    projectTranscript(tree, tip)
+      .filter(m => m.role !== "assistant")
+      .map(m => m.text)
+  const pathA = sent(tipOf(a.laneName))
+  const pathB = sent(tipOf(b.laneName))
   ok(
     pathA.some(t => t.includes("WRITER-A")) &&
       !pathA.some(t => t.includes("WRITER-B")),
@@ -473,7 +477,7 @@ if (forkParent !== null) {
   await pw.prompt("P's message, to be cited")
   await idle()
   const pTip = tipOf(pw.laneName)
-  const pPath = projectTranscript(readRenderableEntries(host.doc), pTip)
+  const pPath = projectTranscript(readTreeIndex(host.doc), pTip)
   const cited = pPath.at(-2)?.id ?? pPath[0]?.id ?? null
   ok(cited !== null, "P has a message to cite")
   if (cited !== null) {
@@ -482,7 +486,7 @@ if (forkParent !== null) {
     await idle()
     const qTip = tipOf(qw.laneName)
     const pBefore = projectTranscript(
-      readRenderableEntries(host.doc),
+      readTreeIndex(host.doc),
       tipOf(pw.laneName),
     )
 
@@ -501,7 +505,7 @@ if (forkParent !== null) {
       "the reference is attached at Q's lane tip, not P's",
     )
     const pAfter = projectTranscript(
-      readRenderableEntries(host.doc),
+      readTreeIndex(host.doc),
       tipOf(pw.laneName),
     )
     ok(
@@ -623,7 +627,7 @@ if (forkParent !== null) {
     contentOf(a1id) === "Alice: the secret word is PLUM",
     `the stored content carries the speaker (${JSON.stringify(contentOf(a1id))})`,
   )
-  const talk = projectTranscript(readRenderableEntries(host.doc), b1id)
+  const talk = projectTranscript(readTreeIndex(host.doc), b1id)
   ok(
     talk.map(m => `${m.role}:${m.author}`).join(",") ===
       "chat:Alice,assistant:undefined,chat:Alice,chat:Bob",
@@ -660,7 +664,7 @@ if (forkParent !== null) {
   ok(ask.kind === "started", `@agent starts a run (${ask.kind})`)
   await idle()
   const agentTip = tipOf(agentLane)
-  const agentPath = projectTranscript(readRenderableEntries(host.doc), agentTip)
+  const agentPath = projectTranscript(readTreeIndex(host.doc), agentTip)
   const shape = agentPath.map(m =>
     m.role === "chat" ? `chat:${m.author}` : m.role,
   )
@@ -766,18 +770,22 @@ if (forkParent !== null) {
 if (LIVE) {
   console.log("\n--- live turn ---")
   streamSamples.length = 0
+  // Wait for THIS turn's reply. The transcript already holds earlier turns,
+  // so a length threshold alone was met at once, and the last message was
+  // the prompt itself, which contains the token: a check that could not fail.
+  const before = client.view().transcript.length
   const r = await client.prompt(PROMPT)
   ok(accepted(r), "live prompt accepted")
-  const done = await waitFor(
-    () => client.view().transcript.length >= 4,
-    120_000,
-  )
+  const done = await waitFor(() => {
+    const t = client.view().transcript
+    return t.length >= before + 2 && t.at(-1)?.role === "assistant"
+  }, 120_000)
   ok(done >= 0, `live turn completed and replicated (${done}ms)`)
   const last = client.view().transcript.at(-1)
   console.log(`  model said: ${JSON.stringify(last?.text)}`)
   ok(
-    last?.text.includes("PINETA-OK") === true,
-    "model output contains the requested token",
+    last?.role === "assistant" && last.text.includes("PINETA-OK"),
+    "the model's reply contains the requested token",
   )
   ok(
     streamSamples.length > 0,

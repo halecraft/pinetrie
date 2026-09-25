@@ -17,9 +17,9 @@ import {
   atEntry,
   type ChatAt,
   checkEnvironment,
-  type EntryId,
   ERR,
   entryId,
+  indexTree,
   type LaneName,
   laneNameForAgent,
   laneNameForWriter,
@@ -66,6 +66,7 @@ import {
   endStream,
   hasLaneRecord,
   readActiveRun,
+  readEntries,
   readEntryMessage,
   readLaneTip,
   readValues,
@@ -344,12 +345,6 @@ export async function startHost({
     }
   }
 
-  /** An entry's parent, read from the document. The walk `effectiveDefault` needs. */
-  function parentOf(id: EntryId): EntryId | null {
-    const parent = doc.entries.get(id)?.parentId
-    return typeof parent === "string" ? entryId(parent) : null
-  }
-
   /**
    * A human message: gather, `planChat`, execute. A message that compels the
    * agent is its prompt, run on the agent's lane; any other is appended on
@@ -366,7 +361,7 @@ export async function startHost({
     const names = participantNames(readValues(doc, PARTICIPANT_NAMESPACE))
     const threadDefault = effectiveDefault(
       resolveTarget(authorLane, chat.at),
-      parentOf,
+      indexTree(readEntries(doc)),
       threadDefaults(readValues(doc, THREAD_NAMESPACE)),
     )
 

@@ -10,17 +10,19 @@
 // Pure reads: no subscription, no caching, no pi.
 
 import {
+  type AgentActivity,
+  agentActivity,
+  type EntryId,
   type EntryLike,
-  entryId,
-  followTip,
-  projectSpine,
+  indexTree,
+  laneNameForAgent,
   projectTranscript,
-  ROOT,
-  type SpineProjection,
+  type Responder,
+  THE_AGENT,
+  type TreeIndex,
 } from "@pineta/core"
 import {
   decodeReference,
-  effectiveDefault,
   indexReferences,
   PARTICIPANT_NAMESPACE,
   participantNames,
@@ -55,7 +57,10 @@ export function readTranscript(
   doc: SessionDocHandle,
   lane: string,
 ): ReturnType<typeof projectTranscript> {
-  return projectTranscript(readRenderableEntries(doc), readLaneTip(doc, lane))
+  return projectTranscript(
+    indexTree(readRenderableEntries(doc)),
+    readLaneTip(doc, lane),
+  )
 }
 
 /**
@@ -83,20 +88,6 @@ export function readRenderableEntries(
 }
 
 /**
- * The spine for a chosen tip, plus the branches leaving it.
- *
- * `selectedTipId` is client-local: which path you are LOOKING at, which is not
- * the same as the lane tip the host appends to. Passing it in rather than
- * reading the lane is what makes navigation a read-only operation.
- */
-export function readSpine(
-  doc: SessionDocHandle,
-  selectedTipId: string | null,
-): SpineProjection {
-  return projectSpine(readRenderableEntries(doc), selectedTipId)
-}
-
-/**
  * This lane's live token deltas, or `null` when it is idle. Other writers'
  * runs stream into the same document but are not this window's stream.
  */
@@ -116,36 +107,34 @@ export function readParticipantNames(
 }
 
 /**
- * The tip a reader sees: the newest leaf at or below `at`, the entry they
- * chose to read (null for none), so a reply to your thread moves your view on
- * to it, whoever wrote it (`followTip`).
+ * The tree, indexed once per document change. Every view reads through it:
+ * columns, the rail, thread rules, the agent's path.
  */
-export function readViewTip(
-  doc: SessionDocHandle,
-  at: string | null,
-): string | null {
-  return followTip(readEntries(doc), at)
+export function readTreeIndex(doc: SessionDocHandle): TreeIndex {
+  return indexTree(readRenderableEntries(doc))
 }
 
 /**
- * The thread mode at `at`: `session` when the agent answers every message,
- * `conversation` when only a mention compels it. The same decision the host
- * makes (`effectiveDefault`), read from the same document.
+ * Where the agent is: replying at its lane's tip while its lane has an active
+ * run, else idle. The rail pulses at the tip; columns light the path.
  */
-export function readThreadMode(
+export function readAgentActivity(
   doc: SessionDocHandle,
-  at: string | null,
-): "session" | "conversation" {
-  const entries = readEntries(doc)
-  const compels = effectiveDefault(
-    at === null ? ROOT : { kind: "entry", id: entryId(at) },
-    id => {
-      const parent = entries[id]?.parentId
-      return typeof parent === "string" ? entryId(parent) : null
-    },
-    threadDefaults(readValues(doc, THREAD_NAMESPACE)),
+  index: TreeIndex,
+): AgentActivity {
+  const lane = laneNameForAgent(THE_AGENT)
+  return agentActivity(
+    index,
+    readLaneTip(doc, lane),
+    readActiveRun(doc, lane) !== undefined,
   )
-  return compels.kind === "agent" ? "session" : "conversation"
+}
+
+/** Every thread rule, by the entry it is set at (`pineta.thread`). */
+export function readThreadRules(
+  doc: SessionDocHandle,
+): ReadonlyMap<EntryId, Responder> {
+  return threadDefaults(readValues(doc, THREAD_NAMESPACE))
 }
 
 export function readEntryCount(doc: SessionDocHandle): number {

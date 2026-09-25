@@ -21,9 +21,9 @@
 //
 // Override the endpoint with PW_SERVER if you used a different port.
 
-import { readParticipantNames } from "@pineta/client/projection"
+import { readParticipantNames, readTreeIndex } from "@pineta/client/projection"
 import { connectSession } from "@pineta/client/session"
-import { entryId } from "@pineta/core"
+import { entryId, projectRail } from "@pineta/core"
 import { type Browser, chromium } from "@playwright/test"
 import { startHost } from "../host/index.ts"
 import { createChecks, waitFor } from "./harness.ts"
@@ -84,7 +84,38 @@ try {
   const lane = (await page.textContent("#lane"))?.trim() ?? ""
   ok(lane.startsWith("w-"), `lane carries writer identity, not "main": ${lane}`)
 
-  // A display name: a label, stored by lane, shown to everyone.
+  // ── helpers ──────────────────────────────────────────────────────────────
+  const col = (n: number) => `.column[data-position="${n}"]`
+  const msg = (text: string) =>
+    `.msg:has(> .text:text-is(${JSON.stringify(text)}))`
+  /** Message tools show on hover, so hover the message first. */
+  const tool = async (text: string, cls: string, scope = "") => {
+    await page.hover(`${scope} ${msg(text)}`.trim())
+    await page.click(`${scope} ${msg(text)} .tools .${cls}`.trim())
+  }
+  const label = async (n: number) =>
+    (await page.textContent(`${col(n)} .composer .send`))?.trim() ?? ""
+  const send = async (n: number, text: string) => {
+    await page.fill(`${col(n)} .composer .input`, text)
+    await page.click(`${col(n)} .composer .send`)
+  }
+  const idle = () =>
+    waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+  const shows = (text: string, scope = "") =>
+    page
+      .waitForSelector(`${scope} ${msg(text)}`.trim(), { timeout: 60_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+  const texts = (n: number) =>
+    page.$$eval(`${col(n)} .msg > .text`, ns =>
+      ns.map(t => t.textContent ?? ""),
+    )
+  const top = (sel: string) =>
+    page.$eval(sel, n => n.getBoundingClientRect().top).catch(() => Number.NaN)
+
+  // ── names, and the promise before the first message ─────────────────────
   await page.fill("#name", "Ada")
   await page.press("#name", "Enter")
   const named = await waitFor(
@@ -93,138 +124,208 @@ try {
   )
   ok(named >= 0, "the name typed in the header is stored for this lane")
   await page.waitForFunction(
-    () => document.getElementById("seenBy")?.textContent?.includes("Ada"),
+    () => document.querySelector(".seen-by")?.textContent?.includes("Ada"),
     undefined,
     { timeout: 15_000 },
   )
   ok(true, "the composer says who will see the message")
-
-  // The session's root is a working session, and the composer says so before
-  // anything is sent.
-  const mode = await page.getAttribute("#thread", "data-mode")
-  ok(mode === "session", `a fresh session is a working session (${mode})`)
-  const label = async () => (await page.textContent("#send"))?.trim() ?? ""
   ok(
-    (await label()) === "send · agent will reply",
-    `the composer promises a reply in a working session: "${await label()}"`,
+    (await label(0)) === "send · agent will reply",
+    `a fresh session promises a reply: "${await label(0)}"`,
   )
 
-  await page.fill("#input", "Say exactly: BROWSER-OK")
-  await page.click("#send")
-
-  // Streaming must be visible *before* the turn commits — that is ADR-0014's
-  // Schema.text() insert path, observed through a real DOM. The agent streams
-  // on its own lane, and every window shows it.
+  // ── the first turn: streaming, the reply, the agent joining ─────────────
+  await send(0, "Say exactly: BROWSER-OK")
   const streamed = await page
-    .waitForFunction(() => !document.getElementById("streaming")?.hidden, {
-      timeout: 30_000,
-    })
-    .then(() => true)
-    .catch(() => false)
-  ok(streamed, "streaming text appeared in the DOM while the turn was running")
-
-  const replied = (token: string) =>
-    page
+    .waitForSelector(".streaming", { timeout: 30_000 })
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(streamed, "the agent's stream shows in the column while it replies")
+  ok(
+    await page
       .waitForFunction(
-        t =>
+        () =>
           [...document.querySelectorAll(".msg.assistant .text")].some(n =>
-            n.textContent?.includes(t),
+            n.textContent?.includes("BROWSER-OK"),
           ),
-        token,
+        undefined,
         { timeout: 60_000 },
       )
       .then(
         () => true,
         () => false,
-      )
-  ok(await replied("BROWSER-OK"), "the agent's reply rendered in the DOM")
-
-  const roles = await page.$$eval("#transcript > div > .msg", ns =>
+      ),
+    "the agent's reply rendered in the first column",
+  )
+  await idle()
+  const roles = await page.$$eval(`${col(0)} .msg`, ns =>
     ns.map(
       n =>
         `${n.className.replace("msg ", "")}:${n.querySelector(".role")?.textContent}`,
     ),
   )
   ok(
-    roles.join(",") === "chat asked:Ada,assistant:assistant",
-    `the spine is Ada's message, marked as asked, then the reply: [${roles.join(", ")}]`,
+    roles.join(",") === "chat asked:Ada,assistant:agent",
+    `the column reads Ada's asked message, then the agent: [${roles.join(", ")}]`,
   )
   ok(
-    (await page.$$eval(".joined", ns => ns.length)) === 1,
-    "the thread shows where the agent joined",
+    (await page.$$eval(".joined", n => n.length)) === 1,
+    "the column shows where the agent joined",
   )
 
-  // Switching to a conversation changes the promise, and the promise holds:
-  // a plain message runs nothing; `@agent` runs the agent.
-  await page.click("#threadMode")
-  await page.waitForFunction(
-    () => document.getElementById("thread")?.dataset.mode === "conversation",
-    undefined,
-    { timeout: 15_000 },
+  // ── the rule is set on a message, and the promise holds ─────────────────
+  await tool(
+    (
+      await page.$eval(
+        `${col(0)} .msg.assistant > .text`,
+        n => n.textContent ?? "",
+      )
+    ).trim(),
+    "rule",
   )
-  ok(true, "the thread became a conversation")
-  await page.fill("#input", "just a note")
-  const plainLabel = await label()
-  const plainPromise = (await page.$("#willReply")) !== null
+  const marked = await page
+    .waitForSelector(`${col(0)} .rule-marker[data-rule="none"]`, {
+      timeout: 15_000,
+    })
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(marked, "a rule set on a message shows its marker after that message")
+  await page.fill(`${col(0)} .composer .input`, "just a note")
+  const plain = await label(0)
   const assistantsBefore = await page.$$eval(".msg.assistant", n => n.length)
-  await page.click("#send")
-  await page.waitForFunction(
-    () =>
-      [...document.querySelectorAll("#transcript .text")].some(n =>
-        n.textContent?.includes("just a note"),
-      ),
-    undefined,
-    { timeout: 30_000 },
-  )
+  await page.click(`${col(0)} .composer .send`)
+  await shows("just a note")
   await new Promise(r => setTimeout(r, 1500))
-  const assistantsAfter = await page.$$eval(".msg.assistant", n => n.length)
   ok(
-    plainLabel === "send" &&
-      !plainPromise &&
-      assistantsAfter === assistantsBefore &&
+    plain === "send" &&
+      (await page.$$eval(".msg.assistant", n => n.length)) ===
+        assistantsBefore &&
       Object.keys(host.doc.activeRuns()).length === 0,
-    `in a conversation the composer promised no reply, and none came ("${plainLabel}")`,
+    `below the marker the composer promised no reply, and none came ("${plain}")`,
   )
-  await page.fill("#input", "@agent say exactly: BROWSER-TWO")
-  const askLabel = await label()
-  const askPromise = (await page.$("#willReply")) !== null
-  await page.click("#send")
+  await page.fill(
+    `${col(0)} .composer .input`,
+    "@agent say exactly: BROWSER-TWO",
+  )
+  const ask = await label(0)
+  await page.click(`${col(0)} .composer .send`)
   ok(
-    askLabel === "send · agent will reply" &&
-      askPromise &&
-      (await replied("BROWSER-TWO")),
-    `typing @agent promised a reply, and it came ("${askLabel}")`,
+    ask === "send · agent will reply" &&
+      (await page
+        .waitForFunction(
+          () =>
+            [...document.querySelectorAll(".msg.assistant .text")].some(n =>
+              n.textContent?.includes("BROWSER-TWO"),
+            ),
+          undefined,
+          { timeout: 60_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )),
+    `typing @agent promised a reply, and it came ("${ask}")`,
+  )
+  await idle()
+  const railCount = async () => page.$$eval(".rail-dot", n => n.length)
+  const messages = () => projectRail(readTreeIndex(host.doc)).length
+  ok(
+    (await railCount()) === messages() && messages() >= 5,
+    `the rail has a dot per message (${await railCount()} of ${messages()})`,
   )
 
-  // A fork, written by ANOTHER writer through the protocol, then asserted in
-  // the RENDERED DOM. It attaches at Ada's first message, which is in the
-  // root's working session, so it is a real turn: a message and a reply.
-  const before = await page.$$eval(".fork", ns => ns.length)
-  ok(before === 0, `no fork marker before the branch exists (${before})`)
-  const firstId = await page.$eval(
-    "#transcript > div:first-child .msg",
-    n => n.getAttribute("data-entry") ?? "",
-  )
+  // ── a branch opens beside its parent, in its colour ─────────────────────
+  // It forks at the agent's reply, the second message, so opening has to
+  // bring its first message down to meet the fork point.
+  const replyId =
+    (await page.$eval(`${col(0)} .msg.assistant`, n =>
+      n.getAttribute("data-entry"),
+    )) ?? ""
+  const atReply = `${col(0)} .msg[data-entry="${replyId}"]`
   const other = await connectSession({
     url: host.wsUrl,
     WebSocket,
-    peerId: "browser-other-writer",
+    peerId: "browser-other",
   })
+  await other.setName("Bea")
   const aside = await other.chat("an aside", {
     kind: "entry",
-    id: entryId(firstId),
+    id: entryId(replyId),
   })
   ok(
-    aside.kind === "started",
-    `another writer's aside was accepted (${aside.kind})`,
+    aside.kind === "appended",
+    `another writer's aside, below the marker, is appended with no run (${aside.kind})`,
   )
-  await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
-  await other.close()
+  await page.waitForSelector(`${atReply} .open-branch`, { timeout: 15_000 })
+  const trunkNow = await texts(0)
+  ok(
+    trunkNow.some(t => t.includes("BROWSER-TWO")) &&
+      !trunkNow.includes("an aside"),
+    "a newer branch does not pull the first column away from its thread",
+  )
+  await page.evaluate(() => document.fonts.ready)
+  await page.click(`${atReply} .open-branch`)
+  const opened = await shows("an aside", col(1))
+  ok(
+    opened && (await page.$$eval(".column", n => n.length)) === 2,
+    "the branch opened as a second column, to the right of its parent",
+  )
+  const drift = Math.abs((await top(`${col(1)} .msg`)) - (await top(atReply)))
+  const needed = (await top(atReply)) - (await top(`${col(0)} .msg`))
+  ok(
+    drift <= 4 && needed > 20,
+    `it opened with its first message level with the fork point, ${needed.toFixed(0)}px down (off by ${drift.toFixed(1)}px)`,
+  )
+  const colours = await page.evaluate(
+    ({ first, branch }) => {
+      const column = document.querySelector(branch)
+      const track = column?.getAttribute("data-track") ?? ""
+      const dot = document.querySelector(
+        `${first} .fork-dot[data-track="${track}"]`,
+      )
+      const railDot = document.querySelector(
+        `.rail-dot[data-track="${track}"][data-open="yes"]`,
+      )
+      const head = column?.querySelector(".column-head") ?? null
+      return {
+        head: head === null ? "none" : getComputedStyle(head).borderTopColor,
+        dot: dot === null ? "none" : getComputedStyle(dot).backgroundColor,
+        rail:
+          railDot === null ? "none" : getComputedStyle(railDot).backgroundColor,
+      }
+    },
+    { first: col(0), branch: col(1) },
+  )
+  ok(
+    colours.head !== "none" &&
+      colours.head === colours.dot &&
+      colours.dot === colours.rail,
+    `the branch's header, its fork dot and its rail track share a colour (${colours.head} · ${colours.dot} · ${colours.rail})`,
+  )
+  const beforeScroll = await page.$eval(
+    `${col(1)} .column-body`,
+    n => n.scrollTop,
+  )
+  await page.$eval(`${col(0)} .column-body`, n => {
+    n.scrollTop += 40
+  })
+  ok(
+    (await page.$eval(`${col(1)} .column-body`, n => n.scrollTop)) ===
+      beforeScroll,
+    "scrolling one column does not scroll another",
+  )
 
-  const forked = await page
-    .waitForFunction(
-      () => document.querySelectorAll(".fork").length > 0,
-      undefined,
+  // ── branch from here: beside its parent, and it follows its branch ──────
+  // From the first column while two are open, so "beside its parent"
+  // (position 1) and "the far right" (position 2) differ.
+  await tool("just a note", "branch-here", col(0))
+  const beside = await page
+    .waitForSelector(
+      `${col(1)} .composer .input[placeholder="start a branch here…"]`,
       {
         timeout: 15_000,
       },
@@ -233,130 +334,148 @@ try {
       () => true,
       () => false,
     )
-  ok(forked, "the fork replicated and rendered a branch marker")
-  const texts = async (p = page) =>
-    p.$$eval("#transcript > div > .msg .text", ns =>
-      ns.map(n => n.textContent ?? ""),
-    )
   ok(
-    (await texts()).some(t => t.includes("BROWSER-TWO")) &&
-      !(await texts()).some(t => t.includes("an aside")),
-    "the newer branch does not pull the view away from the thread being read",
+    beside,
+    "a branch opens next to the column it forks from, not at the far right",
   )
-  const summary = await page.$eval(".fork button", n => n.textContent ?? "")
-  // Exact text, not `includes`. A looser check passed while the marker
-  // rendered the literal characters `\u2442` and `\u00b7`, because JSX text
-  // does not process escapes. The screenshot caught it; this now would.
+  const dotsBefore = await railCount()
+  await send(1, "deeper")
   ok(
-    summary.trim() === "⑂ 1 branch · 2 messages",
-    `the marker summarises the branch: "${summary.trim()}"`,
+    await shows("deeper", col(1)),
+    "a message sent in a fresh branch column appears in that column",
   )
-  await page.click(".fork button")
-  const outside = await page.$eval(".outside", n => n.textContent ?? "")
+  await idle()
+  ok((await railCount()) > dotsBefore, "the new branch appears in the rail")
   ok(
-    outside.trim() === "not in your context",
-    `the context boundary is stated in words: "${outside.trim()}"`,
+    !(await texts(0)).includes("deeper"),
+    "the column it branched from does not take the new branch",
+  )
+  // Each column's LAST message, found by class: `:last-of-type` would match
+  // the last div, which may be a rule marker, and pass on finding nothing.
+  const lasts = await page.$$eval(".column", cs =>
+    cs.map(c => {
+      const all = c.querySelectorAll(".column-body .msg")
+      const last = all[all.length - 1]
+      return last === undefined
+        ? "none"
+        : last.querySelector(".branch-here") === null
+          ? "no"
+          : "yes"
+    }),
+  )
+  ok(
+    lasts.length > 0 && lasts.every(x => x === "no"),
+    `a column's last message offers no branch: replying there is the composer's job (${lasts.join(",")})`,
   )
 
-  // Read the branch, and send there: a message goes where you are reading.
-  await page.click(".branch button")
-  await page.click(".fork button") // collapse the preview; it stays mounted
+  // ── make main ────────────────────────────────────────────────────────────
+  await page.click(`${col(2)} .make-main`)
   await page.waitForFunction(
-    () =>
-      [...document.querySelectorAll("#transcript .text")].some(n =>
-        n.textContent?.includes("an aside"),
-      ),
+    c =>
+      document.querySelector(`${c} .msg`)?.textContent?.includes("BROWSER-OK"),
+    col(0),
+    { timeout: 15_000 },
+  )
+  const main = await texts(0)
+  const former = await texts(1)
+  ok(
+    main.includes("an aside") &&
+      former.some(t => t.includes("BROWSER-TWO")) &&
+      !former.includes("Say exactly: BROWSER-OK"),
+    "make main puts the branch first, and the old first column now starts after its fork point",
+  )
+  const leftover = await page.$eval(
+    `${col(0)} .spacer`,
+    n => n.getBoundingClientRect().height,
+  )
+  ok(
+    leftover === 0,
+    `the new first column keeps no alignment spacer: it has no fork point (${leftover}px)`,
+  )
+
+  // ── the agent's context, lit ────────────────────────────────────────────
+  await send(0, "@agent say exactly: LIT")
+  const lit = await page.waitForSelector(".msg.dim", { timeout: 30_000 }).then(
+    () => true,
+    () => false,
+  )
+  const litState = await page.evaluate(() => {
+    const byText = (t: string) =>
+      [...document.querySelectorAll(".msg")].find(
+        n => n.querySelector(":scope > .text")?.textContent === t,
+      )?.className ?? ""
+    return { aside: byText("an aside"), note: byText("just a note") }
+  })
+  ok(
+    lit && litState.aside.includes("lit") && litState.note.includes("dim"),
+    `while the agent replies, its path is lit and the rest dims (${litState.aside} / ${litState.note})`,
+  )
+  await idle()
+
+  // ── the agent in a thread no column shows: the rail pulses ──────────────
+  await page.click(`${col(1)} .close`)
+  await page.click(`${col(1)} .close`)
+  await page.waitForFunction(
+    () => document.querySelectorAll(".column").length === 1,
     undefined,
     { timeout: 15_000 },
   )
-  ok((await page.$("#reading")) !== null, "reading a branch says so")
-  await page.fill("#input", "BRANCH-FROM-BROWSER")
-  await page.click("#send")
-  await page.waitForFunction(
-    () =>
-      [...document.querySelectorAll("#transcript .text")].some(n =>
-        n.textContent?.includes("BRANCH-FROM-BROWSER"),
-      ),
-    undefined,
-    { timeout: 60_000 },
-  )
+  const noteId =
+    Object.values(host.doc.entries()).find(e =>
+      JSON.stringify(e).includes("just a note"),
+    )?.id ?? ""
+  await other.chat("@agent say exactly: PULSE", {
+    kind: "entry",
+    id: entryId(noteId),
+  })
+  const pulsing = await page
+    .waitForSelector(".rail-dot.pulse", { timeout: 30_000 })
+    .then(el => el.getAttribute("data-entry"))
+    .catch(() => null)
   ok(
-    (await texts()).some(t => t.includes("an aside")),
-    "the message was sent on the branch being read, below the aside",
+    pulsing !== null,
+    "the rail pulses where the agent replies, with no column open there",
   )
-
-  // Coming BACK: the trunk is now a fork marker on the first node. Reading it
-  // shows the trunk again, with nothing from the branch.
-  await page.click("#transcript > div:first-child .fork button")
-  await page.click("#transcript > div:first-child .branch button")
-  await page.waitForFunction(
-    () =>
-      [...document.querySelectorAll("#transcript .text")].some(n =>
-        n.textContent?.includes("BROWSER-TWO"),
-      ),
-    undefined,
-    { timeout: 15_000 },
-  )
-  const trunk = await texts()
+  if (pulsing !== null) await page.click(`.rail-dot[data-entry="${pulsing}"]`)
   ok(
-    trunk.some(t => t.includes("BROWSER-TWO")) &&
-      !trunk.some(t => t.includes("BRANCH-FROM-BROWSER")),
-    `reading the trunk again shows the trunk alone (${trunk.length} messages)`,
+    await shows("@agent say exactly: PULSE"),
+    "clicking the pulse opens that thread",
   )
+  await idle()
+  await other.close()
 
-  // A SECOND WINDOW joins. Having chosen nothing, it follows the newest tip
-  // overall, and the root's working session means it would be answered.
+  // ── nothing left of the old controls ────────────────────────────────────
+  const gone = await page.$$eval(
+    "#reading, #thread, #threadMode, #followLatest, #switchLane, #offLane, .fork, #streaming",
+    n => n.length,
+  )
+  ok(gone === 0, `none of the removed controls exist (${gone})`)
+
+  // ── a second window joins, asks, and cites ──────────────────────────────
   const second = await browser.newPage()
   try {
     await second.goto(host.httpUrl, {
       waitUntil: "domcontentloaded",
       timeout: 20_000,
     })
-    // Resolve to a boolean rather than throwing, so a wrong default view is
-    // reported as a labelled FAIL instead of a crashed suite.
     const rendered = await second
-      .waitForFunction(
-        () => document.querySelectorAll("#transcript .msg").length > 0,
-        undefined,
-        { timeout: 20_000 },
-      )
+      .waitForSelector(".column .msg", { timeout: 20_000 })
       .then(
         () => true,
         () => false,
       )
-    ok(rendered, "a joining window renders a conversation at all")
-    const joined = await texts(second)
-    ok(
-      joined.some(t => t.includes("BRANCH-FROM-BROWSER")),
-      `a joining window follows the newest thread (${joined.length} messages)`,
-    )
-
-    // The v1 demo, completed: B asks, which gives B a lane to cite from, then
-    // cites A's first message. A sees the backlink; A's spine is unchanged.
-    await second.fill("#input", "B asks about this")
-    await second.click("#send")
-    await second.waitForFunction(
-      () =>
-        [...document.querySelectorAll("#transcript .text")].some(n =>
-          n.textContent?.includes("B asks about this"),
-        ),
-      undefined,
-      { timeout: 60_000 },
-    )
+    ok(rendered, "a joining window renders a column")
+    await second.fill(`${col(0)} .composer .input`, "B asks about this")
+    await second.click(`${col(0)} .composer .send`)
+    await second
+      .waitForSelector(msg("B asks about this"), { timeout: 60_000 })
+      .catch(() => null)
     await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
-    const spineBefore = await page.$$eval(
-      "#transcript > div > .msg",
-      n => n.length,
-    )
-    await second.click("#transcript > div:first-child .cite")
+    const spineBefore = await page.$$eval(".msg", n => n.length)
+    await second.hover(`${col(0)} .msg`)
+    await second.click(`${col(0)} .msg .tools .cite`)
     const shown = await page
-      .waitForFunction(
-        () => document.querySelector(".cited-by") !== null,
-        undefined,
-        {
-          timeout: 15_000,
-        },
-      )
+      .waitForSelector(".cited-by", { timeout: 15_000 })
       .then(
         () => true,
         () => false,
@@ -366,13 +485,9 @@ try {
       .$eval(".cited-by", n => n.textContent ?? "")
       .catch(() => "")
     ok(marker.includes("cited by 1"), `A sees "${marker.trim()}"`)
-    const spineAfter = await page.$$eval(
-      "#transcript > div > .msg",
-      n => n.length,
-    )
     ok(
-      spineAfter === spineBefore,
-      `A's spine is unchanged by the citation (${spineBefore} -> ${spineAfter})`,
+      (await page.$$eval(".msg", n => n.length)) === spineBefore,
+      "A's columns are unchanged by the citation: it adds no message",
     )
   } finally {
     await second.close().catch(() => {})

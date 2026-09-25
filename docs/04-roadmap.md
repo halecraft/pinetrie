@@ -57,7 +57,8 @@ Roughly in dependency order, each independently shippable:
    "not in your context". Two findings: step 1 is not demonstrable without
    branched data, so the e2e fixture writes a fork as a foreign write (S3);
    and **navigation turned out to be free**, because the selected tip is
-   client-local state rather than a write.
+   client-local state rather than a write. The spine view was later replaced
+   by columns and a rail (`docs/06-interface.md`).
 2. ~~**Branch write**~~ — **done**, both directions. A `branch` command names a
    parent; the host navigates there with pi's `navigateTree`, then prompts. A
    `navigate` command moves the lane and runs nothing, which is how you come

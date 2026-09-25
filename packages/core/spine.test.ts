@@ -6,7 +6,7 @@
 
 import {
   type EntryLike,
-  followTip,
+  indexTree,
   projectSpine,
   projectTranscript,
 } from "@pineta/core"
@@ -32,7 +32,7 @@ describe("projectSpine", () => {
   test("a linear chain has a spine and no branches", () => {
     const linear = { a1: forked.a1, b1: forked.b1, c1: forked.c1 }
     const { spine, orphans, cycles } = projectSpine(
-      linear as Record<string, EntryLike>,
+      indexTree(linear as Record<string, EntryLike>),
       "c1",
     )
     expect(spine.map(n => n.id)).toEqual(["a1", "b1", "c1"])
@@ -42,14 +42,14 @@ describe("projectSpine", () => {
 
   test("the spine equals projectTranscript; branches are the extra", () => {
     // The two projections must never disagree about what is on the path.
-    const { spine } = projectSpine(forked, "c1")
+    const { spine } = projectSpine(indexTree(forked), "c1")
     expect(spine.map(n => ({ id: n.id, role: n.role, text: n.text }))).toEqual(
-      projectTranscript(forked, "c1"),
+      projectTranscript(indexTree(forked), "c1"),
     )
   })
 
   test("a fork appears as a branch on its parent, not on the spine", () => {
-    const { spine } = projectSpine(forked, "c1")
+    const { spine } = projectSpine(indexTree(forked), "c1")
     expect(spine.map(n => n.id)).toEqual(["a1", "b1", "c1"])
     const b1 = spine.find(n => n.id === "b1")
     expect(b1?.branches.map(b => b.rootId)).toEqual(["d1"])
@@ -59,14 +59,9 @@ describe("projectSpine", () => {
   })
 
   test("messageCount covers the whole subtree, not just its root", () => {
-    const { spine } = projectSpine(forked, "c1")
+    const { spine } = projectSpine(indexTree(forked), "c1")
     const branch = spine.find(n => n.id === "b1")?.branches[0]
     expect(branch?.messageCount).toBe(2) // d1 and e1
-  })
-
-  test("tipId is the deepest descendant, so read() re-roots correctly", () => {
-    const { spine } = projectSpine(forked, "c1")
-    expect(spine.find(n => n.id === "b1")?.branches[0]?.tipId).toBe("e1")
   })
 
   test("branches sort by ascending rootId, not insertion order", () => {
@@ -77,7 +72,7 @@ describe("projectSpine", () => {
       m5: msg("m5", "a1", "m"),
       c3: msg("c3", "a1", "c"),
     }
-    const { spine } = projectSpine(many, "b1")
+    const { spine } = projectSpine(indexTree(many), "b1")
     expect(spine.find(n => n.id === "a1")?.branches.map(b => b.rootId)).toEqual(
       ["c3", "m5", "z9"],
     )
@@ -88,7 +83,7 @@ describe("projectSpine", () => {
       a1: msg("a1", null, "root"),
       x1: msg("x1", "missing", "lost"),
     }
-    const { orphans } = projectSpine(orphaned, "a1")
+    const { orphans } = projectSpine(indexTree(orphaned), "a1")
     expect(orphans).toEqual(["x1"])
   })
 
@@ -97,7 +92,7 @@ describe("projectSpine", () => {
       p: { ...msg("p", "q", "p"), parentId: "q" },
       q: { ...msg("q", "p", "q"), parentId: "p" },
     }
-    const { cycles } = projectSpine(cyclic, "p")
+    const { cycles } = projectSpine(indexTree(cyclic), "p")
     expect(cycles.length).toBeGreaterThan(0)
   })
 
@@ -107,46 +102,15 @@ describe("projectSpine", () => {
       s1: { id: "s1", parentId: "a1", type: "compaction" },
       c1: msg("c1", "s1", "after"),
     }
-    const { spine } = projectSpine(mixed, "c1")
+    const { spine } = projectSpine(indexTree(mixed), "c1")
     expect(spine.map(n => n.id)).toEqual(["a1", "c1"])
   })
 
   test("a null tip yields an empty spine, not a throw", () => {
-    expect(projectSpine(forked, null)).toEqual({
+    expect(projectSpine(indexTree(forked), null)).toEqual({
       spine: [],
       orphans: [],
       cycles: [],
     })
-  })
-})
-
-// ── followTip ─────────────────────────────────────────────────────────────
-
-describe("followTip: the view follows the thread you are reading", () => {
-  // a1 -> a2 -> a3 (Alice's thread), and a1 -> b2 (a branch). uuidv7-like ids
-  // sort by age, so the letters after the digit keep that order.
-  const entries = {
-    "1-a1": { parentId: null },
-    "2-a2": { parentId: "1-a1" },
-    "3-b2": { parentId: "1-a1" },
-    "4-a3": { parentId: "2-a2" },
-  }
-  test("follows a newer reply below what you read, whichever lane wrote it", () => {
-    expect(followTip(entries, "2-a2")).toBe("4-a3")
-  })
-  test("never jumps to a branch that is not below you", () => {
-    const withNewerBranch = { ...entries, "5-b3": { parentId: "3-b2" } }
-    expect(followTip(withNewerBranch, "2-a2")).toBe("4-a3")
-  })
-  test("with nothing chosen, follows the newest leaf overall", () => {
-    expect(followTip(entries, null)).toBe("4-a3")
-  })
-  test("a cycle stops the walk rather than spinning", () => {
-    const cyclic = {
-      w: { parentId: "x" },
-      x: { parentId: "y" },
-      y: { parentId: "x" },
-    }
-    expect(followTip(cyclic, "z")).toBe("z")
   })
 })

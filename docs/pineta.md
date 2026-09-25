@@ -87,15 +87,15 @@ discharged before any non-disposable code was written.
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
 | build guards | `pnpm run sanity` | ok |
-| unit (pure core) | `pnpm test` | 11/11 (Vitest) |
+| unit (pure core) | `pnpm test` | 112/112 (Vitest) |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 16/16 |
-| with a real model | `pnpm run e2e:live` | 20/20 |
-| **real browser** | `pnpm run e2e:browser` | 7/7 |
+| end-to-end | `pnpm run e2e` | 72/72 |
+| with a real model | `pnpm run e2e:live` | 77/77 |
+| **real browser** | `pnpm run e2e:browser` | 36/36 |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
-19 TypeScript files, ~3 000 lines. Stack: pnpm workspace · TypeScript (strict,
+41 TypeScript files, ~8 500 lines. Stack: pnpm workspace · TypeScript (strict,
 **no build step** — Node 24 strips types natively) · Vite · Vitest · Biome ·
 Playwright.
 
@@ -291,6 +291,13 @@ and browser still share one connection story and `e2e` drives the real thing.
 Hook names, verified against source: **`useTracked(thunk)`** for a derived
 read — *not* `useValue`, which takes a `CallableRef`; `useDocStatus` returns the
 string union `"pending" | "empty" | "populated"`, not an object.
+
+**The interface is columns and a rail** (`docs/06-interface.md`,
+`packages/client/TECHNICAL.md`): each column is one path on its own scroll, a
+branch opens beside its parent in its rail track's colour, and the rail draws
+the whole tree. Views are pure functions over one `indexTree`
+(`packages/core/tree.ts`); which columns are open is a reducer in
+`packages/client/columns.ts`, never written.
 
 `useText` is **not yet used** — the composer is still local `useState`. Wiring
 it to a `Schema.text()` is shared composition, the last part of step 5, and the

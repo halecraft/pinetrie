@@ -9,10 +9,13 @@
 
 import {
   type AgentId,
+  ancestry,
   type EntryId,
+  entryId,
   type Position,
   type Responder,
   THE_AGENT,
+  type TreeIndex,
 } from "@pineta/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
@@ -49,21 +52,36 @@ export function threadDefaults(
 
 /**
  * The default in force at `at`: the one set at `at` or its nearest ancestor,
- * found by walking `parentOf`. With none set, `ROOT_DEFAULT`. Pure; a cycle
- * stops the walk.
+ * found by walking the tree's `ancestry`. With none set, `ROOT_DEFAULT`. Pure;
+ * a cycle stops the walk. The host and the client both call this with the same
+ * index, so the composer cannot promise a reply the host will not start.
  */
 export function effectiveDefault(
   at: Position,
-  parentOf: (id: EntryId) => EntryId | null,
+  index: TreeIndex,
   defaults: ReadonlyMap<EntryId, Responder>,
 ): Responder {
-  const seen = new Set<EntryId>()
-  let id: EntryId | null = at.kind === "root" ? null : at.id
-  while (id !== null && !seen.has(id)) {
-    const set = defaults.get(id)
+  const { path } = ancestry(index, at.kind === "root" ? null : at.id)
+  for (const id of path) {
+    const set = defaults.get(entryId(id))
     if (set !== undefined) return set
-    seen.add(id)
-    id = parentOf(id)
   }
   return ROOT_DEFAULT
+}
+
+/**
+ * The rule in force at each of `ids`, a path read root first: the default set
+ * at a message, or else the one before it, starting from `inherited`. One pass,
+ * where calling `effectiveDefault` per message would walk the path each time.
+ */
+export function rulesAlong(
+  ids: readonly string[],
+  inherited: Responder,
+  defaults: ReadonlyMap<EntryId, Responder>,
+): Responder[] {
+  let rule = inherited
+  return ids.map(id => {
+    rule = defaults.get(entryId(id)) ?? rule
+    return rule
+  })
 }
