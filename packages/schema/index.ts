@@ -8,6 +8,37 @@ import { batch, createDoc, loro } from "@kyneta/loro-schema"
 import { Schema } from "@kyneta/schema"
 
 /**
+ * One entry as it sits in the document (ADR-0015).
+ *
+ * Six typed columns plus one sealed leaf. The columns are exactly what Pineta
+ * itself reasons about: the tree edge, plus the fields `projectTranscript`,
+ * `orderNewEntries` and fold read. Everything pi-specific stays in `payload`.
+ *
+ *   - `type` is an UNCONSTRAINED string on purpose. A new pi `EntryType` then
+ *     needs no schema change here at all. A `discriminatedUnion` would demand
+ *     one every time, and its discriminant must be a constrained literal.
+ *   - `.json()` makes the whole entry ONE inert leaf: Kyneta classifies a
+ *     `.json()` node as `register`, stored as a single tuple rather than
+ *     decomposed into per-field state. That is exactly right for entries,
+ *     which are written once and never edited (ADR-0004, ADR-0009), so
+ *     per-field CRDT merge is machinery we would never use.
+ *   - No `seq` column. ADR-0013 is now STRUCTURAL for stored entries: an
+ *     undeclared key cannot be written through a typed struct, the same way
+ *     `Schema.struct` already protects Line messages on the wire.
+ *
+ * `payload` is pi's variant data and ONLY that. It must never carry a copy of
+ * a column above. See `toStoredRow` in `packages/pi/storage.ts`.
+ */
+const StoredEntryRowSchema = Schema.struct.json({
+  id: Schema.string(),
+  parentId: Schema.string().nullable(),
+  type: Schema.string(),
+  timestamp: Schema.number(),
+  fromId: Schema.string().nullable(),
+  payload: Schema.any(),
+})
+
+/**
  * One session document, replicated host -> client.
  *
  * entries / usageRows / values / lists back pi's `Storage` port.
@@ -16,8 +47,10 @@ import { Schema } from "@kyneta/schema"
  *     per-key LWW register, and grow-only-set semantics emerge only because
  *     each key is written exactly once (ADR-0009). A list would duplicate on
  *     retry; `Schema.set` is rejected by the Loro backend.
- *   - No stored `seq` anywhere. `seq` is a derived replica-local arrival index
- *     (ADR-0013), so it is structurally impossible for it to replicate.
+ *   - `usageRows`, `values` and `lists` stay `Schema.any()`. They are pi's
+ *     bookkeeping for its `Storage` port, not Pineta's domain model, and
+ *     nothing of ours traverses them. The asymmetry with `entries` is
+ *     deliberate: we type what we reason about.
  *
  * `pendingText` is the live assistant stream: a `Schema.text()` per run, written
  * with insert(at, delta) and cleared on commit (ADR-0014). NOT `Schema.string()`
@@ -25,7 +58,7 @@ import { Schema } from "@kyneta/schema"
  */
 export const SessionDoc = loro.bind(
   Schema.struct({
-    entries: Schema.record(Schema.any()),
+    entries: Schema.record(StoredEntryRowSchema),
     usageRows: Schema.record(Schema.any()),
     values: Schema.record(Schema.any()),
     lists: Schema.record(Schema.list(Schema.any())),
@@ -85,8 +118,31 @@ export function endStream(doc: SessionDocHandle, runId: string): void {
 
 // --- read helpers used by the client ---------------------------------------
 
-export const readEntries = (doc: SessionDocHandle): Record<string, unknown> =>
-  doc.entries()
+/**
+ * One stored entry, derived from the schema rather than restated, so the shape
+ * above stays the single source of truth.
+ */
+export type StoredEntryRow = ReturnType<SessionDocHandle["entries"]>[string]
+
+/**
+ * Write one entry row.
+ *
+ * Takes the TYPED row, not `unknown`: reading is receiving, where anything
+ * might arrive, but writing is our own act and the shape can be demanded
+ * (ADR-0015).
+ *
+ * The caller supplies `id`. Nothing here mints one, because entry-id
+ * uniqueness is a safety invariant (ADR-0009) and a same-key write is
+ * silently discarded by the per-key LWW register. Id minting stays with pi's
+ * `IdGenerator`.
+ */
+export function writeEntry(doc: SessionDocHandle, row: StoredEntryRow): void {
+  doc.entries.set(row.id, row)
+}
+
+export const readEntries = (
+  doc: SessionDocHandle,
+): Record<string, StoredEntryRow> => doc.entries()
 
 /**
  * pi stores the lane tip in the `values` record under a physical key of

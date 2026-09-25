@@ -21,7 +21,10 @@
 //
 // Override the endpoint with PW_SERVER if you used a different port.
 
+import { projectTranscript } from "@pineta/core"
+import { writeEntry } from "@pineta/schema"
 import { type Browser, chromium } from "@playwright/test"
+import { readRenderableEntries } from "../client/projection.ts"
 import { startHost } from "../host/index.ts"
 import { createChecks } from "./harness.ts"
 
@@ -110,6 +113,61 @@ try {
     roles.join(",").includes("user,assistant"),
     `transcript ordered by parentId walk: [${roles.join(", ")}]`,
   )
+
+  // A fork, written host-side exactly as another replica would write it, then
+  // asserted in the RENDERED DOM. A spine with no branch proves nothing, so
+  // the fixture has to actually fork.
+  const before = await page.$$eval(".fork", ns => ns.length)
+  ok(before === 0, `no fork marker before the branch exists (${before})`)
+
+  const tip = await host.agent.tipId()
+  const parentId =
+    projectTranscript(readRenderableEntries(host.doc), tip).at(-2)?.id ?? null
+  ok(parentId !== null, "found a parent to fork from")
+  if (parentId !== null) {
+    writeEntry(host.doc, {
+      id: `aside-${Math.random().toString(36).slice(2, 10)}`,
+      parentId,
+      type: "message",
+      timestamp: Date.now(),
+      fromId: null,
+      payload: {
+        message: { role: "user", content: "an aside", timestamp: Date.now() },
+      },
+    })
+
+    await page.waitForFunction(
+      () => document.querySelectorAll(".fork").length > 0,
+      { timeout: 15_000 },
+    )
+    ok(true, "the fork replicated and rendered a branch marker")
+
+    const summary = await page.$eval(".fork button", n => n.textContent ?? "")
+    // Exact text, not `includes`. A looser check passed while the marker
+    // rendered the literal characters `\u2442` and `\u00b7`, because JSX text
+    // does not process escapes. The screenshot caught it; this now would.
+    ok(
+      summary.trim() === "⑂ 1 branch · 1 message",
+      `the marker summarises the branch: "${summary.trim()}"`,
+    )
+
+    await page.click(".fork button")
+    const label = await page.$eval(".outside", n => n.textContent ?? "")
+    ok(
+      label.trim() === "not in your context",
+      `the context boundary is stated in words: "${label.trim()}"`,
+    )
+
+    const spineNodes = await page.$$eval(
+      "#transcript > div > .msg",
+      ns => ns.length,
+    )
+    ok(
+      spineNodes === 2,
+      `the branch does NOT join the spine (${spineNodes} spine nodes)`,
+    )
+  }
+
   ok(
     errors.length === 0,
     `no page errors overall${errors[0] === undefined ? "" : ` — ${errors[0].slice(0, 90)}`}`,

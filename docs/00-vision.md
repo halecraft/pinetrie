@@ -75,6 +75,31 @@ for, not shipped); replacing pi's TUI.
 merge node (`fromId` alongside `parentId`) from day one — retrofitting a second
 parent edge is painful; allowing it now is free.
 
+## What the tree adds, stated precisely
+
+Two sets:
+
+- **E** — every entry that exists in the conversation.
+- **T** — the entries on the current tip path, which is exactly what is sent to
+  the model on the next turn. `T` is always a subset of `E`.
+
+In a normal chat tool these are identical: if a message exists, the model sees
+it. There is no way to have something exist without it costing tokens and
+steering the next reply.
+
+Pineta's purpose is to let them differ, and to let you control what moves
+between them. An Aside is an entry in `E` but not in `T` — real, shared,
+durable, costing the trunk nothing. A fold is the deliberate act of moving part
+of `E` into `T`.
+
+**A transcript forces "exists" and "is in context" to be the same thing;
+Pineta separates them.**
+
+Everything else serves that. The CRDT makes `E` shared across people and
+devices. `parentId` defines which subset counts as `T`. ADR-0010's three-way
+fold is the rule for moving something from `E` into `T` well. The UI draws `T`
+onto `E` so the boundary is visible before you spend anything.
+
 ## The v1 demo
 
 Two browser windows, one pi host, one conversation tree. Window A runs a long

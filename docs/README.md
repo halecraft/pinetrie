@@ -26,12 +26,22 @@ rejected reasoning is the valuable part.
 
 ## Status
 
-Pre-implementation. No code written. Spikes S5, S2, S7 are the gate.
+The walking skeleton runs end to end and the stack is complete (TypeScript,
+pnpm workspace, Vite, React, Vitest, Biome, Playwright). All twelve spikes are
+resolved. Next is the roadmap's thickening sequence in `04-roadmap.md`.
 
-## ⚠️ Note on location
+## Where documents live
 
-These plans live in `docs/`, and `.gitignore` excludes `.jj`. **They are
-not tracked by jj and will not be versioned, shared, or backed up.** That is
-fine for scratch planning, but if these are meant to be durable or
-collaborative, move them to `docs/plans/` or `plans/` at the repo root.
-See `04-roadmap.md` § Open process questions.
+Two tiers, with different lifetimes:
+
+| | | |
+|---|---|---|
+| `docs/` | **tracked** | Architectural reference. Vision, architecture, ADRs, spike findings, stack decisions. Long-lived: these explain *why the system is shaped as it is*. |
+| `.jj/plans/` | untracked | Implementation plans, one per change, named `YYYY-MM-DD-slug.md`. Short-lived: they describe *work to be done* and are spent once done. |
+
+An implementation plan may cite anything in `docs/` or any source path. It must
+**not** cite anything under `.jj/`, since that is not shared — a plan has to be
+readable by someone who only has the repository.
+
+`.gitignore` excludes `.jj`, so plans are deliberately not versioned here.
+`@halecraft/plans` will later store `.jj/plans/` in its own VCS namespace.

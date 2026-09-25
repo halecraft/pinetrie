@@ -52,7 +52,12 @@ instead of month three, and gives a demo target that keeps the project legible.
 
 Roughly in dependency order, each independently shippable:
 
-1. **Tree read** — render the `parentId` tree; navigate; per-peer tip in presence
+1. ~~**Tree read**~~ — **done.** `projectSpine` in `@pineta/core`; the client
+   renders a linear spine with branches hanging off it, dimmed and labelled
+   "not in your context". Two findings: step 1 is not demonstrable without
+   branched data, so the e2e fixture writes a fork as a foreign write (S3);
+   and **navigation turned out to be free**, because the selected tip is
+   client-local state rather than a write.
 2. **Branch write** — create a branch from any entry; Aside kind first
 3. **Concurrent lanes** — two branches running at once (this is where S3's
    answer gets cashed)
@@ -208,13 +213,34 @@ output is a proposal, not a workaround — which changes how it is built.
    mutation; `da978ec` mutates *more* aggressively than S11's patch did, so the
    risk **grew**. Nothing in Pineta's suites touches those packages.
 
+## S17 — typed entries (resolved)
+
+Entries are a typed Kyneta row, not `Schema.any()` (ADR-0015,
+`findings/S17-typed-entries.md`).
+
+One finding constrains **every future schema change in this repository**:
+Kyneta's migration walk descends product-to-product fields only, so
+`Schema.record` is a barrier and so is a sum. Nothing about the entry row is
+migratable. A change to it is a coordinated upgrade, not a migration. A new
+schema does still read old data locally, with absent fields taking defaults;
+it is peer negotiation between different builds that is exposed.
+
+Practical rule: keep the typed surface small and stable. Every typed field is
+one that forces a coordinated upgrade if pi moves it.
+
 ## Open process questions
 
-1. **These plans are untracked.** They live in `docs/` and `.gitignore`
-   excludes `.jj`, so jj will not snapshot them. If they should be durable or
-   shared, move to `plans/` or `docs/plans/` at the repo root.
-2. **Repo layout** — monorepo with the host, browser client, and storage adapter
-   as separate packages? Presumed yes; not yet decided.
+1. ~~**These plans are untracked.**~~ **Settled.** Two tiers with different
+   lifetimes: `docs/` is the tracked architectural reference (this file
+   included); `.jj/plans/` holds untracked per-change implementation plans.
+   `@halecraft/plans` will later give `.jj/plans/` its own VCS namespace. A
+   plan may cite `docs/` and source paths, never anything under `.jj/`.
+   See `README.md` § Where documents live.
+2. ~~**Repo layout**~~ **Settled.** A pnpm workspace with `packages/core`,
+   `packages/schema`, `packages/pi` and `packages/conformance`; `host/`,
+   `client/`, `protocol/`, `e2e/` stay in the root app. The pi boundary is
+   enforced by module resolution rather than by the scanner — see
+   `01-architecture.md`.
 3. **Language/runtime for the host** — Node assumed (pi is Node). Bun is viable
    and Kyneta has `internal/bun-server`.
 4. **Does Pineta vendor Kyneta or depend on published `@kyneta/*`?** Published

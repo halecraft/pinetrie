@@ -107,7 +107,9 @@ Five contracts. Fix these and everything else proceeds in parallel.
 ```
 packages/core/         @pineta/core        NO dependencies at all
 packages/schema/       @pineta/schema      Kyneta only — never pi
-packages/pi/           @pineta/pi          THE pi boundary
+                         entries are a TYPED row (ADR-0015): six columns
+                         plus a sealed `payload`. See its TECHNICAL.md.
+packages/pi/           @pineta/pi          THE pi boundary (see TECHNICAL.md)
                          agent.ts    harness lifecycle, createAgent
                          storage.ts  our implementation of pi's Storage port
                          deep.ts     pi entry points absent from its exports map
@@ -142,6 +144,27 @@ Both have negative controls.
 Dependency direction is physical: `core → schema → pi → app`. A package cannot
 reach up into the app, which is what forced `core` and `schema` to become
 packages — pi depends on them.
+
+### Two projections over the same `parentId` edges
+
+`projectTranscript(entries, tipId)` returns the **tip path**: exactly what the
+model sees on the next turn. `projectSpine(entries, tipId)` returns the same
+path, each node also carrying the children that are *not* on it.
+
+They answer different questions, so both exist:
+
+| | answers |
+|---|---|
+| `projectTranscript` | what will the model see? (the context window) |
+| `projectSpine` | what exists around that path? (the shared reality) |
+
+The difference between those two sets is the product. An Aside is an entry that
+exists without being in context. Both share `renderableMessage`, so they cannot
+disagree about which entries are messages.
+
+`projectSpine` is deliberately not a generic tree. Almost every node has one
+child, so an n-ary tree would be an intermediate structure the UI discards; the
+UI renders a linear spine with branches hanging off it.
 
 ## Data model
 

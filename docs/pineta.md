@@ -4,10 +4,15 @@
 picking the project up cold. The detailed record lives in `docs/`; this
 file exists to tell you what matters, what is decided, and what to do next.
 
-> The planning record lives alongside this file in `docs/` and is **tracked**.
-> `00`–`05` are the standing documents; `findings/` holds the 14 spike reports
-> that are the evidence behind them. This file is the orientation layer over
-> the top.
+> The architectural record lives alongside this file in `docs/` and is
+> **tracked**. `00`–`05` are the standing documents; `findings/` holds the 14
+> spike reports that are the evidence behind them. This file is the orientation
+> layer over the top.
+>
+> **Implementation plans are not here.** They live in `.jj/plans/`, one per
+> change, and are untracked — see `docs/README.md` § Where documents live.
+> `docs/` explains why the system is shaped as it is; a plan describes one
+> piece of work and is spent once done.
 
 ---
 
@@ -148,6 +153,19 @@ late arrival sort *below* a live cursor and vanish. `seq` must never cross the
 wire as a durable identifier — entry `id` is durable. Nothing may render by seq
 order; ordering comes from the `parentId` walk.
 
+**ADR-0015 — entries are a TYPED row**, not `Schema.any()`. Kyneta is
+schema-first: with `any()` the catamorphism has nothing to walk, so validation,
+typed reads, observation granularity and indexes are all forfeited for the
+document's primary content. A flat `struct.json` with six columns — `id`,
+`parentId`, `type`, `timestamp`, `fromId`, `payload` — and `Schema.any()` at
+`payload` only, where the pi boundary forbids naming `AgentMessage` /
+`JsonValue` / `Usage`. `type` is *unconstrained*, so a new pi `EntryType` needs
+no schema change; a `discriminatedUnion` was rejected for demanding one every
+time. `.json()` because entries are written once, making per-field CRDT merge
+unused machinery. **S17/P1: Kyneta's migration walk cannot reach inside a
+`Schema.record`, so no entry-shape change is migratable** — keep the typed
+surface small, and treat changes as coordinated upgrades.
+
 **ADR-0014 — token deltas stream into a durable `Schema.text()`** via
 `insert(at, delta)`, cleared on commit. **Never `Schema.string()` for anything
 that accumulates** — it is a whole-value LWW register, so appending is O(n²) on
@@ -270,10 +288,10 @@ string union `"pending" | "empty" | "populated"`, not an object.
 `useText` is **not yet used** — the composer is still local `useState`. Wiring
 it to a `Schema.text()` is step 5 and the first genuinely collaborative edit.
 
-**Now thicken the skeleton** (`docs/04-roadmap.md`), each step
+**Step 1 (tree read) is done.** Now continue thickening (`docs/04-roadmap.md`), each step
 independently shippable:
 
-1. tree read — render the `parentId` tree, navigate, per-peer tip in presence
+1. ~~tree read~~ — done: `projectSpine`, spine + branch markers, navigation is client-local state
 2. branch write — create a branch from any entry; Aside first
 3. concurrent lanes — two branches at once
 4. references (ADR-0006) — entry and entry-span kinds, with backlinks

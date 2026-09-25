@@ -1,5 +1,11 @@
 # WS2 — TypeScript migration
 
+> **Superseded in part by ADR-0015.** `StoredEntry` no longer exists: the type
+> is `EntryWithoutSeq` and uses a *distributive* omit, because `Omit` over
+> pi's `Entry` union silently collapsed it to the common keys. The stored shape
+> is now `StoredEntryRow`, a typed Kyneta row. See
+> `S17-typed-entries.md`.
+
 **Date:** 2026-09-24 · **Repo:** `~/halecraft/pineta` (working copy, not committed)
 **Node:** v24.19.0 (native type stripping — no `tsx`, no build step)
 **TypeScript:** 5.9.3, `strict` + `noUncheckedIndexedAccess` + `verbatimModuleSyntax`

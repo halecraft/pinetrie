@@ -18,6 +18,20 @@
       .role { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: #6f7784; }
       .msg.user .role { color: #7bd88f; }
       .msg.assistant .role { color: #9ecbff; }
+      /* The spine is what is in context, so it stays at full contrast.
+         Branches are dimmed AND labelled: dimming alone would not survive
+         greyscale or low vision. */
+      .fork { margin: -0.5rem 0 1rem; font-size: 0.85rem; }
+      .fork > button { background: none; border: 1px dashed #555;
+        color: #bbb; cursor: pointer; padding: 0.15rem 0.5rem;
+        border-radius: 3px; }
+      .branches { margin: 0.5rem 0 0 1rem; padding-left: 0.75rem;
+        border-left: 2px dotted #555; opacity: 0.6; }
+      .outside { color: #d0a15f; font-style: italic; margin-bottom: 0.35rem; }
+      .branch { display: flex; gap: 0.6rem; align-items: center;
+        margin-bottom: 0.25rem; }
+      .branch-id { font-family: monospace; color: #888; }
+      #offLane { margin: 0 0 1rem; color: #d0a15f; font-size: 0.85rem; }
       .text { white-space: pre-wrap; margin-top: .2rem; }
       #streaming { opacity: .75; border-left: 2px solid #9ecbff; padding-left: .75rem; margin-bottom: 1rem; }
       form { display: flex; gap: .5rem; margin-top: 1.5rem; }

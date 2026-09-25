@@ -7,14 +7,16 @@
 // `useText` gives us the composer itself.
 
 import { ExchangeProvider, useDocStatus, useTracked } from "@kyneta/react"
+import type { BranchSummary } from "@pineta/core"
 import type { SessionDocHandle } from "@pineta/schema"
 import { StrictMode, useState } from "react"
 import { createRoot } from "react-dom/client"
 import {
   readEntryCount,
   readLane,
+  readLaneTipId,
+  readSpine,
   readStreaming,
-  readTranscript,
 } from "./projection.ts"
 import { connectSession, type SessionClient } from "./session-view.ts"
 
@@ -25,18 +27,74 @@ import { connectSession, type SessionClient } from "./session-view.ts"
 // durable in the doc: seq is a replica-local arrival index and would reorder
 // under a late arrival, silently remounting rows.
 
-function Transcript({ doc }: { doc: SessionDocHandle }) {
-  const transcript = useTracked(() => readTranscript(doc))
+/**
+ * The spine reads as an ordinary transcript, at full contrast, because that is
+ * what is in context. Branches hang off it, dimmed and inset, because they are
+ * not. The gap between those two sets is what Pineta adds over a transcript.
+ */
+function Spine({
+  doc,
+  selectedTipId,
+  onRead,
+}: {
+  doc: SessionDocHandle
+  selectedTipId: string | null
+  onRead: (tipId: string) => void
+}) {
+  const { spine } = useTracked(() => readSpine(doc, selectedTipId))
 
   return (
     <div id="transcript">
-      {transcript.map(m => (
-        <div className={`msg ${m.role}`} key={m.id}>
-          <span className="role">{m.role}</span>
-          {/* JSX escapes by default, so model output is never HTML. */}
-          <div className="text">{m.text}</div>
+      {spine.map(node => (
+        <div key={node.id}>
+          <div className={`msg ${node.role}`}>
+            <span className="role">{node.role}</span>
+            {/* JSX escapes by default, so model output is never HTML. */}
+            <div className="text">{node.text}</div>
+          </div>
+          {node.branches.length > 0 && (
+            <BranchMarker branches={node.branches} onRead={onRead} />
+          )}
         </div>
       ))}
+    </div>
+  )
+}
+
+function BranchMarker({
+  branches,
+  onRead,
+}: {
+  branches: readonly BranchSummary[]
+  onRead: (tipId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const messages = branches.reduce((n, b) => n + b.messageCount, 0)
+
+  return (
+    <div className="fork" data-branches={branches.length}>
+      <button onClick={() => setOpen(!open)} type="button">
+        ⑂ {branches.length} branch{branches.length === 1 ? "" : "es"} ·{" "}
+        {messages} message{messages === 1 ? "" : "s"}
+      </button>
+      {open && (
+        <div className="branches">
+          {/* Stated in words, not by dimming alone: the boundary has to
+              survive greyscale and low contrast. */}
+          <div className="outside">not in your context</div>
+          {branches.map(b => (
+            <div className="branch" key={b.rootId}>
+              <span className="branch-id">{b.rootId.slice(0, 8)}</span>
+              <span className="branch-count">
+                {b.messageCount} message{b.messageCount === 1 ? "" : "s"}
+              </span>
+              <button onClick={() => onRead(b.tipId)} type="button">
+                read
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -58,7 +116,19 @@ function Streaming({ doc }: { doc: SessionDocHandle }) {
   )
 }
 
-function Composer({ session }: { session: SessionClient }) {
+/**
+ * Naming the parent is a correctness affordance, not decoration. Selection is
+ * client-local, so reading a branch and then prompting would otherwise append
+ * silently to a lane tip you navigated away from. Step 2 (branch write)
+ * replaces the refusal with "branch from here".
+ */
+function Composer({
+  session,
+  onLane,
+}: {
+  session: SessionClient
+  onLane: boolean
+}) {
   const [text, setText] = useState("")
   const [status, setStatus] = useState("connected")
 
@@ -81,12 +151,15 @@ function Composer({ session }: { session: SessionClient }) {
     >
       <input
         autoComplete="off"
+        disabled={!onLane}
         id="input"
         onChange={e => setText(e.target.value)}
-        placeholder="say something…"
+        placeholder={onLane ? "say something…" : "return to your lane to reply"}
         value={text}
       />
-      <button type="submit">send</button>
+      <button disabled={!onLane} type="submit">
+        send
+      </button>
       <span id="status">{status}</span>
     </form>
   )
@@ -97,6 +170,13 @@ function App({ session }: { session: SessionClient }) {
   const lane = useTracked(() => readLane(doc))
   const count = useTracked(() => readEntryCount(doc))
   const status = useDocStatus(doc)
+  const laneTipId = useTracked(() => readLaneTipId(doc))
+
+  // Which path you are LOOKING at. Client-local, never written: that is what
+  // makes navigation read-only. `null` means follow the lane tip.
+  const [selected, setSelected] = useState<string | null>(null)
+  const selectedTipId = selected ?? laneTipId
+  const onLane = selected === null || selected === laneTipId
 
   return (
     <>
@@ -108,9 +188,17 @@ function App({ session }: { session: SessionClient }) {
           {status === "pending" ? "syncing…" : status}
         </div>
       </header>
-      <Transcript doc={doc} />
+      <Spine doc={doc} onRead={setSelected} selectedTipId={selectedTipId} />
+      {onLane ? null : (
+        <div id="offLane">
+          reading a branch, not your lane{" "}
+          <button onClick={() => setSelected(null)} type="button">
+            return to your lane
+          </button>
+        </div>
+      )}
       <Streaming doc={doc} />
-      <Composer session={session} />
+      <Composer onLane={onLane} session={session} />
     </>
   )
 }

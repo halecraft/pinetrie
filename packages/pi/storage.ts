@@ -62,7 +62,11 @@ import type { Usage } from "@earendil-works/pi-ai"
 import { batch } from "@kyneta/loro-schema"
 import { type Segment, subscribe } from "@kyneta/schema"
 import { orderNewEntries } from "@pineta/core"
-import { newSessionDoc, type SessionDocHandle } from "@pineta/schema"
+import {
+  newSessionDoc,
+  type SessionDocHandle,
+  type StoredEntryRow,
+} from "@pineta/schema"
 import { addUsage, emptyUsage } from "./deep.ts"
 
 const physicalKey = (namespace: string, key: string): string =>
@@ -138,8 +142,105 @@ interface StoredListElement {
   value: unknown
 }
 
-/** An entry as it sits in the doc: pi's `Entry` minus the never-stored `seq`. */
-type StoredEntry = Omit<Entry, "seq">
+/**
+ * pi's `Entry` minus `seq`. An IN-MEMORY shape, not the stored one.
+ * `StoredEntryRow` is what sits in the document (ADR-0015).
+ */
+/**
+ * `Omit` over a union collapses it to the keys common to every member, which
+ * for pi's `Entry` discards `message`, `summary`, `fromId` and the rest. The
+ * conditional distributes over the union instead, so each variant keeps its
+ * own fields. Distribution needs a naked type parameter, hence the helper.
+ */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
+  ? Omit<T, K>
+  : never
+
+export type EntryWithoutSeq = DistributiveOmit<Entry, "seq">
+
+/**
+ * The columns `StoredEntryRow` hoists out of the entry. Listed once, so the
+ * split and the rejoin cannot disagree about which keys are columns.
+ */
+const HOISTED = ["id", "parentId", "type", "timestamp", "fromId"] as const
+
+/**
+ * Keys `payload` must never carry: the hoisted columns, plus `seq`.
+ *
+ * `seq` needs naming here even though the write path already strips it. The
+ * columns are typed, so an undeclared key cannot reach them \u2014 but `payload` is
+ * `Schema.any()`, and a `seq` that got in there WOULD persist and replicate,
+ * which is precisely what ADR-0013 forbids. The typed schema makes the rule
+ * structural for the columns only; this list is what makes it hold for the
+ * payload. A test asserts both halves.
+ */
+const NEVER_IN_PAYLOAD: readonly string[] = [...HOISTED, "seq"]
+
+/**
+ * Entry -> the row we persist (ADR-0015).
+ *
+ * `payload` carries the variant data and ONLY that. Putting the whole entry in
+ * it would give `parentId` two homes, and nothing would keep them equal:
+ * `#reconcile` orders arrivals from the column while a renderer could read the
+ * blob. A round-trip test cannot detect that, because rejoining from either
+ * copy yields the same entry. The guard is the disjointness case in
+ * `storage.test.ts`.
+ */
+export function toStoredRow(entry: EntryWithoutSeq): StoredEntryRow {
+  const payload: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(entry)) {
+    if (!NEVER_IN_PAYLOAD.includes(k)) payload[k] = v
+  }
+  return {
+    id: entry.id,
+    parentId: entry.parentId,
+    type: entry.type,
+    timestamp: entry.timestamp,
+    // `fromId` exists only on `branch_summary`, so the discriminant narrows it
+    // rather than a cast. If pi ever renames or drops that variant, this
+    // comparison stops type-checking, which is the warning we want.
+    // Absent and null are different facts: the column records null and
+    // `fromStoredRow` restores absence.
+    fromId: entry.type === "branch_summary" ? entry.fromId : null,
+    payload,
+  }
+}
+
+/**
+ * Row -> pi's `Entry`, identical to what pi wrote.
+ *
+ * `seq` is supplied by the caller rather than read from the row: it is a
+ * replica-local arrival index (ADR-0013) and never lives in the document.
+ * Passing it here keeps the pairing with `toStoredRow` visible in the type.
+ *
+ * The return needs a double cast, because a union member cannot be built from
+ * a dynamic object. What that cast actually trusts is narrower than it looks:
+ *
+ *   - the COLUMNS are typed by the Kyneta schema, and a row from a peer on a
+ *     different build materializes missing fields as schema defaults rather
+ *     than as garbage (measured in S17/P1c), so they are well-formed.
+ *   - the WRITE path is checked by pi's own `validateCommittedWrites`.
+ *   - `payload` is unchecked, and is not checkable here. pi ships no schema
+ *     for `Entry` \u2014 its typebox use is for tool parameters \u2014 so validating it
+ *     would mean hand-writing a copy of pi's shape in this repository, which
+ *     is the coupling ADR-0015 exists to avoid.
+ *
+ * So the residual is provenance for `payload`, which is ADR-0015's open
+ * question, not a defect in this function.
+ */
+export function fromStoredRow(row: StoredEntryRow, seq: number): Entry {
+  const rebuilt: Record<string, unknown> = {
+    ...(row.payload as Record<string, unknown>),
+    id: row.id,
+    parentId: row.parentId,
+    type: row.type,
+    timestamp: row.timestamp,
+    seq,
+  }
+  // Restore absence: a message entry never carried `fromId` at all.
+  if (row.fromId !== null) rebuilt.fromId = row.fromId
+  return rebuilt as unknown as Entry
+}
 
 /** A usage row as stored: pi's `UsageRow` minus the never-stored `seq`. */
 type StoredUsageRow = Omit<UsageRow, "seq">
@@ -311,7 +412,7 @@ export class KynetaStorage implements Storage {
       if (entryCandidates !== undefined) {
         const fresh = entryCandidates.filter(id => !this.#entrySeq.has(id))
         if (fresh.length > 0) {
-          const rec = new Map<string, StoredEntry | undefined>()
+          const rec = new Map<string, StoredEntryRow | undefined>()
           for (const id of fresh) rec.set(id, this.#readEntryRaw(id))
 
           // The ordering itself is a pure calculation in @pineta/core, where
@@ -430,12 +531,13 @@ export class KynetaStorage implements Storage {
   }
 
   /**
-   * The doc stores entries as opaque JSON (`Schema.any()`), so these two
-   * readers are the ONLY place the untyped substrate is re-typed. Everything
-   * downstream works with `StoredEntry` / `StoredValueRecord`.
+   * `entries` is a TYPED row now (ADR-0015), so this reader hands the row back
+   * as-is and `fromStoredRow` rebuilds pi's entry from it. `values` is still
+   * `Schema.any()`, so `#readValueRaw` below is the remaining place where an
+   * untyped record has to be re-typed.
    */
-  #readEntryRaw(id: string): StoredEntry | undefined {
-    return this.#doc.entries.get(id) as StoredEntry | undefined
+  #readEntryRaw(id: string): StoredEntryRow | undefined {
+    return this.#doc.entries.get(id) ?? undefined
   }
 
   #readValueRaw(pkey: string): StoredValueRecord | undefined {
@@ -447,7 +549,7 @@ export class KynetaStorage implements Storage {
     if (raw === undefined) return undefined
     const seq = this.#entrySeq.get(id)
     if (seq === undefined) return undefined
-    return { ...raw, seq } as Entry
+    return fromStoredRow(raw, seq)
   }
 
   #storedValue<T>(namespace: string, key: string): StoredValue<T> | undefined {
@@ -499,7 +601,7 @@ export class KynetaStorage implements Storage {
         switch (write.kind) {
           case "entry": {
             const { kind: _k, seq: _s, ...entry } = write
-            d.entries.set(entry.id, entry)
+            d.entries.set(entry.id, toStoredRow(entry))
             stagedEntries.push([entry.id, write.seq])
             if (entry.type === "message") messageDelta += 1
             break
@@ -741,9 +843,14 @@ export class KynetaStorage implements Storage {
       const raw = this.#readEntryRaw(id)
       if (raw === undefined) continue
       if (query.type !== undefined && raw.type !== query.type) continue
-      if (query.customType !== undefined && raw.customType !== query.customType)
+      // `customType` lives in the payload: it is pi's variant data, not one of
+      // the columns Pineta reasons about.
+      if (
+        query.customType !== undefined &&
+        (raw.payload as { customType?: string }).customType !== query.customType
+      )
         continue
-      out.push({ ...raw, seq } as Entry)
+      out.push(fromStoredRow(raw, seq))
     }
     return out
   }

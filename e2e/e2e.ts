@@ -8,8 +8,9 @@
 //   node e2e/e2e.mjs              offline: transport + docs + protocol, no model call
 //   PINETA_LIVE=1 node e2e/e2e.mjs   also drives a REAL turn against a real model
 
-import { type EntryLike, findSeqKeys, projectTranscript } from "@pineta/core"
-import { readEntries, readLaneTip } from "@pineta/schema"
+import { findSeqKeys, projectSpine, projectTranscript } from "@pineta/core"
+import { readEntries, readLaneTip, writeEntry } from "@pineta/schema"
+import { readRenderableEntries } from "../client/projection.ts"
 import { connectSession } from "../client/session-view.ts"
 import { startHost } from "../host/index.ts"
 import { createChecks } from "./harness.ts"
@@ -127,7 +128,7 @@ ok(client.view().streaming === null, "pendingText cleared on commit")
 
 // --- ADR-0013: seq never escapes the replica ------------------------------
 // The doc stores entries as opaque JSON; re-type once, at the read boundary.
-const rawEntries = readEntries(host.doc) as Record<string, EntryLike>
+const rawEntries = readEntries(host.doc)
 const storedSeq = Object.values(rawEntries).filter(
   e => e !== null && typeof e === "object" && "seq" in e,
 )
@@ -157,11 +158,54 @@ ok(
   hostTip === readLaneTip(host.doc, host.laneName),
   "lane tip in the document matches the harness's own tip",
 )
-const hostTranscript = projectTranscript(rawEntries, hostTip)
+// Project through the SAME reader the client uses. `rawEntries` is the stored
+// form (typed columns + sealed payload, ADR-0015); it is right for the seq
+// scan above and wrong for rendering, because `message` lives in the payload.
+const hostTranscript = projectTranscript(
+  readRenderableEntries(host.doc),
+  hostTip,
+)
 ok(
   hostTranscript.length === view.transcript.length,
   `host and client project the same transcript (${hostTranscript.length} messages)`,
 )
+
+// --- a fork, written as another replica would write it ---------------------
+//
+// The only command today is `prompt`, so a branch cannot be created through
+// the protocol. Writing the entry directly is not a contrivance: it is exactly
+// the S3 foreign-write scenario, which is what a branch from another device
+// looks like on arrival. The parent must exist, or KynetaStorage's reconcile
+// takes its unresolved-parents path and throws.
+const forkParent = hostTranscript.at(-2)?.id ?? hostTranscript[0]?.id ?? null
+ok(forkParent !== null, "found a parent to fork from")
+if (forkParent !== null) {
+  writeEntry(host.doc, {
+    id: `aside-${Math.random().toString(36).slice(2, 10)}`,
+    parentId: forkParent,
+    type: "message",
+    timestamp: Date.now(),
+    fromId: null,
+    payload: {
+      message: { role: "user", content: "an aside", timestamp: Date.now() },
+    },
+  })
+
+  const { spine } = projectSpine(readRenderableEntries(host.doc), hostTip)
+  const forked = spine.filter(n => n.branches.length > 0)
+  ok(
+    forked.length === 1,
+    `exactly one spine node reports a branch (${forked.length})`,
+  )
+  ok(
+    forked[0]?.branches[0]?.messageCount === 1,
+    `the branch summarises its subtree (${forked[0]?.branches[0]?.messageCount} message)`,
+  )
+  ok(
+    spine.length === hostTranscript.length,
+    `the fork does NOT join the spine (${spine.length} vs ${hostTranscript.length})`,
+  )
+}
 
 // --- LIVE assertion -------------------------------------------------------
 if (LIVE) {

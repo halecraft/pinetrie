@@ -160,8 +160,9 @@ export interface AgentMessageLike {
 
 export interface EntryLike {
   readonly id: string
-  readonly parentId?: string | null
-  readonly type?: string
+  readonly parentId: string | null
+  readonly type: string
+  /** Absent on entries that carry no message, e.g. a compaction. */
   readonly message?: AgentMessageLike
 }
 
@@ -195,13 +196,22 @@ export function projectTranscript(
   }
   out.reverse()
   return out
-    .filter(e => e.type === "message")
-    .map(e => ({
-      id: e.id,
-      role: e.message?.role ?? "unknown",
-      text: messageText(e.message),
-    }))
-    .filter(m => m.role === "user" || m.role === "assistant")
+    .map(renderableMessage)
+    .filter((m): m is TranscriptMessage => m !== null)
+}
+
+/**
+ * One entry -> the message a reader sees, or `null` if it is not one.
+ *
+ * Shared by `projectTranscript` and `projectSpine` so the two cannot disagree
+ * about which entries are messages. Non-message entries and roles other than
+ * user/assistant are dropped.
+ */
+function renderableMessage(entry: EntryLike): TranscriptMessage | null {
+  if (entry.type !== "message") return null
+  const role = entry.message?.role ?? "unknown"
+  if (role !== "user" && role !== "assistant") return null
+  return { id: entry.id, role, text: messageText(entry.message) }
 }
 
 /** Flatten pi's AgentMessage content into display text. */
@@ -330,4 +340,127 @@ export function orderNewEntries(
   }
 
   return { ordered, unresolved: [...pending] }
+}
+
+// ── the spine (roadmap step 1) ────────────────────────────────────────────
+
+/** A branch departing the spine at some node. */
+export interface BranchSummary {
+  /** The child entry that leaves the spine. */
+  readonly rootId: string
+  /** Deepest descendant, so "read" can re-root the spine there. */
+  readonly tipId: string
+  /** Messages in the whole subtree, for the collapsed summary line. */
+  readonly messageCount: number
+}
+
+export interface SpineNode extends TranscriptMessage {
+  /** Children of this node that are NOT the next node on the spine. */
+  readonly branches: readonly BranchSummary[]
+}
+
+export interface SpineProjection {
+  readonly spine: readonly SpineNode[]
+  /** Ids whose parentId names an entry absent from the set. Never dropped. */
+  readonly orphans: readonly string[]
+  /** Ids on a parentId cycle. Reported rather than spun on. */
+  readonly cycles: readonly string[]
+}
+
+/**
+ * The tip path, plus the branches that leave it.
+ *
+ * `projectTranscript` answers "what will the model see" and returns the path
+ * alone. This answers "what exists around that path": the same nodes, each
+ * carrying the children that are NOT on it. The difference between the two is
+ * the product — an Aside is an entry that exists without being in context.
+ *
+ * Deliberately not a generic tree. Almost every node has one child, so an
+ * n-ary tree would be an intermediate structure the UI discards; the UI renders
+ * a linear spine with branches hanging off it. Build the shape you render.
+ */
+export function projectSpine(
+  entries: Readonly<Record<string, EntryLike>>,
+  tipId: string | null,
+): SpineProjection {
+  const childrenOf = new Map<string, string[]>()
+  const orphans: string[] = []
+  for (const [id, entry] of Object.entries(entries)) {
+    const parent = entry.parentId
+    if (parent === null || parent === undefined) continue
+    if (entries[parent] === undefined) {
+      orphans.push(id)
+      continue
+    }
+    const siblings = childrenOf.get(parent)
+    if (siblings === undefined) childrenOf.set(parent, [id])
+    else siblings.push(id)
+  }
+
+  // Walk tip -> root, the same direction and cycle rule as projectTranscript,
+  // but reporting a cycle instead of throwing: a renderer must still draw the
+  // part of the tree that is sound.
+  const path: string[] = []
+  const cycles: string[] = []
+  const seen = new Set<string>()
+  let cursor: string | null = tipId
+  while (cursor !== null) {
+    const entry: EntryLike | undefined = entries[cursor]
+    if (entry === undefined) break
+    if (seen.has(cursor)) {
+      cycles.push(cursor)
+      break
+    }
+    seen.add(cursor)
+    path.push(cursor)
+    cursor = entry.parentId ?? null
+  }
+  path.reverse()
+
+  const onSpine = new Set(path)
+  const spine: SpineNode[] = []
+  for (const [index, id] of path.entries()) {
+    const entry = entries[id]
+    if (entry === undefined) continue
+    const message = renderableMessage(entry)
+    if (message === null) continue
+    const next = path[index + 1]
+    const branches = (childrenOf.get(id) ?? [])
+      .filter(child => child !== next && !onSpine.has(child))
+      // Ascending id is ascending creation time (uuidv7, S9). Sorting the
+      // ids — not relying on iteration order — is what makes two replicas
+      // draw the same picture.
+      .sort()
+      .map(rootId => summarizeBranch(entries, childrenOf, rootId))
+    spine.push({ ...message, branches })
+  }
+
+  return { spine, orphans, cycles }
+}
+
+/** Walk a branch subtree once: count its messages, find its deepest node. */
+function summarizeBranch(
+  entries: Readonly<Record<string, EntryLike>>,
+  childrenOf: ReadonlyMap<string, readonly string[]>,
+  rootId: string,
+): BranchSummary {
+  let messageCount = 0
+  let tipId = rootId
+  let deepest = -1
+  const stack: Array<{ id: string; depth: number }> = [{ id: rootId, depth: 0 }]
+  const visited = new Set<string>()
+  while (stack.length > 0) {
+    const node = stack.pop()
+    if (node === undefined || visited.has(node.id)) continue
+    visited.add(node.id)
+    if (entries[node.id]?.type === "message") messageCount += 1
+    // Deepest wins; ascending id breaks a tie, so "read" is deterministic.
+    if (node.depth > deepest || (node.depth === deepest && node.id < tipId)) {
+      deepest = node.depth
+      tipId = node.id
+    }
+    for (const child of childrenOf.get(node.id) ?? [])
+      stack.push({ id: child, depth: node.depth + 1 })
+  }
+  return { rootId, tipId, messageCount }
 }
