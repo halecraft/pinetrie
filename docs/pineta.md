@@ -119,7 +119,7 @@ The root declares only tooling, so a package can import only what it declares.
 
 ---
 
-## 3. Decisions that constrain everything (ADR-0001..0014)
+## 3. Decisions that constrain everything (ADR-0001..0019)
 
 Full text with rationale and rejected alternatives: `docs/02-decisions.md`.
 The ones you must not violate by accident:
@@ -137,6 +137,13 @@ three registers by lane name (`pi.branch.tip`, `pi.lane.state`,
 queued steering messages, and lose an in-flight operation record. `LaneName` is
 a branded type mintable only by `laneNameForWriter()`, so `"main"` is not
 assignable.
+
+**ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
+lane is a *conversation lane* and never touches disk. A *work lane* carries
+agent work and will own a jj workspace, so creating one is deliberate, and fold
+merges both the tree and the workspace. A busy agent queues; it never grows
+more lanes. Moving the agent's lane across branches is valid only while its
+runs do not touch disk.
 
 **ADR-0013 — `seq` is a derived, replica-local ARRIVAL index.** Two different
 mechanisms keep it off the wire, and they are not interchangeable: Line
@@ -376,7 +383,7 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
 |---|---|
 | `docs/00-vision.md` | product thesis, branch kinds, v1 scope |
 | `docs/01-architecture.md` | evidence base, layer cake, data model, module layout |
-| `docs/02-decisions.md` | **ADR-0001..0014** with rationale |
+| `docs/02-decisions.md` | **ADR-0001..0019** with rationale |
 | `docs/03-spikes.md` | S1–S16, each with question + kill criterion |
 | `docs/04-roadmap.md` | sequencing, invariants, action items |
 | `docs/05-stack.md` | stack decisions, sandbox constraints |

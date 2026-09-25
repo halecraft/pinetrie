@@ -95,7 +95,9 @@ Roughly in dependency order, each independently shippable:
    - **Shared composition** — `Schema.text()` drafts written by tabs, anchored
      anywhere in the tree; the visceral multiplayer win.
 6. **Scout kind** — read-only tools, shared workspace
-7. **Fold** — three-way merge producing a `fromId` node
+7. **Fold** — three-way merge producing a `fromId` node. Per ADR-0019 it is two
+   merges, both agent-assisted: the branch of the tree, and the line of work's
+   jj workspace.
 
 Items 4–5 are independent of 1–3 and can proceed in parallel once the document
 schema is fixed.
@@ -110,7 +112,7 @@ and it appears live in A's tree — **with zero tokens entering A's context.**
 
 | Deferred | Until |
 |---|---|
-| Worktree branches, effect merge | after fold works for Aside/Scout |
+| A jj workspace per work lane; its merge inside fold (ADR-0019) | after fold works for Aside/Scout |
 | Remote / team networking | designed for now (ADR-0007), shipped after v1 |
 | Trust & authority model | before *any* networking; explicitly punted for local v1 |
 | Replacing pi's TUI | indefinitely — not a goal |
