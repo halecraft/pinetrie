@@ -20,7 +20,7 @@ import {
   type WriterLaneState,
 } from "@pineta/core"
 import { type Static, Type } from "typebox"
-import { Value } from "typebox/value"
+import { decodeWith } from "./decode.ts"
 
 /** pi value namespace. The key is the reference id. */
 export type { ReferenceTarget }
@@ -58,25 +58,22 @@ export interface Reference {
   readonly author: LaneName
 }
 
-/**
- * Stored value -> reference, or undefined. Total: values are `Schema.any()` in
- * the document and may come from any replica, so a malformed one is dropped,
- * never thrown. One bad value must not break every client's render.
- */
-export function decodeReference(value: unknown): Reference | undefined {
-  if (!Value.Check(ReferenceSchema, value)) return undefined
-  const w = value as Wire
-  const to: ReferenceTarget =
-    w.to.kind === "entry"
-      ? { kind: "entry", id: entryId(w.to.id) }
-      : { kind: "span", id: entryId(w.to.id), start: w.to.start, end: w.to.end }
-  return {
+/** Stored value -> reference, or undefined if malformed (see `decodeWith`). */
+export const decodeReference = (value: unknown): Reference | undefined =>
+  decodeWith(ReferenceSchema, value, w => ({
     id: referenceId(w.id),
     from: entryId(w.from),
-    to,
+    to:
+      w.to.kind === "entry"
+        ? { kind: "entry", id: entryId(w.to.id) }
+        : {
+            kind: "span",
+            id: entryId(w.to.id),
+            start: w.to.start,
+            end: w.to.end,
+          },
     author: w.author as LaneName,
-  }
-}
+  }))
 
 export interface ReferenceIndex {
   /** What each entry cites. */

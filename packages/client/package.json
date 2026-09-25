@@ -23,7 +23,7 @@
     "@kyneta/websocket-transport": "link:../../../kyneta/packages/exchange/transports/websocket",
     "@pineta/core": "workspace:*",
     "@pineta/protocol": "workspace:*",
-    "@pineta/references": "workspace:*",
+    "@pineta/marginalia": "workspace:*",
     "@pineta/schema": "workspace:*",
     "react": "19.2.0",
     "react-dom": "19.2.0"

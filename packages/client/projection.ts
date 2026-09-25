@@ -22,7 +22,7 @@ import {
   REFERENCE_NAMESPACE,
   type Reference,
   type ReferenceIndex,
-} from "@pineta/references"
+} from "@pineta/marginalia"
 import {
   readActiveRun,
   readEntries,

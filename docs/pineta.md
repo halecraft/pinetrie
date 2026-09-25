@@ -108,7 +108,7 @@ packages/core/         @pineta/core         declares NOTHING
 packages/schema/       @pineta/schema       Kyneta only; the document shape
 packages/pi/           @pineta/pi           THE pi boundary
 packages/protocol/     @pineta/protocol     the wire contract and its codec
-packages/references/   @pineta/references   citations as pi values (ADR-0017)
+packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: references (ADR-0017)
 packages/client/       @pineta/client       browser UI; owns its Vite build
 (root)                                      development tooling only
 ```

@@ -19,7 +19,7 @@ import {
   encodeReference,
   REFERENCE_NAMESPACE,
   type Reference,
-} from "@pineta/references"
+} from "@pineta/marginalia"
 import { hasLaneRecord, type SessionDocHandle } from "@pineta/schema"
 import { createAgentHarness, ModelRuntime } from "./deep.ts"
 import { KynetaStorage } from "./storage.ts"

@@ -70,8 +70,8 @@ test("the protocol declares only Kyneta and core", () => {
   assert.deepEqual(extra, [])
 })
 
-test("references declare only TypeBox and core", () => {
-  assert.deepEqual(deps(read("packages/references")).sort(), [
+test("marginalia declares only TypeBox and core", () => {
+  assert.deepEqual(deps(read("packages/marginalia")).sort(), [
     "@pineta/core",
     "typebox",
   ])

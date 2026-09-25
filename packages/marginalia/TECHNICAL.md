@@ -1,4 +1,16 @@
-# `@pineta/references` — technical notes
+# `@pineta/marginalia` — technical notes
+
+The notes and links people write in the margins of the agent's work. Each shape
+is stored in pi's extension slots and typed here, by Pineta, which is its single
+authority. Every module decodes through `decodeWith` (`decode.ts`), which is
+total: a malformed value is dropped, never thrown.
+
+Namespaces are stored data and name the owner, `pineta.`, following pi's own
+`pi.` convention. They deliberately do not follow the package name: renaming a
+package must never require changing stored data. This package was
+`@pineta/references`; its namespace is still `pineta.reference`.
+
+# References
 
 A reference is a semantic pointer: from the entry it was attached at (the
 author's lane tip) to an entry or a span of one. ADR-0006, realised by ADR-0017.

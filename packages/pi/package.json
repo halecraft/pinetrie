@@ -13,7 +13,7 @@
     "@kyneta/loro-schema": "link:../../../kyneta/packages/schema/backends/loro",
     "@kyneta/schema": "link:../../../kyneta/packages/schema",
     "@pineta/core": "workspace:*",
-    "@pineta/references": "workspace:*",
+    "@pineta/marginalia": "workspace:*",
     "@pineta/schema": "workspace:*",
     "loro-crdt": "^1.16.0"
   }

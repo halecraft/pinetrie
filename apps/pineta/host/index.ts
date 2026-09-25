@@ -31,6 +31,7 @@ import {
   turnFinished,
   type WriterLaneState,
 } from "@pineta/core"
+import { type CitedEntry, planReference } from "@pineta/marginalia"
 import { type Agent, createAgent, type LaneOutcome, newId } from "@pineta/pi"
 import {
   decodeCommand,
@@ -40,7 +41,6 @@ import {
 } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
 import { HOST_PEER_ID, SESSION_DOC_ID } from "@pineta/protocol/messages"
-import { type CitedEntry, planReference } from "@pineta/references"
 import {
   appendStream,
   beginStream,

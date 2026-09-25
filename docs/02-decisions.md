@@ -928,7 +928,8 @@ own id, written only through `Agent.addReference`.
   join the causal graph, contradicting ADR-0006, and appending one would move
   the author's lane tip. Values stay out of the causal graph and out of every
   model's context.
-- **One schema, TypeBox, in `packages/references`.** Pineta owns the reference
+- **One schema, TypeBox, in `packages/marginalia`** (named `packages/references`
+  when this was decided). Pineta owns the reference
   shape, so this schema is the single authority, not a mirror of pi's. It is
   the TypeBox version pi pins, so one copy is installed. Decoding is total: a
   malformed value is dropped, never thrown.
