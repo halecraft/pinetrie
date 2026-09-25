@@ -7,19 +7,24 @@ import { Exchange } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 
-import type { projectTranscript } from "@pineta/core"
+import {
+  type EntryId,
+  type Intent,
+  type LaneName,
+  laneNameForWriter,
+  type Position,
+  type projectTranscript,
+} from "@pineta/core"
 import { SessionDoc, type SessionDocHandle } from "@pineta/schema"
+import { decodeReply, encodeIntent, type Outcome } from "../protocol/codec.ts"
 import { Control } from "../protocol/line.ts"
 import {
-  type Command,
-  command,
   HOST_PEER_ID,
   type Reply,
   SESSION_DOC_ID,
 } from "../protocol/messages.ts"
 import {
   readEntryCount,
-  readLane,
   readStreaming,
   readTranscript,
   type StreamingView,
@@ -44,7 +49,8 @@ export interface ConnectOptions {
 export type { StreamingView }
 
 export interface SessionView {
-  readonly laneName: string | null
+  /** This writer's own lane, derived from its peer id (ADR-0011). */
+  readonly laneName: LaneName
   readonly transcript: ReturnType<typeof projectTranscript>
   readonly streaming: StreamingView | null
   readonly entryCount: number
@@ -60,15 +66,20 @@ export interface SessionClient {
    */
   readonly exchange: Exchange
   readonly doc: SessionDocHandle
-  view(): SessionView
-  /** Send a prompt; resolves with the host's Reply. */
   /**
-   * Send a prompt. `parentId` null appends at the lane tip; a string forks
-   * from that entry (the host navigates there first).
+   * This writer's lane. The host derives the same name from the same peer id,
+   * via the transport, so no lane name ever crosses the wire.
    */
-  prompt(text: string, parentId?: string | null): Promise<Reply>
-  /** Move this writer's lane tip to `targetId`, running nothing. */
-  navigate(targetId: string): Promise<Reply>
+  readonly laneName: LaneName
+  view(): SessionView
+  /**
+   * Send a prompt. With no `from`, it appends at this writer's lane tip. With
+   * an entry, it forks from there.
+   */
+  prompt(text: string, from?: EntryId): Promise<Outcome>
+  /** Move this writer's lane to `to`, running nothing. */
+  navigate(to: Position): Promise<Outcome>
+  /** Every reply as it arrived on the wire, for wire-level checks. */
   readonly replies: readonly Reply[]
   close(): Promise<void>
 }
@@ -106,45 +117,42 @@ export async function connectSession(
    * from seq (ADR-0013: nothing may render by seq order). Entries in the doc
    * carry no seq at all, so this is enforced structurally, not by discipline.
    */
+  const laneName = laneNameForWriter(peerId)
+
   function view(): SessionView {
     return {
-      laneName: readLane(doc),
-      transcript: readTranscript(doc),
-      streaming: readStreaming(doc),
+      laneName,
+      transcript: readTranscript(doc, laneName),
+      streaming: readStreaming(doc, laneName),
       entryCount: readEntryCount(doc),
     }
   }
 
   const unsubscribe = subscribe(doc, () => options.onChange?.(view()))
 
+  /** Encode an intent, send it, and resolve with the decoded outcome. */
+  function send(intent: Intent): Promise<Outcome> {
+    const id = `c-${Math.random().toString(36).slice(2, 10)}`
+    const settled = new Promise<Reply>(resolve => replyWaiters.set(id, resolve))
+    sender.send(encodeIntent(id, intent))
+    return settled.then(decodeReply)
+  }
+
   return {
     peerId,
+    laneName,
     exchange,
     doc,
     view,
-    /**
-     * Send a prompt. `parentId` null appends at the lane tip; a string forks
-     * from that entry (the host navigates there first).
-     */
-    prompt(text: string, parentId?: string | null): Promise<Reply> {
-      const id = `c-${Math.random().toString(36).slice(2, 10)}`
-      const settled = new Promise<Reply>(resolve =>
-        replyWaiters.set(id, resolve),
+    prompt(text: string, from?: EntryId): Promise<Outcome> {
+      return send(
+        from === undefined
+          ? { kind: "prompt", text }
+          : { kind: "branch", text, from },
       )
-      const outgoing: Command =
-        parentId === null || parentId === undefined
-          ? command({ id, kind: "prompt", text })
-          : command({ id, kind: "branch", text, parentId })
-      sender.send(outgoing)
-      return settled
     },
-    navigate(targetId: string): Promise<Reply> {
-      const id = `c-${Math.random().toString(36).slice(2, 10)}`
-      const settled = new Promise<Reply>(resolve =>
-        replyWaiters.set(id, resolve),
-      )
-      sender.send(command({ id, kind: "navigate", parentId: targetId }))
-      return settled
+    navigate(to: Position): Promise<Outcome> {
+      return send({ kind: "navigate", to })
     },
     replies,
     async close() {

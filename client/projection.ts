@@ -11,11 +11,13 @@
 
 import {
   type EntryLike,
+  latestTip,
   projectSpine,
   projectTranscript,
   type SpineProjection,
 } from "@pineta/core"
 import {
+  readActiveRun,
   readEntries,
   readLaneNames,
   readLaneTip,
@@ -28,9 +30,19 @@ export interface StreamingView {
   readonly text: string
 }
 
-/** The lane this replica renders. `null` before the host has claimed one. */
-export function readLane(doc: SessionDocHandle): string | null {
-  return readLaneNames(doc)[0] ?? null
+/**
+ * The tip a window should show when it has no selection of its own: its own
+ * lane's tip, or, for a window that has not written yet, the most recently
+ * advanced lane in the session.
+ */
+export function readDefaultViewTip(
+  doc: SessionDocHandle,
+  ownLane: string,
+): string | null {
+  return (
+    readLaneTip(doc, ownLane) ??
+    latestTip(readLaneNames(doc).map(lane => readLaneTip(doc, lane)))
+  )
 }
 
 /**
@@ -40,13 +52,9 @@ export function readLane(doc: SessionDocHandle): string | null {
  */
 export function readTranscript(
   doc: SessionDocHandle,
+  lane: string,
 ): ReturnType<typeof projectTranscript> {
-  const entries = readRenderableEntries(doc)
-  const lane = readLane(doc)
-  return projectTranscript(
-    entries,
-    lane === null ? null : readLaneTip(doc, lane),
-  )
+  return projectTranscript(readRenderableEntries(doc), readLaneTip(doc, lane))
 }
 
 /**
@@ -87,15 +95,16 @@ export function readSpine(
 }
 
 /** The lane's own tip: where the host will append the next entry. */
-export function readLaneTipId(doc: SessionDocHandle): string | null {
-  const lane = readLane(doc)
-  return lane === null ? null : readLaneTip(doc, lane)
-}
-
-/** Live token deltas, or `null` when no run is active. */
-export function readStreaming(doc: SessionDocHandle): StreamingView | null {
-  const runId = doc.activeRunId()
-  return runId === "" ? null : { runId, text: readStream(doc, runId) }
+/**
+ * This lane's live token deltas, or `null` when it is idle. Other writers'
+ * runs stream into the same document but are not this window's stream.
+ */
+export function readStreaming(
+  doc: SessionDocHandle,
+  lane: string,
+): StreamingView | null {
+  const runId = readActiveRun(doc, lane)
+  return runId === undefined ? null : { runId, text: readStream(doc, runId) }
 }
 
 export function readEntryCount(doc: SessionDocHandle): number {

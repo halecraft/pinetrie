@@ -316,6 +316,13 @@ Why this one:
 
 The hazard needs ≥2 harness processes on one logical session. Under ADR-0001/ADR-0007 the v1 architecture is **one Node host owning the harness, with thin browser clients**, and S2/T5 established that `Storage`'s admission queue serialises commits within a process. Two browser windows driving one host therefore contend on nothing — and two concurrent Aside/Scout branches in that host are already two lanes with distinct keys. **S8 is a prerequisite for multi-device/team multiplayer, not for the v1 demo.**
 
+> **Annotation (step 3).** "Two browser windows driving one host contend on
+> nothing" was true of the *design* and false of the *implementation* until
+> step 3: the host minted a single lane at startup and every window drove it.
+> Since `PLAN-2026-09-25-lane-per-writer`, each window has its own lane, keyed by
+> the transport's peer id, and the claim holds. The original sentence is left
+> as written; findings are the evidence record.
+
 ---
 
 ## 5. Consequences for the plan

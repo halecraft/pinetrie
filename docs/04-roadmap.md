@@ -72,8 +72,13 @@ Roughly in dependency order, each independently shippable:
    - A foreign-written entry is NOT navigable: pi's session index never saw it
      created.
 
-3. **Concurrent lanes** — two branches running at once (this is where S3's
-   answer gets cashed)
+3. ~~**Concurrent lanes**~~ — **done.** A lane and a turn per writer, keyed by
+   the transport's peer id. Two windows run turns at once; neither moves the
+   other's lane; streams do not mix. Findings: pi refuses to navigate to the
+   current tip (so attachment is a decision with a `stay` outcome); pi ignores
+   `createAt` for a lane that exists and throws for an unknown one; and pi
+   records a lane on creation, which is what lets the document tell "no lane"
+   from "a lane at the root".
 4. **References** — entry and entry-span kinds; backlinks
 5. **Multi-writer composer** — `Schema.text()`; the visceral multiplayer win
 6. **Scout kind** — read-only tools, shared workspace

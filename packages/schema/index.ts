@@ -63,9 +63,10 @@ export const SessionDoc = loro.bind(
     values: Schema.record(Schema.any()),
     lists: Schema.record(Schema.list(Schema.any())),
     pendingText: Schema.record(Schema.text()),
-    // Which run is currently streaming, "" when idle. A small whole-value
-    // register is the right shape here: it is replaced, never appended to.
-    activeRunId: Schema.string(),
+    // Which run each lane is streaming, keyed by lane name. A missing key
+    // means that lane is idle; nothing is ever set to "" to mean idle. One
+    // entry per lane is what lets two writers stream at once.
+    activeRuns: Schema.record(Schema.string()),
   }),
 )
 
@@ -82,11 +83,23 @@ export type SessionDocHandle = ReturnType<typeof newSessionDoc>
 
 // --- pendingText helpers (ADR-0014) ----------------------------------------
 
-export function beginStream(doc: SessionDocHandle, runId: string): void {
+export function beginStream(
+  doc: SessionDocHandle,
+  lane: string,
+  runId: string,
+): void {
   batch(doc, d => {
     d.pendingText.set(runId, "")
-    d.activeRunId.set(runId)
+    d.activeRuns.set(lane, runId)
   })
+}
+
+/** The run a lane is streaming, or undefined when the lane is idle. */
+export function readActiveRun(
+  doc: SessionDocHandle,
+  lane: string,
+): string | undefined {
+  return doc.activeRuns.get(lane) ?? undefined
 }
 
 /** Append a streamed delta. Only the inserted characters go on the wire. */
@@ -108,11 +121,18 @@ export function readStream(doc: SessionDocHandle, runId: string): string {
   return ref === undefined ? "" : ref()
 }
 
-/** Clear on commit — the committed entry is the durable record from here on. */
-export function endStream(doc: SessionDocHandle, runId: string): void {
+/**
+ * Clear on commit — the committed entry is the durable record from here on.
+ * The lane's key is DELETED, not set to "": absence is what "idle" means.
+ */
+export function endStream(
+  doc: SessionDocHandle,
+  lane: string,
+  runId: string,
+): void {
   batch(doc, d => {
     d.pendingText.delete(runId)
-    if (d.activeRunId() === runId) d.activeRunId.set("")
+    if (d.activeRuns.get(lane) === runId) d.activeRuns.delete(lane)
   })
 }
 
@@ -145,22 +165,65 @@ export const readEntries = (
 ): Record<string, StoredEntryRow> => doc.entries()
 
 /**
- * pi stores the lane tip in the `values` record under a physical key of
- * `namespace \u0000 key`, with namespace `pi.branch.tip` keyed by LANE NAME
- * (ADR-0011). Reading it does not require pi.
+ * The record key for one of pi's values: `namespace`, a NUL, then `key`.
+ *
+ * pi addresses a value by a (namespace, key) pair; that pair is pi's. Folding
+ * it into ONE record key is ours: `values` is a flat record, so each address
+ * becomes one leaf register and there is no child container to race when two
+ * replicas write a new namespace at once (S18, ADR-0016). NUL is the
+ * separator pi's own in-memory storage uses; it cannot appear in a namespace,
+ * and it sorts first, so one namespace's keys are adjacent.
+ *
+ * The key is an IDENTITY, not a format to read back. It is built here and
+ * nowhere else, and never parsed: every stored value also carries its
+ * `namespace` and `key` as properties, and readers use those.
  */
+export const physicalKey = (namespace: string, key: string): string =>
+  `${namespace}\u0000${key}`
+
+/** pi's namespace for lane tips, keyed by lane name (ADR-0011). pi's name. */
+const LANE_TIP = "pi.branch.tip"
+
+/** A stored value's own record of its address and contents. */
+interface StoredAddress {
+  readonly namespace?: unknown
+  readonly key?: unknown
+  readonly value?: unknown
+}
+const asStored = (v: unknown): StoredAddress | undefined =>
+  v !== null && typeof v === "object" ? (v as StoredAddress) : undefined
+
+/**
+ * Whether the document records a lane named `lane` at all.
+ *
+ * This is the only way to tell "no lane" from "a lane at the root": pi writes
+ * the lane's tip value when it creates a lane, null until the lane has an
+ * entry, so `readLaneTip` returns null for both. Measured, not assumed: see
+ * `packages/pi/TECHNICAL.md`.
+ */
+export function hasLaneRecord(doc: SessionDocHandle, lane: string): boolean {
+  return doc.values.get(physicalKey(LANE_TIP, lane)) !== undefined
+}
+
+/** A lane's tip entry id, or null if the lane has none (or does not exist). */
 export function readLaneTip(
   doc: SessionDocHandle,
   laneName: string,
 ): string | null {
-  const stored = doc.values.get(`pi.branch.tip\u0000${laneName}`)
-  if (stored === null || typeof stored !== "object") return null
-  const value = (stored as { value?: unknown }).value
+  const value = asStored(doc.values.get(physicalKey(LANE_TIP, laneName)))?.value
   return typeof value === "string" ? value : null
 }
 
+/**
+ * Every lane the document records. Read from each value's own `namespace` and
+ * `key` properties, never by splitting the record key.
+ */
 export function readLaneNames(doc: SessionDocHandle): string[] {
-  return Object.keys(doc.values())
-    .filter(k => k.startsWith("pi.branch.tip\u0000"))
-    .map(k => k.slice("pi.branch.tip\u0000".length))
+  const names: string[] = []
+  for (const stored of Object.values(doc.values())) {
+    const s = asStored(stored)
+    if (s?.namespace === LANE_TIP && typeof s.key === "string")
+      names.push(s.key)
+  }
+  return names
 }

@@ -68,3 +68,43 @@ this during implementation; it is not hypothetical.
 **`usageRows`, `values` and `lists` are still `Schema.any()`.** They are pi's
 bookkeeping for its `Storage` port, not Pineta's domain model, and nothing of
 ours traverses them. The asymmetry with `entries` is deliberate.
+
+## `activeRuns`: one stream per lane
+
+`activeRuns: Schema.record(Schema.string())` maps a lane name to the run it is
+streaming. A **missing key means idle**; `endStream` deletes the key rather than
+setting `""`, so no sentinel survives inside the structure. It replaced a single
+`activeRunId` register, which allowed only one stream in the whole document.
+
+This is a change to a **root product field**, and root product fields ARE
+reachable by Kyneta's migration walk (S17's control row). So unlike a change to
+the entry row, this one is migratable, as a drop plus an add at the root. It was
+deliberately not migrated: the value is a transient stream pointer and there
+were no users. Recorded precisely so it does not blur S17's finding that
+`Schema.record` and sums are the barrier, not root fields.
+
+## Telling "no lane" from "a lane at the root"
+
+`readLaneTip` returns null for both. `hasLaneRecord` separates them: pi writes
+the `pi.branch.tip` key when it creates a lane, even before its first entry.
+See `packages/pi/TECHNICAL.md` for why this matters.
+
+## Never race a child container (S18)
+
+A child container created lazily under a record key LOSES one writer's contents
+when two replicas create it concurrently: nested `values[ns][key]` kept both
+writers' values in 0 of 40 trials, against 40 of 40 for the flat layout. Once
+the container exists, merging inside it is fine; the hazard is creation.
+
+`pendingText` (a `Schema.text()` per run) and `lists` (a `Schema.list()` per pi
+operation) do create child containers lazily. They are safe only because each is
+keyed by a globally unique id and only the host replica writes. **Do not key a
+lazily created container by anything two replicas could share**: a namespace, a
+lane name, a user id. See `docs/findings/S18-nested-values.md`. The rule is ADR-0016.
+
+`values` therefore stays flat, one leaf register per address, keyed by
+`physicalKey(namespace, key)`. The (namespace, key) address is pi's; folding it
+into one key with a NUL is ours, mirroring pi's reference storage. The key is
+an identity, never parsed: readers use each stored value's own `namespace` and
+`key` properties. `physicalKey` is the single definition, used by the writer in
+`packages/pi` and by point lookups here.

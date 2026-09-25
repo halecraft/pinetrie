@@ -35,3 +35,19 @@ export function createChecks(): Checks {
     },
   }
 }
+
+/**
+ * Poll until `pred` holds. Resolves with the elapsed milliseconds, or -1 on
+ * timeout. Shared by both suites so each does not grow its own copy.
+ */
+export async function waitFor(
+  pred: () => boolean,
+  timeoutMs = 60_000,
+): Promise<number> {
+  const t0 = Date.now()
+  while (Date.now() - t0 < timeoutMs) {
+    if (pred()) return Date.now() - t0
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
+  return -1
+}

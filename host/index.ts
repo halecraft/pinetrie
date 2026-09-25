@@ -13,26 +13,42 @@ import {
   wrapNodeWebsocket,
 } from "@kyneta/websocket-transport/server"
 import {
+  type Attach,
+  atEntry,
   checkEnvironment,
-  type InboundCommand,
+  entryId,
   type LaneName,
   laneNameForWriter,
+  planAttach,
   planCommand,
+  ROOT,
+  runId,
+  type Target,
   type TurnState,
   turnFinished,
+  type WriterLaneState,
 } from "@pineta/core"
-import { type Agent, createAgent, newId } from "@pineta/pi"
+import { type Agent, createAgent, type LaneOutcome, newId } from "@pineta/pi"
 import {
   appendStream,
   beginStream,
   endStream,
+  hasLaneRecord,
+  readActiveRun,
+  readLaneTip,
   SessionDoc,
   type SessionDocHandle,
 } from "@pineta/schema"
 import { createServer as createViteServer } from "vite"
 import { WebSocketServer } from "ws"
+import {
+  decodeCommand,
+  encodeOutcome,
+  type Outcome,
+  type WireCommand,
+} from "../protocol/codec.ts"
 import { Control } from "../protocol/line.ts"
-import { HOST_PEER_ID, reply, SESSION_DOC_ID } from "../protocol/messages.ts"
+import { HOST_PEER_ID, SESSION_DOC_ID } from "../protocol/messages.ts"
 
 const require = createRequire(import.meta.url)
 
@@ -67,9 +83,6 @@ export interface RunningHost {
   readonly port: number
   readonly httpUrl: string
   readonly wsUrl: string
-  /** Branded: minted by `laneNameForWriter`, so it can never be "main". */
-  readonly laneName: LaneName
-  readonly peerId: string
   readonly doc: SessionDocHandle
   readonly agent: Agent
   shutdown(): Promise<void>
@@ -86,14 +99,11 @@ export async function startHost({
     `[host] env ok — loro-crdt ${env.loroVersion}, node ${env.node}, stepInPlace present`,
   )
 
-  const peerId = newId()
-  const laneName = laneNameForWriter(peerId) // ADR-0011: never "main"
-
   // --- transport + exchange ------------------------------------------------
   const serverTransport = new WebsocketServerTransport()
   // The Exchange id is the address a client's Line targets, so it is the
-  // agreed constant. `peerId` is a different thing: WRITER identity, which
-  // names the lane (ADR-0011).
+  // agreed constant. The host has no WRITER identity: writers are the
+  // connected clients, and each names its own lane (ADR-0011).
   const exchange = new Exchange({
     id: HOST_PEER_ID,
     transports: [serverTransport],
@@ -103,108 +113,143 @@ export async function startHost({
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
 
   // --- pi stack ------------------------------------------------------------
-  let activeRunId = ""
   const agent = await createAgent({
     doc,
-    peerId,
-    laneName,
+    replicaId: newId(),
     provider,
     model,
-    onDelta: ({ delta }) => {
-      if (activeRunId !== "") appendStream(doc, activeRunId, delta)
+    // Route each delta by the lane pi says it streamed on, looking the run up
+    // in the document. The document already records which run each lane is
+    // streaming; a second copy here would be two sources of truth.
+    onDelta: ({ lane, delta }) => {
+      const run = readActiveRun(doc, lane)
+      if (run !== undefined) appendStream(doc, run, delta)
     },
-    onTurnEnd: () => {},
   })
-  log(`[host] agent ready — model ${agent.modelLabel}, lane ${laneName}`)
+  log(`[host] agent ready — model ${agent.modelLabel}`)
 
   // --- command channel (ADR-0007) -----------------------------------------
-  let state: TurnState = { ready: true, busy: false }
+  // One turn state per WRITER, so one writer's running turn never makes
+  // another busy. A record per writer that ever connected stays for the life
+  // of the process; that is small and acceptable for v1.
+  const turns = new Map<LaneName, TurnState>()
+  const turnOf = (lane: LaneName): TurnState =>
+    turns.get(lane) ?? { ready: true, busy: false }
 
   const listener = Control.listen(exchange)
   type ControlSender = Parameters<Parameters<typeof listener.onReceive>[0]>[0]
 
-  // The command arrives off a socket, so it is UNTRUSTED: the Line schema types
-  // `kind` as `string`, not our `"prompt"` literal. `InboundCommand` is core's
-  // permissive shape and `planCommand` does the narrowing, rejecting anything
-  // that is not a well-formed prompt. Typing this parameter as our own
-  // `Command` would have been a lie that only compiled because the old code was
-  // untyped.
+  /**
+   * Where this writer's lane is, read from the document.
+   *
+   * "No lane" and "a lane at the root" both have a null tip, and mistaking one
+   * for the other is silent: pi ignores `createAt` for a lane that exists, so
+   * a branch would attach at the root. They differ in whether the lane is
+   * RECORDED, which pi does on creation even before the first entry. Reading
+   * the document, not the agent's cache, keeps this right across a restart.
+   */
+  function gatherLane(lane: LaneName): WriterLaneState {
+    if (!hasLaneRecord(doc, lane)) return { kind: "none" }
+    const tip = readLaneTip(doc, lane)
+    return { kind: "lane", at: tip === null ? ROOT : atEntry(entryId(tip)) }
+  }
+
+  /** Carry out an `Attach` decision. The shell's half of `planAttach`. */
+  function attach(lane: LaneName, plan: Attach): Promise<LaneOutcome> {
+    switch (plan.kind) {
+      case "stay":
+        return Promise.resolve({ kind: "ok" })
+      case "create":
+        return agent.lane(lane).create(plan.at)
+      case "navigate":
+        return agent.lane(lane).navigate(plan.to)
+    }
+  }
+
+  /**
+   * One command from one writer: gather, plan, execute.
+   *
+   * The command is UNTRUSTED text off a socket, so it is decoded first. The
+   * codec owns every shape rule; `planCommand` and `planAttach` are pure and
+   * own policy. Attachment is awaited BEFORE replying, so anything pi refuses
+   * there comes back as a structured refusal. Only the run itself happens
+   * after the reply.
+   */
   async function handleCommand(
     sender: ControlSender,
-    cmd: InboundCommand,
+    lane: LaneName,
+    wire: WireCommand,
   ): Promise<void> {
-    const decision = planCommand(state, cmd, newId()) // plan (pure)
-    state = decision.next
+    const id = typeof wire.id === "string" ? wire.id : ""
+    const respond = (outcome: Outcome) =>
+      sender.send(encodeOutcome(id, outcome))
 
+    const intent = decodeCommand(wire)
+    if (intent.kind === "refused") return respond(intent)
+
+    // gather
+    const turn = turnOf(lane)
+    const at = gatherLane(lane)
+
+    // plan (pure)
+    const decision = planCommand(turn, intent, runId(newId()))
     if (decision.kind === "reject") {
-      sender.send(
-        reply({
-          id: cmd.id ?? "",
-          accepted: false,
-          errorCode: decision.code,
-          errorMessage: decision.message,
-        }),
-      )
-      return
+      return respond({
+        kind: "refused",
+        code: decision.code,
+        message: decision.message,
+      })
     }
+    const target: Target =
+      decision.kind === "navigate" ? decision.to : decision.from
+    const plan = planAttach(at, target)
 
-    if (decision.kind === "navigate") {
-      // Unlike a run, navigation is awaited BEFORE replying. It has no stream
-      // and no turn, so there is nothing to start early \u2014 and waiting means
-      // pi's refusal (an unknown target, say) travels back as a structured
-      // rejection instead of being logged after the reply has gone.
-      const moved = await agent.navigate(decision.targetId)
-      sender.send(
-        reply({
-          id: cmd.id ?? "",
-          accepted: moved.ok,
-          errorCode: moved.ok ? "" : moved.status.replace(/^rejected:/, ""),
-          errorMessage: moved.ok ? "" : `navigation refused: ${moved.status}`,
-        }),
-      )
+    // execute: attach first, so a refusal can still be reported
+    const attached = await attach(lane, plan)
+    if (attached.kind === "refused") {
       log(
-        `[host] navigate -> ${decision.targetId.slice(-8)} ${moved.ok ? "ok" : moved.status}`,
+        `[host] ${lane.slice(-8)} attach ${plan.kind} REFUSED: ${attached.code}`,
       )
-      return
+      return respond({
+        kind: "refused",
+        code: attached.code,
+        message: `pi refused to ${plan.kind === "create" ? "create the lane" : "navigate"}`,
+      })
     }
+    if (decision.kind === "navigate") return respond({ kind: "navigated" })
 
-    // execute
-    sender.send(
-      reply({ id: cmd.id ?? "", accepted: true, runId: decision.runId }),
-    )
-    activeRunId = decision.runId
-    beginStream(doc, decision.runId)
+    turns.set(lane, decision.next)
+    respond({ kind: "started", runId: decision.runId })
+    beginStream(doc, lane, decision.runId)
     log(
-      `[host] run ${decision.runId.slice(-8)}${
-        decision.parentId === null
-          ? ""
-          : ` branch<-${decision.parentId.slice(-8)}`
-      } <- ${JSON.stringify(decision.text.slice(0, 60))}`,
+      `[host] ${lane.slice(-8)} run ${decision.runId.slice(-8)} ${plan.kind} <- ${JSON.stringify(decision.text.slice(0, 60))}`,
     )
     try {
-      // The reply above was the ACCEPTANCE; the run happens after it. A run pi
-      // refuses (a navigation to an unknown target, say) therefore cannot
-      // travel back as a rejection, so it must at least be visible here rather
-      // than being swallowed by the "done" line below.
-      const outcome = await agent.run(decision.text, decision.parentId)
-      if (!outcome.ok) {
-        log(`[host] run ${decision.runId.slice(-8)} REFUSED: ${outcome.status}`)
+      // The reply above was the ACCEPTANCE; the run happens after it, so a run
+      // pi refuses cannot travel back as a rejection. Log it rather than let
+      // the "done" line below swallow it.
+      const ran = await agent.lane(lane).run(decision.text)
+      if (ran.kind === "refused") {
+        log(`[host] run ${decision.runId.slice(-8)} REFUSED: ${ran.code}`)
       }
     } catch (error) {
       log(
         `[host] run failed: ${error instanceof Error ? error.message : String(error)}`,
       )
     } finally {
-      endStream(doc, decision.runId)
-      activeRunId = ""
-      state = turnFinished(state)
+      endStream(doc, lane, decision.runId)
+      turns.set(lane, turnFinished(turnOf(lane)))
       log(`[host] run ${decision.runId.slice(-8)} done`)
     }
   }
 
+  // Identity comes from the TRANSPORT, never the message: `sender.peer` is
+  // the connected client's peer id. A client therefore can only ever drive
+  // its own lane, and no command field can name someone else's.
   listener.onReceive((sender, receiver) => {
+    const lane = laneNameForWriter(sender.peer)
     void (async () => {
-      for await (const cmd of receiver) await handleCommand(sender, cmd)
+      for await (const cmd of receiver) await handleCommand(sender, lane, cmd)
     })()
   })
 
@@ -273,8 +318,6 @@ export async function startHost({
     port: actualPort,
     httpUrl: `http://localhost:${actualPort}/`,
     wsUrl: `ws://localhost:${actualPort}/ws`,
-    laneName,
-    peerId,
     doc,
     agent,
     async shutdown() {

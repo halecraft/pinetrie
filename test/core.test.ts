@@ -3,16 +3,23 @@
 
 import assert from "node:assert/strict"
 import {
+  atEntry,
   type CommandDecision,
   checkEnvironment,
   compareVersions,
   type EnvironmentReport,
   ERR,
+  entryId,
   findSeqKeys,
+  type Intent,
   laneNameForWriter,
+  latestTip,
   messageText,
+  planAttach,
   planCommand,
   projectTranscript,
+  ROOT,
+  runId,
   turnFinished,
 } from "@pineta/core"
 import { test } from "vitest"
@@ -39,140 +46,110 @@ function firstProblem(report: EnvironmentReport): string {
   return problem
 }
 
+const prompt = (text: string): Intent => ({ kind: "prompt", text })
+const RUN = runId("run-1")
+const E1 = entryId("e-1")
+const E2 = entryId("e-2")
+
 test("planCommand: a decision is a value, and it does not mutate state", () => {
   const before = { ...READY }
-  const decision = planCommand(before, { kind: "prompt", text: "hi" }, "run-1")
+  const decision = planCommand(before, prompt("hi"), RUN)
   assert.equal(decision.kind, "run")
-  assert.equal(decision.runId, "run-1")
+  assert.deepEqual(before, READY, "input state untouched")
   assert.equal(decision.next.busy, true)
-  assert.deepEqual(
-    before,
-    READY,
-    "planCommand must not mutate the state it is given",
-  )
 })
 
-test("planCommand: rejections are structured, not thrown", () => {
+test("planCommand: only STATE policy lives here — not ready, and busy", () => {
+  // Shape rules (empty text, a missing parent, an unknown kind) belong to the
+  // protocol codec and are tested in test/codec.test.ts.
   assert.equal(
-    rejection(planCommand(READY, { kind: "fold", text: "x" }, "r")).code,
-    ERR.UNKNOWN_KIND,
-  )
-  assert.equal(
-    rejection(planCommand(READY, { kind: "prompt", text: "   " }, "r")).code,
-    ERR.EMPTY_PROMPT,
-  )
-  assert.equal(
-    rejection(
-      planCommand(
-        { ready: false, busy: false },
-        { kind: "prompt", text: "x" },
-        "r",
-      ),
-    ).code,
+    rejection(planCommand({ ready: false, busy: false }, prompt("x"), RUN))
+      .code,
     ERR.NOT_READY,
   )
+  const busy = { ready: true, busy: true }
+  assert.equal(rejection(planCommand(busy, prompt("x"), RUN)).code, ERR.BUSY)
   assert.equal(
-    rejection(
-      planCommand(
-        { ready: true, busy: true },
-        { kind: "prompt", text: "x" },
-        "r",
-      ),
-    ).code,
+    rejection(planCommand(busy, { kind: "branch", text: "x", from: E1 }, RUN))
+      .code,
+    ERR.BUSY,
+  )
+  // Moving the tip under a running turn would decide where its entries land.
+  assert.equal(
+    rejection(planCommand(busy, { kind: "navigate", to: ROOT }, RUN)).code,
     ERR.BUSY,
   )
 })
 
 test("planCommand/turnFinished: busy round-trips", () => {
-  const running = planCommand(READY, { kind: "prompt", text: "hi" }, "r").next
-  assert.equal(running.busy, true)
-  assert.equal(turnFinished(running).busy, false)
+  const running = planCommand(READY, prompt("hi"), RUN)
+  assert.equal(turnFinished(running.next).busy, false)
 })
 
-test("planCommand: a branch carries its parent into the decision", () => {
-  const decision = planCommand(
-    READY,
-    { kind: "branch", text: "an aside", parentId: "e-42" },
-    "run-9",
-  )
-  assert.equal(decision.kind, "run")
-  // One decision variant: a branch is a run with an attachment point.
-  assert.equal(decision.kind === "run" ? decision.parentId : "", "e-42")
-  assert.equal(decision.kind === "run" ? decision.text : "", "an aside")
+test("planCommand: each writer's turn state is independent (ADR-0011)", () => {
+  // The host keeps a TurnState per writer. Writer A running a turn must not
+  // make writer B busy — the old single-lane host refused B here.
+  const a = planCommand(READY, prompt("from A"), RUN)
+  assert.equal(a.next.busy, true)
+  const b = planCommand(READY, prompt("from B"), runId("run-2"))
+  assert.equal(b.kind, "run", "B is not refused because A is running")
 })
 
-test("planCommand: a prompt has no parent, so it appends at the tip", () => {
-  const decision = planCommand(READY, { kind: "prompt", text: "hi" }, "r")
-  assert.equal(decision.kind === "run" ? decision.parentId : "unset", null)
+test("planCommand: a prompt attaches at the TIP; a branch at an entry", () => {
+  const p = planCommand(READY, prompt("hi"), RUN)
+  assert.deepEqual(p.kind === "run" ? p.from : null, { kind: "tip" })
+  const b = planCommand(READY, { kind: "branch", text: "x", from: E1 }, RUN)
+  assert.deepEqual(b.kind === "run" ? b.from : null, atEntry(E1))
 })
 
-test("planCommand: a branch without a parent is rejected, not run", () => {
-  assert.equal(
-    rejection(planCommand(READY, { kind: "branch", text: "x" }, "r")).code,
-    ERR.NO_PARENT,
-  )
-  assert.equal(
-    rejection(
-      planCommand(READY, { kind: "branch", text: "x", parentId: "  " }, "r"),
-    ).code,
-    ERR.NO_PARENT,
-  )
+test("planCommand: navigate is its own decision, and never makes the lane busy", () => {
+  const n = planCommand(READY, { kind: "navigate", to: atEntry(E1) }, RUN)
+  assert.equal(n.kind, "navigate")
+  assert.equal(n.next.busy, false)
 })
 
-test("planCommand: an empty branch prompt reports the EMPTY prompt", () => {
-  // Order matters: an empty prompt is reported as such even when the parent is
-  // also missing, so the user is told the first thing that is wrong.
-  assert.equal(
-    rejection(planCommand(READY, { kind: "branch", text: "  " }, "r")).code,
-    ERR.EMPTY_PROMPT,
-  )
+test("planAttach: every lane state against every target", () => {
+  const none = { kind: "none" } as const
+  const atRoot = { kind: "lane", at: ROOT } as const
+  const atE1 = { kind: "lane", at: atEntry(E1) } as const
+
+  // No lane yet: always create, never navigate. pi would ignore `createAt`
+  // for a lane that exists, so this must only happen when there is none.
+  assert.deepEqual(planAttach(none, atEntry(E1)), {
+    kind: "create",
+    at: atEntry(E1),
+  })
+  assert.deepEqual(planAttach(none, ROOT), { kind: "create", at: ROOT })
+  assert.deepEqual(planAttach(none, { kind: "tip" }), {
+    kind: "create",
+    at: ROOT,
+  })
+
+  // Already there: stay. pi refuses to navigate to the current tip
+  // (`current_tip`), so this must never become a navigate.
+  assert.deepEqual(planAttach(atE1, atEntry(E1)), { kind: "stay" })
+  assert.deepEqual(planAttach(atRoot, ROOT), { kind: "stay" })
+  assert.deepEqual(planAttach(atE1, { kind: "tip" }), { kind: "stay" })
+
+  // Elsewhere: navigate.
+  assert.deepEqual(planAttach(atE1, atEntry(E2)), {
+    kind: "navigate",
+    to: atEntry(E2),
+  })
+  assert.deepEqual(planAttach(atRoot, atEntry(E1)), {
+    kind: "navigate",
+    to: atEntry(E1),
+  })
+  assert.deepEqual(planAttach(atE1, ROOT), { kind: "navigate", to: ROOT })
 })
 
-test("planCommand: a branch is refused while a turn is running", () => {
-  assert.equal(
-    rejection(
-      planCommand(
-        { ready: true, busy: true },
-        { kind: "branch", text: "x", parentId: "e-1" },
-        "r",
-      ),
-    ).code,
-    ERR.BUSY,
-  )
-})
-
-test("planCommand: navigate is its own decision, not a run", () => {
-  const decision = planCommand(
-    READY,
-    { kind: "navigate", text: "", parentId: "e-7" },
-    "r",
-  )
-  assert.equal(decision.kind, "navigate")
-  assert.equal(decision.kind === "navigate" ? decision.targetId : "", "e-7")
-  // Navigation runs no turn, so it must not mark the lane busy.
-  assert.equal(decision.next.busy, false)
-})
-
-test("planCommand: navigate needs no text, but does need a target", () => {
-  // An empty text is fine: navigation runs nothing. An empty target is not.
-  assert.equal(
-    rejection(planCommand(READY, { kind: "navigate", text: "" }, "r")).code,
-    ERR.NO_PARENT,
-  )
-})
-
-test("planCommand: navigate is refused while a turn is running", () => {
-  // Moving the tip under a running turn would decide where its entries land.
-  assert.equal(
-    rejection(
-      planCommand(
-        { ready: true, busy: true },
-        { kind: "navigate", text: "", parentId: "e-1" },
-        "r",
-      ),
-    ).code,
-    ERR.BUSY,
-  )
+test("latestTip: the newest tip by id, independent of input order", () => {
+  // Out of id order on purpose: a helper that returned the first or last tip
+  // would pass an in-order input.
+  assert.equal(latestTip(["b-2", null, "c-3", "a-1"]), "c-3")
+  assert.equal(latestTip(["c-3", "a-1", "b-2"]), "c-3")
+  assert.equal(latestTip([null, null]), null, "lanes with no tip are ignored")
+  assert.equal(latestTip([]), null, "an empty session has no view")
 })
 
 test("laneNameForWriter: ADR-0011 — never 'main', always writer-derived", () => {

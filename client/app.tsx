@@ -7,14 +7,13 @@
 // `useText` gives us the composer itself.
 
 import { ExchangeProvider, useDocStatus, useTracked } from "@kyneta/react"
-import type { BranchSummary } from "@pineta/core"
-import type { SessionDocHandle } from "@pineta/schema"
+import { atEntry, type BranchSummary, entryId } from "@pineta/core"
+import { readLaneTip, type SessionDocHandle } from "@pineta/schema"
 import { StrictMode, useState } from "react"
 import { createRoot } from "react-dom/client"
 import {
+  readDefaultViewTip,
   readEntryCount,
-  readLane,
-  readLaneTipId,
   readSpine,
   readStreaming,
 } from "./projection.ts"
@@ -104,8 +103,8 @@ function BranchMarker({
  * delta re-renders only this component — the transcript above does not move,
  * which is the whole point of the port.
  */
-function Streaming({ doc }: { doc: SessionDocHandle }) {
-  const streaming = useTracked(() => readStreaming(doc))
+function Streaming({ doc, lane }: { doc: SessionDocHandle; lane: string }) {
+  const streaming = useTracked(() => readStreaming(doc, lane))
   return (
     <div hidden={streaming === null} id="streaming">
       <span className="role">assistant</span>
@@ -147,19 +146,19 @@ function Composer({
         if (prompt === "") return
         setText("")
         setStatus(onLane ? "running…" : "branching…")
-        const reply = await session.prompt(
+        const outcome = await session.prompt(
           prompt,
-          onLane ? null : selectedTipId,
+          onLane || selectedTipId === null ? undefined : entryId(selectedTipId),
         )
         setStatus(
-          reply.accepted
-            ? "connected"
-            : `rejected: ${reply.errorCode} — ${reply.errorMessage}`,
+          outcome.kind === "refused"
+            ? `rejected: ${outcome.code} — ${outcome.message}`
+            : "connected",
         )
         // The lane tip has moved onto the new entry, so drop the local
         // selection and let the spine follow the lane again. A stale selection
         // would show a path we are no longer appending to.
-        if (reply.accepted && !onLane) onBranched()
+        if (outcome.kind !== "refused" && !onLane) onBranched()
       }}
     >
       <input
@@ -179,16 +178,21 @@ function Composer({
 
 function App({ session }: { session: SessionClient }) {
   const doc = session.doc
-  const lane = useTracked(() => readLane(doc))
+  const lane = session.laneName
   const count = useTracked(() => readEntryCount(doc))
   const status = useDocStatus(doc)
-  const laneTipId = useTracked(() => readLaneTipId(doc))
+  const laneTipId = useTracked(() => readLaneTip(doc, lane))
+  const defaultTip = useTracked(() => readDefaultViewTip(doc, lane))
 
   // Which path you are LOOKING at. Client-local, never written: that is what
-  // makes navigation read-only. `null` means follow the lane tip.
+  // makes navigation read-only. With no selection you see your own lane, or,
+  // before you have written anything, the most recently advanced lane.
   const [selected, setSelected] = useState<string | null>(null)
-  const selectedTipId = selected ?? laneTipId
-  const onLane = selected === null || selected === laneTipId
+  const selectedTipId = selected ?? defaultTip
+  // On-lane means "what I see is where my next prompt lands". A window that
+  // joins a live session views someone else's lane, so it is off-lane and its
+  // composer branches from what it is reading, which creates its own lane.
+  const onLane = selectedTipId === laneTipId
 
   return (
     <>
@@ -212,8 +216,10 @@ function App({ session }: { session: SessionClient }) {
             id="switchLane"
             onClick={async () => {
               if (selectedTipId === null) return
-              const reply = await session.navigate(selectedTipId)
-              if (reply.accepted) setSelected(null)
+              const outcome = await session.navigate(
+                atEntry(entryId(selectedTipId)),
+              )
+              if (outcome.kind !== "refused") setSelected(null)
             }}
             type="button"
           >
@@ -224,7 +230,7 @@ function App({ session }: { session: SessionClient }) {
           </button>
         </div>
       )}
-      <Streaming doc={doc} />
+      <Streaming doc={doc} lane={lane} />
       <Composer
         onBranched={() => setSelected(null)}
         onLane={onLane}

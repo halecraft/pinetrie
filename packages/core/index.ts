@@ -14,6 +14,12 @@
 //
 // Several ADRs are constraints a type system can hold. Branding them moves the
 // check from a runtime assertion in e2e/ to a compile error at the call site.
+//
+// A brand prevents MIX-UPS where a value is created and passed around. It does
+// nothing about serialization, which is why a `LocalSeq` brand was deleted:
+// its risk was a seq reaching the wire, and a branded number drops into any
+// `number` field. These brands guard against swapped arguments, which is what
+// brands are for.
 
 declare const laneNameBrand: unique symbol
 /**
@@ -21,6 +27,49 @@ declare const laneNameBrand: unique symbol
  * `laneNameForWriter()` can mint one, so `"main"` is not assignable.
  */
 export type LaneName = string & { readonly [laneNameBrand]: true }
+
+declare const entryIdBrand: unique symbol
+declare const runIdBrand: unique symbol
+/**
+ * Entry ids and run ids are both uuidv7 strings and cannot be told apart at
+ * runtime. Navigation takes an entry id; `activeRuns` and `pendingText` are
+ * keyed by run id. Passing one where the other belongs would otherwise
+ * compile, run, and fail silently. Mint them only at the edges: the protocol
+ * codec, the document readers, and the host's id generator.
+ */
+export type EntryId = string & { readonly [entryIdBrand]: true }
+export type RunId = string & { readonly [runIdBrand]: true }
+export const entryId = (id: string): EntryId => id as EntryId
+export const runId = (id: string): RunId => id as RunId
+
+// --- positions --------------------------------------------------------------
+
+/**
+ * A point in the tree: the root, or a specific entry.
+ *
+ * pi's API spells this `string | null`, and the wire spells it `""`. Both are
+ * converted to a `Position` at the edge they arrive from, so decision logic
+ * never has to guess whether `null` means "the root" or "absent".
+ */
+export type Position =
+  | { readonly kind: "root" }
+  | { readonly kind: "entry"; readonly id: EntryId }
+
+export const ROOT: Position = { kind: "root" }
+
+/**
+ * Where a turn attaches: the writer's own lane tip, or a named position.
+ * `"tip"` is its own variant because pi reads `null` as the ROOT, so a
+ * nullable "no position given" would be one refactor away from meaning root.
+ */
+export type Target = { readonly kind: "tip" } | Position
+export const atEntry = (id: EntryId): Position => ({ kind: "entry", id })
+
+export function samePosition(a: Position, b: Position): boolean {
+  return a.kind === "root"
+    ? b.kind === "root"
+    : b.kind === "entry" && a.id === b.id
+}
 
 // --- command admission ------------------------------------------------------
 
@@ -32,10 +81,12 @@ export const ERR = {
   NOT_READY: "not_ready",
   /** A branch named no parent to fork from. */
   NO_PARENT: "no_parent",
-  /** pi refused the navigation: the target is not in this conversation. */
+  /** pi refused the target: it is not in this conversation. */
   UNKNOWN_TARGET: "unknown_target",
-  /** pi refused the navigation as invalid, e.g. a cycle. */
+  /** pi refused the navigation as invalid. */
   INVALID_NAVIGATION: "invalid_navigation",
+  /** pi refused for a reason with no more specific code here. */
+  REFUSED: "refused",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -45,104 +96,131 @@ export interface TurnState {
   readonly ready: boolean
 }
 
-export interface InboundCommand {
-  /** Set only for a branch: the entry to fork from. */
-  readonly parentId?: string
-  readonly id?: string
-  readonly kind?: string
-  readonly text?: string
-}
+/**
+ * A command whose SHAPE is already known to be valid. The protocol codec
+ * produces it; it owns every shape rule (a kind we know, non-empty text, a
+ * named parent), so this type cannot express a malformed command.
+ */
+export type Intent =
+  | { readonly kind: "prompt"; readonly text: string }
+  | { readonly kind: "branch"; readonly text: string; readonly from: EntryId }
+  | { readonly kind: "navigate"; readonly to: Position }
 
 export type CommandDecision =
   /**
    * A branch is a run with a different attachment point, so there is ONE run
-   * decision rather than two. `parentId` null means "append at the lane tip";
-   * a string means "navigate there first". Two command kinds in, one decision
-   * out: the validation differs, the execution does not.
+   * decision. `from` says where the turn attaches: the lane's own tip for a
+   * prompt, or a position for a branch. It replaces a `parentId` whose `null`
+   * meant "the tip", which pi's `navigateTree(null)` reads as "the root".
    */
   | {
       kind: "run"
-      runId: string
+      runId: RunId
       text: string
-      parentId: string | null
+      from: Target
       next: TurnState
     }
   /**
-   * Moving the lane tip is NOT a run: no runId, no stream, no turn. It gets
-   * its own decision rather than the `run` variant a branch shares with a
-   * prompt, because everything the host does for a run \u2014 issue a runId, open a
-   * stream, mark the turn busy \u2014 would be wrong here.
+   * Moving the lane tip is NOT a run: no run id, no stream, no turn, and the
+   * lane does not become busy.
    */
-  | { kind: "navigate"; targetId: string; next: TurnState }
+  | { kind: "navigate"; to: Position; next: TurnState }
   | { kind: "reject"; code: ErrCode; message: string; next: TurnState }
 
-/** Decide what to do with an inbound command. Pure: (state, command) -> decision. */
+/**
+ * Decide what to do with a well-formed intent, given ONE writer's turn state.
+ *
+ * Only state policy lives here: ready and busy. Shape rules belong to the
+ * protocol codec. Each writer has their own `TurnState` (ADR-0011), so one
+ * writer's running turn never makes another writer busy.
+ */
 export function planCommand(
   state: TurnState,
-  command: InboundCommand | null | undefined,
-  runId: string,
+  intent: Intent,
+  newRunId: RunId,
 ): CommandDecision {
-  const reject = (code: ErrCode, message: string): CommandDecision => ({
-    kind: "reject",
-    code,
-    message,
-    next: state,
-  })
-
-  if (command === null || command === undefined) {
-    return reject(ERR.UNKNOWN_KIND, "no command")
-  }
-  const kind = command.kind
-  if (kind !== "prompt" && kind !== "branch" && kind !== "navigate") {
-    return reject(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
-  }
   if (!state.ready) {
-    return reject(ERR.NOT_READY, "host is not ready")
-  }
-
-  if (kind === "navigate") {
-    const targetId = (command.parentId ?? "").trim()
-    if (targetId.length === 0) {
-      return reject(ERR.NO_PARENT, "navigate must name a target entry")
+    return {
+      kind: "reject",
+      code: ERR.NOT_READY,
+      message: "host is not ready",
+      next: state,
     }
-    // Refused while a turn runs: moving the tip underneath a running turn
-    // would decide where its entries land.
-    if (state.busy) {
-      return reject(ERR.BUSY, "a turn is already running")
-    }
-    // `next` is unchanged: navigation does not make the lane busy.
-    return { kind: "navigate", targetId, next: state }
   }
-  if (!state.ready) {
-    return reject(ERR.NOT_READY, "host is not ready")
-  }
-  const text = typeof command.text === "string" ? command.text.trim() : ""
-  if (text.length === 0) {
-    return reject(ERR.EMPTY_PROMPT, "prompt text is empty")
-  }
+  // A navigation is refused mid-turn too: moving the tip underneath a running
+  // turn would decide where its entries land.
   if (state.busy) {
-    // The skeleton runs one turn at a time. Concurrency is out of scope.
-    return reject(ERR.BUSY, "a turn is already running")
+    return {
+      kind: "reject",
+      code: ERR.BUSY,
+      message: "your turn is already running",
+      next: state,
+    }
   }
-  // Validated last, so a branch with an empty prompt is still reported as an
-  // empty prompt rather than as a missing parent.
-  const parentId = kind === "branch" ? (command.parentId ?? "").trim() : ""
-  if (kind === "branch" && parentId.length === 0) {
-    return reject(ERR.NO_PARENT, "a branch must name a parent entry")
-  }
-
-  return {
-    kind: "run",
-    runId,
-    text,
-    parentId: kind === "branch" ? parentId : null,
-    next: { ...state, busy: true },
+  switch (intent.kind) {
+    case "navigate":
+      return { kind: "navigate", to: intent.to, next: state }
+    case "prompt":
+      return {
+        kind: "run",
+        runId: newRunId,
+        text: intent.text,
+        from: { kind: "tip" },
+        next: { ...state, busy: true },
+      }
+    case "branch":
+      return {
+        kind: "run",
+        runId: newRunId,
+        text: intent.text,
+        from: atEntry(intent.from),
+        next: { ...state, busy: true },
+      }
   }
 }
 
 /** Pure state transition for turn completion. */
 export function turnFinished(state: TurnState): TurnState {
   return { ...state, busy: false }
+}
+
+// --- attaching a writer's lane ----------------------------------------------
+
+/** Where this writer's lane is, including that it may not exist yet. */
+export type WriterLaneState =
+  | { readonly kind: "none" }
+  | { readonly kind: "lane"; readonly at: Position }
+
+/** What the shell must do so the writer's lane is at `target`. */
+export type Attach =
+  | { readonly kind: "create"; readonly at: Position }
+  | { readonly kind: "navigate"; readonly to: Position }
+  | { readonly kind: "stay" }
+
+/**
+ * Decide how to put a writer's lane at `target`.
+ *
+ * `"stay"` exists because pi refuses to navigate a lane to its current tip
+ * (`InvalidNavigation`, reason `current_tip`). "Already there" is a value to
+ * act on, not an error to catch. `create` and `navigate` are exclusive: a new
+ * lane is created where it is wanted, never created and then moved.
+ */
+export function planAttach(lane: WriterLaneState, target: Target): Attach {
+  if (target.kind === "tip") {
+    // Your own tip: a writer with no lane yet starts one at the root, which
+    // is what a brand-new session did before lanes were per writer.
+    return lane.kind === "none"
+      ? { kind: "create", at: ROOT }
+      : { kind: "stay" }
+  }
+  switch (lane.kind) {
+    case "none":
+      return { kind: "create", at: target }
+    case "lane":
+      return samePosition(lane.at, target)
+        ? { kind: "stay" }
+        : { kind: "navigate", to: target }
+  }
 }
 
 // --- lane naming (ADR-0011) -------------------------------------------------
@@ -521,4 +599,23 @@ function summarizeBranch(
       stack.push({ id: child, depth: node.depth + 1 })
   }
   return { rootId, tipId, messageCount }
+}
+
+// ── the default view ──────────────────────────────────────────────────────
+
+/**
+ * The most recently advanced tip among `tips`, or null if none has one.
+ *
+ * A window that joins a live session has no lane of its own, so it views the
+ * lane whose tip is newest. Entry ids are uuidv7, so the greatest id is the
+ * newest (S9). Chosen by comparing ids, never by position in `tips`: two
+ * clients reading the same document in a different order must pick the same
+ * lane, or one of them branches from a stale point without noticing.
+ */
+export function latestTip(tips: Iterable<string | null>): string | null {
+  let latest: string | null = null
+  for (const tip of tips) {
+    if (tip !== null && (latest === null || tip > latest)) latest = tip
+  }
+  return latest
 }

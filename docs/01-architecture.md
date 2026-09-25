@@ -145,6 +145,20 @@ Dependency direction is physical: `core → schema → pi → app`. A package ca
 reach up into the app, which is what forced `core` and `schema` to become
 packages — pi depends on them.
 
+### Writers, lanes and the host
+
+The host owns one pi harness and is **not a writer**. Each connected client is
+a writer with its own lane, named from the transport's `LineSender.peer`
+(ADR-0011), and its own turn state, so writers run concurrently without moving
+each other. Decisions are pure (`planCommand`, `planAttach` in `@pineta/core`);
+the host gathers, plans and executes.
+
+Wire sentinels live only in `protocol/codec.ts`. The wire is total, so `""`
+stands for "absent"; the codec decodes commands into an `Intent` union and
+replies into an `Outcome` union, and nothing past it sees `""`. Likewise pi's
+`string | null` for a tree position becomes a `Position` inside
+`packages/pi` only.
+
 ### Branching
 
 A branch command names a parent. The host navigates the lane there with pi's

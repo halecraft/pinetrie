@@ -67,8 +67,8 @@ const RULES: Record<string, ModuleRule> = {
   protocol: {
     packages: "kyneta",
     pi: false,
-    local: ["protocol"],
-    why: "the contract; both sides agree on it",
+    local: ["protocol", "core"],
+    why: "the contract; both sides agree on it. May use core because the contract's types (ErrCode, Position, EntryId) live there, and core imports nothing, so the edge adds no weight and cannot form a cycle",
   },
   pi: {
     packages: "any",
@@ -148,6 +148,25 @@ const ZERO_IMPORT_FILES = new Set([
 const IMPORT_RE =
   /(?:^|[\s;}])import\s+["']([^"']+)["']|(?:^|[\s(=])(?:import|export)\s[^;]*?from\s*["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)|require\(\s*["']([^"']+)["']\s*\)/gm
 
+/**
+ * Remove comments before scanning.
+ *
+ * The `from` form of IMPORT_RE is bounded by `[^;]*?`, but this codebase omits
+ * semicolons (Biome `asNeeded`), so a match can run across whole functions
+ * until it meets ANY `from "..."`, including one in a comment. It did: a doc
+ * comment reading 'tell "no lane" from "a lane at the root"' was reported as
+ * an import of a package called "a lane at the root".
+ *
+ * Deliberately simple. The line-comment pattern skips `://` so URLs in
+ * strings survive; a `//` inside some other string would lose the rest of its
+ * line, which can only hide an import written on that same line.
+ */
+function stripComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1")
+}
+
 async function* walk(dir: string): AsyncGenerator<string> {
   let entries: Dirent[]
   try {
@@ -204,7 +223,7 @@ for (const moduleName of MODULES) {
   for await (const file of walk(MODULE_DIRS[moduleName] ?? moduleName)) {
     const source = await readFile(path.join(ROOT, file), "utf8")
     const specs: string[] = []
-    for (const match of source.matchAll(IMPORT_RE)) {
+    for (const match of stripComments(source).matchAll(IMPORT_RE)) {
       const spec = match[1] ?? match[2] ?? match[3] ?? match[4]
       if (spec !== undefined) specs.push(spec)
     }

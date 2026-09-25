@@ -21,11 +21,13 @@
 //
 // Override the endpoint with PW_SERVER if you used a different port.
 
-import { projectTranscript } from "@pineta/core"
+import { entryId, projectTranscript } from "@pineta/core"
+import { readLaneNames, readLaneTip } from "@pineta/schema"
 import { type Browser, chromium } from "@playwright/test"
 import { readRenderableEntries } from "../client/projection.ts"
+import { connectSession } from "../client/session-view.ts"
 import { startHost } from "../host/index.ts"
-import { createChecks } from "./harness.ts"
+import { createChecks, waitFor } from "./harness.ts"
 
 const PW_SERVER = process.env.PW_SERVER ?? "ws://localhost:3100/"
 
@@ -121,22 +123,31 @@ try {
   const before = await page.$$eval(".fork", ns => ns.length)
   ok(before === 0, `no fork marker before the branch exists (${before})`)
 
-  const tip = await host.agent.tipId()
+  // The page is the only writer so far, so its lane is the only one recorded.
+  const pageLane = readLaneNames(host.doc)[0] ?? ""
+  const tip = readLaneTip(host.doc, pageLane)
   const parentId =
     projectTranscript(readRenderableEntries(host.doc), tip).at(-2)?.id ?? null
   ok(parentId !== null, "found a parent to fork from")
   if (parentId !== null) {
-    // Created THROUGH THE HARNESS, not written into the document. A
-    // foreign-written entry is refused by `navigateTree` with
-    // `unknown_target`: pi's session index never saw it created, so its tree
-    // navigation cannot reach it. The Node e2e covers the foreign-write (S3)
-    // path; this suite needs a branch a user can actually navigate into.
-    const trunkTip = await host.agent.tipId()
-    await host.agent.run("an aside", parentId)
-    // `run` navigates and STAYS, so put the lane back on the trunk. Otherwise
-    // the aside becomes the lane and the spine the browser renders is the
-    // branch, not the trunk it forked from.
-    await host.agent.navigate(trunkTip)
+    // The v1 demo's frame: ANOTHER writer branches off the page's message.
+    // It has its own lane (ADR-0011), so the page's lane is never touched and
+    // nothing has to be moved back afterwards. It goes through the protocol
+    // and pi, so the aside is an entry pi created and the page can navigate
+    // into it later.
+    const other = await connectSession({
+      url: host.wsUrl,
+      WebSocket,
+      peerId: "browser-other-writer",
+    })
+    const aside = await other.prompt("an aside", entryId(parentId))
+    ok(aside.kind === "started", "another writer's aside was accepted")
+    await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+    ok(
+      readLaneTip(host.doc, pageLane) === tip,
+      "the other writer's aside did not move the page's lane",
+    )
+    await other.close()
 
     await page.waitForFunction(
       () => document.querySelectorAll(".fork").length > 0,
@@ -231,13 +242,53 @@ try {
   )
   const hostLane = projectTranscript(
     readRenderableEntries(host.doc),
-    await host.agent.tipId(),
+    readLaneTip(host.doc, pageLane),
   ).map(m => m.text)
   ok(
     hostLane.some(t => t.includes("BROWSER-OK")) &&
       !hostLane.some(t => t.includes("BRANCH-FROM-BROWSER")),
-    `switched back: the HOST's lane is the trunk again (${hostLane.length} messages)`,
+    `switched back: the page's lane in the HOST is the trunk again (${hostLane.length} messages)`,
   )
+
+  // A SECOND WINDOW joins the live session. It has written nothing, so it has
+  // no lane: it must show the most recently advanced lane by default, and its
+  // composer must offer to branch, because sending forks from what it reads.
+  // Getting the default wrong would make a joining window fork from a stale
+  // point without anyone noticing.
+  const second = await browser.newPage()
+  try {
+    await second.goto(host.httpUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 20_000,
+    })
+    // Resolve to a boolean rather than throwing, so a wrong default view is
+    // reported as a labelled FAIL instead of a crashed suite.
+    const rendered = await second
+      .waitForFunction(
+        () => document.querySelectorAll("#transcript .msg").length > 0,
+        undefined,
+        { timeout: 20_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(rendered, "a joining window renders a conversation at all")
+    const joined = await second.$$eval("#transcript > div > .msg .text", ns =>
+      ns.map(n => n.textContent ?? ""),
+    )
+    ok(
+      joined.some(t => t.includes("BROWSER-OK")),
+      `a joining window shows the live lane by default (${joined.length} messages)`,
+    )
+    const joinedSend = await second.$eval("#send", n => n.textContent ?? "")
+    ok(
+      joinedSend.trim() === "branch from here",
+      `a joining window is off-lane, so it branches: "${joinedSend.trim()}"`,
+    )
+  } finally {
+    await second.close().catch(() => {})
+  }
 
   ok(
     errors.length === 0,

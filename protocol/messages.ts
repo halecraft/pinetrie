@@ -44,7 +44,11 @@ export interface Command {
   readonly id: string
   readonly kind: CommandKind
   readonly text: string
-  /** `branch`: the entry to fork from. `navigate`: the entry to move to. */
+  /**
+   * `branch`: the entry to fork from, where `""` is refused. `navigate`: the
+   * entry to move to, where `""` means the root. Only `protocol/codec.ts`
+   * interprets this; nothing past it sees `""`.
+   */
   readonly parentId: string
 }
 

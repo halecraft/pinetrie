@@ -42,54 +42,68 @@ Three rules hold them together:
 ADR-0003 exists to hold. `vitest.config.mjs` includes `packages/*/*.test.ts`
 for this reason.
 
-### Branching is `navigateTree` then `prompt`
+### One harness, a lane per writer
 
-`lane.prompt` has no parent parameter: pi always appends at the lane tip. So a
-branch is "move the tip, then prompt", and pi supports exactly that through
-`lane.navigateTree(targetId, options, context)`. We do not reimplement a tree
-operation pi owns.
+The host owns one harness. Each connected client is a writer with its own lane,
+named `laneNameForWriter(peer)` from the transport's `LineSender.peer` (ADR-0011),
+so a client can only drive its own lane. The host has no writer identity; the
+`replicaId` passed to `createAgent` is the process's storage identity, which is
+a different thing.
 
-`Agent.run(text, parentId)` is one method rather than a separate `branch()`:
-both map pi's `RunResult` the same way, and a duplicated mapping is where
-"navigation succeeded but the prompt failed" gets handled in one copy and not
-the other. `Agent.navigate(targetId)` moves the tip without running a turn.
+`Agent.lane(name)` returns a `WriterLane` with `create`, `navigate` and `run`,
+each returning a `LaneOutcome` (`ok`, or `refused` with our `ErrCode`). pi
+`Lane` objects are single-writer state (S3), so they are held one per writer
+and never shared. There is deliberately no way to READ a tip through the agent:
+readers use the document, so observing a lane can never create one.
 
-`navigationErrCode(tag)` is pure, so pi's error union can be mapped to our
-`ErrCode` without a harness. `agent.test.ts` covers it, including that an
-unrecognised tag falls back rather than throwing: pi may add error tags, and
-reporting the wrong navigation code is recoverable while throwing inside the
-host's reply path is not.
+### Attaching is a decision
 
-**`Agent.navigate` backs the `navigate` command**, which is how a writer comes
-back from an Aside. `navigateTree` moves the lane onto a branch and, before
-that command existed, nothing moved it back: a branch was one-way. For a while
-`navigate` was reachable only from a test fixture, which looked like
-speculative API and was in fact a half-wired feature. It is NOT a run, so it
-has its own decision in `planCommand`.
+A turn runs at its lane's tip. Moving the lane somewhere first is decided by
+`planAttach` in `@pineta/core`, which returns `create`, `navigate` or `stay`.
+The host carries that out, awaited, **before** it replies, so any refusal comes
+back to the client as a structured rejection. Only the run itself happens after
+the reply. Three pi behaviours, read from pi's source, shape this:
 
-Navigation is awaited before the host replies, so its refusal comes back to the
-client as a structured rejection. Only a *run's* outcome is still stranded
-behind the acceptance.
+- **pi refuses to navigate a lane to its current tip** (`InvalidNavigation`,
+  reason `current_tip`). That is why `stay` exists. Branching from your own tip
+  used to fail.
+- **`harness.lane(name, { createAt })` ignores `createAt` if the lane already
+  exists**, in memory or restored from storage. So `create` is only correct
+  when the lane really is absent.
+- **`harness.lane()` THROWS `UnknownTarget`** for an entry pi does not hold,
+  where `navigateTree` returns a `Result`. `WriterLane.create` catches it, so
+  nothing thrown by pi reaches the host.
 
-**A foreign-written entry is NOT navigable.** An entry written straight into
-the document with `writeEntry` is refused by `navigateTree` with
-`unknown_target`: pi's session index never saw it created, so its tree
-navigation cannot reach it. This is why the browser suite creates its branch
-fixture through `agent.run` while the Node suite keeps a `writeEntry` fixture
-for the S3 foreign-write scenario. They exercise different halves, and only
-one of them is navigable.
+Telling "no lane" from "a lane at the root" is therefore load-bearing, and both
+have a null tip. Measured (`sandbox/empty-lane-tip.ts`): **pi records the
+`pi.branch.tip` key when it creates a lane**, with a null value until the first
+entry. So the document alone distinguishes them, through `hasLaneRecord`, and
+the host reads it rather than the agent's cache. That also keeps it correct
+across a host restart.
 
-**A run's outcome cannot travel back as a rejection.** The host replies with
-the ACCEPTANCE before the run starts, so a refusal from pi (the navigation
-half of a *branch*, say) arrives after the reply has gone. A plain `navigate`
-does not have this problem, because it is awaited first. The host logs
-`run … REFUSED: …`; the client never learns. Carrying it back needs a second
-message on the Line, which the protocol does not have yet.
+`laneErrCode(tag)` maps pi's refusal tags for runs, navigation and lane
+creation alike. Before it was shared, a run's refusal passed pi's raw tag
+through, which leaked pi's vocabulary past the boundary (ADR-0003). An unknown
+tag becomes `refused` rather than a navigation-specific code.
 
-**`NavigateOptions.summarize` emits a `branch_summary` entry.** That is
-ADR-0010's fold, unused for now. Note the hazard before reaching for it:
-`projectSpine` drops non-message entries, so a `branch_summary` would vanish
+A foreign-written entry is not navigable (`unknown_target`): pi's session never
+saw it created. The Node e2e keeps a `writeEntry` fixture for that S3 case.
+
+`NavigateOptions.summarize` emits a `branch_summary` entry, ADR-0010's fold,
+unused for now. `projectSpine` drops non-message entries, so one would vanish
 from the spine silently.
+
+### Streaming, per lane
+
+Every pi `HarnessEvent` carries `lane`, so `onDelta` reports `{ lane, delta }`.
+The host looks the lane's current run up in the document's `activeRuns` rather
+than keeping its own map, which would be a second record of the same fact.
+
+### Turn state
+
+One `TurnState` per writer, in a map the host keeps for the life of the
+process. A small record per writer that ever connected is never removed, which
+is acceptable for v1.
 
 ### `seq` is derived, not stored
 

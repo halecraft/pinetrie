@@ -8,29 +8,32 @@
 //   node e2e/e2e.mjs              offline: transport + docs + protocol, no model call
 //   PINETA_LIVE=1 node e2e/e2e.mjs   also drives a REAL turn against a real model
 
-import { ERR, findSeqKeys, projectSpine, projectTranscript } from "@pineta/core"
-import { readEntries, readLaneTip, writeEntry } from "@pineta/schema"
+import {
+  atEntry,
+  ERR,
+  entryId,
+  findSeqKeys,
+  projectSpine,
+  projectTranscript,
+  ROOT,
+} from "@pineta/core"
+import {
+  hasLaneRecord,
+  readEntries,
+  readLaneTip,
+  writeEntry,
+} from "@pineta/schema"
 import { readRenderableEntries } from "../client/projection.ts"
 import { connectSession } from "../client/session-view.ts"
 import { startHost } from "../host/index.ts"
-import { createChecks } from "./harness.ts"
+import type { Outcome } from "../protocol/codec.ts"
+import { createChecks, waitFor } from "./harness.ts"
 
 const LIVE = process.env.PINETA_LIVE === "1"
 const PROMPT = "Say exactly: PINETA-OK"
 
 const { ok, report } = createChecks()
 const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms))
-async function waitFor(
-  pred: () => boolean,
-  timeoutMs = 60_000,
-): Promise<number> {
-  const t0 = Date.now()
-  while (Date.now() - t0 < timeoutMs) {
-    if (pred()) return Date.now() - t0
-    await sleep(10)
-  }
-  return -1
-}
 
 console.log(
   `=== Pineta walking skeleton — end to end (${LIVE ? "LIVE model" : "offline"}) ===\n`,
@@ -55,20 +58,23 @@ ok(
 )
 
 // --- layer: Line command channel, rejection path --------------------------
+/** Outcome, read the way these checks need it. */
+const accepted = (o: Outcome) => o.kind !== "refused"
+const codeOf = (o: Outcome) => (o.kind === "refused" ? o.code : "")
+const runOf = (o: Outcome) => (o.kind === "started" ? o.runId : "")
+/** A lane's tip, read from the host's document. */
+const tipOf = (lane: string) => readLaneTip(host.doc, lane)
+
 const rejected = await client.prompt("   ")
 ok(
-  rejected.accepted === false && rejected.errorCode === "empty_prompt",
-  `empty prompt structurally rejected: ${rejected.errorCode}`,
+  !accepted(rejected) && codeOf(rejected) === "empty_prompt",
+  `empty prompt structurally rejected: ${codeOf(rejected)}`,
 )
 
-const badKind = await (async () => {
-  // Send a kind the protocol permits but the host does not implement.
-  const r = await client.prompt("hello")
-  return r
-})()
+const hello = await client.prompt("hello")
 ok(
-  badKind.accepted === true && badKind.runId !== "",
-  `prompt accepted, runId issued (${badKind.runId.slice(-8)})`,
+  accepted(hello) && runOf(hello) !== "",
+  `prompt accepted, runId issued (${runOf(hello).slice(-8)})`,
 )
 
 if (!LIVE) {
@@ -93,7 +99,12 @@ ok(
   view.laneName?.startsWith("w-"),
   `lane name carries writer identity, not "main": ${view.laneName}`,
 )
-ok(view.laneName === host.laneName, "client and host agree on the lane name")
+// Identity comes from the transport: the host must have recorded this
+// client's work under exactly the lane name the client derived for itself.
+ok(
+  hasLaneRecord(host.doc, client.laneName),
+  "the host keyed this client's work to the client's own lane",
+)
 
 const roles = view.transcript.map(m => m.role)
 ok(
@@ -153,11 +164,10 @@ ok(
 )
 
 // --- the host's own view agrees -------------------------------------------
-const hostTip = await host.agent.tipId()
-ok(
-  hostTip === readLaneTip(host.doc, host.laneName),
-  "lane tip in the document matches the harness's own tip",
-)
+// Read through the DOCUMENT, as the client does. There is deliberately no
+// way to read a tip through the agent, so observing cannot create a lane.
+const hostTip = tipOf(client.laneName)
+ok(hostTip !== null, "the client's lane has a tip in the host's document")
 // Project through the SAME reader the client uses. `rawEntries` is the stored
 // form (typed columns + sealed payload, ADR-0015); it is right for the seq
 // scan above and wrong for rendering, because `message` lives in the payload.
@@ -179,18 +189,18 @@ ok(
 {
   const trunkBefore = projectTranscript(
     readRenderableEntries(host.doc),
-    await host.agent.tipId(),
+    tipOf(client.laneName),
   )
   const forkFrom = trunkBefore[0]?.id ?? null
   ok(forkFrom !== null, "found an entry to branch from")
   if (forkFrom !== null) {
-    const reply = await client.prompt("BRANCH-OK", forkFrom)
+    const reply = await client.prompt("BRANCH-OK", entryId(forkFrom))
     ok(
-      reply.accepted,
-      `branch command accepted${reply.accepted ? "" : `: ${reply.errorCode}`}`,
+      accepted(reply),
+      `branch command accepted${accepted(reply) ? "" : `: ${codeOf(reply)}`}`,
     )
 
-    const movedTip = await host.agent.tipId()
+    const movedTip = tipOf(client.laneName)
     ok(
       movedTip !== null && movedTip !== trunkBefore.at(-1)?.id,
       "the lane tip moved onto the branch",
@@ -229,19 +239,16 @@ ok(
   const trunkTip = hostTranscript.at(-1)?.id ?? null
   ok(trunkTip !== null, "remembered the trunk tip before the aside")
   if (trunkTip !== null) {
-    const back = await client.navigate(trunkTip)
+    const back = await client.navigate(atEntry(entryId(trunkTip)))
     ok(
-      back.accepted,
-      `navigate back to the trunk accepted${back.accepted ? "" : `: ${back.errorCode}`}`,
+      accepted(back),
+      `navigate back to the trunk accepted${accepted(back) ? "" : `: ${codeOf(back)}`}`,
     )
-    ok(
-      (await host.agent.tipId()) === trunkTip,
-      "the lane tip is back on the trunk",
-    )
+    ok(tipOf(client.laneName) === trunkTip, "the lane tip is back on the trunk")
 
     const known = new Set(Object.keys(readRenderableEntries(host.doc)))
     const resumed = await client.prompt("RESUMED")
-    ok(resumed.accepted, "a prompt after returning is accepted")
+    ok(accepted(resumed), "a prompt after returning is accepted")
     await waitFor(
       () => Object.keys(readRenderableEntries(host.doc)).length > known.size,
     )
@@ -257,10 +264,10 @@ ok(
 
   // Unlike a run, navigation is awaited before the reply, so pi's refusal
   // comes back as a structured rejection rather than a host log line.
-  const bogus = await client.navigate("no-such-entry")
+  const bogus = await client.navigate(atEntry(entryId("no-such-entry")))
   ok(
-    !bogus.accepted && bogus.errorCode === ERR.UNKNOWN_TARGET,
-    `an unknown target is REJECTED back to the client (${bogus.errorCode})`,
+    !accepted(bogus) && codeOf(bogus) === ERR.UNKNOWN_TARGET,
+    `an unknown target is REJECTED back to the client (${codeOf(bogus)})`,
   )
 }
 
@@ -311,12 +318,141 @@ if (forkParent !== null) {
   )
 }
 
+// --- two writers, one host (ADR-0011) ---------------------------------------
+//
+// The headline claims of step 3. Before it, every client drove ONE host-owned
+// lane: B could move A's lane, and B was refused as busy while A ran.
+{
+  const seenBy = { a: new Set<string>(), b: new Set<string>() }
+  const a = await connectSession({
+    url: host.wsUrl,
+    WebSocket,
+    peerId: "writer-a",
+    onChange: v => v.streaming && seenBy.a.add(v.streaming.runId),
+  })
+  const b = await connectSession({
+    url: host.wsUrl,
+    WebSocket,
+    peerId: "writer-b",
+    onChange: v => v.streaming && seenBy.b.add(v.streaming.runId),
+  })
+  ok(a.laneName !== b.laneName, "two clients have two lanes")
+
+  // Concurrency. Both prompts are sent before either finishes.
+  let bothActive = false
+  const watch = setInterval(() => {
+    const active = host.doc.activeRuns()
+    if (a.laneName in active && b.laneName in active) bothActive = true
+  }, 5)
+  const [ra, rb] = await Promise.all([
+    a.prompt("WRITER-A says hello"),
+    b.prompt("WRITER-B says hello"),
+  ])
+  ok(
+    accepted(ra) && accepted(rb),
+    `both writers' prompts accepted at once (B: ${codeOf(rb) || "ok"})`,
+  )
+  await waitFor(() => tipOf(a.laneName) !== null && tipOf(b.laneName) !== null)
+  await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+  clearInterval(watch)
+  ok(bothActive, "both lanes were streaming at the same moment")
+
+  // Stream isolation: each window's stream view only ever showed its OWN run.
+  ok(
+    [...seenBy.a].every(id => id === runOf(ra)) &&
+      [...seenBy.b].every(id => id === runOf(rb)),
+    `each window streamed only its own run (A saw ${seenBy.a.size}, B saw ${seenBy.b.size})`,
+  )
+
+  // Each turn attached to its own lane, proven by parentage.
+  const rows = readRenderableEntries(host.doc)
+  const pathA = projectTranscript(rows, tipOf(a.laneName)).map(m => m.text)
+  const pathB = projectTranscript(rows, tipOf(b.laneName)).map(m => m.text)
+  ok(
+    pathA.some(t => t.includes("WRITER-A")) &&
+      !pathA.some(t => t.includes("WRITER-B")),
+    "A's lane holds A's turn and not B's",
+  )
+  ok(
+    pathB.some(t => t.includes("WRITER-B")) &&
+      !pathB.some(t => t.includes("WRITER-A")),
+    "B's lane holds B's turn and not A's",
+  )
+
+  // B navigating must not move A's lane. This is the ADR-0011 hazard.
+  const aBefore = tipOf(a.laneName)
+  const moved = await b.navigate(ROOT)
+  ok(accepted(moved), `B navigates its own lane (${codeOf(moved) || "ok"})`)
+  // `aBefore !== null` is required. Without it this passed when every
+  // writer shared one lane: A's own lane was never written, so its tip read
+  // null before and after, and null === null. Proven by a negative control.
+  ok(
+    aBefore !== null && tipOf(a.laneName) === aBefore,
+    "B navigating did NOT move A's lane",
+  )
+
+  // Branching from your own tip is "stay" then a run. pi refuses to navigate
+  // to the current tip, so without planAttach this failed as invalid_navigation.
+  const aTip = tipOf(a.laneName)
+  if (aTip !== null) {
+    const own = await a.prompt("from my own tip", entryId(aTip))
+    ok(
+      accepted(own),
+      `branching from your own tip succeeds (${codeOf(own) || "ok"})`,
+    )
+    await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+  }
+
+  // Navigate to the ROOT first, then branch from an entry: the run must attach
+  // to the entry. The document tells "no lane" from "lane at root" only because
+  // pi records the lane on creation; get that wrong and pi ignores createAt.
+  const c = await connectSession({
+    url: host.wsUrl,
+    WebSocket,
+    peerId: "writer-c",
+  })
+  const toRoot = await c.navigate(ROOT)
+  ok(accepted(toRoot), "a new writer can start its lane at the root")
+  const forkAt = pathA.length > 0 ? tipOf(a.laneName) : null
+  if (forkAt !== null) {
+    const known = new Set(Object.keys(readRenderableEntries(host.doc)))
+    const fork = await c.prompt("C forks", entryId(forkAt))
+    ok(
+      accepted(fork),
+      `branch after a root navigation accepted (${codeOf(fork) || "ok"})`,
+    )
+    await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+    const fresh = Object.values(readRenderableEntries(host.doc)).filter(
+      e => !known.has(e.id),
+    )
+    ok(
+      fresh.some(e => e.parentId === forkAt),
+      "it attached to the ENTRY, not the root the lane was created at",
+    )
+  }
+
+  // A writer with NO lane branching to an unknown entry: lane creation throws
+  // in pi, and must still come back as a structured refusal.
+  const d = await connectSession({
+    url: host.wsUrl,
+    WebSocket,
+    peerId: "writer-d",
+  })
+  const lost = await d.prompt("into the void", entryId("no-such-entry"))
+  ok(
+    codeOf(lost) === ERR.UNKNOWN_TARGET,
+    `an unknown target on a NEW lane is refused back (${codeOf(lost) || "accepted"})`,
+  )
+
+  await Promise.all([a.close(), b.close(), c.close(), d.close()])
+}
+
 // --- LIVE assertion -------------------------------------------------------
 if (LIVE) {
   console.log("\n--- live turn ---")
   streamSamples.length = 0
   const r = await client.prompt(PROMPT)
-  ok(r.accepted, "live prompt accepted")
+  ok(accepted(r), "live prompt accepted")
   const done = await waitFor(
     () => client.view().transcript.length >= 4,
     120_000,

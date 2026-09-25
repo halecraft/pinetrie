@@ -64,13 +64,11 @@ import { type Segment, subscribe } from "@kyneta/schema"
 import { orderNewEntries } from "@pineta/core"
 import {
   newSessionDoc,
+  physicalKey,
   type SessionDocHandle,
   type StoredEntryRow,
 } from "@pineta/schema"
 import { addUsage, emptyUsage } from "./deep.ts"
-
-const physicalKey = (namespace: string, key: string): string =>
-  `${namespace}\u0000${key}`
 
 // pi orders value keys by Unicode CODE POINT, not UTF-16 code unit.
 function compareKeys(left: string, right: string): number {
