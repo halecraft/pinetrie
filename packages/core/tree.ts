@@ -9,6 +9,15 @@
 // Order is structural throughout: the `parentId` walk, and ids, which are
 // uuidv7 and so sort by creation (S9). Nothing here can see a seq (ADR-0013).
 
+import {
+  atEntry,
+  entryId,
+  type LaneName,
+  type Position,
+  ROOT,
+  type WriterId,
+} from "./index.ts"
+
 // ── entries and messages ──────────────────────────────────────────────────
 
 export interface MessagePart {
@@ -23,6 +32,8 @@ export interface AgentMessageLike {
   readonly author?: string
   /** Role `chat` only: whether it compelled the agent to reply. */
   readonly compelled?: boolean
+  /** Role `chat` only: the writer who sent it, from the transport. */
+  readonly writer?: WriterId
 }
 
 export interface EntryLike {
@@ -37,10 +48,12 @@ export interface TranscriptMessage {
   readonly id: string
   readonly role: string
   readonly text: string
-  /** Role `chat` only: the speaker's display name. */
+  /** Role `chat` only: the speaker's display name as sent. */
   readonly author?: string
   /** Role `chat` only: whether it compelled the agent to reply. */
   readonly compelled?: boolean
+  /** Role `chat` only: who sent it, so a reader can look up their current name. */
+  readonly writer?: WriterId
 }
 
 /** Flatten pi's AgentMessage content into display text. */
@@ -78,6 +91,9 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
       text: messageText(entry.message),
       author: entry.message?.author ?? "",
       compelled: entry.message?.compelled === true,
+      ...(entry.message?.writer === undefined
+        ? {}
+        : { writer: entry.message.writer }),
     }
   }
   if (role !== "user" && role !== "assistant") return null
@@ -276,9 +292,8 @@ export function latestTip(tips: Iterable<string | null>): string | null {
  * view moves on to it. A branch elsewhere is not below `at`, so the view never
  * jumps to it. `at` null is the root, below which everything lies.
  *
- * Leaves, not lane tips: a lane moves away from a thread (the agent's does,
- * each time another thread compels it), and a thread's last message must stay
- * in view after the lane that wrote it has gone elsewhere.
+ * Leaves, not lane tips: a conversation thread has no lane at all (ADR-0020),
+ * so a thread's end is its newest leaf, whoever wrote it.
  *
  * `exclude` is for a fresh branch: children of `at` that already existed when
  * it opened. Only leaves reached through a NEW child count, so the column stays
@@ -442,26 +457,101 @@ export function projectRail(index: TreeIndex): readonly RailRow[] {
   return rows
 }
 
-// ── the agent, and colour ─────────────────────────────────────────────────
+// ── threads, lanes, and the agent ─────────────────────────────────────────
 
-export type AgentActivity =
-  | { readonly kind: "idle" }
-  | {
-      readonly kind: "replying"
-      /** The agent's lane tip: the message it is answering, then its reply. */
-      readonly tip: string
-      /** What it reads: the path to `tip`. */
-      readonly path: ReadonlySet<string>
-    }
+/**
+ * Where a message sent at `at` lands: at the root, a new conversation, so the
+ * root itself; otherwise the end of the thread below `at` (`followTip`). The
+ * root is never followed: that would join whatever thread happens to be newest.
+ */
+export function threadEnd(index: TreeIndex, at: Position): Position {
+  if (at.kind === "root") return ROOT
+  const end = followTip(index, at.id)
+  return end === null ? at : atEntry(entryId(end))
+}
 
+/**
+ * Whether another writer took the slot below `at`: the newest compelled
+ * message below it by someone other than `me`. A plain remark and an agent
+ * reply are not a race: a compelled message simply goes after them. Pure.
+ */
+export function raceSince(
+  index: TreeIndex,
+  at: Position,
+  me: WriterId,
+): { readonly by: WriterId } | null {
+  if (at.kind === "root") return null
+  let newest: { id: string; by: WriterId } | null = null
+  const seen = new Set<string>([at.id])
+  const stack = [...(index.childrenOf.get(at.id) ?? [])]
+  for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
+    if (seen.has(id)) continue
+    seen.add(id)
+    const m = index.entries[id]?.message
+    if (
+      m?.role === "chat" &&
+      m.compelled === true &&
+      m.writer !== undefined &&
+      m.writer !== me &&
+      (newest === null || id > newest.id)
+    )
+      newest = { id, by: m.writer }
+    stack.push(...(index.childrenOf.get(id) ?? []))
+  }
+  return newest === null ? null : { by: newest.by }
+}
+
+/** A lane as the reads see it. */
+export interface LaneView {
+  readonly name: LaneName
+  readonly tip: string | null
+  readonly running: boolean
+  /** Messages waiting in its outbox. */
+  readonly waiting: number
+  /** Who the agent is answering, or who waits first: for a conflict's "by". */
+  readonly askedBy: WriterId | null
+}
+
+export type ThreadLane =
+  | { readonly kind: "none" }
+  | ({ readonly kind: "lane" } & LaneView)
+
+/**
+ * The lane whose tip is `end`. A lane's tip is always its thread's end
+ * (ADR-0020), so the end names the thread's lane with no stored mapping. The
+ * root never has a thread lane: a message there starts a new conversation.
+ */
+export function threadLaneAt(
+  lanes: readonly LaneView[],
+  end: Position,
+): ThreadLane {
+  if (end.kind === "root") return { kind: "none" }
+  const lane = lanes.find(l => l.tip === end.id)
+  return lane === undefined ? { kind: "none" } : { kind: "lane", ...lane }
+}
+
+/** One lane the agent is replying on: where, and what it reads. */
+export interface AgentRun {
+  readonly lane: LaneName
+  /** The lane's tip: the message it is answering, then its reply. */
+  readonly tip: string
+  /** What it reads: the path to `tip`. */
+  readonly path: ReadonlySet<string>
+}
+
+/**
+ * Every lane the agent is replying on. Threads have their own lanes, so
+ * several can run at once; an empty list is an idle agent.
+ */
 export function agentActivity(
   index: TreeIndex,
-  agentTip: string | null,
-  running: boolean,
-): AgentActivity {
-  return running && agentTip !== null
-    ? { kind: "replying", tip: agentTip, path: pathIds(index, agentTip) }
-    : { kind: "idle" }
+  running: readonly { readonly lane: LaneName; readonly tip: string | null }[],
+): readonly AgentRun[] {
+  return running.flatMap(r =>
+    r.tip === null
+      ? []
+      : [{ lane: r.lane, tip: r.tip, path: pathIds(index, r.tip) }],
+  )
 }
 
 /** A column with no messages of its own yet: a fresh branch. */

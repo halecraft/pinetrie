@@ -60,9 +60,13 @@
       .msg:hover .tools, .msg:focus-within .tools { display: flex; }
       .cites, .cited-by { color: #9ecbff; }
       .streaming { opacity: .75; border-left: 2px solid #9ecbff; padding-left: .75rem; }
+      /* Waiting for the thread's lane: not in the tree yet. */
+      .msg.waiting { opacity: .5; border-left: 2px dashed #777; padding-left: .75rem; }
+      /* Someone else asked first: the sender chooses to wait or to branch. */
+      .conflict { font-size: .8rem; color: #d0a15f; margin-bottom: .35rem; }
+      .conflict button { padding: .1rem .5rem; font-size: .75rem; }
 
       .composer { padding: .5rem .75rem .75rem; border-top: 1px solid #23272e; }
-      .audience { font-size: .8rem; color: #aaa; margin-bottom: .35rem; }
       .compose-row { display: flex; gap: .5rem; }
       .status { font-size: .75rem; color: #d0a15f; }
       input {

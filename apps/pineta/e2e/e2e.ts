@@ -1,37 +1,43 @@
-// e2e — drive the WHOLE skeleton without a browser.
+// e2e — drive the WHOLE system without a browser.
 //
 // This is the CI-runnable proof. It uses client/session-view.ts unmodified —
-// the same module the browser bundle uses — so what is exercised is the real
-// client path, with Node's global WebSocket standing in for the browser's.
-// What is NOT exercised: any browser runtime. Stated plainly in the findings.
+// the same module the browser bundle uses — and reads the document through
+// `@pineta/reads`, the same reads the host decides from. Node's global
+// WebSocket stands in for the browser's. What is NOT exercised: any browser
+// runtime.
 //
-//   node e2e/e2e.mjs              offline: transport + docs + protocol, no model call
-//   PINETA_LIVE=1 node e2e/e2e.mjs   also drives a REAL turn against a real model
+//   pnpm run e2e        offline: the model IS called, but its words are not checked
+//   pnpm run e2e:live   also asserts on what the model says
 
+import { readStreaming } from "@pineta/client/projection"
+import { connectSession, type SessionClient } from "@pineta/client/session"
 import {
-  readParticipantNames,
-  readReferences,
-  readRenderableEntries,
-  readTreeIndex,
-} from "@pineta/client/projection"
-import { connectSession } from "@pineta/client/session"
-import {
+  ancestry,
   atEntry,
   ERR,
   entryId,
   findSeqKeys,
-  laneNameForAgent,
+  followTip,
+  type Position,
   projectSpine,
   projectTranscript,
   ROOT,
-  THE_AGENT,
 } from "@pineta/core"
 import { decodeChat } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
-  hasLaneRecord,
+  readLanes,
+  readOutbox,
+  readParticipantNames,
+  readReferences,
+  readRenderableEntries,
+  readTreeIndex,
+} from "@pineta/reads"
+import {
+  readActiveRun,
   readEntries,
   readEntryMessage,
+  readLaneNames,
   readLaneTip,
   writeEntry,
 } from "@pineta/schema"
@@ -45,758 +51,598 @@ const { ok, report } = createChecks()
 const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms))
 
 console.log(
-  `=== Pineta walking skeleton — end to end (${LIVE ? "LIVE model" : "offline"}) ===\n`,
+  `=== Pineta — end to end (${LIVE ? "LIVE model" : "offline"}) ===\n`,
 )
 
 const host = await startHost({ port: 0, log: m => console.log(m) })
 console.log(`[e2e] host at ${host.httpUrl}\n`)
 
-// --- layer: browser client module over a real websocket -------------------
-const streamSamples: string[] = []
-const client = await connectSession({
-  url: host.wsUrl,
-  WebSocket,
-  peerId: "e2e-client",
-  onChange: v => {
-    if (v.streaming) streamSamples.push(v.streaming.text)
-  },
-})
-ok(
-  true,
-  "client connected over a real websocket and opened the session document",
-)
+// ── helpers ───────────────────────────────────────────────────────────────
 
-// --- layer: Line command channel, rejection path --------------------------
-/** Outcome, read the way these checks need it. */
-const accepted = (o: Outcome) => o.kind !== "refused"
 const codeOf = (o: Outcome) => (o.kind === "refused" ? o.code : "")
 const runOf = (o: Outcome) => (o.kind === "started" ? o.runId : "")
-/** A lane's tip, read from the host's document. */
-const tipOf = (lane: string) => readLaneTip(host.doc, lane)
-
-const rejected = await client.prompt("   ")
-ok(
-  !accepted(rejected) && codeOf(rejected) === "empty_prompt",
-  `empty prompt structurally rejected: ${codeOf(rejected)}`,
-)
-
-const hello = await client.prompt("hello")
-ok(
-  accepted(hello) && runOf(hello) !== "",
-  `prompt accepted, runId issued (${runOf(hello).slice(-8)})`,
-)
-
-if (!LIVE) {
-  console.log(
-    "\n  (offline mode: the accepted prompt above DOES call the model —",
+const tree = () => readTreeIndex(host.doc)
+const lanes = () => readLanes(host.doc, tree())
+const at = (id: string | null): Position =>
+  id === null ? ROOT : atEntry(entryId(id))
+/** Nothing running, and nothing waiting to run. */
+const idle = () =>
+  waitFor(
+    () =>
+      Object.keys(host.doc.activeRuns()).length === 0 &&
+      readOutbox(host.doc).length === 0,
+    120_000,
   )
-  console.log("   set PINETA_LIVE=1 to assert on its content)\n")
+/** The id of the message whose text is exactly `text`. */
+const idOf = (text: string): string | null =>
+  Object.values(readRenderableEntries(host.doc)).find(
+    e =>
+      e.message !== undefined &&
+      projectTranscript(tree(), e.id).at(-1)?.text === text,
+  )?.id ?? null
+/** The path to `tip`, as "role:text" (chat as "Name:text"). */
+const shape = (tip: string | null) =>
+  projectTranscript(tree(), tip).map(m =>
+    m.role === "chat" ? `${m.author}:${m.text}` : m.role,
+  )
+const connect = (peerId: string, onChange?: () => void) =>
+  connectSession({ url: host.wsUrl, WebSocket, peerId, onChange })
+
+/**
+ * Invariants of ADR-0020, checked after every section:
+ *   - every lane is a thread's (`t-…`); none is named after a person;
+ *   - no two lanes share a tip: a lane's tip is its thread's end;
+ *   - a lane only advances: its earlier tip is on its current tip's path.
+ */
+const seenTips = new Map<string, string>()
+function invariants(section: string) {
+  const all = readLaneNames(host.doc)
+  const tips = all
+    .map(l => readLaneTip(host.doc, l))
+    .filter((t): t is string => t !== null)
+  const moved = all.filter(l => {
+    const before = seenTips.get(l)
+    const now = readLaneTip(host.doc, l)
+    return (
+      before !== undefined &&
+      now !== null &&
+      !ancestry(tree(), now).path.includes(before)
+    )
+  })
+  for (const l of all) {
+    const t = readLaneTip(host.doc, l)
+    if (t !== null) seenTips.set(l, t)
+  }
+  ok(
+    all.every(l => l.startsWith("t-")) &&
+      new Set(tips).size === tips.length &&
+      moved.length === 0,
+    `${section}: lanes are threads', tips unique, none moved (${all.length} lanes)`,
+  )
 }
 
-// --- layer: harness + storage + replication -------------------------------
-const gotEntries = await waitFor(
-  () => client.view().transcript.length >= 2,
-  120_000,
-)
+// ── the first turn ────────────────────────────────────────────────────────
+const streamSamples: string[] = []
+const client: SessionClient = await connect("e2e-client", () => {
+  for (const lane of readLaneNames(host.doc)) {
+    const s = readStreaming(host.doc, lane)
+    if (s !== null) streamSamples.push(s.text)
+  }
+})
+ok(true, "client connected over a real websocket and opened the document")
+
+const rejected = await client.chat("   ", ROOT)
 ok(
-  gotEntries >= 0,
-  `committed entries replicated to the client (${gotEntries}ms)`,
+  codeOf(rejected) === ERR.EMPTY_MESSAGE,
+  `an empty message is structurally rejected: ${codeOf(rejected)}`,
 )
 
-const view = client.view()
+// The root is a working session, so a first message runs the agent: the
+// first compelled message in a thread creates that thread's lane.
+const hello = await client.chat("hello", ROOT)
 ok(
-  view.laneName?.startsWith("w-"),
-  `lane name carries writer identity, not "main": ${view.laneName}`,
+  runOf(hello) !== "",
+  `a first message starts a run (${runOf(hello).slice(-8)})`,
 )
-// Identity comes from the transport: the host must have recorded this
-// client's work under exactly the lane name the client derived for itself.
+await idle()
+
+const firstLanes = readLaneNames(host.doc)
 ok(
-  hasLaneRecord(host.doc, client.laneName),
-  "the host keyed this client's work to the client's own lane",
+  firstLanes.length === 1 && firstLanes[0]?.startsWith("t-") === true,
+  `the thread got a lane of its own: ${firstLanes.join(",")}`,
+)
+ok(
+  !firstLanes.some(l => l.includes(client.peerId)),
+  "no lane is named after the person who wrote",
+)
+const trunk = firstLanes[0] ?? ""
+const trunkTip = () => readLaneTip(host.doc, trunk)
+const first = shape(trunkTip())
+ok(
+  first.length === 2 &&
+    first[0]?.endsWith(":hello") &&
+    first[1] === "assistant",
+  `the thread reads the message, then the agent's reply: [${first.join(", ")}]`,
+)
+const helloEntry = projectTranscript(tree(), trunkTip())[0]
+const helloMsg =
+  helloEntry === undefined
+    ? undefined
+    : readEntryMessage(host.doc, helloEntry.id)
+ok(
+  decodeChat(helloMsg?.present ? helloMsg.message : undefined)?.author ===
+    client.writer,
+  "the message records its writer, from the transport",
 )
 
-const roles = view.transcript.map(m => m.role)
-ok(
-  roles[0] === "user" && roles[1] === "assistant",
-  `transcript ordered by parentId walk: [${roles.join(", ")}]`,
-)
-const userTurn = view.transcript[0]
-const assistantTurn = view.transcript[1]
-ok(
-  userTurn?.text === "hello",
-  `user turn round-tripped: ${JSON.stringify(userTurn?.text)}`,
-)
-ok(
-  (assistantTurn?.text.length ?? 0) > 0,
-  `assistant replied (${assistantTurn?.text.length ?? 0} chars)`,
-)
-
-// --- ADR-0014: streaming went through Schema.text() -----------------------
+// ADR-0014: the stream went through Schema.text(), and cleared on commit.
 ok(
   streamSamples.length > 0,
-  `client observed ${streamSamples.length} live streaming updates`,
+  `the client saw ${streamSamples.length} live streaming updates`,
 )
-const monotonic = streamSamples.every((s, i) => {
-  const previous = streamSamples[i - 1]
-  return previous === undefined || s.startsWith(previous)
-})
 ok(
-  monotonic,
+  streamSamples.every((s, i) => {
+    const previous = streamSamples[i - 1]
+    return previous === undefined || s.startsWith(previous) || s.length < 2
+  }),
   "streamed text grew monotonically (insert(at, delta), never a whole-value replace)",
 )
-ok(client.view().streaming === null, "pendingText cleared on commit")
+ok(readActiveRun(host.doc, trunk) === undefined, "the stream cleared on commit")
 
-// --- ADR-0013: seq never escapes the replica ------------------------------
-// The doc stores entries as opaque JSON; re-type once, at the read boundary.
+// ADR-0013: seq never escapes the replica.
 const rawEntries = readEntries(host.doc)
-const storedSeq = Object.values(rawEntries).filter(
-  e => e !== null && typeof e === "object" && "seq" in e,
-)
-// A scan over an empty set proves nothing, so assert the sample first.
 ok(
-  Object.keys(rawEntries).length > 0,
-  `the stored-seq scan has something to scan (${Object.keys(rawEntries).length} entries)`,
+  Object.keys(rawEntries).length > 0 &&
+    Object.values(rawEntries).every(
+      e => !(e !== null && typeof e === "object" && "seq" in e),
+    ),
+  `no stored entry carries a seq (${Object.keys(rawEntries).length} checked)`,
 )
 ok(
-  storedSeq.length === 0,
-  `no entry in the replicated document carries a stored seq (${Object.keys(rawEntries).length} entries checked)`,
+  client.replies.length > 0 &&
+    client.replies.flatMap(r => findSeqKeys(r)).length === 0,
+  `no seq key on any wire message (${client.replies.length} checked)`,
 )
 
-const wireSeq = client.replies.flatMap(r => findSeqKeys(r))
-ok(
-  client.replies.length > 0,
-  `the wire-seq scan has something to scan (${client.replies.length} replies)`,
+// The client's replica projects what the host's does.
+await waitFor(
+  () =>
+    projectTranscript(readTreeIndex(client.doc), trunkTip()).length ===
+    first.length,
 )
 ok(
-  wireSeq.length === 0,
-  `no seq key on any wire message (${client.replies.length} replies checked)`,
+  projectTranscript(readTreeIndex(client.doc), trunkTip()).length ===
+    first.length,
+  "the client's replica projects the same thread as the host's",
 )
+invariants("first turn")
 
-// --- the host's own view agrees -------------------------------------------
-// Read through the DOCUMENT, as the client does. There is deliberately no
-// way to read a tip through the agent, so observing cannot create a lane.
-const hostTip = tipOf(client.laneName)
-ok(hostTip !== null, "the client's lane has a tip in the host's document")
-// Project through the SAME reader the client uses. `rawEntries` is the stored
-// form (typed columns + sealed payload, ADR-0015); it is right for the seq
-// scan above and wrong for rendering, because `message` lives in the payload.
-const hostTranscript = projectTranscript(readTreeIndex(host.doc), hostTip)
-ok(
-  hostTranscript.length === view.transcript.length,
-  `host and client project the same transcript (${hostTranscript.length} messages)`,
-)
-
-// --- a fork created THROUGH THE PROTOCOL -----------------------------------
-//
-// The user-facing path: a branch command names a parent, the host navigates
-// there, and the turn forks from it. Distinct from the foreign write below,
-// which simulates a branch arriving from another replica (S3). Both matter;
-// they exercise different halves.
+// ── replying continues the thread's own lane ──────────────────────────────
 {
-  const trunkBefore = projectTranscript(
-    readTreeIndex(host.doc),
-    tipOf(client.laneName),
+  const before = trunkTip()
+  const more = await client.chat("and again", at(before))
+  ok(runOf(more) !== "", "a reply at the thread's end runs on its lane")
+  await idle()
+  ok(
+    readLaneNames(host.doc).length === 1 &&
+      projectTranscript(tree(), trunkTip()).some(m => m.text === "and again"),
+    "no new lane: the thread's lane advanced past its old end",
   )
-  const forkFrom = trunkBefore[0]?.id ?? null
-  ok(forkFrom !== null, "found an entry to branch from")
-  if (forkFrom !== null) {
-    const reply = await client.prompt("BRANCH-OK", entryId(forkFrom))
-    ok(
-      accepted(reply),
-      `branch command accepted${accepted(reply) ? "" : `: ${codeOf(reply)}`}`,
-    )
-
-    const movedTip = tipOf(client.laneName)
-    ok(
-      movedTip !== null && movedTip !== trunkBefore.at(-1)?.id,
-      "the lane tip moved onto the branch",
-    )
-
-    // THE assertion. Everything softer than this passes for a plain prompt
-    // too: appending at the tip also moves the tip, and projectSpine from an
-    // OLD tip reports any later append as a branch, because those entries are
-    // children of that tip but not on its path. Only parentage distinguishes
-    // "forked from the entry I named" from "appended where it always would".
-    const after = readRenderableEntries(host.doc)
-    const parentOfNew = Object.values(after)
-      .filter(e => !trunkBefore.some(t => t.id === e.id))
-      .map(e => e.parentId)
-    ok(
-      parentOfNew.includes(forkFrom),
-      `the new turn attaches to the entry we named, not the lane tip (${JSON.stringify(parentOfNew)} contains ${forkFrom})`,
-    )
-
-    const trunkTip = trunkBefore.at(-1)?.id ?? null
-    const { spine } = projectSpine(readTreeIndex(host.doc), trunkTip)
-    ok(
-      spine.length === trunkBefore.length,
-      `the trunk transcript is unchanged (${spine.length} vs ${trunkBefore.length})`,
-    )
-  }
+  invariants("reply")
 }
 
-// --- coming back from an Aside --------------------------------------------
-//
-// Without this a branch is one-way: navigateTree moves the lane onto the
-// branch and nothing moves it back. Proven by PARENTAGE, as the branch was:
-// the next turn must attach to the trunk tip we returned to.
+// ── branch: a fork made on purpose ────────────────────────────────────────
 {
-  const entries = readRenderableEntries(host.doc)
-  const trunkTip = hostTranscript.at(-1)?.id ?? null
-  ok(trunkTip !== null, "remembered the trunk tip before the aside")
-  if (trunkTip !== null) {
-    const back = await client.navigate(atEntry(entryId(trunkTip)))
-    ok(
-      accepted(back),
-      `navigate back to the trunk accepted${accepted(back) ? "" : `: ${codeOf(back)}`}`,
-    )
-    ok(tipOf(client.laneName) === trunkTip, "the lane tip is back on the trunk")
-
-    const known = new Set(Object.keys(readRenderableEntries(host.doc)))
-    const resumed = await client.prompt("RESUMED")
-    ok(accepted(resumed), "a prompt after returning is accepted")
-    await waitFor(
-      () => Object.keys(readRenderableEntries(host.doc)).length > known.size,
-    )
-    const fresh = Object.values(readRenderableEntries(host.doc)).filter(
-      e => !known.has(e.id),
-    )
-    ok(
-      fresh.some(e => e.parentId === trunkTip),
-      "the next turn resumes the TRUNK, not the aside",
-    )
-    void entries
-  }
-
-  // Unlike a run, navigation is awaited before the reply, so pi's refusal
-  // comes back as a structured rejection rather than a host log line.
-  const bogus = await client.navigate(atEntry(entryId("no-such-entry")))
-  ok(
-    !accepted(bogus) && codeOf(bogus) === ERR.UNKNOWN_TARGET,
-    `an unknown target is REJECTED back to the client (${codeOf(bogus)})`,
-  )
-}
-
-// --- a fork, written as another replica would write it (S3) ----------------
-//
-// The only command today is `prompt`, so a branch cannot be created through
-// the protocol. Writing the entry directly is not a contrivance: it is exactly
-// the S3 foreign-write scenario, which is what a branch from another device
-// looks like on arrival. The parent must exist, or KynetaStorage's reconcile
-// takes its unresolved-parents path and throws.
-const branchesBefore = projectSpine(
-  readTreeIndex(host.doc),
-  hostTip,
-).spine.reduce((n, node) => n + node.branches.length, 0)
-const forkParent = hostTranscript.at(-2)?.id ?? hostTranscript[0]?.id ?? null
-ok(forkParent !== null, "found a parent to fork from")
-if (forkParent !== null) {
-  writeEntry(host.doc, {
-    id: `aside-${Math.random().toString(36).slice(2, 10)}`,
-    parentId: forkParent,
-    type: "message",
-    timestamp: Date.now(),
-    fromId: null,
-    payload: {
-      message: { role: "user", content: "an aside", timestamp: Date.now() },
-    },
-  })
-
-  const { spine } = projectSpine(readTreeIndex(host.doc), hostTip)
-  // A DELTA, and counting BRANCHES rather than branched nodes: the protocol
-  // branch above already forked from this same parent, so a per-node count
-  // would not move when a second branch joins the same node.
-  const branchesAfter = spine.reduce((n, node) => n + node.branches.length, 0)
-  ok(
-    branchesAfter === branchesBefore + 1,
-    `the foreign write adds one more branch (${branchesBefore} -> ${branchesAfter})`,
-  )
-  const foreign = spine
-    .flatMap(n => n.branches)
-    .find(b => b.rootId.startsWith("aside-"))
-  ok(
-    foreign?.messageCount === 1,
-    `the foreign branch summarises its subtree (${foreign?.messageCount} message)`,
+  const helloId = idOf("hello")
+  const trunkBefore = shape(trunkTip())
+  const known = new Set(Object.keys(readEntries(host.doc)))
+  const fork = await client.chat("BRANCH-OK", at(helloId), "branch")
+  ok(runOf(fork) !== "", `a compelled branch starts a run (${fork.kind})`)
+  await idle()
+  const fresh = Object.values(readEntries(host.doc)).filter(
+    e => !known.has(e.id),
   )
   ok(
-    spine.length === hostTranscript.length,
-    `the fork does NOT join the spine (${spine.length} vs ${hostTranscript.length})`,
-  )
-}
-
-// --- two writers, one host (ADR-0011) ---------------------------------------
-//
-// The headline claims of step 3. Before it, every client drove ONE host-owned
-// lane: B could move A's lane, and B was refused as busy while A ran.
-{
-  const seenBy = { a: new Set<string>(), b: new Set<string>() }
-  const a = await connectSession({
-    url: host.wsUrl,
-    WebSocket,
-    peerId: "writer-a",
-    onChange: v => v.streaming && seenBy.a.add(v.streaming.runId),
-  })
-  const b = await connectSession({
-    url: host.wsUrl,
-    WebSocket,
-    peerId: "writer-b",
-    onChange: v => v.streaming && seenBy.b.add(v.streaming.runId),
-  })
-  ok(a.laneName !== b.laneName, "two clients have two lanes")
-
-  // Concurrency. Both prompts are sent before either finishes.
-  let bothActive = false
-  const watch = setInterval(() => {
-    const active = host.doc.activeRuns()
-    if (a.laneName in active && b.laneName in active) bothActive = true
-  }, 5)
-  const [ra, rb] = await Promise.all([
-    a.prompt("WRITER-A says hello"),
-    b.prompt("WRITER-B says hello"),
-  ])
-  ok(
-    accepted(ra) && accepted(rb),
-    `both writers' prompts accepted at once (B: ${codeOf(rb) || "ok"})`,
-  )
-  await waitFor(() => tipOf(a.laneName) !== null && tipOf(b.laneName) !== null)
-  await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
-  clearInterval(watch)
-  ok(bothActive, "both lanes were streaming at the same moment")
-
-  // Stream isolation: each window's stream view only ever showed its OWN run.
-  ok(
-    [...seenBy.a].every(id => id === runOf(ra)) &&
-      [...seenBy.b].every(id => id === runOf(rb)),
-    `each window streamed only its own run (A saw ${seenBy.a.size}, B saw ${seenBy.b.size})`,
-  )
-
-  // Each turn attached to its own lane, proven by parentage. Only what the
-  // writers sent is compared: a model's reply may echo either token, and
-  // whether it does says nothing about which lane a turn attached to.
-  const tree = readTreeIndex(host.doc)
-  const sent = (tip: string | null) =>
-    projectTranscript(tree, tip)
-      .filter(m => m.role !== "assistant")
-      .map(m => m.text)
-  const pathA = sent(tipOf(a.laneName))
-  const pathB = sent(tipOf(b.laneName))
-  ok(
-    pathA.some(t => t.includes("WRITER-A")) &&
-      !pathA.some(t => t.includes("WRITER-B")),
-    "A's lane holds A's turn and not B's",
+    fresh.some(e => e.parentId === helloId),
+    "the branch attaches to the entry named, not the thread's end",
   )
   ok(
-    pathB.some(t => t.includes("WRITER-B")) &&
-      !pathB.some(t => t.includes("WRITER-A")),
-    "B's lane holds B's turn and not A's",
+    readLaneNames(host.doc).length === 2,
+    "a compelled branch is a new line of work: a second lane",
   )
-
-  // B navigating must not move A's lane. This is the ADR-0011 hazard.
-  const aBefore = tipOf(a.laneName)
-  const moved = await b.navigate(ROOT)
-  ok(accepted(moved), `B navigates its own lane (${codeOf(moved) || "ok"})`)
-  // `aBefore !== null` is required. Without it this passed when every
-  // writer shared one lane: A's own lane was never written, so its tip read
-  // null before and after, and null === null. Proven by a negative control.
   ok(
-    aBefore !== null && tipOf(a.laneName) === aBefore,
-    "B navigating did NOT move A's lane",
+    shape(trunkTip()).join("|") === trunkBefore.join("|"),
+    "the trunk is unchanged by the branch",
   )
-
-  // Branching from your own tip is "stay" then a run. pi refuses to navigate
-  // to the current tip, so without planAttach this failed as invalid_navigation.
-  const aTip = tipOf(a.laneName)
-  if (aTip !== null) {
-    const own = await a.prompt("from my own tip", entryId(aTip))
-    ok(
-      accepted(own),
-      `branching from your own tip succeeds (${codeOf(own) || "ok"})`,
-    )
-    await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
-  }
-
-  // Navigate to the ROOT first, then branch from an entry: the run must attach
-  // to the entry. The document tells "no lane" from "lane at root" only because
-  // pi records the lane on creation; get that wrong and pi ignores createAt.
-  const c = await connectSession({
-    url: host.wsUrl,
-    WebSocket,
-    peerId: "writer-c",
-  })
-  const toRoot = await c.navigate(ROOT)
-  ok(accepted(toRoot), "a new writer can start its lane at the root")
-  const forkAt = pathA.length > 0 ? tipOf(a.laneName) : null
-  if (forkAt !== null) {
-    const known = new Set(Object.keys(readRenderableEntries(host.doc)))
-    const fork = await c.prompt("C forks", entryId(forkAt))
-    ok(
-      accepted(fork),
-      `branch after a root navigation accepted (${codeOf(fork) || "ok"})`,
-    )
-    await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
-    const fresh = Object.values(readRenderableEntries(host.doc)).filter(
-      e => !known.has(e.id),
-    )
-    ok(
-      fresh.some(e => e.parentId === forkAt),
-      "it attached to the ENTRY, not the root the lane was created at",
-    )
-  }
-
-  // A writer with NO lane branching to an unknown entry: lane creation throws
-  // in pi, and must still come back as a structured refusal.
-  const d = await connectSession({
-    url: host.wsUrl,
-    WebSocket,
-    peerId: "writer-d",
-  })
-  const lost = await d.prompt("into the void", entryId("no-such-entry"))
+  const lost = await client.chat("into the void", at("no-such-entry"), "branch")
   ok(
     codeOf(lost) === ERR.UNKNOWN_TARGET,
-    `an unknown target on a NEW lane is refused back (${codeOf(lost) || "accepted"})`,
+    `a message at an unknown entry is refused (${codeOf(lost) || lost.kind})`,
   )
-
-  await Promise.all([a.close(), b.close(), c.close(), d.close()])
+  invariants("branch")
 }
 
-// --- references (ADR-0017) ---------------------------------------------------
+// ── a fork written as another replica would write it (S3) ─────────────────
 {
-  const pw = await connectSession({
-    url: host.wsUrl,
-    WebSocket,
-    peerId: "ref-p",
-  })
-  const qw = await connectSession({
-    url: host.wsUrl,
-    WebSocket,
-    peerId: "ref-q",
-  })
-  const idle = () =>
-    waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
-
-  await pw.prompt("P's message, to be cited")
-  await idle()
-  const pTip = tipOf(pw.laneName)
-  const pPath = projectTranscript(readTreeIndex(host.doc), pTip)
-  const cited = pPath.at(-2)?.id ?? pPath[0]?.id ?? null
-  ok(cited !== null, "P has a message to cite")
-  if (cited !== null) {
-    // Q needs a lane at an entry to attach a reference to: it forks from P.
-    await qw.prompt("Q asks about it", entryId(cited))
-    await idle()
-    const qTip = tipOf(qw.laneName)
-    const pBefore = projectTranscript(
-      readTreeIndex(host.doc),
-      tipOf(pw.laneName),
-    )
-
-    const r = await qw.cite({ kind: "entry", id: entryId(cited) })
-    ok(
-      r.kind === "referenced",
-      `Q's citation is written (${codeOf(r) || r.kind})`,
-    )
-    const back = readReferences(host.doc).to.get(entryId(cited)) ?? []
-    ok(
-      back.length === 1 && back[0]?.author === qw.laneName,
-      `P's message shows one backlink, authored by Q (${back.length})`,
-    )
-    ok(
-      back[0]?.from === qTip,
-      "the reference is attached at Q's lane tip, not P's",
-    )
-    const pAfter = projectTranscript(
-      readTreeIndex(host.doc),
-      tipOf(pw.laneName),
-    )
-    ok(
-      JSON.stringify(pAfter) === JSON.stringify(pBefore),
-      "P's transcript is unchanged: no token entered P's context",
-    )
-
-    // ADR-0016: two writers citing the SAME entry at once both survive.
-    const [x, y] = await Promise.all([
-      pw.cite({ kind: "entry", id: entryId(cited) }),
-      qw.cite({ kind: "entry", id: entryId(cited) }),
-    ])
-    const after = readReferences(host.doc).to.get(entryId(cited)) ?? []
-    ok(
-      x.kind === "referenced" && y.kind === "referenced" && after.length === 3,
-      `two concurrent citations of one entry both survive (${after.length} backlinks)`,
-    )
-
-    const lost = await qw.cite({ kind: "entry", id: entryId("no-such-entry") })
-    ok(
-      codeOf(lost) === ERR.UNKNOWN_TARGET,
-      `an unknown target is refused (${codeOf(lost)})`,
-    )
-    const wide = await qw.cite({
-      kind: "span",
-      id: entryId(cited),
-      start: 0,
-      end: 100_000,
+  const tip = trunkTip()
+  const spineBefore = projectSpine(tree(), tip).spine
+  const branchesBefore = spineBefore.reduce((n, x) => n + x.branches.length, 0)
+  const parent = projectTranscript(tree(), tip).at(-2)?.id ?? null
+  ok(parent !== null, "found a parent to fork from")
+  if (parent !== null) {
+    writeEntry(host.doc, {
+      id: `aside-${Math.random().toString(36).slice(2, 10)}`,
+      parentId: parent,
+      type: "message",
+      timestamp: Date.now(),
+      fromId: null,
+      payload: {
+        message: { role: "user", content: "an aside", timestamp: Date.now() },
+      },
     })
+    const { spine } = projectSpine(tree(), tip)
+    const branchesAfter = spine.reduce((n, x) => n + x.branches.length, 0)
     ok(
-      codeOf(wide) === ERR.INVALID_SPAN,
-      `an out-of-bounds span is refused (${codeOf(wide)})`,
+      branchesAfter === branchesBefore + 1,
+      `the foreign write adds one branch (${branchesBefore} -> ${branchesAfter})`,
+    )
+    ok(
+      spine.length === spineBefore.length,
+      "the foreign fork does NOT join the spine",
     )
   }
-  await Promise.all([pw.close(), qw.close()])
 }
 
-// --- humans in the tree -----------------------------------------------------
+// ── two threads run at once; one thread takes one message at a time ──────
 {
-  console.log("\n--- humans in the tree ---")
-  const al = await connectSession({
-    url: host.wsUrl,
-    WebSocket,
-    peerId: "h-alice",
-  })
-  const bo = await connectSession({
-    url: host.wsUrl,
-    WebSocket,
-    peerId: "h-bob",
-  })
-  const agentLane = laneNameForAgent(THE_AGENT)
-  const idle = () =>
-    waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
-  const entryIdOf = (o: Outcome) => (o.kind === "appended" ? o.id : null)
-  /** The stored message's raw `content`: what pi sends the model. */
-  const contentOf = (id: string | null) => {
-    const found = id === null ? undefined : readEntryMessage(host.doc, id)
-    const m = found?.present
-      ? (found.message as { content?: unknown })
-      : undefined
-    return typeof m?.content === "string" ? m.content : ""
+  const a = await connect("writer-a")
+  const b = await connect("writer-b")
+  let bothActive = false
+  const watch = setInterval(() => {
+    if (Object.keys(host.doc.activeRuns()).length >= 2) bothActive = true
+  }, 5)
+  const [ra, rb] = await Promise.all([
+    a.chat("WRITER-A says hello", ROOT),
+    b.chat("WRITER-B says hello", ROOT),
+  ])
+  ok(
+    runOf(ra) !== "" && runOf(rb) !== "",
+    "two new conversations each start their own run",
+  )
+  await idle()
+  clearInterval(watch)
+  ok(bothActive, "two threads' lanes were running at the same moment")
+  const sent = (text: string) => {
+    const tip = lanes().find(l =>
+      projectTranscript(tree(), l.tip).some(m => m.text === text),
+    )?.tip
+    return projectTranscript(tree(), tip ?? null)
+      .filter(m => m.role !== "assistant")
+      .map(m => m.text)
   }
+  ok(
+    sent("WRITER-A says hello").join() === "WRITER-A says hello" &&
+      sent("WRITER-B says hello").join() === "WRITER-B says hello",
+    "each thread holds its own message and not the other's",
+  )
+  invariants("concurrency")
+  await Promise.all([a.close(), b.close()])
+}
 
-  const [na, nb] = await Promise.all([al.setName("Alice"), bo.setName("Bob")])
+// ── conversation threads have no lane ─────────────────────────────────────
+{
+  const alice = await connect("h-alice")
+  const bob = await connect("h-bob")
+  const [na, nb] = await Promise.all([
+    alice.setName("Alice"),
+    bob.setName("Bob"),
+  ])
   const names = readParticipantNames(host.doc)
   ok(
     na.kind === "named" &&
       nb.kind === "named" &&
-      names.get(al.laneName) === "Alice" &&
-      names.get(bo.laneName) === "Bob",
-    "each person's display name is stored by their lane",
+      names.get(alice.writer) === "Alice" &&
+      names.get(bob.writer) === "Bob",
+    "each person's display name is stored by their writer id",
   )
 
-  // The session's root is a working session: someone alone gets a reply.
-  const first = await al.chat("hello, let's get started")
-  ok(
-    first.kind === "started",
-    `a first message in a fresh session runs the agent (${first.kind})`,
-  )
-  await idle()
-  const opened = tipOf(agentLane)
-
-  // Alice makes the thread a conversation below the agent's reply; then two
-  // people talk, and nothing runs.
-  const conv =
-    opened === null
-      ? undefined
-      : await al.setThreadMode(entryId(opened), "conversation")
-  ok(
-    conv?.kind === "threaded",
-    `the thread becomes a conversation (${conv?.kind})`,
-  )
-  const before = Object.keys(readEntries(host.doc)).length
-  const a1 = await al.chat(
+  // A conversation, branched on purpose from the first message, with no lane.
+  const helloId = idOf("hello")
+  if (helloId !== null)
+    await alice.setThreadMode(entryId(helloId), "conversation")
+  const lanesBefore = readLaneNames(host.doc).length
+  const opened = await alice.chat(
     "the secret word is PLUM",
-    opened === null ? undefined : { kind: "entry", id: entryId(opened) },
+    at(helloId),
+    "branch",
   )
-  const a1id = entryIdOf(a1)
-  const b1 = await bo.chat(
-    "noted, thanks @alice",
-    a1id === null ? undefined : { kind: "entry", id: a1id },
-  )
-  const b1id = entryIdOf(b1)
+  const plumId = opened.kind === "appended" ? opened.id : null
+  ok(plumId !== null, `a plain branch is appended (${opened.kind})`)
   ok(
-    a1id !== null && b1id !== null,
-    `both messages are appended (${a1.kind}, ${b1.kind})`,
+    readLaneNames(host.doc).length === lanesBefore,
+    "a conversation thread has no lane",
   )
-  await sleep(200)
+
+  // Five replies at once, all having seen the same end: a chain, not siblings.
+  const replies = await Promise.all(
+    ["one", "two", "three", "four", "five"].map(t =>
+      (t.length % 2 === 0 ? alice : bob).chat(t, at(plumId)),
+    ),
+  )
+  const index = tree()
+  const below = (id: string | null) =>
+    id === null ? 0 : (index.childrenOf.get(id)?.length ?? 0)
+  const chain = ["one", "two", "three", "four", "five"].map(idOf)
   ok(
-    Object.keys(readEntries(host.doc)).length === before + 2 &&
-      tipOf(agentLane) === opened,
-    "plain chat and a person-mention add exactly two entries and run nothing",
+    replies.every(r => r.kind === "appended") &&
+      [plumId, ...chain].every(id => below(id) <= 1),
+    "five replies sent at once to one end form a chain, never siblings",
   )
   ok(
-    b1id !== null && host.doc.entries.get(b1id)?.parentId === a1id,
-    "Bob's reply is parented at the message he was viewing",
+    readLaneNames(host.doc).length === lanesBefore,
+    "plain chat in a conversation still makes no lane",
   )
+  const content = readEntryMessage(host.doc, plumId ?? "")
   ok(
-    contentOf(a1id) === "Alice: the secret word is PLUM",
-    `the stored content carries the speaker (${JSON.stringify(contentOf(a1id))})`,
-  )
-  const talk = projectTranscript(readTreeIndex(host.doc), b1id)
-  ok(
-    talk.map(m => `${m.role}:${m.author}`).join(",") ===
-      "chat:Alice,assistant:undefined,chat:Alice,chat:Bob",
-    `the thread renders as chat, by speaker (${talk.map(m => `${m.role}:${m.author}`).join(",")})`,
+    content.present &&
+      (content.message as { content?: unknown }).content ===
+        "Alice: the secret word is PLUM",
+    "the stored content carries the speaker",
   )
 
   // Spans cover what the author wrote, not the attributed content.
-  if (a1id !== null) {
+  if (plumId !== null) {
     const words = "the secret word is PLUM".length
-    const inText = await bo.cite({
-      kind: "span",
-      id: a1id,
-      start: 19,
-      end: words,
-    })
-    const pastText = await bo.cite({
-      kind: "span",
-      id: a1id,
-      start: 0,
-      end: words + 1,
-    })
+    const inText = await bob.cite(
+      { kind: "span", id: entryId(plumId), start: 19, end: words },
+      at(plumId),
+    )
+    const pastText = await bob.cite(
+      { kind: "span", id: entryId(plumId), start: 0, end: words + 1 },
+      at(plumId),
+    )
     ok(
       inText.kind === "referenced" && codeOf(pastText) === ERR.INVALID_SPAN,
       `a span of a chat message is over its text (${inText.kind}, ${codeOf(pastText)})`,
     )
   }
 
-  // Compelling the agent: the message IS its prompt, on the agent's lane.
-  const bobTipBefore = tipOf(bo.laneName)
-  const ask = await bo.chat(
+  // The agent, asked in the conversation, gets a lane there, and reads it.
+  // The five replies arrived in whatever order: the end is measured, not assumed.
+  const end = followTip(tree(), idOf("five") ?? "")
+  const ask = await bob.chat(
     "@agent who told us a secret word, and what was it?",
-    b1id === null ? undefined : { kind: "entry", id: b1id },
+    at(end),
   )
-  ok(ask.kind === "started", `@agent starts a run (${ask.kind})`)
+  ok(runOf(ask) !== "", `@agent in a conversation starts a run (${ask.kind})`)
   await idle()
-  const agentTip = tipOf(agentLane)
-  const agentPath = projectTranscript(readTreeIndex(host.doc), agentTip)
-  const shape = agentPath.map(m =>
-    m.role === "chat" ? `chat:${m.author}` : m.role,
+  const asked = lanes().find(l =>
+    projectTranscript(tree(), l.tip).some(m => m.text.includes("who told us")),
   )
-  const chats = shape.filter(r => r.startsWith("chat:"))
-  const lastChat = shape.lastIndexOf(chats.at(-1) ?? "")
-  const reply = shape.slice(lastChat + 1)
-  // pi may leave a provider error and its retry on the path, so a reply is
-  // one or more assistant entries; what matters is the thread around it.
+  const path = shape(asked?.tip ?? null)
   ok(
-    chats.join(",") === "chat:Alice,chat:Alice,chat:Bob,chat:Bob" &&
-      reply.length > 0 &&
-      reply.every(r => r === "assistant"),
-    `the agent's path is the thread by speaker, then its reply (${shape.join(",")})`,
+    readLaneNames(host.doc).length === lanesBefore + 1 &&
+      path.includes("Alice:the secret word is PLUM") &&
+      path.at(-1) === "assistant",
+    `a lane was created at the conversation's end, reading all of it (${path.length} messages)`,
   )
-  if (reply.length > 1) {
-    const reasons = agentPath.slice(lastChat + 1).map(m => {
-      const found = readEntryMessage(host.doc, m.id)
-      return found.present
-        ? (found.message as { stopReason?: unknown }).stopReason
-        : "absent"
-    })
-    console.log(`  (assistant entries' stopReason: ${JSON.stringify(reasons)})`)
-  }
-  const askEntry = agentPath.filter(m => m.role === "chat").at(-1)?.id ?? null
-  const askMsg =
-    askEntry === null ? undefined : readEntryMessage(host.doc, askEntry)
+  const askId = idOf("@agent who told us a secret word, and what was it?")
   ok(
-    askEntry !== null &&
-      host.doc.entries.get(askEntry)?.parentId === b1id &&
-      decodeChat(askMsg?.present ? askMsg.message : undefined)?.compels.kind ===
-        "agent",
-    "the compelled message is the run's prompt, parented where Bob was viewing",
-  )
-  ok(
-    tipOf(bo.laneName) === bobTipBefore,
-    "the compelled message is on the agent's lane, not Bob's",
+    askId !== null &&
+      host.doc.entries.get(askId)?.parentId === end &&
+      Object.values(readRenderableEntries(host.doc)).filter(e =>
+        projectTranscript(tree(), e.id).at(-1)?.text?.includes("who told us"),
+      ).length === 1,
+    "the compelled message is the run's prompt, exactly once, where Bob was reading",
   )
   if (LIVE) {
-    const reply = agentPath.at(-1)?.text ?? ""
+    const reply =
+      projectTranscript(tree(), asked?.tip ?? null).at(-1)?.text ?? ""
     console.log(`  agent said: ${JSON.stringify(reply)}`)
     ok(
       /plum/i.test(reply) && /alice/i.test(reply),
       "LIVE: the agent answered from both speakers' messages",
     )
   }
+  invariants("conversation")
+  await Promise.all([alice.close(), bob.close()])
+}
 
-  // A working session compels the agent without a mention; a conversation
-  // set deeper inside it does not.
-  const root = a1id === null ? null : a1id
-  const set =
-    root === null ? undefined : await al.setThreadMode(root, "session")
+// ── a busy thread: waiting, conflict, queue, branch (ADR-0020, S21) ───────
+{
+  const alice = await connect("q-alice")
+  const bob = await connect("q-bob")
+  const carol = await connect("q-carol")
+  await Promise.all([
+    alice.setName("Alice"),
+    bob.setName("Bob"),
+    carol.setName("Carol"),
+  ])
+  // A long answer, so the lane is still running when Bob and Carol send.
+  const QUESTION = "name a fruit, then write four sentences about it"
+  const start = await alice.chat(QUESTION, ROOT)
+  ok(runOf(start) !== "", "Alice's question starts a thread's run")
+  await waitFor(() => idOf(QUESTION) !== null)
+  const promptId = idOf(QUESTION)
+  // A conversation from here: only a mention compels, so Bob's remark is plain.
+  if (promptId !== null)
+    await alice.setThreadMode(entryId(promptId), "conversation")
+  // What Bob and Carol see: the thread ends at Alice's question.
+  const bobRemark = await bob.chat("plain remark", at(promptId))
+  const carolAsk = await carol.chat("@agent name a colour", at(promptId))
   ok(
-    set?.kind === "threaded",
-    `a thread becomes a working session (${set?.kind})`,
+    bobRemark.kind === "queued",
+    `a plain message to a running lane waits (${bobRemark.kind})`,
   )
-  const inSession = await al.chat(
+  ok(
+    carolAsk.kind === "conflict" && carolAsk.by === "Alice",
+    `a compelled reply to a busy lane is a conflict, naming who holds it (${carolAsk.kind}${carolAsk.kind === "conflict" ? `: ${carolAsk.by}` : ""})`,
+  )
+  const queued = await carol.chat("@agent name a colour", at(promptId), "queue")
+  ok(
+    queued.kind === "queued" && queued.position === 1,
+    `queue waits behind the message already waiting (${queued.kind}${queued.kind === "queued" ? ` ${queued.position}` : ""})`,
+  )
+  ok(readOutbox(host.doc).length === 2, "the outbox shows both, to everyone")
+  await idle()
+  const thread = lanes().find(l =>
+    projectTranscript(tree(), l.tip).some(m => m.text === QUESTION),
+  )
+  const path = shape(thread?.tip ?? null)
+  ok(
+    path.join(" → ") ===
+      `Alice:${QUESTION} → assistant → Bob:plain remark → Carol:@agent name a colour → assistant`,
+    `in send order, with no reply to the plain remark: ${path.join(" → ")}`,
+  )
+
+  // A race with the lane idle: Bob saw the end before Carol's question; Carol's
+  // compelled message is below it now, so his compelled reply is a conflict.
+  const bobAsk = await bob.chat(
+    "@agent and a number?",
+    at(idOf("plain remark")),
+  )
+  ok(
+    bobAsk.kind === "conflict" && bobAsk.by === "Carol",
+    `another writer's compelled message below what I saw is a race (${bobAsk.kind})`,
+  )
+  // My own question and the agent's reply to it are not a race for me: Dan
+  // asks, the reply lands, and Dan follows up from where he last looked.
+  const dan = await connect("q-dan")
+  await dan.chat("@agent name a car", ROOT)
+  await waitFor(() => idOf("@agent name a car") !== null)
+  const carId = idOf("@agent name a car")
+  await idle()
+  const followUp = await dan.chat("@agent and a bike?", at(carId))
+  ok(
+    runOf(followUp) !== "",
+    `following up past my own question and its reply runs, no conflict (${followUp.kind})`,
+  )
+  await idle()
+  await dan.close()
+
+  // Branch, instead of queueing: a separate line of work that runs at once.
+  const lanesBefore = readLaneNames(host.doc).length
+  let both = false
+  const busy = await alice.chat(
+    "@agent write four sentences about trees",
+    at(thread?.tip ?? null),
+  )
+  const watch = setInterval(() => {
+    if (Object.keys(host.doc.activeRuns()).length >= 2) both = true
+  }, 5)
+  const branched = await bob.chat(
+    "@agent separately: a tree?",
+    at(promptId),
+    "branch",
+  )
+  await idle()
+  clearInterval(watch)
+  ok(
+    runOf(busy) !== "" &&
+      runOf(branched) !== "" &&
+      readLaneNames(host.doc).length === lanesBefore + 1,
+    "branching on a conflict starts a new lane where the sender was reading",
+  )
+  ok(both, "the branch ran while the thread it forked from was running")
+  invariants("busy thread")
+  await Promise.all([alice.close(), bob.close(), carol.close()])
+}
+
+// ── thread rules ──────────────────────────────────────────────────────────
+{
+  const w = await connect("r-writer")
+  const plumId = idOf("the secret word is PLUM")
+  const setSession =
+    plumId === null
+      ? undefined
+      : await w.setThreadMode(entryId(plumId), "session")
+  ok(setSession?.kind === "threaded", "a thread becomes a working session")
+  const inSession = await w.chat(
     "summarise, please",
-    agentTip === null ? undefined : { kind: "entry", id: entryId(agentTip) },
+    at(idOf("five")),
+    "branch",
   )
   ok(
-    inSession.kind === "started",
+    runOf(inSession) !== "",
     `in a working session a plain message runs (${inSession.kind})`,
   )
   await idle()
-  const sessionTip = tipOf(agentLane)
-  if (sessionTip !== null)
-    await al.setThreadMode(entryId(sessionTip), "conversation")
-  const inConversation = await al.chat(
-    "just between us",
-    sessionTip === null
-      ? undefined
-      : { kind: "entry", id: entryId(sessionTip) },
-  )
-  ok(
-    inConversation.kind === "appended" &&
-      host.doc.entries.get(inConversation.id)?.parentId === sessionTip,
-    `a conversation set inside it runs nothing, and an existing lane moves to where its author views (${inConversation.kind})`,
-  )
-
-  // One reply at a time: a second compelled message while the agent runs is
-  // refused, never dropped silently.
-  const [p, q] = await Promise.all([
-    al.chat("@agent one"),
-    bo.chat("@agent two"),
-  ])
-  const kinds = [p.kind, codeOf(p) || p.kind, q.kind, codeOf(q) || q.kind]
-  ok(
-    [p, q].filter(o => o.kind === "started").length === 1 &&
-      [p, q].filter(o => codeOf(o) === ERR.BUSY).length === 1,
-    `two people compelling the agent at once: one runs, one is told it is busy (${kinds.join(",")})`,
-  )
-  await idle()
-
-  const noThread = await al.setThreadMode(entryId("no-such-entry"), "session")
+  const noThread = await w.setThreadMode(entryId("no-such-entry"), "session")
   ok(
     codeOf(noThread) === ERR.UNKNOWN_TARGET,
     `a thread at an unknown entry is refused (${codeOf(noThread)})`,
   )
-  await Promise.all([al.close(), bo.close()])
+  invariants("rules")
+  await w.close()
 }
 
-// --- LIVE assertion -------------------------------------------------------
+// ── references (ADR-0017) ─────────────────────────────────────────────────
+{
+  const pw = await connect("ref-p")
+  const qw = await connect("ref-q")
+  const cited = idOf("hello")
+  ok(cited !== null, "there is a message to cite")
+  if (cited !== null) {
+    const r = await qw.cite(
+      { kind: "entry", id: entryId(cited) },
+      at(trunkTip()),
+    )
+    ok(
+      r.kind === "referenced",
+      `a citation is written (${codeOf(r) || r.kind})`,
+    )
+    const back = readReferences(host.doc).to.get(entryId(cited)) ?? []
+    ok(
+      back.length === 1 && back[0]?.author === qw.writer,
+      `the message shows one backlink, authored by its writer (${back.length})`,
+    )
+    ok(
+      back[0]?.from === trunkTip(),
+      "the reference is attached where its author was reading",
+    )
+    const [x, y] = await Promise.all([
+      pw.cite({ kind: "entry", id: entryId(cited) }, at(trunkTip())),
+      qw.cite({ kind: "entry", id: entryId(cited) }, at(trunkTip())),
+    ])
+    const after = readReferences(host.doc).to.get(entryId(cited)) ?? []
+    ok(
+      x.kind === "referenced" && y.kind === "referenced" && after.length === 3,
+      `two concurrent citations of one entry both survive (${after.length})`,
+    )
+    const rooted = await qw.cite({ kind: "entry", id: entryId(cited) }, ROOT)
+    ok(
+      codeOf(rooted) === ERR.NO_ANCHOR,
+      `a citation from the root is refused (${codeOf(rooted)})`,
+    )
+    const lost = await qw.cite(
+      { kind: "entry", id: entryId("no-such-entry") },
+      at(trunkTip()),
+    )
+    ok(
+      codeOf(lost) === ERR.UNKNOWN_TARGET,
+      `an unknown target is refused (${codeOf(lost)})`,
+    )
+  }
+  await Promise.all([pw.close(), qw.close()])
+}
+
+// ── LIVE: what the model says ─────────────────────────────────────────────
 if (LIVE) {
   console.log("\n--- live turn ---")
-  streamSamples.length = 0
-  // Wait for THIS turn's reply. The transcript already holds earlier turns,
-  // so a length threshold alone was met at once, and the last message was
-  // the prompt itself, which contains the token: a check that could not fail.
-  const before = client.view().transcript.length
-  const r = await client.prompt(PROMPT)
-  ok(accepted(r), "live prompt accepted")
-  const done = await waitFor(() => {
-    const t = client.view().transcript
-    return t.length >= before + 2 && t.at(-1)?.role === "assistant"
-  }, 120_000)
-  ok(done >= 0, `live turn completed and replicated (${done}ms)`)
-  const last = client.view().transcript.at(-1)
+  const known = new Set(readLaneNames(host.doc))
+  const r = await client.chat(PROMPT, ROOT)
+  ok(runOf(r) !== "", "live prompt accepted")
+  await idle()
+  const lane = readLaneNames(host.doc).find(l => !known.has(l)) ?? ""
+  const last = projectTranscript(tree(), readLaneTip(host.doc, lane)).at(-1)
   console.log(`  model said: ${JSON.stringify(last?.text)}`)
   ok(
     last?.role === "assistant" && last.text.includes("PINETA-OK"),
     "the model's reply contains the requested token",
   )
-  ok(
-    streamSamples.length > 0,
-    `live turn streamed ${streamSamples.length} updates through Schema.text()`,
-  )
 }
 
-console.log("\n--- final client view ---")
-for (const m of client.view().transcript) {
-  console.log(`  ${m.role.padEnd(9)} ${JSON.stringify(m.text.slice(0, 72))}`)
-}
+invariants("end")
 
 // Shut the client down first, then let the socket settle before tearing down
 // the host: otherwise the host's transport decodes a frame against an

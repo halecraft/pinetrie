@@ -59,6 +59,9 @@ importers:
       '@pineta/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@pineta/reads':
+        specifier: workspace:*
+        version: link:../../packages/reads
       '@pineta/schema':
         specifier: workspace:*
         version: link:../../packages/schema
@@ -114,6 +117,9 @@ importers:
       '@pineta/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@pineta/reads':
+        specifier: workspace:*
+        version: link:../reads
       '@pineta/schema':
         specifier: workspace:*
         version: link:../schema
@@ -192,6 +198,18 @@ importers:
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/reads:
+    dependencies:
+      '@pineta/core':
+        specifier: workspace:*
+        version: link:../core
+      '@pineta/marginalia':
+        specifier: workspace:*
+        version: link:../marginalia
+      '@pineta/schema':
+        specifier: workspace:*
+        version: link:../schema
 
   packages/schema:
     dependencies:

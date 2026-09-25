@@ -3,10 +3,10 @@ import {
   atEntry,
   ERR,
   entryId,
-  type LaneName,
-  laneNameForWriter,
   ROOT,
   referenceId,
+  type WriterId,
+  writerId,
 } from "@pineta/core"
 import { test } from "vitest"
 import {
@@ -17,15 +17,13 @@ import {
   type Reference,
 } from "./index.ts"
 
-const A: LaneName = laneNameForWriter("a")
+const A: WriterId = writerId("a")
 const E1 = entryId("e-1")
 const E2 = entryId("e-2")
-const at = (tip: typeof E1) => ({ kind: "lane", at: atEntry(tip) }) as const
 const plan = (over: Partial<Parameters<typeof planReference>[0]>) =>
   planReference({
     author: A,
-    lane: at(E2),
-    at: { kind: "tip" },
+    at: atEntry(E2),
     target: { kind: "entry", id: E1 },
     cited: { kind: "entry", text: "hello" },
     newId: referenceId("r-1"),
@@ -34,23 +32,14 @@ const plan = (over: Partial<Parameters<typeof planReference>[0]>) =>
 const code = (d: ReturnType<typeof planReference>) =>
   d.kind === "refused" ? d.code : "wrote"
 
-test("planReference: attached at the author's lane tip", () => {
+test("planReference: attached where its author is reading, authored by them", () => {
   const d = plan({})
   assert.equal(d.kind === "write" ? d.reference.from : "", E2)
   assert.equal(d.kind === "write" ? d.reference.author : "", A)
 })
 
-test("planReference: attached where the author reads, with or without a lane", () => {
-  const read = { kind: "entry", id: E1 } as const
-  const withLane = plan({ at: read })
-  const without = plan({ at: read, lane: { kind: "none" } })
-  assert.equal(withLane.kind === "write" ? withLane.reference.from : "", E1)
-  assert.equal(without.kind === "write" ? without.reference.from : "", E1)
-})
-
-test("planReference: no lane, or a lane at the root, has nowhere to attach", () => {
-  assert.equal(code(plan({ lane: { kind: "none" } })), ERR.NO_LANE)
-  assert.equal(code(plan({ lane: { kind: "lane", at: ROOT } })), ERR.NO_LANE)
+test("planReference: the root is no anchor", () => {
+  assert.equal(code(plan({ at: ROOT })), ERR.NO_ANCHOR)
 })
 
 test("planReference: an absent entry is unknown; a textless one is citable whole", () => {

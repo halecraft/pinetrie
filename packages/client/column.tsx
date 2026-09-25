@@ -2,21 +2,25 @@
 
 import { useTracked } from "@kyneta/react"
 import {
-  type AgentActivity,
+  type AgentRun,
   ancestry,
+  atEntry,
   type ColumnView,
   type EntryId,
   entryId,
-  laneNameForAgent,
+  type LaneView,
   messageText,
   type ReferenceTarget,
   type Responder,
   ROOT,
-  THE_AGENT,
   type TreeIndex,
+  threadLaneAt,
+  type WriterId,
 } from "@pineta/core"
 import {
+  displayName,
   effectiveDefault,
+  type Held,
   type ReferenceIndex,
   rulesAlong,
 } from "@pineta/marginalia"
@@ -24,12 +28,10 @@ import type { SessionDocHandle } from "@pineta/schema"
 import { useLayoutEffect, useRef } from "react"
 import { Composer } from "./composer.tsx"
 import { Message } from "./message.tsx"
+import { speakerLabel } from "./names.ts"
 import { readStreaming } from "./projection.ts"
 import { colorSlot, trackColor } from "./rail.tsx"
 import type { SessionClient } from "./session-view.ts"
-
-/** Only the agent streams into a column: people's messages arrive whole. */
-const AGENT_LANE = laneNameForAgent(THE_AGENT)
 
 export interface ColumnProps {
   session: SessionClient
@@ -45,8 +47,12 @@ export interface ColumnProps {
   shown: ReadonlySet<string>
   rules: ReadonlyMap<EntryId, Responder>
   refs: ReferenceIndex
-  names: readonly string[]
-  activity: AgentActivity
+  /** Display names by writer, for "queue · agent replies after Bea". */
+  nameOf: ReadonlyMap<WriterId, string>
+  /** Every lane the agent is replying on. Several threads can run at once. */
+  activity: readonly AgentRun[]
+  lanes: readonly LaneView[]
+  outbox: readonly Held[]
   /** The ids on this column's path, which the app has already computed. */
   path: ReadonlySet<string>
   onBranchHere: (at: string) => void
@@ -91,8 +97,23 @@ export function Column(p: ColumnProps) {
     ? undefined
     : view.nodes.find(n => n.compelled === true)?.id
 
-  const replying = p.activity.kind === "replying" ? p.activity : undefined
-  const streamsHere = replying !== undefined && p.path.has(replying.tip)
+  // The agent reads each running lane's path; a message on none of them is
+  // outside every reply being written.
+  const running = p.activity.length > 0
+  const lit = (id: string) => p.activity.some(r => r.path.has(id))
+  // The runs whose tip is on this column's path stream here.
+  const streams = p.activity.filter(r => p.path.has(r.tip))
+  // This thread's lane, at the column's end: busy means a compelled message waits.
+  const lane = threadLaneAt(
+    p.lanes,
+    view.tipId === null ? ROOT : atEntry(entryId(view.tipId)),
+  )
+  const waiting =
+    lane.kind === "lane" ? p.outbox.filter(h => h.lane === lane.name) : []
+  const holder =
+    lane.kind === "lane" && lane.askedBy !== null
+      ? displayName(lane.askedBy, p.nameOf.get(lane.askedBy))
+      : null
 
   // Follow new messages while the reader is at the bottom; leave them alone
   // once they have scrolled up to read.
@@ -105,7 +126,7 @@ export function Column(p: ColumnProps) {
   const fork = view.forkFrom === null ? undefined : index.entries[view.forkFrom]
   const forkLabel =
     fork?.message?.role === "chat"
-      ? (fork.message.author ?? "")
+      ? speakerLabel(p.nameOf, fork.message.writer, fork.message.author ?? "")
       : fork?.message?.role === "assistant"
         ? "agent"
         : ""
@@ -159,13 +180,8 @@ export function Column(p: ColumnProps) {
               forkTracks={p.forks.get(node.id) ?? []}
               joined={node.id === joinedAt}
               key={node.id}
-              light={
-                replying === undefined
-                  ? undefined
-                  : replying.path.has(node.id)
-                    ? "lit"
-                    : "dim"
-              }
+              light={running ? (lit(node.id) ? "lit" : "dim") : undefined}
+              nameOf={p.nameOf}
               node={node}
               onBranchHere={
                 // Below a column's last message is the column itself.
@@ -176,9 +192,7 @@ export function Column(p: ColumnProps) {
               onCite={(to: ReferenceTarget) =>
                 void p.session.cite(
                   to,
-                  view.tipId === null
-                    ? undefined
-                    : { kind: "entry", id: entryId(view.tipId) },
+                  view.tipId === null ? ROOT : atEntry(entryId(view.tipId)),
                 )
               }
               onOpenBranch={p.onOpen}
@@ -188,12 +202,26 @@ export function Column(p: ColumnProps) {
             />
           )
         })}
-        {streamsHere && <Streaming doc={p.session.doc} />}
+        {streams.map(r => (
+          <Streaming doc={p.session.doc} key={r.lane} lane={r.lane} />
+        ))}
+        {/* Messages waiting for this thread's lane, in the order they will
+            be taken. They are not in the tree yet. */}
+        {waiting.map((h, n) => (
+          <div className="msg waiting" data-held={h.id} key={h.id}>
+            <span className="role">
+              {speakerLabel(p.nameOf, h.details.author, h.details.authorName)} ·
+              waiting · {n + 1} of {waiting.length}
+            </span>
+            <div className="text">{h.details.text}</div>
+          </div>
+        ))}
       </div>
       <Composer
         at={view.tipId}
         fresh={view.nodes.length === 0 && view.forkFrom !== null}
-        names={p.names}
+        holderName={holder}
+        lane={lane}
         rule={ruleAtEnd}
         session={p.session}
       />
@@ -205,8 +233,8 @@ export function Column(p: ColumnProps) {
  * Live token deltas. Its own component, reading the stream on its own, so a
  * delta re-renders only this, not the column above it.
  */
-function Streaming({ doc }: { doc: SessionDocHandle }) {
-  const streaming = useTracked(() => readStreaming(doc, AGENT_LANE))
+function Streaming({ doc, lane }: { doc: SessionDocHandle; lane: string }) {
+  const streaming = useTracked(() => readStreaming(doc, lane))
   if (streaming === null) return null
   return (
     <div className="streaming">

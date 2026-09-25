@@ -17,34 +17,20 @@ export const SESSION_DOC_ID = "pineta:session"
 export const HOST_PEER_ID = "host"
 
 /**
- * The verbs. `line.ts` spreads this into a constrained schema
- * literal, so this array is the only place a kind is declared \u2014 adding one
- * here reaches the wire, and nothing else needs editing.
+ * The verbs. `line.ts` spreads this into a constrained schema literal, so this
+ * array is the only place a kind is declared: adding one here reaches the
+ * wire, and nothing else needs editing.
  *
- *   - `prompt` appends at the lane tip.
- *   - `branch` moves the lane tip to `parentId` first, so the turn forks from
- *     there (ADR-0011: the lane carries writer identity, so this moves only
- *     the sending writer's lane).
- *   - `reference` cites `targetId`, or a span of it, from `parentId`: the
- *     entry the sender is reading, or their lane tip when `""`.
- *     It writes one value and runs nothing.
- *   - `navigate` moves the lane tip to `parentId` and runs nothing. It is how
- *     you come back from an Aside: without it a branch is one-way.
- *   - `chat` is a human message at `parentId`, or at the sender's lane tip
- *     when `""`. It runs the agent only when the agent is compelled.
+ *   - `chat` is a human message. `parentId` is where its sender was reading
+ *     (`""`: the root, a new conversation); `mode` says how it joins the tree
+ *     (`CHAT_MODES` in @pineta/core). It runs the agent only when compelled.
+ *   - `reference` cites `targetId`, or a span of it, from `parentId`, the entry
+ *     its author is reading. It writes one value and runs nothing.
  *   - `name` sets the sender's display name to `text`.
  *   - `thread` sets the default at entry `parentId`: `text` is `session` (the
  *     agent answers every message) or `conversation` (nobody is compelled).
  */
-export const COMMAND_KINDS = [
-  "prompt",
-  "branch",
-  "navigate",
-  "reference",
-  "chat",
-  "name",
-  "thread",
-] as const
+export const COMMAND_KINDS = ["chat", "reference", "name", "thread"] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
 /**
@@ -61,14 +47,13 @@ export interface Command {
   readonly kind: CommandKind
   readonly text: string
   /**
-   * An entry, whose meaning depends on the kind. `branch`: the entry to fork
-   * from, where `""` is refused. `navigate`: the entry to move to, where `""`
-   * means the root. `chat` and `reference`: the entry the sender is reading,
-   * where `""` means their own tip. `thread`: the entry the default is set at,
-   * where `""` is refused. Only `codec.ts` interprets this; nothing past it
-   * sees `""`.
+   * An entry: where the sender was reading (`chat`, `reference`), or where a
+   * default is set (`thread`). `""` is the root. Only `codec.ts` interprets
+   * this; nothing past it sees `""`.
    */
   readonly parentId: string
+  /** `chat`: `reply`, `queue` or `branch`; `""` otherwise. */
+  readonly mode: string
   /** `reference`: the entry cited. Separate from `parentId` on purpose. */
   readonly targetId: string
   /** `reference`: a span's bounds, or -1 for the whole entry (the wire is total). */
@@ -82,9 +67,10 @@ export interface Command {
  */
 export const OUTCOME_KINDS = [
   "started",
-  "navigated",
   "referenced",
   "appended",
+  "queued",
+  "conflict",
   "named",
   "threaded",
   "refused",
@@ -101,6 +87,10 @@ export interface Reply {
   readonly referenceId: string
   /** Set only when a chat message was appended: its entry id. */
   readonly entryId: string
+  /** `queued`: how many messages wait ahead of it; -1 otherwise. */
+  readonly position: number
+  /** `conflict`: the display name of the writer who took the slot; "" otherwise. */
+  readonly by: string
 }
 
 /**
@@ -110,9 +100,10 @@ export interface Reply {
  */
 export const EMPTY_COMMAND: Command = Object.freeze({
   id: "",
-  kind: "prompt",
+  kind: "chat",
   text: "",
   parentId: "",
+  mode: "",
   targetId: "",
   spanStart: -1,
   spanEnd: -1,
@@ -126,6 +117,8 @@ export const EMPTY_REPLY: Reply = Object.freeze({
   errorMessage: "",
   referenceId: "",
   entryId: "",
+  position: -1,
+  by: "",
 })
 
 export const command = (fields: Partial<Command>): Command => ({

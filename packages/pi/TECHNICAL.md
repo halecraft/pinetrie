@@ -42,88 +42,70 @@ Three rules hold them together:
 ADR-0003 exists to hold. `vitest.config.mjs` includes `packages/*/*.test.ts`
 for this reason.
 
-### One harness, a lane per writer
+### Lanes belong to threads, and never move (ADR-0020)
 
-The host owns one harness. Each connected client is a writer with its own lane,
-named `laneNameForWriter(peer)` from the transport's `LineSender.peer` (ADR-0011),
-so a client can only drive its own lane. The host has no writer identity; the
-`replicaId` passed to `createAgent` is the process's storage identity, which is
-a different thing.
+The host owns one harness. A lane is a thread's line of work: created by
+`Agent.createThreadLane(at)` where agent work is first wanted in a thread, named
+`laneNameForThread(uuidv7)` (`t-…`), and never navigated. People own no lanes;
+a message records its writer (`details.author`, from the transport). A lane's
+tip is therefore always its thread's end, and `threadLaneAt` finds a thread's
+lane from its end with no stored mapping.
 
-`Agent.lane(name)` returns a `WriterLane` with `create`, `navigate` and `run`,
-each returning a `LaneOutcome` (`ok`, or `refused` with our `ErrCode`). pi
-`Lane` objects are single-writer state (S3), so they are held one per writer
-and never shared. There is deliberately no way to READ a tip through the agent:
-readers use the document, so observing a lane can never create one.
+The facade has no way to move a lane: `ThreadLaneHandle` offers only `append`
+and `run`. Nor is there a way to READ a tip through the agent: readers use the
+document, so observing a lane can never create one.
 
-### Attaching is a decision
+Three facts from pi's source and the probes shape it:
 
-A turn runs at its lane's tip. Moving the lane somewhere first is decided by
-`planAttach` in `@pineta/core`, which returns `create`, `navigate` or `stay`.
-The host carries that out, awaited, **before** it replies, so any refusal comes
-back to the client as a structured rejection. Only the run itself happens after
-the reply. Three pi behaviours, read from pi's source, shape this:
+- **`harness.lane(name, { createAt })` THROWS `UnknownTarget`** for an entry pi
+  does not hold, where most of pi's API returns a `Result`. `createThreadLane`
+  catches it. The host also refuses a chat at an unknown entry before writing
+  anything, because a lane-less append there would reach storage with a parent
+  that does not resolve.
+- **`harness.lane(name)` creates a missing lane.** So restoring a lane after a
+  restart checks `hasLaneRecord` first: pi records a lane's `pi.branch.tip` key
+  when it creates it, with a null value until the first entry.
+- **A foreign-written entry is not navigable** (`unknown_target`): pi's session
+  never saw it created. The Node e2e keeps a `writeEntry` fixture for that S3
+  case.
 
-- **pi refuses to navigate a lane to its current tip** (`InvalidNavigation`,
-  reason `current_tip`). That is why `stay` exists. Branching from your own tip
-  used to fail.
-- **`harness.lane(name, { createAt })` ignores `createAt` if the lane already
-  exists**, in memory or restored from storage. So `create` is only correct
-  when the lane really is absent.
-- **`harness.lane()` THROWS `UnknownTarget`** for an entry pi does not hold,
-  where `navigateTree` returns a `Result`. `WriterLane.create` catches it, so
-  nothing thrown by pi reaches the host.
+### Conversation threads have no lane (S21)
 
-Telling "no lane" from "a lane at the root" is therefore load-bearing, and both
-have a null tip. Measured (`sandbox/empty-lane-tip.ts`): **pi records the
-`pi.branch.tip` key when it creates a lane**, with a null value until the first
-entry. So the document alone distinguishes them, through `hasLaneRecord`, and
-the host reads it rather than the agent's cache. That also keeps it correct
-across a host restart.
+A thread where the agent has not been asked has no lane. `appendToTree` inserts
+its messages with `session.mutate` + `insertEntry`, parented at exactly the
+entry the plan chose; the entry is a full member of the tree (navigable, and a
+lane can later be created at it, whose agent reads it). The host's serial
+executor makes the plan's parent still right when it is written. S21 Q2 showed
+the alternative a second host would need: read the thread's end inside
+`session.mutate`, an exclusive barrier for the whole session.
 
-`laneErrCode(tag)` maps pi's refusal tags for runs, navigation and lane
-creation alike. Before it was shared, a run's refusal passed pi's raw tag
-through, which leaked pi's vocabulary past the boundary (ADR-0003). An unknown
-tag becomes `refused` rather than a navigation-specific code.
+### A running lane is never written (S19, S21)
 
-A foreign-written entry is not navigable (`unknown_target`): pi's session never
-saw it created. The Node e2e keeps a `writeEntry` fixture for that S3 case.
+- **Every write that moves a lane's tip goes through that lane.** A `Lane` plans
+  from its in-memory state, so a write through `session.mutate` would be stored
+  but dropped from its next turn (S19).
+- **Not while it runs.** A message appended to a running lane lands by timing:
+  inside the agent's turn, as a prompt the agent answers, or after the reply
+  while a queued question is never answered (S21 Q3). The host holds such
+  messages in `pineta.outbox` (`Agent.hold`/`release`) and drains them when the
+  lane is idle; see `packages/marginalia/TECHNICAL.md`.
+- **A pi run can only start with `prompt`**, so a compelled chat is passed to
+  `ThreadLaneHandle.run` as the prompt itself: a pi `CustomMessage`, which pi's
+  default `convertToLlm` sends as a `user` message with its `content`.
+- The harness is created with `followUpMode: "one-at-a-time"`, so that pi's own
+  queue, if ever reached, answers one message at a time rather than batching
+  (S20). Pineta's outbox means the host does not use it.
 
-`NavigateOptions.summarize` emits a `branch_summary` entry, ADR-0010's fold,
-unused for now. `projectSpine` drops non-message entries, so one would vanish
-from the spine silently.
+`laneErrCode(tag)` maps pi's refusal tags for runs and lane creation, so none of
+pi's vocabulary passes the boundary (ADR-0003). `UnknownTarget` is the one
+specific code; anything else is `refused`.
 
 ### Streaming, per lane
 
 Every pi `HarnessEvent` carries `lane`, so `onDelta` reports `{ lane, delta }`.
 The host looks the lane's current run up in the document's `activeRuns` rather
 than keeping its own map, which would be a second record of the same fact.
-
-### Turn state
-
-One `TurnState` per writer, in a map the host keeps for the life of the
-process. A small record per writer that ever connected is never removed, which
-is acceptable for v1.
-
-### Chat: through the lane, and the compelled message is the prompt
-
-Two facts from S19 decide how human messages reach pi (ADR-0018):
-
-- **Any host write that moves a lane's tip goes through that `Lane`.**
-  `Lane.command` plans against its in-memory `this.state`, which only the
-  lane's own commits update. `WriterLane.append` wraps `Lane.appendMessage`. A
-  write through `session.mutate` is stored, but the next turn parents at the
-  cached tip and the message drops out of the path with no error. During a run
-  on the same lane pi queues an append and chains it in after.
-- **A pi run can only start with `prompt`.** There is no "run from the tip", and
-  `resume` only continues an operation in progress. So a message that compels
-  the agent is passed to `WriterLane.run` as the prompt itself: a pi
-  `CustomMessage`, which pi's default `convertToLlm` sends as a `user` message
-  with its `content`. No `entryProjectors`.
-
-The agent's lane is `laneNameForAgent` (`a-agent`), apart from every writer's
-`w-` lane, because a client chooses its own peer id. It is shared by every
-writer, so the host claims its turn before the first await.
+Threads run concurrently, and their streams stay apart by lane.
 
 ### References
 

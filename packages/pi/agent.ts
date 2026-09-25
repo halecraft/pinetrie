@@ -14,18 +14,24 @@ import {
   uuidv7,
   value,
 } from "@earendil-works/pi-agent-core"
+import { insertEntry } from "@earendil-works/pi-agent-core/harness/session"
 import {
   type EntryId,
   ERR,
   type ErrCode,
   entryId,
   type LaneName,
+  laneNameForThread,
   type Position,
   type Responder,
+  type WriterId,
 } from "@pineta/core"
 import {
   type ChatMessage,
+  encodeHeld,
   encodeReference,
+  type Held,
+  OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
   REFERENCE_NAMESPACE,
   type Reference,
@@ -70,7 +76,7 @@ export interface CreateAgentOptions {
   readonly doc: SessionDocHandle
   /**
    * This PROCESS's replica id, used by storage for write tokens. It is not a
-   * writer's identity: writers are lanes, named per connected client.
+   * writer's identity: writers are people, identified by the transport.
    */
   readonly replicaId: string
   readonly provider: string
@@ -79,28 +85,25 @@ export interface CreateAgentOptions {
   readonly onDelta?: (event: { lane: string; delta: string }) => void
 }
 
-/** The result of asking pi to do something to a lane. */
-export type LaneOutcome =
+/** The result of a run: pi may refuse to admit it. */
+export type WriteOutcome =
   | { readonly kind: "ok" }
   | { readonly kind: "refused"; readonly code: ErrCode }
 
 /**
  * pi's refusal tag -> our `ErrCode`, as a value.
  *
- * Pure, so it is unit-testable without a harness. It covers every lane
- * operation: runs, navigation and lane creation all refuse with pi
- * TaggedErrors whose `_tag` is the discriminant. Before this was shared, a
- * run's refusal passed pi's raw tag straight through, which leaked pi's
- * vocabulary past the boundary (ADR-0003).
+ * Pure, so it is unit-testable without a harness. Runs and lane creation
+ * refuse with pi TaggedErrors whose `_tag` is the discriminant, and none of
+ * pi's vocabulary passes the boundary (ADR-0003). `LaneBusy` cannot arise:
+ * the host never writes to a running lane (S21), so it is an ordinary refusal.
  */
 export function laneErrCode(tag: string): ErrCode {
   if (tag === "UnknownTarget") return ERR.UNKNOWN_TARGET
-  if (tag === "InvalidNavigation") return ERR.INVALID_NAVIGATION
-  if (tag === "LaneBusy") return ERR.BUSY
   return ERR.REFUSED
 }
 
-const refused = (error: { _tag: string }): LaneOutcome => ({
+const refused = (error: { _tag: string }): WriteOutcome => ({
   kind: "refused",
   code: laneErrCode(error._tag),
 })
@@ -108,51 +111,55 @@ const refused = (error: { _tag: string }): LaneOutcome => ({
 /** Position -> pi's spelling of it, which uses `null` for the root. */
 const toPi = (p: Position): string | null => (p.kind === "root" ? null : p.id)
 
-/**
- * One writer's lane. Only ever obtained on the command path, and only by the
- * writer it belongs to: a pi `Lane` is single-writer state (S3).
- */
-export interface WriterLane {
-  readonly name: LaneName
-  /** Create this lane at `at`. The host calls it only when `planAttach` says to. */
-  create(at: Position): Promise<LaneOutcome>
-  navigate(to: Position): Promise<LaneOutcome>
-  /**
-   * Run one turn at the lane's tip. The prompt is plain text, or a chat
-   * message that compelled this lane's agent: then the chat IS the prompt.
-   */
-  run(prompt: string | ChatMessage): Promise<LaneOutcome>
-  /**
-   * Append a message with no run. Through the pi `Lane`, never the session:
-   * the lane plans against its own cached tip, so a write that bypasses it is
-   * stored but dropped from the next turn's path (S19). During a run on this
-   * lane pi queues it and chains it in after.
-   */
-  append(message: ChatMessage): Promise<AppendOutcome>
-}
-
 export type AppendOutcome =
   | { readonly kind: "appended"; readonly id: EntryId }
   | { readonly kind: "refused"; readonly code: ErrCode }
 
+export type CreateOutcome =
+  | { readonly kind: "created"; readonly lane: LaneName }
+  | { readonly kind: "refused"; readonly code: ErrCode }
+
 /**
- * The narrow facade host/ sees: one harness, a lane per writer. Every member
- * is a string, our own shape, or a promise of one, so "no pi type crosses this
- * boundary" is a checked property of the signature.
- *
- * There is deliberately no way to READ a tip here. Readers use the document,
- * as the client does, so observing a lane can never create one.
+ * A thread's lane (ADR-0020). It is never moved: it advances only by its own
+ * appends and runs, so its tip stays its thread's end. The host touches it only
+ * while it is idle (S21).
+ */
+export interface ThreadLaneHandle {
+  readonly name: LaneName
+  /**
+   * Append with no run, through the pi `Lane`: it plans from its own cached
+   * tip, so a write that bypasses it would be dropped from its next turn (S19).
+   */
+  append(message: ChatMessage): Promise<AppendOutcome>
+  /** Run one turn with `message`, a compelled chat, as the prompt itself (S19). */
+  run(message: ChatMessage): Promise<WriteOutcome>
+}
+
+/**
+ * The narrow facade host/ sees. Every member is a string, our own shape, or a
+ * promise of one, so "no pi type crosses this boundary" is a checked property
+ * of the signature. There is no way to move a lane, and none to READ a tip:
+ * readers use the document, so observing a lane can never create one.
  */
 export interface Agent {
   readonly modelLabel: string
-  lane(name: LaneName): WriterLane
   /**
-   * Store a reference as a pi value in `pineta.reference`, keyed by its own id
-   * (ADR-0016, ADR-0017). The only writer of that namespace.
+   * Append at exactly `parent`, with no lane: a conversation thread (S21 Q1).
+   * The host's serial executor guarantees nothing was written there since it
+   * planned, so no re-read is needed here.
    */
-  addReference(reference: Reference): Promise<LaneOutcome>
-  /** Store a writer's display name in `pineta.participant`, keyed by lane. */
-  setParticipantName(lane: LaneName, name: string): Promise<void>
+  appendToTree(message: ChatMessage, parent: Position): Promise<AppendOutcome>
+  /** Create a thread's lane at `at`. Called only where no lane is. */
+  createThreadLane(at: Position): Promise<CreateOutcome>
+  lane(name: LaneName): ThreadLaneHandle
+  /** Hold a message in `pineta.outbox` until its lane is idle. */
+  hold(item: Held): Promise<void>
+  /** Remove a held message: it has been taken. */
+  release(id: string): Promise<void>
+  /** Store a reference as a pi value in `pineta.reference` (ADR-0016, ADR-0017). */
+  addReference(reference: Reference): Promise<void>
+  /** Store a writer's display name in `pineta.participant`, keyed by writer. */
+  setParticipantName(writer: WriterId, name: string): Promise<void>
   /** Store a thread's default in `pineta.thread`, keyed by the entry it is set at. */
   setThreadDefault(at: EntryId, compels: Responder): Promise<void>
   stats(): Promise<{ messageCount: number }>
@@ -186,13 +193,16 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       tools: [],
       systemPrompt:
         "You are a concise assistant inside a walking-skeleton test harness. Answer in one short sentence.",
+      // Pineta's outbox means pi's own queue is never used; should it be, it
+      // answers one message at a time rather than batching them (S20).
+      followUpMode: "one-at-a-time",
     },
     CTX,
   )
 
   // Streaming: every harness event carries the lane it happened on, so
-  // concurrent writers' deltas can be routed apart. Only the delta text and
-  // the lane name leave this module.
+  // concurrent threads' deltas are routed apart. Only the delta text and the
+  // lane name leave this module.
   const offUpdate = harness.events.on("message_update", event => {
     const inner = event.event
     if (inner.type !== "text_delta") return
@@ -200,64 +210,27 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     if (delta.length > 0) options.onDelta?.({ lane: event.lane, delta })
   })
 
-  // pi `Lane` objects, one per writer, held for the life of the process.
+  // pi `Lane` objects, one per thread, held for the life of the process.
   type PiLane = Awaited<ReturnType<typeof harness.lane>>
   const held = new Map<LaneName, PiLane>()
 
-  /** The writer's pi lane, or undefined if `create` has not run for it. */
+  /** A thread's pi lane: held, or restored from the document after a restart. */
   async function existing(name: LaneName): Promise<PiLane | undefined> {
     const cached = held.get(name)
     if (cached !== undefined) return cached
     // Restored from the document by a previous process: pi finds it by name.
+    // Checked first, because `harness.lane(name)` would CREATE a missing lane.
     if (!hasLaneRecord(doc, name)) return undefined
     const lane = await harness.lane(name, CTX)
     held.set(name, lane)
     return lane
   }
 
-  function writerLane(name: LaneName): WriterLane {
+  const tagOf = (error: unknown) => (error as { _tag?: unknown })?._tag
+
+  function threadLane(name: LaneName): ThreadLaneHandle {
     return {
       name,
-
-      async create(at) {
-        try {
-          // pi IGNORES `createAt` for a lane that already exists, which is why
-          // this is only called when `planAttach` said the lane is absent. It
-          // THROWS UnknownTarget for an entry pi does not hold, where
-          // navigateTree returns a Result, so the throw is caught here and
-          // nothing thrown by pi reaches the host.
-          const lane = await harness.lane(name, { createAt: toPi(at) }, CTX)
-          held.set(name, lane)
-          return { kind: "ok" }
-        } catch (error) {
-          const tag = (error as { _tag?: unknown })?._tag
-          if (typeof tag === "string") return refused({ _tag: tag })
-          throw error
-        }
-      },
-
-      async navigate(to) {
-        const lane = await existing(name)
-        if (lane === undefined)
-          return { kind: "refused", code: ERR.UNKNOWN_TARGET }
-        const moved = await lane.navigateTree(toPi(to), {}, CTX)
-        return moved.ok ? { kind: "ok" } : refused(moved.error)
-      },
-
-      async run(prompt) {
-        const lane = await existing(name)
-        if (lane === undefined)
-          return { kind: "refused", code: ERR.UNKNOWN_TARGET }
-        // `RunResult` is a Result union. A run that pi admitted and that then
-        // failed is still "ok" here: it ran. Only an admission refusal is
-        // `refused`.
-        const result =
-          typeof prompt === "string"
-            ? await lane.prompt(prompt, undefined, CTX)
-            : await lane.prompt(prompt, CTX)
-        return result.ok ? { kind: "ok" } : refused(result.error)
-      },
-
       async append(message) {
         const lane = await existing(name)
         if (lane === undefined)
@@ -268,18 +241,77 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
             id: entryId(await lane.appendMessage(message, CTX)),
           }
         } catch (error) {
-          const tag = (error as { _tag?: unknown })?._tag
+          const tag = tagOf(error)
           if (typeof tag === "string")
             return { kind: "refused", code: laneErrCode(tag) }
           throw error
         }
+      },
+      async run(message) {
+        const lane = await existing(name)
+        if (lane === undefined)
+          return { kind: "refused", code: ERR.UNKNOWN_TARGET }
+        // `RunResult` is a Result union. A run that pi admitted and that then
+        // failed is still "ok" here: it ran. Only an admission refusal is
+        // `refused`.
+        const result = await lane.prompt(message, CTX)
+        return result.ok ? { kind: "ok" } : refused(result.error)
       },
     }
   }
 
   return {
     modelLabel: `${resolved.provider ?? provider}/${resolved.id}`,
-    lane: writerLane,
+    lane: threadLane,
+
+    async appendToTree(message, parent) {
+      const id = session.idGenerator.next()
+      await session.mutate(
+        m =>
+          m.commit(
+            [
+              insertEntry({
+                id,
+                parentId: toPi(parent),
+                type: "message",
+                message,
+              }),
+            ],
+            CTX,
+          ),
+        CTX,
+      )
+      return { kind: "appended", id: entryId(id) }
+    },
+
+    async createThreadLane(at) {
+      const name = laneNameForThread(uuidv7())
+      try {
+        // pi THROWS UnknownTarget for an entry it does not hold, where most of
+        // its API returns a Result, so the throw is caught here and nothing
+        // thrown by pi reaches the host.
+        const lane = await harness.lane(name, { createAt: toPi(at) }, CTX)
+        held.set(name, lane)
+        return { kind: "created", lane: name }
+      } catch (error) {
+        const tag = tagOf(error)
+        if (typeof tag === "string")
+          return refused({ _tag: tag }) as CreateOutcome
+        throw error
+      }
+    },
+
+    async hold(item) {
+      await session.setValue(
+        value(OUTBOX_NAMESPACE, item.id),
+        encodeHeld(item),
+        CTX,
+      )
+    },
+
+    async release(id) {
+      await session.deleteValue(value(OUTBOX_NAMESPACE, id), CTX)
+    },
 
     async addReference(reference) {
       await session.setValue(
@@ -287,12 +319,11 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         encodeReference(reference),
         CTX,
       )
-      return { kind: "ok" }
     },
 
-    async setParticipantName(lane, displayName) {
+    async setParticipantName(writer, displayName) {
       await session.setValue(
-        value(PARTICIPANT_NAMESPACE, lane),
+        value(PARTICIPANT_NAMESPACE, writer),
         displayName,
         CTX,
       )

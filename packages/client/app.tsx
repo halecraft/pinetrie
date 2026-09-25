@@ -21,6 +21,15 @@ import {
   type TreeIndex,
 } from "@pineta/core"
 import {
+  readAgentActivity,
+  readLanes,
+  readOutbox,
+  readParticipantNames,
+  readReferences,
+  readThreadRules,
+  readTreeIndex,
+} from "@pineta/reads"
+import {
   StrictMode,
   useEffect,
   useLayoutEffect,
@@ -32,14 +41,7 @@ import {
 import { createRoot } from "react-dom/client"
 import { Column } from "./column.tsx"
 import { columnsReducer, initialColumns } from "./columns.ts"
-import {
-  readAgentActivity,
-  readEntryCount,
-  readParticipantNames,
-  readReferences,
-  readThreadRules,
-  readTreeIndex,
-} from "./projection.ts"
+import { readEntryCount } from "./projection.ts"
 import { Rail } from "./rail.tsx"
 import { connectSession, type SessionClient } from "./session-view.ts"
 
@@ -47,7 +49,7 @@ import { connectSession, type SessionClient } from "./session-view.ts"
 function NameField({ session }: { session: SessionClient }) {
   const names = useTracked(() => readParticipantNames(session.doc))
   const [draft, setDraft] = useState<string | null>(null)
-  const current = names.get(session.laneName) ?? ""
+  const current = names.get(session.writer) ?? ""
   return (
     <input
       id="name"
@@ -137,16 +139,19 @@ function App({ session }: { session: SessionClient }) {
   const doc = session.doc
   const status = useDocStatus(doc)
   const count = useTracked(() => readEntryCount(doc))
-  const { index, activity, rules } = useTracked(() => {
+  // One moment's facts, read together: the same reads the host decides from.
+  const { index, activity, rules, lanes, outbox } = useTracked(() => {
     const index = readTreeIndex(doc)
     return {
       index,
       activity: readAgentActivity(doc, index),
       rules: readThreadRules(doc),
+      lanes: readLanes(doc, index),
+      outbox: readOutbox(doc),
     }
   })
   const refs = useTracked(() => readReferences(doc))
-  const names = useTracked(() => [...readParticipantNames(doc).values()])
+  const nameOf = useTracked(() => readParticipantNames(doc))
 
   const [columns, dispatch] = useReducer(
     columnsReducer,
@@ -201,8 +206,7 @@ function App({ session }: { session: SessionClient }) {
       <header id="top">
         <h1>pineta</h1>
         <div className="meta">
-          <NameField session={session} /> · lane{" "}
-          <span id="lane">{session.laneName}</span> · entries{" "}
+          <NameField session={session} /> · entries{" "}
           <span id="count">{count}</span> ·{" "}
           <span id="status">
             {status === "pending" ? "syncing…" : "connected"}
@@ -222,7 +226,9 @@ function App({ session }: { session: SessionClient }) {
                 forks={colors.forks}
                 index={index}
                 key={column.key}
-                names={names}
+                lanes={lanes}
+                nameOf={nameOf}
+                outbox={outbox}
                 onBranchHere={at =>
                   dispatch({
                     kind: "branch",

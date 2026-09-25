@@ -8,17 +8,16 @@ import { subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 
 import {
-  type ChatAt,
+  type ChatMode,
   type EntryId,
   type Intent,
-  type LaneName,
-  laneNameForWriter,
   NOBODY,
   type Position,
   parseMentions,
-  type projectTranscript,
   type ReferenceTarget,
   THE_AGENT,
+  type WriterId,
+  writerId,
 } from "@pineta/core"
 import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
@@ -28,12 +27,6 @@ import {
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
 import { SessionDoc, type SessionDocHandle } from "@pineta/schema"
-import {
-  readEntryCount,
-  readStreaming,
-  readTranscript,
-  type StreamingView,
-} from "./projection.ts"
 
 /**
  * The `WebSocket` constructor to use. The browser supplies the global; Node
@@ -48,46 +41,29 @@ export interface ConnectOptions {
   readonly url: string
   readonly WebSocket: WebSocketCtor
   readonly peerId?: string
-  readonly onChange?: (view: SessionView) => void
-}
-
-export type { StreamingView }
-
-export interface SessionView {
-  /** This writer's own lane, derived from its peer id (ADR-0011). */
-  readonly laneName: LaneName
-  readonly transcript: ReturnType<typeof projectTranscript>
-  readonly streaming: StreamingView | null
-  readonly entryCount: number
+  /** Called on every change to the document; read it through `@pineta/reads`. */
+  readonly onChange?: () => void
 }
 
 export interface SessionClient {
   readonly peerId: string
+  /** Who this client is to the host: derived from the peer id, as the host does. */
+  readonly writer: WriterId
   /**
    * The live Exchange and doc, exposed so a React tree can render from the
    * SAME connection this client already owns (via ExchangeProvider) rather
-   * than opening a second one. Node callers — the e2e check — ignore both and
-   * use `view()`, so one connection story serves both environments.
+   * than opening a second one, and so Node callers read the same document.
    */
   readonly exchange: Exchange
   readonly doc: SessionDocHandle
   /**
-   * This writer's lane. The host derives the same name from the same peer id,
-   * via the transport, so no lane name ever crosses the wire.
+   * A human message. `at` is where the sender is reading (the root starts a
+   * new conversation); `mode` says how it joins the tree (`ChatMode`). It runs
+   * the agent only if the agent is compelled.
    */
-  readonly laneName: LaneName
-  view(): SessionView
-  /**
-   * Send a prompt. With no `from`, it appends at this writer's lane tip. With
-   * an entry, it forks from there.
-   */
-  prompt(text: string, from?: EntryId): Promise<Outcome>
-  /** Move this writer's lane to `to`, running nothing. */
-  navigate(to: Position): Promise<Outcome>
-  /** Cite an entry or a span of one, from this writer's lane tip. */
-  /** Cite `to`, attached where you are reading (`at`), or at your own tip. */
-  cite(to: ReferenceTarget, at?: ChatAt): Promise<Outcome>
-  chat(text: string, at?: ChatAt): Promise<Outcome>
+  chat(text: string, at: Position, mode?: ChatMode): Promise<Outcome>
+  /** Cite `to`, attached where you are reading (`at`). */
+  cite(to: ReferenceTarget, at: Position): Promise<Outcome>
   setName(name: string): Promise<Outcome>
   /** Make the thread rooted at `at` a working session, or a conversation. */
   setThreadMode(at: EntryId, mode: "session" | "conversation"): Promise<Outcome>
@@ -124,23 +100,7 @@ export async function connectSession(
     }
   })()
 
-  /**
-   * The rendered view. Transcript order comes from the parentId walk, never
-   * from seq (ADR-0013: nothing may render by seq order). Entries in the doc
-   * carry no seq at all, so this is enforced structurally, not by discipline.
-   */
-  const laneName = laneNameForWriter(peerId)
-
-  function view(): SessionView {
-    return {
-      laneName,
-      transcript: readTranscript(doc, laneName),
-      streaming: readStreaming(doc, laneName),
-      entryCount: readEntryCount(doc),
-    }
-  }
-
-  const unsubscribe = subscribe(doc, () => options.onChange?.(view()))
+  const unsubscribe = subscribe(doc, () => options.onChange?.())
 
   /** Encode an intent, send it, and resolve with the decoded outcome. */
   function send(intent: Intent): Promise<Outcome> {
@@ -152,31 +112,22 @@ export async function connectSession(
 
   return {
     peerId,
-    laneName,
+    writer: writerId(peerId),
     exchange,
     doc,
-    view,
-    prompt(text: string, from?: EntryId): Promise<Outcome> {
-      return send(
-        from === undefined
-          ? { kind: "prompt", text }
-          : { kind: "branch", text, from },
-      )
+    chat(text, at, mode = "reply") {
+      return send({
+        kind: "chat",
+        text,
+        at,
+        mode,
+        mentions: parseMentions(text),
+      })
     },
-    navigate(to: Position): Promise<Outcome> {
-      return send({ kind: "navigate", to })
-    },
-    cite(to: ReferenceTarget, at: ChatAt = { kind: "tip" }): Promise<Outcome> {
+    cite(to, at) {
       return send({ kind: "reference", to, at })
     },
-    /**
-     * A human message at `at`, or at this writer's own tip. It runs the agent
-     * only if the agent is compelled: mentioned, or the thread's default.
-     */
-    chat(text: string, at: ChatAt = { kind: "tip" }): Promise<Outcome> {
-      return send({ kind: "chat", text, at, mentions: parseMentions(text) })
-    },
-    setName(name: string): Promise<Outcome> {
+    setName(name) {
       return send({ kind: "name", name })
     },
     setThreadMode(at, mode) {

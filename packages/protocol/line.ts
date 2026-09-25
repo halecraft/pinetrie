@@ -18,8 +18,10 @@ const Command = Schema.struct({
   id: Schema.string(),
   kind: Schema.string(...COMMAND_KINDS),
   text: Schema.string(),
-  /** Set only for `kind: "branch"`; "" otherwise (schemas are total). */
+  /** Where the sender was reading, or "" for the root (schemas are total). */
   parentId: Schema.string(),
+  /** A chat's mode, or "" for other kinds. */
+  mode: Schema.string(),
   targetId: Schema.string(),
   spanStart: Schema.number(),
   spanEnd: Schema.number(),
@@ -33,6 +35,8 @@ const Reply = Schema.struct({
   errorMessage: Schema.string(),
   referenceId: Schema.string(),
   entryId: Schema.string(),
+  position: Schema.number(),
+  by: Schema.string(),
 })
 
 /** Asymmetric: client sends Command, host sends Reply. */

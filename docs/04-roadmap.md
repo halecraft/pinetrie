@@ -59,7 +59,9 @@ Roughly in dependency order, each independently shippable:
    and **navigation turned out to be free**, because the selected tip is
    client-local state rather than a write. The spine view was later replaced
    by columns and a rail (`docs/06-interface.md`).
-2. ~~**Branch write**~~ — **done**, both directions. A `branch` command names a
+2. ~~**Branch write**~~ — **done**, both directions. *Superseded by ADR-0020:*
+   lanes no longer move, so a branch is a new thread (and, when the agent is
+   asked, a new lane) rather than a navigated one. A `branch` command names a
    parent; the host navigates there with pi's `navigateTree`, then prompts. A
    `navigate` command moves the lane and runs nothing, which is how you come
    back from an Aside — without it a branch was one-way, and "return to your
@@ -73,13 +75,14 @@ Roughly in dependency order, each independently shippable:
    - A foreign-written entry is NOT navigable: pi's session index never saw it
      created.
 
-3. ~~**Concurrent lanes**~~ — **done.** A lane and a turn per writer, keyed by
+3. ~~**Concurrent lanes**~~ — **done.** *Superseded by ADR-0020:* lanes belong
+   to threads, not writers; threads run concurrently. (Originally: a lane and a turn per writer, keyed by
    the transport's peer id. Two windows run turns at once; neither moves the
    other's lane; streams do not mix. Findings: pi refuses to navigate to the
    current tip (so attachment is a decision with a `stay` outcome); pi ignores
    `createAt` for a lane that exists and throws for an unknown one; and pi
    records a lane on creation, which is what lets the document tell "no lane"
-   from "a lane at the root".
+   from "a lane at the root".)
 4. ~~**References**~~ — **done.** Stored as pi values in `pineta.reference`
    (ADR-0017); backlinks derived; attached where the author is reading. The
    v1 demo runs in a real browser, minus presence.

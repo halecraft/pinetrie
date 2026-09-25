@@ -12,7 +12,8 @@
 
 import {
   atEntry,
-  type ChatAt,
+  CHAT_MODES,
+  type ChatMode,
   type EntryId,
   ERR,
   type ErrCode,
@@ -41,9 +42,12 @@ export interface Refusal {
 /** What a reply means. `reply()` flattens it for the wire. */
 export type Outcome =
   | { readonly kind: "started"; readonly runId: RunId }
-  | { readonly kind: "navigated" }
   | { readonly kind: "referenced"; readonly id: ReferenceId }
   | { readonly kind: "appended"; readonly id: EntryId }
+  /** Waiting behind `position` messages for the thread's lane to be free. */
+  | { readonly kind: "queued"; readonly position: number }
+  /** Another writer took the slot first: `by` is their display name. */
+  | { readonly kind: "conflict"; readonly by: string }
   | { readonly kind: "named" }
   | { readonly kind: "threaded" }
   | Refusal
@@ -66,18 +70,16 @@ const refuse = (code: ErrCode, message: string): Refusal => ({
 /**
  * Wire command -> a well-formed intent, or the first shape rule it breaks.
  *
- * `parentId: ""` means different things per kind, and this is the only place
- * that knows it: on a `navigate` it means the root; on a `branch` it means no
- * parent was named, which is refused.
- *
- * Order matters and is pinned by a test: empty text is reported before a
- * missing parent, so a user is told the first thing that is wrong.
+ * `parentId: ""` is the root, and this is the only place that knows it: for a
+ * chat, a new conversation; for a reference, no anchor (refused by
+ * `planReference`); for a thread default, no entry, refused here.
  */
 export function decodeCommand(
   wire: WireCommand | null | undefined,
 ): Intent | Refusal {
   const kind = wire?.kind
-  const parent = text(wire?.parentId)
+  // "" is the root: a new conversation, or no anchor. Only the codec knows that.
+  const at = positionFromWire(text(wire?.parentId))
 
   if (kind === "reference") {
     const target = text(wire?.targetId)
@@ -87,9 +89,6 @@ export function decodeCommand(
     const start = wire?.spanStart
     const end = wire?.spanEnd
     // -1 on both is the wire's "whole entry"; only the codec knows that.
-    // "" is the author's own tip, as for chat; only the codec knows that.
-    const at: ChatAt =
-      parent === "" ? { kind: "tip" } : { kind: "entry", id: entryId(parent) }
     if (start === -1 && end === -1) {
       return {
         kind: "reference",
@@ -113,12 +112,6 @@ export function decodeCommand(
       at,
     }
   }
-  if (kind === "navigate") {
-    return {
-      kind: "navigate",
-      to: parent === "" ? ROOT : atEntry(entryId(parent)),
-    }
-  }
   if (kind === "name") {
     const name = normalizeName(text(wire?.text))
     return name === undefined
@@ -126,7 +119,7 @@ export function decodeCommand(
       : { kind: "name", name }
   }
   if (kind === "thread") {
-    if (parent === "") {
+    if (at.kind === "root") {
       return refuse(ERR.NO_PARENT, "a thread default must name its entry")
     }
     const mode = text(wire?.text)
@@ -135,70 +128,43 @@ export function decodeCommand(
     }
     return {
       kind: "thread",
-      at: entryId(parent),
+      at: at.id,
       compels:
         mode === "session" ? { kind: "agent", agent: THE_AGENT } : NOBODY,
     }
   }
   if (kind === "chat") {
     const body = text(wire?.text)
-    if (body === "") return refuse(ERR.EMPTY_PROMPT, "message text is empty")
-    return {
-      kind: "chat",
-      text: body,
-      // "" is the sender's own lane tip; only the codec knows that.
-      at:
-        parent === ""
-          ? { kind: "tip" }
-          : { kind: "entry", id: entryId(parent) },
-      mentions: parseMentions(body),
+    if (body === "") return refuse(ERR.EMPTY_MESSAGE, "message text is empty")
+    const mode = text(wire?.mode)
+    if (!isChatMode(mode)) {
+      return refuse(ERR.UNKNOWN_KIND, `unknown chat mode: ${mode}`)
     }
+    return { kind: "chat", text: body, at, mode, mentions: parseMentions(body) }
   }
-  if (kind !== "prompt" && kind !== "branch") {
-    return refuse(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
-  }
-
-  const body = text(wire?.text)
-  if (body === "") return refuse(ERR.EMPTY_PROMPT, "prompt text is empty")
-  if (kind === "prompt") return { kind: "prompt", text: body }
-
-  if (parent === "") {
-    return refuse(ERR.NO_PARENT, "a branch must name a parent entry")
-  }
-  return { kind: "branch", text: body, from: entryId(parent) }
+  return refuse(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
 }
+
+const isChatMode = (mode: string): mode is ChatMode =>
+  (CHAT_MODES as readonly string[]).includes(mode)
 
 /** Intent -> the flat wire command. The client's half of `decodeCommand`. */
 export function encodeIntent(id: string, intent: Intent): Command {
   switch (intent.kind) {
-    case "prompt":
-      return command({ id, kind: "prompt", text: intent.text })
-    case "branch":
-      return command({
-        id,
-        kind: "branch",
-        text: intent.text,
-        parentId: intent.from,
-      })
-    case "navigate":
-      return command({
-        id,
-        kind: "navigate",
-        parentId: positionToWire(intent.to),
-      })
     case "reference":
       return command({
         id,
         kind: "reference",
         ...targetToWire(intent.to),
-        parentId: intent.at.kind === "tip" ? "" : intent.at.id,
+        parentId: positionToWire(intent.at),
       })
     case "chat":
       return command({
         id,
         kind: "chat",
         text: intent.text,
-        parentId: intent.at.kind === "tip" ? "" : intent.at.id,
+        parentId: positionToWire(intent.at),
+        mode: intent.mode,
       })
     case "name":
       return command({ id, kind: "name", text: intent.name })
@@ -218,12 +184,14 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
   switch (outcome.kind) {
     case "started":
       return reply({ id, outcome: "started", runId: outcome.runId })
-    case "navigated":
-      return reply({ id, outcome: "navigated" })
     case "referenced":
       return reply({ id, outcome: "referenced", referenceId: outcome.id })
     case "appended":
       return reply({ id, outcome: "appended", entryId: outcome.id })
+    case "queued":
+      return reply({ id, outcome: "queued", position: outcome.position })
+    case "conflict":
+      return reply({ id, outcome: "conflict", by: outcome.by })
     case "named":
       return reply({ id, outcome: "named" })
     case "threaded":
@@ -243,12 +211,14 @@ export function decodeReply(wire: Reply): Outcome {
   switch (wire.outcome) {
     case "started":
       return { kind: "started", runId: runId(wire.runId) }
-    case "navigated":
-      return { kind: "navigated" }
     case "referenced":
       return { kind: "referenced", id: referenceId(wire.referenceId) }
     case "appended":
       return { kind: "appended", id: entryId(wire.entryId) }
+    case "queued":
+      return { kind: "queued", position: wire.position }
+    case "conflict":
+      return { kind: "conflict", by: wire.by }
     case "named":
       return { kind: "named" }
     case "threaded":
@@ -259,6 +229,8 @@ export function decodeReply(wire: Reply): Outcome {
 }
 
 const positionToWire = (p: Position): string => (p.kind === "root" ? "" : p.id)
+const positionFromWire = (s: string): Position =>
+  s === "" ? ROOT : atEntry(entryId(s))
 
 const targetToWire = (t: ReferenceTarget) =>
   t.kind === "entry"

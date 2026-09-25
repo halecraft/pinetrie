@@ -4,8 +4,8 @@
 // entry (S19). pi's default conversion sends it to the model as a `user`
 // message with its `content`, so `content` carries the speaker ("Alice: …")
 // and needs no projector. A message that compels the agent IS the agent's
-// prompt, so the agent's lane appends it; one that compels nobody is appended
-// on its author's lane with no run.
+// prompt, so its thread's lane appends it; one that compels nobody is appended
+// with no run (ADR-0020).
 //
 // `details` holds the structured fields, which readers decode here and never
 // parse back out of `content`.
@@ -13,26 +13,22 @@
 import {
   type AgentId,
   type AgentMessageLike,
-  type Attach,
-  type ChatAt,
+  type ChatMode,
   compelledResponder,
-  ERR,
-  type ErrCode,
   type LaneName,
   type Mention,
   messageText,
-  planAttach,
+  type Position,
   type Responder,
-  resolveTarget,
-  type TurnState,
-  type WriterLaneState,
+  type ThreadLane,
+  type WriterId,
 } from "@pineta/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 
 export const CHAT_TYPE = "pineta.chat"
 
-/** pi value namespace for display names. The key is the writer's lane name. */
+/** pi value namespace for display names. The key is the writer's id. */
 export const PARTICIPANT_NAMESPACE = "pineta.participant"
 
 const ResponderSchema = Type.Union([
@@ -40,8 +36,8 @@ const ResponderSchema = Type.Union([
   Type.Object({ kind: Type.Literal("agent"), agent: Type.String() }),
 ])
 
-const DetailsSchema = Type.Object({
-  /** The author's lane name, from the transport. */
+export const DetailsSchema = Type.Object({
+  /** The author, from the transport: a `WriterId`. */
   author: Type.String(),
   /** The author's display name when they wrote it. Copied, never looked up. */
   authorName: Type.String(),
@@ -56,7 +52,7 @@ const ChatSchema = Type.Object({
 })
 
 export interface ChatDetails {
-  readonly author: LaneName
+  readonly author: WriterId
   readonly authorName: string
   readonly text: string
   readonly compels: Responder
@@ -95,7 +91,7 @@ export const encodeChat = (
 /** A stored message -> its chat details, or undefined if it is not a chat. */
 export const decodeChat = (message: unknown): ChatDetails | undefined =>
   decodeWith(ChatSchema, message, ({ details: d }) => ({
-    author: d.author as LaneName,
+    author: d.author as WriterId,
     authorName: d.authorName,
     text: d.text,
     compels:
@@ -129,6 +125,7 @@ export function renderableMessage(message: unknown): AgentMessageLike {
         content: chat.text,
         author: chat.authorName,
         compelled: chat.compels.kind === "agent",
+        writer: chat.author,
       }
 }
 
@@ -138,54 +135,87 @@ export function renderableMessage(message: unknown): AgentMessageLike {
  */
 export function participantNames(
   values: Iterable<{ readonly key: string; readonly value: unknown }>,
-): ReadonlyMap<LaneName, string> {
-  const out = new Map<LaneName, string>()
+): ReadonlyMap<WriterId, string> {
+  const out = new Map<WriterId, string>()
   for (const { key, value } of values) {
-    if (typeof value === "string") out.set(key as LaneName, value)
+    if (typeof value === "string") out.set(key as WriterId, value)
   }
   return out
 }
 
 /**
- * A writer's name for display: the one they set, or a label from their lane so
- * a speaker is never blank.
+ * A writer's name for display: the one they set, or a label from their id so a
+ * speaker is never blank.
  */
-export const displayName = (lane: LaneName, set: string | undefined): string =>
-  set ?? `guest-${lane.slice(-4)}`
+export const displayName = (
+  writer: WriterId,
+  set: string | undefined,
+): string => set ?? `guest-${writer.slice(-4)}`
 
 export type ChatDecision =
-  /** Compels nobody: append on the author's lane, and nothing runs. */
+  /** No lane at this thread: append with no lane, parented at exactly `parent`. */
   | {
-      readonly kind: "append"
-      readonly attach: Attach
+      readonly kind: "appendToTree"
+      readonly parent: Position
       readonly details: ChatDetails
     }
-  /** Compels the agent: the message is its prompt, on the agent's lane. */
+  /** The thread's lane is idle: append through it. */
+  | {
+      readonly kind: "appendToLane"
+      readonly lane: LaneName
+      readonly details: ChatDetails
+    }
+  /** The thread's lane is idle and the agent is compelled: run. */
   | {
       readonly kind: "run"
-      readonly agent: AgentId
-      readonly attach: Attach
+      readonly lane: LaneName
       readonly details: ChatDetails
     }
-  | { readonly kind: "refused"; readonly code: ErrCode }
+  /** The agent is compelled here for the first time: create the thread's lane at `at`, then run. */
+  | {
+      readonly kind: "createAndRun"
+      readonly at: Position
+      readonly details: ChatDetails
+    }
+  /** The lane is busy: wait in its outbox, `position` messages ahead. */
+  | {
+      readonly kind: "hold"
+      readonly lane: LaneName
+      readonly details: ChatDetails
+      readonly position: number
+    }
+  /** Another writer took the slot. Nothing is written; the sender chooses. */
+  | { readonly kind: "conflict"; readonly by: WriterId | null }
 
 /**
- * Decide where a human message goes and whether the agent answers. Pure.
+ * Decide what a human message does. Pure; the host gathers every input inside
+ * one serial step, so each decision names exactly where to write.
  *
- * Both outcomes attach at the same place, the position the author is viewing,
- * so a compelled message and a plain one sit identically in the tree; only the
- * lane that appends it differs.
+ * - `branch` makes a fork on purpose: plain, it is appended at `at` with no
+ *   lane; compelled, it ALWAYS creates a new lane there. At an idle thread
+ *   lane's own tip there is nothing to fork, so it is planned as a `reply`.
+ * - A thread lane that is running, or has messages waiting, is busy: a new
+ *   message holds behind the ones ahead of it, and a lane is never written
+ *   while it runs (S21).
+ * - A compelled `reply` that another writer raced, or that finds the lane busy,
+ *   is a conflict: the sender chooses to queue or to branch. `queue` means
+ *   that choice was already made. Plain chat never conflicts.
  */
 export function planChat(input: {
-  readonly author: LaneName
+  readonly author: WriterId
   readonly authorName: string
   readonly text: string
-  readonly at: ChatAt
+  readonly mode: ChatMode
+  /** What the sender saw: the end they read, or the branch point. */
+  readonly at: Position
+  /** `threadEnd(at)`. */
+  readonly end: Position
+  /** `raceSince(at, author)`. */
+  readonly race: { readonly by: WriterId } | null
   readonly mentions: readonly Mention[]
   readonly threadDefault: Responder
-  readonly authorLane: WriterLaneState
-  readonly agentLane: WriterLaneState
-  readonly agentTurn: TurnState
+  /** The lane at `end` for a reply, at `at` for a branch (`threadLaneAt`). */
+  readonly lane: ThreadLane
 }): ChatDecision {
   const compels = compelledResponder(input)
   const details: ChatDetails = {
@@ -194,23 +224,42 @@ export function planChat(input: {
     text: input.text,
     compels,
   }
-  if (compels.kind === "none") {
+  const compelled = compels.kind === "agent"
+  const { lane } = input
+
+  // A branch at a lane's tip is a reply, but only at an IDLE lane's tip. A
+  // running lane's tip equals the branch point only in the moment after it was
+  // created there and before its prompt commits (the run starts after the
+  // serial step returns): that is someone else's new line of work, and a
+  // branch there is another.
+  if (input.mode === "branch" && (lane.kind === "none" || lane.running)) {
+    return compelled
+      ? { kind: "createAndRun", at: input.at, details }
+      : { kind: "appendToTree", parent: input.at, details }
+  }
+  const mode = input.mode === "branch" ? "reply" : input.mode
+
+  if (lane.kind === "none") {
+    if (!compelled) return { kind: "appendToTree", parent: input.end, details }
+    if (mode === "reply" && input.race !== null)
+      return { kind: "conflict", by: input.race.by }
+    return { kind: "createAndRun", at: input.end, details }
+  }
+
+  const name = lane.name
+  const busy = lane.running || lane.waiting > 0
+  if (!compelled) {
+    return busy
+      ? { kind: "hold", lane: name, details, position: lane.waiting }
+      : { kind: "appendToLane", lane: name, details }
+  }
+  if (mode === "reply" && (input.race !== null || busy)) {
     return {
-      kind: "append",
-      attach: planAttach(input.authorLane, input.at),
-      details,
+      kind: "conflict",
+      by: input.race?.by ?? lane.askedBy,
     }
   }
-  // The agent answers one message at a time; a second compelled message while
-  // it runs is refused rather than silently dropped.
-  if (input.agentTurn.busy) return { kind: "refused", code: ERR.BUSY }
-  return {
-    kind: "run",
-    agent: compels.agent,
-    attach: planAttach(
-      input.agentLane,
-      resolveTarget(input.authorLane, input.at),
-    ),
-    details,
-  }
+  return busy
+    ? { kind: "hold", lane: name, details, position: lane.waiting }
+    : { kind: "run", lane: name, details }
 }

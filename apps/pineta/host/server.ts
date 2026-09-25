@@ -10,7 +10,9 @@ const host = await startHost({
 
 console.log(`[host] listening   ${host.httpUrl}`)
 console.log(`[host] websocket   ${host.wsUrl}`)
-console.log("[host] lanes       one per connected client (ADR-0011)")
+console.log(
+  "[host] lanes       one per thread where agent work is wanted (ADR-0020)",
+)
 console.log("[host] open the http url in a browser, or run `pnpm run e2e`")
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

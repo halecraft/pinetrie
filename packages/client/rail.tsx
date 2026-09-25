@@ -5,7 +5,7 @@
 // reads). Colours come from one palette indexed by track, which the column
 // headers and fork dots share, so a branch looks the same everywhere.
 
-import { type AgentActivity, PENDING_TRACK, type RailRow } from "@pineta/core"
+import { type AgentRun, PENDING_TRACK, type RailRow } from "@pineta/core"
 
 const PALETTE = [
   "#9ecbff",
@@ -47,7 +47,8 @@ export function Rail({
   rows: readonly RailRow[]
   /** Ids on any open column's path: drawn at full strength. */
   open: ReadonlySet<string>
-  activity: AgentActivity
+  /** Every running lane: each tip pulses, whether or not a column shows it. */
+  activity: readonly AgentRun[]
   onPick: (id: string) => void
 }) {
   const rowOf = new Map(rows.map((r, i) => [r.id, i]))
@@ -83,7 +84,7 @@ export function Rail({
         <button
           aria-label="open this message's thread"
           className={
-            activity.kind === "replying" && activity.tip === r.id
+            activity.some(run => run.tip === r.id)
               ? "rail-dot pulse"
               : "rail-dot"
           }

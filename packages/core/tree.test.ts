@@ -2,13 +2,21 @@ import { describe, expect, test } from "vitest"
 import {
   agentActivity,
   ancestry,
+  atEntry,
   branchColors,
   type EntryLike,
+  entryId,
   followTip,
   indexTree,
+  laneNameForThread,
   PENDING_TRACK,
   projectColumns,
   projectRail,
+  ROOT,
+  raceSince,
+  threadEnd,
+  threadLaneAt,
+  writerId,
 } from "./index.ts"
 
 /**
@@ -234,13 +242,88 @@ describe("colour and the agent", () => {
     ])
     expect(branchColors(rail, cols).track).toEqual([0, PENDING_TRACK])
   })
-  test("the agent is idle unless running with a tip; replying reads its path", () => {
-    expect(agentActivity(i, "5-a2", false)).toEqual({ kind: "idle" })
-    const a = agentActivity(i, "5-a2", true)
-    expect(a.kind === "replying" ? [...a.path] : []).toEqual([
-      "5-a2",
-      "4-a1",
-      "1-t1",
+  test("the agent is idle with no running lane; each running lane reads its own path", () => {
+    expect(agentActivity(i, [])).toEqual([])
+    const runs = agentActivity(i, [
+      { lane: laneNameForThread("a"), tip: "5-a2" },
+      { lane: laneNameForThread("b"), tip: "7-b2" },
+      { lane: laneNameForThread("new"), tip: null },
     ])
+    expect(runs.map(r => [r.lane, [...r.path]])).toEqual([
+      ["t-a", ["5-a2", "4-a1", "1-t1"]],
+      ["t-b", ["7-b2", "6-b1", "2-t2", "1-t1"]],
+    ])
+  })
+})
+
+describe("threads: where a message lands, and whether it raced", () => {
+  // 1-q is Wu's question; below it the agent's reply, a remark, and questions.
+  const say = (
+    id: string,
+    parentId: string | null,
+    extra: Record<string, unknown>,
+  ): [string, EntryLike] => [
+    id,
+    {
+      id,
+      parentId,
+      type: "message",
+      message: { role: "chat", content: id, ...extra },
+    },
+  ]
+  const entries = Object.fromEntries([
+    say("1-q", null, { writer: "w-wu", compelled: true }),
+    [
+      "2-r",
+      {
+        id: "2-r",
+        parentId: "1-q",
+        type: "message",
+        message: { role: "assistant", content: "r" },
+      },
+    ],
+    say("3-plain", "2-r", { writer: "w-bo", compelled: false }),
+    say("4-mine", "3-plain", { writer: "w-wu", compelled: true }),
+  ]) as Record<string, EntryLike>
+  const at = (id: string) => atEntry(entryId(id))
+
+  test("threadEnd: the root is a new conversation, never the newest thread", () => {
+    const i = indexTree(entries)
+    expect(threadEnd(i, ROOT)).toEqual(ROOT)
+    expect(threadEnd(i, at("1-q"))).toEqual(at("4-mine"))
+  })
+
+  test("raceSince: an agent reply, a plain remark and my own question are not a race", () => {
+    expect(raceSince(indexTree(entries), at("1-q"), writerId("wu"))).toBeNull()
+  })
+
+  test("raceSince: another writer's compelled message below what I saw is", () => {
+    const raced = indexTree({
+      ...entries,
+      ...Object.fromEntries([
+        say("5-theirs", "4-mine", { writer: "w-bo", compelled: true }),
+      ]),
+    })
+    expect(raceSince(raced, at("1-q"), writerId("wu"))).toEqual({ by: "w-bo" })
+    // Nothing below the newest message: no race from there.
+    expect(raceSince(raced, at("5-theirs"), writerId("wu"))).toBeNull()
+  })
+
+  test("threadLaneAt: the lane whose tip is the end; none at the root or elsewhere", () => {
+    const lane = {
+      name: laneNameForThread("x"),
+      tip: "4-mine",
+      running: false,
+      waiting: 0,
+      askedBy: null,
+    }
+    expect(threadLaneAt([lane], at("4-mine"))).toEqual({
+      kind: "lane",
+      ...lane,
+    })
+    expect(threadLaneAt([lane], at("3-plain"))).toEqual({ kind: "none" })
+    expect(threadLaneAt([{ ...lane, tip: null }], ROOT)).toEqual({
+      kind: "none",
+    })
   })
 })

@@ -77,6 +77,15 @@ test("marginalia declares only TypeBox and core", () => {
   ])
 })
 
+test("reads declares only core, schema and marginalia: no pi, no transport", () => {
+  // The host and the client decide from these reads, so they must run in both.
+  assert.deepEqual(deps(read("packages/reads")).sort(), [
+    "@pineta/core",
+    "@pineta/marginalia",
+    "@pineta/schema",
+  ])
+})
+
 test("the client declares no server package and no app", () => {
   const client = deps(read("packages/client"))
   for (const forbidden of ["ws", "vite", "@pineta/app", "@pineta/pi"]) {

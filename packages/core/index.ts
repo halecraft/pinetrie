@@ -21,19 +21,42 @@
 // `number` field. These brands guard against swapped arguments, which is what
 // brands are for.
 
+declare const writerIdBrand: unique symbol
+/**
+ * A person, as the transport identifies them (`LineSender.peer`), never as a
+ * message claims. Authorship is recorded in each message by this id; people
+ * own no lanes (ADR-0020).
+ */
+export type WriterId = string & { readonly [writerIdBrand]: true }
+
+/** The only way to make a `WriterId`: from the transport's peer id. */
+export function writerId(peerId: string): WriterId {
+  if (typeof peerId !== "string" || peerId.length === 0) {
+    throw new Error("writerId: peerId must be a non-empty string")
+  }
+  if (peerId.includes("\u0000")) {
+    throw new Error("writerId: peerId must not contain \\u0000")
+  }
+  return `w-${peerId}` as WriterId
+}
+
 declare const laneNameBrand: unique symbol
 /**
- * A lane name that carries writer identity (ADR-0011). Only
- * `laneNameForWriter()` can mint one, so `"main"` is not assignable.
+ * A thread's lane: a line of work (ADR-0019), created where agent work is first
+ * wanted in a thread and never moved (ADR-0020). Only `laneNameForThread()`
+ * can mint one, so no writer's id or `"main"` is assignable.
  */
 export type LaneName = string & { readonly [laneNameBrand]: true }
+
+/** A new thread lane's name, from a fresh coordination-free id. */
+export const laneNameForThread = (id: string): LaneName => `t-${id}` as LaneName
 
 declare const entryIdBrand: unique symbol
 declare const runIdBrand: unique symbol
 declare const referenceIdBrand: unique symbol
 /**
  * Entry ids and run ids are both uuidv7 strings and cannot be told apart at
- * runtime. Navigation takes an entry id; `activeRuns` and `pendingText` are
+ * runtime. Positions take an entry id; `activeRuns` and `pendingText` are
  * keyed by run id. Passing one where the other belongs would otherwise
  * compile, run, and fail silently. Mint them only at the edges: the protocol
  * codec, the document readers, and the host's id generator.
@@ -59,55 +82,30 @@ export const THE_AGENT = "agent" as AgentId
  *
  * pi's API spells this `string | null`, and the wire spells it `""`. Both are
  * converted to a `Position` at the edge they arrive from, so decision logic
- * never has to guess whether `null` means "the root" or "absent".
+ * never has to guess whether `null` means "the root" or "absent". A message at
+ * the root starts a new conversation.
  */
 export type Position =
   | { readonly kind: "root" }
   | { readonly kind: "entry"; readonly id: EntryId }
 
 export const ROOT: Position = { kind: "root" }
-
-/**
- * Where a turn attaches: the writer's own lane tip, or a named position.
- * `"tip"` is its own variant because pi reads `null` as the ROOT, so a
- * nullable "no position given" would be one refactor away from meaning root.
- */
-export type Target = { readonly kind: "tip" } | Position
-
-/**
- * Where a human message attaches: the sender's own tip, or an entry. Never an
- * explicit root, which the wire could not tell apart from "tip"; a writer
- * with no lane yet still reaches the root through "tip", as a first prompt does.
- */
-export type ChatAt =
-  | { readonly kind: "tip" }
-  | { readonly kind: "entry"; readonly id: EntryId }
 export const atEntry = (id: EntryId): Position => ({ kind: "entry", id })
 
-export function samePosition(a: Position, b: Position): boolean {
-  return a.kind === "root"
-    ? b.kind === "root"
-    : b.kind === "entry" && a.id === b.id
-}
-
-// --- command admission ------------------------------------------------------
+// --- commands ---------------------------------------------------------------
 
 /** Error codes the host may return. Kept here so both sides agree without I/O. */
 export const ERR = {
   UNKNOWN_KIND: "unknown_kind",
-  EMPTY_PROMPT: "empty_prompt",
-  BUSY: "busy",
-  NOT_READY: "not_ready",
-  /** A branch named no parent to fork from. */
+  EMPTY_MESSAGE: "empty_message",
+  /** A thread default named no entry to be set at. */
   NO_PARENT: "no_parent",
   /** pi refused the target: it is not in this conversation. */
   UNKNOWN_TARGET: "unknown_target",
-  /** pi refused the navigation as invalid. */
-  INVALID_NAVIGATION: "invalid_navigation",
   /** pi refused for a reason with no more specific code here. */
   REFUSED: "refused",
-  /** A reference needs an entry to attach at, and this writer has none. */
-  NO_LANE: "no_lane",
+  /** A reference must be attached at an entry, and the root is none. */
+  NO_ANCHOR: "no_anchor",
   /** A span is empty, out of bounds, or on an entry with no text. */
   INVALID_SPAN: "invalid_span",
   /** A display name is empty or too long. */
@@ -116,16 +114,6 @@ export const ERR = {
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
 
-export interface TurnState {
-  readonly busy: boolean
-  readonly ready: boolean
-}
-
-/**
- * A command whose SHAPE is already known to be valid. The protocol codec
- * produces it; it owns every shape rule (a kind we know, non-empty text, a
- * named parent), so this type cannot express a malformed command.
- */
 /** What a reference points at. Spans are UTF-16 code units into `entryText`. */
 export type ReferenceTarget =
   | { readonly kind: "entry"; readonly id: EntryId }
@@ -136,21 +124,38 @@ export type ReferenceTarget =
       readonly end: number
     }
 
+/**
+ * How a message means to join the tree.
+ *
+ * - `reply`: continue the thread I am reading; I saw it end at `at`. If
+ *   another writer compelled the agent there since, that is a race, and the
+ *   sender is told (`conflict`) rather than guessed for.
+ * - `queue`: add this to the agent's work in this thread, whenever it is free.
+ * - `branch`: start a thread at `at`, an earlier message. Deliberate: it is how
+ *   a fork is made, and a compelled branch is a new line of work.
+ */
+export type ChatMode = "reply" | "queue" | "branch"
+export const CHAT_MODES: readonly ChatMode[] = ["reply", "queue", "branch"]
+
+/**
+ * A command whose SHAPE is already known to be valid. The protocol codec
+ * produces it; it owns every shape rule, so this type cannot express a
+ * malformed command. What it then does is decided by `planChat` and
+ * `planReference` in `@pineta/marginalia`, over what the host gathers.
+ */
 export type Intent =
   /** A citation, attached where its author is reading (`at`). */
   | {
       readonly kind: "reference"
       readonly to: ReferenceTarget
-      readonly at: ChatAt
+      readonly at: Position
     }
-  /**
-   * A human message. `at` is where its author is viewing; `mentions` are
-   * parsed from `text` by `parseMentions`, once, at the codec.
-   */
+  /** A human message; `mentions` are parsed from `text` once, at the codec. */
   | {
       readonly kind: "chat"
       readonly text: string
-      readonly at: ChatAt
+      readonly at: Position
+      readonly mode: ChatMode
       readonly mentions: readonly Mention[]
     }
   /** Set the sender's display name: a label, never an identity. */
@@ -161,192 +166,6 @@ export type Intent =
       readonly at: EntryId
       readonly compels: Responder
     }
-  | { readonly kind: "prompt"; readonly text: string }
-  | { readonly kind: "branch"; readonly text: string; readonly from: EntryId }
-  | { readonly kind: "navigate"; readonly to: Position }
-
-export type CommandDecision =
-  /**
-   * A branch is a run with a different attachment point, so there is ONE run
-   * decision. `from` says where the turn attaches: the lane's own tip for a
-   * prompt, or a position for a branch. It replaces a `parentId` whose `null`
-   * meant "the tip", which pi's `navigateTree(null)` reads as "the root".
-   */
-  | {
-      kind: "run"
-      runId: RunId
-      text: string
-      from: Target
-      next: TurnState
-    }
-  /**
-   * Moving the lane tip is NOT a run: no run id, no stream, no turn, and the
-   * lane does not become busy.
-   */
-  | { kind: "navigate"; to: Position; next: TurnState }
-  /**
-   * A citation. Not a run and not a move: it writes one value. Refused while
-   * the author's turn runs: `at` may be the author's tip, and a tip that moves
-   * mid-turn makes "where was this attached" ambiguous.
-   */
-  | { kind: "reference"; to: ReferenceTarget; at: ChatAt; next: TurnState }
-  /**
-   * A human message. Where it goes and whether the agent runs are decided by
-   * `planChat` in `@pineta/marginalia`, which needs the agent's lane too.
-   */
-  | {
-      kind: "chat"
-      text: string
-      at: ChatAt
-      mentions: readonly Mention[]
-      next: TurnState
-    }
-  | { kind: "name"; name: string; next: TurnState }
-  | { kind: "thread"; at: EntryId; compels: Responder; next: TurnState }
-  | { kind: "reject"; code: ErrCode; message: string; next: TurnState }
-
-/**
- * Decide what to do with a well-formed intent, given ONE writer's turn state.
- *
- * Only state policy lives here: ready and busy. Shape rules belong to the
- * protocol codec. Each writer has their own `TurnState` (ADR-0011), so one
- * writer's running turn never makes another writer busy.
- */
-export function planCommand(
-  state: TurnState,
-  intent: Intent,
-  newRunId: RunId,
-): CommandDecision {
-  if (!state.ready) {
-    return {
-      kind: "reject",
-      code: ERR.NOT_READY,
-      message: "host is not ready",
-      next: state,
-    }
-  }
-  // A navigation is refused mid-turn too: moving the tip underneath a running
-  // turn would decide where its entries land.
-  if (state.busy) {
-    return {
-      kind: "reject",
-      code: ERR.BUSY,
-      message: "your turn is already running",
-      next: state,
-    }
-  }
-  switch (intent.kind) {
-    case "navigate":
-      return { kind: "navigate", to: intent.to, next: state }
-    case "reference":
-      return { kind: "reference", to: intent.to, at: intent.at, next: state }
-    case "chat":
-      return {
-        kind: "chat",
-        text: intent.text,
-        at: intent.at,
-        mentions: intent.mentions,
-        next: state,
-      }
-    case "name":
-      return { kind: "name", name: intent.name, next: state }
-    case "thread":
-      return {
-        kind: "thread",
-        at: intent.at,
-        compels: intent.compels,
-        next: state,
-      }
-    case "prompt":
-      return {
-        kind: "run",
-        runId: newRunId,
-        text: intent.text,
-        from: { kind: "tip" },
-        next: { ...state, busy: true },
-      }
-    case "branch":
-      return {
-        kind: "run",
-        runId: newRunId,
-        text: intent.text,
-        from: atEntry(intent.from),
-        next: { ...state, busy: true },
-      }
-  }
-}
-
-/** Pure state transition for turn completion. */
-export function turnFinished(state: TurnState): TurnState {
-  return { ...state, busy: false }
-}
-
-// --- attaching a writer's lane ----------------------------------------------
-
-/** Where this writer's lane is, including that it may not exist yet. */
-export type WriterLaneState =
-  | { readonly kind: "none" }
-  | { readonly kind: "lane"; readonly at: Position }
-
-/** What the shell must do so the writer's lane is at `target`. */
-export type Attach =
-  | { readonly kind: "create"; readonly at: Position }
-  | { readonly kind: "navigate"; readonly to: Position }
-  | { readonly kind: "stay" }
-
-/**
- * Decide how to put a writer's lane at `target`.
- *
- * `"stay"` exists because pi refuses to navigate a lane to its current tip
- * (`InvalidNavigation`, reason `current_tip`). "Already there" is a value to
- * act on, not an error to catch. `create` and `navigate` are exclusive: a new
- * lane is created where it is wanted, never created and then moved.
- */
-export function planAttach(lane: WriterLaneState, target: Target): Attach {
-  if (target.kind === "tip") {
-    // Your own tip: a writer with no lane yet starts one at the root, which
-    // is what a brand-new session did before lanes were per writer.
-    return lane.kind === "none"
-      ? { kind: "create", at: ROOT }
-      : { kind: "stay" }
-  }
-  switch (lane.kind) {
-    case "none":
-      return { kind: "create", at: target }
-    case "lane":
-      return samePosition(lane.at, target)
-        ? { kind: "stay" }
-        : { kind: "navigate", to: target }
-  }
-}
-
-// --- lane naming (ADR-0011) -------------------------------------------------
-
-/**
- * The lane name carries WRITER identity. Never "main": a shared lane name makes
- * `pi.branch.tip`, `pi.lane.state` and `pi.lane.config` contended LWW registers,
- * and a clobber silently orphans a whole turn.
- *
- * This is the ONLY way to produce a `LaneName`.
- */
-export function laneNameForWriter(peerId: string): LaneName {
-  if (typeof peerId !== "string" || peerId.length === 0) {
-    throw new Error("laneNameForWriter: peerId must be a non-empty string")
-  }
-  if (peerId.includes("\u0000")) {
-    // pi's assertValidBranchName rejects \u0000; fail here rather than there.
-    throw new Error("laneNameForWriter: peerId must not contain \\u0000")
-  }
-  return `w-${peerId}` as LaneName
-}
-
-/**
- * An agent's lane. The `a-` prefix keeps it apart from every writer's `w-`
- * lane: a client chooses its own peer id, so a client calling itself "agent"
- * must not be able to drive the agent's lane.
- */
-export const laneNameForAgent = (agent: AgentId): LaneName =>
-  `a-${agent}` as LaneName
 
 // --- obligation: collaborators and compelled responders ----------------------
 
@@ -412,16 +231,6 @@ export function normalizeName(name: string): string | undefined {
   return n.length === 0 || n.length > MAX_NAME_LENGTH ? undefined : n
 }
 
-/**
- * Where a message attaches, as a position another lane can use. A writer's
- * `"tip"` means nothing to the agent's lane, so it is resolved against the
- * writer's lane first: no lane yet means the root, as for a first prompt.
- */
-export function resolveTarget(lane: WriterLaneState, at: Target): Position {
-  if (at.kind !== "tip") return at
-  return lane.kind === "none" ? ROOT : lane.at
-}
-
 // --- wire hygiene (ADR-0013) ------------------------------------------------
 
 /**
@@ -442,8 +251,9 @@ export function resolveTarget(lane: WriterLaneState, at: Target): Position {
  * A deleted `LocalSeq` brand used to be credited with this. It could never
  * have worked: brands constrain how a value is CREATED, while the risk for seq
  * is how it is SERIALIZED, and a branded number drops into any `number` field
- * with no error. Contrast `LaneName`, where creation IS the danger (ADR-0011)
- * and the brand therefore does real work.
+ * with no error. Contrast `LaneName`, where creation IS the danger (a writer's
+ * id or "main" used as a lane, ADR-0020) and the brand therefore does real
+ * work.
  */
 export function findSeqKeys(value: unknown, path = "$"): string[] {
   const hits: string[] = []

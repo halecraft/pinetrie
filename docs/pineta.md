@@ -87,12 +87,12 @@ discharged before any non-disposable code was written.
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
 | build guards | `pnpm run sanity` | ok |
-| unit (pure core) | `pnpm test` | 122/122 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 30 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 134/134 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 45 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 72/72 |
-| with a real model | `pnpm run e2e:live` | 77/77 |
-| **real browser** | `pnpm run e2e:browser` | 36/36 |
+| end-to-end | `pnpm run e2e` | 64/64 |
+| with a real model | `pnpm run e2e:live` | 67/67 |
+| **real browser** | `pnpm run e2e:browser` | 41/41 |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -109,7 +109,8 @@ packages/core/         @pineta/core         declares NOTHING
 packages/schema/       @pineta/schema       Kyneta only; the document shape
 packages/pi/           @pineta/pi           THE pi boundary
 packages/protocol/     @pineta/protocol     the wire contract and its codec
-packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: references, chat, threads
+packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: references, chat, threads, outbox
+packages/reads/        @pineta/reads        document reads shared by host and client
 packages/client/       @pineta/client       browser UI; owns its Vite build
 (root)                                      development tooling only
 ```
@@ -119,7 +120,7 @@ The root declares only tooling, so a package can import only what it declares.
 
 ---
 
-## 3. Decisions that constrain everything (ADR-0001..0019)
+## 3. Decisions that constrain everything (ADR-0001..0020)
 
 Full text with rationale and rejected alternatives: `docs/02-decisions.md`.
 The ones you must not violate by accident:
@@ -131,12 +132,19 @@ discards one entry — no error, no conflict**. Never derive an id from content,
 index, or position. Use pi's default `IdGenerator` (verified safe in S9: a
 41-bit monotonic counter, intra-process collision probability exactly 0).
 
-**ADR-0011 — the lane name carries writer identity. Never `"main"`.** pi keys
-three registers by lane name (`pi.branch.tip`, `pi.lane.state`,
-`pi.lane.config`). Two writers on one lane silently orphan a whole turn, drop
-queued steering messages, and lose an in-flight operation record. `LaneName` is
-a branded type mintable only by `laneNameForWriter()`, so `"main"` is not
-assignable.
+**ADR-0011 — never share a lane (superseded by ADR-0020).** pi keys three
+registers by lane name (`pi.branch.tip`, `pi.lane.state`, `pi.lane.config`).
+Two writers on one lane silently orphan a whole turn, drop queued steering
+messages, and lose an in-flight operation record. That danger still holds; the
+answer changed: lanes now belong to threads, the host is their only writer, and
+`LaneName` is mintable only by `laneNameForThread()`.
+
+**ADR-0020 — lanes belong to threads and never move; people own none.** A lane
+is created where agent work is first wanted in a thread, and its tip is always
+the thread's end. Conversation threads have no lane. A running lane is never
+written: messages wait in `pineta.outbox`. A compelled reply another writer
+raced is a `conflict`; the sender chooses to queue or branch. Supersedes
+ADR-0011.
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
@@ -316,7 +324,7 @@ independently shippable:
 
 1. ~~tree read~~ — done: `projectSpine`, spine + branch markers, navigation is client-local state
 2. branch write — create a branch from any entry; Aside first
-3. ~~concurrent lanes~~ — done: a lane and a turn per writer, keyed by transport identity
+3. ~~concurrent lanes~~ — done; since ADR-0020, a lane per thread, not per writer
 4. ~~references~~ — done: pi values in `pineta.reference`, derived backlinks (ADR-0017)
 5. humans in the tree (ADR-0018) — ~~chat and compelled responders~~ done; presence; shared composition (`Schema.text()`)
 6. Scout — read-only tools
@@ -339,8 +347,12 @@ context.**
   now enforced by resolution; see `docs/01-architecture.md`.
   It has now failed the same way twice (`.mjs`-blind, then `.tsx`-blind) while
   reporting "all boundary rules hold".
-- Multi-writer is proven only at the *storage* layer. The drive/inference loop
-  has never been exercised with two concurrent writers.
+- ~~Multi-writer is proven only at the *storage* layer.~~ Since ADR-0020, two
+  threads' lanes run at once in e2e, and one thread's writers queue.
+- **A run's refusal cannot reach its author.** The host replies `started`
+  before pi admits the run, so a refusal is only logged; the message is kept
+  in the tree (`settleRun`), with no reply. A second reply, sent once the run
+  is admitted, would fix it; it changes the protocol.
 
 ### Standing chores
 
@@ -383,7 +395,7 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
 |---|---|
 | `docs/00-vision.md` | product thesis, branch kinds, v1 scope |
 | `docs/01-architecture.md` | evidence base, layer cake, data model, module layout |
-| `docs/02-decisions.md` | **ADR-0001..0019** with rationale |
+| `docs/02-decisions.md` | **ADR-0001..0020** with rationale |
 | `docs/03-spikes.md` | S1–S16, each with question + kill criterion |
 | `docs/04-roadmap.md` | sequencing, invariants, action items |
 | `docs/05-stack.md` | stack decisions, sandbox constraints |

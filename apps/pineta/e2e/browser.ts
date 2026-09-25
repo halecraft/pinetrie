@@ -21,9 +21,9 @@
 //
 // Override the endpoint with PW_SERVER if you used a different port.
 
-import { readParticipantNames, readTreeIndex } from "@pineta/client/projection"
 import { connectSession } from "@pineta/client/session"
-import { entryId, projectRail } from "@pineta/core"
+import { atEntry, entryId, projectRail } from "@pineta/core"
+import { readParticipantNames, readTreeIndex } from "@pineta/reads"
 import { type Browser, chromium } from "@playwright/test"
 import { startHost } from "../host/index.ts"
 import { createChecks, waitFor } from "./harness.ts"
@@ -81,8 +81,10 @@ try {
     `no page errors during load${errors[0] === undefined ? "" : ` — ${errors[0].slice(0, 90)}`}`,
   )
 
-  const lane = (await page.textContent("#lane"))?.trim() ?? ""
-  ok(lane.startsWith("w-"), `lane carries writer identity, not "main": ${lane}`)
+  ok(
+    (await page.$("#lane")) === null,
+    "the header shows no lane: people own none, threads do",
+  )
 
   // ── helpers ──────────────────────────────────────────────────────────────
   const col = (n: number) => `.column[data-position="${n}"]`
@@ -119,16 +121,17 @@ try {
   await page.fill("#name", "Ada")
   await page.press("#name", "Enter")
   const named = await waitFor(
-    () => readParticipantNames(host.doc).get(lane) === "Ada",
+    () =>
+      [...readParticipantNames(host.doc)].some(
+        ([writer, name]) => name === "Ada" && writer.startsWith("w-"),
+      ),
     15_000,
   )
-  ok(named >= 0, "the name typed in the header is stored for this lane")
-  await page.waitForFunction(
-    () => document.querySelector(".seen-by")?.textContent?.includes("Ada"),
-    undefined,
-    { timeout: 15_000 },
+  ok(named >= 0, "the name typed in the header is stored by the writer's id")
+  ok(
+    (await page.locator(".composer .audience").count()) === 0,
+    "the composer does not guess an audience: presence will say who is here",
   )
-  ok(true, "the composer says who will see the message")
   ok(
     (await label(0)) === "send · agent will reply",
     `a fresh session promises a reply: "${await label(0)}"`,
@@ -143,16 +146,11 @@ try {
       () => false,
     )
   ok(streamed, "the agent's stream shows in the column while it replies")
+  // Structure, not the model's words: a reply appeared, in this column. What
+  // the model says is `e2e:live`'s to check.
   ok(
     await page
-      .waitForFunction(
-        () =>
-          [...document.querySelectorAll(".msg.assistant .text")].some(n =>
-            n.textContent?.includes("BROWSER-OK"),
-          ),
-        undefined,
-        { timeout: 60_000 },
-      )
+      .waitForSelector(`${col(0)} .msg.assistant`, { timeout: 60_000 })
       .then(
         () => true,
         () => false,
@@ -212,16 +210,14 @@ try {
     "@agent say exactly: BROWSER-TWO",
   )
   const ask = await label(0)
+  const repliesBefore = await page.$$eval(".msg.assistant", n => n.length)
   await page.click(`${col(0)} .composer .send`)
   ok(
     ask === "send · agent will reply" &&
       (await page
         .waitForFunction(
-          () =>
-            [...document.querySelectorAll(".msg.assistant .text")].some(n =>
-              n.textContent?.includes("BROWSER-TWO"),
-            ),
-          undefined,
+          n => document.querySelectorAll(".msg.assistant").length > n,
+          repliesBefore,
           { timeout: 60_000 },
         )
         .then(
@@ -252,10 +248,13 @@ try {
     peerId: "browser-other",
   })
   await other.setName("Bea")
-  const aside = await other.chat("an aside", {
-    kind: "entry",
-    id: entryId(replyId),
-  })
+  // A fork on purpose, at the agent's reply: `branch`. A `reply` there would
+  // continue the thread at its end instead.
+  const aside = await other.chat(
+    "an aside",
+    atEntry(entryId(replyId)),
+    "branch",
+  )
   ok(
     aside.kind === "appended",
     `another writer's aside, below the marker, is appended with no run (${aside.kind})`,
@@ -412,6 +411,66 @@ try {
   )
   await idle()
 
+  // ── a busy thread: the composer says it will queue, and it does ────────
+  // On one host the page sees another writer's run start almost at once, so
+  // the composer chooses `queue` itself: that is what a person meets. A true
+  // conflict needs two sends to cross in flight; its outcome is checked in
+  // e2e, where the commands can be ordered.
+  const tipOf0 = () =>
+    page.$$eval(
+      `${col(0)} .column-body .msg[data-entry]`,
+      ns => ns.at(-1)?.getAttribute("data-entry") ?? "",
+    )
+  await page.fill(`${col(0)} .composer .input`, "@agent after Bea")
+  const idleLabel = await label(0)
+  const bea = await other.chat(
+    "@agent Bea's turn",
+    atEntry(entryId(await tipOf0())),
+  )
+  ok(
+    bea.kind === "started",
+    `Bea's question starts the thread's run (${bea.kind})`,
+  )
+  const queues = await page
+    .waitForFunction(
+      c =>
+        document
+          .querySelector(`${c} .composer .send`)
+          ?.textContent?.startsWith("queue · agent replies after Bea") === true,
+      col(0),
+      { timeout: 15_000 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(
+    idleLabel === "send · agent will reply" && queues,
+    `once Bea's run shows, the composer says it will queue after her ("${await label(0)}")`,
+  )
+  await page.click(`${col(0)} .composer .send`)
+  const waiting = await page
+    .waitForSelector(`${col(0)} .msg.waiting`, { timeout: 15_000 })
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(waiting, "the queued message shows in its column, waiting")
+  await idle()
+  const order = await page.$$eval(`${col(0)} .msg`, ns =>
+    ns
+      .map(n => n.querySelector(":scope > .text")?.textContent ?? "")
+      .filter(t => t === "@agent Bea's turn" || t === "@agent after Bea"),
+  )
+  const lastFour = await page.$$eval(`${col(0)} .msg`, ns =>
+    ns.slice(-4).map(n => n.className.replace("msg ", "").split(" ")[0]),
+  )
+  ok(
+    order.join(" | ") === "@agent Bea's turn | @agent after Bea" &&
+      lastFour.join(",") === "chat,assistant,chat,assistant",
+    `queued after Bea, both are answered in order (${order.join(" | ")}; ${lastFour.join(",")})`,
+  )
+
   // ── the agent in a thread no column shows: the rail pulses ──────────────
   await page.click(`${col(1)} .close`)
   await page.click(`${col(1)} .close`)
@@ -424,10 +483,11 @@ try {
     Object.values(host.doc.entries()).find(e =>
       JSON.stringify(e).includes("just a note"),
     )?.id ?? ""
-  await other.chat("@agent say exactly: PULSE", {
-    kind: "entry",
-    id: entryId(noteId),
-  })
+  await other.chat(
+    "@agent say exactly: PULSE",
+    atEntry(entryId(noteId)),
+    "branch",
+  )
   const pulsing = await page
     .waitForSelector(".rail-dot.pulse", { timeout: 30_000 })
     .then(el => el.getAttribute("data-entry"))
@@ -443,6 +503,27 @@ try {
   )
   await idle()
   await other.close()
+
+  // ── a rename shows, and the name each message was sent under stays ─────
+  await page.fill("#name", "Ada Lovelace")
+  await page.press("#name", "Enter")
+  const renamed = await page
+    .waitForFunction(
+      () =>
+        [...document.querySelectorAll(".msg.chat .role")].some(
+          n => n.textContent === "Ada Lovelace (Ada)",
+        ),
+      undefined,
+      { timeout: 15_000 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(
+    renamed,
+    "after a rename, Ada's earlier messages show her current name, then the one she sent under",
+  )
 
   // ── nothing left of the old controls ────────────────────────────────────
   const gone = await page.$$eval(

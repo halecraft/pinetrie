@@ -43,7 +43,6 @@ This document fixes the design before any code. It draws E and T directly.
 │ ◉    ││ Ada: @agent … ◉replying││                       ││                    │
 │      ││ ┌──────────────────────┐││ ┌───────────────────┐││ ┌────────────────┐ │
 │      ││ │ say something…       │││ │ reply in thread…  │││ │ …              │ │
-│      ││ │ seen by Ada, Bea     │││ │ agent will reply  │││ │                │ │
 │      ││ └──────────────────────┘││ └───────────────────┘││ └────────────────┘ │
 └──────┘└────────────────────────┘└───────────────────────┘└────────────────────┘
 ```
@@ -107,11 +106,17 @@ The rail is E; the lit column is T. Seeing both at once is the product.
   "from here, the agent replies only when @agent is mentioned", or
   "from here, the agent replies to every message". A new session starts with the
   agent replying to every message, and needs no marker.
-- **Changing the rule is an action on a message** ("agent replies from here:
-  always / when @mentioned"), so where it applies is never hidden.
-- The composer states the effect before each send, as today: **seen by** whom,
-  and **"agent will reply"** when it will. It uses the host's own decision
+- **Changing the rule is an action on a message**, labelled with what it does
+  ("from here, only answer @agent" / "from here, answer every message"), so
+  where it applies is never hidden. The rule in force now is its tooltip: a
+  label that read like a state contradicted the composer, which states it.
+- The composer states the effect before each send, on its button: **"send ·
+  agent will reply"** when it will. It uses the host's own decision
   (`compelledResponder`), so it cannot promise a reply that will not come.
+- The composer does not say who will see a message. Everyone in a session can
+  read every thread, and until presence says who is here, any list is a guess;
+  a list of everyone who ever set a name named only you when you were alone.
+  Presence brings it back, naming only the *others* who are here.
 
 ### Messages
 
@@ -136,9 +141,9 @@ The rail is E; the lit column is T. Seeing both at once is the product.
 | "⑂ 1 branch · 2 messages" with a hidden list | the rail, and a coloured fork dot in the column |
 | "switch to this path" (`navigate`) | nothing: sending attaches where you are reading |
 
-The last row matters for Phase 7 of `PLAN-2026-09-26-humans-in-the-tree`: once no
-control moves a lane without sending, the `navigate` command has no caller and
-is deleted with `prompt` and `branch`.
+The last row mattered for `PLAN-2026-09-26-thread-lanes`: with no control moving
+a lane, the `navigate` command had no caller and was deleted with `prompt` and
+`branch`. Lanes now never move at all (ADR-0020).
 
 ## Data: nothing new
 

@@ -45,4 +45,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "close of the last column",
   },
+  {
+    name: "a renamed writer shows only the name they sent under",
+    file: "packages/client/names.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  return now === undefined || now === asSent ? asSent : `${now} (${asSent})`",
+    to: "  return asSent",
+    command: unit,
+    expect: "renamed since",
+  },
 ]

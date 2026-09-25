@@ -27,37 +27,39 @@ import { reply } from "./messages.ts"
 const refusalCode = (x: ReturnType<typeof decodeCommand>) =>
   x.kind === "refused" ? x.code : `not refused: ${x.kind}`
 
-test('decode: parentId "" means the ROOT on a navigate', () => {
-  assert.deepEqual(decodeCommand({ kind: "navigate", parentId: "" }), {
-    kind: "navigate",
-    to: ROOT,
+test('decode: parentId "" is the root: a new conversation for chat, no anchor for a thread', () => {
+  const chat = decodeCommand({
+    kind: "chat",
+    text: "hi",
+    parentId: "",
+    mode: "reply",
   })
-  assert.deepEqual(decodeCommand({ kind: "navigate", parentId: "e-7" }), {
-    kind: "navigate",
-    to: atEntry(entryId("e-7")),
-  })
-})
-
-test('decode: parentId "" on a BRANCH is refused as no_parent', () => {
-  // The same wire value means something different per kind, and only the
-  // codec knows it.
+  assert.equal(chat.kind === "chat" ? chat.at.kind : "", "root")
   assert.equal(
-    refusalCode(decodeCommand({ kind: "branch", text: "x", parentId: "  " })),
+    refusalCode(
+      decodeCommand({ kind: "thread", text: "session", parentId: "" }),
+    ),
     ERR.NO_PARENT,
   )
 })
 
-test("decode: empty text is reported BEFORE a missing parent", () => {
-  // Pinned order, moved from planCommand. Splitting the two rules between the
-  // codec and planCommand would have silently reversed it.
+test("decode: a chat needs text and a known mode", () => {
   assert.equal(
-    refusalCode(decodeCommand({ kind: "branch", text: "  ", parentId: "" })),
-    ERR.EMPTY_PROMPT,
+    refusalCode(decodeCommand({ kind: "chat", text: "  ", mode: "reply" })),
+    ERR.EMPTY_MESSAGE,
   )
   assert.equal(
-    refusalCode(decodeCommand({ kind: "prompt", text: "   " })),
-    ERR.EMPTY_PROMPT,
+    refusalCode(decodeCommand({ kind: "chat", text: "hi", mode: "shout" })),
+    ERR.UNKNOWN_KIND,
   )
+})
+
+test("decode: the removed verbs are unknown", () => {
+  for (const kind of ["prompt", "branch", "navigate"])
+    assert.equal(
+      refusalCode(decodeCommand({ kind, text: "x" })),
+      ERR.UNKNOWN_KIND,
+    )
 })
 
 test("decode: an unknown kind is refused, not guessed", () => {
@@ -67,32 +69,33 @@ test("decode: an unknown kind is refused, not guessed", () => {
 
 test("encodeIntent -> decodeCommand round-trips every intent", () => {
   const intents = [
-    { kind: "prompt", text: "hi" },
-    { kind: "branch", text: "aside", from: entryId("e-3") },
-    { kind: "navigate", to: ROOT },
-    { kind: "navigate", to: atEntry(entryId("e-4")) },
     {
       kind: "chat",
       text: "hi @agent",
-      at: { kind: "tip" },
+      at: ROOT,
+      mode: "reply",
       mentions: [{ kind: "agent", agent: THE_AGENT }],
     },
     {
       kind: "chat",
       text: "hi @bob",
-      at: { kind: "entry", id: entryId("e-5") },
+      at: atEntry(entryId("e-5")),
+      mode: "queue",
       mentions: [{ kind: "person", name: "bob" }],
     },
-    { kind: "name", name: "Alice" },
     {
-      kind: "reference",
-      to: { kind: "entry", id: entryId("e-7") },
-      at: { kind: "tip" },
+      kind: "chat",
+      text: "aside",
+      at: atEntry(entryId("e-3")),
+      mode: "branch",
+      mentions: [],
     },
+    { kind: "name", name: "Alice" },
+    { kind: "reference", to: { kind: "entry", id: entryId("e-7") }, at: ROOT },
     {
       kind: "reference",
       to: { kind: "span", id: entryId("e-7"), start: 0, end: 2 },
-      at: { kind: "entry", id: entryId("e-8") },
+      at: atEntry(entryId("e-8")),
     },
     {
       kind: "thread",
@@ -109,7 +112,8 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
 test("encodeOutcome -> decodeReply round-trips every outcome", () => {
   const outcomes: Outcome[] = [
     { kind: "started", runId: runId("r-1") },
-    { kind: "navigated" },
+    { kind: "queued", position: 2 },
+    { kind: "conflict", by: "Bea" },
     { kind: "referenced", id: referenceId("x-1") },
     { kind: "appended", id: entryId("e-1") },
     { kind: "named" },

@@ -3,10 +3,13 @@
 import type { ReferenceTarget, Responder, SpineNode } from "@pineta/core"
 import { entryId } from "@pineta/core"
 import type { Reference } from "@pineta/marginalia"
+import { speakerLabel } from "./names.ts"
 import { colorSlot, trackColor } from "./rail.tsx"
 
 export interface MessageProps {
   node: SpineNode
+  /** Current display names, by writer. */
+  nameOf: ReadonlyMap<string, string>
   /** While the agent replies: whether it reads this message. */
   light: "lit" | "dim" | undefined
   /** The agent joins the thread here: the first message on the path that asked it. */
@@ -41,7 +44,7 @@ export function Message(p: MessageProps) {
   const id = entryId(node.id)
   const speaker =
     node.role === "chat"
-      ? node.author
+      ? speakerLabel(p.nameOf, node.writer, node.author ?? "")
       : node.role === "assistant"
         ? "agent"
         : node.role
@@ -115,11 +118,19 @@ export function Message(p: MessageProps) {
                 p.ruleHere.kind === "agent" ? "conversation" : "session",
               )
             }
+            // The label is what clicking DOES, as a verb; the rule in force now
+            // is the tooltip. A label that reads like a state would contradict
+            // the composer, which states the rule in force.
+            title={
+              p.ruleHere.kind === "agent"
+                ? "Now: the agent replies to every message here."
+                : "Now: the agent replies only when @agent is mentioned."
+            }
             type="button"
           >
             {p.ruleHere.kind === "agent"
-              ? "agent replies from here: when @mentioned"
-              : "agent replies from here: always"}
+              ? "from here, only answer @agent"
+              : "from here, answer every message"}
           </button>
         </div>
         {(p.closedBranches.length > 0 ||

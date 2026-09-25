@@ -86,4 +86,20 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/marginalia"],
     expect: "working session",
   },
+  {
+    name: "a plain remark counts as a race",
+    file: tree,
+    from: '      m?.role === "chat" &&\n      m.compelled === true &&',
+    to: '      m?.role === "chat" &&',
+    command: unit,
+    expect: "are not a race",
+  },
+  {
+    name: "a new conversation joins the newest thread",
+    file: tree,
+    from: '  if (at.kind === "root") return ROOT\n',
+    to: "",
+    command: unit,
+    expect: "never the newest thread",
+  },
 ]

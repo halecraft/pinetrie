@@ -6,7 +6,8 @@ the only state kept here is which columns are open, and the text being typed.
 
 ## Reads go through one index
 
-`readTreeIndex(doc)` builds `indexTree` once per document change. The columns,
+`readTreeIndex(doc)` (`@pineta/reads`) builds `indexTree` once per document
+change. The columns,
 the rail, thread rules and the agent's path all read that one index
 (`packages/core/tree.ts`). `App` reads it inside a single `useTracked`, together
 with the agent's activity and the thread rules, so they are always from the
@@ -67,6 +68,34 @@ dropped: forks far apart could not be seen together (`docs/06-interface.md`).
 
 `Column` keeps itself at the bottom as messages arrive only while the reader is
 at the bottom; once they scroll up, it leaves them there.
+
+## Threads, lanes and the composer (ADR-0020)
+
+- **The agent can reply in several threads at once**: `readAgentActivity`
+  returns every running lane. The rail pulses at each tip, a message is lit if
+  any run reads it, and each column streams the runs whose tip is on its path.
+- **The composer's mode is chosen before sending**, from the thread's lane at
+  the column's end (`threadLaneAt` over `readLanes`): `reply` when the lane is
+  idle, `queue` when it runs or has messages waiting ("queue · agent replies
+  after Bea"), `branch` in a fresh branch column. These are the same reads the
+  host decides from (`@pineta/reads`).
+- **Conflict.** A compelled `reply` another writer raced comes back `conflict`,
+  and the composer keeps the text and offers **Queue after** or **Branch here**.
+  On one host the page sees another writer's run start almost at once and
+  chooses `queue` itself, so a true conflict needs two sends to cross in flight.
+  Its outcome is checked in e2e; the prompt's rendering is not exercised in the
+  browser suite, because no honest browser action can force the crossing.
+- **Waiting messages** from `pineta.outbox` show dimmed in their column, in the
+  order they will be taken. They are not in the tree yet.
+
+## Names
+
+A message keeps the name its writer had when they sent it: that is what the
+agent read, and rewriting it would change history the agent has seen, and the
+provider's prompt cache. The screen shows the writer's current name, with the
+name the message was sent under in parentheses when they differ
+(`speakerLabel`, `names.ts`): "Duane (guest-x4bu)". Each rendered chat carries
+its `writer` for the lookup.
 
 ## Gotchas
 

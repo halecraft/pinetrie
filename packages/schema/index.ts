@@ -181,7 +181,7 @@ export const readEntries = (
 export const physicalKey = (namespace: string, key: string): string =>
   `${namespace}\u0000${key}`
 
-/** pi's namespace for lane tips, keyed by lane name (ADR-0011). pi's name. */
+/** pi's namespace for lane tips, keyed by lane name (a thread's, ADR-0020). pi's name. */
 const LANE_TIP = "pi.branch.tip"
 
 /** A stored value's own record of its address and contents. */

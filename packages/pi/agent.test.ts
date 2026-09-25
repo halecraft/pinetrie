@@ -10,10 +10,12 @@ import { describe, expect, test } from "vitest"
 import { laneErrCode } from "./agent.ts"
 
 describe("laneErrCode", () => {
-  test("maps pi's navigation failures onto our codes", () => {
+  test("maps pi's refusals onto our codes", () => {
     expect(laneErrCode("UnknownTarget")).toBe(ERR.UNKNOWN_TARGET)
-    expect(laneErrCode("InvalidNavigation")).toBe(ERR.INVALID_NAVIGATION)
-    expect(laneErrCode("LaneBusy")).toBe(ERR.BUSY)
+    // Nothing navigates a lane any more (ADR-0020).
+    expect(laneErrCode("InvalidNavigation")).toBe(ERR.REFUSED)
+    // The host never writes to a running lane (S21), so busy is no special case.
+    expect(laneErrCode("LaneBusy")).toBe(ERR.REFUSED)
   })
 
   test("an unrecognised tag is a generic refusal, not a crash", () => {

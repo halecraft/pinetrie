@@ -4,8 +4,8 @@ export {
   type CreateAgentOptions,
   createAgent,
   KynetaStorage,
-  type LaneOutcome,
   newId,
   resolveModel,
-  type WriterLane,
+  type ThreadLaneHandle,
+  type WriteOutcome,
 } from "./agent.ts"

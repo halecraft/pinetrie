@@ -14,14 +14,26 @@ package must never require changing stored data. This package was
 
 A human message is a pi `CustomMessage`, `customType: "pineta.chat"` (ADR-0018).
 `content` is the attributed text the model reads ("Alice: …"); `details` hold
-the author lane, the display name as written, the text, and the `Responder` it
-compels. `encodeChat` and the total `decodeChat` are the only code that builds
-or reads the shape.
+the author (a `WriterId`, from the transport), the display name as written, the
+text, and the `Responder` it compels. `encodeChat` and the total `decodeChat`
+are the only code that builds or reads the shape.
 
-- **`planChat` decides where a message goes**, reusing `compelledResponder` and
-  `planAttach`: `append` on the author's lane, or `run` on the agent's lane with
-  the message as the prompt. For a run, the author's `"tip"` is first resolved
-  to a position (`resolveTarget`), since another lane cannot attach at it.
+- **`planChat` decides what a message does** (ADR-0020), over what the host
+  gathers in one serial step, and names exactly where to write:
+
+  | a message… | no lane | idle lane | busy lane (running, or messages waiting) |
+  |---|---|---|---|
+  | plain | `appendToTree` at the end | `appendToLane` | `hold` |
+  | compelled `reply`, not raced | `createAndRun` at the end | `run` | `conflict` |
+  | compelled `reply`, raced | `conflict` | `conflict` | `conflict` |
+  | compelled `queue` | `createAndRun` | `run` | `hold` |
+  | `branch` | plain: `appendToTree` at `at`; compelled: `createAndRun` at `at` | a reply | a new lane |
+
+  A race is another writer's compelled message below what the sender saw
+  (`raceSince`); plain remarks and agent replies are not. `branch` at an idle
+  lane's own tip is a reply: there is nothing to fork. At a *running* lane's tip
+  it is a new lane: a running lane's tip equals a branch point only in the
+  moment after it was created there, before its prompt commits.
 - **`entryText` is the one definition of an entry's citable text**: a chat's
   own `text`, never its attributed `content`, so a span covers exactly what its
   author wrote. The host's citation path reads through it.
@@ -29,8 +41,26 @@ or reads the shape.
   and whether it compelled the agent, for `core`'s projections, which only
   admit the role and so need no schema library.
 - **Names are labels, never identities.** `pineta.participant` values, keyed by
-  lane. The name is copied into each message, so a rename never rewrites what
+  writer id. The name is copied into each message, so a rename never rewrites what
   the agent already read, nor invalidates the provider's prompt cache.
+
+# The outbox (`outbox.ts`)
+
+A thread's lane is never written while it runs (S21), so every message for a
+busy thread waits in `pineta.outbox`, keyed by its own id (ADR-0016), with a
+total decoder like every shape here. Ids are uuidv7, so `heldMessages` sorts
+into send order, and `nextHeld` takes a lane's oldest. "A lane with messages
+waiting" counts as busy even between two of them, or a new message would jump
+the queue. The host executes three pure decisions from here:
+
+- **`planDrain`**: when a lane's run ends, its oldest held message is appended
+  (plain) or run (compelled); that run's end brings the next step. A plain
+  message is released only once it is written, so a refused append stays held.
+- **`settleRun`**: a compelled message pi refuses to run is kept, appended with
+  no reply, rather than lost; the author already heard `started`.
+- **`planStartup`**: no run survives a process, so a starting host clears every
+  lane recorded as running, and drains every lane with messages held for it,
+  since no run's end will.
 
 # Threads (`thread.ts`)
 

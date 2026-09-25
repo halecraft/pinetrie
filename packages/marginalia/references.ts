@@ -9,17 +9,15 @@
 // This schema is the single authority on the reference shape. Pineta owns it.
 
 import {
-  type ChatAt,
   type EntryId,
   ERR,
   type ErrCode,
   entryId,
-  type LaneName,
+  type Position,
   type ReferenceId,
   type ReferenceTarget,
   referenceId,
-  resolveTarget,
-  type WriterLaneState,
+  type WriterId,
 } from "@pineta/core"
 import { type Static, Type } from "typebox"
 import { decodeWith } from "./decode.ts"
@@ -46,7 +44,7 @@ export const ReferenceSchema = Type.Object({
   /** The entry it was attached at: where the author was reading, or their tip. */
   from: Type.String(),
   to: TargetSchema,
-  /** The author's lane name, from the transport. */
+  /** The author, from the transport: a `WriterId`. */
   author: Type.String(),
 })
 
@@ -57,7 +55,7 @@ export interface Reference {
   readonly id: ReferenceId
   readonly from: EntryId
   readonly to: ReferenceTarget
-  readonly author: LaneName
+  readonly author: WriterId
 }
 
 /** Stored value -> reference, or undefined if malformed (see `decodeWith`). */
@@ -74,7 +72,7 @@ export const decodeReference = (value: unknown): Reference | undefined =>
             start: w.to.start,
             end: w.to.end,
           },
-    author: w.author as LaneName,
+    author: w.author as WriterId,
   }))
 
 export interface ReferenceIndex {
@@ -122,22 +120,17 @@ export type ReferenceDecision =
 
 /** Decide whether a citation may be written. Pure. */
 export function planReference(input: {
-  readonly author: LaneName
-  readonly lane: WriterLaneState
+  readonly author: WriterId
   /** Where the author is reading: the reference's `from`. */
-  readonly at: ChatAt
+  readonly at: Position
   readonly target: ReferenceTarget
   readonly cited: CitedEntry
   readonly newId: ReferenceId
 }): ReferenceDecision {
-  const { target, cited } = input
-  // A reference is attached at an entry, never the root. Attached where the author is reading: an entry they chose, or their own
-  // tip. A person who has only ever asked the agent has no lane, but can still
-  // cite from what they read.
-  const from = resolveTarget(input.lane, input.at)
-  if (from.kind === "root") {
-    return { kind: "refused", code: ERR.NO_LANE }
-  }
+  const { at, target, cited } = input
+  // A reference is attached at an entry: where its author was reading. The
+  // root is none.
+  if (at.kind === "root") return { kind: "refused", code: ERR.NO_ANCHOR }
   if (cited.kind === "absent")
     return { kind: "refused", code: ERR.UNKNOWN_TARGET }
   if (target.kind === "span") {
@@ -154,7 +147,7 @@ export function planReference(input: {
     kind: "write",
     reference: {
       id: input.newId,
-      from: from.id,
+      from: at.id,
       to: target,
       author: input.author,
     },
