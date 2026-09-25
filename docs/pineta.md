@@ -288,7 +288,7 @@ string union `"pending" | "empty" | "populated"`, not an object.
 `useText` is **not yet used** — the composer is still local `useState`. Wiring
 it to a `Schema.text()` is step 5 and the first genuinely collaborative edit.
 
-**Step 1 (tree read) is done.** Now continue thickening (`docs/04-roadmap.md`), each step
+**Steps 1 and 2 are done.** Now continue thickening (`docs/04-roadmap.md`), each step
 independently shippable:
 
 1. ~~tree read~~ — done: `projectSpine`, spine + branch markers, navigation is client-local state

@@ -67,6 +67,13 @@ export type CommandDecision =
       parentId: string | null
       next: TurnState
     }
+  /**
+   * Moving the lane tip is NOT a run: no runId, no stream, no turn. It gets
+   * its own decision rather than the `run` variant a branch shares with a
+   * prompt, because everything the host does for a run \u2014 issue a runId, open a
+   * stream, mark the turn busy \u2014 would be wrong here.
+   */
+  | { kind: "navigate"; targetId: string; next: TurnState }
   | { kind: "reject"; code: ErrCode; message: string; next: TurnState }
 
 /** Decide what to do with an inbound command. Pure: (state, command) -> decision. */
@@ -86,8 +93,25 @@ export function planCommand(
     return reject(ERR.UNKNOWN_KIND, "no command")
   }
   const kind = command.kind
-  if (kind !== "prompt" && kind !== "branch") {
+  if (kind !== "prompt" && kind !== "branch" && kind !== "navigate") {
     return reject(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
+  }
+  if (!state.ready) {
+    return reject(ERR.NOT_READY, "host is not ready")
+  }
+
+  if (kind === "navigate") {
+    const targetId = (command.parentId ?? "").trim()
+    if (targetId.length === 0) {
+      return reject(ERR.NO_PARENT, "navigate must name a target entry")
+    }
+    // Refused while a turn runs: moving the tip underneath a running turn
+    // would decide where its entries land.
+    if (state.busy) {
+      return reject(ERR.BUSY, "a turn is already running")
+    }
+    // `next` is unchanged: navigation does not make the lane busy.
+    return { kind: "navigate", targetId, next: state }
   }
   if (!state.ready) {
     return reject(ERR.NOT_READY, "host is not ready")

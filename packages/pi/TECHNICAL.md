@@ -60,12 +60,16 @@ unrecognised tag falls back rather than throwing: pi may add error tags, and
 reporting the wrong navigation code is recoverable while throwing inside the
 host's reply path is not.
 
-**`Agent.navigate` has no command wired to it yet.** It is currently reached
-only by a test fixture, which is a smell with a cause: `navigateTree` moves
-the lane onto a branch and nothing moves it back, so a branch is one-way and
-"return to your lane" returns to the branch. Wiring a `navigate` command is
-what completes step 2. It is NOT a run — no runId, no stream — so it needs its
-own decision rather than the `run` variant a branch shares with a prompt.
+**`Agent.navigate` backs the `navigate` command**, which is how a writer comes
+back from an Aside. `navigateTree` moves the lane onto a branch and, before
+that command existed, nothing moved it back: a branch was one-way. For a while
+`navigate` was reachable only from a test fixture, which looked like
+speculative API and was in fact a half-wired feature. It is NOT a run, so it
+has its own decision in `planCommand`.
+
+Navigation is awaited before the host replies, so its refusal comes back to the
+client as a structured rejection. Only a *run's* outcome is still stranded
+behind the acceptance.
 
 **A foreign-written entry is NOT navigable.** An entry written straight into
 the document with `writeEntry` is refused by `navigateTree` with
@@ -76,8 +80,9 @@ for the S3 foreign-write scenario. They exercise different halves, and only
 one of them is navigable.
 
 **A run's outcome cannot travel back as a rejection.** The host replies with
-the ACCEPTANCE before the run starts, so a refusal from pi (an unknown
-navigation target, say) arrives after the reply has gone. The host logs
+the ACCEPTANCE before the run starts, so a refusal from pi (the navigation
+half of a *branch*, say) arrives after the reply has gone. A plain `navigate`
+does not have this problem, because it is awaited first. The host logs
 `run … REFUSED: …`; the client never learns. Carrying it back needs a second
 message on the Line, which the protocol does not have yet.
 

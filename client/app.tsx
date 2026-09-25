@@ -204,8 +204,23 @@ function App({ session }: { session: SessionClient }) {
       {onLane ? null : (
         <div id="offLane">
           reading a branch · sending will fork from here{" "}
+          {/* Moves this writer's lane onto the path being read, running
+              nothing. This is how you come back from an Aside: after a
+              branch, the trunk shows as a fork marker; read it, then switch.
+              Without it a branch is one-way. */}
+          <button
+            id="switchLane"
+            onClick={async () => {
+              if (selectedTipId === null) return
+              const reply = await session.navigate(selectedTipId)
+              if (reply.accepted) setSelected(null)
+            }}
+            type="button"
+          >
+            switch to this path
+          </button>{" "}
           <button onClick={() => setSelected(null)} type="button">
-            return to your lane
+            back to your lane
           </button>
         </div>
       )}

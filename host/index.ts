@@ -148,6 +148,26 @@ export async function startHost({
       return
     }
 
+    if (decision.kind === "navigate") {
+      // Unlike a run, navigation is awaited BEFORE replying. It has no stream
+      // and no turn, so there is nothing to start early \u2014 and waiting means
+      // pi's refusal (an unknown target, say) travels back as a structured
+      // rejection instead of being logged after the reply has gone.
+      const moved = await agent.navigate(decision.targetId)
+      sender.send(
+        reply({
+          id: cmd.id ?? "",
+          accepted: moved.ok,
+          errorCode: moved.ok ? "" : moved.status.replace(/^rejected:/, ""),
+          errorMessage: moved.ok ? "" : `navigation refused: ${moved.status}`,
+        }),
+      )
+      log(
+        `[host] navigate -> ${decision.targetId.slice(-8)} ${moved.ok ? "ok" : moved.status}`,
+      )
+      return
+    }
+
     // execute
     sender.send(
       reply({ id: cmd.id ?? "", accepted: true, runId: decision.runId }),

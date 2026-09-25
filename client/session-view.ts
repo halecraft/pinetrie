@@ -67,6 +67,8 @@ export interface SessionClient {
    * from that entry (the host navigates there first).
    */
   prompt(text: string, parentId?: string | null): Promise<Reply>
+  /** Move this writer's lane tip to `targetId`, running nothing. */
+  navigate(targetId: string): Promise<Reply>
   readonly replies: readonly Reply[]
   close(): Promise<void>
 }
@@ -134,6 +136,14 @@ export async function connectSession(
           ? command({ id, kind: "prompt", text })
           : command({ id, kind: "branch", text, parentId })
       sender.send(outgoing)
+      return settled
+    },
+    navigate(targetId: string): Promise<Reply> {
+      const id = `c-${Math.random().toString(36).slice(2, 10)}`
+      const settled = new Promise<Reply>(resolve =>
+        replyWaiters.set(id, resolve),
+      )
+      sender.send(command({ id, kind: "navigate", parentId: targetId }))
       return settled
     },
     replies,

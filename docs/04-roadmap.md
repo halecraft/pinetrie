@@ -58,21 +58,20 @@ Roughly in dependency order, each independently shippable:
    branched data, so the e2e fixture writes a fork as a foreign write (S3);
    and **navigation turned out to be free**, because the selected tip is
    client-local state rather than a write.
-2. **Branch write** — creating a branch works; **returning from one does not.**
-   A `branch` command names a parent and the host navigates there with pi's
-   `navigateTree`, then prompts. Three findings:
-   - **A branch is one-way.** `navigateTree` moves the lane onto the branch and
-     nothing moves it back, so "return to your lane" returns to the branch. The
-     trunk is readable but prompting there forks again. An Aside you cannot
-     come back from is not an Aside. `Agent.navigate(targetId)` exists and does
-     exactly the right thing; it has no command wired to it, so it is used only
-     by a test fixture. **Completing step 2 means adding a `navigate` command
-     kind.** Note it is not a run: no runId, no stream, so it needs its own
-     decision rather than the `run` variant a branch shares.
-   - A foreign-written entry is NOT navigable (`unknown_target`): pi's session
-     index never saw it created.
-   - A run's outcome cannot travel back as a rejection, because the host
-     replies with the acceptance before the run starts.
+2. ~~**Branch write**~~ — **done**, both directions. A `branch` command names a
+   parent; the host navigates there with pi's `navigateTree`, then prompts. A
+   `navigate` command moves the lane and runs nothing, which is how you come
+   back from an Aside — without it a branch was one-way, and "return to your
+   lane" returned to the branch. Findings:
+   - `navigate` is its own decision, not a `run`: no runId, no stream, and it
+     must not mark the lane busy. The opposite call from `branch`, which is a
+     run with a different attachment point.
+   - Navigation is awaited BEFORE the host replies, so pi's refusal travels
+     back as a structured rejection (`unknown_target`). A run's refusal still
+     cannot: the host replies with the acceptance first.
+   - A foreign-written entry is NOT navigable: pi's session index never saw it
+     created.
+
 3. **Concurrent lanes** — two branches running at once (this is where S3's
    answer gets cashed)
 4. **References** — entry and entry-span kinds; backlinks

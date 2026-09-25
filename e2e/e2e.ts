@@ -8,7 +8,7 @@
 //   node e2e/e2e.mjs              offline: transport + docs + protocol, no model call
 //   PINETA_LIVE=1 node e2e/e2e.mjs   also drives a REAL turn against a real model
 
-import { findSeqKeys, projectSpine, projectTranscript } from "@pineta/core"
+import { ERR, findSeqKeys, projectSpine, projectTranscript } from "@pineta/core"
 import { readEntries, readLaneTip, writeEntry } from "@pineta/schema"
 import { readRenderableEntries } from "../client/projection.ts"
 import { connectSession } from "../client/session-view.ts"
@@ -217,6 +217,51 @@ ok(
       `the trunk transcript is unchanged (${spine.length} vs ${trunkBefore.length})`,
     )
   }
+}
+
+// --- coming back from an Aside --------------------------------------------
+//
+// Without this a branch is one-way: navigateTree moves the lane onto the
+// branch and nothing moves it back. Proven by PARENTAGE, as the branch was:
+// the next turn must attach to the trunk tip we returned to.
+{
+  const entries = readRenderableEntries(host.doc)
+  const trunkTip = hostTranscript.at(-1)?.id ?? null
+  ok(trunkTip !== null, "remembered the trunk tip before the aside")
+  if (trunkTip !== null) {
+    const back = await client.navigate(trunkTip)
+    ok(
+      back.accepted,
+      `navigate back to the trunk accepted${back.accepted ? "" : `: ${back.errorCode}`}`,
+    )
+    ok(
+      (await host.agent.tipId()) === trunkTip,
+      "the lane tip is back on the trunk",
+    )
+
+    const known = new Set(Object.keys(readRenderableEntries(host.doc)))
+    const resumed = await client.prompt("RESUMED")
+    ok(resumed.accepted, "a prompt after returning is accepted")
+    await waitFor(
+      () => Object.keys(readRenderableEntries(host.doc)).length > known.size,
+    )
+    const fresh = Object.values(readRenderableEntries(host.doc)).filter(
+      e => !known.has(e.id),
+    )
+    ok(
+      fresh.some(e => e.parentId === trunkTip),
+      "the next turn resumes the TRUNK, not the aside",
+    )
+    void entries
+  }
+
+  // Unlike a run, navigation is awaited before the reply, so pi's refusal
+  // comes back as a structured rejection rather than a host log line.
+  const bogus = await client.navigate("no-such-entry")
+  ok(
+    !bogus.accepted && bogus.errorCode === ERR.UNKNOWN_TARGET,
+    `an unknown target is REJECTED back to the client (${bogus.errorCode})`,
+  )
 }
 
 // --- a fork, written as another replica would write it (S3) ----------------

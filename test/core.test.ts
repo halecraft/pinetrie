@@ -141,6 +141,40 @@ test("planCommand: a branch is refused while a turn is running", () => {
   )
 })
 
+test("planCommand: navigate is its own decision, not a run", () => {
+  const decision = planCommand(
+    READY,
+    { kind: "navigate", text: "", parentId: "e-7" },
+    "r",
+  )
+  assert.equal(decision.kind, "navigate")
+  assert.equal(decision.kind === "navigate" ? decision.targetId : "", "e-7")
+  // Navigation runs no turn, so it must not mark the lane busy.
+  assert.equal(decision.next.busy, false)
+})
+
+test("planCommand: navigate needs no text, but does need a target", () => {
+  // An empty text is fine: navigation runs nothing. An empty target is not.
+  assert.equal(
+    rejection(planCommand(READY, { kind: "navigate", text: "" }, "r")).code,
+    ERR.NO_PARENT,
+  )
+})
+
+test("planCommand: navigate is refused while a turn is running", () => {
+  // Moving the tip under a running turn would decide where its entries land.
+  assert.equal(
+    rejection(
+      planCommand(
+        { ready: true, busy: true },
+        { kind: "navigate", text: "", parentId: "e-1" },
+        "r",
+      ),
+    ).code,
+    ERR.BUSY,
+  )
+})
+
 test("laneNameForWriter: ADR-0011 — never 'main', always writer-derived", () => {
   assert.equal(laneNameForWriter("abc"), "w-abc")
   assert.notEqual(laneNameForWriter("abc"), "main")

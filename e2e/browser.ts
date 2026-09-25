@@ -209,6 +209,36 @@ try {
     "the branched message renders on the new spine",
   )
 
+  // Coming BACK. The lane is now on the branch, so the trunk shows as a fork
+  // marker on the first spine node. Read it, then switch the lane to it.
+  // Without the navigate command this is impossible: a branch is one-way.
+  await page.click("#transcript > div:first-child .fork button")
+  await page.click("#transcript > div:first-child .branch button")
+  // Reading the trunk ALREADY renders the trunk spine, so waiting on the
+  // spine proves nothing about switching. Assert what only a switch changes:
+  // the off-lane bar goes away, and the HOST's lane tip is on the trunk.
+  ok(
+    (await page.$("#offLane")) !== null,
+    "reading the trunk is off-lane before switching",
+  )
+  await page.click("#switchLane")
+  await page.waitForFunction(
+    () => document.querySelector("#offLane") === null,
+    undefined,
+    {
+      timeout: 15_000,
+    },
+  )
+  const hostLane = projectTranscript(
+    readRenderableEntries(host.doc),
+    await host.agent.tipId(),
+  ).map(m => m.text)
+  ok(
+    hostLane.some(t => t.includes("BROWSER-OK")) &&
+      !hostLane.some(t => t.includes("BRANCH-FROM-BROWSER")),
+    `switched back: the HOST's lane is the trunk again (${hostLane.length} messages)`,
+  )
+
   ok(
     errors.length === 0,
     `no page errors overall${errors[0] === undefined ? "" : ` — ${errors[0].slice(0, 90)}`}`,

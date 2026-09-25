@@ -25,8 +25,10 @@ export const HOST_PEER_ID = "host"
  *   - `branch` moves the lane tip to `parentId` first, so the turn forks from
  *     there (ADR-0011: the lane carries writer identity, so this moves only
  *     the sending writer's lane).
+ *   - `navigate` moves the lane tip to `parentId` and runs nothing. It is how
+ *     you come back from an Aside: without it a branch is one-way.
  */
-export const COMMAND_KINDS = ["prompt", "branch"] as const
+export const COMMAND_KINDS = ["prompt", "branch", "navigate"] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
 /**
@@ -42,7 +44,7 @@ export interface Command {
   readonly id: string
   readonly kind: CommandKind
   readonly text: string
-  /** The entry to fork from. Meaningful only for `kind: "branch"`. */
+  /** `branch`: the entry to fork from. `navigate`: the entry to move to. */
   readonly parentId: string
 }
 
