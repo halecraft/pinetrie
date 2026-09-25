@@ -46,6 +46,12 @@ export const runId = (id: string): RunId => id as RunId
 export type ReferenceId = string & { readonly [referenceIdBrand]: true }
 export const referenceId = (id: string): ReferenceId => id as ReferenceId
 
+declare const agentIdBrand: unique symbol
+/** An agent that can be compelled to reply. The host has exactly one for now. */
+export type AgentId = string & { readonly [agentIdBrand]: true }
+/** The host's agent, addressed as `@agent`. */
+export const THE_AGENT = "agent" as AgentId
+
 // --- positions --------------------------------------------------------------
 
 /**
@@ -67,6 +73,15 @@ export const ROOT: Position = { kind: "root" }
  * nullable "no position given" would be one refactor away from meaning root.
  */
 export type Target = { readonly kind: "tip" } | Position
+
+/**
+ * Where a human message attaches: the sender's own tip, or an entry. Never an
+ * explicit root, which the wire could not tell apart from "tip"; a writer
+ * with no lane yet still reaches the root through "tip", as a first prompt does.
+ */
+export type ChatAt =
+  | { readonly kind: "tip" }
+  | { readonly kind: "entry"; readonly id: EntryId }
 export const atEntry = (id: EntryId): Position => ({ kind: "entry", id })
 
 export function samePosition(a: Position, b: Position): boolean {
@@ -95,6 +110,8 @@ export const ERR = {
   NO_LANE: "no_lane",
   /** A span is empty, out of bounds, or on an entry with no text. */
   INVALID_SPAN: "invalid_span",
+  /** A display name is empty or too long. */
+  INVALID_NAME: "invalid_name",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -109,7 +126,7 @@ export interface TurnState {
  * produces it; it owns every shape rule (a kind we know, non-empty text, a
  * named parent), so this type cannot express a malformed command.
  */
-/** What a reference points at. Spans are UTF-16 code units into messageText. */
+/** What a reference points at. Spans are UTF-16 code units into `entryText`. */
 export type ReferenceTarget =
   | { readonly kind: "entry"; readonly id: EntryId }
   | {
@@ -120,7 +137,30 @@ export type ReferenceTarget =
     }
 
 export type Intent =
-  | { readonly kind: "reference"; readonly to: ReferenceTarget }
+  /** A citation, attached where its author is reading (`at`). */
+  | {
+      readonly kind: "reference"
+      readonly to: ReferenceTarget
+      readonly at: ChatAt
+    }
+  /**
+   * A human message. `at` is where its author is viewing; `mentions` are
+   * parsed from `text` by `parseMentions`, once, at the codec.
+   */
+  | {
+      readonly kind: "chat"
+      readonly text: string
+      readonly at: ChatAt
+      readonly mentions: readonly Mention[]
+    }
+  /** Set the sender's display name: a label, never an identity. */
+  | { readonly kind: "name"; readonly name: string }
+  /** Set who is compelled by default in the thread rooted at `at`. */
+  | {
+      readonly kind: "thread"
+      readonly at: EntryId
+      readonly compels: Responder
+    }
   | { readonly kind: "prompt"; readonly text: string }
   | { readonly kind: "branch"; readonly text: string; readonly from: EntryId }
   | { readonly kind: "navigate"; readonly to: Position }
@@ -146,10 +186,23 @@ export type CommandDecision =
   | { kind: "navigate"; to: Position; next: TurnState }
   /**
    * A citation. Not a run and not a move: it writes one value. Refused while
-   * the author's turn runs, because it is attached at the lane tip, and a tip
-   * that moves mid-turn makes "where was this attached" ambiguous.
+   * the author's turn runs: `at` may be the author's tip, and a tip that moves
+   * mid-turn makes "where was this attached" ambiguous.
    */
-  | { kind: "reference"; to: ReferenceTarget; next: TurnState }
+  | { kind: "reference"; to: ReferenceTarget; at: ChatAt; next: TurnState }
+  /**
+   * A human message. Where it goes and whether the agent runs are decided by
+   * `planChat` in `@pineta/marginalia`, which needs the agent's lane too.
+   */
+  | {
+      kind: "chat"
+      text: string
+      at: ChatAt
+      mentions: readonly Mention[]
+      next: TurnState
+    }
+  | { kind: "name"; name: string; next: TurnState }
+  | { kind: "thread"; at: EntryId; compels: Responder; next: TurnState }
   | { kind: "reject"; code: ErrCode; message: string; next: TurnState }
 
 /**
@@ -186,7 +239,24 @@ export function planCommand(
     case "navigate":
       return { kind: "navigate", to: intent.to, next: state }
     case "reference":
-      return { kind: "reference", to: intent.to, next: state }
+      return { kind: "reference", to: intent.to, at: intent.at, next: state }
+    case "chat":
+      return {
+        kind: "chat",
+        text: intent.text,
+        at: intent.at,
+        mentions: intent.mentions,
+        next: state,
+      }
+    case "name":
+      return { kind: "name", name: intent.name, next: state }
+    case "thread":
+      return {
+        kind: "thread",
+        at: intent.at,
+        compels: intent.compels,
+        next: state,
+      }
     case "prompt":
       return {
         kind: "run",
@@ -270,6 +340,88 @@ export function laneNameForWriter(peerId: string): LaneName {
   return `w-${peerId}` as LaneName
 }
 
+/**
+ * An agent's lane. The `a-` prefix keeps it apart from every writer's `w-`
+ * lane: a client chooses its own peer id, so a client calling itself "agent"
+ * must not be able to drive the agent's lane.
+ */
+export const laneNameForAgent = (agent: AgentId): LaneName =>
+  `a-${agent}` as LaneName
+
+// --- obligation: collaborators and compelled responders ----------------------
+
+/**
+ * An `@` in a message. Mentioning the agent COMPELS it to reply; mentioning a
+ * person only notifies them, because nobody can make a human answer.
+ */
+export type Mention =
+  | { readonly kind: "agent"; readonly agent: AgentId }
+  | { readonly kind: "person"; readonly name: string }
+
+/**
+ * Who must answer a message. Only an agent can be compelled, so this type has
+ * no way to say "compel a person".
+ */
+export type Responder =
+  | { readonly kind: "none" }
+  | { readonly kind: "agent"; readonly agent: AgentId }
+
+export const NOBODY: Responder = { kind: "none" }
+
+/**
+ * Every `@handle` in `text`, in order, without repeats. `@agent` is the agent;
+ * any other handle is a person. A handle starts a word, so an e-mail address is
+ * not a mention.
+ */
+export function parseMentions(text: string): Mention[] {
+  const seen = new Set<string>()
+  const out: Mention[] = []
+  for (const [, handle] of text.matchAll(/(?<![\w@])@([A-Za-z0-9_-]+)/g)) {
+    if (handle === undefined || seen.has(handle)) continue
+    seen.add(handle)
+    out.push(
+      handle === THE_AGENT
+        ? { kind: "agent", agent: THE_AGENT }
+        : { kind: "person", name: handle },
+    )
+  }
+  return out
+}
+
+/**
+ * Who is compelled to answer: the agent if it is mentioned, otherwise the
+ * thread's default. A mention can add an obligation but never remove one, so
+ * in a working session a message that mentions only people still runs.
+ */
+export function compelledResponder(input: {
+  readonly mentions: readonly Mention[]
+  readonly threadDefault: Responder
+}): Responder {
+  const agent = input.mentions.find(m => m.kind === "agent")
+  return agent === undefined
+    ? input.threadDefault
+    : { kind: "agent", agent: agent.agent }
+}
+
+/** A display name's longest form, in UTF-16 code units. */
+export const MAX_NAME_LENGTH = 40
+
+/** A display name as typed -> the stored one, or undefined if unusable. */
+export function normalizeName(name: string): string | undefined {
+  const n = name.trim()
+  return n.length === 0 || n.length > MAX_NAME_LENGTH ? undefined : n
+}
+
+/**
+ * Where a message attaches, as a position another lane can use. A writer's
+ * `"tip"` means nothing to the agent's lane, so it is resolved against the
+ * writer's lane first: no lane yet means the root, as for a first prompt.
+ */
+export function resolveTarget(lane: WriterLaneState, at: Target): Position {
+  if (at.kind !== "tip") return at
+  return lane.kind === "none" ? ROOT : lane.at
+}
+
 // --- wire hygiene (ADR-0013) ------------------------------------------------
 
 /**
@@ -319,6 +471,10 @@ export interface MessagePart {
 export interface AgentMessageLike {
   readonly role?: string
   readonly content?: string | readonly MessagePart[]
+  /** Role `chat` only: the speaker's display name, as written. */
+  readonly author?: string
+  /** Role `chat` only: whether it compelled the agent to reply. */
+  readonly compelled?: boolean
 }
 
 export interface EntryLike {
@@ -333,6 +489,10 @@ export interface TranscriptMessage {
   readonly id: string
   readonly role: string
   readonly text: string
+  /** Role `chat` only: the speaker's display name. */
+  readonly author?: string
+  /** Role `chat` only: whether it compelled the agent to reply. */
+  readonly compelled?: boolean
 }
 
 /**
@@ -368,11 +528,22 @@ export function projectTranscript(
  *
  * Shared by `projectTranscript` and `projectSpine` so the two cannot disagree
  * about which entries are messages. Non-message entries and roles other than
- * user/assistant are dropped.
+ * user, assistant and chat are dropped. A `chat` message is a human's, already
+ * decoded by the reader (`readRenderableEntries` in `packages/client`); core
+ * only admits the role, so it needs no schema library.
  */
 function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   if (entry.type !== "message") return null
   const role = entry.message?.role ?? "unknown"
+  if (role === "chat") {
+    return {
+      id: entry.id,
+      role,
+      text: messageText(entry.message),
+      author: entry.message?.author ?? "",
+      compelled: entry.message?.compelled === true,
+    }
+  }
   if (role !== "user" && role !== "assistant") return null
   return { id: entry.id, role, text: messageText(entry.message) }
 }
@@ -645,4 +816,40 @@ export function latestTip(tips: Iterable<string | null>): string | null {
     if (tip !== null && (latest === null || tip > latest)) latest = tip
   }
   return latest
+}
+
+/**
+ * What a reader sees: the newest leaf at or below `at`, or `at` itself.
+ *
+ * The view follows the thread you are reading. A reply to it, including the
+ * agent's, adds a leaf below `at`, so the view moves on to it. Someone else's
+ * branch elsewhere is not below `at`, so the view never jumps to it. `at` null
+ * is the root, below which everything lies: a reader who has chosen nothing
+ * follows the newest leaf overall.
+ *
+ * Leaves, not lane tips: a lane moves away from a thread (the agent's does,
+ * each time another thread compels it), and a thread's last message must stay
+ * in view after the lane that wrote it has gone elsewhere.
+ */
+export function followTip(
+  entries: Readonly<Record<string, { readonly parentId: string | null }>>,
+  at: string | null,
+): string | null {
+  const parents = new Set<string>()
+  for (const e of Object.values(entries)) {
+    if (e.parentId !== null) parents.add(e.parentId)
+  }
+  const leaves = Object.keys(entries).filter(id => !parents.has(id))
+  if (at === null) return latestTip(leaves)
+  const below = (tip: string): boolean => {
+    const seen = new Set<string>()
+    for (let id: string | null = tip; id !== null; ) {
+      if (id === at) return true
+      if (seen.has(id)) return false
+      seen.add(id)
+      id = entries[id]?.parentId ?? null
+    }
+    return false
+  }
+  return latestTip([at, ...leaves.filter(below)])
 }

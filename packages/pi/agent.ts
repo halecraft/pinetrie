@@ -14,11 +14,22 @@ import {
   uuidv7,
   value,
 } from "@earendil-works/pi-agent-core"
-import { ERR, type ErrCode, type LaneName, type Position } from "@pineta/core"
 import {
+  type EntryId,
+  ERR,
+  type ErrCode,
+  entryId,
+  type LaneName,
+  type Position,
+  type Responder,
+} from "@pineta/core"
+import {
+  type ChatMessage,
   encodeReference,
+  PARTICIPANT_NAMESPACE,
   REFERENCE_NAMESPACE,
   type Reference,
+  THREAD_NAMESPACE,
 } from "@pineta/marginalia"
 import { hasLaneRecord, type SessionDocHandle } from "@pineta/schema"
 import { createAgentHarness, ModelRuntime } from "./deep.ts"
@@ -106,9 +117,23 @@ export interface WriterLane {
   /** Create this lane at `at`. The host calls it only when `planAttach` says to. */
   create(at: Position): Promise<LaneOutcome>
   navigate(to: Position): Promise<LaneOutcome>
-  /** Run one turn at the lane's tip. */
-  run(text: string): Promise<LaneOutcome>
+  /**
+   * Run one turn at the lane's tip. The prompt is plain text, or a chat
+   * message that compelled this lane's agent: then the chat IS the prompt.
+   */
+  run(prompt: string | ChatMessage): Promise<LaneOutcome>
+  /**
+   * Append a message with no run. Through the pi `Lane`, never the session:
+   * the lane plans against its own cached tip, so a write that bypasses it is
+   * stored but dropped from the next turn's path (S19). During a run on this
+   * lane pi queues it and chains it in after.
+   */
+  append(message: ChatMessage): Promise<AppendOutcome>
 }
+
+export type AppendOutcome =
+  | { readonly kind: "appended"; readonly id: EntryId }
+  | { readonly kind: "refused"; readonly code: ErrCode }
 
 /**
  * The narrow facade host/ sees: one harness, a lane per writer. Every member
@@ -126,6 +151,10 @@ export interface Agent {
    * (ADR-0016, ADR-0017). The only writer of that namespace.
    */
   addReference(reference: Reference): Promise<LaneOutcome>
+  /** Store a writer's display name in `pineta.participant`, keyed by lane. */
+  setParticipantName(lane: LaneName, name: string): Promise<void>
+  /** Store a thread's default in `pineta.thread`, keyed by the entry it is set at. */
+  setThreadDefault(at: EntryId, compels: Responder): Promise<void>
   stats(): Promise<{ messageCount: number }>
   close(): Promise<void>
 }
@@ -215,15 +244,35 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         return moved.ok ? { kind: "ok" } : refused(moved.error)
       },
 
-      async run(text) {
+      async run(prompt) {
         const lane = await existing(name)
         if (lane === undefined)
           return { kind: "refused", code: ERR.UNKNOWN_TARGET }
         // `RunResult` is a Result union. A run that pi admitted and that then
         // failed is still "ok" here: it ran. Only an admission refusal is
         // `refused`.
-        const result = await lane.prompt(text, undefined, CTX)
+        const result =
+          typeof prompt === "string"
+            ? await lane.prompt(prompt, undefined, CTX)
+            : await lane.prompt(prompt, CTX)
         return result.ok ? { kind: "ok" } : refused(result.error)
+      },
+
+      async append(message) {
+        const lane = await existing(name)
+        if (lane === undefined)
+          return { kind: "refused", code: ERR.UNKNOWN_TARGET }
+        try {
+          return {
+            kind: "appended",
+            id: entryId(await lane.appendMessage(message, CTX)),
+          }
+        } catch (error) {
+          const tag = (error as { _tag?: unknown })?._tag
+          if (typeof tag === "string")
+            return { kind: "refused", code: laneErrCode(tag) }
+          throw error
+        }
       },
     }
   }
@@ -239,6 +288,18 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         CTX,
       )
       return { kind: "ok" }
+    },
+
+    async setParticipantName(lane, displayName) {
+      await session.setValue(
+        value(PARTICIPANT_NAMESPACE, lane),
+        displayName,
+        CTX,
+      )
+    },
+
+    async setThreadDefault(at, compels) {
+      await session.setValue(value(THREAD_NAMESPACE, at), compels, CTX)
     },
 
     async stats() {

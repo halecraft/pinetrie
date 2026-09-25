@@ -80,9 +80,19 @@ Roughly in dependency order, each independently shippable:
    records a lane on creation, which is what lets the document tell "no lane"
    from "a lane at the root".
 4. ~~**References**~~ — **done.** Stored as pi values in `pineta.reference`
-   (ADR-0017); backlinks derived; attached at the author's lane tip. The v1
-   demo runs in a real browser, minus presence.
-5. **Multi-writer composer** — `Schema.text()`; the visceral multiplayer win
+   (ADR-0017); backlinks derived; attached where the author is reading. The
+   v1 demo runs in a real browser, minus presence.
+5. **Humans in the tree** — reframed from "multi-writer composer" (ADR-0018).
+   Split in three:
+   - ~~**Chat and compelled responders**~~ — **done.** Human messages are pi
+     `CustomMessage`s; a message that compels the agent is its prompt; threads
+     are working sessions or conversations; the view follows the thread.
+     Findings (S19): append through the `Lane`, never the session; a pi run
+     can only start with `prompt`.
+   - **Presence** — who is here, what they read, who is typing; loud by
+     default. Kyneta ephemeral state.
+   - **Shared composition** — `Schema.text()` drafts written by tabs, anchored
+     anywhere in the tree; the visceral multiplayer win.
 6. **Scout kind** — read-only tools, shared workspace
 7. **Fold** — three-way merge producing a `fromId` node
 

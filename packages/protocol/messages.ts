@@ -25,16 +25,25 @@ export const HOST_PEER_ID = "host"
  *   - `branch` moves the lane tip to `parentId` first, so the turn forks from
  *     there (ADR-0011: the lane carries writer identity, so this moves only
  *     the sending writer's lane).
- *   - `reference` cites `targetId`, or a span of it, from the sender's lane tip.
+ *   - `reference` cites `targetId`, or a span of it, from `parentId`: the
+ *     entry the sender is reading, or their lane tip when `""`.
  *     It writes one value and runs nothing.
  *   - `navigate` moves the lane tip to `parentId` and runs nothing. It is how
  *     you come back from an Aside: without it a branch is one-way.
+ *   - `chat` is a human message at `parentId`, or at the sender's lane tip
+ *     when `""`. It runs the agent only when the agent is compelled.
+ *   - `name` sets the sender's display name to `text`.
+ *   - `thread` sets the default at entry `parentId`: `text` is `session` (the
+ *     agent answers every message) or `conversation` (nobody is compelled).
  */
 export const COMMAND_KINDS = [
   "prompt",
   "branch",
   "navigate",
   "reference",
+  "chat",
+  "name",
+  "thread",
 ] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -52,9 +61,12 @@ export interface Command {
   readonly kind: CommandKind
   readonly text: string
   /**
-   * `branch`: the entry to fork from, where `""` is refused. `navigate`: the
-   * entry to move to, where `""` means the root. Only `codec.ts`
-   * interprets this; nothing past it sees `""`.
+   * An entry, whose meaning depends on the kind. `branch`: the entry to fork
+   * from, where `""` is refused. `navigate`: the entry to move to, where `""`
+   * means the root. `chat` and `reference`: the entry the sender is reading,
+   * where `""` means their own tip. `thread`: the entry the default is set at,
+   * where `""` is refused. Only `codec.ts` interprets this; nothing past it
+   * sees `""`.
    */
   readonly parentId: string
   /** `reference`: the entry cited. Separate from `parentId` on purpose. */
@@ -64,14 +76,31 @@ export interface Command {
   readonly spanEnd: number
 }
 
+/**
+ * What a reply says happened, named rather than inferred from which fields are
+ * set. `line.ts` spreads this into a constrained literal, like COMMAND_KINDS.
+ */
+export const OUTCOME_KINDS = [
+  "started",
+  "navigated",
+  "referenced",
+  "appended",
+  "named",
+  "threaded",
+  "refused",
+] as const
+export type OutcomeKind = (typeof OUTCOME_KINDS)[number]
+
 export interface Reply {
   readonly id: string
-  readonly accepted: boolean
+  readonly outcome: OutcomeKind
   readonly runId: string
   readonly errorCode: string
   readonly errorMessage: string
   /** Set only when a reference was written: its id. */
   readonly referenceId: string
+  /** Set only when a chat message was appended: its entry id. */
+  readonly entryId: string
 }
 
 /**
@@ -91,11 +120,12 @@ export const EMPTY_COMMAND: Command = Object.freeze({
 
 export const EMPTY_REPLY: Reply = Object.freeze({
   id: "",
-  accepted: false,
+  outcome: "refused",
   runId: "",
   errorCode: "",
   errorMessage: "",
   referenceId: "",
+  entryId: "",
 })
 
 export const command = (fields: Partial<Command>): Command => ({

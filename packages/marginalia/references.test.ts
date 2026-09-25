@@ -25,6 +25,7 @@ const plan = (over: Partial<Parameters<typeof planReference>[0]>) =>
   planReference({
     author: A,
     lane: at(E2),
+    at: { kind: "tip" },
     target: { kind: "entry", id: E1 },
     cited: { kind: "entry", text: "hello" },
     newId: referenceId("r-1"),
@@ -37,6 +38,14 @@ test("planReference: attached at the author's lane tip", () => {
   const d = plan({})
   assert.equal(d.kind === "write" ? d.reference.from : "", E2)
   assert.equal(d.kind === "write" ? d.reference.author : "", A)
+})
+
+test("planReference: attached where the author reads, with or without a lane", () => {
+  const read = { kind: "entry", id: E1 } as const
+  const withLane = plan({ at: read })
+  const without = plan({ at: read, lane: { kind: "none" } })
+  assert.equal(withLane.kind === "write" ? withLane.reference.from : "", E1)
+  assert.equal(without.kind === "write" ? without.reference.from : "", E1)
 })
 
 test("planReference: no lane, or a lane at the root, has nowhere to attach", () => {

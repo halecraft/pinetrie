@@ -8,7 +8,7 @@
 
 import { Line } from "@kyneta/exchange"
 import { Schema } from "@kyneta/schema"
-import { COMMAND_KINDS, CONTROL_TOPIC } from "./messages.ts"
+import { COMMAND_KINDS, CONTROL_TOPIC, OUTCOME_KINDS } from "./messages.ts"
 
 // `kind` is a CONSTRAINED literal, so a kind outside the list is refused at
 // the wire boundary. Spreading COMMAND_KINDS rather than restating it keeps
@@ -27,11 +27,12 @@ const Command = Schema.struct({
 
 const Reply = Schema.struct({
   id: Schema.string(),
-  accepted: Schema.boolean(),
+  outcome: Schema.string(...OUTCOME_KINDS),
   runId: Schema.string(),
   errorCode: Schema.string(),
   errorMessage: Schema.string(),
   referenceId: Schema.string(),
+  entryId: Schema.string(),
 })
 
 /** Asymmetric: client sends Command, host sends Reply. */

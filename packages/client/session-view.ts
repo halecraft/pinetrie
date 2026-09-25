@@ -8,13 +8,17 @@ import { subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 
 import {
+  type ChatAt,
   type EntryId,
   type Intent,
   type LaneName,
   laneNameForWriter,
+  NOBODY,
   type Position,
+  parseMentions,
   type projectTranscript,
   type ReferenceTarget,
+  THE_AGENT,
 } from "@pineta/core"
 import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
@@ -81,7 +85,12 @@ export interface SessionClient {
   /** Move this writer's lane to `to`, running nothing. */
   navigate(to: Position): Promise<Outcome>
   /** Cite an entry or a span of one, from this writer's lane tip. */
-  cite(to: ReferenceTarget): Promise<Outcome>
+  /** Cite `to`, attached where you are reading (`at`), or at your own tip. */
+  cite(to: ReferenceTarget, at?: ChatAt): Promise<Outcome>
+  chat(text: string, at?: ChatAt): Promise<Outcome>
+  setName(name: string): Promise<Outcome>
+  /** Make the thread rooted at `at` a working session, or a conversation. */
+  setThreadMode(at: EntryId, mode: "session" | "conversation"): Promise<Outcome>
   /** Every reply as it arrived on the wire, for wire-level checks. */
   readonly replies: readonly Reply[]
   close(): Promise<void>
@@ -157,8 +166,26 @@ export async function connectSession(
     navigate(to: Position): Promise<Outcome> {
       return send({ kind: "navigate", to })
     },
-    cite(to: ReferenceTarget): Promise<Outcome> {
-      return send({ kind: "reference", to })
+    cite(to: ReferenceTarget, at: ChatAt = { kind: "tip" }): Promise<Outcome> {
+      return send({ kind: "reference", to, at })
+    },
+    /**
+     * A human message at `at`, or at this writer's own tip. It runs the agent
+     * only if the agent is compelled: mentioned, or the thread's default.
+     */
+    chat(text: string, at: ChatAt = { kind: "tip" }): Promise<Outcome> {
+      return send({ kind: "chat", text, at, mentions: parseMentions(text) })
+    },
+    setName(name: string): Promise<Outcome> {
+      return send({ kind: "name", name })
+    },
+    setThreadMode(at, mode) {
+      return send({
+        kind: "thread",
+        at,
+        compels:
+          mode === "session" ? { kind: "agent", agent: THE_AGENT } : NOBODY,
+      })
     },
     replies,
     async close() {

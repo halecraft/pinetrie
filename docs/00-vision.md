@@ -62,6 +62,27 @@ Two orthogonal graphs over the same nodes:
 
 Most of the interesting UI lives in the second.
 
+## Humans in the tree
+
+People working with an agent also talk to each other, and that talk belongs in
+the tree: a human message is an entry, and a thread is a branch. That puts it
+in E, and in no agent's T until an agent is asked.
+
+The distinction that organises it is **obligation**, not identity. A
+*collaborator* may reply when they choose, human or bot. A *compelled
+responder* must reply, and only an agent can be one: nobody can make a person
+answer. `@agent` compels the agent; `@alice` only tells Alice to look.
+
+A thread has a default. In a **working session** the agent answers every
+message; in a **conversation** it answers when mentioned. The session starts as
+a working session, because the first person in is most likely alone and
+trying to get work done.
+
+The composer says what will happen **before** sending: who will see the
+message, and whether the agent will reply. Writing alone or together is a
+separate choice from who must answer; a note is just a message that compels
+nobody.
+
 ## v1 scope
 
 **In:** browser client over Kyneta against a local pi host; tree visualisation

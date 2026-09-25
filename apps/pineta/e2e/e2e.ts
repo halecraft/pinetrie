@@ -9,6 +9,7 @@
 //   PINETA_LIVE=1 node e2e/e2e.mjs   also drives a REAL turn against a real model
 
 import {
+  readParticipantNames,
   readReferences,
   readRenderableEntries,
 } from "@pineta/client/projection"
@@ -18,14 +19,18 @@ import {
   ERR,
   entryId,
   findSeqKeys,
+  laneNameForAgent,
   projectSpine,
   projectTranscript,
   ROOT,
+  THE_AGENT,
 } from "@pineta/core"
+import { decodeChat } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
   hasLaneRecord,
   readEntries,
+  readEntryMessage,
   readLaneTip,
   writeEntry,
 } from "@pineta/schema"
@@ -532,6 +537,229 @@ if (forkParent !== null) {
     )
   }
   await Promise.all([pw.close(), qw.close()])
+}
+
+// --- humans in the tree -----------------------------------------------------
+{
+  console.log("\n--- humans in the tree ---")
+  const al = await connectSession({
+    url: host.wsUrl,
+    WebSocket,
+    peerId: "h-alice",
+  })
+  const bo = await connectSession({
+    url: host.wsUrl,
+    WebSocket,
+    peerId: "h-bob",
+  })
+  const agentLane = laneNameForAgent(THE_AGENT)
+  const idle = () =>
+    waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+  const entryIdOf = (o: Outcome) => (o.kind === "appended" ? o.id : null)
+  /** The stored message's raw `content`: what pi sends the model. */
+  const contentOf = (id: string | null) => {
+    const found = id === null ? undefined : readEntryMessage(host.doc, id)
+    const m = found?.present
+      ? (found.message as { content?: unknown })
+      : undefined
+    return typeof m?.content === "string" ? m.content : ""
+  }
+
+  const [na, nb] = await Promise.all([al.setName("Alice"), bo.setName("Bob")])
+  const names = readParticipantNames(host.doc)
+  ok(
+    na.kind === "named" &&
+      nb.kind === "named" &&
+      names.get(al.laneName) === "Alice" &&
+      names.get(bo.laneName) === "Bob",
+    "each person's display name is stored by their lane",
+  )
+
+  // The session's root is a working session: someone alone gets a reply.
+  const first = await al.chat("hello, let's get started")
+  ok(
+    first.kind === "started",
+    `a first message in a fresh session runs the agent (${first.kind})`,
+  )
+  await idle()
+  const opened = tipOf(agentLane)
+
+  // Alice makes the thread a conversation below the agent's reply; then two
+  // people talk, and nothing runs.
+  const conv =
+    opened === null
+      ? undefined
+      : await al.setThreadMode(entryId(opened), "conversation")
+  ok(
+    conv?.kind === "threaded",
+    `the thread becomes a conversation (${conv?.kind})`,
+  )
+  const before = Object.keys(readEntries(host.doc)).length
+  const a1 = await al.chat(
+    "the secret word is PLUM",
+    opened === null ? undefined : { kind: "entry", id: entryId(opened) },
+  )
+  const a1id = entryIdOf(a1)
+  const b1 = await bo.chat(
+    "noted, thanks @alice",
+    a1id === null ? undefined : { kind: "entry", id: a1id },
+  )
+  const b1id = entryIdOf(b1)
+  ok(
+    a1id !== null && b1id !== null,
+    `both messages are appended (${a1.kind}, ${b1.kind})`,
+  )
+  await sleep(200)
+  ok(
+    Object.keys(readEntries(host.doc)).length === before + 2 &&
+      tipOf(agentLane) === opened,
+    "plain chat and a person-mention add exactly two entries and run nothing",
+  )
+  ok(
+    b1id !== null && host.doc.entries.get(b1id)?.parentId === a1id,
+    "Bob's reply is parented at the message he was viewing",
+  )
+  ok(
+    contentOf(a1id) === "Alice: the secret word is PLUM",
+    `the stored content carries the speaker (${JSON.stringify(contentOf(a1id))})`,
+  )
+  const talk = projectTranscript(readRenderableEntries(host.doc), b1id)
+  ok(
+    talk.map(m => `${m.role}:${m.author}`).join(",") ===
+      "chat:Alice,assistant:undefined,chat:Alice,chat:Bob",
+    `the thread renders as chat, by speaker (${talk.map(m => `${m.role}:${m.author}`).join(",")})`,
+  )
+
+  // Spans cover what the author wrote, not the attributed content.
+  if (a1id !== null) {
+    const words = "the secret word is PLUM".length
+    const inText = await bo.cite({
+      kind: "span",
+      id: a1id,
+      start: 19,
+      end: words,
+    })
+    const pastText = await bo.cite({
+      kind: "span",
+      id: a1id,
+      start: 0,
+      end: words + 1,
+    })
+    ok(
+      inText.kind === "referenced" && codeOf(pastText) === ERR.INVALID_SPAN,
+      `a span of a chat message is over its text (${inText.kind}, ${codeOf(pastText)})`,
+    )
+  }
+
+  // Compelling the agent: the message IS its prompt, on the agent's lane.
+  const bobTipBefore = tipOf(bo.laneName)
+  const ask = await bo.chat(
+    "@agent who told us a secret word, and what was it?",
+    b1id === null ? undefined : { kind: "entry", id: b1id },
+  )
+  ok(ask.kind === "started", `@agent starts a run (${ask.kind})`)
+  await idle()
+  const agentTip = tipOf(agentLane)
+  const agentPath = projectTranscript(readRenderableEntries(host.doc), agentTip)
+  const shape = agentPath.map(m =>
+    m.role === "chat" ? `chat:${m.author}` : m.role,
+  )
+  const chats = shape.filter(r => r.startsWith("chat:"))
+  const lastChat = shape.lastIndexOf(chats.at(-1) ?? "")
+  const reply = shape.slice(lastChat + 1)
+  // pi may leave a provider error and its retry on the path, so a reply is
+  // one or more assistant entries; what matters is the thread around it.
+  ok(
+    chats.join(",") === "chat:Alice,chat:Alice,chat:Bob,chat:Bob" &&
+      reply.length > 0 &&
+      reply.every(r => r === "assistant"),
+    `the agent's path is the thread by speaker, then its reply (${shape.join(",")})`,
+  )
+  if (reply.length > 1) {
+    const reasons = agentPath.slice(lastChat + 1).map(m => {
+      const found = readEntryMessage(host.doc, m.id)
+      return found.present
+        ? (found.message as { stopReason?: unknown }).stopReason
+        : "absent"
+    })
+    console.log(`  (assistant entries' stopReason: ${JSON.stringify(reasons)})`)
+  }
+  const askEntry = agentPath.filter(m => m.role === "chat").at(-1)?.id ?? null
+  const askMsg =
+    askEntry === null ? undefined : readEntryMessage(host.doc, askEntry)
+  ok(
+    askEntry !== null &&
+      host.doc.entries.get(askEntry)?.parentId === b1id &&
+      decodeChat(askMsg?.present ? askMsg.message : undefined)?.compels.kind ===
+        "agent",
+    "the compelled message is the run's prompt, parented where Bob was viewing",
+  )
+  ok(
+    tipOf(bo.laneName) === bobTipBefore,
+    "the compelled message is on the agent's lane, not Bob's",
+  )
+  if (LIVE) {
+    const reply = agentPath.at(-1)?.text ?? ""
+    console.log(`  agent said: ${JSON.stringify(reply)}`)
+    ok(
+      /plum/i.test(reply) && /alice/i.test(reply),
+      "LIVE: the agent answered from both speakers' messages",
+    )
+  }
+
+  // A working session compels the agent without a mention; a conversation
+  // set deeper inside it does not.
+  const root = a1id === null ? null : a1id
+  const set =
+    root === null ? undefined : await al.setThreadMode(root, "session")
+  ok(
+    set?.kind === "threaded",
+    `a thread becomes a working session (${set?.kind})`,
+  )
+  const inSession = await al.chat(
+    "summarise, please",
+    agentTip === null ? undefined : { kind: "entry", id: entryId(agentTip) },
+  )
+  ok(
+    inSession.kind === "started",
+    `in a working session a plain message runs (${inSession.kind})`,
+  )
+  await idle()
+  const sessionTip = tipOf(agentLane)
+  if (sessionTip !== null)
+    await al.setThreadMode(entryId(sessionTip), "conversation")
+  const inConversation = await al.chat(
+    "just between us",
+    sessionTip === null
+      ? undefined
+      : { kind: "entry", id: entryId(sessionTip) },
+  )
+  ok(
+    inConversation.kind === "appended" &&
+      host.doc.entries.get(inConversation.id)?.parentId === sessionTip,
+    `a conversation set inside it runs nothing, and an existing lane moves to where its author views (${inConversation.kind})`,
+  )
+
+  // One reply at a time: a second compelled message while the agent runs is
+  // refused, never dropped silently.
+  const [p, q] = await Promise.all([
+    al.chat("@agent one"),
+    bo.chat("@agent two"),
+  ])
+  const kinds = [p.kind, codeOf(p) || p.kind, q.kind, codeOf(q) || q.kind]
+  ok(
+    [p, q].filter(o => o.kind === "started").length === 1 &&
+      [p, q].filter(o => codeOf(o) === ERR.BUSY).length === 1,
+    `two people compelling the agent at once: one runs, one is told it is busy (${kinds.join(",")})`,
+  )
+  await idle()
+
+  const noThread = await al.setThreadMode(entryId("no-such-entry"), "session")
+  ok(
+    codeOf(noThread) === ERR.UNKNOWN_TARGET,
+    `a thread at an unknown entry is refused (${codeOf(noThread)})`,
+  )
+  await Promise.all([al.close(), bo.close()])
 }
 
 // --- LIVE assertion -------------------------------------------------------

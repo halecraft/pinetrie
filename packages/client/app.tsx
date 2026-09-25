@@ -3,25 +3,31 @@
 // The renderer this replaced rebuilt the whole transcript with `innerHTML` on
 // every change. That is O(entries) DOM churn per token delta, and — decisively
 // — it destroys focus and selection on every keystroke, which makes a
-// collaborative composer impossible. React gives us stable node identity, and
-// `useText` gives us the composer itself.
+// collaborative composer impossible. React gives us stable node identity;
+// `useText` is for shared composition, which is not built yet.
 
 import { ExchangeProvider, useDocStatus, useTracked } from "@kyneta/react"
 import {
-  atEntry,
   type BranchSummary,
+  compelledResponder,
   entryId,
+  laneNameForAgent,
+  NOBODY,
+  parseMentions,
   type ReferenceTarget,
+  THE_AGENT,
 } from "@pineta/core"
-import { readLaneTip, type SessionDocHandle } from "@pineta/schema"
+import type { SessionDocHandle } from "@pineta/schema"
 import { StrictMode, useState } from "react"
 import { createRoot } from "react-dom/client"
 import {
-  readDefaultViewTip,
   readEntryCount,
+  readParticipantNames,
   readReferences,
   readSpine,
   readStreaming,
+  readThreadMode,
+  readViewTip,
 } from "./projection.ts"
 import { connectSession, type SessionClient } from "./session-view.ts"
 
@@ -50,6 +56,9 @@ function Spine({
 }) {
   const { spine } = useTracked(() => readSpine(doc, selectedTipId))
   const refs = useTracked(() => readReferences(doc))
+  // The agent joins a thread at the first message on the path that compelled
+  // it: from there on, what is above is its context.
+  const joinedAt = spine.find(n => n.compelled === true)?.id
 
   return (
     <div id="transcript">
@@ -59,8 +68,16 @@ function Spine({
         const citedBy = refs.to.get(id) ?? []
         return (
           <div key={node.id}>
-            <div className={`msg ${node.role}`} data-entry={node.id}>
-              <span className="role">{node.role}</span>
+            {node.id === joinedAt && (
+              <div className="joined">agent joined · it reads this thread</div>
+            )}
+            <div
+              className={`msg ${node.role}${node.compelled === true ? " asked" : ""}`}
+              data-entry={node.id}
+            >
+              <span className="role">
+                {node.role === "chat" ? node.author : node.role}
+              </span>
               {/* JSX escapes by default, so model output is never HTML. */}
               <div className="text">{node.text}</div>
               <div className="refs">
@@ -112,7 +129,7 @@ function Spine({
 /**
  * The selection inside `text`, as UTF-16 offsets into its rendered string, or
  * null if nothing inside it is selected. The element renders exactly
- * `messageText`, so these are the offsets a span reference means.
+ * `entryText`, so these are the offsets a span reference means.
  */
 function selectedSpan(text: Element): { start: number; end: number } | null {
   const selection = window.getSelection()
@@ -188,132 +205,196 @@ function Streaming({ doc, lane }: { doc: SessionDocHandle; lane: string }) {
 }
 
 /**
- * Naming the parent is a correctness affordance, not decoration. Selection is
- * client-local, so reading a branch and then prompting would otherwise append
- * silently to a lane tip you navigated away from.
- *
- * Off-lane the composer BRANCHES from the selected entry rather than refusing:
- * the host navigates there first, so the turn forks from what you are reading.
+ * Before sending, the composer says who will see the message and who must
+ * answer it. Everyone in the session can read it; only the agent can be
+ * compelled, by an `@agent` or by a working session. The same
+ * `compelledResponder` the host runs decides the label, so it cannot promise
+ * a reply the host will not start.
  */
 function Composer({
   session,
-  onLane,
-  selectedTipId,
-  onBranched,
+  viewTipId,
+  onSent,
 }: {
   session: SessionClient
-  onLane: boolean
-  selectedTipId: string | null
-  onBranched: () => void
+  viewTipId: string | null
+  onSent: (at: string | null) => void
 }) {
+  const doc = session.doc
   const [text, setText] = useState("")
   const [status, setStatus] = useState("connected")
+  const mode = useTracked(() => readThreadMode(doc, viewTipId))
+  const names = useTracked(() => readParticipantNames(doc))
+  const willReply =
+    compelledResponder({
+      mentions: parseMentions(text),
+      threadDefault:
+        mode === "session" ? { kind: "agent", agent: THE_AGENT } : NOBODY,
+    }).kind === "agent"
 
   return (
     <form
       id="form"
       onSubmit={async event => {
         event.preventDefault()
-        const prompt = text.trim()
-        if (prompt === "") return
+        const message = text.trim()
+        if (message === "") return
         setText("")
-        setStatus(onLane ? "running…" : "branching…")
-        const outcome = await session.prompt(
-          prompt,
-          onLane || selectedTipId === null ? undefined : entryId(selectedTipId),
+        setStatus("sending…")
+        const outcome = await session.chat(
+          message,
+          viewTipId === null
+            ? undefined
+            : { kind: "entry", id: entryId(viewTipId) },
         )
         setStatus(
           outcome.kind === "refused"
             ? `rejected: ${outcome.code} — ${outcome.message}`
             : "connected",
         )
-        // The lane tip has moved onto the new entry, so drop the local
-        // selection and let the spine follow the lane again. A stale selection
-        // would show a path we are no longer appending to.
-        if (outcome.kind !== "refused" && !onLane) onBranched()
+        // Stay in this thread, and follow it as replies arrive.
+        if (outcome.kind !== "refused") onSent(viewTipId)
       }}
     >
+      <div id="audience">
+        seen by{" "}
+        <span id="seenBy">
+          {[...names.values()].join(", ") || "everyone here"}
+        </span>
+        {willReply && (
+          <>
+            {" "}
+            · will reply <span id="willReply">agent</span>
+          </>
+        )}
+      </div>
       <input
         autoComplete="off"
         id="input"
         onChange={e => setText(e.target.value)}
-        placeholder={onLane ? "say something…" : "branch from here…"}
+        placeholder={
+          mode === "session"
+            ? "ask the agent…"
+            : "say something · @agent to ask"
+        }
         value={text}
       />
       <button id="send" type="submit">
-        {onLane ? "send" : "branch from here"}
+        {willReply ? "send · agent will reply" : "send"}
       </button>
       <span id="status">{status}</span>
     </form>
   )
 }
 
+/** The thread's mode at what you are reading, and the switch between them. */
+function ThreadMode({
+  session,
+  viewTipId,
+}: {
+  session: SessionClient
+  viewTipId: string | null
+}) {
+  const mode = useTracked(() => readThreadMode(session.doc, viewTipId))
+  return (
+    <div data-mode={mode} id="thread">
+      {mode === "session"
+        ? "working session · the agent answers every message"
+        : "conversation · the agent answers when @agent is mentioned"}{" "}
+      {/* A mode is set at an entry and inherited below it; an empty session
+          has none to set it at. */}
+      {viewTipId !== null && (
+        <button
+          id="threadMode"
+          onClick={() =>
+            void session.setThreadMode(
+              entryId(viewTipId),
+              mode === "session" ? "conversation" : "session",
+            )
+          }
+          type="button"
+        >
+          make this a {mode === "session" ? "conversation" : "working session"}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** A display name: a label for you, never your identity. */
+function NameField({ session }: { session: SessionClient }) {
+  const names = useTracked(() => readParticipantNames(session.doc))
+  const [draft, setDraft] = useState<string | null>(null)
+  const current = names.get(session.laneName) ?? ""
+  return (
+    <input
+      id="name"
+      onBlur={() => {
+        if (draft !== null && draft.trim() !== current)
+          void session.setName(draft)
+        setDraft(null)
+      }}
+      onChange={e => setDraft(e.target.value)}
+      onKeyDown={e => {
+        if (e.key === "Enter") e.currentTarget.blur()
+      }}
+      placeholder="your name"
+      value={draft ?? current}
+    />
+  )
+}
+
 function App({ session }: { session: SessionClient }) {
   const doc = session.doc
-  const lane = session.laneName
   const count = useTracked(() => readEntryCount(doc))
   const status = useDocStatus(doc)
-  const laneTipId = useTracked(() => readLaneTip(doc, lane))
-  const defaultTip = useTracked(() => readDefaultViewTip(doc, lane))
 
-  // Which path you are LOOKING at. Client-local, never written: that is what
-  // makes navigation read-only. With no selection you see your own lane, or,
-  // before you have written anything, the most recently advanced lane.
-  const [selected, setSelected] = useState<string | null>(null)
-  const selectedTipId = selected ?? defaultTip
-  // On-lane means "what I see is where my next prompt lands". A window that
-  // joins a live session views someone else's lane, so it is off-lane and its
-  // composer branches from what it is reading, which creates its own lane.
-  const onLane = selectedTipId === laneTipId
+  // What you chose to READ: client-local, never written. Null until you choose,
+  // which follows the newest tip overall. The view is the newest tip at or
+  // below it, so replies to your thread, the agent's included, move the view
+  // on, and someone else's branch never pulls it away (`followTip`).
+  const [anchor, setAnchor] = useState<string | null>(null)
+  const viewTipId = useTracked(() => readViewTip(doc, anchor))
 
   return (
     <>
       <header>
         <h1>pineta</h1>
         <div className="meta">
-          lane <span id="lane">{lane ?? "(none)"}</span> · entries{" "}
+          <NameField session={session} /> · lane{" "}
+          <span id="lane">{session.laneName}</span> · entries{" "}
           <span id="count">{count}</span> ·{" "}
           {status === "pending" ? "syncing…" : status}
         </div>
       </header>
       <Spine
         doc={doc}
-        onCite={to => void session.cite(to)}
-        onRead={setSelected}
-        selectedTipId={selectedTipId}
+        onCite={to =>
+          void session.cite(
+            to,
+            viewTipId === null
+              ? undefined
+              : { kind: "entry", id: entryId(viewTipId) },
+          )
+        }
+        onRead={setAnchor}
+        selectedTipId={viewTipId}
       />
-      {onLane ? null : (
-        <div id="offLane">
-          reading a branch · sending will fork from here{" "}
-          {/* Moves this writer's lane onto the path being read, running
-              nothing. This is how you come back from an Aside: after a
-              branch, the trunk shows as a fork marker; read it, then switch.
-              Without it a branch is one-way. */}
+      {anchor !== null && (
+        <div id="reading">
+          reading a thread · sending replies here{" "}
           <button
-            id="switchLane"
-            onClick={async () => {
-              if (selectedTipId === null) return
-              const outcome = await session.navigate(
-                atEntry(entryId(selectedTipId)),
-              )
-              if (outcome.kind !== "refused") setSelected(null)
-            }}
+            id="followLatest"
+            onClick={() => setAnchor(null)}
             type="button"
           >
-            switch to this path
-          </button>{" "}
-          <button onClick={() => setSelected(null)} type="button">
-            back to your lane
+            follow the newest
           </button>
         </div>
       )}
-      <Streaming doc={doc} lane={lane} />
-      <Composer
-        onBranched={() => setSelected(null)}
-        onLane={onLane}
-        selectedTipId={selectedTipId}
-        session={session}
-      />
+      <Streaming doc={doc} lane={laneNameForAgent(THE_AGENT)} />
+      <ThreadMode session={session} viewTipId={viewTipId} />
+      <Composer onSent={setAnchor} session={session} viewTipId={viewTipId} />
     </>
   )
 }

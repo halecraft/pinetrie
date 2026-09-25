@@ -114,7 +114,7 @@ packages/     libraries; their boundaries are enforced by resolution
   schema/        @pineta/schema       Kyneta only; the document shape (TECHNICAL.md)
   pi/            @pineta/pi           THE pi boundary (TECHNICAL.md)
   protocol/      @pineta/protocol     the wire contract and its codec
-  marginalia/    @pineta/marginalia   Pineta's shapes stored in pi: references (ADR-0017)
+  marginalia/    @pineta/marginalia   Pineta's shapes stored in pi: references, chat, threads
   client/        @pineta/client       browser UI and session client; owns its Vite build
 
 (root)        a bare workspace: development tooling only, no dependencies

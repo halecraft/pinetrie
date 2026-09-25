@@ -11,22 +11,29 @@
 
 import {
   type EntryLike,
-  latestTip,
+  entryId,
+  followTip,
   projectSpine,
   projectTranscript,
+  ROOT,
   type SpineProjection,
 } from "@pineta/core"
 import {
   decodeReference,
+  effectiveDefault,
   indexReferences,
+  PARTICIPANT_NAMESPACE,
+  participantNames,
   REFERENCE_NAMESPACE,
   type Reference,
   type ReferenceIndex,
+  renderableMessage,
+  THREAD_NAMESPACE,
+  threadDefaults,
 } from "@pineta/marginalia"
 import {
   readActiveRun,
   readEntries,
-  readLaneNames,
   readLaneTip,
   readStream,
   readValues,
@@ -37,21 +44,6 @@ import {
 export interface StreamingView {
   readonly runId: string
   readonly text: string
-}
-
-/**
- * The tip a window should show when it has no selection of its own: its own
- * lane's tip, or, for a window that has not written yet, the most recently
- * advanced lane in the session.
- */
-export function readDefaultViewTip(
-  doc: SessionDocHandle,
-  ownLane: string,
-): string | null {
-  return (
-    readLaneTip(doc, ownLane) ??
-    latestTip(readLaneNames(doc).map(lane => readLaneTip(doc, lane)))
-  )
 }
 
 /**
@@ -72,7 +64,8 @@ export function readTranscript(
  * `id`, `parentId` and `type` are typed columns, read straight off the row.
  * `message` is pi's variant data in the sealed `payload`; it is lifted by
  * `rowMessage` in `packages/schema`, the one definition of where a message
- * lives in a row. The host reaches it through `readEntryMessage`.
+ * lives in a row. The host reaches it through `readEntryMessage`. A human's
+ * chat message is decoded here, by `renderableMessage`, into role `chat`.
  */
 export function readRenderableEntries(
   doc: SessionDocHandle,
@@ -83,7 +76,7 @@ export function readRenderableEntries(
       id: row.id,
       parentId: row.parentId,
       type: row.type,
-      message: rowMessage(row) as EntryLike["message"],
+      message: renderableMessage(rowMessage(row)),
     }
   }
   return out
@@ -103,7 +96,6 @@ export function readSpine(
   return projectSpine(readRenderableEntries(doc), selectedTipId)
 }
 
-/** The lane's own tip: where the host will append the next entry. */
 /**
  * This lane's live token deltas, or `null` when it is idle. Other writers'
  * runs stream into the same document but are not this window's stream.
@@ -114,6 +106,46 @@ export function readStreaming(
 ): StreamingView | null {
   const runId = readActiveRun(doc, lane)
   return runId === undefined ? null : { runId, text: readStream(doc, runId) }
+}
+
+/** Each writer's display name, by lane (`pineta.participant`). */
+export function readParticipantNames(
+  doc: SessionDocHandle,
+): ReadonlyMap<string, string> {
+  return participantNames(readValues(doc, PARTICIPANT_NAMESPACE))
+}
+
+/**
+ * The tip a reader sees: the newest leaf at or below `at`, the entry they
+ * chose to read (null for none), so a reply to your thread moves your view on
+ * to it, whoever wrote it (`followTip`).
+ */
+export function readViewTip(
+  doc: SessionDocHandle,
+  at: string | null,
+): string | null {
+  return followTip(readEntries(doc), at)
+}
+
+/**
+ * The thread mode at `at`: `session` when the agent answers every message,
+ * `conversation` when only a mention compels it. The same decision the host
+ * makes (`effectiveDefault`), read from the same document.
+ */
+export function readThreadMode(
+  doc: SessionDocHandle,
+  at: string | null,
+): "session" | "conversation" {
+  const entries = readEntries(doc)
+  const compels = effectiveDefault(
+    at === null ? ROOT : { kind: "entry", id: entryId(at) },
+    id => {
+      const parent = entries[id]?.parentId
+      return typeof parent === "string" ? entryId(parent) : null
+    },
+    threadDefaults(readValues(doc, THREAD_NAMESPACE)),
+  )
+  return compels.kind === "agent" ? "session" : "conversation"
 }
 
 export function readEntryCount(doc: SessionDocHandle): number {

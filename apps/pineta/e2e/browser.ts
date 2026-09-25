@@ -21,10 +21,9 @@
 //
 // Override the endpoint with PW_SERVER if you used a different port.
 
-import { readRenderableEntries } from "@pineta/client/projection"
+import { readParticipantNames } from "@pineta/client/projection"
 import { connectSession } from "@pineta/client/session"
-import { entryId, projectTranscript } from "@pineta/core"
-import { readLaneNames, readLaneTip } from "@pineta/schema"
+import { entryId } from "@pineta/core"
 import { type Browser, chromium } from "@playwright/test"
 import { startHost } from "../host/index.ts"
 import { createChecks, waitFor } from "./harness.ts"
@@ -85,13 +84,37 @@ try {
   const lane = (await page.textContent("#lane"))?.trim() ?? ""
   ok(lane.startsWith("w-"), `lane carries writer identity, not "main": ${lane}`)
 
+  // A display name: a label, stored by lane, shown to everyone.
+  await page.fill("#name", "Ada")
+  await page.press("#name", "Enter")
+  const named = await waitFor(
+    () => readParticipantNames(host.doc).get(lane) === "Ada",
+    15_000,
+  )
+  ok(named >= 0, "the name typed in the header is stored for this lane")
+  await page.waitForFunction(
+    () => document.getElementById("seenBy")?.textContent?.includes("Ada"),
+    undefined,
+    { timeout: 15_000 },
+  )
+  ok(true, "the composer says who will see the message")
+
+  // The session's root is a working session, and the composer says so before
+  // anything is sent.
+  const mode = await page.getAttribute("#thread", "data-mode")
+  ok(mode === "session", `a fresh session is a working session (${mode})`)
+  const label = async () => (await page.textContent("#send"))?.trim() ?? ""
+  ok(
+    (await label()) === "send · agent will reply",
+    `the composer promises a reply in a working session: "${await label()}"`,
+  )
+
   await page.fill("#input", "Say exactly: BROWSER-OK")
-  await page
-    .click("#form button, #form [type=submit]")
-    .catch(() => page.press("#input", "Enter"))
+  await page.click("#send")
 
   // Streaming must be visible *before* the turn commits — that is ADR-0014's
-  // Schema.text() insert path, observed through a real DOM.
+  // Schema.text() insert path, observed through a real DOM. The agent streams
+  // on its own lane, and every window shows it.
   const streamed = await page
     .waitForFunction(() => !document.getElementById("streaming")?.hidden, {
       timeout: 30_000,
@@ -100,108 +123,155 @@ try {
     .catch(() => false)
   ok(streamed, "streaming text appeared in the DOM while the turn was running")
 
+  const replied = (token: string) =>
+    page
+      .waitForFunction(
+        t =>
+          [...document.querySelectorAll(".msg.assistant .text")].some(n =>
+            n.textContent?.includes(t),
+          ),
+        token,
+        { timeout: 60_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+  ok(await replied("BROWSER-OK"), "the agent's reply rendered in the DOM")
+
+  const roles = await page.$$eval("#transcript > div > .msg", ns =>
+    ns.map(
+      n =>
+        `${n.className.replace("msg ", "")}:${n.querySelector(".role")?.textContent}`,
+    ),
+  )
+  ok(
+    roles.join(",") === "chat asked:Ada,assistant:assistant",
+    `the spine is Ada's message, marked as asked, then the reply: [${roles.join(", ")}]`,
+  )
+  ok(
+    (await page.$$eval(".joined", ns => ns.length)) === 1,
+    "the thread shows where the agent joined",
+  )
+
+  // Switching to a conversation changes the promise, and the promise holds:
+  // a plain message runs nothing; `@agent` runs the agent.
+  await page.click("#threadMode")
+  await page.waitForFunction(
+    () => document.getElementById("thread")?.dataset.mode === "conversation",
+    undefined,
+    { timeout: 15_000 },
+  )
+  ok(true, "the thread became a conversation")
+  await page.fill("#input", "just a note")
+  const plainLabel = await label()
+  const plainPromise = (await page.$("#willReply")) !== null
+  const assistantsBefore = await page.$$eval(".msg.assistant", n => n.length)
+  await page.click("#send")
   await page.waitForFunction(
     () =>
-      [...document.querySelectorAll(".msg.assistant .text")].some(n =>
-        n.textContent?.includes("BROWSER-OK"),
+      [...document.querySelectorAll("#transcript .text")].some(n =>
+        n.textContent?.includes("just a note"),
       ),
-    { timeout: 60_000 },
+    undefined,
+    { timeout: 30_000 },
   )
-  ok(true, "assistant reply rendered in the DOM")
-
-  const roles = await page.$$eval(".msg", ns =>
-    ns.map(n => n.className.replace("msg ", "")),
-  )
+  await new Promise(r => setTimeout(r, 1500))
+  const assistantsAfter = await page.$$eval(".msg.assistant", n => n.length)
   ok(
-    roles.join(",").includes("user,assistant"),
-    `transcript ordered by parentId walk: [${roles.join(", ")}]`,
+    plainLabel === "send" &&
+      !plainPromise &&
+      assistantsAfter === assistantsBefore &&
+      Object.keys(host.doc.activeRuns()).length === 0,
+    `in a conversation the composer promised no reply, and none came ("${plainLabel}")`,
+  )
+  await page.fill("#input", "@agent say exactly: BROWSER-TWO")
+  const askLabel = await label()
+  const askPromise = (await page.$("#willReply")) !== null
+  await page.click("#send")
+  ok(
+    askLabel === "send · agent will reply" &&
+      askPromise &&
+      (await replied("BROWSER-TWO")),
+    `typing @agent promised a reply, and it came ("${askLabel}")`,
   )
 
-  // A fork, written host-side exactly as another replica would write it, then
-  // asserted in the RENDERED DOM. A spine with no branch proves nothing, so
-  // the fixture has to actually fork.
+  // A fork, written by ANOTHER writer through the protocol, then asserted in
+  // the RENDERED DOM. It attaches at Ada's first message, which is in the
+  // root's working session, so it is a real turn: a message and a reply.
   const before = await page.$$eval(".fork", ns => ns.length)
   ok(before === 0, `no fork marker before the branch exists (${before})`)
+  const firstId = await page.$eval(
+    "#transcript > div:first-child .msg",
+    n => n.getAttribute("data-entry") ?? "",
+  )
+  const other = await connectSession({
+    url: host.wsUrl,
+    WebSocket,
+    peerId: "browser-other-writer",
+  })
+  const aside = await other.chat("an aside", {
+    kind: "entry",
+    id: entryId(firstId),
+  })
+  ok(
+    aside.kind === "started",
+    `another writer's aside was accepted (${aside.kind})`,
+  )
+  await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+  await other.close()
 
-  // The page is the only writer so far, so its lane is the only one recorded.
-  const pageLane = readLaneNames(host.doc)[0] ?? ""
-  const tip = readLaneTip(host.doc, pageLane)
-  const parentId =
-    projectTranscript(readRenderableEntries(host.doc), tip).at(-2)?.id ?? null
-  ok(parentId !== null, "found a parent to fork from")
-  if (parentId !== null) {
-    // The v1 demo's frame: ANOTHER writer branches off the page's message.
-    // It has its own lane (ADR-0011), so the page's lane is never touched and
-    // nothing has to be moved back afterwards. It goes through the protocol
-    // and pi, so the aside is an entry pi created and the page can navigate
-    // into it later.
-    const other = await connectSession({
-      url: host.wsUrl,
-      WebSocket,
-      peerId: "browser-other-writer",
-    })
-    const aside = await other.prompt("an aside", entryId(parentId))
-    ok(aside.kind === "started", "another writer's aside was accepted")
-    await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
-    ok(
-      readLaneTip(host.doc, pageLane) === tip,
-      "the other writer's aside did not move the page's lane",
-    )
-    await other.close()
-
-    await page.waitForFunction(
+  const forked = await page
+    .waitForFunction(
       () => document.querySelectorAll(".fork").length > 0,
-      { timeout: 15_000 },
+      undefined,
+      {
+        timeout: 15_000,
+      },
     )
-    ok(true, "the fork replicated and rendered a branch marker")
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(forked, "the fork replicated and rendered a branch marker")
+  const texts = async (p = page) =>
+    p.$$eval("#transcript > div > .msg .text", ns =>
+      ns.map(n => n.textContent ?? ""),
+    )
+  ok(
+    (await texts()).some(t => t.includes("BROWSER-TWO")) &&
+      !(await texts()).some(t => t.includes("an aside")),
+    "the newer branch does not pull the view away from the thread being read",
+  )
+  const summary = await page.$eval(".fork button", n => n.textContent ?? "")
+  // Exact text, not `includes`. A looser check passed while the marker
+  // rendered the literal characters `\u2442` and `\u00b7`, because JSX text
+  // does not process escapes. The screenshot caught it; this now would.
+  ok(
+    summary.trim() === "⑂ 1 branch · 2 messages",
+    `the marker summarises the branch: "${summary.trim()}"`,
+  )
+  await page.click(".fork button")
+  const outside = await page.$eval(".outside", n => n.textContent ?? "")
+  ok(
+    outside.trim() === "not in your context",
+    `the context boundary is stated in words: "${outside.trim()}"`,
+  )
 
-    const summary = await page.$eval(".fork button", n => n.textContent ?? "")
-    // Exact text, not `includes`. A looser check passed while the marker
-    // rendered the literal characters `\u2442` and `\u00b7`, because JSX text
-    // does not process escapes. The screenshot caught it; this now would.
-    ok(
-      // Two, because the aside is a real turn: the user entry and the reply.
-      summary.trim() === "⑂ 1 branch · 2 messages",
-      `the marker summarises the branch: "${summary.trim()}"`,
-    )
-
-    await page.click(".fork button")
-    const label = await page.$eval(".outside", n => n.textContent ?? "")
-    ok(
-      label.trim() === "not in your context",
-      `the context boundary is stated in words: "${label.trim()}"`,
-    )
-
-    const spineNodes = await page.$$eval(
-      "#transcript > div > .msg",
-      ns => ns.length,
-    )
-    ok(
-      spineNodes === 2,
-      `the branch does NOT join the spine (${spineNodes} spine nodes)`,
-    )
-  }
-
-  // The first end-to-end proof that a USER can fork a conversation: read a
-  // branch, type into it, and the turn attaches there rather than at the lane
-  // tip they navigated away from.
+  // Read the branch, and send there: a message goes where you are reading.
   await page.click(".branch button")
-  await page.click(".fork button") // collapse the preview
-  const offLane = await page.$eval("#offLane", n => n.textContent ?? "")
-  ok(
-    offLane.includes("fork from here"),
-    `reading a branch says sending will fork: "${offLane.trim().slice(0, 48)}"`,
+  await page.click(".fork button") // collapse the preview; it stays mounted
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll("#transcript .text")].some(n =>
+        n.textContent?.includes("an aside"),
+      ),
+    undefined,
+    { timeout: 15_000 },
   )
-  const sendLabel = await page.$eval("#send", n => n.textContent ?? "")
-  ok(
-    sendLabel.trim() === "branch from here",
-    `the composer offers to branch, not to refuse: "${sendLabel.trim()}"`,
-  )
-
+  ok((await page.$("#reading")) !== null, "reading a branch says so")
   await page.fill("#input", "BRANCH-FROM-BROWSER")
   await page.click("#send")
-  // The reply is the ACCEPTANCE, not the completion, so wait for the entry to
-  // commit and replicate rather than for the status to settle.
   await page.waitForFunction(
     () =>
       [...document.querySelectorAll("#transcript .text")].some(n =>
@@ -210,51 +280,32 @@ try {
     undefined,
     { timeout: 60_000 },
   )
-  ok(true, "the branch turn ran and the spine re-rooted")
-
-  const rendered = await page.$$eval("#transcript .text", ns =>
-    ns.map(n => n.textContent ?? ""),
-  )
   ok(
-    rendered.some(t => t.includes("BRANCH-FROM-BROWSER")),
-    "the branched message renders on the new spine",
+    (await texts()).some(t => t.includes("an aside")),
+    "the message was sent on the branch being read, below the aside",
   )
 
-  // Coming BACK. The lane is now on the branch, so the trunk shows as a fork
-  // marker on the first spine node. Read it, then switch the lane to it.
-  // Without the navigate command this is impossible: a branch is one-way.
+  // Coming BACK: the trunk is now a fork marker on the first node. Reading it
+  // shows the trunk again, with nothing from the branch.
   await page.click("#transcript > div:first-child .fork button")
   await page.click("#transcript > div:first-child .branch button")
-  // Reading the trunk ALREADY renders the trunk spine, so waiting on the
-  // spine proves nothing about switching. Assert what only a switch changes:
-  // the off-lane bar goes away, and the HOST's lane tip is on the trunk.
-  ok(
-    (await page.$("#offLane")) !== null,
-    "reading the trunk is off-lane before switching",
-  )
-  await page.click("#switchLane")
   await page.waitForFunction(
-    () => document.querySelector("#offLane") === null,
+    () =>
+      [...document.querySelectorAll("#transcript .text")].some(n =>
+        n.textContent?.includes("BROWSER-TWO"),
+      ),
     undefined,
-    {
-      timeout: 15_000,
-    },
+    { timeout: 15_000 },
   )
-  const hostLane = projectTranscript(
-    readRenderableEntries(host.doc),
-    readLaneTip(host.doc, pageLane),
-  ).map(m => m.text)
+  const trunk = await texts()
   ok(
-    hostLane.some(t => t.includes("BROWSER-OK")) &&
-      !hostLane.some(t => t.includes("BRANCH-FROM-BROWSER")),
-    `switched back: the page's lane in the HOST is the trunk again (${hostLane.length} messages)`,
+    trunk.some(t => t.includes("BROWSER-TWO")) &&
+      !trunk.some(t => t.includes("BRANCH-FROM-BROWSER")),
+    `reading the trunk again shows the trunk alone (${trunk.length} messages)`,
   )
 
-  // A SECOND WINDOW joins the live session. It has written nothing, so it has
-  // no lane: it must show the most recently advanced lane by default, and its
-  // composer must offer to branch, because sending forks from what it reads.
-  // Getting the default wrong would make a joining window fork from a stale
-  // point without anyone noticing.
+  // A SECOND WINDOW joins. Having chosen nothing, it follows the newest tip
+  // overall, and the root's working session means it would be answered.
   const second = await browser.newPage()
   try {
     await second.goto(host.httpUrl, {
@@ -274,21 +325,14 @@ try {
         () => false,
       )
     ok(rendered, "a joining window renders a conversation at all")
-    const joined = await second.$$eval("#transcript > div > .msg .text", ns =>
-      ns.map(n => n.textContent ?? ""),
-    )
+    const joined = await texts(second)
     ok(
-      joined.some(t => t.includes("BROWSER-OK")),
-      `a joining window shows the live lane by default (${joined.length} messages)`,
-    )
-    const joinedSend = await second.$eval("#send", n => n.textContent ?? "")
-    ok(
-      joinedSend.trim() === "branch from here",
-      `a joining window is off-lane, so it branches: "${joinedSend.trim()}"`,
+      joined.some(t => t.includes("BRANCH-FROM-BROWSER")),
+      `a joining window follows the newest thread (${joined.length} messages)`,
     )
 
-    // The v1 demo, completed: B asks from its own branch, then cites A's
-    // message. A sees the backlink; A's spine is unchanged.
+    // The v1 demo, completed: B asks, which gives B a lane to cite from, then
+    // cites A's first message. A sees the backlink; A's spine is unchanged.
     await second.fill("#input", "B asks about this")
     await second.click("#send")
     await second.waitForFunction(
@@ -299,6 +343,7 @@ try {
       undefined,
       { timeout: 60_000 },
     )
+    await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
     const spineBefore = await page.$$eval(
       "#transcript > div > .msg",
       n => n.length,
@@ -308,7 +353,9 @@ try {
       .waitForFunction(
         () => document.querySelector(".cited-by") !== null,
         undefined,
-        { timeout: 15_000 },
+        {
+          timeout: 15_000,
+        },
       )
       .then(
         () => true,

@@ -12,17 +12,23 @@
 
 import {
   atEntry,
+  type ChatAt,
+  type EntryId,
   ERR,
   type ErrCode,
   entryId,
   type Intent,
+  NOBODY,
+  normalizeName,
   type Position,
+  parseMentions,
   type ReferenceId,
   type ReferenceTarget,
   ROOT,
   type RunId,
   referenceId,
   runId,
+  THE_AGENT,
 } from "@pineta/core"
 import { type Command, command, type Reply, reply } from "./messages.ts"
 
@@ -37,6 +43,9 @@ export type Outcome =
   | { readonly kind: "started"; readonly runId: RunId }
   | { readonly kind: "navigated" }
   | { readonly kind: "referenced"; readonly id: ReferenceId }
+  | { readonly kind: "appended"; readonly id: EntryId }
+  | { readonly kind: "named" }
+  | { readonly kind: "threaded" }
   | Refusal
 
 /**
@@ -78,8 +87,15 @@ export function decodeCommand(
     const start = wire?.spanStart
     const end = wire?.spanEnd
     // -1 on both is the wire's "whole entry"; only the codec knows that.
+    // "" is the author's own tip, as for chat; only the codec knows that.
+    const at: ChatAt =
+      parent === "" ? { kind: "tip" } : { kind: "entry", id: entryId(parent) }
     if (start === -1 && end === -1) {
-      return { kind: "reference", to: { kind: "entry", id: entryId(target) } }
+      return {
+        kind: "reference",
+        to: { kind: "entry", id: entryId(target) },
+        at,
+      }
     }
     if (
       typeof start !== "number" ||
@@ -94,12 +110,48 @@ export function decodeCommand(
     return {
       kind: "reference",
       to: { kind: "span", id: entryId(target), start, end },
+      at,
     }
   }
   if (kind === "navigate") {
     return {
       kind: "navigate",
       to: parent === "" ? ROOT : atEntry(entryId(parent)),
+    }
+  }
+  if (kind === "name") {
+    const name = normalizeName(text(wire?.text))
+    return name === undefined
+      ? refuse(ERR.INVALID_NAME, "a name must be 1 to 40 characters")
+      : { kind: "name", name }
+  }
+  if (kind === "thread") {
+    if (parent === "") {
+      return refuse(ERR.NO_PARENT, "a thread default must name its entry")
+    }
+    const mode = text(wire?.text)
+    if (mode !== "session" && mode !== "conversation") {
+      return refuse(ERR.UNKNOWN_KIND, `unknown thread mode: ${mode}`)
+    }
+    return {
+      kind: "thread",
+      at: entryId(parent),
+      compels:
+        mode === "session" ? { kind: "agent", agent: THE_AGENT } : NOBODY,
+    }
+  }
+  if (kind === "chat") {
+    const body = text(wire?.text)
+    if (body === "") return refuse(ERR.EMPTY_PROMPT, "message text is empty")
+    return {
+      kind: "chat",
+      text: body,
+      // "" is the sender's own lane tip; only the codec knows that.
+      at:
+        parent === ""
+          ? { kind: "tip" }
+          : { kind: "entry", id: entryId(parent) },
+      mentions: parseMentions(body),
     }
   }
   if (kind !== "prompt" && kind !== "branch") {
@@ -135,7 +187,29 @@ export function encodeIntent(id: string, intent: Intent): Command {
         parentId: positionToWire(intent.to),
       })
     case "reference":
-      return command({ id, kind: "reference", ...targetToWire(intent.to) })
+      return command({
+        id,
+        kind: "reference",
+        ...targetToWire(intent.to),
+        parentId: intent.at.kind === "tip" ? "" : intent.at.id,
+      })
+    case "chat":
+      return command({
+        id,
+        kind: "chat",
+        text: intent.text,
+        parentId: intent.at.kind === "tip" ? "" : intent.at.id,
+      })
+    case "name":
+      return command({ id, kind: "name", text: intent.name })
+    case "thread":
+      return command({
+        id,
+        kind: "thread",
+        parentId: intent.at,
+        // The wire names a mode; only the host's one agent can be compelled.
+        text: intent.compels.kind === "agent" ? "session" : "conversation",
+      })
   }
 }
 
@@ -143,15 +217,21 @@ export function encodeIntent(id: string, intent: Intent): Command {
 export function encodeOutcome(id: string, outcome: Outcome): Reply {
   switch (outcome.kind) {
     case "started":
-      return reply({ id, accepted: true, runId: outcome.runId })
+      return reply({ id, outcome: "started", runId: outcome.runId })
     case "navigated":
-      return reply({ id, accepted: true })
+      return reply({ id, outcome: "navigated" })
     case "referenced":
-      return reply({ id, accepted: true, referenceId: outcome.id })
+      return reply({ id, outcome: "referenced", referenceId: outcome.id })
+    case "appended":
+      return reply({ id, outcome: "appended", entryId: outcome.id })
+    case "named":
+      return reply({ id, outcome: "named" })
+    case "threaded":
+      return reply({ id, outcome: "threaded" })
     case "refused":
       return reply({
         id,
-        accepted: false,
+        outcome: "refused",
         errorCode: outcome.code,
         errorMessage: outcome.message,
       })
@@ -160,15 +240,22 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
 
 /** Wire reply -> what it means. The client's half of `encodeOutcome`. */
 export function decodeReply(wire: Reply): Outcome {
-  if (!wire.accepted) {
-    return refuse(asErrCode(wire.errorCode), wire.errorMessage)
+  switch (wire.outcome) {
+    case "started":
+      return { kind: "started", runId: runId(wire.runId) }
+    case "navigated":
+      return { kind: "navigated" }
+    case "referenced":
+      return { kind: "referenced", id: referenceId(wire.referenceId) }
+    case "appended":
+      return { kind: "appended", id: entryId(wire.entryId) }
+    case "named":
+      return { kind: "named" }
+    case "threaded":
+      return { kind: "threaded" }
+    case "refused":
+      return refuse(asErrCode(wire.errorCode), wire.errorMessage)
   }
-  if (wire.referenceId !== "") {
-    return { kind: "referenced", id: referenceId(wire.referenceId) }
-  }
-  return wire.runId === ""
-    ? { kind: "navigated" }
-    : { kind: "started", runId: runId(wire.runId) }
 }
 
 const positionToWire = (p: Position): string => (p.kind === "root" ? "" : p.id)

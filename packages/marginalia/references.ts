@@ -9,6 +9,7 @@
 // This schema is the single authority on the reference shape. Pineta owns it.
 
 import {
+  type ChatAt,
   type EntryId,
   ERR,
   type ErrCode,
@@ -17,6 +18,7 @@ import {
   type ReferenceId,
   type ReferenceTarget,
   referenceId,
+  resolveTarget,
   type WriterLaneState,
 } from "@pineta/core"
 import { type Static, Type } from "typebox"
@@ -32,7 +34,7 @@ const TargetSchema = Type.Union([
   Type.Object({
     kind: Type.Literal("span"),
     id: Type.String(),
-    // UTF-16 code units into `messageText`: exactly the string the client
+    // UTF-16 code units into `entryText`: exactly the string the client
     // renders, so a user's selection maps onto it directly.
     start: Type.Integer({ minimum: 0 }),
     end: Type.Integer({ minimum: 1 }),
@@ -41,7 +43,7 @@ const TargetSchema = Type.Union([
 
 export const ReferenceSchema = Type.Object({
   id: Type.String(),
-  /** The entry it was attached at: the author's lane tip, read by the host. */
+  /** The entry it was attached at: where the author was reading, or their tip. */
   from: Type.String(),
   to: TargetSchema,
   /** The author's lane name, from the transport. */
@@ -122,14 +124,18 @@ export type ReferenceDecision =
 export function planReference(input: {
   readonly author: LaneName
   readonly lane: WriterLaneState
+  /** Where the author is reading: the reference's `from`. */
+  readonly at: ChatAt
   readonly target: ReferenceTarget
   readonly cited: CitedEntry
   readonly newId: ReferenceId
 }): ReferenceDecision {
-  const { lane, target, cited } = input
-  // A reference is attached at an entry. No lane, or a lane still at the
-  // root, has none.
-  if (lane.kind === "none" || lane.at.kind === "root") {
+  const { target, cited } = input
+  // A reference is attached at an entry, never the root. Attached where the author is reading: an entry they chose, or their own
+  // tip. A person who has only ever asked the agent has no lane, but can still
+  // cite from what they read.
+  const from = resolveTarget(input.lane, input.at)
+  if (from.kind === "root") {
     return { kind: "refused", code: ERR.NO_LANE }
   }
   if (cited.kind === "absent")
@@ -148,7 +154,7 @@ export function planReference(input: {
     kind: "write",
     reference: {
       id: input.newId,
-      from: lane.at.id,
+      from: from.id,
       to: target,
       author: input.author,
     },

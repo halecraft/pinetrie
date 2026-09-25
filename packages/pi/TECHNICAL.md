@@ -105,6 +105,26 @@ One `TurnState` per writer, in a map the host keeps for the life of the
 process. A small record per writer that ever connected is never removed, which
 is acceptable for v1.
 
+### Chat: through the lane, and the compelled message is the prompt
+
+Two facts from S19 decide how human messages reach pi (ADR-0018):
+
+- **Any host write that moves a lane's tip goes through that `Lane`.**
+  `Lane.command` plans against its in-memory `this.state`, which only the
+  lane's own commits update. `WriterLane.append` wraps `Lane.appendMessage`. A
+  write through `session.mutate` is stored, but the next turn parents at the
+  cached tip and the message drops out of the path with no error. During a run
+  on the same lane pi queues an append and chains it in after.
+- **A pi run can only start with `prompt`.** There is no "run from the tip", and
+  `resume` only continues an operation in progress. So a message that compels
+  the agent is passed to `WriterLane.run` as the prompt itself: a pi
+  `CustomMessage`, which pi's default `convertToLlm` sends as a `user` message
+  with its `content`. No `entryProjectors`.
+
+The agent's lane is `laneNameForAgent` (`a-agent`), apart from every writer's
+`w-` lane, because a client chooses its own peer id. It is shared by every
+writer, so the host claims its turn before the first await.
+
 ### References
 
 `Agent.addReference` is the only writer of the `pineta.reference` value

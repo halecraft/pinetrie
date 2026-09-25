@@ -4,7 +4,12 @@
 // straight line and every assertion passes vacuously, so the fork cases carry
 // the weight.
 
-import { type EntryLike, projectSpine, projectTranscript } from "@pineta/core"
+import {
+  type EntryLike,
+  followTip,
+  projectSpine,
+  projectTranscript,
+} from "@pineta/core"
 import { describe, expect, test } from "vitest"
 
 const msg = (id: string, parentId: string | null, text: string): EntryLike => ({
@@ -112,5 +117,36 @@ describe("projectSpine", () => {
       orphans: [],
       cycles: [],
     })
+  })
+})
+
+// ── followTip ─────────────────────────────────────────────────────────────
+
+describe("followTip: the view follows the thread you are reading", () => {
+  // a1 -> a2 -> a3 (Alice's thread), and a1 -> b2 (a branch). uuidv7-like ids
+  // sort by age, so the letters after the digit keep that order.
+  const entries = {
+    "1-a1": { parentId: null },
+    "2-a2": { parentId: "1-a1" },
+    "3-b2": { parentId: "1-a1" },
+    "4-a3": { parentId: "2-a2" },
+  }
+  test("follows a newer reply below what you read, whichever lane wrote it", () => {
+    expect(followTip(entries, "2-a2")).toBe("4-a3")
+  })
+  test("never jumps to a branch that is not below you", () => {
+    const withNewerBranch = { ...entries, "5-b3": { parentId: "3-b2" } }
+    expect(followTip(withNewerBranch, "2-a2")).toBe("4-a3")
+  })
+  test("with nothing chosen, follows the newest leaf overall", () => {
+    expect(followTip(entries, null)).toBe("4-a3")
+  })
+  test("a cycle stops the walk rather than spinning", () => {
+    const cyclic = {
+      w: { parentId: "x" },
+      x: { parentId: "y" },
+      y: { parentId: "x" },
+    }
+    expect(followTip(cyclic, "z")).toBe("z")
   })
 })

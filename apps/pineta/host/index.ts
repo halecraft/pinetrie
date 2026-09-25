@@ -13,25 +13,44 @@ import {
   wrapNodeWebsocket,
 } from "@kyneta/websocket-transport/server"
 import {
-  type AgentMessageLike,
   type Attach,
   atEntry,
+  type ChatAt,
   checkEnvironment,
+  type EntryId,
+  ERR,
   entryId,
   type LaneName,
+  laneNameForAgent,
   laneNameForWriter,
-  messageText,
+  type Mention,
   planAttach,
   planCommand,
   ROOT,
+  type RunId,
   referenceId,
+  resolveTarget,
   runId,
   type Target,
+  THE_AGENT,
   type TurnState,
   turnFinished,
   type WriterLaneState,
 } from "@pineta/core"
-import { type CitedEntry, planReference } from "@pineta/marginalia"
+import {
+  type ChatMessage,
+  type CitedEntry,
+  displayName,
+  effectiveDefault,
+  encodeChat,
+  entryText,
+  PARTICIPANT_NAMESPACE,
+  participantNames,
+  planChat,
+  planReference,
+  THREAD_NAMESPACE,
+  threadDefaults,
+} from "@pineta/marginalia"
 import { type Agent, createAgent, type LaneOutcome, newId } from "@pineta/pi"
 import {
   decodeCommand,
@@ -49,6 +68,7 @@ import {
   readActiveRun,
   readEntryMessage,
   readLaneTip,
+  readValues,
   SessionDoc,
   type SessionDocHandle,
 } from "@pineta/schema"
@@ -215,13 +235,14 @@ export async function startHost({
             text:
               found.message === undefined
                 ? undefined
-                : messageText(found.message as AgentMessageLike),
+                : entryText(found.message),
           }
         : { kind: "absent" }
       // plan (pure)
       const planned = planReference({
         author: lane,
         lane: at,
+        at: decision.at,
         target: decision.to,
         cited,
         newId: referenceId(newId()),
@@ -246,6 +267,29 @@ export async function startHost({
       return respond({ kind: "referenced", id: planned.reference.id })
     }
 
+    if (decision.kind === "name") {
+      await agent.setParticipantName(lane, decision.name)
+      log(`[host] ${lane.slice(-8)} is named ${JSON.stringify(decision.name)}`)
+      return respond({ kind: "named" })
+    }
+    if (decision.kind === "chat") {
+      return handleChat(respond, lane, at, decision)
+    }
+    if (decision.kind === "thread") {
+      if (doc.entries.get(decision.at) === undefined) {
+        return respond({
+          kind: "refused",
+          code: ERR.UNKNOWN_TARGET,
+          message: "no such entry to root a thread at",
+        })
+      }
+      await agent.setThreadDefault(decision.at, decision.compels)
+      log(
+        `[host] ${lane.slice(-8)} thread ${decision.at.slice(-8)} compels ${decision.compels.kind}`,
+      )
+      return respond({ kind: "threaded" })
+    }
+
     const target: Target =
       decision.kind === "navigate" ? decision.to : decision.from
     const plan = planAttach(at, target)
@@ -266,27 +310,125 @@ export async function startHost({
 
     turns.set(lane, decision.next)
     respond({ kind: "started", runId: decision.runId })
-    beginStream(doc, lane, decision.runId)
     log(
       `[host] ${lane.slice(-8)} run ${decision.runId.slice(-8)} ${plan.kind} <- ${JSON.stringify(decision.text.slice(0, 60))}`,
     )
+    await execRun(lane, decision.runId, decision.text)
+  }
+
+  /**
+   * Run one turn on `lane`, streaming into the document. The caller has marked
+   * the lane busy and replied: that reply was the ACCEPTANCE, so a run pi then
+   * refuses cannot travel back as a rejection. It is logged instead, rather
+   * than swallowed by the "done" line.
+   */
+  async function execRun(
+    lane: LaneName,
+    id: RunId,
+    prompt: string | ChatMessage,
+  ): Promise<void> {
+    beginStream(doc, lane, id)
     try {
-      // The reply above was the ACCEPTANCE; the run happens after it, so a run
-      // pi refuses cannot travel back as a rejection. Log it rather than let
-      // the "done" line below swallow it.
-      const ran = await agent.lane(lane).run(decision.text)
+      const ran = await agent.lane(lane).run(prompt)
       if (ran.kind === "refused") {
-        log(`[host] run ${decision.runId.slice(-8)} REFUSED: ${ran.code}`)
+        log(`[host] run ${id.slice(-8)} REFUSED: ${ran.code}`)
       }
     } catch (error) {
       log(
         `[host] run failed: ${error instanceof Error ? error.message : String(error)}`,
       )
     } finally {
-      endStream(doc, lane, decision.runId)
+      endStream(doc, lane, id)
       turns.set(lane, turnFinished(turnOf(lane)))
-      log(`[host] run ${decision.runId.slice(-8)} done`)
+      log(`[host] run ${id.slice(-8)} done`)
     }
+  }
+
+  /** An entry's parent, read from the document. The walk `effectiveDefault` needs. */
+  function parentOf(id: EntryId): EntryId | null {
+    const parent = doc.entries.get(id)?.parentId
+    return typeof parent === "string" ? entryId(parent) : null
+  }
+
+  /**
+   * A human message: gather, `planChat`, execute. A message that compels the
+   * agent is its prompt, run on the agent's lane; any other is appended on
+   * the author's lane with no run. Both attach where the author is viewing.
+   */
+  async function handleChat(
+    respond: (outcome: Outcome) => void,
+    lane: LaneName,
+    authorLane: WriterLaneState,
+    chat: { text: string; at: ChatAt; mentions: readonly Mention[] },
+  ): Promise<void> {
+    // gather
+    const agentLane = laneNameForAgent(THE_AGENT)
+    const names = participantNames(readValues(doc, PARTICIPANT_NAMESPACE))
+    const threadDefault = effectiveDefault(
+      resolveTarget(authorLane, chat.at),
+      parentOf,
+      threadDefaults(readValues(doc, THREAD_NAMESPACE)),
+    )
+
+    // plan (pure)
+    const planned = planChat({
+      author: lane,
+      authorName: displayName(lane, names.get(lane)),
+      text: chat.text,
+      at: chat.at,
+      mentions: chat.mentions,
+      threadDefault,
+      authorLane,
+      agentLane: gatherLane(agentLane),
+      agentTurn: turnOf(agentLane),
+    })
+    if (planned.kind === "refused") {
+      return respond({
+        kind: "refused",
+        code: planned.code,
+        message: "the agent is already replying",
+      })
+    }
+
+    // execute. The agent's lane is SHARED by every writer, and each writer's
+    // commands run concurrently, so claim its turn before the first await:
+    // otherwise two writers compelling it at once would both see it idle.
+    const target = planned.kind === "append" ? lane : agentLane
+    if (planned.kind === "run") {
+      turns.set(agentLane, { ...turnOf(agentLane), busy: true })
+    }
+    const attached = await attach(target, planned.attach)
+    if (attached.kind === "refused") {
+      if (planned.kind === "run") {
+        turns.set(agentLane, turnFinished(turnOf(agentLane)))
+      }
+      return respond({
+        kind: "refused",
+        code: attached.code,
+        message: `pi refused to ${planned.attach.kind === "create" ? "create the lane" : "navigate"}`,
+      })
+    }
+    const message = encodeChat(planned.details, Date.now())
+
+    if (planned.kind === "append") {
+      const appended = await agent.lane(lane).append(message)
+      if (appended.kind === "refused") {
+        return respond({
+          kind: "refused",
+          code: appended.code,
+          message: "pi refused the message",
+        })
+      }
+      log(`[host] ${lane.slice(-8)} chat ${appended.id.slice(-8)}`)
+      return respond({ kind: "appended", id: appended.id })
+    }
+
+    const id = runId(newId())
+    respond({ kind: "started", runId: id })
+    log(
+      `[host] ${lane.slice(-8)} compels ${planned.agent} run ${id.slice(-8)} ${planned.attach.kind}`,
+    )
+    await execRun(agentLane, id, message)
   }
 
   // Identity comes from the TRANSPORT, never the message: `sender.peer` is
