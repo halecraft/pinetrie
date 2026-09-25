@@ -15,14 +15,14 @@ import {
   type Position,
   type projectTranscript,
 } from "@pineta/core"
-import { SessionDoc, type SessionDocHandle } from "@pineta/schema"
-import { decodeReply, encodeIntent, type Outcome } from "../protocol/codec.ts"
-import { Control } from "../protocol/line.ts"
+import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
+import { Control } from "@pineta/protocol/line"
 import {
   HOST_PEER_ID,
   type Reply,
   SESSION_DOC_ID,
-} from "../protocol/messages.ts"
+} from "@pineta/protocol/messages"
+import { SessionDoc, type SessionDocHandle } from "@pineta/schema"
 import {
   readEntryCount,
   readStreaming,

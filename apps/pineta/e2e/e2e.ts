@@ -8,6 +8,8 @@
 //   node e2e/e2e.mjs              offline: transport + docs + protocol, no model call
 //   PINETA_LIVE=1 node e2e/e2e.mjs   also drives a REAL turn against a real model
 
+import { readRenderableEntries } from "@pineta/client/projection"
+import { connectSession } from "@pineta/client/session"
 import {
   atEntry,
   ERR,
@@ -17,16 +19,14 @@ import {
   projectTranscript,
   ROOT,
 } from "@pineta/core"
+import type { Outcome } from "@pineta/protocol/codec"
 import {
   hasLaneRecord,
   readEntries,
   readLaneTip,
   writeEntry,
 } from "@pineta/schema"
-import { readRenderableEntries } from "../client/projection.ts"
-import { connectSession } from "../client/session-view.ts"
 import { startHost } from "../host/index.ts"
-import type { Outcome } from "../protocol/codec.ts"
 import { createChecks, waitFor } from "./harness.ts"
 
 const LIVE = process.env.PINETA_LIVE === "1"

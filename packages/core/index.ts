@@ -253,7 +253,7 @@ export function laneNameForWriter(peerId: string): LaneName {
  * nothing strips a stray key. Proven: writing `{ ...entry, seq: 99 }` makes
  * the e2e stored-seq check FAIL.
  *
- * Where it does NOT: LINE MESSAGES. `protocol/line.ts` declares Command and
+ * Where it does NOT: LINE MESSAGES. `packages/protocol/line.ts` declares Command and
  * Reply as `Schema.struct({...})`, and Kyneta encodes only declared fields, so
  * an undeclared `seq` is dropped at the boundary. Proven: a reply sent as
  * `{ ...reply, seq: 1 }` arrives without it, and the e2e wire-seq check still

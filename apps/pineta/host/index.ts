@@ -5,7 +5,7 @@
 
 import http from "node:http"
 import { createRequire } from "node:module"
-import { fileURLToPath } from "node:url"
+import path from "node:path"
 import { Exchange } from "@kyneta/exchange"
 import { stepInPlace } from "@kyneta/schema"
 import {
@@ -30,6 +30,14 @@ import {
 } from "@pineta/core"
 import { type Agent, createAgent, type LaneOutcome, newId } from "@pineta/pi"
 import {
+  decodeCommand,
+  encodeOutcome,
+  type Outcome,
+  type WireCommand,
+} from "@pineta/protocol/codec"
+import { Control } from "@pineta/protocol/line"
+import { HOST_PEER_ID, SESSION_DOC_ID } from "@pineta/protocol/messages"
+import {
   appendStream,
   beginStream,
   endStream,
@@ -41,14 +49,6 @@ import {
 } from "@pineta/schema"
 import { createServer as createViteServer } from "vite"
 import { WebSocketServer } from "ws"
-import {
-  decodeCommand,
-  encodeOutcome,
-  type Outcome,
-  type WireCommand,
-} from "../protocol/codec.ts"
-import { Control } from "../protocol/line.ts"
-import { HOST_PEER_ID, SESSION_DOC_ID } from "../protocol/messages.ts"
 
 const require = createRequire(import.meta.url)
 
@@ -266,9 +266,14 @@ export async function startHost({
 
   // Vite serves the client: index.html, module transforms, wasm, HMR. One
   // node:http server is shared, so there is a single port and a single origin.
+  // Locate the client through module RESOLUTION, not a relative path: it is a
+  // package this app depends on, and where it sits on disk is its business.
+  const clientDir = path.dirname(
+    createRequire(import.meta.url).resolve("@pineta/client/package.json"),
+  )
   const vite = await createViteServer({
-    root: fileURLToPath(new URL("../client/", import.meta.url)),
-    configFile: fileURLToPath(new URL("../vite.config.ts", import.meta.url)),
+    root: clientDir,
+    configFile: path.join(clientDir, "vite.config.ts"),
     server: { middlewareMode: true, hmr: { server: httpServer } },
   })
   httpServer.on("request", (req, res) => {

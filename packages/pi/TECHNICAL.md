@@ -2,7 +2,7 @@
 
 **The pi boundary.** This is the only package that may resolve
 `@earendil-works/*`. That is enforced by module resolution, not by a scanner:
-pi is declared here and in `@pineta/conformance` and nowhere else, so from the
+pi is declared here and in `@pineta/conformance` (`apps/conformance`) and nowhere else, so from the
 app every spelling fails with `ERR_MODULE_NOT_FOUND`. See
 `docs/01-architecture.md`.
 

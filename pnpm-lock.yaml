@@ -7,55 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@kyneta/changefeed':
-        specifier: link:../kyneta/packages/changefeed
-        version: link:../kyneta/packages/changefeed
-      '@kyneta/exchange':
-        specifier: link:../kyneta/packages/exchange
-        version: link:../kyneta/packages/exchange
-      '@kyneta/loro-schema':
-        specifier: link:../kyneta/packages/schema/backends/loro
-        version: link:../kyneta/packages/schema/backends/loro
-      '@kyneta/machine':
-        specifier: link:../kyneta/packages/machine
-        version: link:../kyneta/packages/machine
-      '@kyneta/react':
-        specifier: link:../kyneta/packages/react
-        version: link:../kyneta/packages/react
-      '@kyneta/reactive':
-        specifier: link:../kyneta/packages/reactive
-        version: link:../kyneta/packages/reactive
-      '@kyneta/schema':
-        specifier: link:../kyneta/packages/schema
-        version: link:../kyneta/packages/schema
-      '@kyneta/transport':
-        specifier: link:../kyneta/packages/transport
-        version: link:../kyneta/packages/transport
-      '@kyneta/websocket-transport':
-        specifier: link:../kyneta/packages/exchange/transports/websocket
-        version: link:../kyneta/packages/exchange/transports/websocket
-      '@pineta/core':
-        specifier: workspace:*
-        version: link:packages/core
-      '@pineta/pi':
-        specifier: workspace:*
-        version: link:packages/pi
-      '@pineta/schema':
-        specifier: workspace:*
-        version: link:packages/schema
-      loro-crdt:
-        specifier: ^1.16.0
-        version: 1.16.1
-      react:
-        specifier: 19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: 19.2.0
-        version: 19.2.0(react@19.2.0)
-      ws:
-        specifier: ^8.18.0
-        version: 8.21.3
     devDependencies:
       '@biomejs/biome':
         specifier: 2.4.8
@@ -66,39 +17,122 @@ importers:
       '@types/node':
         specifier: 24.10.1
         version: 24.10.1
-      '@types/react':
-        specifier: 19.2.2
-        version: 19.2.2
-      '@types/react-dom':
-        specifier: 19.2.1
-        version: 19.2.1(@types/react@19.2.2)
-      '@types/ws':
-        specifier: 8.18.1
-        version: 8.18.1
-      '@vitejs/plugin-react':
-        specifier: 5.0.4
-        version: 5.0.4(vite@7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0))
       typescript:
         specifier: 5.9.3
         version: 5.9.3
-      vite:
-        specifier: 7.1.11
-        version: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
-      vite-plugin-wasm:
-        specifier: 3.5.0
-        version: 3.5.0(vite@7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0))
       vitest:
         specifier: 3.2.4
         version: 3.2.4(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
 
-  packages/conformance:
+  apps/conformance:
     dependencies:
       '@earendil-works/pi-agent-core':
         specifier: 0.87.1
         version: 0.87.1(ws@8.21.3)
       '@pineta/pi':
         specifier: workspace:*
-        version: link:../pi
+        version: link:../../packages/pi
+
+  apps/pineta:
+    dependencies:
+      '@kyneta/exchange':
+        specifier: link:../../../kyneta/packages/exchange
+        version: link:../../../kyneta/packages/exchange
+      '@kyneta/schema':
+        specifier: link:../../../kyneta/packages/schema
+        version: link:../../../kyneta/packages/schema
+      '@kyneta/websocket-transport':
+        specifier: link:../../../kyneta/packages/exchange/transports/websocket
+        version: link:../../../kyneta/packages/exchange/transports/websocket
+      '@pineta/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@pineta/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@pineta/pi':
+        specifier: workspace:*
+        version: link:../../packages/pi
+      '@pineta/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@pineta/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      loro-crdt:
+        specifier: ^1.16.0
+        version: 1.16.1
+      vite:
+        specifier: 7.1.11
+        version: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
+      ws:
+        specifier: ^8.18.0
+        version: 8.21.3
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.56.0
+        version: 1.56.0
+      '@types/ws':
+        specifier: 8.18.1
+        version: 8.18.1
+
+  packages/client:
+    dependencies:
+      '@kyneta/changefeed':
+        specifier: link:../../../kyneta/packages/changefeed
+        version: link:../../../kyneta/packages/changefeed
+      '@kyneta/exchange':
+        specifier: link:../../../kyneta/packages/exchange
+        version: link:../../../kyneta/packages/exchange
+      '@kyneta/machine':
+        specifier: link:../../../kyneta/packages/machine
+        version: link:../../../kyneta/packages/machine
+      '@kyneta/react':
+        specifier: link:../../../kyneta/packages/react
+        version: link:../../../kyneta/packages/react
+      '@kyneta/reactive':
+        specifier: link:../../../kyneta/packages/reactive
+        version: link:../../../kyneta/packages/reactive
+      '@kyneta/schema':
+        specifier: link:../../../kyneta/packages/schema
+        version: link:../../../kyneta/packages/schema
+      '@kyneta/transport':
+        specifier: link:../../../kyneta/packages/transport
+        version: link:../../../kyneta/packages/transport
+      '@kyneta/websocket-transport':
+        specifier: link:../../../kyneta/packages/exchange/transports/websocket
+        version: link:../../../kyneta/packages/exchange/transports/websocket
+      '@pineta/core':
+        specifier: workspace:*
+        version: link:../core
+      '@pineta/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@pineta/schema':
+        specifier: workspace:*
+        version: link:../schema
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: 19.2.0
+        version: 19.2.0(react@19.2.0)
+    devDependencies:
+      '@types/react':
+        specifier: 19.2.2
+        version: 19.2.2
+      '@types/react-dom':
+        specifier: 19.2.1
+        version: 19.2.1(@types/react@19.2.2)
+      '@vitejs/plugin-react':
+        specifier: 5.0.4
+        version: 5.0.4(vite@7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0))
+      vite:
+        specifier: 7.1.11
+        version: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
+      vite-plugin-wasm:
+        specifier: 3.5.0
+        version: 3.5.0(vite@7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/core: {}
 
@@ -128,6 +162,18 @@ importers:
       loro-crdt:
         specifier: ^1.16.0
         version: 1.16.1
+
+  packages/protocol:
+    dependencies:
+      '@kyneta/exchange':
+        specifier: link:../../../kyneta/packages/exchange
+        version: link:../../../kyneta/packages/exchange
+      '@kyneta/schema':
+        specifier: link:../../../kyneta/packages/schema
+        version: link:../../../kyneta/packages/schema
+      '@pineta/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/schema:
     dependencies:

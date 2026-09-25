@@ -9,6 +9,7 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "noUncheckedSideEffectImports": true,
     "jsx": "react-jsx",
     "noEmit": true,
 
@@ -20,14 +21,6 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "packages",
-    "protocol",
-    "host",
-    "client",
-    "e2e",
-    "test",
-    "scripts"
-  ],
-  "exclude": ["node_modules", "sandbox", "client/app.bundle.js"]
+  "include": ["apps", "packages", "workspace.test.ts"],
+  "exclude": ["node_modules", "sandbox"]
 }

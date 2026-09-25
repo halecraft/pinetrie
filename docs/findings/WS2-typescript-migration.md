@@ -1,5 +1,9 @@
 # WS2 — TypeScript migration
 
+> **Later:** `scripts/check-boundaries` was deleted in
+> `PLAN-2026-09-25-apps-and-packages`. Boundaries are enforced by module
+> resolution; see `docs/01-architecture.md`.
+
 > **Superseded in part by ADR-0015.** `StoredEntry` no longer exists: the type
 > is `EntryWithoutSeq` and uses a *distributive* omit, because `Omit` over
 > pi's `Entry` union silently collapsed it to the common keys. The stored shape

@@ -816,7 +816,7 @@ Five sub-decisions, each evidence-backed:
   pi build wrote a payload. See the open question below.
 - `PLAN-2026-09-24-tree-read` is unblocked, with `projectSpine` respecified over
   typed rows. `message` lives in the sealed `payload` and is lifted by
-  `readRenderableEntries` in `client/projection.ts`.
+  `readRenderableEntries` in `packages/client/projection.ts`.
 
 **Alternatives rejected.**
 

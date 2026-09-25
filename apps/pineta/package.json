@@ -1,0 +1,30 @@
+{
+  "name": "@pineta/app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "host": "node host/server.ts",
+    "sanity": "node sanity.ts",
+    "e2e": "node e2e/e2e.ts",
+    "e2e:live": "PINETA_LIVE=1 node e2e/e2e.ts",
+    "e2e:browser": "node e2e/browser.ts"
+  },
+  "dependencies": {
+    "@kyneta/exchange": "link:../../../kyneta/packages/exchange",
+    "@kyneta/schema": "link:../../../kyneta/packages/schema",
+    "@kyneta/websocket-transport": "link:../../../kyneta/packages/exchange/transports/websocket",
+    "@pineta/client": "workspace:*",
+    "@pineta/core": "workspace:*",
+    "@pineta/pi": "workspace:*",
+    "@pineta/protocol": "workspace:*",
+    "@pineta/schema": "workspace:*",
+    "loro-crdt": "^1.16.0",
+    "vite": "7.1.11",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.0",
+    "@types/ws": "8.18.1"
+  }
+}

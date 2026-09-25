@@ -2,12 +2,13 @@ import { defineConfig } from "vitest/config"
 
 export default defineConfig({
   test: {
-    // Unit tests only. The heavier gates are separate scripts because they
-    // need a live host, a real model, or a browser: `conformance`, `e2e`,
-    // `e2e:live`, `e2e:browser`.
-    // `packages/**` too. A test for a pure function that takes a pi type must
-    // live inside packages/pi, or it would import a pi type across the
-    // boundary ADR-0003 holds. Co-location keeps that boundary intact.
-    include: ["test/**/*.test.ts", "packages/*/*.test.ts"],
+    // Unit tests only, each beside the code it tests. The heavier gates need a
+    // live host, a real model or a browser, so they are separate scripts:
+    // `conformance`, `e2e`, `e2e:live`, `e2e:browser`.
+    //
+    // workspace.test.ts is the one test at the root: it checks the manifests
+    // that make package boundaries hold by resolution.
+    include: ["packages/*/*.test.ts", "apps/*/*.test.ts", "workspace.test.ts"],
+    exclude: ["**/node_modules/**"],
   },
 })

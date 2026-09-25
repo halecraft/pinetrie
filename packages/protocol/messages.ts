@@ -17,7 +17,7 @@ export const SESSION_DOC_ID = "pineta:session"
 export const HOST_PEER_ID = "host"
 
 /**
- * The verbs. `protocol/line.ts` spreads this into a constrained schema
+ * The verbs. `line.ts` spreads this into a constrained schema
  * literal, so this array is the only place a kind is declared \u2014 adding one
  * here reaches the wire, and nothing else needs editing.
  *
@@ -46,7 +46,7 @@ export interface Command {
   readonly text: string
   /**
    * `branch`: the entry to fork from, where `""` is refused. `navigate`: the
-   * entry to move to, where `""` means the root. Only `protocol/codec.ts`
+   * entry to move to, where `""` means the root. Only `codec.ts`
    * interprets this; nothing past it sees `""`.
    */
   readonly parentId: string

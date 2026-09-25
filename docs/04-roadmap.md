@@ -255,7 +255,9 @@ one that forces a coordinated upgrade if pi moves it.
    plan may cite `docs/` and source paths, never anything under `.jj/`.
    See `README.md` § Where documents live.
 2. ~~**Repo layout**~~ **Settled.** A pnpm workspace with `packages/core`,
-   `packages/schema`, `packages/pi` and `packages/conformance`; `host/`,
+   `packages/schema`, `packages/pi`, `packages/protocol` and `packages/client`,
+   with `apps/pineta` and `apps/conformance` for what is run. Superseding the
+   earlier arrangement of
    `client/`, `protocol/`, `e2e/` stay in the root app. The pi boundary is
    enforced by module resolution rather than by the scanner — see
    `01-architecture.md`.

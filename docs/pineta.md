@@ -85,7 +85,7 @@ discharged before any non-disposable code was written.
 | gate | command | status |
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
-| module boundaries | `pnpm run check` | ok |
+| module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
 | build guards | `pnpm run sanity` | ok |
 | unit (pure core) | `pnpm test` | 11/11 (Vitest) |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
@@ -102,19 +102,18 @@ Playwright.
 ### Layout
 
 ```
-packages/core/         @pineta/core        NO dependencies at all
-packages/schema/       @pineta/schema      Kyneta only — never pi
-packages/pi/           @pineta/pi          THE pi boundary
-                         agent.ts    harness lifecycle, createAgent
-                         storage.ts  our impl of pi's Storage port
-                         deep.ts     pi entry points absent from its exports map
-                         index.ts    re-exports OUR shapes; no pi type crosses
-packages/conformance/  @pineta/conformance pi's Storage suite vs our adapter
-
-protocol/ host/ client/ e2e/ test/ scripts/    the app (root package)
+apps/pineta/           @pineta/app          host, e2e suites, sanity (run, never imported)
+apps/conformance/      @pineta/conformance  pi's Storage suite vs our adapter
+packages/core/         @pineta/core         declares NOTHING
+packages/schema/       @pineta/schema       Kyneta only; the document shape
+packages/pi/           @pineta/pi           THE pi boundary
+packages/protocol/     @pineta/protocol     the wire contract and its codec
+packages/client/       @pineta/client       browser UI; owns its Vite build
+(root)                                      development tooling only
 ```
 
-Dependency direction is physical: **core → schema → pi → app**.
+Dependency direction is physical: **core → schema, protocol → pi, client → app**.
+The root declares only tooling, so a package can import only what it declares.
 
 ---
 
@@ -263,12 +262,12 @@ a conformance suite — that is the single deep coupling, and it survived the
 ## 5. What makes this codebase unusual — respect these
 
 **The pi boundary is correct-by-construction, not checked.** `@earendil-works/*`
-is declared *only* by `packages/pi` and `packages/conformance`. pnpm's
+is declared *only* by `packages/pi` and `apps/conformance`. pnpm's
 `node_modules` is strict, so from the app every spelling fails at resolution —
 `import()`, a template literal, `createRequire`. This replaced a syntax scan
-that **all three evaded**. `scripts/check-boundaries.ts` now asserts the
-*manifest* properties that make resolution the enforcer (root declares no pi;
-`@pineta/core` declares nothing), plus the intra-app rules.
+that **all three evaded**. Every other package boundary now works the same way:
+the root declares only tooling, so a package can import only what it declares.
+`workspace.test.ts` checks the manifests. See `docs/01-architecture.md`.
 
 **ADRs are encoded as types where possible.** `LaneName` and `LocalSeq` are
 branded; `projectTranscript(entries, tipId)` cannot even accept a seq.
@@ -285,7 +284,7 @@ parameter properties, or decorators.
 
 ## 6. What to do next
 
-**The stack is complete.** `client/app.tsx` is React, rendering from the same
+**The stack is complete.** `packages/client/app.tsx` is React, rendering from the same
 Exchange `connectSession` already owns (handed to `ExchangeProvider`), so Node
 and browser still share one connection story and `e2e` drives the real thing.
 Hook names, verified against source: **`useTracked(thunk)`** for a derived
@@ -319,7 +318,8 @@ context.**
   residue. Lower priority since the wire-cost half of its premise dissolved.
 - **S10 remainder** — snapshot/sync-payload size at scale.
 - **S6** — file-range reference anchoring (only matters for Worktree branches).
-- `scripts/check-boundaries.ts` is ~290 lines and has no tests of its own.
+- ~~`scripts/check-boundaries.ts` has no tests~~ — deleted. Boundaries are
+  now enforced by resolution; see `docs/01-architecture.md`.
   It has now failed the same way twice (`.mjs`-blind, then `.tsx`-blind) while
   reporting "all boundary rules hold".
 - Multi-writer is proven only at the *storage* layer. The drive/inference loop

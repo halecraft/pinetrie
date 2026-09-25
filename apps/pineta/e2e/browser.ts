@@ -21,11 +21,11 @@
 //
 // Override the endpoint with PW_SERVER if you used a different port.
 
+import { readRenderableEntries } from "@pineta/client/projection"
+import { connectSession } from "@pineta/client/session"
 import { entryId, projectTranscript } from "@pineta/core"
 import { readLaneNames, readLaneTip } from "@pineta/schema"
 import { type Browser, chromium } from "@playwright/test"
-import { readRenderableEntries } from "../client/projection.ts"
-import { connectSession } from "../client/session-view.ts"
 import { startHost } from "../host/index.ts"
 import { createChecks, waitFor } from "./harness.ts"
 

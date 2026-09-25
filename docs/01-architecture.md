@@ -105,24 +105,27 @@ Five contracts. Fix these and everything else proceeds in parallel.
 ## Module layout (as built)
 
 ```
-packages/core/         @pineta/core        NO dependencies at all
-packages/schema/       @pineta/schema      Kyneta only — never pi
-                         entries are a TYPED row (ADR-0015): six columns
-                         plus a sealed `payload`. See its TECHNICAL.md.
-packages/pi/           @pineta/pi          THE pi boundary (see TECHNICAL.md)
-                         agent.ts    harness lifecycle, createAgent
-                         storage.ts  our implementation of pi's Storage port
-                         deep.ts     pi entry points absent from its exports map
-                         index.ts    re-exports OUR shapes; no pi type crosses
-packages/conformance/  @pineta/conformance pi's own Storage suite vs our adapter
+apps/         things you RUN; nothing imports them
+  pineta/        @pineta/app          the host (server), its e2e suites, sanity
+  conformance/   @pineta/conformance  pi's own Storage suite vs our adapter
 
-protocol/  host/  client/  e2e/  test/  scripts/     the app (root package)
+packages/     libraries; their boundaries are enforced by resolution
+  core/          @pineta/core         declares NOTHING; pure decisions and types
+  schema/        @pineta/schema       Kyneta only; the document shape (TECHNICAL.md)
+  pi/            @pineta/pi           THE pi boundary (TECHNICAL.md)
+  protocol/      @pineta/protocol     the wire contract and its codec
+  client/        @pineta/client       browser UI and session client; owns its Vite build
+
+(root)        a bare workspace: development tooling only, no dependencies
 ```
+
+Unit tests sit beside the code they test. `workspace.test.ts` at the root is
+the one exception: it checks the manifests.
 
 ### The pi rule is correct-by-construction, not checked
 
 `@earendil-works/*` is declared **only** by `packages/pi` and
-`packages/conformance`. pnpm's `node_modules` is strict, so from the app every
+`apps/conformance`. pnpm's `node_modules` is strict, so from the app every
 spelling fails at resolution:
 
 | from the app | result |
@@ -136,10 +139,41 @@ This replaced a syntax scan that **all three of those spellings evaded**. A
 scanner reads syntax and a specifier can be spelled unboundedly many ways;
 resolution is the one chokepoint they all pass through.
 
-`scripts/check-boundaries.ts` keeps the intra-app rules (which module may use
-which) and now also asserts the two *manifest* properties that make resolution
-the enforcer: the root app declares no pi, and `@pineta/core` declares nothing.
-Both have negative controls.
+### Every boundary is enforced by resolution
+
+A package can import only what it declares, plus whatever its parent
+directories declare, because Node resolves by walking up through each parent's
+`node_modules`. Workspace packages sit inside the root, so **the root declares
+only development tooling**. With nothing runtime at the root, an undeclared
+import fails at type-check time (`TS2307`, including side-effect imports via
+`noUncheckedSideEffectImports`) and at run time (`ERR_MODULE_NOT_FOUND`).
+
+This replaced `scripts/check-boundaries.ts`, a regex scanner that failed
+silently three times. It was needed while all app code lived in the root
+package, and it was the only thing enforcing "core imports nothing": measured
+before the split, `core` resolved `ws`, `vite` and Kyneta because the root
+declared them.
+
+`workspace.test.ts` checks the manifest rules resolution cannot express: the
+root's tooling allowlist, that only `packages/pi` and `apps/conformance` declare
+pi, that `core` declares nothing, that `protocol` declares only Kyneta and core,
+that `client` declares no server package, that nothing depends on an app. It
+also re-measures the resolution claim itself in a child process. Each rule has
+been shown to fail when violated.
+
+**Residue, stated rather than hidden.** None of these is structural:
+
+- Every package can reach the root's development tooling (Biome, TypeScript,
+  Vitest, Playwright). The test holds that list to an exact allowlist.
+- `client` can reach `vite`, its own devDependency for the build.
+- Nothing stops the client importing `node:*`; builtins always resolve. The
+  browser build and `e2e:browser` catch it.
+- **Under Vitest, anything resolves.** It runs under a pnpm shim that sets
+  `NODE_PATH` to pnpm's hidden hoist, so a unit test could import an
+  undeclared package and still run. `typecheck`, which is in `verify`, still
+  reports it.
+- Per-file rules are gone. `messages.ts` "imports nothing" became "the protocol
+  package declares only Kyneta and core".
 
 Dependency direction is physical: `core → schema → pi → app`. A package cannot
 reach up into the app, which is what forced `core` and `schema` to become
@@ -153,7 +187,7 @@ a writer with its own lane, named from the transport's `LineSender.peer`
 each other. Decisions are pure (`planCommand`, `planAttach` in `@pineta/core`);
 the host gathers, plans and executes.
 
-Wire sentinels live only in `protocol/codec.ts`. The wire is total, so `""`
+Wire sentinels live only in `packages/protocol/codec.ts`. The wire is total, so `""`
 stands for "absent"; the codec decodes commands into an `Intent` union and
 replies into an `Outcome` union, and nothing past it sees `""`. Likewise pi's
 `string | null` for a tree position becomes a `Position` inside

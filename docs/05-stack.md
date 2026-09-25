@@ -106,8 +106,8 @@ include both — though that couples the repos, so I would *not* do it by defaul
 ### D3 — Vite ✅ recommend
 
 **DONE.** Was: esbuild one-shot bundle + a hand-rolled static file server in
-`host/index.ts` with a manual MIME map, plus a manual wasm copy step. All three
-are deleted; `host/index.ts` runs Vite in middleware mode on the shared
+`apps/pineta/host/index.ts` with a manual MIME map, plus a manual wasm copy step. All three
+are deleted; `apps/pineta/host/index.ts` runs Vite in middleware mode on the shared
 `node:http` server. Bundle fell 771 kB → 305 kB (Vite tree-shakes).
 
 Vite gives us HMR, kills the MIME map, and — importantly — kills the
@@ -123,7 +123,7 @@ error, and a modern browser needs no TLA rewrite (`target: esnext` instead).
 
 ### D4 — React + `@kyneta/react` ✅ recommend
 
-**DONE.** `client/app.tsx` is a React tree; the `innerHTML` rebuild is gone.
+**DONE.** `packages/client/app.tsx` is a React tree; the `innerHTML` rebuild is gone.
 It renders from the SAME Exchange `connectSession` owns, handed to
 `ExchangeProvider`, so Node and browser share one connection story.
 
@@ -194,6 +194,9 @@ I lean (a), but it is the one choice with no precedent to copy.
 
 Ours, working, no equivalent upstream — do not discard in the migration:
 
+- ~~`scripts/check-boundaries`~~ — deleted. It was a regex scanner and failed
+  silently three times; boundaries are now enforced by module resolution, with
+  `workspace.test.ts` checking the manifests. The original entry follows.
 - **`scripts/check-boundaries.mjs`** — enforces ADR-0003's single-pi-coupling
   rule mechanically. It has already caught one real violation (mine).
 - **`scripts/sanity.mjs`** — `stepInPlace` present + loro-crdt ≥ 1.13.4. These
@@ -265,7 +268,7 @@ Three consequences, all now handled:
 | D1 | TypeScript | ✅ **done** — all `.ts`/`.tsx`, 0 `.mjs` source, `tsc --noEmit` clean (WS2) |
 | D2 | pnpm, standalone | ✅ **done** — `link:` deps, `relink.sh` deleted, pi pinned 0.87.1 |
 | D3 | Vite | ✅ **done** — middleware mode on the shared server; `/ws` guard verified; esbuild + MIME map + wasm-copy deleted |
-| D4 | React + `@kyneta/react` | ✅ **done** — `client/app.tsx`; `useText` still unused (roadmap step 5) |
+| D4 | React + `@kyneta/react` | ✅ **done** — `packages/client/app.tsx`; `useText` still unused (roadmap step 5) |
 | D5 | Vitest | ✅ **done** — replaced `node --test` |
 | D6 | Biome | ✅ **done** — Kyneta's settings; caught a real lint bug on day one |
 | D8 | `verify` cascade | ✅ **done** — `lint → check → sanity → test → conformance → e2e` |

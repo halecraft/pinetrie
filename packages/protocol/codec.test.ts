@@ -13,7 +13,7 @@ import {
   encodeIntent,
   encodeOutcome,
   type Outcome,
-} from "../protocol/codec.ts"
+} from "./codec.ts"
 
 const refusalCode = (x: ReturnType<typeof decodeCommand>) =>
   x.kind === "refused" ? x.code : `not refused: ${x.kind}`
