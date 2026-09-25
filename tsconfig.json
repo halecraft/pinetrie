@@ -21,6 +21,6 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["apps", "packages", "workspace.test.ts"],
+  "include": ["apps", "packages", "scripts", "workspace.test.ts"],
   "exclude": ["node_modules", "sandbox"]
 }

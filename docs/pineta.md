@@ -87,7 +87,8 @@ discharged before any non-disposable code was written.
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
 | build guards | `pnpm run sanity` | ok |
-| unit (pure core) | `pnpm test` | 112/112 (Vitest) |
+| unit (pure core) | `pnpm test` | 122/122 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 30 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
 | end-to-end | `pnpm run e2e` | 72/72 |
 | with a real model | `pnpm run e2e:live` | 77/77 |
@@ -360,6 +361,14 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
   boundary.
 - **Report honestly.** A clean negative result is a success; a layer that does
   not work, stated plainly, beats one that appears to.
+- **A check without a proof it can fail is not yet a check.** Prove it with a
+  mutation, listed as data in `scripts/mutations/*.ts` and run by
+  `pnpm mutate scripts/mutations/<list>.ts [name]`. The harness
+  (`scripts/mutate.ts`) holds the rules: an anchor must occur exactly once, the
+  file is always restored, a mutant that does not load is BROKEN, and with
+  `expect` the intended check must be the one that fails (else ELSEWHERE). A
+  mutant must be valid code, so it fails on behaviour, not on a typo. A fast
+  test (`scripts/mutations.test.ts`) keeps every list's anchors from drifting.
 
 ### Map of the record
 
