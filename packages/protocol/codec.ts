@@ -19,7 +19,7 @@ import {
   type ErrCode,
   entryId,
   type Intent,
-  NOBODY,
+  isLaneName,
   normalizeName,
   type Position,
   parseMentions,
@@ -29,7 +29,6 @@ import {
   type RunId,
   referenceId,
   runId,
-  THE_AGENT,
 } from "@pineta/core"
 import { type Command, command, type Reply, reply } from "./messages.ts"
 
@@ -46,10 +45,12 @@ export type Outcome =
   | { readonly kind: "appended"; readonly id: EntryId }
   /** Waiting behind `position` messages for the thread's lane to be free. */
   | { readonly kind: "queued"; readonly position: number }
-  /** Another writer took the slot first: `by` is their display name. */
-  | { readonly kind: "conflict"; readonly by: string }
+  /**
+   * Another writer took the slot first: `by` is their display name, or null
+   * when no one can be named (two lanes just started at one point).
+   */
+  | { readonly kind: "conflict"; readonly by: string | null }
   | { readonly kind: "named" }
-  | { readonly kind: "threaded" }
   | Refusal
 
 /**
@@ -71,14 +72,14 @@ const refuse = (code: ErrCode, message: string): Refusal => ({
  * Wire command -> a well-formed intent, or the first shape rule it breaks.
  *
  * `parentId: ""` is the root, and this is the only place that knows it: for a
- * chat, a new conversation; for a reference, no anchor (refused by
- * `planReference`); for a thread default, no entry, refused here.
+ * chat, where only a `branch` may start a thread; for a reference, no anchor
+ * (refused by `planReference`).
  */
 export function decodeCommand(
   wire: WireCommand | null | undefined,
 ): Intent | Refusal {
   const kind = wire?.kind
-  // "" is the root: a new conversation, or no anchor. Only the codec knows that.
+  // "" is the root. Only the codec knows that.
   const at = positionFromWire(text(wire?.parentId))
 
   if (kind === "reference") {
@@ -115,23 +116,11 @@ export function decodeCommand(
   if (kind === "name") {
     const name = normalizeName(text(wire?.text))
     return name === undefined
-      ? refuse(ERR.INVALID_NAME, "a name must be 1 to 40 characters")
+      ? refuse(
+          ERR.INVALID_NAME,
+          "a name must be 1 to 40 characters, with a letter or digit, and not 'agent'",
+        )
       : { kind: "name", name }
-  }
-  if (kind === "thread") {
-    if (at.kind === "root") {
-      return refuse(ERR.NO_PARENT, "a thread default must name its entry")
-    }
-    const mode = text(wire?.text)
-    if (mode !== "session" && mode !== "conversation") {
-      return refuse(ERR.UNKNOWN_KIND, `unknown thread mode: ${mode}`)
-    }
-    return {
-      kind: "thread",
-      at: at.id,
-      compels:
-        mode === "session" ? { kind: "agent", agent: THE_AGENT } : NOBODY,
-    }
   }
   if (kind === "chat") {
     const body = text(wire?.text)
@@ -140,7 +129,22 @@ export function decodeCommand(
     if (!isChatMode(mode)) {
       return refuse(ERR.UNKNOWN_KIND, `unknown chat mode: ${mode}`)
     }
-    return { kind: "chat", text: body, at, mode, mentions: parseMentions(body) }
+    if (at.kind === "root" && mode !== "branch") {
+      return refuse(ERR.NO_ANCHOR, "only a branch starts a thread at the root")
+    }
+    const lane = text(wire?.lane)
+    if (lane !== "" && !isLaneName(lane)) {
+      return refuse(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+    }
+    return {
+      kind: "chat",
+      text: body,
+      at,
+      mode,
+      lane: isLaneName(lane) ? lane : null,
+      asksAgent: wire?.asksAgent === true,
+      mentions: parseMentions(body),
+    }
   }
   return refuse(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
 }
@@ -165,17 +169,11 @@ export function encodeIntent(id: string, intent: Intent): Command {
         text: intent.text,
         parentId: positionToWire(intent.at),
         mode: intent.mode,
+        lane: intent.lane ?? "",
+        asksAgent: intent.asksAgent,
       })
     case "name":
       return command({ id, kind: "name", text: intent.name })
-    case "thread":
-      return command({
-        id,
-        kind: "thread",
-        parentId: intent.at,
-        // The wire names a mode; only the host's one agent can be compelled.
-        text: intent.compels.kind === "agent" ? "session" : "conversation",
-      })
   }
 }
 
@@ -191,11 +189,9 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
     case "queued":
       return reply({ id, outcome: "queued", position: outcome.position })
     case "conflict":
-      return reply({ id, outcome: "conflict", by: outcome.by })
+      return reply({ id, outcome: "conflict", by: outcome.by ?? "" })
     case "named":
       return reply({ id, outcome: "named" })
-    case "threaded":
-      return reply({ id, outcome: "threaded" })
     case "refused":
       return reply({
         id,
@@ -218,11 +214,9 @@ export function decodeReply(wire: Reply): Outcome {
     case "queued":
       return { kind: "queued", position: wire.position }
     case "conflict":
-      return { kind: "conflict", by: wire.by }
+      return { kind: "conflict", by: wire.by === "" ? null : wire.by }
     case "named":
       return { kind: "named" }
-    case "threaded":
-      return { kind: "threaded" }
     case "refused":
       return refuse(asErrCode(wire.errorCode), wire.errorMessage)
   }

@@ -48,8 +48,15 @@ declare const laneNameBrand: unique symbol
  */
 export type LaneName = string & { readonly [laneNameBrand]: true }
 
+const LANE_PREFIX = "t-"
+
 /** A new thread lane's name, from a fresh coordination-free id. */
-export const laneNameForThread = (id: string): LaneName => `t-${id}` as LaneName
+export const laneNameForThread = (id: string): LaneName =>
+  `${LANE_PREFIX}${id}` as LaneName
+
+/** Whether untrusted text names a thread's lane: the codec's check. */
+export const isLaneName = (s: string): s is LaneName =>
+  s.startsWith(LANE_PREFIX) && s.length > LANE_PREFIX.length
 
 declare const entryIdBrand: unique symbol
 declare const runIdBrand: unique symbol
@@ -82,8 +89,8 @@ export const THE_AGENT = "agent" as AgentId
  *
  * pi's API spells this `string | null`, and the wire spells it `""`. Both are
  * converted to a `Position` at the edge they arrive from, so decision logic
- * never has to guess whether `null` means "the root" or "absent". A message at
- * the root starts a new conversation.
+ * never has to guess whether `null` means "the root" or "absent". Only a
+ * `branch` starts a thread at the root.
  */
 export type Position =
   | { readonly kind: "root" }
@@ -98,13 +105,14 @@ export const atEntry = (id: EntryId): Position => ({ kind: "entry", id })
 export const ERR = {
   UNKNOWN_KIND: "unknown_kind",
   EMPTY_MESSAGE: "empty_message",
-  /** A thread default named no entry to be set at. */
-  NO_PARENT: "no_parent",
   /** pi refused the target: it is not in this conversation. */
   UNKNOWN_TARGET: "unknown_target",
   /** pi refused for a reason with no more specific code here. */
   REFUSED: "refused",
-  /** A reference must be attached at an entry, and the root is none. */
+  /**
+   * The root is no entry: a reference cannot attach there, and a `reply` or
+   * `queue` has nothing to continue. Only a `branch` starts a thread at it.
+   */
   NO_ANCHOR: "no_anchor",
   /** A span is empty, out of bounds, or on an entry with no text. */
   INVALID_SPAN: "invalid_span",
@@ -131,8 +139,9 @@ export type ReferenceTarget =
  *   another writer compelled the agent there since, that is a race, and the
  *   sender is told (`conflict`) rather than guessed for.
  * - `queue`: add this to the agent's work in this thread, whenever it is free.
- * - `branch`: start a thread at `at`, an earlier message. Deliberate: it is how
- *   a fork is made, and a compelled branch is a new line of work.
+ * - `branch`: start a thread at `at`, the root or any message. Every thread
+ *   starts this way, and a branch never continues an existing lane: a
+ *   compelled one is a new line of work (ADR-0021).
  */
 export type ChatMode = "reply" | "queue" | "branch"
 export const CHAT_MODES: readonly ChatMode[] = ["reply", "queue", "branch"]
@@ -156,22 +165,22 @@ export type Intent =
       readonly text: string
       readonly at: Position
       readonly mode: ChatMode
+      /** The lane the sender's column is bound to: its thread, named. */
+      readonly lane: LaneName | null
+      /** A Start Agent column: with no mention, the agent is asked. */
+      readonly asksAgent: boolean
       readonly mentions: readonly Mention[]
     }
   /** Set the sender's display name: a label, never an identity. */
   | { readonly kind: "name"; readonly name: string }
-  /** Set who is compelled by default in the thread rooted at `at`. */
-  | {
-      readonly kind: "thread"
-      readonly at: EntryId
-      readonly compels: Responder
-    }
 
 // --- obligation: collaborators and compelled responders ----------------------
 
 /**
- * An `@` in a message. Mentioning the agent COMPELS it to reply; mentioning a
- * person only notifies them, because nobody can make a human answer.
+ * An `@` in a message. Mentioning the agent COMPELS it to reply. Mentioning a
+ * person addresses them, and so leaves the agent out; nobody can make a human
+ * answer (ADR-0021). A person mention counts only if it names a participant
+ * (`address`).
  */
 export type Mention =
   | { readonly kind: "agent"; readonly agent: AgentId }
@@ -188,6 +197,13 @@ export type Responder =
 export const NOBODY: Responder = { kind: "none" }
 
 /**
+ * The characters of a mention's handle: any letter or digit, in any script,
+ * and `_` or `-`. `parseMentions` and `handleOf` share it, so every name that
+ * can be shown can be typed as a mention.
+ */
+const HANDLE_CHARS = "\\p{L}\\p{N}_\\-"
+
+/**
  * Every `@handle` in `text`, in order, without repeats. `@agent` is the agent;
  * any other handle is a person. A handle starts a word, so an e-mail address is
  * not a mention.
@@ -195,7 +211,11 @@ export const NOBODY: Responder = { kind: "none" }
 export function parseMentions(text: string): Mention[] {
   const seen = new Set<string>()
   const out: Mention[] = []
-  for (const [, handle] of text.matchAll(/(?<![\w@])@([A-Za-z0-9_-]+)/g)) {
+  const pattern = new RegExp(
+    `(?<![${HANDLE_CHARS}@])@([${HANDLE_CHARS}]+)`,
+    "gu",
+  )
+  for (const [, handle] of text.matchAll(pattern)) {
     if (handle === undefined || seen.has(handle)) continue
     seen.add(handle)
     out.push(
@@ -208,27 +228,72 @@ export function parseMentions(text: string): Mention[] {
 }
 
 /**
- * Who is compelled to answer: the agent if it is mentioned, otherwise the
- * thread's default. A mention can add an obligation but never remove one, so
- * in a working session a message that mentions only people still runs.
+ * A display name as a mention must spell it: lower case, composed (NFC), handle
+ * characters only. "Ada Lovelace" is `@adalovelace`, "O'Brien" is `@obrien`,
+ * "José" is `@josé`, "日本" is `@日本`.
  */
-export function compelledResponder(input: {
-  readonly mentions: readonly Mention[]
-  readonly threadDefault: Responder
-}): Responder {
-  const agent = input.mentions.find(m => m.kind === "agent")
-  return agent === undefined
-    ? input.threadDefault
-    : { kind: "agent", agent: agent.agent }
+export const handleOf = (name: string): string =>
+  name
+    .normalize("NFC")
+    .toLowerCase()
+    .replace(new RegExp(`[^${HANDLE_CHARS}]`, "gu"), "")
+
+/** Who a message is for. */
+export interface Address {
+  /** The agent, if it must answer: a run. */
+  readonly compels: Responder
+  /** Participants the message names, by display name. Never compelled. */
+  readonly people: readonly string[]
 }
+
+/**
+ * Who a message is for (ADR-0021). `@agent` compels the agent. Otherwise a
+ * message naming participants is for them, and the agent is left out.
+ * Otherwise the thread decides: the agent where it is the default (a thread
+ * with a lane, or a Start Agent column), nobody where it is not.
+ *
+ * A handle that names no participant is ignored, so `@types/node` in agent
+ * work still asks the agent. Pure; the composer and the host both call it.
+ */
+export function address(input: {
+  readonly mentions: readonly Mention[]
+  /** Every participant's display name, as shown. */
+  readonly participants: readonly string[]
+  readonly agentByDefault: boolean
+}): Address {
+  const byHandle = new Map(input.participants.map(n => [handleOf(n), n]))
+  const people = input.mentions.flatMap(m =>
+    m.kind === "person" ? [byHandle.get(handleOf(m.name))].filter(isName) : [],
+  )
+  const agent = input.mentions.find(m => m.kind === "agent")
+  const compels: Responder =
+    agent !== undefined
+      ? { kind: "agent", agent: agent.agent }
+      : people.length > 0 || !input.agentByDefault
+        ? NOBODY
+        : { kind: "agent", agent: THE_AGENT }
+  return { compels, people }
+}
+
+const isName = (n: string | undefined): n is string => n !== undefined
 
 /** A display name's longest form, in UTF-16 code units. */
 export const MAX_NAME_LENGTH = 40
 
-/** A display name as typed -> the stored one, or undefined if unusable. */
+/**
+ * A display name as typed -> the stored one, or undefined if unusable: empty,
+ * too long, or one no mention could reach (no letter or digit, or spelled
+ * `@agent`, which is always the agent).
+ */
 export function normalizeName(name: string): string | undefined {
   const n = name.trim()
-  return n.length === 0 || n.length > MAX_NAME_LENGTH ? undefined : n
+  const handle = handleOf(n)
+  return n.length === 0 ||
+    n.length > MAX_NAME_LENGTH ||
+    handle === "" ||
+    handle === THE_AGENT
+    ? undefined
+    : n
 }
 
 // --- wire hygiene (ADR-0013) ------------------------------------------------

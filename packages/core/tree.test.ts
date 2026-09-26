@@ -4,18 +4,19 @@ import {
   ancestry,
   atEntry,
   branchColors,
+  type ChatMode,
   type EntryLike,
   entryId,
   followTip,
   indexTree,
+  type LaneName,
   laneNameForThread,
   PENDING_TRACK,
+  type Position,
   projectColumns,
   projectRail,
   ROOT,
-  raceSince,
-  threadEnd,
-  threadLaneAt,
+  threadOf,
   writerId,
 } from "./index.ts"
 
@@ -101,15 +102,6 @@ describe("followTip: the view follows the thread you are reading", () => {
     // Every entry on a cycle has a child, so there is no leaf below: `at` stands.
     expect(followTip(indexTree(tree({ x: "y", y: "x" })), "x")).toBe("x")
   })
-  test("a fresh branch stays at its anchor until a new child exists", () => {
-    const i = indexTree(entries)
-    expect(followTip(i, "1-a1", ["2-a2", "3-b2"])).toBe("1-a1")
-    const grown = indexTree({
-      ...entries,
-      ...tree({ "6-n1": "1-a1", "7-n2": "6-n1" }),
-    })
-    expect(followTip(grown, "1-a1", ["2-a2", "3-b2"])).toBe("7-n2")
-  })
 })
 
 describe("projectColumns", () => {
@@ -159,12 +151,22 @@ describe("projectColumns", () => {
     ])
     expect([c?.forkFrom, ids(c?.nodes ?? [])]).toEqual([null, ["8-r1", "9-r2"]])
   })
-  test("a fresh branch has no messages and forks from its anchor", () => {
+  test("a pinned column (fresh, or bound to a lane) ends at its anchor and follows nothing", () => {
     const [, c] = projectColumns(i, [
       { anchor: "3-t3" },
-      { anchor: "2-t2", exclude: ["3-t3", "6-b1"] },
+      { anchor: "2-t2", pinned: true },
     ])
-    expect([c?.forkFrom, ids(c?.nodes ?? [])]).toEqual(["2-t2", []])
+    expect([c?.tipId, c?.forkFrom, ids(c?.nodes ?? [])]).toEqual([
+      "2-t2",
+      "2-t2",
+      [],
+    ])
+    // A fresh column at the root: nothing at all, and no fork.
+    const [, root] = projectColumns(i, [
+      { anchor: "3-t3" },
+      { anchor: null, pinned: true },
+    ])
+    expect([root?.tipId, root?.forkFrom, root?.nodes]).toEqual([null, null, []])
   })
 })
 
@@ -238,7 +240,7 @@ describe("colour and the agent", () => {
   test("a fresh branch is pending until it has a message", () => {
     const cols = projectColumns(i, [
       { anchor: "3-t3" },
-      { anchor: "2-t2", exclude: ["3-t3", "6-b1"] },
+      { anchor: "2-t2", pinned: true },
     ])
     expect(branchColors(rail, cols).track).toEqual([0, PENDING_TRACK])
   })
@@ -287,43 +289,124 @@ describe("threads: where a message lands, and whether it raced", () => {
   ]) as Record<string, EntryLike>
   const at = (id: string) => atEntry(entryId(id))
 
-  test("threadEnd: the root is a new conversation, never the newest thread", () => {
+  const me = writerId("wu")
+  const lane = (tip: string | null, name = "x") => ({
+    name: laneNameForThread(name),
+    tip,
+    running: false,
+    waiting: 0,
+    askedBy: null,
+  })
+  const send = (
+    at: Position,
+    mode: ChatMode = "reply",
+    named: LaneName | null = null,
+  ) => ({ at, mode, lane: named, me })
+
+  test("threadOf: a reply lands at the newest leaf; a branch starts at `at`, with no lane", () => {
     const i = indexTree(entries)
-    expect(threadEnd(i, ROOT)).toEqual(ROOT)
-    expect(threadEnd(i, at("1-q"))).toEqual(at("4-mine"))
+    const lanes = [lane("4-mine")]
+    expect(threadOf(i, lanes, send(at("1-q")))).toMatchObject({
+      end: at("4-mine"),
+      lane: { kind: "lane" },
+    })
+    expect(threadOf(i, lanes, send(at("4-mine"), "branch"))).toEqual({
+      kind: "thread",
+      end: at("4-mine"),
+      lane: { kind: "none" },
+      race: null,
+    })
+    // Only a branch starts at the root, and an unknown entry is no thread.
+    expect(threadOf(i, lanes, send(ROOT)).kind).toBe("unknown")
+    expect(threadOf(i, lanes, send(ROOT, "branch")).kind).toBe("thread")
+    expect(threadOf(i, lanes, send(at("9-gone"))).kind).toBe("unknown")
   })
 
-  test("raceSince: an agent reply, a plain remark and my own question are not a race", () => {
-    expect(raceSince(indexTree(entries), at("1-q"), writerId("wu"))).toBeNull()
+  test("threadOf: a named lane is its thread, past a newer conversation forked at its tip", () => {
+    // 5-conv steps down at the lane's old tip; the lane then moved on to 6-next.
+    const i = indexTree({
+      ...entries,
+      ...Object.fromEntries([
+        say("6-next", "4-mine", { writer: "w-wu", compelled: false }),
+        say("7-conv", "4-mine", { writer: "w-bo", compelled: false }),
+      ]),
+    })
+    const lanes = [lane("6-next")]
+    expect(threadOf(i, lanes, send(at("4-mine"))).kind).toBe("thread")
+    // Unnamed, the newest leaf wins: the conversation.
+    expect(threadOf(i, lanes, send(at("4-mine")))).toMatchObject({
+      end: at("7-conv"),
+    })
+    const named = threadOf(
+      i,
+      lanes,
+      send(at("4-mine"), "reply", lanes[0]?.name),
+    )
+    expect(named).toMatchObject({ end: at("6-next"), lane: { kind: "lane" } })
+    // `at` off the lane's path, or a lane that does not exist: refused.
+    expect(
+      threadOf(i, lanes, send(at("7-conv"), "reply", lanes[0]?.name)).kind,
+    ).toBe("unknown")
+    expect(
+      threadOf(i, lanes, send(at("4-mine"), "reply", laneNameForThread("no")))
+        .kind,
+    ).toBe("unknown")
   })
 
-  test("raceSince: another writer's compelled message below what I saw is", () => {
+  test("threadOf: one lane ending at the end is its lane; two are ambiguous", () => {
+    const i = indexTree(entries)
+    const lane4 = (lanes: ReturnType<typeof lane>[]) =>
+      threadOf(i, lanes, send(at("4-mine")))
+    expect(lane4([lane("4-mine")])).toMatchObject({ lane: { kind: "lane" } })
+    expect(lane4([lane("3-plain")])).toMatchObject({ lane: { kind: "none" } })
+    expect(lane4([lane("4-mine", "x"), lane("4-mine", "y")]).kind).toBe(
+      "ambiguous",
+    )
+  })
+
+  test("threadOf: a named lane is that lane, even while another shares its tip", () => {
+    const i = indexTree(entries)
+    const y = laneNameForThread("y")
+    expect(
+      threadOf(
+        i,
+        [lane("4-mine", "x"), lane("4-mine", "y")],
+        send(at("4-mine"), "reply", y),
+      ),
+    ).toMatchObject({ lane: { kind: "lane", name: y } })
+  })
+
+  test("threadOf race: an agent reply, a plain remark and my own question are not a race", () => {
+    expect(threadOf(indexTree(entries), [], send(at("1-q")))).toMatchObject({
+      race: null,
+    })
+  })
+
+  test("threadOf race: another writer's compelled message on the thread is; in a sibling fork, not", () => {
     const raced = indexTree({
       ...entries,
       ...Object.fromEntries([
         say("5-theirs", "4-mine", { writer: "w-bo", compelled: true }),
       ]),
     })
-    expect(raceSince(raced, at("1-q"), writerId("wu"))).toEqual({ by: "w-bo" })
-    // Nothing below the newest message: no race from there.
-    expect(raceSince(raced, at("5-theirs"), writerId("wu"))).toBeNull()
-  })
-
-  test("threadLaneAt: the lane whose tip is the end; none at the root or elsewhere", () => {
-    const lane = {
-      name: laneNameForThread("x"),
-      tip: "4-mine",
-      running: false,
-      waiting: 0,
-      askedBy: null,
-    }
-    expect(threadLaneAt([lane], at("4-mine"))).toEqual({
-      kind: "lane",
-      ...lane,
+    expect(threadOf(raced, [], send(at("1-q")))).toMatchObject({
+      race: { by: "w-bo" },
     })
-    expect(threadLaneAt([lane], at("3-plain"))).toEqual({ kind: "none" })
-    expect(threadLaneAt([{ ...lane, tip: null }], ROOT)).toEqual({
-      kind: "none",
+    // Nothing below the newest message: no race from there.
+    expect(threadOf(raced, [], send(at("5-theirs")))).toMatchObject({
+      race: null,
+    })
+    // Bob asks in a fork at 2-r; my thread continues through 6-mine, newer.
+    const forked = indexTree({
+      ...entries,
+      ...Object.fromEntries([
+        say("5-fork", "2-r", { writer: "w-bo", compelled: true }),
+        say("6-mine", "4-mine", { writer: "w-wu", compelled: false }),
+      ]),
+    })
+    expect(threadOf(forked, [], send(at("1-q")))).toMatchObject({
+      end: at("6-mine"),
+      race: null,
     })
   })
 })

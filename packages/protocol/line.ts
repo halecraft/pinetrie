@@ -22,6 +22,8 @@ const Command = Schema.struct({
   parentId: Schema.string(),
   /** A chat's mode, or "" for other kinds. */
   mode: Schema.string(),
+  lane: Schema.string(),
+  asksAgent: Schema.boolean(),
   targetId: Schema.string(),
   spanStart: Schema.number(),
   spanEnd: Schema.number(),

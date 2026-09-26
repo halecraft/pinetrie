@@ -87,14 +87,11 @@ try {
   )
 
   // ── helpers ──────────────────────────────────────────────────────────────
+  /** A message for Ada only: it names her, so in agent work it asks no one. */
+  const NOTE = "@Ada just a note"
   const col = (n: number) => `.column[data-position="${n}"]`
   const msg = (text: string) =>
     `.msg:has(> .text:text-is(${JSON.stringify(text)}))`
-  /** Message tools show on hover, so hover the message first. */
-  const tool = async (text: string, cls: string, scope = "") => {
-    await page.hover(`${scope} ${msg(text)}`.trim())
-    await page.click(`${scope} ${msg(text)} .tools .${cls}`.trim())
-  }
   const label = async (n: number) =>
     (await page.textContent(`${col(n)} .composer .send`))?.trim() ?? ""
   const send = async (n: number, text: string) => {
@@ -133,8 +130,15 @@ try {
     "the composer does not guess an audience: presence will say who is here",
   )
   ok(
+    (await page.locator(`${col(0)} .start`).count()) === 1 &&
+      (await page.locator(`${col(0)} .composer`).count()) === 0,
+    "an empty session offers Start Chat and Start Agent, and no composer",
+  )
+  await page.click(`${col(0)} .start-agent`)
+  await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
+  ok(
     (await label(0)) === "send · agent will reply",
-    `a fresh session promises a reply: "${await label(0)}"`,
+    `Start Agent promises a reply with no mention: "${await label(0)}"`,
   )
 
   // ── the first turn: streaming, the reply, the agent joining ─────────────
@@ -173,37 +177,21 @@ try {
     "the column shows where the agent joined",
   )
 
-  // ── the rule is set on a message, and the promise holds ─────────────────
-  await tool(
-    (
-      await page.$eval(
-        `${col(0)} .msg.assistant > .text`,
-        n => n.textContent ?? "",
-      )
-    ).trim(),
-    "rule",
-  )
-  const marked = await page
-    .waitForSelector(`${col(0)} .rule-marker[data-rule="none"]`, {
-      timeout: 15_000,
-    })
-    .then(
-      () => true,
-      () => false,
-    )
-  ok(marked, "a rule set on a message shows its marker after that message")
-  await page.fill(`${col(0)} .composer .input`, "just a note")
+  // ── mentions pick the addressee, and the button says so ────────────────
+  // The thread has a lane now, so a message naming no one asks the agent; one
+  // naming only a person is for them (ADR-0021).
+  await page.fill(`${col(0)} .composer .input`, NOTE)
   const plain = await label(0)
   const assistantsBefore = await page.$$eval(".msg.assistant", n => n.length)
   await page.click(`${col(0)} .composer .send`)
-  await shows("just a note")
+  await shows(NOTE)
   await new Promise(r => setTimeout(r, 1500))
   ok(
-    plain === "send" &&
+    plain === "send · to Ada" &&
       (await page.$$eval(".msg.assistant", n => n.length)) ===
         assistantsBefore &&
       Object.keys(host.doc.activeRuns()).length === 0,
-    `below the marker the composer promised no reply, and none came ("${plain}")`,
+    `naming only a person, the button said who it is for, and no reply came ("${plain}")`,
   )
   await page.fill(
     `${col(0)} .composer .input`,
@@ -248,16 +236,14 @@ try {
     peerId: "browser-other",
   })
   await other.setName("Bea")
-  // A fork on purpose, at the agent's reply: `branch`. A `reply` there would
-  // continue the thread at its end instead.
-  const aside = await other.chat(
-    "an aside",
-    atEntry(entryId(replyId)),
-    "branch",
-  )
+  // A fork on purpose, at the agent's reply: `branch`. A branch starts as a
+  // conversation, so it is appended with no run.
+  const aside = await other.chat("an aside", atEntry(entryId(replyId)), {
+    mode: "branch",
+  })
   ok(
     aside.kind === "appended",
-    `another writer's aside, below the marker, is appended with no run (${aside.kind})`,
+    `another writer's aside is a conversation: appended, no run (${aside.kind})`,
   )
   await page.waitForSelector(`${atReply} .open-branch`, { timeout: 15_000 })
   const trunkNow = await texts(0)
@@ -318,16 +304,20 @@ try {
     "scrolling one column does not scroll another",
   )
 
-  // ── branch from here: beside its parent, and it follows its branch ──────
+  // ── → opens a branch beside its parent, and it follows its branch ──────
   // From the first column while two are open, so "beside its parent"
   // (position 1) and "the far right" (position 2) differ.
-  await tool("just a note", "branch-here", col(0))
+  await page.hover(`${col(0)} ${msg(NOTE)}`)
+  await page.click(`${col(0)} ${msg(NOTE)} > .branch`)
   const beside = await page
-    .waitForSelector(
-      `${col(1)} .composer .input[placeholder="start a branch here…"]`,
-      {
-        timeout: 15_000,
-      },
+    .waitForFunction(
+      ([c, note]) =>
+        document
+          .querySelector(`${c} .fork-label`)
+          ?.textContent?.includes(note) === true &&
+        document.querySelector(`${c} .msg`) === null,
+      [col(1), NOTE] as const,
+      { timeout: 15_000 },
     )
     .then(
       () => true,
@@ -335,13 +325,13 @@ try {
     )
   ok(
     beside,
-    "a branch opens next to the column it forks from, not at the far right",
+    "→ opens an empty column next to the column it forks from, not at the far right",
   )
   const dotsBefore = await railCount()
   await send(1, "deeper")
   ok(
     await shows("deeper", col(1)),
-    "a message sent in a fresh branch column appears in that column",
+    "a message sent in a fresh column appears in that column",
   )
   await idle()
   ok((await railCount()) > dotsBefore, "the new branch appears in the rail")
@@ -350,21 +340,20 @@ try {
     "the column it branched from does not take the new branch",
   )
   // Each column's LAST message, found by class: `:last-of-type` would match
-  // the last div, which may be a rule marker, and pass on finding nothing.
+  // the last div, and pass on finding nothing.
   const lasts = await page.$$eval(".column", cs =>
     cs.map(c => {
       const all = c.querySelectorAll(".column-body .msg")
       const last = all[all.length - 1]
-      return last === undefined
-        ? "none"
-        : last.querySelector(".branch-here") === null
-          ? "no"
-          : "yes"
+      return (
+        last?.querySelector(":scope > .branch")?.getAttribute("title") ??
+        (last === undefined ? "none" : "no")
+      )
     }),
   )
   ok(
-    lasts.length > 0 && lasts.every(x => x === "no"),
-    `a column's last message offers no branch: replying there is the composer's job (${lasts.join(",")})`,
+    lasts.join(" | ") === "continue as a conversation | no | no",
+    `→ at a column's end only in agent work, where it steps down (${lasts.join(" | ")})`,
   )
 
   // ── make main ────────────────────────────────────────────────────────────
@@ -398,13 +387,13 @@ try {
     () => true,
     () => false,
   )
-  const litState = await page.evaluate(() => {
+  const litState = await page.evaluate(note => {
     const byText = (t: string) =>
       [...document.querySelectorAll(".msg")].find(
         n => n.querySelector(":scope > .text")?.textContent === t,
       )?.className ?? ""
-    return { aside: byText("an aside"), note: byText("just a note") }
-  })
+    return { aside: byText("an aside"), note: byText(note) }
+  }, NOTE)
   ok(
     lit && litState.aside.includes("lit") && litState.note.includes("dim"),
     `while the agent replies, its path is lit and the rest dims (${litState.aside} / ${litState.note})`,
@@ -483,11 +472,9 @@ try {
     Object.values(host.doc.entries()).find(e =>
       JSON.stringify(e).includes("just a note"),
     )?.id ?? ""
-  await other.chat(
-    "@agent say exactly: PULSE",
-    atEntry(entryId(noteId)),
-    "branch",
-  )
+  await other.chat("@agent say exactly: PULSE", atEntry(entryId(noteId)), {
+    mode: "branch",
+  })
   const pulsing = await page
     .waitForSelector(".rail-dot.pulse", { timeout: 30_000 })
     .then(el => el.getAttribute("data-entry"))
@@ -525,9 +512,60 @@ try {
     "after a rename, Ada's earlier messages show her current name, then the one she sent under",
   )
 
+  // ── the rail's +: an agent thread at the root, and stepping down ───────
+  const before = await page.$$eval(".column", n => n.length)
+  await page.click("#rail .new-thread")
+  await page.click("#rail .start-agent")
+  const agentCol = col(before)
+  await page.waitForSelector(`${agentCol} .composer`, { timeout: 15_000 })
+  ok(
+    (await label(before)) === "send · agent will reply" &&
+      (await page.$$eval(`${agentCol} .msg`, n => n.length)) === 0,
+    "the rail's + opens an empty Start Agent column at the end",
+  )
+  await send(before, "say exactly: DOWN-ONE")
+  await page.waitForSelector(`${agentCol} .msg.assistant`, { timeout: 60_000 })
+  await idle()
+  // → at the agent thread's end: a conversation continuing from there.
+  const end = `${agentCol} .msg.assistant`
+  await page.hover(end)
+  await page.click(`${end} > .branch`)
+  const downCol = col(before + 1)
+  await page.waitForSelector(`${downCol} .composer`, { timeout: 15_000 })
+  ok(
+    (await label(before + 1)) === "send",
+    `the stepped-down column is a conversation: "${await label(before + 1)}"`,
+  )
+  await send(before + 1, "off the record")
+  await shows("off the record", downCol)
+  // The agent thread goes on through its lane; the newer conversation at its
+  // old end must not take its column, nor its reply.
+  await send(before, "say exactly: DOWN-TWO")
+  await page
+    .waitForFunction(
+      c => document.querySelectorAll(`${c} .msg.assistant`).length === 2,
+      agentCol,
+      { timeout: 60_000 },
+    )
+    .catch(() => null)
+  await idle()
+  const agentTexts = await texts(before)
+  const downTexts = await texts(before + 1)
+  ok(
+    agentTexts.includes("say exactly: DOWN-TWO") &&
+      !agentTexts.includes("off the record") &&
+      (await page.$$eval(`${agentCol} .msg.assistant`, n => n.length)) === 2,
+    `the agent thread's column keeps its thread past the newer conversation (${agentTexts.length} messages)`,
+  )
+  ok(
+    downTexts.includes("off the record") &&
+      !downTexts.includes("say exactly: DOWN-TWO"),
+    "the conversation's column keeps only its own thread",
+  )
+
   // ── nothing left of the old controls ────────────────────────────────────
   const gone = await page.$$eval(
-    "#reading, #thread, #threadMode, #followLatest, #switchLane, #offLane, .fork, #streaming",
+    "#reading, #thread, #threadMode, #followLatest, #switchLane, #offLane, .fork, #streaming, .rule, .rule-marker, .branch-here",
     n => n.length,
   )
   ok(gone === 0, `none of the removed controls exist (${gone})`)
@@ -552,6 +590,14 @@ try {
       .waitForSelector(msg("B asks about this"), { timeout: 60_000 })
       .catch(() => null)
     await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+    // A's replica has everything the host has, and has drawn it, before A's
+    // messages are counted: otherwise a reply still arriving reads as a change.
+    const total = String(Object.keys(host.doc.entries()).length)
+    await page.waitForFunction(
+      n => document.getElementById("count")?.textContent === n,
+      total,
+      { timeout: 15_000 },
+    )
     const spineBefore = await page.$$eval(".msg", n => n.length)
     await second.hover(`${col(0)} .msg`)
     await second.click(`${col(0)} .msg .tools .cite`)

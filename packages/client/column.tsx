@@ -6,36 +6,33 @@ import {
   ancestry,
   atEntry,
   type ColumnView,
-  type EntryId,
   entryId,
   type LaneView,
   messageText,
+  type Position,
   type ReferenceTarget,
-  type Responder,
   ROOT,
+  type ThreadLane,
   type TreeIndex,
-  threadLaneAt,
+  threadOf,
   type WriterId,
 } from "@pineta/core"
-import {
-  displayName,
-  effectiveDefault,
-  type Held,
-  type ReferenceIndex,
-  rulesAlong,
-} from "@pineta/marginalia"
+import { displayName, type Held, type ReferenceIndex } from "@pineta/marginalia"
 import type { SessionDocHandle } from "@pineta/schema"
 import { useLayoutEffect, useRef } from "react"
+import type { Column as ColumnSpec } from "./columns.ts"
 import { Composer } from "./composer.tsx"
 import { Message } from "./message.tsx"
 import { speakerLabel } from "./names.ts"
 import { readStreaming } from "./projection.ts"
 import { colorSlot, trackColor } from "./rail.tsx"
 import type { SessionClient } from "./session-view.ts"
+import { Start } from "./start.tsx"
 
 export interface ColumnProps {
   session: SessionClient
-  columnKey: string
+  /** The column as the reducer holds it: its lane, and whether it is fresh. */
+  column: ColumnSpec
   position: number
   view: ColumnView
   index: TreeIndex
@@ -45,17 +42,25 @@ export interface ColumnProps {
   forks: ReadonlyMap<string, readonly number[]>
   /** Ids any open column shows: a branch leaving here that is shown needs no button. */
   shown: ReadonlySet<string>
-  rules: ReadonlyMap<EntryId, Responder>
   refs: ReferenceIndex
   /** Display names by writer, for "queue · agent replies after Bea". */
   nameOf: ReadonlyMap<WriterId, string>
+  /** Everyone who can be mentioned (`readParticipants`). */
+  participants: readonly string[]
   /** Every lane the agent is replying on. Several threads can run at once. */
   activity: readonly AgentRun[]
   lanes: readonly LaneView[]
   outbox: readonly Held[]
   /** The ids on this column's path, which the app has already computed. */
   path: ReadonlySet<string>
-  onBranchHere: (at: string) => void
+  /** Open a fresh column to the right, forked at `at`. */
+  onBranch: (at: string) => void
+  /** After a conflict: a fresh column at `at`, which sends `text` there. */
+  onBranchInstead: (at: Position, text: string) => void
+  /** The empty session's column: turn it into a fresh thread at the root. */
+  onStart: (asksAgent: boolean) => void
+  /** A fresh column's first send, by id. */
+  onSent: (sendId: string) => void
   onOpen: (anchor: string) => void
   onMakeMain: () => void
   onClose: () => void
@@ -75,17 +80,17 @@ export function Column(p: ColumnProps) {
       spacer.current.style.height = "0px"
   }, [view.forkFrom])
 
-  // The rule in force above this column's first message, then along it.
-  const inherited = effectiveDefault(
-    view.forkFrom === null
+  const fresh = p.column.fresh !== undefined
+  // Where a send attaches: a fresh column's branch point, else the column's end.
+  const at: Position = fresh
+    ? p.column.anchor === null
       ? ROOT
-      : { kind: "entry", id: entryId(view.forkFrom) },
-    index,
-    p.rules,
-  )
-  const ids = view.nodes.map(n => n.id)
-  const rules = rulesAlong(ids, inherited, p.rules)
-  const ruleAtEnd = rules.at(-1) ?? inherited
+      : atEntry(entryId(p.column.anchor))
+    : view.tipId === null
+      ? ROOT
+      : atEntry(entryId(view.tipId))
+  // An empty session's column offers the two starts instead of a composer.
+  const choosing = !fresh && view.tipId === null
 
   // The agent joined where it was first asked, unless that is above this column.
   const askedAbove =
@@ -103,11 +108,18 @@ export function Column(p: ColumnProps) {
   const lit = (id: string) => p.activity.some(r => r.path.has(id))
   // The runs whose tip is on this column's path stream here.
   const streams = p.activity.filter(r => p.path.has(r.tip))
-  // This thread's lane, at the column's end: busy means a compelled message waits.
-  const lane = threadLaneAt(
-    p.lanes,
-    view.tipId === null ? ROOT : atEntry(entryId(view.tipId)),
-  )
+  // This thread's lane, as the host will find it: busy means a compelled
+  // message waits.
+  const thread = choosing
+    ? undefined
+    : threadOf(p.index, p.lanes, {
+        at,
+        mode: fresh ? "branch" : "reply",
+        lane: p.column.lane ?? null,
+        me: p.session.writer,
+      })
+  const lane: ThreadLane =
+    thread?.kind === "thread" ? thread.lane : { kind: "none" }
   const waiting =
     lane.kind === "lane" ? p.outbox.filter(h => h.lane === lane.name) : []
   const holder =
@@ -135,7 +147,7 @@ export function Column(p: ColumnProps) {
   return (
     <section
       className="column"
-      data-key={p.columnKey}
+      data-key={p.column.key}
       data-position={p.position}
       data-track={p.track}
     >
@@ -146,7 +158,11 @@ export function Column(p: ColumnProps) {
       >
         <span className="fork-label">
           {fork === undefined
-            ? "thread"
+            ? fresh
+              ? p.column.asksAgent === true
+                ? "new · with the agent"
+                : "new chat"
+              : "thread"
             : `from ${forkLabel}: “${forkText}${forkText.length === 48 ? "…" : ""}”`}
         </span>
         {p.position > 0 && (
@@ -183,11 +199,20 @@ export function Column(p: ColumnProps) {
               light={running ? (lit(node.id) ? "lit" : "dim") : undefined}
               nameOf={p.nameOf}
               node={node}
-              onBranchHere={
-                // Below a column's last message is the column itself.
-                i === view.nodes.length - 1
-                  ? undefined
-                  : () => p.onBranchHere(node.id)
+              onBranch={
+                i < view.nodes.length - 1
+                  ? {
+                      title: "open a branch here",
+                      go: () => p.onBranch(node.id),
+                    }
+                  : // At the end, a branch differs from replying only in agent
+                    // work: there it steps back down to a conversation.
+                    p.column.lane !== undefined
+                    ? {
+                        title: "continue as a conversation",
+                        go: () => p.onBranch(node.id),
+                      }
+                    : undefined
               }
               onCite={(to: ReferenceTarget) =>
                 void p.session.cite(
@@ -196,9 +221,6 @@ export function Column(p: ColumnProps) {
                 )
               }
               onOpenBranch={p.onOpen}
-              onSetRule={mode => void p.session.setThreadMode(id, mode)}
-              ruleHere={rules[i] ?? inherited}
-              ruleSet={p.rules.get(id)}
             />
           )
         })}
@@ -217,14 +239,28 @@ export function Column(p: ColumnProps) {
           </div>
         ))}
       </div>
-      <Composer
-        at={view.tipId}
-        fresh={view.nodes.length === 0 && view.forkFrom !== null}
-        holderName={holder}
-        lane={lane}
-        rule={ruleAtEnd}
-        session={p.session}
-      />
+      {choosing ? (
+        <Start onStart={p.onStart} />
+      ) : (
+        <Composer
+          asksAgent={p.column.asksAgent === true}
+          at={at}
+          boundLane={p.column.lane}
+          fresh={fresh}
+          holderName={holder}
+          lane={lane}
+          onBranchInstead={text => p.onBranchInstead(at, text)}
+          onSend={() => {
+            if (!fresh) return undefined
+            const id = crypto.randomUUID()
+            p.onSent(id)
+            return id
+          }}
+          participants={p.participants}
+          pending={p.column.fresh?.pending}
+          session={p.session}
+        />
+      )}
     </section>
   )
 }

@@ -87,12 +87,12 @@ discharged before any non-disposable code was written.
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
 | build guards | `pnpm run sanity` | ok |
-| unit (pure core) | `pnpm test` | 134/134 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 45 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 143/143 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 55 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 64/64 |
-| with a real model | `pnpm run e2e:live` | 67/67 |
-| **real browser** | `pnpm run e2e:browser` | 41/41 |
+| end-to-end | `pnpm run e2e` | 74/74 |
+| with a real model | `pnpm run e2e:live` | 77/77 |
+| **real browser** | `pnpm run e2e:browser` | 45/45 |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 

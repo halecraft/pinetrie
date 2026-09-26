@@ -1,26 +1,22 @@
 // client/composer — one per column, sending at the end of its path.
 
 import {
-  atEntry,
+  address,
+  agentByDefault,
   type ChatMode,
-  compelledResponder,
-  entryId,
-  NOBODY,
+  type LaneName,
   type Position,
   parseMentions,
-  type Responder,
-  ROOT,
   type ThreadLane,
 } from "@pineta/core"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { SessionClient } from "./session-view.ts"
 
 /**
- * Before sending, the composer says who will see the message, whether the
- * agent must answer it, and whether it will wait. The same
- * `compelledResponder` the host runs decides the label, from the rule in force
- * where the message attaches and the thread lane's state, both read through
- * `@pineta/reads` as the host reads them.
+ * Before sending, the composer's button says what the message will do: who it
+ * is for, and whether it will wait. The same `address` the host runs decides
+ * it, over the thread `threadOf` gives, both read through `@pineta/reads` as
+ * the host reads them (ADR-0021).
  *
  * A reply carries the end its sender saw. If another writer's compelled
  * message got there first, the host writes nothing and says so (`conflict`),
@@ -29,49 +25,78 @@ import type { SessionClient } from "./session-view.ts"
 export function Composer({
   session,
   at,
-  rule,
   lane,
-  holderName,
+  boundLane,
+  asksAgent,
   fresh,
+  participants,
+  holderName,
+  onSend,
+  onBranchInstead,
+  pending,
 }: {
   session: SessionClient
-  /** Where the message attaches: the column's last message, or null in an empty session. */
-  at: string | null
-  /** The rule in force at `at`. */
-  rule: Responder
-  /** The thread's lane at `at`: whether the agent is busy there. */
+  /** Where the message attaches: the column's end, or its branch point. */
+  at: Position
+  /** The thread's lane, from `threadOf`: whether the agent is busy there. */
   lane: ThreadLane
+  /** The lane this column is bound to, which its sends name. */
+  boundLane: LaneName | undefined
+  /** A Start Agent column. */
+  asksAgent: boolean
+  /** A fresh column: its first message starts the thread (`branch`). */
+  fresh: boolean
+  /** Everyone who can be mentioned, as shown. */
+  participants: readonly string[]
   /** Who the agent is answering, or who waits first, by name. */
   holderName: string | null
-  /** A fresh branch, with nothing in it yet: a message here makes the fork. */
-  fresh: boolean
+  /** A fresh column's send id, recorded before its message is sent. */
+  onSend: () => string | undefined
+  /** After a conflict: open a branch at `at`, which sends the message. */
+  onBranchInstead: (text: string) => void
+  /** A first message to send at once: this column was opened to send it. */
+  pending: string | undefined
 }) {
   const [text, setText] = useState("")
   const [status, setStatus] = useState("")
-  const [conflict, setConflict] = useState<{ text: string; by: string } | null>(
-    null,
-  )
-  const where: Position = at === null ? ROOT : atEntry(entryId(at))
-  const compelled =
-    compelledResponder({
-      mentions: parseMentions(text),
-      threadDefault: rule.kind === "agent" ? rule : NOBODY,
-    }).kind === "agent"
+  const [conflict, setConflict] = useState<{
+    text: string
+    by: string | null
+  } | null>(null)
+  const byDefault = agentByDefault({
+    mode: fresh ? "branch" : "reply",
+    lane,
+    asksAgent,
+  })
+  const to = address({
+    mentions: parseMentions(text),
+    participants,
+    agentByDefault: byDefault,
+  })
+  const compelled = to.compels.kind === "agent"
   const busy = lane.kind === "lane" && (lane.running || lane.waiting > 0)
   const mode: ChatMode = fresh
     ? "branch"
     : compelled && busy
       ? "queue"
       : "reply"
-  const label = !compelled
-    ? "send"
-    : busy && !fresh
+  const label = compelled
+    ? busy && !fresh
       ? `queue · agent replies after ${holderName ?? "the others"}`
       : "send · agent will reply"
+    : to.people.length > 0
+      ? `send · to ${to.people.join(", ")}`
+      : "send"
 
   const send = async (message: string, as: ChatMode) => {
     setStatus("sending…")
-    const outcome = await session.chat(message, where, as)
+    const id = onSend()
+    const outcome = await session.chat(message, at, {
+      mode: as,
+      ...(boundLane === undefined ? {} : { lane: boundLane }),
+      asksAgent,
+      ...(id === undefined ? {} : { id }),
+    })
     if (outcome.kind === "conflict") {
       setConflict({ text: message, by: outcome.by })
       setText(message)
@@ -88,6 +113,15 @@ export function Composer({
     )
   }
 
+  // Sent once, however often React runs effects (StrictMode runs them twice).
+  const sentPending = useRef(false)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, on opening
+  useEffect(() => {
+    if (pending === undefined || sentPending.current) return
+    sentPending.current = true
+    void send(pending, "branch")
+  }, [])
+
   return (
     <form
       className="composer"
@@ -102,7 +136,9 @@ export function Composer({
       {conflict !== null && (
         <div className="conflict">
           <span className="conflict-text">
-            {conflict.by} asked the agent a moment before you.
+            {conflict.by === null
+              ? "Another thread started here a moment before you."
+              : `${conflict.by} asked the agent a moment before you.`}
           </span>{" "}
           <button
             className="queue-after"
@@ -112,13 +148,14 @@ export function Composer({
             }}
             type="button"
           >
-            Queue after {conflict.by}
+            {conflict.by === null ? "Queue" : `Queue after ${conflict.by}`}
           </button>{" "}
           <button
             className="branch-instead"
             onClick={() => {
               setText("")
-              void send(conflict.text, "branch")
+              setConflict(null)
+              onBranchInstead(conflict.text)
             }}
             type="button"
           >
@@ -132,11 +169,7 @@ export function Composer({
           className="input"
           onChange={e => setText(e.target.value)}
           placeholder={
-            fresh
-              ? "start a branch here…"
-              : rule.kind === "agent"
-                ? "ask the agent…"
-                : "say something · @agent to ask"
+            byDefault ? "ask the agent…" : "say something · @agent to ask"
           }
           value={text}
         />

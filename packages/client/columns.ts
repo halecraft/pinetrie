@@ -4,22 +4,47 @@
 // It is a view choice, never written to the document: which paths a person
 // reads is theirs. Pure: a reducer over values, tested without a DOM.
 
-import { followTip, type TreeIndex } from "@pineta/core"
+import {
+  followTip,
+  type LaneName,
+  type LaneView,
+  type TreeIndex,
+} from "@pineta/core"
 
 export interface Column {
   /** React key; stable when columns move. */
   readonly key: string
   /**
-   * The entry the column follows from (`followTip`). Null only before the
-   * session has a message: `sync` pins it to the first thread.
+   * The entry the column follows from (`followTip`); a bound column's is its
+   * lane's tip. Null before the session has a message, or for a fresh column
+   * at the root.
    */
   readonly anchor: string | null
   /**
-   * A fresh branch's children of `anchor` that existed when it opened, sorted.
-   * Present only until the branch's first message exists.
+   * The lane this column's thread is (ADR-0021). Set once the column's end is
+   * exactly one lane's tip; from then on the column follows the lane, never
+   * the newest leaf, and its sends name it, because a conversation forked at
+   * the lane's tip is newer and is another thread.
    */
-  readonly exclude?: readonly string[]
+  readonly lane?: LaneName
+  /** A Start Agent column: a message with no mention asks the agent. */
+  readonly asksAgent?: true
+  /**
+   * A fresh column: nothing of its own yet. Once its first message is sent,
+   * `sendId` is that send's id, and `sync` anchors the column at the entry it
+   * wrote (`TreeIndex.bySend`): exactly, whatever else appeared meanwhile.
+   * `pending` is a first message to send on opening ("Branch here" after a
+   * conflict), sent by the column's own composer so its outcome shows there.
+   */
+  readonly fresh?: { readonly sendId?: string; readonly pending?: string }
 }
+
+/** Where a new column goes. */
+export type Place =
+  | { readonly after: number }
+  /** In place of a column: the empty session's first, when a start is chosen. */
+  | { readonly replace: number }
+  | { readonly end: true }
 
 export type ColumnAction =
   /** Open a path next to the column it forks from. `key` comes from the shell. */
@@ -29,29 +54,46 @@ export type ColumnAction =
       readonly after: number
       readonly anchor: string
     }
-  /** Open a fresh branch at a message, next to the column showing it. */
+  /** Open a fresh column: a branch at `at`, or a new thread at the root (null). */
   | {
-      readonly kind: "branch"
+      readonly kind: "openFresh"
       readonly key: string
-      readonly after: number
-      readonly at: string
-      readonly existing: readonly string[]
+      readonly at: string | null
+      readonly asksAgent: boolean
+      readonly place: Place
+      /** A first message the column sends as soon as it opens. */
+      readonly text?: string
     }
+  /** A fresh column sent its first message, as send `sendId`. */
+  | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
   | { readonly kind: "close"; readonly index: number }
   | { readonly kind: "makeMain"; readonly index: number }
-  | { readonly kind: "sync"; readonly index: TreeIndex }
+  | {
+      readonly kind: "sync"
+      readonly index: TreeIndex
+      readonly lanes: readonly LaneView[]
+    }
 
 /** One column, following the newest thread until `sync` pins it. */
 export const initialColumns = (): readonly Column[] => [
   { key: "first", anchor: null },
 ]
 
-const insertAfter = (
+/** Whether a column's path ends at its anchor (`ColumnSpec.pinned`). */
+export const isPinned = (c: Column): boolean =>
+  c.fresh !== undefined || c.lane !== undefined
+
+const place = (
   state: readonly Column[],
-  after: number,
+  where: Place,
   column: Column,
 ): readonly Column[] => {
-  const at = Math.min(Math.max(after + 1, 0), state.length)
+  if ("replace" in where)
+    return state.map((c, i) => (i === where.replace ? column : c))
+  const at =
+    "end" in where
+      ? state.length
+      : Math.min(Math.max(where.after + 1, 0), state.length)
   return [...state.slice(0, at), column, ...state.slice(at)]
 }
 
@@ -61,16 +103,24 @@ export function columnsReducer(
 ): readonly Column[] {
   switch (action.kind) {
     case "open":
-      return insertAfter(state, action.after, {
-        key: action.key,
-        anchor: action.anchor,
-      })
-    case "branch":
-      return insertAfter(state, action.after, {
+      return place(
+        state,
+        { after: action.after },
+        { key: action.key, anchor: action.anchor },
+      )
+    case "openFresh":
+      return place(state, action.place, {
         key: action.key,
         anchor: action.at,
-        exclude: [...action.existing].sort(),
+        fresh: action.text === undefined ? {} : { pending: action.text },
+        ...(action.asksAgent ? { asksAgent: true } : {}),
       })
+    case "sent":
+      return state.map(c =>
+        c.key === action.key && c.fresh !== undefined
+          ? { ...c, fresh: { sendId: action.sendId } }
+          : c,
+      )
     case "close": {
       const rest = state.filter((_, i) => i !== action.index)
       return rest.length > 0 ? rest : initialColumns()
@@ -81,49 +131,64 @@ export function columnsReducer(
       return [column, ...state.filter((_, i) => i !== action.index)]
     }
     case "sync":
-      return syncColumns(state, action.index)
+      return syncColumns(state, action.index, action.lanes)
   }
 }
 
 /**
  * Settle columns against the tree, once per change.
  *
- * - A null anchor pins to the newest leaf as soon as there is one, so a new
- *   session's first column follows its first thread.
- * - Every other anchor ADVANCES to its column's tip: a column follows its own
- *   path, so a reply below its last message moves it on, and a branch off an
- *   earlier message, however new, never does. Following from a fixed anchor
- *   instead would jump to any newer branch below that anchor.
- * - A fresh branch whose first message now exists anchors at that message and
- *   drops `exclude`, so it follows its own branch from then on.
+ * - A fresh column waits for the entry its send wrote, then anchors there.
+ * - A bound column follows its lane: its anchor is the lane's tip.
+ * - Any other column follows its own path: its anchor ADVANCES to its tip
+ *   (`followTip`), so a reply below its last message moves it on, and a branch
+ *   off an earlier message never does. A null anchor pins to the newest leaf
+ *   once there is one. When the tip is exactly one lane's, the column binds.
  *
  * Returns `state` itself when nothing changes, so React skips the render.
  */
 function syncColumns(
   state: readonly Column[],
   index: TreeIndex,
+  lanes: readonly LaneView[],
 ): readonly Column[] {
   let changed = false
   const next = state.map(column => {
-    if (column.anchor === null) {
-      const pinned = followTip(index, null)
-      if (pinned === null) return column
-      changed = true
-      return { key: column.key, anchor: pinned }
-    }
-    if (column.exclude !== undefined) {
-      const excluded = new Set(column.exclude)
-      const fresh = (index.childrenOf.get(column.anchor) ?? []).find(
-        child => !excluded.has(child),
-      )
-      if (fresh === undefined) return column
-      changed = true
-      return { key: column.key, anchor: followTip(index, fresh) ?? fresh }
-    }
-    const tip = followTip(index, column.anchor)
-    if (tip === null || tip === column.anchor) return column
-    changed = true
-    return { key: column.key, anchor: tip }
+    const settled = settle(column, index, lanes)
+    if (settled !== column) changed = true
+    return settled
   })
   return changed ? next : state
+}
+
+function settle(
+  column: Column,
+  index: TreeIndex,
+  lanes: readonly LaneView[],
+): Column {
+  const { fresh, lane, ...rest } = column
+  if (fresh !== undefined) {
+    const own =
+      fresh.sendId === undefined ? undefined : index.bySend.get(fresh.sendId)
+    // Anchored at its own message, it follows like any column from here.
+    return own === undefined
+      ? column
+      : settle({ ...rest, anchor: own }, index, lanes)
+  }
+  if (lane !== undefined) {
+    const tip = lanes.find(l => l.name === lane)?.tip ?? null
+    return tip === null || tip === column.anchor
+      ? column
+      : { ...column, anchor: tip }
+  }
+  const tip = followTip(index, column.anchor)
+  if (tip === null) return column
+  const ending = lanes.filter(l => l.tip === tip)
+  const bound = ending.length === 1 ? ending[0]?.name : undefined
+  if (tip === column.anchor && bound === undefined) return column
+  return {
+    ...rest,
+    anchor: tip,
+    ...(bound === undefined ? {} : { lane: bound }),
+  }
 }

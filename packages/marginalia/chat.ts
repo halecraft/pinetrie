@@ -4,8 +4,9 @@
 // entry (S19). pi's default conversion sends it to the model as a `user`
 // message with its `content`, so `content` carries the speaker ("Alice: …")
 // and needs no projector. A message that compels the agent IS the agent's
-// prompt, so its thread's lane appends it; one that compels nobody is appended
-// with no run (ADR-0020).
+// prompt, so its thread's lane runs it; one that compels nobody is appended
+// with no run (ADR-0020). Who a message is for comes from its mentions, then
+// from whether its thread has a lane (`address`, ADR-0021).
 //
 // `details` holds the structured fields, which readers decode here and never
 // parse back out of `content`.
@@ -13,8 +14,9 @@
 import {
   type AgentId,
   type AgentMessageLike,
+  address,
+  agentByDefault,
   type ChatMode,
-  compelledResponder,
   type LaneName,
   type Mention,
   messageText,
@@ -23,13 +25,10 @@ import {
   type ThreadLane,
   type WriterId,
 } from "@pineta/core"
-import { Type } from "typebox"
+import { type Static, Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 
 export const CHAT_TYPE = "pineta.chat"
-
-/** pi value namespace for display names. The key is the writer's id. */
-export const PARTICIPANT_NAMESPACE = "pineta.participant"
 
 const ResponderSchema = Type.Union([
   Type.Object({ kind: Type.Literal("none") }),
@@ -43,6 +42,8 @@ export const DetailsSchema = Type.Object({
   authorName: Type.String(),
   text: Type.String(),
   compels: ResponderSchema,
+  /** The send that wrote it (the command's id), so its column can find it. */
+  sendId: Type.String(),
 })
 
 const ChatSchema = Type.Object({
@@ -56,6 +57,7 @@ export interface ChatDetails {
   readonly authorName: string
   readonly text: string
   readonly compels: Responder
+  readonly sendId: string
 }
 
 /** The pi `CustomMessage` a chat is stored as. */
@@ -88,17 +90,26 @@ export const encodeChat = (
   timestamp,
 })
 
+/**
+ * Details that matched `DetailsSchema` -> `ChatDetails`, branding the ids. The
+ * one conversion, for a chat in the tree and a message held in the outbox.
+ */
+export const detailsFromStored = (
+  d: Static<typeof DetailsSchema>,
+): ChatDetails => ({
+  author: d.author as WriterId,
+  authorName: d.authorName,
+  text: d.text,
+  compels:
+    d.compels.kind === "agent"
+      ? { kind: "agent", agent: d.compels.agent as AgentId }
+      : { kind: "none" },
+  sendId: d.sendId,
+})
+
 /** A stored message -> its chat details, or undefined if it is not a chat. */
 export const decodeChat = (message: unknown): ChatDetails | undefined =>
-  decodeWith(ChatSchema, message, ({ details: d }) => ({
-    author: d.author as WriterId,
-    authorName: d.authorName,
-    text: d.text,
-    compels:
-      d.compels.kind === "agent"
-        ? { kind: "agent", agent: d.compels.agent as AgentId }
-        : { kind: "none" },
-  }))
+  decodeWith(ChatSchema, message, ({ details }) => detailsFromStored(details))
 
 /**
  * The text of any citable message: a chat's own `text`, never its attributed
@@ -126,31 +137,9 @@ export function renderableMessage(message: unknown): AgentMessageLike {
         author: chat.authorName,
         compelled: chat.compels.kind === "agent",
         writer: chat.author,
+        sendId: chat.sendId,
       }
 }
-
-/**
- * Stored `pineta.participant` values -> each writer's name, by lane. Total: a
- * value that is not a string is skipped, like any malformed stored value.
- */
-export function participantNames(
-  values: Iterable<{ readonly key: string; readonly value: unknown }>,
-): ReadonlyMap<WriterId, string> {
-  const out = new Map<WriterId, string>()
-  for (const { key, value } of values) {
-    if (typeof value === "string") out.set(key as WriterId, value)
-  }
-  return out
-}
-
-/**
- * A writer's name for display: the one they set, or a label from their id so a
- * speaker is never blank.
- */
-export const displayName = (
-  writer: WriterId,
-  set: string | undefined,
-): string => set ?? `guest-${writer.slice(-4)}`
 
 export type ChatDecision =
   /** No lane at this thread: append with no lane, parented at exactly `parent`. */
@@ -191,9 +180,10 @@ export type ChatDecision =
  * Decide what a human message does. Pure; the host gathers every input inside
  * one serial step, so each decision names exactly where to write.
  *
- * - `branch` makes a fork on purpose: plain, it is appended at `at` with no
- *   lane; compelled, it ALWAYS creates a new lane there. At an idle thread
- *   lane's own tip there is nothing to fork, so it is planned as a `reply`.
+ * - Who it is for is `address`: its mentions, else the thread's default (the
+ *   agent where the thread has a lane or the column is a Start Agent column).
+ * - `branch` starts a thread at `at` and never continues a lane: plain, it is
+ *   appended there with no lane; compelled, it creates a new lane there.
  * - A thread lane that is running, or has messages waiting, is busy: a new
  *   message holds behind the ones ahead of it, and a lane is never written
  *   while it runs (S21).
@@ -208,56 +198,61 @@ export function planChat(input: {
   readonly mode: ChatMode
   /** What the sender saw: the end they read, or the branch point. */
   readonly at: Position
-  /** `threadEnd(at)`. */
-  readonly end: Position
-  /** `raceSince(at, author)`. */
-  readonly race: { readonly by: WriterId } | null
+  /** The thread, from `threadOf`. */
+  readonly thread: {
+    readonly end: Position
+    readonly lane: ThreadLane
+    readonly race: { readonly by: WriterId } | null
+  }
   readonly mentions: readonly Mention[]
-  readonly threadDefault: Responder
-  /** The lane at `end` for a reply, at `at` for a branch (`threadLaneAt`). */
-  readonly lane: ThreadLane
+  /** Every participant's display name (`participants`). */
+  readonly participants: readonly string[]
+  readonly asksAgent: boolean
+  /** The command's id. */
+  readonly sendId: string
 }): ChatDecision {
-  const compels = compelledResponder(input)
+  const { lane, end, race } = input.thread
+  const branch = input.mode === "branch"
+  const { compels } = address({
+    mentions: input.mentions,
+    participants: input.participants,
+    agentByDefault: agentByDefault({
+      mode: input.mode,
+      lane,
+      asksAgent: input.asksAgent,
+    }),
+  })
   const details: ChatDetails = {
     author: input.author,
     authorName: input.authorName,
     text: input.text,
     compels,
+    sendId: input.sendId,
   }
   const compelled = compels.kind === "agent"
-  const { lane } = input
 
-  // A branch at a lane's tip is a reply, but only at an IDLE lane's tip. A
-  // running lane's tip equals the branch point only in the moment after it was
-  // created there and before its prompt commits (the run starts after the
-  // serial step returns): that is someone else's new line of work, and a
-  // branch there is another.
-  if (input.mode === "branch" && (lane.kind === "none" || lane.running)) {
+  if (branch) {
     return compelled
       ? { kind: "createAndRun", at: input.at, details }
       : { kind: "appendToTree", parent: input.at, details }
   }
-  const mode = input.mode === "branch" ? "reply" : input.mode
 
   if (lane.kind === "none") {
-    if (!compelled) return { kind: "appendToTree", parent: input.end, details }
-    if (mode === "reply" && input.race !== null)
-      return { kind: "conflict", by: input.race.by }
-    return { kind: "createAndRun", at: input.end, details }
+    if (!compelled) return { kind: "appendToTree", parent: end, details }
+    if (input.mode === "reply" && race !== null)
+      return { kind: "conflict", by: race.by }
+    return { kind: "createAndRun", at: end, details }
   }
 
-  const name = lane.name
+  const name: LaneName = lane.name
   const busy = lane.running || lane.waiting > 0
   if (!compelled) {
     return busy
       ? { kind: "hold", lane: name, details, position: lane.waiting }
       : { kind: "appendToLane", lane: name, details }
   }
-  if (mode === "reply" && (input.race !== null || busy)) {
-    return {
-      kind: "conflict",
-      by: input.race?.by ?? lane.askedBy,
-    }
+  if (input.mode === "reply" && (race !== null || busy)) {
+    return { kind: "conflict", by: race?.by ?? lane.askedBy }
   }
   return busy
     ? { kind: "hold", lane: name, details, position: lane.waiting }

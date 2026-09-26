@@ -13,12 +13,10 @@ import {
   type AgentRun,
   agentActivity,
   ancestry,
-  type EntryId,
   type EntryLike,
   indexTree,
   type LaneName,
   type LaneView,
-  type Responder,
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
@@ -30,12 +28,11 @@ import {
   OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
   participantNames,
+  participants,
   REFERENCE_NAMESPACE,
   type Reference,
   type ReferenceIndex,
   renderableMessage,
-  THREAD_NAMESPACE,
-  threadDefaults,
 } from "@pineta/marginalia"
 import {
   readActiveRun,
@@ -119,17 +116,25 @@ export function readAgentActivity(
   )
 }
 
-/** Every thread rule, by the entry it is set at (`pineta.thread`). */
-export const readThreadRules = (
-  doc: SessionDocHandle,
-): ReadonlyMap<EntryId, Responder> =>
-  threadDefaults(readValues(doc, THREAD_NAMESPACE))
-
 /** Each writer's display name (`pineta.participant`). */
 export const readParticipantNames = (
   doc: SessionDocHandle,
 ): ReadonlyMap<WriterId, string> =>
   participantNames(readValues(doc, PARTICIPANT_NAMESPACE))
+
+/**
+ * Every participant's display name, guests included: the list a mention
+ * resolves against (`address`), and the names the screen shows.
+ */
+export function readParticipants(
+  doc: SessionDocHandle,
+  index: TreeIndex,
+): readonly string[] {
+  const writers = Object.values(index.entries).flatMap(e =>
+    e.message?.writer === undefined ? [] : [e.message.writer],
+  )
+  return participants(readParticipantNames(doc), writers)
+}
 
 /**
  * Every reference, indexed both ways (ADR-0017). Decoded totally: a malformed

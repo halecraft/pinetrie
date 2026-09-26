@@ -71,15 +71,19 @@ in E, and in no agent's T until an agent is asked.
 The distinction that organises it is **obligation**, not identity. A
 *collaborator* may reply when they choose, human or bot. A *compelled
 responder* must reply, and only an agent can be one: nobody can make a person
-answer. `@agent` compels the agent; `@alice` only tells Alice to look.
+answer. `@agent` compels the agent; `@alice` addresses Alice, and leaves the
+agent out.
 
-A thread has a default. In a **working session** the agent answers every
-message; in a **conversation** it answers when mentioned. The session starts as
-a working session, because the first person in is most likely alone and
-trying to get work done.
+A thread's mode is whether the agent works in it. Where it does, it answers
+every message that names no one else; in a **conversation** it answers when
+mentioned. Nothing sets the mode: it is whether the agent has been asked there
+(ADR-0021). Each step up in cost is deliberate: a message costs nothing, asking
+the agent spends time and money, and a workspace spends disk. So a session
+begins with a choice, **Start Chat** or **Start Agent**, and a branch starts as
+a conversation.
 
-The composer says what will happen **before** sending: who will see the
-message, and whether the agent will reply. Writing alone or together is a
+The composer says what will happen **before** sending: whether the agent will
+reply, or who the message is for. Writing alone or together is a
 separate choice from who must answer; a note is just a message that compels
 nobody.
 

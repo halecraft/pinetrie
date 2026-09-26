@@ -25,8 +25,8 @@ import {
   readLanes,
   readOutbox,
   readParticipantNames,
+  readParticipants,
   readReferences,
-  readThreadRules,
   readTreeIndex,
 } from "@pineta/reads"
 import {
@@ -40,7 +40,7 @@ import {
 } from "react"
 import { createRoot } from "react-dom/client"
 import { Column } from "./column.tsx"
-import { columnsReducer, initialColumns } from "./columns.ts"
+import { columnsReducer, initialColumns, isPinned } from "./columns.ts"
 import { readEntryCount } from "./projection.ts"
 import { Rail } from "./rail.tsx"
 import { connectSession, type SessionClient } from "./session-view.ts"
@@ -140,14 +140,14 @@ function App({ session }: { session: SessionClient }) {
   const status = useDocStatus(doc)
   const count = useTracked(() => readEntryCount(doc))
   // One moment's facts, read together: the same reads the host decides from.
-  const { index, activity, rules, lanes, outbox } = useTracked(() => {
+  const { index, activity, lanes, outbox, participants } = useTracked(() => {
     const index = readTreeIndex(doc)
     return {
       index,
       activity: readAgentActivity(doc, index),
-      rules: readThreadRules(doc),
       lanes: readLanes(doc, index),
       outbox: readOutbox(doc),
+      participants: readParticipants(doc, index),
     }
   })
   const refs = useTracked(() => readReferences(doc))
@@ -158,9 +158,16 @@ function App({ session }: { session: SessionClient }) {
     undefined,
     initialColumns,
   )
-  useEffect(() => dispatch({ kind: "sync", index }), [index])
+  useEffect(() => dispatch({ kind: "sync", index, lanes }), [index, lanes])
 
-  const views = useMemo(() => projectColumns(index, columns), [index, columns])
+  const views = useMemo(
+    () =>
+      projectColumns(
+        index,
+        columns.map(c => ({ anchor: c.anchor, pinned: isPinned(c) })),
+      ),
+    [index, columns],
+  )
   const rail = useMemo(() => projectRail(index), [index])
   const colors = useMemo(() => branchColors(rail, views), [rail, views])
   const paths = useMemo(
@@ -214,7 +221,21 @@ function App({ session }: { session: SessionClient }) {
         </div>
       </header>
       <main id="workspace">
-        <Rail activity={activity} onPick={openAt} open={shown} rows={rail} />
+        <Rail
+          activity={activity}
+          onPick={openAt}
+          onStart={asksAgent =>
+            dispatch({
+              kind: "openFresh",
+              key: crypto.randomUUID(),
+              at: null,
+              asksAgent,
+              place: { end: true },
+            })
+          }
+          open={shown}
+          rows={rail}
+        />
         <div id="strip" ref={strip}>
           {views.map((view, i) => {
             const column = columns[i]
@@ -222,20 +243,42 @@ function App({ session }: { session: SessionClient }) {
             return (
               <Column
                 activity={activity}
-                columnKey={column.key}
+                column={column}
                 forks={colors.forks}
                 index={index}
                 key={column.key}
                 lanes={lanes}
                 nameOf={nameOf}
                 outbox={outbox}
-                onBranchHere={at =>
+                onBranch={at =>
                   dispatch({
-                    kind: "branch",
+                    kind: "openFresh",
                     key: crypto.randomUUID(),
-                    after: i,
                     at,
-                    existing: index.childrenOf.get(at) ?? [],
+                    asksAgent: false,
+                    place: { after: i },
+                  })
+                }
+                onBranchInstead={(at, text) =>
+                  dispatch({
+                    kind: "openFresh",
+                    key: crypto.randomUUID(),
+                    at: at.kind === "root" ? null : at.id,
+                    asksAgent: false,
+                    place: { after: i },
+                    text,
+                  })
+                }
+                onSent={sendId =>
+                  dispatch({ kind: "sent", key: column.key, sendId })
+                }
+                onStart={asksAgent =>
+                  dispatch({
+                    kind: "openFresh",
+                    key: crypto.randomUUID(),
+                    at: null,
+                    asksAgent,
+                    place: { replace: i },
                   })
                 }
                 onClose={() => dispatch({ kind: "close", index: i })}
@@ -243,8 +286,8 @@ function App({ session }: { session: SessionClient }) {
                 onOpen={openAt}
                 path={paths[i] ?? new Set()}
                 position={i}
+                participants={participants}
                 refs={refs}
-                rules={rules}
                 session={session}
                 shown={shown}
                 track={colors.track[i] ?? PENDING_TRACK}

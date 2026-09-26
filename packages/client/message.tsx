@@ -1,6 +1,6 @@
 // client/message — one message in a column, and what can be done to it.
 
-import type { ReferenceTarget, Responder, SpineNode } from "@pineta/core"
+import type { ReferenceTarget, SpineNode } from "@pineta/core"
 import { entryId } from "@pineta/core"
 import type { Reference } from "@pineta/marginalia"
 import { speakerLabel } from "./names.ts"
@@ -14,10 +14,6 @@ export interface MessageProps {
   light: "lit" | "dim" | undefined
   /** The agent joins the thread here: the first message on the path that asked it. */
   joined: boolean
-  /** The rule set AT this message, if one is: a marker is drawn after it. */
-  ruleSet: Responder | undefined
-  /** The rule in force at this message, for the action that changes it. */
-  ruleHere: Responder
   /** Tracks of open columns that fork here: a dot of each colour. */
   forkTracks: readonly number[]
   /** Branches leaving here that no column shows. */
@@ -28,16 +24,13 @@ export interface MessageProps {
   cites: readonly Reference[]
   citedBy: readonly Reference[]
   onCite: (to: ReferenceTarget) => void
-  /** Undefined on a column's last message: replying there is the composer's job. */
-  onBranchHere: (() => void) | undefined
+  /**
+   * Open a column to the right, forked here (ADR-0021). Undefined where it
+   * would only mean replying: a conversation's last message.
+   */
+  onBranch: { readonly title: string; readonly go: () => void } | undefined
   onOpenBranch: (rootId: string) => void
-  onSetRule: (mode: "session" | "conversation") => void
 }
-
-const ruleText = (r: Responder) =>
-  r.kind === "agent"
-    ? "from here, the agent replies to every message"
-    : "from here, the agent replies only when @agent is mentioned"
 
 export function Message(p: MessageProps) {
   const { node } = p
@@ -80,8 +73,20 @@ export function Message(p: MessageProps) {
         ))}
         {/* JSX escapes by default, so model output is never HTML. */}
         <div className="text">{node.text}</div>
+        {/* In the right margin, because what it opens appears to the right. */}
+        {p.onBranch !== undefined && (
+          <button
+            aria-label={p.onBranch.title}
+            className="branch"
+            onClick={p.onBranch.go}
+            title={p.onBranch.title}
+            type="button"
+          >
+            →
+          </button>
+        )}
         {/* Tools float over the message on hover or focus: every message has
-            them, and three buttons under each would drown the conversation. */}
+            them, and buttons under each would drown the conversation. */}
         <div className="tools">
           <button
             className="cite"
@@ -101,36 +106,6 @@ export function Message(p: MessageProps) {
             type="button"
           >
             cite
-          </button>
-          {p.onBranchHere !== undefined && (
-            <button
-              className="branch-here"
-              onClick={p.onBranchHere}
-              type="button"
-            >
-              branch from here
-            </button>
-          )}
-          <button
-            className="rule"
-            onClick={() =>
-              p.onSetRule(
-                p.ruleHere.kind === "agent" ? "conversation" : "session",
-              )
-            }
-            // The label is what clicking DOES, as a verb; the rule in force now
-            // is the tooltip. A label that reads like a state would contradict
-            // the composer, which states the rule in force.
-            title={
-              p.ruleHere.kind === "agent"
-                ? "Now: the agent replies to every message here."
-                : "Now: the agent replies only when @agent is mentioned."
-            }
-            type="button"
-          >
-            {p.ruleHere.kind === "agent"
-              ? "from here, only answer @agent"
-              : "from here, answer every message"}
           </button>
         </div>
         {(p.closedBranches.length > 0 ||
@@ -164,11 +139,6 @@ export function Message(p: MessageProps) {
           </div>
         )}
       </div>
-      {p.ruleSet !== undefined && (
-        <div className="rule-marker" data-rule={p.ruleSet.kind}>
-          {ruleText(p.ruleSet)}
-        </div>
-      )}
     </>
   )
 }

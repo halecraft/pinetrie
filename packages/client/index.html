@@ -25,6 +25,15 @@
       #workspace { flex: 1; display: flex; min-height: 0; }
       #rail { position: relative; flex: 0 0 auto; min-width: 3rem; padding-right: .5rem;
         overflow-y: auto; border-right: 1px solid #23272e; }
+      /* How a thread at the root begins: a declared purpose, before any message. */
+      .start { display: flex; gap: .5rem; padding: .75rem; }
+      .column > .start { justify-content: center; border-top: 1px solid #23272e; }
+      .rail-tree { position: relative; }
+      /* A new thread at the root: above the root threads, where the tree starts. */
+      .new-thread { display: block; margin: .3rem auto .4rem .1rem; padding: 0 .45rem;
+        background: none; border: 1px solid #3a3f48; color: #aaa; }
+      #rail .start { flex-direction: column; margin: 0 0 .5rem; }
+      #rail .start button { font-size: .72rem; padding: .15rem .4rem; }
       .rail-dot { position: absolute; width: 8px; height: 8px; padding: 0; border-radius: 50%; }
       .rail-dot.pulse { animation: pulse 1s ease-in-out infinite; }
       @keyframes pulse { 50% { transform: scale(1.8); } }
@@ -38,7 +47,7 @@
       .column-head .fork-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .column-head button { padding: .1rem .5rem; font-size: .75rem; background: none;
         border: 1px solid #444; color: #bbb; }
-      .column-body { flex: 1; overflow-y: auto; padding: .75rem; }
+      .column-body { flex: 1; overflow-y: auto; padding: .75rem 1.75rem .75rem .75rem; }
 
       .msg { position: relative; margin: 0 0 1rem; transition: opacity .2s; }
       /* While the agent replies: what it reads stays; the rest steps back. */
@@ -49,7 +58,6 @@
       /* A message that compelled the agent: it was asked, so a reply follows. */
       .msg.asked { border-left: 2px solid #9ecbff; padding-left: .75rem; }
       .joined { margin: 0 0 .5rem; font-size: .8rem; color: #9ecbff; }
-      .rule-marker { margin: -.5rem 0 1rem; font-size: .8rem; color: #d0a15f; font-style: italic; }
       .text { white-space: pre-wrap; margin-top: .2rem; }
       .fork-dot { display: inline-block; width: 10px; height: 10px; padding: 0; margin-left: .4rem;
         border-radius: 50%; vertical-align: middle; }
@@ -58,6 +66,10 @@
       .tools { position: absolute; top: -.2rem; right: 0; display: none; gap: .3rem;
         font-size: .72rem; background: #1b1e24; padding: .15rem; border-radius: 4px; }
       .msg:hover .tools, .msg:focus-within .tools { display: flex; }
+      /* In the right margin: what it opens appears to the right. */
+      .msg .branch { position: absolute; top: 1.1rem; right: -1.5rem; padding: 0 .3rem;
+        background: none; border: 1px solid #3a3f48; color: #9ecbff; visibility: hidden; }
+      .msg:hover .branch, .msg:focus-within .branch { visibility: visible; }
       .cites, .cited-by { color: #9ecbff; }
       .streaming { opacity: .75; border-left: 2px solid #9ecbff; padding-left: .75rem; }
       /* Waiting for the thread's lane: not in the tree yet. */

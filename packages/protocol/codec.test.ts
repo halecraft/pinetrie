@@ -9,6 +9,7 @@ import {
   atEntry,
   ERR,
   entryId,
+  laneNameForThread,
   ROOT,
   referenceId,
   runId,
@@ -27,19 +28,41 @@ import { reply } from "./messages.ts"
 const refusalCode = (x: ReturnType<typeof decodeCommand>) =>
   x.kind === "refused" ? x.code : `not refused: ${x.kind}`
 
-test('decode: parentId "" is the root: a new conversation for chat, no anchor for a thread', () => {
-  const chat = decodeCommand({
+test('decode: parentId "" is the root, where only a branch starts a thread', () => {
+  const branch = decodeCommand({
     kind: "chat",
     text: "hi",
     parentId: "",
-    mode: "reply",
+    mode: "branch",
   })
-  assert.equal(chat.kind === "chat" ? chat.at.kind : "", "root")
+  assert.equal(branch.kind === "chat" ? branch.at.kind : "", "root")
+  for (const mode of ["reply", "queue"])
+    assert.equal(
+      refusalCode(
+        decodeCommand({ kind: "chat", text: "hi", parentId: "", mode }),
+      ),
+      ERR.NO_ANCHOR,
+    )
+})
+
+test("decode: thread defaults are gone; a lane must be a thread's", () => {
   assert.equal(
     refusalCode(
-      decodeCommand({ kind: "thread", text: "session", parentId: "" }),
+      decodeCommand({ kind: "thread", text: "session", parentId: "e-1" }),
     ),
-    ERR.NO_PARENT,
+    ERR.UNKNOWN_KIND,
+  )
+  assert.equal(
+    refusalCode(
+      decodeCommand({
+        kind: "chat",
+        text: "hi",
+        parentId: "e-1",
+        mode: "reply",
+        lane: "w-someone",
+      }),
+    ),
+    ERR.UNKNOWN_TARGET,
   )
 })
 
@@ -73,7 +96,9 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       kind: "chat",
       text: "hi @agent",
       at: ROOT,
-      mode: "reply",
+      mode: "branch",
+      lane: null,
+      asksAgent: true,
       mentions: [{ kind: "agent", agent: THE_AGENT }],
     },
     {
@@ -81,6 +106,8 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       text: "hi @bob",
       at: atEntry(entryId("e-5")),
       mode: "queue",
+      lane: laneNameForThread("abc"),
+      asksAgent: false,
       mentions: [{ kind: "person", name: "bob" }],
     },
     {
@@ -88,6 +115,8 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       text: "aside",
       at: atEntry(entryId("e-3")),
       mode: "branch",
+      lane: null,
+      asksAgent: false,
       mentions: [],
     },
     { kind: "name", name: "Alice" },
@@ -97,12 +126,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       to: { kind: "span", id: entryId("e-7"), start: 0, end: 2 },
       at: atEntry(entryId("e-8")),
     },
-    {
-      kind: "thread",
-      at: entryId("e-6"),
-      compels: { kind: "agent", agent: THE_AGENT },
-    },
-    { kind: "thread", at: entryId("e-6"), compels: { kind: "none" } },
   ] as const
   for (const intent of intents) {
     assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
@@ -114,10 +137,10 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "started", runId: runId("r-1") },
     { kind: "queued", position: 2 },
     { kind: "conflict", by: "Bea" },
+    { kind: "conflict", by: null },
     { kind: "referenced", id: referenceId("x-1") },
     { kind: "appended", id: entryId("e-1") },
     { kind: "named" },
-    { kind: "threaded" },
     { kind: "refused", code: ERR.UNKNOWN_TARGET, message: "nope" },
   ]
   for (const outcome of outcomes) {

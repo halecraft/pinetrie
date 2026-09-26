@@ -18,12 +18,13 @@ import {
   entryId,
   findSeqKeys,
   followTip,
+  laneNameForThread,
   type Position,
   projectSpine,
   projectTranscript,
   ROOT,
 } from "@pineta/core"
-import { decodeChat } from "@pineta/marginalia"
+import { decodeChat, displayName } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
   readLanes,
@@ -87,6 +88,14 @@ const shape = (tip: string | null) =>
   )
 const connect = (peerId: string, onChange?: () => void) =>
   connectSession({ url: host.wsUrl, WebSocket, peerId, onChange })
+/** A guest's mention handle: their screen label, `guest-…`. */
+const handleOfGuest = (w: Parameters<typeof displayName>[0]) =>
+  displayName(w, undefined)
+/** How the two starts send at the root (ADR-0021). */
+const START_AGENT = { mode: "branch", asksAgent: true } as const
+const START_CHAT = { mode: "branch" } as const
+const BRANCH = { mode: "branch" } as const
+const entryCount = () => Object.keys(readEntries(host.doc)).length
 
 /**
  * Invariants of ADR-0020, checked after every section:
@@ -137,14 +146,22 @@ ok(
   `an empty message is structurally rejected: ${codeOf(rejected)}`,
 )
 
-// The root is a working session, so a first message runs the agent: the
-// first compelled message in a thread creates that thread's lane.
-const hello = await client.chat("hello", ROOT)
+// Start Agent: a first message with no mention asks the agent, and the first
+// compelled message in a thread creates that thread's lane.
+const HELLO_SEND = crypto.randomUUID()
+const hello = await client.chat("hello", ROOT, {
+  ...START_AGENT,
+  id: HELLO_SEND,
+})
 ok(
   runOf(hello) !== "",
-  `a first message starts a run (${runOf(hello).slice(-8)})`,
+  `a Start Agent message starts a run (${runOf(hello).slice(-8)})`,
 )
 await idle()
+ok(
+  tree().bySend.get(HELLO_SEND) === idOf("hello"),
+  "the message carries its send's id, so its column can find it",
+)
 
 const firstLanes = readLaneNames(host.doc)
 ok(
@@ -215,6 +232,19 @@ ok(
     first.length,
   "the client's replica projects the same thread as the host's",
 )
+{
+  const lanesBefore = readLaneNames(host.doc).length
+  const chat = await client.chat("just us here", ROOT, START_CHAT)
+  ok(
+    chat.kind === "appended" && readLaneNames(host.doc).length === lanesBefore,
+    `a Start Chat message makes no lane (${chat.kind})`,
+  )
+  const rootReply = await client.chat("where does this go?", ROOT)
+  ok(
+    codeOf(rootReply) === ERR.NO_ANCHOR,
+    `only a branch starts at the root; a reply there is refused (${codeOf(rootReply)})`,
+  )
+}
 invariants("first turn")
 
 // ── replying continues the thread's own lane ──────────────────────────────
@@ -236,7 +266,7 @@ invariants("first turn")
   const helloId = idOf("hello")
   const trunkBefore = shape(trunkTip())
   const known = new Set(Object.keys(readEntries(host.doc)))
-  const fork = await client.chat("BRANCH-OK", at(helloId), "branch")
+  const fork = await client.chat("@agent BRANCH-OK", at(helloId), BRANCH)
   ok(runOf(fork) !== "", `a compelled branch starts a run (${fork.kind})`)
   await idle()
   const fresh = Object.values(readEntries(host.doc)).filter(
@@ -254,7 +284,7 @@ invariants("first turn")
     shape(trunkTip()).join("|") === trunkBefore.join("|"),
     "the trunk is unchanged by the branch",
   )
-  const lost = await client.chat("into the void", at("no-such-entry"), "branch")
+  const lost = await client.chat("into the void", at("no-such-entry"), BRANCH)
   ok(
     codeOf(lost) === ERR.UNKNOWN_TARGET,
     `a message at an unknown entry is refused (${codeOf(lost) || lost.kind})`,
@@ -302,12 +332,12 @@ invariants("first turn")
     if (Object.keys(host.doc.activeRuns()).length >= 2) bothActive = true
   }, 5)
   const [ra, rb] = await Promise.all([
-    a.chat("WRITER-A says hello", ROOT),
-    b.chat("WRITER-B says hello", ROOT),
+    a.chat("WRITER-A says hello", ROOT, START_AGENT),
+    b.chat("WRITER-B says hello", ROOT, START_AGENT),
   ])
   ok(
     runOf(ra) !== "" && runOf(rb) !== "",
-    "two new conversations each start their own run",
+    "two new agent threads each start their own run",
   )
   await idle()
   clearInterval(watch)
@@ -346,15 +376,14 @@ invariants("first turn")
     "each person's display name is stored by their writer id",
   )
 
-  // A conversation, branched on purpose from the first message, with no lane.
+  // A branch is a conversation: made on purpose from the first message, with
+  // no lane, though the thread it leaves is agent work (ADR-0021).
   const helloId = idOf("hello")
-  if (helloId !== null)
-    await alice.setThreadMode(entryId(helloId), "conversation")
   const lanesBefore = readLaneNames(host.doc).length
   const opened = await alice.chat(
     "the secret word is PLUM",
     at(helloId),
-    "branch",
+    BRANCH,
   )
   const plumId = opened.kind === "appended" ? opened.id : null
   ok(plumId !== null, `a plain branch is appended (${opened.kind})`)
@@ -458,17 +487,16 @@ invariants("first turn")
     bob.setName("Bob"),
     carol.setName("Carol"),
   ])
+  const REMARK = "@Carol plain remark"
   // A long answer, so the lane is still running when Bob and Carol send.
   const QUESTION = "name a fruit, then write four sentences about it"
-  const start = await alice.chat(QUESTION, ROOT)
+  const start = await alice.chat(QUESTION, ROOT, START_AGENT)
   ok(runOf(start) !== "", "Alice's question starts a thread's run")
   await waitFor(() => idOf(QUESTION) !== null)
   const promptId = idOf(QUESTION)
-  // A conversation from here: only a mention compels, so Bob's remark is plain.
-  if (promptId !== null)
-    await alice.setThreadMode(entryId(promptId), "conversation")
+  // This thread is agent work; Bob's remark names Carol, so it is for her only.
   // What Bob and Carol see: the thread ends at Alice's question.
-  const bobRemark = await bob.chat("plain remark", at(promptId))
+  const bobRemark = await bob.chat(REMARK, at(promptId))
   const carolAsk = await carol.chat("@agent name a colour", at(promptId))
   ok(
     bobRemark.kind === "queued",
@@ -478,7 +506,9 @@ invariants("first turn")
     carolAsk.kind === "conflict" && carolAsk.by === "Alice",
     `a compelled reply to a busy lane is a conflict, naming who holds it (${carolAsk.kind}${carolAsk.kind === "conflict" ? `: ${carolAsk.by}` : ""})`,
   )
-  const queued = await carol.chat("@agent name a colour", at(promptId), "queue")
+  const queued = await carol.chat("@agent name a colour", at(promptId), {
+    mode: "queue",
+  })
   ok(
     queued.kind === "queued" && queued.position === 1,
     `queue waits behind the message already waiting (${queued.kind}${queued.kind === "queued" ? ` ${queued.position}` : ""})`,
@@ -491,16 +521,13 @@ invariants("first turn")
   const path = shape(thread?.tip ?? null)
   ok(
     path.join(" → ") ===
-      `Alice:${QUESTION} → assistant → Bob:plain remark → Carol:@agent name a colour → assistant`,
+      `Alice:${QUESTION} → assistant → Bob:${REMARK} → Carol:@agent name a colour → assistant`,
     `in send order, with no reply to the plain remark: ${path.join(" → ")}`,
   )
 
   // A race with the lane idle: Bob saw the end before Carol's question; Carol's
   // compelled message is below it now, so his compelled reply is a conflict.
-  const bobAsk = await bob.chat(
-    "@agent and a number?",
-    at(idOf("plain remark")),
-  )
+  const bobAsk = await bob.chat("@agent and a number?", at(idOf(REMARK)))
   ok(
     bobAsk.kind === "conflict" && bobAsk.by === "Carol",
     `another writer's compelled message below what I saw is a race (${bobAsk.kind})`,
@@ -508,7 +535,7 @@ invariants("first turn")
   // My own question and the agent's reply to it are not a race for me: Dan
   // asks, the reply lands, and Dan follows up from where he last looked.
   const dan = await connect("q-dan")
-  await dan.chat("@agent name a car", ROOT)
+  await dan.chat("@agent name a car", ROOT, START_CHAT)
   await waitFor(() => idOf("@agent name a car") !== null)
   const carId = idOf("@agent name a car")
   await idle()
@@ -533,7 +560,7 @@ invariants("first turn")
   const branched = await bob.chat(
     "@agent separately: a tree?",
     at(promptId),
-    "branch",
+    BRANCH,
   )
   await idle()
   clearInterval(watch)
@@ -548,31 +575,98 @@ invariants("first turn")
   await Promise.all([alice.close(), bob.close(), carol.close()])
 }
 
-// ── thread rules ──────────────────────────────────────────────────────────
+// ── mentions pick the addressee (ADR-0021) ────────────────────────────────
 {
-  const w = await connect("r-writer")
-  const plumId = idOf("the secret word is PLUM")
-  const setSession =
-    plumId === null
-      ? undefined
-      : await w.setThreadMode(entryId(plumId), "session")
-  ok(setSession?.kind === "threaded", "a thread becomes a working session")
-  const inSession = await w.chat(
-    "summarise, please",
-    at(idOf("five")),
-    "branch",
-  )
-  ok(
-    runOf(inSession) !== "",
-    `in a working session a plain message runs (${inSession.kind})`,
-  )
+  const w = await connect("m-writer")
+  await w.setName("Wes")
   await idle()
-  const noThread = await w.setThreadMode(entryId("no-such-entry"), "session")
+  const send = async (text: string) => {
+    const r = await w.chat(text, at(trunkTip()))
+    await idle()
+    return r
+  }
+  // The trunk has a lane: a message naming no one asks the agent.
+  const toBob = await send("@Bob look at this")
   ok(
-    codeOf(noThread) === ERR.UNKNOWN_TARGET,
-    `a thread at an unknown entry is refused (${codeOf(noThread)})`,
+    toBob.kind === "appended",
+    `in agent work, a message naming only a person is for them: no run (${toBob.kind})`,
   )
-  invariants("rules")
+  const guest = handleOfGuest(client.writer)
+  const toGuest = await send(`@${guest} see above`)
+  ok(
+    toGuest.kind === "appended",
+    `a guest is mentioned by the label the screen shows, @${guest} (${toGuest.kind})`,
+  )
+  const unknown = await send("bump @types/node please")
+  ok(
+    runOf(unknown) !== "",
+    `a handle naming no participant is ignored: the agent is still asked (${unknown.kind})`,
+  )
+  const both = await send("@agent @Bob thoughts?")
+  ok(runOf(both) !== "", `@agent with a person asks the agent (${both.kind})`)
+  invariants("mentions")
+  await w.close()
+}
+
+// ── stepping down at the end (ADR-0021) ───────────────────────────────────
+{
+  const w = await connect("s-writer")
+  const T = trunkTip()
+  const lanesBefore = readLaneNames(host.doc).length
+  // A branch at the lane's tip is a conversation continuing from its end.
+  const down = await w.chat("off the record", at(T), BRANCH)
+  const convId = down.kind === "appended" ? down.id : null
+  ok(
+    convId !== null &&
+      host.doc.entries.get(convId)?.parentId === T &&
+      trunkTip() === T &&
+      readLaneNames(host.doc).length === lanesBefore,
+    `a plain branch at a lane's tip is a lane-less child of it; the lane stays (${down.kind})`,
+  )
+  // The conversation is now the newest leaf below T. A send naming the lane
+  // still continues the lane: the agent thread's column knows its thread.
+  const trunkLane = lanes().find(l => l.name === trunk)?.name
+  const onLane = await w.chat("@agent go on", at(T), {
+    ...(trunkLane === undefined ? {} : { lane: trunkLane }),
+  })
+  await idle()
+  const goOn = idOf("@agent go on")
+  ok(
+    runOf(onLane) !== "" &&
+      goOn !== null &&
+      host.doc.entries.get(goOn)?.parentId === T &&
+      ancestry(tree(), trunkTip()).path.includes(goOn),
+    `a send naming the lane runs on it, past the newer conversation (${onLane.kind})`,
+  )
+  const inConv = await w.chat("still here", at(convId))
+  ok(
+    inConv.kind === "appended" &&
+      host.doc.entries.get(inConv.id)?.parentId === convId,
+    `a reply in the conversation stays in it (${inConv.kind})`,
+  )
+  const asked = await w.chat("@agent summarise us", at(idOf("still here")))
+  await idle()
+  const second = lanes().find(l =>
+    projectTranscript(tree(), l.tip).some(
+      m => m.text === "@agent summarise us",
+    ),
+  )
+  ok(
+    runOf(asked) !== "" &&
+      readLaneNames(host.doc).length === lanesBefore + 1 &&
+      second?.tip != null &&
+      ancestry(tree(), second.tip).path.includes(T ?? ""),
+    "@agent in the conversation makes its own lane, reading the agent thread above",
+  )
+  const count = entryCount()
+  const nowhere = await w.chat("lost", at(trunkTip()), {
+    lane: laneNameForThread("no-such-lane"),
+  })
+  ok(
+    codeOf(nowhere) === ERR.UNKNOWN_TARGET && entryCount() === count,
+    `a send naming an unknown lane is refused, writing nothing (${codeOf(nowhere)})`,
+  )
+  invariants("stepping down")
   await w.close()
 }
 
@@ -630,7 +724,7 @@ invariants("first turn")
 if (LIVE) {
   console.log("\n--- live turn ---")
   const known = new Set(readLaneNames(host.doc))
-  const r = await client.chat(PROMPT, ROOT)
+  const r = await client.chat(PROMPT, ROOT, START_AGENT)
   ok(runOf(r) !== "", "live prompt accepted")
   await idle()
   const lane = readLaneNames(host.doc).find(l => !known.has(l)) ?? ""

@@ -48,7 +48,7 @@ The host owns one harness. A lane is a thread's line of work: created by
 `Agent.createThreadLane(at)` where agent work is first wanted in a thread, named
 `laneNameForThread(uuidv7)` (`t-…`), and never navigated. People own no lanes;
 a message records its writer (`details.author`, from the transport). A lane's
-tip is therefore always its thread's end, and `threadLaneAt` finds a thread's
+tip is therefore always its thread's end, and `threadOf` finds a thread's
 lane from its end with no stored mapping.
 
 The facade has no way to move a lane: `ThreadLaneHandle` offers only `append`

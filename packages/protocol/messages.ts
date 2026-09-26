@@ -21,16 +21,17 @@ export const HOST_PEER_ID = "host"
  * array is the only place a kind is declared: adding one here reaches the
  * wire, and nothing else needs editing.
  *
- *   - `chat` is a human message. `parentId` is where its sender was reading
- *     (`""`: the root, a new conversation); `mode` says how it joins the tree
- *     (`CHAT_MODES` in @pineta/core). It runs the agent only when compelled.
+ *   - `chat` is a human message. `parentId` is where its sender was reading,
+ *     or the branch point (`""`: the root, where only a `branch` may start);
+ *     `mode` says how it joins the tree (`CHAT_MODES` in @pineta/core); `lane`
+ *     names the thread's lane when the sender's column is bound to one;
+ *     `asksAgent` marks a Start Agent column. It runs the agent only when the
+ *     agent is its addressee (`address`).
  *   - `reference` cites `targetId`, or a span of it, from `parentId`, the entry
  *     its author is reading. It writes one value and runs nothing.
  *   - `name` sets the sender's display name to `text`.
- *   - `thread` sets the default at entry `parentId`: `text` is `session` (the
- *     agent answers every message) or `conversation` (nobody is compelled).
  */
-export const COMMAND_KINDS = ["chat", "reference", "name", "thread"] as const
+export const COMMAND_KINDS = ["chat", "reference", "name"] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
 /**
@@ -47,13 +48,16 @@ export interface Command {
   readonly kind: CommandKind
   readonly text: string
   /**
-   * An entry: where the sender was reading (`chat`, `reference`), or where a
-   * default is set (`thread`). `""` is the root. Only `codec.ts` interprets
-   * this; nothing past it sees `""`.
+   * An entry: where the sender was reading, or the branch point. `""` is the
+   * root. Only `codec.ts` interprets this; nothing past it sees `""`.
    */
   readonly parentId: string
   /** `chat`: `reply`, `queue` or `branch`; `""` otherwise. */
   readonly mode: string
+  /** `chat`: the lane the sender's column is bound to, or `""`. */
+  readonly lane: string
+  /** `chat`: a Start Agent column, where no mention asks the agent. */
+  readonly asksAgent: boolean
   /** `reference`: the entry cited. Separate from `parentId` on purpose. */
   readonly targetId: string
   /** `reference`: a span's bounds, or -1 for the whole entry (the wire is total). */
@@ -72,7 +76,6 @@ export const OUTCOME_KINDS = [
   "queued",
   "conflict",
   "named",
-  "threaded",
   "refused",
 ] as const
 export type OutcomeKind = (typeof OUTCOME_KINDS)[number]
@@ -104,6 +107,8 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   text: "",
   parentId: "",
   mode: "",
+  lane: "",
+  asksAgent: false,
   targetId: "",
   spanStart: -1,
   spanEnd: -1,

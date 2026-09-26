@@ -1084,7 +1084,11 @@ already attributes.
 - **Invariant: a lane's tip is always its thread's end.** Every rule keeps it:
   lanes never move; everything in a lane's thread goes through that lane; a
   branch never reuses a lane. So the thread's lane is found from the thread's
-  end, with no stored mapping (`threadLaneAt`).
+  end, with no stored mapping (`threadOf`). *Amended by ADR-0021:* a
+  compelled branch at a lane's tip creates a new lane there, and until its
+  prompt commits the two share a tip. In that moment the end names neither
+  lane: nothing binds to either, and a send that does not name its lane is a
+  `conflict`.
 - **People own no lanes.** A message records its writer (`WriterId`, from the
   transport). The host is every lane's only writer, and one serial executor
   runs every command's gather, plan and execute, so no two contend.

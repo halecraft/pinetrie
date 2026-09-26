@@ -11,10 +11,11 @@
 
 import {
   atEntry,
+  type ChatMode,
+  type EntryId,
   entryId,
   type LaneName,
   type Position,
-  ROOT,
   type WriterId,
 } from "./index.ts"
 
@@ -34,6 +35,8 @@ export interface AgentMessageLike {
   readonly compelled?: boolean
   /** Role `chat` only: the writer who sent it, from the transport. */
   readonly writer?: WriterId
+  /** Role `chat` only: the id of the send that wrote it, for its column. */
+  readonly sendId?: string
 }
 
 export interface EntryLike {
@@ -54,6 +57,8 @@ export interface TranscriptMessage {
   readonly compelled?: boolean
   /** Role `chat` only: who sent it, so a reader can look up their current name. */
   readonly writer?: WriterId
+  /** Role `chat` only: the send that wrote it. */
+  readonly sendId?: string
 }
 
 /** Flatten pi's AgentMessage content into display text. */
@@ -78,7 +83,7 @@ export function messageText(
  * The one rule for which entries are messages, shared by every view so they
  * cannot disagree. Non-message entries and roles other than user, assistant
  * and chat are dropped. A `chat` message is a human's, already decoded by the
- * reader (`readRenderableEntries` in `packages/client`); core only admits the
+ * reader (`readRenderableEntries` in `@pineta/reads`); core only admits the
  * role, so it needs no schema library.
  */
 function renderableMessage(entry: EntryLike): TranscriptMessage | null {
@@ -94,6 +99,9 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
       ...(entry.message?.writer === undefined
         ? {}
         : { writer: entry.message.writer }),
+      ...(entry.message?.sendId === undefined
+        ? {}
+        : { sendId: entry.message.sendId }),
     }
   }
   if (role !== "user" && role !== "assistant") return null
@@ -108,12 +116,17 @@ export interface TreeIndex {
   readonly childrenOf: ReadonlyMap<string, readonly string[]>
   /** An entry's parent id as stored; null for a root. */
   readonly parentOf: (id: string) => string | null
-  /** Entries with no parent: one per fresh conversation. Ascending by id. */
+  /** Entries with no parent: one per thread started at the root. Ascending by id. */
   readonly roots: readonly string[]
   /** Entries whose parent is absent from the set. Never dropped. Ascending. */
   readonly orphans: readonly string[]
   /** Entries with no children. Ascending by id. */
   readonly leaves: readonly string[]
+  /**
+   * Chat entries by the send that wrote them. A fresh column knows its send's
+   * id before the entry exists, so it finds its first message here, exactly.
+   */
+  readonly bySend: ReadonlyMap<string, string>
 }
 
 const ascending = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
@@ -128,7 +141,10 @@ export function indexTree(
   const childrenOf = new Map<string, string[]>()
   const roots: string[] = []
   const orphans: string[] = []
+  const bySend = new Map<string, string>()
   for (const [id, entry] of Object.entries(entries)) {
+    const send = entry.message?.sendId
+    if (send !== undefined) bySend.set(send, id)
     const parent = entry.parentId
     if (parent === null || parent === undefined) roots.push(id)
     else if (entries[parent] === undefined) orphans.push(id)
@@ -148,6 +164,7 @@ export function indexTree(
     leaves: Object.keys(entries)
       .filter(id => !childrenOf.has(id))
       .sort(ascending),
+    bySend,
   }
 }
 
@@ -293,25 +310,18 @@ export function latestTip(tips: Iterable<string | null>): string | null {
  * jumps to it. `at` null is the root, below which everything lies.
  *
  * Leaves, not lane tips: a conversation thread has no lane at all (ADR-0020),
- * so a thread's end is its newest leaf, whoever wrote it.
- *
- * `exclude` is for a fresh branch: children of `at` that already existed when
- * it opened. Only leaves reached through a NEW child count, so the column stays
- * at `at` until the branch's first message exists, then follows it.
+ * so its end is its newest leaf, whoever wrote it. A thread that has a lane is
+ * followed through the lane instead (`threadOf`, and a bound column), because
+ * a conversation forked at the lane's tip is newer and is not its thread.
  */
-export function followTip(
-  index: TreeIndex,
-  at: string | null,
-  exclude?: readonly string[],
-): string | null {
+export function followTip(index: TreeIndex, at: string | null): string | null {
   if (at === null) return latestTip(index.leaves)
   if (index.entries[at] === undefined) return at
   // Walk DOWN from `at`: the leaves below it are the only candidates, so there
   // is no need to walk up from every leaf in the tree to find them.
-  const skip = new Set(exclude)
   const leaves: string[] = []
   const seen = new Set<string>([at])
-  const stack = (index.childrenOf.get(at) ?? []).filter(c => !skip.has(c))
+  const stack = [...(index.childrenOf.get(at) ?? [])]
   for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
     if (seen.has(id)) continue
     seen.add(id)
@@ -327,12 +337,17 @@ export function followTip(
 export interface ColumnSpec {
   /** The entry the column follows from; null follows the newest leaf overall. */
   readonly anchor: string | null
-  /** A fresh branch's pre-existing children of `anchor` (see `followTip`). */
-  readonly exclude?: readonly string[]
+  /**
+   * The path ends at `anchor` (nothing, when null) and follows nothing below
+   * it: a fresh column, which has nothing of its own yet, or a column bound to
+   * a lane, whose anchor is the lane's tip and whose thread goes on only
+   * through the lane.
+   */
+  readonly pinned?: boolean
 }
 
 export interface ColumnView {
-  /** Where this column's path ends: `followTip(anchor, exclude)`. */
+  /** Where this column's path ends: its anchor if pinned, else `followTip`. */
   readonly tipId: string | null
   /**
    * The deepest message this path shares with ANY column to its left, or null
@@ -357,7 +372,8 @@ export function projectColumns(
 ): ColumnView[] {
   const shown = new Set<string>()
   return columns.map(column => {
-    const tipId = followTip(index, column.anchor, column.exclude)
+    const tipId =
+      column.pinned === true ? column.anchor : followTip(index, column.anchor)
     const { spine } = projectSpine(index, tipId)
     let cut = -1
     for (const [i, node] of spine.entries()) if (shown.has(node.id)) cut = i
@@ -459,48 +475,6 @@ export function projectRail(index: TreeIndex): readonly RailRow[] {
 
 // ── threads, lanes, and the agent ─────────────────────────────────────────
 
-/**
- * Where a message sent at `at` lands: at the root, a new conversation, so the
- * root itself; otherwise the end of the thread below `at` (`followTip`). The
- * root is never followed: that would join whatever thread happens to be newest.
- */
-export function threadEnd(index: TreeIndex, at: Position): Position {
-  if (at.kind === "root") return ROOT
-  const end = followTip(index, at.id)
-  return end === null ? at : atEntry(entryId(end))
-}
-
-/**
- * Whether another writer took the slot below `at`: the newest compelled
- * message below it by someone other than `me`. A plain remark and an agent
- * reply are not a race: a compelled message simply goes after them. Pure.
- */
-export function raceSince(
-  index: TreeIndex,
-  at: Position,
-  me: WriterId,
-): { readonly by: WriterId } | null {
-  if (at.kind === "root") return null
-  let newest: { id: string; by: WriterId } | null = null
-  const seen = new Set<string>([at.id])
-  const stack = [...(index.childrenOf.get(at.id) ?? [])]
-  for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
-    if (seen.has(id)) continue
-    seen.add(id)
-    const m = index.entries[id]?.message
-    if (
-      m?.role === "chat" &&
-      m.compelled === true &&
-      m.writer !== undefined &&
-      m.writer !== me &&
-      (newest === null || id > newest.id)
-    )
-      newest = { id, by: m.writer }
-    stack.push(...(index.childrenOf.get(id) ?? []))
-  }
-  return newest === null ? null : { by: newest.by }
-}
-
 /** A lane as the reads see it. */
 export interface LaneView {
   readonly name: LaneName
@@ -516,18 +490,116 @@ export type ThreadLane =
   | { readonly kind: "none" }
   | ({ readonly kind: "lane" } & LaneView)
 
+/** Which thread a send continues, as the host and the composer both decide it. */
+export type ThreadOf =
+  | {
+      readonly kind: "thread"
+      /** Where a `reply` lands: the thread's end, or `at` for a `branch`. */
+      readonly end: Position
+      readonly lane: ThreadLane
+      /** Another writer's compelled message on the thread since `at`. */
+      readonly race: { readonly by: WriterId } | null
+    }
+  /** `at`, or the named lane, is not in this tree, or `at` is not on the lane. */
+  | { readonly kind: "unknown" }
+  /** Two lanes end where the sender is: which one they meant cannot be told. */
+  | { readonly kind: "ambiguous" }
+
 /**
- * The lane whose tip is `end`. A lane's tip is always its thread's end
- * (ADR-0020), so the end names the thread's lane with no stored mapping. The
- * root never has a thread lane: a message there starts a new conversation.
+ * Which thread a send continues. Pure; the host decides from it and the
+ * composer labels from it, so the promise and the decision cannot differ.
+ *
+ * - A `branch` starts a thread at `at`, with no lane and nothing to race.
+ * - A send naming its lane continues that lane: its tip is the end, wherever
+ *   the newest leaf below `at` is (ADR-0021: a conversation forked at the
+ *   lane's tip is newer, and is another thread).
+ * - Otherwise the thread is the newest leaf below `at` (`followTip`), and its
+ *   lane is the one ending there, if exactly one does.
+ *
+ * A race is judged along the thread's own path, from `at` down to its end: a
+ * compelled message in a sibling fork is someone else's thread.
  */
-export function threadLaneAt(
+export function threadOf(
+  index: TreeIndex,
   lanes: readonly LaneView[],
-  end: Position,
-): ThreadLane {
-  if (end.kind === "root") return { kind: "none" }
-  const lane = lanes.find(l => l.tip === end.id)
-  return lane === undefined ? { kind: "none" } : { kind: "lane", ...lane }
+  send: {
+    readonly at: Position
+    readonly mode: ChatMode
+    readonly lane: LaneName | null
+    readonly me: WriterId
+  },
+): ThreadOf {
+  const { at } = send
+  if (at.kind === "entry" && index.entries[at.id] === undefined)
+    return { kind: "unknown" }
+  if (send.mode === "branch")
+    return { kind: "thread", end: at, lane: { kind: "none" }, race: null }
+  if (at.kind === "root") return { kind: "unknown" }
+
+  let end: string
+  let lane: LaneView | undefined
+  if (send.lane !== null) {
+    // Named, the lane is the thread: never looked up again by its tip, which
+    // a lane just branched there may share for a moment.
+    lane = lanes.find(l => l.name === send.lane)
+    if (lane?.tip == null || !pathIds(index, lane.tip).has(at.id))
+      return { kind: "unknown" }
+    end = lane.tip
+  } else {
+    // A lane's tip is its thread's end (ADR-0020), so the end names the
+    // thread's lane with no stored mapping. Two lanes share a tip for a moment
+    // after a compelled branch at a lane's tip, until the new one's prompt
+    // commits: then the end names neither.
+    end = followTip(index, at.id) ?? at.id
+    const ending = lanes.filter(l => l.tip === end)
+    if (ending.length > 1) return { kind: "ambiguous" }
+    lane = ending[0]
+  }
+  return {
+    kind: "thread",
+    end: atEntry(entryId(end)),
+    lane: lane === undefined ? { kind: "none" } : { kind: "lane", ...lane },
+    race: raceAlong(index, at.id, end, send.me),
+  }
+}
+
+/**
+ * Whether a message with no mention asks the agent: in a thread with a lane,
+ * or from a Start Agent column. A branch is a new thread, with no lane of its
+ * own yet, so only a Start Agent column makes it ask (ADR-0021).
+ */
+export const agentByDefault = (send: {
+  readonly mode: ChatMode
+  readonly lane: ThreadLane
+  readonly asksAgent: boolean
+}): boolean =>
+  (send.mode !== "branch" && send.lane.kind === "lane") || send.asksAgent
+
+/**
+ * The newest compelled chat by someone other than `me` on the path from `at`
+ * (exclusive) down to `end`. A plain remark and an agent reply are not a race:
+ * a compelled message simply goes after them.
+ */
+function raceAlong(
+  index: TreeIndex,
+  at: EntryId,
+  end: string,
+  me: WriterId,
+): { readonly by: WriterId } | null {
+  let newest: { id: string; by: WriterId } | null = null
+  for (const id of ancestry(index, end).path) {
+    if (id === at) break
+    const m = index.entries[id]?.message
+    if (
+      m?.role === "chat" &&
+      m.compelled === true &&
+      m.writer !== undefined &&
+      m.writer !== me &&
+      (newest === null || id > newest.id)
+    )
+      newest = { id, by: m.writer }
+  }
+  return newest === null ? null : { by: newest.by }
 }
 
 /** One lane the agent is replying on: where, and what it reads. */

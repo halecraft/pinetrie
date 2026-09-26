@@ -18,8 +18,19 @@ the author (a `WriterId`, from the transport), the display name as written, the
 text, and the `Responder` it compels. `encodeChat` and the total `decodeChat`
 are the only code that builds or reads the shape.
 
-- **`planChat` decides what a message does** (ADR-0020), over what the host
-  gathers in one serial step, and names exactly where to write:
+- **Who a message is for is `address`** (`@pineta/core`, ADR-0021): `@agent`
+  asks the agent; a message naming only participants is for them; with no
+  mention that resolves, the thread decides (`agentByDefault`: the agent where
+  the thread has a lane or the column is a Start Agent column, and never by a
+  lane's default for a `branch`, which is a new thread). A handle resolves
+  against `participants`: every named writer and every writer in the tree,
+  guests by their `guest-…` label, through `handleOf`: letters and digits in
+  any script, `_` and `-`, lower-cased and composed (NFC), so "José" typed
+  either way is `@josé`. An unknown handle (`@types/node`) is ignored, so it
+  never silences the agent; `normalizeName` refuses a name with no handle, or
+  the handle `agent`.
+- **`planChat` decides what a message does** (ADR-0020), over the thread
+  `threadOf` gives, and names exactly where to write:
 
   | a message… | no lane | idle lane | busy lane (running, or messages waiting) |
   |---|---|---|---|
@@ -27,22 +38,25 @@ are the only code that builds or reads the shape.
   | compelled `reply`, not raced | `createAndRun` at the end | `run` | `conflict` |
   | compelled `reply`, raced | `conflict` | `conflict` | `conflict` |
   | compelled `queue` | `createAndRun` | `run` | `hold` |
-  | `branch` | plain: `appendToTree` at `at`; compelled: `createAndRun` at `at` | a reply | a new lane |
+  | `branch` | plain: `appendToTree` at `at`; compelled: `createAndRun` at `at` | the same: a branch never continues a lane | the same |
 
-  A race is another writer's compelled message below what the sender saw
-  (`raceSince`); plain remarks and agent replies are not. `branch` at an idle
-  lane's own tip is a reply: there is nothing to fork. At a *running* lane's tip
-  it is a new lane: a running lane's tip equals a branch point only in the
-  moment after it was created there, before its prompt commits.
+  A race is another writer's compelled message on the thread's path since what
+  the sender saw; plain remarks, agent replies and sibling forks are not. A
+  `branch` at a lane's tip is stepping down: a new thread there, the lane left
+  where it is.
+- **Each chat stores its send's id** (`sendId`, the command's id), so the
+  column that sent it finds it exactly (`TreeIndex.bySend`).
+  `detailsFromStored` is the one conversion of stored details, for a chat and
+  for a held message alike.
 - **`entryText` is the one definition of an entry's citable text**: a chat's
   own `text`, never its attributed `content`, so a span covers exactly what its
   author wrote. The host's citation path reads through it.
 - **`renderableMessage`** turns a stored chat into role `chat` with its author
   and whether it compelled the agent, for `core`'s projections, which only
   admit the role and so need no schema library.
-- **Names are labels, never identities.** `pineta.participant` values, keyed by
-  writer id. The name is copied into each message, so a rename never rewrites what
-  the agent already read, nor invalidates the provider's prompt cache.
+- **Names are labels, never identities** (`participant.ts`). The name is copied
+  into each message, so a rename never rewrites what the agent already read,
+  nor invalidates the provider's prompt cache.
 
 # The outbox (`outbox.ts`)
 
@@ -62,15 +76,12 @@ the queue. The host executes three pure decisions from here:
   lane recorded as running, and drains every lane with messages held for it,
   since no run's end will.
 
-# Threads (`thread.ts`)
+# Participants (`participant.ts`)
 
-A thread's default is a `Responder` stored in `pineta.thread`, keyed by the
-entry it is set at. `effectiveDefault` takes the `TreeIndex` (`@pineta/core`),
-walks `ancestry` from where a message attaches, and takes the nearest setting;
-with none, `ROOT_DEFAULT`, a working session. The client's composer and the host
-both call it with an index of the same document, so the label cannot promise a
-reply the host will not start. `rulesAlong` gives each message on a path its
-rule in one pass, for columns that draw many messages.
+A session is its participants (ADR-0021). `pineta.participant` values are names
+keyed by writer id; `displayName` gives an unnamed writer the `guest-…` label
+the screen shows; `participants` lists every named writer and every writer in
+the tree, sorted, which is what a mention resolves against.
 
 # References
 

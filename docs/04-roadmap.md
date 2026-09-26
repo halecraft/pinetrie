@@ -89,8 +89,9 @@ Roughly in dependency order, each independently shippable:
 5. **Humans in the tree** — reframed from "multi-writer composer" (ADR-0018).
    Split in three:
    - ~~**Chat and compelled responders**~~ — **done.** Human messages are pi
-     `CustomMessage`s; a message that compels the agent is its prompt; threads
-     are working sessions or conversations; the view follows the thread.
+     `CustomMessage`s; a message that compels the agent is its prompt; a
+     thread is agent work or a conversation, which since ADR-0021 is whether
+     it has a lane, and mentions pick who a message is for.
      Findings (S19): append through the `Lane`, never the session; a pi run
      can only start with `prompt`.
    - **Presence** — who is here, what they read, who is typing; loud by

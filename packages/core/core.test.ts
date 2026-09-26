@@ -3,18 +3,24 @@
 
 import assert from "node:assert/strict"
 import {
+  address,
   checkEnvironment,
   compareVersions,
   type EnvironmentReport,
   findSeqKeys,
+  handleOf,
   indexTree,
   laneNameForThread,
   latestTip,
   messageText,
+  NOBODY,
+  normalizeName,
+  parseMentions,
   projectTranscript,
+  THE_AGENT,
   writerId,
 } from "@pineta/core"
-import { test } from "vitest"
+import { describe, expect, test } from "vitest"
 
 /** First problem from an environment report, asserted present. */
 function firstProblem(report: EnvironmentReport): string {
@@ -185,4 +191,55 @@ test("compareVersions / checkEnvironment: the deterministic build guards", () =>
     ),
     /below the 1.13.4 floor/,
   )
+})
+
+describe("address: mentions pick who a message is for (ADR-0021)", () => {
+  const who = (text: string, agentByDefault: boolean) =>
+    address({
+      mentions: parseMentions(text),
+      participants: ["Ada Lovelace", "O'Brien", "guest-x4bu"],
+      agentByDefault,
+    })
+  test("@agent asks the agent, with or without people", () => {
+    expect(who("@agent go", false).compels.kind).toBe("agent")
+    expect(who("@agent @adalovelace go", false)).toEqual({
+      compels: { kind: "agent", agent: THE_AGENT },
+      people: ["Ada Lovelace"],
+    })
+  })
+  test("@Ada alone in agent work is for Ada only", () => {
+    expect(who("@AdaLovelace look", true)).toEqual({
+      compels: NOBODY,
+      people: ["Ada Lovelace"],
+    })
+  })
+  test("an unknown handle is ignored: the thread's default stands", () => {
+    expect(who("bump @types/node please", true).compels.kind).toBe("agent")
+    expect(who("bump @types/node please", false).compels).toEqual(NOBODY)
+  })
+  test("no mention: the default, either way", () => {
+    expect(who("hi", true).compels.kind).toBe("agent")
+    expect(who("hi", false).compels).toEqual(NOBODY)
+  })
+  test("a handle is a name in any script: @日本, @josé, however José was typed", () => {
+    const people = address({
+      mentions: parseMentions("@日本 @josé look"),
+      participants: ["日本", "Jose\u0301"],
+      agentByDefault: true,
+    })
+    expect(people).toEqual({ compels: NOBODY, people: ["日本", "Jose\u0301"] })
+  })
+  test("normalizeName refuses a name no mention could reach", () => {
+    expect(normalizeName("  Ada ")).toBe("Ada")
+    expect(normalizeName("!!")).toBeUndefined()
+    expect(normalizeName("Agent")).toBeUndefined()
+    expect(normalizeName("")).toBeUndefined()
+  })
+  test("a handle is the name in handle characters: @obrien, @guest-x4bu", () => {
+    expect(handleOf("O'Brien")).toBe("obrien")
+    expect(who("@obrien @guest-x4bu", true).people).toEqual([
+      "O'Brien",
+      "guest-x4bu",
+    ])
+  })
 })

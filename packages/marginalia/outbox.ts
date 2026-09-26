@@ -6,9 +6,9 @@
 // them when the lane is idle. Stored as pi values in OUTBOX_NAMESPACE, keyed by
 // the held message's own id (ADR-0016), so every window sees who is waiting.
 
-import type { AgentId, LaneName, WriterId } from "@pineta/core"
+import type { LaneName } from "@pineta/core"
 import { Type } from "typebox"
-import { type ChatDetails, DetailsSchema } from "./chat.ts"
+import { type ChatDetails, DetailsSchema, detailsFromStored } from "./chat.ts"
 import { decodeWith } from "./decode.ts"
 
 export const OUTBOX_NAMESPACE = "pineta.outbox"
@@ -41,15 +41,7 @@ export const decodeHeld = (value: unknown): Held | undefined =>
     id: h.id,
     lane: h.lane as LaneName,
     timestamp: h.timestamp,
-    details: {
-      author: h.details.author as WriterId,
-      authorName: h.details.authorName,
-      text: h.details.text,
-      compels:
-        h.details.compels.kind === "agent"
-          ? { kind: "agent", agent: h.details.compels.agent as AgentId }
-          : { kind: "none" },
-    },
+    details: detailsFromStored(h.details),
   }))
 
 /** Stored `pineta.outbox` values -> the held messages, oldest first. */

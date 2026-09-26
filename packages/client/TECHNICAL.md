@@ -7,33 +7,46 @@ the only state kept here is which columns are open, and the text being typed.
 ## Reads go through one index
 
 `readTreeIndex(doc)` (`@pineta/reads`) builds `indexTree` once per document
-change. The columns,
-the rail, thread rules and the agent's path all read that one index
+change. The columns, the rail and the agent's path all read that one index
 (`packages/core/tree.ts`). `App` reads it inside a single `useTracked`, together
-with the agent's activity and the thread rules, so they are always from the
-same moment.
+with the agent's activity, the lanes, the outbox and the participants, so they
+are always from the same moment; `sync` takes the index and the lanes together.
 
 ## The column model (`columns.ts`)
 
-A column is `{ key, anchor, exclude? }`, and `columnsReducer` is pure: keys come
-from the shell in the action, so the reducer has no hidden counter.
+A column is `{ key, anchor, lane?, asksAgent?, fresh? }`, and `columnsReducer`
+is pure: keys come from the shell in the action, so the reducer has no hidden
+counter.
 
 - **A column follows its own tip.** `sync` runs on every change and advances
   each anchor to `followTip(anchor)`. A reply below a column's last message
   moves it on; a branch off an earlier message, however new, never does.
   Following from a fixed anchor instead would jump to any newer branch below
-  it. `followTip` follows **leaves**, not lane tips, because the agent's lane
-  leaves a thread whenever another thread compels it (ADR-0018).
+  it. Leaves, because a conversation has no lane at all.
+- **Until it is agent work.** When a column's tip is exactly one lane's tip,
+  `sync` binds it (`lane`), and from then on its anchor is the lane's tip and
+  its sends name the lane. A conversation stepped down at the lane's tip is
+  newer, so following leaves would slide the agent's column into it, and send
+  the agent's next message there. Binding waits while two lanes share the tip
+  (a compelled branch at a lane's tip, until its prompt commits). A bound or
+  fresh column is `pinned` in `projectColumns`: its path ends at its anchor.
 - **A null anchor** is a new session's first column. `sync` pins it to the
-  newest leaf once one exists, then it follows as above.
-- **A fresh branch** (`branch from here`) is `anchor` plus `exclude`, the
-  anchor's children when it opened. It follows only leaves reached through a
-  new child, so it stays empty until its first message exists; then `sync`
-  anchors it there and drops `exclude`. A `started` reply carries no entry id,
-  so this is how the column finds its own branch.
-- **No branch from a column's last message.** A message there is a child of the
-  column's tip, which the column itself follows, so a fresh column would be
-  left empty. The action is not offered; the composer replies there.
+  newest leaf once one exists, then it follows as above. While the session is
+  empty it offers **Start Chat** and **Start Agent** (`start.tsx`) in place of
+  a composer; choosing replaces it with a fresh column at the root.
+- **A fresh column** (`openFresh`: `→`, the rail's `+`, a start, or "Branch
+  here" after a conflict) has nothing of its own yet. Its first send mints the
+  command's id (`sent`), which the host stores with the message (`sendId`), and
+  `sync` anchors the column at the entry that send wrote (`TreeIndex.bySend`).
+  Exact: no other message at the same point, the lane's own next append
+  included, can be mistaken for it. "Branch here" opens one holding the text
+  (`pending`), and that column's composer sends it, so a refusal shows where
+  the message is, like any other send.
+- **`→` at a column's end only in agent work.** Below a conversation's last
+  message, a branch would be the same as replying. At an agent thread's end
+  it steps back down to a conversation (ADR-0021).
+- **`asksAgent`** is a Start Agent column: a message with no mention asks the
+  agent, as if `@agent` were written, until the thread has a lane of its own.
 - **Deduplication is the shell's.** Two anchors can resolve to one path, which
   the reducer cannot see. Before opening, `App` checks whether any open column
   already shows the entry, and scrolls to it instead.
@@ -74,11 +87,13 @@ at the bottom; once they scroll up, it leaves them there.
 - **The agent can reply in several threads at once**: `readAgentActivity`
   returns every running lane. The rail pulses at each tip, a message is lit if
   any run reads it, and each column streams the runs whose tip is on its path.
-- **The composer's mode is chosen before sending**, from the thread's lane at
-  the column's end (`threadLaneAt` over `readLanes`): `reply` when the lane is
-  idle, `queue` when it runs or has messages waiting ("queue · agent replies
-  after Bea"), `branch` in a fresh branch column. These are the same reads the
-  host decides from (`@pineta/reads`).
+- **The composer decides before sending, as the host will.** `threadOf` finds
+  the thread (the column's bound lane, or its end) and `address` who the
+  message is for, over `readLanes` and `readParticipants`: the same reads and
+  functions the host decides from. The button says the result: "send", "send ·
+  to Ada", "send · agent will reply", or "queue · agent replies after Bea"
+  (`queue` when the lane runs or has messages waiting). A fresh column sends
+  `branch`.
 - **Conflict.** A compelled `reply` another writer raced comes back `conflict`,
   and the composer keeps the text and offers **Queue after** or **Branch here**.
   On one host the page sees another writer's run start almost at once and
@@ -99,10 +114,11 @@ its `writer` for the lookup.
 
 ## Gotchas
 
-- **Message tools are hidden until hover or focus.** A browser test must hover
-  a message before clicking its `.tools` buttons.
-- **`:last-of-type` matches element type, not class.** Rule markers and the
-  stream are `div`s too; find a column's last message by querying `.msg`.
+- **Message tools are hidden until hover or focus**, the margin `→` too. A
+  browser test must hover a message before clicking its `.tools` buttons or
+  its `.branch`.
+- **`:last-of-type` matches element type, not class.** The "agent
+  joined" marker and the stream are `div`s too; find a column's last message by querying `.msg`.
 - **The agent's stream renders only in a column containing its tip.** When no
   open column does, the rail's pulse is the only sign, and clicking it opens
   that thread.

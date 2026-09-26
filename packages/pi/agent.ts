@@ -23,7 +23,6 @@ import {
   type LaneName,
   laneNameForThread,
   type Position,
-  type Responder,
   type WriterId,
 } from "@pineta/core"
 import {
@@ -35,7 +34,6 @@ import {
   PARTICIPANT_NAMESPACE,
   REFERENCE_NAMESPACE,
   type Reference,
-  THREAD_NAMESPACE,
 } from "@pineta/marginalia"
 import { hasLaneRecord, type SessionDocHandle } from "@pineta/schema"
 import { createAgentHarness, ModelRuntime } from "./deep.ts"
@@ -160,8 +158,6 @@ export interface Agent {
   addReference(reference: Reference): Promise<void>
   /** Store a writer's display name in `pineta.participant`, keyed by writer. */
   setParticipantName(writer: WriterId, name: string): Promise<void>
-  /** Store a thread's default in `pineta.thread`, keyed by the entry it is set at. */
-  setThreadDefault(at: EntryId, compels: Responder): Promise<void>
   stats(): Promise<{ messageCount: number }>
   close(): Promise<void>
 }
@@ -327,10 +323,6 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         displayName,
         CTX,
       )
-    },
-
-    async setThreadDefault(at, compels) {
-      await session.setValue(value(THREAD_NAMESPACE, at), compels, CTX)
     },
 
     async stats() {

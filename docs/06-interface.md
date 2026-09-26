@@ -24,8 +24,9 @@ This document fixes the design before any code. It draws E and T directly.
    not invent one. Whatever you put first is what reads as the trunk.
 4. **Show context, don't describe it.** What the agent will read is a path; draw
    that path lit and everything else not.
-5. **Say the rule, not a mode name.** "Agent replies: always" says what happens.
-   "Working session" is a name someone has to learn.
+5. **Say the effect, not a mode name.** "send · agent will reply" says what
+   happens. "Working session" is a name someone has to learn. So there is no
+   mode to set: the send button says what each message will do (ADR-0021).
 6. **Every control is a choice the user made.** Nothing appears because of
    internal state.
 
@@ -38,11 +39,10 @@ This document fixes the design before any code. It draws E and T directly.
 │ ├──● ││ agent: OK              ││ an aside              ││ aside of aside     │
 │ │  │ ││ Ada                    ││ agent: …      ●green  ││ agent: …           │
 │ │  ● ││ just a note            ││ Bea                   ││                    │
-│ ●    ││ ─ from here: agent     ││   what about X?       ││   agent: …         │
-│ │    ││   replies when @agent ─││                       ││                    │
+│ ●    ││ Ada: @Bea have a look →││   what about X?       ││   agent: …         │
 │ ◉    ││ Ada: @agent … ◉replying││                       ││                    │
 │      ││ ┌──────────────────────┐││ ┌───────────────────┐││ ┌────────────────┐ │
-│      ││ │ say something…       │││ │ reply in thread…  │││ │ …              │ │
+│      ││ │ ask the agent…  send │││ │ reply in thread…  │││ │ …              │ │
 │      ││ └──────────────────────┘││ └───────────────────┘││ └────────────────┘ │
 └──────┘└────────────────────────┘└───────────────────────┘└────────────────────┘
 ```
@@ -100,33 +100,50 @@ The rail is E; the lit column is T. Seeing both at once is the product.
 - A message the agent was asked shows as asked (a margin bar), and the thread
   marks **where the agent joined**, since everything above it is now its context.
 
-### Rules where they start
+### Who a message is for (ADR-0021)
 
-- The reply rule is a **marker in the thread at the entry it is set at**:
-  "from here, the agent replies only when @agent is mentioned", or
-  "from here, the agent replies to every message". A new session starts with the
-  agent replying to every message, and needs no marker.
-- **Changing the rule is an action on a message**, labelled with what it does
-  ("from here, only answer @agent" / "from here, answer every message"), so
-  where it applies is never hidden. The rule in force now is its tooltip: a
-  label that read like a state contradicted the composer, which states it.
-- The composer states the effect before each send, on its button: **"send ·
-  agent will reply"** when it will. It uses the host's own decision
-  (`compelledResponder`), so it cannot promise a reply that will not come.
+- **A thread's mode is whether the agent works in it**, which is whether it has
+  a lane. In agent work, a message that names no one asks the agent; in a
+  conversation, only `@agent` does. Nothing is set or stored, so there is no
+  rule to mark and no mode to toggle.
+- **Mentions pick who a message is for.** `@agent` asks the agent. A message
+  naming only people goes to them, in agent work too. A handle that names no
+  participant (`@types/node`) is ignored. A person's handle is their name as
+  shown, in lower case, keeping only letters and digits (in any script), `_`
+  and `-`: `@adalovelace`, `@josé`, `@日本`, `@guest-x4bu`. A name with no
+  such character, or spelled `agent`, is refused: no mention could reach it.
+- **The send button says what the message will do**: "send", "send · to Ada",
+  "send · agent will reply", or "queue · agent replies after Bea". It uses the
+  host's own decision (`address`, over `threadOf`), so it cannot promise a
+  reply that will not come.
 - The composer does not say who will see a message. Everyone in a session can
   read every thread, and until presence says who is here, any list is a guess;
   a list of everyone who ever set a name named only you when you were alone.
   Presence brings it back, naming only the *others* who are here.
 
+### Starting, branching, and stepping down
+
+- **At the root, two ways to start**, because there is no context yet: a person
+  declares a purpose. **Start Chat** opens a conversation. **Start Agent** opens
+  a column whose messages ask the agent unless they name someone, so its first
+  message creates the lane. An empty session offers both in place of a
+  composer; afterwards, the rail's `+` offers them above the root threads.
+- **`→` in a message's right margin opens a branch** as a column to its right,
+  empty until something is sent there. What it opens appears to the right, so
+  the button sits on that side. A branch starts as a conversation; `@agent`
+  there makes it agent work.
+- **At an agent thread's end, `→` steps back down**: a conversation continuing
+  from there, reading everything above. The agent thread's column keeps
+  following its lane. At a conversation's end `→` is hidden, since it would be
+  the same as replying.
+- Every one of these only opens a column. Nothing is written until the first
+  send, and closing the column first leaves no trace.
+
 ### Messages
 
 - The speaker's name heads each human message; the agent's messages are marked
   as the agent's.
-- **Branch from here** is an action on any message but a column's last: it
-  opens a new column at that message with an empty composer, and the branch
-  exists once something is sent. On the last message, replying is the
-  column's own composer.
-- A message's tools (cite, branch, the reply rule) appear on hover or focus;
+- A message's tools (cite, and `→` in the margin) appear on hover or focus;
   beneath it stay only branch buttons and citation counts.
 - **Cite** stays an action on a message or a text selection. A reference draws
   as a link between columns when both ends are open, and as a count otherwise.
@@ -137,7 +154,7 @@ The rail is E; the lit column is T. Seeing both at once is the product.
 |---|---|
 | "follow the newest" | columns grow on their own; there is no hidden anchor |
 | "reading a thread · sending replies here" | every column's composer sends at its own path |
-| "make this a conversation" in a bar | a rule set on a message, with a marker there |
+| "make this a conversation" in a bar | nothing: a thread's mode is whether the agent works in it (ADR-0021) |
 | "⑂ 1 branch · 2 messages" with a hidden list | the rail, and a coloured fork dot in the column |
 | "switch to this path" (`navigate`) | nothing: sending attaches where you are reading |
 
@@ -150,13 +167,13 @@ a lane, the `navigate` command had no caller and was deleted with `prompt` and
 Every part of this is a read of what the document already holds.
 
 - **A column** is a client-local anchor entry. Its path is `projectTranscript`
-  of `followTip(anchor)`; the part after its fork point is the suffix below the
-  column to its left.
+  of `followTip(anchor)`, or, once it is bound to a lane, of the lane's tip;
+  the part after its fork point is the suffix below the column to its left.
 - **The rail** is the tree itself, from `parentId`, drawn in id order, which is
   creation order (uuidv7).
 - **The lit path** is the agent's run's path: the agent's lane tip while
   `activeRuns` has its lane.
-- **Rule markers** are `pineta.thread` values; **names**, `pineta.participant`.
+- **A thread's mode** is its lane; **names** are `pineta.participant` values.
 - **Which columns are open, and in what order**, is view state, never written.
 
 ## Deferred, but designed for

@@ -2,12 +2,10 @@ import assert from "node:assert/strict"
 import {
   atEntry,
   entryId,
-  indexTree,
   laneNameForThread,
   NOBODY,
   parseMentions,
   type Responder,
-  ROOT,
   THE_AGENT,
   type ThreadLane,
   type WriterId,
@@ -16,18 +14,16 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   decodeChat,
-  effectiveDefault,
   encodeChat,
   entryText,
   heldMessages,
   nextHeld,
+  participants,
   planChat,
   planDrain,
   planStartup,
   renderableMessage,
-  rulesAlong,
   settleRun,
-  threadDefaults,
 } from "./index.ts"
 
 const ALICE: WriterId = writerId("alice")
@@ -50,8 +46,10 @@ const lane = (
 const NONE: ThreadLane = { kind: "none" }
 const ASK = parseMentions("@agent please")
 
-const plan = (over: Partial<Parameters<typeof planChat>[0]>) =>
-  planChat({
+type PlanInput = Omit<Parameters<typeof planChat>[0], "thread"> &
+  Parameters<typeof planChat>[0]["thread"]
+const plan = (over: Partial<PlanInput>) => {
+  const i: PlanInput = {
     author: ALICE,
     authorName: "Alice",
     text: "hello",
@@ -59,42 +57,58 @@ const plan = (over: Partial<Parameters<typeof planChat>[0]>) =>
     at: atEntry(E1),
     end: atEntry(E1),
     race: null,
-    mentions: [],
-    threadDefault: NOBODY,
     lane: NONE,
+    mentions: [],
+    participants: ["Alice", "Bo"],
+    asksAgent: false,
+    sendId: "s-1",
     ...over,
-  })
+  }
+  const { end, race, lane: l, ...rest } = i
+  return planChat({ ...rest, thread: { end, race, lane: l } })
+}
 const kind = (d: ReturnType<typeof planChat>) => d.kind
 
 describe("planChat: plain messages never conflict", () => {
+  // In a thread with a lane, a plain message is one naming only people.
+  const TO_BO = parseMentions("@bo look")
   test("no lane: appended at the thread's end, with no lane", () => {
     const d = plan({ end: atEntry(E2) })
     expect(d).toMatchObject({ kind: "appendToTree", parent: atEntry(E2) })
   })
   test("an idle lane: appended through it", () => {
-    expect(plan({ lane: lane() })).toMatchObject({
+    expect(plan({ mentions: TO_BO, lane: lane() })).toMatchObject({
       kind: "appendToLane",
       lane: LANE,
     })
   })
   test("a running lane, or one with messages waiting: held, behind them", () => {
-    expect(plan({ lane: lane({ running: true }) })).toMatchObject({
+    expect(
+      plan({ mentions: TO_BO, lane: lane({ running: true }) }),
+    ).toMatchObject({
       kind: "hold",
       position: 0,
     })
-    expect(plan({ lane: lane({ waiting: 2 }) })).toMatchObject({
-      kind: "hold",
-      position: 2,
-    })
+    expect(plan({ mentions: TO_BO, lane: lane({ waiting: 2 }) })).toMatchObject(
+      {
+        kind: "hold",
+        position: 2,
+      },
+    )
   })
   test("another writer's compelled message below: still appended, never a conflict", () => {
     expect(kind(plan({ race: { by: BO } }))).toBe("appendToTree")
-    expect(kind(plan({ race: { by: BO }, lane: lane() }))).toBe("appendToLane")
+    expect(
+      kind(plan({ mentions: TO_BO, race: { by: BO }, lane: lane() })),
+    ).toBe("appendToLane")
   })
-  test("mentioning a person only notifies: still plain", () => {
+  test("naming only people leaves the agent out, even where it is the default", () => {
     expect(kind(plan({ mentions: parseMentions("hi @bo") }))).toBe(
       "appendToTree",
     )
+    expect(
+      kind(plan({ mentions: parseMentions("hi @bo"), lane: lane() })),
+    ).toBe("appendToLane")
   })
 })
 
@@ -105,8 +119,10 @@ describe("planChat: a compelled message", () => {
       at: atEntry(E2),
     })
   })
-  test("a working session compels without a mention", () => {
-    expect(kind(plan({ threadDefault: AGENT }))).toBe("createAndRun")
+  test("a thread with a lane, or a Start Agent column, compels without a mention", () => {
+    expect(kind(plan({ lane: lane() }))).toBe("run")
+    expect(kind(plan({ asksAgent: true }))).toBe("createAndRun")
+    expect(kind(plan({ asksAgent: true, mode: "branch" }))).toBe("createAndRun")
   })
   test("an idle lane: runs on it", () => {
     expect(plan({ mentions: ASK, lane: lane() })).toMatchObject({
@@ -174,19 +190,14 @@ describe("planChat: branch", () => {
       at: atEntry(E2),
     })
   })
-  test("at a lane just created there, still running, it is another new lane", () => {
+  test("a branch never continues a lane, even at its idle tip: that is stepping down", () => {
+    expect(plan({ mode: "branch", lane: lane() })).toMatchObject({
+      kind: "appendToTree",
+      parent: atEntry(E1),
+    })
     expect(
       plan({ mode: "branch", mentions: ASK, lane: lane({ running: true }) }),
-    ).toMatchObject({
-      kind: "createAndRun",
-      at: atEntry(E1),
-    })
-  })
-  test("at a thread lane's own tip it is a reply: nothing there to fork", () => {
-    expect(kind(plan({ mode: "branch", lane: lane() }))).toBe("appendToLane")
-    expect(kind(plan({ mode: "branch", mentions: ASK, lane: lane() }))).toBe(
-      "run",
-    )
+    ).toMatchObject({ kind: "createAndRun", at: atEntry(E1) })
   })
 })
 
@@ -197,53 +208,6 @@ test("parseMentions: handles start words, repeats collapse, e-mail is not a ment
   ])
 })
 
-// ── thread defaults ──────────────────────────────────────────────────────────
-
-// e-3 -> e-2 -> e-1 -> root
-const parents: Record<string, string | null> = {
-  "e-1": null,
-  "e-2": "e-1",
-  "e-3": "e-2",
-}
-const index = indexTree(
-  Object.fromEntries(
-    Object.entries(parents).map(([id, parentId]) => [
-      id,
-      { id, parentId, type: "message" },
-    ]),
-  ),
-)
-
-test("effectiveDefault: unset means the root's working session", () => {
-  assert.deepEqual(
-    effectiveDefault(atEntry(entryId("e-3")), index, new Map()),
-    AGENT,
-  )
-  assert.deepEqual(effectiveDefault(ROOT, index, new Map()), AGENT)
-})
-
-test("effectiveDefault: the nearest ancestor's default wins", () => {
-  const defaults = new Map([
-    [E1, AGENT],
-    [E2, NOBODY],
-  ])
-  // e-2 sets a conversation inside e-1's working session.
-  assert.deepEqual(
-    effectiveDefault(atEntry(entryId("e-3")), index, defaults),
-    NOBODY,
-  )
-  // e-1's own default applies at e-1 itself.
-  assert.deepEqual(effectiveDefault(atEntry(E1), index, defaults), AGENT)
-})
-
-test("threadDefaults: a malformed stored default is skipped", () => {
-  const d = threadDefaults([
-    { key: "e-1", value: { kind: "agent", agent: "agent" } },
-    { key: "e-2", value: { kind: "everyone" } },
-  ])
-  assert.deepEqual([...d.keys()], [E1])
-})
-
 // ── the stored message ───────────────────────────────────────────────────────
 
 const details = {
@@ -251,6 +215,7 @@ const details = {
   authorName: "Alice",
   text: "the plum",
   compels: NOBODY,
+  sendId: "s-1",
 }
 
 test("encodeChat: the model reads the speaker; details keep the author's words", () => {
@@ -280,23 +245,26 @@ test("renderableMessage: a chat renders as role chat with its author", () => {
     author: "Alice",
     compelled: false,
     writer: ALICE,
+    sendId: "s-1",
   })
 })
 
-test("rulesAlong: each message carries the rule set there, or the one above", () => {
-  const defaults = new Map([[E2, NOBODY]])
-  assert.deepEqual(rulesAlong(["e-1", "e-2", "e-3"], AGENT, defaults), [
-    AGENT,
-    NOBODY,
-    NOBODY,
-  ])
+test("participants: named writers and every writer in the tree, guests by their label", () => {
+  const names = new Map([[ALICE, "Alice"]])
+  assert.deepEqual(participants(names, [ALICE, BO]), ["Alice", "guest-w-bo"])
 })
 
 describe("outbox", () => {
   const held = (id: string, laneName: string) => ({
     id,
     lane: laneName,
-    details: { author: ALICE, authorName: "Alice", text: id, compels: NOBODY },
+    details: {
+      author: ALICE,
+      authorName: "Alice",
+      text: id,
+      compels: NOBODY,
+      sendId: id,
+    },
     timestamp: 1,
   })
   test("heldMessages: oldest first, malformed values skipped", () => {
@@ -322,7 +290,13 @@ describe("draining, settling and starting up", () => {
   const held = (id: string, compels: Responder) => ({
     id,
     lane: LANE1,
-    details: { author: ALICE, authorName: "Alice", text: id, compels },
+    details: {
+      author: ALICE,
+      authorName: "Alice",
+      text: id,
+      compels,
+      sendId: id,
+    },
     timestamp: 1,
   })
   test("planDrain: a plain message is appended, a compelled one is run, then idle", () => {

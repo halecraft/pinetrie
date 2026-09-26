@@ -18,11 +18,9 @@ import {
   type Intent,
   type LaneName,
   type RunId,
-  raceSince,
   referenceId,
   runId,
-  threadEnd,
-  threadLaneAt,
+  threadOf,
   type WriterId,
   writerId,
 } from "@pineta/core"
@@ -31,7 +29,6 @@ import {
   type ChatMessage,
   type CitedEntry,
   displayName,
-  effectiveDefault,
   encodeChat,
   entryText,
   planChat,
@@ -53,7 +50,7 @@ import {
   readLanes,
   readOutbox,
   readParticipantNames,
-  readThreadRules,
+  readParticipants,
   readTreeIndex,
 } from "@pineta/reads"
 import {
@@ -245,40 +242,49 @@ export async function startHost({
     for (const lane of plan.drain) await drain(lane)
   })
 
-  /** A human message: gather, `planChat`, execute. */
+  /** A human message: gather, `threadOf` and `planChat`, execute. */
   async function handleChat(
     respond: (outcome: Outcome) => void,
     writer: WriterId,
+    sendId: string,
     chat: Extract<Intent, { kind: "chat" }>,
   ): Promise<void> {
     // gather
     const index = readTreeIndex(doc)
-    // A message at an entry this document does not hold has nowhere to go:
-    // refused here, before anything is written, as pi would refuse a lane there.
-    if (chat.at.kind === "entry" && index.entries[chat.at.id] === undefined) {
+    const names = readParticipantNames(doc)
+    const nameOf = (w: WriterId) => displayName(w, names.get(w))
+
+    // plan (pure)
+    const thread = threadOf(index, readLanes(doc, index), {
+      at: chat.at,
+      mode: chat.mode,
+      lane: chat.lane,
+      me: writer,
+    })
+    // An entry or lane this document does not hold has nowhere to go: refused
+    // before anything is written, as pi would refuse a lane there.
+    if (thread.kind === "unknown") {
       return respond({
         kind: "refused",
         code: ERR.UNKNOWN_TARGET,
-        message: "no such entry to write at",
+        message: "no such entry or lane to write at",
       })
     }
-    const end = threadEnd(index, chat.at)
-    const names = readParticipantNames(doc)
-    const nameOf = (w: WriterId) => displayName(w, names.get(w))
-    const where = chat.mode === "branch" ? chat.at : end
-
-    // plan (pure)
+    // Two lanes end here for a moment (a new one, just branched): which thread
+    // the sender meant cannot be told, so they are asked, as for a race.
+    if (thread.kind === "ambiguous")
+      return respond({ kind: "conflict", by: null })
     const planned = planChat({
       author: writer,
       authorName: nameOf(writer),
       text: chat.text,
       mode: chat.mode,
       at: chat.at,
-      end,
-      race: raceSince(index, chat.at, writer),
+      thread,
       mentions: chat.mentions,
-      threadDefault: effectiveDefault(where, index, readThreadRules(doc)),
-      lane: threadLaneAt(readLanes(doc, index), where),
+      participants: readParticipants(doc, index),
+      asksAgent: chat.asksAgent,
+      sendId,
     })
 
     // execute
@@ -287,7 +293,7 @@ export async function startHost({
       case "conflict":
         return respond({
           kind: "conflict",
-          by: planned.by === null ? "someone" : nameOf(planned.by),
+          by: planned.by === null ? null : nameOf(planned.by),
         })
       case "hold":
         await agent.hold({
@@ -386,22 +392,13 @@ export async function startHost({
       case "refused":
         return respond(intent)
       case "chat":
-        return handleChat(respond, writer, intent)
+        // The command's id is the send's id: its column finds its message by it.
+        return handleChat(respond, writer, id === "" ? newId() : id, intent)
       case "reference":
         return handleReference(respond, writer, intent)
       case "name":
         await agent.setParticipantName(writer, intent.name)
         return respond({ kind: "named" })
-      case "thread":
-        if (doc.entries.get(intent.at) === undefined) {
-          return respond({
-            kind: "refused",
-            code: ERR.UNKNOWN_TARGET,
-            message: "no such entry to root a thread at",
-          })
-        }
-        await agent.setThreadDefault(intent.at, intent.compels)
-        return respond({ kind: "threaded" })
     }
   }
 

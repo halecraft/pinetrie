@@ -6,6 +6,8 @@
 // headers and fork dots share, so a branch looks the same everywhere.
 
 import { type AgentRun, PENDING_TRACK, type RailRow } from "@pineta/core"
+import { useState } from "react"
+import { Start } from "./start.tsx"
 
 const PALETTE = [
   "#9ecbff",
@@ -43,6 +45,7 @@ export function Rail({
   open,
   activity,
   onPick,
+  onStart,
 }: {
   rows: readonly RailRow[]
   /** Ids on any open column's path: drawn at full strength. */
@@ -50,58 +53,80 @@ export function Rail({
   /** Every running lane: each tip pulses, whether or not a column shows it. */
   activity: readonly AgentRun[]
   onPick: (id: string) => void
+  /** A new thread at the root, above every root thread: where the tree starts. */
+  onStart: (asksAgent: boolean) => void
 }) {
+  const [starting, setStarting] = useState(false)
   const rowOf = new Map(rows.map((r, i) => [r.id, i]))
   const tracks = rows.reduce((n, r) => Math.max(n, r.track + 1), 1)
   return (
     <nav aria-label="the whole tree" id="rail">
-      <svg height={y(rows.length)} width={x(tracks)}>
-        <title>every message, as a dot on its branch's track</title>
-        {rows.map((r, i) => {
-          const from = r.parentId === null ? undefined : rowOf.get(r.parentId)
-          if (from === undefined || r.parentTrack === null) return null
-          // Down the parent's track to its row, then across and down the
-          // child's: a branch leaves its parent and runs on its own rail.
-          const d =
-            r.track === r.parentTrack
-              ? `M${x(r.track)},${y(from)} L${x(r.track)},${y(i)}`
-              : `M${x(r.parentTrack)},${y(from)} L${x(r.track)},${y(from) + ROW / 2} L${x(r.track)},${y(i)}`
-          return (
-            <path
-              d={d}
-              fill="none"
-              key={`e-${r.id}`}
-              opacity={open.has(r.id) ? 1 : 0.35}
-              stroke={trackColor(r.track)}
-              strokeWidth={2}
-            />
-          )
-        })}
-      </svg>
-      {/* Dots are buttons over the drawing, so they are reachable by keyboard
-          and read as controls. */}
-      {rows.map((r, i) => (
-        <button
-          aria-label="open this message's thread"
-          className={
-            activity.some(run => run.tip === r.id)
-              ? "rail-dot pulse"
-              : "rail-dot"
-          }
-          data-entry={r.id}
-          data-open={open.has(r.id) ? "yes" : "no"}
-          data-track={r.track}
-          key={r.id}
-          onClick={() => onPick(r.id)}
-          style={{
-            left: x(r.track) - DOT,
-            top: y(i) - DOT,
-            background: trackColor(r.track),
-            opacity: open.has(r.id) ? 1 : 0.35,
+      <button
+        aria-expanded={starting}
+        className="new-thread"
+        onClick={() => setStarting(!starting)}
+        title="a new thread at the root"
+        type="button"
+      >
+        +
+      </button>
+      {starting && (
+        <Start
+          onStart={asksAgent => {
+            setStarting(false)
+            onStart(asksAgent)
           }}
-          type="button"
         />
-      ))}
+      )}
+      <div className="rail-tree">
+        <svg height={y(rows.length)} width={x(tracks)}>
+          <title>every message, as a dot on its branch's track</title>
+          {rows.map((r, i) => {
+            const from = r.parentId === null ? undefined : rowOf.get(r.parentId)
+            if (from === undefined || r.parentTrack === null) return null
+            // Down the parent's track to its row, then across and down the
+            // child's: a branch leaves its parent and runs on its own rail.
+            const d =
+              r.track === r.parentTrack
+                ? `M${x(r.track)},${y(from)} L${x(r.track)},${y(i)}`
+                : `M${x(r.parentTrack)},${y(from)} L${x(r.track)},${y(from) + ROW / 2} L${x(r.track)},${y(i)}`
+            return (
+              <path
+                d={d}
+                fill="none"
+                key={`e-${r.id}`}
+                opacity={open.has(r.id) ? 1 : 0.35}
+                stroke={trackColor(r.track)}
+                strokeWidth={2}
+              />
+            )
+          })}
+        </svg>
+        {/* Dots are buttons over the drawing, so they are reachable by keyboard
+          and read as controls. */}
+        {rows.map((r, i) => (
+          <button
+            aria-label="open this message's thread"
+            className={
+              activity.some(run => run.tip === r.id)
+                ? "rail-dot pulse"
+                : "rail-dot"
+            }
+            data-entry={r.id}
+            data-open={open.has(r.id) ? "yes" : "no"}
+            data-track={r.track}
+            key={r.id}
+            onClick={() => onPick(r.id)}
+            style={{
+              left: x(r.track) - DOT,
+              top: y(i) - DOT,
+              background: trackColor(r.track),
+              opacity: open.has(r.id) ? 1 : 0.35,
+            }}
+            type="button"
+          />
+        ))}
+      </div>
     </nav>
   )
 }

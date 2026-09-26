@@ -9,13 +9,11 @@ import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 
 import {
   type ChatMode,
-  type EntryId,
   type Intent,
-  NOBODY,
+  type LaneName,
   type Position,
   parseMentions,
   type ReferenceTarget,
-  THE_AGENT,
   type WriterId,
   writerId,
 } from "@pineta/core"
@@ -57,19 +55,28 @@ export interface SessionClient {
   readonly exchange: Exchange
   readonly doc: SessionDocHandle
   /**
-   * A human message. `at` is where the sender is reading (the root starts a
-   * new conversation); `mode` says how it joins the tree (`ChatMode`). It runs
-   * the agent only if the agent is compelled.
+   * A human message. `at` is where the sender is reading, or the branch point
+   * (only a `branch` starts at the root). It runs the agent only if the agent
+   * is its addressee (`address`).
    */
-  chat(text: string, at: Position, mode?: ChatMode): Promise<Outcome>
+  chat(text: string, at: Position, how?: ChatHow): Promise<Outcome>
   /** Cite `to`, attached where you are reading (`at`). */
   cite(to: ReferenceTarget, at: Position): Promise<Outcome>
   setName(name: string): Promise<Outcome>
-  /** Make the thread rooted at `at` a working session, or a conversation. */
-  setThreadMode(at: EntryId, mode: "session" | "conversation"): Promise<Outcome>
   /** Every reply as it arrived on the wire, for wire-level checks. */
   readonly replies: readonly Reply[]
   close(): Promise<void>
+}
+
+/** How a chat is sent: its mode, its column's lane, and its send id. */
+export interface ChatHow {
+  readonly mode?: ChatMode
+  /** The lane the sender's column is bound to. */
+  readonly lane?: LaneName
+  /** A Start Agent column. */
+  readonly asksAgent?: boolean
+  /** The send's id, minted by a fresh column so it can find its message. */
+  readonly id?: string
 }
 
 export async function connectSession(
@@ -102,9 +109,14 @@ export async function connectSession(
 
   const unsubscribe = subscribe(doc, () => options.onChange?.())
 
-  /** Encode an intent, send it, and resolve with the decoded outcome. */
-  function send(intent: Intent): Promise<Outcome> {
-    const id = `c-${Math.random().toString(36).slice(2, 10)}`
+  /**
+   * Encode an intent, send it, and resolve with the decoded outcome. The id is
+   * a UUID, because a chat's id is its send id, stored with the message.
+   */
+  function send(
+    intent: Intent,
+    id: string = crypto.randomUUID(),
+  ): Promise<Outcome> {
     const settled = new Promise<Reply>(resolve => replyWaiters.set(id, resolve))
     sender.send(encodeIntent(id, intent))
     return settled.then(decodeReply)
@@ -115,28 +127,25 @@ export async function connectSession(
     writer: writerId(peerId),
     exchange,
     doc,
-    chat(text, at, mode = "reply") {
-      return send({
-        kind: "chat",
-        text,
-        at,
-        mode,
-        mentions: parseMentions(text),
-      })
+    chat(text, at, how = {}) {
+      return send(
+        {
+          kind: "chat",
+          text,
+          at,
+          mode: how.mode ?? "reply",
+          lane: how.lane ?? null,
+          asksAgent: how.asksAgent === true,
+          mentions: parseMentions(text),
+        },
+        how.id,
+      )
     },
     cite(to, at) {
       return send({ kind: "reference", to, at })
     },
     setName(name) {
       return send({ kind: "name", name })
-    },
-    setThreadMode(at, mode) {
-      return send({
-        kind: "thread",
-        at,
-        compels:
-          mode === "session" ? { kind: "agent", agent: THE_AGENT } : NOBODY,
-      })
     },
     replies,
     async close() {
