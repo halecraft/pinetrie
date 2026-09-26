@@ -330,4 +330,20 @@ export const mutations: readonly Mutation[] = [
     command: browser,
     expect: "a done note draws its markdown",
   },
+  {
+    name: "the columns are not restored",
+    file: "packages/client/app.tsx",
+    from: "    () => columnStore.load() ?? initialColumns(),",
+    to: "    initialColumns,",
+    command: browser,
+    expect: "a reload keeps the tab's open columns",
+  },
+  {
+    name: "restored columns are pruned before the document settles",
+    file: "packages/client/app.tsx",
+    from: '    if (settled) dispatch({ kind: "prune", index })',
+    to: '    dispatch({ kind: "prune", index })',
+    command: browser,
+    expect: "a reload keeps the tab's open columns",
+  },
 ]

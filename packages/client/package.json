@@ -35,6 +35,7 @@
     "remark-parse": "11.0.0",
     "remark-rehype": "11.1.2",
     "remend": "1.3.1",
+    "typebox": "1.3.27",
     "unified": "11.0.5"
   },
   "devDependencies": {

@@ -356,6 +356,21 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S29 — State per tab, and Kyneta's peer-id lease ✅ PASS
+
+`findings/S29-tab-state-and-peer-lease.md`. Kyneta keeps a peer id in a tab
+slot and a device slot, with a lease in `localStorage`; Pineta's open columns
+take the same shape without the lease (ADR-0027).
+
+- **Duplicate Tab gives two live tabs one peer id**, because browsers copy
+  `sessionStorage`. A Kyneta bug: the fix, probably Web Locks, needs a probe in
+  a real browser first.
+- **A reload is safe only because the lease is written while gathering**,
+  before the decision.
+- **After `whenSettled`, a late client reads every entry** (50 of 50 trials);
+  at `connectSession`, none had them. `"populated"` and `useDocReady` are not
+  that signal.
+
 ### S27 — Markdown that still cites its source ✅ PASS
 
 `findings/S27-markdown-rendering.md`. Over 3 592 real messages, 0 of 28 734

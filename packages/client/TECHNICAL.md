@@ -2,7 +2,8 @@
 
 The browser interface: a rail beside a strip of columns (`docs/06-interface.md`).
 Everything drawn is a read of the session document through `projection.ts`;
-the only state kept here is which columns are open, and the text being typed.
+the only state kept here is which columns are open, kept per tab, and the
+text being typed.
 
 ## Reads go through one index
 
@@ -50,12 +51,48 @@ counter.
 - **Deduplication is the shell's.** Two anchors can resolve to one path, which
   the reducer cannot see. Before opening, `App` checks whether any open column
   already shows the entry, and scrolls to it instead.
-- **Open columns are never written.** Which paths a person reads is theirs.
+- **Open columns are never written to the document.** Which paths a person
+  reads is theirs. They are kept in the browser (below).
 
 `projectColumns` shows each column only past the deepest message it shares
 with ANY column to its left, so a shared stretch of paths is drawn once, in the
 leftmost column that shows it. Anything looking for a message on screen (the
 rail's scroll-to, the alignment) must search every column.
+
+## Kept per tab (`tab-state.ts`, ADR-0027)
+
+`tabState` keeps a value under one key in two slots: the tab's
+(`sessionStorage`), read first, which survives a reload; and the device's
+(`localStorage`), which a new tab starts from. It knows nothing of Pineta; a
+value's stored form is its codec's. Open columns are its one use.
+
+- **Every change is saved, `sync`'s too.** Saving only what a person does
+  would store older anchors, and `followTip` from an older anchor can land on
+  a newer branch below it. So with two tabs open, the device slot holds
+  whichever changed last: both move their columns as messages arrive.
+- **The codec is the edge** (`encodeColumns`, `decodeColumns`), in the house
+  shape: a TypeBox schema, then a build step field by field. A layout decodes
+  whole or not at all, and `v` rejects an older one. A lane that is not a lane
+  name is left off; `sync` binds the column again.
+- **`fresh.pending` is never stored**, by either side: restoring it would send
+  its message again. A "Branch here" column comes back empty.
+- **Restored anchors the document lacks are pruned once, after
+  `whenSettled`.** Until then, missing means not yet arrived: `connectSession`
+  returns before the document does (S29: 0 of 50 had it). Neither
+  `docStatus`'s `"populated"` nor `useDocReady` will do, since both turn true
+  with the first data. Once is enough: entries are immutable, and compaction
+  keeps them.
+- **Restored columns usually open at their end.** `alignOnOpen` runs when a
+  column first renders, usually before the document has arrived, so it finds
+  no fork point. When the document is there first, a column aligns with its
+  fork point, as a new one does.
+- **A failed write is ignored,** each slot on its own. `getItem` is not
+  guarded: where storage is disabled, touching it throws, and
+  `persistentPeerId` does so first.
+- **In the browser suite,** the main page comes from `browser.newContext()`.
+  A page from `browser.newPage()` owns its context, and Playwright refuses a
+  second tab in it; each `browser.newPage()` is a new context, with storage of
+  its own.
 
 ## Colour carries the link, not geometry
 
@@ -210,6 +247,8 @@ Kyneta's examples do. A reload keeps it, so a person keeps their name and is
 not shown to themselves as someone else while the old entries decay. The first
 tab open on a device takes the device's stable id; a tab opened alongside gets
 a fresh one, so two windows are two people. The writer id is `w-` and that id.
+Except a duplicated tab: browsers copy `sessionStorage`, so Duplicate Tab gives
+two live tabs one peer id, and one writer (S29). That is Kyneta's to fix.
 
 ## Names
 

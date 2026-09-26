@@ -214,7 +214,9 @@ is its own document (ADR-0025).
 - **The lit path** is the agent's run's path: the agent's lane tip while
   `activeRuns` has its lane.
 - **A thread's mode** is its lane; **names** are `pineta.participant` values.
-- **Which columns are open, and in what order**, is view state, never written.
+- **Which columns are open, and in what order**, is view state, kept in the
+  browser per tab, with the device's latest for a new tab, and never in the
+  document (ADR-0027).
 
 ## Deferred, but designed for
 

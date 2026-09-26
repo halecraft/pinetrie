@@ -2,14 +2,18 @@
 //
 // The only client-local state the interface keeps, besides text being typed.
 // It is a view choice, never written to the document: which paths a person
-// reads is theirs. Pure: a reducer over values, tested without a DOM.
+// reads is theirs. The browser keeps it per tab (ADR-0027, the stored form at
+// the end of this file). Pure: a reducer over values, tested without a DOM.
 
 import {
   followTip,
+  isLaneName,
   type LaneName,
   type LaneView,
   type TreeIndex,
 } from "@pineta/core"
+import { type Static, Type } from "typebox"
+import { Value } from "typebox/value"
 
 export interface Column {
   /** React key; stable when columns move. */
@@ -73,8 +77,13 @@ export type ColumnAction =
       readonly index: TreeIndex
       readonly lanes: readonly LaneView[]
     }
+  /** Drop restored columns whose anchor the settled document does not have. */
+  | { readonly kind: "prune"; readonly index: TreeIndex }
 
-/** One column, following the newest thread until `sync` pins it. */
+/**
+ * One column, following the newest thread until `sync` pins it: a new tab
+ * with nothing stored, or what is left when every column is closed or pruned.
+ */
 export const initialColumns = (): readonly Column[] => [
   { key: "first", anchor: null },
 ]
@@ -132,6 +141,13 @@ export function columnsReducer(
     }
     case "sync":
       return syncColumns(state, action.index, action.lanes)
+    case "prune": {
+      const known = state.filter(
+        c => c.anchor === null || action.index.entries[c.anchor] !== undefined,
+      )
+      if (known.length === state.length) return state
+      return known.length > 0 ? known : initialColumns()
+    }
   }
 }
 
@@ -192,3 +208,62 @@ function settle(
     ...(bound === undefined ? {} : { lane: bound }),
   }
 }
+
+// ── stored form (ADR-0027) ────────────────────────────────────────────────
+//
+// Kept per tab through `tab-state.ts`. Built field by field both ways, so a
+// field the schema does not name is never stored or restored. `fresh.pending`
+// is one: restoring it would send its message again.
+
+const StoredColumn = Type.Object({
+  key: Type.String(),
+  anchor: Type.Union([Type.String(), Type.Null()]),
+  lane: Type.Optional(Type.String()),
+  asksAgent: Type.Optional(Type.Literal(true)),
+  fresh: Type.Optional(Type.Object({ sendId: Type.Optional(Type.String()) })),
+})
+
+/** `v` changes when the shape does; an older layout is dropped, not migrated. */
+const StoredColumns = Type.Object({
+  v: Type.Literal(1),
+  columns: Type.Array(StoredColumn, { minItems: 1 }),
+})
+
+type Stored = Static<typeof StoredColumn>
+
+const toStored = (c: Column): Stored => ({
+  key: c.key,
+  anchor: c.anchor,
+  ...(c.lane === undefined ? {} : { lane: c.lane }),
+  ...(c.asksAgent ? { asksAgent: true } : {}),
+  ...(c.fresh === undefined
+    ? {}
+    : {
+        fresh: c.fresh.sendId === undefined ? {} : { sendId: c.fresh.sendId },
+      }),
+})
+
+const fromStored = (s: Stored): Column => ({
+  key: s.key,
+  anchor: s.anchor,
+  // Unrecognised, it is left off: `sync` binds the column again once its tip
+  // is exactly one lane's.
+  ...(s.lane !== undefined && isLaneName(s.lane) ? { lane: s.lane } : {}),
+  ...(s.asksAgent ? { asksAgent: true } : {}),
+  ...(s.fresh === undefined
+    ? {}
+    : {
+        fresh: s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId },
+      }),
+})
+
+export const encodeColumns = (
+  columns: readonly Column[],
+): Static<typeof StoredColumns> => ({ v: 1, columns: columns.map(toStored) })
+
+/**
+ * A stored layout, whole or not at all: only this build writes it, so a
+ * half-valid one is not worth keeping. Total.
+ */
+export const decodeColumns = (raw: unknown): readonly Column[] | undefined =>
+  Value.Check(StoredColumns, raw) ? raw.columns.map(fromStored) : undefined

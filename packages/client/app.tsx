@@ -4,14 +4,15 @@
 // draws the whole tree; each column is one path, read on its own scroll. What
 // is drawn is a read of the document, through `projection.ts`. Which columns
 // are open, and in what order, is this window's own view state: a reducer
-// (`columns.ts`), never written.
+// (`columns.ts`), kept in this tab's storage and never in the document
+// (ADR-0027).
 //
 // The renderer before React rebuilt the transcript with `innerHTML` on every
 // change, which destroyed focus and selection on every keystroke. React gives
 // stable node identity, which `useText` needs to keep a note's textarea
 // bound while everyone types (ADR-0025).
 
-import { persistentPeerId } from "@kyneta/exchange"
+import { persistentPeerId, whenSettled } from "@kyneta/exchange"
 import { ExchangeProvider, useDocStatus, useTracked } from "@kyneta/react"
 import {
   ancestry,
@@ -24,6 +25,7 @@ import {
   type TreeIndex,
 } from "@pineta/core"
 import { noteEntry } from "@pineta/marginalia"
+import { SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
   type NoteFilter,
   notesIndex,
@@ -48,12 +50,27 @@ import {
 } from "react"
 import { createRoot } from "react-dom/client"
 import { Column } from "./column.tsx"
-import { columnsReducer, initialColumns, isPinned } from "./columns.ts"
+import {
+  columnsReducer,
+  decodeColumns,
+  encodeColumns,
+  initialColumns,
+  isPinned,
+} from "./columns.ts"
 import { NotesIndex } from "./note.tsx"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { readEntryCount } from "./projection.ts"
 import { Rail } from "./rail.tsx"
 import { connectSession, type SessionClient } from "./session-view.ts"
+import { tabState } from "./tab-state.ts"
+
+/** Open columns: this tab's, or on a new tab the device's latest (ADR-0027). */
+const columnStore = tabState({
+  key: `pineta-columns:${SESSION_DOC_ID}`,
+  codec: { encode: encodeColumns, decode: decodeColumns },
+  tab: sessionStorage,
+  device: localStorage,
+})
 
 /** A display name: a label for you, never your identity. */
 function NameField({ session }: { session: SessionClient }) {
@@ -187,9 +204,29 @@ function App({ session }: { session: SessionClient }) {
   const [columns, dispatch] = useReducer(
     columnsReducer,
     undefined,
-    initialColumns,
+    () => columnStore.load() ?? initialColumns(),
   )
   useEffect(() => dispatch({ kind: "sync", index, lanes }), [index, lanes])
+  // Every change is saved, `sync`'s too: restored from an older anchor,
+  // `followTip` could land on a newer branch below it.
+  useEffect(() => columnStore.save(columns), [columns])
+  // Restored anchors the document lacks are dropped once, when it has
+  // settled: before then, missing means not yet arrived. `"populated"` comes
+  // with the first data, so it cannot tell (S29).
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    let live = true
+    void whenSettled(doc).then(() => {
+      if (live) setSettled(true)
+    })
+    return () => {
+      live = false
+    }
+  }, [doc])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, at settle, with the index of that render
+  useEffect(() => {
+    if (settled) dispatch({ kind: "prune", index })
+  }, [settled])
 
   const views = useMemo(
     () =>
@@ -431,7 +468,8 @@ function App({ session }: { session: SessionClient }) {
 
 const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`
 // Who this tab is: Kyneta's per-tab lease. A reload keeps the id, so you stay
-// yourself, your name with you; a second tab open at once gets its own.
+// yourself, your name with you; a second tab open at once gets its own, except
+// a duplicated one, which shares it (S29).
 const session = await connectSession({
   url: wsUrl,
   WebSocket,

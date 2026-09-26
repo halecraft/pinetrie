@@ -4,6 +4,7 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "packages/client"]
 const file = "packages/client/columns.ts"
 const markdown = "packages/client/markdown.ts"
+const tabState = "packages/client/tab-state.ts"
 
 export const mutations: readonly Mutation[] = [
   {
@@ -231,5 +232,77 @@ export const mutations: readonly Mutation[] = [
     to: "  return s === null || e === null || s > e",
     command: unit,
     expect: "no source covered cites the whole entry",
+  },
+  {
+    name: "the tab's slot is read after the device's",
+    file: tabState,
+    from: "      readStored(tab.getItem(key), codec.decode) ??\n      readStored(device.getItem(key), codec.decode),",
+    to: "      readStored(device.getItem(key), codec.decode) ??\n      readStored(tab.getItem(key), codec.decode),",
+    command: unit,
+    expect: "the tab's own value wins",
+  },
+  {
+    name: "a save writes only the tab's slot",
+    file: tabState,
+    from: "      for (const slot of [tab, device]) {",
+    to: "      for (const slot of [tab]) {",
+    command: unit,
+    expect: "a new tab loads the device's latest",
+  },
+  {
+    name: "a malformed tab slot hides the device's",
+    file: tabState,
+    from: "      readStored(tab.getItem(key), codec.decode) ??\n      readStored(device.getItem(key), codec.decode),",
+    to: "      tab.getItem(key) === null\n        ? readStored(device.getItem(key), codec.decode)\n        : readStored(tab.getItem(key), codec.decode),",
+    command: unit,
+    expect: "falls back to the device",
+  },
+  {
+    name: "one failed write stops the other",
+    file: tabState,
+    from: "      for (const slot of [tab, device]) {\n        try {\n          slot.setItem(key, raw)\n        } catch {}\n      }",
+    to: "      try {\n        for (const slot of [tab, device]) slot.setItem(key, raw)\n      } catch {}",
+    command: unit,
+    expect: "the other slot is still written",
+  },
+  {
+    name: "a pending message is stored",
+    file: file,
+    from: "        fresh: c.fresh.sendId === undefined ? {} : { sendId: c.fresh.sendId },",
+    to: "        fresh: c.fresh,",
+    command: unit,
+    expect: "never stored, nor restored",
+  },
+  {
+    name: "a stored pending message is restored",
+    file: file,
+    from: "        fresh: s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId },",
+    to: "        fresh: s.fresh,",
+    command: unit,
+    expect: "never stored, nor restored",
+  },
+  {
+    name: "any string is restored as a lane",
+    file: file,
+    from: "  ...(s.lane !== undefined && isLaneName(s.lane) ? { lane: s.lane } : {}),",
+    to: "  ...(s.lane !== undefined ? { lane: s.lane } : {}),",
+    command: unit,
+    expect: "not a lane name",
+  },
+  {
+    name: "prune keeps every column",
+    file: file,
+    from: "        c => c.anchor === null || action.index.entries[c.anchor] !== undefined,",
+    to: "        c => c.anchor === null || true,",
+    command: unit,
+    expect: "prune drops the columns",
+  },
+  {
+    name: "prune of every column leaves none",
+    file: file,
+    from: "      return known.length > 0 ? known : initialColumns()",
+    to: "      return known",
+    command: unit,
+    expect: "prune of every column leaves the initial one",
   },
 ]

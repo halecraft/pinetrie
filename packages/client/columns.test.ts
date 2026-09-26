@@ -5,7 +5,13 @@ import {
   laneNameForThread,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { type Column, columnsReducer, initialColumns } from "./columns.ts"
+import {
+  type Column,
+  columnsReducer,
+  decodeColumns,
+  encodeColumns,
+  initialColumns,
+} from "./columns.ts"
 
 /** A tree from `child: parent` pairs; `sends` gives some entries a send id. */
 const tree = (
@@ -195,5 +201,85 @@ describe("columnsReducer", () => {
       { kind: "makeMain", index: 2 },
     )
     expect(s.map(c => c.key)).toEqual(["c", "a", "b"])
+  })
+
+  test("sync leaves a column whose anchor has not arrived, and settles it once it has", () => {
+    const waiting: readonly Column[] = [{ key: "k", anchor: "2-b" }]
+    expect(sync(waiting, tree({ "1-a": null }))).toBe(waiting)
+    const arrived = tree({ "1-a": null, "2-b": "1-a", "3-c": "2-b" })
+    expect(anchors(sync(waiting, arrived))).toEqual(["3-c"])
+  })
+
+  test("prune drops the columns whose anchor the settled document lacks", () => {
+    const s: readonly Column[] = [
+      { key: "a", anchor: "1-a" },
+      { key: "b", anchor: "gone" },
+      { key: "c", anchor: null },
+    ]
+    const pruned = columnsReducer(s, {
+      kind: "prune",
+      index: tree({ "1-a": null }),
+    })
+    expect(pruned.map(c => c.key)).toEqual(["a", "c"])
+    expect(
+      columnsReducer(pruned, { kind: "prune", index: tree({ "1-a": null }) }),
+    ).toBe(pruned)
+  })
+
+  test("prune of every column leaves the initial one", () => {
+    const s = columnsReducer([{ key: "a", anchor: "gone" }], {
+      kind: "prune",
+      index: tree({}),
+    })
+    expect(s).toEqual(initialColumns())
+  })
+})
+
+describe("encodeColumns / decodeColumns", () => {
+  const trip = (c: readonly Column[]) =>
+    decodeColumns(JSON.parse(JSON.stringify(encodeColumns(c))))
+
+  test("a round trip keeps key, anchor, lane, asksAgent and the send id", () => {
+    const c: readonly Column[] = [
+      { key: "a", anchor: null },
+      { key: "b", anchor: "2-t", lane: L },
+      { key: "c", anchor: null, asksAgent: true, fresh: {} },
+      { key: "d", anchor: "1-a", fresh: { sendId: "s-1" } },
+    ]
+    expect(trip(c)).toEqual(c)
+  })
+
+  test("a message waiting to be sent is never stored, nor restored: it would be sent again", () => {
+    const stored = encodeColumns([
+      { key: "a", anchor: "1-a", fresh: { pending: "hello" } },
+    ])
+    expect(JSON.stringify(stored)).not.toContain("hello")
+    const raw = {
+      v: 1,
+      columns: [{ key: "a", anchor: "1-a", fresh: { pending: "hello" } }],
+    }
+    expect(decodeColumns(raw)).toEqual([{ key: "a", anchor: "1-a", fresh: {} }])
+  })
+
+  test("a layout that is another version, empty, or partly malformed restores nothing", () => {
+    const good = { key: "a", anchor: null }
+    for (const raw of [
+      { v: 2, columns: [good] },
+      { v: 1, columns: [] },
+      { v: 1, columns: [good, { key: 3, anchor: null }] },
+      { v: 1, columns: [good, { key: "b" }] },
+      [good],
+      "columns",
+      null,
+    ])
+      expect(decodeColumns(raw)).toBeUndefined()
+  })
+
+  test("a lane that is not a lane name is left off, and the column kept", () => {
+    const raw = {
+      v: 1,
+      columns: [{ key: "a", anchor: "1-a", lane: "w-someone" }],
+    }
+    expect(decodeColumns(raw)).toEqual([{ key: "a", anchor: "1-a" }])
   })
 })

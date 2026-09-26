@@ -67,7 +67,9 @@ const host = await startHost({
 })
 console.log(`  host              : ${host.httpUrl}\n`)
 
-const page = await browser.newPage()
+// An explicit context: a page from `browser.newPage()` owns its context, and
+// Playwright refuses a second tab in it, which the column checks open.
+const page = await (await browser.newContext()).newPage()
 const errors: string[] = []
 page.on("pageerror", e => errors.push(String(e.message)))
 page.on("console", m => m.type() === "error" && errors.push(m.text()))
@@ -1099,6 +1101,26 @@ try {
     await second.close().catch(() => {})
   }
 
+  // A reload keeps the tab's open columns (ADR-0027). At least two, one of
+  // them opened from the rail at a message no column shows.
+  const columnKeys = (p: typeof page) =>
+    p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))
+  if ((await columnKeys(page)).length < 2) {
+    const unshown = await page.$$eval(
+      ".rail-dot[data-entry]",
+      dots =>
+        dots
+          .map(d => d.getAttribute("data-entry"))
+          .find(
+            id =>
+              id !== null &&
+              document.querySelector(`.msg[data-entry="${id}"]`) === null,
+          ) ?? null,
+    )
+    if (unshown !== null) await page.click(`.rail-dot[data-entry="${unshown}"]`)
+  }
+  const openKeys = await columnKeys(page)
+
   // A reload is the same person: the tab keeps its peer id, so its name stays
   // and it is not shown to itself as someone else.
   const myName = await page.inputValue("#name")
@@ -1128,6 +1150,32 @@ try {
     myName !== "" && kept && ghosts === 0,
     `a reload keeps who you are: your name (${myName}), and no ghost of yourself`,
   )
+  // The document has arrived (the name shows); give the prune after settling
+  // time to run before comparing.
+  await waitFor(() => false, 1_000)
+  const reopened = await columnKeys(page)
+  ok(
+    openKeys.length >= 2 && reopened.join() === openKeys.join(),
+    `a reload keeps the tab's open columns, in order (${reopened.length} of ${openKeys.length})`,
+  )
+  // A new tab shares the device's storage (same context; every
+  // `browser.newPage()` makes a new one) and opens the layout last saved.
+  const newTab = await page.context().newPage()
+  try {
+    await newTab.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+    await newTab.waitForFunction(
+      () => document.getElementById("status")?.textContent === "connected",
+      { timeout: 20_000 },
+    )
+    await waitFor(() => false, 1_000)
+    const inNewTab = await columnKeys(newTab)
+    ok(
+      inNewTab.join() === openKeys.join(),
+      `a new tab opens the device's last layout (${inNewTab.length} of ${openKeys.length})`,
+    )
+  } finally {
+    await newTab.close().catch(() => {})
+  }
 
   ok(
     errors.length === 0,
