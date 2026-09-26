@@ -59,8 +59,7 @@ import {
 } from "@earendil-works/pi-agent-core"
 // `Usage` is pi-ai's type; pi-agent-core re-uses it but does not re-export it.
 import type { Usage } from "@earendil-works/pi-ai"
-import { batch } from "@kyneta/loro-schema"
-import { type Segment, subscribe } from "@kyneta/schema"
+import { batch, type Segment, subscribe } from "@kyneta/schema"
 import { orderNewEntries, tailEdit } from "@pineta/core"
 import {
   applyTextEdits,
@@ -120,6 +119,55 @@ function asMapChange(
         ? (c.set as Record<string, unknown>)
         : undefined,
     delete: Array.isArray(c.delete) ? (c.delete as string[]) : undefined,
+  }
+}
+
+/** What a replayed change leaves to re-index: pi's four fields, by key. */
+export type Dirty =
+  | { readonly kind: "none" }
+  | { readonly kind: "all" }
+  | { readonly kind: "usage" }
+  | {
+      readonly kind: "entries" | "values" | "lists"
+      readonly keys: readonly string[] | "all"
+    }
+
+/**
+ * Which of pi's indexes a replayed change can invalidate. Pure.
+ *
+ * Only pi's four fields back its `Storage` port, so only they are re-indexed;
+ * every other root field (streams, runs, checkpoint text, and any added later)
+ * is ignored. A change with no field replaces the whole document. The keys a
+ * map change sets or deletes are re-indexed alone; a change of another shape
+ * re-indexes the whole field. Kyneta's change union is broad, so only the
+ * leading path segment and a map's keys are read. The ignore list this replaced
+ * had to name every non-pi field, so a field it missed re-indexed everything.
+ */
+export function dirtyFrom(
+  segments: readonly Segment[],
+  change: unknown,
+): Dirty {
+  const field = asKey(segments[0])
+  if (field === undefined) return { kind: "all" }
+  if (field === "usageRows") return { kind: "usage" }
+  if (field !== "entries" && field !== "values" && field !== "lists")
+    return { kind: "none" }
+  // A write inside one list (`lists[key]…`) names its key in the path.
+  const inList = field === "lists" ? asKey(segments[1]) : undefined
+  if (inList !== undefined) return { kind: "lists", keys: [inList] }
+  const ch = asMapChange(change)
+  // Entries are only ever added (ADR-0004), so a change that sets none of them
+  // is unexpected, and re-indexes them all. Values and lists are re-indexed by
+  // the keys set or deleted.
+  if (field === "entries")
+    return ch?.set === undefined
+      ? { kind: "entries", keys: "all" }
+      : { kind: "entries", keys: Object.keys(ch.set) }
+  if (ch === undefined || (ch.set === undefined && ch.delete === undefined))
+    return { kind: field, keys: "all" }
+  return {
+    kind: field,
+    keys: [...Object.keys(ch.set ?? {}), ...(ch.delete ?? [])],
   }
 }
 
@@ -305,57 +353,31 @@ export class KynetaStorage implements Storage {
     this.#unsubscribe = subscribe(this.#doc, cs => {
       if (cs.replay !== true) return
       for (const op of cs.changes) {
-        // Kyneta's op/change union is broad; we only ever look at the leading
-        // path segment and the map set/delete keys, so narrow locally rather
-        // than restate the substrate's whole change algebra.
-        const segs: readonly Segment[] = op.path?.segments ?? []
-        const field = asKey(segs[0])
-        if (field === "entries") {
-          const ch = asMapChange(op.change)
-          if (ch?.set !== undefined) {
-            for (const k of Object.keys(ch.set)) this.#dirtyEntryKeys.add(k)
-          } else this.#dirtyEntriesAll = true
-        } else if (field === "usageRows") this.#dirtyUsage = true
-        else if (field === "values") {
-          const ch = asMapChange(op.change)
-          if (
-            ch !== undefined &&
-            (ch.set !== undefined || ch.delete !== undefined)
-          ) {
-            for (const k of Object.keys(ch.set ?? {}))
-              this.#dirtyValueKeys.add(k)
-            for (const k of ch.delete ?? []) this.#dirtyValueKeys.add(k)
-          } else this.#dirtyValuesAll = true
-        } else if (field === "lists") {
-          const listKey = asKey(segs[1])
-          if (listKey !== undefined) this.#dirtyListKeys.add(listKey)
-          else {
-            const ch = asMapChange(op.change)
-            if (
-              ch !== undefined &&
-              (ch.set !== undefined || ch.delete !== undefined)
-            ) {
-              for (const k of Object.keys(ch.set ?? {}))
-                this.#dirtyListKeys.add(k)
-              for (const k of ch.delete ?? []) this.#dirtyListKeys.add(k)
-            } else this.#dirtyListsAll = true
-          }
-        } else if (
-          field === "streams" ||
-          field === "streamText" ||
-          field === "activeRuns" ||
-          field === "checkpointText"
-        ) {
-          // Live-stream fields (ADR-0014), and checkpoint text, whose value
-          // record is rewritten with it. None invalidates the derived seq
-          // index. `activeRuns` was once `activeRunId`: under the old name,
-          // every stream write fell to the branch below and marked everything
-          // dirty.
-        } else {
-          this.#dirtyEntriesAll = true
-          this.#dirtyUsage = true
-          this.#dirtyValuesAll = true
-          this.#dirtyListsAll = true
+        const dirty = dirtyFrom(op.path?.segments ?? [], op.change)
+        switch (dirty.kind) {
+          case "none":
+            break
+          case "all":
+            this.#dirtyEntriesAll = true
+            this.#dirtyUsage = true
+            this.#dirtyValuesAll = true
+            this.#dirtyListsAll = true
+            break
+          case "entries":
+            if (dirty.keys === "all") this.#dirtyEntriesAll = true
+            else for (const k of dirty.keys) this.#dirtyEntryKeys.add(k)
+            break
+          case "usage":
+            this.#dirtyUsage = true
+            break
+          case "values":
+            if (dirty.keys === "all") this.#dirtyValuesAll = true
+            else for (const k of dirty.keys) this.#dirtyValueKeys.add(k)
+            break
+          case "lists":
+            if (dirty.keys === "all") this.#dirtyListsAll = true
+            else for (const k of dirty.keys) this.#dirtyListKeys.add(k)
+            break
         }
       }
     })

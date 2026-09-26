@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { judge } from "./mutate.ts"
+import { judge, run as runGroup } from "./mutate.ts"
 
 const run = (status: number | null, output: string, timedOut = false) => ({
   status,
@@ -30,5 +30,42 @@ describe("judge: what a mutant's run proves", () => {
   })
   test("a hang is a failure: KILLED", () => {
     expect(judge(run(null, "", true), "anything")).toBe("KILLED")
+  })
+})
+
+describe("run: nothing a command starts outlives it", () => {
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+  // The shell is the child; the sleep it starts in the background is a
+  // grandchild, as vitest's worker is under pnpm.
+  test("on a timeout, the whole process group is killed, grandchildren too", async () => {
+    const r = await runGroup(
+      "sh",
+      ["-c", "sleep 60 & echo $!; wait"],
+      process.cwd(),
+      500,
+    )
+    const pid = Number.parseInt(r.output, 10)
+    expect(r.timedOut).toBe(true)
+    await new Promise(res => setTimeout(res, 100))
+    expect(alive(pid)).toBe(false)
+  })
+  test("when the command ends, what it left running is killed", async () => {
+    const r = await runGroup(
+      "sh",
+      ["-c", "sleep 60 >/dev/null 2>&1 & echo $!"],
+      process.cwd(),
+      10_000,
+    )
+    const pid = Number.parseInt(r.output, 10)
+    expect(r.timedOut).toBe(false)
+    await new Promise(res => setTimeout(res, 100))
+    expect(alive(pid)).toBe(false)
   })
 })

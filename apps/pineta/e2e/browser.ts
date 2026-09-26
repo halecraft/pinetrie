@@ -74,9 +74,9 @@ try {
     timeout: 20_000,
   })
 
-  // The bundle must instantiate the Loro wasm before anything renders. A
-  // mismatched wasm/glue pair fails exactly here, with a LinkError — which is
-  // the bug a browser-free check cannot see.
+  // The bundle must load and connect before anything renders: a module the
+  // browser cannot run fails exactly here, which a browser-free check cannot
+  // see.
   await page.waitForFunction(
     () => document.getElementById("status")?.textContent === "connected",
     { timeout: 20_000 },
@@ -85,6 +85,19 @@ try {
   ok(
     errors.length === 0,
     `no page errors during load${errors[0] === undefined ? "" : ` — ${errors[0].slice(0, 90)}`}`,
+  )
+  // The session is plain JSON (ADR-0023): the page loads no Loro and no wasm.
+  // In development Vite pre-bundles loro-crdt with its wasm inside a JS module,
+  // so a check for `.wasm` files alone would pass with Loro loaded.
+  const heavy = await page.evaluate(() =>
+    performance
+      .getEntriesByType("resource")
+      .map(e => e.name)
+      .filter(n => /loro|\.wasm/i.test(n)),
+  )
+  ok(
+    heavy.length === 0,
+    `the page loads no Loro and no wasm${heavy[0] === undefined ? "" : ` — ${heavy[0].split("/").at(-1)}`}`,
   )
 
   ok(

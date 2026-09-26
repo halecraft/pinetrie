@@ -74,7 +74,7 @@ browser page ─┐
 Node client ──┘                                              │
                                                      KynetaStorage (ADR-0013)
                                                              │
-                              Loro doc ── replicated back ── ┘
+                    json.bind doc ── replicated back ── ┘
 ```
 
 Twelve spikes resolved, fourteen ADRs, **no open blockers**. The gate was fully
@@ -86,13 +86,12 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| build guards | `pnpm run sanity` | ok |
-| unit (pure core) | `pnpm test` | 167/167 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 71 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 173/173 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 75 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 91/91 |
-| with a real model | `pnpm run e2e:live` | 94/94 |
-| **real browser** | `pnpm run e2e:browser` | 49/49 |
+| end-to-end | `pnpm run e2e` | 95/95 |
+| with a real model | `pnpm run e2e:live` | 98/98 |
+| **real browser** | `pnpm run e2e:browser` | 50/50 |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -103,7 +102,7 @@ Playwright.
 ### Layout
 
 ```
-apps/pineta/           @pineta/app          host, e2e suites, sanity (run, never imported)
+apps/pineta/           @pineta/app          host and e2e suites (run, never imported)
 apps/conformance/      @pineta/conformance  pi's Storage suite vs our adapter
 packages/core/         @pineta/core         declares NOTHING
 packages/schema/       @pineta/schema       Kyneta only; the document shape
@@ -126,7 +125,9 @@ Full text with rationale and rejected alternatives: `docs/02-decisions.md`.
 The ones you must not violate by accident:
 
 **ADR-0009 — entry ids must be unique and coordination-free.** Entries live in a
-Loro map, which is a per-key LWW register. Grow-only-set semantics hold *only*
+keyed record, a per-key register (a Loro map when this was decided; `json.bind`
+with one writer since ADR-0023, where the hazard cannot arise but the rule
+stays). Grow-only-set semantics hold *only*
 because each key is written exactly once. A same-key concurrent write **silently
 discards one entry — no error, no conflict**. Never derive an id from content,
 index, or position. Use pi's default `IdGenerator` (verified safe in S9: a
@@ -271,13 +272,14 @@ exceptions *inside* it; reads are open with a `denyRead` blacklist.
 
 Local workspace at `~/halecraft/kyneta`, wired by `link:` deps. **Published
 `@kyneta/*` 3.0.0 is unusable** — it predates the O(δ) write fix and declares a
-`loro-crdt` floor of `>=1.8.0` where the real floor is `>=1.13.4`.
-`pnpm run sanity` gates on both markers (`stepInPlace` exported, loro ≥ 1.13.4)
-and refuses to start otherwise.
+`loro-crdt` floor of `>=1.8.0` where the real floor is `>=1.13.4`. Every host
+checks for `stepInPlace` when it starts (`assertEnvironment`) and refuses a
+stale build. Since ADR-0023 Pineta uses no Loro, so only that marker remains.
 
 Three issues were filed to the Kyneta team (`docs/findings/kyneta-issues-verification.md`):
-`compact()` throws on live Loro docs (**still open** — it is why ADR-0014 leaves
-~5.6 KB residue per message); the `Line` schemaHash collision (**fixed**); and
+`compact()` throws on live Loro docs (**moot for Pineta** since ADR-0023: the
+session is `json.bind`, compacted live, and ADR-0014's ~5.6 KB residue per
+message is gone); the `Line` schemaHash collision (**fixed**); and
 the ephemeral wire cost (**withdrawn — our error**, we used `Schema.string()`
 where `Schema.text()` was the right primitive).
 
@@ -357,19 +359,23 @@ context.**
   (locally, unreleased), verified from Pineta: 0 overlapping records, where one
   tool run had 133 KB of 345 KB (S22 addendum). Pineta needs the Kyneta release
   that carries it.
-- **`compact()` on a live Loro substrate throws** (reported to Kyneta). Kyneta's
-  store fix reworked `compact`; not yet re-verified from Pineta. Without it,
-  every tool run grows the store for good.
-- **A tool's output is stored twice**, as the live stream and as pi's
-  checkpoint. One text would do if pi's `tool_update` carried the checkpoint's
-  key (`operationId`/`invocationId`): an upstream request to pi.
+- ~~**`compact()` on a live Loro substrate throws**~~ — moot: the session is
+  `json.bind`, which compacts live (S24, ADR-0023). It still throws on Loro and
+  Yjs; **live Yjs compaction** is what collaborative documents wait for.
+- **A client's command Line is stored and never compacted.** Each Line document
+  grows about 1 KB per command, and the host cannot compact the half a client
+  writes. Line's pruning should compact it: to file upstream.
+- **While a tool runs, its output is in the session document twice:** the live
+  stream, and pi's checkpoint (its crash recovery). So clients receive it twice.
+  Compaction clears both when the run ends, so it costs bandwidth during a run,
+  not storage. One text would do if pi's `tool_update` carried the checkpoint's
+  key (`operationId`/`invocationId`): an upstream request to pi, low priority.
 - **Identity is not authenticated.** The invite key decides who gets in; peer
   ids are chosen by clients, so a collaborator can pose as another (ADR-0022).
 
 - **S15** — the trunk winner rule uses wall-clock `ts`; clock skew is
   adversarial. Needs a Lamport clock (S1 deliberately built none).
-- **S16** — a disposable per-message doc would remove ADR-0014's ~5.6 KB
-  residue. Lower priority since the wire-cost half of its premise dissolved.
+- ~~**S16**~~ — moot: compaction removes ADR-0014's residue (ADR-0023).
 - **S10 remainder** — snapshot/sync-payload size at scale.
 - **S6** — file-range reference anchoring (only matters for Worktree branches).
 - ~~`scripts/check-boundaries.ts` has no tests~~ — deleted. Boundaries are
@@ -387,6 +393,7 @@ context.**
 
 - Republish `@kyneta/*` **and raise the declared loro floor** — shipping the code
   fix with `>=1.8.0` lets consumers install a 17×-slow combination silently.
+  (Pineta no longer uses Loro, but other Kyneta users do.)
 - Exercise `@kyneta/react` + `@kyneta/devtools` against Kyneta's in-place
   mutation change (they are the likeliest holders of an object-identity
   assumption).

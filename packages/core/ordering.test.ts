@@ -1,7 +1,7 @@
 // ADR-0013's safety claim, stated as tests.
 //
 // This derivation used to live inside KynetaStorage, tangled with seven dirty
-// flags, reachable only through a live Loro substrate and an Exchange. None of
+// flags, reachable only through a live substrate and an Exchange. None of
 // the properties below could be expressed. That is why it was extracted.
 
 import { orderNewEntries } from "@pineta/core"

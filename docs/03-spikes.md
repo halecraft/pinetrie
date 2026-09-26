@@ -12,7 +12,7 @@ Order by information gained per unit cost, weighted by blast radius if wrong:
 
 > ~~S1~~ ~~S2~~ ~~S3~~ ~~S5~~ ~~S7~~ ~~S8~~ ~~S11~~ ~~S12~~ ~~S13~~ ~~S14~~ ✅
 > **ALL TWELVE RESOLVED. No blocker, nothing in flight.**
-> Remaining, none blocking: **S16 → S15 → S10 → S6**
+> Remaining, none blocking: **S15 → S10 → S6** (S16 moot since ADR-0023)
 >
 > The gate is fully discharged. **The walking skeleton is unblocked.**
 
@@ -313,7 +313,14 @@ S1's Lamport work** — if S1 lands a causal clock for `seq`, S15 is nearly free
 **Not urgent:** replicas converge either way; this is about picking the *right*
 winner, not a correct one.
 
-## S16 — Can a disposable per-message doc remove the streaming residue?
+## ~~S16~~ — MOOT ✅ → ADR-0023 (compaction removes the residue)
+
+> **Resolved without the spike.** The residue was Loro keeping each finished
+> stream's history. Since ADR-0023 the session is `json.bind` and is compacted
+> when every run ends, which drops that history (S25). The original question is
+> kept below for the record.
+
+### S16 — Can a disposable per-message doc remove the streaming residue?
 
 **Size:** S–M · **Depends on:** S4 · **Raised by:** ADR-0014's accepted tradeoff
 

@@ -4,8 +4,7 @@
 // convergence with no harness in the picture, and that property is worth
 // keeping. Nothing here knows what pi is.
 
-import { batch, createDoc, loro } from "@kyneta/loro-schema"
-import { Schema } from "@kyneta/schema"
+import { batch, createDoc, json, Schema } from "@kyneta/schema"
 import { type StreamEvent, type TextEdit, tailEdit } from "@pineta/core"
 
 /**
@@ -40,14 +39,16 @@ const StoredEntryRowSchema = Schema.struct.json({
 })
 
 /**
- * One session document, replicated host -> client.
+ * One session document, replicated host -> client. Authoritative JSON
+ * (`json.bind`, ADR-0023): the host is its only writer, clients send commands,
+ * and it is compacted between runs, keeping its state and not its edits.
  *
  * entries / usageRows / values / lists back pi's `Storage` port.
  *
- *   - `entries` is a RECORD keyed by UUIDv7, not a list: a Loro map is a
- *     per-key LWW register, and grow-only-set semantics emerge only because
- *     each key is written exactly once (ADR-0009). A list would duplicate on
- *     retry; `Schema.set` is rejected by the Loro backend.
+ *   - `entries` is a RECORD keyed by UUIDv7, not a list: each entry is written
+ *     exactly once and never edited (ADR-0004, ADR-0009), so a keyed record is
+ *     the whole of what is needed, and a retried write lands on the same key
+ *     where a list would duplicate it.
  *   - `usageRows`, `values` and `lists` stay `Schema.any()`. They are pi's
  *     bookkeeping for its `Storage` port, not Pineta's domain model, and
  *     nothing of ours traverses them. The asymmetry with `entries` is
@@ -60,7 +61,7 @@ const StoredEntryRowSchema = Schema.struct.json({
  * `checkpointText` holds pi's tool-output checkpoints, written the same way by
  * `KynetaStorage`.
  */
-export const SessionDoc = loro.bind(
+export const SessionDoc = json.bind(
   Schema.struct({
     entries: Schema.record(StoredEntryRowSchema),
     usageRows: Schema.record(Schema.any()),
@@ -100,7 +101,7 @@ export type SessionDocHandle = ReturnType<typeof newSessionDoc>
 // --- runs and streams (ADR-0014, S22) -------------------------------------
 
 /** Mark a lane as running `runId`. Its streams open as it writes. */
-export function beginStream(
+export function beginRun(
   doc: SessionDocHandle,
   lane: string,
   runId: string,
@@ -120,7 +121,7 @@ export function readActiveRun(
  * The run ended. The lane's key is DELETED, not set to "": absence is what
  * "idle" means. Its streams were closed as their messages and tools ended.
  */
-export function endStream(
+export function endRun(
   doc: SessionDocHandle,
   lane: string,
   runId: string,

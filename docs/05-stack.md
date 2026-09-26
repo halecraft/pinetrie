@@ -199,9 +199,8 @@ Ours, working, no equivalent upstream — do not discard in the migration:
   `workspace.test.ts` checking the manifests. The original entry follows.
 - **`scripts/check-boundaries.mjs`** — enforces ADR-0003's single-pi-coupling
   rule mechanically. It has already caught one real violation (mine).
-- **`scripts/sanity.mjs`** — `stepInPlace` present + loro-crdt ≥ 1.13.4. These
-  are the deterministic guards `04-roadmap.md` specifies, and they have already
-  caught a stale build.
+- ~~**`scripts/sanity.mjs`**~~ — deleted (ADR-0023). Its `stepInPlace` guard runs
+  in every host at startup; its loro-crdt floor went with Loro.
 - **`conformance/`** — pi's own 21-case `Storage` suite against our adapter.
 - **`e2e/`** — the ADR assertions (monotonic `insert`, no wire `seq`, lane name
   not `"main"`). These stay valuable *after* types, because they test runtime

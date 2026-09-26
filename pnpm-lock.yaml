@@ -71,9 +71,6 @@ importers:
       '@pineta/schema':
         specifier: workspace:*
         version: link:../../packages/schema
-      loro-crdt:
-        specifier: ^1.16.0
-        version: 1.16.1
       vite:
         specifier: 7.1.11
         version: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
@@ -148,9 +145,6 @@ importers:
       vite:
         specifier: 7.1.11
         version: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
-      vite-plugin-wasm:
-        specifier: 3.5.0
-        version: 3.5.0(vite@7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/core: {}
 
@@ -174,9 +168,6 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: 0.87.1
         version: 0.87.1(ws@8.21.3)
-      '@kyneta/loro-schema':
-        specifier: link:../../../kyneta/packages/schema/backends/loro
-        version: link:../../../kyneta/packages/schema/backends/loro
       '@kyneta/schema':
         specifier: link:../../../kyneta/packages/schema
         version: link:../../../kyneta/packages/schema
@@ -189,9 +180,6 @@ importers:
       '@pineta/schema':
         specifier: workspace:*
         version: link:../schema
-      loro-crdt:
-        specifier: ^1.16.0
-        version: 1.16.1
 
   packages/protocol:
     dependencies:
@@ -219,18 +207,12 @@ importers:
 
   packages/schema:
     dependencies:
-      '@kyneta/loro-schema':
-        specifier: link:../../../kyneta/packages/schema/backends/loro
-        version: link:../../../kyneta/packages/schema/backends/loro
       '@kyneta/schema':
         specifier: link:../../../kyneta/packages/schema
         version: link:../../../kyneta/packages/schema
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
-      loro-crdt:
-        specifier: ^1.16.0
-        version: 1.16.1
 
 packages:
 
@@ -1346,9 +1328,6 @@ packages:
   long@5.3.2:
     resolution: {integrity: sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==}
 
-  loro-crdt@1.16.1:
-    resolution: {integrity: sha512-olUkbQEjeeE78Kx6BknYrpbaX43wxRAycoiLZUSLVcMFKMSZ8RxPfp244kNVQEM8MQfgkbnwrNOaHU/yUb5Ncg==}
-
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
 
@@ -1582,11 +1561,6 @@ packages:
     resolution: {integrity: sha512-EbKSKh+bh1E1IFxeO0pg1n4dvoOTt0UDiXMd/qn++r98+jPO1xtJilvXldeuQ8giIB5IkpjCgMleHMNEsGH6pg==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
-
-  vite-plugin-wasm@3.5.0:
-    resolution: {integrity: sha512-X5VWgCnqiQEGb+omhlBVsvTfxikKtoOgAzQ95+BZ8gQ+VfMHIjSHr0wyvXFQCa0eKQ0fKyaL0kWcEnYqBac4lQ==}
-    peerDependencies:
-      vite: ^2 || ^3 || ^4 || ^5 || ^6 || ^7
 
   vite@7.1.11:
     resolution: {integrity: sha512-uzcxnSDVjAopEUjljkWh8EIrg6tlzrjFUfMcR1EVsRDGwf/ccef0qQPRyOrROwhrTDaApueq+ja+KLPlzR/zdg==}
@@ -2808,8 +2782,6 @@ snapshots:
 
   long@5.3.2: {}
 
-  loro-crdt@1.16.1: {}
-
   loupe@3.2.1: {}
 
   lru-cache@11.5.3: {}
@@ -3030,10 +3002,6 @@ snapshots:
       - terser
       - tsx
       - yaml
-
-  vite-plugin-wasm@3.5.0(vite@7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)):
-    dependencies:
-      vite: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
 
   vite@7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0):
     dependencies:

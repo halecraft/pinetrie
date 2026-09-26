@@ -154,10 +154,14 @@ the value record keeps a shell (`sealed: true`), and the text goes to
 rejoin them; a delete removes both. Any other shape is stored whole.
 `sealCheckpoint`/`unsealCheckpoint` are the pure rule. Conformance stays 21/21.
 
-`KynetaStorage` ignores changes to the stream fields (`streams`, `streamText`,
-`activeRuns`) and to `checkpointText`, whose value record is rewritten with it.
-Under the field's old name, `activeRunId`, every stream write fell through and
-marked all of pi's indexes dirty.
+`KynetaStorage` re-indexes only for **replayed** changes (hydration, or edits
+synced from another replica): its own commits index themselves. Which indexes a
+replayed change touches is `dirtyFrom`, a pure function: only pi's four fields
+(`entries`, `usageRows`, `values`, `lists`), by key; a change with no field, the
+whole document; any other root field, nothing. It replaced a list of fields to
+ignore, which had to name every non-pi field: one it missed (after `activeRunId`
+became `activeRuns`) made a replayed change to it re-index everything. That cost
+only work, never correctness, and never touched the host's own stream writes.
 
 ### References
 

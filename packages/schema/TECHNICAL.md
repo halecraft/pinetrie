@@ -72,7 +72,7 @@ ours traverses them. The asymmetry with `entries` is deliberate.
 ## `activeRuns`: one stream per lane
 
 `activeRuns: Schema.record(Schema.string())` maps a lane name to the run it is
-streaming. A **missing key means idle**; `endStream` deletes the key rather than
+streaming. A **missing key means idle**; `endRun` deletes the key rather than
 setting `""`, so no sentinel survives inside the structure. It replaced a single
 `activeRunId` register, which allowed only one stream in the whole document.
 
@@ -114,9 +114,24 @@ host serves, one append-only record stream per document; today that is this one
 
 **A root schema change cannot open an existing store**: Kyneta refuses a schema
 that cannot read what is stored. Migrate (root fields are migratable, S17), or
-move the file aside. Each record is a Loro update "since" a version; Kyneta
-repeats bytes when a commit lands while another is being written (S22
-addendum), and `compact()` does not yet work on a live Loro substrate.
+move the file aside. A Loro store from before ADR-0023 cannot be opened at all.
+
+## Authoritative JSON, compacted (ADR-0023)
+
+`SessionDoc` is `json.bind`: plain JSON, serialized writes, one writer (the
+host). No replica writes it, so it needs no CRDT merging, and the browser loads
+no Loro and no wasm. Its in-memory op log grows with every edit until
+compacted (S25), so the host compacts it between runs (`settle`: after a run
+ends, and at startup): the store's records become the document as it stands,
+and the log is trimmed. What is lost is the history of edits to transient
+state: streams, cleared values, the outbox. The tree is explicit and
+immutable, so no conversation is lost. A client behind the compacted point
+receives the whole document once.
+
+Every host has a store, an in-memory one when no file is given: Kyneta compacts
+only a document with a store. Only the session is compacted: a client's
+command Line is half written by the client, and Kyneta cannot compact a replica
+of a document another peer writes.
 
 ## Telling "no lane" from "a lane at the root"
 
@@ -125,6 +140,10 @@ the `pi.branch.tip` key when it creates a lane, even before its first entry.
 See `packages/pi/TECHNICAL.md` for why this matters.
 
 ## Never race a child container (S18)
+
+Moot for the session since ADR-0023: it has one writer, so two replicas never
+create a container concurrently. The rule stands for any collaborative (Yjs)
+document, and keeping the session's keys unique costs nothing.
 
 A child container created lazily under a record key LOSES one writer's contents
 when two replicas create it concurrently: nested `values[ns][key]` kept both

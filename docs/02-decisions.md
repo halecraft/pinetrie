@@ -209,7 +209,8 @@ durable identifier.
 
 **Status:** Accepted for v1 (from S4). Revisit when the notification defect is
 fixed. **Corrected post-review** — one supporting claim was retracted; the
-decision stands on the remaining two.
+decision stands on the remaining two. Amended by ADR-0023: the accepted residue
+per message is gone, since the session is compacted when every run ends.
 
 **Context.** The open question in ADR-0007 was whether high-rate streaming
 (`text_delta`) should use ephemeral presence — cheap, no history — or the durable
@@ -1261,7 +1262,8 @@ for a Claude subscription works only through a pi extension (S23).
   cannot open an existing store: migrate it, or start a new file.
 
 **Consequences.**
-- A tool's output is stored twice: as the live stream, and as pi's checkpoint.
+- While a tool runs, its output is in the document twice: as the live stream,
+  and as pi's checkpoint; compaction clears both when the run ends (ADR-0023).
   The two could share one text if pi's `tool_update` carried the checkpoint's
   key (`operationId`/`invocationId`); that is an upstream request.
 - Kyneta's store repeated bytes when a commit landed while another was being

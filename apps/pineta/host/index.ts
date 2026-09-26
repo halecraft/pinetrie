@@ -7,7 +7,12 @@ import http from "node:http"
 import { createRequire } from "node:module"
 import { networkInterfaces } from "node:os"
 import path from "node:path"
-import { Exchange, whenHydrated } from "@kyneta/exchange"
+import {
+  createInMemoryStore,
+  Exchange,
+  type Store,
+  whenHydrated,
+} from "@kyneta/exchange"
 import { stepInPlace } from "@kyneta/schema"
 import {
   WebsocketServerTransport,
@@ -57,9 +62,9 @@ import {
 } from "@pineta/reads"
 import {
   applyStreamOps,
-  beginStream,
+  beginRun,
   clearStreams,
-  endStream,
+  endRun,
   planStream,
   readActiveRun,
   readEntryMessage,
@@ -79,26 +84,24 @@ import {
 } from "./admission.ts"
 import { openStore } from "./store.ts"
 
-const require = createRequire(import.meta.url)
-
 export interface EnvironmentInfo {
-  readonly loroVersion: string
   readonly node: string
 }
 
-/** Deterministic build guard. Refuse to start on a stale Kyneta / old loro. */
+/**
+ * Deterministic build guard: refuse to start on a stale Kyneta build. Every
+ * host runs it, so a stale build fails the first suite that starts one.
+ */
 export function assertEnvironment(): EnvironmentInfo {
-  const loroVersion: string = require("loro-crdt/package.json").version
   const result = checkEnvironment({
     hasStepInPlace: typeof stepInPlace === "function",
-    loroVersion,
   })
   if (!result.ok) {
     throw new Error(
       `environment gate failed:\n  - ${result.problems.join("\n  - ")}`,
     )
   }
-  return { loroVersion, node: process.version }
+  return { node: process.version }
 }
 
 export interface StartHostOptions {
@@ -116,8 +119,14 @@ export interface StartHostOptions {
   readonly tools?: { readonly cwd: string } | null
   /** Vite's hot reload. Off for a host whose agent edits the client it serves. */
   readonly hmr?: boolean
-  /** A SQLite file to keep the session in; absent or null, memory only. */
-  readonly store?: string | null
+  /**
+   * Where the session is kept: a SQLite file; a Kyneta store a caller made (and
+   * closes), as a suite does to control it; or, absent or null, a store in
+   * memory. Every host has a store: Kyneta compacts only a document with one,
+   * and compaction is also what trims the session's in-memory op log
+   * (ADR-0023).
+   */
+  readonly store?: string | Store | null
   readonly log?: (message: string) => void
 }
 
@@ -131,6 +140,11 @@ export interface RunningHost {
   readonly key: string | null
   /** Links a collaborator can open, key included; the local URL on loopback. */
   readonly invites: readonly string[]
+  /**
+   * Resolves when no queued step remains (a compaction after a run among them)
+   * and every write has reached the store. Checks await this rather than guess.
+   */
+  quiet(): Promise<void>
   shutdown(): Promise<void>
 }
 
@@ -146,9 +160,7 @@ export async function startHost({
 }: StartHostOptions): Promise<RunningHost> {
   const key = isLoopback(bind) ? null : (givenKey ?? newKey())
   const env = assertEnvironment()
-  log(
-    `[host] env ok — loro-crdt ${env.loroVersion}, node ${env.node}, stepInPlace present`,
-  )
+  log(`[host] env ok — node ${env.node}, @kyneta/schema stepInPlace present`)
 
   // --- transport + exchange ------------------------------------------------
   const serverTransport = new WebsocketServerTransport()
@@ -156,18 +168,23 @@ export async function startHost({
   // agreed constant. The host has no WRITER identity: writers are the
   // connected clients, identified by the transport, and they own no lanes;
   // lanes belong to threads (ADR-0020).
-  const stored = storeFile === null ? null : openStore(storeFile)
+  const stored =
+    storeFile === null
+      ? { store: createInMemoryStore(), close: () => {} }
+      : typeof storeFile === "string"
+        ? openStore(storeFile)
+        : { store: storeFile, close: () => {} }
   const exchange = new Exchange({
     id: HOST_PEER_ID,
     transports: [serverTransport],
-    ...(stored === null ? {} : { stores: [stored.store] }),
+    stores: [stored.store],
   })
 
   // The session document is BOTH pi's storage and the thing we replicate.
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
   // A stored session loads asynchronously; pi must see it before it starts.
   // Only storage is awaited: the host is the authority, with no peer upstream.
-  if (stored !== null) await whenHydrated(doc)
+  await whenHydrated(doc)
 
   // --- pi stack ------------------------------------------------------------
   const agent = await createAgent({
@@ -217,6 +234,49 @@ export async function startHost({
     return run
   }
 
+  /** Settles when no step is queued or running: each step may queue more. */
+  async function quiet(): Promise<void> {
+    for (let seen = tail; ; seen = tail) {
+      await seen
+      if (seen === tail) break
+    }
+    await exchange.flush()
+  }
+
+  // A compaction queued and not yet started absorbs the next request: several
+  // runs ending together compact once.
+  let compactionQueued = false
+
+  /**
+   * What happens between runs, as one serial step: drain each lane given, then
+   * compact the session. Draining first means a message waiting for the lane
+   * does not wait for the compaction; a run it starts streams while the
+   * session compacts. Compaction replaces the store's records with the document
+   * as it stands and trims the in-memory op log (ADR-0023); a run's end is when
+   * that log has grown most and its streams have just closed. A failed
+   * compaction is logged; the host carries on.
+   */
+  function settle(lanes: readonly LaneName[]): Promise<void> {
+    const compact = !compactionQueued
+    compactionQueued = true
+    return serially(async () => {
+      for (const lane of lanes) await drain(lane)
+      if (!compact) return
+      compactionQueued = false
+      // The session only. Each client's command Line is also stored, and grows
+      // a little with every command, but half of it is the client's to write,
+      // and Kyneta cannot compact a replica of a document another peer writes.
+      // Its pruning should compact it; that is upstream (S25 addendum).
+      try {
+        await exchange.compact(SESSION_DOC_ID)
+      } catch (error) {
+        log(
+          `[host] compaction failed: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    })
+  }
+
   /**
    * Start one turn on a thread's lane, streaming into the document. Its end
    * enqueues one drain step for that lane: "a run ended" is the only state the
@@ -224,7 +284,7 @@ export async function startHost({
    */
   function startRun(lane: LaneName, message: ChatMessage): RunId {
     const id = runId(newId())
-    beginStream(doc, lane, id)
+    beginRun(doc, lane, id)
     void (async () => {
       try {
         const ran = await agent.lane(lane).run(message)
@@ -239,9 +299,9 @@ export async function startHost({
           `[host] run failed: ${error instanceof Error ? error.message : String(error)}`,
         )
       } finally {
-        endStream(doc, lane, id)
+        endRun(doc, lane, id)
         log(`[host] run ${id.slice(-8)} done`)
-        void serially(() => drain(lane))
+        void settle([lane])
       }
     })()
     return id
@@ -276,13 +336,11 @@ export async function startHost({
     }
   }
 
-  // No run or stream survives a process: clear them, then drain every lane
-  // with messages held for it, since no run's end will.
-  void serially(async () => {
-    clearStreams(doc)
-    for (const lane of planStartup({ held: readOutbox(doc) }).drain)
-      await drain(lane)
-  })
+  // No run or stream survives a process: clear them. Nothing else runs yet, so
+  // this needs no serial step. Then settle: drain every lane with messages held
+  // for it, since no run's end will, and compact.
+  clearStreams(doc)
+  void settle(planStartup({ held: readOutbox(doc) }).drain)
 
   /** A human message: gather, `threadOf` and `planChat`, execute. */
   async function handleChat(
@@ -596,7 +654,12 @@ export async function startHost({
     agent,
     key,
     invites,
+    quiet,
     async shutdown() {
+      // Let queued steps, a compaction among them, finish their writes.
+      try {
+        await quiet()
+      } catch {}
       try {
         await agent.close()
       } catch {}
@@ -610,7 +673,7 @@ export async function startHost({
         httpServer.close(() => resolve())
       })
       try {
-        stored?.close()
+        stored.close()
       } catch {}
     },
   }

@@ -21,4 +21,12 @@ export const mutations: readonly Mutation[] = [
     command: e2e,
     expect: "a read is stored as a call paired with its result",
   },
+  {
+    name: "a field pi does not own re-indexes everything",
+    file: "packages/pi/storage.ts",
+    from: '  if (field !== "entries" && field !== "values" && field !== "lists")\n    return { kind: "none" }',
+    to: '  if (field !== "entries" && field !== "values" && field !== "lists")\n    return { kind: "all" }',
+    command: unit,
+    expect: "ignored, whatever it is called",
+  },
 ]

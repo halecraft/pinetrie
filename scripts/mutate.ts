@@ -18,7 +18,7 @@
 // Usage: node scripts/mutate.ts <mutations.ts> [name-substring]
 // Exits with the number of mutations that were not KILLED.
 
-import { spawnSync } from "node:child_process"
+import { spawn } from "node:child_process"
 import { readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import process from "node:process"
@@ -75,7 +75,48 @@ export function judge(
   return failing.some(line => line.includes(expect)) ? "KILLED" : "ELSEWHERE"
 }
 
-function apply(root: string, m: Mutation): Verdict {
+/**
+ * Run `cmd` in its own process group, and on timeout kill the whole group. A
+ * timeout that killed only the direct child (`pnpm`) left its workers running:
+ * a mutant that loops forever, as one is meant to, then spun at full CPU for
+ * hours after the harness had moved on.
+ */
+export function run(
+  cmd: string,
+  args: readonly string[],
+  cwd: string,
+  timeoutMs: number,
+): Promise<{ status: number | null; timedOut: boolean; output: string }> {
+  return new Promise(resolve => {
+    const child = spawn(cmd, args, { cwd, detached: true })
+    let output = ""
+    child.stdout.on("data", d => {
+      output += d
+    })
+    child.stderr.on("data", d => {
+      output += d
+    })
+    let timedOut = false
+    const killGroup = () => {
+      if (child.pid === undefined) return
+      try {
+        process.kill(-child.pid, "SIGKILL")
+      } catch {}
+    }
+    const timer = setTimeout(() => {
+      timedOut = true
+      killGroup()
+    }, timeoutMs)
+    child.on("close", status => {
+      clearTimeout(timer)
+      // The run is over: nothing it started may outlive it.
+      killGroup()
+      resolve({ status, timedOut, output })
+    })
+  })
+}
+
+async function apply(root: string, m: Mutation): Promise<Verdict> {
   const file = path.join(root, m.file)
   const original = readFileSync(file, "utf8")
   if (original.split(m.from).length !== 2) return "ANCHOR"
@@ -85,24 +126,7 @@ function apply(root: string, m: Mutation): Verdict {
   try {
     const [cmd, ...args] = m.command
     if (cmd === undefined) return "BROKEN"
-    const run = spawnSync(cmd, args, {
-      cwd: root,
-      encoding: "utf8",
-      timeout: m.timeoutMs ?? 900_000,
-      maxBuffer: 64 * 1024 * 1024,
-    })
-    const timedOut =
-      run.error !== undefined &&
-      "code" in run.error &&
-      run.error.code === "ETIMEDOUT"
-    return judge(
-      {
-        status: run.status,
-        timedOut,
-        output: `${run.stdout ?? ""}${run.stderr ?? ""}`,
-      },
-      m.expect,
-    )
+    return judge(await run(cmd, args, root, m.timeoutMs ?? 900_000), m.expect)
   } finally {
     restore()
     process.removeListener("SIGINT", restore)
@@ -126,7 +150,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   )
   let bad = 0
   for (const m of chosen) {
-    const verdict = apply(root, m)
+    const verdict = await apply(root, m)
     console.log(`  ${verdict.padEnd(9)} ${m.name}`)
     if (verdict !== "KILLED") bad += 1
   }

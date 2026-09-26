@@ -82,7 +82,7 @@ and version-locked across seven packages — treat all of it as churning.**
 └───────────────┬──────────────────────────────┘
                 │  pi `Storage` interface (10 methods)
 ┌───────────────┴──────────────────────────────┐
-│ KynetaStorage — Loro substrate, Exchange     │
+│ KynetaStorage — json.bind, Exchange, store   │
 └──────────────────────────────────────────────┘
 ```
 
@@ -106,7 +106,7 @@ Five contracts. Fix these and everything else proceeds in parallel.
 
 ```
 apps/         things you RUN; nothing imports them
-  pineta/        @pineta/app          the host (server), its e2e suites, sanity
+  pineta/        @pineta/app          the host (server) and its e2e suites
   conformance/   @pineta/conformance  pi's own Storage suite vs our adapter
 
 packages/     libraries; their boundaries are enforced by resolution
@@ -233,7 +233,7 @@ UI renders a linear spine with branches hanging off it.
 
 | Axis | Owner | Answers |
 |---|---|---|
-| Loro op-DAG / version history | substrate | "who wrote what, when, across devices" |
+| the substrate's op log | substrate | "which edits reached which replica"; compacted away (ADR-0023) |
 | `parentId` tree | us | "what follows what, conversationally" |
 
 Precedent: **jj has both** — an operation log (undo, cross-machine concurrency)
@@ -246,9 +246,11 @@ branches from the op log. Our mapping is exact. (ADR-0008)
   keyed by UUIDv7, values opaque immutable blobs. **Not** `Schema.list` (not
   idempotent — the same entry appended on two peers yields two copies, so any
   retry or at-least-once delivery silently duplicates conversation entries).
-  **Not** `Schema.set` (rejected at runtime by the Loro backend:
-  `'set-op' is not yet supported`). `record` also gives O(1) `getEntries(ids)`,
-  which is exactly pi's `Storage` access pattern.
+  **Not** `Schema.set` (rejected at runtime by the Loro backend this ran on
+  then: `'set-op' is not yet supported`). `record` also gives O(1)
+  `getEntries(ids)`, which is exactly pi's `Storage` access pattern.
+  Since ADR-0023 the document is authoritative JSON (`json.bind`), written by
+  the host alone and compacted between runs.
 
   > **Load-bearing invariant (ADR-0009): entry ids must be unique.** A Loro map
   > is a per-key LWW register; grow-only-set semantics emerge *only* because

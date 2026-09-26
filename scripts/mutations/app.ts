@@ -125,8 +125,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host does not wait for its stored session",
     file: "apps/pineta/host/index.ts",
-    from: "  if (stored !== null) await whenHydrated(doc)",
-    to: "  if (stored !== null) void whenHydrated",
+    from: "  await whenHydrated(doc)",
+    to: "  void whenHydrated",
     command: e2e,
     expect: "held message was drained",
   },
@@ -177,5 +177,21 @@ export const mutations: readonly Mutation[] = [
     to: '    call.result === undefined ? "pending" : "ok"',
     command: browser,
     expect: "Stop ends a running command",
+  },
+  {
+    name: "a run's end does not compact",
+    file: "apps/pineta/host/index.ts",
+    from: "        void settle([lane])",
+    to: "        void serially(() => drain(lane))",
+    command: e2e,
+    expect: "after the run, the store holds the compacted session",
+  },
+  {
+    name: "startup does not compact",
+    file: "apps/pineta/host/index.ts",
+    from: "  void settle(planStartup({ held: readOutbox(doc) }).drain)",
+    to: "  for (const l of planStartup({ held: readOutbox(doc) }).drain)\n    void serially(() => drain(l))",
+    command: e2e,
+    expect: "a starting host compacts",
   },
 ]

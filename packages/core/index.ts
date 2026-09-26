@@ -368,23 +368,6 @@ export function findSeqKeys(value: unknown, path = "$"): string[] {
 
 // --- environment gate -------------------------------------------------------
 
-/** Compare dotted numeric versions. -1 | 0 | 1 */
-export function compareVersions(a: string, b: string): -1 | 0 | 1 {
-  const pa = String(a)
-    .split(".")
-    .map(n => Number.parseInt(n, 10) || 0)
-  const pb = String(b)
-    .split(".")
-    .map(n => Number.parseInt(n, 10) || 0)
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0)
-    if (d !== 0) return d < 0 ? -1 : 1
-  }
-  return 0
-}
-
-export const LORO_FLOOR = "1.13.4"
-
 export interface EnvironmentReport {
   readonly ok: boolean
   readonly problems: readonly string[]
@@ -397,19 +380,14 @@ export interface EnvironmentReport {
  */
 export function checkEnvironment({
   hasStepInPlace,
-  loroVersion,
 }: {
   hasStepInPlace: boolean
-  loroVersion: string
 }): EnvironmentReport {
   const problems: string[] = []
   if (hasStepInPlace !== true) {
     problems.push(
       "@kyneta/schema does not export stepInPlace — stale (published 3.0.0) build",
     )
-  }
-  if (compareVersions(loroVersion, LORO_FLOOR) < 0) {
-    problems.push(`loro-crdt ${loroVersion} is below the ${LORO_FLOOR} floor`)
   }
   return { ok: problems.length === 0, problems }
 }

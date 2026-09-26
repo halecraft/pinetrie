@@ -17,6 +17,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { DatabaseSync } from "node:sqlite"
+import type { Store } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import { connectSession, type SessionClient } from "@pineta/client/session"
 import {
@@ -37,6 +38,7 @@ import {
 import { decodeChat, displayName } from "@pineta/marginalia"
 import { newId as newHeldId, scriptedModel } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
+import { SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
   readLanes,
   readOutbox,
@@ -55,6 +57,7 @@ import {
   writeEntry,
 } from "@pineta/schema"
 import { startHost } from "../host/index.ts"
+import { openStore } from "../host/store.ts"
 import { createChecks, waitFor } from "./harness.ts"
 
 const LIVE = process.env.PINETA_LIVE === "1"
@@ -96,8 +99,12 @@ const idle = () =>
       readOutbox(host.doc).length === 0,
     120_000,
   )
-/** The bytes of a Kyneta SQLite store's records. */
-const storeBytes = (file: string): number => {
+/**
+ * The session's records in a Kyneta SQLite store: how many, and their bytes.
+ * The store also holds each client's command Line, which the host does not
+ * compact (see `settle`), so only the session document is counted.
+ */
+const storeSize = (file: string): { records: number; bytes: number } => {
   const db = new DatabaseSync(file, { readOnly: true })
   try {
     const tables = db
@@ -107,14 +114,43 @@ const storeBytes = (file: string): number => {
     const records = tables.find(t => t.includes("record")) ?? ""
     const row = db
       .prepare(
-        `select coalesce(sum(length(blob)), 0) + coalesce(sum(length(payload)), 0) as n from ${records}`,
+        `select count(*) as records, coalesce(sum(length(blob)), 0) + coalesce(sum(length(payload)), 0) as bytes from ${records} where doc_id = ?`,
       )
-      .get() as { n: number | null }
-    return row.n ?? 0
+      .get(SESSION_DOC_ID) as { records: number; bytes: number }
+    return { records: row.records, bytes: row.bytes }
   } finally {
     db.close()
   }
 }
+/**
+ * `store`, taking `ms` before it starts to load: a host that does not wait for
+ * its store to load then starts from an empty session. Every method forwards;
+ * a spread would lose them, since stores are class instances.
+ */
+const slowToLoad = (store: Store, ms: number): Store => ({
+  append: (docId, record) => store.append(docId, record),
+  loadAll: docId =>
+    (async function* () {
+      await sleep(ms)
+      yield* store.loadAll(docId)
+    })(),
+  replace: (docId, records) => store.replace(docId, records),
+  delete: docId => store.delete(docId),
+  currentMeta: async docId => {
+    await sleep(ms)
+    return store.currentMeta(docId)
+  },
+  listDocIds: prefix => store.listDocIds(prefix),
+  close: () => store.close(),
+})
+/** A session's size as it stands: what a compacted store should hold. */
+const sessionBytes = (doc: typeof host.doc): number =>
+  JSON.stringify({
+    entries: doc.entries(),
+    usageRows: doc.usageRows(),
+    values: doc.values(),
+    lists: doc.lists(),
+  }).length
 /** In `doc`, the id of the message whose text is exactly `text`. */
 const idOfIn = (doc: typeof host.doc, text: string): string | null => {
   const index = readTreeIndex(doc)
@@ -320,6 +356,43 @@ invariants("first turn")
       projectTranscript(tree(), trunkTip()).some(m => m.text === "and again"),
     "no new lane: the thread's lane advanced past its old end",
   )
+  // The first run's end compacted the session; the thread runs on after it,
+  // reading its whole path in order, and a client that stayed connected
+  // follows (ADR-0023).
+  await host.quiet()
+  const path = projectTranscript(tree(), trunkTip()).map(m => m.id)
+  const again = await client.chat("after a compaction", at(trunkTip()))
+  await idle()
+  await host.quiet()
+  const next = projectTranscript(tree(), trunkTip()).map(m => m.id)
+  ok(
+    runOf(again) !== "" &&
+      next.slice(0, path.length).join() === path.join() &&
+      next.length > path.length,
+    `a thread runs on after a compaction, its path in order (${path.length} -> ${next.length} messages)`,
+  )
+  await waitFor(
+    () =>
+      projectTranscript(readTreeIndex(client.doc), trunkTip()).length ===
+      next.length,
+  )
+  ok(
+    projectTranscript(readTreeIndex(client.doc), trunkTip()).length ===
+      next.length,
+    "a client connected across compactions follows the thread",
+  )
+  const late = await connect("after-compactions")
+  await waitFor(
+    () =>
+      Object.keys(late.doc.entries()).length ===
+      Object.keys(host.doc.entries()).length,
+  )
+  ok(
+    Object.keys(late.doc.entries()).length ===
+      Object.keys(host.doc.entries()).length,
+    `a client connecting after compactions receives the whole session (${Object.keys(late.doc.entries()).length} entries)`,
+  )
+  await late.close()
   invariants("reply")
 }
 
@@ -811,11 +884,11 @@ invariants("end")
   )
   writeFileSync(path.join(work, "notes.txt"), "the secret word is MANGO\n")
   const script = scriptedModel()
-  const open = (log: (m: string) => void) =>
+  const open = (log: (m: string) => void, store: string | Store = dbFile) =>
     startHost({
       model: { kind: "scripted", script },
       tools: { cwd: work },
-      store: dbFile,
+      store,
       log,
     })
   let th = await open(() => {})
@@ -894,7 +967,6 @@ invariants("end")
     { text: "ran it" },
   ])
   watched.length = 0
-  const sizeBefore = storeBytes(dbFile)
   const l3 = tlane()
   await u.chat("run it", at(l3?.tip ?? null), { lane: l3?.name })
   await tidle()
@@ -915,16 +987,14 @@ invariants("end")
     `a running command's output streamed live (${toolTexts.length} updates), matching its result`,
   )
   ok(readStreams(th.doc).length === 0, "when the tool ended, its stream closed")
-  // The store's own record bytes, not the file's: SQLite's page overhead for
-  // large blobs varies. The live stream, pi's checkpoints, the result and pi's
-  // pending copy of it each cost about what was printed or returned. Stored
-  // as whole values, the live stream alone was 4.35 MB (S22), which this bound
-  // catches; the checkpoints' routing has its own unit test.
-  const grew = storeBytes(dbFile) - sizeBefore
-  const bound = 4 * (printed + result.length)
+  // The run's end compacted the session (ADR-0023): the store holds the
+  // document as it stands, not the run's edits. Whole-value streams are guarded
+  // by `planStream`'s unit test, since compaction would hide them here.
+  await th.quiet()
+  const compacted = storeSize(dbFile)
   ok(
-    grew <= bound,
-    `the store's records grew ${Math.round(grew / 1024)} KB for ${Math.round(printed / 1024)} KB printed (at most ${Math.round(bound / 1024)} KB)`,
+    compacted.records <= 3 && compacted.bytes <= 2 * sessionBytes(th.doc),
+    `after the run, the store holds the compacted session: ${compacted.records} records, ${Math.round(compacted.bytes / 1024)} KB for a ${Math.round(sessionBytes(th.doc) / 1024)} KB session (${Math.round(printed / 1024)} KB printed)`,
   )
 
   // 4. Two assistant messages in one run: two reply streams, one at a time.
@@ -1009,16 +1079,29 @@ invariants("end")
       },
       timestamp: Date.now(),
     })
+  // Written after the last compaction, so the store the next host opens holds
+  // more than the compacted session: its startup must compact again.
+  await u.setName("Uma, again")
   unwatch()
   await u.close()
   await bob.close()
-  await sleep(100)
+  await th.quiet()
+  const beforeRestart = storeSize(dbFile)
   await th.shutdown()
-  th = await open(() => {})
+  // The store opens slowly, so a host that did not wait for it would start
+  // from an empty session, and leave the held message undrained.
+  const slow = openStore(dbFile)
+  th = await open(() => {}, slowToLoad(slow.store, 3_000))
   unwatch = watch()
   await waitFor(
     () => idOfIn(th.doc, "@Bob held across a restart") !== null,
     15_000,
+  )
+  await th.quiet()
+  const afterRestart = storeSize(dbFile)
+  ok(
+    beforeRestart.records > 3 && afterRestart.records <= 3,
+    `a starting host compacts the session it opened (${beforeRestart.records} records -> ${afterRestart.records})`,
   )
   const after = {
     entries: Object.keys(th.doc.entries()).length - 1,
@@ -1026,7 +1109,10 @@ invariants("end")
     names: [...readParticipantNames(th.doc).values()].sort(),
   }
   ok(
-    JSON.stringify(after.names) === JSON.stringify(before.names) &&
+    JSON.stringify(after.names) ===
+      JSON.stringify(
+        before.names.map(n => (n === "Uma" ? "Uma, again" : n)).sort(),
+      ) &&
       after.entries === before.entries &&
       readOutbox(th.doc).length === 0,
     `after a restart the session is all there, and the held message was drained (${after.entries} entries)`,
@@ -1052,6 +1138,7 @@ invariants("end")
   unwatch()
   await u2.close()
   await sleep(100)
+  // The host's Exchange closes its stores when it shuts down, this one too.
   await th.shutdown()
 }
 

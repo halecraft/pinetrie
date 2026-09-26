@@ -5,7 +5,6 @@ import assert from "node:assert/strict"
 import {
   address,
   checkEnvironment,
-  compareVersions,
   type EnvironmentReport,
   findSeqKeys,
   handleOf,
@@ -168,28 +167,12 @@ test("messageText: flattens pi's content parts", () => {
   assert.equal(messageText(undefined), "")
 })
 
-test("compareVersions / checkEnvironment: the deterministic build guards", () => {
-  assert.equal(compareVersions("1.16.3", "1.13.4"), 1)
-  assert.equal(compareVersions("1.13.4", "1.13.4"), 0)
-  assert.equal(compareVersions("1.10.8", "1.13.4"), -1)
-  assert.equal(compareVersions("1.9", "1.10"), -1, "numeric, not lexical")
-
-  assert.equal(
-    checkEnvironment({ hasStepInPlace: true, loroVersion: "1.16.3" }).ok,
-    true,
-  )
+test("checkEnvironment: the deterministic build guard", () => {
+  assert.equal(checkEnvironment({ hasStepInPlace: true }).ok, true)
   // Published @kyneta/schema 3.0.0 lacks stepInPlace — that is the whole point.
   assert.match(
-    firstProblem(
-      checkEnvironment({ hasStepInPlace: false, loroVersion: "1.16.3" }),
-    ),
+    firstProblem(checkEnvironment({ hasStepInPlace: false })),
     /stepInPlace/,
-  )
-  assert.match(
-    firstProblem(
-      checkEnvironment({ hasStepInPlace: true, loroVersion: "1.10.8" }),
-    ),
-    /below the 1.13.4 floor/,
   )
 })
 
