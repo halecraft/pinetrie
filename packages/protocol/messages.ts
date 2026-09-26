@@ -8,6 +8,8 @@ export const CONTROL_TOPIC = "pineta.control"
 
 /** Document ids replicated host -> client (ADR-0007: state over documents). */
 export const SESSION_DOC_ID = "pineta:session"
+/** Who is here, and what each person reads and types: ephemeral, never stored (ADR-0024). */
+export const PRESENCE_DOC_ID = "pineta:presence"
 
 /**
  * Exchange id of the host. A Line is addressed to a peer id, so both sides must

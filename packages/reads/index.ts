@@ -35,6 +35,7 @@ import {
   renderableMessage,
 } from "@pineta/marginalia"
 import {
+  type PresenceDocHandle,
   readActiveRun,
   readEntries,
   readLaneNames,
@@ -147,4 +148,33 @@ export function readReferences(doc: SessionDocHandle): ReferenceIndex {
     if (r !== undefined) refs.push(r)
   }
   return indexReferences(refs)
+}
+
+/** Who is here, as the presence document says it: decayed (null) values dropped. */
+export interface PresenceFacts {
+  /** One entry per open column: its writer, and the thread end it follows. */
+  readonly reading: readonly (readonly [WriterId, string])[]
+  readonly typing: ReadonlyMap<WriterId, string>
+  readonly editing: ReadonlyMap<WriterId, string>
+}
+
+/**
+ * The presence document's live entries. A decayed value is `null` and its key
+ * stays, so nulls are skipped here, once. `reading` keys are
+ * `${writer}:${columnKey}`; the writer is everything before the last colon.
+ */
+export function readPresence(doc: PresenceDocHandle): PresenceFacts {
+  const reading: [WriterId, string][] = []
+  for (const [key, end] of Object.entries(doc.reading())) {
+    const at = key.lastIndexOf(":")
+    if (end !== null && at > 0)
+      reading.push([key.slice(0, at) as WriterId, end])
+  }
+  const live = (record: Record<string, string | null>) =>
+    new Map(
+      Object.entries(record).flatMap(([w, v]) =>
+        v === null ? [] : [[w as WriterId, v] as const],
+      ),
+    )
+  return { reading, typing: live(doc.typing()), editing: live(doc.editing()) }
 }

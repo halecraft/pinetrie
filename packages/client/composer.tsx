@@ -34,6 +34,8 @@ export function Composer({
   onSend,
   onBranchInstead,
   pending,
+  typing,
+  onTyping,
 }: {
   session: SessionClient
   /** Where the message attaches: the column's end, or its branch point. */
@@ -56,6 +58,10 @@ export function Composer({
   onBranchInstead: (text: string) => void
   /** A first message to send at once: this column was opened to send it. */
   pending: string | undefined
+  /** Others typing here, by name (presence). */
+  typing: readonly string[]
+  /** Called on each keystroke; presence is written at most once a second. */
+  onTyping: () => void
 }) {
   const [text, setText] = useState("")
   const [status, setStatus] = useState("")
@@ -173,11 +179,19 @@ export function Composer({
           Stop
         </button>
       )}
+      {typing.length > 0 && (
+        <div className="typing">
+          {typing.join(", ")} {typing.length === 1 ? "is" : "are"} typing…
+        </div>
+      )}
       <div className="compose-row">
         <input
           autoComplete="off"
           className="input"
-          onChange={e => setText(e.target.value)}
+          onChange={e => {
+            setText(e.target.value)
+            onTyping()
+          }}
           placeholder={
             byDefault ? "ask the agent…" : "say something · @agent to ask"
           }

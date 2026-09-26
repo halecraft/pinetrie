@@ -436,3 +436,5 @@ export function readEntryMessage(
 /** A row's message, lifted out of its sealed `payload`. Pure; no lookup. */
 export const rowMessage = (row: StoredEntryRow): unknown =>
   (row.payload as { message?: unknown } | null)?.message
+
+export * from "./presence.ts"

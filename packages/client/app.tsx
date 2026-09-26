@@ -16,6 +16,7 @@ import {
   branchColors,
   PENDING_TRACK,
   pathIds,
+  presenceView,
   projectColumns,
   projectRail,
   type TreeIndex,
@@ -26,6 +27,7 @@ import {
   readOutbox,
   readParticipantNames,
   readParticipants,
+  readPresence,
   readReferences,
   readTreeIndex,
 } from "@pineta/reads"
@@ -41,6 +43,7 @@ import {
 import { createRoot } from "react-dom/client"
 import { Column } from "./column.tsx"
 import { columnsReducer, initialColumns, isPinned } from "./columns.ts"
+import { nameFor, presenceColor } from "./presence.tsx"
 import { readEntryCount } from "./projection.ts"
 import { Rail } from "./rail.tsx"
 import { connectSession, type SessionClient } from "./session-view.ts"
@@ -135,6 +138,9 @@ function alignOnOpen(strip: HTMLElement, key: string, forkFrom: string | null) {
   }
 }
 
+/** How often a visible page refreshes its presence: well inside its 30 s decay. */
+const PRESENCE_REFRESH_MS = 10_000
+
 function App({ session }: { session: SessionClient }) {
   const doc = session.doc
   const status = useDocStatus(doc)
@@ -152,6 +158,7 @@ function App({ session }: { session: SessionClient }) {
   })
   const refs = useTracked(() => readReferences(doc))
   const nameOf = useTracked(() => readParticipantNames(doc))
+  const presenceFacts = useTracked(() => readPresence(session.presence))
 
   const [columns, dispatch] = useReducer(
     columnsReducer,
@@ -169,6 +176,63 @@ function App({ session }: { session: SessionClient }) {
     [index, columns],
   )
   const rail = useMemo(() => projectRail(index), [index])
+  const here = useMemo(
+    () => presenceView(presenceFacts, session.writer, index),
+    [presenceFacts, index, session.writer],
+  )
+  const rings = useMemo(
+    () =>
+      new Map(
+        [...here.readingAt].map(([end, writers]) => [
+          end,
+          writers.map(w => ({
+            name: nameFor(nameOf, w),
+            color: presenceColor(w),
+          })),
+        ]),
+      ),
+    [here, nameOf],
+  )
+
+  // Report every open column's thread end (ADR-0024: there is no focused
+  // column; each is being read). A closed column's entry is deleted. While the
+  // page is visible the entries are refreshed, so they outlive their decay.
+  // A column with no message yet (an empty session, a fresh root) follows no
+  // thread: its end is null, and it reports nothing.
+  const reported = useRef(new Map<string, string | null>())
+  useEffect(() => {
+    const now = new Map(
+      columns.map((c, i) => [c.key, views[i]?.tipId ?? null] as const),
+    )
+    for (const [key, end] of now)
+      if (end !== null && reported.current.get(key) !== end)
+        session.setReading(key, end)
+    for (const key of reported.current.keys())
+      if (!now.has(key)) session.clearReading(key)
+    reported.current = now
+  }, [columns, views, session])
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return
+      for (const [key, end] of reported.current)
+        if (end !== null) session.setReading(key, end)
+    }
+    const timer = setInterval(refresh, PRESENCE_REFRESH_MS)
+    document.addEventListener("visibilitychange", refresh)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener("visibilitychange", refresh)
+    }
+  }, [session])
+  // Typing is written at most once a second.
+  const lastTyped = useRef(0)
+  const typing = (end: string | null) => {
+    const t = Date.now()
+    if (end === null) return
+    if (t - lastTyped.current < 1_000) return
+    lastTyped.current = t
+    session.setTyping(end)
+  }
   const colors = useMemo(() => branchColors(rail, views), [rail, views])
   const paths = useMemo(
     () => views.map(v => pathIds(index, v.tipId)),
@@ -223,6 +287,7 @@ function App({ session }: { session: SessionClient }) {
       <main id="workspace">
         <Rail
           activity={activity}
+          here={rings}
           onPick={openAt}
           onStart={asksAgent =>
             dispatch({
@@ -286,8 +351,11 @@ function App({ session }: { session: SessionClient }) {
                 onOpen={openAt}
                 path={paths[i] ?? new Set()}
                 position={i}
+                onTyping={() => typing(views[i]?.tipId ?? null)}
                 participants={participants}
                 refs={refs}
+                seenBy={view.tipId === null ? [] : here.seenBy(view.tipId)}
+                typing={view.tipId === null ? [] : here.typingAt(view.tipId)}
                 session={session}
                 shown={shown}
                 track={colors.track[i] ?? PENDING_TRACK}

@@ -94,8 +94,9 @@ Roughly in dependency order, each independently shippable:
      it has a lane, and mentions pick who a message is for.
      Findings (S19): append through the `Lane`, never the session; a pi run
      can only start with `prompt`.
-   - **Presence** — who is here, what they read, who is typing; loud by
-     default. Kyneta ephemeral state.
+   - ~~**Presence**~~ — **done** (ADR-0024): an ephemeral document, one entry
+     per open column, decaying; rings on the rail, avatars in column headers,
+     typing in the composer. The host refuses client writes to the session.
    - **Shared composition** — `Schema.text()` drafts written by tabs, anchored
      anywhere in the tree; the visceral multiplayer win.
    - ~~**Self-hosting**~~ — **done** (ADR-0022): with `PINETA_TOOLS=1` the

@@ -706,6 +706,12 @@ try {
   ok(gone === 0, `none of the removed controls exist (${gone})`)
 
   // ── a second window joins, asks, and cites ──────────────────────────────
+  // Alone, nobody else is shown anywhere (ADR-0024).
+  ok(
+    (await page.locator(".avatar").count()) === 0 &&
+      (await page.locator(".rail-dot[data-here]").count()) === 0,
+    "alone, no avatars and no rings",
+  )
   const second = await browser.newPage()
   try {
     await second.goto(host.httpUrl, {
@@ -719,6 +725,39 @@ try {
         () => false,
       )
     ok(rendered, "a joining window renders a column")
+    // Presence: the second window's open column rings its thread's end on the
+    // first window's rail; opening that thread shows it in the header.
+    const ring = await page
+      .waitForSelector(".rail-dot[data-here]", { timeout: 15_000 })
+      .then(
+        el => el,
+        () => null,
+      )
+    const ringTitle = (await ring?.getAttribute("title")) ?? ""
+    ok(
+      ring !== null && ringTitle.startsWith("here: "),
+      `another window following a thread rings its end on the rail (${ringTitle})`,
+    )
+    if (ring !== null) await ring.click()
+    const avatar = await page
+      .waitForSelector(".column-head .avatar", { timeout: 15_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      avatar,
+      "the column following that thread shows the other window in its header",
+    )
+    await second.fill(`${col(0)} .composer .input`, "thinking")
+    const typing = await page
+      .waitForSelector(".composer .typing", { timeout: 15_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(typing, "the other window's typing shows in that thread's composer")
+    await second.fill(`${col(0)} .composer .input`, "")
     await second.fill(`${col(0)} .composer .input`, "B asks about this")
     await second.click(`${col(0)} .composer .send`)
     await second

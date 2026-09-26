@@ -86,12 +86,12 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 173/173 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 75 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 181/181 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 80 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 95/95 |
-| with a real model | `pnpm run e2e:live` | 98/98 |
-| **real browser** | `pnpm run e2e:browser` | 50/50 |
+| end-to-end | `pnpm run e2e` | 101/101 |
+| with a real model | `pnpm run e2e:live` | 104/104 |
+| **real browser** | `pnpm run e2e:browser` | 54/54 |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -119,7 +119,7 @@ The root declares only tooling, so a package can import only what it declares.
 
 ---
 
-## 3. Decisions that constrain everything (ADR-0001..0023)
+## 3. Decisions that constrain everything (ADR-0001..0024)
 
 Full text with rationale and rejected alternatives: `docs/02-decisions.md`.
 The ones you must not violate by accident:
@@ -146,6 +146,11 @@ the thread's end. Conversation threads have no lane. A running lane is never
 written: messages wait in `pineta.outbox`. A compelled reply another writer
 raced is a `conflict`; the sender chooses to queue or branch. Supersedes
 ADR-0011.
+
+**ADR-0024 — presence is ephemeral, per open column, written by each client.**
+Who is here decays rather than leaving; every open column reports its thread.
+Rings on the rail, avatars in column headers, typing in the composer; never
+yourself. The host refuses client writes to the session.
 
 **ADR-0021 — a thread's mode is its lane; a mention picks the addressee.** A
 thread with a lane is agent work, one without is a conversation; nothing is
@@ -355,6 +360,15 @@ context.**
 
 ### Open, non-blocking
 
+- **Kyneta ephemeral: a write and a deletion in the same millisecond diverge.**
+  A peer that sets a key and deletes it within one millisecond applies both in
+  order, so the key is gone there; on other peers the equal timestamps tie and
+  the write wins, so the key stays. Measured through Pineta's host: 14 of 20
+  such deletions lost; 3 ms apart, 0 of 20. One peer's later operation should
+  beat its own earlier one. In Pineta it needs a column refreshed and closed in
+  the same millisecond, and leaves only an empty key readers skip. To file
+  upstream.
+
 - ~~**Kyneta's store repeats bytes when commits overlap**~~ — fixed in Kyneta
   (locally, unreleased), verified from Pineta: 0 overlapping records, where one
   tool run had 133 KB of 345 KB (S22 addendum). Pineta needs the Kyneta release
@@ -445,7 +459,7 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
 |---|---|
 | `docs/00-vision.md` | product thesis, branch kinds, v1 scope |
 | `docs/01-architecture.md` | evidence base, layer cake, data model, module layout |
-| `docs/02-decisions.md` | **ADR-0001..0023** with rationale |
+| `docs/02-decisions.md` | **ADR-0001..0024** with rationale |
 | `docs/03-spikes.md` | S1–S16, each with question + kill criterion |
 | `docs/04-roadmap.md` | sequencing, invariants, action items |
 | `docs/05-stack.md` | stack decisions, sandbox constraints |

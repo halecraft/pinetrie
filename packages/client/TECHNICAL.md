@@ -121,6 +121,21 @@ at the bottom; once they scroll up, it leaves them there.
   that same-origin requests and upgrades carry. `connectSession({ key })` is
   for Node clients.
 
+## Presence (ADR-0024)
+
+- **Every open column is reported,** since there is no focused column: `App`
+  writes each column's thread end when it changes, deletes a closed column's
+  key, and refreshes all of them every 10 s while `document.visibilityState` is
+  `visible` (a `visibilitychange` listener refreshes on return). Typing is
+  written at most once a second.
+- **`presenceView` (core) decides everything shown**, from `readPresence`
+  (`@pineta/reads`) and the tree: rings (`readingAt`), a header's avatars
+  (`seenBy`, others whose thread end lies on one path with this column's), and
+  typing (`typingAt`). It always leaves you out.
+- **A person's colour** (`presenceColor`) is a hue from their writer id, at a
+  saturation the branch palette does not use, so a ring never reads as a track.
+  Names go through `displayName`, the `guest-…` fallback included.
+
 ## Names
 
 A message keeps the name its writer had when they sent it: that is what the

@@ -459,5 +459,6 @@ export function orderNewEntries(
 // ── the tree ──────────────────────────────────────────────────────────────
 
 export * from "./edits.ts"
+export * from "./presence.ts"
 export * from "./tools.ts"
 export * from "./tree.ts"

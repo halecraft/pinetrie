@@ -18,7 +18,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import type { Store } from "@kyneta/exchange"
-import { subscribe } from "@kyneta/schema"
+import { batch, subscribe } from "@kyneta/schema"
 import { connectSession, type SessionClient } from "@pineta/client/session"
 import {
   ancestry,
@@ -38,11 +38,12 @@ import {
 import { decodeChat, displayName } from "@pineta/marginalia"
 import { newId as newHeldId, scriptedModel } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
-import { SESSION_DOC_ID } from "@pineta/protocol/messages"
+import { PRESENCE_DOC_ID, SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
   readLanes,
   readOutbox,
   readParticipantNames,
+  readPresence,
   readReferences,
   readRenderableEntries,
   readTreeIndex,
@@ -51,6 +52,7 @@ import {
   readActiveRun,
   readEntries,
   readEntryMessage,
+  readingKey,
   readLaneNames,
   readLaneTip,
   readStreams,
@@ -1140,6 +1142,109 @@ invariants("end")
   await sleep(100)
   // The host's Exchange closes its stores when it shuts down, this one too.
   await th.shutdown()
+}
+
+// ── presence: who is here, per open column, decaying (ADR-0024) ────────────
+// Its own host, with a short decay and a store, so leaving is quick to see.
+{
+  const decay = { presenceMs: 300, typingMs: 300 }
+  const dbFile = path.join(
+    mkdtempSync(path.join(tmpdir(), "pineta-presence-")),
+    "pineta.db",
+  )
+  const ph = await startHost({
+    model: { kind: "scripted", script: scriptedModel() },
+    store: dbFile,
+    presenceDecay: decay,
+    log: () => {},
+  })
+  const join = (peerId: string) =>
+    connectSession({ url: ph.wsUrl, WebSocket, peerId, presenceDecay: decay })
+  const ada = await join("p-ada")
+  const bea = await join("p-bea")
+  ada.setReading("c1", "e-one")
+  ada.setReading("c2", "e-two")
+  ada.setTyping("e-two")
+  const seen = await waitFor(
+    () => readPresence(bea.presence).reading.length === 2,
+    5_000,
+  )
+  const facts = readPresence(bea.presence)
+  ok(
+    seen >= 0 &&
+      facts.reading.every(([w]) => w === ada.writer) &&
+      facts.reading
+        .map(([, e]) => e)
+        .sort()
+        .join() === "e-one,e-two" &&
+      facts.typing.get(ada.writer) === "e-two",
+    `each open column is reported, and another client sees them (${facts.reading.length} columns)`,
+  )
+  // Typing decays with no further keystroke; reading, refreshed, stays.
+  const stopped = await waitFor(() => {
+    ada.setReading("c1", "e-one")
+    ada.setReading("c2", "e-two")
+    return !readPresence(bea.presence).typing.has(ada.writer)
+  }, 5_000)
+  ok(
+    stopped >= 0 && readPresence(bea.presence).reading.length === 2,
+    "typing decays when the keystrokes stop; refreshed reading stays",
+  )
+  // A closed column's key is deleted, not left to decay: decay keeps the key
+  // holding null, so only a deletion removes it. c1 stays refreshed meanwhile. As
+  // the app does, the column stops being refreshed before it is deleted: a
+  // write and a deletion of one key in the same millisecond diverge across
+  // peers in Kyneta today (docs/pineta.md, open items).
+  await sleep(20)
+  ada.clearReading("c2")
+  const closed = await waitFor(() => {
+    ada.setReading("c1", "e-one")
+    return (
+      !(readingKey(ada.writer, "c2") in bea.presence.reading()) &&
+      readPresence(bea.presence).reading.length === 1
+    )
+  }, 5_000)
+  ok(closed >= 0, "a closed column's entry is deleted from others' view")
+  // Leaving is silence: a client that shuts down decays away.
+  await ada.close()
+  const left = await waitFor(
+    () => readPresence(bea.presence).reading.length === 0,
+    5_000,
+  )
+  ok(
+    left >= 0,
+    "a client that leaves is gone from others' view once its entries decay",
+  )
+  // Clients may not write the session: the host's policy refuses it.
+  batch(bea.doc, d => d.values.set("forged", { value: "bea is the host" }))
+  await sleep(500)
+  ok(
+    ph.doc.values.get("forged") === undefined,
+    "a client's direct write to the session is refused by the host",
+  )
+  await ph.quiet()
+  const presenceRows = (() => {
+    const db = new DatabaseSync(dbFile, { readOnly: true })
+    try {
+      const table =
+        db
+          .prepare("select name from sqlite_master where type = 'table'")
+          .all()
+          .map(r => String(r.name))
+          .find(t => t.includes("record")) ?? ""
+      return (
+        db
+          .prepare(`select count(*) as n from ${table} where doc_id = ?`)
+          .get(PRESENCE_DOC_ID) as { n: number }
+      ).n
+    } finally {
+      db.close()
+    }
+  })()
+  ok(presenceRows === 0, `presence is never stored (${presenceRows} records)`)
+  await bea.close()
+  await sleep(100)
+  await ph.shutdown()
 }
 
 // ── admission: off loopback, only the invite key gets in ───────────────────

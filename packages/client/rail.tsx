@@ -46,6 +46,7 @@ export function Rail({
   activity,
   onPick,
   onStart,
+  here,
 }: {
   rows: readonly RailRow[]
   /** Ids on any open column's path: drawn at full strength. */
@@ -55,6 +56,8 @@ export function Rail({
   onPick: (id: string) => void
   /** A new thread at the root, above every root thread: where the tree starts. */
   onStart: (asksAgent: boolean) => void
+  /** Others following each thread end, with their names and colours: a ring there. */
+  here: ReadonlyMap<string, readonly { name: string; color: string }[]>
 }) {
   const [starting, setStarting] = useState(false)
   const rowOf = new Map(rows.map((r, i) => [r.id, i]))
@@ -104,28 +107,46 @@ export function Rail({
         </svg>
         {/* Dots are buttons over the drawing, so they are reachable by keyboard
           and read as controls. */}
-        {rows.map((r, i) => (
-          <button
-            aria-label="open this message's thread"
-            className={
-              activity.some(run => run.tip === r.id)
-                ? "rail-dot pulse"
-                : "rail-dot"
-            }
-            data-entry={r.id}
-            data-open={open.has(r.id) ? "yes" : "no"}
-            data-track={r.track}
-            key={r.id}
-            onClick={() => onPick(r.id)}
-            style={{
-              left: x(r.track) - DOT,
-              top: y(i) - DOT,
-              background: trackColor(r.track),
-              opacity: open.has(r.id) ? 1 : 0.35,
-            }}
-            type="button"
-          />
-        ))}
+        {rows.map((r, i) => {
+          const people = here.get(r.id) ?? []
+          const [first] = people
+          return (
+            <button
+              aria-label="open this message's thread"
+              className={
+                activity.some(run => run.tip === r.id)
+                  ? "rail-dot pulse"
+                  : "rail-dot"
+              }
+              data-entry={r.id}
+              data-here={people.length > 0 ? String(people.length) : undefined}
+              data-open={open.has(r.id) ? "yes" : "no"}
+              data-track={r.track}
+              key={r.id}
+              onClick={() => onPick(r.id)}
+              style={{
+                left: x(r.track) - DOT,
+                top: y(i) - DOT,
+                background: trackColor(r.track),
+                opacity: open.has(r.id) || first !== undefined ? 1 : 0.35,
+                // Someone else follows this thread: a ring in their colour. The
+                // dot is 8 px, so the rail marks and the column header names.
+                boxShadow:
+                  first === undefined ? undefined : `0 0 0 2px ${first.color}`,
+              }}
+              title={
+                people.length === 0
+                  ? undefined
+                  : `here: ${people.map(p => p.name).join(", ")}`
+              }
+              type="button"
+            >
+              {people.length > 1 && (
+                <span className="here-count">{people.length}</span>
+              )}
+            </button>
+          )
+        })}
       </div>
     </nav>
   )

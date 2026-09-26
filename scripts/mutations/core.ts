@@ -175,4 +175,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "message count ignores tool results",
   },
+  {
+    name: "presence counts me as someone else",
+    file: "packages/core/presence.ts",
+    from: "  const others = facts.reading.filter(([w]) => w !== me)",
+    to: "  const others = facts.reading.filter(([w]) => w !== undefined)",
+    command: unit,
+    expect: "excludes me, everywhere",
+  },
 ]

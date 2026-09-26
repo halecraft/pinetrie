@@ -105,6 +105,24 @@ This package depends on `@pineta/core` (for `tailEdit` and `StreamEvent`), which
 the dependency direction `core → schema → pi → app` allows. It still imports no
 pi.
 
+## Presence (`presence.ts`, ADR-0024)
+
+`pineta:presence` is a Kyneta `ephemeral` document: never stored, last writer
+wins per field. Its records are flat: `reading` keyed `${writer}:${columnKey}`
+(every open column reports its thread's end), `typing` and `editing` keyed by
+writer. Each field is a `Schema.string().nullable().decay(ms)`: decay reverts a
+field to its zero, and a nullable's zero is `null`, so absence is `null`, never
+a sentinel string. Kyneta refuses `.decay()` below a register, so these are
+plain records of scalars.
+
+Measured before building (the plan's Phase 0):
+- a field with no fresh write reverts to `null` on the next tick (Kyneta's
+  Exchange ticks every second); **the key stays**, so readers skip nulls;
+- a peer that shuts down is not removed; its values decay like any others, so
+  leaving is silence. A closed column's key is deleted outright;
+- documents bound with different decays sync (their schema hashes differ, and
+  Kyneta reads across them), which is how e2e uses a 300 ms decay.
+
 ## Persistence
 
 The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`

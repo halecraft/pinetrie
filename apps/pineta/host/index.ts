@@ -52,7 +52,11 @@ import {
   type WireCommand,
 } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
-import { HOST_PEER_ID, SESSION_DOC_ID } from "@pineta/protocol/messages"
+import {
+  HOST_PEER_ID,
+  PRESENCE_DOC_ID,
+  SESSION_DOC_ID,
+} from "@pineta/protocol/messages"
 import {
   readLanes,
   readOutbox,
@@ -65,7 +69,11 @@ import {
   beginRun,
   clearStreams,
   endRun,
+  PRESENCE_DECAY,
+  type PresenceDecay,
+  type PresenceDocHandle,
   planStream,
+  presenceDoc,
   readActiveRun,
   readEntryMessage,
   readStreams,
@@ -82,6 +90,7 @@ import {
   newKey,
   urlHost,
 } from "./admission.ts"
+import { writePolicy } from "./policy.ts"
 import { openStore } from "./store.ts"
 
 export interface EnvironmentInfo {
@@ -127,6 +136,8 @@ export interface StartHostOptions {
    * (ADR-0023).
    */
   readonly store?: string | Store | null
+  /** How long presence lasts without a refresh; a suite shortens it. */
+  readonly presenceDecay?: PresenceDecay
   readonly log?: (message: string) => void
 }
 
@@ -135,6 +146,7 @@ export interface RunningHost {
   readonly httpUrl: string
   readonly wsUrl: string
   readonly doc: SessionDocHandle
+  readonly presence: PresenceDocHandle
   readonly agent: Agent
   /** The invite key, or null on loopback. */
   readonly key: string | null
@@ -156,6 +168,7 @@ export async function startHost({
   tools = null,
   hmr = true,
   store: storeFile = null,
+  presenceDecay = PRESENCE_DECAY,
   log = console.log,
 }: StartHostOptions): Promise<RunningHost> {
   const key = isLoopback(bind) ? null : (givenKey ?? newKey())
@@ -182,6 +195,10 @@ export async function startHost({
 
   // The session document is BOTH pi's storage and the thing we replicate.
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
+  // Clients may write presence, never the session (host/policy.ts).
+  exchange.register(writePolicy)
+  // Held here so the host relays it between clients (ADR-0024).
+  const presence = exchange.get(PRESENCE_DOC_ID, presenceDoc(presenceDecay))
   // A stored session loads asynchronously; pi must see it before it starts.
   // Only storage is awaited: the host is the authority, with no peer upstream.
   await whenHydrated(doc)
@@ -651,6 +668,7 @@ export async function startHost({
     httpUrl: `http://${local}:${actualPort}/`,
     wsUrl: `ws://${local}:${actualPort}/ws`,
     doc,
+    presence,
     agent,
     key,
     invites,

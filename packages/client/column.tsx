@@ -24,6 +24,7 @@ import type { Column as ColumnSpec } from "./columns.ts"
 import { Composer } from "./composer.tsx"
 import { Message } from "./message.tsx"
 import { speakerLabel } from "./names.ts"
+import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackColor } from "./rail.tsx"
 import type { SessionClient } from "./session-view.ts"
 import { Start } from "./start.tsx"
@@ -46,6 +47,11 @@ export interface ColumnProps {
   nameOf: ReadonlyMap<WriterId, string>
   /** Everyone who can be mentioned (`readParticipants`). */
   participants: readonly string[]
+  /** Others following this column's thread, and others typing at its end (ADR-0024). */
+  seenBy: readonly WriterId[]
+  typing: readonly WriterId[]
+  /** This window is typing in this column's composer. */
+  onTyping: () => void
   /** Every lane the agent is replying on. Several threads can run at once. */
   activity: readonly AgentRun[]
   lanes: readonly LaneView[]
@@ -166,6 +172,7 @@ export function Column(p: ColumnProps) {
               : "thread"
             : `from ${forkLabel}: “${forkText}${forkText.length === 48 ? "…" : ""}”`}
         </span>
+        <Avatars nameOf={p.nameOf} writers={p.seenBy} />
         {p.position > 0 && (
           <button className="make-main" onClick={p.onMakeMain} type="button">
             make main
@@ -257,8 +264,10 @@ export function Column(p: ColumnProps) {
             p.onSent(id)
             return id
           }}
+          onTyping={p.onTyping}
           participants={p.participants}
           pending={p.column.fresh?.pending}
+          typing={p.typing.map(w => nameFor(p.nameOf, w))}
           session={p.session}
         />
       )}

@@ -4,7 +4,7 @@
 // environment-specific value is the WebSocket constructor. No pi.
 
 import { Exchange } from "@kyneta/exchange"
-import { subscribe } from "@kyneta/schema"
+import { batch, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 
 import {
@@ -21,10 +21,19 @@ import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
 import {
   HOST_PEER_ID,
+  PRESENCE_DOC_ID,
   type Reply,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
-import { SessionDoc, type SessionDocHandle } from "@pineta/schema"
+import {
+  PRESENCE_DECAY,
+  type PresenceDecay,
+  type PresenceDocHandle,
+  presenceDoc,
+  readingKey,
+  SessionDoc,
+  type SessionDocHandle,
+} from "@pineta/schema"
 
 /**
  * The `WebSocket` constructor to use. The browser supplies the global; Node
@@ -42,6 +51,8 @@ export interface ConnectOptions {
    * none: the invite link's redirect set a cookie its requests carry.
    */
   readonly key?: string
+  /** How long presence lasts without a refresh; a suite shortens it. */
+  readonly presenceDecay?: PresenceDecay
   readonly WebSocket: WebSocketCtor
   readonly peerId?: string
   /** Called on every change to the document; read it through `@pineta/reads`. */
@@ -59,6 +70,16 @@ export interface SessionClient {
    */
   readonly exchange: Exchange
   readonly doc: SessionDocHandle
+  /** Who is here (ADR-0024). Write only through the methods below. */
+  readonly presence: PresenceDocHandle
+  /** This window's column `columnKey` follows the thread ending at `end`. */
+  setReading(columnKey: string, end: string): void
+  /** The column closed: its entry is deleted, not left to decay. */
+  clearReading(columnKey: string): void
+  /** This window is typing in the composer at `end`. Silence decays it. */
+  setTyping(end: string): void
+  /** This window is editing `note`, or, with null, has stopped. */
+  setEditing(note: string | null): void
   /**
    * A human message. `at` is where the sender is reading, or the branch point
    * (only a `branch` starts at the root). It runs the agent only if the agent
@@ -104,6 +125,11 @@ export async function connectSession(
   await transport.waitForStatus("ready", { timeoutMs: 10_000 })
 
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
+  const presence = exchange.get(
+    PRESENCE_DOC_ID,
+    presenceDoc(options.presenceDecay ?? PRESENCE_DECAY),
+  )
+  const me = writerId(peerId)
   const sender = Control.sender(exchange, HOST_PEER_ID)
   const receiver = Control.claimReceiver(exchange, HOST_PEER_ID)
 
@@ -134,7 +160,22 @@ export async function connectSession(
 
   return {
     peerId,
-    writer: writerId(peerId),
+    writer: me,
+    presence,
+    setReading(columnKey, end) {
+      batch(presence, d => d.reading.set(readingKey(me, columnKey), end))
+    },
+    clearReading(columnKey) {
+      const key = readingKey(me, columnKey)
+      if (presence.reading()[key] !== undefined)
+        batch(presence, d => d.reading.delete(key))
+    },
+    setTyping(end) {
+      batch(presence, d => d.typing.set(me, end))
+    },
+    setEditing(note) {
+      batch(presence, d => d.editing.set(me, note))
+    },
     exchange,
     doc,
     chat(text, at, how = {}) {

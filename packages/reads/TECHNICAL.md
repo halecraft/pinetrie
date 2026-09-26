@@ -15,7 +15,7 @@ functions.
 
 Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes`, `readOutbox`,
-`readParticipantNames`, `readParticipants`, `readReferences`,
+`readParticipantNames`, `readParticipants`, `readReferences`, `readPresence`,
 `readAgentActivity`. Live streams are read with `readStreams` in
 `@pineta/schema`; an entry count stays in `packages/client/projection.ts`.
 

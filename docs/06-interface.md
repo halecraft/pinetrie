@@ -116,10 +116,18 @@ The rail is E; the lit column is T. Seeing both at once is the product.
   "send · agent will reply", or "queue · agent replies after Bea". It uses the
   host's own decision (`address`, over `threadOf`), so it cannot promise a
   reply that will not come.
-- The composer does not say who will see a message. Everyone in a session can
-  read every thread, and until presence says who is here, any list is a guess;
-  a list of everyone who ever set a name named only you when you were alone.
-  Presence brings it back, naming only the *others* who are here.
+- **Who else is here** (ADR-0024) shows where there is room for it:
+  - the **rail** rings the dot at the end of each thread someone else follows,
+    in their colour, with a count when several do; hovering names them. The
+    dots are 8 px, so the rail marks and the header names;
+  - a **column's header** shows small avatars of the others following its
+    thread: this is "seen by", naming only others, and nothing when you are
+    alone;
+  - the **composer** says "Bea is typing…".
+
+  Presence is thread-level: every open column reports the thread it follows.
+  Which message someone has on screen waits until thread-level proves too
+  coarse.
 
 ### Starting, branching, and stepping down
 
@@ -186,8 +194,6 @@ Every part of this is a read of what the document already holds.
 
 ## Deferred, but designed for
 
-- **Presence** (its own plan): avatars in the rail at the branch each person is
-  reading, and "typing" in a column's composer.
 - **Shared composition**: a draft anchored at any message appears in that
   column, and in the rail as a pending dot.
 - **Narrow screens**: the stacked sequence described above; built after the wide
