@@ -100,12 +100,64 @@ the alternative a second host would need: read the thread's end inside
 pi's vocabulary passes the boundary (ADR-0003). `UnknownTarget` is the one
 specific code; anything else is `refused`.
 
-### Streaming, per lane
+### Streaming, in Pineta's words (ADR-0022)
 
-Every pi `HarnessEvent` carries `lane`, so `onDelta` reports `{ lane, delta }`.
-The host looks the lane's current run up in the document's `activeRuns` rather
-than keeping its own map, which would be a second record of the same fact.
-Threads run concurrently, and their streams stay apart by lane.
+`createAgent` takes one `onStream(event: StreamEvent)`. `StreamEvent` is
+declared in `@pineta/core`, so pi's events never leave this package. Every pi
+`HarnessEvent` carries `lane`, so concurrent threads stay apart.
+
+| pi's event | `StreamEvent` |
+|---|---|
+| `message_update` (a `text_delta`) | `text` |
+| `message_end` | `messageEnd` |
+| `tool_start` | `toolStart`, labelled `toolLabel(name, args)` here |
+| `tool_update` (the first text part of `partialResult`) | `toolOutput`, a whole snapshot |
+| `tool_end` | `toolEnd` |
+
+The harness's tool events are `tool_start`, `tool_update` and `tool_end`. The
+`tool_execution_*` events in pi's types belong to its older agent loop, and the
+harness never emits them (S22). What each event does to the document is
+`planStream`'s decision, in `@pineta/schema`.
+
+### Models, tools and the prompt (`config.ts`, S23)
+
+`ModelChoice` is one of three:
+- **`configured`:** the person's pi setup. `SettingsManager` and
+  `DefaultResourceLoader` load it as pi does, and only the extensions'
+  provider registrations are applied to `ModelRuntime`. Commands, tools,
+  handlers and UI hooks are pi's coding agent's, and Pineta emits none of its
+  events. A Claude subscription token works only through `pi-anthropic-auth`'s
+  provider: without it, Anthropic refuses (S23).
+- **`named`:** `models.json` and `auth.json` only, for suites that call a real
+  model.
+- **`scripted`:** pi-ai's faux provider (`scripted.ts`), for repeatable suites.
+  Its handle never leaves this package.
+
+Loading runs every package's factory, so side effects happen (`pi-subagents`
+logs a warning). `pickModel` is the pure choice: an override's fields win over
+the settings' defaults. With tools (`CreateAgentOptions.tools`), pi-agent-core's
+`read`, `write`, `edit` and `bash` run in `cwd` through `NodeExecutionEnv`. The
+system prompt is pi's `buildSystemPrompt`, with the loader's context files (the
+repo's `AGENTS.md`) and skills: the section layout `pi-anthropic-auth` shapes.
+
+`ThreadLaneHandle.abort()` is pi's `lane.abort`: a running tool is aborted and
+its result recorded as aborted, and the lane takes its next message (S22).
+Resuming an operation a crash interrupted is left to pi; a graceful restart is
+what the suites exercise.
+
+### pi's checkpoints, stored as text (`checkpoint.ts`)
+
+While a tool runs, pi writes its whole output view to `pi.pending.tool_output`
+every 2 s. `KynetaStorage` stores a checkpoint with one text part in two pieces:
+the value record keeps a shell (`sealed: true`), and the text goes to
+`checkpointText` under the same physical key, written with `tailEdit`. Reads
+rejoin them; a delete removes both. Any other shape is stored whole.
+`sealCheckpoint`/`unsealCheckpoint` are the pure rule. Conformance stays 21/21.
+
+`KynetaStorage` ignores changes to the stream fields (`streams`, `streamText`,
+`activeRuns`) and to `checkpointText`, whose value record is rewritten with it.
+Under the field's old name, `activeRunId`, every stream write fell through and
+marked all of pi's indexes dirty.
 
 ### References
 
@@ -135,7 +187,9 @@ and holds the subtle logic.
 ### `deep.ts`
 
 Reaches pi entry points that are absent from its `exports` map, by relative path
-into `node_modules`. Those paths are depth-sensitive: they broke when this
+into `node_modules`: `createAgentHarness`, `addUsage`/`emptyUsage`,
+`ModelRuntime`, and, for the person's pi setup, `SettingsManager`,
+`DefaultResourceLoader` and `buildSystemPrompt`. Those paths are depth-sensitive: they broke when this
 package moved under `packages/`. If they break again, the failure is
 `ERR_MODULE_NOT_FOUND` at import time, not a type error.
 

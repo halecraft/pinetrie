@@ -1,19 +1,42 @@
-// host/server — the entry point. `npm run host`
+// host/server — the entry point. `pnpm run host`
+//
+//   PINETA_PORT      the port (default 7391; 0 = any free port)
+//   PINETA_BIND      the address (default 127.0.0.1: this machine only)
+//   PINETA_KEY       the invite key off loopback (default: a fresh one)
+//   PINETA_TOOLS=1   the agent reads, writes, edits and runs commands in this
+//                    repo, as you; hot reload is then off (ADR-0022)
+//   PINETA_STORE     the SQLite file the session is kept in
+//                    (default .pineta/pineta.db in the repo)
+//   PINETA_PROVIDER, PINETA_MODEL
+//                    override the model; by default, pi's settings' default,
+//                    with the providers your pi extensions register
+import path from "node:path"
 import { startHost } from "./index.ts"
 
-const port = Number.parseInt(process.env.PINETA_PORT ?? "7391", 10)
+const repo = path.resolve(import.meta.dirname, "../../..")
+const env = process.env
+const tools = env.PINETA_TOOLS === "1" ? { cwd: repo } : null
 const host = await startHost({
-  port,
-  provider: process.env.PINETA_PROVIDER ?? "cerebras",
-  model: process.env.PINETA_MODEL ?? "qwen-3.8-27b",
+  port: Number.parseInt(env.PINETA_PORT ?? "7391", 10),
+  bind: env.PINETA_BIND ?? "127.0.0.1",
+  ...(env.PINETA_KEY === undefined ? {} : { key: env.PINETA_KEY }),
+  model: {
+    kind: "configured",
+    ...(env.PINETA_PROVIDER === undefined
+      ? {}
+      : { provider: env.PINETA_PROVIDER }),
+    ...(env.PINETA_MODEL === undefined ? {} : { model: env.PINETA_MODEL }),
+  },
+  tools,
+  hmr: tools === null,
+  store: env.PINETA_STORE ?? path.join(repo, ".pineta", "pineta.db"),
 })
 
 console.log(`[host] listening   ${host.httpUrl}`)
-console.log(`[host] websocket   ${host.wsUrl}`)
+for (const invite of host.invites) console.log(`[host] open        ${invite}`)
 console.log(
   "[host] lanes       one per thread where agent work is wanted (ADR-0020)",
 )
-console.log("[host] open the http url in a browser, or run `pnpm run e2e`")
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {

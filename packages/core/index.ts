@@ -63,8 +63,8 @@ declare const runIdBrand: unique symbol
 declare const referenceIdBrand: unique symbol
 /**
  * Entry ids and run ids are both uuidv7 strings and cannot be told apart at
- * runtime. Positions take an entry id; `activeRuns` and `pendingText` are
- * keyed by run id. Passing one where the other belongs would otherwise
+ * runtime. Positions take an entry id; `activeRuns` holds run ids. Passing
+ * one where the other belongs would otherwise
  * compile, run, and fail silently. Mint them only at the edges: the protocol
  * codec, the document readers, and the host's id generator.
  */
@@ -173,6 +173,8 @@ export type Intent =
     }
   /** Set the sender's display name: a label, never an identity. */
   | { readonly kind: "name"; readonly name: string }
+  /** End a thread's running turn. Idempotent: an idle lane is already stopped. */
+  | { readonly kind: "stop"; readonly lane: LaneName }
 
 // --- obligation: collaborators and compelled responders ----------------------
 
@@ -295,6 +297,34 @@ export function normalizeName(name: string): string | undefined {
     ? undefined
     : n
 }
+
+// --- streams ----------------------------------------------------------------
+
+/**
+ * What a running turn streams, in Pineta's own words (ADR-0003: no pi type
+ * crosses). `packages/pi` maps pi's harness events onto it; `planStream` in
+ * `@pineta/schema` decides what each does to the document.
+ */
+export type StreamEvent =
+  /** Text the model is writing, as a delta. */
+  | { readonly kind: "text"; readonly lane: string; readonly delta: string }
+  /** A message ended: its committed entry is the record from here on. */
+  | { readonly kind: "messageEnd"; readonly lane: string }
+  | {
+      readonly kind: "toolStart"
+      readonly lane: string
+      readonly callId: string
+      /** `toolLabel(name, args)`, so nothing downstream needs the arguments. */
+      readonly label: string
+    }
+  /** The tool's output so far: a whole snapshot, not a delta. */
+  | {
+      readonly kind: "toolOutput"
+      readonly lane: string
+      readonly callId: string
+      readonly text: string
+    }
+  | { readonly kind: "toolEnd"; readonly lane: string; readonly callId: string }
 
 // --- wire hygiene (ADR-0013) ------------------------------------------------
 
@@ -450,4 +480,6 @@ export function orderNewEntries(
 
 // ── the tree ──────────────────────────────────────────────────────────────
 
+export * from "./edits.ts"
+export * from "./tools.ts"
 export * from "./tree.ts"

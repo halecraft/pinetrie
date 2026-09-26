@@ -18,13 +18,12 @@ import {
   type WriterId,
 } from "@pineta/core"
 import { displayName, type Held, type ReferenceIndex } from "@pineta/marginalia"
-import type { SessionDocHandle } from "@pineta/schema"
+import { readStreams, type SessionDocHandle } from "@pineta/schema"
 import { useLayoutEffect, useRef } from "react"
 import type { Column as ColumnSpec } from "./columns.ts"
 import { Composer } from "./composer.tsx"
 import { Message } from "./message.tsx"
 import { speakerLabel } from "./names.ts"
-import { readStreaming } from "./projection.ts"
 import { colorSlot, trackColor } from "./rail.tsx"
 import type { SessionClient } from "./session-view.ts"
 import { Start } from "./start.tsx"
@@ -106,8 +105,10 @@ export function Column(p: ColumnProps) {
   // outside every reply being written.
   const running = p.activity.length > 0
   const lit = (id: string) => p.activity.some(r => r.path.has(id))
-  // The runs whose tip is on this column's path stream here.
-  const streams = p.activity.filter(r => p.path.has(r.tip))
+  // The lanes running on this column's path stream here.
+  const streamingLanes = p.activity
+    .filter(r => p.path.has(r.tip))
+    .map(r => r.lane)
   // This thread's lane, as the host will find it: busy means a compelled
   // message waits.
   const thread = choosing
@@ -224,9 +225,9 @@ export function Column(p: ColumnProps) {
             />
           )
         })}
-        {streams.map(r => (
-          <Streaming doc={p.session.doc} key={r.lane} lane={r.lane} />
-        ))}
+        {streamingLanes.length > 0 && (
+          <Streams doc={p.session.doc} lanes={streamingLanes} />
+        )}
         {/* Messages waiting for this thread's lane, in the order they will
             be taken. They are not in the tree yet. */}
         {waiting.map((h, n) => (
@@ -266,16 +267,51 @@ export function Column(p: ColumnProps) {
 }
 
 /**
- * Live token deltas. Its own component, reading the stream on its own, so a
- * delta re-renders only this, not the column above it.
+ * What the lanes on this path are writing now: the agent's reply, and each
+ * running tool's output. Its own component, reading the streams on its own, so
+ * a delta re-renders only this, not the column above it.
  */
-function Streaming({ doc, lane }: { doc: SessionDocHandle; lane: string }) {
-  const streaming = useTracked(() => readStreaming(doc, lane))
-  if (streaming === null) return null
+function Streams({
+  doc,
+  lanes,
+}: {
+  doc: SessionDocHandle
+  lanes: readonly string[]
+}) {
+  const open = useTracked(() => readStreams(doc)).filter(s =>
+    lanes.includes(s.lane),
+  )
   return (
-    <div className="streaming">
-      <span className="role">agent</span>
-      <div className="text">{streaming.text}</div>
-    </div>
+    <>
+      {open.map(s =>
+        s.kind === "reply" ? (
+          <div className="streaming" key={s.id}>
+            <span className="role">agent</span>
+            <div className="text">{s.text}</div>
+          </div>
+        ) : (
+          <div className="tool live" data-stream={s.id} key={s.id}>
+            <span className="tool-label">{s.label}</span>{" "}
+            <span className="tool-status">…</span>
+            <LiveOutput text={s.text} />
+          </div>
+        ),
+      )}
+    </>
+  )
+}
+
+/** A running tool's output, kept scrolled to its end as it grows. */
+function LiveOutput({ text }: { text: string }) {
+  const pre = useRef<HTMLPreElement>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: follow the text
+  useLayoutEffect(() => {
+    const el = pre.current
+    if (el !== null) el.scrollTop = el.scrollHeight
+  }, [text])
+  return (
+    <pre className="tool-output" ref={pre}>
+      {text}
+    </pre>
   )
 }

@@ -16,8 +16,8 @@ functions.
 Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes`, `readOutbox`,
 `readParticipantNames`, `readParticipants`, `readReferences`,
-`readAgentActivity`. View-shaped reads (a stream's live text, an entry count)
-stay in `packages/client/projection.ts`.
+`readAgentActivity`. Live streams are read with `readStreams` in
+`@pineta/schema`; an entry count stays in `packages/client/projection.ts`.
 
 It declares core, schema and marginalia only (`workspace.test.ts`), so it runs
 in the host and in the browser alike: no pi, no transport.

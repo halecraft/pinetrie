@@ -21,8 +21,12 @@
 //
 // Override the endpoint with PW_SERVER if you used a different port.
 
+import { mkdtempSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { connectSession } from "@pineta/client/session"
 import { atEntry, entryId, projectRail } from "@pineta/core"
+import { scriptedModel } from "@pineta/pi"
 import { readParticipantNames, readTreeIndex } from "@pineta/reads"
 import { type Browser, chromium } from "@playwright/test"
 import { startHost } from "../host/index.ts"
@@ -53,6 +57,8 @@ console.log(`  playwright server : ${PW_SERVER}`)
 console.log(`  browser           : ${browser.version()}\n`)
 
 const host = await startHost({
+  // The suites' own model: never the person's pi setup, which costs them.
+  model: { kind: "named", provider: "cerebras", model: "qwen-3.8-27b" },
   log: (m: string) => console.log("    [host]", m),
 })
 console.log(`  host              : ${host.httpUrl}\n`)
@@ -141,15 +147,11 @@ try {
     `Start Agent promises a reply with no mention: "${await label(0)}"`,
   )
 
-  // ── the first turn: streaming, the reply, the agent joining ─────────────
+  // ── the first turn: the reply, the agent joining ────────────────────────
+  // Whether a reply streams live is checked on the scripted host below, where
+  // its pace is set: a live model's one-line reply can open and close its
+  // stream between two of the page's renders.
   await send(0, "Say exactly: BROWSER-OK")
-  const streamed = await page
-    .waitForSelector(".streaming", { timeout: 30_000 })
-    .then(
-      () => true,
-      () => false,
-    )
-  ok(streamed, "the agent's stream shows in the column while it replies")
   // Structure, not the model's words: a reply appeared, in this column. What
   // the model says is `e2e:live`'s to check.
   ok(
@@ -562,6 +564,126 @@ try {
       !downTexts.includes("say exactly: DOWN-TWO"),
     "the conversation's column keeps only its own thread",
   )
+
+  // ── tools: rows, live output, and Stop, on a scripted host ─────────────
+  {
+    const work = mkdtempSync(path.join(tmpdir(), "pineta-browser-tools-"))
+    writeFileSync(path.join(work, "notes.txt"), "the secret word is MANGO\n")
+    // Slow enough that a reply is seen while it is still being written.
+    const script = scriptedModel({ tokensPerSecond: 60 })
+    const toolHost = await startHost({
+      model: { kind: "scripted", script },
+      tools: { cwd: work },
+      log: () => {},
+    })
+    const tp = await browser.newPage()
+    try {
+      await tp.goto(toolHost.httpUrl, { waitUntil: "domcontentloaded" })
+      await tp.click(`${col(0)} .start-agent`)
+      const say = async (text: string) => {
+        await tp.fill(`${col(0)} .composer .input`, text)
+        await tp.click(`${col(0)} .composer .send`)
+      }
+      const toolIdle = () =>
+        waitFor(() => Object.keys(toolHost.doc.activeRuns()).length === 0)
+      const appears = (sel: string, timeout = 20_000) =>
+        tp.waitForSelector(sel, { timeout }).then(
+          () => true,
+          () => false,
+        )
+
+      script.use([
+        { text: "Let me look.", tool: "read", args: { path: "notes.txt" } },
+        { text: "It says MANGO. The file holds one line, and nothing else." },
+      ])
+      await say("what is in notes?")
+      const streamed = await tp
+        .waitForFunction(
+          c => {
+            const s = document.querySelector(`${c} .streaming .text`)
+            return s !== null && (s.textContent ?? "").length > 0
+          },
+          col(0),
+          { timeout: 20_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      ok(streamed, "the agent's reply shows in its column while it is written")
+      const row = `${col(0)} .tool[data-tool="read"][data-status="ok"]`
+      const shown = await appears(row)
+      await toolIdle()
+      const label = await tp.textContent(`${row} .tool-label`).catch(() => "")
+      if (shown) await tp.click(`${row} summary`)
+      const output = await tp.textContent(`${row} .tool-output`).catch(() => "")
+      ok(
+        shown &&
+          label === "read notes.txt" &&
+          (await tp.textContent(`${row} .tool-status`)) === "✓" &&
+          output?.includes("MANGO") === true,
+        `a tool call shows as a row with its label, ✓, and its result folded in (${label})`,
+      )
+
+      script.use([
+        {
+          tool: "bash",
+          args: {
+            command:
+              "for i in 1 2 3 4 5 6 7 8; do echo tick $i; sleep 0.25; done",
+          },
+        },
+        { text: "ticked" },
+      ])
+      await say("tick")
+      const live = await tp
+        .waitForFunction(
+          c =>
+            document
+              .querySelector(`${c} .tool.live .tool-output`)
+              ?.textContent?.includes("tick 2") === true,
+          col(0),
+          { timeout: 20_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      ok(live, "a running command's output shows live in its column")
+      await toolIdle()
+      ok(
+        (await tp.locator(`${col(0)} .tool.live`).count()) === 0,
+        "when the command ends, its live row gives way to the committed one",
+      )
+
+      script.use([
+        { tool: "bash", args: { command: "sleep 5" } },
+        { text: "after" },
+      ])
+      await say("sleep")
+      // As a person does: stop the command once it is seen running.
+      await appears(`${col(0)} .tool.live`)
+      const stopShown = await appears(`${col(0)} .stop`)
+      const t0 = Date.now()
+      if (stopShown) await tp.click(`${col(0)} .stop`)
+      const failed = `${col(0)} .tool[data-tool="bash"][data-status="error"]`
+      const ended = await appears(failed, 10_000)
+      if (ended) await tp.click(`${failed} summary`)
+      const why = await tp.textContent(`${failed} .tool-output`).catch(() => "")
+      ok(
+        stopShown &&
+          ended &&
+          Date.now() - t0 < 4_000 &&
+          (await tp.textContent(`${failed} .tool-status`)) === "✗" &&
+          why?.includes("aborted") === true,
+        `Stop ends a running command, shown as ✗ "Command aborted" (${why?.slice(-16) ?? "none"})`,
+      )
+      await toolIdle()
+    } finally {
+      await tp.close().catch(() => {})
+      await toolHost.shutdown().catch(() => {})
+    }
+  }
 
   // ── nothing left of the old controls ────────────────────────────────────
   const gone = await page.$$eval(

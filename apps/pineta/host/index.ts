@@ -5,8 +5,9 @@
 
 import http from "node:http"
 import { createRequire } from "node:module"
+import { networkInterfaces } from "node:os"
 import path from "node:path"
-import { Exchange } from "@kyneta/exchange"
+import { Exchange, whenHydrated } from "@kyneta/exchange"
 import { stepInPlace } from "@kyneta/schema"
 import {
   WebsocketServerTransport,
@@ -17,6 +18,7 @@ import {
   ERR,
   type Intent,
   type LaneName,
+  planStop,
   type RunId,
   referenceId,
   runId,
@@ -37,7 +39,7 @@ import {
   planStartup,
   settleRun,
 } from "@pineta/marginalia"
-import { type Agent, createAgent, newId } from "@pineta/pi"
+import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
 import {
   decodeCommand,
   encodeOutcome,
@@ -54,16 +56,28 @@ import {
   readTreeIndex,
 } from "@pineta/reads"
 import {
-  appendStream,
+  applyStreamOps,
   beginStream,
+  clearStreams,
   endStream,
+  planStream,
   readActiveRun,
   readEntryMessage,
+  readStreams,
   SessionDoc,
   type SessionDocHandle,
 } from "@pineta/schema"
 import { createServer as createViteServer } from "vite"
 import { WebSocketServer } from "ws"
+import {
+  admits,
+  DEFAULT_BIND,
+  isLoopback,
+  KEY_COOKIE,
+  newKey,
+  urlHost,
+} from "./admission.ts"
+import { openStore } from "./store.ts"
 
 const require = createRequire(import.meta.url)
 
@@ -89,8 +103,21 @@ export function assertEnvironment(): EnvironmentInfo {
 
 export interface StartHostOptions {
   readonly port?: number
-  readonly provider?: string
-  readonly model?: string
+  /** The address to listen on. Default loopback: only this machine. */
+  readonly bind?: string
+  /**
+   * The invite key, off loopback. Absent, a fresh one is made; on loopback
+   * there is none, since only this machine can connect.
+   */
+  readonly key?: string
+  /** No default: a suite that forgot one must not spend the person's models. */
+  readonly model: ModelChoice
+  /** Where the agent's tools run; absent or null, it has none. */
+  readonly tools?: { readonly cwd: string } | null
+  /** Vite's hot reload. Off for a host whose agent edits the client it serves. */
+  readonly hmr?: boolean
+  /** A SQLite file to keep the session in; absent or null, memory only. */
+  readonly store?: string | null
   readonly log?: (message: string) => void
 }
 
@@ -100,15 +127,24 @@ export interface RunningHost {
   readonly wsUrl: string
   readonly doc: SessionDocHandle
   readonly agent: Agent
+  /** The invite key, or null on loopback. */
+  readonly key: string | null
+  /** Links a collaborator can open, key included; the local URL on loopback. */
+  readonly invites: readonly string[]
   shutdown(): Promise<void>
 }
 
 export async function startHost({
   port = 0,
-  provider = "cerebras",
-  model = "qwen-3.8-27b",
+  bind = DEFAULT_BIND,
+  key: givenKey,
+  model,
+  tools = null,
+  hmr = true,
+  store: storeFile = null,
   log = console.log,
-}: StartHostOptions = {}): Promise<RunningHost> {
+}: StartHostOptions): Promise<RunningHost> {
+  const key = isLoopback(bind) ? null : (givenKey ?? newKey())
   const env = assertEnvironment()
   log(
     `[host] env ok — loro-crdt ${env.loroVersion}, node ${env.node}, stepInPlace present`,
@@ -120,29 +156,43 @@ export async function startHost({
   // agreed constant. The host has no WRITER identity: writers are the
   // connected clients, identified by the transport, and they own no lanes;
   // lanes belong to threads (ADR-0020).
+  const stored = storeFile === null ? null : openStore(storeFile)
   const exchange = new Exchange({
     id: HOST_PEER_ID,
     transports: [serverTransport],
+    ...(stored === null ? {} : { stores: [stored.store] }),
   })
 
   // The session document is BOTH pi's storage and the thing we replicate.
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
+  // A stored session loads asynchronously; pi must see it before it starts.
+  // Only storage is awaited: the host is the authority, with no peer upstream.
+  if (stored !== null) await whenHydrated(doc)
 
   // --- pi stack ------------------------------------------------------------
   const agent = await createAgent({
     doc,
     replicaId: newId(),
-    provider,
     model,
-    // Route each delta by the lane pi says it streamed on, looking the run up
-    // in the document. The document already records which run each lane is
-    // streaming; a second copy here would be two sources of truth.
-    onDelta: ({ lane, delta }) => {
-      const run = readActiveRun(doc, lane)
-      if (run !== undefined) appendStream(doc, run, delta)
+    tools,
+    // Gather the lane's streams from the document, plan, execute. The document
+    // records what each lane is running and streaming; a second copy here
+    // would be two sources of truth.
+    onStream: event => {
+      applyStreamOps(
+        doc,
+        planStream({
+          event,
+          open: readStreams(doc),
+          running: readActiveRun(doc, event.lane) !== undefined,
+          newId,
+        }),
+      )
     },
   })
-  log(`[host] agent ready — model ${agent.modelLabel}`)
+  log(
+    `[host] agent ready — model ${agent.modelLabel}; tools ${tools === null ? "off" : `on, in ${tools.cwd}`}`,
+  )
 
   // --- command channel (ADR-0007) -----------------------------------------
   const listener = Control.listen(exchange)
@@ -226,20 +276,12 @@ export async function startHost({
     }
   }
 
-  // No run survives a process: clear any lane recorded as running, and drain
-  // every lane with messages held for it, since no run's end will.
+  // No run or stream survives a process: clear them, then drain every lane
+  // with messages held for it, since no run's end will.
   void serially(async () => {
-    const plan = planStartup({
-      running: readLanes(doc, readTreeIndex(doc))
-        .filter(l => l.running)
-        .map(l => l.name),
-      held: readOutbox(doc),
-    })
-    for (const lane of plan.clear) {
-      const run = readActiveRun(doc, lane)
-      if (run !== undefined) endStream(doc, lane, run)
-    }
-    for (const lane of plan.drain) await drain(lane)
+    clearStreams(doc)
+    for (const lane of planStartup({ held: readOutbox(doc) }).drain)
+      await drain(lane)
   })
 
   /** A human message: gather, `threadOf` and `planChat`, execute. */
@@ -399,6 +441,21 @@ export async function startHost({
       case "name":
         await agent.setParticipantName(writer, intent.name)
         return respond({ kind: "named" })
+      case "stop": {
+        const planned = planStop(
+          readLanes(doc, readTreeIndex(doc)),
+          intent.lane,
+        )
+        if (planned === "unknown")
+          return respond({
+            kind: "refused",
+            code: ERR.UNKNOWN_TARGET,
+            message: "no such lane to stop",
+          })
+        // The run's end then drains the lane's outbox, as any run's does.
+        if (planned === "abort") await agent.lane(intent.lane).abort()
+        return respond({ kind: "stopped" })
+      }
     }
   }
 
@@ -434,9 +491,32 @@ export async function startHost({
   const vite = await createViteServer({
     root: clientDir,
     configFile: path.join(clientDir, "vite.config.ts"),
-    server: { middlewareMode: true, hmr: { server: httpServer } },
+    server: {
+      middlewareMode: true,
+      // Vite attaches its own upgrade listener, ahead of the one below, so its
+      // socket would bypass admission: hot reload runs on loopback only.
+      hmr: hmr && key === null ? { server: httpServer } : false,
+    },
   })
+  // Admission comes first: nothing reaches Vite or the Exchange without it.
   httpServer.on("request", (req, res) => {
+    const admission = admits(
+      { url: req.url ?? "/", cookie: req.headers.cookie },
+      key,
+    )
+    if (admission.kind === "refuse") {
+      res.writeHead(403).end()
+      return
+    }
+    if (admission.kind === "admitAndForget") {
+      res
+        .writeHead(302, {
+          location: admission.location,
+          "set-cookie": `${KEY_COOKIE}=${encodeURIComponent(key ?? "")}; HttpOnly; SameSite=Strict; Path=/`,
+        })
+        .end()
+      return
+    }
     vite.middlewares(req, res)
   })
 
@@ -446,7 +526,15 @@ export async function startHost({
   // Handling every upgrade here — which is what this did before Vite — would
   // swallow HMR silently.
   httpServer.on("upgrade", (req, socket, head) => {
-    if (req.url === "/ws") {
+    const admission = admits(
+      { url: req.url ?? "/", cookie: req.headers.cookie },
+      key,
+    )
+    if (admission.kind === "refuse") {
+      socket.end("HTTP/1.1 403 Forbidden\r\n\r\n")
+      return
+    }
+    if (new URL(req.url ?? "/", "http://host").pathname === "/ws") {
       wss.handleUpgrade(req, socket, head, ws =>
         wss.emit("connection", ws, req),
       )
@@ -471,7 +559,7 @@ export async function startHost({
       }
       reject(err)
     })
-    httpServer.listen(port, resolve)
+    httpServer.listen(port, bind, resolve)
   })
   const address = httpServer.address()
   if (address === null || typeof address === "string") {
@@ -479,12 +567,35 @@ export async function startHost({
   }
   const actualPort = address.port
 
+  const local = urlHost(bind)
+  // A collaborator opens one of these; on 0.0.0.0, one per network address.
+  const addresses =
+    bind === "0.0.0.0"
+      ? Object.values(networkInterfaces())
+          .flat()
+          .flatMap(a =>
+            a !== undefined && a.family === "IPv4" && !a.internal
+              ? [a.address]
+              : [],
+          )
+      : [local]
+  const invites = addresses.map(
+    a =>
+      `http://${a}:${actualPort}/${key === null ? "" : `?key=${encodeURIComponent(key)}`}`,
+  )
+  if (key !== null && tools !== null)
+    log(
+      "[host] WARNING: anyone with the invite link can run commands on this machine as you.",
+    )
+
   return {
     port: actualPort,
-    httpUrl: `http://localhost:${actualPort}/`,
-    wsUrl: `ws://localhost:${actualPort}/ws`,
+    httpUrl: `http://${local}:${actualPort}/`,
+    wsUrl: `ws://${local}:${actualPort}/ws`,
     doc,
     agent,
+    key,
+    invites,
     async shutdown() {
       try {
         await agent.close()
@@ -498,6 +609,9 @@ export async function startHost({
       await new Promise<void>(resolve => {
         httpServer.close(() => resolve())
       })
+      try {
+        stored?.close()
+      } catch {}
     },
   }
 }

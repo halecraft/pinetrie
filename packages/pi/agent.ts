@@ -10,10 +10,15 @@
 
 import {
   BACKGROUND_CONTEXT,
+  createBashTool,
+  createEditTool,
+  createReadTool,
+  createWriteTool,
   StorageBackedSession,
   uuidv7,
   value,
 } from "@earendil-works/pi-agent-core"
+import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
 import { insertEntry } from "@earendil-works/pi-agent-core/harness/session"
 import {
   type EntryId,
@@ -23,6 +28,8 @@ import {
   type LaneName,
   laneNameForThread,
   type Position,
+  type StreamEvent,
+  toolLabel,
   type WriterId,
 } from "@pineta/core"
 import {
@@ -36,7 +43,8 @@ import {
   type Reference,
 } from "@pineta/marginalia"
 import { hasLaneRecord, type SessionDocHandle } from "@pineta/schema"
-import { createAgentHarness, ModelRuntime } from "./deep.ts"
+import { type ModelChoice, setUpModel } from "./config.ts"
+import { buildSystemPrompt, createAgentHarness } from "./deep.ts"
 import { KynetaStorage } from "./storage.ts"
 
 export { KynetaStorage }
@@ -47,29 +55,6 @@ export const CTX = BACKGROUND_CONTEXT
 /** Coordination-free id, used for peer ids. Same generator pi uses for entries. */
 export const newId = (): string => uuidv7()
 
-/**
- * Resolve a model.
- *
- * ADR-0009: we do NOT inject an IdGenerator. pi's default is
- * `{ next: uuidv7 }` (session.js:158) — a 41-bit monotonic counter seeded once
- * per module instance, so intra-process entry-id collision probability is
- * exactly 0. Replacing it is the documented hazard; the default is verified safe.
- */
-export async function resolveModel({
-  provider,
-  model,
-}: {
-  provider: string
-  model: string
-}) {
-  const runtime = await ModelRuntime.create({ refreshOnCreate: false })
-  const resolved = runtime.getModel(provider, model)
-  if (resolved === undefined) {
-    throw new Error(`model not found: ${provider}/${model}`)
-  }
-  return { models: runtime, model: resolved }
-}
-
 export interface CreateAgentOptions {
   readonly doc: SessionDocHandle
   /**
@@ -77,10 +62,14 @@ export interface CreateAgentOptions {
    * writer's identity: writers are people, identified by the transport.
    */
   readonly replicaId: string
-  readonly provider: string
-  readonly model: string
-  /** A text delta, attributed to the lane it streamed on. */
-  readonly onDelta?: (event: { lane: string; delta: string }) => void
+  readonly model: ModelChoice
+  /**
+   * Where the agent reads, writes, edits and runs commands; null for no tools.
+   * Tools run as the host's user, so they are on only when asked for.
+   */
+  readonly tools: { readonly cwd: string } | null
+  /** What a running turn writes, in Pineta's own words, per lane. */
+  readonly onStream?: (event: StreamEvent) => void
 }
 
 /** The result of a run: pi may refuse to admit it. */
@@ -105,6 +94,18 @@ const refused = (error: { _tag: string }): WriteOutcome => ({
   kind: "refused",
   code: laneErrCode(error._tag),
 })
+
+/** A tool's partial result -> its text: the first text part, or "". */
+function firstText(result: unknown): string {
+  const content = (result as { content?: unknown } | undefined)?.content
+  if (!Array.isArray(content)) return ""
+  const part = content.find(
+    (c): c is { type: "text"; text: string } =>
+      (c as { type?: unknown })?.type === "text" &&
+      typeof (c as { text?: unknown }).text === "string",
+  )
+  return part?.text ?? ""
+}
 
 /** Position -> pi's spelling of it, which uses `null` for the root. */
 const toPi = (p: Position): string | null => (p.kind === "root" ? null : p.id)
@@ -131,6 +132,11 @@ export interface ThreadLaneHandle {
   append(message: ChatMessage): Promise<AppendOutcome>
   /** Run one turn with `message`, a compelled chat, as the prompt itself (S19). */
   run(message: ChatMessage): Promise<WriteOutcome>
+  /**
+   * End the lane's running turn. A tool running is aborted, and its result
+   * recorded as aborted (S22); the lane then takes its next message.
+   */
+  abort(): Promise<void>
 }
 
 /**
@@ -167,7 +173,7 @@ export interface Agent {
  * narrow facade.
  */
 export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
-  const { doc, replicaId, provider, model } = options
+  const { doc, replicaId } = options
 
   const storage = new KynetaStorage({ doc, peerId: replicaId })
   const session = new StorageBackedSession(
@@ -176,19 +182,37 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     {},
   )
 
-  const { models, model: resolved } = await resolveModel({ provider, model })
+  const cwd = options.tools?.cwd ?? process.cwd()
+  const setup = await setUpModel(options.model, { cwd })
+  const resolved = setup.model
+  // pi-agent-core's own tools, built for this harness; they run in `cwd`.
+  const tools =
+    options.tools === null
+      ? []
+      : [
+          createReadTool(),
+          createWriteTool(),
+          createEditTool(),
+          createBashTool(),
+        ]
+  const toolNames = tools.map(t => t.name)
 
   const { harness } = await createAgentHarness(
     {
       session,
-      models,
+      models: setup.models,
       model: resolved,
-      // The skeleton runs a plain chat turn. No tools, no skills, no compaction
-      // surprises — those are "thicken" steps, not skeleton steps.
-      activeToolNames: [],
-      tools: [],
-      systemPrompt:
-        "You are a concise assistant inside a walking-skeleton test harness. Answer in one short sentence.",
+      tools: tools as never[],
+      activeToolNames: toolNames,
+      toolContext: { env: new NodeExecutionEnv({ cwd }) },
+      // pi's own prompt, with the repo's context files and the person's skills,
+      // so an extension that shapes pi's prompt sections finds them (S23).
+      systemPrompt: buildSystemPrompt({
+        cwd,
+        selectedTools: toolNames,
+        contextFiles: setup.contextFiles,
+        skills: setup.skills,
+      }),
       // Pineta's outbox means pi's own queue is never used; should it be, it
       // answers one message at a time rather than batching them (S20).
       followUpMode: "one-at-a-time",
@@ -197,14 +221,40 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   )
 
   // Streaming: every harness event carries the lane it happened on, so
-  // concurrent threads' deltas are routed apart. Only the delta text and the
-  // lane name leave this module.
-  const offUpdate = harness.events.on("message_update", event => {
-    const inner = event.event
-    if (inner.type !== "text_delta") return
-    const delta = typeof inner.delta === "string" ? inner.delta : ""
-    if (delta.length > 0) options.onDelta?.({ lane: event.lane, delta })
-  })
+  // concurrent threads' streams stay apart. pi's events become `StreamEvent`s
+  // here; nothing else of them leaves this module. The harness's tool events
+  // are `tool_*`: the `tool_execution_*` in pi's types are its older loop's.
+  const emit = (event: StreamEvent) => options.onStream?.(event)
+  const offs = [
+    harness.events.on("message_update", event => {
+      const inner = event.event
+      if (inner.type !== "text_delta") return
+      const delta = typeof inner.delta === "string" ? inner.delta : ""
+      if (delta.length > 0) emit({ kind: "text", lane: event.lane, delta })
+    }),
+    harness.events.on("message_end", event =>
+      emit({ kind: "messageEnd", lane: event.lane }),
+    ),
+    harness.events.on("tool_start", event =>
+      emit({
+        kind: "toolStart",
+        lane: event.lane,
+        callId: event.toolCallId,
+        label: toolLabel(event.toolName, event.args),
+      }),
+    ),
+    harness.events.on("tool_update", event =>
+      emit({
+        kind: "toolOutput",
+        lane: event.lane,
+        callId: event.toolCallId,
+        text: firstText(event.partialResult),
+      }),
+    ),
+    harness.events.on("tool_end", event =>
+      emit({ kind: "toolEnd", lane: event.lane, callId: event.toolCallId }),
+    ),
+  ]
 
   // pi `Lane` objects, one per thread, held for the life of the process.
   type PiLane = Awaited<ReturnType<typeof harness.lane>>
@@ -253,11 +303,15 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         const result = await lane.prompt(message, CTX)
         return result.ok ? { kind: "ok" } : refused(result.error)
       },
+      async abort() {
+        const lane = await existing(name)
+        if (lane !== undefined) await lane.abort(CTX)
+      },
     }
   }
 
   return {
-    modelLabel: `${resolved.provider ?? provider}/${resolved.id}`,
+    modelLabel: `${resolved.provider}/${resolved.id}`,
     lane: threadLane,
 
     async appendToTree(message, parent) {
@@ -330,7 +384,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     },
 
     async close() {
-      offUpdate?.()
+      for (const off of offs) off()
       await harness.close(CTX)
     },
   }

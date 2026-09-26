@@ -163,6 +163,16 @@ export function Composer({
           </button>
         </div>
       )}
+      {lane.kind === "lane" && lane.running && (
+        <button
+          className="stop"
+          onClick={() => void session.stop(lane.name)}
+          title="end the agent's turn here; messages waiting are then taken"
+          type="button"
+        >
+          Stop
+        </button>
+      )}
       <div className="compose-row">
         <input
           autoComplete="off"

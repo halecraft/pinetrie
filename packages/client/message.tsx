@@ -1,6 +1,6 @@
 // client/message — one message in a column, and what can be done to it.
 
-import type { ReferenceTarget, SpineNode } from "@pineta/core"
+import type { ReferenceTarget, SpineNode, ToolCallView } from "@pineta/core"
 import { entryId } from "@pineta/core"
 import type { Reference } from "@pineta/marginalia"
 import { speakerLabel } from "./names.ts"
@@ -71,8 +71,14 @@ export function Message(p: MessageProps) {
             type="button"
           />
         ))}
-        {/* JSX escapes by default, so model output is never HTML. */}
-        <div className="text">{node.text}</div>
+        {/* JSX escapes by default, so model output is never HTML. A message
+            that only called tools shows only its tool rows. */}
+        {(node.text !== "" || node.toolCalls === undefined) && (
+          <div className="text">{node.text}</div>
+        )}
+        {node.toolCalls?.map(call => (
+          <ToolRow call={call} key={call.id} />
+        ))}
         {/* In the right margin, because what it opens appears to the right. */}
         {p.onBranch !== undefined && (
           <button
@@ -140,6 +146,36 @@ export function Message(p: MessageProps) {
         )}
       </div>
     </>
+  )
+}
+
+/** The most of a result a row shows; the whole of it is in the tree. */
+const SHOWN = 20_000
+
+/**
+ * One tool call: what it touched, whether it worked, and, folded, what it
+ * returned. The result is its own entry in the tree, paired here by
+ * `projectSpine`; with none yet, the call is still running or was cut off.
+ */
+function ToolRow({ call }: { call: ToolCallView }) {
+  const status =
+    call.result === undefined ? "pending" : call.result.isError ? "error" : "ok"
+  const mark = status === "pending" ? "…" : status === "error" ? "✗" : "✓"
+  const text = call.result?.text ?? ""
+  return (
+    <details className="tool" data-status={status} data-tool={call.name}>
+      <summary>
+        <span className="tool-label">{call.label}</span>{" "}
+        <span className="tool-status">{mark}</span>
+      </summary>
+      {call.result !== undefined && (
+        <pre className="tool-output">
+          {text.length > SHOWN
+            ? `${text.slice(0, SHOWN)}\n… ${text.length - SHOWN} more characters`
+            : text}
+        </pre>
+      )}
+    </details>
   )
 }
 

@@ -312,12 +312,10 @@ describe("draining, settling and starting up", () => {
     expect(settleRun({ kind: "refused" })).toBe("keep")
     expect(settleRun({ kind: "ok" })).toBe("done")
   })
-  test("planStartup: stale runs are cleared; every lane with held messages drains, once", () => {
-    const LANE2 = laneNameForThread("2")
+  test("planStartup: every lane with held messages drains, once", () => {
     const plan = planStartup({
-      running: [LANE2],
       held: [held("1-a", NOBODY), held("2-b", AGENT)],
     })
-    expect(plan).toEqual({ clear: [LANE2], drain: [LANE1] })
+    expect(plan).toEqual({ drain: [LANE1] })
   })
 })

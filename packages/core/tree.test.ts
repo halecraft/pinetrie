@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest"
 import {
   agentActivity,
   ancestry,
+  applyEdits,
   atEntry,
   branchColors,
   type ChatMode,
@@ -13,10 +14,14 @@ import {
   laneNameForThread,
   PENDING_TRACK,
   type Position,
+  planStop,
   projectColumns,
   projectRail,
+  projectSpine,
   ROOT,
+  tailEdit,
   threadOf,
+  toolLabel,
   writerId,
 } from "./index.ts"
 
@@ -408,5 +413,126 @@ describe("threads: where a message lands, and whether it raced", () => {
       end: at("6-mine"),
       race: null,
     })
+  })
+})
+
+describe("tool calls: paired with their results on the path", () => {
+  const e = (
+    id: string,
+    parentId: string | null,
+    message: Record<string, unknown>,
+  ): [string, EntryLike] => [id, { id, parentId, type: "message", message }]
+  const call = (id: string, name: string, args: unknown) => ({
+    type: "toolCall",
+    id,
+    name,
+    arguments: args,
+  })
+  const entries = Object.fromEntries([
+    e("1-q", null, { role: "user", content: "what is in notes?" }),
+    e("2-a", "1-q", {
+      role: "assistant",
+      content: [call("c1", "read", { path: "notes.txt" })],
+    }),
+    e("3-r", "2-a", {
+      role: "toolResult",
+      toolCallId: "c1",
+      content: [{ type: "text", text: "MANGO" }],
+      isError: false,
+    }),
+    e("4-a", "3-r", { role: "assistant", content: "It says MANGO." }),
+    // A sibling branch answering the same call id: not on the main path.
+    e("5-r", "2-a", {
+      role: "toolResult",
+      toolCallId: "c1",
+      content: [{ type: "text", text: "elsewhere" }],
+      isError: true,
+    }),
+  ])
+  const i = indexTree(entries)
+
+  test("a call and its result on one path pair; a message with only calls keeps them", () => {
+    const { spine } = projectSpine(i, "4-a")
+    expect(spine.map(n => n.id)).toEqual(["1-q", "2-a", "4-a"])
+    expect(spine[1]?.toolCalls).toEqual([
+      {
+        id: "c1",
+        name: "read",
+        label: "read notes.txt",
+        result: { text: "MANGO", isError: false },
+      },
+    ])
+  })
+  test("a result off the path does not pair", () => {
+    // Path to 5-r: its result pairs; path to 2-a alone: no result yet.
+    expect(
+      projectSpine(i, "2-a").spine[1]?.toolCalls?.[0]?.result,
+    ).toBeUndefined()
+    expect(projectSpine(i, "5-r").spine[1]?.toolCalls?.[0]?.result).toEqual({
+      text: "elsewhere",
+      isError: true,
+    })
+  })
+  test("a branch's message count ignores tool results", () => {
+    const { spine } = projectSpine(i, "1-q")
+    expect(spine[0]?.branches).toEqual([{ rootId: "2-a", messageCount: 2 }])
+  })
+})
+
+test("planStop: abort a running lane; an idle one is already stopped; an unknown one is refused", () => {
+  const lane = (running: boolean) => ({
+    name: laneNameForThread("s"),
+    tip: null,
+    running,
+    waiting: 0,
+    askedBy: null,
+  })
+  expect(planStop([lane(true)], laneNameForThread("s"))).toBe("abort")
+  expect(planStop([lane(false)], laneNameForThread("s"))).toBe("idle")
+  expect(planStop([lane(true)], laneNameForThread("other"))).toBe("unknown")
+})
+
+describe("toolLabel and tailEdit", () => {
+  test("toolLabel names what the call touches", () => {
+    expect(toolLabel("read", { path: "a.ts" })).toBe("read a.ts")
+    expect(toolLabel("bash", { command: "pnpm test\necho done" })).toBe(
+      "bash pnpm test",
+    )
+    expect(toolLabel("mystery", { x: 1 })).toBe("mystery")
+  })
+
+  // A tail-kept view: lines 1..n, keeping the last `keep` lines.
+  const view = (n: number, keep: number) =>
+    Array.from({ length: n }, (_, k) => `line ${k + 1} ${"x".repeat(k % 7)}\n`)
+      .slice(-keep)
+      .join("")
+
+  test("tailEdit reproduces every snapshot, however the view moved", () => {
+    const cases: [string, string][] = [
+      ["", "a"],
+      ["abc", "abcdef"],
+      [view(10, 10), view(14, 10)],
+      [view(30, 8), view(31, 8)],
+      ["unrelated", "different text"],
+      ["abc", ""],
+      ["same", "same"],
+    ]
+    for (const [prev, next] of cases)
+      expect(applyEdits(prev, tailEdit(prev, next))).toBe(next)
+  })
+  test("tailEdit appends as one insert, and a moved tail as a front cut plus an append", () => {
+    expect(tailEdit("abc", "abcdef")).toEqual([
+      { at: 3, remove: 0, insert: "def" },
+    ])
+    const prev = view(30, 8)
+    const next = view(32, 8)
+    const edits = tailEdit(prev, next)
+    expect(edits.length).toBe(2)
+    expect(edits[0]).toMatchObject({ at: 0, insert: "" })
+    expect(edits[1]?.remove).toBe(0)
+    // Each edit carries only what changed, never the whole view again.
+    expect(edits.reduce((n, x) => n + x.insert.length, 0)).toBeLessThan(
+      next.length / 2,
+    )
   })
 })

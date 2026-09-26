@@ -61,13 +61,19 @@ import {
 import type { Usage } from "@earendil-works/pi-ai"
 import { batch } from "@kyneta/loro-schema"
 import { type Segment, subscribe } from "@kyneta/schema"
-import { orderNewEntries } from "@pineta/core"
+import { orderNewEntries, tailEdit } from "@pineta/core"
 import {
+  applyTextEdits,
   newSessionDoc,
   physicalKey,
   type SessionDocHandle,
   type StoredEntryRow,
 } from "@pineta/schema"
+import {
+  CHECKPOINT_NAMESPACE,
+  sealCheckpoint,
+  unsealCheckpoint,
+} from "./checkpoint.ts"
 import { addUsage, emptyUsage } from "./deep.ts"
 
 // pi orders value keys by Unicode CODE POINT, not UTF-16 code unit.
@@ -132,6 +138,11 @@ interface StoredValueRecord {
   key: string
   value: unknown
   wid: string
+  /**
+   * A tool-output checkpoint stored in two parts: `value` is its shell, and its
+   * text is in `checkpointText` under the same physical key (S22).
+   */
+  sealed?: true
 }
 
 /** One element of a stored list. `eid` is the per-append identity token. */
@@ -329,9 +340,17 @@ export class KynetaStorage implements Storage {
               for (const k of ch.delete ?? []) this.#dirtyListKeys.add(k)
             } else this.#dirtyListsAll = true
           }
-        } else if (field === "pendingText" || field === "activeRunId") {
-          // Live-stream fields (ADR-0014). Not backed by pi's Storage port, so
-          // a change there never invalidates the derived seq index.
+        } else if (
+          field === "streams" ||
+          field === "streamText" ||
+          field === "activeRuns" ||
+          field === "checkpointText"
+        ) {
+          // Live-stream fields (ADR-0014), and checkpoint text, whose value
+          // record is rewritten with it. None invalidates the derived seq
+          // index. `activeRuns` was once `activeRunId`: under the old name,
+          // every stream write fell to the branch below and marked everything
+          // dirty.
         } else {
           this.#dirtyEntriesAll = true
           this.#dirtyUsage = true
@@ -542,6 +561,13 @@ export class KynetaStorage implements Storage {
     return this.#doc.values.get(pkey) as StoredValueRecord | undefined
   }
 
+  /** A stored record's value as pi wrote it: a sealed checkpoint rejoined. */
+  #valueOf(raw: StoredValueRecord, pkey: string): unknown {
+    return raw.sealed === true
+      ? unsealCheckpoint(raw.value, this.#doc.checkpointText.at(pkey)?.() ?? "")
+      : raw.value
+  }
+
   #entry(id: string): Entry | undefined {
     const raw = this.#readEntryRaw(id)
     if (raw === undefined) return undefined
@@ -558,7 +584,7 @@ export class KynetaStorage implements Storage {
     if (seq === undefined) return undefined
     return {
       address: value<T>(raw.namespace, raw.key),
-      value: raw.value as T,
+      value: this.#valueOf(raw, pkey) as T,
       seq,
     }
   }
@@ -615,15 +641,30 @@ export class KynetaStorage implements Storage {
             const pkey = physicalKey(write.namespace, write.key)
             if (write.op === "delete") {
               d.values.delete(pkey)
+              if (d.checkpointText.has(pkey)) d.checkpointText.delete(pkey)
               stagedValues.push([pkey, null])
             } else {
               const wid = makeToken(this.#peer)
+              // A checkpoint's text is written as edits to its own text, so
+              // each write stores what changed, not the whole view again.
+              const sealed =
+                write.namespace === CHECKPOINT_NAMESPACE
+                  ? sealCheckpoint(write.value)
+                  : undefined
               d.values.set(pkey, {
                 namespace: write.namespace,
                 key: write.key,
-                value: write.value,
+                value: sealed === undefined ? write.value : sealed.shell,
                 wid,
+                ...(sealed === undefined ? {} : { sealed: true }),
               })
+              if (sealed !== undefined) {
+                if (!d.checkpointText.has(pkey)) d.checkpointText.set(pkey, "")
+                const text = d.checkpointText.at(pkey)
+                if (text !== undefined)
+                  applyTextEdits(text, tailEdit(text(), sealed.text))
+              } else if (d.checkpointText.has(pkey))
+                d.checkpointText.delete(pkey)
               stagedValues.push([pkey, { wid, seq: write.seq }])
             }
             break
@@ -722,7 +763,7 @@ export class KynetaStorage implements Storage {
         continue
       out.push({
         address: value<T>(raw.namespace, raw.key),
-        value: raw.value as T,
+        value: this.#valueOf(raw, pkey) as T,
         seq: meta.seq,
       })
     }

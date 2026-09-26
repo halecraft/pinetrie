@@ -95,8 +95,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup drains nothing",
     file: "packages/marginalia/outbox.ts",
-    from: "    drain: [...new Set(input.held.map(h => h.lane))],",
-    to: "    drain: [],",
+    from: "  return { drain: [...new Set(input.held.map(h => h.lane))] }",
+    to: "  return { drain: [] }",
     command: unit,
     expect: "every lane with held messages drains",
   },

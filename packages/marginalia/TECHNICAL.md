@@ -72,9 +72,9 @@ the queue. The host executes three pure decisions from here:
   message is released only once it is written, so a refused append stays held.
 - **`settleRun`**: a compelled message pi refuses to run is kept, appended with
   no reply, rather than lost; the author already heard `started`.
-- **`planStartup`**: no run survives a process, so a starting host clears every
-  lane recorded as running, and drains every lane with messages held for it,
-  since no run's end will.
+- **`planStartup`**: a starting host drains every lane with messages held for
+  it, since no run's end will. What does not survive a process (runs and
+  streams) is cleared first, by `clearStreams` in `@pineta/schema`.
 
 # Participants (`participant.ts`)
 

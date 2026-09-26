@@ -151,4 +151,28 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "no mention could reach",
   },
+  {
+    name: "tailEdit never cuts the front",
+    file: "packages/core/edits.ts",
+    from: "  if (kept === 0 || next.length - kept >= single.insert.length) return [single]",
+    to: "  if (kept >= 0) return [single]",
+    command: unit,
+    expect: "a moved tail as a front cut plus an append",
+  },
+  {
+    name: "tool results are not paired with their calls",
+    file: tree,
+    from: "              return result === undefined ? call : { ...call, result }",
+    to: "              return result === undefined ? call : call",
+    command: unit,
+    expect: "a call and its result on one path pair",
+  },
+  {
+    name: "a branch's count includes tool results",
+    file: tree,
+    from: "    if (entry !== undefined && renderableMessage(entry) !== null)",
+    to: '    if (entry?.type === "message")',
+    command: unit,
+    expect: "message count ignores tool results",
+  },
 ]

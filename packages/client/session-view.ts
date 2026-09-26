@@ -37,6 +37,11 @@ type WebSocketCtor = ConstructorParameters<
 
 export interface ConnectOptions {
   readonly url: string
+  /**
+   * An invite key, for a Node client of a host off loopback. A browser needs
+   * none: the invite link's redirect set a cookie its requests carry.
+   */
+  readonly key?: string
   readonly WebSocket: WebSocketCtor
   readonly peerId?: string
   /** Called on every change to the document; read it through `@pineta/reads`. */
@@ -63,6 +68,8 @@ export interface SessionClient {
   /** Cite `to`, attached where you are reading (`at`). */
   cite(to: ReferenceTarget, at: Position): Promise<Outcome>
   setName(name: string): Promise<Outcome>
+  /** End the running turn of the thread whose lane is `lane`. */
+  stop(lane: LaneName): Promise<Outcome>
   /** Every reply as it arrived on the wire, for wire-level checks. */
   readonly replies: readonly Reply[]
   close(): Promise<void>
@@ -86,7 +93,10 @@ export async function connectSession(
     options.peerId ?? `client-${Math.random().toString(36).slice(2, 10)}`
 
   const transport = new WebsocketClientTransport({
-    url: options.url,
+    url:
+      options.key === undefined
+        ? options.url
+        : `${options.url}?key=${encodeURIComponent(options.key)}`,
     WebSocket: options.WebSocket,
     reconnect: { enabled: false },
   })
@@ -146,6 +156,9 @@ export async function connectSession(
     },
     setName(name) {
       return send({ kind: "name", name })
+    },
+    stop(lane) {
+      return send({ kind: "stop", lane })
     },
     replies,
     async close() {

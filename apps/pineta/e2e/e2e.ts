@@ -8,8 +8,16 @@
 //
 //   pnpm run e2e        offline: the model IS called, but its words are not checked
 //   pnpm run e2e:live   also asserts on what the model says
+//
+// The main host names its model; the tools and admission sections run their
+// own hosts with a scripted model, so their steps are repeatable and cost
+// nothing. No section uses the person's pi setup.
 
-import { readStreaming } from "@pineta/client/projection"
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
+import { DatabaseSync } from "node:sqlite"
+import { subscribe } from "@kyneta/schema"
 import { connectSession, type SessionClient } from "@pineta/client/session"
 import {
   ancestry,
@@ -19,12 +27,15 @@ import {
   findSeqKeys,
   followTip,
   laneNameForThread,
+  NOBODY,
   type Position,
+  projectRail,
   projectSpine,
   projectTranscript,
   ROOT,
 } from "@pineta/core"
 import { decodeChat, displayName } from "@pineta/marginalia"
+import { newId as newHeldId, scriptedModel } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
   readLanes,
@@ -40,6 +51,7 @@ import {
   readEntryMessage,
   readLaneNames,
   readLaneTip,
+  readStreams,
   writeEntry,
 } from "@pineta/schema"
 import { startHost } from "../host/index.ts"
@@ -55,7 +67,17 @@ console.log(
   `=== Pineta — end to end (${LIVE ? "LIVE model" : "offline"}) ===\n`,
 )
 
-const host = await startHost({ port: 0, log: m => console.log(m) })
+/** The suites' own model: never the person's pi setup, which costs them. */
+const NAMED = {
+  kind: "named",
+  provider: "cerebras",
+  model: "qwen-3.8-27b",
+} as const
+const host = await startHost({
+  port: 0,
+  model: NAMED,
+  log: m => console.log(m),
+})
 console.log(`[e2e] host at ${host.httpUrl}\n`)
 
 // ── helpers ───────────────────────────────────────────────────────────────
@@ -74,6 +96,34 @@ const idle = () =>
       readOutbox(host.doc).length === 0,
     120_000,
   )
+/** The bytes of a Kyneta SQLite store's records. */
+const storeBytes = (file: string): number => {
+  const db = new DatabaseSync(file, { readOnly: true })
+  try {
+    const tables = db
+      .prepare("select name from sqlite_master where type = 'table'")
+      .all()
+      .map(r => String(r.name))
+    const records = tables.find(t => t.includes("record")) ?? ""
+    const row = db
+      .prepare(
+        `select coalesce(sum(length(blob)), 0) + coalesce(sum(length(payload)), 0) as n from ${records}`,
+      )
+      .get() as { n: number | null }
+    return row.n ?? 0
+  } finally {
+    db.close()
+  }
+}
+/** In `doc`, the id of the message whose text is exactly `text`. */
+const idOfIn = (doc: typeof host.doc, text: string): string | null => {
+  const index = readTreeIndex(doc)
+  return (
+    Object.keys(index.entries).find(
+      id => projectTranscript(index, id).at(-1)?.text === text,
+    ) ?? null
+  )
+}
 /** The id of the message whose text is exactly `text`. */
 const idOf = (text: string): string | null =>
   Object.values(readRenderableEntries(host.doc)).find(
@@ -131,13 +181,17 @@ function invariants(section: string) {
 }
 
 // ── the first turn ────────────────────────────────────────────────────────
-const streamSamples: string[] = []
-const client: SessionClient = await connect("e2e-client", () => {
-  for (const lane of readLaneNames(host.doc)) {
-    const s = readStreaming(host.doc, lane)
-    if (s !== null) streamSamples.push(s.text)
-  }
+// Every reply stream's text at each change of the host's document, by stream:
+// each assistant message is its own stream, so growth is judged within one.
+// Sampled on the host's own changes: a reply's stream closes when its message
+// ends, which can fall between two of a client's syncs.
+const streamSamples = new Map<string, string[]>()
+const unsample = subscribe(host.doc, () => {
+  for (const s of readStreams(host.doc))
+    if (s.kind === "reply")
+      streamSamples.set(s.id, [...(streamSamples.get(s.id) ?? []), s.text])
 })
+const client: SessionClient = await connect("e2e-client")
 ok(true, "client connected over a real websocket and opened the document")
 
 const rejected = await client.chat("   ", ROOT)
@@ -193,18 +247,26 @@ ok(
 )
 
 // ADR-0014: the stream went through Schema.text(), and cleared on commit.
+unsample()
+const samples = [...streamSamples.values()]
 ok(
-  streamSamples.length > 0,
-  `the client saw ${streamSamples.length} live streaming updates`,
+  samples.flat().length > 0,
+  `the client saw ${samples.flat().length} live streaming updates`,
 )
 ok(
-  streamSamples.every((s, i) => {
-    const previous = streamSamples[i - 1]
-    return previous === undefined || s.startsWith(previous) || s.length < 2
-  }),
-  "streamed text grew monotonically (insert(at, delta), never a whole-value replace)",
+  samples.every(texts =>
+    texts.every((s, i) => {
+      const previous = texts[i - 1]
+      return previous === undefined || s.startsWith(previous)
+    }),
+  ),
+  "each reply streamed by appending (edits, never a whole-value replace)",
 )
-ok(readActiveRun(host.doc, trunk) === undefined, "the stream cleared on commit")
+ok(
+  readActiveRun(host.doc, trunk) === undefined &&
+    readStreams(host.doc).length === 0,
+  "the run ended, and its stream closed when its message did",
+)
 
 // ADR-0013: seq never escapes the replica.
 const rawEntries = readEntries(host.doc)
@@ -737,6 +799,314 @@ if (LIVE) {
 }
 
 invariants("end")
+
+// ── tools: the agent reads, writes, edits and runs, visibly (ADR-0022) ────
+// A second host with a scripted model, tools in a temporary directory, and its
+// session in a SQLite file, so every step is repeatable and spends nothing.
+{
+  const work = mkdtempSync(path.join(tmpdir(), "pineta-tools-"))
+  const dbFile = path.join(
+    mkdtempSync(path.join(tmpdir(), "pineta-db-")),
+    "pineta.db",
+  )
+  writeFileSync(path.join(work, "notes.txt"), "the secret word is MANGO\n")
+  const script = scriptedModel()
+  const open = (log: (m: string) => void) =>
+    startHost({
+      model: { kind: "scripted", script },
+      tools: { cwd: work },
+      store: dbFile,
+      log,
+    })
+  let th = await open(() => {})
+  const tidle = () =>
+    waitFor(
+      () =>
+        Object.keys(th.doc.activeRuns()).length === 0 &&
+        readOutbox(th.doc).length === 0,
+      60_000,
+    )
+  const ttree = () => readTreeIndex(th.doc)
+  const tlane = () => readLanes(th.doc, ttree())[0]
+  // Every open stream at each change of the host's document.
+  const watched: ReturnType<typeof readStreams>[] = []
+  const watch = () =>
+    subscribe(th.doc, () => watched.push([...readStreams(th.doc)]))
+  let unwatch = watch()
+  const u = await connectSession({
+    url: th.wsUrl,
+    WebSocket,
+    peerId: "tools-user",
+  })
+  await u.setName("Uma")
+
+  // 1. Read a file, then answer.
+  script.use([
+    { text: "Let me look.", tool: "read", args: { path: "notes.txt" } },
+    { text: "It says MANGO." },
+  ])
+  const asked = await u.chat("what is in notes?", ROOT, START_AGENT)
+  await tidle()
+  const spine = projectSpine(ttree(), tlane()?.tip ?? null).spine
+  const call = spine.find(n => n.toolCalls !== undefined)?.toolCalls?.[0]
+  ok(
+    runOf(asked) !== "" &&
+      call?.label === "read notes.txt" &&
+      call.result?.text.includes("MANGO") === true &&
+      call.result.isError === false,
+    `a read is stored as a call paired with its result (${call?.label ?? "none"})`,
+  )
+  ok(
+    projectRail(ttree()).length === spine.length && spine.length === 3,
+    `the rail has one dot per message, none per tool result (${projectRail(ttree()).length})`,
+  )
+
+  // 2. Write a file, then edit it: the disk changes.
+  script.use([
+    { tool: "write", args: { path: "new.txt", content: "alpha\n" } },
+    {
+      tool: "edit",
+      args: { path: "new.txt", edits: [{ oldText: "alpha", newText: "beta" }] },
+    },
+    { text: "done" },
+  ])
+  const lane = tlane()
+  await u.chat("make new.txt", at(lane?.tip ?? null), { lane: lane?.name })
+  await tidle()
+  ok(
+    readFileSync(path.join(work, "new.txt"), "utf8") === "beta\n",
+    "the agent wrote a file, then edited it, on disk",
+  )
+
+  // 3. A long command streams live, as edits, and leaves no stream behind.
+  const lines = 400
+  const printed = Array.from(
+    { length: lines },
+    (_, k) => `line ${k + 1} `.length + 201,
+  ).reduce((a, b) => a + b, 0)
+  script.use([
+    {
+      tool: "bash",
+      args: {
+        command: `for i in $(seq 1 ${lines}); do echo "line $i $(head -c 150 /dev/urandom | base64 | tr -d '\\n')"; sleep 0.005; done`,
+      },
+    },
+    { text: "ran it" },
+  ])
+  watched.length = 0
+  const sizeBefore = storeBytes(dbFile)
+  const l3 = tlane()
+  await u.chat("run it", at(l3?.tip ?? null), { lane: l3?.name })
+  await tidle()
+  await sleep(300)
+  const toolTexts = watched
+    .flat()
+    .filter(s => s.kind === "tool")
+    .map(s => s.text)
+  const lastLive = toolTexts.at(-1) ?? ""
+  const result =
+    projectSpine(ttree(), tlane()?.tip ?? null)
+      .spine.flatMap(n => n.toolCalls ?? [])
+      .at(-1)?.result?.text ?? ""
+  ok(
+    toolTexts.length > 3 &&
+      lastLive.length > 0 &&
+      result.includes(lastLive.slice(-300)),
+    `a running command's output streamed live (${toolTexts.length} updates), matching its result`,
+  )
+  ok(readStreams(th.doc).length === 0, "when the tool ended, its stream closed")
+  // The store's own record bytes, not the file's: SQLite's page overhead for
+  // large blobs varies. The live stream, pi's checkpoints, the result and pi's
+  // pending copy of it each cost about what was printed or returned. Stored
+  // as whole values, the live stream alone was 4.35 MB (S22), which this bound
+  // catches; the checkpoints' routing has its own unit test.
+  const grew = storeBytes(dbFile) - sizeBefore
+  const bound = 4 * (printed + result.length)
+  ok(
+    grew <= bound,
+    `the store's records grew ${Math.round(grew / 1024)} KB for ${Math.round(printed / 1024)} KB printed (at most ${Math.round(bound / 1024)} KB)`,
+  )
+
+  // 4. Two assistant messages in one run: two reply streams, one at a time.
+  script.use([
+    { text: "First.", tool: "read", args: { path: "notes.txt" } },
+    { text: "Second." },
+  ])
+  watched.length = 0
+  const l4 = tlane()
+  await u.chat("look again", at(l4?.tip ?? null), { lane: l4?.name })
+  await tidle()
+  const replies = watched.map(open => open.filter(s => s.kind === "reply"))
+  ok(
+    replies.every(r => r.length <= 1) &&
+      !replies
+        .flat()
+        .some(r => r.text.includes("First") && r.text.includes("Second")) &&
+      new Set(replies.flat().map(r => r.id)).size === 2,
+    "each assistant message streamed on its own; the first was never shown again",
+  )
+
+  // 5. Stop ends a running command; a message waiting is then taken.
+  const bob = await connectSession({
+    url: th.wsUrl,
+    WebSocket,
+    peerId: "tools-bob",
+  })
+  await bob.setName("Bob")
+  script.use([
+    { tool: "bash", args: { command: "sleep 5; echo late" } },
+    { text: "after" },
+  ])
+  const l5 = tlane()
+  const t0 = Date.now()
+  await u.chat("sleep", at(l5?.tip ?? null), { lane: l5?.name })
+  await waitFor(() => readStreams(th.doc).some(s => s.kind === "tool"), 10_000)
+  const waiting = await bob.chat("@Uma noted", at(tlane()?.tip ?? null), {
+    lane: l5?.name,
+  })
+  const stopped = l5 === undefined ? undefined : await u.stop(l5.name)
+  await tidle()
+  const aborted = projectSpine(ttree(), tlane()?.tip ?? null)
+    .spine.flatMap(n => n.toolCalls ?? [])
+    .at(-1)
+  ok(
+    waiting.kind === "queued" &&
+      stopped?.kind === "stopped" &&
+      aborted?.result?.isError === true &&
+      aborted.result.text.includes("aborted") &&
+      Date.now() - t0 < 4_000,
+    `stop ended the command at once, recorded as aborted (${aborted?.result?.text.slice(-20) ?? "none"})`,
+  )
+  ok(
+    idOfIn(th.doc, "@Uma noted") !== null && readOutbox(th.doc).length === 0,
+    "the message waiting for the lane was taken after the stop",
+  )
+  const again = l5 === undefined ? undefined : await u.stop(l5.name)
+  const nowhere = await u.stop(laneNameForThread("no-such-lane"))
+  ok(
+    again?.kind === "stopped" && codeOf(nowhere) === ERR.UNKNOWN_TARGET,
+    "stopping an idle lane is a no-op; an unknown lane is refused",
+  )
+
+  // 6. Restart over the same store: everything is there, and a held message
+  // is drained by the new host's startup, since no run's end will.
+  const before = {
+    entries: Object.keys(th.doc.entries()).length,
+    lanes: readLanes(th.doc, ttree()).map(l => `${l.name}@${l.tip}`),
+    names: [...readParticipantNames(th.doc).values()].sort(),
+  }
+  const l6 = tlane()
+  if (l6 !== undefined)
+    await th.agent.hold({
+      id: newHeldId(),
+      lane: l6.name,
+      details: {
+        author: u.writer,
+        authorName: "Uma",
+        text: "@Bob held across a restart",
+        compels: NOBODY,
+        sendId: "held-1",
+      },
+      timestamp: Date.now(),
+    })
+  unwatch()
+  await u.close()
+  await bob.close()
+  await sleep(100)
+  await th.shutdown()
+  th = await open(() => {})
+  unwatch = watch()
+  await waitFor(
+    () => idOfIn(th.doc, "@Bob held across a restart") !== null,
+    15_000,
+  )
+  const after = {
+    entries: Object.keys(th.doc.entries()).length - 1,
+    lanes: readLanes(th.doc, ttree()).map(l => `${l.name}@${l.tip}`),
+    names: [...readParticipantNames(th.doc).values()].sort(),
+  }
+  ok(
+    JSON.stringify(after.names) === JSON.stringify(before.names) &&
+      after.entries === before.entries &&
+      readOutbox(th.doc).length === 0,
+    `after a restart the session is all there, and the held message was drained (${after.entries} entries)`,
+  )
+  const u2 = await connectSession({
+    url: th.wsUrl,
+    WebSocket,
+    peerId: "tools-user",
+  })
+  script.use([{ text: "back again" }])
+  const l7 = tlane()
+  const resumed = await u2.chat("still there?", at(l7?.tip ?? null), {
+    lane: l7?.name,
+  })
+  await tidle()
+  ok(
+    runOf(resumed) !== "" &&
+      projectTranscript(ttree(), tlane()?.tip ?? null).at(-1)?.text ===
+        "back again" &&
+      before.lanes.every(l => l.split("@")[0] === l7?.name),
+    "the thread's lane resumes after a restart and runs again",
+  )
+  unwatch()
+  await u2.close()
+  await sleep(100)
+  await th.shutdown()
+}
+
+// ── admission: off loopback, only the invite key gets in ───────────────────
+{
+  const script = scriptedModel()
+  const open = await startHost({
+    bind: "0.0.0.0",
+    key: "k3y",
+    model: { kind: "scripted", script },
+    log: () => {},
+  })
+  const status = async (url: string, init?: RequestInit) =>
+    (await fetch(url, { redirect: "manual", ...init })).status
+  const wsRefused = await new Promise<boolean>(resolve => {
+    const ws = new WebSocket(open.wsUrl)
+    ws.onopen = () => {
+      ws.close()
+      resolve(false)
+    }
+    ws.onerror = () => resolve(true)
+  })
+  ok(
+    (await status(open.httpUrl)) === 403 &&
+      (await status(`${open.httpUrl}app.tsx`)) === 403 &&
+      wsRefused,
+    "without the key: no page, no source file, no websocket",
+  )
+  const invited = await fetch(`${open.httpUrl}?key=k3y`, { redirect: "manual" })
+  const cookie = invited.headers.get("set-cookie") ?? ""
+  ok(
+    invited.status === 302 &&
+      invited.headers.get("location") === "/" &&
+      cookie.includes("pineta_key=k3y") &&
+      cookie.includes("HttpOnly"),
+    "the invite link sets the key cookie and redirects to the page without the key",
+  )
+  ok(
+    (await status(open.httpUrl, { headers: { cookie: "pineta_key=k3y" } })) ===
+      200,
+    "with the cookie, the page loads",
+  )
+  const guest = await connectSession({
+    url: open.wsUrl,
+    WebSocket,
+    peerId: "keyed",
+    key: "k3y",
+  })
+  const named = await guest.setName("Keyed")
+  ok(named.kind === "named", "a client with the key syncs and sends commands")
+  await guest.close()
+  await sleep(100)
+  await open.shutdown()
+  ok((await status(host.httpUrl)) === 200, "a loopback host needs no key")
+}
 
 // Shut the client down first, then let the socket settle before tearing down
 // the host: otherwise the host's transport decodes a frame against an

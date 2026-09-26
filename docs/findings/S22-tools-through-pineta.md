@@ -151,3 +151,46 @@ first run. Across the three, with the random output and timing varying:
 | `pi.pending.tool_output` writes | 231–235 KB |
 | every update as whole values | 4.35–4.81 MB |
 | every update as tail edits | 96–97 KB |
+
+## Addendum: measured in the host, and a Kyneta store redundancy
+
+Implementing the plan (`PLAN-2026-09-27-agent-tools`) measured the same long
+`bash` through the real host, with a SQLite store:
+
+| stored for 82 KB printed, a 51 KB result | bytes |
+|---|---|
+| store records (blob + payload) | about 345 KB, in about 87 records |
+| of which, records that repeat an earlier record's operations | about 133 KB, in 6 records |
+| SQLite file growth | about 520 KB (page overhead for large blobs) |
+
+The pieces are what the design predicts:
+- the live tool stream, as tail edits: about 109 KB in about 80 small records;
+- pi's checkpoints, as edits: about 72 KB;
+- pi's pending copy of the result and the committed result: about 52 KB each.
+
+The rest is Kyneta's store repeating itself.
+
+**The redundancy.** Each store record is a Loro update exported "since" a
+version. In `packages/exchange/src/runtime.ts`, `#persistIfAdvanced` computes
+`exportSince(confirmedVersion)`, the version of the last *completed* write. When
+a change arrives while a write is still in flight, its delta therefore starts
+from before that write, and repeats everything the in-flight write carries. In
+the run above, pi's commit of its 52 KB pending entry was still being written
+when the host closed the tool's stream. The close's record then held the
+52 KB again. `decodeImportBlobMeta` shows it: that record's operation range
+starts where the previous record's starts.
+
+The existing dedup there (`#versionAlreadyTargeted`) catches two writes that
+target the *same* version, not overlapping ones. Imports are idempotent, so
+nothing is wrong, but the bytes are stored twice, and the redundancy grows with
+the size of whatever write was in flight.
+
+**Fixed in Kyneta** (locally, not yet released). The store program now asks for
+a write owed, and the runtime reads the replica when each write *starts*
+(`#prepareWrite`), so a write behind another diffs from the version that one
+confirmed. Re-measured on the same run, three times: **0 overlapping records**
+(before: 6, holding 133 KB); the whole store about 297 KB, where the bash run
+alone had added about 345 KB. Replaying the records rebuilds the session, and
+Pineta's gates pass on it, the restart over the store included (the e2e figure
+for the run fell from 343 KB to 287 KB). Kyneta's own tests for the change
+could not be run from Pineta's sandbox.

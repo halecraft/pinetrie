@@ -7,6 +7,7 @@
     ".": "./index.ts"
   },
   "dependencies": {
+    "@pineta/core": "workspace:*",
     "@kyneta/schema": "link:../../../kyneta/packages/schema",
     "@kyneta/loro-schema": "link:../../../kyneta/packages/schema/backends/loro",
     "loro-crdt": "^1.16.0"

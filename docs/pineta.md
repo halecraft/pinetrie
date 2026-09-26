@@ -87,12 +87,12 @@ discharged before any non-disposable code was written.
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
 | build guards | `pnpm run sanity` | ok |
-| unit (pure core) | `pnpm test` | 143/143 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 55 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 167/167 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 71 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 74/74 |
-| with a real model | `pnpm run e2e:live` | 77/77 |
-| **real browser** | `pnpm run e2e:browser` | 45/45 |
+| end-to-end | `pnpm run e2e` | 91/91 |
+| with a real model | `pnpm run e2e:live` | 94/94 |
+| **real browser** | `pnpm run e2e:browser` | 49/49 |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -120,7 +120,7 @@ The root declares only tooling, so a package can import only what it declares.
 
 ---
 
-## 3. Decisions that constrain everything (ADR-0001..0021)
+## 3. Decisions that constrain everything (ADR-0001..0022)
 
 Full text with rationale and rejected alternatives: `docs/02-decisions.md`.
 The ones you must not violate by accident:
@@ -153,6 +153,14 @@ agent out); with none, the mode fills in. Branches start as conversations, and
 branching at an agent thread's end steps back down to one; the root offers
 Start Chat and Start Agent. A session is its participants; threads
 are topics inside it. Amends ADR-0018 and ADR-0020.
+
+**ADR-0022 — the agent works in its own repo, visibly, with the person's
+models.** With `PINETA_TOOLS=1` the agent reads, writes, edits and runs commands
+in the repo, with hot reload off. The host binds to loopback; anywhere else it
+admits only the invite key. Models come from the person's pi setup (only the
+extensions' providers are applied). Replies and tool output are one kind of
+stream, written as text edits; pi's checkpoints are stored the same way. Stop
+ends a thread's turn. The session persists in `.pineta/pineta.db`.
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
@@ -345,6 +353,19 @@ context.**
 
 ### Open, non-blocking
 
+- ~~**Kyneta's store repeats bytes when commits overlap**~~ — fixed in Kyneta
+  (locally, unreleased), verified from Pineta: 0 overlapping records, where one
+  tool run had 133 KB of 345 KB (S22 addendum). Pineta needs the Kyneta release
+  that carries it.
+- **`compact()` on a live Loro substrate throws** (reported to Kyneta). Kyneta's
+  store fix reworked `compact`; not yet re-verified from Pineta. Without it,
+  every tool run grows the store for good.
+- **A tool's output is stored twice**, as the live stream and as pi's
+  checkpoint. One text would do if pi's `tool_update` carried the checkpoint's
+  key (`operationId`/`invocationId`): an upstream request to pi.
+- **Identity is not authenticated.** The invite key decides who gets in; peer
+  ids are chosen by clients, so a collaborator can pose as another (ADR-0022).
+
 - **S15** — the trunk winner rule uses wall-clock `ts`; clock skew is
   adversarial. Needs a Lamport clock (S1 deliberately built none).
 - **S16** — a disposable per-message doc would remove ADR-0014's ~5.6 KB
@@ -372,6 +393,20 @@ context.**
 - Periodically diff pi upstream; `pnpm run conformance` is the gate.
 
 ---
+
+### Running Pineta on itself
+
+- `pnpm run host` starts the development host: loopback, your pi settings'
+  model, the session in `.pineta/pineta.db`. `PINETA_TOOLS=1` gives the agent
+  its tools in this repo, as you, and turns hot reload off. Run `jj new` first,
+  so its edits are one reviewable change; restart the host to pick up changes
+  to host code.
+- **Inviting a collaborator:** `PINETA_BIND=0.0.0.0` (or an address). The host
+  prints an invite link per network address, with its key; `PINETA_KEY` fixes
+  the key. Everyone with the link gets in, and with tools on, can run commands
+  on this machine as you. Use a trusted network or a tunnel.
+- `PINETA_PROVIDER` / `PINETA_MODEL` override the model. A root schema change
+  cannot open an existing store: move `.pineta/pineta.db` aside.
 
 ## 7. Working agreements
 
@@ -403,7 +438,7 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
 |---|---|
 | `docs/00-vision.md` | product thesis, branch kinds, v1 scope |
 | `docs/01-architecture.md` | evidence base, layer cake, data model, module layout |
-| `docs/02-decisions.md` | **ADR-0001..0021** with rationale |
+| `docs/02-decisions.md` | **ADR-0001..0022** with rationale |
 | `docs/03-spikes.md` | S1–S16, each with question + kill criterion |
 | `docs/04-roadmap.md` | sequencing, invariants, action items |
 | `docs/05-stack.md` | stack decisions, sandbox constraints |

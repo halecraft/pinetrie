@@ -30,8 +30,9 @@ export const HOST_PEER_ID = "host"
  *   - `reference` cites `targetId`, or a span of it, from `parentId`, the entry
  *     its author is reading. It writes one value and runs nothing.
  *   - `name` sets the sender's display name to `text`.
+ *   - `stop` ends the running turn of the thread whose lane is `lane`.
  */
-export const COMMAND_KINDS = ["chat", "reference", "name"] as const
+export const COMMAND_KINDS = ["chat", "reference", "name", "stop"] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
 /**
@@ -76,6 +77,7 @@ export const OUTCOME_KINDS = [
   "queued",
   "conflict",
   "named",
+  "stopped",
   "refused",
 ] as const
 export type OutcomeKind = (typeof OUTCOME_KINDS)[number]

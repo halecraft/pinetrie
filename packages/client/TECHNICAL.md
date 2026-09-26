@@ -103,6 +103,24 @@ at the bottom; once they scroll up, it leaves them there.
 - **Waiting messages** from `pineta.outbox` show dimmed in their column, in the
   order they will be taken. They are not in the tree yet.
 
+## Tools and live work (ADR-0022)
+
+- **A tool call is a row under the agent's message** (`ToolRow` in
+  `message.tsx`): its label (`toolLabel`), ✓, ✗ or …, and its result folded in
+  a `<details>`, capped for display. A result is its own entry in the tree;
+  `projectSpine` pairs it with its call on the same path, so it adds no column
+  row and no rail dot. A message that only called tools shows only its rows.
+- **Live work is one component** (`Streams` in `column.tsx`), reading
+  `readStreams` for the lanes running on the column's path: the reply as it is
+  written, and each running tool's output, kept scrolled to its end. A reply's
+  stream closes when its message ends, which a fast model can do between two
+  renders, so a check that must see one uses a slow scripted model.
+- **Stop** shows in the composer while the thread's lane runs, and sends
+  `stop`.
+- **The invite key** needs no client code: the host's redirect sets a cookie
+  that same-origin requests and upgrades carry. `connectSession({ key })` is
+  for Node clients.
+
 ## Names
 
 A message keeps the name its writer had when they sent it: that is what the
@@ -117,6 +135,9 @@ its `writer` for the lookup.
 - **Message tools are hidden until hover or focus**, the margin `→` too. A
   browser test must hover a message before clicking its `.tools` buttons or
   its `.branch`.
+- **Stop aborts a running command only once the command has started.** With a
+  slow model, the tool call itself streams first; a check waits for the live
+  tool row before clicking Stop, as a person would.
 - **`:last-of-type` matches element type, not class.** The "agent
   joined" marker and the stream are `div`s too; find a column's last message by querying `.msg`.
 - **The agent's stream renders only in a column containing its tip.** When no

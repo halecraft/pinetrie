@@ -83,6 +83,41 @@ deliberately not migrated: the value is a transient stream pointer and there
 were no users. Recorded precisely so it does not blur S17's finding that
 `Schema.record` and sums are the barrier, not root fields.
 
+## Streams: replies and tools alike (ADR-0022)
+
+`streams` (a record per open stream: lane, `reply` or `tool`, call, label) and
+`streamText` (a `Schema.text()` per stream) replaced `pendingText`, which held
+one text per run. Keys are fresh uuidv7s (ADR-0016), written only by the host.
+
+- A reply stream opens on its message's first text and closes when the message
+  ends, so each assistant message is its own stream. Per run, a second message
+  would have shown the first one's committed text again.
+- A tool stream opens and closes with the tool. Its output arrives as whole
+  snapshots of a tail-kept view and is written with `tailEdit` (`@pineta/core`).
+- `planStream` is the pure decision per event; `applyStreamOps` is the one
+  writer; `readStreams` the one reader; `clearStreams` what a starting host
+  calls, since nothing streams across a process.
+- `activeRuns` keeps one meaning: this lane is running.
+- `checkpointText` holds pi's tool-output checkpoints' text, keyed by
+  `physicalKey`, written by `KynetaStorage` (`packages/pi/TECHNICAL.md`).
+
+This package depends on `@pineta/core` (for `tailEdit` and `StreamEvent`), which
+the dependency direction `core → schema → pi → app` allows. It still imports no
+pi.
+
+## Persistence
+
+The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`
+over `node:sqlite`, `.pineta/pineta.db` by default. It holds every document the
+host serves, one append-only record stream per document; today that is this one
+`SessionDoc`, which is also pi's storage. It is not a pi session file.
+
+**A root schema change cannot open an existing store**: Kyneta refuses a schema
+that cannot read what is stored. Migrate (root fields are migratable, S17), or
+move the file aside. Each record is a Loro update "since" a version; Kyneta
+repeats bytes when a commit lands while another is being written (S22
+addendum), and `compact()` does not yet work on a live Loro substrate.
+
 ## Telling "no lane" from "a lane at the root"
 
 `readLaneTip` returns null for both. `hasLaneRecord` separates them: pi writes
@@ -96,8 +131,9 @@ when two replicas create it concurrently: nested `values[ns][key]` kept both
 writers' values in 0 of 40 trials, against 40 of 40 for the flat layout. Once
 the container exists, merging inside it is fine; the hazard is creation.
 
-`pendingText` (a `Schema.text()` per run) and `lists` (a `Schema.list()` per pi
-operation) do create child containers lazily. They are safe only because each is
+`streamText` and `checkpointText` (a `Schema.text()` per stream or checkpoint)
+and `lists` (a `Schema.list()` per pi operation) do create child containers
+lazily. They are safe only because each is
 keyed by a globally unique id and only the host replica writes. **Do not key a
 lazily created container by anything two replicas could share**: a namespace, a
 lane name, a user id. See `docs/findings/S18-nested-values.md`. The rule is ADR-0016.

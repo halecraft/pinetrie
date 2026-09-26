@@ -51,6 +51,7 @@ export type Outcome =
    */
   | { readonly kind: "conflict"; readonly by: string | null }
   | { readonly kind: "named" }
+  | { readonly kind: "stopped" }
   | Refusal
 
 /**
@@ -122,6 +123,12 @@ export function decodeCommand(
         )
       : { kind: "name", name }
   }
+  if (kind === "stop") {
+    const lane = text(wire?.lane)
+    return isLaneName(lane)
+      ? { kind: "stop", lane }
+      : refuse(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+  }
   if (kind === "chat") {
     const body = text(wire?.text)
     if (body === "") return refuse(ERR.EMPTY_MESSAGE, "message text is empty")
@@ -174,6 +181,8 @@ export function encodeIntent(id: string, intent: Intent): Command {
       })
     case "name":
       return command({ id, kind: "name", text: intent.name })
+    case "stop":
+      return command({ id, kind: "stop", lane: intent.lane })
   }
 }
 
@@ -192,6 +201,8 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "conflict", by: outcome.by ?? "" })
     case "named":
       return reply({ id, outcome: "named" })
+    case "stopped":
+      return reply({ id, outcome: "stopped" })
     case "refused":
       return reply({
         id,
@@ -217,6 +228,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "conflict", by: wire.by === "" ? null : wire.by }
     case "named":
       return { kind: "named" }
+    case "stopped":
+      return { kind: "stopped" }
     case "refused":
       return refuse(asErrCode(wire.errorCode), wire.errorMessage)
   }

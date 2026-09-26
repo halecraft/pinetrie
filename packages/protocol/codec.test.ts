@@ -120,6 +120,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       mentions: [],
     },
     { kind: "name", name: "Alice" },
+    { kind: "stop", lane: laneNameForThread("abc") },
     { kind: "reference", to: { kind: "entry", id: entryId("e-7") }, at: ROOT },
     {
       kind: "reference",
@@ -141,6 +142,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "referenced", id: referenceId("x-1") },
     { kind: "appended", id: entryId("e-1") },
     { kind: "named" },
+    { kind: "stopped" },
     { kind: "refused", code: ERR.UNKNOWN_TARGET, message: "nope" },
   ]
   for (const outcome of outcomes) {
@@ -152,4 +154,11 @@ test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
   const wire = reply({ id: "c", outcome: "refused", errorCode: "made-up" })
   const out = decodeReply(wire)
   assert.equal(out.kind === "refused" ? out.code : "", ERR.UNKNOWN_KIND)
+})
+
+test("decode: stop must name a thread's lane", () => {
+  assert.equal(
+    refusalCode(decodeCommand({ kind: "stop", lane: "w-someone" })),
+    ERR.UNKNOWN_TARGET,
+  )
 })

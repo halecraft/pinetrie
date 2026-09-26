@@ -143,6 +143,14 @@ The rail is E; the lit column is T. Seeing both at once is the product.
 
 - The speaker's name heads each human message; the agent's messages are marked
   as the agent's.
+- **Tool calls are rows under the agent's message** (ADR-0022): what the call
+  touched (`read packages/core/tree.ts`, `bash pnpm test`), then ✓, ✗, or …
+  while it has no result, with the result folded away. A result is its own
+  entry in the tree, but it belongs to its call, so it adds no message and no
+  rail dot.
+- **While the agent works, its column shows it live**: the reply as it is
+  written, and each running command's output, kept scrolled to its end.
+  **Stop** ends the turn; messages waiting are then taken.
 - A message's tools (cite, and `→` in the margin) appear on hover or focus;
   beneath it stay only branch buttons and citation counts.
 - **Cite** stays an action on a message or a text selection. A reference draws

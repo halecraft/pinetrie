@@ -98,6 +98,10 @@ Roughly in dependency order, each independently shippable:
      default. Kyneta ephemeral state.
    - **Shared composition** — `Schema.text()` drafts written by tabs, anchored
      anywhere in the tree; the visceral multiplayer win.
+   - ~~**Self-hosting**~~ — **done** (ADR-0022): with `PINETA_TOOLS=1` the
+     agent reads, writes, edits and runs commands in the repo, visibly, with the
+     person's own pi models; stop, persistence, and an invite key off loopback.
+     Next: a sandbox profile for `bash`, then a workspace per lane (ADR-0019).
 6. **Scout kind** — read-only tools, shared workspace
 7. **Fold** — three-way merge producing a `fromId` node. Per ADR-0019 it is two
    merges, both agent-assisted: the branch of the tree, and the line of work's

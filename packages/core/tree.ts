@@ -8,6 +8,9 @@
 //
 // Order is structural throughout: the `parentId` walk, and ids, which are
 // uuidv7 and so sort by creation (S9). Nothing here can see a seq (ADR-0013).
+//
+// A tool's result is its own entry, but it belongs to its call: `projectSpine`
+// pairs it with the call on the same path, and it is never a message itself.
 
 import {
   atEntry,
@@ -18,12 +21,17 @@ import {
   type Position,
   type WriterId,
 } from "./index.ts"
+import { toolLabel } from "./tools.ts"
 
 // ── entries and messages ──────────────────────────────────────────────────
 
 export interface MessagePart {
   readonly type?: string
   readonly text?: string
+  /** A `toolCall` part: the call's id, the tool, and its arguments. */
+  readonly id?: string
+  readonly name?: string
+  readonly arguments?: unknown
 }
 
 export interface AgentMessageLike {
@@ -37,6 +45,9 @@ export interface AgentMessageLike {
   readonly writer?: WriterId
   /** Role `chat` only: the id of the send that wrote it, for its column. */
   readonly sendId?: string
+  /** Role `toolResult` only: the call it answers, and whether it failed. */
+  readonly toolCallId?: string
+  readonly isError?: boolean
 }
 
 export interface EntryLike {
@@ -59,6 +70,17 @@ export interface TranscriptMessage {
   readonly writer?: WriterId
   /** Role `chat` only: the send that wrote it. */
   readonly sendId?: string
+  /** Role `assistant` only: the tools it called, each with its result once known. */
+  readonly toolCalls?: readonly ToolCallView[]
+}
+
+/** A tool call as a reader sees it. */
+export interface ToolCallView {
+  readonly id: string
+  readonly name: string
+  readonly label: string
+  /** Its result, when the result is on the same path. */
+  readonly result?: { readonly text: string; readonly isError: boolean }
 }
 
 /** Flatten pi's AgentMessage content into display text. */
@@ -82,9 +104,11 @@ export function messageText(
  *
  * The one rule for which entries are messages, shared by every view so they
  * cannot disagree. Non-message entries and roles other than user, assistant
- * and chat are dropped. A `chat` message is a human's, already decoded by the
- * reader (`readRenderableEntries` in `@pineta/reads`); core only admits the
- * role, so it needs no schema library.
+ * and chat are dropped, `toolResult` included: a result belongs to its call,
+ * which `projectSpine` pairs it with. An assistant message carries its tool
+ * calls. A `chat` message is a human's, already decoded by the reader
+ * (`readRenderableEntries` in `@pineta/reads`); core only admits the role, so it
+ * needs no schema library.
  */
 function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   if (entry.type !== "message") return null
@@ -105,7 +129,44 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
     }
   }
   if (role !== "user" && role !== "assistant") return null
-  return { id: entry.id, role, text: messageText(entry.message) }
+  const message = { id: entry.id, role, text: messageText(entry.message) }
+  const calls = role === "assistant" ? toolCallsOf(entry.message) : []
+  return calls.length === 0 ? message : { ...message, toolCalls: calls }
+}
+
+/** An assistant message's tool calls, from its `toolCall` content parts. */
+function toolCallsOf(message: AgentMessageLike | undefined): ToolCallView[] {
+  const content = message?.content
+  if (!Array.isArray(content)) return []
+  return content.flatMap(part =>
+    part?.type === "toolCall" &&
+    typeof part.id === "string" &&
+    typeof part.name === "string"
+      ? [
+          {
+            id: part.id,
+            name: part.name,
+            label: toolLabel(part.name, part.arguments),
+          },
+        ]
+      : [],
+  )
+}
+
+/** A `toolResult` entry -> the call it answers and what it said, or null. */
+function toolResultOf(entry: EntryLike): {
+  readonly callId: string
+  readonly text: string
+  readonly isError: boolean
+} | null {
+  const m = entry.message
+  if (entry.type !== "message" || m?.role !== "toolResult") return null
+  if (typeof m.toolCallId !== "string") return null
+  return {
+    callId: m.toolCallId,
+    text: messageText(m),
+    isError: m.isError === true,
+  }
 }
 
 // ── the index ─────────────────────────────────────────────────────────────
@@ -254,11 +315,30 @@ export function projectSpine(
   const { path: upward, cycleAt } = ancestry(index, tipId)
   const path = upward.toReversed()
   const onSpine = new Set(path)
+  // A tool's result is its own entry, after the call. It belongs to the call,
+  // not to the path as a message: shown as one, it would add a column row and
+  // a rail dot per call. Only results on this path pair.
+  const results = new Map<string, { text: string; isError: boolean }>()
+  for (const id of path) {
+    const entry = index.entries[id]
+    const r = entry === undefined ? null : toolResultOf(entry)
+    if (r !== null) results.set(r.callId, { text: r.text, isError: r.isError })
+  }
   const spine: SpineNode[] = []
   for (const [i, id] of path.entries()) {
     const entry = index.entries[id]
-    const message = entry === undefined ? null : renderableMessage(entry)
-    if (message === null) continue
+    const found = entry === undefined ? null : renderableMessage(entry)
+    if (found === null) continue
+    const message =
+      found.toolCalls === undefined
+        ? found
+        : {
+            ...found,
+            toolCalls: found.toolCalls.map(call => {
+              const result = results.get(call.id)
+              return result === undefined ? call : { ...call, result }
+            }),
+          }
     const next = path[i + 1]
     const branches = (index.childrenOf.get(id) ?? [])
       .filter(child => child !== next && !onSpine.has(child))
@@ -279,7 +359,11 @@ function summarizeBranch(index: TreeIndex, rootId: string): BranchSummary {
   for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
     if (visited.has(id)) continue
     visited.add(id)
-    if (index.entries[id]?.type === "message") messageCount += 1
+    // What the rail and columns show as a message, so a tool's result, which
+    // belongs to its call, is not counted.
+    const entry = index.entries[id]
+    if (entry !== undefined && renderableMessage(entry) !== null)
+      messageCount += 1
     stack.push(...(index.childrenOf.get(id) ?? []))
   }
   return { rootId, messageCount }
@@ -561,6 +645,19 @@ export function threadOf(
     lane: lane === undefined ? { kind: "none" } : { kind: "lane", ...lane },
     race: raceAlong(index, at.id, end, send.me),
   }
+}
+
+/**
+ * What stopping a thread's lane does: abort its running turn; nothing when it
+ * is idle (stopping is idempotent); refused for a lane that does not exist.
+ * Pure.
+ */
+export function planStop(
+  lanes: readonly LaneView[],
+  lane: LaneName,
+): "abort" | "idle" | "unknown" {
+  const found = lanes.find(l => l.name === lane)
+  return found === undefined ? "unknown" : found.running ? "abort" : "idle"
 }
 
 /**

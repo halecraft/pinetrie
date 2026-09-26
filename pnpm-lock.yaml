@@ -41,6 +41,12 @@ importers:
       '@kyneta/schema':
         specifier: link:../../../kyneta/packages/schema
         version: link:../../../kyneta/packages/schema
+      '@kyneta/sql-store-core':
+        specifier: link:../../../kyneta/packages/exchange/stores/sql-core
+        version: link:../../../kyneta/packages/exchange/stores/sql-core
+      '@kyneta/sqlite-store':
+        specifier: link:../../../kyneta/packages/exchange/stores/sqlite
+        version: link:../../../kyneta/packages/exchange/stores/sqlite
       '@kyneta/websocket-transport':
         specifier: link:../../../kyneta/packages/exchange/transports/websocket
         version: link:../../../kyneta/packages/exchange/transports/websocket
@@ -219,6 +225,9 @@ importers:
       '@kyneta/schema':
         specifier: link:../../../kyneta/packages/schema
         version: link:../../../kyneta/packages/schema
+      '@pineta/core':
+        specifier: workspace:*
+        version: link:../core
       loro-crdt:
         specifier: ^1.16.0
         version: 1.16.1

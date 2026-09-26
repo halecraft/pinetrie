@@ -13,6 +13,8 @@
   "dependencies": {
     "@kyneta/exchange": "link:../../../kyneta/packages/exchange",
     "@kyneta/schema": "link:../../../kyneta/packages/schema",
+    "@kyneta/sql-store-core": "link:../../../kyneta/packages/exchange/stores/sql-core",
+    "@kyneta/sqlite-store": "link:../../../kyneta/packages/exchange/stores/sqlite",
     "@kyneta/websocket-transport": "link:../../../kyneta/packages/exchange/transports/websocket",
     "@pineta/client": "workspace:*",
     "@pineta/core": "workspace:*",

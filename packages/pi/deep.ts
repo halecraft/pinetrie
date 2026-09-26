@@ -15,7 +15,9 @@
 //        "./experimental/plugin"
 // `@earendil-works/pi-coding-agent`'s root ALSO cannot be imported here: it
 // pulls in dist/experimental/server.js, which requires `@earendil-works/pi-server`,
-// a package the install does not ship. So ModelRuntime must come from its file.
+// a package the install does not ship. So `ModelRuntime`, and the pieces that
+// load a person's pi setup (`SettingsManager`, `DefaultResourceLoader`,
+// `buildSystemPrompt`; S23), come from their files.
 //
 // TYPING NOTE: the runtime import is a URL, which carries no types — but the
 // matching `.d.ts` files DO exist on disk. `typeof import(...)` recovers pi's
@@ -34,6 +36,12 @@ type RuntimeModule =
   typeof import("./node_modules/@earendil-works/pi-agent-core/dist/harness/runtime/index.js")
 type ModelRuntimeModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.js")
+type SettingsModule =
+  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js")
+type ResourceLoaderModule =
+  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js")
+type SystemPromptModule =
+  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/system-prompt.js")
 
 const base = new URL("./node_modules/", import.meta.url)
 const deep = (p: string): Promise<unknown> => import(new URL(p, base).href)
@@ -48,6 +56,19 @@ const modelRuntime = (await deep(
   "@earendil-works/pi-coding-agent/dist/core/model-runtime.js",
 )) as ModelRuntimeModule
 
+const settings = (await deep(
+  "@earendil-works/pi-coding-agent/dist/core/settings-manager.js",
+)) as SettingsModule
+const resourceLoader = (await deep(
+  "@earendil-works/pi-coding-agent/dist/core/resource-loader.js",
+)) as ResourceLoaderModule
+const systemPrompt = (await deep(
+  "@earendil-works/pi-coding-agent/dist/core/system-prompt.js",
+)) as SystemPromptModule
+
 export const { addUsage, emptyUsage } = usage
+export const { SettingsManager } = settings
+export const { DefaultResourceLoader } = resourceLoader
+export const { buildSystemPrompt } = systemPrompt
 export const { createAgentHarness } = runtime
 export const { ModelRuntime } = modelRuntime

@@ -90,20 +90,12 @@ export const settleRun = (
 ): "done" | "keep" => (ran.kind === "refused" ? "keep" : "done")
 
 /**
- * What a host must do when it starts over a document: no run survives a
- * process, so every lane recorded as running is stale and is cleared; and a
- * lane with messages held for it has no run whose end would drain it, so each
- * is drained. Pure.
+ * The lanes a starting host must drain: each with messages held for it has no
+ * run whose end would drain it. Pure. What does not survive a process (runs,
+ * streams) is cleared first, by `clearStreams` in `@pineta/schema`.
  */
-export function planStartup(input: {
-  readonly running: readonly LaneName[]
-  readonly held: readonly Held[]
-}): {
-  readonly clear: readonly LaneName[]
+export function planStartup(input: { readonly held: readonly Held[] }): {
   readonly drain: readonly LaneName[]
 } {
-  return {
-    clear: input.running,
-    drain: [...new Set(input.held.map(h => h.lane))],
-  }
+  return { drain: [...new Set(input.held.map(h => h.lane))] }
 }

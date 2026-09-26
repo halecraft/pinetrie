@@ -27,3 +27,6 @@ e2e/browser-screenshot.png
 # vite production build output
 dist/
 client/dist/
+
+# The session store (host/store.ts)
+.pineta/
