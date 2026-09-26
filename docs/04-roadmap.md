@@ -102,6 +102,25 @@ Roughly in dependency order, each independently shippable:
      agent reads, writes, edits and runs commands in the repo, visibly, with the
      person's own pi models; stop, persistence, and an invite key off loopback.
      Next: a sandbox profile for `bash`, then a workspace per lane (ADR-0019).
+   - **The session on `json.bind`** (ADR-0023): authoritative, compacted when a
+     run ends and when the host starts; Loro removed.
+   - **Notes and fold** (next; S26 first). A note is a collaborative comment
+     anchored at an entry, one Yjs document each; the session records that it
+     exists. Not in the agent's context by default: it is read when cited or
+     through a tool, and what the agent read is recorded in the tree. The agent's
+     edits to a note are visible through its tool rows, not per character.
+     **Fold** brings what one line has and another lacks into the other,
+     synthesized by the agent, as one merge entry on the target lane's tip whose
+     `fromId` is the source's tip. What to fold is a set difference: everything
+     reachable from the source's tip, minus everything reachable from the
+     target's, over parent and `fromId` edges. So repeated folds take only what
+     is new, criss-cross folds need no single common ancestor, and each target
+     is its own destination (ADR-0010). A note's changes since the target last
+     took it come as hunks with their paragraph. A lane folds into a lane the
+     same way; its files merge only once lanes have workspaces (ADR-0019). S26
+     verifies: a `json` session and Yjs notes on one Exchange; rich text on Yjs;
+     per-document write permission; pi appending an entry with `fromId`, and
+     what reaches the model's context; and note hunks the model can use.
 6. **Scout kind** — read-only tools, shared workspace
 7. **Fold** — three-way merge producing a `fromId` node. Per ADR-0019 it is two
    merges, both agent-assisted: the branch of the tree, and the line of work's

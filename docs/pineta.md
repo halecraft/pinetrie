@@ -120,7 +120,7 @@ The root declares only tooling, so a package can import only what it declares.
 
 ---
 
-## 3. Decisions that constrain everything (ADR-0001..0022)
+## 3. Decisions that constrain everything (ADR-0001..0023)
 
 Full text with rationale and rejected alternatives: `docs/02-decisions.md`.
 The ones you must not violate by accident:
@@ -438,7 +438,7 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
 |---|---|
 | `docs/00-vision.md` | product thesis, branch kinds, v1 scope |
 | `docs/01-architecture.md` | evidence base, layer cake, data model, module layout |
-| `docs/02-decisions.md` | **ADR-0001..0022** with rationale |
+| `docs/02-decisions.md` | **ADR-0001..0023** with rationale |
 | `docs/03-spikes.md` | S1–S16, each with question + kill criterion |
 | `docs/04-roadmap.md` | sequencing, invariants, action items |
 | `docs/05-stack.md` | stack decisions, sandbox constraints |
