@@ -86,12 +86,12 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 181/181 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 80 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 205/205 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 91 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 101/101 |
-| with a real model | `pnpm run e2e:live` | 104/104 |
-| **real browser** | `pnpm run e2e:browser` | 54/54 |
+| end-to-end | `pnpm run e2e` | 118/118 |
+| with a real model | `pnpm run e2e:live` | 121/121 |
+| **real browser** | `pnpm run e2e:browser` | 61/61 |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -108,7 +108,7 @@ packages/core/         @pineta/core         declares NOTHING
 packages/schema/       @pineta/schema       Kyneta only; the document shape
 packages/pi/           @pineta/pi           THE pi boundary
 packages/protocol/     @pineta/protocol     the wire contract and its codec
-packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: references, chat, threads, outbox
+packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: references, chat, notes, outbox
 packages/reads/        @pineta/reads        document reads shared by host and client
 packages/client/       @pineta/client       browser UI; owns its Vite build
 (root)                                      development tooling only
@@ -119,7 +119,7 @@ The root declares only tooling, so a package can import only what it declares.
 
 ---
 
-## 3. Decisions that constrain everything (ADR-0001..0024)
+## 3. Decisions that constrain everything (ADR-0001..0025)
 
 Full text with rationale and rejected alternatives: `docs/02-decisions.md`.
 The ones you must not violate by accident:
@@ -151,6 +151,12 @@ ADR-0011.
 Who is here decays rather than leaving; every open column reports its thread.
 Rings on the rail, avatars in column headers, typing in the composer; never
 yourself. The host refuses client writes to the session.
+
+**ADR-0025 — notes: a message opened for everyone's editing, or a draft of the
+next one.** The text is a Yjs document per note; the record is a host-written
+`pineta.note` value; entries stay as sent, and the model reads them so. One
+draft per thread end, sent through the one send path. Contributors come from
+each edit's Yjs `clientID`. The host refuses writes to a done note.
 
 **ADR-0021 — a thread's mode is its lane; a mention picks the addressee.** A
 thread with a lane is agent work, one without is a conversation; nothing is
@@ -338,18 +344,17 @@ the whole tree. Views are pure functions over one `indexTree`
 (`packages/core/tree.ts`); which columns are open is a reducer in
 `packages/client/columns.ts`, never written.
 
-`useText` is **not yet used** — the composer is still local `useState`. Wiring
-it to a `Schema.text()` is shared composition, the last part of step 5, and the
-first genuinely collaborative edit.
+`useText` binds each note's textarea to its Yjs text (ADR-0025): the first
+genuinely collaborative edit. Each person's composer stays local `useState`.
 
-**Steps 1–4 are done; step 5 is under way** (ADR-0018). Now continue thickening (`docs/04-roadmap.md`), each step
+**Steps 1–5 are done** (ADR-0018). Now continue thickening (`docs/04-roadmap.md`), each step
 independently shippable:
 
 1. ~~tree read~~ — done: `projectSpine`, spine + branch markers, navigation is client-local state
 2. branch write — create a branch from any entry; Aside first
 3. ~~concurrent lanes~~ — done; since ADR-0020, a lane per thread, not per writer
 4. ~~references~~ — done: pi values in `pineta.reference`, derived backlinks (ADR-0017)
-5. humans in the tree (ADR-0018) — ~~chat and compelled responders~~ done; presence; shared composition (`Schema.text()`)
+5. ~~humans in the tree~~ (ADR-0018) — done: chat and compelled responders, presence (ADR-0024), notes and drafts (ADR-0025)
 6. Scout — read-only tools
 7. fold — three-way merge producing a `fromId` node
 
@@ -359,6 +364,14 @@ reference — and it appears live in A's tree **with zero tokens entering A's
 context.**
 
 ### Open, non-blocking
+
+- **Kyneta does not export `hashPeerId`.** Pineta's `clientIdOf`
+  (`packages/schema/note.ts`) copies it to attribute note edits, pinned by a
+  test. Ask Kyneta to export it, then delete the copy.
+- **A refused write to a note splits that client's replica.** Its later edits
+  build on the refused one and never reach the host, even after the note is
+  reopened (S26 addendum 2). The screen offers no way to write a done note; a
+  client writing directly can.
 
 - **Kyneta ephemeral: a write and a deletion in the same millisecond diverge.**
   A peer that sets a key and deletes it within one millisecond applies both in
@@ -459,7 +472,7 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
 |---|---|
 | `docs/00-vision.md` | product thesis, branch kinds, v1 scope |
 | `docs/01-architecture.md` | evidence base, layer cake, data model, module layout |
-| `docs/02-decisions.md` | **ADR-0001..0024** with rationale |
+| `docs/02-decisions.md` | **ADR-0001..0025** with rationale |
 | `docs/03-spikes.md` | S1–S16, each with question + kill criterion |
 | `docs/04-roadmap.md` | sequencing, invariants, action items |
 | `docs/05-stack.md` | stack decisions, sandbox constraints |

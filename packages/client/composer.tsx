@@ -36,6 +36,7 @@ export function Composer({
   pending,
   typing,
   onTyping,
+  onComposeTogether,
 }: {
   session: SessionClient
   /** Where the message attaches: the column's end, or its branch point. */
@@ -62,6 +63,12 @@ export function Composer({
   typing: readonly string[]
   /** Called on each keystroke; presence is written at most once a second. */
   onTyping: () => void
+  /**
+   * Start this thread's shared draft with what is typed so far (ADR-0025).
+   * Undefined where there is none to start: a fresh column, or a thread that
+   * already has one.
+   */
+  onComposeTogether: ((text: string) => void) | undefined
 }) {
   const [text, setText] = useState("")
   const [status, setStatus] = useState("")
@@ -201,6 +208,19 @@ export function Composer({
           {label}
         </button>
       </div>
+      {onComposeTogether !== undefined && (
+        <button
+          className="compose-together"
+          onClick={() => {
+            onComposeTogether(text)
+            setText("")
+          }}
+          title="write the next message together: everyone here can edit it"
+          type="button"
+        >
+          compose together
+        </button>
+      )}
       <span className="status">{status}</span>
     </form>
   )

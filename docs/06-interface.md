@@ -164,6 +164,29 @@ The rail is E; the lit column is T. Seeing both at once is the product.
 - **Cite** stays an action on a message or a text selection. A reference draws
   as a link between columns when both ends are open, and as a count otherwise.
 
+### Notes, and drafting together (ADR-0025)
+
+- **Any message can be opened for editing**, the agent's replies included:
+  *edit* is among its tools. It becomes a **note**, drawn in place of its text
+  as a card everyone can type in at once. The card's header says its state,
+  who has written in it, and who is editing it now. The message itself stays as
+  sent, which is what the agent read.
+- **Compose together**, under a column's composer, starts the thread's shared
+  draft with whatever is typed. There is one draft per thread end: another
+  person's column following that thread shows "Ada is drafting the next
+  message · join". *Send* on the draft sends it as a reply from that column,
+  with the send button's usual effects: it may queue, or be a conflict, which
+  keeps the draft. It then reads "Ada, with Bea".
+- **Done** makes a note read-only; *reopen* makes it editable again, and a
+  reopened note, once edited, reads "changed since done". A sent draft is done.
+- **While the note being edited is scrolled out of view**, a bar at the top of
+  its column leads back to it.
+- **On the rail, a note's message is a square.** A closed branch's button
+  counts its notes: "⑂ 6 messages · 1 note".
+- **The notes index**, *notes (n)* at the top of the rail, lists every note,
+  newest first, by its first line, state and writers; filters show drafts,
+  open, done, changed since done, and mine. A row opens its note's column.
+
 ## What goes away
 
 | today | replaced by |
@@ -180,7 +203,8 @@ a lane, the `navigate` command had no caller and was deleted with `prompt` and
 
 ## Data: nothing new
 
-Every part of this is a read of what the document already holds.
+Every part of this is a read of what the document already holds; a note's text
+is its own document (ADR-0025).
 
 - **A column** is a client-local anchor entry. Its path is `projectTranscript`
   of `followTip(anchor)`, or, once it is bound to a lane, of the lane's tip;
@@ -194,8 +218,6 @@ Every part of this is a read of what the document already holds.
 
 ## Deferred, but designed for
 
-- **Shared composition**: a draft anchored at any message appears in that
-  column, and in the rail as a pending dot.
 - **Narrow screens**: the stacked sequence described above; built after the wide
   layout works.
 

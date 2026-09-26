@@ -6,6 +6,13 @@
 // that person is NOW, with the name they sent it under when it differs, so a
 // message sent before someone named themselves does not read as a stranger's.
 
+/**
+ * A draft written together names its sender, then the others who wrote it
+ * (ADR-0025): "Ada, with Bea". Each by their current name.
+ */
+export const withContributors = (speaker: string, others: readonly string[]) =>
+  others.length === 0 ? speaker : `${speaker}, with ${others.join(", ")}`
+
 /** "Duane (guest-x4bu)" when the name has changed since; "Duane" when it has not. */
 export function speakerLabel(
   current: ReadonlyMap<string, string>,

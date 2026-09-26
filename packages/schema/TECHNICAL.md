@@ -123,12 +123,29 @@ Measured before building (the plan's Phase 0):
 - documents bound with different decays sync (their schema hashes differ, and
   Kyneta reads across them), which is how e2e uses a 300 ms decay.
 
+## Notes (`note.ts`, ADR-0025)
+
+A note's text is a Yjs document, `NoteDoc` (`{ text: Schema.text() }`), with id
+`note:<note id>` (`noteDocId`, and `noteIdOfDoc` back). It is the one place
+people type together, so it is a CRDT (ADR-0023); the record is a session
+value.
+
+- **`clientIdOf` copies Kyneta's `hashPeerId`** (FNV-1a over the peer id, 32
+  bits, 0 kept for structure), which Kyneta does not export. `note.test.ts`
+  pins it to a real document's `clientID`, so drift fails a test. Delete it
+  once Kyneta exports one. `noteAuthors` maps each known writer's `clientID`
+  back to them.
+- **A note's document is never compacted.** Kyneta cannot compact a live Yjs
+  document (S24); at note sizes its history is small.
+- **Yjs costs the page about 36 kB gzipped.** It is plain JavaScript: no wasm.
+
 ## Persistence
 
 The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`
 over `node:sqlite`, `.pineta/pineta.db` by default. It holds every document the
-host serves, one append-only record stream per document; today that is this one
-`SessionDoc`, which is also pi's storage. It is not a pi session file.
+host serves, one append-only record stream per document: the `SessionDoc`,
+which is also pi's storage, each note's text, and each client's command Line.
+It is not a pi session file.
 
 **A root schema change cannot open an existing store**: Kyneta refuses a schema
 that cannot read what is stored. Migrate (root fields are migratable, S17), or

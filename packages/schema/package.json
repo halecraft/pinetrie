@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@pineta/core": "workspace:*",
-    "@kyneta/schema": "link:../../../kyneta/packages/schema"
+    "@kyneta/schema": "link:../../../kyneta/packages/schema",
+    "@kyneta/yjs-schema": "link:../../../kyneta/packages/schema/backends/yjs"
   }
 }

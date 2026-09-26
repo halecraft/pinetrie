@@ -27,6 +27,7 @@ import {
   entryId,
   type LaneName,
   laneNameForThread,
+  type NoteRecord,
   type Position,
   type StreamEvent,
   toolLabel,
@@ -35,8 +36,10 @@ import {
 import {
   type ChatMessage,
   encodeHeld,
+  encodeNote,
   encodeReference,
   type Held,
+  NOTE_NAMESPACE,
   OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
   REFERENCE_NAMESPACE,
@@ -164,6 +167,8 @@ export interface Agent {
   addReference(reference: Reference): Promise<void>
   /** Store a writer's display name in `pineta.participant`, keyed by writer. */
   setParticipantName(writer: WriterId, name: string): Promise<void>
+  /** Store a note's record in `pineta.note`, keyed by its id (ADR-0025). */
+  setNote(note: NoteRecord): Promise<void>
   stats(): Promise<{ messageCount: number }>
   close(): Promise<void>
 }
@@ -375,6 +380,14 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       await session.setValue(
         value(PARTICIPANT_NAMESPACE, writer),
         displayName,
+        CTX,
+      )
+    },
+
+    async setNote(note) {
+      await session.setValue(
+        value(NOTE_NAMESPACE, note.id),
+        encodeNote(note),
         CTX,
       )
     },

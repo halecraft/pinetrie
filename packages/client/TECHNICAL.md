@@ -136,6 +136,29 @@ at the bottom; once they scroll up, it leaves them there.
   saturation the branch palette does not use, so a ring never reads as a track.
   Names go through `displayName`, the `guest-…` fallback included.
 
+## Notes (ADR-0025)
+
+- **A note's card (`note.tsx`) binds its textarea with `useText`** to the note's
+  Yjs text, which `session.noteText(id)` gets from the one Exchange. The
+  textarea is uncontrolled: `useText` applies remote edits in place and keeps
+  the cursor, so the card never re-renders per keystroke; `useValue` reads the
+  text where it is shown (a done note, the index's first lines).
+- **A message with a note draws its card in place of its text**, the sent
+  draft's included; a message without one offers *edit* among its tools.
+- **A thread's draft** sits above its column's composer (`draftFor` over the
+  column's end). Its opener and its writers see the card; anyone else sees
+  "Ada is drafting the next message · join". *Compose together* sends the
+  column's `at` and bound lane, as a reply would.
+- **Presence `editing`** is set on focus and while typing (at most once a
+  second), and set to null on blur, and when the editor goes with no blur (the
+  draft sent, the note done). A done note shows no editors.
+- **The sticky bar** follows the note this window last focused, through an
+  `IntersectionObserver` on the column's body.
+- **The notes index** is `notesIndex` (`@pineta/reads`) over the records, drawn
+  from the rail's top; each row reads its note's first line on its own.
+- **Selectors in the browser suite:** a card replaces `.msg > .text`, so a
+  message with a note is found by `.note-text` or by `data-entry`.
+
 ## Names
 
 A message keeps the name its writer had when they sent it: that is what the

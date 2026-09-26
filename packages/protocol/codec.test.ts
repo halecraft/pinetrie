@@ -10,6 +10,7 @@ import {
   ERR,
   entryId,
   laneNameForThread,
+  noteId,
   ROOT,
   referenceId,
   runId,
@@ -127,6 +128,28 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       to: { kind: "span", id: entryId("e-7"), start: 0, end: 2 },
       at: atEntry(entryId("e-8")),
     },
+    { kind: "note", action: { kind: "open", entry: entryId("e-2") } },
+    {
+      kind: "note",
+      action: {
+        kind: "draft",
+        at: atEntry(entryId("e-2")),
+        lane: laneNameForThread("abc"),
+        text: "  as typed ",
+      },
+    },
+    {
+      kind: "note",
+      action: {
+        kind: "draft",
+        at: atEntry(entryId("e-2")),
+        lane: null,
+        text: "",
+      },
+    },
+    { kind: "note", action: { kind: "send", note: noteId("n-1") } },
+    { kind: "note", action: { kind: "done", note: noteId("n-1") } },
+    { kind: "note", action: { kind: "reopen", note: noteId("n-1") } },
   ] as const
   for (const intent of intents) {
     assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
@@ -143,6 +166,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "appended", id: entryId("e-1") },
     { kind: "named" },
     { kind: "stopped" },
+    { kind: "noted", id: noteId("n-1") },
     { kind: "refused", code: ERR.UNKNOWN_TARGET, message: "nope" },
   ]
   for (const outcome of outcomes) {
@@ -159,6 +183,34 @@ test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
 test("decode: stop must name a thread's lane", () => {
   assert.equal(
     refusalCode(decodeCommand({ kind: "stop", lane: "w-someone" })),
+    ERR.UNKNOWN_TARGET,
+  )
+})
+
+test("decode: a note names a known action, and what it acts on", () => {
+  assert.equal(
+    refusalCode(decodeCommand({ kind: "note", mode: "edit", parentId: "e-1" })),
+    ERR.UNKNOWN_KIND,
+  )
+  for (const mode of ["open", "draft"])
+    assert.equal(
+      refusalCode(decodeCommand({ kind: "note", mode, parentId: "" })),
+      ERR.NO_ANCHOR,
+    )
+  for (const mode of ["send", "done", "reopen"])
+    assert.equal(
+      refusalCode(decodeCommand({ kind: "note", mode, targetId: "" })),
+      ERR.UNKNOWN_TARGET,
+    )
+  assert.equal(
+    refusalCode(
+      decodeCommand({
+        kind: "note",
+        mode: "draft",
+        parentId: "e-1",
+        lane: "x",
+      }),
+    ),
     ERR.UNKNOWN_TARGET,
   )
 })

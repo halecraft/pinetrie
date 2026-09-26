@@ -6,7 +6,7 @@
 // headers and fork dots share, so a branch looks the same everywhere.
 
 import { type AgentRun, PENDING_TRACK, type RailRow } from "@pineta/core"
-import { useState } from "react"
+import { type ReactNode, useState } from "react"
 import { Start } from "./start.tsx"
 
 const PALETTE = [
@@ -47,6 +47,8 @@ export function Rail({
   onPick,
   onStart,
   here,
+  notes,
+  notesPanel,
 }: {
   rows: readonly RailRow[]
   /** Ids on any open column's path: drawn at full strength. */
@@ -58,6 +60,15 @@ export function Rail({
   onStart: (asksAgent: boolean) => void
   /** Others following each thread end, with their names and colours: a ring there. */
   here: ReadonlyMap<string, readonly { name: string; color: string }[]>
+  /** Messages that are notes' (ADR-0025): drawn as squares. */
+  notes: ReadonlySet<string>
+  /** The notes index, opened from the rail's top. */
+  notesPanel: {
+    readonly count: number
+    readonly open: boolean
+    readonly toggle: () => void
+    readonly panel: ReactNode
+  }
 }) {
   const [starting, setStarting] = useState(false)
   const rowOf = new Map(rows.map((r, i) => [r.id, i]))
@@ -73,6 +84,16 @@ export function Rail({
       >
         +
       </button>
+      <button
+        aria-expanded={notesPanel.open}
+        className="notes-toggle"
+        onClick={notesPanel.toggle}
+        title="every note in this session"
+        type="button"
+      >
+        notes ({notesPanel.count})
+      </button>
+      {notesPanel.open && notesPanel.panel}
       {starting && (
         <Start
           onStart={asksAgent => {
@@ -113,11 +134,13 @@ export function Rail({
           return (
             <button
               aria-label="open this message's thread"
-              className={
-                activity.some(run => run.tip === r.id)
-                  ? "rail-dot pulse"
-                  : "rail-dot"
-              }
+              className={[
+                "rail-dot",
+                activity.some(run => run.tip === r.id) ? "pulse" : "",
+                notes.has(r.id) ? "note" : "",
+              ]
+                .filter(c => c !== "")
+                .join(" ")}
               data-entry={r.id}
               data-here={people.length > 0 ? String(people.length) : undefined}
               data-open={open.has(r.id) ? "yes" : "no"}

@@ -17,6 +17,7 @@ import {
   indexTree,
   type LaneName,
   type LaneView,
+  type NoteRecord,
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
@@ -25,6 +26,9 @@ import {
   type Held,
   heldMessages,
   indexReferences,
+  NOTE_NAMESPACE,
+  noteAt,
+  noteRecords,
   OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
   participantNames,
@@ -177,4 +181,57 @@ export function readPresence(doc: PresenceDocHandle): PresenceFacts {
       ),
     )
   return { reading, typing: live(doc.typing()), editing: live(doc.editing()) }
+}
+
+/** Every note's record (`pineta.note`), oldest first. */
+export const readNotes = (doc: SessionDocHandle): readonly NoteRecord[] =>
+  noteRecords(readValues(doc, NOTE_NAMESPACE))
+
+/** What the notes index can show: every note, or one kind of note. */
+export type NoteFilter = "all" | "draft" | "open" | "done" | "changed" | "mine"
+export const NOTE_FILTERS: readonly NoteFilter[] = [
+  "all",
+  "draft",
+  "open",
+  "done",
+  "changed",
+  "mine",
+]
+
+/** One row of the notes index. */
+export interface NoteRow {
+  readonly note: NoteRecord
+  /** Where it sits in the tree now (`noteAt`): a column opens there. */
+  readonly at: string | null
+}
+
+/**
+ * The notes index: the notes `filter` keeps, newest first. "mine" is the
+ * notes `me` opened or wrote in. Pure.
+ */
+export function notesIndex(
+  notes: readonly NoteRecord[],
+  index: TreeIndex,
+  lanes: readonly LaneView[],
+  filter: NoteFilter,
+  me: WriterId,
+): readonly NoteRow[] {
+  const keep = (n: NoteRecord): boolean => {
+    switch (filter) {
+      case "all":
+        return true
+      case "draft":
+      case "open":
+      case "done":
+        return n.state === filter
+      case "changed":
+        return n.changedSinceDone
+      case "mine":
+        return n.openedBy === me || n.contributors.includes(me)
+    }
+  }
+  return notes
+    .filter(keep)
+    .toReversed()
+    .map(note => ({ note, at: noteAt(note, lanes, index) }))
 }

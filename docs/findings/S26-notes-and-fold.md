@@ -112,6 +112,22 @@ Kyneta's `createDocAs` documents the intent: "the document's operations will
 be exported and attributed to a named peer". Probe A's conclusion that the
 transport cannot say who edited stands; it is simply the wrong layer.
 
+## Addendum 2: a refused write to a note
+
+Measured through Pineta's host, once notes were built (`PLAN-2026-09-27-notes`):
+a client writes to a note that is done, which the host's policy refuses; the
+note is reopened; the same client writes again.
+
+| check | result |
+|---|---|
+| the refused write, on the host | absent |
+| the refused write, on the client that made it | present |
+| that client's next write, after reopening, on the host | absent: it builds on the refused one |
+
+A refused write splits that client's replica of the note from the host's for
+good. The screen never offers a done note for editing, so this needs a client
+that writes directly.
+
 ## Not tested
 
 - Yjs rich text through Kyneta (notes start as plain text).

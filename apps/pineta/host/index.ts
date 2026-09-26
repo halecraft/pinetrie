@@ -13,7 +13,7 @@ import {
   type Store,
   whenHydrated,
 } from "@kyneta/exchange"
-import { stepInPlace } from "@kyneta/schema"
+import { stepInPlace, unwrap } from "@kyneta/schema"
 import {
   WebsocketServerTransport,
   wrapNodeWebsocket,
@@ -23,6 +23,9 @@ import {
   ERR,
   type Intent,
   type LaneName,
+  type NoteId,
+  noteId,
+  parseMentions,
   planStop,
   type RunId,
   referenceId,
@@ -40,8 +43,11 @@ import {
   entryText,
   planChat,
   planDrain,
+  planNote,
+  planNoteEdit,
   planReference,
   planStartup,
+  sentNote,
   settleRun,
 } from "@pineta/marginalia"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
@@ -59,6 +65,7 @@ import {
 } from "@pineta/protocol/messages"
 import {
   readLanes,
+  readNotes,
   readOutbox,
   readParticipantNames,
   readParticipants,
@@ -69,6 +76,10 @@ import {
   beginRun,
   clearStreams,
   endRun,
+  NoteDoc,
+  type NoteDocHandle,
+  noteAuthors,
+  noteDocId,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
@@ -147,6 +158,8 @@ export interface RunningHost {
   readonly wsUrl: string
   readonly doc: SessionDocHandle
   readonly presence: PresenceDocHandle
+  /** A note's text as the host holds it; undefined for a note it does not hold. */
+  noteText(id: NoteId): string | undefined
   readonly agent: Agent
   /** The invite key, or null on loopback. */
   readonly key: string | null
@@ -195,8 +208,11 @@ export async function startHost({
 
   // The session document is BOTH pi's storage and the thing we replicate.
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
-  // Clients may write presence, never the session (host/policy.ts).
-  exchange.register(writePolicy)
+  // Clients may write presence and open notes, never the session
+  // (host/policy.ts). A note's state is its record's, read when asked.
+  exchange.register(
+    writePolicy(id => readNotes(doc).find(n => n.id === id)?.state),
+  )
   // Held here so the host relays it between clients (ADR-0024).
   const presence = exchange.get(PRESENCE_DOC_ID, presenceDoc(presenceDecay))
   // A stored session loads asynchronously; pi must see it before it starts.
@@ -283,7 +299,8 @@ export async function startHost({
       // The session only. Each client's command Line is also stored, and grows
       // a little with every command, but half of it is the client's to write,
       // and Kyneta cannot compact a replica of a document another peer writes.
-      // Its pruning should compact it; that is upstream (S25 addendum).
+      // Its pruning should compact it; that is upstream (S25 addendum). A
+      // note's text is Yjs, which Kyneta cannot compact live (S24).
       try {
         await exchange.compact(SESSION_DOC_ID)
       } catch (error) {
@@ -359,13 +376,17 @@ export async function startHost({
   clearStreams(doc)
   void settle(planStartup({ held: readOutbox(doc) }).drain)
 
-  /** A human message: gather, `threadOf` and `planChat`, execute. */
-  async function handleChat(
-    respond: (outcome: Outcome) => void,
+  /**
+   * A human message, from a `chat` command or a sent draft: gather, `threadOf`
+   * and `planChat`, execute. The one send path, so queueing, conflicts and who
+   * a message is for hold for both.
+   */
+  async function sendChat(
     writer: WriterId,
     sendId: string,
-    chat: Extract<Intent, { kind: "chat" }>,
-  ): Promise<void> {
+    chat: Omit<Extract<Intent, { kind: "chat" }>, "kind">,
+    contributors: readonly WriterId[],
+  ): Promise<Outcome> {
     // gather
     const index = readTreeIndex(doc)
     const names = readParticipantNames(doc)
@@ -381,16 +402,15 @@ export async function startHost({
     // An entry or lane this document does not hold has nowhere to go: refused
     // before anything is written, as pi would refuse a lane there.
     if (thread.kind === "unknown") {
-      return respond({
+      return {
         kind: "refused",
         code: ERR.UNKNOWN_TARGET,
         message: "no such entry or lane to write at",
-      })
+      }
     }
     // Two lanes end here for a moment (a new one, just branched): which thread
     // the sender meant cannot be told, so they are asked, as for a race.
-    if (thread.kind === "ambiguous")
-      return respond({ kind: "conflict", by: null })
+    if (thread.kind === "ambiguous") return { kind: "conflict", by: null }
     const planned = planChat({
       author: writer,
       authorName: nameOf(writer),
@@ -402,16 +422,17 @@ export async function startHost({
       participants: readParticipants(doc, index),
       asksAgent: chat.asksAgent,
       sendId,
+      contributors,
     })
 
     // execute
     const message = (details: ChatDetails) => encodeChat(details, Date.now())
     switch (planned.kind) {
       case "conflict":
-        return respond({
+        return {
           kind: "conflict",
           by: planned.by === null ? null : nameOf(planned.by),
-        })
+        }
       case "hold":
         await agent.hold({
           id: newId(),
@@ -419,7 +440,7 @@ export async function startHost({
           details: planned.details,
           timestamp: Date.now(),
         })
-        return respond({ kind: "queued", position: planned.position })
+        return { kind: "queued", position: planned.position }
       case "appendToTree":
       case "appendToLane": {
         const appended =
@@ -427,36 +448,178 @@ export async function startHost({
             ? await agent.appendToTree(message(planned.details), planned.parent)
             : await agent.lane(planned.lane).append(message(planned.details))
         if (appended.kind === "refused") {
-          return respond({
+          return {
             kind: "refused",
             code: appended.code,
             message: "pi refused the message",
-          })
+          }
         }
-        return respond({ kind: "appended", id: appended.id })
+        return { kind: "appended", id: appended.id }
       }
       case "run":
-        return respond({
+        return {
           kind: "started",
           runId: startRun(planned.lane, message(planned.details)),
-        })
+        }
       case "createAndRun": {
         const created = await agent.createThreadLane(planned.at)
         if (created.kind === "refused") {
-          return respond({
+          return {
             kind: "refused",
             code: created.code,
             message: "pi refused to start the thread's lane",
-          })
+          }
         }
         log(`[host] ${writer.slice(-8)} starts lane ${created.lane.slice(-8)}`)
-        return respond({
+        return {
           kind: "started",
           runId: startRun(created.lane, message(planned.details)),
-        })
+        }
       }
     }
   }
+
+  // --- notes (ADR-0025) ----------------------------------------------------
+
+  /** Each note's text, held for the life of the process, and its listener's release. */
+  const notes = new Map<NoteId, { doc: NoteDocHandle; release: () => void }>()
+
+  /**
+   * Every writer the host knows: those connected, and those in the session.
+   * A note's edits are attributed by matching their `clientID`s against these.
+   */
+  function knownWriters(): WriterId[] {
+    const index = readTreeIndex(doc)
+    const inTree = Object.values(index.entries).flatMap(e =>
+      e.message?.writer === undefined ? [] : [e.message.writer],
+    )
+    return [
+      ...[...exchange.peers.keys()].map(writerId),
+      ...readParticipantNames(doc).keys(),
+      ...inTree,
+    ]
+  }
+
+  /**
+   * Hold a note's text, seeded with `seed` if it is new, and attribute every
+   * later edit: each change's `clientID`s whose clocks moved are gathered
+   * here, `planNoteEdit` decides, and a changed record is written in a serial
+   * step. The operations themselves say who wrote them (S26 addendum).
+   */
+  async function holdNote(
+    id: NoteId,
+    seed: string | null,
+  ): Promise<NoteDocHandle> {
+    const held = notes.get(id)
+    if (held !== undefined) return held.doc
+    const note = exchange.get(noteDocId(id), NoteDoc)
+    // A stored note is loaded first, so its history is not taken for new edits.
+    await whenHydrated(note)
+    if (seed !== null && seed !== "") note.text.insert(0, seed)
+    const ydoc = unwrap(note)
+    const onChange = (tr: {
+      beforeState: Map<number, number>
+      afterState: Map<number, number>
+    }) => {
+      const changed = [...tr.afterState].flatMap(([client, clock]) =>
+        clock > (tr.beforeState.get(client) ?? 0) ? [client] : [],
+      )
+      if (changed.length === 0) return
+      void serially(async () => {
+        const record = readNotes(doc).find(n => n.id === id)
+        if (record === undefined) return
+        const next = planNoteEdit(record, {
+          changed,
+          authors: noteAuthors(knownWriters()),
+        })
+        if (next !== null) await agent.setNote(next)
+      })
+    }
+    ydoc.on("afterTransaction", onChange)
+    notes.set(id, {
+      doc: note,
+      release: () => ydoc.off("afterTransaction", onChange),
+    })
+    return note
+  }
+
+  /** A note command: gather, `planNote`, execute. */
+  async function handleNote(
+    writer: WriterId,
+    sendId: string,
+    intent: Extract<Intent, { kind: "note" }>,
+  ): Promise<Outcome> {
+    // gather
+    const { action } = intent
+    const index = readTreeIndex(doc)
+    const opened =
+      action.kind === "open" ? readEntryMessage(doc, action.entry) : undefined
+
+    // plan (pure)
+    const planned = planNote({
+      action,
+      writer,
+      notes: readNotes(doc),
+      index,
+      lanes: readLanes(doc, index),
+      entryText: !opened?.present
+        ? undefined
+        : opened.message === undefined
+          ? ""
+          : entryText(opened.message),
+      newId: noteId(newId()),
+    })
+
+    // execute
+    switch (planned.kind) {
+      case "refused":
+        return planned
+      case "existing":
+        return { kind: "noted", id: planned.id }
+      case "create":
+        await holdNote(planned.record.id, planned.text)
+        await agent.setNote(planned.record)
+        return { kind: "noted", id: planned.record.id }
+      case "update":
+        await agent.setNote(planned.record)
+        return { kind: "noted", id: planned.record.id }
+      case "send": {
+        const text = (await holdNote(planned.record.id, null)).text()
+        if (text.trim() === "")
+          return {
+            kind: "refused",
+            code: ERR.EMPTY_MESSAGE,
+            message: "the draft is empty",
+          }
+        const sent = await sendChat(
+          writer,
+          sendId,
+          {
+            text,
+            at: planned.at,
+            mode: "reply",
+            lane: planned.lane,
+            asksAgent: false,
+            mentions: parseMentions(text),
+          },
+          planned.record.contributors.filter(w => w !== writer),
+        )
+        // Written, running or waiting, the message is the draft's now; on a
+        // conflict or a refusal nothing was sent, and it stays a draft.
+        if (
+          sent.kind === "appended" ||
+          sent.kind === "started" ||
+          sent.kind === "queued"
+        )
+          await agent.setNote(sentNote(planned.record, sendId))
+        return sent
+      }
+    }
+  }
+
+  // Every recorded note's text is held, so edits to it are attributed and
+  // reach the store. Before any command: nothing else runs yet.
+  for (const n of readNotes(doc)) await holdNote(n.id, null)
 
   /** A citation: gather the cited entry, `planReference`, write one value. */
   async function handleReference(
@@ -510,7 +673,13 @@ export async function startHost({
         return respond(intent)
       case "chat":
         // The command's id is the send's id: its column finds its message by it.
-        return handleChat(respond, writer, id === "" ? newId() : id, intent)
+        return respond(
+          await sendChat(writer, id === "" ? newId() : id, intent, []),
+        )
+      case "note":
+        return respond(
+          await handleNote(writer, id === "" ? newId() : id, intent),
+        )
       case "reference":
         return handleReference(respond, writer, intent)
       case "name":
@@ -669,6 +838,7 @@ export async function startHost({
     wsUrl: `ws://${local}:${actualPort}/ws`,
     doc,
     presence,
+    noteText: id => notes.get(id)?.doc.text(),
     agent,
     key,
     invites,
@@ -678,6 +848,7 @@ export async function startHost({
       try {
         await quiet()
       } catch {}
+      for (const n of notes.values()) n.release()
       try {
         await agent.close()
       } catch {}

@@ -210,6 +210,9 @@ importers:
       '@kyneta/schema':
         specifier: link:../../../kyneta/packages/schema
         version: link:../../../kyneta/packages/schema
+      '@kyneta/yjs-schema':
+        specifier: link:../../../kyneta/packages/schema/backends/yjs
+        version: link:../../../kyneta/packages/schema/backends/yjs
       '@pineta/core':
         specifier: workspace:*
         version: link:../core

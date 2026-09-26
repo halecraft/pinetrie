@@ -29,4 +29,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "closes when its message ends",
   },
+  {
+    name: "clientIdOf drifts from Kyneta's",
+    file: "packages/schema/note.ts",
+    from: "    hash = Math.imul(hash, 0x01000193)",
+    to: "    hash = Math.imul(hash, 0x01000197)",
+    command: unit,
+    expect: "is the clientID a Kyneta Yjs document gives its peer",
+  },
 ]

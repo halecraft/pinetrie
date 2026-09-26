@@ -33,8 +33,19 @@ export const HOST_PEER_ID = "host"
  *     its author is reading. It writes one value and runs nothing.
  *   - `name` sets the sender's display name to `text`.
  *   - `stop` ends the running turn of the thread whose lane is `lane`.
+ *   - `note` acts on a note (ADR-0025); `mode` names the action. `open` opens
+ *     the entry `parentId` for editing. `draft` starts or joins the draft of
+ *     the thread a reply from `parentId` (and `lane`) would continue, with
+ *     `text` as what its sender had typed. `send`, `done` and `reopen` act on
+ *     the note `targetId`.
  */
-export const COMMAND_KINDS = ["chat", "reference", "name", "stop"] as const
+export const COMMAND_KINDS = [
+  "chat",
+  "reference",
+  "name",
+  "stop",
+  "note",
+] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
 /**
@@ -55,13 +66,13 @@ export interface Command {
    * root. Only `codec.ts` interprets this; nothing past it sees `""`.
    */
   readonly parentId: string
-  /** `chat`: `reply`, `queue` or `branch`; `""` otherwise. */
+  /** `chat`: `reply`, `queue` or `branch`; `note`: the action; `""` otherwise. */
   readonly mode: string
-  /** `chat`: the lane the sender's column is bound to, or `""`. */
+  /** `chat` and a `note` draft: the lane the sender's column is bound to, or `""`. */
   readonly lane: string
   /** `chat`: a Start Agent column, where no mention asks the agent. */
   readonly asksAgent: boolean
-  /** `reference`: the entry cited. Separate from `parentId` on purpose. */
+  /** `reference`: the entry cited; `note`: the note acted on. Separate from `parentId` on purpose. */
   readonly targetId: string
   /** `reference`: a span's bounds, or -1 for the whole entry (the wire is total). */
   readonly spanStart: number
@@ -80,6 +91,7 @@ export const OUTCOME_KINDS = [
   "conflict",
   "named",
   "stopped",
+  "noted",
   "refused",
 ] as const
 export type OutcomeKind = (typeof OUTCOME_KINDS)[number]
@@ -98,6 +110,8 @@ export interface Reply {
   readonly position: number
   /** `conflict`: the display name of the writer who took the slot; "" otherwise. */
   readonly by: string
+  /** `noted`: the note's id; "" otherwise. */
+  readonly noteId: string
 }
 
 /**
@@ -128,6 +142,7 @@ export const EMPTY_REPLY: Reply = Object.freeze({
   entryId: "",
   position: -1,
   by: "",
+  noteId: "",
 })
 
 export const command = (fields: Partial<Command>): Command => ({

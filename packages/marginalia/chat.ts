@@ -44,6 +44,8 @@ export const DetailsSchema = Type.Object({
   compels: ResponderSchema,
   /** The send that wrote it (the command's id), so its column can find it. */
   sendId: Type.String(),
+  /** A sent draft's other editors (`WriterId`s), in order of first edit. */
+  contributors: Type.Optional(Type.Array(Type.String())),
 })
 
 const ChatSchema = Type.Object({
@@ -52,12 +54,19 @@ const ChatSchema = Type.Object({
   details: DetailsSchema,
 })
 
+/**
+ * A chat's structured fields. `author` is who sent it; a draft written
+ * together (ADR-0025) also names its other editors, in `contributors`, so it
+ * reads "Ada, with Bea". The model reads only the sender's name.
+ */
 export interface ChatDetails {
   readonly author: WriterId
   readonly authorName: string
   readonly text: string
   readonly compels: Responder
   readonly sendId: string
+  /** Absent when the sender wrote it alone. */
+  readonly contributors?: readonly WriterId[]
 }
 
 /** The pi `CustomMessage` a chat is stored as. */
@@ -105,6 +114,9 @@ export const detailsFromStored = (
       ? { kind: "agent", agent: d.compels.agent as AgentId }
       : { kind: "none" },
   sendId: d.sendId,
+  ...(d.contributors === undefined
+    ? {}
+    : { contributors: d.contributors as WriterId[] }),
 })
 
 /** A stored message -> its chat details, or undefined if it is not a chat. */
@@ -138,6 +150,9 @@ export function renderableMessage(message: unknown): AgentMessageLike {
         compelled: chat.compels.kind === "agent",
         writer: chat.author,
         sendId: chat.sendId,
+        ...(chat.contributors === undefined
+          ? {}
+          : { contributors: chat.contributors }),
       }
 }
 
@@ -210,6 +225,8 @@ export function planChat(input: {
   readonly asksAgent: boolean
   /** The command's id. */
   readonly sendId: string
+  /** A sent draft's other editors; empty for a message written alone. */
+  readonly contributors: readonly WriterId[]
 }): ChatDecision {
   const { lane, end, race } = input.thread
   const branch = input.mode === "branch"
@@ -228,6 +245,9 @@ export function planChat(input: {
     text: input.text,
     compels,
     sendId: input.sendId,
+    ...(input.contributors.length === 0
+      ? {}
+      : { contributors: input.contributors }),
   }
   const compelled = compels.kind === "agent"
 

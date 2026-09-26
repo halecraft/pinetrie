@@ -76,6 +76,39 @@ the queue. The host executes three pure decisions from here:
   it, since no run's end will. What does not survive a process (runs and
   streams) is cleared first, by `clearStreams` in `@pineta/schema`.
 
+# Notes (`note.ts`, ADR-0025)
+
+A note is a message opened for everyone to edit, or a draft of a thread's next
+message. Its text is its own Yjs document (`NoteDoc` in `@pineta/schema`); its
+record is a host-written `pineta.note` value keyed by note id, typed here as
+`NoteRecord` (`@pineta/core`) and stored through `encodeNote`/`decodeNote`.
+
+- **`subject` says what a note is the text of**, as a union: an opened
+  message's entry; a draft's place, kept as a send carries it (where it was
+  started, and its column's lane); or, once sent, the send's id. `noteEntry`
+  finds its message (a sent draft through `TreeIndex.bySend`, so a draft still
+  waiting in an outbox has none yet); `noteAt` is where it sits now, a draft at
+  its thread's end.
+- **A draft is resolved, never stored as an end.** `noteAt` runs `threadOf` from
+  its place, as a reply from there would be sent, so the draft follows its
+  thread as the thread grows. `draftFor(end, …)` is the draft whose resolved end
+  is `end`: one per thread end.
+- **`planNote` decides every action**, pure: `open` (a new note seeded with the
+  entry's text, or the one it has), `draft` (the thread's draft, or a new one;
+  what its requester had typed is theirs), `send` (only a draft; the host sends
+  its text through `sendChat`, the one send path, and marks it sent on
+  `appended`, `started` or `queued`), `done` and `reopen`.
+- **`planNoteEdit` decides what one edit changes**, pure: contributors are the
+  `clientID`s whose clocks moved, as known writers (`noteAuthors`), in order of
+  first edit; an unknown `clientID`, the host's own among them, is nobody's. A
+  reopened note, once edited, is `changedSinceDone`. It returns null when
+  nothing changes, so an edit writes nothing to the session unless it matters.
+  `changedSinceDone` is stored, not derived: deriving it would open every note's
+  document to filter the index.
+- **A sent draft's message is its sender's**, with the others in
+  `ChatDetails.contributors`, "Ada, with Bea". The model reads only the
+  sender's name.
+
 # Participants (`participant.ts`)
 
 A session is its participants (ADR-0021). `pineta.participant` values are names

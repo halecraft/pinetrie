@@ -11,6 +11,8 @@ import {
   type ChatMode,
   type Intent,
   type LaneName,
+  type NoteAction,
+  type NoteId,
   type Position,
   parseMentions,
   type ReferenceTarget,
@@ -26,6 +28,9 @@ import {
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
 import {
+  NoteDoc,
+  type NoteDocHandle,
+  noteDocId,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
@@ -91,6 +96,14 @@ export interface SessionClient {
   setName(name: string): Promise<Outcome>
   /** End the running turn of the thread whose lane is `lane`. */
   stop(lane: LaneName): Promise<Outcome>
+  /**
+   * Open a message for editing, draft a thread's next one, or move a note on
+   * (ADR-0025). `id` is the command's: a sent draft's send id, by which its
+   * column finds the message.
+   */
+  note(action: NoteAction, id?: string): Promise<Outcome>
+  /** A note's text: the same document for every caller. */
+  noteText(id: NoteId): NoteDocHandle
   /** Every reply as it arrived on the wire, for wire-level checks. */
   readonly replies: readonly Reply[]
   close(): Promise<void>
@@ -200,6 +213,12 @@ export async function connectSession(
     },
     stop(lane) {
       return send({ kind: "stop", lane })
+    },
+    note(action, id) {
+      return send({ kind: "note", action }, id)
+    },
+    noteText(id) {
+      return exchange.get(noteDocId(id), NoteDoc)
     },
     replies,
     async close() {

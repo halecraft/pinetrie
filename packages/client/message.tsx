@@ -1,15 +1,27 @@
 // client/message — one message in a column, and what can be done to it.
 
-import type { ReferenceTarget, SpineNode, ToolCallView } from "@pineta/core"
+import type {
+  BranchSummary,
+  ReferenceTarget,
+  SpineNode,
+  ToolCallView,
+  WriterId,
+} from "@pineta/core"
 import { entryId } from "@pineta/core"
 import type { Reference } from "@pineta/marginalia"
-import { speakerLabel } from "./names.ts"
+import type { ReactNode } from "react"
+import { speakerLabel, withContributors } from "./names.ts"
+import { nameFor } from "./presence.tsx"
 import { colorSlot, trackColor } from "./rail.tsx"
 
 export interface MessageProps {
   node: SpineNode
   /** Current display names, by writer. */
-  nameOf: ReadonlyMap<string, string>
+  nameOf: ReadonlyMap<WriterId, string>
+  /** This message's note, drawn in place of its text (ADR-0025). */
+  note: ReactNode | undefined
+  /** Open it for everyone to edit; undefined once it has a note. */
+  onEdit: (() => void) | undefined
   /** While the agent replies: whether it reads this message. */
   light: "lit" | "dim" | undefined
   /** The agent joins the thread here: the first message on the path that asked it. */
@@ -17,10 +29,7 @@ export interface MessageProps {
   /** Tracks of open columns that fork here: a dot of each colour. */
   forkTracks: readonly number[]
   /** Branches leaving here that no column shows. */
-  closedBranches: readonly {
-    readonly rootId: string
-    readonly messageCount: number
-  }[]
+  closedBranches: readonly BranchSummary[]
   cites: readonly Reference[]
   citedBy: readonly Reference[]
   onCite: (to: ReferenceTarget) => void
@@ -37,7 +46,10 @@ export function Message(p: MessageProps) {
   const id = entryId(node.id)
   const speaker =
     node.role === "chat"
-      ? speakerLabel(p.nameOf, node.writer, node.author ?? "")
+      ? withContributors(
+          speakerLabel(p.nameOf, node.writer, node.author ?? ""),
+          (node.contributors ?? []).map(w => nameFor(p.nameOf, w)),
+        )
       : node.role === "assistant"
         ? "agent"
         : node.role
@@ -73,9 +85,10 @@ export function Message(p: MessageProps) {
         ))}
         {/* JSX escapes by default, so model output is never HTML. A message
             that only called tools shows only its tool rows. */}
-        {(node.text !== "" || node.toolCalls === undefined) && (
-          <div className="text">{node.text}</div>
-        )}
+        {p.note ??
+          ((node.text !== "" || node.toolCalls === undefined) && (
+            <div className="text">{node.text}</div>
+          ))}
         {node.toolCalls?.map(call => (
           <ToolRow call={call} key={call.id} />
         ))}
@@ -113,6 +126,16 @@ export function Message(p: MessageProps) {
           >
             cite
           </button>
+          {p.onEdit !== undefined && (
+            <button
+              className="edit"
+              onClick={p.onEdit}
+              title="open this message for everyone to edit"
+              type="button"
+            >
+              edit
+            </button>
+          )}
         </div>
         {(p.closedBranches.length > 0 ||
           p.cites.length > 0 ||
@@ -126,6 +149,8 @@ export function Message(p: MessageProps) {
                 type="button"
               >
                 ⑂ {b.messageCount} message{b.messageCount === 1 ? "" : "s"}
+                {b.noteCount > 0 &&
+                  ` · ${b.noteCount} note${b.noteCount === 1 ? "" : "s"}`}
               </button>
             ))}
             {p.cites.length > 0 && (

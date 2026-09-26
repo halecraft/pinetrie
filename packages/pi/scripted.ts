@@ -12,9 +12,14 @@ import {
   fauxToolCall,
 } from "@earendil-works/pi-ai"
 
-/** One scripted reply: text, or a tool call with optional text before it. */
+/**
+ * One scripted reply: text; text made from the context the model was given,
+ * each message's text in order, so a suite can see what the model saw; or a
+ * tool call with optional text before it.
+ */
 export type ScriptStep =
   | { readonly text: string }
+  | { readonly reply: (context: readonly string[]) => string }
   | {
       readonly tool: string
       readonly args: Record<string, unknown>
@@ -56,7 +61,12 @@ export function scriptedModel(
                 ],
                 { stopReason: "toolUse" },
               )
-            : fauxAssistantMessage(step.text),
+            : "reply" in step
+              ? (context: { messages: readonly { content: unknown }[] }) =>
+                  fauxAssistantMessage(
+                    step.reply(context.messages.map(m => textOf(m.content))),
+                  )
+              : fauxAssistantMessage(step.text),
         ),
       )
     },
@@ -64,6 +74,20 @@ export function scriptedModel(
   handles.set(model, faux)
   return model
 }
+
+/** A message's content as text: a string, or its text parts joined. */
+const textOf = (content: unknown): string =>
+  typeof content === "string"
+    ? content
+    : Array.isArray(content)
+      ? content
+          .flatMap(part =>
+            part?.type === "text" && typeof part.text === "string"
+              ? [part.text]
+              : [],
+          )
+          .join("")
+      : ""
 
 /** The faux provider behind a scripted model. */
 export function fauxOf(model: ScriptedModel): FauxProviderHandle {

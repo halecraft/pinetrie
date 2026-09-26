@@ -97,20 +97,18 @@ Roughly in dependency order, each independently shippable:
    - ~~**Presence**~~ — **done** (ADR-0024): an ephemeral document, one entry
      per open column, decaying; rings on the rail, avatars in column headers,
      typing in the composer. The host refuses client writes to the session.
-   - **Shared composition** — `Schema.text()` drafts written by tabs, anchored
-     anywhere in the tree; the visceral multiplayer win.
    - ~~**Self-hosting**~~ — **done** (ADR-0022): with `PINETA_TOOLS=1` the
      agent reads, writes, edits and runs commands in the repo, visibly, with the
      person's own pi models; stop, persistence, and an invite key off loopback.
      Next: a sandbox profile for `bash`, then a workspace per lane (ADR-0019).
    - **The session on `json.bind`** (ADR-0023): authoritative, compacted when a
      run ends and when the host starts; Loro removed.
-   - **Notes and fold** (next; S26 first). A note is a collaborative comment
-     anchored at an entry, one Yjs document each; the session records that it
-     exists. Not in the agent's context by default: it is read when cited or
-     through a tool, and what the agent read is recorded in the tree. The agent's
-     edits to a note are visible through its tool rows, not per character.
-     **Fold** brings what one line has and another lacks into the other,
+   - ~~**Notes**~~ — **done** (ADR-0025): any message, the agent's included,
+     can be opened for everyone to edit, and a thread's next message drafted
+     together (which is what "shared composition" became). One Yjs document per
+     note; the session holds its record; the entry stays as sent, and the model
+     reads it so. Draft, open, done; contributors from each edit's `clientID`.
+   - **Fold** (next). **Fold** brings what one line has and another lacks into the other,
      synthesized by the agent, as one merge entry on the target lane's tip whose
      `fromId` is the source's tip. What to fold is a set difference: everything
      reachable from the source's tip, minus everything reachable from the

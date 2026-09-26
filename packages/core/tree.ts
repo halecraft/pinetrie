@@ -45,6 +45,8 @@ export interface AgentMessageLike {
   readonly writer?: WriterId
   /** Role `chat` only: the id of the send that wrote it, for its column. */
   readonly sendId?: string
+  /** Role `chat` only: a sent draft's other editors. */
+  readonly contributors?: readonly WriterId[]
   /** Role `toolResult` only: the call it answers, and whether it failed. */
   readonly toolCallId?: string
   readonly isError?: boolean
@@ -70,6 +72,8 @@ export interface TranscriptMessage {
   readonly writer?: WriterId
   /** Role `chat` only: the send that wrote it. */
   readonly sendId?: string
+  /** Role `chat` only: a sent draft's other editors, in order of first edit. */
+  readonly contributors?: readonly WriterId[]
   /** Role `assistant` only: the tools it called, each with its result once known. */
   readonly toolCalls?: readonly ToolCallView[]
 }
@@ -126,6 +130,9 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
       ...(entry.message?.sendId === undefined
         ? {}
         : { sendId: entry.message.sendId }),
+      ...(entry.message?.contributors === undefined
+        ? {}
+        : { contributors: entry.message.contributors }),
     }
   }
   if (role !== "user" && role !== "assistant") return null
@@ -285,7 +292,11 @@ export interface BranchSummary {
   readonly rootId: string
   /** Messages in the whole subtree, for its "⑂ n messages" button. */
   readonly messageCount: number
+  /** Of those, the ones that are notes' messages (ADR-0025): "· 1 note". */
+  readonly noteCount: number
 }
+
+const NO_NOTES: ReadonlySet<string> = new Set()
 
 export interface SpineNode extends TranscriptMessage {
   /** Children of this node that are NOT the next node on the spine. */
@@ -311,6 +322,8 @@ export interface SpineProjection {
 export function projectSpine(
   index: TreeIndex,
   tipId: string | null,
+  /** The entries that are notes' messages, which a branch's summary counts. */
+  notes: ReadonlySet<string> = NO_NOTES,
 ): SpineProjection {
   const { path: upward, cycleAt } = ancestry(index, tipId)
   const path = upward.toReversed()
@@ -342,7 +355,7 @@ export function projectSpine(
     const next = path[i + 1]
     const branches = (index.childrenOf.get(id) ?? [])
       .filter(child => child !== next && !onSpine.has(child))
-      .map(rootId => summarizeBranch(index, rootId))
+      .map(rootId => summarizeBranch(index, rootId, notes))
     spine.push({ ...message, branches })
   }
   return {
@@ -352,8 +365,14 @@ export function projectSpine(
   }
 }
 
-function summarizeBranch(index: TreeIndex, rootId: string): BranchSummary {
+/** A branch's size: its messages, and how many of them are notes'. */
+function summarizeBranch(
+  index: TreeIndex,
+  rootId: string,
+  notes: ReadonlySet<string>,
+): BranchSummary {
   let messageCount = 0
+  let noteCount = 0
   const stack = [rootId]
   const visited = new Set<string>()
   for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
@@ -362,11 +381,13 @@ function summarizeBranch(index: TreeIndex, rootId: string): BranchSummary {
     // What the rail and columns show as a message, so a tool's result, which
     // belongs to its call, is not counted.
     const entry = index.entries[id]
-    if (entry !== undefined && renderableMessage(entry) !== null)
+    if (entry !== undefined && renderableMessage(entry) !== null) {
       messageCount += 1
+      if (notes.has(id)) noteCount += 1
+    }
     stack.push(...(index.childrenOf.get(id) ?? []))
   }
-  return { rootId, messageCount }
+  return { rootId, messageCount, noteCount }
 }
 
 // ── following a thread ────────────────────────────────────────────────────
@@ -453,12 +474,14 @@ export interface ColumnView {
 export function projectColumns(
   index: TreeIndex,
   columns: readonly ColumnSpec[],
+  /** The entries that are notes' messages (`projectSpine`). */
+  notes: ReadonlySet<string> = NO_NOTES,
 ): ColumnView[] {
   const shown = new Set<string>()
   return columns.map(column => {
     const tipId =
       column.pinned === true ? column.anchor : followTip(index, column.anchor)
-    const { spine } = projectSpine(index, tipId)
+    const { spine } = projectSpine(index, tipId, notes)
     let cut = -1
     for (const [i, node] of spine.entries()) if (shown.has(node.id)) cut = i
     for (const node of spine) shown.add(node.id)

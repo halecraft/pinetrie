@@ -8,7 +8,8 @@
 //
 // The renderer before React rebuilt the transcript with `innerHTML` on every
 // change, which destroyed focus and selection on every keystroke. React gives
-// stable node identity; `useText` is for shared composition, not built yet.
+// stable node identity, which `useText` needs to keep a note's textarea
+// bound while everyone types (ADR-0025).
 
 import { ExchangeProvider, useDocStatus, useTracked } from "@kyneta/react"
 import {
@@ -21,9 +22,13 @@ import {
   projectRail,
   type TreeIndex,
 } from "@pineta/core"
+import { noteEntry } from "@pineta/marginalia"
 import {
+  type NoteFilter,
+  notesIndex,
   readAgentActivity,
   readLanes,
+  readNotes,
   readOutbox,
   readParticipantNames,
   readParticipants,
@@ -43,6 +48,7 @@ import {
 import { createRoot } from "react-dom/client"
 import { Column } from "./column.tsx"
 import { columnsReducer, initialColumns, isPinned } from "./columns.ts"
+import { NotesIndex } from "./note.tsx"
 import { nameFor, presenceColor } from "./presence.tsx"
 import { readEntryCount } from "./projection.ts"
 import { Rail } from "./rail.tsx"
@@ -146,16 +152,33 @@ function App({ session }: { session: SessionClient }) {
   const status = useDocStatus(doc)
   const count = useTracked(() => readEntryCount(doc))
   // One moment's facts, read together: the same reads the host decides from.
-  const { index, activity, lanes, outbox, participants } = useTracked(() => {
-    const index = readTreeIndex(doc)
-    return {
-      index,
-      activity: readAgentActivity(doc, index),
-      lanes: readLanes(doc, index),
-      outbox: readOutbox(doc),
-      participants: readParticipants(doc, index),
-    }
-  })
+  const { index, activity, lanes, outbox, participants, notes } = useTracked(
+    () => {
+      const index = readTreeIndex(doc)
+      return {
+        index,
+        activity: readAgentActivity(doc, index),
+        lanes: readLanes(doc, index),
+        outbox: readOutbox(doc),
+        participants: readParticipants(doc, index),
+        notes: readNotes(doc),
+      }
+    },
+  )
+  // The messages that are notes' (ADR-0025): a square on the rail, and
+  // counted on a closed branch's button.
+  const noteEntries = useMemo(
+    () =>
+      new Set(
+        notes.flatMap(n => {
+          const e = noteEntry(n, index)
+          return e === null ? [] : [e as string]
+        }),
+      ),
+    [notes, index],
+  )
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [noteFilter, setNoteFilter] = useState<NoteFilter>("all")
   const refs = useTracked(() => readReferences(doc))
   const nameOf = useTracked(() => readParticipantNames(doc))
   const presenceFacts = useTracked(() => readPresence(session.presence))
@@ -172,8 +195,9 @@ function App({ session }: { session: SessionClient }) {
       projectColumns(
         index,
         columns.map(c => ({ anchor: c.anchor, pinned: isPinned(c) })),
+        noteEntries,
       ),
-    [index, columns],
+    [index, columns, noteEntries],
   )
   const rail = useMemo(() => projectRail(index), [index])
   const here = useMemo(
@@ -288,6 +312,28 @@ function App({ session }: { session: SessionClient }) {
         <Rail
           activity={activity}
           here={rings}
+          notes={noteEntries}
+          notesPanel={{
+            count: notes.length,
+            open: notesOpen,
+            toggle: () => setNotesOpen(!notesOpen),
+            panel: (
+              <NotesIndex
+                filter={noteFilter}
+                nameOf={nameOf}
+                onFilter={setNoteFilter}
+                onPick={openAt}
+                rows={notesIndex(
+                  notes,
+                  index,
+                  lanes,
+                  noteFilter,
+                  session.writer,
+                )}
+                session={session}
+              />
+            ),
+          }}
           onPick={openAt}
           onStart={asksAgent =>
             dispatch({
@@ -309,7 +355,9 @@ function App({ session }: { session: SessionClient }) {
               <Column
                 activity={activity}
                 column={column}
+                editing={presenceFacts.editing}
                 forks={colors.forks}
+                notes={notes}
                 index={index}
                 key={column.key}
                 lanes={lanes}

@@ -40,6 +40,9 @@ export function writerId(peerId: string): WriterId {
   return `w-${peerId}` as WriterId
 }
 
+/** The peer id a writer was made from: `writerId`'s inverse. */
+export const peerIdOf = (writer: WriterId): string => writer.slice(2)
+
 declare const laneNameBrand: unique symbol
 /**
  * A thread's lane: a line of work (ADR-0019), created where agent work is first
@@ -75,6 +78,10 @@ export const runId = (id: string): RunId => id as RunId
 /** A reference's id: the key of its stored value, so it must be unique (ADR-0016). */
 export type ReferenceId = string & { readonly [referenceIdBrand]: true }
 export const referenceId = (id: string): ReferenceId => id as ReferenceId
+declare const noteIdBrand: unique symbol
+/** A note's id, uuidv7: the key of its record and the name of its text's document. */
+export type NoteId = string & { readonly [noteIdBrand]: true }
+export const noteId = (id: string): NoteId => id as NoteId
 
 declare const agentIdBrand: unique symbol
 /** An agent that can be compelled to reply. The host has exactly one for now. */
@@ -118,6 +125,8 @@ export const ERR = {
   INVALID_SPAN: "invalid_span",
   /** A display name is empty or too long. */
   INVALID_NAME: "invalid_name",
+  /** A note action its note's state does not allow: sending a note that is no draft. */
+  NOTE_STATE: "note_state",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -175,6 +184,60 @@ export type Intent =
   | { readonly kind: "name"; readonly name: string }
   /** End a thread's running turn. Idempotent: an idle lane is already stopped. */
   | { readonly kind: "stop"; readonly lane: LaneName }
+  /** Open a message for editing, draft a thread's next one, or move a note on. */
+  | { readonly kind: "note"; readonly action: NoteAction }
+
+// --- notes (ADR-0025) --------------------------------------------------------
+
+/**
+ * What a `note` command asks. A draft is started where its sender reads, with
+ * their column's lane, exactly as a reply would be sent from there, and may
+ * carry what they had already typed.
+ */
+export type NoteAction =
+  | { readonly kind: "open"; readonly entry: EntryId }
+  | {
+      readonly kind: "draft"
+      readonly at: Position
+      readonly lane: LaneName | null
+      readonly text: string
+    }
+  | { readonly kind: "done" | "reopen" | "send"; readonly note: NoteId }
+
+export const NOTE_ACTIONS = ["open", "draft", "done", "reopen", "send"] as const
+
+/** Draft: not yet sent. Open: being edited. Done: read-only until reopened. */
+export type NoteState = "draft" | "open" | "done"
+
+/**
+ * What a note is the text of. An opened message's entry; a draft's place,
+ * kept as a send carries it and resolved by `threadOf` whenever it is needed,
+ * so it follows its thread as the thread grows; or, once a draft is sent, the
+ * send that wrote its message, which the tree finds by `bySend` even while the
+ * message waits in a lane's outbox.
+ */
+export type NoteSubject =
+  | { readonly kind: "entry"; readonly id: EntryId }
+  | {
+      readonly kind: "draft"
+      readonly at: Position
+      readonly lane: LaneName | null
+    }
+  | { readonly kind: "sent"; readonly sendId: string }
+
+/** A note's record: a host-written `pineta.note` value. Its text is its own document. */
+export interface NoteRecord {
+  readonly id: NoteId
+  readonly state: NoteState
+  readonly subject: NoteSubject
+  readonly openedBy: WriterId
+  /** Writers whose edits are in its text, in order of first edit. */
+  readonly contributors: readonly WriterId[]
+  /** Reopened after being done, and not done again since. */
+  readonly reopened: boolean
+  /** Edited since it was reopened. */
+  readonly changedSinceDone: boolean
+}
 
 // --- obligation: collaborators and compelled responders ----------------------
 

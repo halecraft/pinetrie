@@ -437,4 +437,5 @@ export function readEntryMessage(
 export const rowMessage = (row: StoredEntryRow): unknown =>
   (row.payload as { message?: unknown } | null)?.message
 
+export * from "./note.ts"
 export * from "./presence.ts"

@@ -4,6 +4,7 @@
 
 export * from "./chat.ts"
 export * from "./decode.ts"
+export * from "./note.ts"
 export * from "./outbox.ts"
 export * from "./participant.ts"
 export * from "./references.ts"

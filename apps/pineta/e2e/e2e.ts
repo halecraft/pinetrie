@@ -29,18 +29,26 @@ import {
   followTip,
   laneNameForThread,
   NOBODY,
+  noteId,
   type Position,
   projectRail,
   projectSpine,
   projectTranscript,
   ROOT,
 } from "@pineta/core"
-import { decodeChat, displayName } from "@pineta/marginalia"
+import {
+  decodeChat,
+  displayName,
+  draftFor,
+  entryText,
+  noteAt,
+} from "@pineta/marginalia"
 import { newId as newHeldId, scriptedModel } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import { PRESENCE_DOC_ID, SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
   readLanes,
+  readNotes,
   readOutbox,
   readParticipantNames,
   readPresence,
@@ -1142,6 +1150,267 @@ invariants("end")
   await sleep(100)
   // The host's Exchange closes its stores when it shuts down, this one too.
   await th.shutdown()
+}
+
+// ── notes: a message opened for editing, a draft written together (ADR-0025) ──
+// Its own host, with a store to restart over and a scripted model that can
+// show what it was given.
+{
+  const dbFile = path.join(
+    mkdtempSync(path.join(tmpdir(), "pineta-notes-")),
+    "pineta.db",
+  )
+  const script = scriptedModel()
+  const open = () =>
+    startHost({
+      model: { kind: "scripted", script },
+      store: dbFile,
+      log: () => {},
+    })
+  let nh = await open()
+  const join = (peerId: string) =>
+    connectSession({ url: nh.wsUrl, WebSocket, peerId })
+  const ada = await join("n-ada")
+  const bea = await join("n-bea")
+  await Promise.all([ada.setName("Ada"), bea.setName("Bea")])
+  const noteOf = (o: Outcome) => (o.kind === "noted" ? o.id : null)
+  const record = (id: string | null) => readNotes(nh.doc).find(n => n.id === id)
+  const tipOf = () => {
+    const l = readLaneNames(nh.doc)[0]
+    return l === undefined ? null : readLaneTip(nh.doc, l)
+  }
+  const nIdle = () =>
+    waitFor(
+      () =>
+        Object.keys(nh.doc.activeRuns()).length === 0 &&
+        readOutbox(nh.doc).length === 0,
+      30_000,
+    )
+
+  const ANSWER = "Three steps: plan, build, check."
+  script.use([{ text: ANSWER }])
+  await ada.chat("@agent how do we start?", ROOT, START_AGENT)
+  await nIdle()
+  const answer = tipOf()
+
+  // 1. The agent's reply, opened for editing by Ada; Bea opening it gets the same note.
+  const opened = noteOf(
+    await ada.note({ kind: "open", entry: entryId(answer ?? "") }),
+  )
+  const again = noteOf(
+    await bea.note({ kind: "open", entry: entryId(answer ?? "") }),
+  )
+  ok(
+    opened !== null && again === opened && record(opened)?.state === "open",
+    "a message is opened for editing, and opening it again gives the same note",
+  )
+  const n1 = noteId(opened ?? "")
+  const adaText = ada.noteText(n1)
+  const beaText = bea.noteText(n1)
+  const seeded = await waitFor(
+    () => adaText.text() === ANSWER && beaText.text() === ANSWER,
+    5_000,
+  )
+  ok(seeded >= 0, "the note starts with the message's text, for everyone")
+  adaText.text.insert(0, "Ada: ")
+  await waitFor(() => nh.noteText(n1)?.startsWith("Ada: ") === true, 5_000)
+  beaText.text.insert(beaText.text().length, " Bea.")
+  const merged = `Ada: ${ANSWER} Bea.`
+  const both = await waitFor(
+    () =>
+      nh.noteText(n1) === merged &&
+      adaText.text() === merged &&
+      beaText.text() === merged,
+    5_000,
+  )
+  ok(
+    both >= 0,
+    `two people's edits merge, on the host and each client (${nh.noteText(n1)})`,
+  )
+  const asSent = readEntryMessage(nh.doc, answer ?? "")
+  ok(
+    asSent.present &&
+      asSent.message !== undefined &&
+      entryText(asSent.message) === ANSWER,
+    "the opened message's entry is unchanged",
+  )
+  // 2. Contributors, from the edits themselves: no command said who typed.
+  const credited = await waitFor(
+    () => record(n1)?.contributors.join() === [ada.writer, bea.writer].join(),
+    5_000,
+  )
+  ok(
+    credited >= 0,
+    `contributors come from the note's own edits, in order, the host's seeding not among them (${record(n1)?.contributors.join()})`,
+  )
+
+  // 8. The model reads the message as sent, never the note's edits.
+  let context: readonly string[] = []
+  script.use([
+    {
+      reply: seen => {
+        context = seen
+        return "noted"
+      },
+    },
+  ])
+  await ada.chat("@agent go on", at(answer))
+  await nIdle()
+  ok(
+    context.includes(ANSWER) && !context.some(t => t.includes("Bea.")),
+    "the model reads the opened message as sent, not the note's edits",
+  )
+
+  // 4. A draft at the lane's end, joined by Bea, written by both, sent by Ada.
+  const end = tipOf()
+  const d1 = noteOf(
+    await ada.note({ kind: "draft", at: at(end), lane: null, text: "" }),
+  )
+  const joined = noteOf(
+    await bea.note({ kind: "draft", at: at(end), lane: null, text: "" }),
+  )
+  ok(
+    d1 !== null && joined === d1 && record(d1)?.state === "draft",
+    "compose together makes the thread's draft, and a second person joins it",
+  )
+  const draft1 = noteId(d1 ?? "")
+  ada.noteText(draft1).text.insert(0, "Next: ")
+  await waitFor(() => nh.noteText(draft1) === "Next: ", 5_000)
+  const beaDraft = bea.noteText(draft1)
+  await waitFor(() => beaDraft.text() === "Next: ", 5_000)
+  beaDraft.text.insert(6, "write the tests.")
+  await waitFor(
+    () =>
+      nh.noteText(draft1) === "Next: write the tests." &&
+      record(draft1)?.contributors.length === 2,
+    5_000,
+  )
+  script.use([{ text: "Tests it is." }])
+  const SEND1 = crypto.randomUUID()
+  const sent1 = await ada.note({ kind: "send", note: draft1 }, SEND1)
+  await nIdle()
+  const index1 = readTreeIndex(nh.doc)
+  const sentId = index1.bySend.get(SEND1)
+  const sentMsg = sentId === undefined ? undefined : index1.entries[sentId]
+  const reply1 = projectTranscript(index1, tipOf()).at(-1)
+  ok(
+    sent1.kind === "started" &&
+      sentMsg?.message?.writer === ada.writer &&
+      sentMsg.message.contributors?.join() === bea.writer &&
+      sentMsg.message.content === "Next: write the tests." &&
+      sentMsg.parentId === end &&
+      reply1?.text === "Tests it is.",
+    `a sent draft is Ada's message, with Bea, at the lane's end, and the agent answers (${sent1.kind})`,
+  )
+  const done1 = record(draft1)
+  ok(
+    done1?.state === "done" &&
+      done1.subject.kind === "sent" &&
+      done1.subject.sendId === SEND1,
+    "the sent draft is done, linked to its message",
+  )
+
+  // 9. A draft follows its thread: two messages later it is still this end's.
+  const d2 = noteOf(
+    await bea.note({
+      kind: "draft",
+      at: at(tipOf()),
+      lane: null,
+      text: "Later",
+    }),
+  )
+  const draft2 = noteId(d2 ?? "")
+  await ada.chat("@Bea one", at(tipOf()))
+  await ada.chat("@Bea two", at(tipOf()))
+  await nIdle()
+  const grownEnd = tipOf()
+  const found = draftFor(
+    grownEnd ?? "",
+    readLanes(nh.doc, readTreeIndex(nh.doc)),
+    readTreeIndex(nh.doc),
+    readNotes(nh.doc),
+  )
+  const rejoined = noteOf(
+    await ada.note({ kind: "draft", at: at(grownEnd), lane: null, text: "" }),
+  )
+  ok(
+    found?.id === draft2 && rejoined === draft2,
+    "a draft is still its thread's after the thread grows",
+  )
+  ok(
+    record(draft2)?.contributors.join() === bea.writer,
+    "what a drafter had typed is theirs",
+  )
+
+  // 5. Sent to a busy lane, a plain draft waits, and is done once queued.
+  script.use([{ text: "A long answer. ".repeat(400) }])
+  await ada.chat("@agent a long one", at(grownEnd))
+  bea.noteText(draft2).text.insert(5, ", @Bea")
+  await waitFor(() => nh.noteText(draft2) === "Later, @Bea", 5_000)
+  const SEND2 = crypto.randomUUID()
+  const sent2 = await bea.note({ kind: "send", note: draft2 }, SEND2)
+  ok(
+    sent2.kind === "queued" && record(draft2)?.state === "done",
+    `a draft sent to a busy lane waits in its outbox, and is done (${sent2.kind})`,
+  )
+  await nIdle()
+  const landed = readTreeIndex(nh.doc).bySend.get(SEND2)
+  const sent2Note = record(draft2)
+  ok(
+    landed !== undefined &&
+      sent2Note !== undefined &&
+      noteAt(sent2Note, [], readTreeIndex(nh.doc)) === landed,
+    "once the lane is free, the waiting draft lands, and its note is its message's",
+  )
+
+  // 6. Done is read-only, enforced by the host; reopening lets edits in again.
+  const doneOutcome = await ada.note({ kind: "done", note: n1 })
+  ok(
+    noteOf(doneOutcome) === n1 && record(n1)?.state === "done",
+    "a note is marked done",
+  )
+  const cat = await join("n-cat")
+  const catText = cat.noteText(n1)
+  await waitFor(() => catText.text() === merged, 5_000)
+  catText.text.insert(0, "Cat was here. ")
+  await cat.exchange.flush()
+  await sleep(500)
+  ok(
+    nh.noteText(n1) === merged,
+    "a client's write to a done note is refused by the host",
+  )
+  await cat.close()
+  await ada.note({ kind: "reopen", note: n1 })
+  adaText.text.insert(adaText.text().length, " Reopened.")
+  const changed = await waitFor(
+    () => record(n1)?.changedSinceDone === true,
+    5_000,
+  )
+  ok(
+    changed >= 0 && record(n1)?.state === "open",
+    "a reopened note, edited, is changed since done",
+  )
+
+  // 7. Restart over the store: records and text are back.
+  await waitFor(() => nh.noteText(n1)?.endsWith(" Reopened.") === true, 5_000)
+  const before = {
+    notes: JSON.stringify(readNotes(nh.doc)),
+    text: nh.noteText(n1),
+  }
+  await Promise.all([ada.close(), bea.close()])
+  await nh.shutdown()
+  nh = await open()
+  const eve = await join("n-eve")
+  const eveText = eve.noteText(n1)
+  const back = await waitFor(() => eveText.text() === before.text, 5_000)
+  ok(
+    JSON.stringify(readNotes(nh.doc)) === before.notes &&
+      nh.noteText(n1) === before.text &&
+      back >= 0,
+    "after a restart, every note's record and text are back",
+  )
+  await eve.close()
+  await nh.shutdown()
 }
 
 // ── presence: who is here, per open column, decaying (ADR-0024) ────────────

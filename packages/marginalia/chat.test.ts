@@ -56,6 +56,7 @@ const plan = (over: Partial<PlanInput>) => {
     mode: "reply",
     at: atEntry(E1),
     end: atEntry(E1),
+    contributors: [],
     race: null,
     lane: NONE,
     mentions: [],

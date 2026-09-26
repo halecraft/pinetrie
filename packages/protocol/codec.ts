@@ -20,7 +20,11 @@ import {
   entryId,
   type Intent,
   isLaneName,
+  NOTE_ACTIONS,
+  type NoteAction,
+  type NoteId,
   normalizeName,
+  noteId,
   type Position,
   parseMentions,
   type ReferenceId,
@@ -52,6 +56,8 @@ export type Outcome =
   | { readonly kind: "conflict"; readonly by: string | null }
   | { readonly kind: "named" }
   | { readonly kind: "stopped" }
+  /** A note was made, joined or moved on: its id. */
+  | { readonly kind: "noted"; readonly id: NoteId }
   | Refusal
 
 /**
@@ -153,8 +159,46 @@ export function decodeCommand(
       mentions: parseMentions(body),
     }
   }
+  if (kind === "note") return decodeNote(wire, at)
   return refuse(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
 }
+
+/** A `note` command: `mode` names the action; only the codec reads it there. */
+function decodeNote(
+  wire: WireCommand | null | undefined,
+  at: Position,
+): Intent | Refusal {
+  const action = text(wire?.mode)
+  if (!isNoteAction(action))
+    return refuse(ERR.UNKNOWN_KIND, `unknown note action: ${action}`)
+  const note = (a: NoteAction): Intent => ({ kind: "note", action: a })
+  if (action === "open") {
+    return at.kind === "root"
+      ? refuse(ERR.NO_ANCHOR, "the root is no message to open")
+      : note({ kind: "open", entry: at.id })
+  }
+  if (action === "draft") {
+    if (at.kind === "root")
+      return refuse(ERR.NO_ANCHOR, "a draft continues a thread")
+    const lane = text(wire?.lane)
+    if (lane !== "" && !isLaneName(lane))
+      return refuse(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+    return note({
+      kind: "draft",
+      at,
+      lane: isLaneName(lane) ? lane : null,
+      // What its sender had typed, as typed: a draft is not trimmed.
+      text: typeof wire?.text === "string" ? wire.text : "",
+    })
+  }
+  const target = text(wire?.targetId)
+  return target === ""
+    ? refuse(ERR.UNKNOWN_TARGET, "a note action must name its note")
+    : note({ kind: action, note: noteId(target) })
+}
+
+const isNoteAction = (a: string): a is (typeof NOTE_ACTIONS)[number] =>
+  (NOTE_ACTIONS as readonly string[]).includes(a)
 
 const isChatMode = (mode: string): mode is ChatMode =>
   (CHAT_MODES as readonly string[]).includes(mode)
@@ -183,6 +227,24 @@ export function encodeIntent(id: string, intent: Intent): Command {
       return command({ id, kind: "name", text: intent.name })
     case "stop":
       return command({ id, kind: "stop", lane: intent.lane })
+    case "note":
+      return command({ id, kind: "note", ...noteToWire(intent.action) })
+  }
+}
+
+const noteToWire = (a: NoteAction) => {
+  switch (a.kind) {
+    case "open":
+      return { mode: "open", parentId: a.entry }
+    case "draft":
+      return {
+        mode: "draft",
+        parentId: positionToWire(a.at),
+        lane: a.lane ?? "",
+        text: a.text,
+      }
+    default:
+      return { mode: a.kind, targetId: a.note }
   }
 }
 
@@ -203,6 +265,8 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "named" })
     case "stopped":
       return reply({ id, outcome: "stopped" })
+    case "noted":
+      return reply({ id, outcome: "noted", noteId: outcome.id })
     case "refused":
       return reply({
         id,
@@ -230,6 +294,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "named" }
     case "stopped":
       return { kind: "stopped" }
+    case "noted":
+      return { kind: "noted", id: noteId(wire.noteId) }
     case "refused":
       return refuse(asErrCode(wire.errorCode), wire.errorMessage)
   }

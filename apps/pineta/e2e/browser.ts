@@ -790,6 +790,111 @@ try {
       (await page.$$eval(".msg", n => n.length)) === spineBefore,
       "A's columns are unchanged by the citation: it adds no message",
     )
+
+    // ── notes: a message opened for editing, and a draft written together ──
+    // A message shown once, in whichever column shows it first.
+    const askedEntry = await page
+      .locator(msg("B asks about this"))
+      .first()
+      .getAttribute("data-entry")
+    const asked = `.msg[data-entry="${askedEntry}"]`
+    await page.hover(asked)
+    await page.click(`${asked} .tools .edit`)
+    const editorA = page.locator(`${asked} .note textarea`)
+    const editorB = second.locator(`${asked} .note textarea`)
+    const cards = await Promise.all([
+      editorA.waitFor({ timeout: 15_000 }).then(
+        () => true,
+        () => false,
+      ),
+      editorB.waitFor({ timeout: 15_000 }).then(
+        () => true,
+        () => false,
+      ),
+    ])
+    ok(
+      cards.every(Boolean),
+      "a message opened for editing becomes a note in both windows",
+    )
+    await editorA.focus()
+    await page.keyboard.press("End")
+    await page.keyboard.type(" A1")
+    await editorB.focus()
+    await second.keyboard.press("End")
+    await second.keyboard.type(" B2")
+    const bothIn = (v: string) => v.includes("A1") && v.includes("B2")
+    const merged = await waitFor(() => false, 1_500).then(async () => [
+      await editorA.inputValue(),
+      await editorB.inputValue(),
+    ])
+    ok(
+      merged.every(bothIn),
+      `two windows typing in one note see the merged text (${merged[0]})`,
+    )
+    const editingShown = await page
+      .waitForSelector(`${asked} .note .note-editing`, { timeout: 15_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(editingShown, "the other window editing the note shows on its card")
+    ok(
+      (await page.locator(".rail-dot.note").count()) === 1,
+      "the rail draws the note's message as a square",
+    )
+
+    await page.fill(`${col(0)} .composer .input`, "Together:")
+    await page.click(`${col(0)} .composer .compose-together`)
+    const draftA = page.locator(`${col(0)} .draft-slot textarea`)
+    await draftA.waitFor({ timeout: 15_000 }).catch(() => null)
+    // The other window opens that thread from its rail, at its end.
+    const draftEnd = await page
+      .locator(`${col(0)} .msg[data-entry]`)
+      .last()
+      .getAttribute("data-entry")
+    await second.click(`.rail-dot[data-entry="${draftEnd}"]`)
+    await second
+      .click(".draft-slot .join-draft", { timeout: 15_000 })
+      .catch(() => null)
+    const draftB = second.locator(".draft-slot textarea")
+    const joinedDraft = await draftB.waitFor({ timeout: 15_000 }).then(
+      () => true,
+      () => false,
+    )
+    ok(
+      joinedDraft && (await draftA.inputValue()) === "Together:",
+      "compose together makes the thread's draft, and the other window joins it",
+    )
+    await draftB.focus()
+    await second.keyboard.press("End")
+    await second.keyboard.type(" from B")
+    await waitFor(() => false, 1_500)
+    await page.click(`${col(0)} .draft-slot .note-send`)
+    // Sent, the draft is done: its message shows its card, read-only.
+    const sentDraft = `.msg:has(.note[data-state="done"] > .note-text:text-is("Together: from B"))`
+    const together = await page
+      .waitForSelector(sentDraft, { timeout: 60_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+    const byLine = await page
+      .$eval(`${sentDraft} .role`, n => n.textContent ?? "")
+      .catch(() => "")
+    ok(
+      together && /^Ada.*, with /.test(byLine),
+      `a sent draft is the sender's message, with its other writer (${byLine})`,
+    )
+    await idle()
+    await page.click(".notes-toggle")
+    await page.click('.notes-filters [data-filter="done"]')
+    const doneRows = await page.locator('.notes-row[data-state="done"]').count()
+    const allDone = await page.locator(".notes-row").count()
+    ok(
+      doneRows === 1 && allDone === 1,
+      `the notes index lists the sent draft under done (${doneRows} of ${allDone})`,
+    )
+    await page.click(".notes-toggle")
   } finally {
     await second.close().catch(() => {})
   }

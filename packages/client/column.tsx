@@ -9,6 +9,8 @@ import {
   entryId,
   type LaneView,
   messageText,
+  type NoteId,
+  type NoteRecord,
   type Position,
   type ReferenceTarget,
   ROOT,
@@ -17,13 +19,20 @@ import {
   threadOf,
   type WriterId,
 } from "@pineta/core"
-import { displayName, type Held, type ReferenceIndex } from "@pineta/marginalia"
+import {
+  displayName,
+  draftFor,
+  type Held,
+  noteEntry,
+  type ReferenceIndex,
+} from "@pineta/marginalia"
 import { readStreams, type SessionDocHandle } from "@pineta/schema"
-import { useLayoutEffect, useRef } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { Column as ColumnSpec } from "./columns.ts"
 import { Composer } from "./composer.tsx"
 import { Message } from "./message.tsx"
-import { speakerLabel } from "./names.ts"
+import { speakerLabel, withContributors } from "./names.ts"
+import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackColor } from "./rail.tsx"
 import type { SessionClient } from "./session-view.ts"
@@ -52,6 +61,10 @@ export interface ColumnProps {
   typing: readonly WriterId[]
   /** This window is typing in this column's composer. */
   onTyping: () => void
+  /** Every note's record (ADR-0025). */
+  notes: readonly NoteRecord[]
+  /** Who is editing which note now (presence), others and this window alike. */
+  editing: ReadonlyMap<WriterId, string>
   /** Every lane the agent is replying on. Several threads can run at once. */
   activity: readonly AgentRun[]
   lanes: readonly LaneView[]
@@ -151,6 +164,56 @@ export function Column(p: ColumnProps) {
         : ""
   const forkText = messageText(fork?.message).slice(0, 48)
 
+  // Notes by the message they are the text of, and this thread's draft.
+  const noteOf = new Map(
+    p.notes.flatMap(n => {
+      const entry = noteEntry(n, index)
+      return entry === null ? [] : [[entry as string, n] as const]
+    }),
+  )
+  const draft =
+    fresh || view.tipId === null
+      ? undefined
+      : draftFor(view.tipId, p.lanes, index, p.notes)
+  // The note this window is editing: while it is scrolled out of view, a bar
+  // at the column's top leads back to it.
+  const [editingNote, setEditingNote] = useState<NoteId | null>(null)
+  const [outOfView, setOutOfView] = useState(false)
+  const edited = p.notes.find(n => n.id === editingNote)
+  const stillEdited = edited !== undefined && edited.state !== "done"
+  const [joined, setJoined] = useState<NoteId | null>(null)
+  const card = (note: NoteRecord) => (
+    <NoteCard
+      editors={[...p.editing].flatMap(([w, n]) =>
+        n === note.id && w !== p.session.writer ? [w] : [],
+      )}
+      key={note.id}
+      nameOf={p.nameOf}
+      note={note}
+      onFocus={setEditingNote}
+      session={p.session}
+    />
+  )
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-observe as the column grows
+  useEffect(() => {
+    const root = body.current
+    const el =
+      editingNote === null
+        ? null
+        : root?.querySelector(`.note[data-note="${editingNote}"]`)
+    if (root === null || el === null || el === undefined) {
+      setOutOfView(false)
+      return
+    }
+    const seen = new IntersectionObserver(
+      ([e]) => setOutOfView(e !== undefined && !e.isIntersecting),
+      { root },
+    )
+    seen.observe(el)
+    return () => seen.disconnect()
+  }, [editingNote, view.nodes.length])
+
   return (
     <section
       className="column"
@@ -191,6 +254,19 @@ export function Column(p: ColumnProps) {
         }}
         ref={body}
       >
+        {stillEdited && outOfView && (
+          <button
+            className="note-bar"
+            onClick={() =>
+              body.current
+                ?.querySelector(`.note[data-note="${editingNote}"]`)
+                ?.scrollIntoView({ block: "nearest" })
+            }
+            type="button"
+          >
+            editing a {edited.state === "draft" ? "draft" : "note"} · back to it
+          </button>
+        )}
         {/* Room above the first message, so opening can bring it level with
             its fork point even when the column is short. */}
         <div className="spacer" ref={spacer} />
@@ -207,6 +283,15 @@ export function Column(p: ColumnProps) {
               light={running ? (lit(node.id) ? "lit" : "dim") : undefined}
               nameOf={p.nameOf}
               node={node}
+              note={(() => {
+                const note = noteOf.get(node.id)
+                return note === undefined ? undefined : card(note)
+              })()}
+              onEdit={
+                noteOf.has(node.id)
+                  ? undefined
+                  : () => void p.session.note({ kind: "open", entry: id })
+              }
               onBranch={
                 i < view.nodes.length - 1
                   ? {
@@ -240,13 +325,37 @@ export function Column(p: ColumnProps) {
         {waiting.map((h, n) => (
           <div className="msg waiting" data-held={h.id} key={h.id}>
             <span className="role">
-              {speakerLabel(p.nameOf, h.details.author, h.details.authorName)} ·
-              waiting · {n + 1} of {waiting.length}
+              {withContributors(
+                speakerLabel(p.nameOf, h.details.author, h.details.authorName),
+                (h.details.contributors ?? []).map(w =>
+                  displayName(w, p.nameOf.get(w)),
+                ),
+              )}{" "}
+              · waiting · {n + 1} of {waiting.length}
             </span>
             <div className="text">{h.details.text}</div>
           </div>
         ))}
       </div>
+      {/* The thread's draft (ADR-0025): one per thread end, shared by all. */}
+      {draft !== undefined &&
+        (joined === draft.id ||
+        draft.openedBy === p.session.writer ||
+        draft.contributors.includes(p.session.writer) ? (
+          <div className="draft-slot">{card(draft)}</div>
+        ) : (
+          <div className="draft-slot draft-invite">
+            {displayName(draft.openedBy, p.nameOf.get(draft.openedBy))} is
+            drafting the next message ·{" "}
+            <button
+              className="join-draft"
+              onClick={() => setJoined(draft.id)}
+              type="button"
+            >
+              join
+            </button>
+          </div>
+        ))}
       {choosing ? (
         <Start onStart={p.onStart} />
       ) : (
@@ -264,6 +373,17 @@ export function Column(p: ColumnProps) {
             p.onSent(id)
             return id
           }}
+          onComposeTogether={
+            fresh || draft !== undefined
+              ? undefined
+              : text =>
+                  void p.session.note({
+                    kind: "draft",
+                    at,
+                    lane: p.column.lane ?? null,
+                    text,
+                  })
+          }
           onTyping={p.onTyping}
           participants={p.participants}
           pending={p.column.fresh?.pending}
