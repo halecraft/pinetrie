@@ -121,6 +121,42 @@ at the bottom; once they scroll up, it leaves them there.
   that same-origin requests and upgrades carry. `connectSession({ key })` is
   for Node clients.
 
+## Message text is markdown (S27)
+
+`messageTree` (`markdown.ts`) turns a message's text into the tree
+`MessageText` draws: remark-parse, remark-gfm and remark-rehype, as
+react-markdown runs them, then Pineta's own pass over the tree. Owning the
+pipeline keeps the tree a pure function, testable without a DOM.
+
+- **Nothing in it is HTML.** Raw HTML becomes text. A link or image URL keeps
+  only http, https, mailto, relative and `#` targets (`safeUrl`, react-markdown's
+  `defaultUrlTransform`; micromark's `sanitizeUri` HTML-encodes `&`, which a
+  React prop would carry literally).
+- **Committed text is wrapped in runs:** each text node becomes
+  `span[data-s][data-e]`, the source range it came from (`data-code` in code).
+  `align` maps a run's characters to the tokens that produced them (a literal,
+  a backslash escape, a character reference), skipping what produces nothing
+  (indentation, `>` markers). In code, only literals: backslashes and `&` are
+  text there. Code text has no position of its own; it takes its element's,
+  past the fence line or the opening backticks.
+- **Citing is gather, plan, execute.** `selectionBoundaries` (DOM) reports
+  each end of the selection as inside a run, between two runs, or outside the
+  text; a point at a run's edge is between it and its neighbour. `citeTarget`
+  (pure) snaps a start forward and an end back, and cites the whole entry when
+  no source is covered. The cite button reads `:scope > .text`: a note's card
+  has text of its own.
+- **Streaming text goes through remend**, which closes an unfinished `**`,
+  fence or link, with `singleTilde` and `comparisonOperators` off: those
+  escape mid-text, and the message would change when it commits. Streaming text
+  gets no runs: it is not citable, and its positions point into remend's output.
+- **One `white-space: pre-line` on `.text`** shows soft breaks as people type
+  them. `dropBlockWhitespace` removes the newlines to-hast puts between blocks
+  and after a `<br>`, which would otherwise show as blank lines. Chrome then
+  ends a paragraph at a shown newline, so a triple-click there selects a line.
+- **Known gaps:** a footnote's backlink adds a space to the text before it,
+  and inline code spanning a line break has its newline turned into a space.
+  Neither run aligns, so a selection there cites the whole entry.
+
 ## Presence (ADR-0024)
 
 - **Every open column is reported,** since there is no focused column: `App`
@@ -148,7 +184,8 @@ at the bottom; once they scroll up, it leaves them there.
   the cursor, so the card never re-renders per keystroke; `useValue` reads the
   text where it is shown (a done note, the index's first lines).
 - **A message with a note draws its card in place of its text**, the sent
-  draft's included; a message without one offers *edit* among its tools.
+  draft's included; a message without one offers *edit* among its tools. A
+  done note's text is markdown, through `MessageText`.
 - **A thread's draft** sits above its column's composer (`draftFor` over the
   column's end). Its opener and its writers see the card; anyone else sees
   "Ada is drafting the next message · join". *Compose together* sends the
@@ -162,6 +199,9 @@ at the bottom; once they scroll up, it leaves them there.
   from the rail's top; each row reads its note's first line on its own.
 - **Selectors in the browser suite:** a card replaces `.msg > .text`, so a
   message with a note is found by `.note-text` or by `data-entry`.
+- **`:text-is` matches the smallest element holding the text**, which in
+  markdown is a run's `span`, not `.text`. The suite finds a plain message by
+  `.text > p:only-child > span:only-child:text-is(…)`.
 
 ## Who a tab is
 

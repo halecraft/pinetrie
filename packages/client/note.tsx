@@ -8,6 +8,7 @@ import { useText, useValue } from "@kyneta/react"
 import type { NoteId, NoteRecord, NoteState, WriterId } from "@pineta/core"
 import { NOTE_FILTERS, type NoteFilter, type NoteRow } from "@pineta/reads"
 import { useEffect, useRef, useState } from "react"
+import { MessageText } from "./message-text.tsx"
 import { nameFor } from "./presence.tsx"
 import type { SessionClient } from "./session-view.ts"
 
@@ -109,7 +110,7 @@ export function NoteCard({
         )}
       </div>
       {!editable ? (
-        <div className="text note-text">{text}</div>
+        <MessageText className="note-text" mode="committed" text={text} />
       ) : (
         <textarea
           aria-label={note.state === "draft" ? "the draft" : "the note"}

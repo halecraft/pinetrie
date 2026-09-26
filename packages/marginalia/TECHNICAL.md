@@ -143,9 +143,10 @@ Decoding is also where `ReferenceId` and `EntryId` are branded.
   directions in one pass, each list ascending by id. A stored list per target
   would be a child container created lazily under a key two writers share: the
   S18 shape, which lost a writer's value in 40 of 40 trials.
-- **Spans are UTF-16 code units over `entryText`.** That is the string the
-  client renders, so a DOM selection maps onto it directly. A surrogate pair is
-  two units; the unit test pins it.
+- **Spans are UTF-16 code units over `entryText`.** That is the source the
+  client renders from, as markdown; a DOM selection reaches it through the
+  source ranges the renderer records (`packages/client/markdown.ts`). A
+  surrogate pair is two units; the unit test pins it.
 - **Only committed entries are citable.** A streaming message is not an entry,
   and its text is still changing, so an offset into it would not be stable.
 - **Absent and textless are different facts.** `CitedEntry` keeps them apart:

@@ -945,8 +945,13 @@ own id, written only through `Agent.addReference`.
   chat, someone who only ever asks the agent has no lane. The reference names
   the entry being read, or the author's tip. Refused while the author's turn
   runs.
-- **Spans are UTF-16 code units over `messageText`**, which is what the client
-  renders. Only committed entries are citable.
+- **Spans are UTF-16 code units over `messageText`.** Only committed entries
+  are citable. *Amended by S27:* this said "which is what the client renders".
+  The client now renders it as markdown, so `**bold**` shows as "bold" and a
+  selection's DOM offsets are not source offsets. Each rendered run of text
+  carries the source range it came from, and a selection reaches the source
+  through them (`packages/client/markdown.ts`). The offsets themselves are
+  unchanged.
 
 **Consequences.** References travel in pi's JSONL. A pi extension can reach
 them once Pineta supplies an API through the embedder-provided `toolContext`;

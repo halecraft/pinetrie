@@ -99,6 +99,25 @@ cases are what catch them.
   so far). Either should cite the whole entry.
 - Footnotes produce text with no source. Leave them uncitable, or turn them off.
 
+## Addendum: two errors the sampling missed
+
+The implementation (`packages/client/markdown.ts`) checks every character of
+the edge cases, not 8 per message. That found two errors in the probe's
+alignment, which the 28 734 sampled characters never hit:
+
+- **A literal was tried before an escape or reference.** In `\\` or `&amp;`,
+  the first `\` or `&` matched the rendered character by itself. In text,
+  CommonMark always reads these as tokens, so tokens go first; in code they are
+  always literal, so a run records whether it is code.
+- **Code indented in a list** matched its leading spaces to the list's
+  indentation. Of a longer run of spaces in the source, the value's are the
+  last.
+
+The exhaustive check also has to skip a mutation that changes the parse: a mark
+in `<div>` or `<https://…>` makes it no longer HTML or an autolink, which says
+nothing about the mapping. It compares the elements before and after, and still
+checks over 600 characters.
+
 ## Not tested
 
 - A real browser. The DOM was jsdom's, rendered with `renderToStaticMarkup`,

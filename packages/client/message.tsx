@@ -10,6 +10,8 @@ import type {
 import { entryId } from "@pineta/core"
 import type { Reference } from "@pineta/marginalia"
 import type { ReactNode } from "react"
+import { citeTarget } from "./markdown.ts"
+import { MessageText, selectionBoundaries } from "./message-text.tsx"
 import { speakerLabel, withContributors } from "./names.ts"
 import { nameFor } from "./presence.tsx"
 import { colorSlot, trackColor } from "./rail.tsx"
@@ -83,11 +85,10 @@ export function Message(p: MessageProps) {
             type="button"
           />
         ))}
-        {/* JSX escapes by default, so model output is never HTML. A message
-            that only called tools shows only its tool rows. */}
+        {/* A message that only called tools shows only its tool rows. */}
         {p.note ??
           ((node.text !== "" || node.toolCalls === undefined) && (
-            <div className="text">{node.text}</div>
+            <MessageText mode="committed" text={node.text} />
           ))}
         {node.toolCalls?.map(call => (
           <ToolRow call={call} key={call.id} />
@@ -111,14 +112,16 @@ export function Message(p: MessageProps) {
             className="cite"
             // Keep the text selection alive through the click.
             onClick={e => {
+              // The message's own text: a note's card, drawn in its place,
+              // has text of its own that `entryText` offsets don't cover.
               const text = e.currentTarget
                 .closest(".msg")
-                ?.querySelector(".text")
-              const span = text ? selectedSpan(text) : null
+                ?.querySelector(":scope > .text")
+              const ends = text ? selectionBoundaries(text) : null
               p.onCite(
-                span === null
+                ends === null
                   ? { kind: "entry", id }
-                  : { kind: "span", id, ...span },
+                  : citeTarget(node.text, id, ...ends),
               )
             }}
             onMouseDown={e => e.preventDefault()}
@@ -202,27 +205,4 @@ function ToolRow({ call }: { call: ToolCallView }) {
       )}
     </details>
   )
-}
-
-/**
- * The selection inside `text`, as UTF-16 offsets into its rendered string, or
- * null if nothing inside it is selected. The element renders exactly
- * `entryText`, so these are the offsets a span reference means.
- */
-function selectedSpan(text: Element): { start: number; end: number } | null {
-  const selection = window.getSelection()
-  if (selection === null || selection.isCollapsed || selection.rangeCount === 0)
-    return null
-  const range = selection.getRangeAt(0)
-  if (
-    !text.contains(range.startContainer) ||
-    !text.contains(range.endContainer)
-  )
-    return null
-  const before = document.createRange()
-  before.selectNodeContents(text)
-  before.setEnd(range.startContainer, range.startOffset)
-  const start = before.toString().length
-  const end = start + range.toString().length
-  return end > start ? { start, end } : null
 }

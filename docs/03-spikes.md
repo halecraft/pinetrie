@@ -356,6 +356,22 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S27 — Markdown that still cites its source ✅ PASS
+
+`findings/S27-markdown-rendering.md`. Over 3 592 real messages, 0 of 28 734
+rendered characters traced to the wrong source; no HTML or `javascript:` let
+through; 5.8 ms per streaming frame for the largest message.
+
+- **Each rendered run of text carries its source range**, and an alignment
+  maps its characters to the literal, escape or reference that produced them.
+- **Code needs its own handling:** past the fence line, past inline code's
+  backticks, and literal only (no escapes or references in code).
+- **remend only while streaming**, with the two handlers that escape mid-text
+  off.
+- **The spike's sampling missed two mapping errors** that exhaustive checking
+  of its edge cases found in the implementation: an escape or reference losing
+  to its first character, and code indented in a list. Kept as unit tests.
+
 ### S9 — pi's `IdGenerator` ✅ PASS — safe *structurally*, not statistically
 
 `findings/S9-idgenerator-collisions.md`. 41 assertions, zero failures.

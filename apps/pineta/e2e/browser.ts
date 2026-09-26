@@ -27,7 +27,11 @@ import path from "node:path"
 import { connectSession } from "@pineta/client/session"
 import { atEntry, entryId, projectRail } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
-import { readParticipantNames, readTreeIndex } from "@pineta/reads"
+import {
+  readParticipantNames,
+  readReferences,
+  readTreeIndex,
+} from "@pineta/reads"
 import { type Browser, chromium } from "@playwright/test"
 import { startHost } from "../host/index.ts"
 import { createChecks, waitFor } from "./harness.ts"
@@ -109,8 +113,10 @@ try {
   /** A message for Ada only: it names her, so in agent work it asks no one. */
   const NOTE = "@Ada just a note"
   const col = (n: number) => `.column[data-position="${n}"]`
+  // Plain text is drawn as markdown: one paragraph holding one run. `:text-is`
+  // matches the smallest element holding the text, which is that run.
   const msg = (text: string) =>
-    `.msg:has(> .text:text-is(${JSON.stringify(text)}))`
+    `.msg:has(> .text > p:only-child > span:only-child:text-is(${JSON.stringify(text)}))`
   const label = async (n: number) =>
     (await page.textContent(`${col(n)} .composer .send`))?.trim() ?? ""
   const send = async (n: number, text: string) => {
@@ -727,6 +733,136 @@ try {
         `Stop ends a running command, shown as ✗ "Command aborted" (${why?.slice(-16) ?? "none"})`,
       )
       await toolIdle()
+
+      // ── markdown: drawn, and a selection in it cites its source ───────────
+      const REPLY = [
+        "Plain **bold** here.",
+        "",
+        "A first line,",
+        "and a second.",
+        "",
+        "```sh",
+        "echo hi",
+        "```",
+        "",
+        "| a | b |",
+        "|---|---|",
+        "| 1 | 2 |",
+        "",
+        "<script>alert(1)</script>",
+        "",
+        "[x](javascript:alert(1))",
+      ].join("\n")
+      script.use([{ text: REPLY }])
+      await say("show me markdown")
+      await toolIdle()
+      const drawn = `${col(0)} .msg:has(> .text strong)`
+      await appears(drawn)
+      const replyId =
+        (await tp.locator(drawn).last().getAttribute("data-entry")) ?? ""
+      const reply = `.msg[data-entry="${replyId}"]`
+      // A soft break shows, as people type them. (So a triple-click there
+      // selects one line: Chrome ends a paragraph at a shown newline.)
+      const lines = `${reply} > .text p:nth-of-type(2)`
+      const twoLines = await tp
+        .$eval(lines, p => (p as HTMLElement).innerText)
+        .catch(() => "")
+      ok(
+        (await tp.locator(`${reply} > .text pre code`).count()) === 1 &&
+          (await tp.locator(`${reply} > .text table`).count()) === 1 &&
+          twoLines === "A first line,\nand a second.",
+        `a reply's markdown is drawn: bold, a code block, a table, and its soft break (${JSON.stringify(twoLines)})`,
+      )
+      const shownText = (await tp.textContent(`${reply} > .text`)) ?? ""
+      ok(
+        (await tp.locator(`${reply} .text script`).count()) === 0 &&
+          shownText.includes("<script>alert(1)</script>") &&
+          (await tp.getAttribute(`${reply} .text a`, "href")) === "",
+        "raw HTML in a reply shows as text, and a javascript: link goes nowhere",
+      )
+
+      /** Select from one run's character to another's, as a drag would. */
+      const select = (from: string, fromAt: number, to: string, toAt: number) =>
+        tp.evaluate(
+          ([scope, a, ao, b, bo]) => {
+            const runs = [...document.querySelectorAll(`${scope} span[data-s]`)]
+            const textOf = (v: string) =>
+              runs.find(r => r.textContent === v)?.firstChild
+            const s = textOf(a)
+            const e = textOf(b)
+            if (s == null || e == null) return false
+            window.getSelection()?.setBaseAndExtent(s, ao, e, bo)
+            return true
+          },
+          [reply, from, fromAt, to, toAt] as const,
+        )
+      /** Cite the page's selection, and what the host stored of it. */
+      const cite = async () => {
+        const refs = () =>
+          readReferences(toolHost.doc).to.get(entryId(replyId)) ?? []
+        const before = refs().length
+        await tp.hover(reply)
+        await tp.click(`${reply} .tools .cite`)
+        await waitFor(() => refs().length > before, 15_000)
+        const to = refs().at(-1)?.to
+        return to?.kind === "span" ? REPLY.slice(to.start, to.end) : to?.kind
+      }
+      await select("bold", 0, "bold", 4)
+      const bold = await cite()
+      ok(
+        bold === "bold",
+        `selecting rendered bold text cites its source (${JSON.stringify(bold)})`,
+      )
+      await select("Plain ", 2, "echo hi", 4)
+      const across = await cite()
+      ok(
+        across ===
+          "ain **bold** here.\n\nA first line,\nand a second.\n\n```sh\necho",
+        `a selection across a code block cites its source from end to end (${JSON.stringify(across)})`,
+      )
+      // A drag to the start of the next line ends at that block's first
+      // character, which is not selected.
+      await select("Plain ", 0, "A first line,\nand a second.", 0)
+      const toNext = await cite()
+      ok(
+        toNext === "Plain **bold** here.",
+        `a selection ending at the next block's start cites its own block, and no more (${JSON.stringify(toNext)})`,
+      )
+      await tp.click(`${reply} > .text p:first-of-type`, {
+        clickCount: 3,
+        position: { x: 4, y: 4 },
+      })
+      const paragraph = await cite()
+      ok(
+        paragraph === "Plain **bold** here.",
+        `a triple-clicked paragraph cites its source, and no more (${JSON.stringify(paragraph)})`,
+      )
+
+      // A done note's text is markdown too (ADR-0025).
+      await tp.hover(reply)
+      await tp.click(`${reply} .tools .edit`)
+      await tp
+        .click(`${reply} .note .note-done`, { timeout: 15_000 })
+        .catch(() => null)
+      const doneLine = await tp
+        .waitForSelector(
+          `${reply} .note[data-state="done"] .note-text strong`,
+          {
+            timeout: 15_000,
+          },
+        )
+        .then(
+          () =>
+            tp.$eval(
+              `${reply} .note .note-text p:nth-of-type(2)`,
+              p => (p as HTMLElement).innerText,
+            ),
+          () => "",
+        )
+      ok(
+        doneLine === "A first line,\nand a second.",
+        `a done note draws its markdown, and keeps its line breaks (${JSON.stringify(doneLine)})`,
+      )
     } finally {
       await tp.close().catch(() => {})
       await toolHost.shutdown().catch(() => {})
@@ -916,7 +1052,7 @@ try {
     await waitFor(() => false, 1_500)
     await page.click(`${col(0)} .draft-slot .note-send`)
     // Sent, the draft is done: its message shows its card, read-only.
-    const sentDraft = `.msg:has(.note[data-state="done"] > .note-text:text-is("Together: from B"))`
+    const sentDraft = `.msg:has(.note[data-state="done"] > .note-text > p:only-child > span:only-child:text-is("Together: from B"))`
     const together = await page
       .waitForSelector(sentDraft, { timeout: 60_000 })
       .then(

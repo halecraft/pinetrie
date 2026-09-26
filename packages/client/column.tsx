@@ -31,6 +31,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { Column as ColumnSpec } from "./columns.ts"
 import { Composer } from "./composer.tsx"
 import { Message } from "./message.tsx"
+import { MessageText } from "./message-text.tsx"
 import { speakerLabel, withContributors } from "./names.ts"
 import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
@@ -335,7 +336,7 @@ export function Column(p: ColumnProps) {
               )}{" "}
               · waiting · {n + 1} of {waiting.length}
             </span>
-            <div className="text">{h.details.text}</div>
+            <MessageText mode="committed" text={h.details.text} />
           </div>
         ))}
       </div>
@@ -418,7 +419,7 @@ function Streams({
         s.kind === "reply" ? (
           <div className="streaming" key={s.id}>
             <span className="role">agent</span>
-            <div className="text">{s.text}</div>
+            <MessageText mode="streaming" text={s.text} />
           </div>
         ) : (
           <div className="tool live" data-stream={s.id} key={s.id}>
