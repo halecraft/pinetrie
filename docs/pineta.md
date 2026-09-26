@@ -120,7 +120,7 @@ The root declares only tooling, so a package can import only what it declares.
 
 ---
 
-## 3. Decisions that constrain everything (ADR-0001..0020)
+## 3. Decisions that constrain everything (ADR-0001..0021)
 
 Full text with rationale and rejected alternatives: `docs/02-decisions.md`.
 The ones you must not violate by accident:
@@ -145,6 +145,14 @@ the thread's end. Conversation threads have no lane. A running lane is never
 written: messages wait in `pineta.outbox`. A compelled reply another writer
 raced is a `conflict`; the sender chooses to queue or branch. Supersedes
 ADR-0011.
+
+**ADR-0021 — a thread's mode is its lane; a mention picks the addressee.** A
+thread with a lane is agent work, one without is a conversation; nothing is
+stored. Mentions pick who a message is for (naming only people leaves the
+agent out); with none, the mode fills in. Branches start as conversations, and
+branching at an agent thread's end steps back down to one; the root offers
+Start Chat and Start Agent. A session is its participants; threads
+are topics inside it. Amends ADR-0018 and ADR-0020.
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
@@ -395,7 +403,7 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
 |---|---|
 | `docs/00-vision.md` | product thesis, branch kinds, v1 scope |
 | `docs/01-architecture.md` | evidence base, layer cake, data model, module layout |
-| `docs/02-decisions.md` | **ADR-0001..0020** with rationale |
+| `docs/02-decisions.md` | **ADR-0001..0021** with rationale |
 | `docs/03-spikes.md` | S1–S16, each with question + kill criterion |
 | `docs/04-roadmap.md` | sequencing, invariants, action items |
 | `docs/05-stack.md` | stack decisions, sandbox constraints |
