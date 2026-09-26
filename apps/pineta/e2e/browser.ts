@@ -320,6 +320,41 @@ try {
   )
 
   // ── → opens a branch beside its parent, and it follows its branch ──────
+  // The → sits in the column's right padding, all but a pixel outside its
+  // message, and a hidden → takes no hover. A pointer that overshoots into
+  // that padding, past the →, must still show it and reach it.
+  await page.locator(`${col(0)} ${msg(NOTE)}`).scrollIntoViewIfNeeded()
+  const gutter = await page.$eval(`${col(0)} ${msg(NOTE)}`, m => {
+    const body = m.closest(".column-body")
+    const arrow = m.querySelector(":scope > .branch")?.getBoundingClientRect()
+    if (body === null || arrow === undefined) return null
+    // Its client area's right edge: a scrollbar, if drawn, lies beyond it.
+    const inner =
+      body.getBoundingClientRect().left + body.clientLeft + body.clientWidth
+    return {
+      past: { x: inner - 1, y: arrow.top + arrow.height / 2 },
+      on: { x: arrow.left + arrow.width / 2, y: arrow.top + arrow.height / 2 },
+    }
+  })
+  await page.mouse.move(0, 0)
+  if (gutter !== null) {
+    await page.mouse.move(gutter.past.x, gutter.past.y)
+    await page.mouse.move(gutter.on.x, gutter.on.y, { steps: 4 })
+  }
+  const reached =
+    gutter !== null &&
+    (await page.evaluate(({ x, y }) => {
+      const hit = document.elementFromPoint(x, y)
+      return (
+        hit?.classList.contains("branch") === true &&
+        getComputedStyle(hit).visibility === "visible"
+      )
+    }, gutter.on))
+  ok(
+    reached,
+    "→ shows from the padding beside its message, and takes the click",
+  )
+
   // From the first column while two are open, so "beside its parent"
   // (position 1) and "the far right" (position 2) differ.
   await page.hover(`${col(0)} ${msg(NOTE)}`)

@@ -283,6 +283,14 @@ export const mutations: readonly Mutation[] = [
     expect: "the notes index opens over the columns, whole",
   },
   {
+    name: "the column's padding does not hover its message",
+    file: "packages/client/index.html",
+    from: "      .msg::before { left: 100%; width: 1.75rem; }",
+    to: "      .msg::before { left: 100%; width: 0; }",
+    command: browser,
+    expect: "shows from the padding beside its message",
+  },
+  {
     name: "each page load is a new person",
     file: "packages/client/app.tsx",
     from: '  peerId: persistentPeerId("pineta-peer-id"),',
