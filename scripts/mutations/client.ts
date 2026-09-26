@@ -94,4 +94,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "holds it until its send",
   },
+  {
+    name: "everyone present has the first colour",
+    file: "packages/client/presence.tsx",
+    from: "    return (i === undefined ? undefined : FIRST[i]) ?? hashed(writer)",
+    to: "    return (i === undefined ? undefined : FIRST[0]) ?? hashed(writer)",
+    command: unit,
+    expect: "each have their own colour",
+  },
 ]

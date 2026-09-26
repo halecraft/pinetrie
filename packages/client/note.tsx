@@ -191,6 +191,7 @@ export function NotesIndex({
   onFilter,
   nameOf,
   onPick,
+  onClose,
 }: {
   session: SessionClient
   rows: readonly NoteRow[]
@@ -198,9 +199,18 @@ export function NotesIndex({
   onFilter: (filter: NoteFilter) => void
   nameOf: ReadonlyMap<WriterId, string>
   onPick: (at: string) => void
+  /** Escape closes it, as does picking a row. */
+  onClose: () => void
 }) {
   return (
-    <div className="notes-index">
+    <div
+      aria-label="notes"
+      className="notes-index"
+      onKeyDown={e => {
+        if (e.key === "Escape") onClose()
+      }}
+      role="dialog"
+    >
       <div className="notes-filters">
         {NOTE_FILTERS.map(f => (
           <button

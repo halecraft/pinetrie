@@ -1222,8 +1222,11 @@ for a Claude subscription works only through a pi extension (S23).
 
 **Decision.**
 - **The agent works in the repo it runs from.** pi-agent-core's `read`,
-  `write`, `edit` and `bash` run in the repo root through `NodeExecutionEnv`,
-  only when the host is started for it (`PINETA_TOOLS=1`). There is no second
+  `write`, `edit` and `bash` run in the repo root through `NodeExecutionEnv`.
+  The development host gives them by default, since an agent without them
+  cannot do the work it is asked for; `PINETA_TOOLS=0` turns them off. A host
+  started from code (`startHost`) has none unless given a directory, so no
+  suite runs commands by accident. There is no second
   checkout: Node loads the host's code once, jj keeps the agent's edits in a
   reviewable change, and hot reload is off, so the agent's edits to the client
   never reach an open page mid-run.

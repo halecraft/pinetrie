@@ -11,6 +11,7 @@
 // stable node identity, which `useText` needs to keep a note's textarea
 // bound while everyone types (ADR-0025).
 
+import { persistentPeerId } from "@kyneta/exchange"
 import { ExchangeProvider, useDocStatus, useTracked } from "@kyneta/react"
 import {
   ancestry,
@@ -49,7 +50,7 @@ import { createRoot } from "react-dom/client"
 import { Column } from "./column.tsx"
 import { columnsReducer, initialColumns, isPinned } from "./columns.ts"
 import { NotesIndex } from "./note.tsx"
-import { nameFor, presenceColor } from "./presence.tsx"
+import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { readEntryCount } from "./projection.ts"
 import { Rail } from "./rail.tsx"
 import { connectSession, type SessionClient } from "./session-view.ts"
@@ -204,6 +205,10 @@ function App({ session }: { session: SessionClient }) {
     () => presenceView(presenceFacts, session.writer, index),
     [presenceFacts, index, session.writer],
   )
+  const colorOf = useMemo(
+    () => presenceColors(writerOrder(index, nameOf.keys())),
+    [index, nameOf],
+  )
   const rings = useMemo(
     () =>
       new Map(
@@ -211,11 +216,11 @@ function App({ session }: { session: SessionClient }) {
           end,
           writers.map(w => ({
             name: nameFor(nameOf, w),
-            color: presenceColor(w),
+            color: colorOf(w),
           })),
         ]),
       ),
-    [here, nameOf],
+    [here, nameOf, colorOf],
   )
 
   // Report every open column's thread end (ADR-0024: there is no focused
@@ -317,22 +322,6 @@ function App({ session }: { session: SessionClient }) {
             count: notes.length,
             open: notesOpen,
             toggle: () => setNotesOpen(!notesOpen),
-            panel: (
-              <NotesIndex
-                filter={noteFilter}
-                nameOf={nameOf}
-                onFilter={setNoteFilter}
-                onPick={openAt}
-                rows={notesIndex(
-                  notes,
-                  index,
-                  lanes,
-                  noteFilter,
-                  session.writer,
-                )}
-                session={session}
-              />
-            ),
           }}
           onPick={openAt}
           onStart={asksAgent =>
@@ -347,6 +336,22 @@ function App({ session }: { session: SessionClient }) {
           open={shown}
           rows={rail}
         />
+        {/* Over the columns, beside the rail: inside the rail, whose own
+            scroll clips what overflows it, only a sliver of it showed. */}
+        {notesOpen && (
+          <NotesIndex
+            filter={noteFilter}
+            nameOf={nameOf}
+            onClose={() => setNotesOpen(false)}
+            onFilter={setNoteFilter}
+            onPick={at => {
+              setNotesOpen(false)
+              openAt(at)
+            }}
+            rows={notesIndex(notes, index, lanes, noteFilter, session.writer)}
+            session={session}
+          />
+        )}
         <div id="strip" ref={strip}>
           {views.map((view, i) => {
             const column = columns[i]
@@ -354,6 +359,7 @@ function App({ session }: { session: SessionClient }) {
             return (
               <Column
                 activity={activity}
+                colorOf={colorOf}
                 column={column}
                 editing={presenceFacts.editing}
                 forks={colors.forks}
@@ -424,7 +430,13 @@ function App({ session }: { session: SessionClient }) {
 // same function in Node.
 
 const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`
-const session = await connectSession({ url: wsUrl, WebSocket })
+// Who this tab is: Kyneta's per-tab lease. A reload keeps the id, so you stay
+// yourself, your name with you; a second tab open at once gets its own.
+const session = await connectSession({
+  url: wsUrl,
+  WebSocket,
+  peerId: persistentPeerId("pineta-peer-id"),
+})
 
 const root = document.getElementById("root")
 if (root === null) throw new Error("client/app: missing #root in the page")

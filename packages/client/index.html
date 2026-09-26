@@ -22,7 +22,7 @@
       #name { width: 9rem; padding: .2rem .4rem; }
 
       /* The workspace: the rail (E, everything) beside the columns (paths). */
-      #workspace { flex: 1; display: flex; min-height: 0; }
+      #workspace { position: relative; flex: 1; display: flex; min-height: 0; }
       #rail { position: relative; flex: 0 0 auto; min-width: 3rem; padding-right: .5rem;
         overflow-y: auto; border-right: 1px solid #23272e; }
       /* How a thread at the root begins: a declared purpose, before any message. */
@@ -111,16 +111,16 @@
       .note-actions button, .join-draft, .compose-together, .notes-toggle, .notes-filters button {
         padding: .05rem .45rem; font-size: .72rem; background: none; border: 1px solid #3a3f48; color: #aaa; }
       .note-actions .note-send { border-color: #2f6feb; color: #9ecbff; }
-      .compose-together { margin-top: .35rem; }
       .draft-slot { padding: .4rem .75rem 0; border-top: 1px solid #23272e; font-size: .8rem; color: #aaa; }
       /* The note being edited, scrolled away: a way back to it. */
       .note-bar { position: sticky; top: -.75rem; z-index: 2; display: block; width: 100%;
         margin-bottom: .5rem; padding: .15rem .5rem; font-size: .75rem; background: #2a2140;
         color: #c792ea; border: 1px solid #c792ea; }
-      /* A note's message on the rail: a square. */
-      .rail-dot.note { border-radius: 1px; }
+      /* A note's message on the rail: a square. Not `.note`, the card's class. */
+      .rail-dot.noted { border-radius: 1px; }
       .notes-toggle { display: block; margin: .3rem auto .3rem .1rem; white-space: nowrap; }
-      .notes-index { position: absolute; z-index: 3; left: .25rem; top: 4.5rem; width: 22rem;
+      /* Drawn over the columns, just right of the rail (`#workspace` is its box). */
+      .notes-index { position: absolute; z-index: 3; left: 3.5rem; top: .5rem; width: 24rem;
         max-height: 70vh; overflow-y: auto; padding: .5rem; background: #1b1e24;
         border: 1px solid #3a3f48; border-radius: 6px; }
       .notes-filters { display: flex; flex-wrap: wrap; gap: .25rem; margin-bottom: .4rem; }
@@ -133,9 +133,13 @@
 
       .composer { padding: .5rem .75rem .75rem; border-top: 1px solid #23272e; }
       .typing { font-size: .75rem; color: #8b93a1; margin-bottom: .3rem; font-style: italic; }
-      .compose-row { display: flex; gap: .5rem; }
+      .composer .input { display: block; width: 100%; resize: vertical; }
+      /* Under the text: compose together at the left, send at the right. */
+      .compose-row { display: flex; gap: .5rem; align-items: center; justify-content: flex-end;
+        margin-top: .4rem; }
+      .compose-row .compose-together { margin: 0 auto 0 0; }
       .status { font-size: .75rem; color: #d0a15f; }
-      input {
+      input, .composer textarea {
         flex: 1; padding: .5rem .7rem; border-radius: 6px;
         border: 1px solid #2c313a; background: #1b1e24; color: inherit; font: inherit;
       }

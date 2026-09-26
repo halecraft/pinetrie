@@ -86,12 +86,12 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 205/205 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 91 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 207/207 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 95 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
 | end-to-end | `pnpm run e2e` | 118/118 |
 | with a real model | `pnpm run e2e:live` | 121/121 |
-| **real browser** | `pnpm run e2e:browser` | 61/61 |
+| **real browser** | `pnpm run e2e:browser` | 63/63 |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -167,8 +167,8 @@ Start Chat and Start Agent. A session is its participants; threads
 are topics inside it. Amends ADR-0018 and ADR-0020.
 
 **ADR-0022 — the agent works in its own repo, visibly, with the person's
-models.** With `PINETA_TOOLS=1` the agent reads, writes, edits and runs commands
-in the repo, with hot reload off. The host binds to loopback; anywhere else it
+models.** The development host's agent reads, writes, edits and runs commands
+in the repo, with hot reload off (`PINETA_TOOLS=0` turns tools off). The host binds to loopback; anywhere else it
 admits only the invite key. Models come from the person's pi setup (only the
 extensions' providers are applied). Replies and tool output are one kind of
 stream, written as text edits; pi's checkpoints are stored the same way. Stop
@@ -431,8 +431,9 @@ context.**
 ### Running Pineta on itself
 
 - `pnpm run host` starts the development host: loopback, your pi settings'
-  model, the session in `.pineta/pineta.db`. `PINETA_TOOLS=1` gives the agent
-  its tools in this repo, as you, and turns hot reload off. Run `jj new` first,
+  model, the session in `.pineta/pineta.db`. The agent has its tools in this
+  repo, as you, and hot reload is off; `PINETA_TOOLS=0` removes the tools and
+  turns hot reload back on. Run `jj new` first,
   so its edits are one reviewable change; restart the host to pick up changes
   to host code.
 - **Inviting a collaborator:** `PINETA_BIND=0.0.0.0` (or an address). The host

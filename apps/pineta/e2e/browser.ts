@@ -838,9 +838,19 @@ try {
         () => false,
       )
     ok(editingShown, "the other window editing the note shows on its card")
+    // Drawn in the same 8 px box as every dot, so it sits on its track.
+    const square = await page
+      .locator(".rail-dot.noted")
+      .evaluateAll(ns => ns.map(n => n.getBoundingClientRect()))
+    const dot = await page
+      .locator(".rail-dot:not(.noted)")
+      .first()
+      .evaluate(n => n.getBoundingClientRect())
     ok(
-      (await page.locator(".rail-dot.note").count()) === 1,
-      "the rail draws the note's message as a square",
+      square.length === 1 &&
+        square[0]?.width === dot.width &&
+        square[0]?.height === dot.height,
+      `the rail draws the note's message as a square, the size of a dot (${square[0]?.width}×${square[0]?.height})`,
     )
 
     await page.fill(`${col(0)} .composer .input`, "Together:")
@@ -887,6 +897,25 @@ try {
     )
     await idle()
     await page.click(".notes-toggle")
+    // The whole index shows, over the columns: its middle is its own, not a
+    // column's drawn over it, and it is wider than the rail.
+    const panel = await page.$eval(".notes-index", el => {
+      const r = el.getBoundingClientRect()
+      const rail = document.getElementById("rail")?.getBoundingClientRect()
+      const hit = document.elementFromPoint(
+        r.left + r.width / 2,
+        r.top + r.height / 2,
+      )
+      return {
+        on: hit !== null && el.contains(hit),
+        width: r.width,
+        rail: rail?.width ?? 0,
+      }
+    })
+    ok(
+      panel.on && panel.width > panel.rail,
+      `the notes index opens over the columns, whole (${Math.round(panel.width)}px, rail ${Math.round(panel.rail)}px)`,
+    )
     await page.click('.notes-filters [data-filter="done"]')
     const doneRows = await page.locator('.notes-row[data-state="done"]').count()
     const allDone = await page.locator(".notes-row").count()
@@ -898,6 +927,36 @@ try {
   } finally {
     await second.close().catch(() => {})
   }
+
+  // A reload is the same person: the tab keeps its peer id, so its name stays
+  // and it is not shown to itself as someone else.
+  const myName = await page.inputValue("#name")
+  const me = await page.evaluate(
+    () => `w-${sessionStorage.getItem("pineta-peer-id")}`,
+  )
+  await page.reload({ waitUntil: "domcontentloaded" })
+  await page.waitForFunction(
+    () => document.getElementById("status")?.textContent === "connected",
+    { timeout: 20_000 },
+  )
+  const kept = await page
+    .waitForFunction(
+      n =>
+        (document.getElementById("name") as HTMLInputElement | null)?.value ===
+        n,
+      myName,
+      { timeout: 10_000 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+  // Another window's entries may not have expired yet; none may be mine.
+  const ghosts = await page.locator(`.avatar[data-writer="${me}"]`).count()
+  ok(
+    myName !== "" && kept && ghosts === 0,
+    `a reload keeps who you are: your name (${myName}), and no ghost of yourself`,
+  )
 
   ok(
     errors.length === 0,

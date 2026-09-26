@@ -6,7 +6,7 @@
 // headers and fork dots share, so a branch looks the same everywhere.
 
 import { type AgentRun, PENDING_TRACK, type RailRow } from "@pineta/core"
-import { type ReactNode, useState } from "react"
+import { useState } from "react"
 import { Start } from "./start.tsx"
 
 const PALETTE = [
@@ -62,12 +62,14 @@ export function Rail({
   here: ReadonlyMap<string, readonly { name: string; color: string }[]>
   /** Messages that are notes' (ADR-0025): drawn as squares. */
   notes: ReadonlySet<string>
-  /** The notes index, opened from the rail's top. */
+  /**
+   * The notes index's toggle, at the rail's top. The index itself is drawn by
+   * the app, over the columns: the rail scrolls, so it would clip it.
+   */
   notesPanel: {
     readonly count: number
     readonly open: boolean
     readonly toggle: () => void
-    readonly panel: ReactNode
   }
 }) {
   const [starting, setStarting] = useState(false)
@@ -93,7 +95,6 @@ export function Rail({
       >
         notes ({notesPanel.count})
       </button>
-      {notesPanel.open && notesPanel.panel}
       {starting && (
         <Start
           onStart={asksAgent => {
@@ -137,7 +138,7 @@ export function Rail({
               className={[
                 "rail-dot",
                 activity.some(run => run.tip === r.id) ? "pulse" : "",
-                notes.has(r.id) ? "note" : "",
+                notes.has(r.id) ? "noted" : "",
               ]
                 .filter(c => c !== "")
                 .join(" ")}
@@ -152,10 +153,13 @@ export function Rail({
                 top: y(i) - DOT,
                 background: trackColor(r.track),
                 opacity: open.has(r.id) || first !== undefined ? 1 : 0.35,
-                // Someone else follows this thread: a ring in their colour. The
-                // dot is 8 px, so the rail marks and the column header names.
+                // Someone else follows this thread: a ring in their colour, with
+                // a dark gap so it reads against any track's colour. The dot is
+                // 8 px, so the rail marks and the column header names.
                 boxShadow:
-                  first === undefined ? undefined : `0 0 0 2px ${first.color}`,
+                  first === undefined
+                    ? undefined
+                    : `0 0 0 1.5px #14161a, 0 0 0 3.5px ${first.color}`,
               }}
               title={
                 people.length === 0

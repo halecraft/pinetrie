@@ -132,8 +132,12 @@ at the bottom; once they scroll up, it leaves them there.
   (`@pineta/reads`) and the tree: rings (`readingAt`), a header's avatars
   (`seenBy`, others whose thread end lies on one path with this column's), and
   typing (`typingAt`). It always leaves you out.
-- **A person's colour** (`presenceColor`) is a hue from their writer id, at a
-  saturation the branch palette does not use, so a ring never reads as a track.
+- **A person's colour** (`presenceColors`): the first three people, in the
+  order they first wrote (`writerOrder`, the same in every window), get
+  magenta, white and yellow, far from each other and from the tracks; anyone
+  later, a hue from their writer id at a saturation the tracks don't use. A
+  ring on the rail has a dark gap between it and the dot, so it reads against
+  any track.
   Names go through `displayName`, the `guest-…` fallback included.
 
 ## Notes (ADR-0025)
@@ -158,6 +162,14 @@ at the bottom; once they scroll up, it leaves them there.
   from the rail's top; each row reads its note's first line on its own.
 - **Selectors in the browser suite:** a card replaces `.msg > .text`, so a
   message with a note is found by `.note-text` or by `data-entry`.
+
+## Who a tab is
+
+A tab's peer id comes from Kyneta's `persistentPeerId("pineta-peer-id")`, as
+Kyneta's examples do. A reload keeps it, so a person keeps their name and is
+not shown to themselves as someone else while the old entries decay. The first
+tab open on a device takes the device's stable id; a tab opened alongside gets
+a fresh one, so two windows are two people. The writer id is `w-` and that id.
 
 ## Names
 

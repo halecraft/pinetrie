@@ -266,4 +266,28 @@ export const mutations: readonly Mutation[] = [
     command: e2e,
     expect: "every note's record and text are back",
   },
+  {
+    name: "a note's rail dot takes the note card's class",
+    file: "packages/client/rail.tsx",
+    from: '                notes.has(r.id) ? "noted" : "",',
+    to: '                notes.has(r.id) ? "note" : "",',
+    command: browser,
+    expect: "the size of a dot",
+  },
+  {
+    name: "the columns are drawn over the notes index",
+    file: "packages/client/index.html",
+    from: "      .notes-index { position: absolute; z-index: 3; left: 3.5rem; top: .5rem; width: 24rem;",
+    to: "      .notes-index { position: absolute; z-index: -1; left: 3.5rem; top: .5rem; width: 24rem;",
+    command: browser,
+    expect: "the notes index opens over the columns, whole",
+  },
+  {
+    name: "each page load is a new person",
+    file: "packages/client/app.tsx",
+    from: '  peerId: persistentPeerId("pineta-peer-id"),',
+    to: '  peerId: "client-" + crypto.randomUUID(),',
+    command: browser,
+    expect: "a reload keeps who you are",
+  },
 ]

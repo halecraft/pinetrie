@@ -135,15 +135,19 @@ export function Composer({
     void send(pending, "branch")
   }, [])
 
+  const submit = async () => {
+    const message = text.trim()
+    if (message === "") return
+    setText("")
+    await send(message, mode)
+  }
+
   return (
     <form
       className="composer"
-      onSubmit={async event => {
+      onSubmit={event => {
         event.preventDefault()
-        const message = text.trim()
-        if (message === "") return
-        setText("")
-        await send(message, mode)
+        void submit()
       }}
     >
       {conflict !== null && (
@@ -191,36 +195,45 @@ export function Composer({
           {typing.join(", ")} {typing.length === 1 ? "is" : "are"} typing…
         </div>
       )}
+      {/* Enter sends; Shift+Enter is a new line. It grows with what is
+          typed, up to a limit, then scrolls. */}
+      <textarea
+        autoComplete="off"
+        className="input"
+        onChange={e => {
+          setText(e.target.value)
+          onTyping()
+        }}
+        onKeyDown={e => {
+          if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing)
+            return
+          e.preventDefault()
+          void submit()
+        }}
+        placeholder={
+          byDefault ? "ask the agent…" : "say something · @agent to ask"
+        }
+        rows={Math.min(8, Math.max(2, text.split("\n").length))}
+        value={text}
+      />
       <div className="compose-row">
-        <input
-          autoComplete="off"
-          className="input"
-          onChange={e => {
-            setText(e.target.value)
-            onTyping()
-          }}
-          placeholder={
-            byDefault ? "ask the agent…" : "say something · @agent to ask"
-          }
-          value={text}
-        />
+        {onComposeTogether !== undefined && (
+          <button
+            className="compose-together"
+            onClick={() => {
+              onComposeTogether(text)
+              setText("")
+            }}
+            title="write the next message together: everyone here can edit it"
+            type="button"
+          >
+            compose together
+          </button>
+        )}
         <button className="send" type="submit">
           {label}
         </button>
       </div>
-      {onComposeTogether !== undefined && (
-        <button
-          className="compose-together"
-          onClick={() => {
-            onComposeTogether(text)
-            setText("")
-          }}
-          title="write the next message together: everyone here can edit it"
-          type="button"
-        >
-          compose together
-        </button>
-      )}
       <span className="status">{status}</span>
     </form>
   )

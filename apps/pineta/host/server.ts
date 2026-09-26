@@ -3,8 +3,9 @@
 //   PINETA_PORT      the port (default 7391; 0 = any free port)
 //   PINETA_BIND      the address (default 127.0.0.1: this machine only)
 //   PINETA_KEY       the invite key off loopback (default: a fresh one)
-//   PINETA_TOOLS=1   the agent reads, writes, edits and runs commands in this
-//                    repo, as you; hot reload is then off (ADR-0022)
+//   PINETA_TOOLS=0   the agent has no tools. By default it reads, writes,
+//                    edits and runs commands in this repo, as you, and hot
+//                    reload is off (ADR-0022); with tools off, it is on
 //   PINETA_STORE     the SQLite file the session is kept in
 //                    (default .pineta/pineta.db in the repo)
 //   PINETA_PROVIDER, PINETA_MODEL
@@ -15,7 +16,7 @@ import { startHost } from "./index.ts"
 
 const repo = path.resolve(import.meta.dirname, "../../..")
 const env = process.env
-const tools = env.PINETA_TOOLS === "1" ? { cwd: repo } : null
+const tools = env.PINETA_TOOLS === "0" ? null : { cwd: repo }
 const host = await startHost({
   port: Number.parseInt(env.PINETA_PORT ?? "7391", 10),
   bind: env.PINETA_BIND ?? "127.0.0.1",

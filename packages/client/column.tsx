@@ -59,6 +59,8 @@ export interface ColumnProps {
   /** Others following this column's thread, and others typing at its end (ADR-0024). */
   seenBy: readonly WriterId[]
   typing: readonly WriterId[]
+  /** Each person's colour (`presenceColors`). */
+  colorOf: (writer: WriterId) => string
   /** This window is typing in this column's composer. */
   onTyping: () => void
   /** Every note's record (ADR-0025). */
@@ -235,7 +237,7 @@ export function Column(p: ColumnProps) {
               : "thread"
             : `from ${forkLabel}: “${forkText}${forkText.length === 48 ? "…" : ""}”`}
         </span>
-        <Avatars nameOf={p.nameOf} writers={p.seenBy} />
+        <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={p.seenBy} />
         {p.position > 0 && (
           <button className="make-main" onClick={p.onMakeMain} type="button">
             make main

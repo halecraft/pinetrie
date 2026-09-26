@@ -97,7 +97,7 @@ Roughly in dependency order, each independently shippable:
    - ~~**Presence**~~ — **done** (ADR-0024): an ephemeral document, one entry
      per open column, decaying; rings on the rail, avatars in column headers,
      typing in the composer. The host refuses client writes to the session.
-   - ~~**Self-hosting**~~ — **done** (ADR-0022): with `PINETA_TOOLS=1` the
+   - ~~**Self-hosting**~~ — **done** (ADR-0022): the development host's
      agent reads, writes, edits and runs commands in the repo, visibly, with the
      person's own pi models; stop, persistence, and an invite key off loopback.
      Next: a sandbox profile for `bash`, then a workspace per lane (ADR-0019).
