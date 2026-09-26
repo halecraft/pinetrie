@@ -5,7 +5,7 @@ picking the project up cold. The detailed record lives in `docs/`; this
 file exists to tell you what matters, what is decided, and what to do next.
 
 > The architectural record lives alongside this file in `docs/` and is
-> **tracked**. `00`–`05` are the standing documents; `findings/` holds the 14
+> **tracked**. `00`–`05` are the standing documents; `findings/` holds the 18
 > spike reports that are the evidence behind them. This file is the orientation
 > layer over the top.
 >
@@ -407,5 +407,5 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
 | `docs/03-spikes.md` | S1–S16, each with question + kill criterion |
 | `docs/04-roadmap.md` | sequencing, invariants, action items |
 | `docs/05-stack.md` | stack decisions, sandbox constraints |
-| `docs/findings/` | 14 spike reports — the evidence |
+| `docs/findings/` | 18 spike reports — the evidence |
 | `sandbox/` | disposable spike code (gitignored), kept for reproduction |
