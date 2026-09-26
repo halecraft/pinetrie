@@ -158,6 +158,13 @@ next one.** The text is a Yjs document per note; the record is a host-written
 draft per thread end, sent through the one send path. Contributors come from
 each edit's Yjs `clientID`. The host refuses writes to a done note.
 
+**ADR-0026 — everything queued is a note; the queue waits at a
+note someone has open.** A message waiting for a busy lane becomes a `queued`
+note that anyone can edit, cancel, or release from someone's hold. The host
+takes notes in order and stops at one someone is editing. It refuses no write
+to a note that has a record, because a refused write cannot be recovered from
+(S28). Replaces `pineta.outbox`.
+
 **ADR-0021 — a thread's mode is its lane; a mention picks the addressee.** A
 thread with a lane is agent work, one without is a conversation; nothing is
 stored. Mentions pick who a message is for (naming only people leaves the
@@ -370,8 +377,18 @@ context.**
   test. Ask Kyneta to export it, then delete the copy.
 - **A refused write to a note splits that client's replica.** Its later edits
   build on the refused one and never reach the host, even after the note is
-  reopened (S26 addendum 2). The screen offers no way to write a done note; a
-  client writing directly can.
+  reopened (S26 addendum 2). The host keeps those later edits as pending
+  structs, and a fresh replica under the same peer id collides with them and
+  corrupts the text (S28). Someone marking a note done while another person
+  types gets there. ADR-0026 stops refusing writes to notes that have a record.
+- **A reload can corrupt a note, and costs attribution.** The browser comes
+  back under the same peer id with a fresh replica. Once the note syncs, Yjs
+  replaces the `clientID` with a random one, so the host credits nobody for
+  that client's later edits. A write made before the sync reuses clocks the
+  host already holds, and corrupts the text (S28). In Pineta: the note's editor
+  should accept no input until the note has synced. Upstream: Kyneta should
+  claim the peer's `clientID` for a network-synced Yjs document only after its
+  first sync, as `createForHydration` does for a store. To file.
 
 - **Kyneta ephemeral: a write and a deletion in the same millisecond diverge.**
   A peer that sets a key and deletes it within one millisecond applies both in
