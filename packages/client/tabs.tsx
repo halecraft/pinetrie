@@ -69,7 +69,11 @@ export function TabBar({
    * viewport: the tab list scrolls sideways, which makes it clip vertically
    * too, so a menu positioned inside it would be cut off below the bar.
    */
-  const [menu, setMenu] = useState<{ top: number; right: number } | null>(null)
+  const [menu, setMenu] = useState<{
+    root: string
+    top: number
+    right: number
+  } | null>(null)
   // A menu opened on one tab closes when another is shown.
   // biome-ignore lint/correctness/useExhaustiveDependencies: close on every change of tab
   useEffect(() => setMenu(null), [active])
@@ -159,22 +163,27 @@ export function TabBar({
                   writers={readers.get(root) ?? []}
                 />
               </button>
-              {selected && !archived.has(root) && (
-                <span className="tab-more">
+              {/* On every root tab: shown on the one you are on, and on
+                  another on hover or focus, so any root can be archived. */}
+              {!archived.has(root) && (
+                <span
+                  className={menu?.root === root ? "tab-more open" : "tab-more"}
+                >
                   <button
-                    aria-expanded={menu !== null}
+                    aria-expanded={menu?.root === root}
                     aria-haspopup="menu"
                     aria-label="more for this thread"
                     className="tab-menu"
                     onClick={e => {
                       const r = e.currentTarget.getBoundingClientRect()
                       setMenu(
-                        menu === null
-                          ? {
+                        menu?.root === root
+                          ? null
+                          : {
+                              root,
                               top: r.bottom,
                               right: window.innerWidth - r.right,
-                            }
-                          : null,
+                            },
                       )
                     }}
                     onKeyDown={e => {
@@ -184,7 +193,7 @@ export function TabBar({
                   >
                     ⋯
                   </button>
-                  {menu !== null && (
+                  {menu?.root === root && (
                     <div
                       className="menu"
                       role="menu"

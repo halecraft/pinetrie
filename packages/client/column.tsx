@@ -89,6 +89,11 @@ export interface ColumnProps {
   onOpen: (anchor: string) => void
   onMakeMain: () => void
   onClose: () => void
+  /**
+   * Whether "close" does anything: not on a root tab's only column, which the
+   * root would give back at once (`columnsOf`), nor in a preview.
+   */
+  closable: boolean
 }
 
 export function Column(p: ColumnProps) {
@@ -234,9 +239,11 @@ export function Column(p: ColumnProps) {
             make main
           </button>
         )}
-        <button className="close" onClick={p.onClose} type="button">
-          close
-        </button>
+        {p.closable && (
+          <button className="close" onClick={p.onClose} type="button">
+            close
+          </button>
+        )}
       </header>
       <div className="column-body" ref={body}>
         {stillEdited && outOfView && (

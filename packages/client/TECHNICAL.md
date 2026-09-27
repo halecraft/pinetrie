@@ -336,6 +336,11 @@ its `writer` for the lookup.
 
 ## Gotchas
 
+- **A root tab's `⋯` is always rendered, hidden with `visibility`** except on
+  the tab you are on, while hovered or focused, or while its menu is open. The
+  menu is its child, so hiding the `⋯` would hide an open menu too.
+- **"close" is `closable`:** hidden on a root tab's only column (`columnsOf`
+  would give it back) and in the Archive tab's preview.
 - **Anything that pops out of the tab bar is `position: fixed`.** `.tab-list`
   scrolls sideways, and `overflow-x: auto` makes its vertical overflow `auto`
   too, so a menu positioned inside it is clipped below the bar. The tab's `⋯`

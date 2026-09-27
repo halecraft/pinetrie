@@ -39,6 +39,11 @@
       .tab-new { font-style: italic; }
       .tab-close, .tab-menu { padding: 0 .35rem; background: none; color: #aaa; }
       .tab-more { position: relative; }
+      /* ⋯ on the tab you are on, and on another while hovered or focused. Hidden
+         with visibility, which keeps the tab's width from jumping. */
+      .tab-wrap .tab-more { visibility: hidden; }
+      .tab-wrap:hover .tab-more, .tab-wrap:focus-within .tab-more, .tab-more.open,
+      .tab-wrap:has(> .tab[aria-selected="true"]) .tab-more { visibility: visible; }
       .menu { position: absolute; z-index: 4; top: 100%; right: 0; display: flex;
         flex-direction: column; min-width: 12rem; padding: .25rem; background: #1b1e24;
         border: 1px solid #3a3f48; border-radius: 6px; }

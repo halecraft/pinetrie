@@ -37,6 +37,8 @@ import { startHost } from "../host/index.ts"
 import { createChecks, waitFor } from "./harness.ts"
 
 const PW_SERVER = process.env.PW_SERVER ?? "ws://localhost:3100/"
+/** The ⋯ of the tab you are on: every root tab has one, shown on hover. */
+const OWN_MENU = '#tabs .tab[aria-selected="true"] ~ .tab-more .tab-menu'
 
 const { ok, report } = createChecks()
 
@@ -662,6 +664,16 @@ try {
     appeared && (await selectedRoot(page)) === firstRoot,
     "a root another writer starts appears as a tab, and the page stays where it is",
   )
+  // Any root can be archived: another tab's ⋯ shows while it is hovered.
+  const otherMenu = page.locator(`${tabSel(thirdRoot)} ~ .tab-more .tab-menu`)
+  const hiddenAtRest = !(await otherMenu.isVisible())
+  await page.hover(tabSel(thirdRoot))
+  const shownOnHover = await otherMenu.isVisible()
+  await page.mouse.move(0, 0)
+  ok(
+    hiddenAtRest && shownOnHover,
+    `another root's tab shows its ⋯ on hover, and not at rest (${hiddenAtRest}, ${shownOnHover})`,
+  )
 
   // 3. Only the tab someone is on shows them, and switching moves them.
   const tb = await browser.newPage()
@@ -732,8 +744,13 @@ try {
     // 5. Archived, a root leaves everyone's bar; the page on it reads it.
     await page.click(tabSel(thirdRoot))
     await page.waitForSelector(`${col(0)} .composer .send`, { timeout: 15_000 })
+    ok(
+      (await page.locator(".column").count()) === 1 &&
+        (await page.locator(".column .close").count()) === 0,
+      "a root tab's only column offers no close: the root would give it back",
+    )
     await page.fill(`${col(0)} .composer .input`, "typed, not sent")
-    await page.click("#tabs .tab-menu")
+    await page.click(OWN_MENU)
     // Seen, not only clickable: Playwright scrolls a clipped element into view
     // before clicking it, which a person cannot do.
     const menuSeen = await page
@@ -798,7 +815,7 @@ try {
 
     // Archived again and left, its tab goes; the Archive tab brings it back.
     await page.fill(input, "")
-    await page.click("#tabs .tab-menu")
+    await page.click(OWN_MENU)
     await page.click("#tabs .archive-root")
     await page
       .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })
@@ -1324,7 +1341,7 @@ try {
             )
             .catch(() => null)) === own
         await tp.click(`#tabs .tab[data-root="${newRoot}"]`)
-        await tp.click("#tabs .tab-menu")
+        await tp.click(OWN_MENU)
         const item = "#tabs .archive-root"
         const disabled = await tp
           .$eval(item, b => (b as HTMLButtonElement).disabled)

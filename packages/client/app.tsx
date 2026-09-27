@@ -611,6 +611,8 @@ function App({ session }: { session: SessionClient }) {
                     return (
                       <Column
                         {...shared}
+                        // A new tab's column closes the new tab.
+                        closable={newTab !== null || columns.length > 1}
                         column={column}
                         forks={colors.forks}
                         key={column.key}
@@ -684,6 +686,7 @@ function Preview({
   noteEntries: ReadonlySet<string>
   shared: Omit<
     ColumnProps,
+    | "closable"
     | "column"
     | "forks"
     | "onBranch"
@@ -725,6 +728,7 @@ function Preview({
       <div className="preview-strip">
         <Column
           {...shared}
+          closable={false}
           column={column}
           forks={new Map()}
           onBranch={none}

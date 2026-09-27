@@ -452,4 +452,20 @@ export const mutations: readonly Mutation[] = [
     command: browser,
     expect: "a tab's ⋯ opens a menu drawn in full",
   },
+  {
+    name: "a tab's ⋯ shows only on the tab you are on",
+    file: "packages/client/tabs.tsx",
+    from: "              {!archived.has(root) && (\n                <span",
+    to: "              {selected && !archived.has(root) && (\n                <span",
+    command: browser,
+    expect: "another root's tab shows its ⋯ on hover",
+  },
+  {
+    name: "a root tab's only column offers close",
+    file: "packages/client/app.tsx",
+    from: "                        closable={newTab !== null || columns.length > 1}",
+    to: "                        closable={true}",
+    command: browser,
+    expect: "a root tab's only column offers no close",
+  },
 ]
