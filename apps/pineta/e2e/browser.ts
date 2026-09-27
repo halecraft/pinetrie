@@ -734,6 +734,19 @@ try {
     await page.waitForSelector(`${col(0)} .composer .send`, { timeout: 15_000 })
     await page.fill(`${col(0)} .composer .input`, "typed, not sent")
     await page.click("#tabs .tab-menu")
+    // Seen, not only clickable: Playwright scrolls a clipped element into view
+    // before clicking it, which a person cannot do.
+    const menuSeen = await page
+      .$eval("#tabs .menu", m => {
+        const r = m.getBoundingClientRect()
+        const hit = document.elementFromPoint(
+          r.left + r.width / 2,
+          r.top + r.height / 2,
+        )
+        return hit !== null && m.contains(hit)
+      })
+      .catch(() => false)
+    ok(menuSeen, "a tab's ⋯ opens a menu drawn in full below the tab bar")
     await page.click("#tabs .archive-root")
     await page
       .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })

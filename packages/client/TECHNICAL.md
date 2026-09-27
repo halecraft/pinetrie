@@ -336,6 +336,15 @@ its `writer` for the lookup.
 
 ## Gotchas
 
+- **Anything that pops out of the tab bar is `position: fixed`.** `.tab-list`
+  scrolls sideways, and `overflow-x: auto` makes its vertical overflow `auto`
+  too, so a menu positioned inside it is clipped below the bar. The tab's `⋯`
+  menu is placed from its button's rect when opened, and closes when the list
+  scrolls or the window resizes.
+- **Playwright clicks what a person cannot see.** It scrolls a clipped element
+  into view before clicking, so a check that a popup can be clicked does not
+  show it is visible. Check what `elementFromPoint` finds at its centre.
+
 - **Selectors for root tabs:** a root's tab is `#tabs .tab[data-root="…"]`,
   the one you are on has `aria-selected="true"`, Archive is `.tab-archive`,
   new tabs are `.tab-new`, and the add tab's buttons are `.add-agent`,

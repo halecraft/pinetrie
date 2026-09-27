@@ -444,4 +444,12 @@ export const mutations: readonly Mutation[] = [
     command: browser,
     expect: "the page on it reads it",
   },
+  {
+    name: "the tab menu is drawn inside the tab list, which clips it",
+    file: "packages/client/tabs.tsx",
+    from: '                        position: "fixed",',
+    to: '                        position: "absolute",',
+    command: browser,
+    expect: "a tab's ⋯ opens a menu drawn in full",
+  },
 ]

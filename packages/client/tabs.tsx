@@ -64,16 +64,30 @@ export function TabBar({
   onArchive: (root: string) => void
   onAdd: (asksAgent: boolean) => void
 }) {
-  const [menu, setMenu] = useState(false)
+  /**
+   * Where the open tab menu is drawn, or null when closed. Fixed to the
+   * viewport: the tab list scrolls sideways, which makes it clip vertically
+   * too, so a menu positioned inside it would be cut off below the bar.
+   */
+  const [menu, setMenu] = useState<{ top: number; right: number } | null>(null)
   // A menu opened on one tab closes when another is shown.
   // biome-ignore lint/correctness/useExhaustiveDependencies: close on every change of tab
-  useEffect(() => setMenu(false), [active])
+  useEffect(() => setMenu(null), [active])
+  // Placed once, when opened: a resize would leave it beside nothing.
+  useEffect(() => {
+    if (menu === null) return
+    const close = () => setMenu(null)
+    window.addEventListener("resize", close)
+    return () => window.removeEventListener("resize", close)
+  }, [menu])
   return (
     <nav aria-label="threads" id="tabs">
       <div
         aria-label="threads"
         className="tab-list"
         onKeyDown={moveFocus}
+        // The menu is fixed where it opened; scrolled, its tab moves away.
+        onScroll={() => setMenu(null)}
         role="tablist"
       >
         {tabs.map(tab => {
@@ -148,22 +162,43 @@ export function TabBar({
               {selected && !archived.has(root) && (
                 <span className="tab-more">
                   <button
-                    aria-expanded={menu}
+                    aria-expanded={menu !== null}
                     aria-haspopup="menu"
                     aria-label="more for this thread"
                     className="tab-menu"
-                    onClick={() => setMenu(!menu)}
+                    onClick={e => {
+                      const r = e.currentTarget.getBoundingClientRect()
+                      setMenu(
+                        menu === null
+                          ? {
+                              top: r.bottom,
+                              right: window.innerWidth - r.right,
+                            }
+                          : null,
+                      )
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === "Escape") setMenu(null)
+                    }}
                     type="button"
                   >
                     ⋯
                   </button>
-                  {menu && (
-                    <div className="menu" role="menu">
+                  {menu !== null && (
+                    <div
+                      className="menu"
+                      role="menu"
+                      style={{
+                        position: "fixed",
+                        top: menu.top,
+                        right: menu.right,
+                      }}
+                    >
                       <button
                         className="archive-root"
                         disabled={busy !== undefined}
                         onClick={() => {
-                          setMenu(false)
+                          setMenu(null)
                           onArchive(root)
                         }}
                         role="menuitem"
