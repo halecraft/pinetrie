@@ -23,8 +23,8 @@ This document fixes the design before any code. It draws E and T directly.
 3. **No thread is special.** The data has no "main thread"; the interface should
    not invent one. Whatever you put first is what reads as the trunk. Roots
    are peers too: each has a tab, in the order they began (ADR-0029).
-4. **Show context, don't describe it.** What the agent will read is a path; draw
-   that path lit and everything else not.
+4. **Show context, don't describe it.** What the agent will read is a path: the
+   column shows it, and marks where the agent joined.
 5. **Say the effect, not a mode name.** "send · agent will reply" says what
    happens. "Working session" is a name someone has to learn. So there is no
    mode to set: the send button says what each message will do (ADR-0021).
@@ -136,21 +136,17 @@ so it is the one behind the menu. What each does is under "Starting" below.
 
 - A git-graph strip at the left edge draws every branch in the tab's root as a
   line, and every message as a dot, in tree order.
-- **Open columns are highlighted** in the rail in their colours, so you can see
-  which branches are on screen and where they sit in the whole.
+- **A column wears its rail track's colour**, so you can see which branches are
+  on screen and where they sit in the whole.
 - **Clicking a branch in the rail opens it as a column**, or scrolls to it if it
   is open.
 - **Activity shows in the rail**: a pulsing dot where the agent is replying, a
   mark where a branch has messages you have not read.
 
-The rail is E; the lit column is T. Seeing both at once is the product.
+The rail is E; the column is T. Seeing both at once is the product.
 
 ### Context, drawn
 
-- **When the agent is replying, the path it reads is lit**: that column from the
-  root to the message it is answering, including the part shown in columns to
-  the left. Everything else dims. This is the E/T distinction, visible while it
-  matters.
 - A message the agent was asked shows as asked (a margin bar), and the thread
   marks **where the agent joined**, since everything above it is now its context.
 
@@ -280,8 +276,6 @@ archive record (ADR-0029); a note's text is its own document (ADR-0025).
   the part after its fork point is the suffix below the column to its left.
 - **The rail** is the tree itself, from `parentId`, drawn in id order, which is
   creation order (uuidv7).
-- **The lit path** is the agent's run's path: the agent's lane tip while
-  `activeRuns` has its lane.
 - **A thread's mode** is its lane; **names** are `pineta.participant` values.
 - **A root tab** is a root of the tree index (an orphan counts as one) that
   has no `archived` record. The tab bar is those, ascending by id.

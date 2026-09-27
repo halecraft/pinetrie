@@ -258,16 +258,16 @@ describe("colour and the agent", () => {
     ])
     expect(branchColors(rail, cols).track).toEqual([0, PENDING_TRACK])
   })
-  test("the agent is idle with no running lane; each running lane reads its own path", () => {
-    expect(agentActivity(i, [])).toEqual([])
-    const runs = agentActivity(i, [
+  test("the agent is idle with no running lane; a lane runs once it has a tip", () => {
+    expect(agentActivity([])).toEqual([])
+    const runs = agentActivity([
       { lane: laneNameForThread("a"), tip: "5-a2" },
       { lane: laneNameForThread("b"), tip: "7-b2" },
       { lane: laneNameForThread("new"), tip: null },
     ])
-    expect(runs.map(r => [r.lane, [...r.path]])).toEqual([
-      ["t-a", ["5-a2", "4-a1", "1-t1"]],
-      ["t-b", ["7-b2", "6-b1", "2-t2", "1-t1"]],
+    expect(runs.map(r => [r.lane, r.tip])).toEqual([
+      ["t-a", "5-a2"],
+      ["t-b", "7-b2"],
     ])
   })
 })

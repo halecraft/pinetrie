@@ -127,10 +127,6 @@ export function Column(p: ColumnProps) {
     ? undefined
     : view.nodes.find(n => n.compelled === true)?.id
 
-  // The agent reads each running lane's path; a message on none of them is
-  // outside every reply being written.
-  const running = p.activity.length > 0
-  const lit = (id: string) => p.activity.some(r => r.path.has(id))
   // The lanes running on this column's path stream here.
   const streamingLanes = p.activity
     .filter(r => p.path.has(r.tip))
@@ -275,7 +271,6 @@ export function Column(p: ColumnProps) {
                 forkTracks={p.forks.get(node.id) ?? []}
                 joined={node.id === joinedAt}
                 key={node.id}
-                light={running ? (lit(node.id) ? "lit" : "dim") : undefined}
                 nameOf={p.nameOf}
                 node={node}
                 note={(() => {

@@ -191,8 +191,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 ## Threads, lanes and the composer (ADR-0020)
 
 - **The agent can reply in several threads at once**: `readAgentActivity`
-  returns every running lane. The rail pulses at each tip, a message is lit if
-  any run reads it, and each column streams the runs whose tip is on its path.
+  returns every running lane. The rail pulses at each tip, and each column
+  streams the runs whose tip is on its path.
 - **The composer decides before sending, as the host will.** `threadOf` finds
   the thread (the column's bound lane, or its end) and `address` who the
   message is for, over `readLanes` and `readParticipants`: the same reads and

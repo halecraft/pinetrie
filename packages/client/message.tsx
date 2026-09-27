@@ -24,8 +24,6 @@ export interface MessageProps {
   note: ReactNode | undefined
   /** Open it for everyone to edit; undefined once it has a note. */
   onEdit: (() => void) | undefined
-  /** While the agent replies: whether it reads this message. */
-  light: "lit" | "dim" | undefined
   /** The agent joins the thread here: the first message on the path that asked it. */
   joined: boolean
   /** Tracks of open columns that fork here: a dot of each colour. */
@@ -60,7 +58,6 @@ export function Message(p: MessageProps) {
     "msg",
     node.role,
     node.compelled === true ? "asked" : "",
-    p.light ?? "",
   ].filter(c => c !== "")
   return (
     <>

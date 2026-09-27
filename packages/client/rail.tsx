@@ -48,7 +48,7 @@ export function Rail({
   notesPanel,
 }: {
   rows: readonly RailRow[]
-  /** Ids on any open column's path: drawn at full strength. */
+  /** Ids on any open column's path: marked `data-open`. */
   open: ReadonlySet<string>
   /** Every running lane: each tip pulses, whether or not a column shows it. */
   activity: readonly AgentRun[]
@@ -101,7 +101,6 @@ export function Rail({
                 d={d}
                 fill="none"
                 key={`e-${r.id}`}
-                opacity={open.has(r.id) ? 1 : 0.35}
                 stroke={trackColor(r.track)}
                 strokeWidth={2}
               />
@@ -133,7 +132,6 @@ export function Rail({
                 left: x(r.track) - DOT,
                 top: y(i) - DOT,
                 background: trackColor(r.track),
-                opacity: open.has(r.id) || first !== undefined ? 1 : 0.35,
                 // Someone else follows this thread: a ring in their colour, with
                 // a dark gap so it reads against any track's colour. The dot is
                 // 8 px, so the rail marks and the column header names.

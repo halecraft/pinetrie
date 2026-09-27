@@ -444,25 +444,6 @@ try {
     `the new first column keeps no alignment spacer: it has no fork point (${leftover}px)`,
   )
 
-  // ── the agent's context, lit ────────────────────────────────────────────
-  await send(0, "@agent say exactly: LIT")
-  const lit = await page.waitForSelector(".msg.dim", { timeout: 30_000 }).then(
-    () => true,
-    () => false,
-  )
-  const litState = await page.evaluate(note => {
-    const byText = (t: string) =>
-      [...document.querySelectorAll(".msg")].find(
-        n => n.querySelector(":scope > .text")?.textContent === t,
-      )?.className ?? ""
-    return { aside: byText("an aside"), note: byText(note) }
-  }, NOTE)
-  ok(
-    lit && litState.aside.includes("lit") && litState.note.includes("dim"),
-    `while the agent replies, its path is lit and the rest dims (${litState.aside} / ${litState.note})`,
-  )
-  await idle()
-
   // ── a busy thread: the composer says it will queue, and it does ────────
   // On one host the page sees another writer's run start almost at once, so
   // the composer chooses `queue` itself: that is what a person meets. A true

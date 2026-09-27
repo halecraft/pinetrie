@@ -112,13 +112,12 @@ export function readLanes(
   })
 }
 
-/** Every lane the agent is replying on, and what each reads. */
+/** Every lane the agent is replying on. */
 export function readAgentActivity(
   doc: SessionDocHandle,
   index: TreeIndex,
 ): readonly AgentRun[] {
   return agentActivity(
-    index,
     readLanes(doc, index)
       .filter(l => l.running)
       .map(l => ({ lane: l.name, tip: l.tip })),

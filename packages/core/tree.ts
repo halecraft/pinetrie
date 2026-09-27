@@ -729,13 +729,11 @@ function raceAlong(
   return newest === null ? null : { by: newest.by }
 }
 
-/** One lane the agent is replying on: where, and what it reads. */
+/** One lane the agent is replying on. */
 export interface AgentRun {
   readonly lane: LaneName
   /** The lane's tip: the message it is answering, then its reply. */
   readonly tip: string
-  /** What it reads: the path to `tip`. */
-  readonly path: ReadonlySet<string>
 }
 
 /**
@@ -743,13 +741,10 @@ export interface AgentRun {
  * several can run at once; an empty list is an idle agent.
  */
 export function agentActivity(
-  index: TreeIndex,
   running: readonly { readonly lane: LaneName; readonly tip: string | null }[],
 ): readonly AgentRun[] {
   return running.flatMap(r =>
-    r.tip === null
-      ? []
-      : [{ lane: r.lane, tip: r.tip, path: pathIds(index, r.tip) }],
+    r.tip === null ? [] : [{ lane: r.lane, tip: r.tip }],
   )
 }
 

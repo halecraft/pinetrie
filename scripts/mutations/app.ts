@@ -59,14 +59,6 @@ export const mutations: readonly Mutation[] = [
     expect: "share a colour",
   },
   {
-    name: "every message is lit while the agent replies",
-    file: "packages/client/column.tsx",
-    from: '              light={running ? (lit(node.id) ? "lit" : "dim") : undefined}',
-    to: '              light={running ? "lit" : undefined}',
-    command: browser,
-    expect: "its path is lit and the rest dims",
-  },
-  {
     name: "a first column keeps its alignment spacer",
     file: "packages/client/column.tsx",
     from: '      spacer.current.style.height = "0px"',
