@@ -63,6 +63,7 @@ import { readEntryCount } from "./projection.ts"
 import { Rail } from "./rail.tsx"
 import { connectSession, type SessionClient } from "./session-view.ts"
 import { tabState } from "./tab-state.ts"
+import { PLACED } from "./use-follow.ts"
 
 /** Open columns: this tab's, or on a new tab the device's latest (ADR-0027). */
 const columnStore = tabState({
@@ -119,8 +120,9 @@ function openBeside(
 
 /**
  * Bring a newly opened column's first message level with its fork point in
- * the column that shows it. The one imperative layout step: after it, every
- * column scrolls on its own. A column with no fork point opens at its end.
+ * the column that shows it. A column with no fork point opens at its end.
+ * Then tell the column it was placed, so it follows its end only if it was
+ * placed there (`follow.ts`).
  */
 function alignOnOpen(strip: HTMLElement, key: string, forkFrom: string | null) {
   const column = strip.querySelector<HTMLElement>(`.column[data-key="${key}"]`)
@@ -132,6 +134,17 @@ function alignOnOpen(strip: HTMLElement, key: string, forkFrom: string | null) {
     body === undefined
   )
     return
+  place(strip, column, body, forkFrom)
+  body.dispatchEvent(new Event(PLACED))
+}
+
+/** Scroll the column, or grow its spacer, to meet its fork point. */
+function place(
+  strip: HTMLElement,
+  column: HTMLElement,
+  body: HTMLElement,
+  forkFrom: string | null,
+) {
   const spacer = body.querySelector<HTMLElement>(".spacer")
   const first = body.querySelector<HTMLElement>(".msg")
   const fork =

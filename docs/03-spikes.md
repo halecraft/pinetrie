@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S32 — Following a column's end ✅ PASS
+
+`findings/S32-following-the-end.md`. A column did not follow a reply being
+written: its follow ran on new messages, not on growth. Chromium dispatches
+scroll events before ResizeObserver callbacks in each frame, so a column that
+follows its size in a ResizeObserver can tell the reader's scroll up (a scroll
+event above where it last left the scroll) from its own follow, with no wheel,
+key or touch listeners.
+
 ### S31 — A new command kind, and a store holding the old Lines ✅ PASS
 
 `findings/S31-line-kinds-and-stored-lines.md`. Adding a kind to

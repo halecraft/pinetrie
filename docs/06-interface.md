@@ -110,6 +110,9 @@ so it is the one behind the menu. What each does is under "Starting" below.
 - **Each column scrolls on its own.** A new column opens scrolled so its first
   message is level with its fork point; after that it scrolls freely. Forks far
   apart (message 2 and message 95 of a long trunk) are both readable at once.
+- **A column at its end follows what is written there**, the agent's reply as
+  it streams included. A scroll up holds it still; **↓ new below**, a scroll
+  back to the end, or your own send brings it back.
 - **The shared part of paths is shown once.** A column shows only what follows
   the deepest entry it shares with any column to its left; its header says where
   it came from.
@@ -211,7 +214,8 @@ The rail is E; the lit column is T. Seeing both at once is the product.
   entry in the tree, but it belongs to its call, so it adds no message and no
   rail dot.
 - **While the agent works, its column shows it live**: the reply as it is
-  written, and each running command's output, kept scrolled to its end.
+  written, and each running command's output, following its end as a column
+  does.
   **Stop** ends the turn; messages waiting are then taken.
 - A message's tools (cite, and `→` in the margin) appear on hover or focus;
   beneath it stay only branch buttons and citation counts.

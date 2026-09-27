@@ -865,6 +865,168 @@ try {
         doneLine === "A first line,\nand a second.",
         `a done note draws its markdown, and keeps its line breaks (${JSON.stringify(doneLine)})`,
       )
+
+      // ── a column follows its end, until the reader scrolls up ──────────────
+      const body = (n: number) => `${col(n)} .column-body`
+      const gapOf = (n: number) =>
+        tp.$eval(body(n), b => b.scrollHeight - b.scrollTop - b.clientHeight)
+      const frame = () =>
+        tp.evaluate(() => new Promise(r => requestAnimationFrame(r)))
+      const streamHeight = () =>
+        tp
+          .$eval(`${col(0)} .streaming`, s => s.getBoundingClientRect().height)
+          .catch(() => 0)
+      /** The column's gap to its end, sampled while its reply is written. */
+      const sampleWhileStreaming = async () => {
+        const gaps: number[] = []
+        let tallest = 0
+        while ((await tp.$(`${col(0)} .streaming`)) !== null) {
+          tallest = Math.max(tallest, await streamHeight())
+          gaps.push(Math.round(await gapOf(0)))
+          await new Promise(r => setTimeout(r, 100))
+        }
+        return { gaps, tallest }
+      }
+      const LONG = Array.from(
+        { length: 40 },
+        (_, i) => `Line ${i + 1} of a long reply.`,
+      ).join("\n\n")
+
+      script.use([{ text: LONG }])
+      await say("a long one")
+      await appears(`${col(0)} .streaming`)
+      const followed = await sampleWhileStreaming()
+      await toolIdle()
+      ok(
+        followed.gaps.length >= 3 &&
+          followed.tallest >= 300 &&
+          followed.gaps.every(g => g < 80),
+        `a column at its end follows a reply as it is written (gaps ${followed.gaps.join(" ")}; reply ${Math.round(followed.tallest)}px)`,
+      )
+
+      script.use([{ text: LONG }])
+      await say("another long one")
+      await tp
+        .waitForFunction(
+          c =>
+            (document.querySelector(`${c} .streaming`)?.getBoundingClientRect()
+              .height ?? 0) > 100,
+          col(0),
+          { timeout: 20_000 },
+        )
+        .catch(() => null)
+      await tp.hover(body(0))
+      await tp.mouse.wheel(0, -10)
+      await new Promise(r => setTimeout(r, 300))
+      const heldAt = await tp.$eval(body(0), b => b.scrollTop)
+      const grownFrom = await streamHeight()
+      await tp
+        .waitForFunction(
+          ([c, h]) =>
+            (document.querySelector(`${c} .streaming`)?.getBoundingClientRect()
+              .height ?? 0) >
+            h + 200,
+          [col(0), grownFrom] as const,
+          { timeout: 20_000 },
+        )
+        .catch(() => null)
+      const heldTo = await tp.$eval(body(0), b => b.scrollTop)
+      const offered = await appears(`${col(0)} .jump-latest`, 2_000)
+      if (offered) await tp.click(`${col(0)} .jump-latest`)
+      await frame()
+      const jumped = await gapOf(0)
+      const gone = (await tp.locator(`${col(0)} .jump-latest`).count()) === 0
+      const after = await sampleWhileStreaming()
+      await toolIdle()
+      ok(
+        Math.abs(heldTo - heldAt) <= 1 &&
+          offered &&
+          // While the reply streams, a paragraph can land between the jump
+          // and this read, as in the samples.
+          jumped < 80 &&
+          gone &&
+          after.gaps.every(g => g < 80),
+        `a small scroll up holds the column still while the reply is written, and ↓ new below is the way back (held ${Math.round(heldAt)}→${Math.round(heldTo)}, offered ${offered}, gap after ${Math.round(jumped)}, then ${after.gaps.join(" ")})`,
+      )
+
+      await tp.hover(body(0))
+      await tp.mouse.wheel(0, -300)
+      await new Promise(r => setTimeout(r, 300))
+      const away = await gapOf(0)
+      script.use([{ text: "short" }])
+      await say("back to the end")
+      await toolIdle()
+      await appears(`${col(0)} ${msg("back to the end")}`)
+      await frame()
+      const back = await gapOf(0)
+      ok(
+        away > 200 && back <= 2,
+        `your own send brings the column back to its end (${Math.round(away)}px away, then ${Math.round(back)})`,
+      )
+
+      // A column opened level with its fork point, and longer than it is
+      // tall, keeps that place as its thread grows: it was placed short of
+      // its end, so it does not follow it.
+      const aligner = await connectSession({
+        url: toolHost.wsUrl,
+        WebSocket,
+        peerId: "browser-aligner",
+      })
+      try {
+        const forkId =
+          (await tp
+            .locator(`${col(0)} .msg[data-entry]`)
+            .nth(2)
+            .getAttribute("data-entry")) ?? ""
+        const lines = (n: number) =>
+          `Branch message ${n}.\nIts second line.\nIts third line.`
+        const first = await aligner.chat(lines(0), atEntry(entryId(forkId)), {
+          mode: "branch",
+        })
+        let tip = first.kind === "appended" ? first.id : null
+        for (let n = 1; n <= 12 && tip !== null; n++) {
+          const next = await aligner.chat(lines(n), atEntry(tip))
+          tip = next.kind === "appended" ? next.id : null
+        }
+        const fork = `${col(0)} .msg[data-entry="${forkId}"]`
+        await tp.waitForSelector(`${fork} .open-branch`, { timeout: 15_000 })
+        await tp.$eval(body(0), b => {
+          b.scrollTop = 0
+        })
+        await tp.evaluate(() => document.fonts.ready)
+        await tp.click(`${fork} .open-branch`)
+        await tp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
+        await frame()
+        await frame()
+        const level = async () => {
+          const a = await tp.$eval(
+            `${col(1)} .msg`,
+            m => m.getBoundingClientRect().top,
+          )
+          const b = await tp.$eval(fork, m => m.getBoundingClientRect().top)
+          return Math.abs(a - b)
+        }
+        const opened = await level()
+        const more =
+          tip === null
+            ? null
+            : await aligner.chat("one more below", atEntry(tip))
+        await tp
+          .waitForSelector(
+            `${col(1)} .msg[data-entry="${more?.kind === "appended" ? more.id : "none"}"]`,
+            { state: "attached", timeout: 15_000 },
+          )
+          .catch(() => null)
+        await frame()
+        const grown = await level()
+        const short = await gapOf(1)
+        ok(
+          tip !== null && opened <= 4 && grown <= 4 && short > 100,
+          `an aligned column that runs past its end keeps its alignment as its thread grows (off by ${opened.toFixed(1)}, then ${grown.toFixed(1)}px; ${Math.round(short)}px above its end)`,
+        )
+      } finally {
+        await aligner.close()
+      }
     } finally {
       await tp.close().catch(() => {})
       await toolHost.shutdown().catch(() => {})

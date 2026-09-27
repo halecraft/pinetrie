@@ -38,6 +38,7 @@ import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackColor } from "./rail.tsx"
 import type { SessionClient } from "./session-view.ts"
 import { Start } from "./start.tsx"
+import { useFollow } from "./use-follow.ts"
 
 export interface ColumnProps {
   session: SessionClient
@@ -90,8 +91,9 @@ export interface ColumnProps {
 export function Column(p: ColumnProps) {
   const { view, index } = p
   const body = useRef<HTMLDivElement>(null)
+  const content = useRef<HTMLDivElement>(null)
   const spacer = useRef<HTMLDivElement>(null)
-  const atBottom = useRef(true)
+  const end = useFollow(body, content)
 
   // The spacer exists to line a new column up with its fork point. A column
   // with no fork point (the first, or one moved there by "make main") has
@@ -149,14 +151,6 @@ export function Column(p: ColumnProps) {
     lane.kind === "lane" && lane.askedBy !== null
       ? displayName(lane.askedBy, p.nameOf.get(lane.askedBy))
       : null
-
-  // Follow new messages while the reader is at the bottom; leave them alone
-  // once they have scrolled up to read.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when the column grows
-  useLayoutEffect(() => {
-    const el = body.current
-    if (el !== null && atBottom.current) el.scrollTop = el.scrollHeight
-  }, [view.nodes.length, view.tipId])
 
   const fork = view.forkFrom === null ? undefined : index.entries[view.forkFrom]
   const forkLabel =
@@ -248,15 +242,7 @@ export function Column(p: ColumnProps) {
           close
         </button>
       </header>
-      <div
-        className="column-body"
-        onScroll={e => {
-          const el = e.currentTarget
-          atBottom.current =
-            el.scrollHeight - el.scrollTop - el.clientHeight < 24
-        }}
-        ref={body}
-      >
+      <div className="column-body" ref={body}>
         {stillEdited && outOfView && (
           <button
             className="note-bar"
@@ -270,75 +256,93 @@ export function Column(p: ColumnProps) {
             editing a {edited.state === "draft" ? "draft" : "note"} · back to it
           </button>
         )}
-        {/* Room above the first message, so opening can bring it level with
+        {/* `useFollow` watches its height. Keep it unpositioned: it would
+            become the messages' offsetParent, and `alignOnOpen` measures
+            their offsetTop against the body's. */}
+        <div className="column-content" ref={content}>
+          {/* Room above the first message, so opening can bring it level with
             its fork point even when the column is short. */}
-        <div className="spacer" ref={spacer} />
-        {view.nodes.map((node, i) => {
-          const id = entryId(node.id)
-          return (
-            <Message
-              cites={p.refs.from.get(id) ?? []}
-              citedBy={p.refs.to.get(id) ?? []}
-              closedBranches={node.branches.filter(b => !p.shown.has(b.rootId))}
-              forkTracks={p.forks.get(node.id) ?? []}
-              joined={node.id === joinedAt}
-              key={node.id}
-              light={running ? (lit(node.id) ? "lit" : "dim") : undefined}
-              nameOf={p.nameOf}
-              node={node}
-              note={(() => {
-                const note = noteOf.get(node.id)
-                return note === undefined ? undefined : card(note)
-              })()}
-              onEdit={
-                noteOf.has(node.id)
-                  ? undefined
-                  : () => void p.session.note({ kind: "open", entry: id })
-              }
-              onBranch={
-                i < view.nodes.length - 1
-                  ? {
-                      title: "open a branch here",
-                      go: () => p.onBranch(node.id),
-                    }
-                  : // At the end, a branch differs from replying only in agent
-                    // work: there it steps back down to a conversation.
-                    p.column.lane !== undefined
+          <div className="spacer" ref={spacer} />
+          {view.nodes.map((node, i) => {
+            const id = entryId(node.id)
+            return (
+              <Message
+                cites={p.refs.from.get(id) ?? []}
+                citedBy={p.refs.to.get(id) ?? []}
+                closedBranches={node.branches.filter(
+                  b => !p.shown.has(b.rootId),
+                )}
+                forkTracks={p.forks.get(node.id) ?? []}
+                joined={node.id === joinedAt}
+                key={node.id}
+                light={running ? (lit(node.id) ? "lit" : "dim") : undefined}
+                nameOf={p.nameOf}
+                node={node}
+                note={(() => {
+                  const note = noteOf.get(node.id)
+                  return note === undefined ? undefined : card(note)
+                })()}
+                onEdit={
+                  noteOf.has(node.id)
+                    ? undefined
+                    : () => void p.session.note({ kind: "open", entry: id })
+                }
+                onBranch={
+                  i < view.nodes.length - 1
                     ? {
-                        title: "continue as a conversation",
+                        title: "open a branch here",
                         go: () => p.onBranch(node.id),
                       }
-                    : undefined
-              }
-              onCite={(to: ReferenceTarget) =>
-                void p.session.cite(
-                  to,
-                  view.tipId === null ? ROOT : atEntry(entryId(view.tipId)),
-                )
-              }
-              onOpenBranch={p.onOpen}
-            />
-          )
-        })}
-        {streamingLanes.length > 0 && (
-          <Streams doc={p.session.doc} lanes={streamingLanes} />
-        )}
-        {/* Messages waiting for this thread's lane, in the order they will
+                    : // At the end, a branch differs from replying only in agent
+                      // work: there it steps back down to a conversation.
+                      p.column.lane !== undefined
+                      ? {
+                          title: "continue as a conversation",
+                          go: () => p.onBranch(node.id),
+                        }
+                      : undefined
+                }
+                onCite={(to: ReferenceTarget) =>
+                  void p.session.cite(
+                    to,
+                    view.tipId === null ? ROOT : atEntry(entryId(view.tipId)),
+                  )
+                }
+                onOpenBranch={p.onOpen}
+              />
+            )
+          })}
+          {streamingLanes.length > 0 && (
+            <Streams doc={p.session.doc} lanes={streamingLanes} />
+          )}
+          {/* Messages waiting for this thread's lane, in the order they will
             be taken. They are not in the tree yet. */}
-        {waiting.map((h, n) => (
-          <div className="msg waiting" data-held={h.id} key={h.id}>
-            <span className="role">
-              {withContributors(
-                speakerLabel(p.nameOf, h.details.author, h.details.authorName),
-                (h.details.contributors ?? []).map(w =>
-                  displayName(w, p.nameOf.get(w)),
-                ),
-              )}{" "}
-              · waiting · {n + 1} of {waiting.length}
-            </span>
-            <MessageText mode="committed" text={h.details.text} />
+          {waiting.map((h, n) => (
+            <div className="msg waiting" data-held={h.id} key={h.id}>
+              <span className="role">
+                {withContributors(
+                  speakerLabel(
+                    p.nameOf,
+                    h.details.author,
+                    h.details.authorName,
+                  ),
+                  (h.details.contributors ?? []).map(w =>
+                    displayName(w, p.nameOf.get(w)),
+                  ),
+                )}{" "}
+                · waiting · {n + 1} of {waiting.length}
+              </span>
+              <MessageText mode="committed" text={h.details.text} />
+            </div>
+          ))}
+        </div>
+        {end.unseen && (
+          <div className="jump-slot">
+            <button className="jump-latest" onClick={end.follow} type="button">
+              ↓ new below
+            </button>
           </div>
-        ))}
+        )}
       </div>
       {/* The thread's draft (ADR-0025): one per thread end, shared by all. */}
       {draft !== undefined &&
@@ -371,6 +375,7 @@ export function Column(p: ColumnProps) {
           lane={lane}
           onBranchInstead={text => p.onBranchInstead(at, text)}
           onSend={() => {
+            end.follow()
             if (!fresh) return undefined
             const id = crypto.randomUUID()
             p.onSent(id)
@@ -433,17 +438,16 @@ function Streams({
   )
 }
 
-/** A running tool's output, kept scrolled to its end as it grows. */
+/** A running tool's output, following its end as a column does. */
 function LiveOutput({ text }: { text: string }) {
   const pre = useRef<HTMLPreElement>(null)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: follow the text
-  useLayoutEffect(() => {
-    const el = pre.current
-    if (el !== null) el.scrollTop = el.scrollHeight
-  }, [text])
+  const inner = useRef<HTMLElement>(null)
+  useFollow(pre, inner)
   return (
     <pre className="tool-output" ref={pre}>
-      {text}
+      <code className="tool-output-text" ref={inner}>
+        {text}
+      </code>
     </pre>
   )
 }

@@ -109,15 +109,42 @@ colour. There are no connector lines, so sibling branches never cross.
 
 ## Layout: columns scroll independently
 
-Each column scrolls on its own, its composer at its foot. The **only**
-imperative layout code is `alignOnOpen` in `app.tsx`: when a column first
-appears, it scrolls the column (or grows a spacer above its first message) so
-that message is level with its fork point in the column showing it. After that,
-columns scroll freely. A shared vertical scroll was tried in design and
-dropped: forks far apart could not be seen together (`docs/06-interface.md`).
+Each column scrolls on its own, its composer at its foot. `alignOnOpen` in
+`app.tsx` places a column when it first appears: it scrolls the column (or
+grows a spacer above its first message) so that message is level with its fork
+point in the column showing it. A shared vertical scroll was tried in design
+and dropped: forks far apart could not be seen together
+(`docs/06-interface.md`).
 
-`Column` keeps itself at the bottom as messages arrive only while the reader is
-at the bottom; once they scroll up, it leaves them there.
+## Following a column's end (S32)
+
+A column at its end stays there as it grows; once the reader scrolls up, it
+holds still. `follow.ts` is the rule, pure; `useFollow` (`use-follow.ts`) reads
+the scroller, calls it, and scrolls. A running tool's output uses the same hook.
+
+- **It follows height, not data.** A ResizeObserver watches the column's
+  viewport and `.column-content`, and scrolls to the end in the frame the
+  layout changed. A streaming reply, markdown reflowing, a tool row opening,
+  a note card, an image, the composer growing: each is a change of size.
+  Following new messages alone missed a reply being written (S32: 900 px
+  behind by its end).
+- **A scroll up is the reader leaving.** The column only moves down on its
+  own, and remembers where it last left the scroll, so a scroll event above
+  that releases it, however small. Its own follow's echo, arriving after the
+  content grew further, is not a move up. A scroll the browser clamps after
+  content shrank lands exactly at the end, which is not leaving either. The
+  height alone cannot tell a clamp: clicking `.open-branch` scrolls its message
+  into view and removes the button in the same moment.
+- **Chromium dispatches scroll events before ResizeObserver callbacks** in each
+  frame (S32), so the reader's scroll is seen before the next follow could
+  undo it. No wheel, key or touch listeners are needed.
+- **It follows again** on a scroll down to within 24 px of the end, on the
+  reader's own send (`onSend`), and on **↓ new below**, which shows while
+  released with content grown since.
+- **`alignOnOpen` settles it:** it dispatches `PLACED` on the body, and the
+  column follows only if it was placed at its end. Without it, a column
+  aligned short of its end would jump there on its first ResizeObserver
+  callback.
 
 ## Threads, lanes and the composer (ADR-0020)
 
@@ -149,7 +176,8 @@ at the bottom; once they scroll up, it leaves them there.
   row and no rail dot. A message that only called tools shows only its rows.
 - **Live work is one component** (`Streams` in `column.tsx`), reading
   `readStreams` for the lanes running on the column's path: the reply as it is
-  written, and each running tool's output, kept scrolled to its end. A reply's
+  written, and each running tool's output, following its end as a column
+  does. A reply's
   stream closes when its message ends, which a fast model can do between two
   renders, so a check that must see one uses a slow scripted model.
 - **Stop** shows in the composer while the thread's lane runs, and sends
@@ -260,6 +288,14 @@ name the message was sent under in parentheses when they differ
 its `writer` for the lookup.
 
 ## Gotchas
+
+- **`.column-content` must stay unpositioned.** A positioned wrapper becomes
+  the messages' offsetParent, and `alignOnOpen` measures `offsetTop` against
+  the body's.
+- **A ResizeObserver sees an inline element as 0 × 0.** `LiveOutput`'s
+  `<code>` is `display: block` for it.
+- **Every scroll `useFollow` makes is instant.** A smooth one passes through
+  positions short of the end, and the rule reads each as the reader leaving.
 
 - **Message tools are hidden until hover or focus**, the margin `→` too. A
   browser test must hover a message before clicking its `.tools` buttons or
