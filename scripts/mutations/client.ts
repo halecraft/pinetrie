@@ -519,4 +519,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "peopleHere groups each person's columns",
   },
+  {
+    name: "a reader counts once per thread, not per root",
+    file: "packages/client/here.ts",
+    from: "      if (!at.includes(writer)) at.push(writer)",
+    to: "      at.push(writer)",
+    command: unit,
+    expect: "readersByRoot turns people around",
+  },
+  {
+    name: "a label keeps a leading blank line",
+    file: "packages/client/names.ts",
+    from: '      .find(l => l !== "") ?? ""',
+    to: '      .at(0) ?? ""',
+    command: unit,
+    expect: "firstLine: the first non-empty line",
+  },
 ]

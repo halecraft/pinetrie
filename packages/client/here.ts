@@ -3,6 +3,7 @@
 // Presence is thread-level (ADR-0024): each column of the tab a person is on
 // reports the end of its thread. The header groups those by person, where
 // `presenceView` groups them by thread end; "never you" is `presenceView`'s.
+// The tabs' avatars are the same people turned around, by root.
 
 import { rootOf, type TreeIndex, type WriterId } from "@pineta/core"
 
@@ -39,4 +40,18 @@ export function peopleHere(
   return [...threads]
     .sort(([a], [b]) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0))
     .map(([writer, ts]) => ({ writer, threads: ts }))
+}
+
+/** Each root's readers, for the tabs' avatars: `people` turned around. */
+export function readersByRoot(
+  people: readonly PersonHere[],
+): ReadonlyMap<string, readonly WriterId[]> {
+  const readers = new Map<string, WriterId[]>()
+  for (const { writer, threads } of people)
+    for (const { root } of threads) {
+      const at = readers.get(root) ?? []
+      if (!at.includes(writer)) at.push(writer)
+      readers.set(root, at)
+    }
+  return readers
 }

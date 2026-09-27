@@ -72,22 +72,6 @@ export function rootWork(
   return work
 }
 
-/** Others reading in each root: thread ends (`PresenceView.readingAt`) resolved to roots. */
-export function rootReaders(
-  index: TreeIndex,
-  readingAt: ReadonlyMap<string, readonly WriterId[]>,
-): ReadonlyMap<string, readonly WriterId[]> {
-  const readers = new Map<string, WriterId[]>()
-  for (const [end, writers] of readingAt) {
-    const root = rootOf(index, end)
-    if (root === null) continue
-    const at = readers.get(root) ?? []
-    for (const w of writers) if (!at.includes(w)) at.push(w)
-    readers.set(root, at)
-  }
-  return readers
-}
-
 const UUIDV7 = /^([0-9a-f]{8})-([0-9a-f]{4})-7[0-9a-f]{3}-/i
 
 /** A uuidv7's creation time in ms since the epoch: its first 48 bits. Null for any other id. */

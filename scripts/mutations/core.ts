@@ -64,14 +64,6 @@ export const mutations: readonly Mutation[] = [
     expect: "running and waiting lanes resolve to their roots",
   },
   {
-    name: "a reader counts at their thread's end, not its root",
-    file: roots,
-    from: "    const root = rootOf(index, end)",
-    to: "    const root: string | null = end",
-    command: unit,
-    expect: "readers resolve to their roots",
-  },
-  {
     name: "followTip has no cycle guard going down",
     file: tree,
     from: "    if (seen.has(id)) continue\n    seen.add(id)\n    const children = index.childrenOf.get(id) ?? []",

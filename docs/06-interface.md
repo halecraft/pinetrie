@@ -34,7 +34,7 @@ This document fixes the design before any code. It draws E and T directly.
 ## Layout
 
 ```
- pineta   Ada · connected                                   (B)(C)  (🤖 2)   @ 2
+ pineta   Ada · connected                                   (B)(C)  (✦ 2)   @ 2
  Archive │ Fix the sync bug ◉ × │ Release notes ·Bea × │ Q3 planning × │ ＋ agent ▾
 ━━━━━━━━━┷━━━━━━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━┷━━━━━━━━━━━
 ┌ rail ┐┌ column 1 ──────────────┐┌ column 2 ─────────────┐┌ column 3 ──────────┐

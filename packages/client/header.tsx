@@ -15,14 +15,9 @@ import { useState } from "react"
 import type { PersonHere } from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
+import { firstLine } from "./names.ts"
 import { Avatar, nameFor } from "./presence.tsx"
 import type { InboxView } from "./use-inbox.ts"
-
-/** The start of a message's text, on one line. */
-const opening = (text: string): string => {
-  const line = (text.trim().split("\n")[0] ?? "").trim()
-  return line.length > 48 ? `${line.slice(0, 48)}…` : line
-}
 
 export function Header({
   people,
@@ -56,7 +51,7 @@ export function Header({
       <>
         <span className="here-root">{labelOf(root)}</span>
         <span className="here-at">
-          {opening(messageText(index.entries[end]?.message))}
+          {firstLine(messageText(index.entries[end]?.message), 48)}
         </span>
       </>
     ),
@@ -68,9 +63,7 @@ export function Header({
         {people.map(p => (
           <Menu
             className="here-person"
-            heading={
-              <p className="menu-heading">{nameFor(nameOf, p.writer)} is in</p>
-            }
+            heading={`${nameFor(nameOf, p.writer)} is in`}
             items={p.threads.map(t => thread(t.end, t.end, t.root))}
             key={p.writer}
             label={`${nameFor(nameOf, p.writer)}: where they are`}
@@ -84,7 +77,7 @@ export function Header({
         {runs.length > 0 && (
           <Menu
             className="here-agent running"
-            heading={<p className="menu-heading">The agent is working in</p>}
+            heading="The agent is working in"
             items={runs.map(r =>
               thread(r.lane, r.tip, rootOf(index, r.tip) ?? r.tip),
             )}
@@ -92,7 +85,7 @@ export function Header({
             title="the agent is working"
             trigger={
               <>
-                <span className="avatar agent-mark">✦</span>
+                <span className="agent-mark">✦</span>
                 <span className="here-count">{runs.length}</span>
               </>
             }
@@ -155,7 +148,7 @@ function InboxMenu({
         <span className="inbox-who">
           {nameFor(nameOf, m.by)} · {labelOf(m.root)}
         </span>
-        <span className="inbox-text">{opening(m.text)}</span>
+        <span className="inbox-text">{firstLine(m.text, 48)}</span>
       </>
     ),
     onChoose: () => {
@@ -167,11 +160,7 @@ function InboxMenu({
     <Menu
       className="inbox"
       heading={
-        <p className="menu-heading">
-          {mentions.length === 0
-            ? "No one has mentioned you."
-            : "Mentions of you"}
-        </p>
+        mentions.length === 0 ? "No one has mentioned you." : "Mentions of you"
       }
       items={mentions.length === 0 ? [] : [...controls, ...rows]}
       label={`mentions of you: ${inbox.unseen} unseen`}

@@ -20,7 +20,7 @@ The layout is `{ active, open, roots, newTabs }`, and `layoutReducer` is pure.
 A root tab's key is its root entry's id: a thread started at the root is
 rooted at its first message (S30). `open` is your tabs: the roots you opened,
 in that order. `tabBar(layout)` is Archive, `open`, then new tabs.
-`summarizeRoots`, `rootWork` and `rootReaders` (`packages/core/roots.ts`)
+`summarizeRoots` and `rootWork` (`packages/core/roots.ts`)
 give labels and each tab's signals.
 
 - **Only you put a root in `open`.** `show` of a root opens it, so every way of
@@ -145,7 +145,11 @@ in it opens a tab until you choose.
   and the add tab's. It wraps its trigger in a span that gains `open` while
   open, which keeps `.tab-more.open` visible; its list is `position: fixed`
   from the trigger's rect, and a scroll, a resize or a click elsewhere closes
-  it. Items can carry `data-*` attributes (`MenuItem.data`).
+  it. Items can carry `data-*` attributes (`MenuItem.data`). A heading is
+  drawn above the `role="menu"` list, not in it, since a menu holds only
+  menu items; the list is named by it (`aria-labelledby`).
+- **The agent's mark is not an `.avatar`.** It is not a person, and checks
+  count the people shown by `.avatar`.
 
 ## Kept per tab (`tab-state.ts`, ADR-0027)
 
@@ -378,8 +382,8 @@ pipeline keeps the tree a pure function, testable without a DOM.
   `visibilitychange` listener refreshes on return). Switching tabs therefore
   clears the last tab's keys, through that same deletion. The Archive tab
   reports nothing. Typing is written at most once a second.
-- **A tab's avatars** are `rootReaders`: others' thread ends resolved to their
-  roots.
+- **A tab's avatars** are `readersByRoot(people)` (`here.ts`): the header's
+  people turned around, so each thread end is resolved to its root once.
 - **`presenceView` (core) decides everything shown**, from `readPresence`
   (`@pineta/reads`) and the tree: rings (`readingAt`), a header's avatars
   (`seenBy`, others whose thread end lies on one path with this column's), and

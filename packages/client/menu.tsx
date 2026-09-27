@@ -52,16 +52,21 @@ export function Menu({
   /** The trigger's accessible name. */
   label: string
   title?: string
-  /** Shown above the items, not focusable. */
-  heading?: ReactNode
+  /**
+   * Shown above the items, outside the `role="menu"` list, which may hold only
+   * menu items; the list takes its name from it.
+   */
+  heading?: string
   items: readonly MenuItem[]
 }) {
   const [at, setAt] = useState<{ top: number; right: number } | null>(null)
   const open = at !== null
   const wrapper = useRef<HTMLSpanElement>(null)
   const button = useRef<HTMLButtonElement>(null)
+  const box = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLDivElement>(null)
   const listId = useId()
+  const headingId = useId()
 
   const show = () => {
     const r = button.current?.getBoundingClientRect()
@@ -87,7 +92,7 @@ export function Menu({
       setAt(null)
     }
     const drift = (e: Event) => {
-      if (e.target instanceof Node && list.current?.contains(e.target)) return
+      if (e.target instanceof Node && box.current?.contains(e.target)) return
       setAt(null)
     }
     const shut = () => setAt(null)
@@ -128,49 +133,60 @@ export function Menu({
       {at !== null && (
         <div
           className="menu"
-          id={listId}
-          onKeyDown={e => {
-            if (e.key === "Escape") {
-              e.preventDefault()
-              close(true)
-              return
-            }
-            if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return
-            e.preventDefault()
-            const all = focusable(list.current)
-            // `indexOf` would take `activeElement` only as a button; it is any element.
-            // biome-ignore lint/complexity/useIndexOf: the types differ, see above
-            const here = all.findIndex(b => b === document.activeElement)
-            const step = e.key === "ArrowDown" ? 1 : all.length - 1
-            all[(here + step) % all.length]?.focus()
-          }}
-          ref={list}
-          role="menu"
+          ref={box}
           style={{ position: "fixed", top: at.top, right: at.right }}
         >
-          {heading}
-          {items.map(item => (
-            <button
-              {...Object.fromEntries(
-                Object.entries(item.data ?? {}).map(([k, v]) => [
-                  `data-${k}`,
-                  v,
-                ]),
-              )}
-              className={item.className}
-              disabled={item.disabled}
-              key={item.key}
-              onClick={() => {
-                if (!item.keepOpen) close(false)
-                item.onChoose()
-              }}
-              role="menuitem"
-              title={item.title}
-              type="button"
-            >
-              {item.label}
-            </button>
-          ))}
+          {heading !== undefined && (
+            <p className="menu-heading" id={headingId}>
+              {heading}
+            </p>
+          )}
+          <div
+            aria-label={heading === undefined ? label : undefined}
+            aria-labelledby={heading === undefined ? undefined : headingId}
+            onKeyDown={e => {
+              if (e.key === "Escape") {
+                e.preventDefault()
+                close(true)
+                return
+              }
+              if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return
+              e.preventDefault()
+              const all = focusable(list.current)
+              // `indexOf` would take `activeElement` only as a button; it is any element.
+              // biome-ignore lint/complexity/useIndexOf: the types differ, see above
+              const here = all.findIndex(b => b === document.activeElement)
+              const step = e.key === "ArrowDown" ? 1 : all.length - 1
+              all[(here + step) % all.length]?.focus()
+            }}
+            className="menu-items"
+            id={listId}
+            ref={list}
+            role="menu"
+          >
+            {items.map(item => (
+              <button
+                {...Object.fromEntries(
+                  Object.entries(item.data ?? {}).map(([k, v]) => [
+                    `data-${k}`,
+                    v,
+                  ]),
+                )}
+                className={item.className}
+                disabled={item.disabled}
+                key={item.key}
+                onClick={() => {
+                  if (!item.keepOpen) close(false)
+                  item.onChoose()
+                }}
+                role="menuitem"
+                title={item.title}
+                type="button"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </span>

@@ -43,22 +43,17 @@ const OWN_MENU = '#tabs .tab[aria-selected="true"] ~ .tab-more .tab-menu'
 const { ok, report } = createChecks()
 
 /**
- * Open the menu behind `trigger`, and choose `item` in it, if a person could:
- * Playwright scrolls a clipped element into view and clicks it, so a menu
+ * Open the menu behind `trigger`, and find `item` in it if a person could see
+ * it: Playwright scrolls a clipped element into view and clicks it, so a menu
  * check proves it can be seen by what `elementFromPoint` finds at the item's
- * centre (`packages/client/TECHNICAL.md`, Gotchas). Returns whether it was
- * seen; an item not seen is not clicked.
+ * centre (`packages/client/TECHNICAL.md`, Gotchas). Null when not seen.
  */
-async function chooseFromMenu(
-  p: Page,
-  trigger: string,
-  item: string,
-): Promise<boolean> {
+async function seeInMenu(p: Page, trigger: string, item: string) {
   await p.click(trigger)
   const el = await p
     .waitForSelector(`.menu ${item}`, { timeout: 15_000 })
     .catch(() => null)
-  if (el === null) return false
+  if (el === null) return null
   const seen = await el.evaluate(n => {
     const r = n.getBoundingClientRect()
     const hit = document.elementFromPoint(
@@ -67,8 +62,19 @@ async function chooseFromMenu(
     )
     return hit !== null && n.contains(hit)
   })
-  if (seen) await el.click()
-  return seen
+  return seen ? el : null
+}
+
+/** `seeInMenu`, then choose the item. Whether it was seen; one not seen is not clicked. */
+async function chooseFromMenu(
+  p: Page,
+  trigger: string,
+  item: string,
+): Promise<boolean> {
+  const el = await seeInMenu(p, trigger, item)
+  if (el === null) return false
+  await el.click()
+  return true
 }
 
 /** In the page: the messages its rail draws, a dot each and a capsule's count. */
@@ -1059,8 +1065,7 @@ try {
 
     // Archived again and left, its tab goes; the Archive tab brings it back.
     await page.fill(input, "")
-    await page.click(OWN_MENU)
-    await page.click("#tabs .archive-root")
+    await chooseFromMenu(page, OWN_MENU, ".archive-root")
     await page
       .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })
       .catch(() => null)
@@ -1589,12 +1594,14 @@ try {
         const opened = await appears(
           `#tabs .tab[data-root="${newRoot}"][aria-selected="true"]`,
         )
-        await tp.click(OWN_MENU)
-        const item = "#tabs .archive-root"
-        const disabled = await tp
-          .$eval(item, b => (b as HTMLButtonElement).disabled)
-          .catch(() => false)
-        const why = (await tp.textContent(`${item} .why`).catch(() => "")) ?? ""
+        const item = await seeInMenu(tp, OWN_MENU, ".archive-root")
+        const disabled =
+          (await item?.evaluate(b => (b as HTMLButtonElement).disabled)) ??
+          false
+        const why =
+          (await item
+            ?.$eval(".why", n => n.textContent ?? "")
+            .catch(() => "")) ?? ""
         ok(
           started.kind === "started" &&
             pulsed &&

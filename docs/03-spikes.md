@@ -356,6 +356,18 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S36 — What a jj workspace per lane costs ✅ ANSWERED
+
+`findings/S36-a-workspace-per-lane.md`. `jj workspace add` takes 0.2 s; an
+APFS clone of every `node_modules` takes about 6 s and 11 MB, and runs the
+workspace's own code once links leaving the repo are re-pointed. Symlinking
+`node_modules` back would import your packages instead. Rewriting a lane's
+ancestor while it has edits not yet snapshotted diverges its change and takes
+those edits off its disk. A symlink swap cannot hide the real directory.
+Addendum: immutable run revisions keep one lane from staling another, a fold as
+a merge rewrites nothing and repeats take only what is new, so `update-stale`
+is only a guard; a jj command wanting an editor hangs an agent's shell.
+
 ### S35 — Why an agent's column jumps while it works ✅ ANSWERED
 
 `findings/S35-agent-work-jumps.md`. A tool call changes the column's height

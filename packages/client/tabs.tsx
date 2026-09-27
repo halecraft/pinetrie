@@ -52,7 +52,7 @@ export function TabBar({
   archived: ReadonlySet<string>
   /** The agent's work in each root (`rootWork`). */
   work: ReadonlyMap<string, "running" | "waiting">
-  /** Others reading in each root (`rootReaders`). */
+  /** Others reading in each root (`readersByRoot`). */
   readers: ReadonlyMap<string, readonly WriterId[]>
   nameOf: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string

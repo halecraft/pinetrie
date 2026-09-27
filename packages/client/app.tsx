@@ -26,7 +26,6 @@ import {
   presenceView,
   projectColumns,
   projectRail,
-  rootReaders,
   rootWork,
   summarizeRoots,
 } from "@pineta/core"
@@ -62,7 +61,7 @@ import { Column, type ColumnProps } from "./column.tsx"
 import { type Column as ColumnSpec, isPinned } from "./columns.ts"
 import type { ReadOnly } from "./composer.tsx"
 import { Header } from "./header.tsx"
-import { peopleHere } from "./here.ts"
+import { peopleHere, readersByRoot } from "./here.ts"
 import {
   decodeInbox,
   encodeInbox,
@@ -80,6 +79,7 @@ import {
   planOpen,
   tabBar,
 } from "./layout.ts"
+import { firstLine } from "./names.ts"
 import { NotesIndex } from "./note.tsx"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { readEntryCount } from "./projection.ts"
@@ -241,9 +241,9 @@ function App({ session }: { session: SessionClient }) {
   const work = useMemo(() => rootWork(index, lanes), [index, lanes])
   const labelOf = (root: string): string => {
     const first = summaries.find(s => s.root === root)?.first ?? root
-    const text = messageText(index.entries[first]?.message).trim()
-    const line = text.split("\n")[0] ?? ""
-    return line.length > 40 ? `${line.slice(0, 40)}…` : line || "(no text)"
+    return (
+      firstLine(messageText(index.entries[first]?.message), 40) || "(no text)"
+    )
   }
 
   const [layout, dispatch] = useReducer(
@@ -330,10 +330,6 @@ function App({ session }: { session: SessionClient }) {
     () => presenceView(presenceFacts, session.writer, index),
     [presenceFacts, index, session.writer],
   )
-  const readers = useMemo(
-    () => rootReaders(index, here.readingAt),
-    [index, here],
-  )
   const order = useMemo(
     () => writerOrder(index, nameOf.keys()),
     [index, nameOf],
@@ -344,6 +340,7 @@ function App({ session }: { session: SessionClient }) {
     () => peopleHere(here.readingAt, index, order),
     [here, index, order],
   )
+  const readers = useMemo(() => readersByRoot(people), [people])
   const rings = useMemo(
     () =>
       new Map(

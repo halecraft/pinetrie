@@ -6,7 +6,6 @@ import {
   type LaneView,
   laneNameForThread,
   projectRail,
-  rootReaders,
   rootWork,
   summarizeRoots,
   type WriterId,
@@ -85,23 +84,6 @@ describe("rootWork", () => {
     expect([
       ...rootWork(index, [lane("2-a"), lane(null, { running: true })]),
     ]).toEqual([])
-  })
-})
-
-describe("rootReaders", () => {
-  test("readers resolve to their roots, each once", () => {
-    const readers = rootReaders(
-      index,
-      new Map([
-        ["2-a", [ADA]],
-        ["4-b", [ADA, BEA]],
-        ["6-d", [BEA]],
-      ]),
-    )
-    expect([...readers]).toEqual([
-      ["1-r1", [ADA, BEA]],
-      ["3-r2", [BEA]],
-    ])
   })
 })
 

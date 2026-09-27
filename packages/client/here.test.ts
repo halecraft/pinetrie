@@ -1,6 +1,6 @@
 import { type EntryLike, indexTree, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
-import { peopleHere } from "./here.ts"
+import { peopleHere, readersByRoot } from "./here.ts"
 
 const ADA = writerId("ada")
 const BEA = writerId("bea")
@@ -35,5 +35,21 @@ test("peopleHere groups each person's columns, in order, and drops an end not ar
         { end: "3-r2", root: "3-r2" },
       ],
     },
+  ])
+})
+
+test("readersByRoot turns people around: each root with its readers, each once", () => {
+  const people = peopleHere(
+    new Map([
+      ["2-a", [BEA, CY]],
+      ["1-r1", [BEA]],
+      ["3-r2", [BEA]],
+    ]),
+    index,
+    [BEA, CY],
+  )
+  expect([...readersByRoot(people)]).toEqual([
+    ["1-r1", [BEA, CY]],
+    ["3-r2", [BEA]],
   ])
 })

@@ -33,7 +33,7 @@ import type { Column as ColumnSpec } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
 import { Message } from "./message.tsx"
 import { MessageText } from "./message-text.tsx"
-import { speakerLabel, withContributors } from "./names.ts"
+import { firstLine, speakerLabel, withContributors } from "./names.ts"
 import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackColor } from "./rail.tsx"
@@ -160,7 +160,7 @@ export function Column(p: ColumnProps) {
       : fork?.message?.role === "assistant"
         ? "agent"
         : ""
-  const forkText = messageText(fork?.message).slice(0, 48)
+  const forkText = firstLine(messageText(fork?.message), 48)
 
   // Notes by the message they are the text of, and this thread's draft.
   const noteOf = new Map(
@@ -231,7 +231,7 @@ export function Column(p: ColumnProps) {
                 ? "new · with the agent"
                 : "new chat"
               : "thread"
-            : `from ${forkLabel}: “${forkText}${forkText.length === 48 ? "…" : ""}”`}
+            : `from ${forkLabel}: “${forkText}”`}
         </span>
         <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={p.seenBy} />
         {p.position > 0 && (

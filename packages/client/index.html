@@ -48,6 +48,7 @@
       .menu { position: absolute; z-index: 4; top: 100%; right: 0; display: flex;
         flex-direction: column; min-width: 12rem; padding: .25rem; background: #1b1e24;
         border: 1px solid #3a3f48; border-radius: 6px; }
+      .menu-items { display: flex; flex-direction: column; }
       .menu button { text-align: left; background: none; color: #ddd; padding: .3rem .5rem; }
       .menu button:disabled { color: #777; cursor: default; }
       .menu .why { font-size: .75rem; }
@@ -264,7 +265,9 @@
       .here-trigger, .inbox-trigger { display: inline-flex; align-items: center; gap: .2rem;
         padding: .1rem .3rem; background: none; color: #ddd; border-radius: 999px; }
       .here-trigger .avatar { width: 22px; height: 22px; line-height: 22px; font-size: 12px; }
-      .here-agent .agent-mark { background: #9ecbff; }
+      /* Not an .avatar: the agent is not a person, and checks count people by .avatar. */
+      .agent-mark { display: inline-block; width: 22px; height: 22px; line-height: 22px;
+        border-radius: 50%; text-align: center; font-size: 12px; color: #111; background: #9ecbff; }
       .here-agent.running .agent-mark { animation: pulse 1s ease-in-out infinite; }
       .here-count { font-size: .75rem; color: #aab4c3; }
       .inbox-trigger { font-weight: 600; border: 1px solid #3a3f48; padding: .1rem .5rem; }
