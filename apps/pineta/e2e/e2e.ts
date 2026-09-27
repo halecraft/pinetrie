@@ -943,7 +943,7 @@ invariants("end")
   const dots = projectRail(ttree(), spine[0]?.id ?? "").length
   ok(
     dots === spine.length && spine.length === 3,
-    `the rail has one dot per message, none per tool result (${dots})`,
+    `the rail has one row per message, none per tool result (${dots})`,
   )
 
   // 2. Write a file, then edit it: the disk changes.

@@ -66,6 +66,9 @@
       .rail-tree { position: relative; }
       .rail-dot { position: absolute; width: 8px; height: 8px; padding: 0; border-radius: 50%; }
       .rail-dot.pulse { animation: pulse 1s ease-in-out infinite; }
+      /* A run of uneventful messages: a capsule, its length and fill inline. */
+      .rail-run { position: absolute; width: 8px; padding: 0; border: 1.5px solid; border-radius: 4px;
+        box-sizing: border-box; }
       /* Others here (ADR-0024): the ring is inline style; several share a count. */
       .here-count { position: absolute; top: -9px; left: 7px; font-size: 9px; line-height: 1;
         color: #ddd; pointer-events: none; }

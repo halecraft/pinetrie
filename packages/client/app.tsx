@@ -16,6 +16,7 @@ import { persistentPeerId, whenSettled } from "@kyneta/exchange"
 import { ExchangeProvider, useDocStatus, useTracked } from "@kyneta/react"
 import {
   branchColors,
+  compactRail,
   entryId,
   messageText,
   openRoots,
@@ -73,10 +74,12 @@ import { NotesIndex } from "./note.tsx"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { readEntryCount } from "./projection.ts"
 import { Rail } from "./rail.tsx"
+import { railKeep } from "./rail-view.ts"
 import { connectSession, type SessionClient } from "./session-view.ts"
 import { tabState } from "./tab-state.ts"
 import { TabBar } from "./tabs.tsx"
 import { PLACED } from "./use-follow.ts"
+import { useReveal } from "./use-reveal.ts"
 
 /**
  * The tab you are on and each root's columns: this browser tab's, or on a new
@@ -375,6 +378,20 @@ function App({ session }: { session: SessionClient }) {
     [index, views],
   )
   const shown = useMemo(() => new Set(paths.flatMap(p => [...p])), [paths])
+  const railItems = useMemo(
+    () =>
+      compactRail(
+        index,
+        rail,
+        railKeep({
+          notes: noteEntries,
+          rings,
+          activity,
+          ends: views.map(v => v.tipId),
+        }),
+      ),
+    [index, rail, noteEntries, rings, activity, views],
+  )
 
   const strip = useRef<HTMLDivElement>(null)
 
@@ -394,32 +411,29 @@ function App({ session }: { session: SessionClient }) {
     }
   }, [columns, views])
 
-  // A message to scroll to once its tab is drawn.
-  const scrollTo = useRef<string | null>(null)
-  useLayoutEffect(() => {
-    const id = scrollTo.current
-    if (id === null) return
-    const el = strip.current?.querySelector(`.msg[data-entry="${id}"]`)
-    if (el === null || el === undefined) return
-    scrollTo.current = null
-    el.scrollIntoView({ block: "center" })
-  })
+  // After the alignment above: a picked message the alignment left out of
+  // view is scrolled to.
+  const reveal = useReveal(strip)
 
   // The Archive tab's own state: never stored.
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("all")
   const [archiveQuery, setArchiveQuery] = useState("")
   const [archivePick, setArchivePick] = useState<string | null>(null)
 
-  /** Show entry `id`, wherever it is (`planOpen`). */
+  /**
+   * Show entry `id`, wherever it is (`planOpen`): in view in the column that
+   * shows it, or in a new one.
+   */
   const openAt = (id: string) => {
     const plan = planOpen(layout, index, archive, id)
     if (plan === null) return
     switch (plan.kind) {
       case "scroll":
-        scrollTo.current = id
+        reveal(id)
         dispatch({ kind: "show", tab: { kind: "root", root: plan.root } })
         return
       case "open":
+        reveal(id)
         dispatch({ kind: "show", tab: { kind: "root", root: plan.root } })
         dispatch({
           kind: "columns",
@@ -576,9 +590,10 @@ function App({ session }: { session: SessionClient }) {
                       open: notesOpen,
                       toggle: () => setNotesOpen(!notesOpen),
                     }}
+                    items={railItems}
+                    nameOf={w => nameFor(nameOf, w)}
                     onPick={openAt}
                     open={shown}
-                    rows={rail}
                   />
                 )}
                 {/* Over the columns, beside the rail: inside the rail, whose own
@@ -670,8 +685,8 @@ function App({ session }: { session: SessionClient }) {
 }
 
 /**
- * A root, read-only, in the Archive tab: its rail, and one column that a rail
- * dot moves. Its anchor is its own state, never stored.
+ * A root, read-only, in the Archive tab: its rail, and one column that a pick
+ * on the rail moves. Its anchor is its own state, never stored.
  */
 function Preview({
   root,
@@ -707,10 +722,26 @@ function Preview({
   >
 }) {
   const [anchor, setAnchor] = useState(root)
+  const previewStrip = useRef<HTMLDivElement>(null)
+  const reveal = useReveal(previewStrip)
+  const pick = (id: string) => {
+    setAnchor(id)
+    reveal(id)
+  }
   const { index } = shared
   const column: ColumnSpec = { key: `preview-${root}`, anchor }
   const [view] = projectColumns(index, [{ anchor }], noteEntries)
   const rail = projectRail(index, root)
+  const items = compactRail(
+    index,
+    rail,
+    railKeep({
+      notes: noteEntries,
+      rings,
+      activity: shared.activity,
+      ends: [view?.tipId ?? null],
+    }),
+  )
   const path = pathIds(index, view?.tipId ?? null)
   const track = branchColors(rail, view === undefined ? [] : [view]).track[0]
   const none = () => {}
@@ -720,12 +751,13 @@ function Preview({
       <Rail
         activity={shared.activity}
         here={rings}
+        items={items}
+        nameOf={w => nameFor(shared.nameOf, w)}
         notes={noteEntries}
-        onPick={setAnchor}
+        onPick={pick}
         open={path}
-        rows={rail}
       />
-      <div className="preview-strip">
+      <div className="preview-strip" ref={previewStrip}>
         <Column
           {...shared}
           closable={false}
@@ -735,7 +767,7 @@ function Preview({
           onBranchInstead={none}
           onClose={none}
           onMakeMain={none}
-          onOpen={setAnchor}
+          onOpen={pick}
           onSent={none}
           onTyping={none}
           path={path}

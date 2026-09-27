@@ -136,6 +136,55 @@ value's stored form is its codec's. The layout is its one use, under the key
   second tab in it; each `browser.newPage()` is a new context, with storage of
   its own.
 
+## Rail runs (ADR-0031)
+
+The rail draws `compactRail(index, projectRail(...), keep)`: a dot per
+landmark, and a capsule per run of three or more uneventful messages.
+`projectRail` still returns a row per message, and everything else reads
+those rows (tab summaries, archive search, `branchColors`).
+
+- **`compactRail` (core) is the rule; `railKeep` (`rail-view.ts`) is the
+  view's part of it:** notes, rings, running tips and every open column's end.
+  A column's end is kept because a pinned column can end mid-stretch: inside a
+  run, half of it would be on the column's path, and where the column ends
+  would not show. So a run is all on an open path or all off it, and
+  `data-open` on its first message speaks for it.
+- **Every item has `slot`, `span` and `ids`;** a dot is an item with one id and
+  a span of 1. An edge leaves its parent item's last slot, so the renderer
+  never asks which kind an item is, only how to draw it.
+- **A click picks by where it lands** (`pickAt`, pure): a fraction of the way
+  down the capsule is that fraction through the run. A click from the keyboard
+  has `detail` 0 and no point, and picks the first message. A browser check
+  clicks at a point with `mouse.click`; `page.click` clicks the centre, which
+  is the run's middle message.
+- **Selectors:** `.rail-run[data-entry]` is a run's first message, with
+  `data-count`, `data-span` and `data-fill` (`agent`, `people` or `mixed`).
+  The browser suite's `railCount`
+  counts messages, as dots plus each run's `data-count`; a check counting
+  `.rail-dot` alone misses every message inside a run.
+- **A capsule's background depends on its fill** (the panel's colour, the
+  track's, or the two blended half and half), so a colour check reads a `.rail-dot`. Signals (`.pulse`, `[data-here]`, `.noted`) are always on dots.
+
+## Revealing a picked message (`use-reveal.ts`, S33)
+
+`useReveal(container)` returns `reveal(id)`, which `openAt` calls for a pick
+that scrolls and for one that opens a column, and the Archive preview for its
+picks.
+
+- **It tries at once.** Picking a message a column on the tab you are on
+  already draws changes no layout state: `show` for the same tab returns the
+  same state, so no render follows, and an effect waiting for one never runs
+  (S33: the rail's scroll-to did nothing). Otherwise the id waits for the render
+  the pick causes, in a layout effect with no dependencies.
+- **It scrolls only a message that is out of view.** A branch opened from its
+  fork point is already level with it, and centring it would undo that.
+- **It dispatches `PLACED`.** A column scrolled down, from 0 or from a shorter
+  path, has not moved up, so it is still following, and the next resize would
+  take it to its end (S33, answer 6). The Archive preview shows it: the pick
+  changes its path, and the new content resizes it.
+- **It is declared after the alignment effect in `App`,** so a pick the
+  alignment left out of view is scrolled to in the same commit.
+
 ## Colour carries the link, not geometry
 
 Each column takes the rail track of its last message (`branchColors`); its
@@ -186,7 +235,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **`alignOnOpen` settles it:** it dispatches `PLACED` on the body, and the
   column follows only if it was placed at its end. Without it, a column
   aligned short of its end would jump there on its first ResizeObserver
-  callback.
+  callback. `useReveal` dispatches it too (below).
 
 ## Threads, lanes and the composer (ADR-0020)
 
@@ -215,7 +264,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `message.tsx`): its label (`toolLabel`), ✓, ✗ or …, and its result folded in
   a `<details>`, capped for display. A result is its own entry in the tree;
   `projectSpine` pairs it with its call on the same path, so it adds no column
-  row and no rail dot. A message that only called tools shows only its rows.
+  row and no rail row. A message that only called tools shows only its rows.
 - **Live work is one component** (`Streams` in `column.tsx`), reading
   `readStreams` for the lanes running on the column's path: the reply as it is
   written, and each running tool's output, following its end as a column

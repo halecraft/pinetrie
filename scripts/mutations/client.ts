@@ -405,4 +405,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a key with no colon",
   },
+  {
+    name: "a click on a capsule picks from the bottom up",
+    file: "packages/client/rail-view.ts",
+    from: "  const i = Math.floor(fraction * ids.length)",
+    to: "  const i = Math.floor((1 - fraction) * ids.length)",
+    command: unit,
+    expect: "pickAt: the message as far through the run",
+  },
+  {
+    name: "a run fills by a threshold, not by whether anyone wrote",
+    file: "packages/client/rail-view.ts",
+    from: '  if (stats.people === 0) return "agent"',
+    to: '  if (stats.people * 10 < count) return "agent"',
+    command: unit,
+    expect: "runFill: the agent alone, people alone, or both",
+  },
 ]

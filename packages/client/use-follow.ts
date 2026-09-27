@@ -10,7 +10,7 @@ import {
 } from "react"
 import { type FollowEvent, follow, initialFollow } from "./follow.ts"
 
-/** The DOM event `alignOnOpen` dispatches on a column body it has placed. */
+/** The DOM event `alignOnOpen` and `useReveal` dispatch on a column body they have placed. */
 export const PLACED = "pineta:placed"
 
 export interface Follow {

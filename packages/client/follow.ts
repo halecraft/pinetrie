@@ -29,7 +29,7 @@ export type FollowEvent =
   /** A ResizeObserver callback: the content or the viewport changed size. */
   | { readonly kind: "resized"; readonly at: Metrics }
   | { readonly kind: "scrolled"; readonly at: Metrics }
-  /** Something outside placed the scroll on purpose (`alignOnOpen`). */
+  /** Something outside placed the scroll on purpose (`alignOnOpen`, `useReveal`). */
   | { readonly kind: "placed"; readonly at: Metrics }
   /** The reader's own send, or ↓ new below. */
   | { readonly kind: "follow"; readonly at: Metrics }

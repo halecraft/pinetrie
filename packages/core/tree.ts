@@ -176,6 +176,24 @@ function toolResultOf(entry: EntryLike): {
   }
 }
 
+/**
+ * The tool results among `ids`' entries, by the call each answers. A result
+ * is its own entry but belongs to its call: counted as a message, it would
+ * add a column row and a rail row per call.
+ */
+function resultsOn(
+  index: TreeIndex,
+  ids: Iterable<string>,
+): ReadonlyMap<string, { readonly text: string; readonly isError: boolean }> {
+  const results = new Map<string, { text: string; isError: boolean }>()
+  for (const id of ids) {
+    const entry = index.entries[id]
+    const r = entry === undefined ? null : toolResultOf(entry)
+    if (r !== null) results.set(r.callId, { text: r.text, isError: r.isError })
+  }
+  return results
+}
+
 // ── the index ─────────────────────────────────────────────────────────────
 
 export interface TreeIndex {
@@ -266,6 +284,22 @@ export const pathIds = (
   tip: string | null,
 ): ReadonlySet<string> => new Set(ancestry(index, tip).path)
 
+/**
+ * Who wrote `ids`' messages, in order of first message: ids are uuidv7, so
+ * sorting them is creation order.
+ */
+export function writersOf(
+  index: TreeIndex,
+  ids: Iterable<string>,
+): readonly WriterId[] {
+  const out: WriterId[] = []
+  for (const id of [...ids].sort()) {
+    const w = index.entries[id]?.message?.writer
+    if (w !== undefined && !out.includes(w)) out.push(w)
+  }
+  return out
+}
+
 // ── the transcript: what the model reads ──────────────────────────────────
 
 /**
@@ -332,15 +366,8 @@ export function projectSpine(
   const { path: upward, cycleAt } = ancestry(index, tipId)
   const path = upward.toReversed()
   const onSpine = new Set(path)
-  // A tool's result is its own entry, after the call. It belongs to the call,
-  // not to the path as a message: shown as one, it would add a column row and
-  // a rail dot per call. Only results on this path pair.
-  const results = new Map<string, { text: string; isError: boolean }>()
-  for (const id of path) {
-    const entry = index.entries[id]
-    const r = entry === undefined ? null : toolResultOf(entry)
-    if (r !== null) results.set(r.callId, { text: r.text, isError: r.isError })
-  }
+  // Only results on this path pair with its calls.
+  const results = resultsOn(index, path)
   const spine: SpineNode[] = []
   for (const [i, id] of path.entries()) {
     const entry = index.entries[id]
@@ -502,7 +529,7 @@ export function projectColumns(
 
 export interface RailRow {
   readonly id: string
-  /** Which vertical track the dot sits on. */
+  /** Which vertical track the row sits on. */
   readonly track: number
   /** The nearest ancestor with a row, or null at a root: the edge's other end. */
   readonly parentId: string | null
@@ -511,7 +538,7 @@ export interface RailRow {
 }
 
 /**
- * One root's tree as git-graph rows: a dot per message, depth-first from
+ * One root's tree as git-graph rows: a row per message, depth-first from
  * `root`, children in id order. Tracks start at 0 in every tree.
  *
  * The oldest child continues its parent's track; each younger child takes the
@@ -585,6 +612,164 @@ export function projectRail(
     }
   }
   return rows
+}
+
+interface RailItemBase {
+  /** Its first row slot. Each item's is the previous item's `slot + span`. */
+  readonly slot: number
+  /** Rows it takes. */
+  readonly span: number
+  /** Its messages, top to bottom: each the only child of the one above. */
+  readonly ids: readonly [string, ...string[]]
+  readonly track: number
+  /** The first message's parent and that parent's track: the edge into it. */
+  readonly parentId: string | null
+  readonly parentTrack: number | null
+}
+
+/** A message the rail draws on its own. */
+export interface RailDot extends RailItemBase {
+  readonly kind: "dot"
+  readonly span: 1
+  readonly ids: readonly [string]
+}
+
+/** A straight stretch of uneventful messages on one track, drawn as one capsule. */
+export interface RailRun extends RailItemBase {
+  readonly kind: "run"
+  readonly stats: RunStats
+}
+
+/** What a run holds. The agent's messages are `ids.length - people`. */
+export interface RunStats {
+  /** Messages people wrote: every role but `assistant`. */
+  readonly people: number
+  /** Who wrote them, in order of first message. */
+  readonly writers: readonly WriterId[]
+  /** Tool calls in its messages, and how many of them failed. */
+  readonly calls: number
+  readonly failed: number
+}
+
+export type RailItem = RailDot | RailRun
+
+/** The shortest stretch drawn as a run: two dots are no taller than a capsule. */
+const MIN_RUN = 3
+
+/** A run's rows: one, and one more per digit of its size (3–9 → 2, 10–99 → 3). */
+export const runSpan = (size: number): number => 1 + String(size).length
+
+/**
+ * What the rail draws: `projectRail`'s rows, with each straight stretch of
+ * uneventful messages drawn as one run.
+ *
+ * A row is uneventful when it is none of: in `keep` (what the view needs to
+ * see: notes, rings, running tips, open columns' ends), the root's first
+ * message, a branch's first message, a fork, or a thread end. So a run holds
+ * no structure, and the compacted rail has every branch the full one has.
+ * An uneventful row's only child is the next row in depth-first order, so a
+ * run is a stretch of consecutive rows.
+ */
+export function compactRail(
+  index: TreeIndex,
+  rows: readonly RailRow[],
+  keep: ReadonlySet<string>,
+): readonly RailItem[] {
+  const childRows = new Map<string, number>()
+  for (const r of rows)
+    if (r.parentId !== null)
+      childRows.set(r.parentId, (childRows.get(r.parentId) ?? 0) + 1)
+  const uneventful = (r: RailRow): boolean =>
+    !keep.has(r.id) &&
+    r.parentId !== null &&
+    // Off its parent's track means a branch's first message: only a younger
+    // child is, since the oldest keeps its parent's track (`projectRail`).
+    r.track === r.parentTrack &&
+    childRows.get(r.id) === 1
+
+  const items: RailItem[] = []
+  let slot = 0
+  const dot = (r: RailRow) => {
+    items.push({ kind: "dot", slot, span: 1, ids: [r.id], ...edge(r) })
+    slot += 1
+  }
+  /** Row `j` carries on the stretch that row `j - 1` is in. */
+  const continues = (j: number): boolean => {
+    const r = rows[j]
+    return r !== undefined && uneventful(r) && r.parentId === rows[j - 1]?.id
+  }
+  for (let i = 0; i < rows.length; ) {
+    const start = rows[i]
+    if (start === undefined) break
+    if (!uneventful(start)) {
+      dot(start)
+      i += 1
+      continue
+    }
+    let end = i + 1
+    while (continues(end)) end += 1
+    const stretch = rows.slice(i, end)
+    const [first, ...more] = stretch
+    if (first === undefined || stretch.length < MIN_RUN) stretch.forEach(dot)
+    else {
+      const span = runSpan(stretch.length)
+      items.push({
+        kind: "run",
+        slot,
+        span,
+        ids: [first.id, ...more.map(r => r.id)],
+        ...edge(first),
+        stats: runStats(index, stretch, rows[end]?.id),
+      })
+      slot += span
+    }
+    i = end
+  }
+  return items
+}
+
+const edge = (r: RailRow) => ({
+  track: r.track,
+  parentId: r.parentId,
+  parentTrack: r.parentTrack,
+})
+
+/**
+ * A run's stats. Its tool results are between its messages: below each
+ * member, up to the row after it, which is the next member or `after`.
+ */
+function runStats(
+  index: TreeIndex,
+  members: readonly RailRow[],
+  after: string | undefined,
+): RunStats {
+  const between: string[] = []
+  let people = 0
+  const calls: ToolCallView[] = []
+  for (const [k, m] of members.entries()) {
+    const entry = index.entries[m.id]
+    const message = entry === undefined ? null : renderableMessage(entry)
+    if (message?.role !== "assistant") people += 1
+    calls.push(...(message?.toolCalls ?? []))
+    const next = members[k + 1]?.id ?? after
+    if (next === undefined) continue
+    for (
+      let id = index.parentOf(next);
+      id !== null && id !== m.id;
+      id = index.parentOf(id)
+    )
+      between.push(id)
+  }
+  const results = resultsOn(index, between)
+  return {
+    people,
+    writers: writersOf(
+      index,
+      members.map(m => m.id),
+    ),
+    calls: calls.length,
+    failed: calls.filter(c => results.get(c.id)?.isError === true).length,
+  }
 }
 
 // ── threads, lanes, and the agent ─────────────────────────────────────────

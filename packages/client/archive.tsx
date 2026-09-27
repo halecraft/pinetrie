@@ -9,6 +9,7 @@ import {
   type ArchiveFilter,
   type ArchiveRow,
 } from "./archive-rows.ts"
+import { plural } from "./counts.ts"
 import { nameFor } from "./presence.tsx"
 
 /** How long ago `ms` was, roughly. */
@@ -101,10 +102,8 @@ export function ArchiveTab({
                     {row.summary.writers
                       .map(w => nameFor(nameOf, w))
                       .join(", ")}{" "}
-                    · {row.summary.messages} message
-                    {row.summary.messages === 1 ? "" : "s"}
-                    {row.notes > 0 &&
-                      ` · ${row.notes} note${row.notes === 1 ? "" : "s"}`}
+                    · {plural(row.summary.messages, "message")}
+                    {row.notes > 0 && ` · ${plural(row.notes, "note")}`}
                   </span>
                 </button>
               </li>

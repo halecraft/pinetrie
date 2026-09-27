@@ -356,6 +356,23 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S34 — Links to a thread, off loopback ✅ PASS
+
+`findings/S34-links-off-loopback.md`. A fragment survives the invite link's
+redirect, so `?key=…#e=…` lands on the thread. A key-less link clicked on
+another site is refused even with the key cookie set (`SameSite=Strict`), and
+the page cannot read the `HttpOnly` cookie: a link to share must be one of the
+host's invite links, which the host gives the page.
+
+### S33 — Picking a message from the rail ✅ PASS
+
+`findings/S33-picking-a-message-from-the-rail.md`. A pick from the rail
+brought its message into view in none of three cases. On the tab you are on,
+a pick causes no render, so an effect waiting for one never ran; a new column
+aligned to its fork point; and the Archive preview did not scroll. Scrolling
+at once when the message is drawn, and dispatching `PLACED` so the column
+stops following, lands every case in view and keeps it there.
+
 ### S32 — Following a column's end ✅ PASS
 
 `findings/S32-following-the-end.md`. A column did not follow a reply being

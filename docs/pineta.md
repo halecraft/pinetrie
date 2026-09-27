@@ -357,8 +357,8 @@ string union `"pending" | "empty" | "populated"`, not an object.
 **The interface is a tab per root, each a rail beside columns**
 (`docs/06-interface.md`, `packages/client/TECHNICAL.md`, ADR-0029): each
 column is one path on its own scroll, a branch opens beside its parent in its
-rail track's colour, and the rail draws the tab's root. The Archive tab lists
-every root. Views are pure functions over one `indexTree`
+rail track's colour, and the rail draws the tab's root, with each uneventful
+stretch drawn as one capsule (ADR-0031). The Archive tab lists every root. Views are pure functions over one `indexTree`
 (`packages/core/tree.ts`, `roots.ts`); which tab you are on and each root's
 columns are a reducer in `packages/client/layout.ts`, never written.
 

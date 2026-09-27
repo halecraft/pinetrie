@@ -5,7 +5,7 @@
 // get colours far from each other and from the tracks; the rest, a hue from
 // their writer id.
 
-import type { TreeIndex, WriterId } from "@pineta/core"
+import { type TreeIndex, type WriterId, writersOf } from "@pineta/core"
 import { displayName } from "@pineta/marginalia"
 
 /**
@@ -24,22 +24,18 @@ function hashed(writer: WriterId): string {
 }
 
 /**
- * Writers in the order they joined: by their first message (entry ids are
- * uuidv7, so id order is creation order), then those who have only named
- * themselves, by id. Every window reads the same document, so every window
- * gives each person the same colour. Pure.
+ * Writers in the order they joined: by their first message in the session
+ * (`writersOf`), then those who have only named themselves, by id. Every
+ * window reads the same document, so every window gives each person the same
+ * colour. Pure.
  */
 export function writerOrder(
   index: TreeIndex,
   named: Iterable<WriterId>,
 ): readonly WriterId[] {
-  const out: WriterId[] = []
-  for (const id of Object.keys(index.entries).sort()) {
-    const w = index.entries[id]?.message?.writer
-    if (w !== undefined && !out.includes(w)) out.push(w)
-  }
-  const rest = [...named].filter(w => !out.includes(w)).sort()
-  return [...out, ...rest]
+  const wrote = writersOf(index, Object.keys(index.entries))
+  const rest = [...named].filter(w => !wrote.includes(w)).sort()
+  return [...wrote, ...rest]
 }
 
 /** Each writer's colour: one of `FIRST` by `order`, else from their id. Pure. */

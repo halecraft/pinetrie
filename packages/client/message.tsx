@@ -10,6 +10,7 @@ import type {
 import { entryId } from "@pineta/core"
 import type { Reference } from "@pineta/marginalia"
 import type { ReactNode } from "react"
+import { plural } from "./counts.ts"
 import { citeTarget } from "./markdown.ts"
 import { MessageText, selectionBoundaries } from "./message-text.tsx"
 import { speakerLabel, withContributors } from "./names.ts"
@@ -151,9 +152,8 @@ export function Message(p: MessageProps) {
                 onClick={() => p.onOpenBranch(b.rootId)}
                 type="button"
               >
-                ⑂ {b.messageCount} message{b.messageCount === 1 ? "" : "s"}
-                {b.noteCount > 0 &&
-                  ` · ${b.noteCount} note${b.noteCount === 1 ? "" : "s"}`}
+                ⑂ {plural(b.messageCount, "message")}
+                {b.noteCount > 0 && ` · ${plural(b.noteCount, "note")}`}
               </button>
             ))}
             {p.cites.length > 0 && (

@@ -6,6 +6,7 @@ import {
   atEntry,
   branchColors,
   type ChatMode,
+  compactRail,
   type EntryLike,
   entryId,
   followTip,
@@ -18,12 +19,15 @@ import {
   projectColumns,
   projectRail,
   projectSpine,
+  type RailItem,
   ROOT,
   rootOf,
+  runSpan,
   tailEdit,
   threadOf,
   toolLabel,
   writerId,
+  writersOf,
 } from "./index.ts"
 
 /**
@@ -182,6 +186,22 @@ describe("projectColumns", () => {
   })
 })
 
+describe("writersOf", () => {
+  test("each writer once, in order of their first message", () => {
+    const ada = writerId("w-ada")
+    const bea = writerId("w-bea")
+    const by = (writer: typeof ada) => ({ role: "chat", author: "", writer })
+    const i = indexTree({
+      "1-a": { id: "1-a", parentId: null, type: "message", message: by(bea) },
+      "2-b": { id: "2-b", parentId: "1-a", type: "message", message: by(ada) },
+      "3-c": { id: "3-c", parentId: "2-b", type: "message", message: by(bea) },
+      "4-d": { id: "4-d", parentId: "3-c", type: "message" },
+    })
+    expect(writersOf(i, ["4-d", "3-c", "2-b", "1-a"])).toEqual([bea, ada])
+    expect(writersOf(i, ["3-c", "2-b"])).toEqual([ada, bea])
+  })
+})
+
 describe("projectRail", () => {
   const rows = projectRail(indexTree(forks), "1-t1")
   const trackOf = (id: string) => rows.find(r => r.id === id)?.track
@@ -231,6 +251,155 @@ describe("projectRail", () => {
     expect(r.find(x => x.id === "9-after")).toMatchObject({
       parentId: "3-t3",
       track: 0,
+    })
+  })
+})
+
+describe("compactRail", () => {
+  const pad = (n: number) => String(n).padStart(3, "0")
+  const e = (
+    id: string,
+    parentId: string | null,
+    message: Record<string, unknown>,
+  ): [string, EntryLike] => [id, { id, parentId, type: "message", message }]
+  /**
+   * A person's question, `steps` agent messages that each call `read` and get
+   * a result, and a reply. Ids sort in the order written. Step k is
+   * `${pad(2k)}-s`, its result `${pad(2k + 1)}-r`.
+   */
+  const loop = (steps: number, failAt?: number): Record<string, EntryLike> => {
+    const out: [string, EntryLike][] = [e("000-q", null, { role: "user" })]
+    let parent = "000-q"
+    for (let k = 1; k <= steps; k += 1) {
+      const step = `${pad(2 * k)}-s`
+      const result = `${pad(2 * k + 1)}-r`
+      out.push(
+        e(step, parent, {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: `c${k}`, name: "read", arguments: {} },
+          ],
+        }),
+        e(result, step, {
+          role: "toolResult",
+          toolCallId: `c${k}`,
+          content: "",
+          isError: k === failAt,
+        }),
+      )
+      parent = result
+    }
+    out.push(e("999-a", parent, { role: "assistant", content: "done" }))
+    return Object.fromEntries(out)
+  }
+  const steps = (n: number) =>
+    Array.from({ length: n }, (_, k) => `${pad(2 * (k + 1))}-s`)
+  const compact = (
+    entries: Record<string, EntryLike>,
+    root: string,
+    keep: readonly string[] = [],
+  ) => {
+    const i = indexTree(entries)
+    return compactRail(i, projectRail(i, root), new Set(keep))
+  }
+  const shape = (items: readonly RailItem[]) =>
+    items.map(it => (it.kind === "dot" ? it.ids[0] : [...it.ids]))
+
+  test("an agent loop between a question and its reply is one run", () => {
+    const items = compact(loop(12), "000-q")
+    expect(shape(items)).toEqual(["000-q", steps(12), "999-a"])
+    expect(items[1]).toMatchObject({
+      kind: "run",
+      span: 3,
+      stats: { people: 0, writers: [], calls: 12, failed: 0 },
+    })
+  })
+  test("one or two uneventful messages stay dots", () => {
+    expect(shape(compact(loop(1), "000-q"))).toEqual([
+      "000-q",
+      "002-s",
+      "999-a",
+    ])
+    expect(shape(compact(loop(2), "000-q"))).toEqual([
+      "000-q",
+      "002-s",
+      "004-s",
+      "999-a",
+    ])
+  })
+  test("roots, forks, branches and thread ends are never in a run", () => {
+    const branched = tree({
+      "01": null,
+      "02": "01",
+      "03": "02",
+      "04": "03",
+      "05": "04",
+      "06": "05",
+      "07": "02",
+      "08": "07",
+      "09": "08",
+      "10": "09",
+      "11": "10",
+    })
+    expect(shape(compact(branched, "01"))).toEqual([
+      "01",
+      "02",
+      ["03", "04", "05"],
+      "06",
+      "07",
+      ["08", "09", "10"],
+      "11",
+    ])
+  })
+  test("a kept message splits a run around it", () => {
+    const [a, b] = [steps(12).slice(0, 5), steps(12).slice(6)]
+    expect(shape(compact(loop(12), "000-q", ["012-s"]))).toEqual([
+      "000-q",
+      a,
+      "012-s",
+      b,
+      "999-a",
+    ])
+  })
+  test("a failed call counts, its result below the run's last message included", () => {
+    const run = (failAt: number) =>
+      compact(loop(12, failAt), "000-q").find(it => it.kind === "run")
+    expect(run(3)).toMatchObject({ stats: { calls: 12, failed: 1 } })
+    expect(run(12)).toMatchObject({ stats: { calls: 12, failed: 1 } })
+  })
+  test("a run's span is one row, and one more per digit of its size", () => {
+    expect([3, 9, 10, 99, 100].map(runSpan)).toEqual([2, 2, 3, 3, 4])
+    expect(compact(loop(100), "000-q")[1]).toMatchObject({ span: 4 })
+  })
+  test("every row is in exactly one item, in order, and slots add up", () => {
+    const i = indexTree({ ...loop(12), ...tree({ "005-x": "004-s" }) })
+    const rows = projectRail(i, "000-q")
+    const items = compactRail(i, rows, new Set())
+    expect(items.flatMap(it => it.ids)).toEqual(rows.map(r => r.id))
+    for (const [k, it] of items.entries())
+      expect(it.slot).toBe(
+        k === 0 ? 0 : (items[k - 1]?.slot ?? 0) + (items[k - 1]?.span ?? 0),
+      )
+  })
+  test("a run counts the messages people wrote, and who, in order", () => {
+    const ada = writerId("w-ada")
+    const bea = writerId("w-bea")
+    const chat = (writer: typeof ada) => ({ role: "chat", author: "", writer })
+    const agent = { role: "assistant", content: "ok" }
+    const items = compact(
+      Object.fromEntries([
+        e("01", null, chat(ada)),
+        e("02", "01", chat(bea)),
+        e("03", "02", agent),
+        e("04", "03", chat(ada)),
+        e("05", "04", agent),
+        e("06", "05", chat(bea)),
+      ]),
+      "01",
+    )
+    expect(items[1]).toMatchObject({
+      ids: ["02", "03", "04", "05"],
+      stats: { people: 2, writers: [bea, ada], calls: 0 },
     })
   })
 })

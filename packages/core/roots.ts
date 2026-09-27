@@ -5,13 +5,19 @@
 // is rooted at its first message (S30), so a root's id is its tab's key.
 
 import type { ArchiveRecord, WriterId } from "./index.ts"
-import { type LaneView, projectRail, rootOf, type TreeIndex } from "./tree.ts"
+import {
+  type LaneView,
+  projectRail,
+  rootOf,
+  type TreeIndex,
+  writersOf,
+} from "./tree.ts"
 
 export interface RootSummary {
   readonly root: string
   /** Its first message, as the rail finds it: the tab's label. */
   readonly first: string
-  /** Messages the rail draws. */
+  /** Its messages: the rail's rows, some of which it draws inside a run. */
   readonly messages: number
   /** Its newest message: last activity, since ids are uuidv7. */
   readonly newest: string
@@ -23,8 +29,8 @@ const ascending = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
 /**
  * Every root with at least one message, ascending by id. Built from each
- * root's rail rows, so "a message" and "its first message" mean exactly what
- * the rail draws.
+ * root's rail rows, so "a message" and "its first message" mean what the rail
+ * means by them.
  */
 export function summarizeRoots(index: TreeIndex): readonly RootSummary[] {
   return [...index.roots, ...index.orphans].sort(ascending).flatMap(root => {
@@ -32,18 +38,13 @@ export function summarizeRoots(index: TreeIndex): readonly RootSummary[] {
     const first = rows[0]?.id
     if (first === undefined) return []
     const ids = rows.map(r => r.id).sort(ascending)
-    const writers: WriterId[] = []
-    for (const id of ids) {
-      const w = index.entries[id]?.message?.writer
-      if (w !== undefined && !writers.includes(w)) writers.push(w)
-    }
     return [
       {
         root,
         first,
         messages: rows.length,
         newest: ids.at(-1) ?? first,
-        writers,
+        writers: writersOf(index, ids),
       },
     ]
   })

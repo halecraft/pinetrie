@@ -113,7 +113,7 @@ The leftmost tab. It finds roots, so it is a list, not a rail with columns.
   it, its messages and notes, and its state. Filters: archived, open, mine.
   Search over message text.
 - **Selecting a row previews it:** that root's rail, and one read-only column
-  that a rail dot moves. Its composer is disabled, and none of the tools that
+  that a pick on the rail moves. Its composer is disabled, and none of the tools that
   write are there: branch, edit, mark, cite. In place of sending it offers
   **Restore** for an archived root, and **Open** for an open one. A citation is written where its author is reading,
   which here is the archived root. Once the inventory exists (planned with
@@ -168,11 +168,24 @@ so it is the one behind the menu. What each does is under "Starting" below.
 ### The rail: a root's tree, compactly
 
 - A git-graph strip at the left edge draws every branch in the tab's root as a
-  line, and every message as a dot, in tree order.
+  line, and every message as a dot, in tree order, except for uneventful
+  stretches (below).
 - **A column wears its rail track's colour**, so you can see which branches are
   on screen and where they sit in the whole.
-- **Clicking a branch in the rail opens it as a column**, or scrolls to it if it
-  is open.
+- **Clicking a message in the rail brings it into view**: in the column that
+  shows it, or in a new column opened beside it.
+- **Uneventful stretches are capsules** (ADR-0031). A message is always its own
+  dot if it is the root's first message, a branch's first message, a fork, a
+  thread end, a note's message, a thread end someone else follows, where the
+  agent is replying, or the end of a column you have open. Three or more other
+  messages in a row are one capsule on their track: 2 rows long for 3–9
+  messages, 3 for 10–99, 4 for 100–999. It is hollow when only the agent
+  wrote in it, solid when only people did, and filled at half strength for
+  both; its
+  tooltip gives the counts, failed tool calls included. Clicking
+  it opens the message at that point of the run: near its top, the first;
+  three quarters down, the message three quarters through. The column is where
+  it is read.
 - **Activity shows in the rail**: a pulsing dot where the agent is replying, a
   mark where a branch has messages you have not read.
 
@@ -246,7 +259,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   touched (`read packages/core/tree.ts`, `bash pnpm test`), then ✓, ✗, or …
   while it has no result, with the result folded away. A result is its own
   entry in the tree, but it belongs to its call, so it adds no message and no
-  rail dot.
+  row on the rail.
 - **While the agent works, its column shows it live**: the reply as it is
   written, and each running command's output, following its end as a column
   does.

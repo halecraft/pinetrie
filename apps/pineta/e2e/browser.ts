@@ -42,6 +42,14 @@ const OWN_MENU = '#tabs .tab[aria-selected="true"] ~ .tab-more .tab-menu'
 
 const { ok, report } = createChecks()
 
+/** In the page: the messages its rail draws, a dot each and a capsule's count. */
+const RAIL_MESSAGES = () =>
+  document.querySelectorAll(".rail .rail-dot").length +
+  [...document.querySelectorAll(".rail .rail-run")].reduce(
+    (n, run) => n + Number(run.getAttribute("data-count")),
+    0,
+  )
+
 let browser: Browser
 try {
   browser = await chromium.connect(PW_SERVER, { timeout: 5000 })
@@ -242,14 +250,15 @@ try {
     `typing @agent promised a reply, and it came ("${ask}")`,
   )
   await idle()
-  const railCount = async () => page.$$eval(".rail-dot", n => n.length)
+  /** Messages the rail draws: one per dot, and each capsule's count. */
+  const railCount = (p: Page = page) => p.evaluate(RAIL_MESSAGES)
   const messages = () => {
     const index = readTreeIndex(host.doc)
     return projectRail(index, index.roots[0] ?? "").length
   }
   ok(
     (await railCount()) === messages() && messages() >= 5,
-    `the rail has a dot per message (${await railCount()} of ${messages()})`,
+    `the rail accounts for every message (${await railCount()} of ${messages()})`,
   )
 
   // ── a branch opens beside its parent, in its colour ─────────────────────
@@ -392,14 +401,14 @@ try {
     beside,
     "→ opens an empty column next to the column it forks from, not at the far right",
   )
-  const dotsBefore = await railCount()
+  const railBefore = await railCount()
   await send(1, "deeper")
   ok(
     await shows("deeper", col(1)),
     "a message sent in a fresh column appears in that column",
   )
   await idle()
-  ok((await railCount()) > dotsBefore, "the new branch appears in the rail")
+  ok((await railCount()) > railBefore, "the new branch appears in the rail")
   ok(
     !(await texts(0)).includes("deeper"),
     "the column it branched from does not take the new branch",
@@ -622,7 +631,7 @@ try {
         n.getAttribute("data-root"),
       )
       .catch(() => null)
-  const dotsIn = (root: string) =>
+  const messagesIn = (root: string) =>
     projectRail(readTreeIndex(host.doc), root).length
   const firstTrack = () =>
     page.$eval(".rail-dot", n => n.getAttribute("data-track")).catch(() => "")
@@ -631,18 +640,20 @@ try {
   await page.click(tabSel(firstRoot))
   await page
     .waitForFunction(
-      n => document.querySelectorAll(".rail-dot").length === n,
-      dotsIn(firstRoot),
-      { timeout: 15_000 },
+      `(${RAIL_MESSAGES})() === ${messagesIn(firstRoot)}`,
+      null,
+      {
+        timeout: 15_000,
+      },
     )
     .catch(() => null)
   ok(
     downRoot !== firstRoot &&
-      downShown[0] === dotsIn(downRoot) &&
+      downShown[0] === messagesIn(downRoot) &&
       downShown[1] === "0" &&
-      (await railCount()) === dotsIn(firstRoot) &&
+      (await railCount()) === messagesIn(firstRoot) &&
       (await firstTrack()) === "0",
-    `each root's tab draws only its root, from track 0 (${downShown[0]} of ${dotsIn(downRoot)}; ${await railCount()} of ${dotsIn(firstRoot)})`,
+    `each root's tab draws only its root, from track 0 (${downShown[0]} of ${messagesIn(downRoot)}; ${await railCount()} of ${messagesIn(firstRoot)})`,
   )
 
   // 2. A root someone else starts appears as a tab, and the page stays put.
@@ -1358,6 +1369,199 @@ try {
         await toolIdle()
       } finally {
         await starter.close()
+      }
+
+      // ── the rail draws a long loop as one capsule (ADR-0031) ─────────────
+      await tp.keyboard.press("Escape")
+      await tp.click("#tabs .add-agent")
+      script.use([
+        ...Array.from({ length: 30 }, () => ({
+          tool: "read",
+          args: { path: "notes.txt" },
+        })),
+        { tool: "read", args: { path: "missing.txt" } },
+        { text: "I read it 30 times, and one file was missing." },
+      ])
+      await say("read notes, again and again")
+      await toolIdle()
+      const loopIndex = readTreeIndex(toolHost.doc)
+      const loopRows = projectRail(loopIndex, loopIndex.roots.at(-1) ?? "")
+      await tp.waitForSelector(
+        `${col(0)} .msg[data-entry="${loopRows.at(-1)?.id ?? "none"}"]`,
+        { timeout: 15_000 },
+      )
+      const tall = await tp.$eval(
+        body(0),
+        b => b.scrollHeight > 2 * b.clientHeight,
+      )
+      const capsule = await tp
+        .$eval(".rail .rail-run", r => ({
+          count: Number(r.getAttribute("data-count")),
+          span: Number(r.getAttribute("data-span")),
+          height: r.getBoundingClientRect().height,
+          label: r.getAttribute("title") ?? "",
+          fill: r.getAttribute("data-fill"),
+        }))
+        .catch(() => null)
+      const accounted = await railCount(tp)
+      ok(
+        tall &&
+          capsule !== null &&
+          capsule.count >= 30 &&
+          capsule.span === 1 + String(capsule.count).length &&
+          capsule.height > 8 &&
+          capsule.label.endsWith("· 1 failed") &&
+          capsule.fill === "agent" &&
+          accounted === loopRows.length,
+        `a long loop is one hollow capsule on the rail, as long as its size has digits, its label counting the failed call (${capsule?.count ?? 0} messages, ${capsule?.span ?? 0} rows, ${capsule?.fill ?? "no"} fill, "${capsule?.label ?? ""}"; ${accounted} of ${loopRows.length} accounted for)`,
+      )
+
+      // A capsule opens its first message in view, and the column keeps it
+      // there. Its fork point is out of view in the column that shows it, so
+      // aligning the new column to it alone would not show the message. The
+      // aside is one message, so the preview below opens on a short path and
+      // its pick scrolls down, which does not stop a column following (S33).
+      const railer = await connectSession({
+        url: toolHost.wsUrl,
+        WebSocket,
+        peerId: "browser-railer",
+      })
+      try {
+        const say3 = (n: string) => `${n}.\nIts second line.\nIts third line.`
+        const chain = async (from: string, name: string, n: number) => {
+          let tip = from
+          for (let k = 1; k <= n; k++) {
+            // A message below one that has a reply starts a branch there.
+            const r = await railer.chat(
+              say3(`${name} ${k}`),
+              atEntry(entryId(tip)),
+              k === 1 ? { mode: "branch" } : undefined,
+            )
+            if (r.kind !== "appended") return null
+            tip = r.id
+          }
+          return tip
+        }
+        const start = await railer.chat(say3("Trunk 0"), ROOT, {
+          mode: "branch",
+        })
+        const trunk =
+          start.kind === "appended" ? await chain(start.id, "Trunk", 20) : null
+        // The trunk's continuation first, so it keeps the trunk's track; the
+        // aside after it, so it is the newest leaf, which the tab opens.
+        const later = trunk === null ? null : await chain(trunk, "Later", 30)
+        const aside = trunk === null ? null : await chain(trunk, "Aside", 1)
+        const railRoot = start.kind === "appended" ? start.id : "none"
+        await tp.click(`#tabs .tab[data-root="${railRoot}"]`, {
+          timeout: 15_000,
+        })
+        await tp.waitForSelector(
+          `${col(0)} .msg[data-entry="${aside ?? "none"}"]`,
+          { timeout: 15_000 },
+        )
+        const rows = projectRail(readTreeIndex(toolHost.doc), railRoot)
+        const firstLater = rows.find(r => r.parentId === trunk && r.track === 0)
+        const target = firstLater?.id ?? "none"
+        /** Whether `target` is drawn whole inside its column's view, in `scope`. */
+        const inView = (scope = "#strip", id = target) =>
+          tp.evaluate(
+            ([scope, id]) => {
+              const m = document.querySelector(
+                `${scope} .msg[data-entry="${id}"]`,
+              )
+              const b = m?.closest(".column-body")
+              if (
+                m === null ||
+                m === undefined ||
+                b === null ||
+                b === undefined
+              )
+                return false
+              const r = m.getBoundingClientRect()
+              const v = b.getBoundingClientRect()
+              return r.top >= v.top - 1 && r.bottom <= v.bottom + 1
+            },
+            [scope, id] as const,
+          )
+        /** A resize: a column that is still following jumps to its end. */
+        const nudge = async () => {
+          const size = tp.viewportSize()
+          if (size !== null)
+            await tp.setViewportSize({ ...size, height: size.height - 40 })
+          await frame()
+          await frame()
+          if (size !== null) await tp.setViewportSize(size)
+        }
+        // The fork point, the trunk's last message, goes below the view.
+        await tp.$eval(body(0), b => {
+          b.scrollTop = 0
+        })
+        /** Click `fraction` of the way down the capsule. */
+        const clickRun = async (scope: string, fraction: number) => {
+          const box = await tp
+            .locator(`${scope} .rail-run[data-entry="${target}"]`)
+            .boundingBox()
+          if (box !== null)
+            await tp.mouse.click(
+              box.x + box.width / 2,
+              box.y + fraction * box.height,
+            )
+        }
+        const before = await inView()
+        // At its top: a click there opens the run's first message.
+        await clickRun(".rail", 0.02)
+        await tp.waitForSelector(`#strip .msg[data-entry="${target}"]`, {
+          timeout: 15_000,
+        })
+        await frame()
+        const shownAtOnce = await inView()
+        await nudge()
+        const kept = await inView()
+        ok(
+          later !== null && !before && shownAtOnce && kept,
+          `a click at a capsule's top opens a column at its first message, in view, and the column keeps it there (${before}, ${shownAtOnce}, ${kept})`,
+        )
+
+        // Three quarters of the way down: the message three quarters through
+        // the run, in the column now showing it, and far from the first.
+        // A run's messages are consecutive rows.
+        const count = Number(
+          await tp.getAttribute(
+            `.rail .rail-run[data-entry="${target}"]`,
+            "data-count",
+          ),
+        )
+        const at = rows.findIndex(r => r.id === target)
+        const members = at < 0 ? [] : rows.slice(at, at + count)
+        const three = members[Math.floor(0.75 * members.length)]?.id ?? "none"
+        await clickRun(".rail", 0.75)
+        await frame()
+        const deepShown = await inView("#strip", three)
+        const firstGone = !(await inView())
+        ok(
+          members.length > 20 && deepShown && firstGone,
+          `a click lower on a capsule shows the message that far through its run (${members.length} messages; ${deepShown}, ${firstGone})`,
+        )
+
+        // The Archive tab's preview does the same with its one column, which
+        // opens at the newest leaf's end and moves to what is picked.
+        const preview = ".archive-preview"
+        await tp.click("#tabs .tab-archive")
+        await tp.click(`.archive-row[data-root="${railRoot}"]`)
+        await tp.waitForSelector(`${preview} .column .msg`, { timeout: 15_000 })
+        await clickRun(preview, 0.02)
+        await tp.waitForSelector(`${preview} .msg[data-entry="${target}"]`, {
+          timeout: 15_000,
+        })
+        await frame()
+        await nudge()
+        const previewed = await inView(preview)
+        ok(
+          previewed,
+          "a capsule in the Archive tab's preview shows its first message, and keeps it in view",
+        )
+      } finally {
+        await railer.close()
       }
     } finally {
       await tp.close().catch(() => {})
