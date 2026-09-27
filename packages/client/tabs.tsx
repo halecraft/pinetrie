@@ -1,20 +1,16 @@
-// client/tabs — the tab bar: Archive, a tab per open root, new tabs, and the
-// add tab (ADR-0029).
+// client/tabs — the tab bar: Archive, your open roots, new tabs, and the add
+// tab (ADR-0029, ADR-0030).
 //
-// Which roots have tabs is the same for everyone (every root not archived);
-// which tab you are on is yours. A root someone else starts appears here and
-// does not take you to it.
+// Your tabs are yours: the roots you have opened, in that order. × closes one
+// for you and writes nothing; Archive, in its ⋯, hides a root for everyone. A
+// root someone else starts opens no tab here.
 
 import type { WriterId } from "@pineta/core"
 import { ROOT_BUSY_REASON } from "@pineta/marginalia"
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react"
-import type { ActiveTab } from "./layout.ts"
+import type { KeyboardEvent } from "react"
+import { type ActiveTab, sameTab } from "./layout.ts"
+import { Menu } from "./menu.tsx"
 import { Avatars } from "./presence.tsx"
-
-const sameTab = (a: ActiveTab, b: ActiveTab): boolean =>
-  a.kind === b.kind &&
-  (a.kind !== "root" || b.kind !== "root" || a.root === b.root) &&
-  (a.kind !== "new" || b.kind !== "new" || a.key === b.key)
 
 /** Left and Right move focus between tabs. */
 function moveFocus(e: KeyboardEvent<HTMLElement>) {
@@ -42,6 +38,7 @@ export function TabBar({
   colorOf,
   onShow,
   onCloseNew,
+  onCloseRoot,
   onArchive,
   onAdd,
 }: {
@@ -61,37 +58,17 @@ export function TabBar({
   colorOf: (writer: WriterId) => string
   onShow: (tab: ActiveTab) => void
   onCloseNew: (key: string) => void
+  /** Close a root's tab for you: nothing is written (ADR-0030). */
+  onCloseRoot: (root: string) => void
   onArchive: (root: string) => void
   onAdd: (asksAgent: boolean) => void
 }) {
-  /**
-   * Where the open tab menu is drawn, or null when closed. Fixed to the
-   * viewport: the tab list scrolls sideways, which makes it clip vertically
-   * too, so a menu positioned inside it would be cut off below the bar.
-   */
-  const [menu, setMenu] = useState<{
-    root: string
-    top: number
-    right: number
-  } | null>(null)
-  // A menu opened on one tab closes when another is shown.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: close on every change of tab
-  useEffect(() => setMenu(null), [active])
-  // Placed once, when opened: a resize would leave it beside nothing.
-  useEffect(() => {
-    if (menu === null) return
-    const close = () => setMenu(null)
-    window.addEventListener("resize", close)
-    return () => window.removeEventListener("resize", close)
-  }, [menu])
   return (
     <nav aria-label="threads" id="tabs">
       <div
         aria-label="threads"
         className="tab-list"
         onKeyDown={moveFocus}
-        // The menu is fixed where it opened; scrolled, its tab moves away.
-        onScroll={() => setMenu(null)}
         role="tablist"
       >
         {tabs.map(tab => {
@@ -166,66 +143,42 @@ export function TabBar({
               {/* On every root tab: shown on the one you are on, and on
                   another on hover or focus, so any root can be archived. */}
               {!archived.has(root) && (
-                <span
-                  className={menu?.root === root ? "tab-more open" : "tab-more"}
-                >
-                  <button
-                    aria-expanded={menu?.root === root}
-                    aria-haspopup="menu"
-                    aria-label="more for this thread"
-                    className="tab-menu"
-                    onClick={e => {
-                      const r = e.currentTarget.getBoundingClientRect()
-                      setMenu(
-                        menu?.root === root
-                          ? null
-                          : {
-                              root,
-                              top: r.bottom,
-                              right: window.innerWidth - r.right,
-                            },
-                      )
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === "Escape") setMenu(null)
-                    }}
-                    type="button"
-                  >
-                    ⋯
-                  </button>
-                  {menu?.root === root && (
-                    <div
-                      className="menu"
-                      role="menu"
-                      style={{
-                        position: "fixed",
-                        top: menu.top,
-                        right: menu.right,
-                      }}
-                    >
-                      <button
-                        className="archive-root"
-                        disabled={busy !== undefined}
-                        onClick={() => {
-                          setMenu(null)
-                          onArchive(root)
-                        }}
-                        role="menuitem"
-                        title="hide for everyone; restore from Archive"
-                        type="button"
-                      >
-                        Archive
-                        {busy !== undefined && (
-                          <span className="why">
-                            {" "}
-                            · {ROOT_BUSY_REASON[busy]}
-                          </span>
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </span>
+                <Menu
+                  className="tab-more"
+                  items={[
+                    {
+                      key: "archive",
+                      className: "archive-root",
+                      disabled: busy !== undefined,
+                      title: "hide for everyone; restore from Archive",
+                      label: (
+                        <>
+                          Archive
+                          {busy !== undefined && (
+                            <span className="why">
+                              {" "}
+                              · {ROOT_BUSY_REASON[busy]}
+                            </span>
+                          )}
+                        </>
+                      ),
+                      onChoose: () => onArchive(root),
+                    },
+                  ]}
+                  label="more for this thread"
+                  trigger="⋯"
+                  triggerClassName="tab-menu"
+                />
               )}
+              <button
+                aria-label="close this thread for you; nothing is written"
+                className="tab-close"
+                onClick={() => onCloseRoot(root)}
+                title="close for you; reopen from Archive"
+                type="button"
+              >
+                ×
+              </button>
             </span>
           )
         })}
@@ -240,17 +193,6 @@ export function TabBar({
  * it is the main action; a conversation is in its menu.
  */
 function AddTab({ onAdd }: { onAdd: (asksAgent: boolean) => void }) {
-  const [open, setOpen] = useState(false)
-  const menuId = useId()
-  const toggle = useRef<HTMLButtonElement>(null)
-  const first = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    if (open) first.current?.focus()
-  }, [open])
-  const close = () => {
-    setOpen(false)
-    toggle.current?.focus()
-  }
   return (
     <span className="add-tab">
       <button
@@ -261,51 +203,22 @@ function AddTab({ onAdd }: { onAdd: (asksAgent: boolean) => void }) {
       >
         ＋ agent
       </button>
-      <button
-        aria-controls={menuId}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label="other ways to start"
-        className="add-menu"
-        onClick={() => setOpen(!open)}
-        onKeyDown={e => {
-          if (e.key === "ArrowDown") {
-            e.preventDefault()
-            setOpen(true)
-          }
-        }}
-        ref={toggle}
-        type="button"
-      >
-        ▾
-      </button>
-      {open && (
-        <div
-          className="menu"
-          id={menuId}
-          onKeyDown={e => {
-            if (e.key === "Escape") {
-              e.preventDefault()
-              close()
-            }
-          }}
-          role="menu"
-        >
-          <button
-            className="add-conversation"
-            onClick={() => {
-              setOpen(false)
-              onAdd(false)
-            }}
-            ref={first}
-            role="menuitem"
-            title="a new conversation: the agent answers only when @agent is mentioned"
-            type="button"
-          >
-            conversation
-          </button>
-        </div>
-      )}
+      <Menu
+        className="add-more"
+        items={[
+          {
+            key: "conversation",
+            className: "add-conversation",
+            title:
+              "a new conversation: the agent answers only when @agent is mentioned",
+            label: "conversation",
+            onChoose: () => onAdd(false),
+          },
+        ]}
+        label="other ways to start"
+        trigger="▾"
+        triggerClassName="add-menu"
+      />
     </span>
   )
 }

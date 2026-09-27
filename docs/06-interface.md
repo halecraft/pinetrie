@@ -240,6 +240,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   tab. Others find the root in the Archive tab, and see you in it from the
   header.
 - **An empty session** shows only the Archive tab and ＋, and points at ＋.
+- **A page with nothing stored** (a new browser, or a first visit) opens on
+  the Archive tab, which lists every root to open: nothing opens a tab by
+  itself (ADR-0030).
 - **`→` in a message's right margin opens a branch** as a column to its right,
   empty until something is sent there. What it opens appears to the right, so
   the button sits on that side. A branch starts as a conversation; `@agent`

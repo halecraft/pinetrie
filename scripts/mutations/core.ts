@@ -56,14 +56,6 @@ export const mutations: readonly Mutation[] = [
     expect: "newest is the largest id",
   },
   {
-    name: "an archived root stays open",
-    file: roots,
-    from: '    archive.get(r.root)?.state === "archived" ? [] : [r.root],',
-    to: "    [r.root],",
-    command: unit,
-    expect: "an archived root is left out",
-  },
-  {
     name: "waiting messages are not work",
     file: roots,
     from: '    else if (lane.waiting > 0 && work.get(root) !== "running")',

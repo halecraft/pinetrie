@@ -14,22 +14,39 @@ change. The columns, the rail and the agent's path all read that one index
 with the agent's activity, the lanes, the outbox and the participants, so they
 are always from the same moment; `sync` takes the index and the lanes together.
 
-## Root tabs and the layout (`layout.ts`, ADR-0029)
+## Root tabs and the layout (`layout.ts`, ADR-0029, ADR-0030)
 
-The layout is `{ active, roots, newTabs }`, and `layoutReducer` is pure. A root
-tab's key is its root entry's id: a thread started at the root is rooted at
-its first message (S30). `summarizeRoots`, `openRoots`, `rootWork` and
-`rootReaders` (`packages/core/roots.ts`) say what the bar shows.
+The layout is `{ active, open, roots, newTabs }`, and `layoutReducer` is pure.
+A root tab's key is its root entry's id: a thread started at the root is
+rooted at its first message (S30). `open` is your tabs: the roots you opened,
+in that order. `tabBar(layout)` is Archive, `open`, then new tabs.
+`summarizeRoots`, `rootWork` and `rootReaders` (`packages/core/roots.ts`)
+give labels and each tab's signals.
 
+- **Only you put a root in `open`.** `show` of a root opens it, so every way of
+  opening goes through `show`: `planOpen`, the Archive tab's Open and Restore,
+  the header. `sync` adds only the root of a new tab whose first message is
+  written. A root someone else starts opens no tab.
+- **`closeRoot` takes a root out of `open` and keeps its columns**, so opening
+  it again brings them back. So `roots` keeps the columns of every root you
+  have opened, bounded by the roots you visit. Closing the tab you are on
+  shows `afterClosing`'s choice: its right neighbour, else its left, else
+  Archive; closing an unsent new tab does the same.
+- **`forgetArchived` takes archived roots out of `open`, except the one you are
+  on.** `App` dispatches it when the archive or the active tab changes, so an
+  archived root you are on leaves when you do. Removing it, not hiding it,
+  means a restore opens it again only for whoever restores it.
 - **`active` is null only before the first `prune`.** A browser tab with
   nothing stored has not chosen a tab, and the document has not arrived.
   `App` draws "connecting…" meanwhile. `prune`, once after `whenSettled`,
-  chooses the newest open root, or Archive when there is none, and replaces a
-  stored active root that is gone or archived. No action sets it back to null,
-  so a root someone starts later never moves you: resolving null at each
-  render did, in the plan's first draft.
+  drops roots the document lacks, applies `forgetArchived`'s rule, and
+  replaces a null, gone or archived active tab with your last open tab, else
+  Archive. With nothing stored, that is Archive: nothing opens a tab by
+  itself. No action sets `active` back to null.
+- **A landed new tab moves left of any unsent ones**: its root joins `open` at
+  the end, and new tabs are drawn after `open`.
 - **An archived active root stays active** until you switch or reload, and
-  `tabBar` keeps it in its place. Its columns are drawn with `readOnly`: the
+  keeps its place in the bar (`forgetArchived` keeps it). Its columns are drawn with `readOnly`: the
   composer stays mounted, disabled, so what was typed survives; Restore brings
   it back in place.
 - **`columnsOf` is the one place a root gets its first column**
@@ -99,6 +116,37 @@ with ANY column to its left, so a shared stretch of paths is drawn once, in the
 leftmost column that shows it. Anything looking for a message on screen (the
 rail's scroll-to, the alignment) must search every column.
 
+## Who is here, and your inbox (ADR-0030)
+
+The header (`header.tsx`) is the rest of the session, from live data; nothing
+in it opens a tab until you choose.
+
+- **People:** `peopleHere` (`here.ts`) groups `presenceView`'s `readingAt` by
+  person, in `writerOrder`. "Never you" is `presenceView`'s rule, not
+  repeated here. Each avatar (`Avatar`, the same circle the tabs and columns
+  draw) is a `Menu` of the threads that person is in.
+- **The agent:** `activity` (`readAgentActivity`) is its running lanes; the
+  header adds nothing of its own, and finds each run's root with `rootOf`.
+- **The inbox** (`inbox.ts`, pure): `mentionsOf` is every chat whose mentions
+  `address` resolves to your display name, never your own; `InboxItem` is one
+  (core's `Mention` is a mention parsed from text). What you have seen is
+  `{ since, seen }`: every mention at or before `since`, and the ids above it
+  in `seen`. Marking compacts: `since` moves past a run of seen mentions, so
+  `seen` holds only those above an unseen one.
+- **`useInbox`** is its shell. With nothing stored, it starts at
+  `startInbox(index)` (the newest entry) only after `whenSettled`: from a
+  partial index, old mentions would count as new (S29). A mention on the
+  paths of the tab you are on is seen (`seenOnScreen`), and the effect writes
+  nothing when there is none.
+- **"You" is a name.** A second browser tab is a second writer (S29); named
+  the same, it has the same mentions. The browser suite names its sibling
+  tab to share the page's inbox.
+- **`Menu`** (`menu.tsx`) is every popover: the header's three, the tab's `⋯`
+  and the add tab's. It wraps its trigger in a span that gains `open` while
+  open, which keeps `.tab-more.open` visible; its list is `position: fixed`
+  from the trigger's rect, and a scroll, a resize or a click elsewhere closes
+  it. Items can carry `data-*` attributes (`MenuItem.data`).
+
 ## Kept per tab (`tab-state.ts`, ADR-0027)
 
 `tabState` keeps a value under one key in two slots: the tab's
@@ -107,15 +155,23 @@ rail's scroll-to, the alignment) must search every column.
 value's stored form is its codec's. The layout is its one use, under the key
 `pineta-columns:<session>`, which predates root tabs.
 
+`deviceState` keeps a value in the device's slot only, shared by the device's
+tabs: the inbox's seen state (`pineta-inbox:<session>`). Each save reads what
+is stored and merges into it (`mergeInbox`), so two tabs marking at once both
+keep theirs, and `subscribe` hears another tab's save through the `storage`
+event, which fires only in the other tabs. Both write through `writeSlot`,
+which drops a full quota's error.
+
 - **Every change is saved, `sync`'s too.** Saving only what a person does
   would store older anchors, and `followTip` from an older anchor can land on
   a newer branch below it. So with two tabs open, the device slot holds
   whichever changed last: both move their columns as messages arrive.
 - **The codec is the edge** (`encodeLayout`, `decodeLayout`), in the house
   shape: a TypeBox schema, then a build step field by field. A layout decodes
-  whole or not at all, and `v` rejects an older one: `v: 1` (a column list,
-  before root tabs) is dropped once and overwritten by the first save. A lane that is not a lane
-  name is left off; `sync` binds the column again.
+  whole or not at all, and `v` rejects an older one: a `v: 2` layout (before
+  your tabs were yours, ADR-0030) is dropped once and overwritten by the first
+  save, and the page opens on the Archive tab. A lane that is not a lane name
+  is left off; `sync` binds the column again.
 - **`fresh.pending` is never stored**, by either side: restoring it would send
   its message again. A "Branch here" column comes back empty.
 - **Restored anchors the document lacks are pruned once, after
@@ -386,23 +442,31 @@ its `writer` for the lookup.
 ## Gotchas
 
 - **A root tab's `⋯` is always rendered, hidden with `visibility`** except on
-  the tab you are on, while hovered or focused, or while its menu is open. The
-  menu is its child, so hiding the `⋯` would hide an open menu too.
+  the tab you are on, while hovered or focused, or while its menu is open
+  (`Menu`'s wrapper, `.tab-more`, gains `open`). The menu is its child, so
+  hiding the `⋯` would hide an open menu too.
 - **"close" is `closable`:** hidden on a root tab's only column (`columnsOf`
   would give it back) and in the Archive tab's preview.
 - **Anything that pops out of the tab bar is `position: fixed`.** `.tab-list`
   scrolls sideways, and `overflow-x: auto` makes its vertical overflow `auto`
-  too, so a menu positioned inside it is clipped below the bar. The tab's `⋯`
-  menu is placed from its button's rect when opened, and closes when the list
-  scrolls or the window resizes.
+  too, so a menu positioned inside it is clipped below the bar. `Menu` places
+  its list from its trigger's rect when opened, and closes on any scroll or a
+  resize, since a fixed list would drift from its trigger.
 - **Playwright clicks what a person cannot see.** It scrolls a clipped element
   into view before clicking, so a check that a popup can be clicked does not
-  show it is visible. Check what `elementFromPoint` finds at its centre.
+  show it is visible. Check what `elementFromPoint` finds at its centre: the
+  browser suite's `chooseFromMenu` does, for every menu.
 
 - **Selectors for root tabs:** a root's tab is `#tabs .tab[data-root="…"]`,
-  the one you are on has `aria-selected="true"`, Archive is `.tab-archive`,
-  new tabs are `.tab-new`, and the add tab's buttons are `.add-agent`,
-  `.add-menu` and `.add-conversation`. The rail is `.rail`, not `#rail`: the
+  the one you are on has `aria-selected="true"`, its × is the `.tab-close`
+  after it, Archive is `.tab-archive`, new tabs are `.tab-new`, and the add
+  tab's buttons are `.add-agent`, `.add-menu` and `.add-conversation`. In the
+  header: `#top .here-person .here-trigger` per person, `.here-agent`, and
+  `.inbox-trigger` with `.inbox-count[data-unseen]`; menu rows are
+  `.here-thread` and `.inbox-row`, each with `data-entry`.
+- **A page with nothing stored opens on the Archive tab**, so a browser check
+  that opens a second page opens its thread from there, or from a person in
+  the header. The rail is `.rail`, not `#rail`: the
   Archive tab's preview draws a second one.
 - **`.column-content` must stay unpositioned.** A positioned wrapper becomes
   the messages' offsetParent, and `alignOnOpen` measures `offsetTop` against

@@ -1,10 +1,13 @@
-// client/layout — which tab you are on, and each root's columns (ADR-0029).
+// client/layout — which tab you are on, your tabs, and each root's columns
+// (ADR-0029, ADR-0030).
 //
-// A root tab shows one root: its rail and its columns. The layout keeps a
-// column list per root, and new tabs, each one fresh column at the root that
-// becomes a root tab once its first message is written. It is this browser
-// tab's view state, never written to the document; it is stored per browser
-// tab (ADR-0027) in the form at the end of this file. Pure.
+// A root tab shows one root: its rail and its columns. Your tabs are the roots
+// you have open, in the order you opened them; a root someone else starts
+// opens none. The layout also keeps a column list per root you have opened,
+// and new tabs, each one fresh column at the root that becomes your tab once
+// its first message is written. It is this browser tab's view state, never
+// written to the document; it is stored per browser tab (ADR-0027) in the form
+// at the end of this file. Pure.
 
 import {
   type ArchiveRecord,
@@ -36,7 +39,12 @@ export interface Layout {
    * document settles. `prune` chooses; no action sets it back to null.
    */
   readonly active: ActiveTab | null
-  /** Each visited root's columns, in order. A root with none is absent. */
+  /** Your open roots, in the order you opened them: the bar's root tabs. */
+  readonly open: readonly string[]
+  /**
+   * Each opened root's columns, in order, kept when its tab is closed so
+   * opening it again brings them back. A root with none is absent.
+   */
   readonly roots: ReadonlyMap<string, readonly Column[]>
   /** New tabs: each one fresh column at the root, local until its first send. */
   readonly newTabs: readonly Column[]
@@ -49,11 +57,14 @@ export type LayoutAction =
       readonly key: string
       readonly asksAgent: boolean
     }
-  /** Close an unsent new tab; `fallback` is the tab to show if it was active. */
+  /** Close an unsent new tab; nothing was written. */
+  | { readonly kind: "closeNewTab"; readonly key: string }
+  /** Close a root's tab for you: nothing is written, and its columns are kept. */
+  | { readonly kind: "closeRoot"; readonly root: string }
+  /** Archived roots leave your tabs, except the one you are on (ADR-0030). */
   | {
-      readonly kind: "closeNewTab"
-      readonly key: string
-      readonly fallback: ActiveTab
+      readonly kind: "forgetArchived"
+      readonly archive: ReadonlyMap<string, ArchiveRecord>
     }
   /** A column action on one root's columns; `sync` and `prune` are the layout's. */
   | {
@@ -72,11 +83,12 @@ export type LayoutAction =
   | {
       readonly kind: "prune"
       readonly index: TreeIndex
-      readonly open: readonly string[]
+      readonly archive: ReadonlyMap<string, ArchiveRecord>
     }
 
 export const initialLayout = (): Layout => ({
   active: null,
+  open: [],
   roots: new Map(),
   newTabs: [],
 })
@@ -89,7 +101,7 @@ export function columnsOf(layout: Layout, root: string): readonly Column[] {
   return layout.roots.get(root) ?? [{ key: `first-${root}`, anchor: root }]
 }
 
-const sameTab = (a: ActiveTab | null, b: ActiveTab): boolean =>
+export const sameTab = (a: ActiveTab | null, b: ActiveTab): boolean =>
   a !== null &&
   a.kind === b.kind &&
   (a.kind !== "root" || b.kind !== "root" || a.root === b.root) &&
@@ -107,18 +119,47 @@ const withRoot = (
   return next
 }
 
-/** The newest open root's tab, or Archive when there is none. */
-const newestTab = (open: readonly string[]): ActiveTab => {
-  const root = open.at(-1)
-  return root === undefined ? { kind: "archive" } : { kind: "root", root }
+/** `open` with `root` at its end, unless it is there already. */
+const opened = (open: readonly string[], root: string): readonly string[] =>
+  open.includes(root) ? open : [...open, root]
+
+/** Your open roots, less the archived ones other than the root you are on. */
+function withoutArchived(
+  open: readonly string[],
+  archive: ReadonlyMap<string, ArchiveRecord>,
+  active: ActiveTab | null,
+): readonly string[] {
+  const kept = open.filter(
+    root =>
+      archive.get(root)?.state !== "archived" ||
+      (active?.kind === "root" && active.root === root),
+  )
+  return kept.length === open.length ? open : kept
+}
+
+/**
+ * The tab to show once `closed` is closed: its right neighbour in the bar,
+ * else its left, else Archive. `layout` is before the close. Pure.
+ */
+export function afterClosing(layout: Layout, closed: ActiveTab): ActiveTab {
+  const bar = tabBar(layout)
+  const at = bar.findIndex(t => sameTab(t, closed))
+  const next = bar[at + 1] ?? bar[at - 1]
+  return at < 0 || next === undefined ? { kind: "archive" } : next
 }
 
 export function layoutReducer(state: Layout, action: LayoutAction): Layout {
   switch (action.kind) {
-    case "show":
-      return sameTab(state.active, action.tab)
+    case "show": {
+      // Showing a root is opening it.
+      const open =
+        action.tab.kind === "root"
+          ? opened(state.open, action.tab.root)
+          : state.open
+      return sameTab(state.active, action.tab) && open === state.open
         ? state
-        : { ...state, active: action.tab }
+        : { ...state, active: action.tab, open }
+    }
     case "newTab":
       return {
         ...state,
@@ -134,13 +175,29 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
         ],
       }
     case "closeNewTab": {
-      const newTabs = state.newTabs.filter(c => c.key !== action.key)
-      const wasActive = sameTab(state.active, { kind: "new", key: action.key })
+      const tab: ActiveTab = { kind: "new", key: action.key }
       return {
         ...state,
-        newTabs,
-        active: wasActive ? action.fallback : state.active,
+        newTabs: state.newTabs.filter(c => c.key !== action.key),
+        active: sameTab(state.active, tab)
+          ? afterClosing(state, tab)
+          : state.active,
       }
+    }
+    case "closeRoot": {
+      if (!state.open.includes(action.root)) return state
+      const tab: ActiveTab = { kind: "root", root: action.root }
+      return {
+        ...state,
+        open: state.open.filter(r => r !== action.root),
+        active: sameTab(state.active, tab)
+          ? afterClosing(state, tab)
+          : state.active,
+      }
+    }
+    case "forgetArchived": {
+      const open = withoutArchived(state.open, action.archive, state.active)
+      return open === state.open ? state : { ...state, open }
     }
     case "columns": {
       const before = columnsOf(state, action.root)
@@ -159,14 +216,15 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
     case "sync":
       return syncLayout(state, action.index, action.lanes)
     case "prune":
-      return pruneLayout(state, action.index, action.open)
+      return pruneLayout(state, action.index, action.archive)
   }
 }
 
 /**
  * Every root's columns follow the tree, not only the active root's: a stored
  * anchor left behind can later follow a newer branch below it (ADR-0027). A
- * new tab whose first message is written becomes that root's tab.
+ * new tab whose first message is written becomes that root's tab, and joins
+ * your open roots at the end.
  */
 function syncLayout(
   state: Layout,
@@ -181,6 +239,7 @@ function syncLayout(
     roots.set(root, next)
   }
   let active = state.active
+  let open = state.open
   const newTabs: Column[] = []
   for (const tab of state.newTabs) {
     const [column = tab] = columnsReducer([tab], { kind: "sync", index, lanes })
@@ -195,16 +254,23 @@ function syncLayout(
     }
     changed = true
     roots.set(root, [...(roots.get(root) ?? []), column])
+    open = opened(open, root)
     if (sameTab(active, { kind: "new", key: tab.key }))
       active = { kind: "root", root }
   }
-  return changed ? { active, roots, newTabs } : state
+  return changed ? { active, open, roots, newTabs } : state
 }
 
+/**
+ * Once the document has settled: roots it lacks go, archived roots leave your
+ * tabs, and the tab to show is chosen. A tab you were on that is gone or
+ * archived gives way to your last open tab, else Archive; with nothing stored,
+ * that is Archive, since nothing opens a tab by itself (ADR-0030).
+ */
 function pruneLayout(
   state: Layout,
   index: TreeIndex,
-  open: readonly string[],
+  archive: ReadonlyMap<string, ArchiveRecord>,
 ): Layout {
   let roots = state.roots
   for (const [root, columns] of state.roots) {
@@ -214,30 +280,33 @@ function pruneLayout(
         : columnsReducer(columns, { kind: "prune", index })
     if (next !== columns) roots = withRoot(roots, root, next)
   }
+  const known = state.open.filter(r => index.entries[r] !== undefined)
+  // An archived root you are on stays only until you leave it, and a reload
+  // leaves it (ADR-0029).
+  const open = withoutArchived(known, archive, null)
   const active = state.active
   const stays =
     active !== null &&
     (active.kind === "archive" ||
       (active.kind === "root" && open.includes(active.root)) ||
       (active.kind === "new" && state.newTabs.some(c => c.key === active.key)))
-  if (roots === state.roots && stays) return state
-  return { ...state, roots, active: stays ? active : newestTab(open) }
+  if (roots === state.roots && open === state.open && stays) return state
+  const last = open.at(-1)
+  const fallback: ActiveTab =
+    last === undefined ? { kind: "archive" } : { kind: "root", root: last }
+  return { ...state, roots, open, active: stays ? active : fallback }
 }
 
-/** Archive, the open roots with an archived active root in its place, then new tabs. */
-export function tabBar(
-  open: readonly string[],
-  active: ActiveTab,
-  newTabs: readonly Column[],
-): readonly ActiveTab[] {
-  const roots =
-    active.kind === "root" && !open.includes(active.root)
-      ? [...open, active.root].sort()
-      : open
+/**
+ * Archive, your open roots in the order you opened them, then new tabs. An
+ * archived root you are on is still in `open` (`forgetArchived` keeps it), so
+ * it keeps its place.
+ */
+export function tabBar(layout: Layout): readonly ActiveTab[] {
   return [
     { kind: "archive" },
-    ...roots.map(root => ({ kind: "root", root }) as const),
-    ...newTabs.map(c => ({ kind: "new", key: c.key }) as const),
+    ...layout.open.map(root => ({ kind: "root", root }) as const),
+    ...layout.newTabs.map(c => ({ kind: "new", key: c.key }) as const),
   ]
 }
 
@@ -324,8 +393,9 @@ const StoredTab = Type.Union([
 
 /** `v` changes when the shape does; an older layout is dropped, not migrated. */
 const StoredLayout = Type.Object({
-  v: Type.Literal(2),
+  v: Type.Literal(3),
   active: Type.Union([StoredTab, Type.Null()]),
+  open: Type.Array(Type.String()),
   roots: Type.Record(Type.String(), Type.Array(StoredColumn, { minItems: 1 })),
   newTabs: Type.Array(StoredColumn),
 })
@@ -359,8 +429,9 @@ const fromStored = (s: Stored): Column => ({
 })
 
 export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
-  v: 2,
+  v: 3,
   active: layout.active,
+  open: [...layout.open],
   roots: Object.fromEntries(
     [...layout.roots].map(([root, columns]) => [root, columns.map(toStored)]),
   ),
@@ -375,6 +446,7 @@ export const decodeLayout = (raw: unknown): Layout | undefined =>
   Value.Check(StoredLayout, raw)
     ? {
         active: raw.active,
+        open: raw.open,
         roots: new Map(
           Object.entries(raw.roots).map(([root, columns]) => [
             root,

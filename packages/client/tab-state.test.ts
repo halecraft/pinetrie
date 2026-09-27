@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest"
 import {
   type Codec,
+  deviceState,
   readStored,
   type StorageLike,
   tabState,
@@ -85,4 +86,47 @@ test("readStored: empty, not JSON, and not a value are all undefined", () => {
   expect(readStored("{", numbers.decode)).toBeUndefined()
   expect(readStored("{}", numbers.decode)).toBeUndefined()
   expect(readStored('{"n":8}', numbers.decode)).toBe(8)
+})
+
+describe("deviceState: one value per device, shared by its tabs", () => {
+  /** Sets of numbers, merged by union: two tabs' saves both survive. */
+  const sets: Codec<readonly number[]> = {
+    encode: ns => ({ ns }),
+    decode: raw =>
+      typeof raw === "object" &&
+      raw !== null &&
+      "ns" in raw &&
+      Array.isArray(raw.ns) &&
+      raw.ns.every(n => typeof n === "number")
+        ? raw.ns
+        : undefined,
+  }
+  const union = (a: readonly number[], b: readonly number[]) =>
+    [...new Set([...a, ...b])].sort()
+  const events = new EventTarget()
+  const make = (device: StorageLike) =>
+    deviceState({ key: "k", codec: sets, device, merge: union, events })
+
+  test("it writes only the device's slot, and a save merges with what another tab stored", () => {
+    const device = storage()
+    const one = make(device)
+    const two = make(device)
+    one.save([1])
+    expect(two.save([2])).toEqual([1, 2])
+    expect(one.load()).toEqual([1, 2])
+    expect([...device.backing.keys()]).toEqual(["k"])
+  })
+
+  test("a subscriber hears another tab's save of its key, and not of another key", () => {
+    const heard: (readonly number[])[] = []
+    const stop = make(storage()).subscribe(v => heard.push(v))
+    const storageEvent = (key: string, newValue: string) =>
+      Object.assign(new Event("storage"), { key, newValue })
+    events.dispatchEvent(storageEvent("other", JSON.stringify({ ns: [9] })))
+    events.dispatchEvent(storageEvent("k", JSON.stringify({ ns: [3] })))
+    events.dispatchEvent(storageEvent("k", "not json"))
+    stop()
+    events.dispatchEvent(storageEvent("k", JSON.stringify({ ns: [4] })))
+    expect(heard).toEqual([[3]])
+  })
 })

@@ -5,6 +5,8 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/client"]
 const file = "packages/client/columns.ts"
 const layout = "packages/client/layout.ts"
 const send = "packages/client/send.ts"
+const inbox = "packages/client/inbox.ts"
+const tabStateFile = "packages/client/tab-state.ts"
 const markdown = "packages/client/markdown.ts"
 const tabState = "packages/client/tab-state.ts"
 
@@ -230,8 +232,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a save writes only the tab's slot",
     file: tabState,
-    from: "      for (const slot of [tab, device]) {",
-    to: "      for (const slot of [tab]) {",
+    from: "      for (const slot of [tab, device]) writeSlot(slot, key, raw)",
+    to: "      for (const slot of [tab]) writeSlot(slot, key, raw)",
     command: unit,
     expect: "a new tab loads the device's latest",
   },
@@ -246,8 +248,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "one failed write stops the other",
     file: tabState,
-    from: "      for (const slot of [tab, device]) {\n        try {\n          slot.setItem(key, raw)\n        } catch {}\n      }",
-    to: "      try {\n        for (const slot of [tab, device]) slot.setItem(key, raw)\n      } catch {}",
+    from: "  try {\n    slot.setItem(key, raw)\n  } catch {}",
+    to: "  slot.setItem(key, raw)",
     command: unit,
     expect: "the other slot is still written",
   },
@@ -334,18 +336,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new root becomes the active tab",
     file: layout,
-    from: "  return changed ? { active, roots, newTabs } : state",
-    to: '  const newest = index.roots.at(-1)\n  return { active: newest === undefined ? active : { kind: "root", root: newest }, roots, newTabs }',
+    from: "  return changed ? { active, open, roots, newTabs } : state",
+    to: '  const newest = index.roots.at(-1)\n  return { active: newest === undefined ? active : { kind: "root", root: newest }, open, roots, newTabs }',
     command: unit,
     expect: "once chosen, the tab you are on stays when a root appears",
   },
   {
     name: "prune leaves a null active tab",
     file: layout,
-    from: "  return { ...state, roots, active: stays ? active : newestTab(open) }",
-    to: "  return { ...state, roots, active: stays || active === null ? active : newestTab(open) }",
+    from: "  return { ...state, roots, open, active: stays ? active : fallback }",
+    to: "  return { ...state, roots, open, active: stays || active === null ? active : fallback }",
     command: unit,
-    expect: "prune chooses the newest open root",
+    expect: "prune with nothing stored lands on Archive",
   },
   {
     name: "prune keeps an archived active root",
@@ -420,5 +422,101 @@ export const mutations: readonly Mutation[] = [
     to: '  if (stats.people * 10 < count) return "agent"',
     command: unit,
     expect: "runFill: the agent alone, people alone, or both",
+  },
+  {
+    name: "closing a root tab forgets its columns",
+    file: layout,
+    from: "        open: state.open.filter(r => r !== action.root),",
+    to: "        open: state.open.filter(r => r !== action.root),\n        roots: withRoot(state.roots, action.root, []),",
+    command: unit,
+    expect: "closing a root's tab keeps its columns",
+  },
+  {
+    name: "an archived root stays in your tabs",
+    file: layout,
+    from: '      archive.get(root)?.state !== "archived" ||',
+    to: "      true ||",
+    command: unit,
+    expect: "archived roots leave your tabs",
+  },
+  {
+    name: "closing the active tab leaves nothing active",
+    file: layout,
+    from: "  const next = bar[at + 1] ?? bar[at - 1]",
+    to: "  const next = bar[at]",
+    command: unit,
+    expect: "closing the tab you are on shows its right neighbour",
+  },
+  {
+    name: "sync opens every new root",
+    file: layout,
+    from: "  let open = state.open\n",
+    to: "  let open = [...new Set([...state.open, ...index.roots])]\n",
+    command: unit,
+    expect: "a root someone else starts opens no tab",
+  },
+  {
+    name: "a v2 layout is decoded",
+    file: layout,
+    from: "  v: Type.Literal(3),",
+    to: "  v: Type.Union([Type.Literal(2), Type.Literal(3)]),",
+    command: unit,
+    expect: "another version, or partly malformed",
+  },
+  {
+    name: "your own message mentions you",
+    file: inbox,
+    from: '    if (m?.role !== "chat" || m.writer === undefined || m.writer === input.me)',
+    to: '    if (m?.role !== "chat" || m.writer === undefined)',
+    command: unit,
+    expect: "never your own message",
+  },
+  {
+    name: "a mention of anyone is yours",
+    file: inbox,
+    from: "    if (!people.includes(input.myName)) continue",
+    to: "    if (people.length === 0) continue",
+    command: unit,
+    expect: "never your own message",
+  },
+  {
+    name: "a device starts with every mention unseen",
+    file: inbox,
+    from: "  for (const id of Object.keys(index.entries)) if (id > since) since = id",
+    to: "",
+    command: unit,
+    expect: "a device starts with nothing unseen",
+  },
+  {
+    name: "compaction passes an unseen mention",
+    file: inbox,
+    from: "    if (!seen.has(id)) break\n",
+    to: "",
+    command: unit,
+    expect: "a seen mention above an unseen one stays",
+  },
+  {
+    name: "a save overwrites another tab's seen",
+    file: tabStateFile,
+    from: "      const next = stored === undefined ? value : merge(stored, value)",
+    to: "      const next = value",
+    command: unit,
+    expect: "a save merges with what another tab stored",
+  },
+  {
+    name: "a mention off screen is seen",
+    file: inbox,
+    from: "    shown.has(i.id) && isUnseen(inbox, i.id) ? [i.id] : [],",
+    to: "    isUnseen(inbox, i.id) ? [i.id] : [],",
+    command: unit,
+    expect: "seen on screen",
+  },
+  {
+    name: "a person keeps only their last thread",
+    file: "packages/client/here.ts",
+    from: "      const theirs = threads.get(w) ?? []",
+    to: "      const theirs: { end: string; root: string }[] = []",
+    command: unit,
+    expect: "peopleHere groups each person's columns",
   },
 ]

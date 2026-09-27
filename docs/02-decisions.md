@@ -1532,7 +1532,7 @@ once a note is taken and having the client recover by fetching the note again
 **Status:** Accepted. Evidence: S29. Implemented by `PLAN-2026-09-26-persist-columns`.
 Amended by ADR-0028, proposed (a stored layout holds the focused piece of
 work), and by ADR-0029, which replaces that: a stored layout holds
-the active root tab and each root's columns; and by ADR-0030, proposed: it
+the active root tab and each root's columns; and by ADR-0030: it
 also holds your open roots.
 
 **Context.** Which columns are open is view state, never written (ADR-0024's
@@ -1707,7 +1707,7 @@ on unmark (the description would be lost).
 ## ADR-0029 — A tab per root, an archive shared by everyone
 
 **Status:** Accepted. Implemented by `PLAN-2026-09-27-root-tabs`. Evidence:
-S30, S31. Amended by ADR-0030, proposed: the tab bar is each person's, and a
+S30, S31. Amended by ADR-0030: the tab bar is each person's, and a
 tab closes for you. Amends ADR-0027 (a stored layout holds a
 tab and columns per root), ADR-0028 (marks stay inside a root; focus is
 withdrawn), ADR-0021 (where Start Chat and Start Agent live) and ADR-0024
@@ -1827,7 +1827,8 @@ A separate session per root (a session is who is in it, ADR-0021).
 
 ## ADR-0030 — Your tabs are yours; the header shows who is here, and your inbox of mentions
 
-**Status:** Proposed. Amends ADR-0029 (the tab bar is each person's; closing
+**Status:** Accepted. Implemented by `PLAN-2026-09-27-your-tabs-inbox`.
+Amends ADR-0029 (the tab bar is each person's; closing
 a tab is yours) and ADR-0027 (a stored layout holds your open roots, and the
 device keeps which mentions you have seen).
 

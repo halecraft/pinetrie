@@ -1,10 +1,10 @@
-// core/roots — each root's tree, as the tab bar and the Archive tab see it
-// (ADR-0029). Pure.
+// core/roots — each root's tree, as the tabs, the header and the Archive tab
+// see it (ADR-0029, ADR-0030). Pure.
 //
 // A root is found by walking up (`rootOf`), and a thread started at the root
 // is rooted at its first message (S30), so a root's id is its tab's key.
 
-import type { ArchiveRecord, WriterId } from "./index.ts"
+import type { WriterId } from "./index.ts"
 import {
   type LaneView,
   projectRail,
@@ -48,16 +48,6 @@ export function summarizeRoots(index: TreeIndex): readonly RootSummary[] {
       },
     ]
   })
-}
-
-/** The tab bar's roots: every summarized root not in state `archived`. */
-export function openRoots(
-  roots: readonly RootSummary[],
-  archive: ReadonlyMap<string, ArchiveRecord>,
-): readonly string[] {
-  return roots.flatMap(r =>
-    archive.get(r.root)?.state === "archived" ? [] : [r.root],
-  )
 }
 
 /**

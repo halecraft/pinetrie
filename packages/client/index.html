@@ -16,7 +16,8 @@
         background: #14161a; color: #e6e6e6;
       }
       #root { display: contents; }
-      #top { padding: .75rem 1rem .5rem; border-bottom: 1px solid #23272e; }
+      #top { display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        padding: .75rem 1rem .5rem; border-bottom: 1px solid #23272e; }
       h1 { font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: #8b93a1; margin: 0 0 .25rem; }
       .meta { font-size: 12px; color: #6f7784; }
       #name { width: 9rem; padding: .2rem .4rem; }
@@ -257,6 +258,24 @@
       #strip:has(.fork-dot[data-color="7"]:hover) .column-head[data-color="7"] { outline: 2px solid currentColor; outline-offset: 2px; }
       #strip:has(.column-head[data-color="pending"]:hover) .fork-dot[data-color="pending"],
       #strip:has(.fork-dot[data-color="pending"]:hover) .column-head[data-color="pending"] { outline: 2px solid currentColor; outline-offset: 2px; }
+      /* The header's right: who is here, the agent, and your inbox (ADR-0030). */
+      .header-right { display: flex; align-items: center; gap: .75rem; }
+      .here { display: flex; align-items: center; gap: .25rem; }
+      .here-trigger, .inbox-trigger { display: inline-flex; align-items: center; gap: .2rem;
+        padding: .1rem .3rem; background: none; color: #ddd; border-radius: 999px; }
+      .here-trigger .avatar { width: 22px; height: 22px; line-height: 22px; font-size: 12px; }
+      .here-agent .agent-mark { background: #9ecbff; }
+      .here-agent.running .agent-mark { animation: pulse 1s ease-in-out infinite; }
+      .here-count { font-size: .75rem; color: #aab4c3; }
+      .inbox-trigger { font-weight: 600; border: 1px solid #3a3f48; padding: .1rem .5rem; }
+      .inbox-count { min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #f28b82;
+        color: #111; font-size: .72rem; text-align: center; }
+      .menu-heading { margin: .1rem .5rem .3rem; font-size: .75rem; color: #8b93a1; }
+      .here-thread, .inbox-row { display: flex; flex-direction: column; max-width: 22rem; }
+      .here-root, .inbox-who { font-size: .72rem; color: #8b93a1; }
+      .here-at, .inbox-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .inbox-row.unseen .inbox-text { font-weight: 600; }
+      .inbox-row.unseen::before { content: "●"; color: #f28b82; font-size: .6rem; }
     </style>
   </head>
   <body>

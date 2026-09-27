@@ -119,7 +119,7 @@ The root declares only tooling, so a package can import only what it declares.
 
 ---
 
-## 3. Decisions that constrain everything (ADR-0001..0029)
+## 3. Decisions that constrain everything (ADR-0001..0031)
 
 Full text with rationale and rejected alternatives: `docs/02-decisions.md`.
 The ones you must not violate by accident:
@@ -167,13 +167,21 @@ to a note that has a record, because a refused write cannot be recovered from
 (S28). Replaces `pineta.outbox`.
 
 **ADR-0029 — a tab per root, an archive shared by everyone.** A column's
-context is its path to its root, so the screen splits there: each root that is
-not archived has a tab with its own rail and columns, the same tabs for
-everyone. Archiving is a host-written `pineta.archive` record; it hides a root
+context is its path to its root, so the screen splits there: a root tab has
+its own rail and columns (the tab bar, at first everyone's, is now each
+person's, ADR-0030). Archiving is a host-written `pineta.archive` record; it hides a root
 and makes it read-only for everyone, deletes nothing, and is refused while the
 agent works there. The Archive tab finds and restores any root; the add tab
 starts one. Which tab you are on, and each root's columns, are kept per
 browser tab (amends ADR-0027).
+
+**ADR-0030 — your tabs are yours; the header shows who is here, and your
+inbox of mentions.** Your tabs are the roots you opened; × closes one for you
+and writes nothing, and a root someone else starts opens none. The header
+shows, from live data, an avatar per person here and the agent while it works,
+each with a menu of their threads. `@` lists the messages that mention you;
+which you have seen is kept per device (`localStorage`), never in the
+document. Nothing opens a tab by itself.
 
 **ADR-0021 — a thread's mode is its lane; a mention picks the addressee.** A
 thread with a lane is agent work, one without is a conversation; nothing is
@@ -354,13 +362,16 @@ Hook names, verified against source: **`useTracked(thunk)`** for a derived
 read — *not* `useValue`, which takes a `CallableRef`; `useDocStatus` returns the
 string union `"pending" | "empty" | "populated"`, not an object.
 
-**The interface is a tab per root, each a rail beside columns**
-(`docs/06-interface.md`, `packages/client/TECHNICAL.md`, ADR-0029): each
+**The interface is your tabs, one per root, each a rail beside columns**
+(`docs/06-interface.md`, `packages/client/TECHNICAL.md`, ADR-0029, ADR-0030),
+under a header showing who is here and your inbox of mentions: each
 column is one path on its own scroll, a branch opens beside its parent in its
 rail track's colour, and the rail draws the tab's root, with each uneventful
-stretch drawn as one capsule (ADR-0031). The Archive tab lists every root. Views are pure functions over one `indexTree`
-(`packages/core/tree.ts`, `roots.ts`); which tab you are on and each root's
-columns are a reducer in `packages/client/layout.ts`, never written.
+stretch drawn as one capsule (ADR-0031). The Archive tab lists every root.
+Views are pure functions over one `indexTree` (`packages/core/tree.ts`,
+`roots.ts`); which tab you are on, your open roots and each root's columns are
+a reducer in `packages/client/layout.ts`, never written, and the inbox is
+`packages/client/inbox.ts`.
 
 `useText` binds each note's textarea to its Yjs text (ADR-0025): the first
 genuinely collaborative edit. Each person's composer stays local `useState`.

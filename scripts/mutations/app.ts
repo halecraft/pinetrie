@@ -357,12 +357,12 @@ export const mutations: readonly Mutation[] = [
   {
     name: "restored columns are pruned before the document settles",
     file: "packages/client/app.tsx",
-    from: '    if (settled) dispatch({ kind: "prune", index, open })',
-    to: '    dispatch({ kind: "prune", index, open })',
+    from: '    if (settled) dispatch({ kind: "prune", index, archive })',
+    to: '    dispatch({ kind: "prune", index, archive })',
     command: browser,
-    // Pruned before the document arrives, a joining window sees no open root
-    // and shows the Archive tab.
-    expect: "a joining window renders a column",
+    // Pruned before the document arrives, a reload drops the tabs and columns
+    // whose roots have not arrived yet.
+    expect: "a reload keeps your tabs, in order",
   },
   {
     name: "the column observes only its viewport",
@@ -410,7 +410,7 @@ export const mutations: readonly Mutation[] = [
     from: '  useEffect(() => dispatch({ kind: "sync", index, lanes }), [index, lanes])',
     to: '  useEffect(() => {\n    dispatch({ kind: "sync", index, lanes })\n    const newest = index.roots.at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", tab: { kind: "root", root: newest } })\n  }, [index, lanes])',
     command: browser,
-    expect: "a root another writer starts appears as a tab, and the page stays",
+    expect: "a root another writer starts opens no tab, and the page stays",
   },
   {
     name: "switching tabs keeps reporting the old tab",
@@ -419,14 +419,6 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: browser,
     expect: "another window shows on the tab it is on, and leaves it",
-  },
-  {
-    name: "an archived root stays in everyone's tab bar",
-    file: "packages/client/app.tsx",
-    from: "    () => openRoots(summaries, archive),",
-    to: "    () => summaries.map(s => s.root),",
-    command: browser,
-    expect: "an archived root leaves the other window's bar",
   },
   {
     name: "the add tab's default starts a conversation",
@@ -446,17 +438,17 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the tab menu is drawn inside the tab list, which clips it",
-    file: "packages/client/tabs.tsx",
-    from: '                        position: "fixed",',
-    to: '                        position: "absolute",',
+    file: "packages/client/menu.tsx",
+    from: '          style={{ position: "fixed", top: at.top, right: at.right }}',
+    to: '          style={{ position: "absolute", top: at.top, right: at.right }}',
     command: browser,
     expect: "a tab's ⋯ opens a menu drawn in full",
   },
   {
     name: "a tab's ⋯ shows only on the tab you are on",
     file: "packages/client/tabs.tsx",
-    from: "              {!archived.has(root) && (\n                <span",
-    to: "              {selected && !archived.has(root) && (\n                <span",
+    from: "              {!archived.has(root) && (\n                <Menu",
+    to: "              {selected && !archived.has(root) && (\n                <Menu",
     command: browser,
     expect: "another root's tab shows its ⋯ on hover",
   },
@@ -499,5 +491,45 @@ export const mutations: readonly Mutation[] = [
     to: "      data-count={1}",
     command: browser,
     expect: "a long loop is one hollow capsule on the rail",
+  },
+  {
+    name: "a new root opens a tab",
+    file: "packages/client/layout.ts",
+    from: "  return changed ? { active, open, roots, newTabs } : state",
+    to: "  return { active, open: [...new Set([...open, ...index.roots])], roots, newTabs }",
+    command: browser,
+    expect: "a root another writer starts opens no tab",
+  },
+  {
+    name: "× archives the root",
+    file: "packages/client/app.tsx",
+    from: '            onCloseRoot={r => dispatch({ kind: "closeRoot", root: r })}',
+    to: '            onCloseRoot={r => void session.archive("archive", entryId(r))}',
+    command: browser,
+    expect: "× closes a root's tab for you, and writes nothing",
+  },
+  {
+    name: "the inbox is kept in page memory",
+    file: "packages/client/use-inbox.ts",
+    from: "      if (next !== from) setInbox(store.save(next))",
+    to: "      if (next !== from) setInbox(next)",
+    command: browser,
+    expect: "after a reload, what was seen stays seen",
+  },
+  {
+    name: "a mention on screen still counts",
+    file: "packages/client/use-inbox.ts",
+    from: "    if (drawn.length > 0) save(markSeen(inbox, drawn, items), inbox)",
+    to: "    if (drawn.length < 0) save(markSeen(inbox, drawn, items), inbox)",
+    command: browser,
+    expect: "a mention drawn in the tab you are on is never counted",
+  },
+  {
+    name: "archived roots are never forgotten",
+    file: "packages/client/app.tsx",
+    from: '    () => dispatch({ kind: "forgetArchived", archive }),',
+    to: "    () => {},",
+    command: browser,
+    expect: "an archived root leaves the other window's bar",
   },
 ]

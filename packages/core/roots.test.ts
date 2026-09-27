@@ -1,13 +1,10 @@
 import { describe, expect, test } from "vitest"
 import {
-  type ArchiveRecord,
   type EntryLike,
-  entryId,
   idTime,
   indexTree,
   type LaneView,
   laneNameForThread,
-  openRoots,
   projectRail,
   rootReaders,
   rootWork,
@@ -69,24 +66,6 @@ describe("summarizeRoots", () => {
   test("writers in order of first message, and newest is the largest id", () => {
     expect(summaries[0]).toMatchObject({ writers: [ADA, BEA], newest: "4-b" })
     expect(summaries[1]).toMatchObject({ writers: [BEA], newest: "6-d" })
-  })
-})
-
-describe("openRoots", () => {
-  const record = (state: ArchiveRecord["state"]): ArchiveRecord => ({
-    root: entryId("1-r1"),
-    state,
-    by: ADA,
-    at: 0,
-  })
-  const summaries = summarizeRoots(index)
-  test("an archived root is left out, a restored one is kept", () => {
-    expect(
-      openRoots(summaries, new Map([["1-r1", record("archived")]])),
-    ).toEqual(["3-r2"])
-    expect(
-      openRoots(summaries, new Map([["1-r1", record("restored")]])),
-    ).toEqual(["1-r1", "3-r2"])
   })
 })
 

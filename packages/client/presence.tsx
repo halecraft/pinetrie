@@ -58,7 +58,28 @@ export const nameFor = (
 /** The most avatars a header shows; the rest are "+n". */
 const MOST = 3
 
-/** Small circles, each a person's initial in their colour; names on hover. */
+/** One person's circle: their initial, in their colour. */
+export function Avatar({
+  writer,
+  nameOf,
+  colorOf,
+}: {
+  writer: WriterId
+  nameOf: ReadonlyMap<WriterId, string>
+  colorOf: (writer: WriterId) => string
+}) {
+  return (
+    <span
+      className="avatar"
+      data-writer={writer}
+      style={{ background: colorOf(writer) }}
+    >
+      {nameFor(nameOf, writer).slice(0, 1).toUpperCase()}
+    </span>
+  )
+}
+
+/** Several people's circles, the first few shown, then "+n"; names on hover. */
 export function Avatars({
   writers,
   nameOf,
@@ -77,14 +98,7 @@ export function Avatars({
       title={`also here: ${writers.map(w => nameFor(nameOf, w)).join(", ")}`}
     >
       {shown.map(w => (
-        <span
-          className="avatar"
-          data-writer={w}
-          key={w}
-          style={{ background: colorOf(w) }}
-        >
-          {nameFor(nameOf, w).slice(0, 1).toUpperCase()}
-        </span>
+        <Avatar colorOf={colorOf} key={w} nameOf={nameOf} writer={w} />
       ))}
       {rest > 0 && <span className="avatar more">+{rest}</span>}
     </span>

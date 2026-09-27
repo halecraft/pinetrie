@@ -25,7 +25,7 @@ import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { connectSession } from "@pineta/client/session"
-import { atEntry, entryId, projectRail, ROOT } from "@pineta/core"
+import { atEntry, entryId, handleOf, projectRail, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
   readParticipantNames,
@@ -41,6 +41,35 @@ const PW_SERVER = process.env.PW_SERVER ?? "ws://localhost:3100/"
 const OWN_MENU = '#tabs .tab[aria-selected="true"] ~ .tab-more .tab-menu'
 
 const { ok, report } = createChecks()
+
+/**
+ * Open the menu behind `trigger`, and choose `item` in it, if a person could:
+ * Playwright scrolls a clipped element into view and clicks it, so a menu
+ * check proves it can be seen by what `elementFromPoint` finds at the item's
+ * centre (`packages/client/TECHNICAL.md`, Gotchas). Returns whether it was
+ * seen; an item not seen is not clicked.
+ */
+async function chooseFromMenu(
+  p: Page,
+  trigger: string,
+  item: string,
+): Promise<boolean> {
+  await p.click(trigger)
+  const el = await p
+    .waitForSelector(`.menu ${item}`, { timeout: 15_000 })
+    .catch(() => null)
+  if (el === null) return false
+  const seen = await el.evaluate(n => {
+    const r = n.getBoundingClientRect()
+    const hit = document.elementFromPoint(
+      r.left + r.width / 2,
+      r.top + r.height / 2,
+    )
+    return hit !== null && n.contains(hit)
+  })
+  if (seen) await el.click()
+  return seen
+}
 
 /** In the page: the messages its rail draws, a dot each and a capsule's count. */
 const RAIL_MESSAGES = () =>
@@ -622,7 +651,7 @@ try {
     "the conversation's column keeps only its own thread",
   )
 
-  // ── a tab per root (ADR-0029) ───────────────────────────────────────────
+  // ── your tabs, the header and the inbox (ADR-0029, ADR-0030) ───────────
   const downRoot = readTreeIndex(host.doc).roots.at(-1) ?? ""
   const tabSel = (root: string) => `#tabs .tab[data-root="${root}"]`
   const selectedRoot = (p: Page) =>
@@ -656,7 +685,7 @@ try {
     `each root's tab draws only its root, from track 0 (${downShown[0]} of ${messagesIn(downRoot)}; ${await railCount()} of ${messagesIn(firstRoot)})`,
   )
 
-  // 2. A root someone else starts appears as a tab, and the page stays put.
+  // 2. A root someone else starts opens no tab here (ADR-0030).
   const api = await connectSession({
     url: host.wsUrl,
     WebSocket,
@@ -665,20 +694,21 @@ try {
   await api.setName("Bea")
   const third = await api.chat("a third thread", ROOT, { mode: "branch" })
   const thirdRoot = third.kind === "appended" ? third.id : ""
-  const appeared = await page
-    .waitForSelector(tabSel(thirdRoot), { timeout: 15_000 })
-    .then(
-      () => true,
-      () => false,
-    )
+  await page.waitForFunction(
+    n => document.getElementById("count")?.textContent === n,
+    String(Object.keys(host.doc.entries()).length),
+    { timeout: 15_000 },
+  )
   ok(
-    appeared && (await selectedRoot(page)) === firstRoot,
-    "a root another writer starts appears as a tab, and the page stays where it is",
+    thirdRoot !== "" &&
+      (await page.locator(tabSel(thirdRoot)).count()) === 0 &&
+      (await selectedRoot(page)) === firstRoot,
+    "a root another writer starts opens no tab, and the page stays where it is",
   )
   // Any root can be archived: another tab's ⋯ shows while it is hovered.
-  const otherMenu = page.locator(`${tabSel(thirdRoot)} ~ .tab-more .tab-menu`)
+  const otherMenu = page.locator(`${tabSel(downRoot)} ~ .tab-more .tab-menu`)
   const hiddenAtRest = !(await otherMenu.isVisible())
-  await page.hover(tabSel(thirdRoot))
+  await page.hover(tabSel(downRoot))
   const shownOnHover = await otherMenu.isVisible()
   await page.mouse.move(0, 0)
   ok(
@@ -686,18 +716,114 @@ try {
     `another root's tab shows its ⋯ on hover, and not at rest (${hiddenAtRest}, ${shownOnHover})`,
   )
 
-  // 3. Only the tab someone is on shows them, and switching moves them.
+  // 3. Closing a tab is yours: × writes nothing, and reopening brings its columns back.
+  await page.click(tabSel(downRoot))
+  await page.waitForFunction(
+    () => document.querySelectorAll(".column").length >= 2,
+    undefined,
+    { timeout: 15_000 },
+  )
+  const downKeys = await page.$$eval(".column", cs =>
+    cs.map(c => c.getAttribute("data-key") ?? ""),
+  )
+  const beforeClose = Object.keys(host.doc.entries()).length
+  await page.click(`${tabSel(downRoot)} ~ .tab-close`)
+  const closed = await page
+    .waitForFunction(
+      r => document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+      downRoot,
+      { timeout: 15_000 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(
+    closed && Object.keys(host.doc.entries()).length === beforeClose,
+    "× closes a root's tab for you, and writes nothing",
+  )
+  const openFromArchive = async (p: Page, r: string) => {
+    await p.click("#tabs .tab-archive")
+    await p.click(`.archive-row[data-root="${r}"]`)
+    await p.click(".archive-preview .read-only-action")
+    await p.waitForSelector(`${tabSel(r)}[aria-selected="true"]`, {
+      timeout: 15_000,
+    })
+  }
+  await openFromArchive(page, downRoot)
+  await page
+    .waitForFunction(
+      n => document.querySelectorAll(".column").length === n,
+      downKeys.length,
+      { timeout: 15_000 },
+    )
+    .catch(() => null)
+  const downAgain = await page.$$eval(".column", cs =>
+    cs.map(c => c.getAttribute("data-key") ?? ""),
+  )
+  ok(
+    downAgain.join() === downKeys.join(),
+    `opening a closed root again brings back its columns (${downAgain.length} of ${downKeys.length})`,
+  )
+  await page.click(tabSel(firstRoot))
+
+  // 4. Another window: the header shows it, never yourself, and takes you to it.
+  const myWriter = await page.evaluate(
+    () => `w-${sessionStorage.getItem("pineta-peer-id")}`,
+  )
   const tb = await browser.newPage()
   try {
     await tb.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
-    await tb.waitForSelector(tabSel(thirdRoot), { timeout: 20_000 })
+    const landed = await tb
+      .waitForSelector('#tabs .tab-archive[aria-selected="true"]', {
+        timeout: 20_000,
+      })
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      landed && (await tb.locator("#tabs .tab-root").count()) === 0,
+      "a page with nothing stored opens on the Archive tab, with no root tabs",
+    )
+    await openFromArchive(tb, thirdRoot)
+    const avatar = await page
+      .waitForSelector("#top .here-person .here-trigger", { timeout: 15_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      avatar &&
+        (await page
+          .locator(`#top .avatar[data-writer="${myWriter}"]`)
+          .count()) === 0,
+      "another window shows in the header, and you never do",
+    )
+    const toThem = await chooseFromMenu(
+      page,
+      "#top .here-person .here-trigger",
+      ".here-thread",
+    )
+    const followed = await page
+      .waitForSelector(`${tabSel(thirdRoot)}[aria-selected="true"]`, {
+        timeout: 15_000,
+      })
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      toThem && followed && (await shows("a third thread")),
+      "choosing a person's thread in the header opens it as your tab",
+    )
     const onThird = await page
       .waitForSelector(`${tabSel(thirdRoot)} .avatar`, { timeout: 15_000 })
       .then(
         () => true,
         () => false,
       )
-    await tb.click(tabSel(firstRoot))
+    await openFromArchive(tb, firstRoot)
     const moved = await page
       .waitForFunction(
         ([from, to]) =>
@@ -717,7 +843,7 @@ try {
       "another window shows on the tab it is on, and leaves it when it switches",
     )
 
-    // 4. The add menu, by keyboard; an unsent new tab closes without a trace.
+    // 5. The add menu, by keyboard; an unsent new tab closes without a trace.
     const entriesBefore = Object.keys(host.doc.entries()).length
     await page.focus("#tabs .add-menu")
     await page.keyboard.press("ArrowDown")
@@ -742,7 +868,7 @@ try {
       `the add menu's conversation, chosen by keyboard, opens a new tab that only sends ("${convo}")`,
     )
     await page.fill(`${col(0)} .composer .input`, "never sent")
-    await page.click("#tabs .tab-close")
+    await page.click("#tabs .tab-new ~ .tab-close")
     await page
       .waitForFunction(() => document.querySelector("#tabs .tab-new") === null)
       .catch(() => null)
@@ -752,7 +878,127 @@ try {
       "closing an unsent new tab writes nothing",
     )
 
-    // 5. Archived, a root leaves everyone's bar; the page on it reads it.
+    // 6. Mentions: @ counts what you have not seen, and takes you there.
+    const unseen = () =>
+      page
+        .$eval("#top .inbox-count", n => Number(n.getAttribute("data-unseen")))
+        .catch(() => 0)
+    // The page's handle, from its name as it is now (it was renamed above).
+    const handle = `@${handleOf(await page.inputValue("#name"))}`
+    const before = await unseen()
+    const mention = await api.chat(
+      `${handle} a look at this?`,
+      atEntry(entryId(downRoot)),
+    )
+    const mentionId = mention.kind === "appended" ? mention.id : ""
+    const counted = await page
+      .waitForFunction(
+        n =>
+          Number(
+            document
+              .querySelector("#top .inbox-count")
+              ?.getAttribute("data-unseen") ?? 0,
+          ) === n,
+        before + 1,
+        { timeout: 15_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    const picked = await chooseFromMenu(
+      page,
+      "#top .inbox-trigger",
+      `.inbox-row[data-entry="${mentionId}"]`,
+    )
+    const drawn = await page
+      .waitForSelector(`.column .msg[data-entry="${mentionId}"]`, {
+        timeout: 15_000,
+      })
+      .then(
+        () => true,
+        () => false,
+      )
+    await page
+      .waitForFunction(
+        () => document.querySelector("#top .inbox-count") === null,
+        undefined,
+        { timeout: 15_000 },
+      )
+      .catch(() => null)
+    ok(
+      counted && picked && drawn && (await unseen()) === 0,
+      `a mention counts on @, and choosing it opens its thread with the message drawn (${before} → ${before + 1} → ${await unseen()})`,
+    )
+    // One on screen is seen at once: the page is on that thread.
+    await api.chat(`${handle} and here`, atEntry(entryId(mentionId)))
+    await shows(`${handle} and here`)
+    await waitFor(() => false, 1_000)
+    ok(
+      (await unseen()) === 0,
+      "a mention drawn in the tab you are on is never counted",
+    )
+    // Seen is kept per device: across a reload, and a mention made meanwhile counts.
+    await page.click(tabSel(firstRoot))
+    const rootTabs = (p: Page) =>
+      p.$$eval("#tabs .tab-root", ts =>
+        ts.map(t => t.getAttribute("data-root") ?? ""),
+      )
+    const tabsBefore = await rootTabs(page)
+    const reloading = page.reload({ waitUntil: "domcontentloaded" })
+    await api.chat(`${handle} while you were away`, atEntry(entryId(mentionId)))
+    await reloading
+    const afterReload = await page
+      .waitForFunction(
+        () =>
+          document
+            .querySelector("#top .inbox-count")
+            ?.getAttribute("data-unseen") === "1",
+        undefined,
+        { timeout: 20_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      afterReload,
+      "after a reload, what was seen stays seen, and a mention made meanwhile counts",
+    )
+    const tabsAfter = await rootTabs(page)
+    ok(
+      tabsBefore.length >= 3 && tabsAfter.join() === tabsBefore.join(),
+      `a reload keeps your tabs, in order (${tabsAfter.length} of ${tabsBefore.length})`,
+    )
+    // Two tabs of one device share it: mark all seen in one clears the other.
+    const sibling = await page.context().newPage()
+    try {
+      await sibling.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+      // A second tab is a second writer (S29), and "you" is a name
+      // (ADR-0030): named as the page is, its mentions are the page's.
+      await sibling.fill("#name", await page.inputValue("#name"))
+      await sibling.press("#name", "Enter")
+      await sibling.waitForSelector("#top .inbox-count", { timeout: 20_000 })
+      await chooseFromMenu(sibling, "#top .inbox-trigger", ".inbox-all-seen")
+      const cleared = await page
+        .waitForFunction(
+          () => document.querySelector("#top .inbox-count") === null,
+          undefined,
+          { timeout: 15_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      ok(
+        cleared,
+        "two tabs of one device share the inbox: mark all seen in one clears the other",
+      )
+    } finally {
+      await sibling.close().catch(() => {})
+    }
+
+    // 7. Archived, a root leaves every tab bar; the page on it reads it.
     await page.click(tabSel(thirdRoot))
     await page.waitForSelector(`${col(0)} .composer .send`, { timeout: 15_000 })
     ok(
@@ -760,22 +1006,13 @@ try {
         (await page.locator(".column .close").count()) === 0,
       "a root tab's only column offers no close: the root would give it back",
     )
+    // tb opens the third root again, so it has a tab there to lose, and then
+    // is on another: the tab someone is on stays until they leave it.
+    await openFromArchive(tb, thirdRoot)
+    await tb.click(tabSel(firstRoot))
     await page.fill(`${col(0)} .composer .input`, "typed, not sent")
-    await page.click(OWN_MENU)
-    // Seen, not only clickable: Playwright scrolls a clipped element into view
-    // before clicking it, which a person cannot do.
-    const menuSeen = await page
-      .$eval("#tabs .menu", m => {
-        const r = m.getBoundingClientRect()
-        const hit = document.elementFromPoint(
-          r.left + r.width / 2,
-          r.top + r.height / 2,
-        )
-        return hit !== null && m.contains(hit)
-      })
-      .catch(() => false)
+    const menuSeen = await chooseFromMenu(page, OWN_MENU, ".archive-root")
     ok(menuSeen, "a tab's ⋯ opens a menu drawn in full below the tab bar")
-    await page.click("#tabs .archive-root")
     await page
       .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })
       .catch(() => null)
@@ -813,15 +1050,11 @@ try {
     await page
       .waitForSelector(`${col(0)} .composer .send`, { timeout: 15_000 })
       .catch(() => null)
-    const backTb = await tb
-      .waitForSelector(tabSel(thirdRoot), { timeout: 15_000 })
-      .then(
-        () => true,
-        () => false,
-      )
+    await waitFor(() => false, 1_000)
     ok(
-      (await page.inputValue(input)) === "typed, not sent" && backTb,
-      "restoring it in place brings back the composer with its text, and the tab for everyone",
+      (await page.inputValue(input)) === "typed, not sent" &&
+        (await tb.locator(tabSel(thirdRoot)).count()) === 0,
+      "restoring it in place brings back the composer with its text, and opens no tab for the other window",
     )
 
     // Archived again and left, its tab goes; the Archive tab brings it back.
@@ -885,15 +1118,10 @@ try {
         () => true,
         () => false,
       )
-    const backAgain = await tb
-      .waitForSelector(tabSel(thirdRoot), { timeout: 15_000 })
-      .then(
-        () => true,
-        () => false,
-      )
+    await waitFor(() => false, 1_000)
     ok(
-      restored && backAgain,
-      "Restore in the Archive tab brings the tab back for everyone, and shows it",
+      restored && (await tb.locator(tabSel(thirdRoot)).count()) === 0,
+      "Restore in the Archive tab opens it as a tab for the page that restored it, and not for the other window",
     )
     // The Archive tab reports no thread: the other window leaves nothing
     // behind, once its deletions have reached this page.
@@ -1318,10 +1546,10 @@ try {
         await aligner.close()
       }
 
-      // ── tabs while the agent works (ADR-0029) ───────────────────────────
-      // Another writer starts agent work at the root: its tab appears and
-      // pulses while the reply is written, the page stays where it is, and
-      // that root cannot be archived until the agent is done.
+      // ── the agent's work, in the header (ADR-0030) ──────────────────────
+      // Another writer starts agent work at the root: no tab opens, the
+      // header's agent pulses with its thread count, choosing the thread
+      // opens it, and that root cannot be archived until the agent is done.
       const own = await tp
         .$eval('#tabs .tab[aria-selected="true"]', n =>
           n.getAttribute("data-root"),
@@ -1342,16 +1570,25 @@ try {
           },
         )
         const newRoot = readTreeIndex(toolHost.doc).roots.at(-1) ?? ""
-        const pulsed = await appears(
-          `#tabs .tab.running[data-root="${newRoot}"]`,
-        )
+        const pulsed = await appears("#top .here-agent.running .here-count")
+        const count = await tp
+          .textContent("#top .here-agent .here-count")
+          .catch(() => "")
         const stayed =
           (await tp
             .$eval('#tabs .tab[aria-selected="true"]', n =>
               n.getAttribute("data-root"),
             )
-            .catch(() => null)) === own
-        await tp.click(`#tabs .tab[data-root="${newRoot}"]`)
+            .catch(() => null)) === own &&
+          (await tp.locator(`#tabs .tab[data-root="${newRoot}"]`).count()) === 0
+        const chosen = await chooseFromMenu(
+          tp,
+          "#top .here-agent .here-trigger",
+          ".here-thread",
+        )
+        const opened = await appears(
+          `#tabs .tab[data-root="${newRoot}"][aria-selected="true"]`,
+        )
         await tp.click(OWN_MENU)
         const item = "#tabs .archive-root"
         const disabled = await tp
@@ -1361,10 +1598,13 @@ try {
         ok(
           started.kind === "started" &&
             pulsed &&
+            count === "1" &&
             stayed &&
+            chosen &&
+            opened &&
             disabled &&
             why.includes("the agent is working here"),
-          `a root started elsewhere appears and pulses while the agent works, the page stays, and its Archive is disabled ("${why.trim()}")`,
+          `a root started elsewhere opens no tab; the header's agent pulses (${count}), its thread opens from there, and its Archive is disabled ("${why.trim()}")`,
         )
         await toolIdle()
       } finally {
@@ -1452,9 +1692,8 @@ try {
         const later = trunk === null ? null : await chain(trunk, "Later", 30)
         const aside = trunk === null ? null : await chain(trunk, "Aside", 1)
         const railRoot = start.kind === "appended" ? start.id : "none"
-        await tp.click(`#tabs .tab[data-root="${railRoot}"]`, {
-          timeout: 15_000,
-        })
+        // Another writer's root opens no tab (ADR-0030): open it from Archive.
+        await openFromArchive(tp, railRoot)
         await tp.waitForSelector(
           `${col(0)} .msg[data-entry="${aside ?? "none"}"]`,
           { timeout: 15_000 },
@@ -1597,13 +1836,25 @@ try {
       waitUntil: "domcontentloaded",
       timeout: 20_000,
     })
+    // It opens on the Archive tab, and follows Ada from her avatar.
+    await second
+      .waitForSelector("#top .here-person .here-trigger", { timeout: 20_000 })
+      .catch(() => null)
+    const followedAda = await chooseFromMenu(
+      second,
+      "#top .here-person .here-trigger",
+      ".here-thread",
+    )
     const rendered = await second
       .waitForSelector(".column .msg", { timeout: 20_000 })
       .then(
         () => true,
         () => false,
       )
-    ok(rendered, "a joining window renders a column")
+    ok(
+      followedAda && rendered,
+      "a joining window follows Ada's thread from her avatar in the header",
+    )
     // Presence: the second window's open column rings its thread's end on the
     // first window's rail; opening that thread shows it in the header.
     const ring = await page
@@ -1898,7 +2149,7 @@ try {
     )
   ok(
     landed,
-    `after a reload, a root archived meanwhile gives way to the newest open root (${await selectedRoot(page)})`,
+    `after a reload, a root archived meanwhile gives way to your last open tab (${await selectedRoot(page)})`,
   )
   await api.close()
 

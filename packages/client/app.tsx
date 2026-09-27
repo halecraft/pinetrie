@@ -1,11 +1,13 @@
 // client/app — browser entry. Vite transforms and serves this directly.
 //
-// The screen is a tab per root, and each root tab is a rail beside a strip of
-// columns (docs/06-interface.md, ADR-0029). The rail draws the root's tree;
+// The screen is your tabs, one per root you opened, each a rail beside a strip
+// of columns, under a header showing who is here and your inbox of mentions
+// (docs/06-interface.md, ADR-0029, ADR-0030). The rail draws the root's tree;
 // each column is one path, read on its own scroll. What is drawn is a read of
-// the document, through `@pineta/reads` and `projection.ts`. Which tab you are on and each root's
-// columns are this window's own view state: a reducer (`layout.ts`), kept in
-// this browser tab's storage and never in the document (ADR-0027).
+// the document, through `@pineta/reads` and `projection.ts`. Which tab you are
+// on, your tabs and each root's columns are this window's own view state: a
+// reducer (`layout.ts`), kept in this browser tab's storage and never in the
+// document (ADR-0027). Which mentions you have seen is kept per device.
 //
 // The renderer before React rebuilt the transcript with `innerHTML` on every
 // change, which destroyed focus and selection on every keystroke. React gives
@@ -19,7 +21,6 @@ import {
   compactRail,
   entryId,
   messageText,
-  openRoots,
   PENDING_TRACK,
   pathIds,
   presenceView,
@@ -60,6 +61,15 @@ import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { Column, type ColumnProps } from "./column.tsx"
 import { type Column as ColumnSpec, isPinned } from "./columns.ts"
 import type { ReadOnly } from "./composer.tsx"
+import { Header } from "./header.tsx"
+import { peopleHere } from "./here.ts"
+import {
+  decodeInbox,
+  encodeInbox,
+  type Inbox,
+  mentionsOf,
+  mergeInbox,
+} from "./inbox.ts"
 import {
   columnsOf,
   decodeLayout,
@@ -76,9 +86,10 @@ import { readEntryCount } from "./projection.ts"
 import { Rail } from "./rail.tsx"
 import { railKeep } from "./rail-view.ts"
 import { connectSession, type SessionClient } from "./session-view.ts"
-import { tabState } from "./tab-state.ts"
+import { deviceState, tabState } from "./tab-state.ts"
 import { TabBar } from "./tabs.tsx"
 import { PLACED } from "./use-follow.ts"
+import { useInbox } from "./use-inbox.ts"
 import { useReveal } from "./use-reveal.ts"
 
 /**
@@ -91,6 +102,18 @@ const layoutStore = tabState({
   codec: { encode: encodeLayout, decode: decodeLayout },
   tab: sessionStorage,
   device: localStorage,
+})
+
+/**
+ * Which mentions of you this device has seen (ADR-0030): shared by its tabs,
+ * kept across reloads, never in the document.
+ */
+const inboxStore = deviceState<Inbox>({
+  key: `pineta-inbox:${SESSION_DOC_ID}`,
+  codec: { encode: encodeInbox, decode: decodeInbox },
+  device: localStorage,
+  merge: mergeInbox,
+  events: window,
 })
 
 /** A display name: a label for you, never your identity. */
@@ -212,12 +235,9 @@ function App({ session }: { session: SessionClient }) {
   const nameOf = useTracked(() => readParticipantNames(doc))
   const presenceFacts = useTracked(() => readPresence(session.presence))
 
-  // Each root, and which have tabs: every root not archived (ADR-0029).
+  // Each root, for labels and the Archive tab. Which have tabs is yours
+  // (`layout.open`, ADR-0030).
   const summaries = useMemo(() => summarizeRoots(index), [index])
-  const open = useMemo(
-    () => openRoots(summaries, archive),
-    [summaries, archive],
-  )
   const work = useMemo(() => rootWork(index, lanes), [index, lanes])
   const labelOf = (root: string): string => {
     const first = summaries.find(s => s.root === root)?.first ?? root
@@ -232,6 +252,13 @@ function App({ session }: { session: SessionClient }) {
     () => layoutStore.load() ?? initialLayout(),
   )
   useEffect(() => dispatch({ kind: "sync", index, lanes }), [index, lanes])
+  // Archived roots leave your tabs; the one you are on stays until you leave
+  // it, which is a change of the active tab.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: leaving a tab is a change of the active tab; the reducer reads it from state
+  useEffect(
+    () => dispatch({ kind: "forgetArchived", archive }),
+    [archive, layout.active],
+  )
   // Every change is saved, `sync`'s too: restored from an older anchor,
   // `followTip` could land on a newer branch below it.
   useEffect(() => layoutStore.save(layout), [layout])
@@ -251,7 +278,7 @@ function App({ session }: { session: SessionClient }) {
   }, [doc])
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, at settle, with the index of that render
   useEffect(() => {
-    if (settled) dispatch({ kind: "prune", index, open })
+    if (settled) dispatch({ kind: "prune", index, archive })
   }, [settled])
 
   const active = layout.active
@@ -284,15 +311,7 @@ function App({ session }: { session: SessionClient }) {
     else if (active?.kind === "new" && action.kind === "close")
       closeNewTab(active.key)
   }
-  const closeNewTab = (key: string) =>
-    dispatch({
-      kind: "closeNewTab",
-      key,
-      fallback:
-        open.length > 0
-          ? { kind: "root", root: open.at(-1) ?? "" }
-          : { kind: "archive" },
-    })
+  const closeNewTab = (key: string) => dispatch({ kind: "closeNewTab", key })
 
   const views = useMemo(
     () =>
@@ -315,9 +334,15 @@ function App({ session }: { session: SessionClient }) {
     () => rootReaders(index, here.readingAt),
     [index, here],
   )
-  const colorOf = useMemo(
-    () => presenceColors(writerOrder(index, nameOf.keys())),
+  const order = useMemo(
+    () => writerOrder(index, nameOf.keys()),
     [index, nameOf],
+  )
+  const colorOf = useMemo(() => presenceColors(order), [order])
+  // Who else is here, by person, for the header.
+  const people = useMemo(
+    () => peopleHere(here.readingAt, index, order),
+    [here, index, order],
   )
   const rings = useMemo(
     () =>
@@ -378,6 +403,25 @@ function App({ session }: { session: SessionClient }) {
     [index, views],
   )
   const shown = useMemo(() => new Set(paths.flatMap(p => [...p])), [paths])
+
+  // Your inbox: the messages that mention you, and which you have seen.
+  const mentions = useMemo(
+    () =>
+      mentionsOf({
+        index,
+        me: session.writer,
+        myName: nameFor(nameOf, session.writer),
+        participants,
+      }),
+    [index, session.writer, nameOf, participants],
+  )
+  const inbox = useInbox({
+    store: inboxStore,
+    index,
+    items: mentions,
+    shown,
+    settled,
+  })
   const railItems = useMemo(
     () =>
       compactRail(
@@ -506,14 +550,27 @@ function App({ session }: { session: SessionClient }) {
   return (
     <>
       <header id="top">
-        <h1>pineta</h1>
-        <div className="meta">
-          <NameField session={session} /> · entries{" "}
-          <span id="count">{count}</span> ·{" "}
-          <span id="status">
-            {status === "pending" ? "syncing…" : "connected"}
-          </span>
+        <div className="header-left">
+          <h1>pineta</h1>
+          <div className="meta">
+            <NameField session={session} /> · entries{" "}
+            <span id="count">{count}</span> ·{" "}
+            <span id="status">
+              {status === "pending" ? "syncing…" : "connected"}
+            </span>
+          </div>
         </div>
+        <Header
+          colorOf={colorOf}
+          inbox={inbox}
+          index={index}
+          labelOf={labelOf}
+          mentions={mentions}
+          nameOf={nameOf}
+          onOpen={openAt}
+          people={people}
+          runs={activity}
+        />
       </header>
       {active === null ? (
         <main id="workspace">
@@ -543,9 +600,10 @@ function App({ session }: { session: SessionClient }) {
             }
             onArchive={r => void session.archive("archive", entryId(r))}
             onCloseNew={closeNewTab}
+            onCloseRoot={r => dispatch({ kind: "closeRoot", root: r })}
             onShow={tab => dispatch({ kind: "show", tab })}
             readers={readers}
-            tabs={tabBar(open, active, layout.newTabs)}
+            tabs={tabBar(layout)}
             work={work}
           />
           <main id="workspace">

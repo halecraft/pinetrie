@@ -356,6 +356,14 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S35 — Why an agent's column jumps while it works ✅ ANSWERED
+
+`findings/S35-agent-work-jumps.md`. A tool call changes the column's height
+five or six times, and each shrink slides the whole column down. Live work
+closes before its entry arrives. The column's anchor follows the new tip one
+render later, and that render shows a `⑂ 0 messages` chip and no live panel.
+When rendering is slow, as in a long session, each of these states is painted.
+
 ### S34 — Links to a thread, off loopback ✅ PASS
 
 `findings/S34-links-off-loopback.md`. A fragment survives the invite link's
