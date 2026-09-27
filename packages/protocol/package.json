@@ -9,8 +9,8 @@
     "./line": "./line.ts"
   },
   "dependencies": {
-    "@kyneta/exchange": "link:../../../kyneta/packages/exchange",
-    "@kyneta/schema": "link:../../../kyneta/packages/schema",
+    "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
+    "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
     "@pineta/core": "workspace:*"
   }
 }

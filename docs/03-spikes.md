@@ -356,6 +356,20 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S31 — A new command kind, and a store holding the old Lines ✅ PASS
+
+`findings/S31-line-kinds-and-stored-lines.md`. Adding a kind to
+`COMMAND_KINDS` and `OUTCOME_KINDS` changes the stored Line's schema, and a
+store written before the change still opens and serves. No migration is
+needed. A new Reply field was not tested.
+
+### S30 — What a root is ✅ PASS
+
+`findings/S30-what-a-root-is.md`. A thread started at the root, whether it is a
+conversation or agent work, is rooted at its first message, and pi writes no
+entry above it. So a root tab (ADR-0029) is keyed by the root entry's id and
+labelled by its first message.
+
 ### S29 — State per tab, and Kyneta's peer-id lease ✅ PASS
 
 `findings/S29-tab-state-and-peer-lease.md`. Kyneta keeps a peer id in a tab

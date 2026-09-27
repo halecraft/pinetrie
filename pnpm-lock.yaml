@@ -36,20 +36,20 @@ importers:
   apps/pineta:
     dependencies:
       '@kyneta/exchange':
-        specifier: link:../../../kyneta/packages/exchange
-        version: link:../../../kyneta/packages/exchange
+        specifier: link:../../../kyneta/workspace/pineta/packages/exchange
+        version: link:../../../kyneta/workspace/pineta/packages/exchange
       '@kyneta/schema':
-        specifier: link:../../../kyneta/packages/schema
-        version: link:../../../kyneta/packages/schema
+        specifier: link:../../../kyneta/workspace/pineta/packages/schema
+        version: link:../../../kyneta/workspace/pineta/packages/schema
       '@kyneta/sql-store-core':
-        specifier: link:../../../kyneta/packages/exchange/stores/sql-core
-        version: link:../../../kyneta/packages/exchange/stores/sql-core
+        specifier: link:../../../kyneta/workspace/pineta/packages/exchange/stores/sql-core
+        version: link:../../../kyneta/workspace/pineta/packages/exchange/stores/sql-core
       '@kyneta/sqlite-store':
-        specifier: link:../../../kyneta/packages/exchange/stores/sqlite
-        version: link:../../../kyneta/packages/exchange/stores/sqlite
+        specifier: link:../../../kyneta/workspace/pineta/packages/exchange/stores/sqlite
+        version: link:../../../kyneta/workspace/pineta/packages/exchange/stores/sqlite
       '@kyneta/websocket-transport':
-        specifier: link:../../../kyneta/packages/exchange/transports/websocket
-        version: link:../../../kyneta/packages/exchange/transports/websocket
+        specifier: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
+        version: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
       '@pineta/client':
         specifier: workspace:*
         version: link:../../packages/client
@@ -88,29 +88,29 @@ importers:
   packages/client:
     dependencies:
       '@kyneta/changefeed':
-        specifier: link:../../../kyneta/packages/changefeed
-        version: link:../../../kyneta/packages/changefeed
+        specifier: link:../../../kyneta/workspace/pineta/packages/changefeed
+        version: link:../../../kyneta/workspace/pineta/packages/changefeed
       '@kyneta/exchange':
-        specifier: link:../../../kyneta/packages/exchange
-        version: link:../../../kyneta/packages/exchange
+        specifier: link:../../../kyneta/workspace/pineta/packages/exchange
+        version: link:../../../kyneta/workspace/pineta/packages/exchange
       '@kyneta/machine':
-        specifier: link:../../../kyneta/packages/machine
-        version: link:../../../kyneta/packages/machine
+        specifier: link:../../../kyneta/workspace/pineta/packages/machine
+        version: link:../../../kyneta/workspace/pineta/packages/machine
       '@kyneta/react':
-        specifier: link:../../../kyneta/packages/react
-        version: link:../../../kyneta/packages/react
+        specifier: link:../../../kyneta/workspace/pineta/packages/react
+        version: link:../../../kyneta/workspace/pineta/packages/react
       '@kyneta/reactive':
-        specifier: link:../../../kyneta/packages/reactive
-        version: link:../../../kyneta/packages/reactive
+        specifier: link:../../../kyneta/workspace/pineta/packages/reactive
+        version: link:../../../kyneta/workspace/pineta/packages/reactive
       '@kyneta/schema':
-        specifier: link:../../../kyneta/packages/schema
-        version: link:../../../kyneta/packages/schema
+        specifier: link:../../../kyneta/workspace/pineta/packages/schema
+        version: link:../../../kyneta/workspace/pineta/packages/schema
       '@kyneta/transport':
-        specifier: link:../../../kyneta/packages/transport
-        version: link:../../../kyneta/packages/transport
+        specifier: link:../../../kyneta/workspace/pineta/packages/transport
+        version: link:../../../kyneta/workspace/pineta/packages/transport
       '@kyneta/websocket-transport':
-        specifier: link:../../../kyneta/packages/exchange/transports/websocket
-        version: link:../../../kyneta/packages/exchange/transports/websocket
+        specifier: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
+        version: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
@@ -199,8 +199,8 @@ importers:
         specifier: 0.87.1
         version: 0.87.1(ws@8.21.3)
       '@kyneta/schema':
-        specifier: link:../../../kyneta/packages/schema
-        version: link:../../../kyneta/packages/schema
+        specifier: link:../../../kyneta/workspace/pineta/packages/schema
+        version: link:../../../kyneta/workspace/pineta/packages/schema
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
@@ -214,11 +214,11 @@ importers:
   packages/protocol:
     dependencies:
       '@kyneta/exchange':
-        specifier: link:../../../kyneta/packages/exchange
-        version: link:../../../kyneta/packages/exchange
+        specifier: link:../../../kyneta/workspace/pineta/packages/exchange
+        version: link:../../../kyneta/workspace/pineta/packages/exchange
       '@kyneta/schema':
-        specifier: link:../../../kyneta/packages/schema
-        version: link:../../../kyneta/packages/schema
+        specifier: link:../../../kyneta/workspace/pineta/packages/schema
+        version: link:../../../kyneta/workspace/pineta/packages/schema
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
@@ -238,11 +238,11 @@ importers:
   packages/schema:
     dependencies:
       '@kyneta/schema':
-        specifier: link:../../../kyneta/packages/schema
-        version: link:../../../kyneta/packages/schema
+        specifier: link:../../../kyneta/workspace/pineta/packages/schema
+        version: link:../../../kyneta/workspace/pineta/packages/schema
       '@kyneta/yjs-schema':
-        specifier: link:../../../kyneta/packages/schema/backends/yjs
-        version: link:../../../kyneta/packages/schema/backends/yjs
+        specifier: link:../../../kyneta/workspace/pineta/packages/schema/backends/yjs
+        version: link:../../../kyneta/workspace/pineta/packages/schema/backends/yjs
       '@pineta/core':
         specifier: workspace:*
         version: link:../core

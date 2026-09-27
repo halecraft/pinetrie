@@ -10,11 +10,11 @@
     "e2e:browser": "node e2e/browser.ts"
   },
   "dependencies": {
-    "@kyneta/exchange": "link:../../../kyneta/packages/exchange",
-    "@kyneta/schema": "link:../../../kyneta/packages/schema",
-    "@kyneta/sql-store-core": "link:../../../kyneta/packages/exchange/stores/sql-core",
-    "@kyneta/sqlite-store": "link:../../../kyneta/packages/exchange/stores/sqlite",
-    "@kyneta/websocket-transport": "link:../../../kyneta/packages/exchange/transports/websocket",
+    "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
+    "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
+    "@kyneta/sql-store-core": "link:../../../kyneta/workspace/pineta/packages/exchange/stores/sql-core",
+    "@kyneta/sqlite-store": "link:../../../kyneta/workspace/pineta/packages/exchange/stores/sqlite",
+    "@kyneta/websocket-transport": "link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket",
     "@pineta/client": "workspace:*",
     "@pineta/core": "workspace:*",
     "@pineta/marginalia": "workspace:*",

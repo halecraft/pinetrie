@@ -1,4 +1,4 @@
-# Interface: columns for reading, a rail for shape
+# Interface: a tab per root, columns for reading, a rail for shape
 
 The backend can now hold a conversation as a tree, with people and an agent in
 it (ADR-0018). The first interface drew that tree as a chat list: one path, with
@@ -21,7 +21,8 @@ This document fixes the design before any code. It draws E and T directly.
 2. **A branch sits beside its parent.** Slack's thread panel gets this right for
    one level. Pineta needs it at any depth.
 3. **No thread is special.** The data has no "main thread"; the interface should
-   not invent one. Whatever you put first is what reads as the trunk.
+   not invent one. Whatever you put first is what reads as the trunk. Roots
+   are peers too: each has a tab, in the order they began (ADR-0029).
 4. **Show context, don't describe it.** What the agent will read is a path; draw
    that path lit and everything else not.
 5. **Say the effect, not a mode name.** "send · agent will reply" says what
@@ -33,6 +34,8 @@ This document fixes the design before any code. It draws E and T directly.
 ## Layout
 
 ```
+ Archive │ Fix the sync bug ◉ │ Release notes  ·Bea │ Q3 planning │ ＋ agent ▾
+━━━━━━━━━┷━━━━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━┷━━━━━━━━━━━━
 ┌ rail ┐┌ column 1 ──────────────┐┌ column 2 ─────────────┐┌ column 3 ──────────┐
 │ ●    ││ Ada                    ││▌from Ada: "Say…" (blue)││▌from agent (green)  │
 │ │    ││ Say exactly: OK  ●blue ││ Bea                   ││ Ada                │
@@ -47,10 +50,55 @@ This document fixes the design before any code. It draws E and T directly.
 └──────┘└────────────────────────┘└───────────────────────┘└────────────────────┘
 ```
 
+### Root tabs: one per root (ADR-0029)
+
+A conversation's context is its path to its root, so nothing in one root is
+ever in the context of another. That is where the screen splits.
+
+- **Each root has a tab**, and a tab shows only that root's tree: its rail, and
+  its columns. Every column in a tab shares the root.
+- **The tab bar is the same for everyone:** every root that is not archived, in
+  the order they began. Which tab you are on is yours. A root someone else
+  starts appears as a tab, and does not take you there.
+- **A tab's label** is its first message's text, cut short, until a mark names
+  it (ADR-0028).
+- **A tab shows what happens in it while you are elsewhere:** a pulse while the
+  agent is working there, and small avatars of the others reading there. There
+  is no view of the whole session; the tabs carry its signals.
+- **Archive is in a tab's menu**, saying what it does: "hide for everyone;
+  restore from Archive". It is disabled while the agent works in that root or
+  messages wait there, with the reason. Archiving writes a record; no message
+  changes.
+- **If someone archives the tab you are on**, it stays while you are there,
+  read-only, saying who archived it, with **Restore**. It leaves the bar when
+  you switch away.
+- **With many tabs**, the bar scrolls; Archive and ＋ stay put.
+
+### The Archive tab
+
+The leftmost tab. It finds roots, so it is a list, not a rail with columns.
+
+- **A row per root, open or archived:** its label, last activity, who wrote in
+  it, its messages and notes, and its state. Filters: archived, open, mine.
+  Search over message text.
+- **Selecting a row previews it:** that root's rail, and one read-only column
+  that a rail dot moves. It has no composer, and none of the tools that write:
+  branch, edit, mark, cite. A citation is written where its author is reading,
+  which here is the archived root.
+- **Restore** puts the root back in the tab bar and switches to it. Restoring
+  is the only way to write in an archived root; the host refuses anything else
+  there.
+
+### The add tab
+
+The rightmost tab, empty but for a split button: **＋ agent**, with
+**conversation** in its menu. A conversation at the root is the rarer start,
+so it is the one behind the menu. What each does is under "Starting" below.
+
 ### Columns: a path each
 
-- **A column is one path through the tree**, from the root to a leaf, read top to
-  bottom. Its composer sends at its last message.
+- **A column is one path through its tab's tree**, from the root to a leaf,
+  read top to bottom. Its composer sends at its last message.
 - **Opening a branch adds a column to the right**, starting after the fork. An
   aside of an aside opens a third column.
 - **Colour, not lines, links a branch to its parent.** Each open branch takes
@@ -78,10 +126,10 @@ This document fixes the design before any code. It draws E and T directly.
 - On a narrow screen, columns stack as a back-navigable sequence (the macOS
   Finder column view on a phone), with a breadcrumb of fork points.
 
-### The rail: the whole tree, compactly
+### The rail: a root's tree, compactly
 
-- A git-graph strip at the left edge draws every branch that exists as a line,
-  and every message as a dot, in tree order.
+- A git-graph strip at the left edge draws every branch in the tab's root as a
+  line, and every message as a dot, in tree order.
 - **Open columns are highlighted** in the rail in their colours, so you can see
   which branches are on screen and where they sit in the whole.
 - **Clicking a branch in the rail opens it as a column**, or scrolls to it if it
@@ -125,17 +173,23 @@ The rail is E; the lit column is T. Seeing both at once is the product.
     alone;
   - the **composer** says "Bea is typing…".
 
-  Presence is thread-level: every open column reports the thread it follows.
+  Presence is thread-level: every column in the tab you are on reports the
+  thread it follows. Columns in other tabs report nothing, so a tab's avatars
+  are the people looking at it now.
   Which message someone has on screen waits until thread-level proves too
   coarse.
 
 ### Starting, branching, and stepping down
 
 - **At the root, two ways to start**, because there is no context yet: a person
-  declares a purpose. **Start Chat** opens a conversation. **Start Agent** opens
-  a column whose messages ask the agent unless they name someone, so its first
-  message creates the lane. An empty session offers both in place of a
-  composer; afterwards, the rail's `+` offers them above the root threads.
+  declares a purpose. Both are on the add tab. **＋ agent** opens a new tab
+  whose column asks the agent unless a message names someone, so its first
+  message creates the lane. **Conversation**, in its menu, opens a new tab
+  whose column is a conversation.
+- **A new tab is yours until its first send**, as any fresh column is. It sits
+  beside ＋, labelled "new agent" or "new conversation", and closing it leaves
+  no trace. Its first send makes the root, and the tab joins everyone's bar.
+- **An empty session** shows only the Archive tab and ＋, and points at ＋.
 - **`→` in a message's right margin opens a branch** as a column to its right,
   empty until something is sent there. What it opens appears to the right, so
   the button sits on that side. A branch starts as a conversation; `@agent`
@@ -163,6 +217,8 @@ The rail is E; the lit column is T. Seeing both at once is the product.
   beneath it stay only branch buttons and citation counts.
 - **Cite** stays an action on a message or a text selection. A reference draws
   as a link between columns when both ends are open, and as a count otherwise.
+  An end in another root is a link to its tab, or to its preview in the
+  Archive tab if that root is archived.
 
 ### Notes, and drafting together (ADR-0025)
 
@@ -183,9 +239,10 @@ The rail is E; the lit column is T. Seeing both at once is the product.
   its column leads back to it.
 - **On the rail, a note's message is a square.** A closed branch's button
   counts its notes: "⑂ 6 messages · 1 note".
-- **The notes index**, *notes (n)* at the top of the rail, lists every note,
-  newest first, by its first line, state and writers; filters show drafts,
-  open, done, changed since done, and mine. A row opens its note's column.
+- **The notes index**, *notes (n)* at the top of the rail, lists the notes in
+  the tab's root, newest first, by its first line, state and writers; filters
+  show drafts, open, done, changed since done, and mine. A row opens its
+  note's column.
 
 ## What goes away
 
@@ -196,15 +253,18 @@ The rail is E; the lit column is T. Seeing both at once is the product.
 | "make this a conversation" in a bar | nothing: a thread's mode is whether the agent works in it (ADR-0021) |
 | "⑂ 1 branch · 2 messages" with a hidden list | the rail, and a coloured fork dot in the column |
 | "switch to this path" (`navigate`) | nothing: sending attaches where you are reading |
+| every tree in one rail, one after another | a tab per root, each with its own rail (ADR-0029) |
+| a column on another root, with no stripe and no fork dot | nothing: a tab's columns share its root |
+| the rail's `+`, and Start Chat and Start Agent in place of a composer | the add tab: ＋ agent, or conversation |
 
 The last row mattered for `PLAN-2026-09-26-thread-lanes`: with no control moving
 a lane, the `navigate` command had no caller and was deleted with `prompt` and
 `branch`. Lanes now never move at all (ADR-0020).
 
-## Data: nothing new
+## Data
 
-Every part of this is a read of what the document already holds; a note's text
-is its own document (ADR-0025).
+Every part of this is a read of what the document already holds, except the
+archive record (ADR-0029); a note's text is its own document (ADR-0025).
 
 - **A column** is a client-local anchor entry. Its path is `projectTranscript`
   of `followTip(anchor)`, or, once it is bound to a lane, of the lane's tip;
@@ -214,14 +274,20 @@ is its own document (ADR-0025).
 - **The lit path** is the agent's run's path: the agent's lane tip while
   `activeRuns` has its lane.
 - **A thread's mode** is its lane; **names** are `pineta.participant` values.
-- **Which columns are open, and in what order**, is view state, kept in the
-  browser per tab, with the device's latest for a new tab, and never in the
-  document (ADR-0027).
+- **A root tab** is a root of the tree index (an orphan counts as one) that
+  has no `archived` record. The tab bar is those, ascending by id.
+- **The archive** is a host-written `pineta.archive` value per root: its state
+  (`archived` or `restored`), who changed it and when (ADR-0029). The host
+  refuses commands that would write in an archived root.
+- **Which tab you are on, and each root's columns**, are view state, kept in
+  the browser per browser tab, with the device's latest for a new one, and
+  never in the document (ADR-0027, amended by ADR-0029).
 
 ## Deferred, but designed for
 
-- **Narrow screens**: the stacked sequence described above; built after the wide
-  layout works.
+- **Narrow screens**: the stacked sequence described above, with the tab bar as
+  a switcher above it; built after the wide layout works.
+- **Unread marks on tabs**, with presence's last-read position (below).
 
 ## Settled while planning
 
