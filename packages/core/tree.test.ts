@@ -19,6 +19,7 @@ import {
   projectRail,
   projectSpine,
   ROOT,
+  rootOf,
   tailEdit,
   threadOf,
   toolLabel,
@@ -62,13 +63,22 @@ describe("indexTree and ancestry", () => {
     const shuffled = Object.fromEntries(Object.entries(forks).toReversed())
     expect(indexTree(shuffled).childrenOf.get("1-t1")).toEqual(["2-t2", "4-a1"])
   })
-  test("roots, orphans and leaves are reported", () => {
+  test("roots and orphans are reported", () => {
     const i = indexTree({
       ...forks,
       ...tree({ "9-x": "missing", "8-r": null }),
     })
     expect([i.roots, i.orphans]).toEqual([["1-t1", "8-r"], ["9-x"]])
-    expect(i.leaves).toEqual(["3-t3", "5-a2", "7-b2", "8-r", "9-x"])
+  })
+  test("rootOf walks up to the root; an orphan is its own root", () => {
+    const i = indexTree({
+      ...forks,
+      ...tree({ "9-x": "missing", "a-y": "9-x" }),
+    })
+    expect(rootOf(i, "7-b2")).toBe("1-t1")
+    expect(rootOf(i, "1-t1")).toBe("1-t1")
+    expect(rootOf(i, "a-y")).toBe("9-x")
+    expect(rootOf(i, "nope")).toBeNull()
   })
   test("a cycle stops ancestry and is reported", () => {
     const cyclic = tree({ x: "y", y: "x" })
@@ -92,9 +102,6 @@ describe("followTip: the view follows the thread you are reading", () => {
   test("never jumps to a branch that is not below you", () => {
     const newer = { ...entries, ...tree({ "5-b3": "3-b2" }) }
     expect(followTip(indexTree(newer), "2-a2")).toBe("4-a3")
-  })
-  test("with nothing chosen, follows the newest leaf overall", () => {
-    expect(followTip(indexTree(entries), null)).toBe("4-a3")
   })
   test("a cycle stops the walk rather than spinning", () => {
     expect(followTip(indexTree(tree({ w: "x", x: "y", y: "x" })), "z")).toBe(
@@ -176,7 +183,7 @@ describe("projectColumns", () => {
 })
 
 describe("projectRail", () => {
-  const rows = projectRail(indexTree(forks))
+  const rows = projectRail(indexTree(forks), "1-t1")
   const trackOf = (id: string) => rows.find(r => r.id === id)?.track
   test("the oldest child continues its parent's track; a younger one takes a new track", () => {
     expect([trackOf("1-t1"), trackOf("2-t2"), trackOf("3-t3")]).toEqual([
@@ -202,14 +209,16 @@ describe("projectRail", () => {
   })
   test("the same entries in another insertion order give the same rows", () => {
     const shuffled = Object.fromEntries(Object.entries(forks).toReversed())
-    expect(projectRail(indexTree(shuffled))).toEqual(rows)
+    expect(projectRail(indexTree(shuffled), "1-t1")).toEqual(rows)
   })
-  test("each root starts a track, reusing tracks its predecessors freed", () => {
-    const two = projectRail(indexTree({ ...forks, ...tree({ "8-r1": null }) }))
-    expect(two.find(r => r.id === "8-r1")).toMatchObject({
+  test("draws only its root's tree, from track 0", () => {
+    const i = indexTree({ ...forks, ...tree({ "8-r1": null, "9-r2": "8-r1" }) })
+    expect(ids(projectRail(i, "8-r1"))).toEqual(["8-r1", "9-r2"])
+    expect(projectRail(i, "8-r1")[0]).toMatchObject({
       track: 0,
       parentId: null,
     })
+    expect(ids(projectRail(i, "1-t1"))).toEqual(ids(rows))
   })
   test("a non-message entry has no row; its child attaches to the message above", () => {
     const withCompaction = {
@@ -217,7 +226,7 @@ describe("projectRail", () => {
       "8-c": { id: "8-c", parentId: "3-t3", type: "compaction" },
       ...tree({ "9-after": "8-c" }),
     }
-    const r = projectRail(indexTree(withCompaction))
+    const r = projectRail(indexTree(withCompaction), "1-t1")
     expect(r.some(x => x.id === "8-c")).toBe(false)
     expect(r.find(x => x.id === "9-after")).toMatchObject({
       parentId: "3-t3",
@@ -228,7 +237,7 @@ describe("projectRail", () => {
 
 describe("colour and the agent", () => {
   const i = indexTree(forks)
-  const rail = projectRail(i)
+  const rail = projectRail(i, "1-t1")
   test("a column's colour is its last message's track; its fork dot matches", () => {
     const cols = projectColumns(i, [
       { anchor: "3-t3" },

@@ -52,6 +52,9 @@ export const newPresenceDoc = () => createDoc(PresenceDoc)
 /** A live handle on the presence document, derived as `SessionDocHandle` is. */
 export type PresenceDocHandle = ReturnType<typeof newPresenceDoc>
 
-/** The key of one column's reading entry. */
+/**
+ * The key of one column's reading entry. The writer is what comes before the
+ * last `:` (`readPresence`), so a column key holds no `:`.
+ */
 export const readingKey = (writer: string, columnKey: string): string =>
   `${writer}:${columnKey}`

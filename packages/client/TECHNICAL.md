@@ -1,9 +1,10 @@
 # `@pineta/client` — technical notes
 
-The browser interface: a rail beside a strip of columns (`docs/06-interface.md`).
-Everything drawn is a read of the session document through `projection.ts`;
-the only state kept here is which columns are open, kept per tab, and the
-text being typed.
+The browser interface: a tab per root, each a rail beside a strip of columns
+(`docs/06-interface.md`, ADR-0029). Everything drawn is a read of the session
+document through `@pineta/reads` and `projection.ts`; the only state kept here
+is the layout (which tab you are on, and each root's columns), kept per
+browser tab, and the text being typed.
 
 ## Reads go through one index
 
@@ -12,6 +13,48 @@ change. The columns, the rail and the agent's path all read that one index
 (`packages/core/tree.ts`). `App` reads it inside a single `useTracked`, together
 with the agent's activity, the lanes, the outbox and the participants, so they
 are always from the same moment; `sync` takes the index and the lanes together.
+
+## Root tabs and the layout (`layout.ts`, ADR-0029)
+
+The layout is `{ active, roots, newTabs }`, and `layoutReducer` is pure. A root
+tab's key is its root entry's id: a thread started at the root is rooted at
+its first message (S30). `summarizeRoots`, `openRoots`, `rootWork` and
+`rootReaders` (`packages/core/roots.ts`) say what the bar shows.
+
+- **`active` is null only before the first `prune`.** A browser tab with
+  nothing stored has not chosen a tab, and the document has not arrived.
+  `App` draws "connecting…" meanwhile. `prune`, once after `whenSettled`,
+  chooses the newest open root, or Archive when there is none, and replaces a
+  stored active root that is gone or archived. No action sets it back to null,
+  so a root someone starts later never moves you: resolving null at each
+  render did, in the plan's first draft.
+- **An archived active root stays active** until you switch or reload, and
+  `tabBar` keeps it in its place. Its columns are drawn with `readOnly`: the
+  composer stays mounted, disabled, so what was typed survives; Restore brings
+  it back in place.
+- **`columnsOf` is the one place a root gets its first column**
+  (`first-<root>`, anchored at the root). `columnsReducer` may leave a root
+  with none; the layout then deletes the entry.
+- **Column keys hold no `:`.** A presence key is `${writer}:${columnKey}`, and
+  `readPresence` takes the writer from before the last colon. A colon in a
+  column key makes your own column read as someone else.
+- **New tabs** are fresh columns at the root (`anchor: null`), local until
+  their first send. `sync` moves one whose message is written to
+  `roots[rootOf(anchor)]`, keeping its key, and keeps it active.
+- **`sync` runs on every root's columns**, not only the active one's: an anchor
+  left behind can later follow a newer branch below it (ADR-0027).
+- **`planOpen` is the deduplication `App` used to do**, pure: scroll to an
+  entry a column of its root already shows, open a column beside the deepest
+  sharer (`openBeside`), or preview an archived root in the Archive tab. The
+  rail, fork dots, references and the notes index all go through it; `App`
+  carries the plan out.
+- **Columns of other tabs are unmounted.** Alignment forgets their keys, so a
+  tab shown again aligns its columns as if opened.
+- **The Archive tab** is `archive.tsx` over `archiveIndex`
+  (`archive-rows.ts`, a client-only read like `projection.ts`). Its filter,
+  search, selection and preview anchor are component state, never stored. The
+  preview is a `Rail` and one `Column` with `readOnly`: Restore for an
+  archived root, Open for an open one.
 
 ## The column model (`columns.ts`)
 
@@ -31,12 +74,9 @@ counter.
   the agent's next message there. Binding waits while two lanes share the tip
   (a compelled branch at a lane's tip, until its prompt commits). A bound or
   fresh column is `pinned` in `projectColumns`: its path ends at its anchor.
-- **A null anchor** is a new session's first column. `sync` pins it to the
-  newest leaf once one exists, then it follows as above. While the session is
-  empty it offers **Start Chat** and **Start Agent** (`start.tsx`) in place of
-  a composer; choosing replaces it with a fresh column at the root.
-- **A fresh column** (`openFresh`: `→`, the rail's `+`, a start, or "Branch
-  here" after a conflict) has nothing of its own yet. Its first send mints the
+- **A null anchor** belongs only to a fresh column at the root: a new tab's.
+- **A fresh column** (`openFresh`: `→`, or "Branch here" after a conflict; or
+  a new tab) has nothing of its own yet. Its first send mints the
   command's id (`sent`), which the host stores with the message (`sendId`), and
   `sync` anchors the column at the entry that send wrote (`TreeIndex.bySend`).
   Exact: no other message at the same point, the lane's own next append
@@ -46,11 +86,11 @@ counter.
 - **`→` at a column's end only in agent work.** Below a conversation's last
   message, a branch would be the same as replying. At an agent thread's end
   it steps back down to a conversation (ADR-0021).
-- **`asksAgent`** is a Start Agent column: a message with no mention asks the
-  agent, as if `@agent` were written, until the thread has a lane of its own.
-- **Deduplication is the shell's.** Two anchors can resolve to one path, which
-  the reducer cannot see. Before opening, `App` checks whether any open column
-  already shows the entry, and scrolls to it instead.
+- **`asksAgent`** is a new tab from **＋ agent** (ADR-0021's Start Agent): a
+  message with no mention asks the agent, as if `@agent` were written, until
+  the thread has a lane of its own.
+- **Deduplication is `planOpen`'s** (`layout.ts`, above). Two anchors can
+  resolve to one path, which `columnsReducer` cannot see.
 - **Open columns are never written to the document.** Which paths a person
   reads is theirs. They are kept in the browser (below).
 
@@ -64,15 +104,17 @@ rail's scroll-to, the alignment) must search every column.
 `tabState` keeps a value under one key in two slots: the tab's
 (`sessionStorage`), read first, which survives a reload; and the device's
 (`localStorage`), which a new tab starts from. It knows nothing of Pineta; a
-value's stored form is its codec's. Open columns are its one use.
+value's stored form is its codec's. The layout is its one use, under the key
+`pineta-columns:<session>`, which predates root tabs.
 
 - **Every change is saved, `sync`'s too.** Saving only what a person does
   would store older anchors, and `followTip` from an older anchor can land on
   a newer branch below it. So with two tabs open, the device slot holds
   whichever changed last: both move their columns as messages arrive.
-- **The codec is the edge** (`encodeColumns`, `decodeColumns`), in the house
+- **The codec is the edge** (`encodeLayout`, `decodeLayout`), in the house
   shape: a TypeBox schema, then a build step field by field. A layout decodes
-  whole or not at all, and `v` rejects an older one. A lane that is not a lane
+  whole or not at all, and `v` rejects an older one: `v: 1` (a column list,
+  before root tabs) is dropped once and overwritten by the first save. A lane that is not a lane
   name is left off; `sync` binds the column again.
 - **`fresh.pending` is never stored**, by either side: restoring it would send
   its message again. A "Branch here" column comes back empty.
@@ -224,11 +266,15 @@ pipeline keeps the tree a pure function, testable without a DOM.
 
 ## Presence (ADR-0024)
 
-- **Every open column is reported,** since there is no focused column: `App`
-  writes each column's thread end when it changes, deletes a closed column's
-  key, and refreshes all of them every 10 s while `document.visibilityState` is
-  `visible` (a `visibilitychange` listener refreshes on return). Typing is
-  written at most once a second.
+- **Every column of the tab you are on is reported** (ADR-0029), since there
+  is no focused column: `App` writes each column's thread end when it changes,
+  deletes the key of a column no longer reported, and refreshes all of them
+  every 10 s while `document.visibilityState` is `visible` (a
+  `visibilitychange` listener refreshes on return). Switching tabs therefore
+  clears the last tab's keys, through that same deletion. The Archive tab
+  reports nothing. Typing is written at most once a second.
+- **A tab's avatars** are `rootReaders`: others' thread ends resolved to their
+  roots.
 - **`presenceView` (core) decides everything shown**, from `readPresence`
   (`@pineta/reads`) and the tree: rings (`readingAt`), a header's avatars
   (`seenBy`, others whose thread end lies on one path with this column's), and
@@ -260,8 +306,9 @@ pipeline keeps the tree a pure function, testable without a DOM.
   draft sent, the note done). A done note shows no editors.
 - **The sticky bar** follows the note this window last focused, through an
   `IntersectionObserver` on the column's body.
-- **The notes index** is `notesIndex` (`@pineta/reads`) over the records, drawn
-  from the rail's top; each row reads its note's first line on its own.
+- **The notes index** is `notesIndex` (`@pineta/reads`) over the records of
+  the tab's root, drawn from the rail's top; each row reads its note's first
+  line on its own.
 - **Selectors in the browser suite:** a card replaces `.msg > .text`, so a
   message with a note is found by `.note-text` or by `data-entry`.
 - **`:text-is` matches the smallest element holding the text**, which in
@@ -289,6 +336,11 @@ its `writer` for the lookup.
 
 ## Gotchas
 
+- **Selectors for root tabs:** a root's tab is `#tabs .tab[data-root="…"]`,
+  the one you are on has `aria-selected="true"`, Archive is `.tab-archive`,
+  new tabs are `.tab-new`, and the add tab's buttons are `.add-agent`,
+  `.add-menu` and `.add-conversation`. The rail is `.rail`, not `#rail`: the
+  Archive tab's preview draws a second one.
 - **`.column-content` must stay unpositioned.** A positioned wrapper becomes
   the messages' offsetParent, and `alignOnOpen` measures `offsetTop` against
   the body's.
@@ -306,5 +358,6 @@ its `writer` for the lookup.
 - **`:last-of-type` matches element type, not class.** The "agent
   joined" marker and the stream are `div`s too; find a column's last message by querying `.msg`.
 - **The agent's stream renders only in a column containing its tip.** When no
-  open column does, the rail's pulse is the only sign, and clicking it opens
+  open column does, the rail's pulse and, in another root, the tab's pulse are
+  the only signs, and clicking the rail's pulse opens
   that thread.

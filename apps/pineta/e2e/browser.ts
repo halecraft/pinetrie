@@ -25,14 +25,14 @@ import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { connectSession } from "@pineta/client/session"
-import { atEntry, entryId, projectRail } from "@pineta/core"
+import { atEntry, entryId, projectRail, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
   readParticipantNames,
   readReferences,
   readTreeIndex,
 } from "@pineta/reads"
-import { type Browser, chromium } from "@playwright/test"
+import { type Browser, chromium, type Page } from "@playwright/test"
 import { startHost } from "../host/index.ts"
 import { createChecks, waitFor } from "./harness.ts"
 
@@ -156,16 +156,18 @@ try {
     (await page.locator(".composer .audience").count()) === 0,
     "the composer does not guess an audience: presence will say who is here",
   )
+  await page.waitForSelector("#tabs .add-agent", { timeout: 15_000 })
   ok(
-    (await page.locator(`${col(0)} .start`).count()) === 1 &&
-      (await page.locator(`${col(0)} .composer`).count()) === 0,
-    "an empty session offers Start Chat and Start Agent, and no composer",
+    (await page.locator('#tabs [role="tab"]').count()) === 1 &&
+      (await page.locator("#tabs .tab-archive").count()) === 1 &&
+      (await page.locator(".composer").count()) === 0,
+    "an empty session shows Archive and ＋, and no composer",
   )
-  await page.click(`${col(0)} .start-agent`)
+  await page.click("#tabs .add-agent")
   await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
   ok(
     (await label(0)) === "send · agent will reply",
-    `Start Agent promises a reply with no mention: "${await label(0)}"`,
+    `＋ agent promises a reply with no mention: "${await label(0)}"`,
   )
 
   // ── the first turn: the reply, the agent joining ────────────────────────
@@ -239,7 +241,10 @@ try {
   )
   await idle()
   const railCount = async () => page.$$eval(".rail-dot", n => n.length)
-  const messages = () => projectRail(readTreeIndex(host.doc)).length
+  const messages = () => {
+    const index = readTreeIndex(host.doc)
+    return projectRail(index, index.roots[0] ?? "").length
+  }
   ok(
     (await railCount()) === messages() && messages() >= 5,
     `the rail has a dot per message (${await railCount()} of ${messages()})`,
@@ -570,16 +575,20 @@ try {
     "after a rename, Ada's earlier messages show her current name, then the one she sent under",
   )
 
-  // ── the rail's +: an agent thread at the root, and stepping down ───────
-  const before = await page.$$eval(".column", n => n.length)
-  await page.click("#rail .new-thread")
-  await page.click("#rail .start-agent")
+  // ── ＋ agent: a new tab, an agent thread at the root, and stepping down ──
+  const firstRoot = readTreeIndex(host.doc).roots[0] ?? ""
+  // A new tab holds one column, so the thread's columns count from 0.
+  const before = 0
+  await page.click("#tabs .add-agent")
   const agentCol = col(before)
   await page.waitForSelector(`${agentCol} .composer`, { timeout: 15_000 })
   ok(
     (await label(before)) === "send · agent will reply" &&
-      (await page.$$eval(`${agentCol} .msg`, n => n.length)) === 0,
-    "the rail's + opens an empty Start Agent column at the end",
+      (await page.$$eval(".column", n => n.length)) === 1 &&
+      (await page.$$eval(`${agentCol} .msg`, n => n.length)) === 0 &&
+      (await page.textContent('#tabs .tab-new[aria-selected="true"]')) ===
+        "new agent",
+    "＋ agent opens a new tab with one empty column, where the agent answers",
   )
   await send(before, "say exactly: DOWN-ONE")
   await page.waitForSelector(`${agentCol} .msg.assistant`, { timeout: 60_000 })
@@ -621,6 +630,265 @@ try {
     "the conversation's column keeps only its own thread",
   )
 
+  // ── a tab per root (ADR-0029) ───────────────────────────────────────────
+  const downRoot = readTreeIndex(host.doc).roots.at(-1) ?? ""
+  const tabSel = (root: string) => `#tabs .tab[data-root="${root}"]`
+  const selectedRoot = (p: Page) =>
+    p
+      .$eval('#tabs .tab[aria-selected="true"]', n =>
+        n.getAttribute("data-root"),
+      )
+      .catch(() => null)
+  const dotsIn = (root: string) =>
+    projectRail(readTreeIndex(host.doc), root).length
+  const firstTrack = () =>
+    page.$eval(".rail-dot", n => n.getAttribute("data-track")).catch(() => "")
+  // 1. Each tab's rail draws its own root only, from track 0.
+  const downShown = [await railCount(), await firstTrack()]
+  await page.click(tabSel(firstRoot))
+  await page
+    .waitForFunction(
+      n => document.querySelectorAll(".rail-dot").length === n,
+      dotsIn(firstRoot),
+      { timeout: 15_000 },
+    )
+    .catch(() => null)
+  ok(
+    downRoot !== firstRoot &&
+      downShown[0] === dotsIn(downRoot) &&
+      downShown[1] === "0" &&
+      (await railCount()) === dotsIn(firstRoot) &&
+      (await firstTrack()) === "0",
+    `each root's tab draws only its root, from track 0 (${downShown[0]} of ${dotsIn(downRoot)}; ${await railCount()} of ${dotsIn(firstRoot)})`,
+  )
+
+  // 2. A root someone else starts appears as a tab, and the page stays put.
+  const api = await connectSession({
+    url: host.wsUrl,
+    WebSocket,
+    peerId: "browser-tabs",
+  })
+  await api.setName("Bea")
+  const third = await api.chat("a third thread", ROOT, { mode: "branch" })
+  const thirdRoot = third.kind === "appended" ? third.id : ""
+  const appeared = await page
+    .waitForSelector(tabSel(thirdRoot), { timeout: 15_000 })
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(
+    appeared && (await selectedRoot(page)) === firstRoot,
+    "a root another writer starts appears as a tab, and the page stays where it is",
+  )
+
+  // 3. Only the tab someone is on shows them, and switching moves them.
+  const tb = await browser.newPage()
+  try {
+    await tb.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+    await tb.waitForSelector(tabSel(thirdRoot), { timeout: 20_000 })
+    const onThird = await page
+      .waitForSelector(`${tabSel(thirdRoot)} .avatar`, { timeout: 15_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+    await tb.click(tabSel(firstRoot))
+    const moved = await page
+      .waitForFunction(
+        ([from, to]) =>
+          document.querySelector(`#tabs .tab[data-root="${from}"] .avatar`) ===
+            null &&
+          document.querySelector(`#tabs .tab[data-root="${to}"] .avatar`) !==
+            null,
+        [thirdRoot, firstRoot] as const,
+        { timeout: 15_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      onThird && moved,
+      "another window shows on the tab it is on, and leaves it when it switches",
+    )
+
+    // 4. The add menu, by keyboard; an unsent new tab closes without a trace.
+    const entriesBefore = Object.keys(host.doc.entries()).length
+    await page.focus("#tabs .add-menu")
+    await page.keyboard.press("ArrowDown")
+    const focused = await page
+      .waitForFunction(
+        () => document.activeElement?.classList.contains("add-conversation"),
+        undefined,
+        { timeout: 5_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    await page.keyboard.press("Enter")
+    await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
+    const convo = await label(0)
+    ok(
+      focused &&
+        convo === "send" &&
+        (await page.textContent('#tabs .tab-new[aria-selected="true"]')) ===
+          "new conversation",
+      `the add menu's conversation, chosen by keyboard, opens a new tab that only sends ("${convo}")`,
+    )
+    await page.fill(`${col(0)} .composer .input`, "never sent")
+    await page.click("#tabs .tab-close")
+    await page
+      .waitForFunction(() => document.querySelector("#tabs .tab-new") === null)
+      .catch(() => null)
+    ok(
+      (await page.locator("#tabs .tab-new").count()) === 0 &&
+        Object.keys(host.doc.entries()).length === entriesBefore,
+      "closing an unsent new tab writes nothing",
+    )
+
+    // 5. Archived, a root leaves everyone's bar; the page on it reads it.
+    await page.click(tabSel(thirdRoot))
+    await page.waitForSelector(`${col(0)} .composer .send`, { timeout: 15_000 })
+    await page.fill(`${col(0)} .composer .input`, "typed, not sent")
+    await page.click("#tabs .tab-menu")
+    await page.click("#tabs .archive-root")
+    await page
+      .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })
+      .catch(() => null)
+    const banner =
+      (await page.textContent(`${col(0)} .read-only-label`).catch(() => "")) ??
+      ""
+    const input = `${col(0)} .composer .input`
+    const kept = await page.inputValue(input).catch(() => "")
+    const frozen = await page
+      .$eval(input, n => (n as HTMLTextAreaElement).readOnly)
+      .catch(() => false)
+    await page.hover(`${col(0)} .msg`)
+    const tools = await page
+      .locator(`${col(0)} .msg .tools button, ${col(0)} .msg .branch`)
+      .count()
+    const leftTb = await tb
+      .waitForFunction(
+        r => document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+        thirdRoot,
+        { timeout: 15_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      banner.startsWith("archived by Ada") &&
+        kept === "typed, not sent" &&
+        frozen &&
+        tools === 0 &&
+        leftTb,
+      `an archived root leaves the other window's bar, and the page on it reads it: "${banner}", its typed text kept, no tools (${tools})`,
+    )
+    await page.click(`${col(0)} .read-only-action`)
+    await page
+      .waitForSelector(`${col(0)} .composer .send`, { timeout: 15_000 })
+      .catch(() => null)
+    const backTb = await tb
+      .waitForSelector(tabSel(thirdRoot), { timeout: 15_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      (await page.inputValue(input)) === "typed, not sent" && backTb,
+      "restoring it in place brings back the composer with its text, and the tab for everyone",
+    )
+
+    // Archived again and left, its tab goes; the Archive tab brings it back.
+    await page.fill(input, "")
+    await page.click("#tabs .tab-menu")
+    await page.click("#tabs .archive-root")
+    await page
+      .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })
+      .catch(() => null)
+    await page.click(tabSel(firstRoot))
+    const left = await page
+      .waitForFunction(
+        r => document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+        thirdRoot,
+        { timeout: 15_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(left, "switching away from an archived root takes its tab from the bar")
+    await page.click("#tabs .tab-archive")
+    const rowOf = (r: string) => `.archive-row[data-root="${r}"]`
+    await page.waitForSelector(rowOf(thirdRoot), { timeout: 15_000 })
+    const states = await page.$$eval(".archive-row", rs =>
+      rs.map(r => r.getAttribute("data-state")),
+    )
+    ok(
+      states.length === 3 &&
+        (await page.getAttribute(rowOf(thirdRoot), "data-state")) ===
+          "archived" &&
+        (await page.getAttribute(rowOf(firstRoot), "data-state")) === "open",
+      `the Archive tab lists every root with its state (${states.join(", ")})`,
+    )
+    await page.click(rowOf(thirdRoot))
+    await page.waitForSelector(".archive-preview .column .msg", {
+      timeout: 15_000,
+    })
+    await page.hover(".archive-preview .column .msg")
+    const previewWrites = await page
+      .locator(
+        ".archive-preview .composer .send, .archive-preview .msg .tools button, .archive-preview .msg .branch",
+      )
+      .count()
+    ok(
+      previewWrites === 0 &&
+        (await page.locator(".archive-preview .rail-dot").count()) >= 1,
+      `the archived root's preview draws its rail and column, with nothing that writes (${previewWrites})`,
+    )
+    await page.click(".archive-preview .read-only-action")
+    const restored = await page
+      .waitForFunction(
+        r =>
+          document
+            .querySelector(`#tabs .tab[data-root="${r}"]`)
+            ?.getAttribute("aria-selected") === "true",
+        thirdRoot,
+        { timeout: 15_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    const backAgain = await tb
+      .waitForSelector(tabSel(thirdRoot), { timeout: 15_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      restored && backAgain,
+      "Restore in the Archive tab brings the tab back for everyone, and shows it",
+    )
+    // The Archive tab reports no thread: the other window leaves nothing
+    // behind, once its deletions have reached this page.
+    await tb.click("#tabs .tab-archive")
+    await page
+      .waitForFunction(
+        () =>
+          document.querySelector(".avatar") === null &&
+          document.querySelector(".rail-dot[data-here]") === null,
+        undefined,
+        { timeout: 15_000 },
+      )
+      .catch(() => null)
+  } finally {
+    await tb.close().catch(() => {})
+  }
+
   // ── tools: rows, live output, and Stop, on a scripted host ─────────────
   {
     const work = mkdtempSync(path.join(tmpdir(), "pineta-browser-tools-"))
@@ -635,7 +903,7 @@ try {
     const tp = await browser.newPage()
     try {
       await tp.goto(toolHost.httpUrl, { waitUntil: "domcontentloaded" })
-      await tp.click(`${col(0)} .start-agent`)
+      await tp.click("#tabs .add-agent")
       const say = async (text: string) => {
         await tp.fill(`${col(0)} .composer .input`, text)
         await tp.click(`${col(0)} .composer .send`)
@@ -1027,6 +1295,59 @@ try {
       } finally {
         await aligner.close()
       }
+
+      // ── tabs while the agent works (ADR-0029) ───────────────────────────
+      // Another writer starts agent work at the root: its tab appears and
+      // pulses while the reply is written, the page stays where it is, and
+      // that root cannot be archived until the agent is done.
+      const own = await tp
+        .$eval('#tabs .tab[aria-selected="true"]', n =>
+          n.getAttribute("data-root"),
+        )
+        .catch(() => null)
+      const starter = await connectSession({
+        url: toolHost.wsUrl,
+        WebSocket,
+        peerId: "browser-starter",
+      })
+      try {
+        script.use([{ text: LONG }])
+        const started = await starter.chat(
+          "@agent a long one elsewhere",
+          ROOT,
+          {
+            mode: "branch",
+          },
+        )
+        const newRoot = readTreeIndex(toolHost.doc).roots.at(-1) ?? ""
+        const pulsed = await appears(
+          `#tabs .tab.running[data-root="${newRoot}"]`,
+        )
+        const stayed =
+          (await tp
+            .$eval('#tabs .tab[aria-selected="true"]', n =>
+              n.getAttribute("data-root"),
+            )
+            .catch(() => null)) === own
+        await tp.click(`#tabs .tab[data-root="${newRoot}"]`)
+        await tp.click("#tabs .tab-menu")
+        const item = "#tabs .archive-root"
+        const disabled = await tp
+          .$eval(item, b => (b as HTMLButtonElement).disabled)
+          .catch(() => false)
+        const why = (await tp.textContent(`${item} .why`).catch(() => "")) ?? ""
+        ok(
+          started.kind === "started" &&
+            pulsed &&
+            stayed &&
+            disabled &&
+            why.includes("the agent is working here"),
+          `a root started elsewhere appears and pulses while the agent works, the page stays, and its Archive is disabled ("${why.trim()}")`,
+        )
+        await toolIdle()
+      } finally {
+        await starter.close()
+      }
     } finally {
       await tp.close().catch(() => {})
       await toolHost.shutdown().catch(() => {})
@@ -1035,17 +1356,25 @@ try {
 
   // ── nothing left of the old controls ────────────────────────────────────
   const gone = await page.$$eval(
-    "#reading, #thread, #threadMode, #followLatest, #switchLane, #offLane, .fork, #streaming, .rule, .rule-marker, .branch-here",
+    "#reading, #thread, #threadMode, #followLatest, #switchLane, #offLane, .fork, #streaming, .rule, .rule-marker, .branch-here, .new-thread, .start, .start-agent, .start-chat",
     n => n.length,
   )
   ok(gone === 0, `none of the removed controls exist (${gone})`)
 
   // ── a second window joins, asks, and cites ──────────────────────────────
   // Alone, nobody else is shown anywhere (ADR-0024).
+  const alone = await page.evaluate(() => ({
+    avatars: [...document.querySelectorAll(".avatar")].map(
+      a =>
+        `${a.closest("[data-root], .column-head")?.className}:${a.getAttribute("data-writer")}`,
+    ),
+    rings: [...document.querySelectorAll(".rail-dot[data-here]")].map(d =>
+      d.getAttribute("title"),
+    ),
+  }))
   ok(
-    (await page.locator(".avatar").count()) === 0 &&
-      (await page.locator(".rail-dot[data-here]").count()) === 0,
-    "alone, no avatars and no rings",
+    alone.avatars.length === 0 && alone.rings.length === 0,
+    `alone, no avatars and no rings (${JSON.stringify(alone)})`,
   )
   const second = await browser.newPage()
   try {
@@ -1236,7 +1565,7 @@ try {
     // column's drawn over it, and it is wider than the rail.
     const panel = await page.$eval(".notes-index", el => {
       const r = el.getBoundingClientRect()
-      const rail = document.getElementById("rail")?.getBoundingClientRect()
+      const rail = document.querySelector(".rail")?.getBoundingClientRect()
       const hit = document.elementFromPoint(
         r.left + r.width / 2,
         r.top + r.height / 2,
@@ -1263,24 +1592,16 @@ try {
     await second.close().catch(() => {})
   }
 
-  // A reload keeps the tab's open columns (ADR-0027). At least two, one of
-  // them opened from the rail at a message no column shows.
+  // A reload keeps the tab you are on, and its open columns (ADR-0027). The
+  // DOWN thread's tab has two: the agent thread and the conversation below it.
+  await page.click(tabSel(downRoot))
+  await page.waitForFunction(
+    () => document.querySelectorAll(".column").length >= 2,
+    undefined,
+    { timeout: 15_000 },
+  )
   const columnKeys = (p: typeof page) =>
     p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))
-  if ((await columnKeys(page)).length < 2) {
-    const unshown = await page.$$eval(
-      ".rail-dot[data-entry]",
-      dots =>
-        dots
-          .map(d => d.getAttribute("data-entry"))
-          .find(
-            id =>
-              id !== null &&
-              document.querySelector(`.msg[data-entry="${id}"]`) === null,
-          ) ?? null,
-    )
-    if (unshown !== null) await page.click(`.rail-dot[data-entry="${unshown}"]`)
-  }
   const openKeys = await columnKeys(page)
 
   // A reload is the same person: the tab keeps its peer id, so its name stays
@@ -1338,6 +1659,33 @@ try {
   } finally {
     await newTab.close().catch(() => {})
   }
+
+  // Archived by someone else before a reload, the tab you were on gives way
+  // to the newest open root.
+  ok(
+    (await selectedRoot(page)) === downRoot,
+    "a reload keeps the tab you were on",
+  )
+  await api.archive("archive", entryId(downRoot))
+  await page.reload({ waitUntil: "domcontentloaded" })
+  const landed = await page
+    .waitForFunction(
+      r =>
+        document
+          .querySelector('#tabs .tab[aria-selected="true"]')
+          ?.getAttribute("data-root") === r,
+      thirdRoot,
+      { timeout: 20_000 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(
+    landed,
+    `after a reload, a root archived meanwhile gives way to the newest open root (${await selectedRoot(page)})`,
+  )
+  await api.close()
 
   ok(
     errors.length === 0,

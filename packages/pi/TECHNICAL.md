@@ -167,7 +167,9 @@ only work, never correctness, and never touched the host's own stream writes.
 
 `Agent.addReference` is the only writer of the `pineta.reference` value
 namespace, through `Session.setValue` (ADR-0017). It uses the generic value
-path, so conformance continues to cover the storage shape.
+path, so conformance continues to cover the storage shape. `setNote` and
+`setArchive` write `pineta.note` and `pineta.archive` the same way (ADR-0025,
+ADR-0029).
 
 ### `seq` is derived, not stored
 

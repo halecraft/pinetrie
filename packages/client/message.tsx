@@ -34,7 +34,8 @@ export interface MessageProps {
   closedBranches: readonly BranchSummary[]
   cites: readonly Reference[]
   citedBy: readonly Reference[]
-  onCite: (to: ReferenceTarget) => void
+  /** Cite this message; undefined where nothing may be written (ADR-0029). */
+  onCite: ((to: ReferenceTarget) => void) | undefined
   /**
    * Open a column to the right, forked here (ADR-0021). Undefined where it
    * would only mean replying: a conversation's last message.
@@ -108,27 +109,29 @@ export function Message(p: MessageProps) {
         {/* Tools float over the message on hover or focus: every message has
             them, and buttons under each would drown the conversation. */}
         <div className="tools">
-          <button
-            className="cite"
-            // Keep the text selection alive through the click.
-            onClick={e => {
-              // The message's own text: a note's card, drawn in its place,
-              // has text of its own that `entryText` offsets don't cover.
-              const text = e.currentTarget
-                .closest(".msg")
-                ?.querySelector(":scope > .text")
-              const ends = text ? selectionBoundaries(text) : null
-              p.onCite(
-                ends === null
-                  ? { kind: "entry", id }
-                  : citeTarget(node.text, id, ...ends),
-              )
-            }}
-            onMouseDown={e => e.preventDefault()}
-            type="button"
-          >
-            cite
-          </button>
+          {p.onCite !== undefined && (
+            <button
+              className="cite"
+              // Keep the text selection alive through the click.
+              onClick={e => {
+                // The message's own text: a note's card, drawn in its place,
+                // has text of its own that `entryText` offsets don't cover.
+                const text = e.currentTarget
+                  .closest(".msg")
+                  ?.querySelector(":scope > .text")
+                const ends = text ? selectionBoundaries(text) : null
+                p.onCite?.(
+                  ends === null
+                    ? { kind: "entry", id }
+                    : citeTarget(node.text, id, ...ends),
+                )
+              }}
+              onMouseDown={e => e.preventDefault()}
+              type="button"
+            >
+              cite
+            </button>
+          )}
           {p.onEdit !== undefined && (
             <button
               className="edit"

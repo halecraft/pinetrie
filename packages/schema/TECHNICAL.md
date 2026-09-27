@@ -109,10 +109,11 @@ pi.
 
 `pineta:presence` is a Kyneta `ephemeral` document: never stored, last writer
 wins per field. Its records are flat: `reading` keyed `${writer}:${columnKey}`
-(every open column reports its thread's end), `typing` and `editing` keyed by
-writer. Each field is a `Schema.string().nullable().decay(ms)`: decay reverts a
-field to its zero, and a nullable's zero is `null`, so absence is `null`, never
-a sentinel string. Kyneta refuses `.decay()` below a register, so these are
+(every column of the tab a person is on reports its thread's end), `typing`
+and `editing` keyed by writer. A column key holds no `:`: readers take the
+writer from before the last colon (`readingKey`). Each field is a
+`Schema.string().nullable().decay(ms)`: decay reverts a field to its zero, and
+a nullable's zero is `null`, so absence is `null`, never a sentinel string. Kyneta refuses `.decay()` below a register, so these are
 plain records of scalars.
 
 Measured before building (the plan's Phase 0):

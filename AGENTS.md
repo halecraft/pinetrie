@@ -44,6 +44,15 @@ reasons are the ADRs in `docs/02-decisions.md`. Each package has a
 A check without a proof it can fail is not yet a check. A new check comes with a
 deliberate bug (a mutation in `scripts/mutations/`) that it catches.
 
+Each mutation runs its whole command, so one checked by `e2e` or `e2e:browser`
+takes minutes. Run unit-test mutations as you write them. Run the suite-level
+ones once, in a batch at the end of the work, after the suite itself passes:
+one `pnpm mutate` call per name (it takes one name substring, or none for the
+whole list), one after another. While writing,
+`npx vitest run scripts/mutations.test.ts` checks that every anchor still
+matches, in seconds. A run you interrupt leaves its mutant in the file: check
+the file and put the line back.
+
 ## Plans
 
 Plans live in `.jj/plans/`, named `YYYY-MM-DD-slug.md`, and are referred to as

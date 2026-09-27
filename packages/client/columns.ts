@@ -1,27 +1,22 @@
-// client/columns — which paths are open, and in what order.
+// client/columns — which paths of one root are open, and in what order.
 //
-// The only client-local state the interface keeps, besides text being typed.
-// It is a view choice, never written to the document: which paths a person
-// reads is theirs. The browser keeps it per tab (ADR-0027, the stored form at
-// the end of this file). Pure: a reducer over values, tested without a DOM.
+// A view choice, never written to the document: which paths a person reads is
+// theirs. `layout.ts` holds a list of these per root and stores them
+// (ADR-0027, ADR-0029). Pure: a reducer over values, tested without a DOM.
 
 import {
   followTip,
-  isLaneName,
   type LaneName,
   type LaneView,
   type TreeIndex,
 } from "@pineta/core"
-import { type Static, Type } from "typebox"
-import { Value } from "typebox/value"
 
 export interface Column {
   /** React key; stable when columns move. */
   readonly key: string
   /**
    * The entry the column follows from (`followTip`); a bound column's is its
-   * lane's tip. Null before the session has a message, or for a fresh column
-   * at the root.
+   * lane's tip. Null only for a fresh column at the root: a new tab's.
    */
   readonly anchor: string | null
   /**
@@ -43,13 +38,6 @@ export interface Column {
   readonly fresh?: { readonly sendId?: string; readonly pending?: string }
 }
 
-/** Where a new column goes. */
-export type Place =
-  | { readonly after: number }
-  /** In place of a column: the empty session's first, when a start is chosen. */
-  | { readonly replace: number }
-  | { readonly end: true }
-
 export type ColumnAction =
   /** Open a path next to the column it forks from. `key` comes from the shell. */
   | {
@@ -58,13 +46,12 @@ export type ColumnAction =
       readonly after: number
       readonly anchor: string
     }
-  /** Open a fresh column: a branch at `at`, or a new thread at the root (null). */
+  /** Open a fresh column after column `after`: a branch at `at`. */
   | {
       readonly kind: "openFresh"
       readonly key: string
-      readonly at: string | null
-      readonly asksAgent: boolean
-      readonly place: Place
+      readonly at: string
+      readonly after: number
       /** A first message the column sends as soon as it opens. */
       readonly text?: string
     }
@@ -80,49 +67,39 @@ export type ColumnAction =
   /** Drop restored columns whose anchor the settled document does not have. */
   | { readonly kind: "prune"; readonly index: TreeIndex }
 
-/**
- * One column, following the newest thread until `sync` pins it: a new tab
- * with nothing stored, or what is left when every column is closed or pruned.
- */
-export const initialColumns = (): readonly Column[] => [
-  { key: "first", anchor: null },
-]
-
 /** Whether a column's path ends at its anchor (`ColumnSpec.pinned`). */
 export const isPinned = (c: Column): boolean =>
   c.fresh !== undefined || c.lane !== undefined
 
-const place = (
+/** Insert `column` after position `after`, clamped to the list. */
+const placeAfter = (
   state: readonly Column[],
-  where: Place,
+  after: number,
   column: Column,
 ): readonly Column[] => {
-  if ("replace" in where)
-    return state.map((c, i) => (i === where.replace ? column : c))
-  const at =
-    "end" in where
-      ? state.length
-      : Math.min(Math.max(where.after + 1, 0), state.length)
+  const at = Math.min(Math.max(after + 1, 0), state.length)
   return [...state.slice(0, at), column, ...state.slice(at)]
 }
 
+/**
+ * One root's columns. `close` and `prune` may leave none: the layout then
+ * gives the root its first column again (`columnsOf`).
+ */
 export function columnsReducer(
   state: readonly Column[],
   action: ColumnAction,
 ): readonly Column[] {
   switch (action.kind) {
     case "open":
-      return place(
-        state,
-        { after: action.after },
-        { key: action.key, anchor: action.anchor },
-      )
+      return placeAfter(state, action.after, {
+        key: action.key,
+        anchor: action.anchor,
+      })
     case "openFresh":
-      return place(state, action.place, {
+      return placeAfter(state, action.after, {
         key: action.key,
         anchor: action.at,
         fresh: action.text === undefined ? {} : { pending: action.text },
-        ...(action.asksAgent ? { asksAgent: true } : {}),
       })
     case "sent":
       return state.map(c =>
@@ -130,10 +107,8 @@ export function columnsReducer(
           ? { ...c, fresh: { sendId: action.sendId } }
           : c,
       )
-    case "close": {
-      const rest = state.filter((_, i) => i !== action.index)
-      return rest.length > 0 ? rest : initialColumns()
-    }
+    case "close":
+      return state.filter((_, i) => i !== action.index)
     case "makeMain": {
       const column = state[action.index]
       if (column === undefined || action.index === 0) return state
@@ -145,8 +120,7 @@ export function columnsReducer(
       const known = state.filter(
         c => c.anchor === null || action.index.entries[c.anchor] !== undefined,
       )
-      if (known.length === state.length) return state
-      return known.length > 0 ? known : initialColumns()
+      return known.length === state.length ? state : known
     }
   }
 }
@@ -158,8 +132,8 @@ export function columnsReducer(
  * - A bound column follows its lane: its anchor is the lane's tip.
  * - Any other column follows its own path: its anchor ADVANCES to its tip
  *   (`followTip`), so a reply below its last message moves it on, and a branch
- *   off an earlier message never does. A null anchor pins to the newest leaf
- *   once there is one. When the tip is exactly one lane's, the column binds.
+ *   off an earlier message never does. When the tip is exactly one lane's,
+ *   the column binds.
  *
  * Returns `state` itself when nothing changes, so React skips the render.
  */
@@ -197,8 +171,9 @@ function settle(
       ? column
       : { ...column, anchor: tip }
   }
+  // Only a fresh column has no anchor, and it was settled above.
+  if (column.anchor === null) return column
   const tip = followTip(index, column.anchor)
-  if (tip === null) return column
   const ending = lanes.filter(l => l.tip === tip)
   const bound = ending.length === 1 ? ending[0]?.name : undefined
   if (tip === column.anchor && bound === undefined) return column
@@ -208,62 +183,3 @@ function settle(
     ...(bound === undefined ? {} : { lane: bound }),
   }
 }
-
-// ── stored form (ADR-0027) ────────────────────────────────────────────────
-//
-// Kept per tab through `tab-state.ts`. Built field by field both ways, so a
-// field the schema does not name is never stored or restored. `fresh.pending`
-// is one: restoring it would send its message again.
-
-const StoredColumn = Type.Object({
-  key: Type.String(),
-  anchor: Type.Union([Type.String(), Type.Null()]),
-  lane: Type.Optional(Type.String()),
-  asksAgent: Type.Optional(Type.Literal(true)),
-  fresh: Type.Optional(Type.Object({ sendId: Type.Optional(Type.String()) })),
-})
-
-/** `v` changes when the shape does; an older layout is dropped, not migrated. */
-const StoredColumns = Type.Object({
-  v: Type.Literal(1),
-  columns: Type.Array(StoredColumn, { minItems: 1 }),
-})
-
-type Stored = Static<typeof StoredColumn>
-
-const toStored = (c: Column): Stored => ({
-  key: c.key,
-  anchor: c.anchor,
-  ...(c.lane === undefined ? {} : { lane: c.lane }),
-  ...(c.asksAgent ? { asksAgent: true } : {}),
-  ...(c.fresh === undefined
-    ? {}
-    : {
-        fresh: c.fresh.sendId === undefined ? {} : { sendId: c.fresh.sendId },
-      }),
-})
-
-const fromStored = (s: Stored): Column => ({
-  key: s.key,
-  anchor: s.anchor,
-  // Unrecognised, it is left off: `sync` binds the column again once its tip
-  // is exactly one lane's.
-  ...(s.lane !== undefined && isLaneName(s.lane) ? { lane: s.lane } : {}),
-  ...(s.asksAgent ? { asksAgent: true } : {}),
-  ...(s.fresh === undefined
-    ? {}
-    : {
-        fresh: s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId },
-      }),
-})
-
-export const encodeColumns = (
-  columns: readonly Column[],
-): Static<typeof StoredColumns> => ({ v: 1, columns: columns.map(toStored) })
-
-/**
- * A stored layout, whole or not at all: only this build writes it, so a
- * half-valid one is not worth keeping. Total.
- */
-export const decodeColumns = (raw: unknown): readonly Column[] | undefined =>
-  Value.Check(StoredColumns, raw) ? raw.columns.map(fromStored) : undefined

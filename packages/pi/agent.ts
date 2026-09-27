@@ -21,6 +21,7 @@ import {
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
 import { insertEntry } from "@earendil-works/pi-agent-core/harness/session"
 import {
+  type ArchiveRecord,
   type EntryId,
   ERR,
   type ErrCode,
@@ -34,7 +35,9 @@ import {
   type WriterId,
 } from "@pineta/core"
 import {
+  ARCHIVE_NAMESPACE,
   type ChatMessage,
+  encodeArchive,
   encodeHeld,
   encodeNote,
   encodeReference,
@@ -169,6 +172,8 @@ export interface Agent {
   setParticipantName(writer: WriterId, name: string): Promise<void>
   /** Store a note's record in `pineta.note`, keyed by its id (ADR-0025). */
   setNote(note: NoteRecord): Promise<void>
+  /** Store a root's archive record in `pineta.archive`, keyed by the root (ADR-0029). */
+  setArchive(record: ArchiveRecord): Promise<void>
   stats(): Promise<{ messageCount: number }>
   close(): Promise<void>
 }
@@ -388,6 +393,14 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       await session.setValue(
         value(NOTE_NAMESPACE, note.id),
         encodeNote(note),
+        CTX,
+      )
+    },
+
+    async setArchive(record) {
+      await session.setValue(
+        value(ARCHIVE_NAMESPACE, record.root),
+        encodeArchive(record),
         CTX,
       )
     },

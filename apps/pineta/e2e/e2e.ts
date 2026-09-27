@@ -47,6 +47,7 @@ import { newId as newHeldId, scriptedModel } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import { PRESENCE_DOC_ID, SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
+  readArchive,
   readLanes,
   readNotes,
   readOutbox,
@@ -939,9 +940,10 @@ invariants("end")
       call.result.isError === false,
     `a read is stored as a call paired with its result (${call?.label ?? "none"})`,
   )
+  const dots = projectRail(ttree(), spine[0]?.id ?? "").length
   ok(
-    projectRail(ttree()).length === spine.length && spine.length === 3,
-    `the rail has one dot per message, none per tool result (${projectRail(ttree()).length})`,
+    dots === spine.length && spine.length === 3,
+    `the rail has one dot per message, none per tool result (${dots})`,
   )
 
   // 2. Write a file, then edit it: the disk changes.
@@ -1411,6 +1413,115 @@ invariants("end")
   )
   await eve.close()
   await nh.shutdown()
+}
+
+// ── the archive: a root put aside for everyone (ADR-0029) ─────────────────
+// Its own host, with a store to restart over, and a slow scripted model so a
+// run can be caught while it is still going.
+{
+  const dbFile = path.join(
+    mkdtempSync(path.join(tmpdir(), "pineta-archive-")),
+    "pineta.db",
+  )
+  const script = scriptedModel({ tokensPerSecond: 40 })
+  const open = () =>
+    startHost({
+      model: { kind: "scripted", script },
+      store: dbFile,
+      log: () => {},
+    })
+  let ah = await open()
+  const join = (peerId: string) =>
+    connectSession({ url: ah.wsUrl, WebSocket, peerId })
+  const ada = await join("a-ada")
+  const bea = await join("a-bea")
+  await Promise.all([ada.setName("Ada"), bea.setName("Bea")])
+  const aIdle = () =>
+    waitFor(
+      () =>
+        Object.keys(ah.doc.activeRuns()).length === 0 &&
+        readOutbox(ah.doc).length === 0,
+      30_000,
+    )
+  const appended = (o: Outcome) => (o.kind === "appended" ? o.id : null)
+  const refusal = (o: Outcome) =>
+    o.kind === "refused" ? `${o.code}: ${o.message}` : o.kind
+
+  // 1. Two roots. Ada archives the first: the record says so, by her.
+  const r1 = appended(await ada.chat("first root", ROOT, START_CHAT)) ?? ""
+  const r1b = appended(await bea.chat("more", at(r1))) ?? ""
+  const r2 = appended(await bea.chat("second root", ROOT, START_CHAT)) ?? ""
+  const archived = await ada.archive("archive", entryId(r1))
+  const record = () => readArchive(ah.doc).get(r1)
+  ok(
+    archived.kind === "archived" &&
+      record()?.state === "archived" &&
+      record()?.by === ada.writer,
+    `a root is archived, by its archiver (${archived.kind})`,
+  )
+
+  // 2. Nothing is written in it, and the refusal names who archived it.
+  const refusals = [
+    await bea.chat("still here?", at(r1b)),
+    await bea.note({ kind: "open", entry: entryId(r1b) }),
+    await bea.note({ kind: "draft", at: at(r1b), lane: null, text: "" }),
+    await bea.cite({ kind: "entry", id: entryId(r2) }, at(r1b)),
+  ].map(refusal)
+  ok(
+    refusals.every(r => r === "archived: archived by Ada"),
+    `a chat, a note opened, a draft and a reference in it are refused (${refusals.join(" | ")})`,
+  )
+
+  // 3. Citing into it from an open root, and a new root, are accepted.
+  const cited = await bea.cite({ kind: "entry", id: entryId(r1b) }, at(r2))
+  const fresh = await bea.chat("a third root", ROOT, START_CHAT)
+  ok(
+    cited.kind === "referenced" && fresh.kind === "appended",
+    `a reference from an open root to an archived message, and a new root, are accepted (${cited.kind}, ${fresh.kind})`,
+  )
+
+  // 4. A root the agent is working in, with a message waiting, is not archived.
+  script.use([{ text: "a long slow answer ".repeat(20) }, { text: "ok" }])
+  const asked = await bea.chat("@agent answer slowly", at(r2))
+  await waitFor(() => Object.keys(ah.doc.activeRuns()).length === 1, 10_000)
+  const lane = readLanes(ah.doc, readTreeIndex(ah.doc))[0]
+  const waiting = await ada.chat("@Bea meanwhile", at(lane?.tip ?? r2), {
+    lane: lane?.name,
+  })
+  const busy = await ada.archive("archive", entryId(r2))
+  const r3 = appended(fresh) ?? ""
+  const other = await ada.archive("archive", entryId(r3))
+  ok(
+    asked.kind === "started" &&
+      waiting.kind === "queued" &&
+      refusal(busy) === "root_busy: the agent is working here" &&
+      other.kind === "archived",
+    `a root the agent works in is not archived, another root is (${refusal(busy)}; ${other.kind})`,
+  )
+  await aIdle()
+
+  // 5. Restored, it takes messages again.
+  const restored = await bea.archive("restore", entryId(r1))
+  const after = await bea.chat("back again", at(r1b))
+  ok(
+    restored.kind === "restored" &&
+      record()?.state === "restored" &&
+      record()?.by === bea.writer &&
+      after.kind === "appended",
+    `a restored root takes messages again (${restored.kind}, ${refusal(after)})`,
+  )
+
+  // 6. The records survive a restart.
+  const before = JSON.stringify([...readArchive(ah.doc)])
+  await Promise.all([ada.close(), bea.close()])
+  await ah.shutdown()
+  ah = await open()
+  ok(
+    JSON.stringify([...readArchive(ah.doc)]) === before &&
+      readArchive(ah.doc).get(r3)?.state === "archived",
+    "after a restart, every archive record is back",
+  )
+  await ah.shutdown()
 }
 
 // ── presence: who is here, per open column, decaying (ADR-0024) ────────────

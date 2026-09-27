@@ -127,6 +127,10 @@ export const ERR = {
   INVALID_NAME: "invalid_name",
   /** A note action its note's state does not allow: sending a note that is no draft. */
   NOTE_STATE: "note_state",
+  /** A write in a root someone archived (ADR-0029). The message names them. */
+  ARCHIVED: "archived",
+  /** Archiving a root where the agent is working or messages are waiting. */
+  ROOT_BUSY: "root_busy",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -186,6 +190,29 @@ export type Intent =
   | { readonly kind: "stop"; readonly lane: LaneName }
   /** Open a message for editing, draft a thread's next one, or move a note on. */
   | { readonly kind: "note"; readonly action: NoteAction }
+  /** Hide a root for everyone, or bring it back (ADR-0029). */
+  | {
+      readonly kind: "archive"
+      readonly action: ArchiveAction
+      readonly root: EntryId
+    }
+
+// --- the archive (ADR-0029) --------------------------------------------------
+
+export type ArchiveAction = "archive" | "restore"
+export const ARCHIVE_ACTIONS: readonly ArchiveAction[] = ["archive", "restore"]
+
+/**
+ * A root's archive record: a host-written `pineta.archive` value keyed by the
+ * root's entry id. Archiving deletes nothing; a restored root keeps its record.
+ */
+export interface ArchiveRecord {
+  readonly root: EntryId
+  readonly state: "archived" | "restored"
+  readonly by: WriterId
+  /** When it last changed, in ms since the epoch. */
+  readonly at: number
+}
 
 // --- notes (ADR-0025) --------------------------------------------------------
 
@@ -523,5 +550,6 @@ export function orderNewEntries(
 
 export * from "./edits.ts"
 export * from "./presence.ts"
+export * from "./roots.ts"
 export * from "./tools.ts"
 export * from "./tree.ts"

@@ -3,18 +3,12 @@ import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/client"]
 const file = "packages/client/columns.ts"
+const layout = "packages/client/layout.ts"
+const send = "packages/client/send.ts"
 const markdown = "packages/client/markdown.ts"
 const tabState = "packages/client/tab-state.ts"
 
 export const mutations: readonly Mutation[] = [
-  {
-    name: "sync re-pins every column to the newest leaf",
-    file: file,
-    from: "  const tip = followTip(index, column.anchor)",
-    to: "  const tip = followTip(index, null)",
-    command: unit,
-    expect: "never re-pins it",
-  },
   {
     name: "a fresh column takes the newest child of its anchor",
     file: file,
@@ -26,8 +20,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "open appends at the far right",
     file: file,
-    from: "        { after: action.after },",
-    to: "        { end: true },",
+    from: "  const at = Math.min(Math.max(after + 1, 0), state.length)",
+    to: "  const at = state.length",
     command: unit,
     expect: "open inserts next to",
   },
@@ -38,14 +32,6 @@ export const mutations: readonly Mutation[] = [
     to: "  if (true) return column",
     command: unit,
     expect: "follows a column's own tip",
-  },
-  {
-    name: "closing the last column leaves none",
-    file,
-    from: "      return rest.length > 0 ? rest : initialColumns()",
-    to: "      return rest",
-    command: unit,
-    expect: "close of the last column",
   },
   {
     name: "a renamed writer shows only the name they sent under",
@@ -267,7 +253,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a pending message is stored",
-    file: file,
+    file: layout,
     from: "        fresh: c.fresh.sendId === undefined ? {} : { sendId: c.fresh.sendId },",
     to: "        fresh: c.fresh,",
     command: unit,
@@ -275,7 +261,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a stored pending message is restored",
-    file: file,
+    file: layout,
     from: "        fresh: s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId },",
     to: "        fresh: s.fresh,",
     command: unit,
@@ -283,7 +269,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "any string is restored as a lane",
-    file: file,
+    file: layout,
     from: "  ...(s.lane !== undefined && isLaneName(s.lane) ? { lane: s.lane } : {}),",
     to: "  ...(s.lane !== undefined ? { lane: s.lane } : {}),",
     command: unit,
@@ -296,14 +282,6 @@ export const mutations: readonly Mutation[] = [
     to: "        c => c.anchor === null || true,",
     command: unit,
     expect: "prune drops the columns",
-  },
-  {
-    name: "prune of every column leaves none",
-    file: file,
-    from: "      return known.length > 0 ? known : initialColumns()",
-    to: "      return known",
-    command: unit,
-    expect: "prune of every column leaves the initial one",
   },
   {
     name: "the column's own follow echo is judged by position",
@@ -344,5 +322,87 @@ export const mutations: readonly Mutation[] = [
     to: "          following: state.following,",
     command: unit,
     expect: "placed above its end",
+  },
+  {
+    name: "a sent new tab stays a new tab",
+    file: layout,
+    from: "      column.fresh === undefined && column.anchor !== null",
+    to: "      column.fresh === undefined && column.anchor === null",
+    command: unit,
+    expect: "a sent new tab becomes its root's tab",
+  },
+  {
+    name: "a new root becomes the active tab",
+    file: layout,
+    from: "  return changed ? { active, roots, newTabs } : state",
+    to: '  const newest = index.roots.at(-1)\n  return { active: newest === undefined ? active : { kind: "root", root: newest }, roots, newTabs }',
+    command: unit,
+    expect: "once chosen, the tab you are on stays when a root appears",
+  },
+  {
+    name: "prune leaves a null active tab",
+    file: layout,
+    from: "  return { ...state, roots, active: stays ? active : newestTab(open) }",
+    to: "  return { ...state, roots, active: stays || active === null ? active : newestTab(open) }",
+    command: unit,
+    expect: "prune chooses the newest open root",
+  },
+  {
+    name: "prune keeps an archived active root",
+    file: layout,
+    from: '      (active.kind === "root" && open.includes(active.root)) ||',
+    to: '      active.kind === "root" ||',
+    command: unit,
+    expect: "prune replaces an active root that is archived or gone",
+  },
+  {
+    name: "a v1 layout is decoded",
+    file: layout,
+    from: "export const decodeLayout = (raw: unknown): Layout | undefined =>\n  Value.Check(StoredLayout, raw)",
+    to: 'export const decodeLayout = (raw: unknown): Layout | undefined =>\n  Value.Check(StoredLayout, raw) || (typeof raw === "object" && raw !== null && "columns" in raw)',
+    command: unit,
+    expect: "another version, or partly malformed",
+  },
+  {
+    name: "a column action changes every root",
+    file: layout,
+    from: "        : { ...state, roots: withRoot(state.roots, action.root, after) }",
+    to: "        : { ...state, roots: new Map([...new Set([...state.roots.keys(), action.root])].map(r => [r, after])) }",
+    command: unit,
+    expect: "a column action changes only its root's columns",
+  },
+  {
+    name: "an emptied root keeps no column",
+    file: layout,
+    from: "  if (columns.length === 0) next.delete(root)\n  else next.set(root, columns)",
+    to: "  next.set(root, columns)",
+    command: unit,
+    expect: "closing a root's last column gives it its first column again",
+  },
+  {
+    name: "planOpen opens a column where one already shows the entry",
+    file: layout,
+    from: '  if (paths.some(p => p.has(id))) return { kind: "scroll", root }',
+    to: "",
+    command: unit,
+    expect: "scrolls to a message a column of its root already shows",
+  },
+  {
+    name: "a refused send drops its text",
+    file: send,
+    from: "        restore: message,\n        status: `not sent",
+    to: "        restore: null,\n        status: `not sent",
+    command: unit,
+    expect: "a conflict and a refusal put the message back",
+  },
+  {
+    name: "a root's first column key holds a colon",
+    file: layout,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  return layout.roots.get(root) ?? [{ key: `first-${root}`, anchor: root }]",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "  return layout.roots.get(root) ?? [{ key: `first:${root}`, anchor: root }]",
+    command: unit,
+    expect: "a key with no colon",
   },
 ]

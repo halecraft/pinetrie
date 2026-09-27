@@ -188,8 +188,6 @@ export interface TreeIndex {
   readonly roots: readonly string[]
   /** Entries whose parent is absent from the set. Never dropped. Ascending. */
   readonly orphans: readonly string[]
-  /** Entries with no children. Ascending by id. */
-  readonly leaves: readonly string[]
   /**
    * Chat entries by the send that wrote them. A fresh column knows its send's
    * id before the entry exists, so it finds its first message here, exactly.
@@ -229,9 +227,6 @@ export function indexTree(
     parentOf: id => entries[id]?.parentId ?? null,
     roots: roots.sort(ascending),
     orphans: orphans.sort(ascending),
-    leaves: Object.keys(entries)
-      .filter(id => !childrenOf.has(id))
-      .sort(ascending),
     bySend,
   }
 }
@@ -254,6 +249,15 @@ export function ancestry(index: TreeIndex, id: string | null): Ancestry {
     path.push(cursor)
   }
   return { path, cycleAt: null }
+}
+
+/**
+ * The root of `id`'s tree: the last entry of its ancestry. An orphan is its
+ * own root, since `ancestry` stops where a parent is missing. Null for an id
+ * the index lacks.
+ */
+export function rootOf(index: TreeIndex, id: string): string | null {
+  return ancestry(index, id).path.at(-1) ?? null
 }
 
 /** The ids on the path to `tip`. */
@@ -412,15 +416,14 @@ export function latestTip(tips: Iterable<string | null>): string | null {
  *
  * A reply to the thread, including the agent's, adds a leaf below `at`, so the
  * view moves on to it. A branch elsewhere is not below `at`, so the view never
- * jumps to it. `at` null is the root, below which everything lies.
+ * jumps to it.
  *
  * Leaves, not lane tips: a conversation thread has no lane at all (ADR-0020),
  * so its end is its newest leaf, whoever wrote it. A thread that has a lane is
  * followed through the lane instead (`threadOf`, and a bound column), because
  * a conversation forked at the lane's tip is newer and is not its thread.
  */
-export function followTip(index: TreeIndex, at: string | null): string | null {
-  if (at === null) return latestTip(index.leaves)
+export function followTip(index: TreeIndex, at: string): string {
   if (index.entries[at] === undefined) return at
   // Walk DOWN from `at`: the leaves below it are the only candidates, so there
   // is no need to walk up from every leaf in the tree to find them.
@@ -434,13 +437,13 @@ export function followTip(index: TreeIndex, at: string | null): string | null {
     if (children.length === 0) leaves.push(id)
     else stack.push(...children)
   }
-  return latestTip([at, ...leaves])
+  return latestTip([at, ...leaves]) ?? at
 }
 
 // ── columns: open paths, side by side ─────────────────────────────────────
 
 export interface ColumnSpec {
-  /** The entry the column follows from; null follows the newest leaf overall. */
+  /** The entry the column follows from; null only for a fresh column at the root. */
   readonly anchor: string | null
   /**
    * The path ends at `anchor` (nothing, when null) and follows nothing below
@@ -452,11 +455,11 @@ export interface ColumnSpec {
 }
 
 export interface ColumnView {
-  /** Where this column's path ends: its anchor if pinned, else `followTip`. */
+  /** Where this column's path ends: its anchor if pinned or null, else `followTip`. */
   readonly tipId: string | null
   /**
    * The deepest message this path shares with ANY column to its left, or null
-   * when it shares none: the first column, or a column on another root.
+   * when it shares none: the first column.
    * Against any column, not only the adjacent one: with the trunk, then a
    * branch off T1, then a branch off T2, the third column shares only T1 with
    * its neighbour but T2 with the trunk, and must start after T2.
@@ -480,7 +483,9 @@ export function projectColumns(
   const shown = new Set<string>()
   return columns.map(column => {
     const tipId =
-      column.pinned === true ? column.anchor : followTip(index, column.anchor)
+      column.pinned === true || column.anchor === null
+        ? column.anchor
+        : followTip(index, column.anchor)
     const { spine } = projectSpine(index, tipId, notes)
     let cut = -1
     for (const [i, node] of spine.entries()) if (shown.has(node.id)) cut = i
@@ -493,7 +498,7 @@ export function projectColumns(
   })
 }
 
-// ── the rail: the whole tree's shape ──────────────────────────────────────
+// ── the rail: one root's tree ─────────────────────────────────────────────
 
 export interface RailRow {
   readonly id: string
@@ -506,8 +511,8 @@ export interface RailRow {
 }
 
 /**
- * The tree as git-graph rows: a dot per message, depth-first from each root in
- * id order, children in id order.
+ * One root's tree as git-graph rows: a dot per message, depth-first from
+ * `root`, children in id order. Tracks start at 0 in every tree.
  *
  * The oldest child continues its parent's track; each younger child takes the
  * lowest track free at the parent's row, reserved there because its edge runs
@@ -515,7 +520,10 @@ export interface RailRow {
  * branch is a new rail, the continuation is not. Non-message entries get no
  * row; their children attach to the nearest ancestor that has one.
  */
-export function projectRail(index: TreeIndex): readonly RailRow[] {
+export function projectRail(
+  index: TreeIndex,
+  root: string,
+): readonly RailRow[] {
   const visible = (id: string): boolean => {
     const entry = index.entries[id]
     return entry !== undefined && renderableMessage(entry) !== null
@@ -540,9 +548,8 @@ export function projectRail(index: TreeIndex): readonly RailRow[] {
   }
 
   const rows: RailRow[] = []
-  const starts = visibleChildren(
-    [...index.roots, ...index.orphans].sort(ascending),
-  )
+  // A root that is no message starts its visible children side by side.
+  const starts = visibleChildren([root])
   type Visit = {
     id: string
     track: number
@@ -556,7 +563,7 @@ export function projectRail(index: TreeIndex): readonly RailRow[] {
   for (let v = stack.pop(); v !== undefined; v = stack.pop()) {
     if (seen.has(v.id)) continue
     seen.add(v.id)
-    // A root claims its track when it is reached, after earlier trees freed theirs.
+    // A start claims its track when it is reached, after earlier starts freed theirs.
     const track = v.track < 0 ? claim() : v.track
     rows.push({
       id: v.id,
@@ -657,7 +664,7 @@ export function threadOf(
     // thread's lane with no stored mapping. Two lanes share a tip for a moment
     // after a compelled branch at a lane's tip, until the new one's prompt
     // commits: then the end names neither.
-    end = followTip(index, at.id) ?? at.id
+    end = followTip(index, at.id)
     const ending = lanes.filter(l => l.tip === end)
     if (ending.length > 1) return { kind: "ambiguous" }
     lane = ending[0]

@@ -150,6 +150,8 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "note", action: { kind: "send", note: noteId("n-1") } },
     { kind: "note", action: { kind: "done", note: noteId("n-1") } },
     { kind: "note", action: { kind: "reopen", note: noteId("n-1") } },
+    { kind: "archive", action: "archive", root: entryId("e-1") },
+    { kind: "archive", action: "restore", root: entryId("e-1") },
   ] as const
   for (const intent of intents) {
     assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
@@ -167,7 +169,10 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "named" },
     { kind: "stopped" },
     { kind: "noted", id: noteId("n-1") },
-    { kind: "refused", code: ERR.UNKNOWN_TARGET, message: "nope" },
+    { kind: "archived" },
+    { kind: "restored" },
+    { kind: "refused", code: ERR.ARCHIVED, message: "archived by Bea" },
+    { kind: "refused", code: ERR.ROOT_BUSY, message: "busy" },
   ]
   for (const outcome of outcomes) {
     assert.deepEqual(decodeReply(encodeOutcome("c-1", outcome)), outcome)
@@ -210,6 +215,21 @@ test("decode: a note names a known action, and what it acts on", () => {
         parentId: "e-1",
         lane: "x",
       }),
+    ),
+    ERR.UNKNOWN_TARGET,
+  )
+})
+
+test("an archive action must be known, and name its root", () => {
+  assert.equal(
+    refusalCode(
+      decodeCommand({ kind: "archive", mode: "delete", targetId: "e-1" }),
+    ),
+    ERR.UNKNOWN_KIND,
+  )
+  assert.equal(
+    refusalCode(
+      decodeCommand({ kind: "archive", mode: "archive", targetId: " " }),
     ),
     ERR.UNKNOWN_TARGET,
   )

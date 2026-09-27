@@ -119,7 +119,7 @@ The root declares only tooling, so a package can import only what it declares.
 
 ---
 
-## 3. Decisions that constrain everything (ADR-0001..0025)
+## 3. Decisions that constrain everything (ADR-0001..0029)
 
 Full text with rationale and rejected alternatives: `docs/02-decisions.md`.
 The ones you must not violate by accident:
@@ -148,7 +148,8 @@ raced is a `conflict`; the sender chooses to queue or branch. Supersedes
 ADR-0011.
 
 **ADR-0024 — presence is ephemeral, per open column, written by each client.**
-Who is here decays rather than leaving; every open column reports its thread.
+Who is here decays rather than leaving; every column of the tab you are on
+reports its thread (ADR-0029).
 Rings on the rail, avatars in column headers, typing in the composer; never
 yourself. The host refuses client writes to the session.
 
@@ -165,12 +166,21 @@ takes notes in order and stops at one someone is editing. It refuses no write
 to a note that has a record, because a refused write cannot be recovered from
 (S28). Replaces `pineta.outbox`.
 
+**ADR-0029 — a tab per root, an archive shared by everyone.** A column's
+context is its path to its root, so the screen splits there: each root that is
+not archived has a tab with its own rail and columns, the same tabs for
+everyone. Archiving is a host-written `pineta.archive` record; it hides a root
+and makes it read-only for everyone, deletes nothing, and is refused while the
+agent works there. The Archive tab finds and restores any root; the add tab
+starts one. Which tab you are on, and each root's columns, are kept per
+browser tab (amends ADR-0027).
+
 **ADR-0021 — a thread's mode is its lane; a mention picks the addressee.** A
 thread with a lane is agent work, one without is a conversation; nothing is
 stored. Mentions pick who a message is for (naming only people leaves the
 agent out); with none, the mode fills in. Branches start as conversations, and
-branching at an agent thread's end steps back down to one; the root offers
-Start Chat and Start Agent. A session is its participants; threads
+branching at an agent thread's end steps back down to one; the add tab offers
+agent work, or a conversation (ADR-0029). A session is its participants; threads
 are topics inside it. Amends ADR-0018 and ADR-0020.
 
 **ADR-0022 — the agent works in its own repo, visibly, with the person's
@@ -344,12 +354,13 @@ Hook names, verified against source: **`useTracked(thunk)`** for a derived
 read — *not* `useValue`, which takes a `CallableRef`; `useDocStatus` returns the
 string union `"pending" | "empty" | "populated"`, not an object.
 
-**The interface is columns and a rail** (`docs/06-interface.md`,
-`packages/client/TECHNICAL.md`): each column is one path on its own scroll, a
-branch opens beside its parent in its rail track's colour, and the rail draws
-the whole tree. Views are pure functions over one `indexTree`
-(`packages/core/tree.ts`); which columns are open is a reducer in
-`packages/client/columns.ts`, never written.
+**The interface is a tab per root, each a rail beside columns**
+(`docs/06-interface.md`, `packages/client/TECHNICAL.md`, ADR-0029): each
+column is one path on its own scroll, a branch opens beside its parent in its
+rail track's colour, and the rail draws the tab's root. The Archive tab lists
+every root. Views are pure functions over one `indexTree`
+(`packages/core/tree.ts`, `roots.ts`); which tab you are on and each root's
+columns are a reducer in `packages/client/layout.ts`, never written.
 
 `useText` binds each note's textarea to its Yjs text (ADR-0025): the first
 genuinely collaborative edit. Each person's composer stays local `useState`.

@@ -1132,8 +1132,8 @@ not show either works).
 
 ## ADR-0021 — A thread's mode is its lane; a mention picks the addressee
 
-**Status:** Accepted. Amends ADR-0018 and ADR-0020. Amended by ADR-0029,
-proposed (Start Chat and Start Agent become the add tab).
+**Status:** Accepted. Amends ADR-0018 and ADR-0020. Amended by ADR-0029
+(Start Chat and Start Agent become the add tab).
 
 **Context.** ADR-0018 stored a default at an entry (`pineta.thread`): below a
 *working session* entry the agent answers every message, below a
@@ -1338,7 +1338,7 @@ missing. Loro without compaction: the store and memory grow for good.
 ## ADR-0024 — Presence is ephemeral, per open column, written by each client
 
 **Status:** Accepted. Implemented by `PLAN-2026-09-27-presence`. Amended by
-ADR-0029, proposed: only the columns of the root tab you are on report.
+ADR-0029: only the columns of the root tab you are on report.
 
 **Context.** Several people share a session, each with their own columns, and
 nothing showed who else was there. The composer's "seen by" was removed because,
@@ -1531,7 +1531,7 @@ once a note is taken and having the client recover by fetching the note again
 
 **Status:** Accepted. Evidence: S29. Implemented by `PLAN-2026-09-26-persist-columns`.
 Amended by ADR-0028, proposed (a stored layout holds the focused piece of
-work), and by ADR-0029, proposed, which replaces that: a stored layout holds
+work), and by ADR-0029, which replaces that: a stored layout holds
 the active root tab and each root's columns.
 
 **Context.** Which columns are open is view state, never written (ADR-0024's
@@ -1575,7 +1575,7 @@ at `"populated"` or `useDocReady` (both come with the first data).
 **Status:** Proposed. Amends ADR-0027 (what a stored layout holds). Builds on
 ADR-0021 (threads are topics inside a session), and ADR-0023 and ADR-0025
 (host-written records, and Yjs where people type together). Amended by
-ADR-0029, proposed: marks stay inside a root, and focus, its breadcrumb and
+ADR-0029: marks stay inside a root, and focus, its breadcrumb and
 the whole-session rail sections are withdrawn, along with this ADR's change
 to ADR-0027.
 
@@ -1705,7 +1705,8 @@ on unmark (the description would be lost).
 
 ## ADR-0029 — A tab per root, an archive shared by everyone
 
-**Status:** Proposed. Evidence: S30, S31. Amends ADR-0027 (a stored layout holds a
+**Status:** Accepted. Implemented by `PLAN-2026-09-27-root-tabs`. Evidence:
+S30, S31. Amends ADR-0027 (a stored layout holds a
 tab and columns per root), ADR-0028 (marks stay inside a root; focus is
 withdrawn), ADR-0021 (where Start Chat and Start Agent live) and ADR-0024
 (which columns report presence).
@@ -1793,9 +1794,14 @@ root's label is its first message's text until a mark names it (ADR-0028). If
 someone archives the root you are looking at, the tab stays while you are on
 it, read-only, saying who archived it, with **Restore**; it leaves the bar when
 you switch away, and after a reload you land on the newest open root, or on
-the Archive tab if there is none. A reference whose other end is in another
-root draws as a link that switches tabs, or opens the Archive tab's preview if
-that root is archived. With many roots open, the tab bar scrolls; Archive and
+the Archive tab if there is none. References show only as counts: the link
+between columns that `docs/06-interface.md` describes was never built, and
+this ADR adds none across roots. What carries something from one root to
+another is the inventory planned with fold (`PLAN-2026-09-27-fold`). Picking
+up writes nothing, so it will work in the Archive tab's preview too, and what
+is picked up there is cited or folded into an open root. A fold from another
+root cannot be drawn as a rail edge, since each rail is one root's, so its
+fold row will have to name and link its source instead. With many roots open, the tab bar scrolls; Archive and
 ＋ stay put. On a narrow screen, the tab bar becomes a switcher above the
 stacked columns. The Line gains a command and two outcomes, which changes the
 schema of stored Lines; a store written before still opens and serves (S31).

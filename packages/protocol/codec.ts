@@ -11,6 +11,8 @@
 // a malformed command is refused is decided in exactly one function.
 
 import {
+  ARCHIVE_ACTIONS,
+  type ArchiveAction,
   atEntry,
   CHAT_MODES,
   type ChatMode,
@@ -58,6 +60,9 @@ export type Outcome =
   | { readonly kind: "stopped" }
   /** A note was made, joined or moved on: its id. */
   | { readonly kind: "noted"; readonly id: NoteId }
+  /** A root is archived, or restored (ADR-0029); also when it already was. */
+  | { readonly kind: "archived" }
+  | { readonly kind: "restored" }
   | Refusal
 
 /**
@@ -160,6 +165,15 @@ export function decodeCommand(
     }
   }
   if (kind === "note") return decodeNote(wire, at)
+  if (kind === "archive") {
+    const action = text(wire?.mode)
+    if (!isArchiveAction(action))
+      return refuse(ERR.UNKNOWN_KIND, `unknown archive action: ${action}`)
+    const root = text(wire?.targetId)
+    return root === ""
+      ? refuse(ERR.UNKNOWN_TARGET, "an archive action must name its root")
+      : { kind: "archive", action, root: entryId(root) }
+  }
   return refuse(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
 }
 
@@ -200,6 +214,9 @@ function decodeNote(
 const isNoteAction = (a: string): a is (typeof NOTE_ACTIONS)[number] =>
   (NOTE_ACTIONS as readonly string[]).includes(a)
 
+const isArchiveAction = (a: string): a is ArchiveAction =>
+  (ARCHIVE_ACTIONS as readonly string[]).includes(a)
+
 const isChatMode = (mode: string): mode is ChatMode =>
   (CHAT_MODES as readonly string[]).includes(mode)
 
@@ -229,6 +246,13 @@ export function encodeIntent(id: string, intent: Intent): Command {
       return command({ id, kind: "stop", lane: intent.lane })
     case "note":
       return command({ id, kind: "note", ...noteToWire(intent.action) })
+    case "archive":
+      return command({
+        id,
+        kind: "archive",
+        mode: intent.action,
+        targetId: intent.root,
+      })
   }
 }
 
@@ -267,6 +291,10 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "stopped" })
     case "noted":
       return reply({ id, outcome: "noted", noteId: outcome.id })
+    case "archived":
+      return reply({ id, outcome: "archived" })
+    case "restored":
+      return reply({ id, outcome: "restored" })
     case "refused":
       return reply({
         id,
@@ -296,6 +324,10 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "stopped" }
     case "noted":
       return { kind: "noted", id: noteId(wire.noteId) }
+    case "archived":
+      return { kind: "archived" }
+    case "restored":
+      return { kind: "restored" }
     case "refused":
       return refuse(asErrCode(wire.errorCode), wire.errorMessage)
   }

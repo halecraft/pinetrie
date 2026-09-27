@@ -82,16 +82,19 @@ The leftmost tab. It finds roots, so it is a list, not a rail with columns.
   it, its messages and notes, and its state. Filters: archived, open, mine.
   Search over message text.
 - **Selecting a row previews it:** that root's rail, and one read-only column
-  that a rail dot moves. It has no composer, and none of the tools that write:
-  branch, edit, mark, cite. A citation is written where its author is reading,
-  which here is the archived root.
+  that a rail dot moves. Its composer is disabled, and none of the tools that
+  write are there: branch, edit, mark, cite. In place of sending it offers
+  **Restore** for an archived root, and **Open** for an open one. A citation is written where its author is reading,
+  which here is the archived root. Once the inventory exists (planned with
+  fold), picking up will work here, since it writes nothing; what is picked up
+  is cited or folded into an open root.
 - **Restore** puts the root back in the tab bar and switches to it. Restoring
   is the only way to write in an archived root; the host refuses anything else
   there.
 
 ### The add tab
 
-The rightmost tab, empty but for a split button: **＋ agent**, with
+The rightmost tab, drawn as an empty tab: a split button, **＋ agent**, with
 **conversation** in its menu. A conversation at the root is the rarer start,
 so it is the one behind the menu. What each does is under "Starting" below.
 
@@ -219,10 +222,12 @@ The rail is E; the lit column is T. Seeing both at once is the product.
   **Stop** ends the turn; messages waiting are then taken.
 - A message's tools (cite, and `→` in the margin) appear on hover or focus;
   beneath it stay only branch buttons and citation counts.
-- **Cite** stays an action on a message or a text selection. A reference draws
-  as a link between columns when both ends are open, and as a count otherwise.
-  An end in another root is a link to its tab, or to its preview in the
-  Archive tab if that root is archived.
+- **Cite** stays an action on a message or a text selection. It is attached at
+  the end of the column it was used in. A reference shows as counts: "↗ cites
+  n" on the message it is attached to, and "↙ cited by n" on what it cites.
+  Neither leads anywhere yet, and the agent does not read references
+  (ADR-0017). A link drawn between columns when both ends are open was
+  designed, but never built.
 
 ### Notes, and drafting together (ADR-0025)
 

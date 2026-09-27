@@ -109,6 +109,30 @@ record is a host-written `pineta.note` value keyed by note id, typed here as
   `ChatDetails.contributors`, "Ada, with Bea". The model reads only the
   sender's name.
 
+# The archive (`archive.ts`, ADR-0029)
+
+A root put aside for everyone. The record is a host-written `pineta.archive`
+value keyed by the root's entry id, `archived` or `restored`, with who changed
+it and when. Archiving writes only the record: entries are immutable, so a root
+is hidden and made read-only, never removed, and restoring keeps the record.
+
+- **`planArchive` decides**, pure. A root is anything `rootOf` maps to itself
+  (a root is always a message, S30). Archiving is refused `root_busy` while
+  `rootWork` lists the root: a lane with its tip there runs, or has messages
+  waiting. `ROOT_BUSY_REASON` is the one wording, which the tab's menu shows
+  too. The state it already has is `unchanged`, and answered the same.
+- **The gate keys on the entry a command writes at.** `writesAt` names it for
+  every intent (a chat's or a reference's `at`, a note's entry or place via
+  `noteAt`), or null for one that writes in no root (a new root, a name, a
+  stop, an archive action). `archivedAt` maps that entry to its root's
+  record. One rule, applied by the host before dispatch; `sendChat` needs no
+  copy, because a sent draft reaches it only through a `note` `send`.
+- **A reference is judged by where it is written**, its `at`, not what it
+  cites: citing an archived message from an open root is accepted.
+- **Yjs writes are not refused for archiving.** A note's text in an archived
+  root stays writable to the host's policy, as ADR-0026 requires (a refused
+  write cannot be recovered from, S28); the screen offers no editor there.
+
 # Participants (`participant.ts`)
 
 A session is its participants (ADR-0021). `pineta.participant` values are names

@@ -1,7 +1,7 @@
 // core/presence — what the screen shows of who else is here. Pure.
 //
-// Presence is thread-level (ADR-0024): each open column reports the end of the
-// thread it follows. Someone is on your thread when their end and yours lie on
+// Presence is thread-level (ADR-0024): each column of the tab a person is on
+// reports the end of the thread it follows (ADR-0029). Someone is on your thread when their end and yours lie on
 // one path: one is the other, or an ancestor of it (a column that has not yet
 // caught up). Someone on a sibling branch is not.
 
@@ -9,7 +9,7 @@ import type { WriterId } from "./index.ts"
 import { pathIds, type TreeIndex } from "./tree.ts"
 
 export interface PresenceView {
-  /** Others following each thread end, from all their open columns: the rail's rings. */
+  /** Others following each thread end, from the columns they report: the rail's rings. */
   readonly readingAt: ReadonlyMap<string, readonly WriterId[]>
   /** Others following the thread that ends at `end`: a column's header. */
   seenBy(end: string): readonly WriterId[]

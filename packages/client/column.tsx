@@ -6,6 +6,7 @@ import {
   ancestry,
   atEntry,
   type ColumnView,
+  type EntryId,
   entryId,
   type LaneView,
   messageText,
@@ -29,7 +30,7 @@ import {
 import { readStreams, type SessionDocHandle } from "@pineta/schema"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { Column as ColumnSpec } from "./columns.ts"
-import { Composer } from "./composer.tsx"
+import { Composer, type ReadOnly } from "./composer.tsx"
 import { Message } from "./message.tsx"
 import { MessageText } from "./message-text.tsx"
 import { speakerLabel, withContributors } from "./names.ts"
@@ -37,7 +38,6 @@ import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackColor } from "./rail.tsx"
 import type { SessionClient } from "./session-view.ts"
-import { Start } from "./start.tsx"
 import { useFollow } from "./use-follow.ts"
 
 export interface ColumnProps {
@@ -51,7 +51,7 @@ export interface ColumnProps {
   track: number
   /** Fork dots, by the message they sit on. */
   forks: ReadonlyMap<string, readonly number[]>
-  /** Ids any open column shows: a branch leaving here that is shown needs no button. */
+  /** Ids any column of this tab shows: a branch leaving here that is shown needs no button. */
   shown: ReadonlySet<string>
   refs: ReferenceIndex
   /** Display names by writer, for "queue · agent replies after Bea". */
@@ -77,10 +77,13 @@ export interface ColumnProps {
   path: ReadonlySet<string>
   /** Open a fresh column to the right, forked at `at`. */
   onBranch: (at: string) => void
-  /** After a conflict: a fresh column at `at`, which sends `text` there. */
-  onBranchInstead: (at: Position, text: string) => void
-  /** The empty session's column: turn it into a fresh thread at the root. */
-  onStart: (asksAgent: boolean) => void
+  /**
+   * After a conflict: a fresh column at `at`, which sends `text` there. A
+   * conflict needs a reply at an entry: a `branch` never conflicts.
+   */
+  onBranchInstead: (at: EntryId, text: string) => void
+  /** Nothing may be written here (ADR-0029): no composer, no tools that write. */
+  readOnly: ReadOnly | null
   /** A fresh column's first send, by id. */
   onSent: (sendId: string) => void
   onOpen: (anchor: string) => void
@@ -112,8 +115,7 @@ export function Column(p: ColumnProps) {
     : view.tipId === null
       ? ROOT
       : atEntry(entryId(view.tipId))
-  // An empty session's column offers the two starts instead of a composer.
-  const choosing = !fresh && view.tipId === null
+  const writable = p.readOnly === null
 
   // The agent joined where it was first asked, unless that is above this column.
   const askedAbove =
@@ -135,16 +137,14 @@ export function Column(p: ColumnProps) {
     .map(r => r.lane)
   // This thread's lane, as the host will find it: busy means a compelled
   // message waits.
-  const thread = choosing
-    ? undefined
-    : threadOf(p.index, p.lanes, {
-        at,
-        mode: fresh ? "branch" : "reply",
-        lane: p.column.lane ?? null,
-        me: p.session.writer,
-      })
+  const thread = threadOf(p.index, p.lanes, {
+    at,
+    mode: fresh ? "branch" : "reply",
+    lane: p.column.lane ?? null,
+    me: p.session.writer,
+  })
   const lane: ThreadLane =
-    thread?.kind === "thread" ? thread.lane : { kind: "none" }
+    thread.kind === "thread" ? thread.lane : { kind: "none" }
   const waiting =
     lane.kind === "lane" ? p.outbox.filter(h => h.lane === lane.name) : []
   const holder =
@@ -169,7 +169,7 @@ export function Column(p: ColumnProps) {
     }),
   )
   const draft =
-    fresh || view.tipId === null
+    fresh || view.tipId === null || !writable
       ? undefined
       : draftFor(view.tipId, p.lanes, index, p.notes)
   // The note this window is editing: while it is scrolled out of view, a bar
@@ -283,30 +283,38 @@ export function Column(p: ColumnProps) {
                   return note === undefined ? undefined : card(note)
                 })()}
                 onEdit={
-                  noteOf.has(node.id)
+                  noteOf.has(node.id) || !writable
                     ? undefined
                     : () => void p.session.note({ kind: "open", entry: id })
                 }
                 onBranch={
-                  i < view.nodes.length - 1
-                    ? {
-                        title: "open a branch here",
-                        go: () => p.onBranch(node.id),
-                      }
-                    : // At the end, a branch differs from replying only in agent
-                      // work: there it steps back down to a conversation.
-                      p.column.lane !== undefined
+                  !writable
+                    ? undefined
+                    : i < view.nodes.length - 1
                       ? {
-                          title: "continue as a conversation",
+                          title: "open a branch here",
                           go: () => p.onBranch(node.id),
                         }
-                      : undefined
+                      : // At the end, a branch differs from replying only in agent
+                        // work: there it steps back down to a conversation.
+                        p.column.lane !== undefined
+                        ? {
+                            title: "continue as a conversation",
+                            go: () => p.onBranch(node.id),
+                          }
+                        : undefined
                 }
-                onCite={(to: ReferenceTarget) =>
-                  void p.session.cite(
-                    to,
-                    view.tipId === null ? ROOT : atEntry(entryId(view.tipId)),
-                  )
+                // A citation is written where its author reads: here.
+                onCite={
+                  writable
+                    ? (to: ReferenceTarget) =>
+                        void p.session.cite(
+                          to,
+                          view.tipId === null
+                            ? ROOT
+                            : atEntry(entryId(view.tipId)),
+                        )
+                    : undefined
                 }
                 onOpenBranch={p.onOpen}
               />
@@ -363,42 +371,41 @@ export function Column(p: ColumnProps) {
             </button>
           </div>
         ))}
-      {choosing ? (
-        <Start onStart={p.onStart} />
-      ) : (
-        <Composer
-          asksAgent={p.column.asksAgent === true}
-          at={at}
-          boundLane={p.column.lane}
-          fresh={fresh}
-          holderName={holder}
-          lane={lane}
-          onBranchInstead={text => p.onBranchInstead(at, text)}
-          onSend={() => {
-            end.follow()
-            if (!fresh) return undefined
-            const id = crypto.randomUUID()
-            p.onSent(id)
-            return id
-          }}
-          onComposeTogether={
-            fresh || draft !== undefined
-              ? undefined
-              : text =>
-                  void p.session.note({
-                    kind: "draft",
-                    at,
-                    lane: p.column.lane ?? null,
-                    text,
-                  })
-          }
-          onTyping={p.onTyping}
-          participants={p.participants}
-          pending={p.column.fresh?.pending}
-          typing={p.typing.map(w => nameFor(p.nameOf, w))}
-          session={p.session}
-        />
-      )}
+      <Composer
+        asksAgent={p.column.asksAgent === true}
+        at={at}
+        boundLane={p.column.lane}
+        fresh={fresh}
+        holderName={holder}
+        lane={lane}
+        onBranchInstead={text => {
+          if (at.kind === "entry") p.onBranchInstead(at.id, text)
+        }}
+        onSend={() => {
+          end.follow()
+          if (!fresh) return undefined
+          const id = crypto.randomUUID()
+          p.onSent(id)
+          return id
+        }}
+        onComposeTogether={
+          fresh || draft !== undefined || !writable
+            ? undefined
+            : text =>
+                void p.session.note({
+                  kind: "draft",
+                  at,
+                  lane: p.column.lane ?? null,
+                  text,
+                })
+        }
+        onTyping={p.onTyping}
+        participants={p.participants}
+        pending={p.column.fresh?.pending}
+        readOnly={p.readOnly}
+        typing={p.typing.map(w => nameFor(p.nameOf, w))}
+        session={p.session}
+      />
     </section>
   )
 }

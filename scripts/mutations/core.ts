@@ -3,6 +3,7 @@ import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/core"]
 const tree = "packages/core/tree.ts"
+const roots = "packages/core/roots.ts"
 const core = "packages/core/index.ts"
 
 export const mutations: readonly Mutation[] = [
@@ -23,20 +24,60 @@ export const mutations: readonly Mutation[] = [
     expect: "insertion order",
   },
   {
-    name: "the rail draws only the first root",
+    name: "the rail draws every tree",
     file: tree,
-    from: "    [...index.roots, ...index.orphans].sort(ascending),",
-    to: "    [...index.roots, ...index.orphans].sort(ascending).slice(0, 1),",
+    from: "  const starts = visibleChildren([root])",
+    to: "  const starts = visibleChildren([...index.roots, ...index.orphans].sort(ascending))",
     command: unit,
-    expect: "each root starts a track",
+    expect: "draws only its root's tree",
+  },
+  {
+    name: "rootOf stops one below the root",
+    file: tree,
+    from: "  return ancestry(index, id).path.at(-1) ?? null",
+    to: "  return ancestry(index, id).path.at(-2) ?? null",
+    command: unit,
+    expect: "rootOf walks up to the root",
   },
   {
     name: "a pinned column follows leaves",
     file: tree,
-    from: "      column.pinned === true ? column.anchor : followTip(index, column.anchor)",
-    to: "      followTip(index, column.anchor)",
+    from: "      column.pinned === true || column.anchor === null",
+    to: "      column.anchor === null",
     command: unit,
     expect: "ends at its anchor and follows nothing",
+  },
+  {
+    name: "a summary's newest is its first message",
+    file: roots,
+    from: "        newest: ids.at(-1) ?? first,",
+    to: "        newest: first,",
+    command: unit,
+    expect: "newest is the largest id",
+  },
+  {
+    name: "an archived root stays open",
+    file: roots,
+    from: '    archive.get(r.root)?.state === "archived" ? [] : [r.root],',
+    to: "    [r.root],",
+    command: unit,
+    expect: "an archived root is left out",
+  },
+  {
+    name: "waiting messages are not work",
+    file: roots,
+    from: '    else if (lane.waiting > 0 && work.get(root) !== "running")',
+    to: '    else if (lane.waiting < 0 && work.get(root) !== "running")',
+    command: unit,
+    expect: "running and waiting lanes resolve to their roots",
+  },
+  {
+    name: "a reader counts at their thread's end, not its root",
+    file: roots,
+    from: "    const root = rootOf(index, end)",
+    to: "    const root: string | null = end",
+    command: unit,
+    expect: "readers resolve to their roots",
   },
   {
     name: "followTip has no cycle guard going down",

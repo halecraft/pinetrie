@@ -11,6 +11,7 @@
 
 import {
   type AgentRun,
+  type ArchiveRecord,
   agentActivity,
   ancestry,
   type EntryLike,
@@ -18,10 +19,13 @@ import {
   type LaneName,
   type LaneView,
   type NoteRecord,
+  rootOf,
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
 import {
+  ARCHIVE_NAMESPACE,
+  archiveRecords,
   decodeReference,
   type Held,
   heldMessages,
@@ -202,12 +206,13 @@ export const NOTE_FILTERS: readonly NoteFilter[] = [
 export interface NoteRow {
   readonly note: NoteRecord
   /** Where it sits in the tree now (`noteAt`): a column opens there. */
-  readonly at: string | null
+  readonly at: string
 }
 
 /**
- * The notes index: the notes `filter` keeps, newest first. "mine" is the
- * notes `me` opened or wrote in. Pure.
+ * The notes index of one root (ADR-0029): the notes `filter` keeps whose place
+ * is in `root`, newest first. "mine" is the notes `me` opened or wrote in. A
+ * note with no place yet (a sent draft still waiting) is in no root. Pure.
  */
 export function notesIndex(
   notes: readonly NoteRecord[],
@@ -215,6 +220,7 @@ export function notesIndex(
   lanes: readonly LaneView[],
   filter: NoteFilter,
   me: WriterId,
+  root: string,
 ): readonly NoteRow[] {
   const keep = (n: NoteRecord): boolean => {
     switch (filter) {
@@ -233,5 +239,14 @@ export function notesIndex(
   return notes
     .filter(keep)
     .toReversed()
-    .map(note => ({ note, at: noteAt(note, lanes, index) }))
+    .flatMap(note => {
+      const at = noteAt(note, lanes, index)
+      return at !== null && rootOf(index, at) === root ? [{ note, at }] : []
+    })
 }
+
+/** Every root's archive record (`pineta.archive`, ADR-0029), keyed by root. */
+export const readArchive = (
+  doc: SessionDocHandle,
+): ReadonlyMap<string, ArchiveRecord> =>
+  archiveRecords(readValues(doc, ARCHIVE_NAMESPACE))

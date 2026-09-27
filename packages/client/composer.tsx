@@ -10,7 +10,18 @@ import {
   type ThreadLane,
 } from "@pineta/core"
 import { useEffect, useRef, useState } from "react"
+import { settleSend } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
+
+/**
+ * A column where nothing may be written: an archived root, in place or
+ * previewed, or an open root's preview (ADR-0029). The composer keeps what
+ * was typed, and shows `label` and `action` in place of its buttons.
+ */
+export interface ReadOnly {
+  readonly label: string
+  readonly action: { readonly title: string; readonly go: () => void }
+}
 
 /**
  * Before sending, the composer's button says what the message will do: who it
@@ -20,7 +31,8 @@ import type { SessionClient } from "./session-view.ts"
  *
  * A reply carries the end its sender saw. If another writer's compelled
  * message got there first, the host writes nothing and says so (`conflict`),
- * and the sender chooses: wait behind them, or branch here.
+ * and the sender chooses: wait behind them, or branch here. A message the
+ * host refuses comes back to the composer too (`settleSend`).
  */
 export function Composer({
   session,
@@ -37,6 +49,7 @@ export function Composer({
   typing,
   onTyping,
   onComposeTogether,
+  readOnly,
 }: {
   session: SessionClient
   /** Where the message attaches: the column's end, or its branch point. */
@@ -69,6 +82,7 @@ export function Composer({
    * already has one.
    */
   onComposeTogether: ((text: string) => void) | undefined
+  readOnly: ReadOnly | null
 }) {
   const [text, setText] = useState("")
   const [status, setStatus] = useState("")
@@ -110,20 +124,10 @@ export function Composer({
       asksAgent,
       ...(id === undefined ? {} : { id }),
     })
-    if (outcome.kind === "conflict") {
-      setConflict({ text: message, by: outcome.by })
-      setText(message)
-      setStatus("")
-      return
-    }
-    setConflict(null)
-    setStatus(
-      outcome.kind === "refused"
-        ? `not sent: ${outcome.message}`
-        : outcome.kind === "queued"
-          ? `waiting · ${ordinal(outcome.position + 1)} in line`
-          : "",
-    )
+    const settled = settleSend(outcome, message)
+    setConflict(settled.conflict)
+    setStatus(settled.status)
+    if (settled.restore !== null) setText(settled.restore)
   }
 
   // Sent once, however often React runs effects (StrictMode runs them twice).
@@ -137,7 +141,7 @@ export function Composer({
 
   const submit = async () => {
     const message = text.trim()
-    if (message === "") return
+    if (message === "" || readOnly !== null) return
     setText("")
     await send(message, mode)
   }
@@ -180,7 +184,7 @@ export function Composer({
           </button>
         </div>
       )}
-      {lane.kind === "lane" && lane.running && (
+      {readOnly === null && lane.kind === "lane" && lane.running && (
         <button
           className="stop"
           onClick={() => void session.stop(lane.name)}
@@ -213,31 +217,42 @@ export function Composer({
         placeholder={
           byDefault ? "ask the agent…" : "say something · @agent to ask"
         }
+        readOnly={readOnly !== null}
         rows={Math.min(8, Math.max(2, text.split("\n").length))}
         value={text}
       />
-      <div className="compose-row">
-        {onComposeTogether !== undefined && (
+      {readOnly !== null ? (
+        <div className="read-only">
+          <span className="read-only-label">{readOnly.label}</span>
           <button
-            className="compose-together"
-            onClick={() => {
-              onComposeTogether(text)
-              setText("")
-            }}
-            title="write the next message together: everyone here can edit it"
+            className="read-only-action"
+            onClick={readOnly.action.go}
             type="button"
           >
-            compose together
+            {readOnly.action.title}
           </button>
-        )}
-        <button className="send" type="submit">
-          {label}
-        </button>
-      </div>
+        </div>
+      ) : (
+        <div className="compose-row">
+          {onComposeTogether !== undefined && (
+            <button
+              className="compose-together"
+              onClick={() => {
+                onComposeTogether(text)
+                setText("")
+              }}
+              title="write the next message together: everyone here can edit it"
+              type="button"
+            >
+              compose together
+            </button>
+          )}
+          <button className="send" type="submit">
+            {label}
+          </button>
+        </div>
+      )}
       <span className="status">{status}</span>
     </form>
   )
 }
-
-const ordinal = (n: number): string =>
-  n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`

@@ -1,13 +1,11 @@
-// client/rail — the whole tree's shape, beside the columns.
+// client/rail — one root's tree, beside its columns (ADR-0029).
 //
 // A dot per message and a line per parent link, drawn from `projectRail`. The
-// rail is E (everything that exists); the lit column is T (what the agent
+// rail is E (everything in this root); the lit column is T (what the agent
 // reads). Colours come from one palette indexed by track, which the column
 // headers and fork dots share, so a branch looks the same everywhere.
 
 import { type AgentRun, PENDING_TRACK, type RailRow } from "@pineta/core"
-import { useState } from "react"
-import { Start } from "./start.tsx"
 
 const PALETTE = [
   "#9ecbff",
@@ -45,7 +43,6 @@ export function Rail({
   open,
   activity,
   onPick,
-  onStart,
   here,
   notes,
   notesPanel,
@@ -56,52 +53,36 @@ export function Rail({
   /** Every running lane: each tip pulses, whether or not a column shows it. */
   activity: readonly AgentRun[]
   onPick: (id: string) => void
-  /** A new thread at the root, above every root thread: where the tree starts. */
-  onStart: (asksAgent: boolean) => void
   /** Others following each thread end, with their names and colours: a ring there. */
   here: ReadonlyMap<string, readonly { name: string; color: string }[]>
   /** Messages that are notes' (ADR-0025): drawn as squares. */
   notes: ReadonlySet<string>
   /**
-   * The notes index's toggle, at the rail's top. The index itself is drawn by
-   * the app, over the columns: the rail scrolls, so it would clip it.
+   * The notes index's toggle, at the rail's top, counting this root's notes.
+   * The index itself is drawn by the app, over the columns: the rail scrolls,
+   * so it would clip it. Absent where there is no index: the Archive tab's
+   * preview.
    */
-  notesPanel: {
+  notesPanel?: {
     readonly count: number
     readonly open: boolean
     readonly toggle: () => void
   }
 }) {
-  const [starting, setStarting] = useState(false)
   const rowOf = new Map(rows.map((r, i) => [r.id, i]))
   const tracks = rows.reduce((n, r) => Math.max(n, r.track + 1), 1)
   return (
-    <nav aria-label="the whole tree" id="rail">
-      <button
-        aria-expanded={starting}
-        className="new-thread"
-        onClick={() => setStarting(!starting)}
-        title="a new thread at the root"
-        type="button"
-      >
-        +
-      </button>
-      <button
-        aria-expanded={notesPanel.open}
-        className="notes-toggle"
-        onClick={notesPanel.toggle}
-        title="every note in this session"
-        type="button"
-      >
-        notes ({notesPanel.count})
-      </button>
-      {starting && (
-        <Start
-          onStart={asksAgent => {
-            setStarting(false)
-            onStart(asksAgent)
-          }}
-        />
+    <nav aria-label="this thread's tree" className="rail">
+      {notesPanel !== undefined && (
+        <button
+          aria-expanded={notesPanel.open}
+          className="notes-toggle"
+          onClick={notesPanel.toggle}
+          title="every note in this thread"
+          type="button"
+        >
+          notes ({notesPanel.count})
+        </button>
       )}
       <div className="rail-tree">
         <svg height={y(rows.length)} width={x(tracks)}>

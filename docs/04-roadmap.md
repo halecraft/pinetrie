@@ -58,7 +58,8 @@ Roughly in dependency order, each independently shippable:
    branched data, so the e2e fixture writes a fork as a foreign write (S3);
    and **navigation turned out to be free**, because the selected tip is
    client-local state rather than a write. The spine view was later replaced
-   by columns and a rail (`docs/06-interface.md`).
+   by columns and a rail, and then by a tab per root, each with its own rail
+   and columns (`docs/06-interface.md`, ADR-0029).
 2. ~~**Branch write**~~ — **done**, both directions. *Superseded by ADR-0020:*
    lanes no longer move, so a branch is a new thread (and, when the agent is
    asked, a new lane) rather than a navigated one. A `branch` command names a

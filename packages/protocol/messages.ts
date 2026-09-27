@@ -38,6 +38,8 @@ export const HOST_PEER_ID = "host"
  *     the thread a reply from `parentId` (and `lane`) would continue, with
  *     `text` as what its sender had typed. `send`, `done` and `reopen` act on
  *     the note `targetId`.
+ *   - `archive` hides the root `targetId` for everyone, or restores it
+ *     (ADR-0029); `mode` names the action, `archive` or `restore`.
  */
 export const COMMAND_KINDS = [
   "chat",
@@ -45,6 +47,7 @@ export const COMMAND_KINDS = [
   "name",
   "stop",
   "note",
+  "archive",
 ] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -92,6 +95,8 @@ export const OUTCOME_KINDS = [
   "named",
   "stopped",
   "noted",
+  "archived",
+  "restored",
   "refused",
 ] as const
 export type OutcomeKind = (typeof OUTCOME_KINDS)[number]

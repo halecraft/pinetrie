@@ -48,7 +48,7 @@ const notes = [
 
 test("notesIndex: newest first, each filter keeping its kind", () => {
   const ids = (filter: (typeof NOTE_FILTERS)[number], me = ADA) =>
-    notesIndex(notes, index, [], filter, me).map(r => r.note.id)
+    notesIndex(notes, index, [], filter, me, "e1").map(r => r.note.id)
   expect(ids("all")).toEqual(["n4", "n3", "n2", "n1"])
   expect(ids("draft")).toEqual(["n2"])
   expect(ids("open")).toEqual(["n4", "n1"])
@@ -59,6 +59,27 @@ test("notesIndex: newest first, each filter keeping its kind", () => {
 })
 
 test("notesIndex: each row sits where its note does; a draft at its thread's end", () => {
-  const at = notesIndex(notes, index, [], "all", ADA).map(r => r.at)
+  const at = notesIndex(notes, index, [], "all", ADA, "e1").map(r => r.at)
   expect(at).toEqual(["e1", "e1", "e2", "e1"])
+})
+
+test("notesIndex: only the notes whose place is in the root", () => {
+  const two = indexTree({
+    ...index.entries,
+    r2: {
+      id: "r2",
+      parentId: null,
+      type: "message",
+      message: { role: "user", content: "r2" },
+    },
+  })
+  const elsewhere = note("n5", {
+    subject: { kind: "entry", id: entryId("r2") },
+  })
+  const ids = (root: string) =>
+    notesIndex([...notes, elsewhere], two, [], "all", ADA, root).map(
+      r => r.note.id,
+    )
+  expect(ids("r2")).toEqual(["n5"])
+  expect(ids("e1")).toEqual(["n4", "n3", "n2", "n1"])
 })

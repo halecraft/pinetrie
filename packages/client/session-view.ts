@@ -8,7 +8,9 @@ import { batch, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 
 import {
+  type ArchiveAction,
   type ChatMode,
+  type EntryId,
   type Intent,
   type LaneName,
   type NoteAction,
@@ -104,6 +106,8 @@ export interface SessionClient {
   note(action: NoteAction, id?: string): Promise<Outcome>
   /** A note's text: the same document for every caller. */
   noteText(id: NoteId): NoteDocHandle
+  /** Hide the root `root` for everyone, or bring it back (ADR-0029). */
+  archive(action: ArchiveAction, root: EntryId): Promise<Outcome>
   /** Every reply as it arrived on the wire, for wire-level checks. */
   readonly replies: readonly Reply[]
   close(): Promise<void>
@@ -219,6 +223,9 @@ export async function connectSession(
     },
     noteText(id) {
       return exchange.get(noteDocId(id), NoteDoc)
+    },
+    archive(action, root) {
+      return send({ kind: "archive", action, root })
     },
     replies,
     async close() {

@@ -2,6 +2,7 @@
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/marginalia"]
+const archive = "packages/marginalia/archive.ts"
 
 export const mutations: readonly Mutation[] = [
   {
@@ -147,5 +148,37 @@ export const mutations: readonly Mutation[] = [
     to: '  return notes.find(\n    n =>\n      n.state === "draft" &&\n      n.subject.kind === "draft" &&\n      n.subject.at.kind === "entry" &&\n      n.subject.at.id === end,\n  )',
     command: unit,
     expect: "still finds a draft after its thread grows",
+  },
+  {
+    name: "archiving ignores the root's work",
+    file: archive,
+    from: '  if (action === "archive" && busy !== undefined)',
+    to: '  if (action === "restore" && busy !== undefined)',
+    command: unit,
+    expect: "refuses while the agent works in the root",
+  },
+  {
+    name: "a note action writes nowhere",
+    file: archive,
+    from: "      return noteWritesAt(intent.action, notes, index, lanes)",
+    to: "      return null",
+    command: unit,
+    expect: "a note opened",
+  },
+  {
+    name: "a restored root stays read-only",
+    file: archive,
+    from: '  return record?.state === "archived" ? record : null',
+    to: "  return record ?? null",
+    command: unit,
+    expect: "a restored root, a root with no record",
+  },
+  {
+    name: "decodeArchive accepts any state",
+    file: archive,
+    from: '  state: Type.Union([Type.Literal("archived"), Type.Literal("restored")]),',
+    to: "  state: Type.String(),",
+    command: unit,
+    expect: "a malformed value is dropped",
   },
 ]

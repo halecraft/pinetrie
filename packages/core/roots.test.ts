@@ -1,0 +1,135 @@
+import { describe, expect, test } from "vitest"
+import {
+  type ArchiveRecord,
+  type EntryLike,
+  entryId,
+  idTime,
+  indexTree,
+  type LaneView,
+  laneNameForThread,
+  openRoots,
+  projectRail,
+  rootReaders,
+  rootWork,
+  summarizeRoots,
+  type WriterId,
+  writerId,
+} from "./index.ts"
+
+const ADA = writerId("ada")
+const BEA = writerId("bea")
+
+/** A chat by `writer` at `parent`; "c" entries are not messages. */
+const chat = (
+  id: string,
+  parentId: string | null,
+  writer: WriterId,
+): EntryLike => ({
+  id,
+  parentId,
+  type: "message",
+  message: { role: "chat", content: id, author: "A", writer },
+})
+
+// Two roots: r1 (Bea replies, then Ada branches) and r2 (a compaction only
+// between two messages); and a root with no message at all.
+const entries: Record<string, EntryLike> = Object.fromEntries(
+  [
+    chat("1-r1", null, ADA),
+    chat("2-a", "1-r1", BEA),
+    chat("4-b", "1-r1", ADA),
+    chat("3-r2", null, BEA),
+    { id: "5-c", parentId: "3-r2", type: "compaction" },
+    chat("6-d", "5-c", BEA),
+    { id: "0-empty", parentId: null, type: "compaction" },
+  ].map(e => [e.id, e]),
+)
+const index = indexTree(entries)
+
+const lane = (tip: string | null, over: Partial<LaneView> = {}): LaneView => ({
+  name: laneNameForThread(tip ?? "none"),
+  tip,
+  running: false,
+  waiting: 0,
+  askedBy: null,
+  ...over,
+})
+
+describe("summarizeRoots", () => {
+  const summaries = summarizeRoots(index)
+  test("one per root with a message, ascending; a root with none is skipped", () => {
+    expect(summaries.map(s => s.root)).toEqual(["1-r1", "3-r2"])
+  })
+  test("first and messages agree with the root's rail rows", () => {
+    for (const s of summaries) {
+      const rows = projectRail(index, s.root)
+      expect([s.first, s.messages]).toEqual([rows[0]?.id, rows.length])
+    }
+  })
+  test("writers in order of first message, and newest is the largest id", () => {
+    expect(summaries[0]).toMatchObject({ writers: [ADA, BEA], newest: "4-b" })
+    expect(summaries[1]).toMatchObject({ writers: [BEA], newest: "6-d" })
+  })
+})
+
+describe("openRoots", () => {
+  const record = (state: ArchiveRecord["state"]): ArchiveRecord => ({
+    root: entryId("1-r1"),
+    state,
+    by: ADA,
+    at: 0,
+  })
+  const summaries = summarizeRoots(index)
+  test("an archived root is left out, a restored one is kept", () => {
+    expect(
+      openRoots(summaries, new Map([["1-r1", record("archived")]])),
+    ).toEqual(["3-r2"])
+    expect(
+      openRoots(summaries, new Map([["1-r1", record("restored")]])),
+    ).toEqual(["1-r1", "3-r2"])
+  })
+})
+
+describe("rootWork", () => {
+  test("running and waiting lanes resolve to their roots; running wins", () => {
+    const work = rootWork(index, [
+      lane("2-a", { waiting: 1 }),
+      lane("4-b", { running: true }),
+      lane("6-d", { waiting: 2 }),
+    ])
+    expect([...work]).toEqual([
+      ["1-r1", "running"],
+      ["3-r2", "waiting"],
+    ])
+  })
+  test("an idle lane is no work, and a lane with no tip is in no root", () => {
+    expect([
+      ...rootWork(index, [lane("2-a"), lane(null, { running: true })]),
+    ]).toEqual([])
+  })
+})
+
+describe("rootReaders", () => {
+  test("readers resolve to their roots, each once", () => {
+    const readers = rootReaders(
+      index,
+      new Map([
+        ["2-a", [ADA]],
+        ["4-b", [ADA, BEA]],
+        ["6-d", [BEA]],
+      ]),
+    )
+    expect([...readers]).toEqual([
+      ["1-r1", [ADA, BEA]],
+      ["3-r2", [BEA]],
+    ])
+  })
+})
+
+describe("idTime", () => {
+  test("a uuidv7's first 48 bits are its time; any other id has none", () => {
+    expect(idTime("01a0e436-221e-72f4-9ff0-6da939708915")).toBe(0x01a0e436221e)
+    expect(idTime("1-r1")).toBeNull()
+    expect(idTime("01a0e436-221e-42f4-9ff0-6da939708915")).toBeNull()
+  })
+})

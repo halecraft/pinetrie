@@ -35,12 +35,14 @@ import {
   writerId,
 } from "@pineta/core"
 import {
+  archivedAt,
   type ChatDetails,
   type ChatMessage,
   type CitedEntry,
   displayName,
   encodeChat,
   entryText,
+  planArchive,
   planChat,
   planDrain,
   planNote,
@@ -49,6 +51,7 @@ import {
   planStartup,
   sentNote,
   settleRun,
+  writesAt,
 } from "@pineta/marginalia"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
 import {
@@ -64,6 +67,7 @@ import {
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
 import {
+  readArchive,
   readLanes,
   readNotes,
   readOutbox,
@@ -654,6 +658,50 @@ export async function startHost({
     return respond({ kind: "referenced", id: planned.reference.id })
   }
 
+  /** Archive a root for everyone, or restore it: gather, `planArchive`, write one value. */
+  async function handleArchive(
+    writer: WriterId,
+    intent: Extract<Intent, { kind: "archive" }>,
+  ): Promise<Outcome> {
+    // gather
+    const index = readTreeIndex(doc)
+    // plan (pure)
+    const planned = planArchive({
+      action: intent.action,
+      root: intent.root,
+      by: writer,
+      now: Date.now(),
+      index,
+      lanes: readLanes(doc, index),
+      archive: readArchive(doc),
+    })
+    // execute
+    if (planned.kind === "refused") return planned
+    if (planned.kind === "write") await agent.setArchive(planned.record)
+    return { kind: intent.action === "archive" ? "archived" : "restored" }
+  }
+
+  /**
+   * A command that would write in an archived root is refused, naming who
+   * archived it (ADR-0029). A sent draft reaches `sendChat` only through a
+   * `note` `send`, which is checked here, so `sendChat` needs no check of its
+   * own. Null when the command may go on.
+   */
+  function refuseInArchive(intent: Intent): Outcome | null {
+    const archive = readArchive(doc)
+    if (archive.size === 0) return null
+    const index = readTreeIndex(doc)
+    const at = writesAt(intent, readNotes(doc), index, readLanes(doc, index))
+    const record = archivedAt(index, archive, at)
+    if (record === null) return null
+    const names = readParticipantNames(doc)
+    return {
+      kind: "refused",
+      code: ERR.ARCHIVED,
+      message: `archived by ${displayName(record.by, names.get(record.by))}`,
+    }
+  }
+
   /**
    * One command from one writer. The command is UNTRUSTED text off a socket,
    * so it is decoded first; the codec owns every shape rule.
@@ -668,9 +716,10 @@ export async function startHost({
       sender.send(encodeOutcome(id, outcome))
 
     const intent = decodeCommand(wire)
+    if (intent.kind === "refused") return respond(intent)
+    const archived = refuseInArchive(intent)
+    if (archived !== null) return respond(archived)
     switch (intent.kind) {
-      case "refused":
-        return respond(intent)
       case "chat":
         // The command's id is the send's id: its column finds its message by it.
         return respond(
@@ -700,6 +749,8 @@ export async function startHost({
         if (planned === "abort") await agent.lane(intent.lane).abort()
         return respond({ kind: "stopped" })
       }
+      case "archive":
+        return respond(await handleArchive(writer, intent))
     }
   }
 

@@ -5,13 +5,7 @@ import {
   laneNameForThread,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import {
-  type Column,
-  columnsReducer,
-  decodeColumns,
-  encodeColumns,
-  initialColumns,
-} from "./columns.ts"
+import { type Column, columnsReducer } from "./columns.ts"
 
 /** A tree from `child: parent` pairs; `sends` gives some entries a send id. */
 const tree = (
@@ -51,19 +45,6 @@ const sync = (
 ) => columnsReducer(s, { kind: "sync", index, lanes })
 
 describe("columnsReducer", () => {
-  test("sync pins a new session's first column once, and never re-pins it", () => {
-    const empty = initialColumns()
-    expect(sync(empty, tree({}))).toBe(empty)
-    const pinned = sync(empty, tree({ "1-a": null, "2-b": "1-a" }))
-    expect(anchors(pinned)).toEqual(["2-b"])
-    // A newer thread elsewhere must not pull the pinned column away.
-    const later = sync(
-      pinned,
-      tree({ "1-a": null, "2-b": "1-a", "3-other": null }),
-    )
-    expect(later).toBe(pinned)
-  })
-
   test("sync follows a column's own tip, never a newer branch above it", () => {
     const col: readonly Column[] = [{ key: "k", anchor: "2-b" }]
     // A reply below the tip moves the column on.
@@ -109,8 +90,7 @@ describe("columnsReducer", () => {
       kind: "openFresh",
       key: "fresh",
       at: "2-t",
-      asksAgent: false,
-      place: { after: 0 },
+      after: 0,
     })
     expect(start[1]).toEqual({ key: "fresh", anchor: "2-t", fresh: {} })
     const sent = columnsReducer(start, {
@@ -128,29 +108,13 @@ describe("columnsReducer", () => {
     expect(sync(sent, ours)[1]).toEqual({ key: "fresh", anchor: "4-ours" })
   })
 
-  test("openFresh replaces the empty session's column, or goes after a column, keeping Start Agent", () => {
-    const replaced = columnsReducer(initialColumns(), {
-      kind: "openFresh",
-      key: "s",
-      at: null,
-      asksAgent: true,
-      place: { replace: 0 },
-    })
-    expect(replaced).toEqual([
-      { key: "s", anchor: null, fresh: {}, asksAgent: true },
-    ])
+  test("openFresh goes after the column it branches from", () => {
     const after = columnsReducer(
       [
         { key: "a", anchor: "x" },
         { key: "b", anchor: "y" },
       ],
-      {
-        kind: "openFresh",
-        key: "f",
-        at: "x",
-        asksAgent: false,
-        place: { after: 0 },
-      },
+      { kind: "openFresh", key: "f", at: "x", after: 0 },
     )
     expect(after.map(c => c.key)).toEqual(["a", "f", "b"])
   })
@@ -160,8 +124,7 @@ describe("columnsReducer", () => {
       kind: "openFresh",
       key: "b",
       at: "2-t",
-      asksAgent: false,
-      place: { after: 0 },
+      after: 0,
       text: "@agent separately?",
     })
     expect(opened[1]?.fresh).toEqual({ pending: "@agent separately?" })
@@ -183,12 +146,12 @@ describe("columnsReducer", () => {
     expect(anchors(s)).toEqual(["x", "z", "y"])
   })
 
-  test("close of the last column leaves one following the newest", () => {
+  test("close of the last column leaves none: the layout gives the root its first", () => {
     const s = columnsReducer([{ key: "a", anchor: "x" }], {
       kind: "close",
       index: 0,
     })
-    expect(anchors(s)).toEqual([null])
+    expect(s).toEqual([])
   })
 
   test("makeMain moves a column to the front, keeping its key", () => {
@@ -224,62 +187,5 @@ describe("columnsReducer", () => {
     expect(
       columnsReducer(pruned, { kind: "prune", index: tree({ "1-a": null }) }),
     ).toBe(pruned)
-  })
-
-  test("prune of every column leaves the initial one", () => {
-    const s = columnsReducer([{ key: "a", anchor: "gone" }], {
-      kind: "prune",
-      index: tree({}),
-    })
-    expect(s).toEqual(initialColumns())
-  })
-})
-
-describe("encodeColumns / decodeColumns", () => {
-  const trip = (c: readonly Column[]) =>
-    decodeColumns(JSON.parse(JSON.stringify(encodeColumns(c))))
-
-  test("a round trip keeps key, anchor, lane, asksAgent and the send id", () => {
-    const c: readonly Column[] = [
-      { key: "a", anchor: null },
-      { key: "b", anchor: "2-t", lane: L },
-      { key: "c", anchor: null, asksAgent: true, fresh: {} },
-      { key: "d", anchor: "1-a", fresh: { sendId: "s-1" } },
-    ]
-    expect(trip(c)).toEqual(c)
-  })
-
-  test("a message waiting to be sent is never stored, nor restored: it would be sent again", () => {
-    const stored = encodeColumns([
-      { key: "a", anchor: "1-a", fresh: { pending: "hello" } },
-    ])
-    expect(JSON.stringify(stored)).not.toContain("hello")
-    const raw = {
-      v: 1,
-      columns: [{ key: "a", anchor: "1-a", fresh: { pending: "hello" } }],
-    }
-    expect(decodeColumns(raw)).toEqual([{ key: "a", anchor: "1-a", fresh: {} }])
-  })
-
-  test("a layout that is another version, empty, or partly malformed restores nothing", () => {
-    const good = { key: "a", anchor: null }
-    for (const raw of [
-      { v: 2, columns: [good] },
-      { v: 1, columns: [] },
-      { v: 1, columns: [good, { key: 3, anchor: null }] },
-      { v: 1, columns: [good, { key: "b" }] },
-      [good],
-      "columns",
-      null,
-    ])
-      expect(decodeColumns(raw)).toBeUndefined()
-  })
-
-  test("a lane that is not a lane name is left off, and the column kept", () => {
-    const raw = {
-      v: 1,
-      columns: [{ key: "a", anchor: "1-a", lane: "w-someone" }],
-    }
-    expect(decodeColumns(raw)).toEqual([{ key: "a", anchor: "1-a" }])
   })
 })
