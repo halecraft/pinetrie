@@ -22,7 +22,7 @@ client/loro_wasm_bg.wasm
 .playwright-browsers/
 
 # Browser e2e artifact (regenerated each run)
-e2e/browser-screenshot.png
+browser-screenshot.png
 
 # vite production build output
 dist/
