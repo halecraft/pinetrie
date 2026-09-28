@@ -7,8 +7,14 @@ import type { Mutation } from "../mutate.ts"
 const e2e = ["pnpm", "run", "e2e"]
 const live = ["pnpm", "run", "e2e:live"]
 const browser = ["pnpm", "run", "e2e:browser"]
-/** Needs `container` running (ADR-0034). */
-const e2eLanes = ["pnpm", "run", "e2e:lanes"]
+/** `e2e:lanes`'s main section; needs `container` running (ADR-0034). */
+const e2eLanes = [
+  "env",
+  "PINETA_LANES_SECTION=main",
+  "pnpm",
+  "run",
+  "e2e:lanes",
+]
 
 export const mutations: readonly Mutation[] = [
   {

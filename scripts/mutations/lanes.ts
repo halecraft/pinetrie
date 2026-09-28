@@ -3,8 +3,14 @@
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
-/** Needs `container` running: minutes each, run once the suite passes. */
-const lanes = ["pnpm", "run", "e2e:lanes"]
+/** One section of `e2e:lanes`; needs `container` running. */
+const lanes = (section: "main" | "images" | "contract") => [
+  "env",
+  `PINETA_LANES_SECTION=${section}`,
+  "pnpm",
+  "run",
+  "e2e:lanes",
+]
 const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
@@ -98,7 +104,7 @@ export const mutations: readonly Mutation[] = [
     file: plan,
     from: '    "--opt",\n    "journal=ordered",\n',
     to: "",
-    command: lanes,
+    command: lanes("contract"),
     expect: "every clone of a journaled volume taken mid-write checks clean",
   },
   {
@@ -106,7 +112,7 @@ export const mutations: readonly Mutation[] = [
     file: plan,
     from: '  inLane("sync"),\n',
     to: "",
-    command: lanes,
+    command: lanes("main"),
     expect:
       "a file the agent wrote is whole in a branch taken at the next turn",
   },
@@ -116,7 +122,7 @@ export const mutations: readonly Mutation[] = [
     from: "    ...readonlyMount({\n      source: spec.hostWorkingCopy,\n      target: HOST_WORKING_COPY,\n    }),",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: '    "--mount",\n    `type=bind,source=${spec.hostWorkingCopy},target=${HOST_WORKING_COPY}`,',
-    command: lanes,
+    command: lanes("main"),
     expect:
       "a write to /mnt/host-working-copy fails, through bash and through write",
   },
@@ -126,7 +132,7 @@ export const mutations: readonly Mutation[] = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  `${RUNTIME_MOUNT}/node/${LOADER}`,\n  "--library-path",\n  `${RUNTIME_MOUNT}/node/lib`,\n  `${RUNTIME_MOUNT}/node/node`,',
     to: '  "node",',
-    command: lanes,
+    command: lanes("images"),
     expect: "a lane on Alpine, with musl and no Node, runs pi's four tools",
   },
   {
@@ -134,7 +140,7 @@ export const mutations: readonly Mutation[] = [
     file: "apps/pineta/host/work.ts",
     from: "              await Promise.all([...recording])\n",
     to: "",
-    command: lanes,
+    command: lanes("main"),
     expect:
       "a file the agent wrote is whole in a branch taken at the next turn",
   },
@@ -143,7 +149,7 @@ export const mutations: readonly Mutation[] = [
     file: "apps/pineta/host/index.ts",
     from: "      hostWorkingCopy: own ? (work.project?.root ?? null) : null,",
     to: "      hostWorkingCopy: null,",
-    command: lanes,
+    command: lanes("main"),
     expect:
       "a person's path to your working copy is stored as the lane sees it",
   },
@@ -152,7 +158,7 @@ export const mutations: readonly Mutation[] = [
     file: "apps/pineta/host/work.ts",
     from: "        if (newest === null) throw new Error(RETIRED)\n",
     to: "",
-    command: lanes,
+    command: lanes("main"),
     expect:
       "a lane with no disk and no snapshot says it predates lane containers",
   },

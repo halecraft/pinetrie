@@ -162,4 +162,13 @@ containers, disks and the helper.
   a turn, a bundle fetch into your repo, a landing with a conflict, the take,
   a clean landing, and a fork, checked for divergence and immutability.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
-  with the contract test.
+  with the contract test, in about 70 s. It has three sections, `main`,
+  `images` and `contract`, and `PINETA_LANES_SECTION` picks some. Each
+  suite-level mutation in `scripts/mutations/lanes.ts` runs only the section
+  its check is in.
+- **The contract test takes about 7 s:**
+  - its volume is 4 GiB, since `e2fsck -f` walks every block group however
+    little a volume holds;
+  - its writer runs only while the clones are taken;
+  - the clones are checked four at a time, in `pineta-fsck:1`, an Alpine
+    image with `e2fsprogs` that it builds once and keeps.

@@ -301,7 +301,7 @@ export const snapshotFile = (paths: DiskPaths, id: SnapshotId): string =>
  * A journaled volume: mid-write clones of one without a journal are corrupt
  * (S41), and `container`'s default has none.
  */
-export const createVolume = (volume: string): LaneStep =>
+export const createVolume = (volume: string, size = DISK_SIZE): LaneStep =>
   onHost(
     "container",
     "volume",
@@ -309,7 +309,7 @@ export const createVolume = (volume: string): LaneStep =>
     "--opt",
     "journal=ordered",
     "--opt",
-    `size=${DISK_SIZE}`,
+    `size=${size}`,
     volume,
   )
 

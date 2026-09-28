@@ -39,7 +39,7 @@ reasons are the ADRs in `docs/02-decisions.md`. Each package has a
 | unit, conformance, e2e | `pnpm run verify` |
 | with a real model | `pnpm run e2e:live` |
 | in a real browser | `pnpm run e2e:browser` (needs `pnpm exec playwright run-server --port 3100` running outside the sandbox, and `container` running) |
-| lanes of their own, in containers | `pnpm run e2e:lanes` (needs Apple's `container` running, outside the sandbox) |
+| lanes of their own, in containers | `pnpm run e2e:lanes` (needs Apple's `container` running, outside the sandbox; `PINETA_LANES_SECTION=main,images,contract` runs some) |
 | deliberate bugs | `pnpm mutate scripts/mutations/<list>.ts [name]` |
 
 A check without a proof it can fail is not yet a check. A new check comes with a
