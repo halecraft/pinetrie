@@ -12,7 +12,8 @@
       "!!**/dist",
       "!!**/.pnpm-store",
       "!!**/.playwright-browsers",
-      "!!sandbox"
+      "!!sandbox",
+      "!!workspace"
     ]
   },
   "formatter": {

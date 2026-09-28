@@ -527,12 +527,4 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "readersByRoot turns people around",
   },
-  {
-    name: "a label keeps a leading blank line",
-    file: "packages/client/names.ts",
-    from: '      .find(l => l !== "") ?? ""',
-    to: '      .at(0) ?? ""',
-    command: unit,
-    expect: "firstLine: the first non-empty line",
-  },
 ]

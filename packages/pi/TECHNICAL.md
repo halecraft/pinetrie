@@ -97,8 +97,10 @@ the alternative a second host would need: read the thread's end inside
   (S20). Pineta's outbox means the host does not use it.
 
 `laneErrCode(tag)` maps pi's refusal tags for runs and lane creation, so none of
-pi's vocabulary passes the boundary (ADR-0003). `UnknownTarget` is the one
-specific code; anything else is `refused`.
+pi's vocabulary passes the boundary (ADR-0003): `UnknownTarget` and `LaneBusy`
+have codes of their own; anything else is `refused`. The host never writes to
+a running lane, but after a crash pi holds the interrupted operation open, and
+the lane is `LaneBusy` until resumed (below).
 
 ### Streaming, in Pineta's words (ADR-0022)
 
@@ -136,14 +138,60 @@ harness never emits them (S22). What each event does to the document is
 Loading runs every package's factory, so side effects happen (`pi-subagents`
 logs a warning). `pickModel` is the pure choice: an override's fields win over
 the settings' defaults. With tools (`CreateAgentOptions.tools`), pi-agent-core's
-`read`, `write`, `edit` and `bash` run in `cwd` through `NodeExecutionEnv`. The
-system prompt is pi's `buildSystemPrompt`, with the loader's context files (the
-repo's `AGENTS.md`) and skills: the section layout `pi-anthropic-auth` shapes.
+`read`, `write`, `edit` and `bash` run in each lane's own directory (below).
+Settings, context files and skills load from `tools.project`. The system prompt
+is pi's `buildSystemPrompt`, with the loader's context files (the repo's
+`AGENTS.md`) and skills: the section layout `pi-anthropic-auth` shapes. Its
+`cwd` is the lane's directory.
 
 `ThreadLaneHandle.abort()` is pi's `lane.abort`: a running tool is aborted and
 its result recorded as aborted, and the lane takes its next message (S22).
-Resuming an operation a crash interrupted is left to pi; a graceful restart is
-what the suites exercise.
+
+### Where each lane works (`lanes.ts`, ADR-0032)
+
+One harness serves every lane, but pi resolves the tools' context from the
+run's `Context` alone: `toolContext` is a function of it
+(`harness/runtime/drive/tools.js`). So every call that drives a lane carries
+its name in the `Context` (`laneContext`): `run`, `resume`, `append` and
+`abort`. Everything else comes from the host's `where(lane)`, one source for
+where a lane works. pi's hooks see the lane's name directly. Measured in S36
+item 18, and in `lanes.test.ts` against the harness.
+
+- **`LaneEnv`** is pi's `NodeExecutionEnv` at the lane's directory, behind a
+  proxy whose every method first awaits `where(lane).ready`: the model starts
+  while dependencies install, and only a tool call waits. Its `shellEnv` sets
+  `JJ_EDITOR`, `VISUAL` and `EDITOR` to `false`.
+- **`transform_context`** rewrites every string the model is sent, through
+  `rewritePaths`: a branch inherits its parent's paths, which name another
+  workspace. It runs on pi's messages before they are converted for the
+  provider, and its event names the lane. Stored entries are untouched.
+  `rewriteMessages` leaves image `data` alone.
+- **`before_tool`** refuses a file tool's `path` in another lane's workspace or
+  your working copy, naming the same path under the lane's own (`refusal`).
+- **`before_request`** calls `hooks.turnDone(lane, tip)`, and pi awaits it:
+  every tool of the turn before has finished, so the snapshot never races a
+  write. It reads the tip from the document, not from the lane: asking the
+  lane from inside its own drive could wait on itself. It acts on `assistant`
+  requests only; compaction and summaries request too. `run` and `resume`
+  call it once more after the run, for the last turn. A hook that throws is
+  reported by pi, and the run goes on.
+- **Resume after a crash.** `Agent.interrupted()` lists lanes whose
+  `inspectExecution` shows an open operation; `ThreadLaneHandle.resume()`
+  resumes one in its `Context`. pi records the interrupted tool call as
+  interrupted, never running it again, and the rest of the run uses the
+  directory in `resume`'s `Context`. `lanes.test.ts` reproduces the crash with
+  two agents over one document.
+- **`ask_for_guidance`** is registered for every lane but inactive:
+  `ThreadLaneHandle.withGuidance(on)` adds or removes it with pi's
+  `lane.setActiveTools`, which pi stores in the lane's configuration. The host
+  turns it on exactly while the run's prompt is a land message, and off at
+  every run's end, so a crash cannot leave it on for a later run.
+- **Pineta's own skills** are in `skills/`, loaded after yours and the repo's
+  (`additionalSkillPaths`; pi's loader keeps the first of a name). So a
+  `resolve-conflicts` of yours or the repo's replaces Pineta's.
+  `Agent.skill(name)` reads the file at call time, without its frontmatter,
+  and hashes it. The scripted and named model choices load no resources, so
+  it falls back to the file in `skills/`.
 
 ### pi's checkpoints, stored as text (`checkpoint.ts`)
 
@@ -167,9 +215,11 @@ only work, never correctness, and never touched the host's own stream writes.
 
 `Agent.addReference` is the only writer of the `pineta.reference` value
 namespace, through `Session.setValue` (ADR-0017). It uses the generic value
-path, so conformance continues to cover the storage shape. `setNote` and
-`setArchive` write `pineta.note` and `pineta.archive` the same way (ADR-0025,
-ADR-0029).
+path, so conformance continues to cover the storage shape. `setNote`,
+`setArchive` and `setWorkRecord` write `pineta.note`, `pineta.archive` and the
+four work records the same way (ADR-0025, ADR-0029, ADR-0032): every setter's
+body is one `put`. `setWorkRecord` takes its namespace and key from
+`encodeWorkRecord`, in marginalia.
 
 ### `seq` is derived, not stored
 

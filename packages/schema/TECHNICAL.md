@@ -165,7 +165,17 @@ immutable, so no conversation is lost. A client behind the compacted point
 receives the whole document once.
 
 Every host has a store, an in-memory one when no file is given: Kyneta compacts
-only a document with a store. Only the session is compacted: a client's
+only a document with a store.
+
+**Nothing may be written before the startup compaction.** `exchange.compact`
+advances the document's base to the least common version of the synced peers,
+or, with none, to the current version. A write compacted with no client
+connected moves the base past offset 0; a client then syncs reporting the
+genesis version (`kyneta.genesis:0`), and every later compaction targets it
+and throws in `advance()` ("target offset 0 is behind base offset 1"). Found
+when the host wrote its project record at startup; the host now writes it
+after the startup compaction, and only when it changed. The fix belongs in
+Kyneta: advancing to a target behind the base should do nothing. Only the session is compacted: a client's
 command Line is half written by the client, and Kyneta cannot compact a replica
 of a document another peer writes.
 

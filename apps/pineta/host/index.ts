@@ -20,13 +20,16 @@ import {
 } from "@kyneta/websocket-transport/server"
 import {
   checkEnvironment,
+  type EntryId,
   ERR,
   type Intent,
   type LaneName,
   type NoteId,
   noteId,
+  type ProjectRecord,
   parseMentions,
   planStop,
+  promptOf,
   type RunId,
   referenceId,
   runId,
@@ -36,15 +39,19 @@ import {
 } from "@pineta/core"
 import {
   archivedAt,
+  CHAT_TYPE,
   type ChatDetails,
   type ChatMessage,
   type CitedEntry,
   displayName,
   encodeChat,
   entryText,
+  LAND_TYPE,
+  type LandMessage,
   planArchive,
   planChat,
   planDrain,
+  planLand,
   planNote,
   planNoteEdit,
   planReference,
@@ -68,12 +75,15 @@ import {
 } from "@pineta/protocol/messages"
 import {
   readArchive,
+  readLaneRecords,
   readLanes,
   readNotes,
   readOutbox,
   readParticipantNames,
   readParticipants,
+  readProject,
   readTreeIndex,
+  workAt,
 } from "@pineta/reads"
 import {
   applyStreamOps,
@@ -91,6 +101,7 @@ import {
   presenceDoc,
   readActiveRun,
   readEntryMessage,
+  readLaneTip,
   readStreams,
   SessionDoc,
   type SessionDocHandle,
@@ -107,6 +118,7 @@ import {
 } from "./admission.ts"
 import { writePolicy } from "./policy.ts"
 import { openStore } from "./store.ts"
+import { startLaneWork } from "./work.ts"
 
 export interface EnvironmentInfo {
   readonly node: string
@@ -139,10 +151,16 @@ export interface StartHostOptions {
   readonly key?: string
   /** No default: a suite that forgot one must not spend the person's models. */
   readonly model: ModelChoice
-  /** Where the agent's tools run; absent or null, it has none. */
-  readonly tools?: { readonly cwd: string } | null
-  /** Vite's hot reload. Off for a host whose agent edits the client it serves. */
-  readonly hmr?: boolean
+  /**
+   * The agent's tools, and the project they work in: each lane in its own jj
+   * workspace there (ADR-0032). Absent or null, the agent has none.
+   */
+  readonly tools?: { readonly project: string } | null
+  /**
+   * Whether a lane gets its own workspace by default. False makes every new
+   * root lane work directly in the project (`PINETA_WORKSPACES=0`).
+   */
+  readonly workspaces?: boolean
   /**
    * Where the session is kept: a SQLite file; a Kyneta store a caller made (and
    * closes), as a suite does to control it; or, absent or null, a store in
@@ -183,7 +201,7 @@ export async function startHost({
   key: givenKey,
   model,
   tools = null,
-  hmr = true,
+  workspaces = true,
   store: storeFile = null,
   presenceDecay = PRESENCE_DECAY,
   log = console.log,
@@ -223,12 +241,35 @@ export async function startHost({
   // Only storage is awaited: the host is the authority, with no peer upstream.
   await whenHydrated(doc)
 
+  // --- where lanes work (ADR-0032) -----------------------------------------
+  // The agent is created with this module's `where` and `hooks`, so it reads
+  // the agent lazily.
+  let created: Agent | undefined
+  const theAgent = (): Agent => {
+    if (created === undefined) throw new Error("the agent is not created yet")
+    return created
+  }
+  const work = await startLaneWork({
+    doc,
+    dir: tools?.project ?? null,
+    defaultDirect: !workspaces,
+    agent: theAgent,
+    log,
+  })
+
   // --- pi stack ------------------------------------------------------------
   const agent = await createAgent({
     doc,
     replicaId: newId(),
     model,
-    tools,
+    tools:
+      tools === null
+        ? null
+        : {
+            project: work.project?.root ?? tools.project,
+            where: work.where,
+            hooks: work.hooks,
+          },
     // Gather the lane's streams from the document, plan, execute. The document
     // records what each lane is running and streaming; a second copy here
     // would be two sources of truth.
@@ -244,9 +285,26 @@ export async function startHost({
       )
     },
   })
+  created = agent
+
   log(
-    `[host] agent ready — model ${agent.modelLabel}; tools ${tools === null ? "off" : `on, in ${tools.cwd}`}`,
+    `[host] agent ready — model ${agent.modelLabel}; tools ${tools === null ? "off" : `on, in ${work.project?.root ?? tools.project}`}`,
   )
+
+  // --- hot reload -----------------------------------------------------------
+  // Agents edit their own workspaces, so the page's code changes only by your
+  // hand, and hot reload stays on (ADR-0032). A lane working directly in your
+  // working copy edits the client this host serves, mid-run: while one runs,
+  // updates are held, and its end reloads the page once (ADR-0022's reason).
+  const hotReload = pausedWhile(() => {
+    const project = work.project
+    if (project === null) return false
+    const records = readLaneRecords(doc)
+    return readLanes(doc, readTreeIndex(doc)).some(l => {
+      const w = l.running ? records.get(l.name)?.work : undefined
+      return w?.kind === "direct" && isWithin(w.dir, project.root)
+    })
+  })
 
   // --- command channel (ADR-0007) -----------------------------------------
   const listener = Control.listen(exchange)
@@ -316,33 +374,114 @@ export async function startHost({
   }
 
   /**
-   * Start one turn on a thread's lane, streaming into the document. Its end
-   * enqueues one drain step for that lane: "a run ended" is the only state the
-   * outbox's loop needs.
+   * Start one turn on a thread's lane, streaming into the document: from a
+   * prompt, or resuming what a crash interrupted. The one way a run starts.
+   * Before it, the lane's workspace is made sure of; `ask_for_guidance` is on
+   * exactly while the prompt is a land message. After it, a landing's run
+   * records its outcome, and one drain step is enqueued for the lane: "a run
+   * ended" is the only state the outbox's loop needs.
    */
-  function startRun(lane: LaneName, message: ChatMessage): RunId {
+  function startRun(
+    lane: LaneName,
+    start:
+      | { readonly kind: "prompt"; readonly message: ChatMessage | LandMessage }
+      | { readonly kind: "resume" },
+  ): RunId {
     const id = runId(newId())
     beginRun(doc, lane, id)
+    const handle = agent.lane(lane)
     void (async () => {
       try {
-        const ran = await agent.lane(lane).run(message)
-        if (settleRun(ran) === "keep") {
+        work.beforeRun(lane)
+        await handle.withGuidance(
+          start.kind === "prompt"
+            ? start.message.customType === LAND_TYPE
+            : latestPrompt(lane)?.land === true,
+        )
+        const ran =
+          start.kind === "prompt"
+            ? await handle.run(start.message)
+            : await handle.resume()
+        if (
+          start.kind === "prompt" &&
+          start.message.customType === CHAT_TYPE &&
+          settleRun(ran) === "keep"
+        ) {
           // The reply was already `started`, so the author cannot be told;
           // at least their message is not lost.
           log(`[host] run ${id.slice(-8)} REFUSED: kept as a message`)
-          await agent.lane(lane).append(message)
+          await handle.append(start.message)
         }
       } catch (error) {
         log(
           `[host] run failed: ${error instanceof Error ? error.message : String(error)}`,
         )
       } finally {
+        try {
+          await handle.withGuidance(false)
+          // A landing's run ends with its outcome, however it started.
+          const prompt = latestPrompt(lane)
+          if (prompt?.land === true) await work.landingEnded(lane, prompt.id)
+        } catch (error) {
+          log(
+            `[host] run end failed: ${error instanceof Error ? error.message : String(error)}`,
+          )
+        }
         endRun(doc, lane, id)
         log(`[host] run ${id.slice(-8)} done`)
+        hotReload.runEnded()
         void settle([lane])
       }
     })()
     return id
+  }
+
+  /** The prompt of the lane's latest run, and whether it is a land message. */
+  function latestPrompt(
+    lane: LaneName,
+  ): { readonly id: EntryId; readonly land: boolean } | null {
+    const index = readTreeIndex(doc)
+    const id = promptOf(index, readLaneTip(doc, lane))
+    return id === null
+      ? null
+      : { id, land: index.entries[id]?.message?.role === "land" }
+  }
+
+  /**
+   * A landing (ADR-0033): a busy lane holds it, as it would a message;
+   * otherwise your work is merged into the lane and its resolution runs.
+   */
+  async function startLanding(lane: LaneName, by: WriterId): Promise<Outcome> {
+    const index = readTreeIndex(doc)
+    const planned = planLand({
+      record: readLaneRecords(doc).get(lane),
+      view: readLanes(doc, index).find(l => l.name === lane),
+    })
+    if (planned.kind === "refused")
+      return {
+        kind: "refused",
+        code: planned.code,
+        message: "only a thread with its own workspace can land",
+      }
+    if (planned.kind === "hold") {
+      await agent.hold({
+        kind: "land",
+        id: newId(),
+        lane,
+        by,
+        timestamp: Date.now(),
+      })
+      return { kind: "queued", position: planned.position }
+    }
+    const message = await work.prepareLanding(lane, by)
+    if ("refused" in message) {
+      log(`[host] landing ${lane.slice(-8)} refused: ${message.refused}`)
+      return { kind: "refused", code: ERR.REFUSED, message: message.refused }
+    }
+    return {
+      kind: "started",
+      runId: startRun(lane, { kind: "prompt", message }),
+    }
   }
 
   /**
@@ -354,6 +493,14 @@ export async function startHost({
     for (;;) {
       const step = planDrain(readOutbox(doc), lane)
       if (step.kind === "idle") return
+      if (step.kind === "land") {
+        // Released first: the landing owns it from here, as a run owns its
+        // message. Its run's end brings the next step.
+        await agent.release(step.held.id)
+        const outcome = await startLanding(lane, step.held.by)
+        if (outcome.kind === "refused") continue
+        return
+      }
       const message = encodeChat(step.held.details, step.held.timestamp)
       if (step.kind === "append") {
         // Released only once written: a refused append stays held, and is
@@ -369,16 +516,38 @@ export async function startHost({
       // The run owns the message from here: if pi refuses it, `settleRun`
       // keeps it in the tree.
       await agent.release(step.held.id)
-      startRun(lane, message)
+      startRun(lane, { kind: "prompt", message })
       return
     }
   }
 
-  // No run or stream survives a process: clear them. Nothing else runs yet, so
-  // this needs no serial step. Then settle: drain every lane with messages held
-  // for it, since no run's end will, and compact.
+  // No stream survives a process: clear them. Nothing else runs yet, so this
+  // needs no serial step. A run a crash interrupted is resumed (below). Then
+  // settle: drain every other lane with messages held for it, since no run's
+  // end will, and compact.
   clearStreams(doc)
-  void settle(planStartup({ held: readOutbox(doc) }).drain)
+  // A lane a crash interrupted holds its operation open: it is resumed, in its
+  // own directory, before anything waiting for it (S36 item 18). Its run's end
+  // drains it, as any run's does.
+  const interrupted = await agent.interrupted()
+  for (const lane of interrupted) {
+    log(`[host] resuming lane ${lane.slice(-8)}, which a crash interrupted`)
+    startRun(lane, { kind: "resume" })
+  }
+  void settle(
+    planStartup({ held: readOutbox(doc) }).drain.filter(
+      lane => !interrupted.includes(lane),
+    ),
+  )
+  // What the host found, written only when it changed, and after the startup
+  // compaction: a write compacted with no client connected moves the base
+  // past the genesis version a new client reports, and Kyneta's `advance()`
+  // then throws on every later compaction.
+  const { project } = work
+  if (project !== null && !sameProject(readProject(doc), project))
+    void serially(() =>
+      agent.setWorkRecord({ kind: "project", record: project }),
+    )
 
   /**
    * A human message, from a `chat` command or a sent draft: gather, `threadOf`
@@ -439,6 +608,7 @@ export async function startHost({
         }
       case "hold":
         await agent.hold({
+          kind: "chat",
           id: newId(),
           lane: planned.lane,
           details: planned.details,
@@ -463,9 +633,22 @@ export async function startHost({
       case "run":
         return {
           kind: "started",
-          runId: startRun(planned.lane, message(planned.details)),
+          runId: startRun(planned.lane, {
+            kind: "prompt",
+            message: message(planned.details),
+          }),
         }
       case "createAndRun": {
+        // Where the new lane works: the send's choice, else the lane above,
+        // else the project's default (ADR-0032).
+        const { work: setting } = workAt(doc, index, planned.at, chat.work)
+        const bad = await work.checkDirectory(setting)
+        if (bad !== null)
+          return {
+            kind: "refused",
+            code: bad,
+            message: "there is no such directory to work in",
+          }
         const created = await agent.createThreadLane(planned.at)
         if (created.kind === "refused") {
           return {
@@ -475,9 +658,13 @@ export async function startHost({
           }
         }
         log(`[host] ${writer.slice(-8)} starts lane ${created.lane.slice(-8)}`)
+        await work.prepareLane(created.lane, setting, planned.at, writer)
         return {
           kind: "started",
-          runId: startRun(created.lane, message(planned.details)),
+          runId: startRun(created.lane, {
+            kind: "prompt",
+            message: message(planned.details),
+          }),
         }
       }
     }
@@ -605,6 +792,7 @@ export async function startHost({
             lane: planned.lane,
             asksAgent: false,
             mentions: parseMentions(text),
+            work: null,
           },
           planned.record.contributors.filter(w => w !== writer),
         )
@@ -677,7 +865,12 @@ export async function startHost({
     })
     // execute
     if (planned.kind === "refused") return planned
-    if (planned.kind === "write") await agent.setArchive(planned.record)
+    if (planned.kind === "write") {
+      await agent.setArchive(planned.record)
+      // Its lanes' workspaces follow: forgotten, or their bookmarks back.
+      if (intent.action === "archive") await work.archived(intent.root)
+      else await work.restored(intent.root)
+    }
     return { kind: intent.action === "archive" ? "archived" : "restored" }
   }
 
@@ -751,6 +944,23 @@ export async function startHost({
       }
       case "archive":
         return respond(await handleArchive(writer, intent))
+      case "land":
+        return respond(await startLanding(intent.lane, writer))
+      case "take": {
+        const refused = await work.take(intent.lane)
+        return respond(
+          refused === null
+            ? { kind: "taken" }
+            : {
+                kind: "refused",
+                code: refused,
+                message:
+                  refused === ERR.MOVED
+                    ? "your work moved on since this landing: land again"
+                    : "there is no resolved landing to take",
+              },
+        )
+      }
     }
   }
 
@@ -786,13 +996,15 @@ export async function startHost({
   const vite = await createViteServer({
     root: clientDir,
     configFile: path.join(clientDir, "vite.config.ts"),
+    plugins: [hotReload.plugin],
     server: {
       middlewareMode: true,
       // Vite attaches its own upgrade listener, ahead of the one below, so its
       // socket would bypass admission: hot reload runs on loopback only.
-      hmr: hmr && key === null ? { server: httpServer } : false,
+      hmr: key === null ? { server: httpServer } : false,
     },
   })
+  hotReload.attach(() => vite.ws.send({ type: "full-reload" }))
   // Admission comes first: nothing reaches Vite or the Exchange without it.
   httpServer.on("request", (req, res) => {
     const admission = admits(
@@ -915,6 +1127,44 @@ export async function startHost({
       try {
         stored.close()
       } catch {}
+    },
+  }
+}
+
+/** Whether two project records say the same. */
+const sameProject = (a: ProjectRecord | null, b: ProjectRecord): boolean =>
+  a !== null && JSON.stringify(a) === JSON.stringify(b)
+
+/** Whether `dir` is `root` or inside it. */
+const isWithin = (dir: string, root: string): boolean => {
+  const rel = path.relative(root, dir)
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel))
+}
+
+/**
+ * A Vite plugin that holds hot updates while `paused()` says so, and a hook
+ * that reloads the page once when the pause ends: a run's end is the moment.
+ */
+function pausedWhile(paused: () => boolean) {
+  let held = false
+  let reload = () => {}
+  return {
+    plugin: {
+      name: "pineta:paused-while-direct",
+      handleHotUpdate() {
+        if (!paused()) return undefined
+        held = true
+        return []
+      },
+    },
+    attach(fullReload: () => void) {
+      reload = fullReload
+    },
+    runEnded() {
+      if (held && !paused()) {
+        held = false
+        reload()
+      }
     },
   }
 }

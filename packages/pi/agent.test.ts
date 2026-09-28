@@ -14,8 +14,8 @@ describe("laneErrCode", () => {
     expect(laneErrCode("UnknownTarget")).toBe(ERR.UNKNOWN_TARGET)
     // Nothing navigates a lane any more (ADR-0020).
     expect(laneErrCode("InvalidNavigation")).toBe(ERR.REFUSED)
-    // The host never writes to a running lane (S21), so busy is no special case.
-    expect(laneErrCode("LaneBusy")).toBe(ERR.REFUSED)
+    // A crash leaves pi's operation open: busy until resumed (S36 item 18).
+    expect(laneErrCode("LaneBusy")).toBe(ERR.BUSY)
   })
 
   test("an unrecognised tag is a generic refusal, not a crash", () => {

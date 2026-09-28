@@ -35,6 +35,9 @@ Branches are not one thing. Cost and machinery follow from *capability*:
 
 Aside and Scout are pure conversation-tree operations and need no effect-merge.
 They cover most daily use. **Worktree is deliberately out of v1.**
+*Superseded by ADR-0032: every agent lane has its own jj workspace, so every
+agent lane is a Worktree and an Aside is a conversation thread. Its effect
+merge is a jj merge whose conflicts the agent resolves (ADR-0033).*
 
 ## Merge is three problems, not one
 

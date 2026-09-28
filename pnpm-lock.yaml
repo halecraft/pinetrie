@@ -71,6 +71,9 @@ importers:
       '@pineta/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@pineta/workspaces':
+        specifier: workspace:*
+        version: link:../../packages/workspaces
       vite:
         specifier: 7.1.11
         version: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
@@ -210,6 +213,9 @@ importers:
       '@pineta/schema':
         specifier: workspace:*
         version: link:../schema
+      typebox:
+        specifier: 1.3.27
+        version: 1.3.27
 
   packages/protocol:
     dependencies:
@@ -243,6 +249,12 @@ importers:
       '@kyneta/yjs-schema':
         specifier: link:../../../kyneta/workspace/pineta/packages/schema/backends/yjs
         version: link:../../../kyneta/workspace/pineta/packages/schema/backends/yjs
+      '@pineta/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/workspaces:
+    dependencies:
       '@pineta/core':
         specifier: workspace:*
         version: link:../core

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { firstLine, speakerLabel } from "./names.ts"
+import { speakerLabel } from "./names.ts"
 
 describe("speakerLabel: the current name, and the one it was sent under", () => {
   const names = new Map([["w-duane", "Duane"]])
@@ -15,13 +15,4 @@ describe("speakerLabel: the current name, and the one it was sent under", () => 
     expect(speakerLabel(names, "w-someone", "Bea")).toBe("Bea")
     expect(speakerLabel(names, undefined, "Bea")).toBe("Bea")
   })
-})
-
-test("firstLine: the first non-empty line, cut with an ellipsis only when longer", () => {
-  expect(firstLine("\n  Plan the release \nand more", 40)).toBe(
-    "Plan the release",
-  )
-  expect(firstLine("abcdef", 3)).toBe("abc…")
-  expect(firstLine("abc", 3)).toBe("abc")
-  expect(firstLine("  \n ", 3)).toBe("")
 })

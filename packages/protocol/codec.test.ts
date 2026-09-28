@@ -101,6 +101,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       lane: null,
       asksAgent: true,
       mentions: [{ kind: "agent", agent: THE_AGENT }],
+      work: null,
     },
     {
       kind: "chat",
@@ -110,6 +111,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       lane: laneNameForThread("abc"),
       asksAgent: false,
       mentions: [{ kind: "person", name: "bob" }],
+      work: { kind: "own" },
     },
     {
       kind: "chat",
@@ -119,6 +121,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       lane: null,
       asksAgent: false,
       mentions: [],
+      work: { kind: "direct", dir: "/tmp/elsewhere" },
     },
     { kind: "name", name: "Alice" },
     { kind: "stop", lane: laneNameForThread("abc") },
@@ -152,6 +155,8 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "note", action: { kind: "reopen", note: noteId("n-1") } },
     { kind: "archive", action: "archive", root: entryId("e-1") },
     { kind: "archive", action: "restore", root: entryId("e-1") },
+    { kind: "land", lane: laneNameForThread("abc") },
+    { kind: "take", lane: laneNameForThread("abc") },
   ] as const
   for (const intent of intents) {
     assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
@@ -233,4 +238,23 @@ test("an archive action must be known, and name its root", () => {
     ),
     ERR.UNKNOWN_TARGET,
   )
+})
+
+test("working directly needs a directory; an unknown work kind is refused", () => {
+  const base = {
+    id: "c-2",
+    kind: "chat",
+    text: "go",
+    parentId: "",
+    mode: "branch",
+  }
+  assert.equal(
+    decodeCommand({ ...base, workKind: "direct", workDir: "" }).kind,
+    "refused",
+  )
+  assert.equal(
+    decodeCommand({ ...base, workKind: "elsewhere" }).kind,
+    "refused",
+  )
+  assert.equal(decodeCommand({ ...base, workKind: "" }).kind, "chat")
 })

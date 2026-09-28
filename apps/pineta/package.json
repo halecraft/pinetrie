@@ -22,6 +22,7 @@
     "@pineta/protocol": "workspace:*",
     "@pineta/reads": "workspace:*",
     "@pineta/schema": "workspace:*",
+    "@pineta/workspaces": "workspace:*",
     "vite": "7.1.11",
     "ws": "^8.18.0"
   },

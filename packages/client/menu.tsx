@@ -1,7 +1,7 @@
 // client/menu — the one popover menu: a trigger button and a list of items.
 //
 // The list is `position: fixed`, placed under its trigger from the trigger's
-// rect when it opens: the tab list scrolls sideways, which clips it
+// rect when it opens (above it, for a trigger in the window's lower half): the tab list scrolls sideways, which clips it
 // vertically too, so a list positioned inside it would be cut off
 // (`TECHNICAL.md`, Gotchas). Being fixed, it would drift from its trigger on a
 // scroll or a resize, so either closes it.
@@ -59,7 +59,13 @@ export function Menu({
   heading?: string
   items: readonly MenuItem[]
 }) {
-  const [at, setAt] = useState<{ top: number; right: number } | null>(null)
+  // Below its trigger; above it when the trigger is in the window's lower
+  // half (a composer's), or the list would open past the window's foot.
+  const [at, setAt] = useState<
+    | { readonly top: number; readonly right: number }
+    | { readonly bottom: number; readonly right: number }
+    | null
+  >(null)
   const open = at !== null
   const wrapper = useRef<HTMLSpanElement>(null)
   const button = useRef<HTMLButtonElement>(null)
@@ -70,8 +76,13 @@ export function Menu({
 
   const show = () => {
     const r = button.current?.getBoundingClientRect()
-    if (r !== undefined)
-      setAt({ top: r.bottom, right: window.innerWidth - r.right })
+    if (r === undefined) return
+    const right = window.innerWidth - r.right
+    setAt(
+      r.bottom > window.innerHeight / 2
+        ? { bottom: window.innerHeight - r.top, right }
+        : { top: r.bottom, right },
+    )
   }
   const close = (refocus: boolean) => {
     setAt(null)
@@ -134,7 +145,13 @@ export function Menu({
         <div
           className="menu"
           ref={box}
-          style={{ position: "fixed", top: at.top, right: at.right }}
+          // `top: auto` too: the stylesheet's `.menu` sets a `top`, which would
+          // win over `bottom`.
+          style={{
+            position: "fixed",
+            ...("bottom" in at ? { top: "auto" } : {}),
+            ...at,
+          }}
         >
           {heading !== undefined && (
             <p className="menu-heading" id={headingId}>

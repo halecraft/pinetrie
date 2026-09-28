@@ -13,6 +13,7 @@
     "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
     "@pineta/core": "workspace:*",
     "@pineta/marginalia": "workspace:*",
-    "@pineta/schema": "workspace:*"
+    "@pineta/schema": "workspace:*",
+    "typebox": "1.3.27"
   }
 }

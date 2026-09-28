@@ -8,6 +8,9 @@
 // Everything pi-shaped is converted to OUR shapes here. host/ never sees a pi
 // type, never imports pi, and would keep compiling if pi's surface moved.
 
+import { createHash } from "node:crypto"
+import { readFile } from "node:fs/promises"
+import path from "node:path"
 import {
   BACKGROUND_CONTEXT,
   createBashTool,
@@ -18,7 +21,6 @@ import {
   uuidv7,
   value,
 } from "@earendil-works/pi-agent-core"
-import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
 import { insertEntry } from "@earendil-works/pi-agent-core/harness/session"
 import {
   type ArchiveRecord,
@@ -30,6 +32,7 @@ import {
   laneNameForThread,
   type NoteRecord,
   type Position,
+  rewritePaths,
   type StreamEvent,
   toolLabel,
   type WriterId,
@@ -41,16 +44,35 @@ import {
   encodeHeld,
   encodeNote,
   encodeReference,
+  encodeWorkRecord,
   type Held,
+  type LandMessage,
   NOTE_NAMESPACE,
   OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
   REFERENCE_NAMESPACE,
   type Reference,
+  type WorkRecord,
 } from "@pineta/marginalia"
-import { hasLaneRecord, type SessionDocHandle } from "@pineta/schema"
+import {
+  hasLaneRecord,
+  readLaneNames,
+  readLaneTip,
+  type SessionDocHandle,
+} from "@pineta/schema"
 import { type ModelChoice, setUpModel } from "./config.ts"
 import { buildSystemPrompt, createAgentHarness } from "./deep.ts"
+import {
+  GUIDANCE_TOOL,
+  guidanceTool,
+  type LaneHooks,
+  type LaneWhere,
+  laneContext,
+  laneEnv,
+  laneOf,
+  refusal,
+  rewriteMessages,
+} from "./lanes.ts"
 import { KynetaStorage } from "./storage.ts"
 
 export { KynetaStorage }
@@ -61,6 +83,17 @@ export const CTX = BACKGROUND_CONTEXT
 /** Coordination-free id, used for peer ids. Same generator pi uses for entries. */
 export const newId = (): string => uuidv7()
 
+/** Pineta's own skills, loaded after yours and the repo's: `resolve-conflicts`. */
+const SKILLS_DIR = path.join(import.meta.dirname, "skills")
+
+/** A skill file's instructions: its text after the frontmatter block. */
+export function withoutFrontmatter(text: string): string {
+  const match = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/.exec(text)
+  return (match === null ? text : text.slice(match[0].length)).trim()
+}
+
+export type { LaneHooks, LaneWhere }
+
 export interface CreateAgentOptions {
   readonly doc: SessionDocHandle
   /**
@@ -70,10 +103,16 @@ export interface CreateAgentOptions {
   readonly replicaId: string
   readonly model: ModelChoice
   /**
-   * Where the agent reads, writes, edits and runs commands; null for no tools.
+   * The agent's tools, and where each lane uses them; null for no tools.
    * Tools run as the host's user, so they are on only when asked for.
    */
-  readonly tools: { readonly cwd: string } | null
+  readonly tools: {
+    /** The project: where pi's settings, `AGENTS.md` and skills load from. */
+    readonly project: string
+    /** Where a lane works: its own workspace, or a directory (ADR-0032). */
+    readonly where: (lane: LaneName) => LaneWhere
+    readonly hooks: LaneHooks
+  } | null
   /** What a running turn writes, in Pineta's own words, per lane. */
   readonly onStream?: (event: StreamEvent) => void
 }
@@ -88,11 +127,13 @@ export type WriteOutcome =
  *
  * Pure, so it is unit-testable without a harness. Runs and lane creation
  * refuse with pi TaggedErrors whose `_tag` is the discriminant, and none of
- * pi's vocabulary passes the boundary (ADR-0003). `LaneBusy` cannot arise:
- * the host never writes to a running lane (S21), so it is an ordinary refusal.
+ * pi's vocabulary passes the boundary (ADR-0003). The host never writes to a
+ * running lane (S21), but after a crash pi holds the interrupted operation
+ * open, and the lane is `LaneBusy` until it is resumed (S36 item 18).
  */
 export function laneErrCode(tag: string): ErrCode {
   if (tag === "UnknownTarget") return ERR.UNKNOWN_TARGET
+  if (tag === "LaneBusy") return ERR.BUSY
   return ERR.REFUSED
 }
 
@@ -136,8 +177,15 @@ export interface ThreadLaneHandle {
    * tip, so a write that bypasses it would be dropped from its next turn (S19).
    */
   append(message: ChatMessage): Promise<AppendOutcome>
-  /** Run one turn with `message`, a compelled chat, as the prompt itself (S19). */
-  run(message: ChatMessage): Promise<WriteOutcome>
+  /**
+   * Run one turn with `message` as the prompt itself (S19): a compelled chat,
+   * or a land message (ADR-0033).
+   */
+  run(message: ChatMessage | LandMessage): Promise<WriteOutcome>
+  /** Resume the operation a crash interrupted, in the lane's own directory. */
+  resume(): Promise<WriteOutcome>
+  /** Turn `ask_for_guidance` on or off for this lane's runs. */
+  withGuidance(on: boolean): Promise<void>
   /**
    * End the lane's running turn. A tool running is aborted, and its result
    * recorded as aborted (S22); the lane then takes its next message.
@@ -174,6 +222,19 @@ export interface Agent {
   setNote(note: NoteRecord): Promise<void>
   /** Store a root's archive record in `pineta.archive`, keyed by the root (ADR-0029). */
   setArchive(record: ArchiveRecord): Promise<void>
+  /** Store a lane, revision, landing or project record (ADR-0032, ADR-0033). */
+  setWorkRecord(record: WorkRecord): Promise<void>
+  /** Lanes pi holds an operation open on: a crash interrupted them. */
+  interrupted(): Promise<readonly LaneName[]>
+  /**
+   * A skill by name, read now: yours, then the repo's, then Pineta's own
+   * (pi's loader keeps the first of a name). Null if none has that name.
+   */
+  skill(name: string): Promise<{
+    readonly path: string
+    readonly content: string
+    readonly hash: string
+  } | null>
   stats(): Promise<{ messageCount: number }>
   close(): Promise<void>
 }
@@ -192,12 +253,17 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     {},
   )
 
-  const cwd = options.tools?.cwd ?? process.cwd()
-  const setup = await setUpModel(options.model, { cwd })
+  const lanes = options.tools
+  const project = lanes?.project ?? process.cwd()
+  const setup = await setUpModel(options.model, {
+    cwd: project,
+    skillsDir: SKILLS_DIR,
+  })
   const resolved = setup.model
-  // pi-agent-core's own tools, built for this harness; they run in `cwd`.
-  const tools =
-    options.tools === null
+  // pi-agent-core's own tools, built for this harness. Each lane uses them in
+  // its own directory: `toolContext` below.
+  const fileTools =
+    lanes === null
       ? []
       : [
           createReadTool(),
@@ -205,7 +271,29 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
           createEditTool(),
           createBashTool(),
         ]
-  const toolNames = tools.map(t => t.name)
+  const toolNames = fileTools.map(t => t.name)
+  const tools =
+    lanes === null
+      ? []
+      : [
+          ...fileTools,
+          guidanceTool((lane, q) => lanes.hooks.askedForGuidance(lane, q)),
+        ]
+  // A call with no lane named (none should run tools) works in the project.
+  const whereFor = (lane: LaneName | undefined): LaneWhere =>
+    lanes === null || lane === undefined
+      ? { dir: project, ready: Promise.resolve(), others: [] }
+      : lanes.where(lane)
+  // pi's own prompt, with the repo's context files and the person's skills, so
+  // an extension that shapes pi's prompt sections finds them (S23). It names
+  // the lane's directory, and does not wait for its setup.
+  const promptFor = (dir: string) =>
+    buildSystemPrompt({
+      cwd: dir,
+      selectedTools: toolNames,
+      contextFiles: setup.contextFiles,
+      skills: setup.skills,
+    })
 
   const { harness } = await createAgentHarness(
     {
@@ -214,21 +302,55 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       model: resolved,
       tools: tools as never[],
       activeToolNames: toolNames,
-      toolContext: { env: new NodeExecutionEnv({ cwd }) },
-      // pi's own prompt, with the repo's context files and the person's skills,
-      // so an extension that shapes pi's prompt sections finds them (S23).
-      systemPrompt: buildSystemPrompt({
-        cwd,
-        selectedTools: toolNames,
-        contextFiles: setup.contextFiles,
-        skills: setup.skills,
-      }),
+      toolContext: (context: typeof CTX) => {
+        const where = whereFor(laneOf(context))
+        return { env: laneEnv(where), dir: where.dir }
+      },
+      systemPrompt: (toolContext: { dir: string }) =>
+        promptFor(toolContext.dir),
       // Pineta's outbox means pi's own queue is never used; should it be, it
       // answers one message at a time rather than batching them (S20).
       followUpMode: "one-at-a-time",
     },
     CTX,
   )
+
+  if (lanes !== null) {
+    // The model sees its history as if it had always worked in its own
+    // workspace: the parent's paths, which a branch inherits, are rewritten to
+    // this lane's. True, because the lane started from the files at that
+    // point; stored entries are untouched (ADR-0032).
+    harness.hooks.on("transform_context", event => {
+      const where = lanes.where(event.lane as LaneName)
+      if (where.others.length === 0) return undefined
+      return {
+        messages: rewriteMessages(event.messages, text =>
+          rewritePaths(text, where.others, where.dir),
+        ),
+      }
+    })
+    // The backstop for a path the rewrite missed.
+    harness.hooks.on("before_tool", event => {
+      const reason = refusal(
+        event.toolName,
+        event.args,
+        lanes.where(event.lane as LaneName),
+      )
+      return reason === null ? undefined : { block: { reason } }
+    })
+    // A turn's files, recorded before the next request: every tool of the
+    // turn has finished, and pi awaits this, so no write races the snapshot.
+    // On a run's first request the tip is its prompt. The tip is read from
+    // the document: asking the lane here, inside its own drive, could wait on
+    // itself.
+    harness.hooks.on("before_request", async event => {
+      if (event.step !== "assistant") return undefined
+      const tip = readLaneTip(doc, event.lane)
+      if (tip !== null)
+        await lanes.hooks.turnDone(event.lane as LaneName, entryId(tip))
+      return undefined
+    })
+  }
 
   // Streaming: every harness event carries the lane it happened on, so
   // concurrent threads' streams stay apart. pi's events become `StreamEvent`s
@@ -284,7 +406,15 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
 
   const tagOf = (error: unknown) => (error as { _tag?: unknown })?._tag
 
+  /** The last turn's files, after a run: before-request records every earlier one. */
+  async function afterRun(name: LaneName): Promise<void> {
+    if (lanes === null) return
+    const tip = readLaneTip(doc, name)
+    if (tip !== null) await lanes.hooks.turnDone(name, entryId(tip))
+  }
+
   function threadLane(name: LaneName): ThreadLaneHandle {
+    const ctx = laneContext(name, CTX)
     return {
       name,
       async append(message) {
@@ -294,7 +424,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         try {
           return {
             kind: "appended",
-            id: entryId(await lane.appendMessage(message, CTX)),
+            id: entryId(await lane.appendMessage(message, ctx)),
           }
         } catch (error) {
           const tag = tagOf(error)
@@ -310,15 +440,41 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         // `RunResult` is a Result union. A run that pi admitted and that then
         // failed is still "ok" here: it ran. Only an admission refusal is
         // `refused`.
-        const result = await lane.prompt(message, CTX)
-        return result.ok ? { kind: "ok" } : refused(result.error)
+        const result = await lane.prompt(message, ctx)
+        if (!result.ok) return refused(result.error)
+        await afterRun(name)
+        return { kind: "ok" }
+      },
+      async resume() {
+        const lane = await existing(name)
+        if (lane === undefined)
+          return { kind: "refused", code: ERR.UNKNOWN_TARGET }
+        // pi records a tool call the crash interrupted as interrupted, never
+        // running it again; the run then continues in the lane's directory.
+        const result = await lane.resume(ctx)
+        if (!result.ok) return refused(result.error)
+        await afterRun(name)
+        return { kind: "ok" }
+      },
+      async withGuidance(on) {
+        const lane = await existing(name)
+        if (lane === undefined || lanes === null) return
+        const active = await lane.getActiveTools(ctx)
+        const next = on
+          ? [...new Set([...active, GUIDANCE_TOOL])]
+          : active.filter(t => t !== GUIDANCE_TOOL)
+        if (next.length !== active.length) await lane.setActiveTools(next, ctx)
       },
       async abort() {
         const lane = await existing(name)
-        if (lane !== undefined) await lane.abort(CTX)
+        if (lane !== undefined) await lane.abort(ctx)
       },
     }
   }
+
+  /** One value written at `namespace`/`key`: every setter's body. */
+  const put = (namespace: string, key: string, stored: unknown) =>
+    session.setValue(value(namespace, key), stored as never, CTX)
 
   return {
     modelLabel: `${resolved.provider}/${resolved.id}`,
@@ -362,11 +518,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     },
 
     async hold(item) {
-      await session.setValue(
-        value(OUTBOX_NAMESPACE, item.id),
-        encodeHeld(item),
-        CTX,
-      )
+      await put(OUTBOX_NAMESPACE, item.id, encodeHeld(item))
     },
 
     async release(id) {
@@ -374,35 +526,48 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     },
 
     async addReference(reference) {
-      await session.setValue(
-        value(REFERENCE_NAMESPACE, reference.id),
-        encodeReference(reference),
-        CTX,
-      )
+      await put(REFERENCE_NAMESPACE, reference.id, encodeReference(reference))
     },
 
     async setParticipantName(writer, displayName) {
-      await session.setValue(
-        value(PARTICIPANT_NAMESPACE, writer),
-        displayName,
-        CTX,
-      )
+      await put(PARTICIPANT_NAMESPACE, writer, displayName)
     },
 
     async setNote(note) {
-      await session.setValue(
-        value(NOTE_NAMESPACE, note.id),
-        encodeNote(note),
-        CTX,
-      )
+      await put(NOTE_NAMESPACE, note.id, encodeNote(note))
     },
 
     async setArchive(record) {
-      await session.setValue(
-        value(ARCHIVE_NAMESPACE, record.root),
-        encodeArchive(record),
-        CTX,
-      )
+      await put(ARCHIVE_NAMESPACE, record.root, encodeArchive(record))
+    },
+
+    async setWorkRecord(record) {
+      const { namespace, key, value: stored } = encodeWorkRecord(record)
+      await put(namespace, key, stored)
+    },
+
+    async interrupted() {
+      const out: LaneName[] = []
+      for (const stored of readLaneNames(doc)) {
+        const name = stored as LaneName
+        const lane = await existing(name)
+        if (lane === undefined) continue
+        const info = await lane.inspectExecution(CTX)
+        if (info.current !== null) out.push(name)
+      }
+      return out
+    },
+
+    async skill(name) {
+      const found = (setup.skills ?? []).find(s => s.name === name)?.filePath
+      const file = found ?? path.join(SKILLS_DIR, name, "SKILL.md")
+      const text = await readFile(file, "utf8").catch(() => null)
+      if (text === null) return null
+      return {
+        path: file,
+        content: withoutFrontmatter(text),
+        hash: createHash("sha256").update(text).digest("hex"),
+      }
     },
 
     async stats() {

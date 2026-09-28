@@ -131,6 +131,14 @@ export const ERR = {
   ARCHIVED: "archived",
   /** Archiving a root where the agent is working or messages are waiting. */
   ROOT_BUSY: "root_busy",
+  /** A lane pi holds an operation open on: after a crash, until it resumes. */
+  BUSY: "busy",
+  /** Landing a lane that has no workspace of its own: it works directly. */
+  NOT_OWN_COPY: "not_own_copy",
+  /** Taking a landing after your `@-` moved on: land again. */
+  MOVED: "moved",
+  /** A lane asked to work directly in a directory that is not one. */
+  BAD_DIRECTORY: "bad_directory",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -183,6 +191,12 @@ export type Intent =
       /** A Start Agent column: with no mention, the agent is asked. */
       readonly asksAgent: boolean
       readonly mentions: readonly Mention[]
+      /**
+       * Where a lane this message creates works: its own copy, or directly in
+       * a directory. Null: the lane above's setting, else the project's
+       * default (ADR-0032). Read only when the message creates a lane.
+       */
+      readonly work: WorkSetting | null
     }
   /** Set the sender's display name: a label, never an identity. */
   | { readonly kind: "name"; readonly name: string }
@@ -196,6 +210,10 @@ export type Intent =
       readonly action: ArchiveAction
       readonly root: EntryId
     }
+  /** Merge your work into a lane, and have the agent resolve it (ADR-0033). */
+  | { readonly kind: "land"; readonly lane: LaneName }
+  /** Put your working copy on a lane's resolved landing (ADR-0033). */
+  | { readonly kind: "take"; readonly lane: LaneName }
 
 // --- the archive (ADR-0029) --------------------------------------------------
 
@@ -211,6 +229,92 @@ export interface ArchiveRecord {
   readonly state: "archived" | "restored"
   readonly by: WriterId
   /** When it last changed, in ms since the epoch. */
+  readonly at: number
+}
+
+// --- where lanes work (ADR-0032, ADR-0033) -----------------------------------
+
+/**
+ * What stops an editor from opening, for jj and for a lane's shell: a shell
+ * with no terminal would wait on one until its timeout (S36 items 13 and 21).
+ * With these, a command that wants one fails at once.
+ */
+export const NO_EDITOR = {
+  JJ_EDITOR: "false",
+  VISUAL: "false",
+  EDITOR: "false",
+} as const
+
+declare const commitIdBrand: unique symbol
+/**
+ * A jj commit id, full hex. A revision a lane builds on is immutable, so its
+ * commit id never changes: never a change id, which names a commit's latest
+ * rewrite.
+ */
+export type CommitId = string & { readonly [commitIdBrand]: true }
+export const commitId = (id: string): CommitId => id as CommitId
+
+/** Where a lane's tools work: its own jj workspace, or directly in a directory. */
+export type WorkSetting =
+  | { readonly kind: "own" }
+  | { readonly kind: "direct"; readonly dir: string }
+
+/**
+ * A lane's record: a host-written `pineta.lane` value keyed by the lane's
+ * name, written once, when the lane is created. The setting never changes:
+ * a lane's files would stop matching its conversation (ADR-0032).
+ */
+export interface LaneRecord {
+  readonly lane: LaneName
+  readonly work: WorkSetting
+  readonly by: WriterId
+  readonly createdAt: number
+}
+
+/**
+ * The files at an entry: a host-written `pineta.revision` value keyed by the
+ * entry's id. Every run's prompt has one (the files the run starts with), and
+ * so does every assistant message whose tool calls changed files. So the
+ * nearest record above any entry names both its lane and its files
+ * (`nearestRevision`).
+ */
+export interface RevisionRecord {
+  readonly entry: EntryId
+  readonly lane: LaneName
+  /** Null for a lane that works directly: it has no revisions. */
+  readonly commit: CommitId | null
+}
+
+/**
+ * What the host found where it runs: a host-written `pineta.project` value,
+ * written at a start when it changed. With `direct`, no lane can have its own
+ * copy. With `workspaces`, a new root lane gets `rootDefault`
+ * (`PINETA_WORKSPACES=0` makes it `direct`), and any lane may choose either.
+ */
+export type ProjectRecord =
+  | {
+      readonly kind: "workspaces"
+      readonly root: string
+      readonly rootDefault: "own" | "direct"
+    }
+  | { readonly kind: "direct"; readonly root: string; readonly reason: string }
+
+/**
+ * How a landing ended: a host-written `pineta.landing` value keyed by its own
+ * id, written when its run ends. A landing in progress has no record: it is a
+ * running lane whose prompt is a land message.
+ */
+export interface LandingRecord {
+  readonly id: string
+  readonly lane: LaneName
+  /** The land message that started it. */
+  readonly prompt: EntryId
+  /** Your `@-` when it merged: taking it is refused once that moves. */
+  readonly yours: readonly CommitId[]
+  /** The lane's newest revision when the run ended. */
+  readonly result: CommitId
+  readonly state: "resolved" | "needs_you" | "taken"
+  readonly by: WriterId
   readonly at: number
 }
 
@@ -553,3 +657,4 @@ export * from "./presence.ts"
 export * from "./roots.ts"
 export * from "./tools.ts"
 export * from "./tree.ts"
+export * from "./work.ts"

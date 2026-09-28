@@ -3,7 +3,8 @@
 The notes and links people write in the margins of the agent's work. Each shape
 is stored in pi's extension slots and typed here, by Pineta, which is its single
 authority. Every module decodes through `decodeWith` (`decode.ts`), which is
-total: a malformed value is dropped, never thrown.
+total: a malformed value is dropped, never thrown. `decodeAll` does it for a
+namespace's stored values.
 
 Namespaces are stored data and name the owner, `pineta.`, following pi's own
 `pi.` convention. They deliberately do not follow the package name: renaming a
@@ -62,7 +63,10 @@ are the only code that builds or reads the shape.
 
 A thread's lane is never written while it runs (S21), so every message for a
 busy thread waits in `pineta.outbox`, keyed by its own id (ADR-0016), with a
-total decoder like every shape here. Ids are uuidv7, so `heldMessages` sorts
+total decoder like every shape here. A landing waits there too (ADR-0033): a
+held item is `kind: "chat"` or `kind: "land"`, and a record stored before
+landings, with no `kind`, decodes as a chat. `heldBy` and `heldRuns` read
+either kind; `planDrain` takes a held landing as a run. Ids are uuidv7, so `heldMessages` sorts
 into send order, and `nextHeld` takes a lane's oldest. "A lane with messages
 waiting" counts as busy even between two of them, or a new message would jump
 the queue. The host executes three pure decisions from here:
@@ -132,6 +136,51 @@ is hidden and made read-only, never removed, and restoring keeps the record.
 - **Yjs writes are not refused for archiving.** A note's text in an archived
   root stays writable to the host's policy, as ADR-0026 requires (a refused
   write cannot be recovered from, S28); the screen offers no editor there.
+
+# Where lanes work (`work.ts`, ADR-0032)
+
+Four host-written records, each with a total decoder. `encodeWorkRecord` is
+the one place their namespaces and keys are chosen, and the agent writes them
+through one `setWorkRecord`:
+
+| record | namespace | key | written |
+|---|---|---|---|
+| a lane's setting: its own copy, or directly in a directory | `pineta.lane` | the lane | once, when the lane is created |
+| the files at an entry | `pineta.revision` | the entry | for every run's prompt, and every assistant message whose tool calls changed files |
+| how a landing ended | `pineta.landing` | its own id | when its run ends; again when taken |
+| what the host found where it runs | `pineta.project` | `project` | at a start, when it changed |
+
+- **Every run's prompt has a revision record**, so the nearest record above
+  any entry names both its lane and its files (`nearestRevision`, in core). A
+  lane working directly records its prompts with no commit: it counts as the
+  lane above, and the walk passes it for files. `planTurnRecord` is the rule.
+- **A landing in progress has no record**: it is a running lane whose prompt is
+  a land message. A `running` state would repeat that, and a crash would
+  leave it stale. A run whose prompt is a land message ends with the
+  landing's outcome, however it started: from a send, the outbox or a resume.
+- **`planLand`** refuses a lane with no workspace of its own, and holds a
+  landing for a busy lane as it would a message (`isBusy`).
+- **`planTake`** takes only a resolved landing, and only while your `@-` is
+  the one it merged: `jj rebase -r @` moves only `@`, so a commit you made
+  since would drop out of `@`'s ancestry.
+- **`landingOutcome`** is resolved only when the agent did not ask for
+  guidance and jj finds no conflicts: the agent can always stop, and can never
+  claim a success the repository contradicts (ADR-0033).
+
+# Landing's prompt (`land.ts`, ADR-0033)
+
+A land message is a pi `CustomMessage`, `customType: "pineta.land"`, like a
+chat. Its `content` is what the model reads: the resolution skill, then each
+conflicted file with its markers and both sides, labelled `ours` (the lane)
+and `theirs` (what comes in), each with why it changed the file. Its `details`
+are what the column shows: `landLine`'s one line, from the file count.
+`renderableMessage` makes it role `land`, and `entryText` its line, so citing
+it cites that line, never the prompt.
+
+`planResolution` builds it. Over its budget, each side's reasons are trimmed,
+oldest first; the labels, both sides and every file's content are always
+kept (ADR-0010). The skill's path and a hash of its content are recorded, so a
+surprising resolution can be traced to the policy that produced it.
 
 # Participants (`participant.ts`)
 

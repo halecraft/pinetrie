@@ -6,6 +6,7 @@
 
 import type { WriterId } from "./index.ts"
 import {
+  isBusy,
   type LaneView,
   projectRail,
   rootOf,
@@ -62,12 +63,11 @@ export function rootWork(
 ): ReadonlyMap<string, "running" | "waiting"> {
   const work = new Map<string, "running" | "waiting">()
   for (const lane of lanes) {
-    if (lane.tip === null) continue
+    if (lane.tip === null || !isBusy(lane)) continue
     const root = rootOf(index, lane.tip)
     if (root === null) continue
     if (lane.running) work.set(root, "running")
-    else if (lane.waiting > 0 && work.get(root) !== "running")
-      work.set(root, "waiting")
+    else if (work.get(root) !== "running") work.set(root, "waiting")
   }
   return work
 }

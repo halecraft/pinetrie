@@ -86,9 +86,19 @@ test("reads declares only core, schema and marginalia: no pi, no transport", () 
   ])
 })
 
+test("workspaces declares only core: it runs jj, never pi or the document", () => {
+  assert.deepEqual(deps(read("packages/workspaces")), ["@pineta/core"])
+})
+
 test("the client declares no server package and no app", () => {
   const client = deps(read("packages/client"))
-  for (const forbidden of ["ws", "vite", "@pineta/app", "@pineta/pi"]) {
+  for (const forbidden of [
+    "ws",
+    "vite",
+    "@pineta/app",
+    "@pineta/pi",
+    "@pineta/workspaces",
+  ]) {
     assert.ok(
       !client.includes(forbidden),
       `client must not depend on ${forbidden}`,

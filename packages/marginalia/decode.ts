@@ -15,3 +15,16 @@ export function decodeWith<S extends TSchema, T>(
 ): T | undefined {
   return Value.Check(schema, value) ? build(value as Static<S>) : undefined
 }
+
+/** Every stored value `decode` accepts, in the order given; the rest dropped. */
+export function decodeAll<T>(
+  values: Iterable<{ readonly value: unknown }>,
+  decode: (value: unknown) => T | undefined,
+): T[] {
+  const out: T[] = []
+  for (const { value } of values) {
+    const decoded = decode(value)
+    if (decoded !== undefined) out.push(decoded)
+  }
+  return out
+}

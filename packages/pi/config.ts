@@ -75,7 +75,12 @@ export interface ModelSetup {
 
 export async function setUpModel(
   choice: ModelChoice,
-  where: { readonly cwd: string; readonly agentDir?: string },
+  where: {
+    readonly cwd: string
+    readonly agentDir?: string
+    /** Pineta's own skills: loaded after yours and the repo's, so yours win by name. */
+    readonly skillsDir?: string
+  },
 ): Promise<ModelSetup> {
   const agentDir = where.agentDir ?? DEFAULT_AGENT_DIR
   switch (choice.kind) {
@@ -100,6 +105,9 @@ export async function setUpModel(
         cwd: where.cwd,
         agentDir,
         settingsManager,
+        ...(where.skillsDir === undefined
+          ? {}
+          : { additionalSkillPaths: [where.skillsDir] }),
       })
       await loader.reload()
       const models = await openRuntime(agentDir)

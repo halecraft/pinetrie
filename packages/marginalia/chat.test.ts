@@ -16,7 +16,9 @@ import {
   decodeChat,
   encodeChat,
   entryText,
+  heldBy,
   heldMessages,
+  heldRuns,
   nextHeld,
   participants,
   planChat,
@@ -284,11 +286,37 @@ describe("outbox", () => {
     ])
     expect(nextHeld(h, laneNameForThread("1"))?.id).toBe("2-b")
   })
+  test("a held record stored before landings had no kind, and is a chat", () => {
+    const [h] = heldMessages([{ value: held("1-a", "t-1") }])
+    expect(h?.kind).toBe("chat")
+  })
+  test("a held landing decodes as one, runs the agent, and is its asker's", () => {
+    const land = {
+      kind: "land",
+      id: "1-a",
+      lane: "t-1",
+      by: ALICE,
+      timestamp: 1,
+    }
+    const [h] = heldMessages([
+      { value: land },
+      { value: { ...land, id: "2-b", by: 3 } },
+    ])
+    expect(h).toMatchObject({ kind: "land", by: ALICE })
+    expect(h === undefined ? null : [heldRuns(h), heldBy(h)]).toEqual([
+      true,
+      ALICE,
+    ])
+    expect(
+      heldMessages([{ value: land }, { value: { ...land, id: "2-b", by: 3 } }]),
+    ).toHaveLength(1)
+  })
 })
 
 describe("draining, settling and starting up", () => {
   const LANE1 = laneNameForThread("1")
   const held = (id: string, compels: Responder) => ({
+    kind: "chat" as const,
     id,
     lane: LANE1,
     details: {
@@ -308,6 +336,16 @@ describe("draining, settling and starting up", () => {
       kind: "run",
     })
     expect(planDrain([], LANE1)).toEqual({ kind: "idle" })
+    const land = {
+      kind: "land" as const,
+      id: "0-z",
+      lane: LANE1,
+      by: ALICE,
+      timestamp: 1,
+    }
+    expect(planDrain([land, held("1-a", NOBODY)], LANE1)).toMatchObject({
+      kind: "land",
+    })
   })
   test("settleRun: a refused run keeps the message; an admitted one is done", () => {
     expect(settleRun({ kind: "refused" })).toBe("keep")

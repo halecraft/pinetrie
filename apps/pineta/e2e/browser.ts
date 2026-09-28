@@ -21,8 +21,7 @@
 //
 // Override the endpoint with PW_SERVER if you used a different port.
 
-import { mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { existsSync } from "node:fs"
 import path from "node:path"
 import { connectSession } from "@pineta/client/session"
 import { atEntry, entryId, handleOf, projectRail, ROOT } from "@pineta/core"
@@ -34,7 +33,7 @@ import {
 } from "@pineta/reads"
 import { type Browser, chromium, type Page } from "@playwright/test"
 import { startHost } from "../host/index.ts"
-import { createChecks, waitFor } from "./harness.ts"
+import { committedProject, createChecks, waitFor } from "./harness.ts"
 
 const PW_SERVER = process.env.PW_SERVER ?? "ws://localhost:3100/"
 /** The ⋯ of the tab you are on: every root tab has one, shown on hover. */
@@ -1146,13 +1145,14 @@ try {
 
   // ── tools: rows, live output, and Stop, on a scripted host ─────────────
   {
-    const work = mkdtempSync(path.join(tmpdir(), "pineta-browser-tools-"))
-    writeFileSync(path.join(work, "notes.txt"), "the secret word is MANGO\n")
+    const work = committedProject("pineta-browser-tools-", {
+      "notes.txt": "the secret word is MANGO\n",
+    })
     // Slow enough that a reply is seen while it is still being written.
     const script = scriptedModel({ tokensPerSecond: 60 })
     const toolHost = await startHost({
       model: { kind: "scripted", script },
-      tools: { cwd: work },
+      tools: { project: work },
       log: () => {},
     })
     const tp = await browser.newPage()
@@ -1170,6 +1170,25 @@ try {
           () => true,
           () => false,
         )
+
+      // ── where the agent will work, said before sending (ADR-0032) ───────
+      const send = `${col(0)} .composer .send`
+      await tp.fill(`${col(0)} .composer .input`, "what is in notes?")
+      const ownWords = await tp.textContent(send)
+      const chose = await chooseFromMenu(
+        tp,
+        `${col(0)} .where-trigger`,
+        ".where-yours",
+      )
+      const directWords = await tp.textContent(send)
+      await chooseFromMenu(tp, `${col(0)} .where-trigger`, ".where-own")
+      ok(
+        ownWords === "send · agent will reply · in its own copy" &&
+          chose &&
+          directWords === "send · agent will reply · in your working copy" &&
+          (await tp.textContent(send)) === ownWords,
+        `the send button says where the new thread's agent works, and the menu changes it (${directWords})`,
+      )
 
       script.use([
         { text: "Let me look.", tool: "read", args: { path: "notes.txt" } },
@@ -1287,6 +1306,33 @@ try {
       ok(
         widths.column === widths.basis && widths.overflow === 0,
         `a long code line and a long tool label leave the column at 28rem, with nothing past its side (${JSON.stringify(widths)})`,
+      )
+
+      // ── landing, and taking it, from the column's header (ADR-0033) ─────
+      ok(
+        (await tp.textContent(`${col(0)} .column-head .where`))?.startsWith(
+          "own copy",
+        ) === true,
+        "the column's header says the thread works in its own copy",
+      )
+      script.use([
+        { tool: "write", args: { path: "from-lane.txt", content: "lane\n" } },
+        { text: "written" },
+      ])
+      await say("write a file")
+      await toolIdle()
+      script.use([{ text: "nothing conflicts" }])
+      await tp.click(`${col(0)} .column-head .land`)
+      const takeShown = await appears(`${col(0)} .column-head .take`)
+      if (takeShown) await tp.click(`${col(0)} .column-head .take`)
+      const took =
+        (await waitFor(
+          () => existsSync(path.join(work, "from-lane.txt")),
+          10_000,
+        )) >= 0
+      ok(
+        takeShown && took,
+        "land shows Take once resolved, and Take brings the thread's work into your working copy",
       )
 
       // ── markdown: drawn, and a selection in it cites its source ───────────

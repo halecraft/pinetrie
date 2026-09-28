@@ -4,6 +4,8 @@ export {
   type CreateAgentOptions,
   createAgent,
   KynetaStorage,
+  type LaneHooks,
+  type LaneWhere,
   newId,
   type ThreadLaneHandle,
   type WriteOutcome,

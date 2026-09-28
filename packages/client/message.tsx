@@ -54,7 +54,9 @@ export function Message(p: MessageProps) {
         )
       : node.role === "assistant"
         ? "agent"
-        : node.role
+        : node.role === "land"
+          ? "landing"
+          : node.role
   const classes = [
     "msg",
     node.role,

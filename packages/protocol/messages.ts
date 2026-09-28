@@ -40,6 +40,9 @@ export const HOST_PEER_ID = "host"
  *     the note `targetId`.
  *   - `archive` hides the root `targetId` for everyone, or restores it
  *     (ADR-0029); `mode` names the action, `archive` or `restore`.
+ *   - `land` merges your work into the thread whose lane is `lane`, and runs
+ *     the agent's resolution (ADR-0033); `take` puts your working copy on that
+ *     lane's resolved landing.
  */
 export const COMMAND_KINDS = [
   "chat",
@@ -48,6 +51,8 @@ export const COMMAND_KINDS = [
   "stop",
   "note",
   "archive",
+  "land",
+  "take",
 ] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -75,6 +80,12 @@ export interface Command {
   readonly lane: string
   /** `chat`: a Start Agent column, where no mention asks the agent. */
   readonly asksAgent: boolean
+  /**
+   * `chat`: where a lane it creates works: `own`, `direct` (in `workDir`), or
+   * `""` for the lane above's setting (ADR-0032).
+   */
+  readonly workKind: string
+  readonly workDir: string
   /** `reference`: the entry cited; `note`: the note acted on. Separate from `parentId` on purpose. */
   readonly targetId: string
   /** `reference`: a span's bounds, or -1 for the whole entry (the wire is total). */
@@ -97,6 +108,7 @@ export const OUTCOME_KINDS = [
   "noted",
   "archived",
   "restored",
+  "taken",
   "refused",
 ] as const
 export type OutcomeKind = (typeof OUTCOME_KINDS)[number]
@@ -132,6 +144,8 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   mode: "",
   lane: "",
   asksAgent: false,
+  workKind: "",
+  workDir: "",
   targetId: "",
   spanStart: -1,
   spanEnd: -1,

@@ -125,7 +125,8 @@ The lift comes from the structure, not from model strength.
 
 ## ADR-0010 — A fold is destination-relative; the `ours` leg is mandatory
 
-**Status:** Accepted (from S5)
+**Status:** Accepted (from S5). Applied to files by ADR-0033: resolving a
+merge's conflicts gets labelled sides, and never loses the destination's.
 
 **Context.** S5's ablation A ran the fold with only the `theirs` leg. The output
 was not a *degraded* fold — it was **confidently wrong**, recommending a design
@@ -1023,7 +1024,9 @@ a policy for when to speak.
 ## ADR-0019 — A lane is a line of work, not a unit of parallelism
 
 **Status:** Accepted. Refines ADR-0011 and ADR-0018; shapes ADR-0010. Amended by
-ADR-0020 (people own no lanes, so there are no conversation lanes).
+ADR-0020 (people own no lanes, so there are no conversation lanes), and by
+ADR-0032 (every lane has a workspace; no line of work is on the main working
+copy).
 
 **Context.** A pi lane is a named cursor into the session tree: a tip where the
 next entry attaches, and its own run state, one model turn at a time
@@ -1133,7 +1136,8 @@ not show either works).
 ## ADR-0021 — A thread's mode is its lane; a mention picks the addressee
 
 **Status:** Accepted. Amends ADR-0018 and ADR-0020. Amended by ADR-0029
-(Start Chat and Start Agent become the add tab).
+(Start Chat and Start Agent become the add tab), and by ADR-0032 (a workspace
+is created with the lane, not as its own step).
 
 **Context.** ADR-0018 stored a default at an entry (`pineta.thread`): below a
 *working session* entry the agent answers every message, below a
@@ -1218,7 +1222,8 @@ second record this ADR removes).
 
 **Status:** Accepted. Evidence: S22, S23. Implemented by
 `PLAN-2026-09-27-agent-tools`. Amended by ADR-0023:
-the session is compacted, on `json.bind`.
+the session is compacted, on `json.bind`. Amended by ADR-0032: the agent's
+tools run in its lane's workspace, never in the repo the host runs from.
 
 **Context.** To use Pineta to build Pineta, its agent needs pi's editing
 abilities: read, write, edit, and run commands. Pineta is shared, streamed and
@@ -1995,3 +2000,661 @@ Collapsing runs in the columns too (a separate decision; the column is where a
 run is read). A red mark on a capsule holding a failed tool call (tried: nothing
 said what it meant, and it did not lead to the failure; the label counts
 failures instead).
+
+## ADR-0032 — A lane works in its own jj workspace, and each turn that changes files is a revision
+
+**Status:** Accepted. Evidence: S36. Implemented by
+`PLAN-2026-09-27-workspaces`. Amends ADR-0019 (the trunk is no longer
+a line of work on the main working copy), ADR-0021 (a workspace is no longer
+its own step) and ADR-0022 (the agent no longer works in the repo the host
+runs from). Changes the vision's branch kinds (`docs/00-vision.md`): every
+agent lane is a Worktree.
+
+**Context.** The agent's tools run in the repo the host runs from, so two
+threads running tools at once share one directory and can collide. ADR-0022
+accepted that until each lane had a workspace. ADR-0019 said a work lane would
+own a jj workspace, created with the lane. ADR-0021 then made the workspace
+its own step, taken deliberately, because it spends disk and CPU.
+
+S36 measured that cost. `jj workspace add` takes 0.2 s for this repo. The
+expensive part is dependencies: `pnpm install --offline` from pnpm's store
+takes 2–3 s and about 7 MB, and a copy-on-write clone of every `node_modules`
+about 6 s and 11 MB on APFS. Creating the workspace at
+the agent's first write instead would save that for read-only threads. But
+writes through `bash` cannot be detected without a sandbox, and the agent
+would see its directory change mid-run: a symlink swap cannot hide the real
+path (S36 item 8).
+
+A branch reads everything above it, so a lane forked from an agent's message
+should also start with the files as they were at that message. jj already
+records file states as revisions, and a jj merge takes only what is new, as a
+fold does (S36 items 11 and 12).
+
+**Decision.**
+- **Every lane has its own jj workspace, created with the lane.** The
+  directory is `workspace/<lane>` in the repo, and the jj workspace has the
+  lane's name. The host lists `/workspace/` in `.git/info/exclude`, so no
+  tracked file changes (S36 item 16). Nothing stored maps a lane to its
+  workspace. Setup runs alongside the model's first turn, and a tool call that
+  arrives first waits for it. A conversation thread has no lane, so it has no
+  workspace. A host started without tools creates none. A lane that works
+  directly (below) has none either.
+- **Where repos are is asked of jj, never inferred from the file system.**
+  A secondary workspace's `.jj/repo` is a file, not a directory, and from
+  inside a jj workspace nested in another repo, git names the outer repo
+  (S36 item 17). Every lane's workspace has that shape. So:
+  - the project is `jj workspace root --ignore-working-copy`, run from the
+    host's directory;
+  - the lanes' directories come from `jj workspace list`;
+  - "your working copy" is the workspace the host runs from, which need not
+    be `default`.
+
+  No code looks for `.jj` or `.git` itself. Every jj command the host runs
+  takes `-R <root>`, never relying on its own working directory, since a
+  command run from the wrong directory acts on whatever repo surrounds it.
+  The host acts on each command's exit status, never on its printed output
+  (S36 item 28). `jj git init` is the one exception: it runs with the
+  directory as its working directory, because `-R` needs an existing repo
+  (S36 item 24).
+- **A project with no jj repo is initialized.** Only when jj finds no repo
+  does the host ask git (`git rev-parse --show-toplevel`):
+  - **git names a repo:** `jj git init --colocate` at its top level. git keeps
+    working, and removing `.jj` undoes it.
+  - **git finds none:** `jj git init` in the host's directory, which creates
+    both (S36 item 15).
+  - **your home directory or `/`:** never initialized, whichever step would
+    initialize there. A home directory that is a dotfiles repo would
+    otherwise be what git names; lanes then work directly.
+
+  jj's own init is the last word: if it refuses, the host reports why, and
+  lanes work directly. In a git worktree it refuses to colocate (S36
+  item 24). The host says at startup what it found and what it
+  did. A directory that a lane names to work in is never initialized.
+- **A lane can instead work directly in a directory.** A lane's workspace
+  setting is either:
+  - **own copy** (the default): the workspace this ADR describes;
+  - **directly in a directory**: the tools run in a directory you name, your
+    working copy by default, repo or not, with no workspace and no revisions.
+
+  The setting is chosen when the lane is created, at the send that first asks
+  the agent (ADR-0021). The send button says where, as it says what: "send ·
+  agent will reply · in its own copy ▾". A new lane inherits the setting, and
+  the directory, from the lane above its fork point. A root lane takes the
+  host's default: own copy, unless `PINETA_WORKSPACES=0` or the project could
+  not be initialized. The setting never changes on an existing lane, since
+  the files and the conversation would then disagree (the reason lanes never
+  move, ADR-0020): to work differently, branch and choose again. So it is
+  stored, in a host-written value per lane, written once. A lane that works
+  directly records its prompts with no commit, so a lane of its own copy
+  branched below it starts from the nearest revision above, or `@-`.
+- **Your working copy is yours.** No agent writes to it, except a lane you set
+  to work directly there. Otherwise the host's code and the page it serves
+  never change under a run, so hot reload comes back on (off while a lane
+  works directly in your working copy), and "run `jj new` first" is no
+  longer needed. Context
+  files and skills are still read from your working copy (ADR-0022), not the
+  lane's.
+- **A lane starts with the files at its fork point.** A revision is recorded
+  against every run's prompt (the files the run starts with) and against
+  every message whose tool calls changed files (below). A lane created at
+  entry E starts its workspace from the nearest revision at or above E. The
+  nearest record above E also names the lane E belongs to, which is where a
+  new lane inherits its setting from. With no revision above, a lane starts
+  from `@-`, resolved when the lane is created: everything
+  you have committed, not what you are still editing. After `jj new`, that is
+  exactly your files. When your working copy has changes, the composer says
+  the agent will not see them.
+- **A turn revision per assistant message whose tool calls changed files.**
+  pi calls an assistant message and its tool results a turn. When a message's
+  tool calls finish, the host snapshots the lane's workspace. If anything
+  changed, the host commits it (`jj commit`), described with the message's
+  first line, with the entry id and lane as trailers. It records the commit id
+  against the message's entry in a host-written `pineta.revision` value, keyed
+  by the entry's id. A message whose calls changed nothing gets no revision; a
+  branch from it starts from the nearest one above. A run's prompt always gets
+  a record: changes made in the lane's directory between runs are committed
+  as their own revision, and otherwise the prompt records the lane's newest
+  revision.
+- **Revisions a lane builds on are immutable.** The host keeps a local
+  bookmark per lane, `pineta/<lane>`, at its newest revision (the only place
+  that revision is stored), and extends
+  `immutable_heads()` in the repo's config with `bookmarks(glob:"pineta/*")`.
+  jj treats every ancestor of an immutable head as immutable. So no agent,
+  and not you without `--ignore-immutable`, can rewrite a revision a lane
+  builds on, including the `@-` a lane started from. Workspace-level config
+  would protect only from commands run in that workspace (S36 item 10).
+- **Staleness is prevented, not repaired.** A workspace goes stale only when
+  something outside it rewrites its history. Immutability covers what is
+  committed, and folds and landing are merges, which rewrite nothing (S36
+  item 11). `jj workspace update-stale` runs only as a guard at a run's start,
+  after the previous run's end committed everything. It is a no-op unless
+  someone overrode immutability. Repairing a stale workspace mid-run can take
+  uncommitted edits off its disk (S36 item 7).
+- **A lane's tools see only its workspace.** The run's `Context` carries the
+  lane's workspace. pi's `toolContext` and system prompt are functions of it
+  (`harness/runtime/drive/tools.js`), so the tools run there and the prompt
+  names it (S36 item 18). Every call that drives a lane carries it, `resume`
+  as well as `prompt`: after a crash, a lane is `LaneBusy` until resumed, and
+  the resumed run's tools use the directory in `resume`'s `Context`. The host
+  resumes such a lane itself. `packages/pi/agent.ts` currently assumes
+  `LaneBusy` cannot arise. As a backstop to the rewrite below, pi's file
+  tools refuse a path in your working copy or in another lane's workspace, and
+  the error names the same path in the lane's own. Paths elsewhere are
+  allowed. `bash` is not covered until it is sandboxed (ADR-0022). The lane's
+  environment sets `JJ_EDITOR`, `VISUAL` and `EDITOR` to a command that fails:
+  a jj command that opens an editor would otherwise hang a shell with no
+  terminal until its timeout. With it, such a command fails in under a
+  second (S36 items 13 and 21).
+- **The model sees its history as if it had always worked in its own
+  workspace.** A branch reads everything above it, and the parent's messages
+  name the parent's paths (`read …/workspace/t-A/packages/core/index.ts`),
+  while the branch works in `…/workspace/t-B`. pi's `transform_context`
+  hook runs before every model request, on pi's messages before they are
+  converted for the provider, and its event names the lane
+  (`harness/runtime/drive/generation.js`). There the host replaces every other
+  lane's workspace root, and your working copy's root, with this lane's root,
+  in everything the model is sent: its text, tool-call arguments, tool
+  results and summaries.
+  - **The rewrite is true.** A lane starts from the revision at its fork
+    point, so each path the parent named had, at that point, the content the
+    same relative path has in the branch. The model is not told of a switch:
+    as far as it can see, there was none.
+  - **The tree keeps what happened.** Entries are immutable (ADR-0004), so
+    the column shows the paths as they were written. Only what the model is
+    sent changes.
+  - **Only lanes with their own copy are rewritten.** A lane that works
+    directly does not start from its fork point's files, so the rewrite would
+    be false there; its history is sent as written.
+- **Setup installs dependencies, then re-points links that leave the
+  workspace.** After `jj workspace add`:
+  - **A pnpm repo** (a `pnpm-lock.yaml`) gets
+    `pnpm install --offline --frozen-lockfile` from the store
+    `pnpm store path` names in your working copy. It takes 2–3 s here,
+    installs from the lane's own lockfile, and imports copy-on-write where
+    the platform can (S36 item 27). If the store lacks a package, the offline
+    install fails at once, and the host installs online.
+  - **Any other repo** gets a clone of every `node_modules` from your working
+    copy. Only `cloneTree(src, dst)` differs by platform: `/bin/cp -c -R` on
+    macOS, and `cp -R --reflink=auto` on Linux, which clones on btrfs or XFS
+    and copies in full on ext4. The host checks at startup whether cloning
+    is copy-on-write and says so.
+
+  Either way, the host then re-points each symlink whose relative target
+  leaves the workspace, resolved from your working copy's matching location
+  (S36 items 5 and 27). What to install or clone and which links to re-point
+  are planned purely; only the commands are effects.
+- **A fold merges files too.** Beside ADR-0010's fold of the tree, folding a
+  source into a target runs `jj new <target's newest revision> <source's
+  revision at the folded tip>` in the target's workspace. It runs at the start
+  of the fold's run, so the target is idle and ADR-0020's queueing applies.
+  jj records conflicts in the merge rather than failing, and ADR-0033
+  resolves them.
+- **Landing: the lane merges your work in, and you take the result.** To bring
+  a lane's work into your working copy, the lane merges your `@-` into itself
+  (`jj new <lane's newest revision> <your @->`), in its own workspace, and
+  resolves any conflicts there (ADR-0033). Only a resolved merge is offered
+  to you. Taking it is one action, `jj rebase -r @ -d <merge>` in your working
+  copy: your uncommitted changes stay in `@`, now on top of the lane's work.
+  It is the only time the host writes to your working copy, and only when you
+  ask.
+- **A workspace exists whenever its lane runs.** Before every run, the host
+  makes sure the workspace is there. It recreates a missing directory at the
+  lane's newest revision and runs setup. Crashes, restarts and deleted
+  directories take this one path.
+- **Archiving a root removes its lanes' workspaces** (ADR-0029): `jj
+  workspace forget`, the directory, and the lane's bookmark, so its revisions
+  become ordinary commits again. Nothing in the repo is lost. Restoring sets
+  each bookmark again, and a lane's next run recreates its workspace.
+
+**Consequences.**
+- **Branching from any message of agent work also branches its files.** Every
+  message whose tool calls changed files has a revision, so it can show its
+  own diff (`jj diff -r`).
+- **ADR-0022's collision is gone for pi's file tools.** `bash` can still reach
+  outside its workspace until it is sandboxed.
+- **The vision's branch kinds collapse.** Aside is a conversation thread,
+  which has no lane; every agent lane is a Worktree, and Scout's shared
+  read-only workspace is not needed. The vision's third merge problem, effect
+  merge, becomes a jj merge and ADR-0033.
+- **`jj log` holds every lane's revisions**, one per file-changing message,
+  under `pineta/<lane>` bookmarks. `jj git push --all` would push those
+  bookmarks too (S36 item 23); push by name.
+- **A turn revision costs about a tenth of a second** per message: 84 ms when
+  nothing changed, 144 ms with a commit (S36 item 26).
+- **While a lane builds on your `@-`, jj refuses to rewrite it.** A `squash`
+  into it, or a `describe` of it, is refused; `jj new` and editing `@` are
+  not affected (S36 item 19). After landing, the merge under your `@` is
+  immutable in the same way (S36 item 20). Overriding with `--ignore-immutable` while that lane runs is
+  exactly the hazard of S36 item 7.
+- **A lane costs 2–3 s and about 7 MB with pnpm's store.** A clone costs
+  about 6 s and 11 MB on APFS, and a full copy of `node_modules` on ext4. A
+  cloned lane has your installed dependencies, which may not match its base's
+  lockfile until it installs.
+- **Lanes can run the test suites at once:** the whole `verify` gate passed
+  in a workspace, and e2e ran in a workspace and in your working copy at the
+  same moment without a port collision, since its host takes `port: 0` (S36
+  item 25). A lane starting the development host needs `PINETA_PORT=0`, or
+  it collides on 7391.
+- **Taking a landing changes the host's own files.** Host code needs a restart
+  to take effect, as today.
+- **Pineta's own `link:` dependencies on Kyneta** are relative, so they need
+  the re-pointing step. That step handles any repo's links that leave it.
+- **A host started from one of its own lanes' workspaces finds the right repo
+  and workspace,** because jj answers, not a directory check.
+  `.git/info/exclude` applies in a secondary workspace too (S36 item 22).
+- **Initializing changes a project that had no jj**, once, and says so. In a
+  git repo, git keeps working beside jj.
+- **A lane that works directly gives up what a workspace gives:** branching
+  does not branch its files, a fold does not merge them, there is nothing to
+  land, and two such lanes in one directory can collide, as before this ADR.
+  Its column header says where it works and that the directory is shared. In
+  your working copy, it turns hot reload off while it works, for ADR-0022's
+  reason: its edits to the client would reach an open page mid-run.
+- **An isolated lane already works outside its workspace** wherever that is
+  not your working copy or another lane's workspace (for example
+  `~/halecraft/kyneta`). Working directly is for tasks that must change your
+  working copy, or that happen where no repo is.
+- **A message that means another lane's workspace is rewritten too,** for
+  example one comparing two branches' files. That is rare. A lane can still
+  reach another lane's files through its revisions (`jj file show -r`).
+- **Not measured:**
+  - the browser suite inside a workspace (it needs a Playwright server
+    outside the sandbox);
+  - installing or cloning on Linux;
+  - the `transform_context` rewrite reaching the model (read in pi's
+    source, not run).
+
+**Alternatives rejected.**
+- A workspace as its own step (ADR-0021): a person would have to decide at send
+  time whether the agent will write, for a cost S36 put at seconds and
+  megabytes.
+- Creating the workspace at the agent's first write (`bash` writes cannot be
+  detected without a sandbox, and the switch is visible mid-run).
+- A symlink swapped from the repo to a workspace (the agent sees the real path
+  at its first command, S36 item 8).
+- Symlinking `node_modules` back to your working copy (pnpm's relative links
+  resolve to your packages, so a lane would test your code, not its own; S36
+  item 3).
+- Node's `fs.cp` as the portable clone (a full copy on macOS, S36 item 14).
+- Cloning `node_modules` in a pnpm repo (slower than pnpm's offline install,
+  and the dependencies would be yours rather than the lane's lockfile's; S36
+  item 27).
+- Forking root lanes from `trunk()` (here `main` is nine commits behind your
+  work).
+- A frozen copy of your working copy (landing conflicts wherever you keep
+  editing the changes it copied).
+- Your live `@` (every snapshot of your working copy rewrites it and would
+  rebase every lane on it).
+- One revision per run (a branch from a message mid-run would get the files
+  from the previous run's end).
+- Snapshots recorded without committing (the commit ids are rewritten on the
+  next snapshot, and old ones survive only until `jj util gc`).
+- Immutability in each workspace's config (it protects only from that
+  workspace, and it outlives the workspace).
+- `update-stale` as a routine sync (it can take uncommitted edits off the
+  disk).
+- Merging a lane into your working copy directly (its conflicts would land
+  where agents never write).
+- Landing by rebasing or squashing a live lane (it rewrites the lane's history
+  and stales it).
+- Mapping a foreign path in a new tool call silently to the lane's own (a
+  refusal that names the right path is visible, and the agent corrects it).
+  Rewriting the history the model is sent differs: it states what was true
+  at the fork point, and it prevents the wrong path rather than catching it.
+- Telling the model at a branch's start that it has moved workspaces (the
+  note puts the old path back in front of the model, which copies what it
+  sees, and it relies on the model's understanding where a rewrite does
+  not).
+- Only the refusal, without the rewrite (each inherited path costs a failed
+  call before the agent corrects it, and `bash` is not covered).
+- Finding repos by looking for `.jj` or `.git` in each ancestor (wrong in a
+  secondary workspace, and wrong again for git inside a nested one; S36
+  item 17).
+- Adding `/workspace` to the project's `.gitignore` (a tracked change the
+  person did not make; `.git/info/exclude` is local).
+- Initializing any directory a lane names (a lane asked to work in `/tmp/x`
+  should not leave a repo there).
+- Switching an existing lane between its own copy and working directly (its
+  files would stop matching its conversation).
+- Turning workspaces off only for the whole host (a task outside the repo
+  would force every thread to give them up).
+
+## ADR-0033 — Conflicts are resolved by the agent in its lane, by a policy you can replace, and the repository decides the outcome
+
+**Status:** Accepted. Implemented by `PLAN-2026-09-27-workspaces` (landing;
+the fold's merge comes with `PLAN-2026-09-27-fold`). Builds on ADR-0032 (folds
+and landing are jj merges in a
+lane's workspace) and ADR-0010 (labelled legs, and the destination's is
+mandatory).
+
+**Context.** A fold of files and a landing are jj merges in a lane's
+workspace (ADR-0032). jj records conflicts rather than failing, so a merge
+always completes and may leave conflicts on disk (S36 item 11). A merge tool
+sees only text. Pineta also knows why each side changed a line: a conflicting
+hunk traces through turn revisions to the messages that produced it. ADR-0010
+showed that a fold without labelled sides is confidently wrong. Merges also
+conflict without touching the same lines: both sides can merge cleanly and
+still break each other. How cautious to be varies by person and by repo.
+
+**Decision.**
+- **Resolution is a run on the lane that holds the merge.** For a fold, it is
+  the fold's own run on the target: its prompt carries the synthesis and,
+  when the merge conflicts, the conflicts. For a landing, it is a run on the
+  lane being landed. Every landing runs, conflicts or not, because a clean
+  merge can still break. It queues behind a running lane, shows in the
+  column, and can be stopped, as any run (ADR-0020).
+- **The host fixes what the agent is given.** For each conflicted file, the
+  run is given:
+  - the base, ours and theirs, labelled: ours is the lane holding the merge
+    (the destination), and theirs is what comes in;
+  - each side's hunks;
+  - for each side, the messages behind the revisions that touched those lines,
+    attributed as a fold sends them. In a landing, theirs is your committed
+    work, which has no messages, so its revision descriptions stand in.
+
+  ADR-0010 holds: the labels are always present, and the destination's side
+  is never dropped. Under a budget, the messages are compacted first, never
+  the hunks.
+- **The policy is a skill, `resolve-conflicts`.** Pineta ships a `SKILL.md`
+  and loads it as an extra skill path. pi loads your skills, then the repo's
+  (`.pi/skills`), then extra paths, and the first of a name wins. So a
+  `resolve-conflicts` of yours or the repo's replaces Pineta's with no
+  configuration. Its frontmatter sets `disable-model-invocation: true`, so the
+  agent never picks it from its list, and only the host invokes it. The skill
+  says:
+  - how to judge whether the two sides meant the same thing;
+  - when to stop and ask;
+  - which checks to run;
+  - how to word the question;
+  - any rules for the repo ("regenerate lockfiles"; "never resolve ADR
+    text").
+
+  It is read from your working copy, never from the lane's, so a branch cannot
+  change the rules that judge its own merge.
+- **The prompt is Pineta's message, not the skill's text.** The column shows a
+  short resolution message ("3 conflicts merging 'aside' into this thread")
+  whose details record the skill's path and a hash of its content. The model
+  sees the skill's content and the conflict material. pi's `lane.skill` is not
+  used: it would write the whole skill into the tree as a `user` message.
+- **The agent can always stop; it can never claim a success the repository
+  contradicts.** A resolution run may call a Pineta tool, `ask_for_guidance`,
+  with its question, to end as "needs you" whatever the files say. The skill
+  tells it to leave a conflict it should ask about unresolved rather than
+  pick a side. When the run ends, the host decides:
+  - **needs you** if the agent asked, or if `jj resolve --list` in the
+    workspace still shows conflicts. The agent's question names the two
+    intents that differ. The conflicts stay in the lane's workspace, and
+    nothing is offered to you. Your answer is a message in the thread, which
+    compels the agent (the thread is agent work), and it continues from there.
+  - **resolved** otherwise. The resolution is committed as a turn revision,
+    and for a landing, the merge is offered to you to take (ADR-0032).
+- **Partial resolution is allowed.** The agent resolves what both sides agree
+  on and asks about the rest; the outcome is still "needs you".
+
+**Consequences.**
+- Every landing costs a run, and a fold that conflicts costs a larger one.
+- Conflict material can be large, so it needs the budget ladder of ADR-0005
+  and ADR-0010.
+- Changing the skill changes the policy without changing code. Someone whose
+  skill says "always resolve" gets that: the skill is theirs. It cannot remove
+  the labels, the destination's side, or the host's check of the outcome.
+- `setUpModel` loads Pineta's skill directory as an extra path, and the
+  harness never needs the skill in its `resources`.
+- Fold's synthesis can later become a skill, `fold`, in the same way.
+
+**Alternatives rejected.**
+- jj's merge tools or an external merge tool (they see text, not intent).
+- Resolving in your working copy (ADR-0032: agents never write there).
+- Trusting the agent's report of success (the repository can check it).
+- A policy written into Pineta (it cannot differ by person or by repo).
+- The policy in `AGENTS.md` (always in context, and not replaceable as one
+  unit).
+- pi's `lane.skill` (it writes the whole skill into the tree).
+- Loading the skill from the lane's workspace (a branch could rewrite the rules
+  that judge it).
+- Landing a clean merge without a run (lines that merge cleanly can still
+  break each other).
+- Stopping at the first conflict (the agent can resolve what agrees and ask
+  about the rest).
+
+## ADR-0034 — A lane is a Linux container on its own disk, and a branch clones that disk
+
+**Status:** Proposed. Evidence: S38, S39, S40, S41, S42, S43. Amends ADR-0032:
+replaces its jj workspace per lane, the rewrite of the history the model is
+sent, the refusal of other lanes' paths, and dependency setup. Keeps its turn
+revisions, its fork-point rule, landing, working directly, and your working
+copy being yours.
+
+**Context.** ADR-0032 gave each lane a jj workspace on the host and made a
+branch's inherited history read as if it had always worked there, by
+rewriting other roots' paths to the lane's before every model request. S38
+found the rewrite cannot be made true:
+- it points paths at things the workspace does not carry (`.jj/`, ignored
+  files, your uncommitted changes), and it misses paths in forms it does not
+  recognize;
+- state that is not files (a server on a port, a database, a process) is the
+  host's, shared by every lane;
+- it rewrote a root lane's own reads of your working copy, which had nothing
+  inherited, so the lane's history contradicted itself;
+- left out for people's messages, it sent a real model to write your working
+  copy through `bash`, which the refusal does not cover.
+
+A lane can only have its own files, ports and processes in a VM: macOS has no
+per-process mounts or network namespaces. Apple's `container` runs each
+container in its own lightweight VM with its own IP address (S39):
+- it starts in under a second; `exec` into a running one takes 50–70 ms;
+- two lanes served `:5173` at once;
+- a read-only mount refused writes in the kernel, `bash` included;
+- every lane saw its directory at the same path, and nothing of the host's;
+- the unit suite ran at host speed once dependencies were on the lane's own
+  disk (3.2–3.6 s; 15.6 s with them on a virtiofs mount).
+
+A lane's disk is one sparse file on APFS, so cloning it is copy-on-write
+(S40): 0.3–0.6 s, stable at any depth, sharing every unchanged block. A fork
+then inherits everything in the directory at that moment, whatever the
+language: tracked files, dependencies, caches, build output.
+- A clone taken while the lane writes is consistent only on a journaled
+  filesystem. `container`'s default volume has none: 0 of 70 mid-write
+  clones were consistent, with shared blocks and corrupt directories. With
+  `--opt journal=ordered`, 687 of 687 were (S41).
+- Without a `sync` first, files the lane wrote but had not flushed come out
+  empty in the clone (S41 item 1).
+
+A clone also carries the lane's jj state. With one repo shared by every lane
+over virtiofs and a workspace per lane (S41), a clone claims to be its
+parent's workspace, must be re-registered before jj runs in it, and several
+VMs write one jj operation log over a shared mount. With the whole repo on
+the lane's disk (S42), a clone is a complete fork of repo and working copy,
+and lanes exchange commits the way separate clones do.
+
+**Decision.**
+- **A lane is a Linux container with its own disk.** The disk is a
+  journaled ext4 volume (`container volume create --opt journal=ordered`)
+  holding the lane's whole directory: a jj repo (a `jj git clone` of yours,
+  colocated), its working copy, and everything ignored. It is mounted at the
+  same path in every lane, `/project`, so every path any lane's history names
+  is a path in every lane that inherits it. Nothing is rewritten.
+- **Your working copy is mounted read-only at `/yours`.** A lane can read it
+  and cannot write it, by any tool. Directories that links leave the project
+  for (Pineta's `link:` dependencies on Kyneta) are mounted read-only where
+  the links resolve. Nothing else of the host is mounted.
+- **The lane's tools run in its container.** The host cannot read an ext4
+  disk, so pi's `read`, `write`, `edit` and `bash` run in the lane: pi's own
+  `NodeExecutionEnv`, in a helper process the host starts with one
+  `container exec -i` per running lane, answers the host's proxy
+  environment. Calls take 0.3–1 ms; `bash` output streams; a timeout or an
+  abort kills the command's process group in the guest (S43 items 1 and 2).
+  The container runs with `--init`, so killed processes are reaped (S39 item
+  6). The system prompt names `/project` and `/yours`. Context files and
+  skills are still read from your working copy on the host (ADR-0022,
+  ADR-0033).
+- **A turn: commit, sync, snapshot, fetch.** At the boundary where ADR-0032
+  records a turn, the lane:
+  1. commits the turn if tracked files changed (`jj commit`, as ADR-0032);
+  2. runs `sync`, so what the tools wrote is on the disk;
+  3. is cloned, copy-on-write, into a snapshot.
+
+  The host then fetches the lane's commit into your repo as `pineta/<lane>`,
+  and the turn's `pineta.revision` record names both the commit (null when
+  nothing tracked changed) and the snapshot. Every turn with tool calls gets a
+  snapshot, because ignored state changes without a commit. A turn's
+  snapshot runs alongside the next model request; the next tool call waits
+  for it. A turn is pi's unit, not a tool call: pi runs a turn's calls in
+  parallel unless told otherwise (`toolExecution` defaults to `"parallel"`
+  in `harness/runtime/harness.js`), so there is no state between them.
+- **A branch clones the snapshot at its fork point.** A lane created at entry
+  E takes the nearest record at or above E (ADR-0032's rule), clones its
+  snapshot into a new disk, and starts a container on it. Before anything else
+  runs there, the lane:
+  1. runs `jj new <the record's commit>`, so it has its own working-copy change;
+  2. marks everything at or above its fork point immutable in its own config,
+     a file on its disk (`JJ_CONFIG`), so forks inherit it.
+
+  A clone always carries someone else's working-copy change; without step 1,
+  its first turn is that change, divergent from its parent's (S42 item 2).
+  Branches of branches are the same operation.
+- **A root lane clones the project's base disk.** The host keeps one disk per
+  project: your repo cloned and its dependencies installed in Linux. A root
+  lane clones it, fetches your `@-` from `/yours` by commit id, and runs
+  `jj new` on it; it installs only if its lockfile differs from the base
+  disk's. That is the only install; a branch never installs. The id is
+  given, not looked up: your `@-` is on no bookmark, and a colocated repo's
+  git `HEAD` is detached, so a clone alone checks out nothing (S43 item 5).
+- **Work moves between repos as commits.** The host fetches from a lane by
+  bundle: the lane writes `git bundle create -` to the host through
+  `container exec`, and the host fetches from it (about 0.1 s, S43 item 3).
+  No lane can write your repo, and your repo's configuration is unchanged. A
+  lane fetches your `@-`, or another lane's commits, from `/yours`, which is
+  read-only and gains nothing (S43 item 4). Landing is ADR-0032's: the lane
+  merges your `@-` into itself, ADR-0033 resolves, and you take the merge with
+  `jj rebase -r @ -d <merge>`. A fold's file merge is a merge in the target
+  lane of commits it fetched. `bookmarks(glob:"pineta/*")` stays in your
+  repo's `immutable_heads()`.
+- **A container runs only while its lane runs.** A VM keeps the most memory
+  its guest ever touched until it stops (S39 item 7), so the host stops a
+  lane's container when its run ends and starts it for the next (0.3 s and
+  0.7 s; the disk keeps everything). After it stops, the host trims its disk
+  in a separate short-lived container with `CAP_SYS_ADMIN`, so the disk gives
+  back space the lane deleted (S40 item 8); the lane's own container never
+  has that capability.
+- **Snapshots last as long as their root.** Any visible turn of an open root
+  can be branched from, so its snapshot is kept. Archiving a root (ADR-0029)
+  deletes its lanes' disks and every snapshot but each lane's newest, in the
+  background (deleting a clone takes about 280 ms, S40 item 4). Restoring a
+  lane clones its newest snapshot.
+- **The image is the project's.** A lane runs the project's `Containerfile`
+  if it has one, else Pineta's default image: Debian trixie, Node, git (2.41
+  or later: jj's push and fetch need it, S42 item 7), and jj. `container build`
+  makes it once per change.
+- **One interface for lanes' disks and containers,** with operations: create
+  from the base disk, snapshot, fork, exec, stop, trim, delete. It has one
+  implementation, Apple's `container`, which needs macOS 26 on Apple silicon.
+  Where it is missing, lanes work directly (ADR-0032) and the host says so at
+  startup.
+- **The container is the boundary, and what crosses it is a grant.** Your
+  home directory is not mounted, so pi's `auth.json`, your git and npm
+  credentials and your ssh keys are out of a lane's reach (S43 item 7). A
+  project declares its grants, and a lane gets nothing else:
+  - forwarding your ssh agent (`--ssh`), for git over ssh;
+  - named environment variables;
+  - further read-only mounts;
+  - tools that run on the host (an MCP server, an extension's tool). Pineta
+    exposes none today; a tool that runs on the host acts outside the lane,
+    with your access, so it runs in the lane unless declared.
+
+  The network is not yet a grant: a lane reaches the internet and every
+  host service bound to all interfaces, at the gateway (`192.168.64.1`); your
+  Playwright server on `:3100` answered. Services bound to the host's
+  loopback are unreachable.
+- **A person's path to your working copy is shown as `/yours`.** When a
+  message is sent, a path under your working copy's root becomes the same
+  path under `/yours`, in the text everyone then sees, before the model reads
+  it. What people see and what the model reads are the same text.
+
+**Consequences.**
+- **A lane's history is true in every lane that inherits it.** The
+  `transform_context` rewrite, the refusal of other lanes' paths, and S38's
+  question of what to rewrite are gone.
+- **No agent can write your working copy**, through any tool, except a lane
+  set to work directly there. Hot reload stays on.
+- **No agent can read your credentials** unless the project grants them, and
+  a lane cannot use the network to anything but the internet and the host's
+  services on all interfaces. Those stay open until the network is a grant.
+- **Branching from any visible turn branches everything in the directory**:
+  a branch's `node_modules` and `.vite` are its parent's at that turn, byte
+  for byte, and its writes never reach its parent (S40 item 1, S42).
+- **Each lane has its own ports and processes.** A lane's dev server is at
+  the lane's IP; the host proxies it for browsers that cannot reach it.
+- **The host sees a lane's work once per turn,** when it fetches, not live.
+  People see a lane's files through its revisions (`jj diff`, `jj file show`)
+  or through the host, not in their own editor.
+- **Costs per turn: 250–300 ms** on Pineta's own repository (S43 item 6): a
+  commit (84–110 ms), a `sync` (52–73 ms), a clone (5–9 ms on a fresh disk,
+  up to 0.6 s on one churned for minutes, S40), and a fetch (98–131 ms). The
+  clone overlaps the next model request. **Per branch:** a clone, a container start (under 1 s), and `jj new`
+  (93 ms, S42). **Memory:** about 1.2 GiB per running lane (S40 item 6), none
+  for a stopped one.
+- **Disk grows only with what lanes write**; a lane that reinstalls its
+  dependencies pays their full size (S40 item 7).
+- **A clone is a disk image written into a volume `container` created.** That
+  is not an API of `container` at 1.4.1: a volume is its `entity.json` and an
+  image, read by path (S40, "Not measured"). A contract test runs the S41 soak
+  in small (clones taken mid-write, then `e2fsck` and content checks) on every
+  upgrade of `container`, with a deliberate bug that drops the journal.
+- **Pineta needs `container` for lanes of their own.** Other hosts, and Linux,
+  work directly until the interface has another implementation (reflinked
+  images on btrfs or XFS, S40 discussion).
+- **ADR-0032's host-side jj workspaces, `workspace/` in the repo, its
+  dependency setup and its re-pointing of links are removed.** Nothing in
+  your working copy's tree is created for a lane.
+- **Not measured:**
+  - the helper under a turn's parallel tool calls;
+  - restricting a lane's network;
+  - a large repository: the base disk's clone (1.2 s for this one), and
+    `git gc` on disks forks keep cloning;
+  - clone time against a disk's fragmentation;
+  - tens of thousands of snapshots over a long session;
+  - the e2e and browser suites in a lane;
+  - a project `Containerfile`, or `devcontainer.json`;
+  - the host proxying a lane's ports.
+
+**Alternatives rejected.**
+- Rewriting paths in the history the model is sent (ADR-0032; S38: untrue
+  wherever the workspace does not carry a path, blind to forms it does not
+  match, and silent to the people reading the same thread).
+- Rewriting only inherited messages (S38: people's paths reached the model
+  literally, and it wrote your working copy through `bash`).
+- A virtual root translated at the tool boundary on the host (servers, ports
+  and processes stay shared, and a path computed in `bash` escapes it).
+- Seatbelt (`sandbox-exec`) alone (it can refuse writes, but gives a lane
+  neither its own paths nor its own ports).
+- macOS VMs (Tart, Virtualization.framework guests: at most two at once per
+  host).
+- Colima, OrbStack or Docker Desktop (every lane shares one VM's kernel;
+  `container` gives each its own VM and address).
+- Dependencies on a virtiofs mount (4.5 times slower, S39 item 4).
+- A shared pnpm store on a named volume (a volume attaches to one running VM
+  at a time, S39 item 4), or any per-tool cache (a disk clone needs none).
+- `container`'s default volumes (no journal: mid-write clones corrupt, S40
+  item 2, S41 item 2).
+- Overlay layers per turn or per tool call (a small change to a large file
+  copies it whole, lookups slow with depth, and sealing a layer means
+  remounting under running processes; layers remain the export format for
+  moving a lane to another machine).
+- A snapshot per tool call (pi runs a turn's calls in parallel) or per run (a
+  branch from mid-run would get the wrong files).
+- One repo shared over virtiofs with a jj workspace per lane (S41: a clone
+  must be re-registered before any jj command, `jj workspace update-stale`
+  in an unregistered clone makes its parent's change divergent, and several
+  VMs share one operation log).
+- Cloning ahead of a fork to avoid `jj new` (a clone always carries a
+  working-copy change someone else has).
+- Lanes pushing into your repo (a lane could write any ref there; the host
+  fetches instead).
+- Fetching over git's `ext::` transport (it works, S43 item 3, but needs
+  `protocol.ext.allow` in your repo, which lets any `ext::` remote URL there
+  run a command).
+- A `container exec` per tool call (50–70 ms each, S39; a helper answers in
+  under a millisecond).
+- Driving Virtualization.framework directly, or waiting for a clone command in
+  `container` (months; the contract test guards the image swap meanwhile).

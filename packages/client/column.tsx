@@ -8,17 +8,24 @@ import {
   type ColumnView,
   type EntryId,
   entryId,
+  firstLine,
+  type LandingRecord,
+  type LaneRecord,
   type LaneView,
   messageText,
   type NoteId,
   type NoteRecord,
+  nearestRevision,
   type Position,
+  type ProjectRecord,
   type ReferenceTarget,
+  type RevisionRecord,
   ROOT,
   type ThreadLane,
   type TreeIndex,
   threadOf,
   type WriterId,
+  workFor,
 } from "@pineta/core"
 import {
   displayName,
@@ -33,7 +40,7 @@ import type { Column as ColumnSpec } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
 import { Message } from "./message.tsx"
 import { MessageText } from "./message-text.tsx"
-import { firstLine, speakerLabel, withContributors } from "./names.ts"
+import { speakerLabel, withContributors } from "./names.ts"
 import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackColor } from "./rail.tsx"
@@ -73,6 +80,8 @@ export interface ColumnProps {
   activity: readonly AgentRun[]
   lanes: readonly LaneView[]
   outbox: readonly Held[]
+  /** Where lanes work, the files at each entry, and landings (ADR-0032). */
+  work: WorkFacts
   /** The ids on this column's path, which the app has already computed. */
   path: ReadonlySet<string>
   /** Open a fresh column to the right, forked at `at`. */
@@ -94,6 +103,27 @@ export interface ColumnProps {
    * root would give back at once (`columnsOf`), nor in a preview.
    */
   closable: boolean
+}
+
+/** What the host records about where lanes work, read with everything else. */
+export interface WorkFacts {
+  readonly project: ProjectRecord | null
+  readonly lanes: ReadonlyMap<string, LaneRecord>
+  readonly revisions: ReadonlyMap<string, RevisionRecord>
+  readonly landings: readonly LandingRecord[]
+}
+
+/**
+ * Where a lane works, as its column's header says it: its own copy at its
+ * newest revision, or the directory it shares.
+ */
+function whereLabel(
+  record: LaneRecord | undefined,
+  commit: string | null,
+): string | null {
+  if (record === undefined) return null
+  if (record.work.kind === "direct") return `in ${record.work.dir} · shared`
+  return commit === null ? "own copy" : `own copy · ${commit.slice(0, 8)}`
 }
 
 export function Column(p: ColumnProps) {
@@ -148,6 +178,31 @@ export function Column(p: ColumnProps) {
     thread.kind === "thread" ? thread.lane : { kind: "none" }
   const waiting =
     lane.kind === "lane" ? p.outbox.filter(h => h.lane === lane.name) : []
+  // Where this thread's lane works, and its latest landing (ADR-0032, 0033).
+  const laneRecord =
+    lane.kind === "lane" ? p.work.lanes.get(lane.name) : undefined
+  const where = whereLabel(
+    laneRecord,
+    at.kind === "entry"
+      ? nearestRevision(index, p.work.revisions, at).commit
+      : null,
+  )
+  const landing =
+    lane.kind === "lane"
+      ? p.work.landings.filter(l => l.lane === lane.name).at(-1)
+      : undefined
+  const canLand =
+    writable &&
+    lane.kind === "lane" &&
+    laneRecord?.work.kind === "own" &&
+    p.work.project?.kind === "workspaces"
+  // Where a lane this column's next send creates would work, before a choice.
+  const defaultWork = workFor({
+    choice: null,
+    above: nearestRevision(index, p.work.revisions, at).lane,
+    lanes: p.work.lanes,
+    project: p.work.project,
+  })
   const holder =
     lane.kind === "lane" && lane.askedBy !== null
       ? displayName(lane.askedBy, p.nameOf.get(lane.askedBy))
@@ -233,6 +288,32 @@ export function Column(p: ColumnProps) {
               : "thread"
             : `from ${forkLabel}: “${forkText}”`}
         </span>
+        {where !== null && (
+          <span className="where" title="where this thread's agent works">
+            {where}
+          </span>
+        )}
+        {canLand &&
+          lane.kind === "lane" &&
+          (landing?.state === "resolved" ? (
+            <button
+              className="take"
+              onClick={() => void p.session.take(lane.name)}
+              title={`put your working copy on this thread's work: jj rebase -r @ -d ${landing.result.slice(0, 12)}`}
+              type="button"
+            >
+              take into my working copy
+            </button>
+          ) : (
+            <button
+              className="land"
+              onClick={() => void p.session.land(lane.name)}
+              title="merge your committed work into this thread's workspace; the agent resolves any conflicts"
+              type="button"
+            >
+              {landing?.state === "needs_you" ? "land again" : "land your work"}
+            </button>
+          ))}
         <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={p.seenBy} />
         {p.position > 0 && (
           <button className="make-main" onClick={p.onMakeMain} type="button">
@@ -330,19 +411,25 @@ export function Column(p: ColumnProps) {
           {waiting.map((h, n) => (
             <div className="msg waiting" data-held={h.id} key={h.id}>
               <span className="role">
-                {withContributors(
-                  speakerLabel(
-                    p.nameOf,
-                    h.details.author,
-                    h.details.authorName,
-                  ),
-                  (h.details.contributors ?? []).map(w =>
-                    displayName(w, p.nameOf.get(w)),
-                  ),
-                )}{" "}
+                {h.kind === "land"
+                  ? displayName(h.by, p.nameOf.get(h.by))
+                  : withContributors(
+                      speakerLabel(
+                        p.nameOf,
+                        h.details.author,
+                        h.details.authorName,
+                      ),
+                      (h.details.contributors ?? []).map(w =>
+                        displayName(w, p.nameOf.get(w)),
+                      ),
+                    )}{" "}
                 · waiting · {n + 1} of {waiting.length}
               </span>
-              <MessageText mode="committed" text={h.details.text} />
+              {h.kind === "land" ? (
+                <div className="land-waiting">landing your work</div>
+              ) : (
+                <MessageText mode="committed" text={h.details.text} />
+              )}
             </div>
           ))}
         </div>
@@ -375,6 +462,15 @@ export function Column(p: ColumnProps) {
         ))}
       <Composer
         asksAgent={p.column.asksAgent === true}
+        defaultWork={defaultWork}
+        project={p.work.project}
+        usedDirs={[
+          ...new Set(
+            [...p.work.lanes.values()].flatMap(r =>
+              r.work.kind === "direct" ? [r.work.dir] : [],
+            ),
+          ),
+        ]}
         at={at}
         boundLane={p.column.lane}
         fresh={fresh}

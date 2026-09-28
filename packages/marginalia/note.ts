@@ -26,7 +26,7 @@ import {
   type WriterId,
 } from "@pineta/core"
 import { type Static, Type } from "typebox"
-import { decodeWith } from "./decode.ts"
+import { decodeAll, decodeWith } from "./decode.ts"
 
 /** pi value namespace for note records. The key is the note's id. */
 export const NOTE_NAMESPACE = "pineta.note"
@@ -95,12 +95,9 @@ export const decodeNote = (value: unknown): NoteRecord | undefined =>
 export function noteRecords(
   values: Iterable<{ readonly value: unknown }>,
 ): readonly NoteRecord[] {
-  const out: NoteRecord[] = []
-  for (const { value } of values) {
-    const n = decodeNote(value)
-    if (n !== undefined) out.push(n)
-  }
-  return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  return decodeAll(values, decodeNote).sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  )
 }
 
 /**

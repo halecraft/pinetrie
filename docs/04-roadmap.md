@@ -101,7 +101,8 @@ Roughly in dependency order, each independently shippable:
    - ~~**Self-hosting**~~ — **done** (ADR-0022): the development host's
      agent reads, writes, edits and runs commands in the repo, visibly, with the
      person's own pi models; stop, persistence, and an invite key off loopback.
-     Next: a sandbox profile for `bash`, then a workspace per lane (ADR-0019).
+     Then a workspace per lane (ADR-0032) and landing (ADR-0033), done.
+     Next: a sandbox profile for `bash`.
    - **The session on `json.bind`** (ADR-0023): authoritative, compacted when a
      run ends and when the host starts; Loro removed.
    - ~~**Notes**~~ — **done** (ADR-0025): any message, the agent's included,
@@ -121,7 +122,9 @@ Roughly in dependency order, each independently shippable:
      verifies: a `json` session and Yjs notes on one Exchange; rich text on Yjs;
      per-document write permission; pi appending an entry with `fromId`, and
      what reaches the model's context; and note hunks the model can use.
-6. **Scout kind** — read-only tools, shared workspace
+6. ~~**Scout kind**~~ — read-only tools, shared workspace. Obsolete under
+   ADR-0032: every agent lane has its own workspace, so no lane needs a
+   shared read-only one.
 7. **Fold** — three-way merge producing a `fromId` node. Per ADR-0019 it is two
    merges, both agent-assisted: the branch of the tree, and the line of work's
    jj workspace.
@@ -139,7 +142,6 @@ and it appears live in A's tree — **with zero tokens entering A's context.**
 
 | Deferred | Until |
 |---|---|
-| A jj workspace per work lane; its merge inside fold (ADR-0019) | after fold works for Aside/Scout |
 | Remote / team networking | designed for now (ADR-0007), shipped after v1 |
 | Trust & authority model | before *any* networking; explicitly punted for local v1 |
 | Replacing pi's TUI | indefinitely — not a goal |

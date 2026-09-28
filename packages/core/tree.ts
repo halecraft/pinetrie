@@ -87,6 +87,20 @@ export interface ToolCallView {
   readonly result?: { readonly text: string; readonly isError: boolean }
 }
 
+/**
+ * A text as a label: its first non-empty line, cut to `max` characters with
+ * "…" when longer. Tabs, fork labels, the header's menus and a revision's
+ * title use it.
+ */
+export function firstLine(text: string, max: number): string {
+  const line =
+    text
+      .split("\n")
+      .map(l => l.trim())
+      .find(l => l !== "") ?? ""
+  return line.length > max ? `${line.slice(0, max)}…` : line
+}
+
 /** Flatten pi's AgentMessage content into display text. */
 export function messageText(
   message: AgentMessageLike | null | undefined,
@@ -135,7 +149,9 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
         : { contributors: entry.message.contributors }),
     }
   }
-  if (role !== "user" && role !== "assistant") return null
+  // A land message (ADR-0033) shows as its short line: the reader decodes it
+  // into role `land` with that line as its content.
+  if (role !== "user" && role !== "assistant" && role !== "land") return null
   const message = { id: entry.id, role, text: messageText(entry.message) }
   const calls = role === "assistant" ? toolCallsOf(entry.message) : []
   return calls.length === 0 ? message : { ...message, toolCalls: calls }
@@ -174,6 +190,40 @@ function toolResultOf(entry: EntryLike): {
     text: messageText(m),
     isError: m.isError === true,
   }
+}
+
+/**
+ * The entry a turn is recorded against, from the lane's tip after it: a tool
+ * result belongs to the assistant message whose call it answers, which sits
+ * above it with only that message's other results between, so the walk goes
+ * up past results. Anything else is its own turn: a prompt, or a message that
+ * called no tools.
+ */
+export function turnEntry(index: TreeIndex, tip: string): EntryId {
+  let at = tip
+  for (;;) {
+    const entry = index.entries[at]
+    const parent = index.parentOf(at)
+    if (entry === undefined || toolResultOf(entry) === null || parent === null)
+      return entryId(at)
+    at = parent
+  }
+}
+
+/** The roles a run can start with: a person's message, pi's own, or a land message. */
+const PROMPT_ROLES: ReadonlySet<string> = new Set(["chat", "user", "land"])
+
+/**
+ * The prompt of the run that wrote `tip`: its nearest ancestor-or-self a run
+ * can start with. A lane is never written while it runs (S21), so no person's
+ * message sits between a run's prompt and its tip.
+ */
+export function promptOf(index: TreeIndex, tip: string | null): EntryId | null {
+  for (const id of ancestry(index, tip).path) {
+    const role = index.entries[id]?.message?.role
+    if (role !== undefined && PROMPT_ROLES.has(role)) return entryId(id)
+  }
+  return null
 }
 
 /**
@@ -788,6 +838,13 @@ export interface LaneView {
 export type ThreadLane =
   | { readonly kind: "none" }
   | ({ readonly kind: "lane" } & LaneView)
+
+/**
+ * A lane is busy while it runs or has messages waiting: a new message then
+ * waits behind them, or it would jump the queue (ADR-0020).
+ */
+export const isBusy = (lane: LaneView): boolean =>
+  lane.running || lane.waiting > 0
 
 /** Which thread a send continues, as the host and the composer both decide it. */
 export type ThreadOf =

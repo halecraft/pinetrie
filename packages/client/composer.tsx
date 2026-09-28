@@ -6,10 +6,13 @@ import {
   type ChatMode,
   type LaneName,
   type Position,
+  type ProjectRecord,
   parseMentions,
   type ThreadLane,
+  type WorkSetting,
 } from "@pineta/core"
 import { useEffect, useRef, useState } from "react"
+import { Menu } from "./menu.tsx"
 import { settleSend } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
 
@@ -34,12 +37,26 @@ export interface ReadOnly {
  * and the sender chooses: wait behind them, or branch here. A message the
  * host refuses comes back to the composer too (`settleSend`).
  */
+/** Where a lane works, in the send button's words. */
+export function whereWords(
+  work: WorkSetting,
+  project: ProjectRecord | null,
+): string {
+  if (work.kind === "own") return "in its own copy"
+  return project !== null && work.dir === project.root
+    ? "in your working copy"
+    : `in ${work.dir}`
+}
+
 export function Composer({
   session,
   at,
   lane,
   boundLane,
   asksAgent,
+  defaultWork,
+  project,
+  usedDirs,
   fresh,
   participants,
   holderName,
@@ -60,6 +77,15 @@ export function Composer({
   boundLane: LaneName | undefined
   /** A Start Agent column. */
   asksAgent: boolean
+  /**
+   * Where a lane this send creates would work with no choice made: the lane
+   * above's setting, else the project's default (`workFor`, as the host
+   * decides). Null with no tools.
+   */
+  defaultWork: WorkSetting | null
+  project: ProjectRecord | null
+  /** Directories other lanes work in directly: offered again. */
+  usedDirs: readonly string[]
   /** A fresh column: its first message starts the thread (`branch`). */
   fresh: boolean
   /** Everyone who can be mentioned, as shown. */
@@ -90,6 +116,8 @@ export function Composer({
     text: string
     by: string | null
   } | null>(null)
+  // Where a lane this send creates works: the column's view state until sent.
+  const [choice, setChoice] = useState<WorkSetting | null>(null)
   const byDefault = agentByDefault({
     mode: fresh ? "branch" : "reply",
     lane,
@@ -107,10 +135,16 @@ export function Composer({
     : compelled && busy
       ? "queue"
       : "reply"
+  // A compelled send creates a lane where there is none, and a branch always
+  // does: then it also says where that lane will work (ADR-0032).
+  const createsLane = compelled && (fresh || lane.kind === "none")
+  const work = choice ?? defaultWork
   const label = compelled
     ? busy && !fresh
       ? `queue · agent replies after ${holderName ?? "the others"}`
-      : "send · agent will reply"
+      : createsLane && work !== null
+        ? `send · agent will reply · ${whereWords(work, project)}`
+        : "send · agent will reply"
     : to.people.length > 0
       ? `send · to ${to.people.join(", ")}`
       : "send"
@@ -123,6 +157,7 @@ export function Composer({
       ...(boundLane === undefined ? {} : { lane: boundLane }),
       asksAgent,
       ...(id === undefined ? {} : { id }),
+      ...(createsLane && choice !== null ? { work: choice } : {}),
     })
     const settled = settleSend(outcome, message)
     setConflict(settled.conflict)
@@ -250,6 +285,54 @@ export function Composer({
           <button className="send" type="submit">
             {label}
           </button>
+          {createsLane && project !== null && (
+            <Menu
+              className="where-menu"
+              heading="where the agent works"
+              items={[
+                {
+                  key: "own",
+                  label: "in its own copy",
+                  className: "where-own",
+                  disabled: project.kind !== "workspaces",
+                  ...(project.kind === "direct"
+                    ? { title: project.reason }
+                    : {}),
+                  onChoose: () => setChoice({ kind: "own" }),
+                },
+                {
+                  key: "yours",
+                  label: "directly in your working copy",
+                  className: "where-yours",
+                  onChoose: () =>
+                    setChoice({ kind: "direct", dir: project.root }),
+                },
+                ...usedDirs
+                  .filter(d => d !== project.root)
+                  .map(dir => ({
+                    key: dir,
+                    label: `directly in ${dir}`,
+                    className: "where-used",
+                    onChoose: () => setChoice({ kind: "direct", dir }),
+                  })),
+                {
+                  key: "other",
+                  label: "directly in…",
+                  className: "where-other",
+                  onChoose: () => {
+                    const dir = window
+                      .prompt("The directory to work in")
+                      ?.trim()
+                    if (dir !== undefined && dir !== "")
+                      setChoice({ kind: "direct", dir })
+                  },
+                },
+              ]}
+              label="where the agent works"
+              trigger="▾"
+              triggerClassName="where-trigger"
+            />
+          )}
         </div>
       )}
       <span className="status">{status}</span>

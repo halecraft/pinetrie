@@ -333,6 +333,17 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   renders, so a check that must see one uses a slow scripted model.
 - **Stop** shows in the composer while the thread's lane runs, and sends
   `stop`.
+- **Where a new thread's agent works** (ADR-0032). When a send would create a
+  lane (it asks the agent where no lane is, or it is a branch), the button
+  says where: "send · agent will reply · in its own copy". Its `▾` menu offers
+  its own copy, your working copy, directories other lanes used, and
+  "directly in…". The choice is the composer's state until sent, as
+  `asksAgent` is; its default is `workFor`, the host's own decision.
+- **A lane's column header** says where it works ("own copy · <commit>", or
+  "in <dir> · shared"), and, for its own copy, offers **land your work**, then
+  **take into my working copy** once a landing resolved (ADR-0033). A landing
+  that needs you offers **land again**. A land message shows as one line, role
+  `land`.
 - **The invite key** needs no client code: the host's redirect sets a cookie
   that same-origin requests and upgrades carry. `connectSession({ key })` is
   for Node clients.
@@ -451,6 +462,10 @@ its `writer` for the lookup.
   hiding the `⋯` would hide an open menu too.
 - **"close" is `closable`:** hidden on a root tab's only column (`columnsOf`
   would give it back) and in the Archive tab's preview.
+- **A menu opens above its trigger in the window's lower half.** A composer's
+  `▾` is at the window's foot, so a list below it would be out of sight; and
+  since `.menu` sets a `top` in the stylesheet, the upward list sets
+  `top: auto` too, or `top` wins over `bottom`.
 - **Anything that pops out of the tab bar is `position: fixed`.** `.tab-list`
   scrolls sideways, and `overflow-x: auto` makes its vertical overflow `auto`
   too, so a menu positioned inside it is clipped below the bar. `Menu` places

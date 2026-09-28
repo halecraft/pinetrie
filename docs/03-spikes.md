@@ -356,6 +356,71 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S43 — pi's tools in a lane, moving commits, a turn's cost, the lane boundary ✅ ANSWERED
+
+`findings/S43-tools-fetches-and-the-lane-boundary.md`. pi's own
+`NodeExecutionEnv`, run in the lane behind one `container exec -i` stream,
+served pi's tools unchanged at 0.3–1 ms a call, streaming `bash` and
+killing process groups on timeout and abort. A lane's commits reach the host
+by bundle or `ext::` in about 0.1 s; your `@-` must be fetched by id. A whole
+turn costs 250–300 ms. Host services on all interfaces, and the internet,
+are reachable from a lane; your credentials are not, unless granted.
+
+### S42 — A jj repo per lane disk ✅ PASS
+
+`findings/S42-a-repo-per-lane-disk.md`. With the whole repo on a lane's disk,
+a fork is a disk clone plus `jj new T` (93 ms); without that `jj new`, the
+host saw a divergent change. Change ids crossed repos in git headers, three
+lanes pushing into one repo at once left it consistent, inherited history
+could be made immutable, and landing and folding were ordinary merges. jj
+needs git 2.41 or later in the lane image.
+
+### S41 — A soak of mid-write clones, and forking a lane's jj workspace ✅ PASS
+
+`findings/S41-clone-soak-and-jj-forks.md`. 687 of 687 clones taken mid-write
+from a journaled volume were consistent; without a journal, 0 of 70 were. A
+fork of a lane's disk becomes its own jj workspace in about 150 ms by
+swapping in a fresh workspace's state; forks of forks then never reached
+their parents. An unregistered clone is refused as stale, and
+`jj workspace update-stale` there makes the parent's change divergent.
+
+### S40 — Forking a lane's whole disk, copy-on-write ✅ PASS
+
+`findings/S40-forking-a-lane-disk.md`. A clone of a running lane's disk image
+at a turn boundary gave a fork byte-identical to that moment, whose inherited
+`node_modules` and `.vite` cache worked unchanged. `container`'s volumes have
+no journal, and clones taken mid-write were corrupt; on a journaled image
+(made with `mke2fs`) all were consistent. Clones take about half a second at
+any depth and share blocks; deleting them is slow; guest deletes free host
+space only after `fstrim`.
+
+### S39 — A Linux container per lane, with Apple's `container` ✅ PASS
+
+`findings/S39-a-container-per-lane.md`. A container starts in under a second
+with its own VM and IP address: two lanes served `:5173` at once, a read-only
+mount refused writes from `bash`, and every lane saw its workspace at the same
+path with `jj` working inside. The unit suite passed at host speed once
+`node_modules` was off the virtiofs mount. A VM keeps what memory it used
+until it stops; stopping and starting take under a second.
+
+### S38 — Can the path rewrite be limited to what a lane inherited? ✅ ANSWERED
+
+`findings/S38-rewriting-only-inherited-messages.md`. Mechanically yes: every
+message pi's `transform_context` receives is the object `scanBranch` returned
+in an entry, and compaction can be done in `before_compaction`, after a
+restart too. But a person's message left verbatim sent a real model to write
+your working copy through `bash`. So only the lane's own agent turns should
+be left verbatim, and ownership should come from the lane's creation point:
+a failed revision record misattributes a whole run.
+
+### S37 — Why a column changes width ✅ ANSWERED
+
+`findings/S37-column-width.md`. A flex item's automatic minimum width is its
+widest unbreakable line, so a long line in a code block, a tool's output or a
+tool's label widened its column; the viewport's width never did. `.column`
+now sets `min-width: 0` and `.tool-label` wraps anywhere. The browser e2e
+checks that a column holds at 28rem.
+
 ### S36 — What a jj workspace per lane costs ✅ ANSWERED
 
 `findings/S36-a-workspace-per-lane.md`. `jj workspace add` takes 0.2 s; an
@@ -367,6 +432,10 @@ those edits off its disk. A symlink swap cannot hide the real directory.
 Addendum: immutable run revisions keep one lane from staling another, a fold as
 a merge rewrites nothing and repeats take only what is new, so `update-stale`
 is only a guard; a jj command wanting an editor hangs an agent's shell.
+Addendum 2: pi takes each lane's directory from the run's `Context`, resumed
+runs included; landing works end to end; the whole gate passes in a workspace
+and e2e runs do not collide; `pnpm install --offline` sets a workspace up in
+2–3 s; a jj command run from the wrong directory acts on the repo around it.
 
 ### S35 — Why an agent's column jumps while it works ✅ ANSWERED
 

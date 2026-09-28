@@ -6,6 +6,7 @@
 
 import {
   type AgentRun,
+  firstLine,
   messageText,
   rootOf,
   type TreeIndex,
@@ -15,7 +16,6 @@ import { useState } from "react"
 import type { PersonHere } from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
-import { firstLine } from "./names.ts"
 import { Avatar, nameFor } from "./presence.tsx"
 import type { InboxView } from "./use-inbox.ts"
 

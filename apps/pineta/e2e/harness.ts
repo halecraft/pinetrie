@@ -7,6 +7,11 @@
 // Deliberately not in core/: core is pure domain logic and imports nothing.
 // A test harness is neither.
 
+import { execFileSync } from "node:child_process"
+import { mkdtempSync, realpathSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
+
 export interface Checks {
   /** Record an assertion. Truthy passes. */
   ok(condition: unknown, label: string): void
@@ -50,4 +55,27 @@ export async function waitFor(
     await new Promise(resolve => setTimeout(resolve, 10))
   }
   return -1
+}
+
+/**
+ * A project for a host with tools: a jj repo, colocated with git, with
+ * `files` committed. A lane starts from your committed work (`@-`,
+ * ADR-0032), so what its agent should see must be committed. The path is the
+ * real one (on macOS a temporary directory is behind a symlink), as jj names
+ * it.
+ */
+export function committedProject(
+  prefix: string,
+  files: Readonly<Record<string, string>>,
+): string {
+  const dir = realpathSync(mkdtempSync(path.join(tmpdir(), prefix)))
+  const jj = (...args: string[]) =>
+    execFileSync("jj", ["--no-pager", ...args], { cwd: dir, stdio: "pipe" })
+  jj("git", "init", "--colocate")
+  jj("config", "set", "--repo", "user.name", "Pineta e2e")
+  jj("config", "set", "--repo", "user.email", "e2e@pineta.invalid")
+  for (const [name, text] of Object.entries(files))
+    writeFileSync(path.join(dir, name), text)
+  jj("commit", "-m", "the project")
+  return dir
 }

@@ -20,6 +20,7 @@ import {
   branchColors,
   compactRail,
   entryId,
+  firstLine,
   messageText,
   PENDING_TRACK,
   pathIds,
@@ -36,13 +37,17 @@ import {
   notesIndex,
   readAgentActivity,
   readArchive,
+  readLandings,
+  readLaneRecords,
   readLanes,
   readNotes,
   readOutbox,
   readParticipantNames,
   readParticipants,
   readPresence,
+  readProject,
   readReferences,
+  readRevisions,
   readTreeIndex,
 } from "@pineta/reads"
 import {
@@ -79,7 +84,6 @@ import {
   planOpen,
   tabBar,
 } from "./layout.ts"
-import { firstLine } from "./names.ts"
 import { NotesIndex } from "./note.tsx"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { readEntryCount } from "./projection.ts"
@@ -204,19 +208,33 @@ function App({ session }: { session: SessionClient }) {
   const status = useDocStatus(doc)
   const count = useTracked(() => readEntryCount(doc))
   // One moment's facts, read together: the same reads the host decides from.
-  const { index, activity, lanes, outbox, participants, notes, archive } =
-    useTracked(() => {
-      const index = readTreeIndex(doc)
-      return {
-        index,
-        activity: readAgentActivity(doc, index),
-        lanes: readLanes(doc, index),
-        outbox: readOutbox(doc),
-        participants: readParticipants(doc, index),
-        notes: readNotes(doc),
-        archive: readArchive(doc),
-      }
-    })
+  const {
+    index,
+    activity,
+    lanes,
+    outbox,
+    participants,
+    notes,
+    archive,
+    workFacts,
+  } = useTracked(() => {
+    const index = readTreeIndex(doc)
+    return {
+      index,
+      activity: readAgentActivity(doc, index),
+      lanes: readLanes(doc, index),
+      outbox: readOutbox(doc),
+      participants: readParticipants(doc, index),
+      notes: readNotes(doc),
+      archive: readArchive(doc),
+      workFacts: {
+        project: readProject(doc),
+        lanes: readLaneRecords(doc),
+        revisions: readRevisions(doc),
+        landings: readLandings(doc),
+      },
+    }
+  })
   // The messages that are notes' (ADR-0025): a square on the rail, and
   // counted on a closed branch's button.
   const noteEntries = useMemo(
@@ -512,6 +530,7 @@ function App({ session }: { session: SessionClient }) {
     participants,
     refs,
     session,
+    work: workFacts,
   }
 
   /** A root, read-only, for the Archive tab: its rail and one column. */

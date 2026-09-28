@@ -29,4 +29,28 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "ignored, whatever it is called",
   },
+  {
+    name: "a lane's tools do not wait for its setup",
+    file: "packages/pi/lanes.ts",
+    from: "        await where.ready",
+    to: "        void where.ready",
+    command: unit,
+    expect: "a tool waits for setup",
+  },
+  {
+    name: "a turn is not awaited before the next request",
+    file: "packages/pi/agent.ts",
+    from: "      if (tip !== null)\n        await lanes.hooks.turnDone(event.lane as LaneName, entryId(tip))",
+    to: "      if (tip !== null)\n        void lanes.hooks.turnDone(event.lane as LaneName, entryId(tip))",
+    command: unit,
+    expect: "each turn is recorded before the next request",
+  },
+  {
+    name: "file tools reach other lanes' paths",
+    file: "packages/pi/agent.ts",
+    from: "      return reason === null ? undefined : { block: { reason } }",
+    to: "      return undefined",
+    command: unit,
+    expect: "a file tool refuses them",
+  },
 ]

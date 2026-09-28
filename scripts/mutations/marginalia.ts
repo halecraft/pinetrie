@@ -15,8 +15,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "entryText ignores chat",
     file: "packages/marginalia/chat.ts",
-    from: "  const chat = decodeChat(message)\n  return chat === undefined\n    ? messageText(message as AgentMessageLike)\n    : chat.text",
-    to: "  return messageText(message as AgentMessageLike)",
+    from: "  const chat = decodeChat(message)\n  if (chat !== undefined) return chat.text\n",
+    to: "",
     command: unit,
     expect: "entryText",
   },
@@ -56,7 +56,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an idle lane with messages waiting runs instead of holding",
     file: "packages/marginalia/chat.ts",
-    from: "  const busy = lane.running || lane.waiting > 0",
+    from: "  const busy = isBusy(lane)",
     to: "  const busy = lane.running",
     command: unit,
     expect: "one with messages waiting",
@@ -180,5 +180,47 @@ export const mutations: readonly Mutation[] = [
     to: "  state: Type.String(),",
     command: unit,
     expect: "a malformed value is dropped",
+  },
+  {
+    name: "a prompt with no new edits gets no record",
+    file: "packages/marginalia/work.ts",
+    from: "  return input.isPrompt && input.newest !== null",
+    to: "  return false && input.newest !== null",
+    command: unit,
+    expect: "a prompt always gets a record",
+  },
+  {
+    name: "take ignores a moved @-",
+    file: "packages/marginalia/work.ts",
+    from: "    landing.yours.length === yoursNow.length &&",
+    to: "    true ||",
+    command: unit,
+    expect: "planTake: a resolved landing, while your @- is the one it merged",
+  },
+  {
+    name: "a landing ignores the agent asking",
+    file: "packages/marginalia/work.ts",
+    from: "  input.askedForGuidance || input.conflictsLeft > 0",
+    to: "  input.conflictsLeft > 0",
+    command: unit,
+    expect: "landingOutcome: the agent can always ask",
+  },
+  {
+    name: "a tight budget drops the destination's side",
+    file: "packages/marginalia/land.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    `### ${f.ours.label}: ${f.ours.who}\\n${ours}\\n` +",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: '    (input.budget < 1000 ? "" : `### ${f.ours.label}: ${f.ours.who}\\n${ours}\\n`) +',
+    command: unit,
+    expect: "under budget, older reasons go first",
+  },
+  {
+    name: "a held record needs a kind",
+    file: "packages/marginalia/outbox.ts",
+    from: '  kind: Type.Optional(Type.Literal("chat")),',
+    to: '  kind: Type.Literal("chat"),',
+    command: unit,
+    expect: "a held record stored before landings had no kind",
   },
 ]

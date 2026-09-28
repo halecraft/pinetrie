@@ -21,7 +21,7 @@ import {
   type WriterId,
 } from "@pineta/core"
 import { Type } from "typebox"
-import { decodeWith } from "./decode.ts"
+import { decodeAll, decodeWith } from "./decode.ts"
 import { noteAt } from "./note.ts"
 
 /** pi value namespace for archive records. The key is the root's entry id. */
@@ -48,12 +48,7 @@ export const decodeArchive = (value: unknown): ArchiveRecord | undefined =>
 export function archiveRecords(
   values: Iterable<{ readonly value: unknown }>,
 ): ReadonlyMap<string, ArchiveRecord> {
-  const out = new Map<string, ArchiveRecord>()
-  for (const { value } of values) {
-    const r = decodeArchive(value)
-    if (r !== undefined) out.set(r.root, r)
-  }
-  return out
+  return new Map(decodeAll(values, decodeArchive).map(r => [r.root, r]))
 }
 
 export type ArchivePlan =
@@ -113,7 +108,8 @@ export function planArchive(input: {
 /**
  * The entry a command writes at, or null when it writes in no root: a new
  * thread at the root, a name, a stop, an archive action. A reference is
- * written where its author reads (`at`), not where it points.
+ * written where its author reads (`at`), not where it points; a landing, at
+ * its lane's tip.
  */
 export function writesAt(
   intent: Intent,
@@ -127,6 +123,10 @@ export function writesAt(
       return intent.at.kind === "root" ? null : intent.at.id
     case "note":
       return noteWritesAt(intent.action, notes, index, lanes)
+    // A landing writes at its lane's tip: an archived root's lanes do not land.
+    case "land":
+    case "take":
+      return lanes.find(l => l.name === intent.lane)?.tip ?? null
     case "name":
     case "stop":
     case "archive":

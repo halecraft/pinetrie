@@ -35,6 +35,7 @@ import {
   type RunId,
   referenceId,
   runId,
+  type WorkSetting,
 } from "@pineta/core"
 import { type Command, command, type Reply, reply } from "./messages.ts"
 
@@ -63,6 +64,8 @@ export type Outcome =
   /** A root is archived, or restored (ADR-0029); also when it already was. */
   | { readonly kind: "archived" }
   | { readonly kind: "restored" }
+  /** Your working copy is on the lane's landing (ADR-0033). */
+  | { readonly kind: "taken" }
   | Refusal
 
 /**
@@ -154,6 +157,9 @@ export function decodeCommand(
     if (lane !== "" && !isLaneName(lane)) {
       return refuse(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
     }
+    const work = workFromWire(text(wire?.workKind), text(wire?.workDir))
+    if (work === "invalid")
+      return refuse(ERR.BAD_DIRECTORY, "working directly needs a directory")
     return {
       kind: "chat",
       text: body,
@@ -162,7 +168,14 @@ export function decodeCommand(
       lane: isLaneName(lane) ? lane : null,
       asksAgent: wire?.asksAgent === true,
       mentions: parseMentions(body),
+      work,
     }
+  }
+  if (kind === "land" || kind === "take") {
+    const lane = text(wire?.lane)
+    return isLaneName(lane)
+      ? { kind, lane }
+      : refuse(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
   }
   if (kind === "note") return decodeNote(wire, at)
   if (kind === "archive") {
@@ -220,6 +233,24 @@ const isArchiveAction = (a: string): a is ArchiveAction =>
 const isChatMode = (mode: string): mode is ChatMode =>
   (CHAT_MODES as readonly string[]).includes(mode)
 
+/** The wire's work fields -> a setting, null for "the lane above's", or invalid. */
+function workFromWire(
+  kind: string,
+  dir: string,
+): WorkSetting | null | "invalid" {
+  if (kind === "") return null
+  if (kind === "own") return { kind: "own" }
+  if (kind === "direct") return dir === "" ? "invalid" : { kind: "direct", dir }
+  return "invalid"
+}
+
+const workToWire = (work: WorkSetting | null) =>
+  work === null
+    ? { workKind: "", workDir: "" }
+    : work.kind === "own"
+      ? { workKind: "own", workDir: "" }
+      : { workKind: "direct", workDir: work.dir }
+
 /** Intent -> the flat wire command. The client's half of `decodeCommand`. */
 export function encodeIntent(id: string, intent: Intent): Command {
   switch (intent.kind) {
@@ -239,6 +270,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         mode: intent.mode,
         lane: intent.lane ?? "",
         asksAgent: intent.asksAgent,
+        ...workToWire(intent.work),
       })
     case "name":
       return command({ id, kind: "name", text: intent.name })
@@ -253,6 +285,9 @@ export function encodeIntent(id: string, intent: Intent): Command {
         mode: intent.action,
         targetId: intent.root,
       })
+    case "land":
+    case "take":
+      return command({ id, kind: intent.kind, lane: intent.lane })
   }
 }
 
@@ -295,6 +330,8 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "archived" })
     case "restored":
       return reply({ id, outcome: "restored" })
+    case "taken":
+      return reply({ id, outcome: "taken" })
     case "refused":
       return reply({
         id,
@@ -328,6 +365,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "archived" }
     case "restored":
       return { kind: "restored" }
+    case "taken":
+      return { kind: "taken" }
     case "refused":
       return refuse(asErrCode(wire.errorCode), wire.errorMessage)
   }

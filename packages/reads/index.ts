@@ -10,37 +10,56 @@
 // Pure reads of a document handle: no subscription, no caching, no pi.
 
 import {
+  type Above,
   type AgentRun,
   type ArchiveRecord,
   agentActivity,
   ancestry,
   type EntryLike,
   indexTree,
+  type LandingRecord,
   type LaneName,
+  type LaneRecord,
   type LaneView,
   type NoteRecord,
+  nearestRevision,
+  type Position,
+  type ProjectRecord,
+  type RevisionRecord,
   rootOf,
   type TreeIndex,
+  type WorkSetting,
   type WriterId,
+  workFor,
 } from "@pineta/core"
 import {
   ARCHIVE_NAMESPACE,
   archiveRecords,
   decodeReference,
   type Held,
+  heldBy,
   heldMessages,
+  heldRuns,
   indexReferences,
+  LANDING_NAMESPACE,
+  LANE_NAMESPACE,
+  landingRecords,
+  laneRecords,
   NOTE_NAMESPACE,
   noteAt,
   noteRecords,
   OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
+  PROJECT_NAMESPACE,
   participantNames,
   participants,
+  projectRecord,
   REFERENCE_NAMESPACE,
+  REVISION_NAMESPACE,
   type Reference,
   type ReferenceIndex,
   renderableMessage,
+  revisionRecords,
 } from "@pineta/marginalia"
 import {
   type PresenceDocHandle,
@@ -101,7 +120,10 @@ export function readLanes(
       ? ancestry(index, tip)
           .path.map(id => index.entries[id]?.message)
           .find(m => m?.role === "chat" && m.compelled === true)?.writer
-      : waiting.find(h => h.details.compels.kind === "agent")?.details.author
+      : (() => {
+          const first = waiting.find(heldRuns)
+          return first === undefined ? undefined : heldBy(first)
+        })()
     return {
       name,
       tip,
@@ -249,3 +271,46 @@ export const readArchive = (
   doc: SessionDocHandle,
 ): ReadonlyMap<string, ArchiveRecord> =>
   archiveRecords(readValues(doc, ARCHIVE_NAMESPACE))
+
+// ── where lanes work (ADR-0032, ADR-0033) ─────────────────────────────────
+
+/** Every lane's record (`pineta.lane`): where it works, by lane. */
+export const readLaneRecords = (
+  doc: SessionDocHandle,
+): ReadonlyMap<string, LaneRecord> =>
+  laneRecords(readValues(doc, LANE_NAMESPACE))
+
+/** Every revision record (`pineta.revision`), by the entry it is at. */
+export const readRevisions = (
+  doc: SessionDocHandle,
+): ReadonlyMap<string, RevisionRecord> =>
+  revisionRecords(readValues(doc, REVISION_NAMESPACE))
+
+/** Every landing's record (`pineta.landing`), oldest first. */
+export const readLandings = (doc: SessionDocHandle): readonly LandingRecord[] =>
+  landingRecords(readValues(doc, LANDING_NAMESPACE))
+
+/** What the host found where it runs (`pineta.project`); null with no tools. */
+export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>
+  projectRecord(readValues(doc, PROJECT_NAMESPACE))
+
+/**
+ * Where a lane created at `at` would work, and the files it would start
+ * from: the send's choice, else the lane above, else the project's default.
+ * The composer shows this, and the host creates the lane by it.
+ */
+export function workAt(
+  doc: SessionDocHandle,
+  index: TreeIndex,
+  at: Position,
+  choice: WorkSetting | null,
+): { readonly work: WorkSetting | null; readonly above: Above } {
+  const above = nearestRevision(index, readRevisions(doc), at)
+  const work = workFor({
+    choice,
+    above: above.lane,
+    lanes: readLaneRecords(doc),
+    project: readProject(doc),
+  })
+  return { work, above }
+}

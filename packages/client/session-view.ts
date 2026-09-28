@@ -18,6 +18,7 @@ import {
   type Position,
   parseMentions,
   type ReferenceTarget,
+  type WorkSetting,
   type WriterId,
   writerId,
 } from "@pineta/core"
@@ -108,6 +109,10 @@ export interface SessionClient {
   noteText(id: NoteId): NoteDocHandle
   /** Hide the root `root` for everyone, or bring it back (ADR-0029). */
   archive(action: ArchiveAction, root: EntryId): Promise<Outcome>
+  /** Merge your work into a lane, and have the agent resolve it (ADR-0033). */
+  land(lane: LaneName): Promise<Outcome>
+  /** Put your working copy on a lane's resolved landing. */
+  take(lane: LaneName): Promise<Outcome>
   /** Every reply as it arrived on the wire, for wire-level checks. */
   readonly replies: readonly Reply[]
   close(): Promise<void>
@@ -120,6 +125,8 @@ export interface ChatHow {
   readonly lane?: LaneName
   /** A Start Agent column. */
   readonly asksAgent?: boolean
+  /** Where a lane this send creates works; absent, the lane above's setting (ADR-0032). */
+  readonly work?: WorkSetting
   /** The send's id, minted by a fresh column so it can find its message. */
   readonly id?: string
 }
@@ -205,6 +212,7 @@ export async function connectSession(
           lane: how.lane ?? null,
           asksAgent: how.asksAgent === true,
           mentions: parseMentions(text),
+          work: how.work ?? null,
         },
         how.id,
       )
@@ -223,6 +231,12 @@ export async function connectSession(
     },
     noteText(id) {
       return exchange.get(noteDocId(id), NoteDoc)
+    },
+    land(lane) {
+      return send({ kind: "land", lane })
+    },
+    take(lane) {
+      return send({ kind: "take", lane })
     },
     archive(action, root) {
       return send({ kind: "archive", action, root })

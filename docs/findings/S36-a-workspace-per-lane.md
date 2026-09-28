@@ -115,25 +115,140 @@ target.
     so a lane's environment needs a non-interactive editor (for example
     `JJ_EDITOR=false`), or the agent's command hangs until its timeout.
 
+14. **Node's `fs.cp` does not clone on macOS** (measured, Node 24.19, root
+    `node_modules`, 31 427 entries). With `mode: COPYFILE_FICLONE` it took
+    9.0 s and used 569 MB: a full copy. `COPYFILE_FICLONE_FORCE` failed with
+    `ENOSYS`. `/bin/cp -c -R` on the same tree took 5.8 s and 13 MB. A
+    copy-on-write copy has to come from the platform's own tool.
+
+15. **Initializing a project is one command either way** (measured, jj
+    0.44, throwaway repos). In a git repo without `.jj`,
+    `jj git init --colocate` imported it; `git status` afterwards still said
+    `On branch main`, clean. In a plain directory, `jj git init` created both
+    `.git` and `.jj`: colocated is the default.
+16. **`.git/info/exclude` keeps workspaces out of snapshots without touching
+    a tracked file** (measured). With `/workspace/` in it, a file under
+    `workspace/t-x/` did not appear in `jj st`.
+
+17. **Only jj can say where a jj repo is** (observed, read-only, in
+    `~/halecraft/kyneta/workspace/pineta`, a secondary workspace nested in
+    the Kyneta repo). There `.jj/repo` is a *file* holding
+    `../../../.jj/repo`, not a directory, so a check for `.jj/repo/` finds no
+    repo. From `packages/schema` inside it, `git rev-parse --show-toplevel`
+    answered `~/halecraft/kyneta`, the outer repo, while
+    `jj workspace root --ignore-working-copy` answered the workspace. Outside
+    any repo, jj exits 1 with "There is no jj repo in". Every lane's
+    workspace has this nested shape.
+
 So `update-stale` is not a routine step: nothing in a lane's normal life
 rewrites another lane's history, provided run revisions are immutable and folds
 are merges. It remains a guard at a run's start, a no-op unless someone
 rewrote a lane deliberately (item 7's hazard applies only to edits not yet
 snapshotted, and the previous run's end snapshotted everything).
 
+## Addendum 2: before the plan
+
+Measured after ADR-0032 and ADR-0033 were written, to settle what they left
+open. jj behaviour in a throwaway repo under `/tmp`; the suites in a Pineta
+workspace under `sandbox/`.
+
+18. **pi takes each lane's directory from the run's `Context`** (measured, a
+    scripted model, `MemoryStorage`). `toolContext` as a function of the
+    `Context`, and the directory passed with `withContextValue`:
+    - two lanes prompted at once each ran `bash pwd` in their own directory;
+    - the system prompt, a function of the tool context, named each lane's;
+    - after a crash (a second harness over the same storage, the first one's
+      tool call never returning), `prompt` on the lane failed `LaneBusy`
+      ("already has an active operation"). `resume` succeeded. It did not run
+      the hanging call again but recorded it as interrupted, and the resumed
+      run's next tool call ran in the directory in `resume`'s `Context`.
+
+    So every call that drives a lane (`prompt`, `resume`) must carry the
+    lane's directory. `packages/pi/agent.ts` says `LaneBusy` cannot arise,
+    but after a crash it does, until something calls `resume`.
+19. **Repo-level immutability through a bookmark protects a lane's base from
+    you** (measured). With `bookmarks(glob:"pineta/*")` in the repo's
+    `immutable_heads()` and `pineta/t-1` on the lane's base `P` (your `@-`),
+    `jj squash` into `@-` and `jj describe -r @-` were refused ("Commit … is
+    immutable"). Editing and describing `@`, and `jj new`, worked.
+20. **Landing works end to end** (measured). The lane committed a change to a
+    line, and you committed a different change to it and kept editing.
+    - The lane's `jj new <its revision> <your @->` conflicted on that line;
+      it resolved the line and committed.
+    - Your `jj rebase -r @ -d <merge>` put your `@` on the merge. Your
+      uncommitted file came along, the shared file held both changes, and
+      nothing conflicted.
+    - The lane stayed fresh, your `@` stayed editable, and the merge, now
+      your `@-`, was immutable.
+21. **`JJ_EDITOR=false` makes an editor-wanting command fail at once**
+    (measured): `jj describe` with no message failed in 0.4 s, "Editor 'false'
+    exited with exit status: 1".
+22. **`.git/info/exclude` applies in a secondary workspace too** (measured,
+    with a control). With `/workspace/` excluded, neither the colocated
+    workspace nor a secondary one listed `workspace/…` in `jj st`; without
+    the line, both did.
+23. **`jj git push --all` would push the lanes' bookmarks** (measured,
+    `--dry-run` to a local bare remote): `pineta/t-1` was listed beside
+    `main`.
+24. **A git worktree cannot be colocated, and a subdirectory project
+    initializes at git's top level** (measured). In a worktree (`.git` a file
+    naming `.git/worktrees/…`), `jj git init --colocate` failed: "Cannot
+    create a colocated jj repo inside a Git worktree". From a subdirectory of
+    a git repo, `jj workspace root` found nothing and git named the top
+    level. `jj -R <top> git init` failed, because `-R` needs an existing repo,
+    so init must run with the top level as its working directory. Afterwards
+    `jj workspace root` from the subdirectory named the top level, and
+    `git status` was clean on `main`.
+25. **The whole gate passes in a workspace, and two e2e runs do not
+    collide** (measured). In a workspace set up by clone and relink (7.6 s in
+    all):
+
+    | lint | typecheck | test | conformance | e2e |
+    |---|---|---|---|---|
+    | 1.5 s | 4.2 s | 3.8 s | 1.1 s | 28.3 s |
+
+    All passed. e2e run at the same moment in the workspace and in your
+    working copy passed in both, with no `EADDRINUSE`: the suite's host takes
+    `port: 0`. The development host defaults to 7391, so two lanes each
+    starting it would collide without `PINETA_PORT=0`. The browser suite was
+    not run: it needs a Playwright server outside the sandbox.
+26. **A turn revision costs about a tenth of a second** (measured, the
+    Pineta workspace, 493 MB of ignored `node_modules`, 5 runs each): 84 ms
+    for a snapshot and the check that nothing changed, 144 ms for a snapshot
+    and `jj commit`.
+27. **`pnpm install --offline` beats cloning, where the store has the
+    packages** (measured). In a fresh workspace, with pnpm's own store
+    (`pnpm store path`, here `~/Library/pnpm/store/v10`),
+    `pnpm install --offline --frozen-lockfile` took 2.3–2.8 s and 6.7 MB of
+    disk; pnpm itself imports copy-on-write where it can. Its `link:`
+    dependencies dangled as the clone's did, the same relink fixed all 18,
+    and the unit suite passed (344 tests). It installs from the workspace's
+    own lockfile, so a lane's dependencies match its base. With a store
+    missing a package, it failed in 0.6 s with `ERR_PNPM_NO_OFFLINE_TARBALL`.
+28. **A jj command run from the wrong directory acts on the repo around it.**
+    Observed by accident: `jj workspace add` failed silently (its parent
+    directory did not exist, and its output was discarded). Each `cd` into it
+    then failed, and the commands meant for the probe ran in `sandbox/`,
+    inside Pineta's repo. There they committed your working-copy change as
+    "turn: resolve" and set a `pineta/t-1` bookmark. `jj op restore` to the
+    snapshot before them undid both, with your `@` back at its commit id and
+    no file changed. Also:
+    - `jj … | head` exits 3 (a broken pipe), which `pipefail` reports as a
+      failure;
+    - an earlier `jj abandon` printed "Abandoned 8 commits" but recorded no
+      operation. Its exit status and the rest of its output were not kept, so
+      why is unknown; the commits were abandoned again.
+
+    So the host runs every jj command with `-R <root>`, never relying on its
+    working directory, and checks each command's exit status rather than
+    its output.
+
 ## Not measured
 
-- `pnpm install --offline --frozen-lockfile` in a fresh workspace, as an
-  alternative to cloning.
-- pi routing a per-lane working directory through the run's `Context` to
-  `toolContext`, including a run resumed after a restart.
-- Whether a workspace directory inside the repo but *not* gitignored is kept
-  out of the default workspace's snapshot (the probe used `sandbox/`, which
-  is ignored).
-- The e2e and browser suites in a workspace (ports, Playwright).
-- `immutable_heads()` in repo-level config instead, which would also protect
-  run revisions from the default workspace, and cost a line in your repo's
-  config.
+- The browser suite in a workspace (it needs a Playwright server outside
+  the sandbox).
+- Cloning or installing on Linux (`cp --reflink=auto` on btrfs, XFS and
+  ext4).
 
 ## Method
 
