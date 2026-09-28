@@ -8,27 +8,25 @@
 import path from "node:path"
 import {
   type CommitId,
+  HOST_WORKING_COPY,
   type LaneName,
   NO_EDITOR,
   type ProjectRecord,
   type SnapshotId,
+  WORKSPACE_ROOT,
 } from "@pineta/core"
 
-/** Where every lane sees its own directory. */
-export const PROJECT_MOUNT = "/project"
-/** Where every lane sees your working copy, read-only. */
-export const YOURS_MOUNT = "/yours"
 /** Pineta's own install, read-only: the helper's code and pi's. */
 export const PINETA_MOUNT = "/pineta"
 /** Pineta's lane runtime, read-only: Node and its libraries, and jj (S44). */
 export const RUNTIME_MOUNT = "/pineta-runtime"
 /** The lane's own jj config, on its disk so that forks inherit it (S42 item 4). */
-export const LANE_CONFIG_DIR = `${PROJECT_MOUNT}/.pineta-lane`
+export const LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pineta-lane`
 export const LANE_JJ_CONFIG = `${LANE_CONFIG_DIR}/jj.toml`
 /** The branch a commit fetched by id is put on, so jj sees it (S44 item 7). */
-export const FETCHED_REF = "refs/heads/pineta/yours"
+export const FETCHED_REF = "refs/heads/pineta/fetched"
 /** A new volume's size. The image is sparse: only written blocks take space. */
-export const DISK_SIZE = "64G"
+const DISK_SIZE = "64G"
 
 /** The bookmark that holds a lane's newest revision, in its repo and in yours. */
 export const bookmarkName = (lane: LaneName): string => `pineta/${lane}`
@@ -54,7 +52,7 @@ export const NO_GRANTS: LaneGrants = { ssh: false, env: [], mounts: [] }
 
 /** How the base snapshot installs a project's dependencies. */
 export interface Install {
-  /** A shell command, run in `/project`. */
+  /** A shell command, run in `/workspace`. */
   readonly command: string
   /** The file whose change makes the base snapshot install again. */
   readonly lockfile: string
@@ -66,8 +64,8 @@ export interface LaneSpec {
   readonly image: string
   /** The image's own `PATH`; the runtime's `bin` is added after it. */
   readonly imagePath: string
-  /** Your working copy's root, mounted read-only at `/yours`. */
-  readonly yours: string
+  /** Your working copy's root, mounted read-only at `/mnt/host-working-copy`. */
+  readonly hostWorkingCopy: string
   /** Pineta's own install, read-only at `/pineta`, for the helper. */
   readonly pineta: string
   /** Pineta's lane runtime, read-only at `/pineta-runtime`. */
@@ -110,8 +108,11 @@ export function planRun(
     "-m",
     spec.memory,
     "-v",
-    `${spec.volume}:${PROJECT_MOUNT}`,
-    ...readonlyMount({ source: spec.yours, target: YOURS_MOUNT }),
+    `${spec.volume}:${WORKSPACE_ROOT}`,
+    ...readonlyMount({
+      source: spec.hostWorkingCopy,
+      target: HOST_WORKING_COPY,
+    }),
     ...readonlyMount({ source: spec.pineta, target: PINETA_MOUNT }),
     ...readonlyMount({ source: spec.runtime, target: RUNTIME_MOUNT }),
     ...spec.links.flatMap(readonlyMount),
@@ -126,7 +127,7 @@ export function planRun(
     // image that has none, and never Node.
     ...setEnv("PATH", `${spec.imagePath}:${RUNTIME_MOUNT}/bin`),
     "-w",
-    PROJECT_MOUNT,
+    WORKSPACE_ROOT,
     spec.image,
     "sleep",
     "infinity",
@@ -199,7 +200,7 @@ export interface Link {
 /**
  * The read-only mounts that let links leaving the project resolve in a lane.
  * For each relative target outside the root, the directory beside the
- * project's that holds it is mounted where it resolves from `/project`: the
+ * project's that holds it is mounted where it resolves from `/workspace`: the
  * whole directory, since a linked package resolves its own dependencies
  * through the `node_modules` of its repo. Pineta's `link:` dependencies on
  * Kyneta resolve this way (S39 item 5).
@@ -218,7 +219,7 @@ export function planLinks(root: string, links: readonly Link[]): Mount[] {
     const top = path.resolve(root, ...parts.slice(0, ups + 1))
     found.set(
       top,
-      path.posix.resolve(PROJECT_MOUNT, ...parts.slice(0, ups + 1)),
+      path.posix.resolve(WORKSPACE_ROOT, ...parts.slice(0, ups + 1)),
     )
   }
   return [...found.keys()]
@@ -266,7 +267,7 @@ const onHost = (...argv: string[]): LaneStep => ({ in: "host", argv })
 const laneShell = (script: string): LaneStep => inLane("sh", "-c", script)
 
 /**
- * Fetch `commits` from `from` (your working copy, at `/yours`) when the disk
+ * Fetch `commits` from `from` (your working copy, at `/mnt/host-working-copy`) when the disk
  * lacks any of them. The fetch puts each on a branch, which is what makes jj
  * see it (S44 item 7), and jj imports it at once: a jj command with
  * `--ignore-working-copy` imports nothing. A commit a fork's disk already
@@ -274,7 +275,7 @@ const laneShell = (script: string): LaneStep => inLane("sh", "-c", script)
  */
 export function fetchById(
   commits: readonly CommitId[],
-  from: string = YOURS_MOUNT,
+  from: string = HOST_WORKING_COPY,
 ): LaneStep {
   const has = commits.map(c => `git cat-file -e ${c}^{commit}`).join(" && ")
   const refs = commits.map((c, i) => `+${c}:${FETCHED_REF}/${i}`).join(" ")
@@ -323,7 +324,7 @@ const cloneFile = (from: string, to: string): LaneStep[] => [
 ]
 
 /** A volume made from a snapshot: created, then its image replaced by a clone. */
-export const restoreVolume = (
+const restoreVolume = (
   paths: DiskPaths,
   id: SnapshotId,
   volume: string,
@@ -368,35 +369,41 @@ export function planForkSetup(
   ]
 }
 
+/** Start a lane's container on its existing volume. */
+export const planStart = (
+  spec: LaneSpec,
+  env: Readonly<Record<string, string | undefined>>,
+): LaneStep => onHost("container", ...planRun(spec, env))
+
 /**
- * A fork: a clone of the fork point's snapshot as the lane's disk, the
- * container started on it, then `planForkSetup`.
+ * A lane's disk, then its container: a new volume, or one cloned from
+ * snapshot `from`.
  */
-export function planFork(input: {
-  readonly lane: LaneName
+export const planDisk = (input: {
+  readonly paths: DiskPaths
+  readonly spec: LaneSpec
+  readonly env: Readonly<Record<string, string | undefined>>
+  readonly from: SnapshotId | null
+}): LaneStep[] => [
+  ...(input.from === null
+    ? [createVolume(input.spec.volume)]
+    : restoreVolume(input.paths, input.from, input.spec.volume)),
+  planStart(input.spec, input.env),
+]
+
+/** A fork: its disk cloned from the fork point's snapshot, then `planForkSetup`. */
+export const planFork = (input: {
   readonly point: {
     readonly snapshot: SnapshotId
     readonly commits: readonly CommitId[]
   }
   readonly paths: DiskPaths
-  readonly run: readonly string[]
-}): readonly LaneStep[] {
-  const volume = volumeOfRun(input.run)
-  return [
-    ...restoreVolume(input.paths, input.point.snapshot, volume),
-    onHost("container", ...input.run),
-    ...planForkSetup(input.lane, input.point.commits),
-  ]
-}
-
-/** The volume a `planRun` mounts at `/project`. */
-function volumeOfRun(run: readonly string[]): string {
-  const i = run.indexOf("-v")
-  const spec = i < 0 ? undefined : run[i + 1]
-  if (spec === undefined || !spec.endsWith(`:${PROJECT_MOUNT}`))
-    throw new Error("planRun's arguments name no volume at /project")
-  return spec.slice(0, -`:${PROJECT_MOUNT}`.length)
-}
+  readonly spec: LaneSpec
+  readonly env: Readonly<Record<string, string | undefined>>
+}): LaneStep[] => [
+  ...planDisk({ ...input, from: input.point.snapshot }),
+  ...planForkSetup(input.spec.lane, input.point.commits),
+]
 
 /**
  * A git bundle of the lane's bookmark, excluding what your repo already has:
@@ -467,30 +474,6 @@ export function planFetch(input: {
     onHost("jj", "-R", input.root, "--ignore-working-copy", "git", "import"),
     onHost("rm", "-f", input.bundle),
   ]
-}
-
-/**
- * What follows a turn's commit, in order: its snapshot, then, when it made a
- * commit, the fetch into your repo.
- */
-export function planTurn(input: {
-  readonly lane: LaneName
-  readonly volume: string
-  readonly snapshot: SnapshotId
-  readonly paths: DiskPaths
-  /** The turn's commit, or null when nothing tracked changed. */
-  readonly committed: CommitId | null
-  readonly have: readonly CommitId[]
-  readonly root: string
-  readonly bundle: string
-}): {
-  readonly snapshot: readonly LaneStep[]
-  readonly fetch: readonly LaneStep[]
-} {
-  return {
-    snapshot: planSnapshot(input),
-    fetch: input.committed === null ? [] : planFetch(input),
-  }
 }
 
 /** What the base snapshot was made from, kept beside it. */
@@ -602,7 +585,7 @@ export function planRoot(f: RootFacts): HostFacts["root"] {
 }
 
 /** Snapshots and the lane runtime live under `.pineta/`, which git ignores. */
-export const EXCLUDE_LINE = "/.pineta/"
+const EXCLUDE_LINE = "/.pineta/"
 
 /** git's exclude file with `/.pineta/` in it, or null when it is already there. */
 export function planExclude(current: string): string | null {
@@ -613,7 +596,7 @@ export function planExclude(current: string): string | null {
 }
 
 /** The oldest git a lane's image may have: jj's fetch needs 2.41 (S42 item 7). */
-export const MIN_GIT: readonly [number, number] = [2, 41]
+const MIN_GIT: readonly [number, number] = [2, 41]
 
 /**
  * Why an image cannot host a lane, from `git --version`'s output (empty when

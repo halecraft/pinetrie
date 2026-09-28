@@ -4,8 +4,8 @@
 // Root lanes fork from it as other lanes fork from a turn's snapshot. It is
 // your repo's `@-`, fetched by id, and its dependencies installed in Linux:
 // the only install; no lane ever installs. It is made and refreshed in a
-// scratch lane, then snapshotted back as `base.img`, renamed into place, so a
-// fork never reads it half-written. `base.json` beside it says what it holds.
+// scratch lane, then snapshotted back as `base.img` as a turn is, so a fork
+// never reads it half-written. `base.json` beside it says what it holds.
 
 import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
@@ -20,17 +20,13 @@ import { executeOrThrow } from "./execute.ts"
 import { laneHandle, type OpenLink, removeLane } from "./lane.ts"
 import {
   type BaseFacts,
-  createVolume,
   type DiskPaths,
   type Install,
   type LaneSpec,
-  type LaneStep,
   laneContainer,
   planBaseRefresh,
-  planRun,
-  restoreVolume,
-  snapshotFile,
-  volumeImage,
+  planDisk,
+  planSnapshot,
 } from "./plan.ts"
 
 /** The scratch lane a base is made in; never a thread's. */
@@ -40,7 +36,7 @@ const factsFile = (paths: DiskPaths) =>
   path.join(paths.snapshots, `${BASE_SNAPSHOT}.json`)
 
 /** What the base snapshot holds, or null when there is none. */
-export async function readBase(paths: DiskPaths): Promise<BaseFacts | null> {
+async function readBase(paths: DiskPaths): Promise<BaseFacts | null> {
   if (!(await snapshotExists(paths, BASE_SNAPSHOT))) return null
   try {
     const raw = JSON.parse(await readFile(factsFile(paths), "utf8")) as {
@@ -86,35 +82,18 @@ export async function refreshBase<C>(input: {
   if (steps.length === 0) return false
   const container = laneContainer(BASE_LANE)
   await removeLane(container)
-  const run = planRun(
-    { ...input.spec, lane: BASE_LANE, volume: container },
-    input.env,
-  )
-  const disk: LaneStep[] =
-    base === null
-      ? [createVolume(container)]
-      : restoreVolume(paths, BASE_SNAPSHOT, container)
   const handle = laneHandle(container, input.open)
   try {
     await executeOrThrow(
-      [...disk, { in: "host", argv: ["container", ...run] }, ...steps],
-      handle.runners,
-    )
-    await executeOrThrow([{ in: "lane", argv: ["sync"] }], handle.runners)
-    await handle.stop()
-    const final = snapshotFile(paths, BASE_SNAPSHOT)
-    await executeOrThrow(
       [
-        {
-          in: "host",
-          argv: [
-            "/bin/cp",
-            "-c",
-            volumeImage(paths, container),
-            `${final}.tmp`,
-          ],
-        },
-        { in: "host", argv: ["/bin/mv", "-f", `${final}.tmp`, final] },
+        ...planDisk({
+          paths,
+          spec: { ...input.spec, lane: BASE_LANE, volume: container },
+          env: input.env,
+          from: base === null ? null : BASE_SNAPSHOT,
+        }),
+        ...steps,
+        ...planSnapshot({ volume: container, snapshot: BASE_SNAPSHOT, paths }),
       ],
       handle.runners,
     )

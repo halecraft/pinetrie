@@ -159,7 +159,7 @@ item 18, and in `lanes.test.ts` against the harness.
 
 - **`LaneAccess`** is Pineta's type, so no pi type crosses the boundary. It
   is either `direct` (a directory on the host, and a promise its tools wait
-  for) or `lane` (a lane of its own: its directory, `/project`, and a
+  for) or `lane` (a lane of its own: its directory, `/workspace`, and a
   `gate()` that settles with its channel).
 - **A lane working directly** gets pi's `NodeExecutionEnv` in its directory
   (`directEnv`). Every method first awaits `ready`, and `shellEnv` sets
@@ -198,7 +198,7 @@ item 18, and in `lanes.test.ts` against the harness.
   `process.execPath` is the loader: nothing in it may re-execute that
   (S44 item 2).
 - **The system prompt** names the lane's directory, and for a lane of its own
-  adds a guideline naming `/yours` as your working copy, read-only. The model
+  adds a guideline naming `/mnt/host-working-copy` as your working copy, read-only. The model
   is sent the conversation as stored: nothing is rewritten.
 - **`before_request`** calls `hooks.turnDone(lane, tip)`, and pi awaits it:
   every tool of the turn before has finished, so the commit never races a

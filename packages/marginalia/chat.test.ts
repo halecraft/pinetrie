@@ -59,7 +59,7 @@ const plan = (over: Partial<PlanInput>) => {
     at: atEntry(E1),
     end: atEntry(E1),
     contributors: [],
-    yours: null,
+    hostWorkingCopy: null,
     race: null,
     lane: NONE,
     mentions: [],
@@ -77,13 +77,13 @@ const textOf = (d: ReturnType<typeof planChat>) =>
 
 describe("planChat: paths to your working copy, in a thread with its own copy", () => {
   const text = "look at /home/p/src/a.ts, not /home/p2/b"
-  test("are stored as the lane sees them, under /yours", () => {
-    expect(textOf(plan({ text, yours: "/home/p" }))).toBe(
-      "look at /yours/src/a.ts, not /home/p2/b",
+  test("are stored as the lane sees them, under /mnt/host-working-copy", () => {
+    expect(textOf(plan({ text, hostWorkingCopy: "/home/p" }))).toBe(
+      "look at /mnt/host-working-copy/src/a.ts, not /home/p2/b",
     )
   })
   test("are stored as typed when the thread works directly", () => {
-    expect(textOf(plan({ text, yours: null }))).toBe(text)
+    expect(textOf(plan({ text, hostWorkingCopy: null }))).toBe(text)
   })
 })
 

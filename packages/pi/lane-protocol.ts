@@ -58,7 +58,7 @@ export type LaneRequest =
   | {
       readonly id: number
       readonly run: readonly string[]
-      /** Defaults to the helper's directory, `/project`. */
+      /** Defaults to the helper's directory, `/workspace`. */
       readonly cwd: string | null
       /** stdout as bytes, for a bundle; else text. */
       readonly bytes: boolean

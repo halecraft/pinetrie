@@ -33,7 +33,7 @@ describe("lane-protocol: values JSON cannot carry", () => {
     const request = roundTrip({
       id: 2,
       method: "writeFile",
-      args: ["/project/a.bin", bytes],
+      args: ["/workspace/a.bin", bytes],
       updates: false,
     })
     expect("args" in request && request.args[1]).toEqual(bytes)
@@ -50,7 +50,7 @@ describe("lane-protocol: values JSON cannot carry", () => {
       id: 1,
       result: {
         ok: false,
-        error: new FileError("not_found", "no such file", "/project/x"),
+        error: new FileError("not_found", "no such file", "/workspace/x"),
       },
     })
     const error = (
@@ -61,7 +61,7 @@ describe("lane-protocol: values JSON cannot carry", () => {
       "FileError",
       "not_found",
       "no such file",
-      "/project/x",
+      "/workspace/x",
     ])
   })
   test("updates, a thrown call, an abort and the ready line", () => {
@@ -72,9 +72,9 @@ describe("lane-protocol: values JSON cannot carry", () => {
       thrown: "boom",
     })
     expect(roundTrip({ abort: 3 })).toEqual({ abort: 3 })
-    expect(roundTrip({ ready: true, cwd: "/project" })).toEqual({
+    expect(roundTrip({ ready: true, cwd: "/workspace" })).toEqual({
       ready: true,
-      cwd: "/project",
+      cwd: "/workspace",
     })
   })
   test("a run request, and its result with bytes for stdout", () => {

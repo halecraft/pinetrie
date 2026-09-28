@@ -11,7 +11,7 @@
 // Every lane mounts it read-only at `/pineta-runtime`. Only `bin/` goes on a
 // lane's `PATH`: Pineta's `node` cannot start without its loader.
 
-import { mkdir, rename, rm, stat } from "node:fs/promises"
+import { mkdir, readdir, rename, rm, stat } from "node:fs/promises"
 import path from "node:path"
 import { RUNTIME_MOUNT } from "./plan.ts"
 import { describeFailure, run } from "./run.ts"
@@ -45,7 +45,7 @@ const exists = (p: string) =>
 /**
  * The runtime for `image` under `dir` (`.pineta/runtime/`), copied out of it
  * once. Its directory is named by the image's tag, so a rebuilt image gets a
- * new runtime. Returns the directory.
+ * new runtime, and those of earlier tags are removed. Returns the directory.
  */
 export async function ensureRuntime(
   dir: string,
@@ -53,7 +53,15 @@ export async function ensureRuntime(
 ): Promise<string> {
   const name = image.replace(/[^A-Za-z0-9._-]/g, "-")
   const final = path.join(dir, name)
-  if (await exists(path.join(final, "bin", "jj"))) return final
+  if (!(await exists(path.join(final, "bin", "jj"))))
+    await extract(final, image)
+  for (const old of await readdir(dir))
+    if (old !== name)
+      await rm(path.join(dir, old), { recursive: true, force: true })
+  return final
+}
+
+async function extract(final: string, image: string): Promise<void> {
   const scratch = `${final}.tmp`
   await rm(scratch, { recursive: true, force: true })
   await mkdir(scratch, { recursive: true })
@@ -73,5 +81,4 @@ export async function ensureRuntime(
   }
   await rm(final, { recursive: true, force: true })
   await rename(scratch, final)
-  return final
 }

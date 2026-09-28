@@ -29,7 +29,7 @@ import {
 import { type Static, Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { decodeLand, landLine } from "./land.ts"
-import { showYours } from "./work.ts"
+import { showHostWorkingCopy } from "./work.ts"
 
 export const CHAT_TYPE = "pineta.chat"
 
@@ -237,10 +237,10 @@ export function planChat(input: {
   readonly contributors: readonly WriterId[]
   /**
    * Your working copy's root when the thread works, or will work, in its own
-   * copy: paths under it are stored as the lane sees them, under `/yours`, so
+   * copy: paths under it are stored as the lane sees them, under `/mnt/host-working-copy`, so
    * people and the model read the same text (ADR-0034). Null otherwise.
    */
-  readonly yours: string | null
+  readonly hostWorkingCopy: string | null
 }): ChatDecision {
   const { lane, end, race } = input.thread
   const branch = input.mode === "branch"
@@ -257,7 +257,9 @@ export function planChat(input: {
     author: input.author,
     authorName: input.authorName,
     text:
-      input.yours === null ? input.text : showYours(input.text, input.yours),
+      input.hostWorkingCopy === null
+        ? input.text
+        : showHostWorkingCopy(input.text, input.hostWorkingCopy),
     compels,
     sendId: input.sendId,
     ...(input.contributors.length === 0

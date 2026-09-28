@@ -481,8 +481,8 @@ context.**
   thread's agent works in its own Linux container (ADR-0034), on a disk
   cloned from the turn it branched at: a root thread's starts from your
   committed work (`@-`), with dependencies installed, so commit what it should
-  see. It sees its own directory at `/project` and your working copy at
-  `/yours`, read-only, and nothing else of your machine unless `pineta.json`
+  see. It sees its own directory at `/workspace` and your working copy at
+  `/mnt/host-working-copy`, read-only, and nothing else of your machine unless `pineta.json`
   grants it. Your working copy is yours, so hot reload stays on. It needs
   Apple's `container` running (`docs/05-stack.md` D10); without it, threads
   work directly. Restart the host to pick up changes to host code.

@@ -608,7 +608,7 @@ export async function startHost({
             chat.work,
           ).work?.kind === "own")
     const planned = planChat({
-      yours: own ? (work.project?.root ?? null) : null,
+      hostWorkingCopy: own ? (work.project?.root ?? null) : null,
       author: writer,
       authorName: nameOf(writer),
       text: chat.text,

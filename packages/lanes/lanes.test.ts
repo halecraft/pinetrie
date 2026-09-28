@@ -14,7 +14,6 @@ import {
   entryId,
   laneNameForThread,
   NO_EDITOR,
-  snapshotId,
 } from "@pineta/core"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import {
@@ -33,8 +32,8 @@ import {
   type LaneStep,
   mergeYours,
   planBaseRefresh,
+  planFetch,
   planForkSetup,
-  planTurn,
   protectLaneBookmarks,
   type Ran,
   type Runner,
@@ -89,8 +88,8 @@ describe("execute", () => {
 // ── against jj and git themselves, in throwaway repos ──────────────────────
 
 /**
- * A lane's steps, run on the host: `/yours` and `/project` are directories
- * here. Only a mount at the start of a word moves: `refs/heads/pineta/yours`
+ * A lane's steps, run on the host: `/mnt/host-working-copy` and `/workspace` are directories
+ * here. Only a mount at the start of a word moves: `refs/heads/pineta/fetched`
  * is a ref, not a path.
  */
 const onHost = (steps: readonly LaneStep[], dirs: Record<string, string>) =>
@@ -148,27 +147,25 @@ describe("a lane's repo, with jj", () => {
     })
     const inLane = (dir: string, steps: readonly LaneStep[]) =>
       executeOrThrow(
-        onHost(steps, { "/yours": yoursDir, "/project": dir }),
+        onHost(steps, {
+          "/mnt/host-working-copy": yoursDir,
+          "/workspace": dir,
+        }),
         runners(dir),
       )
     /** The lane's commits into your repo, by bundle, as after a turn. */
     const fetchInto = (
       dir: string,
       lane: typeof LANE,
-      committed: CommitId,
       have: readonly CommitId[],
     ) =>
       executeOrThrow(
-        planTurn({
+        planFetch({
           lane,
-          volume: "v",
-          snapshot: snapshotId("s"),
-          paths: { volumes: "/v", snapshots: "/s" },
-          committed,
           have,
           root: yoursDir,
           bundle: path.join(top, `${lane}.bundle`),
-        }).fetch,
+        }),
         runners(dir),
       )
 
@@ -217,7 +214,7 @@ describe("a lane's repo, with jj", () => {
     expect(await bookmarkOf(laneJj, LANE)).toBe(r1)
 
     // Your repo fetches it by bundle, and cannot rewrite it.
-    await fetchInto(laneDir, LANE, r1, base)
+    await fetchInto(laneDir, LANE, base)
     expect(await bookmarkOf(yoursJj, LANE)).toBe(r1)
     expect((await yoursJj(["describe", "-r", r1, "-m", "rewritten"])).ok).toBe(
       false,
@@ -268,7 +265,7 @@ describe("a lane's repo, with jj", () => {
     expect((await mergeYours(laneJj, LANE, yours)).merge).toBeNull()
 
     // You take it: both changes, and your uncommitted file kept.
-    await fetchInto(laneDir, LANE, resolved, [r1])
+    await fetchInto(laneDir, LANE, [r1])
     await takeInto(yoursJj, resolved)
     expect(await readFile(path.join(yoursDir, "shared.txt"), "utf8")).toContain(
       "two (you, and lane)",
@@ -300,7 +297,7 @@ describe("a lane's repo, with jj", () => {
     await writeFile(path.join(laneDir, ".gitignore"), "cache.bin\n")
     const point = await commitTurn(laneJj, { ...turn, entry: entryId("e-4") })
     if (point === null) throw new Error("the fork point committed nothing")
-    await fetchInto(laneDir, LANE, point, [resolved])
+    await fetchInto(laneDir, LANE, [resolved])
     await cp(laneDir, forkDir, { recursive: true, verbatimSymlinks: true })
     await inLane(forkDir, planForkSetup(FORK, [point]))
     const forkJj = laneJjAt(forkDir)
@@ -321,8 +318,8 @@ describe("a lane's repo, with jj", () => {
     })
     if (parentNext === null || forkNext === null)
       throw new Error("a turn committed nothing")
-    await fetchInto(laneDir, LANE, parentNext, [point])
-    await fetchInto(forkDir, FORK, forkNext, [point])
+    await fetchInto(laneDir, LANE, [point])
+    await fetchInto(forkDir, FORK, [point])
     // Your repo sees two changes, never one divergent change.
     expect(await commitsOf(yoursJj, "divergent()")).toEqual([])
     expect(await bookmarkOf(yoursJj, FORK)).toBe(forkNext)

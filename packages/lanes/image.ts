@@ -12,24 +12,24 @@ import path from "node:path"
 import { imageRefusal } from "./plan.ts"
 import { describeFailure, run } from "./run.ts"
 
-export const DEFAULT_CONTAINERFILE = path.join(
+const DEFAULT_CONTAINERFILE = path.join(
   import.meta.dirname,
   "image",
   "Containerfile",
 )
-export const PROJECT_CONTAINERFILE = "pineta.Containerfile"
+const PROJECT_CONTAINERFILE = "pineta.Containerfile"
 /** The `PATH` of an image that names none. */
-export const STANDARD_PATH =
+const STANDARD_PATH =
   "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-export interface ImagePlan {
+interface ImagePlan {
   readonly file: string
   readonly tag: string
   readonly buildArgs: readonly string[]
 }
 
 /** The tag an image is built as: a hash of its Containerfile and build arguments. */
-export function planImage(input: {
+function planImage(input: {
   readonly file: string
   readonly content: string
   readonly jjVersion: string
@@ -45,7 +45,7 @@ export function planImage(input: {
 }
 
 /** The host's jj version, which the default image's jj is pinned to. */
-export async function hostJjVersion(): Promise<string> {
+async function hostJjVersion(): Promise<string> {
   const ran = await run("jj", ["--version"])
   const m = /jj (\d+\.\d+\.\d+)/.exec(ran.stdout)
   if (!ran.ok || m?.[1] === undefined)
@@ -54,7 +54,7 @@ export async function hostJjVersion(): Promise<string> {
 }
 
 /** Build `plan`'s image unless its tag exists, then stop the builder. */
-export async function ensureImage(
+async function ensureImage(
   plan: ImagePlan,
   log: (m: string) => void,
 ): Promise<void> {

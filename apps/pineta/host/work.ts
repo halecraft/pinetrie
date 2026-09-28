@@ -31,6 +31,7 @@ import {
   snapshotId,
   toolLabel,
   turnEntry,
+  WORKSPACE_ROOT,
   type WorkSetting,
   type WriterId,
 } from "@pineta/core"
@@ -68,17 +69,17 @@ import {
   NO_GRANTS,
   type OpenLink,
   PINETA_INSTALL,
+  planDisk,
   planFetch,
   planFork,
   planLinks,
-  planRun,
   planSnapshot,
+  planStart,
   prepareHost,
   prepareImages,
   refreshBase,
   removeLane,
   removeSnapshots,
-  restoreVolume,
   setBookmark,
   sideHistory,
   snapshotExists,
@@ -124,8 +125,6 @@ import {
 const RESOLUTION_BUDGET = 60_000
 /** A revision's title: a message's first line, cut. */
 const TITLE_LENGTH = 72
-/** Where a lane of its own works, in its container. */
-const LANE_DIR = "/project"
 /** A running lane's memory ceiling. A VM holds only what its guest touched (S39 item 7). */
 const LANE_MEMORY = "4G"
 const RETIRED =
@@ -227,7 +226,7 @@ export async function startLaneWork(input: {
   if (project !== null) {
     if (project.kind === "lanes")
       log(
-        `[host] each thread's agent works in its own container, on a disk cloned from its fork point; your working copy is /yours there, read-only${project.rootDefault === "direct" ? " (new threads work directly here by default)" : ""}`,
+        `[host] each thread's agent works in its own container, on a disk cloned from its fork point; your working copy is /mnt/host-working-copy there, read-only${project.rootDefault === "direct" ? " (new threads work directly here by default)" : ""}`,
       )
     else log(`[host] lanes work directly in ${project.root}: ${project.reason}`)
   }
@@ -239,11 +238,11 @@ export async function startLaneWork(input: {
   /** Each lane's fetches into your repo: tools never wait on these. */
   const fetches = new Map<LaneName, Promise<void>>()
   /**
-   * Each lane's turn records still being written: a fork waits for them, so
-   * a branch taken at a turn whose snapshot is still running gets that turn's
-   * disk, not the one before.
+   * Turn records still being written: a fork waits for them, so a branch
+   * taken at a turn whose snapshot is still running gets that turn's disk,
+   * not the one before.
    */
-  const recording = new Map<LaneName, Promise<unknown>>()
+  const recording = new Set<Promise<unknown>>()
   /** Work nobody awaits, until it settles: what `quiet` waits for. */
   const background = new Set<Promise<unknown>>()
   const track = <T>(work: Promise<T>): Promise<T> => {
@@ -325,7 +324,7 @@ export async function startLaneWork(input: {
     volume: laneContainer(lane),
     image: r.image,
     imagePath: r.imagePath,
-    yours: at,
+    hostWorkingCopy: at,
     pineta: PINETA_INSTALL,
     runtime: r.runtime,
     links: r.links,
@@ -421,23 +420,17 @@ export async function startLaneWork(input: {
     const handle = handleOf(lane)
     const container = handle.container
     if ((await containerState(container)) === "missing") {
-      if (!(await volumeExists(container))) {
+      const spec = specOf(lane, r, root)
+      if (await volumeExists(container))
+        await executeOrThrow([planStart(spec, process.env)], handle.runners)
+      else {
         const newest = await newestSnapshot(lane)
         if (newest === null) throw new Error(RETIRED)
         await executeOrThrow(
-          restoreVolume(paths, newest, container),
+          planDisk({ paths, spec, env: process.env, from: newest }),
           handle.runners,
         )
       }
-      await executeOrThrow(
-        [
-          {
-            in: "host",
-            argv: ["container", ...planRun(specOf(lane, r, root), process.env)],
-          },
-        ],
-        handle.runners,
-      )
     }
     await handle.start()
   }
@@ -611,7 +604,8 @@ export async function startLaneWork(input: {
               ),
             ),
         )
-        recording.set(lane, Promise.all([recording.get(lane), recorded]))
+        recording.add(recorded)
+        void recorded.finally(() => recording.delete(recorded))
         // Queued now, straight after the snapshot, while the lane runs.
         if (committed !== null) void fetchLane(lane, [newest])
       } catch (error) {
@@ -667,7 +661,7 @@ export async function startLaneWork(input: {
       const handle = handleOf(lane)
       return {
         kind: "lane",
-        dir: LANE_DIR,
+        dir: WORKSPACE_ROOT,
         gate: async () => {
           await handle.queue.idle()
           return (await handle.link()).channel
@@ -696,7 +690,7 @@ export async function startLaneWork(input: {
             async () => {
               if (ready === null) throw new Error("lanes of their own are off")
               const r = await ready
-              await Promise.all(recording.values())
+              await Promise.all([...recording])
               const above = nearestRevision(
                 readTreeIndex(doc),
                 readRevisions(doc),
@@ -709,10 +703,10 @@ export async function startLaneWork(input: {
               await removeLane(handle.container)
               await executeOrThrow(
                 planFork({
-                  lane,
                   point,
                   paths: disk,
-                  run: planRun(specOf(lane, r, base), process.env),
+                  spec: specOf(lane, r, base),
+                  env: process.env,
                 }),
                 handle.runners,
               )

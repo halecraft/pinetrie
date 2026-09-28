@@ -27,7 +27,7 @@ export const mutations: readonly Mutation[] = [
     expect: "planBundle: the lane's bookmark, excluding what your repo has",
   },
   {
-    name: "planTurn clones the image before sync",
+    name: "a turn's snapshot clones the image before sync",
     file: plan,
     from: '  inLane("sync"),\n  ...cloneFile(\n    volumeImage(input.paths, input.volume),\n    snapshotFile(input.paths, input.snapshot),\n  ),',
     to: '  ...cloneFile(\n    volumeImage(input.paths, input.volume),\n    snapshotFile(input.paths, input.snapshot),\n  ),\n  inLane("sync"),',
@@ -111,13 +111,14 @@ export const mutations: readonly Mutation[] = [
       "a file the agent wrote is whole in a branch taken at the next turn",
   },
   {
-    name: "/yours is mounted writable",
+    name: "/mnt/host-working-copy is mounted writable",
     file: plan,
-    from: "    ...readonlyMount({ source: spec.yours, target: YOURS_MOUNT }),",
+    from: "    ...readonlyMount({\n      source: spec.hostWorkingCopy,\n      target: HOST_WORKING_COPY,\n    }),",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: '    "--mount",\n    `type=bind,source=${spec.yours},target=${YOURS_MOUNT}`,',
+    to: '    "--mount",\n    `type=bind,source=${spec.hostWorkingCopy},target=${HOST_WORKING_COPY}`,',
     command: lanes,
-    expect: "a write to /yours fails, through bash and through write",
+    expect:
+      "a write to /mnt/host-working-copy fails, through bash and through write",
   },
   {
     name: "the helper is started with the image's node",
@@ -131,7 +132,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fork waits for no pending turn record",
     file: "apps/pineta/host/work.ts",
-    from: "              await Promise.all(recording.values())\n",
+    from: "              await Promise.all([...recording])\n",
     to: "",
     command: lanes,
     expect:
@@ -140,8 +141,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a person's paths are stored as typed in a thread with its own copy",
     file: "apps/pineta/host/index.ts",
-    from: "      yours: own ? (work.project?.root ?? null) : null,",
-    to: "      yours: null,",
+    from: "      hostWorkingCopy: own ? (work.project?.root ?? null) : null,",
+    to: "      hostWorkingCopy: null,",
     command: lanes,
     expect:
       "a person's path to your working copy is stored as the lane sees it",

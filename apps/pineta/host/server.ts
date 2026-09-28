@@ -6,7 +6,7 @@
 //   PINETA_TOOLS=0   the agent has no tools. By default it reads, writes,
 //                    edits and runs commands: each thread's agent in its own
 //                    Linux container, on a disk cloned from where it branched,
-//                    with this repo read-only at /yours (ADR-0034), so hot
+//                    with this repo read-only at /mnt/host-working-copy (ADR-0034), so hot
 //                    reload stays on
 //   PINETA_LANES=0   new threads' agents work directly in this repo instead,
 //                    as you, sharing it; hot reload waits while one runs

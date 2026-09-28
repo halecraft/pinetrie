@@ -254,6 +254,11 @@ declare const commitIdBrand: unique symbol
 export type CommitId = string & { readonly [commitIdBrand]: true }
 export const commitId = (id: string): CommitId => id as CommitId
 
+/** Where every lane of its own sees its own directory (ADR-0034). */
+export const WORKSPACE_ROOT = "/workspace"
+/** Where every lane of its own sees your working copy, read-only. */
+export const HOST_WORKING_COPY = "/mnt/host-working-copy"
+
 declare const snapshotIdBrand: unique symbol
 /**
  * A lane disk snapshot's id: the entry id of the revision record it belongs

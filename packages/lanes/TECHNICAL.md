@@ -37,7 +37,7 @@ containers, disks and the helper.
   half-written. GNU `cp` has no `-c`.
 - **The image swap is unsupported.** A volume made from a snapshot is
   created by `container`, then has its `volume.img` replaced by a clone
-  (`restoreVolume`). `container` 1.4.1 does not promise that works: a volume is
+  (`planDisk`). `container` 1.4.1 does not promise that works: a volume is
   its `entity.json` and an image read by path (S40). `e2e:lanes` runs a small
   soak on every upgrade: twenty clones taken mid-write, each checked with
   `e2fsck` and for every record the writer had `fsync`ed. Its mutation drops
@@ -59,7 +59,7 @@ containers, disks and the helper.
   `lanes.test.ts` forks a lane's repo and checks that your repo has no
   `divergent()`. Its mutation drops `jj new`.
 - **Inherited history is immutable in the fork.** Its config is a file on its
-  own disk (`JJ_CONFIG=/project/.pineta-lane/jj.toml`), so forks of forks
+  own disk (`JJ_CONFIG=/workspace/.pineta-lane/jj.toml`), so forks of forks
   inherit it. It sets `immutable_heads()` to
   `builtin_immutable_heads() | <fork commit>` (`forkConfig`). A parent's fork
   point is an ancestor of its child's, so nothing needs reading from the lane.
@@ -70,9 +70,9 @@ containers, disks and the helper.
 
 ## Moving commits
 
-- **By commit id, into a lane**: `fetchById` fetches from `/yours` only when
+- **By commit id, into a lane**: `fetchById` fetches from `/mnt/host-working-copy` only when
   the disk lacks the commit, and puts the commit on a branch
-  (`refs/heads/pineta/yours/<i>`). jj imports only branches, remote branches
+  (`refs/heads/pineta/fetched/<i>`). jj imports only branches, remote branches
   and tags, so it does not see a commit fetched with no ref (S44 item 7).
 - **By bundle, into your repo** (`planFetch`): `git bundle create -` in the
   lane, written to a host file through the channel as bytes, then
@@ -126,7 +126,7 @@ containers, disks and the helper.
 ## Running jj and git (`run.ts`)
 
 - **Every jj command takes `-R <root>`**: `hostJj(root)` on the host,
-  `laneJj(runner)` with `-R /project` in a lane. A jj command run from the
+  `laneJj(runner)` with `-R /workspace` in a lane. A jj command run from the
   wrong directory acts on whatever repo surrounds it (S36 item 28).
 - **A path argument is read from the process's directory, not `-R`'s.** Name
   files with the `root:"…"` fileset, as `sideHistory` and `conflictContent`

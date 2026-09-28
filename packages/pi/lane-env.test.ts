@@ -32,7 +32,7 @@ beforeAll(async () => {
   dir = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-lane-env-")))
   channel = openChannel([
     "env",
-    `PINETA_LANE_DIR=${dir}`,
+    `PINETA_WORKSPACE_ROOT=${dir}`,
     process.execPath,
     HELPER,
   ])

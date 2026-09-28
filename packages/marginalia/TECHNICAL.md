@@ -171,8 +171,8 @@ through one `setWorkRecord`:
   first `jj new` must leave it.
 - **`planRetention`** keeps every snapshot of an open root, and each lane's
   newest when the root is archived; the base snapshot is never deleted.
-- **`showYours`** shows a path under your working copy's root as the same
-  path under `/yours`, whole path prefixes only. `planChat` applies it to a
+- **`showHostWorkingCopy`** shows a path under your working copy's root as the same
+  path under `/mnt/host-working-copy`, whole path prefixes only. `planChat` applies it to a
   message's text when its thread works, or will work, in its own copy, so
   people and the model read the same stored text (ADR-0034).
 - **A landing in progress has no record**: it is a running lane whose prompt is

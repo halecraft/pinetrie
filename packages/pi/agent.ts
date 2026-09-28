@@ -28,6 +28,7 @@ import {
   ERR,
   type ErrCode,
   entryId,
+  HOST_WORKING_COPY,
   type LaneName,
   laneNameForThread,
   type NoteRecord,
@@ -70,7 +71,6 @@ import {
   type LaneHooks,
   laneContext,
   laneOf,
-  YOURS_DIR,
 } from "./lanes.ts"
 import { KynetaStorage } from "./storage.ts"
 
@@ -296,7 +296,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       ...(toolContext.own
         ? {
             promptGuidelines: [
-              `This thread works in its own copy of the project, at ${toolContext.dir}. The person's own working copy is at ${YOURS_DIR}, read-only: read it when asked about their files, and never try to write there.`,
+              `This thread works in its own copy of the project, at ${toolContext.dir}. The person's own working copy is at ${HOST_WORKING_COPY}, read-only: read it when asked about their files, and never try to write there.`,
             ],
           }
         : {}),

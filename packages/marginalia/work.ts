@@ -17,6 +17,7 @@ import {
   ERR,
   type ErrCode,
   entryId,
+  HOST_WORKING_COPY,
   isBusy,
   type LandingRecord,
   type LaneName,
@@ -319,20 +320,17 @@ export function planRetention(input: {
   return all.filter(s => !keep.has(s))
 }
 
-/** Where every lane sees your working copy, read-only (ADR-0034). */
-export const YOURS_MOUNT = "/yours"
-
 /** Characters that may continue a path segment: a root followed by one is a longer name. */
 const PATH_CHAR = /[\p{L}\p{N}._\-~@+]/u
 
 /**
  * `text` with each path under your working copy's `root` shown under
- * `/yours`, as every lane sees it. Only a whole path prefix: not preceded by a
+ * `/mnt/host-working-copy`, as every lane sees it. Only a whole path prefix: not preceded by a
  * path character, and followed by `/` or by a character a path segment cannot
  * continue with. A root inside a longer name (`/p/app` for `/p/a`), or inside
  * a longer path (`/x/p` for `/p`), is left alone.
  */
-export function showYours(text: string, root: string): string {
+export function showHostWorkingCopy(text: string, root: string): string {
   const from = root.length > 1 && root.endsWith("/") ? root.slice(0, -1) : root
   if (from === "" || from === "/") return text
   let out = ""
@@ -345,7 +343,7 @@ export function showYours(text: string, root: string): string {
       text.startsWith(from, i) &&
       (next === undefined || !PATH_CHAR.test(next))
     ) {
-      out += YOURS_MOUNT
+      out += HOST_WORKING_COPY
       i += from.length
       continue
     }

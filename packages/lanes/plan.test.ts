@@ -19,14 +19,16 @@ import {
   PINETA_HEADS,
   planBaseRefresh,
   planBundle,
+  planDisk,
   planExclude,
+  planFetch,
   planFork,
   planForkSetup,
   planHost,
   planLinks,
   planRoot,
   planRun,
-  planTurn,
+  planSnapshot,
   shellWord,
 } from "./index.ts"
 
@@ -41,7 +43,7 @@ const spec: LaneSpec = {
   volume: "pineta-t-1",
   image: "pineta-lane:abc",
   imagePath: "/usr/local/bin:/usr/bin:/bin",
-  yours: "/p",
+  hostWorkingCopy: "/p",
   pineta: "/opt/pineta",
   runtime: "/p/.pineta/runtime/abc",
   links: [{ source: "/k", target: "/k" }],
@@ -56,11 +58,11 @@ const valuesOf = (argv: readonly string[], flag: string) =>
 
 describe("planRun: a lane's container", () => {
   const argv = planRun(spec, { HOME, SECRET: "s", GITHUB_TOKEN: "t" })
-  test("--init, the lane's disk at /project, and every host path read-only", () => {
+  test("--init, the lane's disk at /workspace, and every host path read-only", () => {
     expect(argv.slice(0, 3)).toEqual(["run", "-d", "--init"])
-    expect(valuesOf(argv, "-v")).toEqual(["pineta-t-1:/project"])
+    expect(valuesOf(argv, "-v")).toEqual(["pineta-t-1:/workspace"])
     expect(valuesOf(argv, "--mount")).toEqual([
-      "type=bind,source=/p,target=/yours,readonly",
+      "type=bind,source=/p,target=/mnt/host-working-copy,readonly",
       "type=bind,source=/opt/pineta,target=/pineta,readonly",
       "type=bind,source=/p/.pineta/runtime/abc,target=/pineta-runtime,readonly",
       "type=bind,source=/k,target=/k,readonly",
@@ -98,13 +100,13 @@ describe("planRun: a lane's container", () => {
       expect.arrayContaining([
         "JJ_USER=agent",
         "JJ_EMAIL=agent@pineta",
-        "JJ_CONFIG=/project/.pineta-lane/jj.toml",
+        "JJ_CONFIG=/workspace/.pineta-lane/jj.toml",
         "JJ_EDITOR=false",
         "PATH=/usr/local/bin:/usr/bin:/bin:/pineta-runtime/bin",
       ]),
     )
     expect(argv.slice(-4)).toEqual([
-      "/project",
+      "/workspace",
       "pineta-lane:abc",
       "sleep",
       "infinity",
@@ -205,7 +207,7 @@ test("fetchById: skipped when every commit is on the disk, else onto branches", 
   expect(step.in).toBe("lane")
   expect(step.argv.slice(0, 2)).toEqual(["sh", "-c"])
   expect(step.argv[2]).toBe(
-    `{ git cat-file -e c1^{commit} && git cat-file -e c2^{commit}; } 2>/dev/null || { git fetch -q /yours +c1:${FETCHED_REF}/0 +c2:${FETCHED_REF}/1 && jj --ignore-working-copy git import --quiet; }`,
+    `{ git cat-file -e c1^{commit} && git cat-file -e c2^{commit}; } 2>/dev/null || { git fetch -q /mnt/host-working-copy +c1:${FETCHED_REF}/0 +c2:${FETCHED_REF}/1 && jj --ignore-working-copy git import --quiet; }`,
   )
 })
 
@@ -218,69 +220,63 @@ const argvs = (steps: readonly LaneStep[]) =>
   steps.map(s => `${s.in}: ${s.argv.join(" ")}`)
 
 test("planFork: the clone, the container, then jj new before anything else, then the config", () => {
-  const run = planRun(spec, {})
   const steps = planFork({
-    lane: LANE,
     point: { snapshot: snapshotId("e1"), commits: [C1] },
     paths,
-    run,
+    spec,
+    env: {},
   })
   expect(argvs(steps)).toEqual([
     "host: container volume create --opt journal=ordered --opt size=64G pineta-t-1",
     "host: /bin/cp -c /p/.pineta/snapshots/e1.img /v/pineta-t-1/volume.img.tmp",
     "host: /bin/mv -f /v/pineta-t-1/volume.img.tmp /v/pineta-t-1/volume.img",
-    `host: container ${run.join(" ")}`,
+    `host: container ${planRun(spec, {}).join(" ")}`,
     `lane: ${fetchById([C1]).argv.join(" ")}`,
     "lane: jj new c1",
     `lane: jj bookmark set --allow-backwards pineta/${LANE} -r @-`,
-    `lane: sh -c mkdir -p /project/.pineta-lane && printf '%s' ${shellWord(forkConfig([C1]))} > /project/.pineta-lane/jj.toml`,
+    `lane: sh -c mkdir -p /workspace/.pineta-lane && printf '%s' ${shellWord(forkConfig([C1]))} > /workspace/.pineta-lane/jj.toml`,
   ])
-  expect(
-    argvs(
-      planFork({
-        lane: LANE,
-        point: { snapshot: BASE_SNAPSHOT, commits: [C1] },
-        paths,
-        run,
-      }),
-    )[1],
-  ).toContain("/snapshots/base.img")
 })
 
-describe("planTurn: sync, then the clone; the bundle only after a commit", () => {
-  const input = {
+test("planDisk: a new volume, or one cloned from a snapshot; then the container", () => {
+  const disk = (from: typeof BASE_SNAPSHOT | null) =>
+    argvs(planDisk({ paths, spec, env: {}, from }))
+  expect(disk(null)).toEqual([
+    "host: container volume create --opt journal=ordered --opt size=64G pineta-t-1",
+    `host: container ${planRun(spec, {}).join(" ")}`,
+  ])
+  expect(disk(BASE_SNAPSHOT)[1]).toContain("/snapshots/base.img ")
+})
+
+test("planSnapshot: sync comes before the clone", () => {
+  expect(
+    argvs(
+      planSnapshot({ volume: "pineta-t-1", snapshot: snapshotId("e2"), paths }),
+    ),
+  ).toEqual([
+    "lane: sync",
+    "host: /bin/cp -c /v/pineta-t-1/volume.img /p/.pineta/snapshots/e2.img.tmp",
+    "host: /bin/mv -f /p/.pineta/snapshots/e2.img.tmp /p/.pineta/snapshots/e2.img",
+  ])
+})
+
+test("planFetch: the lane's bundle to a host file, then your repo fetches and jj imports it", () => {
+  const fetch = planFetch({
     lane: LANE,
-    volume: "pineta-t-1",
-    snapshot: snapshotId("e2"),
-    paths,
-    committed: C2,
     have: [C1],
     root: "/p",
     bundle: "/tmp/b.bundle",
-  }
-  test("sync comes before the clone", () => {
-    expect(argvs(planTurn(input).snapshot)).toEqual([
-      "lane: sync",
-      "host: /bin/cp -c /v/pineta-t-1/volume.img /p/.pineta/snapshots/e2.img.tmp",
-      "host: /bin/mv -f /p/.pineta/snapshots/e2.img.tmp /p/.pineta/snapshots/e2.img",
-    ])
   })
-  test("a commit is fetched into your repo by bundle", () => {
-    const { fetch } = planTurn(input)
-    expect(fetch[0]).toEqual({
-      in: "lane",
-      argv: planBundle(LANE, [C1]),
-      stdoutTo: "/tmp/b.bundle",
-    })
-    expect(argvs(fetch.slice(1))).toEqual([
-      `host: git -C /p fetch -q /tmp/b.bundle +refs/heads/pineta/${LANE}:refs/heads/pineta/${LANE}`,
-      "host: jj -R /p --ignore-working-copy git import",
-      "host: rm -f /tmp/b.bundle",
-    ])
+  expect(fetch[0]).toEqual({
+    in: "lane",
+    argv: planBundle(LANE, [C1]),
+    stdoutTo: "/tmp/b.bundle",
   })
-  test("nothing committed, nothing fetched", () => {
-    expect(planTurn({ ...input, committed: null }).fetch).toEqual([])
-  })
+  expect(argvs(fetch.slice(1))).toEqual([
+    `host: git -C /p fetch -q /tmp/b.bundle +refs/heads/pineta/${LANE}:refs/heads/pineta/${LANE}`,
+    "host: jj -R /p --ignore-working-copy git import",
+    "host: rm -f /tmp/b.bundle",
+  ])
 })
 
 test("planBundle: the lane's bookmark, excluding what your repo has", () => {

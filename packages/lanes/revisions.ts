@@ -15,8 +15,8 @@ import {
 import { setBookmark } from "./bookmarks.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
 
-export const ENTRY_TRAILER = "Pineta-Entry"
-export const LANE_TRAILER = "Pineta-Lane"
+const ENTRY_TRAILER = "Pineta-Entry"
+const LANE_TRAILER = "Pineta-Lane"
 
 /** A revision's description: its title, then the trailers. */
 export const revisionMessage = (input: {

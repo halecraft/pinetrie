@@ -2475,9 +2475,9 @@ and lanes exchange commits the way separate clones do.
   journaled ext4 volume (`container volume create --opt journal=ordered`)
   holding the lane's whole directory: a jj repo (a `jj git clone` of yours,
   colocated), its working copy, and everything ignored. It is mounted at the
-  same path in every lane, `/project`, so every path any lane's history names
+  same path in every lane, `/workspace`, so every path any lane's history names
   is a path in every lane that inherits it. Nothing is rewritten.
-- **Your working copy is mounted read-only at `/yours`.** A lane can read it
+- **Your working copy is mounted read-only at `/mnt/host-working-copy`.** A lane can read it
   and cannot write it, by any tool. Directories that links leave the project
   for (Pineta's `link:` dependencies on Kyneta) are mounted read-only where
   the links resolve. Nothing else of the host is mounted.
@@ -2488,7 +2488,7 @@ and lanes exchange commits the way separate clones do.
   environment. Calls take 0.3–1 ms; `bash` output streams; a timeout or an
   abort kills the command's process group in the guest (S43 items 1 and 2).
   The container runs with `--init`, so killed processes are reaped (S39 item
-  6). The system prompt names `/project` and `/yours`. Context files and
+  6). The system prompt names `/workspace` and `/mnt/host-working-copy`. Context files and
   skills are still read from your working copy on the host (ADR-0022,
   ADR-0033).
 - **A turn: commit, sync, snapshot, fetch.** At the boundary where ADR-0032
@@ -2518,7 +2518,7 @@ and lanes exchange commits the way separate clones do.
   Branches of branches are the same operation.
 - **A root lane clones the project's base disk.** The host keeps one disk per
   project: your repo cloned and its dependencies installed in Linux. A root
-  lane clones it, fetches your `@-` from `/yours` by commit id, and runs
+  lane clones it, fetches your `@-` from `/mnt/host-working-copy` by commit id, and runs
   `jj new` on it; it installs only if its lockfile differs from the base
   disk's. That is the only install; a branch never installs. The id is
   given, not looked up: your `@-` is on no bookmark, and a colocated repo's
@@ -2527,7 +2527,7 @@ and lanes exchange commits the way separate clones do.
   bundle: the lane writes `git bundle create -` to the host through
   `container exec`, and the host fetches from it (about 0.1 s, S43 item 3).
   No lane can write your repo, and your repo's configuration is unchanged. A
-  lane fetches your `@-`, or another lane's commits, from `/yours`, which is
+  lane fetches your `@-`, or another lane's commits, from `/mnt/host-working-copy`, which is
   read-only and gains nothing (S43 item 4). Landing is ADR-0032's: the lane
   merges your `@-` into itself, ADR-0033 resolves, and you take the merge with
   `jj rebase -r @ -d <merge>`. A fold's file merge is a merge in the target
@@ -2569,9 +2569,9 @@ and lanes exchange commits the way separate clones do.
   host service bound to all interfaces, at the gateway (`192.168.64.1`); your
   Playwright server on `:3100` answered. Services bound to the host's
   loopback are unreachable.
-- **A person's path to your working copy is shown as `/yours`.** When a
+- **A person's path to your working copy is shown as `/mnt/host-working-copy`.** When a
   message is sent, a path under your working copy's root becomes the same
-  path under `/yours`, in the text everyone then sees, before the model reads
+  path under `/mnt/host-working-copy`, in the text everyone then sees, before the model reads
   it. What people see and what the model reads are the same text.
 
 **Consequences.**
@@ -2664,6 +2664,10 @@ and lanes exchange commits the way separate clones do.
 
 **As implemented** (`PLAN-2026-09-28-lane-containers`). Where the build adds
 to or differs from the text above:
+- **The paths are `/workspace` and `/mnt/host-working-copy`** (`WORKSPACE_ROOT`
+  and `HOST_WORKING_COPY` in core). They are named for what they hold: the
+  lane's own copy, and the person's working copy on the host. The findings
+  (S39–S44) measured them as `/project` and `/yours`.
 - **A project's image** is `pineta.Containerfile` at its root. It needs only
   a POSIX `sh` and git 2.41 or later; the host refuses to start lanes on an
   image without them, naming what it lacks. Pineta's default image is Debian

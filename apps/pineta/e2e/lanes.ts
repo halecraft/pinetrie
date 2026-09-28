@@ -87,7 +87,7 @@ function inLane(lane: LaneName, script: string): string {
   try {
     return execFileSync(
       "container",
-      ["exec", name, "sh", "-c", `cd /project && ${script}`],
+      ["exec", name, "sh", "-c", `cd /workspace && ${script}`],
       { stdio: "pipe" },
     ).toString()
   } catch (error) {
@@ -237,10 +237,13 @@ try {
     {
       tool: "bash",
       args: {
-        command: `touch /yours/from-bash 2>&1; echo "home: $(ls ${marker} 2>&1)"; echo "ssh: $SSH_AUTH_SOCK"; ls /yours/shared.txt`,
+        command: `touch /mnt/host-working-copy/from-bash 2>&1; echo "home: $(ls ${marker} 2>&1)"; echo "ssh: $SSH_AUTH_SOCK"; ls /mnt/host-working-copy/shared.txt`,
       },
     },
-    { tool: "write", args: { path: "/yours/from-write", content: "x" } },
+    {
+      tool: "write",
+      args: { path: "/mnt/host-working-copy/from-write", content: "x" },
+    },
     { text: "checked" },
   ])
   const asked = `check the boundary, and ${project}/shared.txt`
@@ -249,9 +252,9 @@ try {
   })
   await idle()
   ok(
-    idOf("check the boundary, and /yours/shared.txt") !== null &&
-      idOf(asked) === null,
-    "a person's path to your working copy is stored as the lane sees it, under /yours",
+    idOf("check the boundary, and /mnt/host-working-copy/shared.txt") !==
+      null && idOf(asked) === null,
+    "a person's path to your working copy is stored as the lane sees it, under /mnt/host-working-copy",
   )
   const boundary = toolResults(one?.name).slice(-2)
   const [bash, write] = boundary
@@ -260,12 +263,12 @@ try {
       write?.includes("EROFS") === true &&
       !existsSync(path.join(project, "from-bash")) &&
       !existsSync(path.join(project, "from-write")),
-    `a write to /yours fails, through bash and through write (${write?.slice(0, 80) ?? "none"})`,
+    `a write to /mnt/host-working-copy fails, through bash and through write (${write?.slice(0, 80) ?? "none"})`,
   )
   ok(
     bash?.includes("No such file or directory") === true &&
-      bash.includes("/yours/shared.txt"),
-    "your home directory is not in a lane; your working copy is, at /yours",
+      bash.includes("/mnt/host-working-copy/shared.txt"),
+    "your home directory is not in a lane; your working copy is, at /mnt/host-working-copy",
   )
   ok(
     /ssh: \S+/.test(bash ?? ""),
@@ -317,7 +320,7 @@ try {
   ])
   await wu.chat(
     "set up deps",
-    at(tipOf("check the boundary, and /yours/shared.txt")),
+    at(tipOf("check the boundary, and /mnt/host-working-copy/shared.txt")),
     {
       lane: one?.name,
     },
@@ -590,12 +593,12 @@ try {
     `a lane with no disk and no snapshot says it predates lane containers (${toolResults(two?.name).at(-1)?.slice(0, 60) ?? "none"})`,
   )
 } finally {
+  // Whatever happened above: nothing of this run is left behind.
   rmSync(marker, { force: true })
+  await wu.close().catch(() => {})
+  await wh.shutdown().catch(() => {})
+  cleanUp(wh.doc, project)
 }
-
-await wu.close()
-await wh.shutdown()
-cleanUp(wh.doc, project)
 // ── 9. Any image with sh and git: Pineta brings Node and jj ──────────────
 // Alpine has musl and no Node; the helper runs on the lane runtime's Node,
 // through its own loader. An image with no git cannot host a lane.
@@ -641,63 +644,70 @@ async function imageHost(containerfile: string) {
       .filter(m => m.role === "toolResult")
       .map(m => messageText(m as never))
   }
-  return { dir, script: imageScript, host, user, results }
+  const close = async () => {
+    await user.close().catch(() => {})
+    await host.shutdown().catch(() => {})
+    cleanUp(host.doc, dir)
+  }
+  return { script: imageScript, host, user, results, close }
 }
 {
   const alpine = await imageHost(
     "FROM docker.io/library/alpine:3.22\nRUN apk add --no-cache git\n",
   )
-  alpine.script.use([
-    { tool: "read", args: { path: "notes.txt" } },
-    { tool: "write", args: { path: "made.txt", content: "made\n" } },
-    {
-      tool: "edit",
-      args: {
-        path: "made.txt",
-        edits: [{ oldText: "made", newText: "edited" }],
+  try {
+    alpine.script.use([
+      { tool: "read", args: { path: "notes.txt" } },
+      { tool: "write", args: { path: "made.txt", content: "made\n" } },
+      {
+        tool: "edit",
+        args: {
+          path: "made.txt",
+          edits: [{ oldText: "made", newText: "edited" }],
+        },
       },
-    },
-    {
-      tool: "bash",
-      args: {
-        command:
-          "cat made.txt; command -v node || echo no node; ls /lib/ld-musl* >/dev/null && echo musl",
+      {
+        tool: "bash",
+        args: {
+          command:
+            "cat made.txt; command -v node || echo no node; ls /lib/ld-musl* >/dev/null && echo musl",
+        },
       },
-    },
-    { text: "done" },
-  ])
-  await alpine.user.chat("use every tool", ROOT, START_AGENT)
-  const ran = await alpine.results("use every tool")
-  ok(
-    ran[0]?.includes("MANGO") === true &&
-      ran.at(-1)?.includes("edited") === true &&
-      ran.at(-1)?.includes("no node") === true &&
-      ran.at(-1)?.includes("musl") === true,
-    `a lane on Alpine, with musl and no Node, runs pi's four tools (${JSON.stringify(ran.at(-1))})`,
-  )
-  const recorded = [...readRevisions(alpine.host.doc).values()]
-  ok(
-    recorded.some(r => r.commit !== null && r.snapshot !== null),
-    "and its turn is committed and snapshotted",
-  )
-  await alpine.user.close()
-  await alpine.host.shutdown()
-  cleanUp(alpine.host.doc, alpine.dir)
+      { text: "done" },
+    ])
+    await alpine.user.chat("use every tool", ROOT, START_AGENT)
+    const ran = await alpine.results("use every tool")
+    ok(
+      ran[0]?.includes("MANGO") === true &&
+        ran.at(-1)?.includes("edited") === true &&
+        ran.at(-1)?.includes("no node") === true &&
+        ran.at(-1)?.includes("musl") === true,
+      `a lane on Alpine, with musl and no Node, runs pi's four tools (${JSON.stringify(ran.at(-1))})`,
+    )
+    const recorded = [...readRevisions(alpine.host.doc).values()]
+    ok(
+      recorded.some(r => r.commit !== null && r.snapshot !== null),
+      "and its turn is committed and snapshotted",
+    )
+  } finally {
+    await alpine.close()
+  }
 
   const bare = await imageHost("FROM docker.io/library/alpine:3.22\n")
-  bare.script.use([
-    { tool: "bash", args: { command: "echo hello" } },
-    { text: "done" },
-  ])
-  await bare.user.chat("say hello", ROOT, START_AGENT)
-  const refused = (await bare.results("say hello")).join("\n")
-  ok(
-    refused.includes("has no git") && !refused.includes("hello\n"),
-    `an image with no git cannot host a lane, and says so (${refused.slice(0, 90)})`,
-  )
-  await bare.user.close()
-  await bare.host.shutdown()
-  cleanUp(bare.host.doc, bare.dir)
+  try {
+    bare.script.use([
+      { tool: "bash", args: { command: "echo hello" } },
+      { text: "done" },
+    ])
+    await bare.user.chat("say hello", ROOT, START_AGENT)
+    const refused = (await bare.results("say hello")).join("\n")
+    ok(
+      refused.includes("has no git") && !refused.includes("hello\n"),
+      `an image with no git cannot host a lane, and says so (${refused.slice(0, 90)})`,
+    )
+  } finally {
+    await bare.close()
+  }
 }
 
 // ── the contract: a clone written into a volume `container` made ─────────
@@ -717,7 +727,7 @@ async function imageHost(containerfile: string) {
   writeFileSync(
     path.join(probe, "writer.js"),
     `const fs = require("fs"), crypto = require("crypto")
-const fd = fs.openSync("/project/log.bin", "a")
+const fd = fs.openSync("/workspace/log.bin", "a")
 const end = Date.now() + Number(process.argv[2])
 let n = 0
 while (Date.now() < end) {
@@ -725,7 +735,7 @@ while (Date.now() < end) {
   fs.fsyncSync(fd)
   n++
   fs.writeFileSync("/probe/fsynced", String(n))
-  if (n % 20 === 0) fs.writeFileSync("/project/churn-" + (n % 7), crypto.randomBytes(40000))
+  if (n % 20 === 0) fs.writeFileSync("/workspace/churn-" + (n % 7), crypto.randomBytes(40000))
 }
 `,
   )
@@ -737,7 +747,7 @@ while (Date.now() < end) {
   const writer = `pineta-contract-writer-${process.pid}`
   try {
     sh(
-      `container run -d --init --name ${writer} -m 1G -v ${volume}:/project --mount type=bind,source=${probe},target=/probe docker.io/library/node:24-trixie-slim sleep infinity >/dev/null`,
+      `container run -d --init --name ${writer} -m 1G -v ${volume}:/workspace --mount type=bind,source=${probe},target=/probe docker.io/library/node:24-trixie-slim sleep infinity >/dev/null`,
     )
     const writing = new Promise<void>((resolve, reject) => {
       const child = execFile(

@@ -16,10 +16,6 @@ import { type EntryId, type LaneName, NO_EDITOR } from "@pineta/core"
 import { Type } from "typebox"
 import type { LaneChannel } from "./lane-env.ts"
 
-/** Where every lane of its own sees its directory, and your working copy. */
-export const LANE_DIR = "/project"
-export const YOURS_DIR = "/yours"
-
 /** How a lane's tools reach its files, as the host resolves it. */
 export type LaneAccess =
   /** Directly in a directory on the host, once `ready` settles. */
@@ -35,7 +31,7 @@ export type LaneAccess =
    */
   | {
       readonly kind: "lane"
-      /** `LANE_DIR` in a container; the helper's own directory in tests. */
+      /** `WORKSPACE_ROOT` in a container; the helper's own directory in tests. */
       readonly dir: string
       readonly gate: () => Promise<LaneChannel>
     }

@@ -20,6 +20,7 @@ import {
   withAbortSignal,
 } from "@earendil-works/pi-agent-core/harness/context"
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
+import { WORKSPACE_ROOT } from "@pineta/core"
 import {
   decode,
   encode,
@@ -29,7 +30,7 @@ import {
   type RunResult,
 } from "./lane-protocol.ts"
 
-const cwd = process.env.PINETA_LANE_DIR ?? "/project"
+const cwd = process.env.PINETA_WORKSPACE_ROOT ?? WORKSPACE_ROOT
 const env = new NodeExecutionEnv({ cwd })
 const running = new Map<number, AbortController>()
 

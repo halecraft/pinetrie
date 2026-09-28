@@ -214,7 +214,7 @@ export const mutations: readonly Mutation[] = [
     expect: "an archived root keeps each lane's newest",
   },
   {
-    name: "showYours rewrites a root inside a longer name",
+    name: "showHostWorkingCopy rewrites a root inside a longer name",
     file: "packages/marginalia/work.ts",
     from: "      (next === undefined || !PATH_CHAR.test(next))",
     to: "      true",
@@ -224,10 +224,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a message in a thread with its own copy is stored as typed",
     file: "packages/marginalia/chat.ts",
-    from: "      input.yours === null ? input.text : showYours(input.text, input.yours),",
-    to: "      input.text,",
+    from: "      : showHostWorkingCopy(input.text, input.hostWorkingCopy)",
+    to: "      : input.text",
     command: unit,
-    expect: "are stored as the lane sees them, under /yours",
+    expect: "are stored as the lane sees them, under /mnt/host-working-copy",
   },
   {
     name: "take ignores a moved @-",

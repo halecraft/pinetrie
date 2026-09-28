@@ -157,7 +157,7 @@ describe("lanes in a harness", () => {
     await mkdir(dir)
     const channel: LaneChannel = openChannel([
       "env",
-      `PINETA_LANE_DIR=${dir}`,
+      `PINETA_WORKSPACE_ROOT=${dir}`,
       process.execPath,
       path.join(import.meta.dirname, "lane-helper.ts"),
     ])
@@ -183,7 +183,9 @@ describe("lanes in a harness", () => {
     const all = texts().map(t => messageText(t.message as never))
     expect(all.some(t => t.includes(`${dir}\nin the lane`))).toBe(true)
     expect(told).toContain(`at ${dir}`)
-    expect(told).toContain("working copy is at /yours, read-only")
+    expect(told).toContain(
+      "working copy is at /mnt/host-working-copy, read-only",
+    )
     channel.close()
     await channel.closed
     await agent.close()

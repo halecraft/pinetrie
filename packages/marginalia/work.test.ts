@@ -28,7 +28,7 @@ import {
   planTake,
   planTurnRecord,
   renderableMessage,
-  showYours,
+  showHostWorkingCopy,
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
@@ -294,22 +294,28 @@ describe("planRetention: which snapshots go", () => {
   })
 })
 
-describe("showYours: whole path prefixes only", () => {
-  test("a root followed by a separator, or by a non-path character, is shown under /yours", () => {
-    expect(showYours("read /r/x.ts", "/r")).toBe("read /yours/x.ts")
-    expect(showYours('{"path":"/r/a.ts"}', "/r")).toBe('{"path":"/yours/a.ts"}')
-    expect(showYours("cd /r && ls", "/r")).toBe("cd /yours && ls")
-    expect(showYours("/r", "/r/")).toBe("/yours")
+describe("showHostWorkingCopy: whole path prefixes only", () => {
+  test("a root followed by a separator, or by a non-path character, is shown under /mnt/host-working-copy", () => {
+    expect(showHostWorkingCopy("read /r/x.ts", "/r")).toBe(
+      "read /mnt/host-working-copy/x.ts",
+    )
+    expect(showHostWorkingCopy('{"path":"/r/a.ts"}', "/r")).toBe(
+      '{"path":"/mnt/host-working-copy/a.ts"}',
+    )
+    expect(showHostWorkingCopy("cd /r && ls", "/r")).toBe(
+      "cd /mnt/host-working-copy && ls",
+    )
+    expect(showHostWorkingCopy("/r", "/r/")).toBe("/mnt/host-working-copy")
   })
   test("never inside a longer name, nor inside a longer path", () => {
-    expect(showYours("/r/workspace/t-ab/x", "/r/workspace/t-a")).toBe(
+    expect(showHostWorkingCopy("/r/workspace/t-ab/x", "/r/workspace/t-a")).toBe(
       "/r/workspace/t-ab/x",
     )
-    expect(showYours("/x/r/y", "/r")).toBe("/x/r/y")
-    expect(showYours("/rr/y", "/r")).toBe("/rr/y")
+    expect(showHostWorkingCopy("/x/r/y", "/r")).toBe("/x/r/y")
+    expect(showHostWorkingCopy("/rr/y", "/r")).toBe("/rr/y")
   })
   test("the file system's root is never a working copy's", () => {
-    expect(showYours("/etc/hosts", "/")).toBe("/etc/hosts")
+    expect(showHostWorkingCopy("/etc/hosts", "/")).toBe("/etc/hosts")
   })
 })
 

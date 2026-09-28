@@ -25,8 +25,7 @@
 // so they never carry it.
 
 import { execFile } from "node:child_process"
-import { NO_EDITOR } from "@pineta/core"
-import { PROJECT_MOUNT } from "./plan.ts"
+import { NO_EDITOR, WORKSPACE_ROOT } from "@pineta/core"
 
 export interface Ran<Out = string> {
   readonly ok: boolean
@@ -109,11 +108,11 @@ export const hostJj =
   args =>
     run("jj", ["-R", root, ...JJ_FLAGS, ...args], { env: NO_EDITOR })
 
-/** jj in a lane, over the lane's runner: always on `/project`. */
+/** jj in a lane, over the lane's runner: always on `/workspace`. */
 export const laneJj =
   (lane: Runner): Runner =>
   args =>
-    lane(["jj", "-R", PROJECT_MOUNT, ...JJ_FLAGS, ...args])
+    lane(["jj", "-R", WORKSPACE_ROOT, ...JJ_FLAGS, ...args])
 
 /** git from `dir` on the host, as a runner of git's arguments. */
 export const hostGit =

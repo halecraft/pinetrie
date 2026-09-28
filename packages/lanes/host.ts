@@ -40,7 +40,7 @@ import {
 } from "./run.ts"
 
 /** Gather what jj, then git, say from `dir`. */
-export async function gatherRoot(dir: string): Promise<RootFacts> {
+async function gatherRoot(dir: string): Promise<RootFacts> {
   const root = await jjIn(dir, ["workspace", "root", "--ignore-working-copy"])
   if (root.ok)
     return { dir, jjRoot: root.stdout.trim(), gitTop: null, home: homedir() }
@@ -102,7 +102,7 @@ async function probeClone(dir: string, near: string): Promise<boolean> {
 }
 
 /** Where lanes' disks and snapshots are, once `container` is known. */
-export const diskPaths = (app: string, root: string): DiskPaths => ({
+const diskPaths = (app: string, root: string): DiskPaths => ({
   volumes: path.join(app, "volumes"),
   snapshots: path.join(root, ".pineta", "snapshots"),
 })

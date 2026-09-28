@@ -13,7 +13,6 @@ export {
 export { type ModelChoice, pickModel } from "./config.ts"
 export {
   type LaneChannel,
-  type LaneRan,
   laneRunner,
   openChannel,
 } from "./lane-env.ts"
