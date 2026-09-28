@@ -195,7 +195,7 @@ export function Column(p: ColumnProps) {
     writable &&
     lane.kind === "lane" &&
     laneRecord?.work.kind === "own" &&
-    p.work.project?.kind === "workspaces"
+    p.work.project?.kind === "lanes"
   // Where a lane this column's next send creates would work, before a choice.
   const defaultWork = workFor({
     choice: null,
@@ -308,7 +308,7 @@ export function Column(p: ColumnProps) {
             <button
               className="land"
               onClick={() => void p.session.land(lane.name)}
-              title="merge your committed work into this thread's workspace; the agent resolves any conflicts"
+              title="merge your committed work into this thread's own copy; the agent resolves any conflicts"
               type="button"
             >
               {landing?.state === "needs_you" ? "land again" : "land your work"}

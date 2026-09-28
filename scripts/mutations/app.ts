@@ -7,6 +7,8 @@ import type { Mutation } from "../mutate.ts"
 const e2e = ["pnpm", "run", "e2e"]
 const live = ["pnpm", "run", "e2e:live"]
 const browser = ["pnpm", "run", "e2e:browser"]
+/** Needs `container` running (ADR-0034). */
+const e2eLanes = ["pnpm", "run", "e2e:lanes"]
 
 export const mutations: readonly Mutation[] = [
   {
@@ -549,19 +551,11 @@ export const mutations: readonly Mutation[] = [
     expect: "an archived root leaves the other window's bar",
   },
   {
-    name: "every lane works in the project",
-    file: "apps/pineta/host/work.ts",
-    from: "    return { ...planned, ready: ready.get(lane) ?? Promise.resolve() }",
-    to: "    return {\n      ...planned,\n      dir: project?.root ?? planned.dir,\n      ready: ready.get(lane) ?? Promise.resolve(),\n    }",
-    command: e2e,
-    expect: "two lanes write the same file at once",
-  },
-  {
     name: "a landing's outcome is never written",
     file: "apps/pineta/host/index.ts",
     from: "          if (prompt?.land === true) await work.landingEnded(lane, prompt.id)",
     to: "          if (false) await work.landingEnded(lane, prompt.id)",
-    command: e2e,
+    command: e2eLanes,
     expect: "landing merges your work",
   },
   {

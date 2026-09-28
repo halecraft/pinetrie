@@ -21,12 +21,14 @@
 //
 // Override the endpoint with PW_SERVER if you used a different port.
 
-import { existsSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { existsSync, rmSync } from "node:fs"
 import path from "node:path"
 import { connectSession } from "@pineta/client/session"
 import { atEntry, entryId, handleOf, projectRail, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
+  readLaneRecords,
   readParticipantNames,
   readReferences,
   readTreeIndex,
@@ -1888,6 +1890,16 @@ try {
     } finally {
       await tp.close().catch(() => {})
       await toolHost.shutdown().catch(() => {})
+      // Its threads' agents worked in containers: remove them, and their disks.
+      for (const lane of readLaneRecords(toolHost.doc).keys())
+        for (const args of [
+          ["rm", "-f", `pineta-${lane}`],
+          ["volume", "rm", `pineta-${lane}`],
+        ])
+          try {
+            execFileSync("container", args, { stdio: "ignore" })
+          } catch {}
+      rmSync(work, { recursive: true, force: true })
     }
   }
 

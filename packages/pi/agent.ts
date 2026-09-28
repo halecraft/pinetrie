@@ -32,7 +32,6 @@ import {
   laneNameForThread,
   type NoteRecord,
   type Position,
-  rewritePaths,
   type StreamEvent,
   toolLabel,
   type WriterId,
@@ -62,16 +61,16 @@ import {
 } from "@pineta/schema"
 import { type ModelChoice, setUpModel } from "./config.ts"
 import { buildSystemPrompt, createAgentHarness } from "./deep.ts"
+import { laneEnv } from "./lane-env.ts"
 import {
+  directEnv,
   GUIDANCE_TOOL,
   guidanceTool,
+  type LaneAccess,
   type LaneHooks,
-  type LaneWhere,
   laneContext,
-  laneEnv,
   laneOf,
-  refusal,
-  rewriteMessages,
+  YOURS_DIR,
 } from "./lanes.ts"
 import { KynetaStorage } from "./storage.ts"
 
@@ -92,7 +91,7 @@ export function withoutFrontmatter(text: string): string {
   return (match === null ? text : text.slice(match[0].length)).trim()
 }
 
-export type { LaneHooks, LaneWhere }
+export type { LaneAccess, LaneHooks }
 
 export interface CreateAgentOptions {
   readonly doc: SessionDocHandle
@@ -109,8 +108,8 @@ export interface CreateAgentOptions {
   readonly tools: {
     /** The project: where pi's settings, `AGENTS.md` and skills load from. */
     readonly project: string
-    /** Where a lane works: its own workspace, or a directory (ADR-0032). */
-    readonly where: (lane: LaneName) => LaneWhere
+    /** How a lane's tools reach its files: its container, or a directory (ADR-0034). */
+    readonly access: (lane: LaneName) => LaneAccess
     readonly hooks: LaneHooks
   } | null
   /** What a running turn writes, in Pineta's own words, per lane. */
@@ -280,19 +279,27 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
           guidanceTool((lane, q) => lanes.hooks.askedForGuidance(lane, q)),
         ]
   // A call with no lane named (none should run tools) works in the project.
-  const whereFor = (lane: LaneName | undefined): LaneWhere =>
+  const accessFor = (lane: LaneName | undefined): LaneAccess =>
     lanes === null || lane === undefined
-      ? { dir: project, ready: Promise.resolve(), others: [] }
-      : lanes.where(lane)
+      ? { kind: "direct", dir: project, ready: Promise.resolve() }
+      : lanes.access(lane)
   // pi's own prompt, with the repo's context files and the person's skills, so
   // an extension that shapes pi's prompt sections finds them (S23). It names
-  // the lane's directory, and does not wait for its setup.
-  const promptFor = (dir: string) =>
+  // the lane's directory, and does not wait for its setup. A lane of its own
+  // is told where your working copy is: the only other files it can see.
+  const promptFor = (toolContext: { dir: string; own: boolean }) =>
     buildSystemPrompt({
-      cwd: dir,
+      cwd: toolContext.dir,
       selectedTools: toolNames,
       contextFiles: setup.contextFiles,
       skills: setup.skills,
+      ...(toolContext.own
+        ? {
+            promptGuidelines: [
+              `This thread works in its own copy of the project, at ${toolContext.dir}. The person's own working copy is at ${YOURS_DIR}, read-only: read it when asked about their files, and never try to write there.`,
+            ],
+          }
+        : {}),
     })
 
   const { harness } = await createAgentHarness(
@@ -303,11 +310,21 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       tools: tools as never[],
       activeToolNames: toolNames,
       toolContext: (context: typeof CTX) => {
-        const where = whereFor(laneOf(context))
-        return { env: laneEnv(where), dir: where.dir }
+        const access = accessFor(laneOf(context))
+        return access.kind === "direct"
+          ? {
+              env: directEnv(access.dir, access.ready),
+              dir: access.dir,
+              own: false,
+            }
+          : {
+              env: laneEnv(access.dir, access.gate),
+              dir: access.dir,
+              own: true,
+            }
       },
-      systemPrompt: (toolContext: { dir: string }) =>
-        promptFor(toolContext.dir),
+      systemPrompt: (toolContext: { dir: string; own: boolean }) =>
+        promptFor(toolContext),
       // Pineta's outbox means pi's own queue is never used; should it be, it
       // answers one message at a time rather than batching them (S20).
       followUpMode: "one-at-a-time",
@@ -316,31 +333,11 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   )
 
   if (lanes !== null) {
-    // The model sees its history as if it had always worked in its own
-    // workspace: the parent's paths, which a branch inherits, are rewritten to
-    // this lane's. True, because the lane started from the files at that
-    // point; stored entries are untouched (ADR-0032).
-    harness.hooks.on("transform_context", event => {
-      const where = lanes.where(event.lane as LaneName)
-      if (where.others.length === 0) return undefined
-      return {
-        messages: rewriteMessages(event.messages, text =>
-          rewritePaths(text, where.others, where.dir),
-        ),
-      }
-    })
-    // The backstop for a path the rewrite missed.
-    harness.hooks.on("before_tool", event => {
-      const reason = refusal(
-        event.toolName,
-        event.args,
-        lanes.where(event.lane as LaneName),
-      )
-      return reason === null ? undefined : { block: { reason } }
-    })
     // A turn's files, recorded before the next request: every tool of the
-    // turn has finished, and pi awaits this, so no write races the snapshot.
-    // On a run's first request the tip is its prompt. The tip is read from
+    // turn has finished, and pi awaits this, so no write races the commit.
+    // The snapshot after it is queued on the lane: the next tool call waits
+    // for it, the next request does not. On a run's first request the tip is
+    // its prompt. The tip is read from
     // the document: asking the lane here, inside its own drive, could wait on
     // itself.
     harness.hooks.on("before_request", async event => {

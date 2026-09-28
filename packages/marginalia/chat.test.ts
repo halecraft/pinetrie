@@ -59,6 +59,7 @@ const plan = (over: Partial<PlanInput>) => {
     at: atEntry(E1),
     end: atEntry(E1),
     contributors: [],
+    yours: null,
     race: null,
     lane: NONE,
     mentions: [],
@@ -71,6 +72,20 @@ const plan = (over: Partial<PlanInput>) => {
   return planChat({ ...rest, thread: { end, race, lane: l } })
 }
 const kind = (d: ReturnType<typeof planChat>) => d.kind
+const textOf = (d: ReturnType<typeof planChat>) =>
+  "details" in d ? d.details.text : undefined
+
+describe("planChat: paths to your working copy, in a thread with its own copy", () => {
+  const text = "look at /home/p/src/a.ts, not /home/p2/b"
+  test("are stored as the lane sees them, under /yours", () => {
+    expect(textOf(plan({ text, yours: "/home/p" }))).toBe(
+      "look at /yours/src/a.ts, not /home/p2/b",
+    )
+  })
+  test("are stored as typed when the thread works directly", () => {
+    expect(textOf(plan({ text, yours: null }))).toBe(text)
+  })
+})
 
 describe("planChat: plain messages never conflict", () => {
   // In a thread with a lane, a plain message is one naming only people.

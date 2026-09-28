@@ -7,7 +7,8 @@
     "host": "node host/server.ts",
     "e2e": "node e2e/e2e.ts",
     "e2e:live": "PINETA_LIVE=1 node e2e/e2e.ts",
-    "e2e:browser": "node e2e/browser.ts"
+    "e2e:browser": "node e2e/browser.ts",
+    "e2e:lanes": "node e2e/lanes.ts"
   },
   "dependencies": {
     "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
@@ -17,12 +18,12 @@
     "@kyneta/websocket-transport": "link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket",
     "@pineta/client": "workspace:*",
     "@pineta/core": "workspace:*",
+    "@pineta/lanes": "workspace:*",
     "@pineta/marginalia": "workspace:*",
     "@pineta/pi": "workspace:*",
     "@pineta/protocol": "workspace:*",
     "@pineta/reads": "workspace:*",
     "@pineta/schema": "workspace:*",
-    "@pineta/workspaces": "workspace:*",
     "vite": "7.1.11",
     "ws": "^8.18.0"
   },

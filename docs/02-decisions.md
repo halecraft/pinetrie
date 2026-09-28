@@ -2008,7 +2008,9 @@ failures instead).
 a line of work on the main working copy), ADR-0021 (a workspace is no longer
 its own step) and ADR-0022 (the agent no longer works in the repo the host
 runs from). Changes the vision's branch kinds (`docs/00-vision.md`): every
-agent lane is a Worktree.
+agent lane is a Worktree. **Amended by ADR-0034:** its workspaces, the
+rewrite of the history the model is sent, the refusal of other lanes' paths,
+and dependency setup are replaced by a container per lane on its own disk.
 
 **Context.** The agent's tools run in the repo the host runs from, so two
 threads running tools at once share one directory and can collide. ADR-0022
@@ -2419,7 +2421,8 @@ still break each other. How cautious to be varies by person and by repo.
 
 ## ADR-0034 — A lane is a Linux container on its own disk, and a branch clones that disk
 
-**Status:** Proposed. Evidence: S38, S39, S40, S41, S42, S43. Amends ADR-0032:
+**Status:** Accepted. Implemented by `PLAN-2026-09-28-lane-containers`.
+Evidence: S38, S39, S40, S41, S42, S43, S44. Amends ADR-0032:
 replaces its jj workspace per lane, the rewrite of the history the model is
 sent, the refusal of other lanes' paths, and dependency setup. Keeps its turn
 revisions, its fork-point rule, landing, working directly, and your working
@@ -2658,3 +2661,35 @@ and lanes exchange commits the way separate clones do.
   under a millisecond).
 - Driving Virtualization.framework directly, or waiting for a clone command in
   `container` (months; the contract test guards the image swap meanwhile).
+
+**As implemented** (`PLAN-2026-09-28-lane-containers`). Where the build adds
+to or differs from the text above:
+- **A project's image** is `pineta.Containerfile` at its root. It needs only
+  a POSIX `sh` and git 2.41 or later; the host refuses to start lanes on an
+  image without them, naming what it lacks. Pineta's default image is Debian
+  trixie with Node 24, git 2.47, pnpm through corepack, and jj pinned to the
+  host's version.
+- **The lane runtime.** Node, with its libraries and glibc's loader, and a
+  static jj, copied out of Pineta's default image into
+  `.pineta/runtime/<image tag>/` and mounted read-only at `/pineta-runtime` in
+  every lane. The helper runs on that Node through that loader, so it needs
+  nothing of the project's image (S44).
+- **Grants** are `pineta.json`'s `lanes` key: `ssh`, `env` (names), `mounts`
+  (read-only). The same key's `install` and `installWhen` name the base
+  snapshot's install command and its lockfile; a repo with `pnpm-lock.yaml`
+  installs with pnpm by default.
+- **Snapshots** are files, `.pineta/snapshots/<entry id>.img`, one per
+  revision record; the base snapshot is `base.img`, with `base.json` naming
+  its commit and lockfile hash. `/.pineta/` is added to git's exclude file.
+- **A fetch by id** puts the commit on a branch, and every git fetch into a
+  colocated repo ends with `jj --ignore-working-copy git import` (S44 items 7
+  and 8). A new base disk is `git init` and `jj git init --colocate`, not
+  `jj git clone`, which refuses a volume's `lost+found`.
+- **A lane from before lane containers**, with a record and neither a disk
+  nor a snapshot, is retired: its tools fail, saying so and to branch from it.
+  A branch from it starts from the base snapshot at its nearest commit.
+- **Commands the host runs carry `PINETA_GIT=1`**, which a git shim that
+  refuses writes in a jj repo when an agent is driving lets through: fetching
+  lanes' bundles into your repo is a git write.
+- **Skills** listed by path from your home directory are not readable in a
+  lane, since your home directory is not mounted. Not yet addressed.

@@ -16,9 +16,10 @@
     "e2e": "pnpm --filter @pineta/app run e2e",
     "e2e:live": "pnpm --filter @pineta/app run e2e:live",
     "e2e:browser": "pnpm --filter @pineta/app run e2e:browser",
+    "e2e:lanes": "pnpm --filter @pineta/app run e2e:lanes",
     "build": "pnpm --filter @pineta/client run build",
     "verify": "pnpm run lint && pnpm run typecheck && pnpm test && pnpm run conformance && pnpm run e2e",
-    "verify:all": "pnpm run verify && pnpm run e2e:live && pnpm run e2e:browser",
+    "verify:all": "pnpm run verify && pnpm run e2e:live && pnpm run e2e:browser && pnpm run e2e:lanes",
     "mutate": "node scripts/mutate.ts"
   },
   "devDependencies": {

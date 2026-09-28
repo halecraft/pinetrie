@@ -101,8 +101,10 @@ Roughly in dependency order, each independently shippable:
    - ~~**Self-hosting**~~ — **done** (ADR-0022): the development host's
      agent reads, writes, edits and runs commands in the repo, visibly, with the
      person's own pi models; stop, persistence, and an invite key off loopback.
-     Then a workspace per lane (ADR-0032) and landing (ADR-0033), done.
-     Next: a sandbox profile for `bash`.
+     Then a workspace per lane (ADR-0032) and landing (ADR-0033), done; then
+     a Linux container per lane on a disk cloned at its fork point, which is
+     also the sandbox (ADR-0034), done. Next: the network as a grant, and
+     skills readable in a lane.
    - **The session on `json.bind`** (ADR-0023): authoritative, compacted when a
      run ends and when the host starts; Loro removed.
    - ~~**Notes**~~ — **done** (ADR-0025): any message, the agent's included,

@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Resolving a landing's conflicts
 
-Someone's work was merged into this thread's workspace. Where both sides changed the same lines, jj left conflict markers in the files. Each file below is shown with its markers, followed by both sides:
+Someone's work was merged into this thread's own copy. Where both sides changed the same lines, jj left conflict markers in the files. Each file below is shown with its markers, followed by both sides:
 
 - **ours** is this thread: the messages that asked for its changes.
 - **theirs** is what came in: the other side's messages, or its commit descriptions.
@@ -14,7 +14,7 @@ Someone's work was merged into this thread's workspace. Where both sides changed
 ## What to do
 
 1. For each conflict, work out what each side meant from its messages, not from the text alone.
-2. Where the two intents agree, or one simply extends the other, write the resolution that keeps both. Edit the file in the workspace so that no conflict markers remain.
+2. Where the two intents agree, or one simply extends the other, write the resolution that keeps both. Edit the file in this thread's copy so that no conflict markers remain.
 3. Where the two intents differ, leave that conflict as it is, markers and all. Then call `ask_for_guidance` with a question that names both intents, and end your turn. Never pick a side silently.
 4. Lockfiles and other generated files are not merged by hand. Resolve their sources, then regenerate them with the project's own command.
 5. When nothing is left unresolved, run the project's checks (see `AGENTS.md`), and fix what the merge broke.

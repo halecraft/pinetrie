@@ -86,8 +86,8 @@ test("reads declares only core, schema and marginalia: no pi, no transport", () 
   ])
 })
 
-test("workspaces declares only core: it runs jj, never pi or the document", () => {
-  assert.deepEqual(deps(read("packages/workspaces")), ["@pineta/core"])
+test("lanes declares only core: it runs container, jj and git, never pi or the document", () => {
+  assert.deepEqual(deps(read("packages/lanes")), ["@pineta/core"])
 })
 
 test("the client declares no server package and no app", () => {
@@ -97,7 +97,7 @@ test("the client declares no server package and no app", () => {
     "vite",
     "@pineta/app",
     "@pineta/pi",
-    "@pineta/workspaces",
+    "@pineta/lanes",
   ]) {
     assert.ok(
       !client.includes(forbidden),

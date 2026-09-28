@@ -356,6 +356,18 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S44 — The lane runtime on any image, and fetching your `@-` by id ✅ PASS
+
+`findings/S44-a-lane-runtime-on-any-image.md`. Node from Pineta's image,
+started through its bundled glibc loader and libraries, ran pi's
+`NodeExecutionEnv` on Alpine, which has musl and no Node. It wrote, read and
+streamed, a timeout killed the command's grandchildren, and `/yours` refused
+writes. `process.execPath` is then the loader. A commit fetched by id is
+invisible to jj unless the fetch puts it on a branch ref. After any git
+fetch into a colocated repo, `jj --ignore-working-copy git import` (12–47 ms)
+imports the refs without snapshotting the working copy. A fresh volume's
+`lost+found` makes `jj git clone` refuse `/project`.
+
 ### S43 — pi's tools in a lane, moving commits, a turn's cost, the lane boundary ✅ ANSWERED
 
 `findings/S43-tools-fetches-and-the-lane-boundary.md`. pi's own

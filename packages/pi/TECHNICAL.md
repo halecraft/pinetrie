@@ -147,34 +147,69 @@ is pi's `buildSystemPrompt`, with the loader's context files (the repo's
 `ThreadLaneHandle.abort()` is pi's `lane.abort`: a running tool is aborted and
 its result recorded as aborted, and the lane takes its next message (S22).
 
-### Where each lane works (`lanes.ts`, ADR-0032)
+### Where each lane works (`lanes.ts`, `lane-env.ts`, ADR-0032, ADR-0034)
 
 One harness serves every lane, but pi resolves the tools' context from the
 run's `Context` alone: `toolContext` is a function of it
 (`harness/runtime/drive/tools.js`). So every call that drives a lane carries
 its name in the `Context` (`laneContext`): `run`, `resume`, `append` and
-`abort`. Everything else comes from the host's `where(lane)`, one source for
+`abort`. Everything else comes from the host's `access(lane)`, one source for
 where a lane works. pi's hooks see the lane's name directly. Measured in S36
 item 18, and in `lanes.test.ts` against the harness.
 
-- **`LaneEnv`** is pi's `NodeExecutionEnv` at the lane's directory, behind a
-  proxy whose every method first awaits `where(lane).ready`: the model starts
-  while dependencies install, and only a tool call waits. Its `shellEnv` sets
+- **`LaneAccess`** is Pineta's type, so no pi type crosses the boundary. It
+  is either `direct` (a directory on the host, and a promise its tools wait
+  for) or `lane` (a lane of its own: its directory, `/project`, and a
+  `gate()` that settles with its channel).
+- **A lane working directly** gets pi's `NodeExecutionEnv` in its directory
+  (`directEnv`). Every method first awaits `ready`, and `shellEnv` sets
   `JJ_EDITOR`, `VISUAL` and `EDITOR` to `false`.
-- **`transform_context`** rewrites every string the model is sent, through
-  `rewritePaths`: a branch inherits its parent's paths, which name another
-  workspace. It runs on pi's messages before they are converted for the
-  provider, and its event names the lane. Stored entries are untouched.
-  `rewriteMessages` leaves image `data` alone.
-- **`before_tool`** refuses a file tool's `path` in another lane's workspace or
-  your working copy, naming the same path under the lane's own (`refusal`).
+- **A lane of its own** gets `laneEnv(dir, gate)`: a proxy whose every method
+  first awaits the gate, then forwards the call over the lane's channel.
+  - The helper (`lane-helper.ts`) serves pi's own `NodeExecutionEnv` in the
+    container, so pi's tools run there unchanged. They use 8 of its methods:
+    `absolutePath`, `canonicalPath`, `exists`, `fileInfo`, `readTextFile`,
+    `readBinaryFile`, `writeFile`, `exec` (S43 item 1).
+  - The context's abort sends `{ abort }`.
+  - `exec`'s `onUpdate` receives each update.
+  - Methods whose results are not data are refused with `not_supported`, not
+    forwarded: `openTextLineReader` returns an object with methods.
+  - The gate is the lane's queue in the host, so the model can think while a
+    turn's disk is cloned, and no tool touches the disk until the clone is
+    done.
+- **The channel** (`openChannel`) is one long-lived process: the helper,
+  started by `container exec -i`, speaking `lane-protocol.ts`, one JSON line
+  per message.
+  - Requests are answered concurrently: pi runs a turn's calls in parallel.
+  - The host closes the channel by ending the helper's input. Killing
+    `container exec` does not reach the guest (S43 item 2).
+  - A helper that exits fails every waiting call with its stderr.
+  - `laneRunner(channel)` gives the host's own jj and git a `run` request:
+    exit status, stdout and stderr apart, and bytes for a bundle. pi's `exec`
+    gives only an exit code and capped, mixed text.
+- **The protocol** (`lane-protocol.ts`) imports nothing, since the helper
+  runs it from Pineta's install, mounted read-only at `/pineta`.
+  - Bytes cross as base64, read from `this[key]` in the replacer: `Buffer`'s
+    own `toJSON` runs first and would hand over `{ type, data }`.
+  - Errors cross as `{ name, code, message, path }` at any depth, since
+    `NodeExecutionEnv` never throws: its errors are values inside results
+    (S44 item 5).
+- **The helper runs on the lane runtime's Node through its own loader**, so
+  `process.execPath` is the loader: nothing in it may re-execute that
+  (S44 item 2).
+- **The system prompt** names the lane's directory, and for a lane of its own
+  adds a guideline naming `/yours` as your working copy, read-only. The model
+  is sent the conversation as stored: nothing is rewritten.
 - **`before_request`** calls `hooks.turnDone(lane, tip)`, and pi awaits it:
-  every tool of the turn before has finished, so the snapshot never races a
-  write. It reads the tip from the document, not from the lane: asking the
-  lane from inside its own drive could wait on itself. It acts on `assistant`
-  requests only; compaction and summaries request too. `run` and `resume`
-  call it once more after the run, for the last turn. A hook that throws is
-  reported by pi, and the run goes on.
+  every tool of the turn before has finished, so the commit never races a
+  write. The turn's snapshot is queued on the lane: the next tool call waits
+  for it, the next request does not.
+  - It reads the tip from the document, not from the lane: asking the lane
+    from inside its own drive could wait on itself.
+  - It acts on `assistant` requests only; compaction and summaries request
+    too.
+  - `run` and `resume` call it once more after the run, for the last turn.
+  - A hook that throws is reported by pi, and the run goes on.
 - **Resume after a crash.** `Agent.interrupted()` lists lanes whose
   `inspectExecution` shows an open operation; `ThreadLaneHandle.resume()`
   resumes one in its `Context`. pi records the interrupted tool call as

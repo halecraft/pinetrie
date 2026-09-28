@@ -1,37 +1,44 @@
-// pi/lanes — where each lane's tools work, as pi sees it (ADR-0032).
+// pi/lanes — where each lane's tools work, as pi sees it (ADR-0032,
+// ADR-0034).
 //
 // One harness serves every lane, but pi resolves the tools' context from the
 // run's `Context` only: `toolContext` is a function of it. So every call that
 // drives a lane carries the lane's name in its `Context` (`laneContext`), and
-// the rest comes from the host's `where(lane)`: one source for where a lane
+// the rest comes from the host's `access(lane)`: one source for where a lane
 // works (S36 item 18). pi's hooks see the lane's name directly.
 
-import path from "node:path"
 import {
   createContextKey,
   withContextValue,
 } from "@earendil-works/pi-agent-core/harness/context"
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
-import {
-  type EntryId,
-  foreignRoot,
-  type LaneName,
-  NO_EDITOR,
-} from "@pineta/core"
+import { type EntryId, type LaneName, NO_EDITOR } from "@pineta/core"
 import { Type } from "typebox"
+import type { LaneChannel } from "./lane-env.ts"
 
-/** Where a lane works, as the host resolves it. */
-export interface LaneWhere {
-  readonly dir: string
-  /** Settles when setup is done: tools wait for it, the model does not. */
-  readonly ready: Promise<void>
+/** Where every lane of its own sees its directory, and your working copy. */
+export const LANE_DIR = "/project"
+export const YOURS_DIR = "/yours"
+
+/** How a lane's tools reach its files, as the host resolves it. */
+export type LaneAccess =
+  /** Directly in a directory on the host, once `ready` settles. */
+  | {
+      readonly kind: "direct"
+      readonly dir: string
+      readonly ready: Promise<void>
+    }
   /**
-   * Other lanes' workspaces and your working copy: the model is shown their
-   * paths as `dir`'s, and the file tools refuse them. Empty for a lane that
-   * works directly.
+   * In the lane's container, through its helper. `gate` settles with the
+   * channel once the lane is started and its queue has drained: tools wait
+   * for it, the model does not.
    */
-  readonly others: readonly string[]
-}
+  | {
+      readonly kind: "lane"
+      /** `LANE_DIR` in a container; the helper's own directory in tests. */
+      readonly dir: string
+      readonly gate: () => Promise<LaneChannel>
+    }
 
 export interface LaneHooks {
   /**
@@ -57,66 +64,21 @@ export const laneOf = (context: Context): LaneName | undefined =>
   context.value(LANE)
 
 /**
- * pi's Node environment at the lane's directory, every method of which first
- * waits for setup. The model can start thinking while dependencies install;
- * only a tool call waits. A failed setup fails the call with its error.
+ * pi's Node environment in a directory on the host, every method of which
+ * first waits for `ready`. A failed setup fails the call with its error.
  */
-export function laneEnv(where: LaneWhere): NodeExecutionEnv {
-  const inner = new NodeExecutionEnv({
-    cwd: where.dir,
-    shellEnv: { ...NO_EDITOR },
-  })
+export function directEnv(dir: string, ready: Promise<void>): NodeExecutionEnv {
+  const inner = new NodeExecutionEnv({ cwd: dir, shellEnv: { ...NO_EDITOR } })
   return new Proxy(inner, {
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver)
       if (typeof value !== "function") return value
       return async (...args: unknown[]) => {
-        await where.ready
+        await ready
         return value.apply(target, args)
       }
     },
   })
-}
-
-/**
- * `value` with `f` applied to every string in it, at any depth. Image data is
- * left alone: it is not text. The one traversal of pi's message shapes the
- * history rewrite needs; unit-tested on each.
- */
-export function rewriteMessages<T>(value: T, f: (s: string) => string): T {
-  const walk = (v: unknown, key: string | null): unknown => {
-    if (typeof v === "string") return key === "data" ? v : f(v)
-    if (Array.isArray(v)) return v.map(x => walk(x, null))
-    if (v !== null && typeof v === "object")
-      return Object.fromEntries(
-        Object.entries(v).map(([k, x]) => [k, walk(x, k)]),
-      )
-    return v
-  }
-  return walk(value, null) as T
-}
-
-/** The tools whose `path` argument names a file. */
-const FILE_TOOLS: ReadonlySet<string> = new Set(["read", "write", "edit"])
-
-/**
- * Why a file tool's call is refused, or null: a path in your working copy or
- * in another lane's workspace. A branch inherits messages naming its parent's
- * paths; the history rewrite hides them, and this catches what it misses.
- */
-export function refusal(
-  toolName: string,
-  args: Readonly<Record<string, unknown>>,
-  where: LaneWhere,
-): string | null {
-  if (!FILE_TOOLS.has(toolName)) return null
-  const given = args.path
-  if (typeof given !== "string") return null
-  const abs = path.resolve(where.dir, given)
-  const foreign = foreignRoot(abs, where.others, where.dir)
-  if (foreign === null) return null
-  const mine = path.join(where.dir, path.relative(foreign, abs))
-  return `${abs} is outside this thread's workspace. This thread works in ${where.dir}: use ${mine}.`
 }
 
 export const GUIDANCE_TOOL = "ask_for_guidance"

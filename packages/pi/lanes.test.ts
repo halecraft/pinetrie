@@ -1,4 +1,4 @@
-// A lane's directory, as pi uses it (ADR-0032). Co-located inside packages/pi,
+// A lane's directory, as pi uses it (ADR-0032, ADR-0034). Co-located inside packages/pi,
 // like agent.test.ts: it drives pi's harness, which only this package may
 // import.
 
@@ -17,62 +17,9 @@ import { encodeChat } from "@pineta/marginalia"
 import { newSessionDoc, readEntries, rowMessage } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { createAgent, withoutFrontmatter } from "./agent.ts"
-import { type LaneWhere, refusal, rewriteMessages } from "./lanes.ts"
+import { type LaneChannel, openChannel } from "./lane-env.ts"
+import type { LaneAccess } from "./lanes.ts"
 import { scriptedModel } from "./scripted.ts"
-
-test("rewriteMessages: every string, at any depth, but never image data", () => {
-  const messages = [
-    { role: "user", content: "read /a/x", timestamp: 1 },
-    {
-      role: "assistant",
-      content: [
-        { type: "text", text: "in /a" },
-        {
-          type: "toolCall",
-          id: "c",
-          name: "read",
-          arguments: { path: "/a/y" },
-        },
-      ],
-    },
-    {
-      role: "toolResult",
-      toolCallId: "c",
-      content: [{ type: "text", text: "/a/y: ok" }],
-    },
-    { role: "custom", customType: "pineta.chat", content: "Ada: see /a" },
-    {
-      role: "user",
-      content: [{ type: "image", data: "/a/base64", mimeType: "image/png" }],
-    },
-  ]
-  const out = rewriteMessages(messages, s => s.replaceAll("/a", "/b"))
-  expect(JSON.stringify(out)).not.toContain('"read /a')
-  expect(out[1]).toMatchObject({
-    content: [{ text: "in /b" }, { arguments: { path: "/b/y" } }],
-  })
-  expect(out[2]).toMatchObject({ content: [{ text: "/b/y: ok" }] })
-  expect(out[3]).toMatchObject({ content: "Ada: see /b" })
-  expect(out[4]).toMatchObject({ content: [{ data: "/a/base64" }] })
-  expect(out[0]).toMatchObject({ timestamp: 1 })
-})
-
-test("refusal: a file tool's path in another lane or your working copy, naming the lane's own", () => {
-  const where: LaneWhere = {
-    dir: "/r/workspace/t-b",
-    ready: Promise.resolve(),
-    others: ["/r/workspace/t-a", "/r"],
-  }
-  expect(refusal("read", { path: "/r/workspace/t-a/x.ts" }, where)).toContain(
-    "use /r/workspace/t-b/x.ts",
-  )
-  expect(refusal("edit", { path: "/r/packages/y.ts" }, where)).toContain(
-    "use /r/workspace/t-b/packages/y.ts",
-  )
-  expect(refusal("write", { path: "x.ts" }, where)).toBeNull()
-  expect(refusal("read", { path: "/elsewhere/z" }, where)).toBeNull()
-  expect(refusal("bash", { command: "cat /r/x" }, where)).toBeNull()
-})
 
 test("withoutFrontmatter: a skill's instructions, not its header", () => {
   expect(withoutFrontmatter("---\nname: x\n---\n\n# Do\nit\n")).toBe("# Do\nit")
@@ -104,7 +51,10 @@ describe("lanes in a harness", () => {
     )
 
   /** An agent whose lanes work where `wheres` says, recording what happens. */
-  async function setUp(wheres: Map<LaneName, LaneWhere>, turns: string[] = []) {
+  async function setUp(
+    wheres: Map<LaneName, LaneAccess>,
+    turns: string[] = [],
+  ) {
     const doc = newSessionDoc()
     const script = scriptedModel()
     const agent = await createAgent({
@@ -113,9 +63,9 @@ describe("lanes in a harness", () => {
       model: { kind: "scripted", script },
       tools: {
         project: root,
-        where: lane => {
+        access: lane => {
           const where = wheres.get(lane)
-          if (where === undefined) throw new Error(`no where for ${lane}`)
+          if (where === undefined) throw new Error(`no access for ${lane}`)
           return where
         },
         hooks: {
@@ -128,7 +78,7 @@ describe("lanes in a harness", () => {
         },
       },
     })
-    const newLane = async (where: LaneWhere) => {
+    const newLane = async (where: LaneAccess) => {
       const made = await agent.createThreadLane(ROOT)
       if (made.kind !== "created") throw new Error("no lane")
       wheres.set(made.lane, where)
@@ -142,10 +92,10 @@ describe("lanes in a harness", () => {
     return { agent, script, newLane, texts, doc }
   }
 
-  const where = (dir: string, others: string[] = []): LaneWhere => ({
+  const where = (dir: string): LaneAccess => ({
+    kind: "direct",
     dir,
     ready: Promise.resolve(),
-    others,
   })
 
   test("two lanes at once each run their tools in their own directory", async () => {
@@ -182,7 +132,7 @@ describe("lanes in a harness", () => {
       release = r
     })
     const { agent, script, newLane, texts } = await setUp(new Map())
-    const lane = await newLane({ dir, ready, others: [] })
+    const lane = await newLane({ kind: "direct", dir, ready })
     script.use([
       { tool: "bash", args: { command: "cat marker.txt" } },
       { text: "done" },
@@ -201,24 +151,41 @@ describe("lanes in a harness", () => {
     await agent.close()
   })
 
-  test("the model is shown its parent's paths as its own; a file tool refuses them", async () => {
-    const [a, b] = [path.join(root, "pa"), path.join(root, "pb")]
-    const { agent, script, newLane, texts } = await setUp(new Map())
-    const lane = await newLane(where(b, [a]))
-    script.use([
-      { tool: "read", args: { path: path.join(a, "x.ts") } },
-      { reply: context => `saw: ${context.join(" | ")}` },
+  test("a lane of its own runs its tools through its helper, and is told where your working copy is", async () => {
+    const dir = path.join(root, "own")
+    const { mkdir } = await import("node:fs/promises")
+    await mkdir(dir)
+    const channel: LaneChannel = openChannel([
+      "env",
+      `PINETA_LANE_DIR=${dir}`,
+      process.execPath,
+      path.join(import.meta.dirname, "lane-helper.ts"),
     ])
-    await agent.lane(lane).run(prompt(`look at ${a}/x.ts`))
+    const { agent, script, newLane, texts } = await setUp(new Map())
+    const lane = await newLane({
+      kind: "lane",
+      dir,
+      gate: async () => channel,
+    })
+    script.use([
+      { tool: "write", args: { path: "made.txt", content: "in the lane\n" } },
+      { tool: "bash", args: { command: "pwd; cat made.txt" } },
+      {
+        // The system prompt is the first message the model is sent.
+        reply: context => {
+          told = context[0] ?? ""
+          return "done"
+        },
+      },
+    ])
+    let told = ""
+    await agent.lane(lane).run(prompt("write, then look"))
     const all = texts().map(t => messageText(t.message as never))
-    const reply = all.find(t => t.startsWith("saw:")) ?? ""
-    // The prompt, as the model saw it, names the lane's own directory.
-    expect(reply).toContain(`look at ${b}/x.ts`)
-    expect(reply).not.toContain(`${a}/`)
-    // Stored as written: the rewrite is only what the model is sent.
-    expect(all.some(t => t.includes(`look at ${a}/x.ts`))).toBe(true)
-    // The read of the parent's path was refused, naming the lane's own.
-    expect(all.some(t => t.includes(`use ${b}/x.ts`))).toBe(true)
+    expect(all.some(t => t.includes(`${dir}\nin the lane`))).toBe(true)
+    expect(told).toContain(`at ${dir}`)
+    expect(told).toContain("working copy is at /yours, read-only")
+    channel.close()
+    await channel.closed
     await agent.close()
   })
 
@@ -242,7 +209,7 @@ describe("lanes in a harness", () => {
       model: { kind: "scripted", script },
       tools: {
         project: root,
-        where: l => wheres.get(l) ?? where(root),
+        access: l => wheres.get(l) ?? where(root),
         hooks: { turnDone: async () => {}, askedForGuidance() {} },
       },
     })

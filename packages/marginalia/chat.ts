@@ -29,6 +29,7 @@ import {
 import { type Static, Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { decodeLand, landLine } from "./land.ts"
+import { showYours } from "./work.ts"
 
 export const CHAT_TYPE = "pineta.chat"
 
@@ -234,6 +235,12 @@ export function planChat(input: {
   readonly sendId: string
   /** A sent draft's other editors; empty for a message written alone. */
   readonly contributors: readonly WriterId[]
+  /**
+   * Your working copy's root when the thread works, or will work, in its own
+   * copy: paths under it are stored as the lane sees them, under `/yours`, so
+   * people and the model read the same text (ADR-0034). Null otherwise.
+   */
+  readonly yours: string | null
 }): ChatDecision {
   const { lane, end, race } = input.thread
   const branch = input.mode === "branch"
@@ -249,7 +256,8 @@ export function planChat(input: {
   const details: ChatDetails = {
     author: input.author,
     authorName: input.authorName,
-    text: input.text,
+    text:
+      input.yours === null ? input.text : showYours(input.text, input.yours),
     compels,
     sendId: input.sendId,
     ...(input.contributors.length === 0

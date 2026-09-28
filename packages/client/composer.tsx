@@ -136,7 +136,7 @@ export function Composer({
       ? "queue"
       : "reply"
   // A compelled send creates a lane where there is none, and a branch always
-  // does: then it also says where that lane will work (ADR-0032).
+  // does: then it also says where that lane will work (ADR-0032, ADR-0034).
   const createsLane = compelled && (fresh || lane.kind === "none")
   const work = choice ?? defaultWork
   const label = compelled
@@ -294,7 +294,7 @@ export function Composer({
                   key: "own",
                   label: "in its own copy",
                   className: "where-own",
-                  disabled: project.kind !== "workspaces",
+                  disabled: project.kind !== "lanes",
                   ...(project.kind === "direct"
                     ? { title: project.reason }
                     : {}),

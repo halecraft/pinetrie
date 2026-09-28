@@ -4,12 +4,12 @@
 //   PINETA_BIND      the address (default 127.0.0.1: this machine only)
 //   PINETA_KEY       the invite key off loopback (default: a fresh one)
 //   PINETA_TOOLS=0   the agent has no tools. By default it reads, writes,
-//                    edits and runs commands, as you: each thread's agent in
-//                    its own jj workspace under workspace/ (ADR-0032), so hot
+//                    edits and runs commands: each thread's agent in its own
+//                    Linux container, on a disk cloned from where it branched,
+//                    with this repo read-only at /yours (ADR-0034), so hot
 //                    reload stays on
-//   PINETA_WORKSPACES=0
-//                    new threads' agents work directly in this repo instead,
-//                    sharing it; hot reload waits while one runs
+//   PINETA_LANES=0   new threads' agents work directly in this repo instead,
+//                    as you, sharing it; hot reload waits while one runs
 //   PINETA_STORE     the SQLite file the session is kept in
 //                    (default .pineta/pineta.db in the repo)
 //   PINETA_PROVIDER, PINETA_MODEL
@@ -33,7 +33,7 @@ const host = await startHost({
     ...(env.PINETA_MODEL === undefined ? {} : { model: env.PINETA_MODEL }),
   },
   tools,
-  workspaces: env.PINETA_WORKSPACES !== "0",
+  lanes: env.PINETA_LANES !== "0",
   store: env.PINETA_STORE ?? path.join(repo, ".pineta", "pineta.db"),
 })
 

@@ -116,7 +116,7 @@ packages/     libraries; their boundaries are enforced by resolution
   protocol/      @pineta/protocol     the wire contract and its codec
   marginalia/    @pineta/marginalia   Pineta's shapes stored in pi: references, chat, threads, outbox
   reads/         @pineta/reads        document reads shared by the host and the client
-  workspaces/    @pineta/workspaces   a lane's jj workspace: the one place jj, git and pnpm run (TECHNICAL.md)
+  lanes/         @pineta/lanes        a lane's container and disk: the one place container, jj and git run (TECHNICAL.md)
   client/        @pineta/client       browser UI and session client; owns its Vite build
 
 (root)        a bare workspace: development tooling only, no dependencies

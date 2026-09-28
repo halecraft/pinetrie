@@ -152,15 +152,20 @@ export interface StartHostOptions {
   /** No default: a suite that forgot one must not spend the person's models. */
   readonly model: ModelChoice
   /**
-   * The agent's tools, and the project they work in: each lane in its own jj
-   * workspace there (ADR-0032). Absent or null, the agent has none.
+   * The agent's tools, and the project they work in: each lane in its own
+   * container, on its own disk (ADR-0034). Absent or null, the agent has none.
    */
   readonly tools?: { readonly project: string } | null
   /**
-   * Whether a lane gets its own workspace by default. False makes every new
-   * root lane work directly in the project (`PINETA_WORKSPACES=0`).
+   * Whether a new root lane gets its own copy by default. False makes every
+   * new root lane work directly in the project (`PINETA_LANES=0`).
    */
-  readonly workspaces?: boolean
+  readonly lanes?: boolean
+  /**
+   * Whether lanes may have containers at all. False makes the project work
+   * directly without asking `container`: a suite that must run anywhere.
+   */
+  readonly containers?: boolean
   /**
    * Where the session is kept: a SQLite file; a Kyneta store a caller made (and
    * closes), as a suite does to control it; or, absent or null, a store in
@@ -201,7 +206,8 @@ export async function startHost({
   key: givenKey,
   model,
   tools = null,
-  workspaces = true,
+  lanes = true,
+  containers = true,
   store: storeFile = null,
   presenceDecay = PRESENCE_DECAY,
   log = console.log,
@@ -241,8 +247,8 @@ export async function startHost({
   // Only storage is awaited: the host is the authority, with no peer upstream.
   await whenHydrated(doc)
 
-  // --- where lanes work (ADR-0032) -----------------------------------------
-  // The agent is created with this module's `where` and `hooks`, so it reads
+  // --- where lanes work (ADR-0032, ADR-0034) --------------------------------
+  // The agent is created with this module's `access` and `hooks`, so it reads
   // the agent lazily.
   let created: Agent | undefined
   const theAgent = (): Agent => {
@@ -252,7 +258,8 @@ export async function startHost({
   const work = await startLaneWork({
     doc,
     dir: tools?.project ?? null,
-    defaultDirect: !workspaces,
+    defaultDirect: !lanes,
+    containers,
     agent: theAgent,
     log,
   })
@@ -267,7 +274,7 @@ export async function startHost({
         ? null
         : {
             project: work.project?.root ?? tools.project,
-            where: work.where,
+            access: work.access,
             hooks: work.hooks,
           },
     // Gather the lane's streams from the document, plan, execute. The document
@@ -292,8 +299,8 @@ export async function startHost({
   )
 
   // --- hot reload -----------------------------------------------------------
-  // Agents edit their own workspaces, so the page's code changes only by your
-  // hand, and hot reload stays on (ADR-0032). A lane working directly in your
+  // Agents edit their own disks, so the page's code changes only by your hand,
+  // and hot reload stays on (ADR-0034). A lane working directly in your
   // working copy edits the client this host serves, mid-run: while one runs,
   // updates are held, and its end reloads the page once (ADR-0022's reason).
   const hotReload = pausedWhile(() => {
@@ -335,6 +342,8 @@ export async function startHost({
       await seen
       if (seen === tail) break
     }
+    // Lanes' own queues: snapshots, fetches, stops and trims after a run.
+    await work.quiet()
     await exchange.flush()
   }
 
@@ -376,10 +385,11 @@ export async function startHost({
   /**
    * Start one turn on a thread's lane, streaming into the document: from a
    * prompt, or resuming what a crash interrupted. The one way a run starts.
-   * Before it, the lane's workspace is made sure of; `ask_for_guidance` is on
-   * exactly while the prompt is a land message. After it, a landing's run
-   * records its outcome, and one drain step is enqueued for the lane: "a run
-   * ended" is the only state the outbox's loop needs.
+   * Before it, a lane of its own's container is queued to start;
+   * `ask_for_guidance` is on exactly while the prompt is a land message.
+   * After it, a landing's run records its outcome, its container is stopped,
+   * and one drain step is enqueued for the lane: "a run ended" is the only
+   * state the outbox's loop needs.
    */
   function startRun(
     lane: LaneName,
@@ -428,6 +438,7 @@ export async function startHost({
           )
         }
         endRun(doc, lane, id)
+        work.runEnded(lane)
         log(`[host] run ${id.slice(-8)} done`)
         hotReload.runEnded()
         void settle([lane])
@@ -461,7 +472,7 @@ export async function startHost({
       return {
         kind: "refused",
         code: planned.code,
-        message: "only a thread with its own workspace can land",
+        message: "only a thread with its own copy can land",
       }
     if (planned.kind === "hold") {
       await agent.hold({
@@ -584,7 +595,20 @@ export async function startHost({
     // Two lanes end here for a moment (a new one, just branched): which thread
     // the sender meant cannot be told, so they are asked, as for a race.
     if (thread.kind === "ambiguous") return { kind: "conflict", by: null }
+    // A thread that works, or will work, in its own copy stores paths under
+    // your working copy as the lane sees them (ADR-0034).
+    const own =
+      work.project?.kind === "lanes" &&
+      (thread.lane.kind === "lane" && chat.mode !== "branch"
+        ? readLaneRecords(doc).get(thread.lane.name)?.work.kind === "own"
+        : workAt(
+            doc,
+            index,
+            chat.mode === "branch" ? chat.at : thread.end,
+            chat.work,
+          ).work?.kind === "own")
     const planned = planChat({
+      yours: own ? (work.project?.root ?? null) : null,
       author: writer,
       authorName: nameOf(writer),
       text: chat.text,
@@ -867,7 +891,7 @@ export async function startHost({
     if (planned.kind === "refused") return planned
     if (planned.kind === "write") {
       await agent.setArchive(planned.record)
-      // Its lanes' workspaces follow: forgotten, or their bookmarks back.
+      // Its lanes follow: their disks deleted, or their bookmarks back.
       if (intent.action === "archive") await work.archived(intent.root)
       else await work.restored(intent.root)
     }
@@ -1114,6 +1138,10 @@ export async function startHost({
       for (const n of notes.values()) n.release()
       try {
         await agent.close()
+      } catch {}
+      // A container runs only while its lane runs (ADR-0034).
+      try {
+        await work.close()
       } catch {}
       try {
         await exchange.shutdown()

@@ -1,6 +1,6 @@
 // land — the prompt of a landing run (ADR-0033).
 //
-// Landing merges your work into a lane, in the lane's workspace, and the agent
+// Landing merges your work into a lane, in the lane's own copy, and the agent
 // then resolves what conflicts. The run starts with a land message: a pi
 // `CustomMessage`, like chat, whose `content` is what the model reads (the
 // resolution skill and the conflict material) and whose `details` are what the
@@ -117,8 +117,8 @@ export function planResolution(input: {
   const { files } = input
   const intro =
     files.length === 0
-      ? "Your work was merged into this thread's workspace with no conflicts. Check that both sides still work together."
-      : `Your work was merged into this thread's workspace, and ${files.length} ${files.length === 1 ? "file conflicts" : "files conflict"}. Resolve them in the workspace.`
+      ? "Your work was merged into this thread's own copy with no conflicts. Check that both sides still work together."
+      : `Your work was merged into this thread's own copy, and ${files.length} ${files.length === 1 ? "file conflicts" : "files conflict"}. Resolve them there.`
   const skill = input.skill === null ? "" : `${input.skill.content.trim()}\n\n`
   const render = (f: ConflictFile, ours: string, theirs: string) =>
     `## ${f.path}\n\n\`\`\`\n${f.content}\n\`\`\`\n\n` +

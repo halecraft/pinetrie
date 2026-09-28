@@ -49,8 +49,10 @@ Full statement: `docs/00-vision.md`.
 
 Aside and Scout are pure conversation-tree operations and cover most daily use.
 **Worktree is out of v1** — it needs effect-merge, which is genuinely hard.
-*Since ADR-0032, every agent lane is a Worktree, with its own jj workspace; an
-Aside is a conversation thread. ADR-0033 resolves the effect merge.*
+*Since ADR-0032 and ADR-0034, every agent lane is a Worktree: a Linux
+container on its own disk, with its own jj repo, and a branch clones its
+parent's disk. An Aside is a conversation thread. ADR-0033 resolves the
+effect merge.*
 
 ### Merge is three problems
 
@@ -62,9 +64,10 @@ Conflating these wasted time early, so keep them separate:
    *The actual product problem.* Solved by a destination-aware three-way fold.
 3. **Effect** — filesystem side effects of a branch that ran tools. *Unsolved,
    out of v1,* needs isolated workspaces + a real jj merge, committed atomically
-   with the conversation merge. *Decided in ADR-0032 (a workspace per lane,
-   folds and landing as jj merges) and ADR-0033 (the agent resolves conflicts,
-   and the repository decides the outcome); not yet built.*
+   with the conversation merge. *Decided in ADR-0032 (a revision per turn,
+   landing as a jj merge), ADR-0033 (the agent resolves conflicts, and the
+   repository decides the outcome) and ADR-0034 (a container and disk per
+   lane). Landing is built; folds' file merges are not.*
 
 ---
 
@@ -474,11 +477,15 @@ context.**
 ### Running Pineta on itself
 
 - `pnpm run host` starts the development host: loopback, your pi settings'
-  model, the session in `.pineta/pineta.db`. The agent has its tools, as you,
-  and each thread's agent works in its own jj workspace under `workspace/`
-  (ADR-0032), starting from your committed work (`@-`): commit what it should
-  see. Your working copy is yours, so hot reload stays on. Restart the host to
-  pick up changes to host code.
+  model, the session in `.pineta/pineta.db`. The agent has its tools, and each
+  thread's agent works in its own Linux container (ADR-0034), on a disk
+  cloned from the turn it branched at: a root thread's starts from your
+  committed work (`@-`), with dependencies installed, so commit what it should
+  see. It sees its own directory at `/project` and your working copy at
+  `/yours`, read-only, and nothing else of your machine unless `pineta.json`
+  grants it. Your working copy is yours, so hot reload stays on. It needs
+  Apple's `container` running (`docs/05-stack.md` D10); without it, threads
+  work directly. Restart the host to pick up changes to host code.
 - **Bringing a thread's work back:** its column's header offers **land your
   work**: the thread merges your committed work into its own, and its agent
   resolves any conflicts, or asks you (ADR-0033). Once resolved, **take into
@@ -487,9 +494,9 @@ context.**
   `pineta/<lane>`, and immutable while it lasts. `jj git push --all` would
   push those bookmarks too; push by name.
 - **Working directly:** the send button's `▾` sets a new thread to work in
-  your working copy, or any directory, with no workspace. A branch inherits
-  its thread's setting. `PINETA_WORKSPACES=0` makes it the default. Such a
-  thread shares its directory, and hot reload waits while one runs in yours.
+  your working copy, or any directory, with no container, as you. A branch
+  inherits its thread's setting. `PINETA_LANES=0` makes it the default. Such
+  a thread shares its directory, and hot reload waits while one runs in yours.
 - `PINETA_TOOLS=0` removes the tools. A thread's agent that starts the
   development host itself needs `PINETA_PORT=0`, or it collides on 7391.
 - **Inviting a collaborator:** `PINETA_BIND=0.0.0.0` (or an address). The host

@@ -17,10 +17,11 @@ Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes`, `readOutbox`,
 `readParticipantNames`, `readParticipants`, `readReferences`, `readPresence`,
 `readAgentActivity`, `readNotes`, `readArchive`, and where lanes work
-(ADR-0032): `readLaneRecords`, `readRevisions`, `readLandings`,
-`readProject`. `workAt` is where a lane created at an entry would work, and the
-files it would start from: the composer shows it, and the host creates the
-lane by it. `notesIndex` is one root's
+(ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
+`readProject` (`lanes`, or `direct` and why). `workAt` is where a lane created
+at an entry would work, and the commit and snapshot it would start from: the
+composer shows it, and the host creates the lane by it, and decides by it
+whether a sent message's paths are stored under `/yours`. `notesIndex` is one root's
 notes index: the records a filter keeps whose place is in that root, newest
 first, each with where it sits now (`noteAt`). The Archive tab's rows are a
 client-only read, in `packages/client/archive-rows.ts`. Live streams are read with `readStreams` in

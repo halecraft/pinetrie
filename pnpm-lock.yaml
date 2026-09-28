@@ -56,6 +56,9 @@ importers:
       '@pineta/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@pineta/lanes':
+        specifier: workspace:*
+        version: link:../../packages/lanes
       '@pineta/marginalia':
         specifier: workspace:*
         version: link:../../packages/marginalia
@@ -71,9 +74,6 @@ importers:
       '@pineta/schema':
         specifier: workspace:*
         version: link:../../packages/schema
-      '@pineta/workspaces':
-        specifier: workspace:*
-        version: link:../../packages/workspaces
       vite:
         specifier: 7.1.11
         version: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
@@ -181,6 +181,12 @@ importers:
 
   packages/core: {}
 
+  packages/lanes:
+    dependencies:
+      '@pineta/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/marginalia:
     dependencies:
       '@pineta/core':
@@ -249,12 +255,6 @@ importers:
       '@kyneta/yjs-schema':
         specifier: link:../../../kyneta/workspace/pineta/packages/schema/backends/yjs
         version: link:../../../kyneta/workspace/pineta/packages/schema/backends/yjs
-      '@pineta/core':
-        specifier: workspace:*
-        version: link:../core
-
-  packages/workspaces:
-    dependencies:
       '@pineta/core':
         specifier: workspace:*
         version: link:../core

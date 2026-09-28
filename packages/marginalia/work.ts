@@ -1,13 +1,16 @@
-// work — where lanes work, the files at each entry, and landings
-// (ADR-0032, ADR-0033).
+// work — where lanes work, the disk and files at each entry, and landings
+// (ADR-0032, ADR-0033, ADR-0034).
 //
 // Four host-written records, each a pi value under a `pineta.` namespace.
 // `encodeWorkRecord` is the one place their namespaces and keys are chosen;
 // each has a total decoder. The decisions a landing needs (`planLand`,
-// `planTake`, `landingOutcome`) and what a turn records
-// (`planTurnRecord`) are pure, over what the host gathers.
+// `planTake`, `landingOutcome`), what a turn records (`planTurnRecord`),
+// where a fork starts (`forkPoint`) and which snapshots go (`planRetention`)
+// are pure, over what the host gathers.
 
 import {
+  type Above,
+  BASE_SNAPSHOT,
   type CommitId,
   commitId,
   type EntryId,
@@ -21,6 +24,8 @@ import {
   type LaneView,
   type ProjectRecord,
   type RevisionRecord,
+  type SnapshotId,
+  snapshotId,
   type WriterId,
 } from "@pineta/core"
 import { Type } from "typebox"
@@ -52,11 +57,15 @@ const RevisionRecordSchema = Type.Object({
   entry: Type.String({ minLength: 1 }),
   lane: Type.String({ minLength: 1 }),
   commit: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  // Absent in records written before lane containers.
+  snapshot: Type.Optional(
+    Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  ),
 })
 
 const ProjectRecordSchema = Type.Union([
   Type.Object({
-    kind: Type.Literal("workspaces"),
+    kind: Type.Literal("lanes"),
     root: Type.String({ minLength: 1 }),
     rootDefault: Type.Union([Type.Literal("own"), Type.Literal("direct")]),
   }),
@@ -97,6 +106,10 @@ export const decodeRevisionRecord = (
     entry: entryId(r.entry),
     lane: r.lane as LaneName,
     commit: r.commit === null ? null : commitId(r.commit),
+    snapshot:
+      r.snapshot === undefined || r.snapshot === null
+        ? null
+        : snapshotId(r.snapshot),
   }))
 
 export const decodeProjectRecord = (
@@ -231,28 +244,113 @@ export const landingOutcome = (input: {
 }): "resolved" | "needs_you" =>
   input.askedForGuidance || input.conflictsLeft > 0 ? "needs_you" : "resolved"
 
-// ── turns ──────────────────────────────────────────────────────────────────
+// ── turns and forks ────────────────────────────────────────────────────────
 
 /**
- * What a turn records. A run's prompt always gets a record: the files the run
- * starts with (a commit of edits made between runs, else the lane's newest
- * revision), or no commit for a lane that works directly. An assistant
- * message gets one only when its tool calls changed files.
+ * What a turn records. A lane of its own records every prompt and every turn
+ * that made tool calls, since ignored files change without a commit: its
+ * snapshot, and a commit when one was made. A prompt with nothing to commit
+ * records the lane's newest revision, so a branch from it names the commit
+ * its disk was at even after your `@-` moved. A lane working directly records
+ * its prompts only, with neither.
  */
 export function planTurnRecord(input: {
   readonly entry: EntryId
   readonly lane: LaneName
   readonly isPrompt: boolean
+  /** The message made tool calls. */
+  readonly toolCalls: boolean
   readonly own: boolean
   /** What `commitTurn` committed, or null when nothing changed. */
   readonly committed: CommitId | null
   /** The lane's newest revision before this turn. */
   readonly newest: CommitId | null
+  /** The turn's snapshot, or null when it failed. */
+  readonly snapshot: SnapshotId | null
 }): RevisionRecord | null {
   const { entry, lane } = input
-  if (!input.own) return input.isPrompt ? { entry, lane, commit: null } : null
-  if (input.committed !== null) return { entry, lane, commit: input.committed }
-  return input.isPrompt && input.newest !== null
-    ? { entry, lane, commit: input.newest }
-    : null
+  if (!input.own)
+    return input.isPrompt ? { entry, lane, commit: null, snapshot: null } : null
+  if (!input.isPrompt && !input.toolCalls && input.committed === null)
+    return null
+  const commit = input.committed ?? (input.isPrompt ? input.newest : null)
+  return { entry, lane, commit, snapshot: input.snapshot }
+}
+
+/**
+ * Where a new lane of its own starts: the nearest snapshot above it, else the
+ * base snapshot; and the nearest commit above it, else your `@-`. The commit
+ * is always named, because a cloned disk carries its parent's working-copy
+ * change, and the fork's first `jj new` must leave it (S42 item 2). Several
+ * commits when your `@` is a merge.
+ */
+export const forkPoint = (input: {
+  readonly above: Above
+  readonly yours: readonly CommitId[]
+}): {
+  readonly snapshot: SnapshotId
+  readonly commits: readonly CommitId[]
+} => ({
+  snapshot: input.above.snapshot ?? BASE_SNAPSHOT,
+  commits: input.above.commit === null ? input.yours : [input.above.commit],
+})
+
+/**
+ * The snapshots to delete. An open root keeps every one: any visible turn can
+ * be branched from. An archived root keeps each lane's newest, which
+ * restoring it clones. Entry ids are uuidv7, so the greatest is the newest.
+ * The base snapshot is never deleted.
+ */
+export function planRetention(input: {
+  /** The revision records of the root's lanes. */
+  readonly records: Iterable<RevisionRecord>
+  readonly archived: boolean
+}): readonly SnapshotId[] {
+  if (!input.archived) return []
+  const newest = new Map<LaneName, SnapshotId>()
+  const all: SnapshotId[] = []
+  for (const r of input.records) {
+    if (r.snapshot === null || r.snapshot === BASE_SNAPSHOT) continue
+    all.push(r.snapshot)
+    const kept = newest.get(r.lane)
+    if (kept === undefined || r.snapshot > kept) newest.set(r.lane, r.snapshot)
+  }
+  const keep = new Set(newest.values())
+  return all.filter(s => !keep.has(s))
+}
+
+/** Where every lane sees your working copy, read-only (ADR-0034). */
+export const YOURS_MOUNT = "/yours"
+
+/** Characters that may continue a path segment: a root followed by one is a longer name. */
+const PATH_CHAR = /[\p{L}\p{N}._\-~@+]/u
+
+/**
+ * `text` with each path under your working copy's `root` shown under
+ * `/yours`, as every lane sees it. Only a whole path prefix: not preceded by a
+ * path character, and followed by `/` or by a character a path segment cannot
+ * continue with. A root inside a longer name (`/p/app` for `/p/a`), or inside
+ * a longer path (`/x/p` for `/p`), is left alone.
+ */
+export function showYours(text: string, root: string): string {
+  const from = root.length > 1 && root.endsWith("/") ? root.slice(0, -1) : root
+  if (from === "" || from === "/") return text
+  let out = ""
+  let i = 0
+  while (i < text.length) {
+    const before = text[i - 1]
+    const next = text[i + from.length]
+    if (
+      (before === undefined || !PATH_CHAR.test(before)) &&
+      text.startsWith(from, i) &&
+      (next === undefined || !PATH_CHAR.test(next))
+    ) {
+      out += YOURS_MOUNT
+      i += from.length
+      continue
+    }
+    out += text[i]
+    i += 1
+  }
+  return out
 }

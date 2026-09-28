@@ -1,10 +1,10 @@
-// workspaces/revisions — a turn's files, committed (ADR-0032).
+// lanes/revisions — a turn's files, committed (ADR-0032).
 //
 // After a message's tool calls, and at a run's first request, the host
-// commits whatever changed in the lane's workspace: one revision per turn
-// that changed files, described with the message's first line and trailers
-// naming the entry and lane (ADR-0033 reads them back). The lane's bookmark
-// moves to it.
+// commits whatever changed in the lane's repo: one revision per turn that
+// changed tracked files, described with the message's first line and
+// trailers naming the entry and lane (ADR-0033 reads them back). The lane's
+// bookmark moves to it.
 
 import {
   type CommitId,
@@ -12,8 +12,8 @@ import {
   type EntryId,
   type LaneName,
 } from "@pineta/core"
-import { describeFailure, jj, lines } from "./run.ts"
-import { setBookmark } from "./workspace.ts"
+import { setBookmark } from "./bookmarks.ts"
+import { describeFailure, lines, type Runner } from "./run.ts"
 
 export const ENTRY_TRAILER = "Pineta-Entry"
 export const LANE_TRAILER = "Pineta-Lane"
@@ -35,10 +35,10 @@ export function entryOfMessage(description: string): string | null {
 
 /** The commit ids a revset names, in jj's order. */
 export async function commitsOf(
-  root: string,
+  jj: Runner,
   revset: string,
 ): Promise<CommitId[]> {
-  const ran = await jj(root, [
+  const ran = await jj([
     "log",
     "--ignore-working-copy",
     "--no-graph",
@@ -52,21 +52,21 @@ export async function commitsOf(
 }
 
 /**
- * Snapshot the workspace; if anything changed, commit it as a revision, move
- * the lane's bookmark to it, and return it. Null when nothing changed.
+ * Snapshot the lane's working copy; if anything tracked changed, commit it as
+ * a revision, move the lane's bookmark to it, and return it. Null when
+ * nothing changed.
  */
 export async function commitTurn(
-  root: string,
-  workspace: string,
+  jj: Runner,
   input: {
     readonly title: string
     readonly entry: EntryId
     readonly lane: LaneName
   },
 ): Promise<CommitId | null> {
-  const snap = await jj(workspace, ["util", "snapshot"])
+  const snap = await jj(["util", "snapshot"])
   if (!snap.ok) throw new Error(describeFailure("jj util snapshot", snap))
-  const empty = await jj(workspace, [
+  const empty = await jj([
     "log",
     "--ignore-working-copy",
     "--no-graph",
@@ -77,14 +77,13 @@ export async function commitTurn(
   ])
   if (!empty.ok) throw new Error(describeFailure("jj log", empty))
   if (empty.stdout.trim() === "true") return null
-  const commit = await jj(workspace, ["commit", "-m", revisionMessage(input)])
+  const commit = await jj(["commit", "-m", revisionMessage(input)])
   if (!commit.ok) throw new Error(describeFailure("jj commit", commit))
-  const [id] = await commitsOf(workspace, "@-")
+  const [id] = await commitsOf(jj, "@-")
   if (id === undefined) throw new Error("jj commit made no parent to read")
-  await setBookmark(root, input.lane, id)
+  await setBookmark(jj, input.lane, id)
   return id
 }
 
-/** Your `@-`: what a new lane starts from when nothing is above it, and what landing merges. */
-export const yoursNow = (root: string): Promise<CommitId[]> =>
-  commitsOf(root, "@-")
+/** Your `@-`: what a root lane starts from, and what landing merges. */
+export const yoursNow = (jj: Runner): Promise<CommitId[]> => commitsOf(jj, "@-")

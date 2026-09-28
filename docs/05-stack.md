@@ -190,6 +190,28 @@ I lean (a), but it is the one choice with no precedent to copy.
 
 ---
 
+### D10 — Apple's `container` for lanes of their own ✅ adopted (ADR-0034)
+
+Each agent lane of its own runs in a Linux VM made by Apple's `container`.
+The requirements:
+- `container` **1.4 or later**, on **macOS 26, Apple silicon**. Other hosts,
+  and hosts where `container` is missing or stopped, work directly; the host
+  names the reason at startup.
+- **A default kernel**: `container system kernel set --recommended`, once.
+- **`container system start`**, and the host must run outside the sandbox:
+  the jail blocks `container`'s XPC services and writes to its volumes under
+  `~/Library/Application Support/com.apple.container/`.
+- **The project on the same APFS volume as `container`'s data**, so a
+  snapshot under `.pineta/snapshots/` is a copy-on-write clone.
+- **Memory**: about 1.2 GiB per running lane (S40); a stopped lane takes
+  none. `container build` runs a builder VM of 2 GiB, which the host stops
+  after each build.
+- **Disk**: each lane's disk is a sparse 64 GiB image that takes only what it
+  wrote; snapshots share every unchanged block.
+
+`pnpm run e2e:lanes` checks all of it, and reruns the contract test for the
+volume image swap `container` does not promise (S40).
+
 ## What we keep
 
 Ours, working, no equivalent upstream — do not discard in the migration:

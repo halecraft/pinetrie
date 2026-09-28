@@ -133,7 +133,7 @@ export const ERR = {
   ROOT_BUSY: "root_busy",
   /** A lane pi holds an operation open on: after a crash, until it resumes. */
   BUSY: "busy",
-  /** Landing a lane that has no workspace of its own: it works directly. */
+  /** Landing a lane that has no copy of its own: it works directly. */
   NOT_OWN_COPY: "not_own_copy",
   /** Taking a landing after your `@-` moved on: land again. */
   MOVED: "moved",
@@ -254,7 +254,18 @@ declare const commitIdBrand: unique symbol
 export type CommitId = string & { readonly [commitIdBrand]: true }
 export const commitId = (id: string): CommitId => id as CommitId
 
-/** Where a lane's tools work: its own jj workspace, or directly in a directory. */
+declare const snapshotIdBrand: unique symbol
+/**
+ * A lane disk snapshot's id: the entry id of the revision record it belongs
+ * to, or `"base"`. Its file is `.pineta/snapshots/<id>.img`. One snapshot
+ * per record, so a turn retried after a crash writes the same file.
+ */
+export type SnapshotId = string & { readonly [snapshotIdBrand]: true }
+export const snapshotId = (id: string): SnapshotId => id as SnapshotId
+/** The project's disk at your `@-`, which root lanes fork from. */
+export const BASE_SNAPSHOT = snapshotId("base")
+
+/** Where a lane's tools work: its own container and disk, or directly in a directory. */
 export type WorkSetting =
   | { readonly kind: "own" }
   | { readonly kind: "direct"; readonly dir: string }
@@ -273,27 +284,33 @@ export interface LaneRecord {
 
 /**
  * The files at an entry: a host-written `pineta.revision` value keyed by the
- * entry's id. Every run's prompt has one (the files the run starts with), and
- * so does every assistant message whose tool calls changed files. So the
- * nearest record above any entry names both its lane and its files
+ * entry's id (ADR-0032, ADR-0034). Every run's prompt has one, and so does
+ * every assistant message of a lane of its own that made tool calls. So the
+ * nearest record above any entry names its lane, its commit and its disk
  * (`nearestRevision`).
  */
 export interface RevisionRecord {
   readonly entry: EntryId
   readonly lane: LaneName
-  /** Null for a lane that works directly: it has no revisions. */
+  /** The turn's commit; null when nothing tracked changed, or the lane works directly. */
   readonly commit: CommitId | null
+  /**
+   * The lane's whole disk at this entry; null for a lane that works directly,
+   * and in records written before lane containers.
+   */
+  readonly snapshot: SnapshotId | null
 }
 
 /**
  * What the host found where it runs: a host-written `pineta.project` value,
- * written at a start when it changed. With `direct`, no lane can have its own
- * copy. With `workspaces`, a new root lane gets `rootDefault`
- * (`PINETA_WORKSPACES=0` makes it `direct`), and any lane may choose either.
+ * rewritten at every start. With `direct`, no lane can have its own copy, and
+ * `reason` says why (no repo, or no usable `container`). With `lanes`, a new
+ * root lane gets `rootDefault` (`PINETA_LANES=0` makes it `direct`), and any
+ * lane may choose either.
  */
 export type ProjectRecord =
   | {
-      readonly kind: "workspaces"
+      readonly kind: "lanes"
       readonly root: string
       readonly rootDefault: "own" | "direct"
     }

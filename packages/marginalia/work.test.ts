@@ -1,9 +1,12 @@
 import {
+  BASE_SNAPSHOT,
   commitId,
   ERR,
   entryId,
   type LandingRecord,
   laneNameForThread,
+  type RevisionRecord,
+  snapshotId,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
@@ -16,13 +19,16 @@ import {
   decodeRevisionRecord,
   encodeWorkRecord,
   entryText,
+  forkPoint,
   LAND_TYPE,
   landingOutcome,
   planLand,
   planResolution,
+  planRetention,
   planTake,
   planTurnRecord,
   renderableMessage,
+  showYours,
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
@@ -44,7 +50,12 @@ describe("records: one encoder, total decoders", () => {
     by: ADA,
     createdAt: 1,
   }
-  const revision = { entry: entryId("e1"), lane: LANE, commit: C1 }
+  const revision = {
+    entry: entryId("e1"),
+    lane: LANE,
+    commit: C1,
+    snapshot: snapshotId("e1"),
+  }
   const landing: LandingRecord = {
     id: "l1",
     lane: LANE,
@@ -56,7 +67,7 @@ describe("records: one encoder, total decoders", () => {
     at: 2,
   }
   const project = {
-    kind: "workspaces" as const,
+    kind: "lanes" as const,
     root: "/p",
     rootDefault: "own" as const,
   }
@@ -74,10 +85,23 @@ describe("records: one encoder, total decoders", () => {
     const p = encodeWorkRecord({ kind: "project", record: project })
     expect(decodeProjectRecord(p.value)).toEqual(project)
   })
-  test("a direct lane's prompt records no commit, and that decodes", () => {
+  test("a direct lane's prompt records no commit and no disk, and that decodes", () => {
     expect(
-      decodeRevisionRecord({ ...revision, commit: null })?.commit,
-    ).toBeNull()
+      decodeRevisionRecord({ ...revision, commit: null, snapshot: null }),
+    ).toEqual({ ...revision, commit: null, snapshot: null })
+  })
+  test("a record from before lane containers has no snapshot key: it decodes as none", () => {
+    const { snapshot: _, ...old } = revision
+    expect(decodeRevisionRecord(old)).toEqual({ ...old, snapshot: null })
+  })
+  test("a project record from before lane containers is dropped, and rewritten at start", () => {
+    expect(
+      decodeProjectRecord({
+        kind: "workspaces",
+        root: "/p",
+        rootDefault: "own",
+      }),
+    ).toBeUndefined()
   })
   test("malformed values are dropped, never thrown", () => {
     expect(
@@ -156,38 +180,136 @@ describe("landing", () => {
   })
 })
 
-describe("planTurnRecord: every prompt, and messages that changed files", () => {
-  const base = { entry: entryId("e"), lane: LANE, newest: C1 }
-  test("a prompt always gets a record: a commit of edits, else the newest revision", () => {
+describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
+  const S = snapshotId("e")
+  const base = {
+    entry: entryId("e"),
+    lane: LANE,
+    newest: C1,
+    snapshot: S,
+    toolCalls: false,
+    own: true,
+  }
+  test("a prompt always gets a record: its disk, and a commit of edits, else the newest revision", () => {
+    expect(planTurnRecord({ ...base, isPrompt: true, committed: C2 })).toEqual({
+      entry: base.entry,
+      lane: LANE,
+      commit: C2,
+      snapshot: S,
+    })
     expect(
-      planTurnRecord({ ...base, isPrompt: true, own: true, committed: C2 })
-        ?.commit,
-    ).toBe(C2)
-    expect(
-      planTurnRecord({ ...base, isPrompt: true, own: true, committed: null })
-        ?.commit,
-    ).toBe(C1)
+      planTurnRecord({ ...base, isPrompt: true, committed: null }),
+    ).toEqual({ entry: base.entry, lane: LANE, commit: C1, snapshot: S })
   })
-  test("an assistant message gets one only when its calls changed files", () => {
+  test("a turn with tool calls gets its disk, and a commit only when one was made", () => {
     expect(
-      planTurnRecord({ ...base, isPrompt: false, own: true, committed: C2 })
-        ?.commit,
-    ).toBe(C2)
+      planTurnRecord({
+        ...base,
+        isPrompt: false,
+        toolCalls: true,
+        committed: C2,
+      }),
+    ).toEqual({ entry: base.entry, lane: LANE, commit: C2, snapshot: S })
     expect(
-      planTurnRecord({ ...base, isPrompt: false, own: true, committed: null }),
+      planTurnRecord({
+        ...base,
+        isPrompt: false,
+        toolCalls: true,
+        committed: null,
+      }),
+    ).toEqual({ entry: base.entry, lane: LANE, commit: null, snapshot: S })
+  })
+  test("a turn with no tool calls and nothing committed gets none", () => {
+    expect(
+      planTurnRecord({ ...base, isPrompt: false, committed: null }),
     ).toBeNull()
   })
-  test("a lane working directly records its prompts with no commit, and nothing else", () => {
-    expect(
-      planTurnRecord({ ...base, isPrompt: true, own: false, committed: null }),
-    ).toEqual({
+  test("a lane working directly records its prompts with neither, and nothing else", () => {
+    const direct = { ...base, own: false, snapshot: null, committed: null }
+    expect(planTurnRecord({ ...direct, isPrompt: true })).toEqual({
       entry: base.entry,
       lane: LANE,
       commit: null,
+      snapshot: null,
     })
     expect(
-      planTurnRecord({ ...base, isPrompt: false, own: false, committed: null }),
+      planTurnRecord({ ...direct, isPrompt: false, toolCalls: true }),
     ).toBeNull()
+  })
+})
+
+describe("forkPoint: a snapshot to clone, and the commits to start on", () => {
+  const S = snapshotId("e")
+  const yours = [commitId("y1"), commitId("y2")]
+  test("from a turn: its snapshot and the commit above", () => {
+    expect(
+      forkPoint({ above: { lane: LANE, commit: C2, snapshot: S }, yours }),
+    ).toEqual({ snapshot: S, commits: [C2] })
+  })
+  test("from a lane before lane containers: the base snapshot at its commit", () => {
+    expect(
+      forkPoint({ above: { lane: LANE, commit: C2, snapshot: null }, yours }),
+    ).toEqual({ snapshot: BASE_SNAPSHOT, commits: [C2] })
+  })
+  test("from nothing: the base snapshot at your @-, every parent of it", () => {
+    expect(
+      forkPoint({ above: { lane: null, commit: null, snapshot: null }, yours }),
+    ).toEqual({ snapshot: BASE_SNAPSHOT, commits: yours })
+  })
+})
+
+describe("planRetention: which snapshots go", () => {
+  const B = laneNameForThread("2")
+  const rec = (entry: string, lane = LANE): RevisionRecord => ({
+    entry: entryId(entry),
+    lane,
+    commit: null,
+    snapshot: snapshotId(entry),
+  })
+  const records = [
+    rec("01-a"),
+    rec("03-a"),
+    rec("02-a"),
+    rec("04-b", B),
+    rec("05-b", B),
+    { ...rec("06-d"), snapshot: null },
+  ]
+  test("an open root keeps every snapshot", () => {
+    expect(planRetention({ records, archived: false })).toEqual([])
+  })
+  test("an archived root keeps each lane's newest", () => {
+    expect(planRetention({ records, archived: true })).toEqual([
+      "01-a",
+      "02-a",
+      "04-b",
+    ])
+  })
+  test("the base snapshot is never deleted", () => {
+    expect(
+      planRetention({
+        records: [{ ...rec("00-a"), snapshot: BASE_SNAPSHOT }, rec("01-a")],
+        archived: true,
+      }),
+    ).toEqual([])
+  })
+})
+
+describe("showYours: whole path prefixes only", () => {
+  test("a root followed by a separator, or by a non-path character, is shown under /yours", () => {
+    expect(showYours("read /r/x.ts", "/r")).toBe("read /yours/x.ts")
+    expect(showYours('{"path":"/r/a.ts"}', "/r")).toBe('{"path":"/yours/a.ts"}')
+    expect(showYours("cd /r && ls", "/r")).toBe("cd /yours && ls")
+    expect(showYours("/r", "/r/")).toBe("/yours")
+  })
+  test("never inside a longer name, nor inside a longer path", () => {
+    expect(showYours("/r/workspace/t-ab/x", "/r/workspace/t-a")).toBe(
+      "/r/workspace/t-ab/x",
+    )
+    expect(showYours("/x/r/y", "/r")).toBe("/x/r/y")
+    expect(showYours("/rr/y", "/r")).toBe("/rr/y")
+  })
+  test("the file system's root is never a working copy's", () => {
+    expect(showYours("/etc/hosts", "/")).toBe("/etc/hosts")
   })
 })
 

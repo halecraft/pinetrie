@@ -137,7 +137,7 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   root stays writable to the host's policy, as ADR-0026 requires (a refused
   write cannot be recovered from, S28); the screen offers no editor there.
 
-# Where lanes work (`work.ts`, ADR-0032)
+# Where lanes work (`work.ts`, ADR-0032, ADR-0034)
 
 Four host-written records, each with a total decoder. `encodeWorkRecord` is
 the one place their namespaces and keys are chosen, and the agent writes them
@@ -146,19 +146,40 @@ through one `setWorkRecord`:
 | record | namespace | key | written |
 |---|---|---|---|
 | a lane's setting: its own copy, or directly in a directory | `pineta.lane` | the lane | once, when the lane is created |
-| the files at an entry | `pineta.revision` | the entry | for every run's prompt, and every assistant message whose tool calls changed files |
+| the commit and disk at an entry | `pineta.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
 | how a landing ended | `pineta.landing` | its own id | when its run ends; again when taken |
-| what the host found where it runs | `pineta.project` | `project` | at a start, when it changed |
+| what the host found where it runs: `lanes`, or `direct` and why | `pineta.project` | `project` | at every start |
 
 - **Every run's prompt has a revision record**, so the nearest record above
-  any entry names both its lane and its files (`nearestRevision`, in core). A
-  lane working directly records its prompts with no commit: it counts as the
-  lane above, and the walk passes it for files. `planTurnRecord` is the rule.
+  any entry names its lane, its commit and its disk (`nearestRevision`, in
+  core, finds the nearest commit and the nearest snapshot independently).
+  `planTurnRecord` is the rule:
+  - A lane of its own records every turn that made tool calls, with its
+    snapshot, because ignored files change without a commit. The commit is
+    there only when one was made.
+  - A prompt with nothing to commit records the lane's newest commit, so a
+    branch from it names what its disk was at.
+  - A lane working directly records its prompts with neither: it counts as
+    the lane above, and the walk passes it.
+  - A record from before lane containers has no `snapshot` key, which decodes
+    as null. A project record of kind `workspaces` no longer decodes; the
+    host rewrites it at start.
+- **`forkPoint`** is where a new lane of its own starts: the nearest snapshot
+  above it, else the base snapshot; and the nearest commit, else your `@-`,
+  with several commits when your `@` is a merge. The commit is always named:
+  a cloned disk carries its parent's working-copy change, and the fork's
+  first `jj new` must leave it.
+- **`planRetention`** keeps every snapshot of an open root, and each lane's
+  newest when the root is archived; the base snapshot is never deleted.
+- **`showYours`** shows a path under your working copy's root as the same
+  path under `/yours`, whole path prefixes only. `planChat` applies it to a
+  message's text when its thread works, or will work, in its own copy, so
+  people and the model read the same stored text (ADR-0034).
 - **A landing in progress has no record**: it is a running lane whose prompt is
   a land message. A `running` state would repeat that, and a crash would
   leave it stale. A run whose prompt is a land message ends with the
   landing's outcome, however it started: from a send, the outbox or a resume.
-- **`planLand`** refuses a lane with no workspace of its own, and holds a
+- **`planLand`** refuses a lane with no copy of its own, and holds a
   landing for a busy lane as it would a message (`isBusy`).
 - **`planTake`** takes only a resolved landing, and only while your `@-` is
   the one it merged: `jj rebase -r @` moves only `@`, so a commit you made

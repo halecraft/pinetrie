@@ -13,14 +13,7 @@
 // own hosts with a scripted model, so their steps are repeatable and cost
 // nothing. No section uses the person's pi setup.
 
-import { execFileSync } from "node:child_process"
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  writeFileSync,
-} from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { DatabaseSync } from "node:sqlite"
@@ -42,7 +35,6 @@ import {
   projectSpine,
   projectTranscript,
   ROOT,
-  rootOf,
 } from "@pineta/core"
 import {
   decodeChat,
@@ -56,7 +48,6 @@ import type { Outcome } from "@pineta/protocol/codec"
 import { PRESENCE_DOC_ID, SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
   readArchive,
-  readLandings,
   readLaneRecords,
   readLanes,
   readNotes,
@@ -66,7 +57,6 @@ import {
   readProject,
   readReferences,
   readRenderableEntries,
-  readRevisions,
   readTreeIndex,
 } from "@pineta/reads"
 import {
@@ -79,7 +69,6 @@ import {
   readStreams,
   writeEntry,
 } from "@pineta/schema"
-import { workspaceDir } from "@pineta/workspaces"
 import { startHost } from "../host/index.ts"
 import { openStore } from "../host/store.ts"
 import { committedProject, createChecks, waitFor } from "./harness.ts"
@@ -913,6 +902,8 @@ invariants("end")
     startHost({
       model: { kind: "scripted", script },
       tools: { project: work },
+      // `verify` runs anywhere: lanes of their own are `e2e:lanes`'s.
+      containers: false,
       store,
       log,
     })
@@ -972,17 +963,14 @@ invariants("end")
   const lane = tlane()
   await u.chat("make new.txt", at(lane?.tip ?? null), { lane: lane?.name })
   await tidle()
-  // In the lane's own workspace, never in the project (ADR-0032).
-  const written =
-    lane === undefined
-      ? ""
-      : path.join(workspaceDir(work, lane.name), "new.txt")
+  // This host has no containers, so the lane works directly in the project.
+  // A lane of its own is `e2e:lanes`'s.
+  const written = path.join(work, "new.txt")
   ok(
-    written !== "" &&
+    lane !== undefined &&
       existsSync(written) &&
-      readFileSync(written, "utf8") === "beta\n" &&
-      !existsSync(path.join(work, "new.txt")),
-    "the agent wrote a file, then edited it, in its own workspace",
+      readFileSync(written, "utf8") === "beta\n",
+    "the agent wrote a file, then edited it, working directly in the project",
   )
 
   // 3. A long command streams live, as edits, and leaves no stream behind.
@@ -1177,187 +1165,74 @@ invariants("end")
   await th.shutdown()
 }
 
-// ── workspaces: each thread's agent in its own jj workspace (ADR-0032, 0033) ──
-// Real jj, in temporary directories, with a scripted model.
+// ── working directly: a lane in a directory you name (ADR-0032) ─────────────
+// No containers here: lanes of their own are `e2e:lanes`'s. A lane asked to
+// work directly does so wherever lanes of their own are available or not.
 {
-  const jj = (dir: string, ...args: string[]): string =>
-    execFileSync("jj", ["--no-pager", "-R", dir, ...args], {
-      stdio: "pipe",
-    }).toString()
-  const jjOk = (dir: string, ...args: string[]): boolean => {
-    try {
-      jj(dir, ...args)
-      return true
-    } catch {
-      return false
-    }
-  }
-  const read = (file: string) =>
-    existsSync(file) ? readFileSync(file, "utf8") : null
-
-  // A directory with no repo: the host makes one.
-  const plain = realpathSync(mkdtempSync(path.join(tmpdir(), "pineta-plain-")))
-  const ph = await startHost({
-    model: { kind: "scripted", script: scriptedModel() },
-    tools: { project: plain },
-    log: () => {},
-  })
-  await waitFor(() => readProject(ph.doc) !== null, 10_000)
-  ok(
-    existsSync(path.join(plain, ".jj")) &&
-      (read(path.join(plain, ".git/info/exclude")) ?? "").includes(
-        "/workspace/",
-      ) &&
-      readProject(ph.doc)?.kind === "workspaces",
-    "a directory with no repo is initialized, and workspace/ is excluded",
-  )
-  await ph.shutdown()
-
-  const project = committedProject("pineta-ws-", {
-    "shared.txt": "one\ntwo\nthree\n",
+  const project = committedProject("pineta-direct-", {
+    "shared.txt": "one\n",
   })
   const elsewhere = realpathSync(
     mkdtempSync(path.join(tmpdir(), "pineta-elsewhere-")),
   )
   const script = scriptedModel()
-  const wh = await startHost({
+  const dh = await startHost({
     model: { kind: "scripted", script },
     tools: { project },
+    containers: false,
     log: () => {},
   })
-  const wu = await connectSession({ url: wh.wsUrl, WebSocket, peerId: "w-uma" })
-  await wu.setName("Uma")
-  const wtree = () => readTreeIndex(wh.doc)
-  const widle = () =>
+  const du = await connectSession({ url: dh.wsUrl, WebSocket, peerId: "d-uma" })
+  await du.setName("Uma")
+  const didle = () =>
     waitFor(
       () =>
-        Object.keys(wh.doc.activeRuns()).length === 0 &&
-        readOutbox(wh.doc).length === 0,
+        Object.keys(dh.doc.activeRuns()).length === 0 &&
+        readOutbox(dh.doc).length === 0,
       60_000,
     )
-  /** The lane whose thread holds the message with `text`. */
   const laneWith = (text: string) => {
-    const id = idOfIn(wh.doc, text)
-    const index = wtree()
-    return readLanes(wh.doc, index).find(
+    const id = idOfIn(dh.doc, text)
+    const index = readTreeIndex(dh.doc)
+    return readLanes(dh.doc, index).find(
       l => id !== null && ancestry(index, l.tip).path.includes(id),
     )
   }
-  const tipOf = (text: string) => laneWith(text)?.tip ?? null
-  const dirOf = (text: string) => {
-    const lane = laneWith(text)
-    return lane === undefined ? "" : workspaceDir(project, lane.name)
-  }
-
-  // 1. Two lanes at once: each writes the same file, and keeps its own.
-  const where = 'basename "$PWD" > who.txt'
-  script.use([
-    { tool: "bash", args: { command: where } },
-    { tool: "bash", args: { command: where } },
-    { text: "noted" },
-    { text: "noted" },
-  ])
-  await Promise.all([
-    wu.chat("lane one: who are you?", ROOT, START_AGENT),
-    wu.chat("lane two: who are you?", ROOT, START_AGENT),
-  ])
-  await widle()
-  const one = laneWith("lane one: who are you?")
-  const two = laneWith("lane two: who are you?")
   ok(
-    one !== undefined &&
-      two !== undefined &&
-      read(path.join(workspaceDir(project, one.name), "who.txt")) ===
-        `${one.name}\n` &&
-      read(path.join(workspaceDir(project, two.name), "who.txt")) ===
-        `${two.name}\n` &&
-      !existsSync(path.join(project, "who.txt")),
-    "two lanes write the same file at once, each in its own workspace, and the project is untouched",
+    readProject(dh.doc)?.kind === "direct",
+    "a host with no containers says its lanes work directly",
   )
 
-  // 2. Revisions: every prompt, and every message whose calls changed files.
-  const revisions = [...readRevisions(wh.doc).values()]
-  const ofOne = revisions.filter(r => r.lane === one?.name)
-  const promptOne = idOfIn(wh.doc, "lane one: who are you?")
-  const base = ofOne.find(r => r.entry === promptOne)?.commit ?? null
-  ok(
-    base !== null &&
-      ofOne.length === 2 &&
-      ofOne.every(
-        r => r.commit !== null && jjOk(project, "log", "-r", r.commit),
-      ),
-    `a lane's prompt and its file-changing message each have a revision (${ofOne.length})`,
-  )
-  ok(
-    base !== null && !jjOk(project, "describe", "-r", base, "-m", "rewritten"),
-    "the revision a lane builds on is immutable, from your working copy too",
-  )
-
-  // 3. The first lane edits the shared file twice, in two runs.
-  const edit = (content: string) => [
-    { tool: "write", args: { path: "shared.txt", content } },
-    { text: `wrote ${content.split("\n")[1]}` },
-  ]
-  script.use(edit("one\ntwo (lane)\nthree\n"))
-  await wu.chat("edit line two", at(tipOf("lane one: who are you?")), {
-    lane: one?.name,
-  })
-  await widle()
-  const firstEdit = idOfIn(wh.doc, "wrote two (lane)")
-  script.use(edit("one\ntwo (lane, again)\nthree\n"))
-  await wu.chat("edit it again", at(firstEdit), { lane: one?.name })
-  await widle()
-
-  // A branch at the first edit's answer starts with that edit's files, and
-  // the model sees the parent's paths as its own.
-  const parentFile = path.join(dirOf("lane one: who are you?"), "shared.txt")
-  script.use([{ reply: context => `saw ${context.join(" | ")}` }])
-  await wu.chat(`@agent look at ${parentFile}`, at(firstEdit), BRANCH)
-  await widle()
-  const branchDir = dirOf(`@agent look at ${parentFile}`)
-  const saw =
-    projectTranscript(wtree(), tipOf(`@agent look at ${parentFile}`)).at(-1)
-      ?.text ?? ""
-  ok(
-    branchDir !== "" &&
-      read(path.join(branchDir, "shared.txt")) === "one\ntwo (lane)\nthree\n",
-    "a branch at an earlier message starts with that message's files",
-  )
-  ok(
-    saw.includes(path.join(branchDir, "shared.txt")) &&
-      !saw.includes(dirOf("lane one: who are you?")),
-    "the branch's model sees its parent's paths as its own",
-  )
-
-  // 4. Working directly: in the named directory, with no workspace; a branch
-  // below it works there too.
+  // In the named directory; a branch below it works there too.
   script.use([
     { tool: "bash", args: { command: "pwd > here.txt" } },
     { text: "here" },
   ])
-  await wu.chat("work over there", ROOT, {
+  await du.chat("work over there", ROOT, {
     ...START_AGENT,
     work: { kind: "direct", dir: elsewhere },
   })
-  await widle()
+  await didle()
   const direct = laneWith("work over there")
   script.use([{ text: "still here" }])
-  await wu.chat("@agent and below", at(tipOf("work over there")), BRANCH)
-  await widle()
+  await du.chat("@agent and below", at(direct?.tip ?? null), BRANCH)
+  await didle()
   const below = laneWith("@agent and below")
-  const records = readLaneRecords(wh.doc)
+  const records = readLaneRecords(dh.doc)
   ok(
     direct !== undefined &&
-      read(path.join(elsewhere, "here.txt")) === `${elsewhere}\n` &&
-      !existsSync(workspaceDir(project, direct.name)) &&
+      existsSync(path.join(elsewhere, "here.txt")) &&
+      readFileSync(path.join(elsewhere, "here.txt"), "utf8") ===
+        `${elsewhere}\n` &&
+      !existsSync(path.join(project, "here.txt")) &&
       below !== undefined &&
       below.name !== direct.name &&
       JSON.stringify(records.get(below.name)?.work) ===
         JSON.stringify({ kind: "direct", dir: elsewhere }),
-    "a lane working directly writes in its directory with no workspace, and a branch below inherits it",
+    "a lane working directly writes in its directory, and a branch below inherits it",
   )
 
-  const nowhere = await wu.chat("work nowhere", ROOT, {
+  const nowhere = await du.chat("work nowhere", ROOT, {
     ...START_AGENT,
     work: { kind: "direct", dir: path.join(elsewhere, "missing") },
   })
@@ -1365,106 +1240,8 @@ invariants("end")
     nowhere.kind === "refused" && nowhere.code === ERR.BAD_DIRECTORY,
     "a thread asked to work directly in a directory that does not exist is refused",
   )
-
-  // 5. Landing: you changed the same line, committed, and kept editing.
-  writeFileSync(path.join(project, "shared.txt"), "one\ntwo (you)\nthree\n")
-  jj(project, "commit", "-m", "you edit line two")
-  writeFileSync(path.join(project, "still-editing.txt"), "wip\n")
-  script.use([
-    {
-      tool: "write",
-      args: {
-        path: "shared.txt",
-        content: "one\ntwo (you, and lane)\nthree\n",
-      },
-    },
-    { text: "resolved: both kept" },
-  ])
-  const landed = one === undefined ? null : await wu.land(one.name)
-  await widle()
-  const landing = readLandings(wh.doc).at(-1)
-  const landMessage = projectTranscript(wtree(), landing?.prompt ?? null).at(-1)
-  ok(
-    landed?.kind === "started" &&
-      landMessage?.role === "land" &&
-      landMessage.text.includes("1 file conflicts") &&
-      landing?.state === "resolved",
-    `landing merges your work, the agent resolves the conflict, and it ends resolved (${landing?.state ?? "none"})`,
-  )
-  const taken = one === undefined ? null : await wu.take(one.name)
-  ok(
-    taken?.kind === "taken" &&
-      read(path.join(project, "shared.txt")) ===
-        "one\ntwo (you, and lane)\nthree\n" &&
-      read(path.join(project, "still-editing.txt")) === "wip\n",
-    "taking it puts both changes in your working copy, and keeps your uncommitted file",
-  )
-
-  // 6. Once your @- moves, a resolved landing is refused.
-  script.use([{ text: "nothing to resolve" }])
-  if (one !== undefined) await wu.land(one.name)
-  await widle()
-  jj(project, "commit", "-m", "you keep going")
-  const moved = one === undefined ? null : await wu.take(one.name)
-  ok(
-    readLandings(wh.doc).at(-1)?.state === "resolved" &&
-      moved?.kind === "refused" &&
-      moved.code === ERR.MOVED,
-    "take is refused once your work moved on since the landing",
-  )
-
-  // 7. The agent can stop and ask: the landing needs you, conflicts left.
-  script.use(edit("one\ntwo (lane two)\nthree\n"))
-  await wu.chat("edit line two too", at(tipOf("lane two: who are you?")), {
-    lane: two?.name,
-  })
-  await widle()
-  script.use([
-    {
-      tool: "ask_for_guidance",
-      args: { question: "Keep yours, or lane two's?" },
-    },
-    { text: "asked" },
-  ])
-  if (two !== undefined) await wu.land(two.name)
-  await widle()
-  ok(
-    readLandings(wh.doc).at(-1)?.state === "needs_you" &&
-      (
-        read(path.join(dirOf("lane two: who are you?"), "shared.txt")) ?? ""
-      ).includes("<<<<<<<"),
-    "a landing where the agent asks for guidance needs you, and its conflicts stay in the lane",
-  )
-
-  // 8. Archiving a root forgets its lanes' workspaces; restoring and running
-  // again brings them back at their newest revision.
-  const rootOne =
-    one?.tip === undefined || one.tip === null ? null : rootOf(wtree(), one.tip)
-  const dirOne = one === undefined ? "" : workspaceDir(project, one.name)
-  if (rootOne !== null) await wu.archive("archive", entryId(rootOne))
-  const forgotten = !existsSync(dirOne)
-  if (rootOne !== null) await wu.archive("restore", entryId(rootOne))
-  script.use([
-    { tool: "bash", args: { command: "cat shared.txt" } },
-    { text: "back" },
-  ])
-  await wu.chat(
-    "still here?",
-    at(laneWith("lane one: who are you?")?.tip ?? null),
-    {
-      lane: one?.name,
-    },
-  )
-  await widle()
-  ok(
-    forgotten &&
-      read(path.join(dirOne, "shared.txt")) ===
-        "one\ntwo (you, and lane)\nthree\n",
-    "archiving forgets a lane's workspace; after restoring, its next run recreates it at its newest revision",
-  )
-
-  await wu.close()
-  await wh.shutdown()
+  await du.close()
+  await dh.shutdown()
 }
 
 // ── notes: a message opened for editing, a draft written together (ADR-0025) ──
