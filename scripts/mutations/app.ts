@@ -299,6 +299,22 @@ export const mutations: readonly Mutation[] = [
     expect: "the notes index opens over the columns, whole",
   },
   {
+    name: "a column grows to its widest line",
+    file: "packages/client/index.html",
+    from: "      .column { flex: 0 0 28rem; min-width: 0;",
+    to: "      .column { flex: 0 0 28rem;",
+    command: browser,
+    expect: "leave the column at 28rem",
+  },
+  {
+    name: "a long tool label runs out of its column",
+    file: "packages/client/index.html",
+    from: "      .tool-label { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }",
+    to: "      .tool-label { font-family: ui-monospace, monospace; }",
+    command: browser,
+    expect: "leave the column at 28rem",
+  },
+  {
     name: "the column's padding does not hover its message",
     file: "packages/client/index.html",
     from: "      .msg::before { left: 100%; width: 1.75rem; }",

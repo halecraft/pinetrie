@@ -1259,6 +1259,36 @@ try {
       )
       await toolIdle()
 
+      // ── a column keeps its width, whatever its content (S37) ─────────────
+      script.use([
+        {
+          text: `\`\`\`\n${"x".repeat(150)}\n\`\`\``,
+          tool: "read",
+          args: { path: `${"y".repeat(100)}.txt` },
+        },
+        { text: "wide" },
+      ])
+      await say("something wide")
+      await appears(
+        `${col(0)} .tool[data-tool="read"] .tool-label:has-text("yyy")`,
+      )
+      await toolIdle()
+      const widths = await tp.$eval(col(0), c => {
+        const body = c.querySelector(".column-body")
+        const rem = Number.parseFloat(
+          getComputedStyle(document.documentElement).fontSize,
+        )
+        return {
+          column: Math.round(c.getBoundingClientRect().width),
+          basis: Math.round(28 * rem),
+          overflow: body === null ? -1 : body.scrollWidth - body.clientWidth,
+        }
+      })
+      ok(
+        widths.column === widths.basis && widths.overflow === 0,
+        `a long code line and a long tool label leave the column at 28rem, with nothing past its side (${JSON.stringify(widths)})`,
+      )
+
       // ── markdown: drawn, and a selection in it cites its source ───────────
       const REPLY = [
         "Plain **bold** here.",
