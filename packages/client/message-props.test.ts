@@ -1,0 +1,75 @@
+import { type EntryLike, indexTree, projectColumns } from "@pineta/core"
+import { expect, test } from "vitest"
+import { type MessageProps, sameMessageProps } from "./message-props.ts"
+import { messageTools } from "./message-tools.ts"
+
+const entry = (
+  id: string,
+  parentId: string | null,
+  content: string,
+): EntryLike => ({
+  id,
+  parentId,
+  type: "message",
+  message: { role: "user", content },
+})
+
+/** A message's props as `Column` builds them, from entries built afresh. */
+const props = (
+  text: string,
+  over: Partial<MessageProps> = {},
+): MessageProps => {
+  const index = indexTree({
+    a: entry("a", null, "first"),
+    b: entry("b", "a", text),
+  })
+  const [view] = projectColumns(index, [{ anchor: "b" }])
+  const node = view?.nodes[1]
+  if (node === undefined) throw new Error("no node")
+  return {
+    node,
+    nameOf: NAMES,
+    about: undefined,
+    origin: undefined,
+    tools: messageTools(node, {
+      parentId: "a",
+      isLast: true,
+      lane: { kind: "none" },
+      writable: true,
+      hasNoteAbout: false,
+    }),
+    onAct: ACT,
+    join: undefined,
+    forkTracks: [],
+    closedBranches: [],
+    ...over,
+  }
+}
+const NAMES = new Map()
+const ACT = () => {}
+
+test("props rebuilt from an unchanged message draw the same", () => {
+  expect(sameMessageProps(props("hello"), props("hello"))).toBe(true)
+})
+
+test("a change to what a message shows, or a new handler, draws again", () => {
+  const was = props("hello")
+  expect(sameMessageProps(was, props("hello!"))).toBe(false)
+  expect(
+    sameMessageProps(
+      was,
+      props("hello", {
+        closedBranches: [{ rootId: "c", messageCount: 1, noteCount: 0 }],
+      }),
+    ),
+  ).toBe(false)
+  expect(
+    sameMessageProps(
+      was,
+      props("hello", {
+        tools: { ...was.tools, branch: { at: "b", prefill: undefined } },
+      }),
+    ),
+  ).toBe(false)
+  expect(sameMessageProps(was, props("hello", { onAct: () => {} }))).toBe(false)
+})

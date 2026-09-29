@@ -1,47 +1,19 @@
-// client/message — one message in a column, and what can be done to it.
+// client/message — one message in a column, and what can be done to it. It
+// redraws only when `sameMessageProps` says what it shows changed, and reports
+// what the reader asks as a `MessageAct`.
 
-import type {
-  BranchSummary,
-  SpineNode,
-  ToolCallView,
-  WriterId,
-} from "@pineta/core"
-import type { ReactNode } from "react"
-import { joinWords, type LaneJoin } from "./column-view.ts"
-import type { Prefill } from "./columns.ts"
+import { entryId, type ToolCallView } from "@pineta/core"
+import { memo } from "react"
+import { joinWords } from "./column-view.ts"
 import { plural } from "./counts.ts"
+import { type MessageProps, sameMessageProps } from "./message-props.ts"
 import { MessageText } from "./message-text.tsx"
-import type { MessageTools, OpenBranch } from "./message-tools.ts"
+import type { MessageAct, MessageTools } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
 import { nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 
-export interface MessageProps {
-  node: SpineNode
-  /** Current display names, by writer. */
-  nameOf: ReadonlyMap<WriterId, string>
-  /** Its note's card (ADR-0025), drawn below it. */
-  about: ReactNode | undefined
-  /** The card of the note it was sent from, drawn below it once changed. */
-  origin: ReactNode | undefined
-  /** Which tools it offers (`messageTools`). */
-  tools: MessageTools
-  /** Open a note about it. */
-  onNote: () => void
-  /** Open a fresh column to the right: `→`, or an edit (ADR-0021). */
-  onBranch: (branch: OpenBranch) => void
-  /** Open a new tab: a root's first message, edited. */
-  onNewTab: (prefill: Prefill, asksAgent: boolean) => void
-  /** A lane starts here: a divider above the message names it. */
-  join: LaneJoin | undefined
-  /** Tracks of open columns that fork here: a dot of each colour. */
-  forkTracks: readonly number[]
-  /** Branches leaving here that no column shows. */
-  closedBranches: readonly BranchSummary[]
-  onOpenBranch: (rootId: string) => void
-}
-
-export function Message(p: MessageProps) {
+function MessageView(p: MessageProps) {
   const { node } = p
   const speaker =
     node.role === "chat"
@@ -104,7 +76,7 @@ export function Message(p: MessageProps) {
         {node.toolCalls?.map(call => (
           <ToolRow call={call} key={call.id} />
         ))}
-        <Tools {...p} />
+        <Tools id={node.id} onAct={p.onAct} tools={p.tools} />
         {p.about}
         {p.origin}
         {p.closedBranches.length > 0 && (
@@ -113,7 +85,9 @@ export function Message(p: MessageProps) {
               <button
                 className="open-branch"
                 key={b.rootId}
-                onClick={() => p.onOpenBranch(b.rootId)}
+                onClick={() =>
+                  p.onAct({ kind: "openBranch", rootId: b.rootId })
+                }
                 type="button"
               >
                 ⑂ {plural(b.messageCount, "message")}
@@ -132,7 +106,17 @@ export function Message(p: MessageProps) {
  * focus: buttons under every message would drown the conversation. `→` comes
  * last, in the right margin, since what it opens appears to the right.
  */
-function Tools({ tools, onNote, onBranch, onNewTab }: MessageProps) {
+export const Message = memo(MessageView, sameMessageProps)
+
+function Tools({
+  id,
+  tools,
+  onAct,
+}: {
+  id: string
+  tools: MessageTools
+  onAct: (act: MessageAct) => void
+}) {
   const { edit, branch } = tools
   if (!tools.note && edit === undefined && branch === undefined) return null
   return (
@@ -140,7 +124,7 @@ function Tools({ tools, onNote, onBranch, onNewTab }: MessageProps) {
       {tools.note && (
         <button
           className="note-open"
-          onClick={onNote}
+          onClick={() => onAct({ kind: "note", entry: entryId(id) })}
           title="open a note on this message, for everyone"
           type="button"
         >
@@ -150,7 +134,7 @@ function Tools({ tools, onNote, onBranch, onNewTab }: MessageProps) {
       {edit?.kind === "branch" && (
         <button
           className="edit"
-          onClick={() => onBranch(edit)}
+          onClick={() => onAct({ kind: "branch", branch: edit })}
           title="edit and send again, in a branch beside this one"
           type="button"
         >
@@ -160,7 +144,13 @@ function Tools({ tools, onNote, onBranch, onNewTab }: MessageProps) {
       {edit?.kind === "newTab" && (
         <button
           className="edit-new-tab"
-          onClick={() => onNewTab(edit.prefill, edit.asksAgent)}
+          onClick={() =>
+            onAct({
+              kind: "newTab",
+              prefill: edit.prefill,
+              asksAgent: edit.asksAgent,
+            })
+          }
           title="a new tab starting with this message's text"
           type="button"
         >
@@ -171,7 +161,7 @@ function Tools({ tools, onNote, onBranch, onNewTab }: MessageProps) {
         <button
           aria-label="open a branch here"
           className="branch"
-          onClick={() => onBranch(branch)}
+          onClick={() => onAct({ kind: "branch", branch })}
           title="open a branch here"
           type="button"
         >

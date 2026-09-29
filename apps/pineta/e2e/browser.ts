@@ -120,6 +120,27 @@ const RAIL_MESSAGES = () =>
     0,
   )
 
+/**
+ * The component renders React recorded since the last call, and clears them.
+ * React's development build, which the host's Vite serves, measures every
+ * render whose props changed on its "Components ⚛" track, with the changed
+ * props' diff as [label, value] pairs (S54). A label is a two-character mark,
+ * an indent, then the prop's name.
+ */
+const componentRenders = (p: Page) =>
+  p.evaluate(() => {
+    const out = performance.getEntriesByType("measure").flatMap(e => {
+      const d = (e as PerformanceMeasure).detail?.devtools
+      if (d?.track !== "Components \u269b") return []
+      const props: string[] = (d.properties ?? []).map(
+        (pair: readonly string[]) => pair[0] ?? "",
+      )
+      return [{ name: e.name.replace("\u200b", ""), props }]
+    })
+    performance.clearMeasures()
+    return out
+  })
+
 let browser: Browser
 try {
   browser = await chromium.launch()
@@ -1150,6 +1171,44 @@ try {
   ok(
     hiddenAtRest && shownOnHover,
     `another root's tab shows its ⋯ on hover, and not at rest (${hiddenAtRest}, ${shownOnHover})`,
+  )
+
+  // Renders (S54). What only presence changes redraws no message, and gives
+  // no column a new index or view: `App`'s reads keep their identity. A
+  // message's render is named `MessageView`, the function `memo` wraps: a
+  // count of `Message` would be 0 whatever renders.
+  await componentRenders(page)
+  await page.click(`${col(0)} .composer .input`)
+  await page.keyboard.type("typed while only presence changes", {
+    delay: 80,
+  })
+  const typed = await componentRenders(page)
+  const rendersOf = (name: string) => typed.filter(r => r.name === name)
+  const newFacts = rendersOf("Column").filter(r =>
+    r.props.some(l => /^.\u00a0(index|view)$/.test(l)),
+  )
+  ok(
+    rendersOf("Header").length > 0 &&
+      rendersOf("MessageView").length === 0 &&
+      newFacts.length === 0,
+    `typing redraws no message and gives no column new facts (App ${rendersOf("Header").length}, Message ${rendersOf("MessageView").length}, Column with new facts ${newFacts.length})`,
+  )
+  await page.fill(`${col(0)} .composer .input`, "")
+  // A message in a thread this tab does not show redraws none of its messages.
+  await componentRenders(page)
+  const beforeElsewhere = Object.keys(host.doc.entries()).length
+  await api.chat("meanwhile, elsewhere", atEntry(entryId(thirdRoot)))
+  await page.waitForFunction(
+    n => document.getElementById("count")?.textContent === n,
+    String(beforeElsewhere + 1),
+    { timeout: 15_000 },
+  )
+  const elsewhere = (await componentRenders(page)).filter(
+    r => r.name === "MessageView",
+  )
+  ok(
+    elsewhere.length === 0,
+    `a message in another thread redraws none of this tab's messages (${elsewhere.length})`,
   )
 
   // 3. Closing a tab is yours: × writes nothing, and reopening brings its columns back.

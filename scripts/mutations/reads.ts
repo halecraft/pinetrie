@@ -20,4 +20,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "referencedBlobs: chats, held messages",
   },
+  {
+    name: "readTreeIndex indexes again on every call",
+    file: "packages/reads/index.ts",
+    from: "  const known = indexOfEntries.get(rows)",
+    to: "  const known = undefined",
+    command: unit,
+    expect: "readTreeIndex keeps the index",
+  },
+  {
+    name: "readRenderableEntries decodes every row again",
+    file: "packages/reads/index.ts",
+    from: "  const known = entryOfRow.get(row)",
+    to: "  const known = undefined",
+    command: unit,
+    expect: "readTreeIndex keeps the index",
+  },
 ]

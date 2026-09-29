@@ -568,8 +568,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new root takes the page to it",
     file: "packages/client/app.tsx",
-    from: '  useEffect(() => dispatch({ kind: "sync", index, lanes }), [index, lanes])',
-    to: '  useEffect(() => {\n    dispatch({ kind: "sync", index, lanes })\n    const newest = index.roots.at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", tab: { kind: "root", root: newest } })\n  }, [index, lanes])',
+    from: '    () => dispatch({ kind: "sync", index, lanes }),',
+    to: '    () => {\n      dispatch({ kind: "sync", index, lanes })\n      const newest = index.roots.at(-1)\n      if (newest !== undefined) dispatch({ kind: "show", tab: { kind: "root", root: newest } })\n    },',
     command: browser,
     expect: "a root another writer starts opens no tab, and the page stays",
   },
@@ -825,9 +825,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "edit branches at the message, not its parent",
-    file: "packages/client/column.tsx",
-    from: "                onBranch={b => p.onBranch(b.at, b.prefill)}",
-    to: "                onBranch={b => p.onBranch(node.id, b.prefill)}",
+    file: "packages/client/message.tsx",
+    from: '          onClick={() => onAct({ kind: "branch", branch: edit })}',
+    to: '          onClick={() => onAct({ kind: "branch", branch: { ...edit, at: id } })}',
     command: browser,
     expect: "edit sends again beside the original",
   },
@@ -911,5 +911,29 @@ export const mutations: readonly Mutation[] = [
     command: e2e,
     expect:
       "a compelled reply to a busy lane is a conflict, naming who holds it",
+  },
+  {
+    name: "App re-reads its facts on every render",
+    file: "packages/client/app.tsx",
+    from: "  } = useSelector(doc, readSessionFacts)",
+    to: "  } = useSelector(doc, d => readSessionFacts(d))",
+    command: browser,
+    expect: "typing redraws no message and gives no column new facts",
+  },
+  {
+    name: "nameOf re-read on every render",
+    file: "packages/client/app.tsx",
+    from: "  const nameOf = useSelector(doc, readParticipantNames)",
+    to: "  const nameOf = useSelector(doc, d => readParticipantNames(d))",
+    command: browser,
+    expect: "typing redraws no message and gives no column new facts",
+  },
+  {
+    name: "Message is not memoised",
+    file: "packages/client/message.tsx",
+    from: "export const Message = memo(MessageView, sameMessageProps)",
+    to: "export const Message = MessageView",
+    command: browser,
+    expect: "a message in another thread redraws none of this tab's messages",
   },
 ]

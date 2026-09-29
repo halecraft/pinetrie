@@ -1,6 +1,6 @@
 // client/column — one open path, read top to bottom, with its own scroll.
 
-import { useTracked } from "@kyneta/react"
+import { useSelector } from "@kyneta/react"
 import {
   type AgentRun,
   atEntry,
@@ -41,7 +41,7 @@ import { Composer, type ReadOnly } from "./composer.tsx"
 import { Menu } from "./menu.tsx"
 import { Message } from "./message.tsx"
 import { MessageText } from "./message-text.tsx"
-import { messageTools } from "./message-tools.ts"
+import { type MessageAct, messageTools } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
 import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
@@ -49,6 +49,7 @@ import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import type { SessionClient } from "./session-view.ts"
 import { useFollow } from "./use-follow.ts"
+import { useStable } from "./use-stable.ts"
 
 export interface ColumnProps {
   session: SessionClient
@@ -223,6 +224,23 @@ export function Column(p: ColumnProps) {
   const edited = p.notes.find(n => n.id === editingNote)
   const stillEdited = edited !== undefined && edited.state !== "done"
   const [joined, setJoined] = useState<NoteId | null>(null)
+  // What a message's reader asked for, carried out: the one handler every
+  // message shares, so none of them redraws when this column does.
+  const onAct = useStable((act: MessageAct) => {
+    switch (act.kind) {
+      case "note":
+        void p.session.note({ kind: "open", entry: act.entry })
+        return
+      case "branch":
+        p.onBranch(act.branch.at, act.branch.prefill)
+        return
+      case "newTab":
+        p.onNewTab(act.prefill, act.asksAgent)
+        return
+      case "openBranch":
+        p.onOpen(act.rootId)
+    }
+  })
   const card = (note: NoteRecord) => (
     <NoteCard
       editors={p.editorsOf(note.id)}
@@ -324,7 +342,6 @@ export function Column(p: ColumnProps) {
             its fork point even when the column is short. */}
           <div className="spacer" ref={spacer} />
           {view.nodes.map((node, i) => {
-            const id = entryId(node.id)
             const drawn = p.notesOf.get(node.id)
             return (
               <Message
@@ -337,10 +354,7 @@ export function Column(p: ColumnProps) {
                 nameOf={p.nameOf}
                 node={node}
                 about={drawn?.about && card(drawn.about)}
-                onBranch={b => p.onBranch(b.at, b.prefill)}
-                onNewTab={p.onNewTab}
-                onNote={() => void p.session.note({ kind: "open", entry: id })}
-                onOpenBranch={p.onOpen}
+                onAct={onAct}
                 origin={drawn?.origin && card(drawn.origin)}
                 tools={messageTools(node, {
                   parentId: index.parentOf(node.id),
@@ -479,9 +493,7 @@ function Streams({
   doc: SessionDocHandle
   lanes: readonly string[]
 }) {
-  const open = useTracked(() => readStreams(doc)).filter(s =>
-    lanes.includes(s.lane),
-  )
+  const open = useSelector(doc, readStreams).filter(s => lanes.includes(s.lane))
   return (
     <>
       {open.map(s =>

@@ -356,6 +356,16 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S54 — Why the page's memory grew, and what re-rendered ✅ PASS
+
+`findings/S54-render-cascade.md`. 96% of a session's heap growth (255 MB in
+about 3.4 minutes) was React 19.2's dev-build `performance.measure` entries,
+one per component render with changed props. Every `App` render re-rendered
+every message on screen: `App`'s inline `useTracked` thunks re-ran on every
+render and rebuilt the tree index. Kyneta tracked precisely (streaming never
+rendered `App`) and keeps an unchanged row's object, which the reads now cache
+by. Produced PLAN-2026-09-29-render-cascade.
+
 ### S53 — Pasted images: pi's image path, and the model's seam ✅ PASS
 
 `findings/S53-pasted-images.md`. pi's `detectSupportedImageMimeType` reads

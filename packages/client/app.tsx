@@ -15,7 +15,7 @@
 // bound while everyone types (ADR-0025).
 
 import { whenSettled } from "@kyneta/exchange"
-import { ExchangeProvider, useDocStatus, useTracked } from "@kyneta/react"
+import { ExchangeProvider, useDocStatus, useSelector } from "@kyneta/react"
 import {
   branchColors,
   compactRail,
@@ -35,22 +35,8 @@ import { SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
   type NoteFilter,
   notesIndex,
-  readAgentActivity,
-  readArchive,
-  readCommands,
-  readLandings,
-  readLaneRecords,
-  readLanes,
-  readNames,
-  readNotes,
-  readOffers,
-  readOutbox,
   readParticipantNames,
-  readParticipants,
   readPresence,
-  readProject,
-  readRevisions,
-  readTreeIndex,
 } from "@pineta/reads"
 import {
   StrictMode,
@@ -96,7 +82,7 @@ import {
 } from "./layout.ts"
 import { NotesIndex } from "./note.tsx"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
-import { readEntryCount } from "./projection.ts"
+import { readSessionFacts } from "./projection.ts"
 import { EmptyRail, Rail } from "./rail.tsx"
 import { railKeep } from "./rail-view.ts"
 import { connectSession, type SessionClient } from "./session-view.ts"
@@ -211,10 +197,13 @@ const PRESENCE_REFRESH_MS = 10_000
 function App({ session }: { session: SessionClient }) {
   const doc = session.doc
   const status = useDocStatus(doc)
-  const count = useTracked(() => readEntryCount(doc))
-  // One moment's facts, read together: the same reads the host decides from.
+  // Every read is `useSelector` over a named read, never an inline
+  // `useTracked` thunk: a new thunk re-runs, so an inline one would read the
+  // document again on every render, whatever caused it, and give every value
+  // below a new identity.
   const {
     index,
+    count,
     activity,
     lanes,
     outbox,
@@ -222,35 +211,17 @@ function App({ session }: { session: SessionClient }) {
     notes,
     archive,
     workFacts,
-  } = useTracked(() => {
-    const index = readTreeIndex(doc)
-    return {
-      index,
-      activity: readAgentActivity(doc, index),
-      lanes: readLanes(doc, index),
-      outbox: readOutbox(doc),
-      participants: readParticipants(doc, index),
-      notes: readNotes(doc),
-      archive: readArchive(doc),
-      workFacts: {
-        project: readProject(doc),
-        commands: readCommands(doc),
-        lanes: readLaneRecords(doc),
-        revisions: readRevisions(doc),
-        landings: readLandings(doc),
-        offers: readOffers(doc),
-        names: readNames(doc),
-      },
-    }
-  })
+  } = useSelector(doc, readSessionFacts)
   // The notes drawn with each message (ADR-0043). A message with one is a
   // square on the rail, and counted on a closed branch's button.
   const notesOf = useMemo(() => messageNotes(notes, index), [notes, index])
   const noteEntries = useMemo(() => new Set(notesOf.keys()), [notesOf])
   const [notesOpen, setNotesOpen] = useState(false)
   const [noteFilter, setNoteFilter] = useState<NoteFilter>("all")
-  const nameOf = useTracked(() => readParticipantNames(doc))
-  const presenceFacts = useTracked(() => readPresence(session.presence))
+  // Its own read, not part of the facts: every message compares `nameOf` by
+  // identity, so it may change only when a name does.
+  const nameOf = useSelector(doc, readParticipantNames)
+  const presenceFacts = useSelector(session.presence, readPresence)
 
   // Each root, for labels and the Archive tab. Which have tabs is yours
   // (`layout.open`, ADR-0030).
@@ -268,7 +239,14 @@ function App({ session }: { session: SessionClient }) {
     undefined,
     () => layoutStore.load() ?? initialLayout(),
   )
-  useEffect(() => dispatch({ kind: "sync", index, lanes }), [index, lanes])
+  // After a layout change too, not only a document change: a column opened at
+  // a lane's tip is bound at once. `sync` returns the same state when nothing
+  // moves, so this settles after one pass.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a layout change is a reason to sync; the reducer reads the layout from state
+  useEffect(
+    () => dispatch({ kind: "sync", index, lanes }),
+    [index, lanes, layout],
+  )
   // Archived roots leave your tabs; the one you are on stays until you leave
   // it, which is a change of the active tab.
   // biome-ignore lint/correctness/useExhaustiveDependencies: leaving a tab is a change of the active tab; the reducer reads it from state
@@ -318,14 +296,19 @@ function App({ session }: { session: SessionClient }) {
         }
       : null
   // The tab's columns: a root's, or a new tab's one fresh column.
-  const columns: readonly ColumnSpec[] =
-    active === null
-      ? []
-      : active.kind === "root"
-        ? columnsOf(layout, active.root)
-        : active.kind === "new"
-          ? layout.newTabs.filter(c => c.key === active.key)
-          : []
+  // Memoised: `columnsOf` gives a root with no stored columns a new list on
+  // each call, and every projection below is keyed on this one.
+  const columns: readonly ColumnSpec[] = useMemo(
+    () =>
+      active === null
+        ? []
+        : active.kind === "root"
+          ? columnsOf(layout, active.root)
+          : active.kind === "new"
+            ? layout.newTabs.filter(c => c.key === active.key)
+            : [],
+    [layout, active],
+  )
   /** A column action on the tab you are on. */
   const act = (
     action: Extract<LayoutAction, { kind: "columns" }>["action"],

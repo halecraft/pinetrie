@@ -836,4 +836,28 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a /blob/ image the message holds gets its stored size",
   },
+  {
+    name: "sameMessageProps compares a message's node by identity",
+    file: "packages/client/message-props.ts",
+    from: '  node: "value",',
+    to: '  node: "identity",',
+    command: unit,
+    expect: "props rebuilt from an unchanged message draw the same",
+  },
+  {
+    name: "sameMessageProps ignores a message's text",
+    file: "packages/client/message-props.ts",
+    from: "  if (Object.is(a, b)) return true",
+    to: '  if (typeof a === "string" || Object.is(a, b)) return true',
+    command: unit,
+    expect: "a change to what a message shows",
+  },
+  {
+    name: "sameMessageProps ignores props compared by identity",
+    file: "packages/client/message-props.ts",
+    from: ": Object.is(a[k], b[k]),",
+    to: ": true,",
+    command: unit,
+    expect: "a change to what a message shows",
+  },
 ]

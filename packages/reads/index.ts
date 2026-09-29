@@ -4,10 +4,12 @@
 // The composer promises "send" or "queue" from the same facts the host then
 // decides from. If the two read those facts separately, the promise holds only
 // while two copies stay in step, which is the drift this project keeps
-// meeting. So both read here. View-shaped reads (a stream's text, a count)
-// stay in `packages/client/projection.ts`.
+// meeting. So both read here. `packages/client/projection.ts` gathers these
+// for the page; a stream's text is `readStreams`, in `@pineta/schema`.
 //
-// Pure reads of a document handle: no subscription, no caching, no pi.
+// Pure reads of a document handle: no subscription and no pi. The only caches
+// are keyed by objects Kyneta keeps while their content is unchanged, so a hit
+// returns what reading again would.
 
 import {
   type Above,
@@ -82,32 +84,67 @@ import {
   readValues,
   rowMessage,
   type SessionDocHandle,
+  type StoredEntryRow,
   writerOfKey,
 } from "@pineta/schema"
 
 /**
- * Stored rows -> the shape the projections read (ADR-0015). `message` is pi's
- * variant data, lifted by `rowMessage`; a human's chat is decoded here, by
- * `renderableMessage`, into role `chat` with its author and writer.
+ * Each stored row's entry, decoded once. Kyneta returns the same frozen row
+ * object for as long as the entry is unchanged (S54), so a row is its own
+ * cache key and a hit is always current.
  */
-export function readRenderableEntries(
-  doc: SessionDocHandle,
+const entryOfRow = new WeakMap<StoredEntryRow, EntryLike>()
+
+/** The tree index of each `entries` record, which Kyneta keeps while no entry changes (S54). */
+const indexOfEntries = new WeakMap<
+  Readonly<Record<string, StoredEntryRow>>,
+  TreeIndex
+>()
+
+function renderableEntry(row: StoredEntryRow): EntryLike {
+  const known = entryOfRow.get(row)
+  if (known !== undefined) return known
+  const entry: EntryLike = Object.freeze({
+    id: row.id,
+    parentId: row.parentId,
+    type: row.type,
+    message: renderableMessage(rowMessage(row)),
+  })
+  entryOfRow.set(row, entry)
+  return entry
+}
+
+function renderableEntries(
+  rows: Readonly<Record<string, StoredEntryRow>>,
 ): Record<string, EntryLike> {
   const out: Record<string, EntryLike> = {}
-  for (const [id, row] of Object.entries(readEntries(doc))) {
-    out[id] = {
-      id: row.id,
-      parentId: row.parentId,
-      type: row.type,
-      message: renderableMessage(rowMessage(row)),
-    }
-  }
+  for (const [id, row] of Object.entries(rows)) out[id] = renderableEntry(row)
   return out
 }
 
-/** The tree, indexed once per document change (`indexTree`). */
-export const readTreeIndex = (doc: SessionDocHandle): TreeIndex =>
-  indexTree(readRenderableEntries(doc))
+/**
+ * Stored rows -> the shape the projections read (ADR-0015). `message` is pi's
+ * variant data, lifted by `rowMessage`; a human's chat is decoded here, by
+ * `renderableMessage`, into role `chat` with its author and writer. An
+ * unchanged row gives the same entry, frozen.
+ */
+export const readRenderableEntries = (
+  doc: SessionDocHandle,
+): Record<string, EntryLike> => renderableEntries(readEntries(doc))
+
+/**
+ * The tree, indexed once per change of its entries (`indexTree`): a document
+ * change that touches no entry returns the same index. Every caller shares it,
+ * so none may sort or change its lists in place.
+ */
+export function readTreeIndex(doc: SessionDocHandle): TreeIndex {
+  const rows = readEntries(doc)
+  const known = indexOfEntries.get(rows)
+  if (known !== undefined) return known
+  const index = indexTree(renderableEntries(rows))
+  indexOfEntries.set(rows, index)
+  return index
+}
 
 /** Every held message, oldest first (`pineta.outbox`). */
 export const readOutbox = (doc: SessionDocHandle): readonly Held[] =>

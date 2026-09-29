@@ -8,11 +8,50 @@ browser tab, and the text being typed.
 
 ## Reads go through one index
 
-`readTreeIndex(doc)` (`@pineta/reads`) builds `indexTree` once per document
-change. The columns, the rail and the agent's path all read that one index
-(`packages/core/tree.ts`). `App` reads it inside a single `useTracked`, together
-with the agent's activity, the lanes, the outbox and the participants, so they
-are always from the same moment; `sync` takes the index and the lanes together.
+`readTreeIndex(doc)` (`@pineta/reads`) builds `indexTree` once per change of
+the document's entries, and returns the same index until one changes. The
+columns, the rail and the agent's path all read that one index
+(`packages/core/tree.ts`). `App` reads it through `readSessionFacts`
+(`projection.ts`), together with the entry count, the agent's activity, the
+lanes, the outbox, the participants, the notes, the archive and the work facts,
+so they are always from the same moment; `sync` takes the index and the lanes
+together.
+
+## Renders (S54)
+
+A render of `App` redraws no message whose content did not change. `App`
+renders on every presence change, typing included, so a cascade into every
+message costs CPU in any build, and in the development build memory too:
+React keeps a timeline entry per render whose props changed (S54: 255 MB in
+minutes).
+
+- **Every subscription is `useSelector(ref, read)` over a named read**, never
+  an inline `useTracked(() => …)`. `useTracked` re-runs a thunk that is a new
+  function, so an inline one reads the document again on every render,
+  whatever caused it, and gives the index and everything projected from it a
+  new identity (`@kyneta/react`'s identity rule). `useSelector` memoises its
+  thunk on the ref and the read, and a module-level read never changes.
+- **`Message` is `memo(MessageView, sameMessageProps)`** (`message-props.ts`,
+  pure). `MESSAGE_PROPS` says how each prop is compared, and its type refuses
+  a prop that is not in it. The node, its tools, its join, its fork tracks and
+  its closed branches are compared by value, since `projectSpine` builds new
+  nodes on every projection. The rest are compared by identity.
+- **A message reports what its reader asks as a `MessageAct`**
+  (`message-tools.ts`) through one `onAct`, which `Column` makes once with
+  `useStable` and carries out in one `switch`. A handler per message would be
+  new on every render of the column.
+- **A message with a note card still redraws with its column**: the card is a
+  new element each render, compared by identity.
+- **`sync` runs on a layout change too**, not only on a new index: a column
+  opened at a lane's tip is bound at once. It returns the same state when
+  nothing moves, so it settles after one pass.
+- **The browser suite counts renders** from React's development build, which
+  the host's Vite serves: it measures every render whose props changed on its
+  "Components ⚛" track, with the changed props' diff
+  (`componentRenders` in `apps/pineta/e2e/browser.ts`). A production build
+  records none, so the check holds only against the dev server. An entry is
+  named by the function that rendered: a message's is `MessageView`, the
+  function `memo` wraps, so a check counting `Message` counts nothing.
 
 ## Root tabs and the layout (`layout.ts`, ADR-0029, ADR-0030)
 

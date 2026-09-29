@@ -5,7 +5,6 @@
   "type": "module",
   "exports": {
     "./session": "./session-view.ts",
-    "./projection": "./projection.ts",
     "./identity": "./identity.ts",
     "./package.json": "./package.json"
   },

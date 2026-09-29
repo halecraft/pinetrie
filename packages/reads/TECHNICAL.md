@@ -35,7 +35,20 @@ stored images to delete from it.
 It declares core, schema and marginalia only (`workspace.test.ts`), so it runs
 in the host and in the browser alike: no pi, no transport.
 
+A read caches only by an object Kyneta keeps while its content is unchanged
+(S54): a hit returns what reading again would, and the cache holds nothing
+Kyneta has let go.
+
 ## Gotchas
+
+- **`readTreeIndex` returns the same index while the `entries` record is
+  unchanged**, so a write elsewhere (a checkpoint, the outbox, a lane tip)
+  costs no indexing, and the host's many reads within one command share one
+  index. Every caller shares it: copy a list before sorting it
+  (`packages/core/roots.ts` does).
+- **`readRenderableEntries` returns the same entry for the same stored row**,
+  frozen. Kyneta gives an unchanged row the same object across writes, so a
+  new entry decodes only itself.
 
 - **`readLanes`' `askedBy`** is the writer of the compelled message a running
   lane is answering (the nearest compelled chat on its path), or else of the

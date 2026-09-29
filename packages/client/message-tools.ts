@@ -1,8 +1,10 @@
 // client/message-tools — which tools a message offers, as a pure rule: note,
 // edit (or new tab), and `→` (ADR-0021, ADR-0025, ADR-0043). `Column` gathers
-// the facts, and `Message` draws the result.
+// the facts, and `Message` draws the result. What a reader then asks of the
+// message is a `MessageAct`, which `Column` carries out.
 
 import {
+  type EntryId,
   parseMentions,
   THE_AGENT,
   type ThreadLane,
@@ -42,6 +44,17 @@ export interface MessageTools {
  */
 export const branchPrefill = (lane: ThreadLane): Prefill | undefined =>
   lane.kind === "lane" ? { text: AGENT_PREFIX, blank: true } : undefined
+
+/** What a reader asked of a message. `Column` carries it out. */
+export type MessageAct =
+  | { readonly kind: "note"; readonly entry: EntryId }
+  | { readonly kind: "branch"; readonly branch: OpenBranch }
+  | {
+      readonly kind: "newTab"
+      readonly prefill: Prefill
+      readonly asksAgent: boolean
+    }
+  | { readonly kind: "openBranch"; readonly rootId: string }
 
 const NONE: MessageTools = { note: false, edit: undefined, branch: undefined }
 
