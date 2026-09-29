@@ -124,6 +124,19 @@ describe("layoutReducer", () => {
     )
   })
 
+  test("a new tab can start with a prefill: a message's text, to send again", () => {
+    const prefill = { text: "the first question", blank: false }
+    const opened = layoutReducer(at(initialLayout()), {
+      kind: "newTab",
+      key: "n",
+      asksAgent: true,
+      prefill,
+    })
+    expect(opened.newTabs).toEqual([
+      { key: "n", anchor: null, fresh: { prefill }, asksAgent: true },
+    ])
+  })
+
   test("a sent new tab becomes its root's tab, and stays the one you are on", () => {
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
@@ -351,7 +364,7 @@ describe("encodeLayout / decodeLayout", () => {
     })
     expect(JSON.stringify(stored)).not.toContain("hello")
     const raw = {
-      v: 3,
+      v: 4,
       active: null,
       open: [],
       roots: {
@@ -364,7 +377,7 @@ describe("encodeLayout / decodeLayout", () => {
     ])
   })
 
-  test("a branch's prefill is stored and restored: it sends nothing by itself", () => {
+  test("a prefill, blank or content, is stored and restored: only pending sends on opening", () => {
     const l = {
       ...initialLayout(),
       roots: new Map([
@@ -372,7 +385,16 @@ describe("encodeLayout / decodeLayout", () => {
           "1-r1",
           [
             { key: "a", anchor: "1-r1" },
-            { key: "b", anchor: "1-r1", fresh: { prefill: "@agent " } },
+            {
+              key: "b",
+              anchor: "1-r1",
+              fresh: { prefill: { text: "@agent ", blank: true } },
+            },
+            {
+              key: "c",
+              anchor: "1-r1",
+              fresh: { prefill: { text: "say it again", blank: false } },
+            },
           ],
         ],
       ]),
@@ -386,18 +408,28 @@ describe("encodeLayout / decodeLayout", () => {
       { v: 1, columns: [good] },
       { v: 2, active: null, roots: {}, newTabs: [] },
       // A layout of this shape under the previous version is dropped too.
-      { v: 2, active: null, open: [], roots: {}, newTabs: [] },
-      { v: 3, active: null, open: [], roots: { r: [] }, newTabs: [] },
-      { v: 3, active: { kind: "tab" }, open: [], roots: {}, newTabs: [] },
-      { v: 3, active: null, open: [3], roots: {}, newTabs: [] },
+      { v: 3, active: null, open: [], roots: {}, newTabs: [] },
+      // v3 stored a prefill as a string.
       {
         v: 3,
+        active: null,
+        open: [],
+        roots: {
+          r: [{ key: "a", anchor: "1-r1", fresh: { prefill: "@agent " } }],
+        },
+        newTabs: [],
+      },
+      { v: 4, active: null, open: [], roots: { r: [] }, newTabs: [] },
+      { v: 4, active: { kind: "tab" }, open: [], roots: {}, newTabs: [] },
+      { v: 4, active: null, open: [3], roots: {}, newTabs: [] },
+      {
+        v: 4,
         active: null,
         open: [],
         roots: { r: [good, { key: 3 }] },
         newTabs: [],
       },
-      { v: 3, active: null, roots: {}, newTabs: [] },
+      { v: 4, active: null, roots: {}, newTabs: [] },
       "layout",
       null,
     ])
@@ -406,7 +438,7 @@ describe("encodeLayout / decodeLayout", () => {
 
   test("a lane that is not a lane name is left off, and the column kept", () => {
     const raw = {
-      v: 3,
+      v: 4,
       active: null,
       open: [],
       roots: { r: [{ key: "a", anchor: "1-a", lane: "w-someone" }] },

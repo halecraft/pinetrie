@@ -1,0 +1,97 @@
+// client/message-tools — which tools a message offers, as a pure rule: note,
+// edit (or new tab), and `→` (ADR-0021, ADR-0025, ADR-0043). `Column` gathers
+// the facts, and `Message` draws the result.
+
+import {
+  parseMentions,
+  THE_AGENT,
+  type ThreadLane,
+  type TranscriptMessage,
+} from "@pineta/core"
+import type { Prefill } from "./columns.ts"
+
+/** The mention that asks the agent, as a composer starts with it. */
+const AGENT_PREFIX = `@${THE_AGENT} `
+
+/** A fresh column to open: a branch at `at`. */
+export interface OpenBranch {
+  readonly at: string
+  readonly prefill: Prefill | undefined
+}
+
+export type MessageEdit =
+  | ({ readonly kind: "branch" } & OpenBranch)
+  | {
+      readonly kind: "newTab"
+      readonly asksAgent: boolean
+      readonly prefill: Prefill
+    }
+
+export interface MessageTools {
+  /** Open a note about it. */
+  readonly note: boolean
+  readonly edit: MessageEdit | undefined
+  /** `→`: a branch at the message. */
+  readonly branch: OpenBranch | undefined
+}
+
+/**
+ * What a branch's composer starts with: `@agent ` in agent work, so going on
+ * with the agent is already typed, and deleting it makes the branch a
+ * conversation (ADR-0021). Nothing in a conversation.
+ */
+export const branchPrefill = (lane: ThreadLane): Prefill | undefined =>
+  lane.kind === "lane" ? { text: AGENT_PREFIX, blank: true } : undefined
+
+const NONE: MessageTools = { note: false, edit: undefined, branch: undefined }
+
+export function messageTools(
+  node: TranscriptMessage,
+  at: {
+    readonly parentId: string | null
+    /** The column's last message. */
+    readonly isLast: boolean
+    /** The column's thread. */
+    readonly lane: ThreadLane
+    readonly writable: boolean
+    readonly hasNoteAbout: boolean
+  },
+): MessageTools {
+  if (!at.writable) return NONE
+  return {
+    note: !at.hasNoteAbout,
+    edit: node.role === "chat" ? editOf(node, at.parentId) : undefined,
+    // Below a conversation's last message, a branch would be the same as
+    // replying. Agent work follows its lane, so there a branch at the end is
+    // a thread of its own.
+    branch:
+      at.isLast && at.lane.kind !== "lane"
+        ? undefined
+        : { at: node.id, prefill: branchPrefill(at.lane) },
+  }
+}
+
+/**
+ * A person's message sent again, changed or not: a sibling at its parent, or,
+ * for a root's first message, a new tab. It asks the agent exactly when the
+ * original did. A branch asks only through a mention (`agentByDefault`), so a
+ * message its thread's default compelled gets `@agent ` in front.
+ */
+function editOf(node: TranscriptMessage, parentId: string | null): MessageEdit {
+  const compelled = node.compelled === true
+  if (parentId === null)
+    return {
+      kind: "newTab",
+      asksAgent: compelled,
+      prefill: { text: node.text, blank: false },
+    }
+  const named = parseMentions(node.text).some(m => m.kind === "agent")
+  return {
+    kind: "branch",
+    at: parentId,
+    prefill: {
+      text: compelled && !named ? `${AGENT_PREFIX}${node.text}` : node.text,
+      blank: false,
+    },
+  }
+}

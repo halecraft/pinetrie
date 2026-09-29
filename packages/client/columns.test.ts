@@ -5,7 +5,7 @@ import {
   laneNameForThread,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { branchPrefill, type Column, columnsReducer } from "./columns.ts"
+import { type Column, columnsReducer } from "./columns.ts"
 
 /** A tree from `child: parent` pairs; `sends` gives some entries a send id. */
 const tree = (
@@ -139,9 +139,11 @@ describe("columnsReducer", () => {
       key: "b",
       at: "2-t",
       after: 0,
-      prefill: "@agent ",
+      prefill: { text: "@agent ", blank: true },
     })
-    expect(opened[1]?.fresh).toEqual({ prefill: "@agent " })
+    expect(opened[1]?.fresh).toEqual({
+      prefill: { text: "@agent ", blank: true },
+    })
     const sent = columnsReducer(opened, { kind: "sent", key: "b", sendId: "s" })
     expect(sent[1]).toEqual({ key: "b", anchor: "2-t", fresh: { sendId: "s" } })
   })
@@ -216,12 +218,5 @@ describe("columnsReducer", () => {
     expect(
       columnsReducer(pruned, { kind: "prune", index: tree({ "1-a": null }) }),
     ).toBe(pruned)
-  })
-})
-
-describe("branchPrefill", () => {
-  test("a branch from agent work starts with @agent; one from a conversation, empty", () => {
-    expect(branchPrefill({ kind: "lane", ...lane("2-t") })).toBe("@agent ")
-    expect(branchPrefill({ kind: "none" })).toBeUndefined()
   })
 })

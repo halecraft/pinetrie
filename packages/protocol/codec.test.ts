@@ -12,7 +12,6 @@ import {
   laneNameForThread,
   noteId,
   ROOT,
-  referenceId,
   runId,
   THE_AGENT,
   writerId,
@@ -126,12 +125,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     { kind: "name", name: "Alice" },
     { kind: "stop", lane: laneNameForThread("abc") },
-    { kind: "reference", to: { kind: "entry", id: entryId("e-7") }, at: ROOT },
-    {
-      kind: "reference",
-      to: { kind: "span", id: entryId("e-7"), start: 0, end: 2 },
-      at: atEntry(entryId("e-8")),
-    },
     { kind: "note", action: { kind: "open", entry: entryId("e-2") } },
     {
       kind: "note",
@@ -171,7 +164,6 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "queued", position: 2 },
     { kind: "conflict", by: writerId("bea@example.com") },
     { kind: "conflict", by: null },
-    { kind: "referenced", id: referenceId("x-1") },
     { kind: "appended", id: entryId("e-1") },
     { kind: "named" },
     { kind: "stopped" },

@@ -13,14 +13,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
   },
   {
-    name: "entryText ignores chat",
-    file: "packages/marginalia/chat.ts",
-    from: "  const chat = decodeChat(message)\n  if (chat !== undefined) return chat.text\n",
-    to: "",
-    command: unit,
-    expect: "entryText",
-  },
-  {
     name: "the model reads no speaker",
     file: "packages/marginalia/chat.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
@@ -345,6 +337,39 @@ export const mutations: readonly Mutation[] = [
     to: "    bookmark: null,",
     command: unit,
     expect: "the facts",
+  },
+  // ── a note below its message (note.ts, ADR-0043) ──
+  {
+    name: "a note opened on a message starts as its text",
+    file: "packages/marginalia/note.ts",
+    from: '        text: "",',
+    to: '        text: "as sent",',
+    command: unit,
+    expect: "a new, empty note about the message",
+  },
+  {
+    name: "opening a message finds its origin note",
+    file: "packages/marginalia/note.ts",
+    from: '        n => n.subject.kind === "entry" && n.subject.id === action.entry,',
+    to: "        n => noteEntry(n, index) === action.entry,",
+    command: unit,
+    expect: "its message's origin, not a note about it",
+  },
+  {
+    name: "a note opens on a message the tree does not hold",
+    file: "packages/marginalia/note.ts",
+    from: "      if (index.entries[action.entry] === undefined)",
+    to: "      if (false)",
+    command: unit,
+    expect: "a message the tree does not hold is refused",
+  },
+  {
+    name: "every origin note is drawn",
+    file: "packages/marginalia/note.ts",
+    from: '        (note.state !== "done" || note.changedSinceDone))',
+    to: "        true)",
+    command: unit,
+    expect: "an origin note is drawn only once it has changed since done",
   },
   {
     name: "imageSources skips imageReference",

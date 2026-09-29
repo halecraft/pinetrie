@@ -18,7 +18,6 @@ import {
   type OfferAction,
   type Position,
   parseMentions,
-  type ReferenceTarget,
   type WorkSetting,
   type WriterId,
   writerOfPrincipal,
@@ -101,8 +100,6 @@ export interface SessionClient {
    * is its addressee (`address`).
    */
   chat(text: string, at: Position, how?: ChatHow): Promise<Outcome>
-  /** Cite `to`, attached where you are reading (`at`). */
-  cite(to: ReferenceTarget, at: Position): Promise<Outcome>
   setName(name: string): Promise<Outcome>
   /** End the running turn of the thread whose lane is `lane`. */
   stop(lane: LaneName): Promise<Outcome>
@@ -237,9 +234,6 @@ export async function connectSession(
         },
         how.id,
       )
-    },
-    cite(to, at) {
-      return send({ kind: "reference", to, at })
     },
     setName(name) {
       return send({ kind: "name", name })

@@ -1,6 +1,6 @@
 # `@pineta/marginalia` — technical notes
 
-The notes and links people write in the margins of the agent's work. Each shape
+What people write in the margins of the agent's work. Each shape
 is stored in pi's extension slots and typed here, by Pineta, which is its single
 authority. Every module decodes through `decodeWith` (`decode.ts`), which is
 total: a malformed value is dropped, never thrown. `decodeAll` does it for a
@@ -8,8 +8,7 @@ namespace's stored values.
 
 Namespaces are stored data and name the owner, `pineta.`, following pi's own
 `pi.` convention. They deliberately do not follow the package name: renaming a
-package must never require changing stored data. This package was
-`@pineta/references`; its namespace is still `pineta.reference`.
+package must never require changing stored data.
 
 # Chat (`chat.ts`)
 
@@ -55,9 +54,6 @@ are the only code that builds or reads the shape.
   column that sent it finds it exactly (`TreeIndex.bySend`).
   `detailsFromStored` is the one conversion of stored details, for a chat and
   for a held message alike.
-- **`entryText` is the one definition of an entry's citable text**: a chat's
-  own `text`, never its attributed `content`, so a span covers exactly what its
-  author wrote. The host's citation path reads through it.
 - **`renderableMessage`** turns a stored chat into role `chat` with its author
   and whether it compelled the agent, for `core`'s projections, which only
   admit the role and so need no schema library.
@@ -136,23 +132,27 @@ the queue. The host executes three pure decisions from here:
 
 # Notes (`note.ts`, ADR-0025)
 
-A note is a message opened for everyone to edit, or a draft of a thread's next
+A note is about a message, everyone's to edit, or a draft of a thread's next
 message. Its text is its own Yjs document (`NoteDoc` in `@pineta/schema`); its
 record is a host-written `pineta.note` value keyed by note id, typed here as
 `NoteRecord` (`@pineta/core`) and stored through `encodeNote`/`decodeNote`.
 
-- **`subject` says what a note is the text of**, as a union: an opened
-  message's entry; a draft's place, kept as a send carries it (where it was
-  started, and its column's lane); or, once sent, the send's id. `noteEntry`
-  finds its message (a sent draft through `TreeIndex.bySend`, so a draft still
-  waiting in an outbox has none yet); `noteAt` is where it sits now, a draft at
-  its thread's end.
+- **`subject` says what a note belongs to**, as a union: the message it is
+  about (`entry`); a draft's place, kept as a send carries it (where it was
+  started, and its column's lane); or, once sent, the send's id (`sent`: the
+  message's origin). `noteEntry` (not exported) finds its message (a sent
+  draft through `TreeIndex.bySend`, so a draft still waiting in an outbox has
+  none yet); `noteAt` is where it sits now, a draft at its thread's end.
+- **`messageNotes` is what the screen draws with each message** (ADR-0043):
+  its `about` note, and its `origin` only while that is not done or once it
+  has changed since, because until then its text is the message's.
 - **A draft is resolved, never stored as an end.** `noteAt` runs `threadOf` from
   its place, as a reply from there would be sent, so the draft follows its
   thread as the thread grows. `draftFor(end, …)` is the draft whose resolved end
   is `end`: one per thread end.
-- **`planNote` decides every action**, pure: `open` (a new note seeded with the
-  entry's text, or the one it has), `draft` (the thread's draft, or a new one;
+- **`planNote` decides every action**, pure: `open` (a new, empty note about
+  a message the index holds, or the one it has; an `origin` note is not one),
+  `draft` (the thread's draft, or a new one;
   what its requester had typed is theirs), `send` (only a draft; the host sends
   its text through `sendChat`, the one send path, and marks it sent on
   `appended`, `started` or `queued`), `done` and `reopen`.
@@ -181,13 +181,11 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   waiting. `ROOT_BUSY_REASON` is the one wording, which the tab's menu shows
   too. The state it already has is `unchanged`, and answered the same.
 - **The gate keys on the entry a command writes at.** `writesAt` names it for
-  every intent (a chat's or a reference's `at`, a note's entry or place via
+  every intent (a chat's `at`, a note's entry or place via
   `noteAt`), or null for one that writes in no root (a new root, a name, a
   stop, an archive action). `archivedAt` maps that entry to its root's
   record. One rule, applied by the host before dispatch; `sendChat` needs no
   copy, because a sent draft reaches it only through a `note` `send`.
-- **A reference is judged by where it is written**, its `at`, not what it
-  cites: citing an archived message from an open root is accepted.
 - **Yjs writes are not refused for archiving.** A note's text in an archived
   root stays writable to the host's policy, as ADR-0026 requires (a refused
   write cannot be recovered from, S28); the screen offers no editor there.
@@ -314,8 +312,8 @@ chat. Its `content` is what the model reads: the resolution skill, then each
 conflicted file with its markers and both sides, labelled `ours` (the lane)
 and `theirs` (what comes in), each with why it changed the file. Its `details`
 are what the column shows: `landLine`'s one line, from the file count.
-`renderableMessage` makes it role `land`, and `entryText` its line, so citing
-it cites that line, never the prompt.
+`renderableMessage` makes it role `land` with that line, so the column shows the
+line, never the prompt.
 
 `planResolution` builds it. Over its budget, each side's reasons are trimmed,
 oldest first; the labels, both sides and every file's content are always
@@ -329,41 +327,3 @@ keyed by writer id, which is `w-<email>` (ADR-0037); `displayName` gives an
 unnamed writer their email's part before the `@`, which the screen shows and
 a mention reaches (`normalizeEmail` requires a letter or digit there); `participants` lists every named writer and every writer in
 the tree, sorted, which is what a mention resolves against.
-
-# References
-
-A reference is a semantic pointer: from the entry it was attached at (where its
-author was reading, or their lane tip) to an entry or a span of one. ADR-0006,
-realised by ADR-0017, amended by ADR-0018.
-
-## Storage
-
-A pi value in `pineta.reference`, keyed by the reference's own id, written only
-by `Agent.addReference` through `Session.setValue`. Values stay out of pi's
-causal graph and out of every model's context; only custom entries can be
-projected into context. References therefore travel in pi's JSONL.
-
-## The schema is the single authority
-
-`ReferenceSchema` (TypeBox) is the only definition of the shape. Pineta owns it,
-so this is not a mirror of anything pi owns. `decodeReference` is **total**: a
-stored value that does not match is dropped, never thrown, because values are
-`Schema.any()` in the document and one bad value must not break every render.
-Decoding is also where `ReferenceId` and `EntryId` are branded.
-
-## Gotchas
-
-- **Backlinks are derived, never stored.** `indexReferences` builds both
-  directions in one pass, each list ascending by id. A stored list per target
-  would be a child container created lazily under a key two writers share: the
-  S18 shape, which lost a writer's value in 40 of 40 trials.
-- **Spans are UTF-16 code units over `entryText`.** That is the source the
-  client renders from, as markdown; a DOM selection reaches it through the
-  source ranges the renderer records (`packages/client/markdown.ts`). A
-  surrogate pair is two units; the unit test pins it.
-- **Only committed entries are citable.** A streaming message is not an entry,
-  and its text is still changing, so an offset into it would not be stable.
-- **Absent and textless are different facts.** `CitedEntry` keeps them apart:
-  citing a compaction whole is allowed; a span on it is `invalid_span`.
-- **It ships to the browser.** The client decodes references, so TypeBox is in
-  the bundle: +42 kB raw, +12 kB gzipped when added.

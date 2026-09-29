@@ -14,6 +14,7 @@ import {
 } from "@pineta/core"
 import { addressChat, displayName, parseCommand } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
+import type { Prefill } from "./columns.ts"
 
 export interface SendSettled {
   /**
@@ -76,18 +77,21 @@ export function settleSend(
 
 /**
  * What a composer sends: its text trimmed, or null for nothing to send. A
- * text that is only its column's prefill is nothing: `@agent ` alone would ask
- * the agent with no question. Nothing is sent while an image is uploading:
- * its markdown is not in the text yet.
+ * text that is only its column's blank prefill is nothing: `@agent ` alone
+ * would ask the agent with no question. Nothing is sent while an image is
+ * uploading: its markdown is not in the text yet.
  */
 export function sendable(
   text: string,
-  prefill: string | undefined,
+  prefill: Prefill | undefined,
   uploading: boolean,
 ): string | null {
   if (uploading) return null
   const message = text.trim()
-  return message === "" || message === prefill?.trim() ? null : message
+  return message === "" ||
+    (prefill?.blank === true && message === prefill.text.trim())
+    ? null
+    : message
 }
 
 // ── before a send ─────────────────────────────────────────────────────────

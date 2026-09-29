@@ -27,7 +27,6 @@ import {
   readLaneRecords,
   readNames,
   readParticipantNames,
-  readReferences,
   readTreeIndex,
 } from "@pineta/reads"
 import { type Browser, chromium, type Page } from "@playwright/test"
@@ -226,10 +225,10 @@ try {
   /** A message for Ada only: it names her, so in agent work it asks no one. */
   const NOTE = "@Ada just a note"
   const col = (n: number) => `.column[data-position="${n}"]`
-  // Plain text is drawn as markdown: one paragraph holding one run. `:text-is`
-  // matches the smallest element holding the text, which is that run.
+  // Plain text is drawn as markdown: one paragraph. `:text-is` matches the
+  // smallest element holding the text, which is that paragraph.
   const msg = (text: string) =>
-    `.msg:has(> .text > p:only-child > span:only-child:text-is(${JSON.stringify(text)}))`
+    `.msg:has(> .text > p:only-child:text-is(${JSON.stringify(text)}))`
   const label = async (n: number) =>
     (await page.textContent(`${col(n)} .composer .send`))?.trim() ?? ""
   const send = async (n: number, text: string) => {
@@ -524,7 +523,9 @@ try {
   await page.locator(`${col(0)} ${msg(NOTE)}`).scrollIntoViewIfNeeded()
   const gutter = await page.$eval(`${col(0)} ${msg(NOTE)}`, m => {
     const body = m.closest(".column-body")
-    const arrow = m.querySelector(":scope > .branch")?.getBoundingClientRect()
+    const arrow = m
+      .querySelector(":scope > .tools > .branch")
+      ?.getBoundingClientRect()
     if (body === null || arrow === undefined) return null
     // Its client area's right edge: a scrollbar, if drawn, lies beyond it.
     const inner =
@@ -556,7 +557,7 @@ try {
   // From the first column while two are open, so "beside its parent"
   // (position 1) and "the far right" (position 2) differ.
   await page.hover(`${col(0)} ${msg(NOTE)}`)
-  await page.click(`${col(0)} ${msg(NOTE)} > .branch`)
+  await page.click(`${col(0)} ${msg(NOTE)} > .tools > .branch`)
   const beside = await page
     .waitForFunction(
       ([c, note]) =>
@@ -627,8 +628,9 @@ try {
       const all = c.querySelectorAll(".column-body .msg")
       const last = all[all.length - 1]
       return (
-        last?.querySelector(":scope > .branch")?.getAttribute("title") ??
-        (last === undefined ? "none" : "no")
+        last
+          ?.querySelector(":scope > .tools > .branch")
+          ?.getAttribute("title") ?? (last === undefined ? "none" : "no")
       )
     }),
   )
@@ -959,7 +961,7 @@ try {
   // it steps down to a conversation continuing from there.
   const end = `${agentCol} .msg.assistant`
   await page.hover(end)
-  await page.click(`${end} > .branch`)
+  await page.click(`${end} > .tools > .branch`)
   const downCol = col(before + 1)
   await page.waitForSelector(`${downCol} .composer`, { timeout: 15_000 })
   const downStart = await page.inputValue(`${downCol} .composer .input`)
@@ -998,7 +1000,7 @@ try {
   await send(before + 1, "still off it")
   await shows("still off it", downCol)
   await page.hover(`${downCol} ${msg("off the record")}`)
-  await page.click(`${downCol} ${msg("off the record")} > .branch`)
+  await page.click(`${downCol} ${msg("off the record")} > .tools > .branch`)
   const asideCol = col(before + 2)
   await page.waitForSelector(`${asideCol} .composer`, { timeout: 15_000 })
   const asideStart = await page.inputValue(`${asideCol} .composer .input`)
@@ -1007,6 +1009,82 @@ try {
     `→ in a conversation opens a branch with nothing typed ("${asideStart}", "${await label(before + 2)}")`,
   )
   await page.click(`${asideCol} .close`)
+  await page.waitForFunction(
+    () => document.querySelectorAll(".column").length === 2,
+    undefined,
+    { timeout: 15_000 },
+  )
+
+  // ── a message's tools: one row; edit is a sibling; a first message's new tab
+  // (ADR-0043). A person's message in agent work has all three tools.
+  const person = `${agentCol} ${msg("say exactly: DOWN-TWO")}`
+  await page.hover(person)
+  const row = await page.$$eval(`${person} > .tools > button`, bs =>
+    bs.map(b => ({
+      name: b.className,
+      top: Math.round(b.getBoundingClientRect().top * 10) / 10,
+    })),
+  )
+  const tops = row.map(b => b.top)
+  ok(
+    row.map(b => b.name).join(" ") === "note-open edit branch" &&
+      Math.max(...tops) - Math.min(...tops) <= 1,
+    `a message's tools are one row: note, edit, → (${JSON.stringify(row)})`,
+  )
+  // Edit opens a branch at the message's parent, holding its text as sent,
+  // with @agent in front: its thread's default person the agent, and a branch
+  // asks only through a mention.
+  const askedId = (await page.getAttribute(person, "data-entry")) ?? ""
+  const parentId = readTreeIndex(host.doc).parentOf(askedId) ?? ""
+  await page.click(`${person} > .tools > .edit`)
+  const editCol = col(before + 1)
+  await page.waitForSelector(`${editCol} .composer`, { timeout: 15_000 })
+  const editStart = await page.inputValue(`${editCol} .composer .input`)
+  const editTrack = await page.getAttribute(editCol, "data-track")
+  const forkOnParent = await page
+    .locator(
+      `${agentCol} .msg[data-entry="${parentId}"] .fork-dot[data-track="${editTrack}"]`,
+    )
+    .count()
+  // Sent without @agent, it is a plain message: no run.
+  await page.fill(`${editCol} .composer .input`, "say exactly: DOWN-2B")
+  await page.click(`${editCol} .composer .send`)
+  await shows("say exactly: DOWN-2B", editCol)
+  const edited = [...readTreeIndex(host.doc).bySend.values()]
+    .map(id => readTreeIndex(host.doc).entries[id])
+    .find(e => e?.message?.content === "say exactly: DOWN-2B")
+  ok(
+    editStart === "@agent say exactly: DOWN-TWO" &&
+      forkOnParent === 1 &&
+      edited?.parentId === parentId &&
+      (await texts(before)).includes("say exactly: DOWN-TWO"),
+    `edit sends again beside the original: a branch at its parent, starting with its text ("${editStart}", its fork dot on the parent: ${forkOnParent})`,
+  )
+  await page.click(`${editCol} .close`)
+  await page.waitForFunction(
+    () => document.querySelectorAll(".column").length === 2,
+    undefined,
+    { timeout: 15_000 },
+  )
+  // A root's first message has no parent: its edit is a new tab, an agent's
+  // since the message asked the agent.
+  const first = `${agentCol} ${msg("say exactly: DOWN-ONE")}`
+  await page.hover(first)
+  await page.click(`${first} > .tools > .edit-new-tab`)
+  await page.waitForSelector('#tabs .tab-new[aria-selected="true"]', {
+    timeout: 15_000,
+  })
+  const newTabStart = await page.inputValue(`${col(0)} .composer .input`)
+  const newTabLabel = await page.textContent(
+    '#tabs .tab-new[aria-selected="true"]',
+  )
+  ok(
+    newTabStart === "say exactly: DOWN-ONE" && newTabLabel === "new agent",
+    `new tab on a root's first message opens a new agent tab starting with its text ("${newTabStart}", "${newTabLabel}")`,
+  )
+  await page.click(`${col(0)} .close`)
+  const agentRoot = readTreeIndex(host.doc).roots.at(-1) ?? ""
+  await page.click(`#tabs .tab[data-root="${agentRoot}"]`)
   await page.waitForFunction(
     () => document.querySelectorAll(".column").length === 2,
     undefined,
@@ -2025,7 +2103,7 @@ try {
         `the column's foot shows the thread's offer in words, its bookmark apart, and Take brings it into your working copy (${line} · ${bookmark})`,
       )
 
-      // ── markdown: drawn, and a selection in it cites its source ───────────
+      // ── markdown: drawn ───────────────────────────────────────────────────
       const REPLY = [
         "Plain **bold** here.",
         "",
@@ -2072,66 +2150,18 @@ try {
         "raw HTML in a reply shows as text, and a javascript: link goes nowhere",
       )
 
-      /** Select from one run's character to another's, as a drag would. */
-      const select = (from: string, fromAt: number, to: string, toAt: number) =>
-        tp.evaluate(
-          ([scope, a, ao, b, bo]) => {
-            const runs = [...document.querySelectorAll(`${scope} span[data-s]`)]
-            const textOf = (v: string) =>
-              runs.find(r => r.textContent === v)?.firstChild
-            const s = textOf(a)
-            const e = textOf(b)
-            if (s == null || e == null) return false
-            window.getSelection()?.setBaseAndExtent(s, ao, e, bo)
-            return true
-          },
-          [reply, from, fromAt, to, toAt] as const,
-        )
-      /** Cite the page's selection, and what the host stored of it. */
-      const cite = async () => {
-        const refs = () =>
-          readReferences(toolHost.doc).to.get(entryId(replyId)) ?? []
-        const before = refs().length
-        await tp.hover(reply)
-        await tp.click(`${reply} .tools .cite`)
-        await waitFor(() => refs().length > before, 15_000)
-        const to = refs().at(-1)?.to
-        return to?.kind === "span" ? REPLY.slice(to.start, to.end) : to?.kind
-      }
-      await select("bold", 0, "bold", 4)
-      const bold = await cite()
-      ok(
-        bold === "bold",
-        `selecting rendered bold text cites its source (${JSON.stringify(bold)})`,
-      )
-      await select("Plain ", 2, "echo hi", 4)
-      const across = await cite()
-      ok(
-        across ===
-          "ain **bold** here.\n\nA first line,\nand a second.\n\n```sh\necho",
-        `a selection across a code block cites its source from end to end (${JSON.stringify(across)})`,
-      )
-      // A drag to the start of the next line ends at that block's first
-      // character, which is not selected.
-      await select("Plain ", 0, "A first line,\nand a second.", 0)
-      const toNext = await cite()
-      ok(
-        toNext === "Plain **bold** here.",
-        `a selection ending at the next block's start cites its own block, and no more (${JSON.stringify(toNext)})`,
-      )
-      await tp.click(`${reply} > .text p:first-of-type`, {
-        clickCount: 3,
-        position: { x: 4, y: 4 },
-      })
-      const paragraph = await cite()
-      ok(
-        paragraph === "Plain **bold** here.",
-        `a triple-clicked paragraph cites its source, and no more (${JSON.stringify(paragraph)})`,
-      )
-
-      // A done note's text is markdown too (ADR-0025).
+      // A done note's text is markdown too (ADR-0025). A note starts empty,
+      // so its markdown is typed.
       await tp.hover(reply)
-      await tp.click(`${reply} .tools .edit`)
+      await tp.click(`${reply} .tools .note-open`)
+      await tp
+        .locator(`${reply} .note textarea`)
+        .focus({ timeout: 15_000 })
+        .catch(() => null)
+      await tp.keyboard.type(
+        "Plain **bold** here.\n\nA first line,\nand a second.",
+      )
+      await waitFor(() => false, 1_000)
       await tp
         .click(`${reply} .note .note-done`, { timeout: 15_000 })
         .catch(() => null)
@@ -2586,7 +2616,7 @@ try {
   )
   ok(gone === 0, `none of the removed controls exist (${gone})`)
 
-  // ── a second window joins, asks, and cites ──────────────────────────────
+  // ── a second window joins and asks ──────────────────────────────────────
   // Alone, nobody else is shown anywhere (ADR-0024).
   const alone = await page.evaluate(() => ({
     avatars: [...document.querySelectorAll(".avatar")].map(
@@ -2666,34 +2696,16 @@ try {
       .waitForSelector(msg("B asks about this"), { timeout: 60_000 })
       .catch(() => null)
     await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
-    // A's replica has everything the host has, and has drawn it, before A's
-    // messages are counted: otherwise a reply still arriving reads as a change.
+    // A's replica has everything the host has, and has drawn it, before the
+    // notes below look for B's message in A's window.
     const total = String(Object.keys(host.doc.entries()).length)
     await page.waitForFunction(
       n => document.getElementById("count")?.textContent === n,
       total,
       { timeout: 15_000 },
     )
-    const spineBefore = await page.$$eval(".msg", n => n.length)
-    await second.hover(`${col(0)} .msg`)
-    await second.click(`${col(0)} .msg .tools .cite`)
-    const shown = await page
-      .waitForSelector(".cited-by", { timeout: 15_000 })
-      .then(
-        () => true,
-        () => false,
-      )
-    ok(shown, "B's citation appears live in A's window as a backlink")
-    const marker = await page
-      .$eval(".cited-by", n => n.textContent ?? "")
-      .catch(() => "")
-    ok(marker.includes("cited by 1"), `A sees "${marker.trim()}"`)
-    ok(
-      (await page.$$eval(".msg", n => n.length)) === spineBefore,
-      "A's columns are unchanged by the citation: it adds no message",
-    )
 
-    // ── notes: a message opened for editing, and a draft written together ──
+    // ── notes: a note below its message, and a draft written together ──
     // A message shown once, in whichever column shows it first.
     const askedEntry = await page
       .locator(msg("B asks about this"))
@@ -2701,9 +2713,9 @@ try {
       .getAttribute("data-entry")
     const asked = `.msg[data-entry="${askedEntry}"]`
     await page.hover(asked)
-    await page.click(`${asked} .tools .edit`)
-    const editorA = page.locator(`${asked} .note textarea`)
-    const editorB = second.locator(`${asked} .note textarea`)
+    await page.click(`${asked} .tools .note-open`)
+    const editorA = page.locator(`${asked} > .note textarea`)
+    const editorB = second.locator(`${asked} > .note textarea`)
     const cards = await Promise.all([
       editorA.waitFor({ timeout: 15_000 }).then(
         () => true,
@@ -2714,9 +2726,28 @@ try {
         () => false,
       ),
     ])
+    // Below the message's text, which still shows, and empty.
+    const placed = await page
+      .$eval(asked, m => {
+        const text = m.querySelector(":scope > .text")
+        const card = m.querySelector(":scope > .note")
+        return {
+          text: text?.textContent ?? "",
+          below:
+            text !== null &&
+            card !== null &&
+            card.getBoundingClientRect().top >=
+              text.getBoundingClientRect().bottom,
+          empty: card?.querySelector("textarea")?.value === "",
+        }
+      })
+      .catch(() => ({ text: "", below: false, empty: false }))
     ok(
-      cards.every(Boolean),
-      "a message opened for editing becomes a note in both windows",
+      cards.every(Boolean) &&
+        placed.text === "B asks about this" &&
+        placed.below &&
+        placed.empty,
+      `a note opened on a message is an empty card below its text, in both windows (${JSON.stringify(placed)})`,
     )
     await editorA.focus()
     await page.keyboard.press("End")
@@ -2782,14 +2813,22 @@ try {
     await second.keyboard.type(" from B")
     await waitFor(() => false, 1_500)
     await page.click(`${col(0)} .draft-slot .note-send`)
-    // Sent, the draft is done: its message shows its card, read-only.
-    const sentDraft = `.msg:has(.note[data-state="done"] > .note-text > p:only-child > span:only-child:text-is("Together: from B"))`
+    // Sent, the draft is done: its message is its text, with no card, since
+    // the card would repeat it.
+    const sentDraft = msg("Together: from B")
     const together = await page
       .waitForSelector(sentDraft, { timeout: 60_000 })
       .then(
         () => true,
         () => false,
       )
+    const cardless = await page
+      .$$eval(`${sentDraft} > .note`, n => n.length)
+      .catch(() => -1)
+    ok(
+      together && cardless === 0,
+      `a sent draft's message draws no card of it (${cardless})`,
+    )
     const byLine = await page
       .$eval(`${sentDraft} .role`, n => n.textContent ?? "")
       .catch(() => "")

@@ -126,15 +126,9 @@ importers:
       '@pineta/schema':
         specifier: workspace:*
         version: link:../schema
-      decode-named-character-reference:
-        specifier: 1.3.0
-        version: 1.3.0
       hast-util-to-jsx-runtime:
         specifier: 2.3.6
         version: 2.3.6
-      micromark-util-decode-numeric-character-reference:
-        specifier: 2.0.2
-        version: 2.0.2
       react:
         specifier: 19.2.0
         version: 19.2.0

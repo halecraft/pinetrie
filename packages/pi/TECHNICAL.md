@@ -326,14 +326,12 @@ ignore, which had to name every non-pi field: one it missed (after `activeRunId`
 became `activeRuns`) made a replayed change to it re-index everything. That cost
 only work, never correctness, and never touched the host's own stream writes.
 
-### References
+### Values
 
-`Agent.addReference` is the only writer of the `pineta.reference` value
-namespace, through `Session.setValue` (ADR-0017). It uses the generic value
-path, so conformance continues to cover the storage shape. `setNote`,
-`setArchive` and `setWorkRecord` write `pineta.note`, `pineta.archive` and the
-four work records the same way (ADR-0025, ADR-0029, ADR-0032): every setter's
-body is one `put`. `setWorkRecord` takes its namespace and key from
+`setNote`, `setArchive` and `setWorkRecord` write `pineta.note`,
+`pineta.archive` and the four work records through `Session.setValue`
+(ADR-0025, ADR-0029, ADR-0032): every setter's body is one `put`. They use the
+generic value path, so conformance covers the storage shape. `setWorkRecord` takes its namespace and key from
 `encodeWorkRecord`, in marginalia.
 
 ### `seq` is derived, not stored

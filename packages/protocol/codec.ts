@@ -31,11 +31,8 @@ import {
   type OfferAction,
   type Position,
   parseMentions,
-  type ReferenceId,
-  type ReferenceTarget,
   ROOT,
   type RunId,
-  referenceId,
   runId,
   type WorkSetting,
   type WriterId,
@@ -51,7 +48,6 @@ export interface Refusal {
 /** What a reply means. `reply()` flattens it for the wire. */
 export type Outcome =
   | { readonly kind: "started"; readonly runId: RunId }
-  | { readonly kind: "referenced"; readonly id: ReferenceId }
   | { readonly kind: "appended"; readonly id: EntryId }
   /** Waiting behind `position` messages for the thread's lane to be free. */
   | { readonly kind: "queued"; readonly position: number }
@@ -98,8 +94,7 @@ const refuse = (code: ErrCode, message: string): Refusal => ({
  * Wire command -> a well-formed intent, or the first shape rule it breaks.
  *
  * `parentId: ""` is the root, and this is the only place that knows it: for a
- * chat, where only a `branch` may start a thread; for a reference, no anchor
- * (refused by `planReference`).
+ * chat, where only a `branch` may start a thread.
  */
 export function decodeCommand(
   wire: WireCommand | null | undefined,
@@ -108,37 +103,6 @@ export function decodeCommand(
   // "" is the root. Only the codec knows that.
   const at = positionFromWire(text(wire?.parentId))
 
-  if (kind === "reference") {
-    const target = text(wire?.targetId)
-    if (target === "") {
-      return refuse(ERR.UNKNOWN_TARGET, "a reference must name a target")
-    }
-    const start = wire?.spanStart
-    const end = wire?.spanEnd
-    // -1 on both is the wire's "whole entry"; only the codec knows that.
-    if (start === -1 && end === -1) {
-      return {
-        kind: "reference",
-        to: { kind: "entry", id: entryId(target) },
-        at,
-      }
-    }
-    if (
-      typeof start !== "number" ||
-      typeof end !== "number" ||
-      !Number.isInteger(start) ||
-      !Number.isInteger(end) ||
-      start < 0 ||
-      end <= start
-    ) {
-      return refuse(ERR.INVALID_SPAN, "a span must satisfy 0 <= start < end")
-    }
-    return {
-      kind: "reference",
-      to: { kind: "span", id: entryId(target), start, end },
-      at,
-    }
-  }
   if (kind === "name") {
     const name = normalizeName(text(wire?.text))
     return name === undefined
@@ -272,13 +236,6 @@ const workToWire = (work: WorkSetting | null) =>
 /** Intent -> the flat wire command. The client's half of `decodeCommand`. */
 export function encodeIntent(id: string, intent: Intent): Command {
   switch (intent.kind) {
-    case "reference":
-      return command({
-        id,
-        kind: "reference",
-        ...targetToWire(intent.to),
-        parentId: positionToWire(intent.at),
-      })
     case "chat":
       return command({
         id,
@@ -336,8 +293,6 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
   switch (outcome.kind) {
     case "started":
       return reply({ id, outcome: "started", runId: outcome.runId })
-    case "referenced":
-      return reply({ id, outcome: "referenced", referenceId: outcome.id })
     case "appended":
       return reply({ id, outcome: "appended", entryId: outcome.id })
     case "queued":
@@ -375,8 +330,6 @@ export function decodeReply(wire: Reply): Outcome {
   switch (wire.outcome) {
     case "started":
       return { kind: "started", runId: runId(wire.runId) }
-    case "referenced":
-      return { kind: "referenced", id: referenceId(wire.referenceId) }
     case "appended":
       return { kind: "appended", id: entryId(wire.entryId) }
     case "queued":
@@ -411,11 +364,6 @@ export function decodeReply(wire: Reply): Outcome {
 const positionToWire = (p: Position): string => (p.kind === "root" ? "" : p.id)
 const positionFromWire = (s: string): Position =>
   s === "" ? ROOT : atEntry(entryId(s))
-
-const targetToWire = (t: ReferenceTarget) =>
-  t.kind === "entry"
-    ? { targetId: t.id, spanStart: -1, spanEnd: -1 }
-    : { targetId: t.id, spanStart: t.start, spanEnd: t.end }
 
 const ERR_CODES: ReadonlySet<string> = new Set(Object.values(ERR))
 

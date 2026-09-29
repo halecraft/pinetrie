@@ -121,11 +121,10 @@ The leftmost tab. It finds roots, so it is a list, not a rail with columns.
   Search over message text.
 - **Selecting a row previews it:** that root's rail, and one read-only column
   that a pick on the rail moves. Its composer is disabled, and none of the tools that
-  write are there: branch, edit, mark, cite. In place of sending it offers
-  **Restore** for an archived root, and **Open** for an open one. A citation is written where its author is reading,
-  which here is the archived root. Once the inventory exists (planned with
-  fold), picking up will work here, since it writes nothing; what is picked up
-  is cited or folded into an open root.
+  write are there: note, edit, branch, mark. In place of sending it offers
+  **Restore** for an archived root, and **Open** for an open one. Once the
+  inventory exists (planned with fold), picking up will work here, since it
+  writes nothing; what is picked up is folded into an open root.
 - **Restore** opens the root as your tab and switches to it; for everyone
   else it is simply no longer archived. **Open** opens an open root as your
   tab. Restoring is the only way to write in an archived root; the host
@@ -309,28 +308,34 @@ The rail is E; the column is T. Seeing both at once is the product.
   at the column's width, and a click opens it in a new tab. The agent is
   given the image itself, after the text. An image no longer stored refuses
   the send, and the text comes back to the box.
-- A message's tools (cite, and `→` in the margin) appear on hover or focus;
-  beneath it stay only branch buttons and citation counts.
-- **Cite** stays an action on a message or a text selection. It is attached at
-  the end of the column it was used in. A reference shows as counts: "↗ cites
-  n" on the message it is attached to, and "↙ cited by n" on what it cites.
-  Neither leads anywhere yet, and the agent does not read references
-  (ADR-0017). A link drawn between columns when both ends are open was
-  designed, but never built.
+- **A message's tools are one row** over its top right, shown on hover or
+  focus (ADR-0043): *note*, *edit*, and `→` last, in the right margin, since
+  what it opens appears to the right. Beneath a message stay only its notes
+  and the buttons of branches no column shows.
+- **Edit sends a person's message again, changed or not**, as a sibling: a
+  branch at its parent whose composer holds its text as sent. The original
+  stays. It asks the agent exactly when the original did, so a message its
+  thread's default sent to the agent starts with `@agent`. Anyone's message
+  can be edited, and the edit is the editor's. On a root's first message,
+  which has no parent, the tool is *new tab*: a new tab holding its text, an
+  agent's when the message asked the agent. An agent's reply offers no edit:
+  that would be a reply the agent never gave.
 
 ### Notes, and drafting together (ADR-0025)
 
-- **Any message can be opened for editing**, the agent's replies included:
-  *edit* is among its tools. It becomes a **note**, drawn in place of its text
-  as a card everyone can type in at once. The card's header says its state,
-  who has written in it, and who is editing it now. The message itself stays as
-  sent, which is what the agent read.
+- **Any message can have a note**, the agent's replies included: *note* is
+  among its tools. The note is a card below the message's text, which still
+  shows, and it starts empty: it is about the message (ADR-0043). Everyone can
+  type in it at once. The card's header says its state, who has written in it,
+  and who is editing it now. The message stays as sent, which is what the agent
+  read.
 - **Compose together**, under a column's composer, starts the thread's shared
   draft with whatever is typed. There is one draft per thread end: another
   person's column following that thread shows "Ada is drafting the next
   message · join". *Send* on the draft sends it as a reply from that column,
   with the send button's usual effects: it may queue, or be a conflict, which
-  keeps the draft. It then reads "Ada, with Bea".
+  keeps the draft. It then reads "Ada, with Bea", and the draft is not drawn
+  beside it, since its text is the message's, unless it changes after.
 - **Done** makes a note read-only; *reopen* makes it editable again, and a
   reopened note, once edited, reads "changed since done". A sent draft is done.
 - **While the note being edited is scrolled out of view**, a bar at the top of

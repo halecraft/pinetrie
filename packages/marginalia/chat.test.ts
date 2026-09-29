@@ -21,7 +21,6 @@ import {
   decodeChat,
   detailsFromStored,
   encodeChat,
-  entryText,
   heldBy,
   heldMessages,
   heldRuns,
@@ -400,11 +399,6 @@ test("decodeChat is total: a malformed or foreign message is not a chat", () => 
   )
   assert.equal(decodeChat({ role: "user", content: "hi" }), undefined)
   assert.equal(decodeChat(undefined), undefined)
-})
-
-test("entryText: a chat's span text is what its author wrote, not the attributed content", () => {
-  assert.equal(entryText(encodeChat(details, 1)), "the plum")
-  assert.equal(entryText({ role: "user", content: "plain" }), "plain")
 })
 
 test("renderableMessage: a chat renders as role chat with its author", () => {

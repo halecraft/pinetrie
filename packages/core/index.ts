@@ -99,7 +99,6 @@ export const isLaneName = (s: string): s is LaneName =>
 
 declare const entryIdBrand: unique symbol
 declare const runIdBrand: unique symbol
-declare const referenceIdBrand: unique symbol
 /**
  * Entry ids and run ids are both uuidv7 strings and cannot be told apart at
  * runtime. Positions take an entry id; `activeRuns` holds run ids. Passing
@@ -111,9 +110,6 @@ export type EntryId = string & { readonly [entryIdBrand]: true }
 export type RunId = string & { readonly [runIdBrand]: true }
 export const entryId = (id: string): EntryId => id as EntryId
 export const runId = (id: string): RunId => id as RunId
-/** A reference's id: the key of its stored value, so it must be unique (ADR-0016). */
-export type ReferenceId = string & { readonly [referenceIdBrand]: true }
-export const referenceId = (id: string): ReferenceId => id as ReferenceId
 declare const noteIdBrand: unique symbol
 /** A note's id, uuidv7: the key of its record and the name of its text's document. */
 export type NoteId = string & { readonly [noteIdBrand]: true }
@@ -153,12 +149,11 @@ export const ERR = {
   /** pi refused for a reason with no more specific code here. */
   REFUSED: "refused",
   /**
-   * The root is no entry: a reference cannot attach there, and a `reply` or
-   * `queue` has nothing to continue. Only a `branch` starts a thread at it.
+   * The root is no entry: a `reply` or `queue` has nothing to continue, and
+   * no note can be opened or drafted there. Only a `branch` starts a thread
+   * at it.
    */
   NO_ANCHOR: "no_anchor",
-  /** A span is empty, out of bounds, or on an entry with no text. */
-  INVALID_SPAN: "invalid_span",
   /** A display name is empty or too long. */
   INVALID_NAME: "invalid_name",
   /** A note action its note's state does not allow: sending a note that is no draft. */
@@ -185,16 +180,6 @@ export const ERR = {
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
 
-/** What a reference points at. Spans are UTF-16 code units into `entryText`. */
-export type ReferenceTarget =
-  | { readonly kind: "entry"; readonly id: EntryId }
-  | {
-      readonly kind: "span"
-      readonly id: EntryId
-      readonly start: number
-      readonly end: number
-    }
-
 /**
  * How a message means to join the tree.
  *
@@ -212,16 +197,10 @@ export const CHAT_MODES: readonly ChatMode[] = ["reply", "queue", "branch"]
 /**
  * A command whose SHAPE is already known to be valid. The protocol codec
  * produces it; it owns every shape rule, so this type cannot express a
- * malformed command. What it then does is decided by `planChat` and
- * `planReference` in `@pineta/marginalia`, over what the host gathers.
+ * malformed command. What it then does is decided by `planChat` and the
+ * other planners in `@pineta/marginalia`, over what the host gathers.
  */
 export type Intent =
-  /** A citation, attached where its author is reading (`at`). */
-  | {
-      readonly kind: "reference"
-      readonly to: ReferenceTarget
-      readonly at: Position
-    }
   /** A human message; `mentions` are parsed from `text` once, at the codec. */
   | {
       readonly kind: "chat"

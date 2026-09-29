@@ -189,21 +189,22 @@
         border-radius: 50%; vertical-align: middle; background: var(--track); }
       .actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center;
         margin-top: .25rem; font-size: .75rem; }
-      .tools { position: absolute; top: -.2rem; right: 0; display: none; gap: .3rem;
-        font-size: .72rem; background: #1b1e24; padding: .15rem; border-radius: 4px; }
-      .msg:hover .tools, .msg:focus-within .tools { display: flex; }
-      /* In the right margin: what it opens appears to the right. */
-      .msg .branch { position: absolute; top: 1.1rem; right: -1.5rem; padding: 0 .3rem;
-        background: none; border: 1px solid #3a3f48; color: #9ecbff; visibility: hidden; }
-      .msg:hover .branch, .msg:focus-within .branch { visibility: visible; }
+      /* One row over the message's top right. Its last button, →, sits in the
+         right gutter, since what it opens appears to the right: `right` is
+         less than .column-body's right padding. Hidden, it keeps its box, so
+         where → is can be measured before a hover. */
+      .tools { position: absolute; top: -.2rem; right: -1.6rem; display: flex; gap: .3rem;
+        font-size: .72rem; background: #1b1e24; padding: .15rem; border-radius: 4px;
+        visibility: hidden; }
+      .msg:hover .tools, .msg:focus-within .tools { visibility: visible; }
+      .tools .branch { color: #9ecbff; }
       /* The column's side padding hovers its message too: the → sits in the right
          gutter, and a hidden → takes no hover to bring itself back. ::before for
-         the right, so the → (later in the tree) paints over it and takes the
+         the right, so .tools (later in the tree) paints over it and takes the
          click; .column-body's padding sets both widths. */
       .msg::before, .msg::after { content: ""; position: absolute; top: 0; bottom: 0; }
       .msg::before { left: 100%; width: 1.75rem; }
       .msg::after { right: 100%; width: .75rem; }
-      .cites, .cited-by { color: #9ecbff; }
       .streaming { opacity: .75; border-left: 2px solid #9ecbff; padding-left: .75rem; }
       /* A tool call: what it touched, its status, and its result folded away. */
       .tool { margin: .3rem 0; font-size: .8rem; }
@@ -225,10 +226,12 @@
       .conflict { font-size: .8rem; color: #d0a15f; margin-bottom: .35rem; }
       .conflict button { padding: .1rem .5rem; font-size: .75rem; }
 
-      /* Notes (ADR-0025): a message's living text, or a thread's shared draft. */
+      /* Notes (ADR-0025): a note about a message, or a thread's shared draft. */
       .note { margin-top: .3rem; padding: .4rem .5rem; border: 1px solid #3a3f48; border-radius: 4px;
         background: #181b21; }
       .note[data-state="draft"] { border-style: dashed; }
+      /* Below its message's text, and part of it (ADR-0043). */
+      .msg > .note { margin-left: .75rem; border: 0; border-left: 2px solid #3a3f48; border-radius: 0; }
       .note[data-state="done"] { opacity: .85; }
       .note[data-collapsed="yes"] .note-text { max-height: 6rem; overflow: hidden; }
       .note-head { font-size: .72rem; color: #8b93a1; margin-bottom: .25rem; }

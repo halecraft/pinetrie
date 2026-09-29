@@ -50,7 +50,6 @@ import {
   encodeArchive,
   encodeHeld,
   encodeNote,
-  encodeReference,
   encodeWorkRecord,
   expandSkill,
   type Held,
@@ -60,8 +59,6 @@ import {
   OFFER_NAMESPACE,
   OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
-  REFERENCE_NAMESPACE,
-  type Reference,
   resolveCommand,
   type StackMessage,
   type UpdateMessage,
@@ -297,8 +294,6 @@ export interface Agent {
   hold(item: Held): Promise<void>
   /** Remove a held message: it has been taken. */
   release(id: string): Promise<void>
-  /** Store a reference as a pi value in `pineta.reference` (ADR-0016, ADR-0017). */
-  addReference(reference: Reference): Promise<void>
   /** Store a writer's display name in `pineta.participant`, keyed by writer. */
   setParticipantName(writer: WriterId, name: string): Promise<void>
   /** Store a note's record in `pineta.note`, keyed by its id (ADR-0025). */
@@ -674,10 +669,6 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
 
     async release(id) {
       await session.deleteValue(value(OUTBOX_NAMESPACE, id), CTX)
-    },
-
-    async addReference(reference) {
-      await put(REFERENCE_NAMESPACE, reference.id, encodeReference(reference))
     },
 
     async setParticipantName(writer, displayName) {

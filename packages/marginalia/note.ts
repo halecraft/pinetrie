@@ -1,9 +1,9 @@
-// note — a message opened for everyone to edit, or a thread's next message
-// drafted together (ADR-0025).
+// note — a note about a message, everyone's to edit, or a thread's next
+// message drafted together (ADR-0025, ADR-0043).
 //
 // A note's text is its own Yjs document (`NoteDoc` in @pineta/schema); its
 // record, here, is a host-written `pineta.note` value keyed by note id
-// (ADR-0016). The entry a note opened is never changed (ADR-0004): the model
+// (ADR-0016). The entry a note is about is never changed (ADR-0004): the model
 // reads it as sent.
 
 import {
@@ -101,11 +101,11 @@ export function noteRecords(
 }
 
 /**
- * The message a note is the text of, if it has one yet: the entry it opened,
- * or the message its draft was sent as. A sent draft that still waits in a
+ * The message a note belongs to, if it has one yet: the entry it is about, or
+ * the message its draft was sent as. A sent draft that still waits in a
  * lane's outbox has none.
  */
-export function noteEntry(note: NoteRecord, index: TreeIndex): EntryId | null {
+function noteEntry(note: NoteRecord, index: TreeIndex): EntryId | null {
   switch (note.subject.kind) {
     case "entry":
       return note.subject.id
@@ -138,6 +138,42 @@ export function noteAt(
   return thread.kind === "thread" && thread.end.kind === "entry"
     ? thread.end.id
     : null
+}
+
+/** The notes drawn with one message (ADR-0043). */
+export interface MessageNotes {
+  /** A note about it: opened on it (`subject.kind === "entry"`). */
+  readonly about: NoteRecord | undefined
+  /**
+   * What it was sent from: a shared draft or a queued note. Its text is the
+   * message's, so it is drawn only while it is not done, or once it has
+   * changed since.
+   */
+  readonly origin: NoteRecord | undefined
+}
+
+/** Each message's notes to draw, by entry id. A message with none is absent. */
+export function messageNotes(
+  notes: readonly NoteRecord[],
+  index: TreeIndex,
+): ReadonlyMap<string, MessageNotes> {
+  const out = new Map<string, MessageNotes>()
+  for (const note of notes) {
+    const shown =
+      note.subject.kind === "entry" ||
+      (note.subject.kind === "sent" &&
+        (note.state !== "done" || note.changedSinceDone))
+    const entry = shown ? noteEntry(note, index) : null
+    if (entry === null) continue
+    const was = out.get(entry) ?? { about: undefined, origin: undefined }
+    out.set(
+      entry,
+      note.subject.kind === "entry"
+        ? { ...was, about: note }
+        : { ...was, origin: note },
+    )
+  }
+  return out
 }
 
 /**
@@ -188,7 +224,7 @@ const refused = (code: ErrCode, message: string): NoteDecision => ({
  * Decide a note action. Pure; the host gathers every input inside one serial
  * step. The lifecycle:
  *
- * - `open` an entry: a new note holding its text, or the note it already has;
+ * - `open` an entry: a new, empty note about it, or the one it already has;
  * - `draft` where a reply would go: the thread's draft (`draftFor`), or a new one;
  * - `send` a draft: its text goes out as a reply from its place;
  * - `done` an open note or a draft, and `reopen` a done one.
@@ -199,8 +235,6 @@ export function planNote(input: {
   readonly notes: readonly NoteRecord[]
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
-  /** The opened entry's text, for `open`; undefined if the tree has no such entry. */
-  readonly entryText: string | undefined
   readonly newId: NoteId
 }): NoteDecision {
   const { action, writer, notes, index, lanes } = input
@@ -215,14 +249,18 @@ export function planNote(input: {
   })
   switch (action.kind) {
     case "open": {
-      if (input.entryText === undefined)
+      if (index.entries[action.entry] === undefined)
         return refused(ERR.UNKNOWN_TARGET, "no such message to open")
-      const existing = notes.find(n => noteEntry(n, index) === action.entry)
+      // A message's origin note (`sent`) is where it came from, not a note
+      // about it, so opening the message makes a new one.
+      const existing = notes.find(
+        n => n.subject.kind === "entry" && n.subject.id === action.entry,
+      )
       if (existing !== undefined) return { kind: "existing", id: existing.id }
       return {
         kind: "create",
         record: fresh({ kind: "entry", id: action.entry }, "open"),
-        text: input.entryText,
+        text: "",
       }
     }
     case "draft": {

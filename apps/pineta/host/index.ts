@@ -34,7 +34,6 @@ import {
   planStop,
   promptOf,
   type RunId,
-  referenceId,
   runId,
   type Sha256,
   threadOf,
@@ -47,12 +46,10 @@ import {
   CHAT_TYPE,
   type ChatDetails,
   type ChatMessage,
-  type CitedEntry,
   decodeCommandRenames,
   displayName,
   encodeChat,
   encodeWorkRecord,
-  entryText,
   LAND_TYPE,
   type LandMessage,
   parseCommand,
@@ -63,7 +60,6 @@ import {
   planImages,
   planNote,
   planNoteEdit,
-  planReference,
   planStartup,
   planUpdate,
   recordChanged,
@@ -124,7 +120,6 @@ import {
   planStream,
   presenceDoc,
   readActiveRun,
-  readEntryMessage,
   readLaneTip,
   readStreams,
   readValues,
@@ -941,8 +936,6 @@ export async function startHost({
     // gather
     const { action } = intent
     const index = readTreeIndex(doc)
-    const opened =
-      action.kind === "open" ? readEntryMessage(doc, action.entry) : undefined
 
     // plan (pure)
     const planned = planNote({
@@ -951,11 +944,6 @@ export async function startHost({
       notes: readNotes(doc),
       index,
       lanes: readLanes(doc, index),
-      entryText: !opened?.present
-        ? undefined
-        : opened.message === undefined
-          ? ""
-          : entryText(opened.message),
       newId: noteId(newId()),
     })
 
@@ -1010,39 +998,6 @@ export async function startHost({
   // Every recorded note's text is held, so edits to it are attributed and
   // reach the store. Before any command: nothing else runs yet.
   for (const n of readNotes(doc)) await holdNote(n.id, null)
-
-  /** A citation: gather the cited entry, `planReference`, write one value. */
-  async function handleReference(
-    respond: (outcome: Outcome) => void,
-    writer: WriterId,
-    intent: Extract<Intent, { kind: "reference" }>,
-  ): Promise<void> {
-    // Absent and textless are different facts (CitedEntry).
-    const found = readEntryMessage(doc, intent.to.id)
-    const cited: CitedEntry = found.present
-      ? {
-          kind: "entry",
-          text:
-            found.message === undefined ? undefined : entryText(found.message),
-        }
-      : { kind: "absent" }
-    const planned = planReference({
-      author: writer,
-      at: intent.at,
-      target: intent.to,
-      cited,
-      newId: referenceId(newId()),
-    })
-    if (planned.kind === "refused") {
-      return respond({
-        kind: "refused",
-        code: planned.code,
-        message: "reference refused",
-      })
-    }
-    await agent.addReference(planned.reference)
-    return respond({ kind: "referenced", id: planned.reference.id })
-  }
 
   /** Archive a root for everyone, or restore it: gather, `planArchive`, write one value. */
   async function handleArchive(
@@ -1127,8 +1082,6 @@ export async function startHost({
         return respond(
           await handleNote(writer, id === "" ? newId() : id, intent),
         )
-      case "reference":
-        return handleReference(respond, writer, intent)
       case "name":
         await agent.setParticipantName(writer, intent.name)
         return respond({ kind: "named" })

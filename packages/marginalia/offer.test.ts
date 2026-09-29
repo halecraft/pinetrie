@@ -18,7 +18,6 @@ import {
   describeRequest,
   encodeUpdate,
   encodeWorkRecord,
-  entryText,
   offerView,
   planRefresh,
   planStack,
@@ -303,7 +302,6 @@ describe("the update and stack messages", () => {
       role: "update",
       content: "↓ your work merged in: 2 files changed",
     })
-    expect(entryText(m)).toBe("↓ your work merged in: 2 files changed")
     expect(updatePrefill(details)).toContain("2 files changed")
   })
   test("a stack message names where it starts and ends, and the bookmark to set", () => {

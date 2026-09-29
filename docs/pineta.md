@@ -115,7 +115,7 @@ packages/core/         @pineta/core         declares NOTHING
 packages/schema/       @pineta/schema       Kyneta only; the document shape
 packages/pi/           @pineta/pi           THE pi boundary
 packages/protocol/     @pineta/protocol     the wire contract and its codec
-packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: references, chat, notes, outbox
+packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: chat, notes, outbox
 packages/reads/        @pineta/reads        document reads shared by host and client
 packages/lanes/        @pineta/lanes        lane containers, disks, and jj/git (ADR-0032–0034, 0038)
 packages/client/       @pineta/client       browser UI; owns its Vite build
@@ -392,7 +392,7 @@ independently shippable:
 1. ~~tree read~~ — done: `projectSpine`, spine + branch markers, navigation is client-local state
 2. branch write — create a branch from any entry; Aside first
 3. ~~concurrent lanes~~ — done; since ADR-0020, a lane per thread, not per writer
-4. ~~references~~ — done: pi values in `pineta.reference`, derived backlinks (ADR-0017)
+4. ~~references~~ — done, then withdrawn (ADR-0043): nothing read them
 5. ~~humans in the tree~~ (ADR-0018) — done: chat and compelled responders, presence (ADR-0024), notes and drafts (ADR-0025)
 6. Scout — read-only tools
 7. fold — three-way merge producing a `fromId` node

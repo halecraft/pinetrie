@@ -26,6 +26,7 @@ import {
   type ColumnAction,
   columnsReducer,
   isPinned,
+  type Prefill,
 } from "./columns.ts"
 
 export type ActiveTab =
@@ -56,6 +57,8 @@ export type LayoutAction =
       readonly kind: "newTab"
       readonly key: string
       readonly asksAgent: boolean
+      /** What its composer starts with. */
+      readonly prefill?: Prefill
     }
   /** Close an unsent new tab; nothing was written. */
   | { readonly kind: "closeNewTab"; readonly key: string }
@@ -169,7 +172,8 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
           {
             key: action.key,
             anchor: null,
-            fresh: {},
+            fresh:
+              action.prefill === undefined ? {} : { prefill: action.prefill },
             ...(action.asksAgent ? { asksAgent: true } : {}),
           },
         ],
@@ -376,7 +380,7 @@ export function planOpen(
 // Kept per browser tab through `tab-state.ts`. Built field by field both ways,
 // so a field the schema does not name is never stored or restored.
 // `fresh.pending` is one: restoring it would send its message again.
-// `fresh.prefill` is stored: it sends nothing by itself.
+// `fresh.prefill` is stored: only `pending` is sent on opening.
 
 const StoredColumn = Type.Object({
   key: Type.String(),
@@ -386,7 +390,9 @@ const StoredColumn = Type.Object({
   fresh: Type.Optional(
     Type.Object({
       sendId: Type.Optional(Type.String()),
-      prefill: Type.Optional(Type.String()),
+      prefill: Type.Optional(
+        Type.Object({ text: Type.String(), blank: Type.Boolean() }),
+      ),
     }),
   ),
 })
@@ -399,7 +405,7 @@ const StoredTab = Type.Union([
 
 /** `v` changes when the shape does; an older layout is dropped, not migrated. */
 const StoredLayout = Type.Object({
-  v: Type.Literal(3),
+  v: Type.Literal(4),
   active: Type.Union([StoredTab, Type.Null()]),
   open: Type.Array(Type.String()),
   roots: Type.Record(Type.String(), Type.Array(StoredColumn, { minItems: 1 })),
@@ -420,7 +426,12 @@ const toStored = (c: Column): Stored => ({
           ...(c.fresh.sendId === undefined ? {} : { sendId: c.fresh.sendId }),
           ...(c.fresh.prefill === undefined
             ? {}
-            : { prefill: c.fresh.prefill }),
+            : {
+                prefill: {
+                  text: c.fresh.prefill.text,
+                  blank: c.fresh.prefill.blank,
+                },
+              }),
         },
       }),
 })
@@ -439,13 +450,18 @@ const fromStored = (s: Stored): Column => ({
           ...(s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId }),
           ...(s.fresh.prefill === undefined
             ? {}
-            : { prefill: s.fresh.prefill }),
+            : {
+                prefill: {
+                  text: s.fresh.prefill.text,
+                  blank: s.fresh.prefill.blank,
+                },
+              }),
         },
       }),
 })
 
 export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
-  v: 3,
+  v: 4,
   active: layout.active,
   open: [...layout.open],
   roots: Object.fromEntries(

@@ -11,6 +11,7 @@ import type {
   WriterId,
 } from "@pineta/core"
 import { useEffect, useRef, useState } from "react"
+import type { Prefill } from "./columns.ts"
 import { matchCommands } from "./commands.ts"
 import { Menu } from "./menu.tsx"
 import {
@@ -63,7 +64,6 @@ export function Composer({
   commands,
   usedDirs,
   fresh,
-  initialText,
   participants,
   nameOf,
   queue,
@@ -71,6 +71,7 @@ export function Composer({
   onBranchInstead,
   pending,
   prefill,
+  insert,
   typing,
   onTyping,
   onComposeTogether,
@@ -100,11 +101,8 @@ export function Composer({
   usedDirs: readonly string[]
   /** A fresh column: its first message starts the thread (`branch`). */
   fresh: boolean
-  /**
-   * Text the box starts with, unsent: a branch's `@agent ` (`branchPrefill`).
-   * Alone, it sends nothing.
-   */
-  initialText: string | undefined
+  /** What the box starts with, unsent: a fresh column's (`Prefill`). */
+  prefill: Prefill | undefined
   /** Everyone who can be mentioned, as shown. */
   participants: readonly string[]
   /** Display names by writer, for a conflict's line. */
@@ -121,7 +119,7 @@ export function Composer({
    * Text to put in the box, unsent and editable: an update's intent
    * (ADR-0038). Each new `key` puts it there once, after what is typed.
    */
-  prefill: { readonly text: string; readonly key: number } | null
+  insert: { readonly text: string; readonly key: number } | null
   /** Others typing here, by name (presence). */
   typing: readonly string[]
   /** Called on each keystroke; presence is written at most once a second. */
@@ -140,7 +138,7 @@ export function Composer({
 }) {
   // A column opened to send `pending` sends it at once, so it starts empty.
   const [text, setText] = useState(
-    pending === undefined ? (initialText ?? "") : "",
+    pending === undefined ? (prefill?.text ?? "") : "",
   )
   const [status, setStatus] = useState("")
   // Pastes whose images are still uploading: sending waits for them.
@@ -211,15 +209,15 @@ export function Composer({
     if (takeFocus()) input.current?.focus()
   }, [])
 
-  // A prefill is put in the box once per key, after whatever is already typed.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once per prefill
+  // An insert is put in the box once per key, after whatever is already typed.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per insert
   useEffect(() => {
-    if (prefill === null || prefill.text === "") return
-    setText(t => (t.trim() === "" ? prefill.text : `${t}\n\n${prefill.text}`))
-  }, [prefill?.key])
+    if (insert === null || insert.text === "") return
+    setText(t => (t.trim() === "" ? insert.text : `${t}\n\n${insert.text}`))
+  }, [insert?.key])
 
   const submit = async () => {
-    const message = sendable(text, initialText, uploading > 0)
+    const message = sendable(text, prefill, uploading > 0)
     if (message === null || readOnly !== null) return
     setText("")
     await send(message, plan.mode)
@@ -346,7 +344,7 @@ export function Composer({
         }}
         onFocus={e => {
           // Focused while it holds only what it started with: type after it.
-          if (initialText === undefined || text !== initialText) return
+          if (prefill === undefined || text !== prefill.text) return
           const end = e.currentTarget.value.length
           e.currentTarget.setSelectionRange(end, end)
         }}

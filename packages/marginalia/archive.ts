@@ -107,9 +107,7 @@ export function planArchive(input: {
 
 /**
  * The entry a command writes at, or null when it writes in no root: a new
- * thread at the root, a name, a stop, an archive action. A reference is
- * written where its author reads (`at`), not where it points; a landing, at
- * its lane's tip.
+ * thread at the root, a name, a stop, an archive action.
  */
 export function writesAt(
   intent: Intent,
@@ -119,7 +117,6 @@ export function writesAt(
 ): string | null {
   switch (intent.kind) {
     case "chat":
-    case "reference":
       return intent.at.kind === "root" ? null : intent.at.id
     case "note":
       return noteWritesAt(intent.action, notes, index, lanes)

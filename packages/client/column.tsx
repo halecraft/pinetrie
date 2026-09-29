@@ -12,7 +12,6 @@ import {
   type NoteRecord,
   nearestRevision,
   type Position,
-  type ReferenceTarget,
   ROOT,
   type ThreadLane,
   type TreeIndex,
@@ -24,9 +23,8 @@ import {
   displayName,
   draftFor,
   type Held,
-  noteEntry,
+  type MessageNotes,
   type OfferButton,
-  type ReferenceIndex,
 } from "@pineta/marginalia"
 import { readStreams, type SessionDocHandle } from "@pineta/schema"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
@@ -38,11 +36,12 @@ import {
   type WorkFacts,
   type WorkStrip,
 } from "./column-view.ts"
-import { branchPrefill, type Column as ColumnSpec } from "./columns.ts"
+import type { Column as ColumnSpec, Prefill } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
 import { Menu } from "./menu.tsx"
 import { Message } from "./message.tsx"
 import { MessageText } from "./message-text.tsx"
+import { messageTools } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
 import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
@@ -67,7 +66,6 @@ export interface ColumnProps {
   forks: ReadonlyMap<string, readonly number[]>
   /** Ids any column of this tab shows: a branch leaving here that is shown needs no button. */
   shown: ReadonlySet<string>
-  refs: ReferenceIndex
   /** Display names by writer. */
   nameOf: ReadonlyMap<WriterId, string>
   /** Everyone who can be mentioned (`readParticipants`). */
@@ -81,6 +79,8 @@ export interface ColumnProps {
   onTyping: () => void
   /** Every note's record (ADR-0025). */
   notes: readonly NoteRecord[]
+  /** The notes drawn with each message (`messageNotes`). */
+  notesOf: ReadonlyMap<string, MessageNotes>
   /** Others editing a note now (presence), each person once. */
   editorsOf: (note: string) => readonly WriterId[]
   /** Every lane the agent is replying on. Several threads can run at once. */
@@ -95,7 +95,9 @@ export interface ColumnProps {
    * Open a fresh column to the right, forked at `at`, its composer starting
    * with `prefill`.
    */
-  onBranch: (at: string, prefill: string | undefined) => void
+  onBranch: (at: string, prefill: Prefill | undefined) => void
+  /** Open a new tab, its composer starting with `prefill`. */
+  onNewTab: (prefill: Prefill, asksAgent: boolean) => void
   /**
    * After a conflict: a fresh column at `at`, which sends `text` there. A
    * conflict needs a reply at an entry: a `branch` never conflicts.
@@ -190,7 +192,7 @@ export function Column(p: ColumnProps) {
     work: p.work,
   })
   // An update's intent, put in this column's composer (ADR-0038).
-  const [prefill, setPrefill] = useState<{
+  const [insert, setInsert] = useState<{
     readonly text: string
     readonly key: number
   } | null>(null)
@@ -199,7 +201,7 @@ export function Column(p: ColumnProps) {
     if (button === "update" || button === "resolve")
       void p.session.update(lane.name).then(outcome => {
         if (outcome.kind === "updated" && outcome.text !== "")
-          setPrefill({ text: outcome.text, key: Date.now() })
+          setInsert({ text: outcome.text, key: Date.now() })
       })
     else void p.session.offer(lane.name, button)
   }
@@ -212,13 +214,6 @@ export function Column(p: ColumnProps) {
   })
   const queue = queuePlace(lane, { me: p.session.writer, nameOf: p.nameOf })
 
-  // Notes by the message they are the text of, and this thread's draft.
-  const noteOf = new Map(
-    p.notes.flatMap(n => {
-      const entry = noteEntry(n, index)
-      return entry === null ? [] : [[entry as string, n] as const]
-    }),
-  )
   const draft =
     fresh || view.tipId === null || !writable
       ? undefined
@@ -332,10 +327,9 @@ export function Column(p: ColumnProps) {
           <div className="spacer" ref={spacer} />
           {view.nodes.map((node, i) => {
             const id = entryId(node.id)
+            const drawn = p.notesOf.get(node.id)
             return (
               <Message
-                cites={p.refs.from.get(id) ?? []}
-                citedBy={p.refs.to.get(id) ?? []}
                 closedBranches={node.branches.filter(
                   b => !p.shown.has(b.rootId),
                 )}
@@ -344,40 +338,19 @@ export function Column(p: ColumnProps) {
                 key={node.id}
                 nameOf={p.nameOf}
                 node={node}
-                note={(() => {
-                  const note = noteOf.get(node.id)
-                  return note === undefined ? undefined : card(note)
-                })()}
-                onEdit={
-                  noteOf.has(node.id) || !writable
-                    ? undefined
-                    : () => void p.session.note({ kind: "open", entry: id })
-                }
-                onBranch={
-                  // Below a conversation's last message, a branch would be
-                  // the same as replying. Agent work follows its lane, so
-                  // there a branch at the end is a thread of its own.
-                  !writable ||
-                  (i === view.nodes.length - 1 && lane.kind !== "lane")
-                    ? undefined
-                    : {
-                        title: "open a branch here",
-                        go: () => p.onBranch(node.id, branchPrefill(lane)),
-                      }
-                }
-                // A citation is written where its author reads: here.
-                onCite={
-                  writable
-                    ? (to: ReferenceTarget) =>
-                        void p.session.cite(
-                          to,
-                          view.tipId === null
-                            ? ROOT
-                            : atEntry(entryId(view.tipId)),
-                        )
-                    : undefined
-                }
+                about={drawn?.about && card(drawn.about)}
+                onBranch={b => p.onBranch(b.at, b.prefill)}
+                onNewTab={p.onNewTab}
+                onNote={() => void p.session.note({ kind: "open", entry: id })}
                 onOpenBranch={p.onOpen}
+                origin={drawn?.origin && card(drawn.origin)}
+                tools={messageTools(node, {
+                  parentId: index.parentOf(node.id),
+                  isLast: i === view.nodes.length - 1,
+                  lane,
+                  writable,
+                  hasNoteAbout: drawn?.about !== undefined,
+                })}
               />
             )
           })}
@@ -460,7 +433,7 @@ export function Column(p: ColumnProps) {
         fresh={fresh}
         nameOf={p.nameOf}
         queue={queue}
-        initialText={p.column.fresh?.prefill}
+        prefill={p.column.fresh?.prefill}
         lane={lane}
         onBranchInstead={text => {
           if (at.kind === "entry") p.onBranchInstead(at.id, text)
@@ -488,7 +461,7 @@ export function Column(p: ColumnProps) {
         takeFocus={() => p.takeFocus(p.column.key)}
         participants={p.participants}
         pending={p.column.fresh?.pending}
-        prefill={prefill}
+        insert={insert}
         readOnly={p.readOnly}
         typing={p.typing.map(w => nameFor(p.nameOf, w))}
         session={p.session}

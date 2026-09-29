@@ -220,15 +220,6 @@ describe("writesAt: the entry a command writes at", () => {
       { kind: "note", action: { kind: "reopen", note: noteId("n-9") } },
       null,
     ],
-    [
-      "a reference, where its author reads",
-      {
-        kind: "reference",
-        to: { kind: "entry", id: entryId("c") },
-        at: atEntry(entryId("b")),
-      },
-      "b",
-    ],
     ["a name", { kind: "name", name: "Ada" }, null],
     ["a stop", { kind: "stop", lane: laneNameForThread("x") }, null],
     [

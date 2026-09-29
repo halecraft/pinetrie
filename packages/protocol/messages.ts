@@ -29,12 +29,10 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     names the thread's lane when the sender's column is bound to one;
  *     `asksAgent` marks a Start Agent column. It runs the agent only when the
  *     agent is its addressee (`address`).
- *   - `reference` cites `targetId`, or a span of it, from `parentId`, the entry
- *     its author is reading. It writes one value and runs nothing.
  *   - `name` sets the sender's display name to `text`.
  *   - `stop` ends the running turn of the thread whose lane is `lane`.
- *   - `note` acts on a note (ADR-0025); `mode` names the action. `open` opens
- *     the entry `parentId` for editing. `draft` starts or joins the draft of
+ *   - `note` acts on a note (ADR-0025); `mode` names the action. `open` opens a
+ *     note on the entry `parentId`. `draft` starts or joins the draft of
  *     the thread a reply from `parentId` (and `lane`) would continue, with
  *     `text` as what its sender had typed. `send`, `done` and `reopen` act on
  *     the note `targetId`.
@@ -48,7 +46,6 @@ export const HOST_PRINCIPAL = "pineta-host"
  */
 export const COMMAND_KINDS = [
   "chat",
-  "reference",
   "name",
   "stop",
   "note",
@@ -88,11 +85,8 @@ export interface Command {
    */
   readonly workKind: string
   readonly workDir: string
-  /** `reference`: the entry cited; `note`: the note acted on. Separate from `parentId` on purpose. */
+  /** `note`: the note acted on; `archive`: the root. Separate from `parentId` on purpose. */
   readonly targetId: string
-  /** `reference`: a span's bounds, or -1 for the whole entry (the wire is total). */
-  readonly spanStart: number
-  readonly spanEnd: number
 }
 
 /**
@@ -101,7 +95,6 @@ export interface Command {
  */
 export const OUTCOME_KINDS = [
   "started",
-  "referenced",
   "appended",
   "queued",
   "conflict",
@@ -123,8 +116,6 @@ export interface Reply {
   readonly runId: string
   readonly errorCode: string
   readonly errorMessage: string
-  /** Set only when a reference was written: its id. */
-  readonly referenceId: string
   /** Set only when a chat message was appended: its entry id. */
   readonly entryId: string
   /** `queued`: how many messages wait ahead of it; -1 otherwise. */
@@ -156,8 +147,6 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   workKind: "",
   workDir: "",
   targetId: "",
-  spanStart: -1,
-  spanEnd: -1,
 })
 
 export const EMPTY_REPLY: Reply = Object.freeze({
@@ -166,7 +155,6 @@ export const EMPTY_REPLY: Reply = Object.freeze({
   runId: "",
   errorCode: "",
   errorMessage: "",
-  referenceId: "",
   entryId: "",
   position: -1,
   by: "",

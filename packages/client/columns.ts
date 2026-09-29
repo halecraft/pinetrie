@@ -8,10 +8,18 @@ import {
   followTip,
   type LaneName,
   type LaneView,
-  THE_AGENT,
-  type ThreadLane,
   type TreeIndex,
 } from "@pineta/core"
+
+/**
+ * Text a fresh column's composer starts with, unsent. A blank one means
+ * nothing sent alone (a branch's `@agent `); anything else is content, which
+ * sent unchanged is still a message (an edit's text: a retry).
+ */
+export interface Prefill {
+  readonly text: string
+  readonly blank: boolean
+}
 
 export interface Column {
   /** React key; stable when columns move. */
@@ -36,22 +44,14 @@ export interface Column {
    * wrote (`TreeIndex.bySend`): exactly, whatever else appeared meanwhile.
    * `pending` is a first message to send on opening ("branch here" after a
    * conflict), sent by the column's own composer so its outcome shows there.
-   * `prefill` is text its composer starts with, unsent (`branchPrefill`).
+   * `prefill` is what its composer starts with.
    */
   readonly fresh?: {
     readonly sendId?: string
     readonly pending?: string
-    readonly prefill?: string
+    readonly prefill?: Prefill
   }
 }
-
-/**
- * What a branch's composer starts with: `@agent ` in agent work, so going on
- * with the agent is already typed, and deleting it makes the branch a
- * conversation (ADR-0021). Nothing in a conversation.
- */
-export const branchPrefill = (lane: ThreadLane): string | undefined =>
-  lane.kind === "lane" ? `@${THE_AGENT} ` : undefined
 
 export type ColumnAction =
   /** Open a path next to the column it forks from. `key` comes from the shell. */
@@ -69,8 +69,8 @@ export type ColumnAction =
       readonly after: number
       /** A first message the column sends as soon as it opens. */
       readonly text?: string
-      /** Text its composer starts with, unsent. */
-      readonly prefill?: string
+      /** What its composer starts with, unsent. */
+      readonly prefill?: Prefill
     }
   /** A fresh column sent its first message, as send `sendId`. */
   | { readonly kind: "sent"; readonly key: string; readonly sendId: string }

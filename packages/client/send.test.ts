@@ -78,18 +78,23 @@ describe("settleSend", () => {
 })
 
 describe("sendable", () => {
-  test("nothing, blank text, or only the prefill sends nothing", () => {
+  const blank = { text: "@agent ", blank: true }
+  test("nothing, blank text, or only a blank prefill sends nothing", () => {
     for (const text of ["", "  \n ", "@agent ", "@agent", " @agent \n"])
-      expect(sendable(text, "@agent ", false)).toBeNull()
+      expect(sendable(text, blank, false)).toBeNull()
     expect(sendable("  ", undefined, false)).toBeNull()
   })
   test("anything more is sent, trimmed", () => {
-    expect(sendable("@agent fix it ", "@agent ", false)).toBe("@agent fix it")
-    expect(sendable("just us", "@agent ", false)).toBe("just us")
+    expect(sendable("@agent fix it ", blank, false)).toBe("@agent fix it")
+    expect(sendable("just us", blank, false)).toBe("just us")
     expect(sendable("@agent", undefined, false)).toBe("@agent")
   })
   test("while an image is uploading, nothing is sent", () => {
     expect(sendable("look at this", undefined, true)).toBeNull()
+  })
+  test("a content prefill sent unchanged is sent: an edit's retry", () => {
+    const edit = { text: "@agent try again ", blank: false }
+    expect(sendable(edit.text, edit, false)).toBe("@agent try again")
   })
 })
 

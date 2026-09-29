@@ -84,9 +84,10 @@ Roughly in dependency order, each independently shippable:
    `createAt` for a lane that exists and throws for an unknown one; and pi
    records a lane on creation, which is what lets the document tell "no lane"
    from "a lane at the root".)
-4. ~~**References**~~ — **done.** Stored as pi values in `pineta.reference`
-   (ADR-0017); backlinks derived; attached where the author is reading. The
-   v1 demo runs in a real browser, minus presence.
+4. ~~**References**~~ — **done, then withdrawn** (ADR-0043). Stored as pi
+   values in `pineta.reference` (ADR-0017); backlinks derived; attached where
+   the author is reading. Nothing read them, so they were removed. The v1 demo
+   runs in a real browser, minus presence.
 5. **Humans in the tree** — reframed from "multi-writer composer" (ADR-0018).
    Split in three:
    - ~~**Chat and compelled responders**~~ — **done.** Human messages are pi

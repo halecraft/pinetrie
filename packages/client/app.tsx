@@ -30,7 +30,7 @@ import {
   rootWork,
   summarizeRoots,
 } from "@pineta/core"
-import { noteEntry } from "@pineta/marginalia"
+import { messageNotes } from "@pineta/marginalia"
 import { SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
   type NoteFilter,
@@ -49,7 +49,6 @@ import {
   readParticipants,
   readPresence,
   readProject,
-  readReferences,
   readRevisions,
   readTreeIndex,
 } from "@pineta/reads"
@@ -67,7 +66,7 @@ import { placement } from "./align.ts"
 import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { Column, type ColumnProps } from "./column.tsx"
-import { type Column as ColumnSpec, isPinned } from "./columns.ts"
+import { type Column as ColumnSpec, isPinned, type Prefill } from "./columns.ts"
 import type { ReadOnly } from "./composer.tsx"
 import { Header } from "./header.tsx"
 import { peopleHere, readersByRoot } from "./here.ts"
@@ -244,21 +243,12 @@ function App({ session }: { session: SessionClient }) {
       },
     }
   })
-  // The messages that are notes' (ADR-0025): a square on the rail, and
-  // counted on a closed branch's button.
-  const noteEntries = useMemo(
-    () =>
-      new Set(
-        notes.flatMap(n => {
-          const e = noteEntry(n, index)
-          return e === null ? [] : [e as string]
-        }),
-      ),
-    [notes, index],
-  )
+  // The notes drawn with each message (ADR-0043). A message with one is a
+  // square on the rail, and counted on a closed branch's button.
+  const notesOf = useMemo(() => messageNotes(notes, index), [notes, index])
+  const noteEntries = useMemo(() => new Set(notesOf.keys()), [notesOf])
   const [notesOpen, setNotesOpen] = useState(false)
   const [noteFilter, setNoteFilter] = useState<NoteFilter>("all")
-  const refs = useTracked(() => readReferences(doc))
   const nameOf = useTracked(() => readParticipantNames(doc))
   const presenceFacts = useTracked(() => readPresence(session.presence))
 
@@ -568,9 +558,11 @@ function App({ session }: { session: SessionClient }) {
     lanes,
     nameOf,
     notes,
+    notesOf,
+    onNewTab: (prefill: Prefill, asksAgent: boolean) =>
+      dispatch({ kind: "newTab", key: opening(), asksAgent, prefill }),
     outbox,
     participants,
-    refs,
     session,
     takeFocus,
     work: workFacts,

@@ -98,7 +98,7 @@ Five contracts. Fix these and everything else proceeds in parallel.
 |---|---|---|
 | 1 | pi `Storage` (10 methods + conformance suite) | **Given.** Adopt, don't design |
 | 2 | Kyneta session document schema | Design — the core one |
-| 3 | Reference union | Design — extensible, low risk |
+| 3 | Reference union | Withdrawn (ADR-0043): nothing read references |
 | 4 | Merge node shape (`parentId` + `fromId`) | Decided; one field |
 | 5 | Host↔client boundary | **Given.** Kyneta Line + replicated docs |
 
@@ -114,7 +114,7 @@ packages/     libraries; their boundaries are enforced by resolution
   schema/        @pineta/schema       Kyneta only; the document shape (TECHNICAL.md)
   pi/            @pineta/pi           THE pi boundary (TECHNICAL.md)
   protocol/      @pineta/protocol     the wire contract and its codec
-  marginalia/    @pineta/marginalia   Pineta's shapes stored in pi: references, chat, threads, outbox
+  marginalia/    @pineta/marginalia   Pineta's shapes stored in pi: chat, notes, threads, outbox
   reads/         @pineta/reads        document reads shared by the host and the client
   lanes/         @pineta/lanes        a lane's container and disk: the one place container, jj and git run (TECHNICAL.md)
   client/        @pineta/client       browser UI and session client; owns its Vite build
@@ -189,7 +189,7 @@ a writer, identified by the transport's `LineSender.peer` and recorded in every
 message it sends; writers own no lanes. A lane belongs to a thread: created
 where agent work is first wanted there, never moved, never written while it
 runs (ADR-0020). Threads run concurrently. Decisions are pure (`planChat`,
-`planReference` in `@pineta/marginalia`, over facts read by `@pineta/reads`);
+`planNote` and the rest in `@pineta/marginalia`, over facts read by `@pineta/reads`);
 the host gathers, plans and executes each command in one serial step.
 
 Wire sentinels live only in `packages/protocol/codec.ts`. The wire is total, so `""`
@@ -270,7 +270,6 @@ branches from the op log. Our mapping is exact. (ADR-0008)
   > pointer. `pi.op.*` is keyed by `operationId` and presumptively uncontended
   > (assumed, not verified).
 - **lists** — grow-only list + tombstones. Carries `pi.pending.assistant_frame`.
-- **references** — own namespace, so backlinks are queryable in both directions.
 - **pending assistant text** — durable **`Schema.text()`**, written with
   `insert(at, delta)` and cleared on commit (ADR-0014). Ships only the inserted
   characters. **Do not use `Schema.string()` for anything that accumulates** —
@@ -291,12 +290,13 @@ branches from the op log. Our mapping is exact. (ADR-0008)
 
 ### Anchor stability (references)
 
-Determined entirely by target mutability:
+References were withdrawn (ADR-0043): nothing read them. What follows is kept
+for whatever points into the tree next. It is determined by target mutability:
 
 - **Entries are immutable** → plain offsets are permanently stable. No Loro
   cursor needed. A gift from pi's data model.
 - **Files are mutable** → need content addressing (blob hash or jj change ID),
-  or references rot silently. A pasted image is content-addressed by
+  or pointers rot silently. A pasted image is content-addressed by
   construction: `/blob/<sha256>` names bytes that never change (ADR-0042).
 - **Composer text is mutable and multi-writer** → the one place that genuinely
   needs `Schema.text()` + Loro cursors.

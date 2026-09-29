@@ -28,8 +28,6 @@ const Command = Schema.struct({
   workKind: Schema.string(),
   workDir: Schema.string(),
   targetId: Schema.string(),
-  spanStart: Schema.number(),
-  spanEnd: Schema.number(),
 })
 
 const Reply = Schema.struct({
@@ -38,7 +36,6 @@ const Reply = Schema.struct({
   runId: Schema.string(),
   errorCode: Schema.string(),
   errorMessage: Schema.string(),
-  referenceId: Schema.string(),
   entryId: Schema.string(),
   position: Schema.number(),
   by: Schema.string(),

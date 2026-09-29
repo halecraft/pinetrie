@@ -67,6 +67,10 @@ Two orthogonal graphs over the same nodes:
 
 Most of the interesting UI lives in the second.
 
+The first implementation, a cite tool whose references showed only as counts,
+was withdrawn (ADR-0043): nothing read them. Semantic links wait for fold,
+which will say what it needs to point at.
+
 ## Humans in the tree
 
 People working with an agent also talk to each other, and that talk belongs in

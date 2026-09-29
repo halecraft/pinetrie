@@ -29,7 +29,6 @@ import {
   isBusy,
   type LaneName,
   type Mention,
-  messageText,
   type Position,
   type Responder,
   type Sha256,
@@ -225,25 +224,6 @@ export const detailsFromStored = (
 /** A stored message -> its chat details, or undefined if it is not a chat. */
 export const decodeChat = (message: unknown): ChatDetails | undefined =>
   decodeWith(ChatSchema, message, ({ details }) => detailsFromStored(details))
-
-/**
- * The text of any citable message: a chat's own `text`, never its attributed
- * `content`, so a span covers exactly what its author wrote; a land, update
- * or stack message's one line, never what the model read; otherwise pi's
- * message text. The
- * one definition shared by citing and rendering.
- */
-export function entryText(message: unknown): string {
-  const chat = decodeChat(message)
-  if (chat !== undefined) return chat.text
-  const land = decodeLand(message)
-  if (land !== undefined) return landLine(land)
-  const update = decodeUpdate(message)
-  if (update !== undefined) return updateLine(update)
-  const stack = decodeStack(message)
-  if (stack !== undefined) return stackLine(stack)
-  return messageText(message as AgentMessageLike)
-}
 
 /**
  * A stored message -> what the projections render. A chat becomes role `chat`

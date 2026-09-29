@@ -65,7 +65,7 @@ give labels and each tab's signals.
 - **`planOpen` is the deduplication `App` used to do**, pure: scroll to an
   entry a column of its root already shows, open a column beside the deepest
   sharer (`openBeside`), or preview an archived root in the Archive tab. The
-  rail, fork dots, references and the notes index all go through it; `App`
+  rail, fork dots and the notes index all go through it; `App`
   carries the plan out.
 - **Columns of other tabs are unmounted.** Alignment forgets their keys, so a
   tab shown again aligns its columns as if opened, left to right, the first
@@ -99,9 +99,12 @@ counter.
   a new tab) has nothing of its own yet. Its first send mints the
   command's id (`sent`), which the host stores with the message (`sendId`), and
   `sync` anchors the column at the entry that send wrote (`TreeIndex.bySend`).
-  A branch from agent work carries `prefill` (`branchPrefill`: `@agent `),
-  which its composer starts with; `sendable` (`send.ts`) sends nothing while
-  the text is only that.
+  A fresh column can carry a `Prefill`, which its composer starts with. A
+  blank one means nothing sent alone: a branch from agent work's `@agent `
+  (`branchPrefill`), which `sendable` (`send.ts`) will not send by itself.
+  Anything else is content: an edit's text, which sent unchanged is a retry.
+  A new tab can carry one too (an edit of a root's first message). Both are
+  stored with the layout (v4), since only `pending` is sent on opening.
 - **A column you open takes focus, once.** `→`, "Branch here" and ＋ open
   their column with `App`'s `opening()` key, and its composer focuses its box
   when it mounts (`takeFocus`); `onFocus` puts the caret after the prefill.
@@ -204,7 +207,7 @@ error.
   is left off; `sync` binds the column again.
 - **`fresh.pending` is never stored**, by either side: restoring it would send
   its message again. A "branch here" column comes back empty. `fresh.prefill`
-  is stored: it sends nothing by itself. What was typed over it is not kept:
+  is stored, blank or content: only `pending` is sent on opening. What was typed over it is not kept:
   the composer's text is its own state, so a reload, or switching root tabs
   (which unmounts the column), starts it from the prefill again.
 - **Restored anchors the document lacks are pruned once, after
@@ -282,6 +285,24 @@ picks.
   changes its path, and the new content resizes it.
 - **It is declared after the alignment effect in `App`,** so a pick the
   alignment left out of view is scrolled to in the same commit.
+
+## A message's tools (`message-tools.ts`, ADR-0043)
+
+`messageTools` decides which tools a message offers, and `Message` draws
+them in one row: *note*, *edit* or *new tab*, `→`.
+
+- **Edit is a branch at the message's parent**, holding its text as sent: a
+  sibling, since entries are immutable. The parent comes from the index, not
+  the column: a branch column's first message has its parent in another
+  column. A root's first message has none, so its edit is a new tab.
+- **An edit asks the agent exactly when the original did.** A branch asks only
+  through a mention (`agentByDefault`), so a message its thread's default
+  compelled gets `@agent ` in front. The unit test checks this through
+  `address`, not the rule's own wording.
+- **Only people's messages** (role `chat`) offer edit: an agent's reply edited
+  by a person would be a reply the agent never gave (ADR-0018).
+- **`→` is hidden at a conversation's last message**, where a branch would be
+  the same as replying. At agent work's end it is a thread of its own.
 
 ## What a column shows (`column-view.ts`, ADR-0040)
 
@@ -521,7 +542,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   other lanes running in the same directory now.
 - **An update's prefill** goes into that column's composer, unsent: `update`
   answers `updated` with the text, and the column hands it to the composer
-  as `prefill` with a fresh key, which lands once after whatever is typed.
+  as `insert` with a fresh key, which lands once after whatever is typed.
 - **Land, update and stack messages** show as one line each, roles `land`
   ("resolving your work"), `update` ("your work") and `stack`.
 - **The page header counts offers open** in your repo, as it counts
@@ -559,30 +580,15 @@ pipeline keeps the tree a pure function, testable without a DOM.
   attributes give. A blob image the message does not hold (a note's, a
   streaming one's) is drawn unsized. `MessageText` opens a blob image in a
   new tab on a click (`.blob-image`).
-- **Committed text is wrapped in runs:** each text node becomes
-  `span[data-s][data-e]`, the source range it came from (`data-code` in code).
-  `align` maps a run's characters to the tokens that produced them (a literal,
-  a backslash escape, a character reference), skipping what produces nothing
-  (indentation, `>` markers). In code, only literals: backslashes and `&` are
-  text there. Code text has no position of its own; it takes its element's,
-  past the fence line or the opening backticks.
-- **Citing is gather, plan, execute.** `selectionBoundaries` (DOM) reports
-  each end of the selection as inside a run, between two runs, or outside the
-  text; a point at a run's edge is between it and its neighbour. `citeTarget`
-  (pure) snaps a start forward and an end back, and cites the whole entry when
-  no source is covered. The cite button reads `:scope > .text`: a note's card
-  has text of its own.
 - **Streaming text goes through remend**, which closes an unfinished `**`,
   fence or link, with `singleTilde` and `comparisonOperators` off: those
-  escape mid-text, and the message would change when it commits. Streaming text
-  gets no runs: it is not citable, and its positions point into remend's output.
+  escape mid-text, and the message would change when it commits. Committed
+  text never goes through it.
 - **One `white-space: pre-line` on `.text`** shows soft breaks as people type
-  them. `dropBlockWhitespace` removes the newlines to-hast puts between blocks
-  and after a `<br>`, which would otherwise show as blank lines. Chrome then
-  ends a paragraph at a shown newline, so a triple-click there selects a line.
-- **Known gaps:** a footnote's backlink adds a space to the text before it,
-  and inline code spanning a line break has its newline turned into a space.
-  Neither run aligns, so a selection there cites the whole entry.
+  them. The pass drops the newlines to-hast puts between blocks and after a
+  `<br>` (text with no position), which would otherwise show as blank lines.
+  Chrome then ends a paragraph at a shown newline, so a triple-click there
+  selects a line.
 
 ## Presence (ADR-0024)
 
@@ -619,9 +625,18 @@ pipeline keeps the tree a pure function, testable without a DOM.
   textarea is uncontrolled: `useText` applies remote edits in place and keeps
   the cursor, so the card never re-renders per keystroke; `useValue` reads the
   text where it is shown (a done note, the index's first lines).
-- **A message with a note draws its card in place of its text**, the sent
-  draft's included; a message without one offers *edit* among its tools. A
-  done note's text is markdown, through `MessageText`.
+- **A note's card is drawn below its message's text**, which always shows
+  (ADR-0043). `messageNotes` (`@pineta/marginalia`) says which: a note
+  about the message, and the note it was sent from (a shared draft or a
+  queued note), the second only while it is not done or once it has changed
+  since. `App` computes it once; its keys are `noteEntries`, so the rail's
+  squares, rail compaction, closed branches' note counts and the Archive
+  preview all count the notes that are drawn. The notes index and the
+  Archive's counts count every record: they list notes, and an origin note
+  is one. A done note's text is markdown, through `MessageText`.
+- **An origin note marked done again hides**, even if its text now differs
+  from its message: `changedSinceDone` resets on done, and the record keeps
+  no other sign of the change.
 - **A thread's draft** sits above its column's composer (`draftFor` over the
   column's end). Its opener and its writers see the card; anyone else sees
   "Ada is drafting the next message · join". *Compose together* sends the
@@ -634,11 +649,11 @@ pipeline keeps the tree a pure function, testable without a DOM.
 - **The notes index** is `notesIndex` (`@pineta/reads`) over the records of
   the tab's root, drawn from the rail's top; each row reads its note's first
   line on its own.
-- **Selectors in the browser suite:** a card replaces `.msg > .text`, so a
-  message with a note is found by `.note-text` or by `data-entry`.
+- **Selectors in the browser suite:** a message's own text is `.msg > .text`,
+  and its cards are `.msg > .note`, whose text is `.note-text`.
 - **`:text-is` matches the smallest element holding the text**, which in
-  markdown is a run's `span`, not `.text`. The suite finds a plain message by
-  `.text > p:only-child > span:only-child:text-is(…)`.
+  markdown is the paragraph, not `.text`. The suite finds a plain message by
+  `.text > p:only-child:text-is(…)`.
 
 ## Who you are (ADR-0037)
 
@@ -743,9 +758,9 @@ shown by their email's part before the `@`. Each rendered chat carries its
 - **Every scroll `useFollow` makes is instant.** A smooth one passes through
   positions short of the end, and the rule reads each as the reader leaving.
 
-- **Message tools are hidden until hover or focus**, the margin `→` too. A
-  browser test must hover a message before clicking its `.tools` buttons or
-  its `.branch`.
+- **Message tools are hidden until hover or focus**, with `visibility`, so
+  their boxes can be measured before a hover. `→` is `.tools > .branch`. A
+  browser test must hover a message before clicking any of them.
 - **Stop aborts a running command only once the command has started.** With a
   slow model, the tool call itself streams first; a check waits for the live
   tool row before clicking Stop, as a person would.

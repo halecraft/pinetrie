@@ -45,14 +45,12 @@ import {
   COMMANDS_NAMESPACE,
   commandsRecord,
   decodeChat,
-  decodeReference,
   HAVE_NAMESPACE,
   type Held,
   haveRecords,
   heldBy,
   heldMessages,
   heldRuns,
-  indexReferences,
   LANDING_NAMESPACE,
   LANE_NAMESPACE,
   landingRecords,
@@ -72,10 +70,7 @@ import {
   participants,
   pastedImages,
   projectRecord,
-  REFERENCE_NAMESPACE,
   REVISION_NAMESPACE,
-  type Reference,
-  type ReferenceIndex,
   renderableMessage,
   revisionRecords,
 } from "@pineta/marginalia"
@@ -188,19 +183,6 @@ export function readParticipants(
     e.message?.writer === undefined ? [] : [e.message.writer],
   )
   return participants(readParticipantNames(doc), writers)
-}
-
-/**
- * Every reference, indexed both ways (ADR-0017). Decoded totally: a malformed
- * one is skipped, so it cannot break a render.
- */
-export function readReferences(doc: SessionDocHandle): ReferenceIndex {
-  const refs: Reference[] = []
-  for (const { value } of readValues(doc, REFERENCE_NAMESPACE)) {
-    const r = decodeReference(value)
-    if (r !== undefined) refs.push(r)
-  }
-  return indexReferences(refs)
 }
 
 /**

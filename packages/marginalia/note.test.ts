@@ -17,6 +17,7 @@ import {
   decodeNote,
   draftFor,
   encodeNote,
+  messageNotes,
   noteAt,
   planNote,
   planNoteEdit,
@@ -70,16 +71,15 @@ const plan = (
     notes,
     index,
     lanes,
-    entryText: action.kind === "open" ? "as sent" : undefined,
     newId: noteId("n-new"),
   })
 
 describe("planNote: the lifecycle", () => {
-  test("open: a new note holding the message's text", () => {
+  test("open: a new, empty note about the message", () => {
     const d = plan({ kind: "open", entry: E2 })
     expect(d).toEqual({
       kind: "create",
-      text: "as sent",
+      text: "",
       record: {
         id: "n-new",
         state: "open",
@@ -92,7 +92,7 @@ describe("planNote: the lifecycle", () => {
     })
   })
 
-  test("open twice gives the same note, and a sent draft is its message's note", () => {
+  test("open twice gives the same note; a sent draft is its message's origin, not a note about it", () => {
     const opened = draft({
       id: noteId("n-1"),
       state: "open",
@@ -107,9 +107,10 @@ describe("planNote: the lifecycle", () => {
       ...entry("e3", "e2"),
       message: { role: "chat", content: "hi", sendId: "s-9" },
     })
-    expect(plan({ kind: "open", entry: E3 }, [sent], index)).toEqual({
-      kind: "existing",
-      id: "n-2",
+    expect(plan({ kind: "open", entry: E3 }, [sent], index)).toMatchObject({
+      kind: "create",
+      text: "",
+      record: { subject: { kind: "entry", id: E3 } },
     })
   })
 
@@ -120,7 +121,6 @@ describe("planNote: the lifecycle", () => {
       notes: [],
       index: tree(),
       lanes: [],
-      entryText: undefined,
       newId: noteId("n-new"),
     })
     expect(d.kind === "refused" && d.code).toBe(ERR.UNKNOWN_TARGET)
@@ -235,6 +235,45 @@ describe("draftFor", () => {
 
   test("a done draft is no one's draft", () => {
     expect(draftFor(E2, [], tree(), [draft({ state: "done" })])).toBeUndefined()
+  })
+})
+
+describe("messageNotes", () => {
+  // e3 was sent from a draft, as send s-9.
+  const index = tree({
+    ...entry("e3", "e2"),
+    message: { role: "chat", content: "hi", sendId: "s-9" },
+  })
+  const about = (id: string, on = E3) =>
+    draft({ id: noteId(id), state: "open", subject: { kind: "entry", id: on } })
+  const origin = sentNote(draft({ id: noteId("n-sent") }), "s-9")
+
+  test("a note about a message is drawn with it", () => {
+    expect(messageNotes([about("n-1", E2)], index).get(E2)).toEqual({
+      about: about("n-1", E2),
+      origin: undefined,
+    })
+  })
+
+  test("an origin note is drawn only once it has changed since done", () => {
+    expect(messageNotes([origin], index).has(E3)).toBe(false)
+    const changed = { ...origin, changedSinceDone: true }
+    expect(messageNotes([changed], index).get(E3)).toEqual({
+      about: undefined,
+      origin: changed,
+    })
+  })
+
+  test("a message can have both", () => {
+    const changed = { ...origin, changedSinceDone: true }
+    expect(messageNotes([changed, about("n-1")], index).get(E3)).toEqual({
+      about: about("n-1"),
+      origin: changed,
+    })
+  })
+
+  test("a draft is with no message", () => {
+    expect(messageNotes([draft()], index).size).toBe(0)
   })
 })
 

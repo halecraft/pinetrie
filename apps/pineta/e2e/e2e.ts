@@ -39,13 +39,7 @@ import {
   ROOT,
   writerId,
 } from "@pineta/core"
-import {
-  decodeChat,
-  displayName,
-  draftFor,
-  entryText,
-  noteAt,
-} from "@pineta/marginalia"
+import { decodeChat, displayName, draftFor, noteAt } from "@pineta/marginalia"
 import { newId as newHeldId, scriptedModel } from "@pineta/pi"
 import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
@@ -66,7 +60,6 @@ import {
   readParticipantNames,
   readPresence,
   readProject,
-  readReferences,
   readRenderableEntries,
   readTreeIndex,
 } from "@pineta/reads"
@@ -634,23 +627,6 @@ invariants("first turn")
     "the stored content carries the speaker",
   )
 
-  // Spans cover what the author wrote, not the attributed content.
-  if (plumId !== null) {
-    const words = "the secret word is PLUM".length
-    const inText = await bob.cite(
-      { kind: "span", id: entryId(plumId), start: 19, end: words },
-      at(plumId),
-    )
-    const pastText = await bob.cite(
-      { kind: "span", id: entryId(plumId), start: 0, end: words + 1 },
-      at(plumId),
-    )
-    ok(
-      inText.kind === "referenced" && codeOf(pastText) === ERR.INVALID_SPAN,
-      `a span of a chat message is over its text (${inText.kind}, ${codeOf(pastText)})`,
-    )
-  }
-
   // The agent, asked in the conversation, gets a lane there, and reads it.
   // The five replies arrived in whatever order: the end is measured, not assumed.
   const end = followTip(tree(), idOf("five") ?? "")
@@ -886,56 +862,6 @@ invariants("first turn")
   )
   invariants("stepping down")
   await w.close()
-}
-
-// ── references (ADR-0017) ─────────────────────────────────────────────────
-{
-  const pw = await connect("ref-p")
-  const qw = await connect("ref-q")
-  const cited = idOf("hello")
-  ok(cited !== null, "there is a message to cite")
-  if (cited !== null) {
-    const r = await qw.cite(
-      { kind: "entry", id: entryId(cited) },
-      at(trunkTip()),
-    )
-    ok(
-      r.kind === "referenced",
-      `a citation is written (${codeOf(r) || r.kind})`,
-    )
-    const back = readReferences(host.doc).to.get(entryId(cited)) ?? []
-    ok(
-      back.length === 1 && back[0]?.author === qw.writer,
-      `the message shows one backlink, authored by its writer (${back.length})`,
-    )
-    ok(
-      back[0]?.from === trunkTip(),
-      "the reference is attached where its author was reading",
-    )
-    const [x, y] = await Promise.all([
-      pw.cite({ kind: "entry", id: entryId(cited) }, at(trunkTip())),
-      qw.cite({ kind: "entry", id: entryId(cited) }, at(trunkTip())),
-    ])
-    const after = readReferences(host.doc).to.get(entryId(cited)) ?? []
-    ok(
-      x.kind === "referenced" && y.kind === "referenced" && after.length === 3,
-      `two concurrent citations of one entry both survive (${after.length})`,
-    )
-    const rooted = await qw.cite({ kind: "entry", id: entryId(cited) }, ROOT)
-    ok(
-      codeOf(rooted) === ERR.NO_ANCHOR,
-      `a citation from the root is refused (${codeOf(rooted)})`,
-    )
-    const lost = await qw.cite(
-      { kind: "entry", id: entryId("no-such-entry") },
-      at(trunkTip()),
-    )
-    ok(
-      codeOf(lost) === ERR.UNKNOWN_TARGET,
-      `an unknown target is refused (${codeOf(lost)})`,
-    )
-  }
-  await Promise.all([pw.close(), qw.close()])
 }
 
 // ── LIVE: what the model says ─────────────────────────────────────────────
@@ -1505,7 +1431,7 @@ invariants("end")
   await nIdle()
   const answer = tipOf()
 
-  // 1. The agent's reply, opened for editing by Ada; Bea opening it gets the same note.
+  // 1. A note on the agent's reply, opened by Ada; Bea opening it gets the same note.
   const opened = noteOf(
     await ada.note({ kind: "open", entry: entryId(answer ?? "") }),
   )
@@ -1514,20 +1440,23 @@ invariants("end")
   )
   ok(
     opened !== null && again === opened && record(opened)?.state === "open",
-    "a message is opened for editing, and opening it again gives the same note",
+    "a note is opened on a message, and opening it again gives the same note",
   )
   const n1 = noteId(opened ?? "")
   const adaText = ada.noteText(n1)
   const beaText = bea.noteText(n1)
-  const seeded = await waitFor(
-    () => adaText.text() === ANSWER && beaText.text() === ANSWER,
+  // It starts empty: what Ada types is all the host and Bea hold.
+  adaText.text.insert(0, "Ada: first")
+  const started = await waitFor(
+    () => nh.noteText(n1) === "Ada: first" && beaText.text() === "Ada: first",
     5_000,
   )
-  ok(seeded >= 0, "the note starts with the message's text, for everyone")
-  adaText.text.insert(0, "Ada: ")
-  await waitFor(() => nh.noteText(n1)?.startsWith("Ada: ") === true, 5_000)
+  ok(
+    started >= 0,
+    `the note starts empty, for everyone (${JSON.stringify(nh.noteText(n1))})`,
+  )
   beaText.text.insert(beaText.text().length, " Bea.")
-  const merged = `Ada: ${ANSWER} Bea.`
+  const merged = "Ada: first Bea."
   const both = await waitFor(
     () =>
       nh.noteText(n1) === merged &&
@@ -1539,13 +1468,8 @@ invariants("end")
     both >= 0,
     `two people's edits merge, on the host and each client (${nh.noteText(n1)})`,
   )
-  const asSent = readEntryMessage(nh.doc, answer ?? "")
-  ok(
-    asSent.present &&
-      asSent.message !== undefined &&
-      entryText(asSent.message) === ANSWER,
-    "the opened message's entry is unchanged",
-  )
+  const asSent = projectTranscript(readTreeIndex(nh.doc), answer ?? "").at(-1)
+  ok(asSent?.text === ANSWER, "the opened message's entry is unchanged")
   // 2. Contributors, from the edits themselves: no command said who typed.
   const credited = await waitFor(
     () => record(n1)?.contributors.join() === [ada.writer, bea.writer].join(),
@@ -1553,7 +1477,7 @@ invariants("end")
   )
   ok(
     credited >= 0,
-    `contributors come from the note's own edits, in order, the host's seeding not among them (${record(n1)?.contributors.join()})`,
+    `contributors come from the note's own edits, in order (${record(n1)?.contributors.join()})`,
   )
 
   // 8. The model reads the message as sent, never the note's edits.
@@ -1790,20 +1714,15 @@ invariants("end")
     await bea.chat("still here?", at(r1b)),
     await bea.note({ kind: "open", entry: entryId(r1b) }),
     await bea.note({ kind: "draft", at: at(r1b), lane: null, text: "" }),
-    await bea.cite({ kind: "entry", id: entryId(r2) }, at(r1b)),
   ].map(refusal)
   ok(
     refusals.every(r => r === "archived: archived by Ada"),
-    `a chat, a note opened, a draft and a reference in it are refused (${refusals.join(" | ")})`,
+    `a chat, a note opened and a draft in it are refused (${refusals.join(" | ")})`,
   )
 
-  // 3. Citing into it from an open root, and a new root, are accepted.
-  const cited = await bea.cite({ kind: "entry", id: entryId(r1b) }, at(r2))
+  // 3. A new root is accepted.
   const fresh = await bea.chat("a third root", ROOT, START_CHAT)
-  ok(
-    cited.kind === "referenced" && fresh.kind === "appended",
-    `a reference from an open root to an archived message, and a new root, are accepted (${cited.kind}, ${fresh.kind})`,
-  )
+  ok(fresh.kind === "appended", `a new root is accepted (${fresh.kind})`)
 
   // 4. A root the agent is working in, with a message waiting, is not archived.
   script.use([{ text: "an answer" }, { text: "ok" }])

@@ -2,18 +2,16 @@
 
 import type {
   BranchSummary,
-  ReferenceTarget,
   SpineNode,
   ToolCallView,
   WriterId,
 } from "@pineta/core"
-import { entryId } from "@pineta/core"
-import type { Reference } from "@pineta/marginalia"
 import type { ReactNode } from "react"
 import { joinWords, type LaneJoin } from "./column-view.ts"
+import type { Prefill } from "./columns.ts"
 import { plural } from "./counts.ts"
-import { citeTarget } from "./markdown.ts"
-import { MessageText, selectionBoundaries } from "./message-text.tsx"
+import { MessageText } from "./message-text.tsx"
+import type { MessageTools, OpenBranch } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
 import { nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
@@ -22,31 +20,29 @@ export interface MessageProps {
   node: SpineNode
   /** Current display names, by writer. */
   nameOf: ReadonlyMap<WriterId, string>
-  /** This message's note, drawn in place of its text (ADR-0025). */
-  note: ReactNode | undefined
-  /** Open it for everyone to edit; undefined once it has a note. */
-  onEdit: (() => void) | undefined
+  /** Its note's card (ADR-0025), drawn below it. */
+  about: ReactNode | undefined
+  /** The card of the note it was sent from, drawn below it once changed. */
+  origin: ReactNode | undefined
+  /** Which tools it offers (`messageTools`). */
+  tools: MessageTools
+  /** Open a note about it. */
+  onNote: () => void
+  /** Open a fresh column to the right: `→`, or an edit (ADR-0021). */
+  onBranch: (branch: OpenBranch) => void
+  /** Open a new tab: a root's first message, edited. */
+  onNewTab: (prefill: Prefill, asksAgent: boolean) => void
   /** A lane starts here: a divider above the message names it. */
   join: LaneJoin | undefined
   /** Tracks of open columns that fork here: a dot of each colour. */
   forkTracks: readonly number[]
   /** Branches leaving here that no column shows. */
   closedBranches: readonly BranchSummary[]
-  cites: readonly Reference[]
-  citedBy: readonly Reference[]
-  /** Cite this message; undefined where nothing may be written (ADR-0029). */
-  onCite: ((to: ReferenceTarget) => void) | undefined
-  /**
-   * Open a column to the right, forked here (ADR-0021). Undefined where it
-   * would only mean replying: a conversation's last message.
-   */
-  onBranch: { readonly title: string; readonly go: () => void } | undefined
   onOpenBranch: (rootId: string) => void
 }
 
 export function Message(p: MessageProps) {
   const { node } = p
-  const id = entryId(node.id)
   const speaker =
     node.role === "chat"
       ? withContributors(
@@ -102,69 +98,16 @@ export function Message(p: MessageProps) {
           />
         ))}
         {/* A message that only called tools shows only its tool rows. */}
-        {p.note ??
-          ((node.text !== "" || node.toolCalls === undefined) && (
-            <MessageText
-              images={node.images}
-              mode="committed"
-              text={node.text}
-            />
-          ))}
+        {(node.text !== "" || node.toolCalls === undefined) && (
+          <MessageText images={node.images} mode="committed" text={node.text} />
+        )}
         {node.toolCalls?.map(call => (
           <ToolRow call={call} key={call.id} />
         ))}
-        {/* In the right margin, because what it opens appears to the right. */}
-        {p.onBranch !== undefined && (
-          <button
-            aria-label={p.onBranch.title}
-            className="branch"
-            onClick={p.onBranch.go}
-            title={p.onBranch.title}
-            type="button"
-          >
-            →
-          </button>
-        )}
-        {/* Tools float over the message on hover or focus: every message has
-            them, and buttons under each would drown the conversation. */}
-        <div className="tools">
-          {p.onCite !== undefined && (
-            <button
-              className="cite"
-              // Keep the text selection alive through the click.
-              onClick={e => {
-                // The message's own text: a note's card, drawn in its place,
-                // has text of its own that `entryText` offsets don't cover.
-                const text = e.currentTarget
-                  .closest(".msg")
-                  ?.querySelector(":scope > .text")
-                const ends = text ? selectionBoundaries(text) : null
-                p.onCite?.(
-                  ends === null
-                    ? { kind: "entry", id }
-                    : citeTarget(node.text, id, ...ends),
-                )
-              }}
-              onMouseDown={e => e.preventDefault()}
-              type="button"
-            >
-              cite
-            </button>
-          )}
-          {p.onEdit !== undefined && (
-            <button
-              className="edit"
-              onClick={p.onEdit}
-              title="open this message for everyone to edit"
-              type="button"
-            >
-              edit
-            </button>
-          )}
-        </div>
-        {(p.closedBranches.length > 0 ||
-          p.cites.length > 0 ||
-          p.citedBy.length > 0) && (
+        <Tools {...p} />
+        {p.about}
+        {p.origin}
+        {p.closedBranches.length > 0 && (
           <div className="actions">
             {p.closedBranches.map(b => (
               <button
@@ -177,24 +120,65 @@ export function Message(p: MessageProps) {
                 {b.noteCount > 0 && ` · ${plural(b.noteCount, "note")}`}
               </button>
             ))}
-            {p.cites.length > 0 && (
-              <span className="cites" data-cites={p.cites.length}>
-                ↗ cites {p.cites.length}
-              </span>
-            )}
-            {p.citedBy.length > 0 && (
-              <span
-                className="cited-by"
-                data-cited-by={p.citedBy.length}
-                title={p.citedBy.map(r => r.author).join(", ")}
-              >
-                ↙ cited by {p.citedBy.length}
-              </span>
-            )}
           </div>
         )}
       </div>
     </>
+  )
+}
+
+/**
+ * A message's tools, in one row that floats over its top right on hover or
+ * focus: buttons under every message would drown the conversation. `→` comes
+ * last, in the right margin, since what it opens appears to the right.
+ */
+function Tools({ tools, onNote, onBranch, onNewTab }: MessageProps) {
+  const { edit, branch } = tools
+  if (!tools.note && edit === undefined && branch === undefined) return null
+  return (
+    <div className="tools">
+      {tools.note && (
+        <button
+          className="note-open"
+          onClick={onNote}
+          title="open a note on this message, for everyone"
+          type="button"
+        >
+          note
+        </button>
+      )}
+      {edit?.kind === "branch" && (
+        <button
+          className="edit"
+          onClick={() => onBranch(edit)}
+          title="edit and send again, in a branch beside this one"
+          type="button"
+        >
+          edit
+        </button>
+      )}
+      {edit?.kind === "newTab" && (
+        <button
+          className="edit-new-tab"
+          onClick={() => onNewTab(edit.prefill, edit.asksAgent)}
+          title="a new tab starting with this message's text"
+          type="button"
+        >
+          new tab
+        </button>
+      )}
+      {branch !== undefined && (
+        <button
+          aria-label="open a branch here"
+          className="branch"
+          onClick={() => onBranch(branch)}
+          title="open a branch here"
+          type="button"
+        >
+          →
+        </button>
+      )}
+    </div>
   )
 }
 
