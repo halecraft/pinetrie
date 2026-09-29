@@ -502,24 +502,26 @@ context.**
   branch. A project can share a directory for everyone in `pineta.json`'s
   `lanes.shared`. A changed config reaches existing threads at their next
   run, after a host restart.
-- **Bringing a thread's work back** (ADR-0038, ADR-0039): each thread has a
-  two-word name, shown in its column's header, and keeps an offer in your
-  repo, one commit on your `@-` under the bookmark `pineta-offer/<name>`.
-  While the thread works, the offer reads `WIP (<name>): <its first message>`
-  and grows in place; when a run ends, an agent writes its commit message. See
-  it in jj or jjui before you take it: it shows its conflicts with your
-  committed work. **take** in its column's header puts it under your
-  uncommitted edits. Reword, squash or split it like any commit of yours; the
-  host then leaves it alone. **split into a stack** has the agent rewrite it
-  as reviewable revisions. Set the bookmark `pineta-onto` to have offers land
-  on another commit instead, such as a branch you are not on; each take moves
-  it up. `jj git push --all` would push it: push by name.
-- **Sending your work to a thread:** the column's `⋯` offers **update from my
-  work**: your `@`, uncommitted edits included, merged into the thread's own
-  copy. The thread gets a note of what changed, and your composer a line you
-  may send. When it conflicts, the agent resolves it, or asks you (ADR-0033).
-  A new root thread starts from your `@` as it is, uncommitted edits
-  included. A thread's own history is in your repo out of sight:
+- **Bringing a thread's work back** (ADR-0038, ADR-0039, ADR-0040): each
+  thread has a two-word name, shown in its column's header, and keeps an
+  offer in your repo, one commit on your `@-` under the bookmark
+  `pineta-offer/<name>`. While the thread works, the offer reads
+  `WIP (<name>): <its first message>` and grows in place; when a run ends,
+  an agent writes its commit message. See it in jj or jjui before you take
+  it: it shows its conflicts with your committed work. **take**, in the work
+  strip at its column's foot, puts it under your uncommitted edits. Reword,
+  squash or split it like any commit of yours; the host then leaves it
+  alone. **split into a stack** has the agent rewrite it as reviewable
+  revisions. Set the bookmark `pineta-onto` to have offers land on another
+  commit instead, such as a branch you are not on; each take moves it up.
+  `jj git push --all` would push it: push by name.
+- **Sending your work to a thread:** the work strip's `⋯` offers **update
+  from my work**: your `@`, uncommitted edits included, merged into the
+  thread's own copy. The thread gets a note of what changed, and your
+  composer a line you may send. When it conflicts, the agent resolves it, or
+  asks you (ADR-0033). A new root thread starts from your `@` as it is,
+  uncommitted edits included. A thread's own history is in your repo out of
+  sight:
   `jj log -r '::remote_bookmarks(remote=glob:"pineta-*") ~ ::@'`.
 - **Working directly:** the send button's `▾` sets a new thread to work in
   your working copy, or any directory, with no container, as you. A branch

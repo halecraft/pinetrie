@@ -143,10 +143,17 @@ so it is the one behind the menu. What each does is under "Starting" below.
   read top to bottom. Its composer sends at its last message.
 - **Opening a branch adds a column to the right**, starting after the fork. An
   aside of an aside opens a third column.
+- **A column's header says who works in it and where it came from**
+  (ADR-0040). Its first row names the agent working there, `✦ amber-fox` in
+  the column's colour, which leads to where that agent started; `✦ new agent`
+  while the composer's next send would start one; or nothing, in a
+  conversation, where a message goes to people. Its second row, for a column
+  that forks, names the fork, `↰ Ada: “Say exactly…”`, and clicking it brings
+  the fork point into view.
 - **Colour, not lines, links a branch to its parent.** Each open branch takes
-  its rail track's colour: its column's header carries a stripe of it and names
-  the fork ("from Ada: 'Say exactly…'"), and the fork point in the parent column
-  shows a dot of it. Hovering either end highlights the other; clicking the dot
+  its rail track's colour: its column's header carries a stripe of it and a dot
+  beside its fork, and the fork point in the parent column shows a dot of it.
+  Hovering either end outlines the other in that colour; clicking the dot
   scrolls to the branch's column. Sibling branches off one column never cross,
   as drawn lines would.
 - **Each column scrolls on its own.** A new column opens scrolled so its first
@@ -172,6 +179,11 @@ so it is the one behind the menu. What each does is under "Starting" below.
   branch is still in the rail. A root tab's only column has no close, since
   the tab would show that path again; a new tab's closes the new tab.
 - Each column's composer sits at its foot. The rail scrolls on its own.
+- **Above the composer, a work strip says what became of the agent's files**
+  (ADR-0040): an agent on its own copy shows its offer in plain words ("2
+  files ready"), with **take** and its bookmark; one working directly says
+  "changes land directly in your working copy", and warns while another
+  agent works in the same directory.
 - On a narrow screen, columns stack as a back-navigable sequence (the macOS
   Finder column view on a phone), with a breadcrumb of fork points.
 
@@ -206,8 +218,10 @@ The rail is E; the column is T. Seeing both at once is the product.
 
 ### Context, drawn
 
-- A message the agent was asked shows as asked (a margin bar), and the thread
-  marks **where the agent joined**, since everything above it is now its context.
+- A message the agent was asked shows as asked (a margin bar), and a divider
+  marks **where each agent joined**, by name: `✦ amber-fox joined`, or
+  `✦ copper-owl, from amber-fox` in a branch of agent work. Everything above
+  it is now that agent's context.
 
 ### Who a message is for (ADR-0021)
 

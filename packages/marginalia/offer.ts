@@ -2,8 +2,8 @@
 // ADR-0039).
 //
 // Every decision an offer needs, pure, over what the host gathers from jj and
-// the document: what a trigger does to it (`planRefresh`), what the column
-// shows and offers (`offerView`), whether the agent's stack may replace it
+// the document: what a trigger does to it (`planRefresh`), its state and
+// what can be done in it (`offerView`), whether the agent's stack may replace it
 // (`acceptStack`), and the commit-message request (`describeRequest`,
 // `withTrailers`, `wipDescription`). The jj steps that carry them out, and
 // where an offer starts (`offerStart`), are planned in `@pineta/lanes`.
@@ -110,9 +110,9 @@ export function acceptStack(input: {
   return { ok: true }
 }
 
-// ── what the column shows ─────────────────────────────────────────────────
+// ── its state and buttons ─────────────────────────────────────────────────
 
-/** A button on the offer's line, or in the column's menu. */
+/** A button beside the offer, or in its menu. */
 export type OfferButton =
   | "take"
   | "split"
@@ -125,7 +125,11 @@ export type OfferButton =
 /** What the lane is running now, as far as the offer cares. */
 export type OfferActivity = "idle" | "turn" | "resolution" | "split"
 
-/** One state of a lane's offer, and what can be done in it (ADR-0038's table). */
+/**
+ * One state of a lane's offer, what can be done in it (ADR-0038's table), and
+ * the facts its words are made from. The words are the client's
+ * (`offerWords`, `@pineta/client`).
+ */
 export interface OfferView {
   readonly state:
     | "nothing"
@@ -138,16 +142,29 @@ export interface OfferView {
     | "stale"
     | "edited"
     | "taken"
-  /** The line the column shows; empty when it shows none. */
-  readonly line: string
-  /** Buttons on the line, the first the primary one. */
+  /** Buttons beside the offer, the first the primary one. */
   readonly buttons: readonly OfferButton[]
-  /** Buttons in the column's menu. */
+  /** Buttons in the offer's menu. */
   readonly menu: readonly OfferButton[]
+  readonly facts: OfferFacts
 }
 
-const count = (n: number, one: string, many: string) =>
-  `${n} ${n === 1 ? one : many}`
+/** What an offer's words are made from. */
+export interface OfferFacts {
+  readonly activity: OfferActivity
+  /** Files in the untaken offer; 0 with none. */
+  readonly files: number
+  /** Revisions in the untaken offer: more than one is a stack. */
+  readonly size: number
+  /** Files that conflict with your work. */
+  readonly conflicts: number
+  /** It touches files you have uncommitted edits in. */
+  readonly touchesYourEdits: boolean
+  /** Its bookmark, to find it in jj; null with no untaken offer. */
+  readonly bookmark: string | null
+  /** The change id it was taken as, or null. */
+  readonly taken: string | null
+}
 
 /**
  * The offer's state and buttons. `landing` is the lane's latest resolution;
@@ -159,77 +176,35 @@ export function offerView(input: {
   readonly landing: LandingRecord | undefined
 }): OfferView {
   const { offer, activity, landing } = input
-  if (activity === "turn")
-    return {
-      state: "running",
-      line: "offer updates after each turn",
-      buttons: [],
-      menu: [],
-    }
-  if (activity !== "idle")
-    return {
-      state: "busy",
-      line:
-        activity === "resolution"
-          ? "resolving your work into this thread"
-          : "splitting the offer into a stack",
-      buttons: [],
-      menu: [],
-    }
-  if (offer === undefined)
-    return { state: "nothing", line: "", buttons: [], menu: ["update"] }
-  if (offer.taken !== null)
-    return {
-      state: "taken",
-      line: `taken as ${offer.taken.slice(0, 8)}`,
-      buttons: [],
-      menu: ["update"],
-    }
+  const open = offer?.taken === null ? offer : undefined
+  const facts: OfferFacts = {
+    activity,
+    files: open?.files.length ?? 0,
+    size: open?.size ?? 0,
+    conflicts: open?.conflicts.length ?? 0,
+    touchesYourEdits: (open?.yourEdits.length ?? 0) > 0,
+    bookmark: open?.bookmark ?? null,
+    taken: offer?.taken ?? null,
+  }
+  const view = (
+    state: OfferView["state"],
+    buttons: readonly OfferButton[],
+    menu: readonly OfferButton[],
+  ): OfferView => ({ state, buttons, menu, facts })
+  if (activity === "turn") return view("running", [], [])
+  if (activity !== "idle") return view("busy", [], [])
+  if (offer === undefined) return view("nothing", [], ["update"])
+  if (offer.taken !== null) return view("taken", [], ["update"])
   if (landing?.state === "needs_you" && landing.at > offer.at)
-    return {
-      state: "needs_you",
-      line: "the agent asked you about your work: see the thread",
-      buttons: ["take"],
-      menu: ["update"],
-    }
-  const files = count(offer.files.length, "file", "files")
-  const where = `\`${offer.bookmark}\``
-  if (offer.edited)
-    return {
-      state: "edited",
-      line: `you edited this offer · ${where}`,
-      buttons: ["take", "refresh"],
-      menu: ["update"],
-    }
+    return view("needs_you", ["take"], ["update"])
+  if (offer.edited) return view("edited", ["take", "refresh"], ["update"])
   if (offer.conflicts.length > 0)
-    return {
-      state: "conflicts",
-      line: `conflicts with your work in ${count(offer.conflicts.length, "file", "files")}`,
-      buttons: ["resolve", "take"],
-      menu: [],
-    }
-  const yours =
-    offer.yourEdits.length === 0 ? "" : " · conflicts expected in your edits"
+    return view("conflicts", ["resolve", "take"], [])
   if (offer.size > 1)
     return offer.stale
-      ? {
-          state: "stale",
-          line: `a stack of ${offer.size}, and changes since · ${where}`,
-          buttons: ["split", "take"],
-          menu: ["update"],
-        }
-      : {
-          state: "stack",
-          line: `offer: a stack of ${offer.size} · ${files} · ${where}${yours}`,
-          buttons: ["take", "squash"],
-          menu: ["update"],
-        }
-  return {
-    state: "ready",
-    line: `offer: ${files} · ${where}${yours}`,
-    buttons: ["take", "split"],
-    menu: ["describe", "update"],
-  }
+      ? view("stale", ["split", "take"], ["update"])
+      : view("stack", ["take", "squash"], ["update"])
+  return view("ready", ["take", "split"], ["describe", "update"])
 }
 
 // ── the commit message ────────────────────────────────────────────────────

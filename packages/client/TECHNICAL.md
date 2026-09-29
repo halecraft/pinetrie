@@ -118,7 +118,8 @@ counter.
   steps back down to a conversation (ADR-0021).
 - **`asksAgent`** is a new tab from **＋ agent** (ADR-0021's Start Agent): a
   message with no mention asks the agent, as if `@agent` were written, until
-  the thread has a lane of its own.
+  the thread has a lane of its own. Only the composer reads it; the header
+  shows what the composer will do (`onIntent`, below).
 - **Deduplication is `planOpen`'s** (`layout.ts`, above). Two anchors can
   resolve to one path, which `columnsReducer` cannot see.
 - **Open columns are never written to the document.** Which paths a person
@@ -281,15 +282,46 @@ picks.
 - **It is declared after the alignment effect in `App`,** so a pick the
   alignment left out of view is scrolled to in the same commit.
 
+## What a column shows (`column-view.ts`, ADR-0040)
+
+`Column` gathers the facts (`ColumnFacts`), `columnView` decides, and
+`Column` draws what it returns: who works in the column (`identity`), where
+it forks (`origin`), where lanes start on its path (`joins`), and what
+became of its files (`strip`).
+
+- **`lanesAlong` is the one model of which lane worked where.** It walks the
+  column's whole path, root first, and starts a stretch at each asked message
+  whose lane differs from the one before. The header's start, the dividers
+  and the origin's speaker are all read from its stretches.
+- **An asked message's lane is its revision record's, which the host writes
+  when the turn ends** (`turnDone`). A message with no record yet is the
+  column's lane's running prompt, so it falls back to the column's lane.
+  With no revisions at all (a host without a project), every asked message
+  falls back, and the whole path reads as the column's lane.
+- **`offerView` (`@pineta/marginalia`) decides an offer; `offerWords`
+  words it**: its line and each button's label, by state. The bookmark is a
+  fact of its own, drawn apart (`.offer-bookmark`), never in the line.
+- **The header's clicks go through `onOpen`** (`openAt`, `planOpen`), which
+  reveals the entry in whichever column shows it. A column's lane may have
+  started in a column to its left.
+- **`onIntent`:** the composer tells the column, in an effect, whether its
+  next send would create a lane, so the header can say `✦ new agent`. It is a
+  boolean, not the text lifted up: `Column` redraws only when it flips, not
+  on every keystroke.
+
 ## Colour carries the link, not geometry
 
 Each column takes the rail track of its last message (`branchColors`); its
 header, its fork dot in the parent column and its rail track share that
 colour. There are no connector lines, so sibling branches never cross.
 
+- **One inline `--track` per element** (`trackStyle`, `rail.tsx`): the
+  header's border, name and origin dot, and the fork dot, read
+  `var(--track)` in CSS.
 - **Hover linking is CSS.** Headers and fork dots carry `data-color`, the track
-  modulo the palette; `:has()` rules in `index.html` outline one when the other
-  is hovered. No component state.
+  modulo the palette; `:has()` rules in `index.html` outline one in
+  `var(--track)` when the other is hovered. No component state. The rules are
+  eight pairs: CSS cannot match two elements' attribute values.
 - **The palette is eight colours**, so tracks eight apart share one. Two open
   columns can share a colour when their branches share a track slot; the rail
   shows them the same way.
@@ -323,10 +355,10 @@ fast the strip scrolls near an edge (`edgeScroll`).
 - **The slide is clamped to the strip's ends.** A transform widens a scroll
   container's overflow, so an unclamped column dragged right would keep
   widening the strip that the edge scroll is chasing.
-- **A press on a control, `.where` or `.offer` starts no drag**
-  (`NOT_A_HANDLE`): those two stay selectable, to copy. The rest of the header
-  is `user-select: none`. A press is a drag only once it has moved 5 px, so
-  clicks still reach the header.
+- **A press on a control starts no drag** (`NOT_A_HANDLE`): the name and the
+  origin row are buttons. The header is `user-select: none`; the offer's
+  bookmark, which you may copy, is in the work strip, outside it. A press is
+  a drag only once it has moved 5 px, so clicks still reach the header.
 - **Escape or a cancelled pointer moves nothing.** A drop in the gap on either
   side of the column also moves nothing, and marks nothing.
 - **After a move by key, the column is scrolled into view.** Its grip keeps
@@ -431,16 +463,17 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `workFor`, the host's own decision. The chip's words are `.where-words`,
   with `data-work` (`own` or `direct`): `Menu` passes no attributes to its
   trigger, so they sit on a span inside it.
-- **A lane's column header** names its thread, then says where it works
-  ("amber-fox · own copy", or "amber-fox · in <dir> · shared", ADR-0039),
-  and, for its own copy, its offer (ADR-0038). It shows no commit: the lane's
-  newest one changes with every tool call.
-- **The offer line** is `offerView`'s (`@pineta/marginalia`), drawn by
-  `OfferLine`: a line naming the offer's bookmark, so you can find it in jj
-  or jjui, its buttons, and a `⋯` menu for the rest ("update from my work",
-  "rewrite description"). What the lane runs now (`activityOf`: a turn, a
-  resolution, or a split, from its latest prompt's role) comes first: while
-  it runs, the line says so and offers nothing.
+- **A column's header** (ADR-0040) names who works in it (`✦ amber-fox`,
+  `✦ new agent`, or nothing in a conversation), then, in a second row, where
+  it forks. It shows no commit and nothing of where the lane works.
+- **The work strip** (`WorkStripView`, above the composer) is the lane's
+  offer for its own copy (ADR-0038): `offerWords`' line, the bookmark apart
+  so you can find it in jj or jjui, its buttons, and a `⋯` menu for the rest
+  ("update from my work", "rewrite description"). What the lane runs now
+  (`activityOf`: a turn, a resolution, or a split, from its latest prompt's
+  role) comes first: while it runs, the line counts files so far and offers
+  nothing. A lane that works directly says where its changes land, and names
+  other lanes running in the same directory now.
 - **An update's prefill** goes into that column's composer, unsent: `update`
   answers `updated` with the text, and the column hands it to the composer
   as `prefill` with a fresh key, which lands once after whatever is typed.
@@ -449,11 +482,14 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **The page header counts offers open** in your repo, as it counts
   mentions, and the agent's running threads; each row leads with the
   thread's name and opens its thread.
-- **Selectors in the browser suite:** a column's offer is
-  `.column-head .offer`, with `data-state` (`ready`, `conflicts`, `stack`,
-  and the rest of `offerView`'s states); its line is `.offer-line`, and each
-  button `.offer-<action>`, Take being `.offer-take`. The header's
-  `.where` holds the thread's name in `data-thread`.
+- **Selectors in the browser suite:** a column's offer is `.work.offer`, with
+  `data-state` (`ready`, `conflicts`, `stack`, and the rest of
+  `offerView`'s states); its line is `.offer-line`, its bookmark
+  `.offer-bookmark`, and each button `.offer-<action>`, Take being
+  `.offer-take`. A direct lane's strip is `.work[data-state="direct"]`, with
+  `.work-warning`. The header's `.agent-name` holds the thread's name in
+  `data-thread` (`.agent-name.pending` before it has one); its origin row
+  is `.origin`. A lane's divider is `.lane-join`, with `data-thread`.
 - **The invite key** needs no client code: the host's redirect sets a cookie
   that same-origin requests and upgrades carry. `connectSession({ key })` is
   for Node clients.
@@ -609,8 +645,8 @@ shown by their email's part before the `@`. Each rendered chat carries its
   the tab you are on, while hovered or focused, or while its menu is open
   (`Menu`'s wrapper, `.tab-more`, gains `open`). The menu is its child, so
   hiding the `⋯` would hide an open menu too.
-- **"close" is `closable`:** hidden on a root tab's only column (`columnsOf`
-  would give it back) and in the Archive tab's preview.
+- **A column's × (`.close`) is `closable`:** hidden on a root tab's only
+  column (`columnsOf` would give it back) and in the Archive tab's preview.
 - **A popover opens above its trigger in the window's lower half.** A
   composer's `▾` is at the window's foot, so a list below it would be out of
   sight; and since `.popover` sets a `top` in the stylesheet, the upward box
@@ -655,8 +691,8 @@ shown by their email's part before the `@`. Each rendered chat carries its
 - **Stop aborts a running command only once the command has started.** With a
   slow model, the tool call itself streams first; a check waits for the live
   tool row before clicking Stop, as a person would.
-- **`:last-of-type` matches element type, not class.** The "agent
-  joined" marker and the stream are `div`s too; find a column's last message by querying `.msg`.
+- **`:last-of-type` matches element type, not class.** A lane's divider
+  (`.lane-join`) and the stream are `div`s too; find a column's last message by querying `.msg`.
 - **The agent's stream renders only in a column containing its tip.** When no
   open column does, the rail's pulse and, in another root, the tab's pulse are
   the only signs, and clicking the rail's pulse opens

@@ -12,6 +12,7 @@ import {
   type RailRun,
   type WriterId,
 } from "@pineta/core"
+import type { CSSProperties } from "react"
 import { pickAt, type RunFill, runFill, runLabel } from "./rail-view.ts"
 
 const PALETTE = [
@@ -36,6 +37,13 @@ export const colorSlot = (track: number): string =>
 /** A track's colour. A fresh branch, which has no track yet, is grey. */
 export const trackColor = (track: number): string =>
   track === PENDING_TRACK ? "#777" : (PALETTE[track % PALETTE.length] ?? "#777")
+
+/**
+ * A track's colour as `--track`, the one inline style of a track-coloured
+ * element in a column: its CSS reads `var(--track)` for every colour it takes.
+ */
+export const trackStyle = (track: number): CSSProperties =>
+  ({ "--track": trackColor(track) }) as CSSProperties
 
 const ROW = 16
 const GAP = 12

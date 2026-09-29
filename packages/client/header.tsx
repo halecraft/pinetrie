@@ -14,6 +14,7 @@ import {
   type WriterId,
 } from "@pineta/core"
 import { useState } from "react"
+import { AGENT_MARK } from "./column-view.ts"
 import type { PersonHere } from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
@@ -109,7 +110,7 @@ export function Header({
             title="the agent is working"
             trigger={
               <>
-                <span className="initial agent-mark">✦</span>
+                <span className="initial agent-mark">{AGENT_MARK}</span>
                 <span className="here-count">{runs.length}</span>
               </>
             }

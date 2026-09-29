@@ -3,30 +3,18 @@
 import { useTracked } from "@kyneta/react"
 import {
   type AgentRun,
-  ancestry,
   atEntry,
   type ColumnView,
-  type CommandSummary,
   type EntryId,
   entryId,
-  firstLine,
-  type LandingRecord,
-  type LaneName,
-  type LaneRecord,
   type LaneView,
-  messageText,
   type NoteId,
   type NoteRecord,
   nearestRevision,
-  type OfferRecord,
   type Position,
-  type ProjectRecord,
-  promptOf,
   type ReferenceTarget,
-  type RevisionRecord,
   ROOT,
   type ThreadLane,
-  type ThreadName,
   type TreeIndex,
   threadOf,
   type WriterId,
@@ -37,14 +25,19 @@ import {
   draftFor,
   type Held,
   noteEntry,
-  type OfferActivity,
   type OfferButton,
-  type OfferView,
-  offerView,
   type ReferenceIndex,
 } from "@pineta/marginalia"
 import { readStreams, type SessionDocHandle } from "@pineta/schema"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import {
+  AGENT_MARK,
+  columnView,
+  type HeadIdentity,
+  type HeadOrigin,
+  type WorkFacts,
+  type WorkStrip,
+} from "./column-view.ts"
 import { branchPrefill, type Column as ColumnSpec } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
 import { Menu } from "./menu.tsx"
@@ -53,7 +46,7 @@ import { MessageText } from "./message-text.tsx"
 import { speakerLabel, withContributors } from "./names.ts"
 import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
-import { colorSlot, trackColor } from "./rail.tsx"
+import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import type { SessionClient } from "./session-view.ts"
 import { useFollow } from "./use-follow.ts"
@@ -127,38 +120,6 @@ export interface ColumnProps {
   closable: boolean
 }
 
-/** What the host records about where lanes work, read with everything else. */
-export interface WorkFacts {
-  readonly project: ProjectRecord | null
-  /** The commands the host's pi loaded (ADR-0036). */
-  readonly commands: readonly CommandSummary[]
-  readonly lanes: ReadonlyMap<string, LaneRecord>
-  readonly revisions: ReadonlyMap<string, RevisionRecord>
-  readonly landings: readonly LandingRecord[]
-  /** Each lane's offer in your repo (ADR-0038). */
-  readonly offers: ReadonlyMap<string, OfferRecord>
-  /** Each lane's name (ADR-0039). */
-  readonly names: ReadonlyMap<LaneName, ThreadName>
-}
-
-/**
- * A lane as its column's header says it: its name, then where it works, its
- * own copy or the directory it shares (ADR-0039).
- */
-function whereLabel(
-  name: ThreadName | undefined,
-  record: LaneRecord | undefined,
-): string | null {
-  const where =
-    record === undefined
-      ? undefined
-      : record.work.kind === "direct"
-        ? `in ${record.work.dir} · shared`
-        : "own copy"
-  const parts = [name, where].filter(p => p !== undefined)
-  return parts.length === 0 ? null : parts.join(" · ")
-}
-
 export function Column(p: ColumnProps) {
   const { view, index } = p
   const body = useRef<HTMLDivElement>(null)
@@ -198,16 +159,6 @@ export function Column(p: ColumnProps) {
       : atEntry(entryId(view.tipId))
   const writable = p.readOnly === null
 
-  // The agent joined where it was first asked, unless that is above this column.
-  const askedAbove =
-    view.forkFrom !== null &&
-    ancestry(index, view.forkFrom).path.some(
-      id => index.entries[id]?.message?.compelled === true,
-    )
-  const joinedAt = askedAbove
-    ? undefined
-    : view.nodes.find(n => n.compelled === true)?.id
-
   // The lanes running on this column's path stream here.
   const streamingLanes = p.activity
     .filter(r => p.path.has(r.tip))
@@ -224,30 +175,19 @@ export function Column(p: ColumnProps) {
     thread.kind === "thread" ? thread.lane : { kind: "none" }
   const waiting =
     lane.kind === "lane" ? p.outbox.filter(h => h.lane === lane.name) : []
-  // Where this thread's lane works, its latest resolution and its offer
-  // (ADR-0032, ADR-0033, ADR-0038).
-  const laneRecord =
-    lane.kind === "lane" ? p.work.lanes.get(lane.name) : undefined
-  const threadName =
-    lane.kind === "lane" ? p.work.names.get(lane.name) : undefined
-  const where = whereLabel(threadName, laneRecord)
-  const landing =
-    lane.kind === "lane"
-      ? p.work.landings.filter(l => l.lane === lane.name).at(-1)
-      : undefined
-  const laneView =
-    lane.kind === "lane" ? p.lanes.find(l => l.name === lane.name) : undefined
-  const offer =
-    writable &&
-    lane.kind === "lane" &&
-    laneRecord?.work.kind === "own" &&
-    p.work.project?.kind === "lanes"
-      ? offerView({
-          offer: p.work.offers.get(lane.name),
-          activity: activityOf(index, laneView),
-          landing,
-        })
-      : null
+  // Whether this column's next send would create a lane: the composer's to
+  // decide, as it is typed.
+  const [createsLane, setCreatesLane] = useState(false)
+  const shows = columnView({
+    index,
+    view,
+    lane,
+    createsLane,
+    writable,
+    nameOf: p.nameOf,
+    lanes: p.lanes,
+    work: p.work,
+  })
   // An update's intent, put in this column's composer (ADR-0038).
   const [prefill, setPrefill] = useState<{
     readonly text: string
@@ -273,15 +213,6 @@ export function Column(p: ColumnProps) {
     lane.kind === "lane" && lane.askedBy !== null
       ? displayName(lane.askedBy, p.nameOf.get(lane.askedBy))
       : null
-
-  const fork = view.forkFrom === null ? undefined : index.entries[view.forkFrom]
-  const forkLabel =
-    fork?.message?.role === "chat"
-      ? speakerLabel(p.nameOf, fork.message.writer, fork.message.author ?? "")
-      : fork?.message?.role === "assistant"
-        ? "agent"
-        : ""
-  const forkText = firstLine(messageText(fork?.message), 48)
 
   // Notes by the message they are the text of, and this thread's draft.
   const noteOf = new Map(
@@ -341,54 +272,44 @@ export function Column(p: ColumnProps) {
       <header
         className="column-head"
         data-color={colorSlot(p.track)}
-        style={{ borderTopColor: trackColor(p.track) }}
+        style={trackStyle(p.track)}
       >
-        {p.count > 1 && (
-          <button
-            aria-keyshortcuts="ArrowLeft ArrowRight Home End"
-            aria-label="move column"
-            className="grip"
-            onKeyDown={e => {
-              const to = keyMove(p.position, p.count, e.key)
-              if (to === null) return
-              e.preventDefault()
-              movedByKey.current = true
-              p.onMove(to)
-            }}
-            ref={grip}
-            title="drag to move · ← → Home End"
-            type="button"
-          >
-            ⠿
-          </button>
-        )}
-        <span className="fork-label">
-          {fork === undefined
-            ? fresh
-              ? p.column.asksAgent === true
-                ? "new · with the agent"
-                : "new chat"
-              : "thread"
-            : `from ${forkLabel}: “${forkText}”`}
-        </span>
-        {where !== null && (
-          <span
-            className="where"
-            data-thread={threadName}
-            title="this thread's name, and where its agent works"
-          >
-            {where}
-          </span>
-        )}
-        {offer !== null && lane.kind === "lane" && (
-          <OfferLine act={act} lane={lane.name} view={offer} />
-        )}
-        <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={p.seenBy} />
-        {p.closable && (
-          <button className="close" onClick={p.onClose} type="button">
-            close
-          </button>
-        )}
+        <div className="head-row">
+          {p.count > 1 && (
+            <button
+              aria-keyshortcuts="ArrowLeft ArrowRight Home End"
+              aria-label="move column"
+              className="grip"
+              onKeyDown={e => {
+                const to = keyMove(p.position, p.count, e.key)
+                if (to === null) return
+                e.preventDefault()
+                movedByKey.current = true
+                p.onMove(to)
+              }}
+              ref={grip}
+              title="drag to move · ← → Home End"
+              type="button"
+            >
+              ⠿
+            </button>
+          )}
+          <Identity identity={shows.identity} onOpen={p.onOpen} />
+          <span className="head-space" />
+          <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={p.seenBy} />
+          {p.closable && (
+            <button
+              aria-label="close column"
+              className="close"
+              onClick={p.onClose}
+              title="close column"
+              type="button"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        <Origin onOpen={p.onOpen} origin={shows.origin} />
       </header>
       <div className="column-body" ref={body}>
         {stillEdited && outOfView && (
@@ -421,7 +342,7 @@ export function Column(p: ColumnProps) {
                   b => !p.shown.has(b.rootId),
                 )}
                 forkTracks={p.forks.get(node.id) ?? []}
-                joined={node.id === joinedAt}
+                join={shows.joins.get(node.id)}
                 key={node.id}
                 nameOf={p.nameOf}
                 node={node}
@@ -519,6 +440,7 @@ export function Column(p: ColumnProps) {
             </button>
           </div>
         ))}
+      <WorkStripView act={act} strip={shows.strip} />
       <Composer
         asksAgent={p.column.asksAgent === true}
         defaultWork={defaultWork}
@@ -547,6 +469,7 @@ export function Column(p: ColumnProps) {
           p.onSent(id)
           return id
         }}
+        onIntent={setCreatesLane}
         onComposeTogether={
           fresh || draft !== undefined || !writable
             ? undefined
@@ -620,74 +543,108 @@ function LiveOutput({ text }: { text: string }) {
   )
 }
 
-/** What a lane is running now, as its offer cares: a turn, a resolution, a split. */
-function activityOf(
-  index: TreeIndex,
-  view: LaneView | undefined,
-): OfferActivity {
-  if (view === undefined || !view.running) return "idle"
-  const prompt = promptOf(index, view.tip)
-  const role =
-    prompt === null ? undefined : index.entries[prompt]?.message?.role
-  return role === "land" ? "resolution" : role === "stack" ? "split" : "turn"
+/**
+ * Who works in the column: its lane's name, which leads to where the lane
+ * started; a lane about to start; or nothing, in a conversation.
+ */
+function Identity({
+  identity,
+  onOpen,
+}: {
+  identity: HeadIdentity
+  onOpen: (id: string) => void
+}) {
+  if (identity.kind === "none") return null
+  if (identity.kind === "pending")
+    return <span className="agent-name pending">{AGENT_MARK} new agent</span>
+  const { start } = identity
+  return (
+    <button
+      className="agent-name"
+      data-thread={identity.name}
+      disabled={start === null}
+      onClick={() => {
+        if (start !== null) onOpen(start)
+      }}
+      title="where this agent started"
+      type="button"
+    >
+      {AGENT_MARK} {identity.name}
+    </button>
+  )
 }
 
-const BUTTON_LABEL: Record<OfferButton, string> = {
-  take: "take",
-  split: "split into a stack",
-  squash: "squash to one",
-  describe: "rewrite description",
-  refresh: "refresh (discards your edits)",
-  resolve: "resolve in the thread",
-  update: "update from my work",
+/** Where the column forks, leading back to it. */
+function Origin({
+  origin,
+  onOpen,
+}: {
+  origin: HeadOrigin
+  onOpen: (id: string) => void
+}) {
+  if (origin.kind === "none") return null
+  return (
+    <button
+      className="origin"
+      onClick={() => onOpen(origin.at)}
+      title="show where this branch starts"
+      type="button"
+    >
+      <span className="origin-dot" />↰ {origin.speaker}: “{origin.text}”
+    </button>
+  )
 }
 
 /**
- * A lane's offer in your repo, in its column's header (ADR-0038): its line,
- * its buttons, and a menu for the rest. The bookmark it names is the one to
- * look for in jj or jjui.
+ * What became of the column's files, at its foot (ADR-0040): the lane's offer
+ * in your repo (ADR-0038), or where a lane that works directly writes. The
+ * bookmark it names is the one to look for in jj or jjui.
  */
-function OfferLine({
-  view,
-  lane,
+function WorkStripView({
+  strip,
   act,
 }: {
-  view: OfferView
-  lane: string
+  strip: WorkStrip
   act: (button: OfferButton) => void
 }) {
-  const label = (b: OfferButton) =>
-    b === "take" && view.state === "stack"
-      ? "take stack"
-      : b === "take" && view.state === "stale"
-        ? "take stack and the rest"
-        : b === "take" &&
-            (view.state === "conflicts" || view.state === "needs_you")
-          ? "take anyway"
-          : b === "split" && view.state === "stale"
-            ? "split again"
-            : BUTTON_LABEL[b]
+  if (strip.kind === "none") return null
+  if (strip.kind === "direct")
+    return (
+      <div className="work" data-state="direct">
+        <span className="work-line">{strip.line}</span>
+        {strip.alsoHere.map(name => (
+          <span className="work-warning" key={name}>
+            {name} is working here too
+          </span>
+        ))}
+      </div>
+    )
+  const { words } = strip
   return (
-    <span className="offer" data-lane={lane} data-state={view.state}>
-      {view.line !== "" && <span className="offer-line">{view.line}</span>}
-      {view.buttons.map(b => (
+    <div className="work offer" data-state={strip.state}>
+      <span className="offer-line">{words.line}</span>
+      {strip.bookmark !== null && (
+        <span className="offer-bookmark">{strip.bookmark}</span>
+      )}
+      <span className="work-space" />
+      {words.buttons.map(({ button, label }) => (
         <button
-          className={`offer-${b}`}
-          key={b}
-          onClick={() => act(b)}
+          className={`offer-${button}`}
+          key={button}
+          onClick={() => act(button)}
           type="button"
         >
-          {label(b)}
+          {label}
         </button>
       ))}
-      {view.menu.length > 0 && (
+      {words.menu.length > 0 && (
         <Menu
           className="offer-more"
-          items={view.menu.map(b => ({
-            key: b,
-            label: BUTTON_LABEL[b],
-            className: `offer-${b}`,
-            onChoose: () => act(b),
+          items={words.menu.map(({ button, label }) => ({
+            key: button,
+            label,
+            className: `offer-${button}`,
+            onChoose: () => act(button),
           }))}
           label="more for this thread's offer"
           title="this thread's offer"
@@ -695,6 +652,6 @@ function OfferLine({
           triggerClassName="offer-more-trigger"
         />
       )}
-    </span>
+    </div>
   )
 }

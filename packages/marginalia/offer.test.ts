@@ -94,11 +94,33 @@ describe("offerView: ADR-0038's table", () => {
       ["update"],
     ])
   })
-  test("files you are editing are named on the line; the buttons stay", () => {
+  test("files you are editing are a fact; the state and buttons stay", () => {
     const v = view({ ...offer, yourEdits: ["b.txt"] })
-    expect([v.state, v.line.includes("conflicts expected")]).toEqual([
+    expect([v.state, v.buttons, v.facts.touchesYourEdits]).toEqual([
       "ready",
+      ["take", "split"],
       true,
+    ])
+    expect(view(offer).facts.touchesYourEdits).toBe(false)
+  })
+  test("the facts: an untaken offer's bookmark, files and size", () => {
+    expect(view({ ...offer, size: 2 }).facts).toEqual({
+      activity: "idle",
+      files: 2,
+      size: 2,
+      conflicts: 0,
+      touchesYourEdits: false,
+      bookmark: "pineta-offer/t-1",
+      taken: null,
+    })
+    expect(view(offer, "turn").facts.files).toBe(2)
+    const none = view(undefined).facts
+    expect([none.files, none.bookmark, none.taken]).toEqual([0, null, null])
+    const taken = view({ ...offer, taken: "zz12345678" }).facts
+    expect([taken.files, taken.bookmark, taken.taken]).toEqual([
+      0,
+      null,
+      "zz12345678",
     ])
   })
   test("a resolution that asked you counts only when newer than the offer", () => {

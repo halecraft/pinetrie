@@ -10,6 +10,7 @@ const tabStateFile = "packages/client/tab-state.ts"
 const markdown = "packages/client/markdown.ts"
 const tabState = "packages/client/tab-state.ts"
 const reorder = "packages/client/reorder.ts"
+const columnView = "packages/client/column-view.ts"
 
 export const mutations: readonly Mutation[] = [
   {
@@ -664,6 +665,56 @@ export const mutations: readonly Mutation[] = [
     to: "    EDGE_SPEED",
     command: unit,
     expect: "grows faster nearer the edge",
+  },
+  {
+    name: "every asked message starts a stretch",
+    file: columnView,
+    from: "    if (owner === null || owner === stretches.at(-1)?.lane) continue",
+    to: "    if (owner === null) continue",
+    command: unit,
+    expect: "a later prompt of the same lane",
+  },
+  {
+    name: "an unrecorded prompt belongs to no lane",
+    file: columnView,
+    from: "    const owner = revisions.get(id)?.lane ?? lane",
+    to: "    const owner = revisions.get(id)?.lane ?? null",
+    command: unit,
+    expect: "an asked message with no record",
+  },
+  {
+    name: "a new column's next send never shows",
+    file: columnView,
+    from: '    return createsLane ? { kind: "pending" } : { kind: "none" }',
+    to: '    return { kind: "none" }',
+    command: unit,
+    expect: "who works here",
+  },
+  {
+    name: "a lane idle in the same directory warns",
+    file: columnView,
+    from: "          other.running &&",
+    to: "          true &&",
+    command: unit,
+    expect: "other running lanes in the same directory",
+  },
+  {
+    name: "a stack reads as one offer",
+    file: columnView,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "                      ? `a stack of ${facts.size} · ${files} ready${yours}`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "                      ? `${files} ready${yours}`",
+    command: unit,
+    expect: "a stack",
+  },
+  {
+    name: "a lane's divider forgets the lane above",
+    file: columnView,
+    from: "      from: before === undefined ? null : { name: names.get(before.lane) },",
+    to: "      from: null,",
+    command: unit,
+    expect: "each naming the lane above",
   },
   {
     name: "a command is not for the agent, as the composer sees it",

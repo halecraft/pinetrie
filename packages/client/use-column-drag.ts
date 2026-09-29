@@ -15,12 +15,9 @@ import {
 } from "react"
 import { edgeScroll, gapAt, landing } from "./reorder.ts"
 
-/**
- * Where a press in a header starts no drag: its controls, and the text a
- * person may want to copy (where the agent works, the offer's bookmark).
- */
+/** Where a press in a header starts no drag: its controls. */
 const NOT_A_HANDLE =
-  "button:not(.grip), a, input, textarea, select, summary, [role='menu'], .where, .offer"
+  "button:not(.grip), a, input, textarea, select, summary, [role='menu']"
 
 /** How far, in px, a press moves before it is a drag rather than a click. */
 export const DRAG_START = 5

@@ -334,7 +334,7 @@ try {
     `the column reads Ada's asked message, then the agent: [${roles.join(", ")}]`,
   )
   ok(
-    (await page.$$eval(".joined", n => n.length)) === 1,
+    (await page.$$eval(".lane-join", n => n.length)) === 1,
     "the column shows where the agent joined",
   )
   const filledLeft = await stripLeft()
@@ -470,6 +470,25 @@ try {
       colours.dot === colours.rail,
     `the branch's header, its fork dot and its rail track share a colour (${colours.head} · ${colours.dot} · ${colours.rail})`,
   )
+  // Hovering the header outlines its fork dot in the branch's colour. The
+  // aside is the reply's younger child, so its track is 1 (`projectRail`),
+  // the slot the mutation names.
+  await page.hover(`${col(1)} .column-head .head-row`)
+  const outline = await page.evaluate(
+    ({ first, branch }) => {
+      const track = document.querySelector(branch)?.getAttribute("data-track")
+      const dot = document.querySelector(
+        `${first} .fork-dot[data-track="${track}"]`,
+      )
+      return dot === null ? "none" : getComputedStyle(dot).outlineColor
+    },
+    { first: col(0), branch: col(1) },
+  )
+  await page.mouse.move(0, 0)
+  ok(
+    outline === colours.head,
+    `hovering a branch's header outlines its fork dot in the branch's colour (${outline} · ${colours.head})`,
+  )
   const beforeScroll = await page.$eval(
     `${col(1)} .column-body`,
     n => n.scrollTop,
@@ -482,6 +501,29 @@ try {
       beforeScroll,
     "scrolling one column does not scroll another",
   )
+  // The header's origin row leads back to the fork point. A short window puts
+  // it out of view first, so the row has somewhere to go.
+  {
+    const size = page.viewportSize()
+    if (size !== null) await page.setViewportSize({ ...size, height: 260 })
+    await page.$eval(`${col(0)} .column-body`, n => {
+      n.scrollTop = n.scrollHeight
+    })
+    const inView = () =>
+      page.$eval(atReply, m => {
+        const r = m.getBoundingClientRect()
+        const body = m.closest(".column-body")?.getBoundingClientRect()
+        return body !== undefined && r.bottom > body.top && r.top < body.bottom
+      })
+    const hidden = !(await inView())
+    await page.click(`${col(1)} .column-head .origin`)
+    const back = await waitFor(() => inView(), 5_000)
+    if (size !== null) await page.setViewportSize(size)
+    ok(
+      hidden && back >= 0,
+      `the origin row leads back to the fork point (hidden first: ${hidden})`,
+    )
+  }
 
   // ── → opens a branch beside its parent, and it follows its branch ──────
   // The → sits in the column's right padding, all but a pixel outside its
@@ -526,10 +568,8 @@ try {
   const beside = await page
     .waitForFunction(
       ([c, note]) =>
-        document
-          .querySelector(`${c} .fork-label`)
-          ?.textContent?.includes(note) === true &&
-        document.querySelector(`${c} .msg`) === null,
+        document.querySelector(`${c} .origin`)?.textContent?.includes(note) ===
+          true && document.querySelector(`${c} .msg`) === null,
       [col(1), NOTE] as const,
       { timeout: 15_000 },
     )
@@ -552,6 +592,30 @@ try {
     caret === "@agent ".length,
     `→ opens a branch ready to type in: its box has focus, the caret after @agent (${caret})`,
   )
+  // Its header says a new agent starts, for as long as its composer asks one.
+  {
+    const pending = `${col(1)} .column-head .agent-name.pending`
+    const appears = (present: boolean) =>
+      page
+        .waitForFunction(
+          ([sel, want]) => (document.querySelector(sel) !== null) === want,
+          [pending, present] as const,
+          { timeout: 5_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+    const first = await appears(true)
+    await page.fill(`${col(1)} .composer .input`, "")
+    const gone = await appears(false)
+    await page.fill(`${col(1)} .composer .input`, "@agent ")
+    const again = await appears(true)
+    ok(
+      first && gone && again,
+      `a new column's header says a new agent starts only while its composer asks one (${first}, ${gone}, ${again})`,
+    )
+  }
   const railBefore = await railCount()
   await send(1, "deeper")
   ok(
@@ -1655,12 +1719,13 @@ try {
         `a long code line and a long tool label leave the column at 28rem, with nothing past its side (${JSON.stringify(widths)})`,
       )
 
-      // ── the thread's offer, and taking it, from the column's header ─────
-      // (ADR-0038)
-      // Its name leads, as the host stored it; no commit follows (ADR-0039).
-      const whereText = await tp.textContent(`${col(0)} .column-head .where`)
+      // ── the thread's name in its header, and its offer at its foot ──────
+      // (ADR-0038, ADR-0039, ADR-0040). The name is as the host stored it.
+      const nameText = await tp.textContent(
+        `${col(0)} .column-head .agent-name`,
+      )
       const threadName = await tp.getAttribute(
-        `${col(0)} .column-head .where`,
+        `${col(0)} .column-head .agent-name`,
         "data-thread",
       )
       ok(
@@ -1668,8 +1733,8 @@ try {
           [...readNames(toolHost.doc).values()].includes(
             threadName as ThreadName,
           ) &&
-          whereText === `${threadName} · own copy`,
-        `the column's header names the thread, then says it works in its own copy (${whereText})`,
+          nameText === `✦ ${threadName}`,
+        `the column's header names the thread (${nameText})`,
       )
       script.use([
         { tool: "write", args: { path: "from-lane.txt", content: "lane\n" } },
@@ -1678,21 +1743,27 @@ try {
       await say("write a file")
       await toolIdle()
       const takeShown = await appears(
-        `${col(0)} .column-head .offer[data-state="ready"] .offer-take`,
+        `${col(0)} .work.offer[data-state="ready"] .offer-take`,
       )
       const line =
+        (await tp.textContent(`${col(0)} .work .offer-line`).catch(() => "")) ??
+        ""
+      const bookmark =
         (await tp
-          .textContent(`${col(0)} .column-head .offer-line`)
+          .textContent(`${col(0)} .work .offer-bookmark`)
           .catch(() => "")) ?? ""
-      if (takeShown) await tp.click(`${col(0)} .column-head .offer-take`)
+      if (takeShown) await tp.click(`${col(0)} .work .offer-take`)
       const took =
         (await waitFor(
           () => existsSync(path.join(work, "from-lane.txt")),
           10_000,
         )) >= 0
       ok(
-        takeShown && line.includes("pineta-offer/") && took,
-        `the column shows the thread's offer, its bookmark, and Take brings it into your working copy (${line})`,
+        takeShown &&
+          bookmark.startsWith("pineta-offer/") &&
+          !line.includes("`") &&
+          took,
+        `the column's foot shows the thread's offer in words, its bookmark apart, and Take brings it into your working copy (${line} · ${bookmark})`,
       )
 
       // ── markdown: drawn, and a selection in it cites its source ───────────

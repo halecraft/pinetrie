@@ -10,12 +10,13 @@ import type {
 import { entryId } from "@pineta/core"
 import type { Reference } from "@pineta/marginalia"
 import type { ReactNode } from "react"
+import { joinWords, type LaneJoin } from "./column-view.ts"
 import { plural } from "./counts.ts"
 import { citeTarget } from "./markdown.ts"
 import { MessageText, selectionBoundaries } from "./message-text.tsx"
 import { speakerLabel, withContributors } from "./names.ts"
 import { nameFor } from "./presence.tsx"
-import { colorSlot, trackColor } from "./rail.tsx"
+import { colorSlot, trackStyle } from "./rail.tsx"
 
 export interface MessageProps {
   node: SpineNode
@@ -25,8 +26,8 @@ export interface MessageProps {
   note: ReactNode | undefined
   /** Open it for everyone to edit; undefined once it has a note. */
   onEdit: (() => void) | undefined
-  /** The agent joins the thread here: the first message on the path that asked it. */
-  joined: boolean
+  /** A lane starts here: a divider above the message names it. */
+  join: LaneJoin | undefined
   /** Tracks of open columns that fork here: a dot of each colour. */
   forkTracks: readonly number[]
   /** Branches leaving here that no column shows. */
@@ -68,8 +69,10 @@ export function Message(p: MessageProps) {
   ].filter(c => c !== "")
   return (
     <>
-      {p.joined && (
-        <div className="joined">agent joined · it reads this thread</div>
+      {p.join !== undefined && (
+        <div className="lane-join" data-thread={p.join.name}>
+          {joinWords(p.join)}
+        </div>
       )}
       <div className={classes.join(" ")} data-entry={node.id}>
         <span className="role">{speaker}</span>
@@ -94,7 +97,7 @@ export function Message(p: MessageProps) {
                 ?.querySelector(`.column[data-track="${t}"]`)
                 ?.scrollIntoView({ block: "nearest", inline: "nearest" })
             }
-            style={{ background: trackColor(t) }}
+            style={trackStyle(t)}
             type="button"
           />
         ))}

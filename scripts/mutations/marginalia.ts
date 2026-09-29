@@ -330,4 +330,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a command is for the agent, and keeps the people it names",
   },
+  {
+    name: "the bookmark is left out",
+    file: "packages/marginalia/offer.ts",
+    from: "    bookmark: open?.bookmark ?? null,",
+    to: "    bookmark: null,",
+    command: unit,
+    expect: "the facts",
+  },
 ]

@@ -235,9 +235,12 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   revisions fails any of three tests against what the host last wrote: the
   description, `jj interdiff`, and the bottom's parent an ancestor of the
   target (S48 item 7). A revision you edit is never touched again.
-- **`offerView`** is ADR-0038's state table: the column's line, its buttons,
-  and its menu. A resolution that asked for you counts only when newer than
-  the offer.
+- **`offerView`** is ADR-0038's state table as a decision: the offer's
+  state, its buttons, its menu, and the facts its words are made from
+  (`OfferFacts`: files, size, conflicts, bookmark, …). It writes no words:
+  the line and the button labels are the client's (`offerWords`,
+  `@pineta/client`, ADR-0040). A resolution that asked for you counts only
+  when newer than the offer.
 - **`acceptStack`** takes an agent's stack only when its top has exactly the
   tip's files.
 - **`describeRequest`** is the commit-message request: the skill, your

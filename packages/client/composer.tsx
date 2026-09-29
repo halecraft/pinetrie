@@ -64,6 +64,7 @@ export function Composer({
   typing,
   onTyping,
   onComposeTogether,
+  onIntent,
   readOnly,
   takeFocus,
 }: {
@@ -119,6 +120,8 @@ export function Composer({
    * already has one.
    */
   onComposeTogether: ((text: string) => void) | undefined
+  /** Told whether the next send would create a lane, each time that changes. */
+  onIntent: (createsLane: boolean) => void
   readOnly: ReadOnly | null
   /** Whether this column was just opened: then the box takes focus, once. */
   takeFocus: () => boolean
@@ -152,6 +155,9 @@ export function Composer({
     setPicked(0)
   }
   const work = choice ?? defaultWork
+  // The column's header says what the next send starts. A callback on the
+  // flag, not the text lifted up: the column redraws only when it flips.
+  useEffect(() => onIntent(plan.createsLane), [plan.createsLane, onIntent])
 
   const send = async (message: string, as: ChatMode) => {
     setStatus("sending…")
