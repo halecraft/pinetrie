@@ -38,6 +38,7 @@ import {
   referenceId,
   runId,
   type WorkSetting,
+  type WriterId,
 } from "@pineta/core"
 import { type Command, command, type Reply, reply } from "./messages.ts"
 
@@ -55,10 +56,11 @@ export type Outcome =
   /** Waiting behind `position` messages for the thread's lane to be free. */
   | { readonly kind: "queued"; readonly position: number }
   /**
-   * Another writer took the slot first: `by` is their display name, or null
-   * when no one can be named (two lanes just started at one point).
+   * Someone took the slot first: `by` is their writer, the sender's own when
+   * the host falls back to the lane's asker, or null when no one can be named
+   * (two lanes just started at one point).
    */
-  | { readonly kind: "conflict"; readonly by: string | null }
+  | { readonly kind: "conflict"; readonly by: WriterId | null }
   | { readonly kind: "named" }
   | { readonly kind: "stopped" }
   /** A note was made, joined or moved on: its id. */
@@ -380,7 +382,11 @@ export function decodeReply(wire: Reply): Outcome {
     case "queued":
       return { kind: "queued", position: wire.position }
     case "conflict":
-      return { kind: "conflict", by: wire.by === "" ? null : wire.by }
+      // Branded here, the one edge a writer id crosses into the client.
+      return {
+        kind: "conflict",
+        by: wire.by === "" ? null : (wire.by as WriterId),
+      }
     case "named":
       return { kind: "named" }
     case "stopped":

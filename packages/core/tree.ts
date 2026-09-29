@@ -855,6 +855,11 @@ export interface LaneView {
   readonly waiting: number
   /** Who the agent is answering, or who waits first: for a conflict's "by". */
   readonly askedBy: WriterId | null
+  /**
+   * Who wrote the newest item in its outbox, whatever its kind: a message
+   * queued now waits behind it. Null when nothing waits.
+   */
+  readonly lastWaiting: WriterId | null
 }
 
 export type ThreadLane =

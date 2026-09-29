@@ -48,6 +48,7 @@ import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
+import { queuePlace } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
 import { useFollow } from "./use-follow.ts"
 
@@ -67,7 +68,7 @@ export interface ColumnProps {
   /** Ids any column of this tab shows: a branch leaving here that is shown needs no button. */
   shown: ReadonlySet<string>
   refs: ReferenceIndex
-  /** Display names by writer, for "queue · agent replies after Bea". */
+  /** Display names by writer. */
   nameOf: ReadonlyMap<WriterId, string>
   /** Everyone who can be mentioned (`readParticipants`). */
   participants: readonly string[]
@@ -209,10 +210,7 @@ export function Column(p: ColumnProps) {
     lanes: p.work.lanes,
     project: p.work.project,
   })
-  const holder =
-    lane.kind === "lane" && lane.askedBy !== null
-      ? displayName(lane.askedBy, p.nameOf.get(lane.askedBy))
-      : null
+  const queue = queuePlace(lane, { me: p.session.writer, nameOf: p.nameOf })
 
   // Notes by the message they are the text of, and this thread's draft.
   const noteOf = new Map(
@@ -456,7 +454,8 @@ export function Column(p: ColumnProps) {
         at={at}
         boundLane={p.column.lane}
         fresh={fresh}
-        holderName={holder}
+        nameOf={p.nameOf}
+        queue={queue}
         initialText={p.column.fresh?.prefill}
         lane={lane}
         onBranchInstead={text => {

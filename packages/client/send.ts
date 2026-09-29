@@ -10,8 +10,9 @@ import {
   parseMentions,
   type ThreadLane,
   type WorkSetting,
+  type WriterId,
 } from "@pineta/core"
-import { addressChat, parseCommand } from "@pineta/marginalia"
+import { addressChat, displayName, parseCommand } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
 
 export interface SendSettled {
@@ -22,23 +23,39 @@ export interface SendSettled {
    */
   readonly restore: string | null
   readonly status: string
-  /** A reply another writer raced: the sender chooses to queue or branch. */
+  /**
+   * A reply that lost a race: the sender chooses to queue or branch. `line`
+   * says who asked first (`raceWords`).
+   */
   readonly conflict: {
     readonly text: string
-    readonly by: string | null
+    readonly line: string
   } | null
+}
+
+/** Who is reading: to tell their own messages apart, and name the rest. */
+export interface Reader {
+  readonly me: WriterId
+  readonly nameOf: ReadonlyMap<WriterId, string>
 }
 
 const ordinal = (n: number): string =>
   n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`
 
-export function settleSend(outcome: Outcome, message: string): SendSettled {
+export function settleSend(
+  outcome: Outcome,
+  message: string,
+  reader: Reader,
+): SendSettled {
   switch (outcome.kind) {
     case "conflict":
       return {
         restore: message,
         status: "",
-        conflict: { text: message, by: outcome.by },
+        conflict: {
+          text: message,
+          line: `${raceWords(outcome.by, reader)}.`,
+        },
       }
     case "refused":
       return {
@@ -101,8 +118,8 @@ export function planSend(input: {
   readonly lane: ThreadLane
   readonly asksAgent: boolean
   readonly participants: readonly string[]
-  /** Who the agent is answering, or who waits first, by name. */
-  readonly holderName: string | null
+  /** Where a queued message would wait. */
+  readonly queue: QueuePlace
 }): SendPlan {
   const { fresh, lane } = input
   const how = {
@@ -124,9 +141,10 @@ export function planSend(input: {
       ? "queue"
       : "reply"
   const [first, ...others] = to.people
+  const queue = queueWords(input.queue)
   const button =
     mode === "queue"
-      ? queueWords(input.holderName)
+      ? queue.button
       : compelled
         ? "ask the agent"
         : first === undefined
@@ -139,16 +157,72 @@ export function planSend(input: {
     createsLane: compelled && (fresh || lane.kind === "none"),
     button,
     title:
-      !compelled && others.length > 0 ? `to ${to.people.join(", ")}` : null,
+      mode === "queue"
+        ? queue.title
+        : !compelled && others.length > 0
+          ? `to ${to.people.join(", ")}`
+          : null,
     placeholder: agentByDefault(how)
       ? "ask the agent…"
       : "say something · @agent to ask",
   }
 }
 
-/** "queue after Bea", or "queue" when no one is named: the button's and the conflict prompt's. */
-export const queueWords = (by: string | null): string =>
-  by === null ? "queue" : `queue after ${by}`
+/** Where a message queued now would wait: what the queue button says. */
+export type QueuePlace =
+  /** Nothing waits: it is taken when the run ends. */
+  | { readonly kind: "next" }
+  /** Behind `ahead` waiting items, the last of them yours. */
+  | { readonly kind: "afterYours"; readonly ahead: number }
+  /** Behind `ahead` waiting items, the last of them `name`'s. */
+  | { readonly kind: "after"; readonly name: string; readonly ahead: number }
+
+/**
+ * Where a message queued on `lane` would wait: behind the newest item in its
+ * outbox, of any kind, since the host takes them in the order sent.
+ */
+export function queuePlace(lane: ThreadLane, reader: Reader): QueuePlace {
+  if (lane.kind === "none") return { kind: "next" }
+  const last = lane.lastWaiting
+  if (last === null) return { kind: "next" }
+  if (last === reader.me) return { kind: "afterYours", ahead: lane.waiting }
+  return {
+    kind: "after",
+    name: displayName(last, reader.nameOf.get(last)),
+    ahead: lane.waiting,
+  }
+}
+
+/**
+ * The queue button's words, the composer's and the conflict prompt's. The
+ * title counts the queue when one name stands for more than one waiting.
+ */
+export function queueWords(place: QueuePlace): {
+  readonly button: string
+  readonly title: string | null
+} {
+  const button =
+    place.kind === "next"
+      ? "queue up next"
+      : place.kind === "afterYours"
+        ? "queue after yours"
+        : `queue after ${place.name}`
+  const title =
+    place.kind !== "next" && place.ahead > 1
+      ? `${place.ahead} waiting ahead`
+      : null
+  return { button, title }
+}
+
+/**
+ * Who asked the agent first, as a clause, for a conflict. `by` is the reader
+ * when the host falls back to the lane's asker (`askedBy`) and that is them.
+ */
+export function raceWords(by: WriterId | null, reader: Reader): string {
+  if (by === null) return "Another thread started here a moment before you"
+  if (by === reader.me) return "You already asked the agent here"
+  return `${displayName(by, reader.nameOf.get(by))} asked the agent a moment before you`
+}
 
 // ── where a new lane works ────────────────────────────────────────────────
 

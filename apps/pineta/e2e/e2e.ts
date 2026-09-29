@@ -714,7 +714,7 @@ invariants("first turn")
     `a plain message to a running lane waits (${bobRemark.kind})`,
   )
   ok(
-    carolAsk.kind === "conflict" && carolAsk.by === "Alice",
+    carolAsk.kind === "conflict" && carolAsk.by === alice.writer,
     `a compelled reply to a busy lane is a conflict, naming who holds it (${carolAsk.kind}${carolAsk.kind === "conflict" ? `: ${carolAsk.by}` : ""})`,
   )
   const queued = await carol.chat("@agent name a colour", at(promptId), {
@@ -741,7 +741,7 @@ invariants("first turn")
   // compelled message is below it now, so his compelled reply is a conflict.
   const bobAsk = await bob.chat("@agent and a number?", at(idOf(REMARK)))
   ok(
-    bobAsk.kind === "conflict" && bobAsk.by === "Carol",
+    bobAsk.kind === "conflict" && bobAsk.by === carol.writer,
     `another writer's compelled message below what I saw is a race (${bobAsk.kind})`,
   )
   // My own question and the agent's reply to it are not a race for me: Dan

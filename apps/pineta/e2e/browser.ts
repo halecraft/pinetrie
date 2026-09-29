@@ -773,44 +773,66 @@ try {
     bea.kind === "started",
     `Bea's question starts the thread's run (${bea.kind})`,
   )
-  const queues = await page
-    .waitForFunction(
-      c =>
-        document.querySelector(`${c} .composer .send`)?.textContent ===
-        "queue after Bea",
-      col(0),
-      { timeout: 15_000 },
-    )
-    .then(
-      () => true,
-      () => false,
-    )
+  // The send button's words and title, once they are `text` and `title`.
+  const queueButton = (text: string, title: string | null) =>
+    page
+      .waitForFunction(
+        ([c, text, title]) => {
+          const b = document.querySelector(`${c} .composer .send`)
+          return b?.textContent === text && b.getAttribute("title") === title
+        },
+        [col(0), text, title] as const,
+        { timeout: 15_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
   ok(
-    idleLabel === "ask the agent" && queues,
-    `once Bea's run shows, the composer says it will queue after her ("${await label(0)}")`,
+    idleLabel === "ask the agent" && (await queueButton("queue up next", null)),
+    `once Bea's run shows, with nothing waiting, the composer says it will queue up next ("${await label(0)}")`,
+  )
+  const beaAgain = await other.chat(
+    "@agent Bea again",
+    atEntry(entryId(await tipOf0())),
+    { mode: "queue" },
+  )
+  ok(
+    beaAgain.kind === "queued" && (await queueButton("queue after Bea", null)),
+    `with Bea's second question waiting, it says it will queue after her (${beaAgain.kind}, "${await label(0)}")`,
   )
   await page.click(`${col(0)} .composer .send`)
   const waiting = await page
-    .waitForSelector(`${col(0)} .msg.waiting`, { timeout: 15_000 })
+    .waitForSelector(`${col(0)} ${msg("@agent after Bea")}.waiting`, {
+      timeout: 15_000,
+    })
     .then(
       () => true,
       () => false,
     )
   ok(waiting, "the queued message shows in its column, waiting")
+  ok(
+    await queueButton("queue after yours", "2 waiting ahead"),
+    `with your own message last in line, it says it will queue after yours ("${await label(0)}")`,
+  )
   beasTurn.resume()
   await idle()
-  const order = await page.$$eval(`${col(0)} .msg`, ns =>
-    ns
-      .map(n => n.querySelector(":scope > .text")?.textContent ?? "")
-      .filter(t => t === "@agent Bea's turn" || t === "@agent after Bea"),
+  const asked = ["@agent Bea's turn", "@agent Bea again", "@agent after Bea"]
+  const order = await page.$$eval(
+    `${col(0)} .msg`,
+    (ns, asked) =>
+      ns
+        .map(n => n.querySelector(":scope > .text")?.textContent ?? "")
+        .filter(t => asked.includes(t)),
+    asked,
   )
   const lastFour = await page.$$eval(`${col(0)} .msg`, ns =>
     ns.slice(-4).map(n => n.className.replace("msg ", "").split(" ")[0]),
   )
   ok(
-    order.join(" | ") === "@agent Bea's turn | @agent after Bea" &&
+    order.join(" | ") === asked.join(" | ") &&
       lastFour.join(",") === "chat,assistant,chat,assistant",
-    `queued after Bea, both are answered in order (${order.join(" | ")}; ${lastFour.join(",")})`,
+    `queued behind Bea, all three are answered in order (${order.join(" | ")}; ${lastFour.join(",")})`,
   )
 
   // ── the agent in a thread no column shows: the rail pulses ──────────────

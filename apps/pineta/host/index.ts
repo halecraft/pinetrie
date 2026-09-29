@@ -736,7 +736,7 @@ export async function startHost({
       case "conflict":
         return {
           kind: "conflict",
-          by: planned.by === null ? null : nameOf(planned.by),
+          by: planned.by,
         }
       case "hold":
         await agent.hold({

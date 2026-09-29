@@ -1139,7 +1139,8 @@ not show either works).
 (Start Chat and Start Agent become the add tab), by ADR-0032 (a workspace
 is created with the lane, not as its own step), and in place below (a branch
 from agent work starts with `@agent ` typed; the send button's words, and a
-chip beside it for where a new agent works, `PLAN-2026-09-29-send-button`).
+chip beside it for where a new agent works, `PLAN-2026-09-29-send-button`;
+who a queued message waits behind, `PLAN-2026-09-29-queue-words`).
 
 **Context.** ADR-0018 stored a default at an entry (`pineta.thread`): below a
 *working session* entry the agent answers every message, below a
@@ -1197,9 +1198,11 @@ The actions differ in cost, and in how far they can be undone:
 - **The send button is the one place that says what a message will do** ("ask
   the agent"). There is no mode toggle: a toggle and a button would be two
   statements of one fact. *Amended:* the button says only what the send does
-  and to whom ("send", "send to Ada", "ask the agent", "queue after Bea"); when
-  the send starts an agent, a chip beside it says where that agent will work
-  (ADR-0032), so the button stays short.
+  and to whom ("send", "send to Ada", "ask the agent", "queue up next",
+  "queue after Bea"); when the send starts an agent, a chip beside it says
+  where that agent will work (ADR-0032), so the button stays short. A queued
+  message names who it will wait behind: the last message already waiting,
+  "yours" when that is your own, or "up next" when none waits.
 - **A workspace is its own step**, an explicit action on a thread that is
   already agent work, never implied by `@agent`. Designed with workspaces.
 - **A session is its participants.** A session is one document, and the

@@ -424,12 +424,23 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   (`@pineta/marginalia`), the function `planChat` runs on the host, so the
   button cannot promise a reply the host will not start. The button says the
   result: "send", "send to Ada" ("send to Ada +2", naming everyone in its
-  `title`), "ask the agent", or "queue after Bea" (`queue` when the lane is
-  busy, `isBusy`). A fresh column sends `branch`. The placeholder is
-  `planSend`'s too: the composer holds only its state and draws.
-- **Conflict.** A compelled `reply` another writer raced comes back `conflict`,
-  and the composer keeps the text and offers **queue after …**
-  (`queueWords`, the button's words) or **branch here**.
+  `title`), "ask the agent", or, when the lane is busy (`isBusy`), a queue:
+  "queue up next", "queue after Bea" or "queue after yours". A fresh column
+  sends `branch`. The placeholder is `planSend`'s too: the composer holds only
+  its state and draws.
+- **The queue names the last message waiting,** not who the agent is
+  answering: the host takes held items in the order sent, whatever their kind,
+  so a new one waits behind the newest (`LaneView.lastWaiting`). `queuePlace`
+  tells yours from someone else's by the column's `session.writer`;
+  `queueWords` says it, with a `title` counting the queue when more than one
+  waits ("3 waiting ahead").
+- **Conflict.** A compelled `reply` that lost a race comes back `conflict`, and
+  the composer keeps the text and offers the queue button, in the lane's
+  current words (`queueWords`), or **branch here**. The line above them is
+  `raceWords`, through `settleSend`: the host sends the writer, not a name, so
+  the client names it and can tell it is you (the host falls back to the
+  lane's `askedBy`, which is you when your own run is going): "You already
+  asked the agent here".
   On one host the page sees another writer's run start almost at once and
   chooses `queue` itself, so a true conflict needs two sends to cross in flight.
   Its outcome is checked in e2e; the prompt's rendering is not exercised in the

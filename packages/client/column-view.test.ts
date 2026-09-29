@@ -159,6 +159,7 @@ const laneView = (name: LaneName, tip: string, running = false): LaneView => ({
   running,
   waiting: 0,
   askedBy: null,
+  lastWaiting: null,
 })
 const onLane = (view: LaneView): ThreadLane => ({ kind: "lane", ...view })
 const record = (lane: LaneName, work: LaneRecord["work"]): LaneRecord => ({

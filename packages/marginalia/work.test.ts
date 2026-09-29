@@ -41,6 +41,7 @@ const view = {
   running: false,
   waiting: 0,
   askedBy: null,
+  lastWaiting: null,
 }
 
 describe("records: one encoder, total decoders", () => {

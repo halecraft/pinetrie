@@ -8,12 +8,14 @@ import type {
   ProjectRecord,
   ThreadLane,
   WorkSetting,
+  WriterId,
 } from "@pineta/core"
 import { useEffect, useRef, useState } from "react"
 import { matchCommands } from "./commands.ts"
 import { Menu } from "./menu.tsx"
 import {
   planSend,
+  type QueuePlace,
   queueWords,
   sendable,
   settleSend,
@@ -39,8 +41,8 @@ export interface ReadOnly {
  * agent, a chip beside it says where that agent will work, and changes it.
  *
  * A reply carries the end its sender saw. If another writer's compelled
- * message got there first, the host writes nothing and says so (`conflict`),
- * and the sender chooses: wait behind them, or branch here. A message the
+ * message got there first, or the lane became busy, the host writes nothing
+ * and says so (`conflict`), and the sender chooses: queue, or branch here. A message the
  * host refuses comes back to the composer too (`settleSend`).
  */
 export function Composer({
@@ -56,7 +58,8 @@ export function Composer({
   fresh,
   initialText,
   participants,
-  holderName,
+  nameOf,
+  queue,
   onSend,
   onBranchInstead,
   pending,
@@ -97,8 +100,10 @@ export function Composer({
   initialText: string | undefined
   /** Everyone who can be mentioned, as shown. */
   participants: readonly string[]
-  /** Who the agent is answering, or who waits first, by name. */
-  holderName: string | null
+  /** Display names by writer, for a conflict's line. */
+  nameOf: ReadonlyMap<WriterId, string>
+  /** Where a message queued now would wait (`queuePlace`). */
+  queue: QueuePlace
   /** A fresh column's send id, recorded before its message is sent. */
   onSend: () => string | undefined
   /** After a conflict: open a branch at `at`, which sends the message. */
@@ -133,7 +138,7 @@ export function Composer({
   const [status, setStatus] = useState("")
   const [conflict, setConflict] = useState<{
     text: string
-    by: string | null
+    line: string
   } | null>(null)
   // Where a lane this send creates works: the column's view state until sent.
   const [choice, setChoice] = useState<WorkSetting | null>(null)
@@ -143,8 +148,9 @@ export function Composer({
     lane,
     asksAgent,
     participants,
-    holderName,
+    queue,
   })
+  const queueNow = queueWords(queue)
   // The commands matching what is typed; Escape hides them for this text.
   const [hidden, setHidden] = useState<string | null>(null)
   const [picked, setPicked] = useState(0)
@@ -169,7 +175,10 @@ export function Composer({
       ...(id === undefined ? {} : { id }),
       ...(plan.createsLane && choice !== null ? { work: choice } : {}),
     })
-    const settled = settleSend(outcome, message)
+    const settled = settleSend(outcome, message, {
+      me: session.writer,
+      nameOf,
+    })
     setConflict(settled.conflict)
     setStatus(settled.status)
     if (settled.restore !== null) setText(settled.restore)
@@ -217,20 +226,17 @@ export function Composer({
     >
       {conflict !== null && (
         <div className="conflict">
-          <span className="conflict-text">
-            {conflict.by === null
-              ? "Another thread started here a moment before you."
-              : `${conflict.by} asked the agent a moment before you.`}
-          </span>{" "}
+          <span className="conflict-text">{conflict.line}</span>{" "}
           <button
             className="queue-after"
             onClick={() => {
               setText("")
               void send(conflict.text, "queue")
             }}
+            title={queueNow.title ?? undefined}
             type="button"
           >
-            {queueWords(conflict.by)}
+            {queueNow.button}
           </button>{" "}
           <button
             className="branch-instead"

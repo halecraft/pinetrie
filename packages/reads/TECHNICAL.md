@@ -35,6 +35,11 @@ in the host and in the browser alike: no pi, no transport.
 - **`readLanes`' `askedBy`** is the writer of the compelled message a running
   lane is answering (the nearest compelled chat on its path), or else of the
   first compelled message waiting for it. It is what a `conflict` names.
+- **`readLanes`' `lastWaiting`** is the writer of the newest item held for the
+  lane, of any kind (`lastHeld`): a message queued now waits behind it, so it
+  is who the queue button names. It is null exactly when `waiting` is 0. It
+  differs from `askedBy` while a run goes: `askedBy` is who the agent
+  answers, `lastWaiting` who is last in line.
 - **`readPresence` gives one entry per key**, as `[writer, value]` pairs for
   `reading`, `typing` and `editing` alike: a person here from two seats
   appears twice (ADR-0037), and `presenceView` shows them once.

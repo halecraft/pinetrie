@@ -479,6 +479,7 @@ describe("threads: where a message lands, and whether it raced", () => {
     running: false,
     waiting: 0,
     askedBy: null,
+    lastWaiting: null,
   })
   const send = (
     at: Position,
@@ -666,6 +667,7 @@ test("planStop: abort a running lane; an idle one is already stopped; an unknown
     running,
     waiting: 0,
     askedBy: null,
+    lastWaiting: null,
   })
   expect(planStop([lane(true)], laneNameForThread("s"))).toBe("abort")
   expect(planStop([lane(false)], laneNameForThread("s"))).toBe("idle")

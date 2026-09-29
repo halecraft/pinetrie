@@ -142,7 +142,14 @@ describe("planNote: the lifecycle", () => {
   test("draft: a new draft keeps its place and what its sender typed", () => {
     const lane = laneNameForThread("x")
     const lanes: LaneView[] = [
-      { name: lane, tip: E2, running: false, waiting: 0, askedBy: null },
+      {
+        name: lane,
+        tip: E2,
+        running: false,
+        waiting: 0,
+        askedBy: null,
+        lastWaiting: null,
+      },
     ]
     const d = plan(
       { kind: "draft", at: atEntry(E2), lane, text: "so far" },
@@ -206,7 +213,14 @@ describe("draftFor", () => {
     const lane = laneNameForThread("x")
     const bound = draft({ subject: { kind: "draft", at: atEntry(E1), lane } })
     const lanes: LaneView[] = [
-      { name: lane, tip: E2, running: false, waiting: 0, askedBy: null },
+      {
+        name: lane,
+        tip: E2,
+        running: false,
+        waiting: 0,
+        askedBy: null,
+        lastWaiting: null,
+      },
     ]
     // Unbound, a reply from e1 continues its newest leaf, f1.
     expect(

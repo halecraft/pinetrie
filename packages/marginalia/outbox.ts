@@ -102,6 +102,12 @@ export const nextHeld = (
   lane: LaneName,
 ): Held | undefined => held.find(h => h.lane === lane)
 
+/** The newest item held for a lane: a new message waits behind it. Pure. */
+export const lastHeld = (
+  held: readonly Held[],
+  lane: LaneName,
+): Held | undefined => held.findLast(h => h.lane === lane)
+
 type HeldChat = Extract<Held, { kind: "chat" }>
 type HeldUpdate = Extract<Held, { kind: "update" }>
 

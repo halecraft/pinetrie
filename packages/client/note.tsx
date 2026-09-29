@@ -10,6 +10,7 @@ import { NOTE_FILTERS, type NoteFilter, type NoteRow } from "@pineta/reads"
 import { useEffect, useRef, useState } from "react"
 import { MessageText } from "./message-text.tsx"
 import { nameFor } from "./presence.tsx"
+import { raceWords } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
 
 const STATE_LABEL: Record<NoteState, string> = {
@@ -77,7 +78,7 @@ export function NoteCard({
       outcome.kind === "refused"
         ? `not done: ${outcome.message}`
         : outcome.kind === "conflict"
-          ? `${outcome.by ?? "Someone"} asked the agent a moment before you; the draft is kept.`
+          ? `${raceWords(outcome.by, { me: session.writer, nameOf })}; the draft is kept.`
           : outcome.kind === "queued"
             ? "sent · waiting for the agent"
             : "",

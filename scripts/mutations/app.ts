@@ -838,4 +838,29 @@ export const mutations: readonly Mutation[] = [
     command: browser,
     expect: "outlines its fork dot in the branch's colour",
   },
+  {
+    name: "the column does not know who you are",
+    file: "packages/client/column.tsx",
+    from: "  const queue = queuePlace(lane, { me: p.session.writer, nameOf: p.nameOf })",
+    to: '  const queue = queuePlace(lane, { me: "w-nobody" as WriterId, nameOf: p.nameOf })',
+    command: browser,
+    expect: "it says it will queue after yours",
+  },
+  {
+    name: "the queue names the first one waiting",
+    file: "packages/reads/index.ts",
+    from: "        const last = lastHeld(outbox, name)",
+    to: "        const last = outbox.find(h => h.lane === name)",
+    command: browser,
+    expect: "it says it will queue after yours",
+  },
+  {
+    name: "the host names the racer",
+    file: "apps/pineta/host/index.ts",
+    from: "          by: planned.by,",
+    to: "          by: planned.by === null ? null : (nameOf(planned.by) as WriterId),",
+    command: e2e,
+    expect:
+      "a compelled reply to a busy lane is a conflict, naming who holds it",
+  },
 ]

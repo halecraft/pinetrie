@@ -226,7 +226,14 @@ describe("a turn's entry, and a run's prompt", () => {
 })
 
 test("isBusy: running, or with messages waiting", () => {
-  const view = { name: A, tip: null, running: false, waiting: 0, askedBy: null }
+  const view = {
+    name: A,
+    tip: null,
+    running: false,
+    waiting: 0,
+    askedBy: null,
+    lastWaiting: null,
+  }
   expect(isBusy(view)).toBe(false)
   expect(isBusy({ ...view, running: true })).toBe(true)
   expect(isBusy({ ...view, waiting: 1 })).toBe(true)

@@ -48,6 +48,7 @@ const lane = (tip: string | null, over: Partial<LaneView> = {}): LaneView => ({
   running: false,
   waiting: 0,
   askedBy: null,
+  lastWaiting: null,
   ...over,
 })
 

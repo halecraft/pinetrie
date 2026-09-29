@@ -15,6 +15,7 @@ import {
   referenceId,
   runId,
   THE_AGENT,
+  writerId,
 } from "@pineta/core"
 import { test } from "vitest"
 import {
@@ -168,7 +169,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
   const outcomes: Outcome[] = [
     { kind: "started", runId: runId("r-1") },
     { kind: "queued", position: 2 },
-    { kind: "conflict", by: "Bea" },
+    { kind: "conflict", by: writerId("bea@example.com") },
     { kind: "conflict", by: null },
     { kind: "referenced", id: referenceId("x-1") },
     { kind: "appended", id: entryId("e-1") },

@@ -129,7 +129,10 @@ export interface Reply {
   readonly entryId: string
   /** `queued`: how many messages wait ahead of it; -1 otherwise. */
   readonly position: number
-  /** `conflict`: the display name of the writer who took the slot; "" otherwise. */
+  /**
+   * `conflict`: the writer id of who took the slot, or "" when none is known
+   * or for any other outcome. The client names it, and can tell it is itself.
+   */
   readonly by: string
   /** `noted`: the note's id; "" otherwise. */
   readonly noteId: string

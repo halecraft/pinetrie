@@ -239,7 +239,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   `ada@example.com`, ADR-0037). A name with no such character, or spelled
   `agent`, is refused: no mention could reach it.
 - **The send button says what the message will do**: "send", "send to Ada",
-  "ask the agent", or "queue after Bea". It uses the host's own decision
+  "ask the agent", or, while the agent is busy, "queue up next", "queue after
+  Bea" or "queue after yours", naming the last message already waiting. It uses the host's own decision
   (`addressChat`, over `threadOf`), so it cannot promise a reply that will
   not come. When the send starts an agent, a chip beside the button says where
   it will work ("on a copy ▾"), and opens the choices.

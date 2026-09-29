@@ -55,6 +55,7 @@ import {
   LANE_NAMESPACE,
   landingRecords,
   laneRecords,
+  lastHeld,
   NAME_NAMESPACE,
   NOTE_NAMESPACE,
   nameRecords,
@@ -117,8 +118,9 @@ export const readOutbox = (doc: SessionDocHandle): readonly Held[] =>
 
 /**
  * Every thread lane: its tip, whether it runs, how many messages wait for it,
- * and who holds it (for a conflict's "by"): the writer of the compelled message
- * it is answering, or of the first one waiting.
+ * who holds it (for a conflict's "by"): the writer of the compelled message
+ * it is answering, or of the first one waiting; and who wrote the last one
+ * waiting, whom a message queued now follows.
  */
 export function readLanes(
   doc: SessionDocHandle,
@@ -145,6 +147,10 @@ export function readLanes(
       running,
       waiting: waiting.length,
       askedBy: asking ?? null,
+      lastWaiting: (() => {
+        const last = lastHeld(outbox, name)
+        return last === undefined ? null : heldBy(last)
+      })(),
     }
   })
 }

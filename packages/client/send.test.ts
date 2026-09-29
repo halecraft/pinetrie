@@ -5,28 +5,56 @@ import {
   type ProjectRecord,
   runId,
   type ThreadLane,
+  writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   planSend,
+  queuePlace,
   queueWords,
+  raceWords,
   sendable,
   settleSend,
   whereChoices,
   whereWords,
 } from "./send.ts"
 
+const ME = writerId("duane@example.com")
+const BEA = writerId("bea@example.com")
+const CY = writerId("cy@example.com")
+const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
+
+const lane = (
+  over: Partial<Extract<ThreadLane, { kind: "lane" }>> = {},
+): ThreadLane => ({
+  kind: "lane",
+  name: laneNameForThread("1"),
+  tip: "e-1",
+  running: false,
+  waiting: 0,
+  askedBy: null,
+  lastWaiting: null,
+  ...over,
+})
+
 describe("settleSend", () => {
   test("a conflict and a refusal put the message back", () => {
-    expect(settleSend({ kind: "conflict", by: "Bea" }, "hi")).toEqual({
+    expect(settleSend({ kind: "conflict", by: BEA }, "hi", READER)).toEqual({
       restore: "hi",
       status: "",
-      conflict: { text: "hi", by: "Bea" },
+      conflict: {
+        text: "hi",
+        line: "Bea asked the agent a moment before you.",
+      },
     })
+    expect(
+      settleSend({ kind: "conflict", by: ME }, "hi", READER).conflict?.line,
+    ).toBe("You already asked the agent here.")
     expect(
       settleSend(
         { kind: "refused", code: ERR.ARCHIVED, message: "archived by Bea" },
         "hi",
+        READER,
       ),
     ).toEqual({
       restore: "hi",
@@ -36,12 +64,12 @@ describe("settleSend", () => {
   })
   test("a written, started or queued message leaves the composer as it is", () => {
     expect(
-      settleSend({ kind: "appended", id: entryId("e") }, "hi").restore,
+      settleSend({ kind: "appended", id: entryId("e") }, "hi", READER).restore,
     ).toBeNull()
     expect(
-      settleSend({ kind: "started", runId: runId("r") }, "hi").restore,
+      settleSend({ kind: "started", runId: runId("r") }, "hi", READER).restore,
     ).toBeNull()
-    expect(settleSend({ kind: "queued", position: 1 }, "hi")).toEqual({
+    expect(settleSend({ kind: "queued", position: 1 }, "hi", READER)).toEqual({
       restore: null,
       status: "waiting · 2nd in line",
       conflict: null,
@@ -63,18 +91,6 @@ describe("sendable", () => {
 })
 
 describe("planSend: the button, as the host will decide (ADR-0021)", () => {
-  const LANE = laneNameForThread("1")
-  const lane = (
-    over: Partial<Extract<ThreadLane, { kind: "lane" }>> = {},
-  ): ThreadLane => ({
-    kind: "lane",
-    name: LANE,
-    tip: "e-1",
-    running: false,
-    waiting: 0,
-    askedBy: null,
-    ...over,
-  })
   const plan = (
     text: string,
     over: Partial<Parameters<typeof planSend>[0]> = {},
@@ -85,7 +101,7 @@ describe("planSend: the button, as the host will decide (ADR-0021)", () => {
       lane: { kind: "none" },
       asksAgent: false,
       participants: ["Ada", "Bea", "Cy"],
-      holderName: "Bea",
+      queue: { kind: "next" },
       ...over,
     })
   test("in a conversation, a message is sent, to whoever it names", () => {
@@ -131,11 +147,19 @@ describe("planSend: the button, as the host will decide (ADR-0021)", () => {
     for (const busy of [lane({ running: true }), lane({ waiting: 1 })])
       expect(plan("hi", { lane: busy })).toMatchObject({
         mode: "queue",
-        button: "queue after Bea",
+        button: "queue up next",
+        title: null,
       })
     expect(
-      plan("hi", { lane: lane({ running: true }), holderName: null }).button,
-    ).toBe("queue")
+      plan("hi", {
+        lane: lane({ waiting: 3 }),
+        queue: { kind: "after", name: "Bea", ahead: 3 },
+      }),
+    ).toMatchObject({
+      mode: "queue",
+      button: "queue after Bea",
+      title: "3 waiting ahead",
+    })
     expect(plan("@ada hi", { lane: lane({ running: true }) })).toMatchObject({
       mode: "reply",
       button: "send to Ada",
@@ -153,10 +177,63 @@ describe("planSend: the button, as the host will decide (ADR-0021)", () => {
   })
 })
 
+describe("queuePlace: behind the newest message waiting", () => {
+  test("with nothing waiting, it is next", () => {
+    expect(queuePlace(lane({ running: true }), READER)).toEqual({
+      kind: "next",
+    })
+    expect(queuePlace({ kind: "none" }, READER)).toEqual({ kind: "next" })
+  })
+  test("behind someone else, by name", () => {
+    expect(queuePlace(lane({ waiting: 1, lastWaiting: BEA }), READER)).toEqual({
+      kind: "after",
+      name: "Bea",
+      ahead: 1,
+    })
+    expect(queuePlace(lane({ waiting: 1, lastWaiting: CY }), READER)).toEqual({
+      kind: "after",
+      name: "cy",
+      ahead: 1,
+    })
+  })
+  test("behind your own message, as yours", () => {
+    expect(queuePlace(lane({ waiting: 2, lastWaiting: ME }), READER)).toEqual({
+      kind: "afterYours",
+      ahead: 2,
+    })
+  })
+})
+
 describe("queueWords", () => {
-  test("names who it waits behind, when anyone", () => {
-    expect(queueWords("Bea")).toBe("queue after Bea")
-    expect(queueWords(null)).toBe("queue")
+  test("says where it waits", () => {
+    expect(queueWords({ kind: "next" })).toEqual({
+      button: "queue up next",
+      title: null,
+    })
+    expect(queueWords({ kind: "after", name: "Bea", ahead: 1 })).toEqual({
+      button: "queue after Bea",
+      title: null,
+    })
+    expect(queueWords({ kind: "afterYours", ahead: 1 }).button).toBe(
+      "queue after yours",
+    )
+  })
+  test("counts the queue when one name stands for several", () => {
+    expect(queueWords({ kind: "afterYours", ahead: 3 }).title).toBe(
+      "3 waiting ahead",
+    )
+  })
+})
+
+describe("raceWords", () => {
+  test("names who asked first, and never names you", () => {
+    expect(raceWords(null, READER)).toBe(
+      "Another thread started here a moment before you",
+    )
+    expect(raceWords(ME, READER)).toBe("You already asked the agent here")
+    expect(raceWords(BEA, READER)).toBe(
+      "Bea asked the agent a moment before you",
+    )
   })
 })
 
