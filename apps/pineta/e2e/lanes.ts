@@ -29,7 +29,6 @@ import {
 } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import path from "node:path"
-import { connectSession } from "@pineta/client/session"
 import {
   ancestry,
   atEntry,
@@ -59,9 +58,8 @@ import {
   readTreeIndex,
 } from "@pineta/reads"
 import { readEntries, rowMessage } from "@pineta/schema"
-import { WebSocket } from "ws"
 import { startHost } from "../host/index.ts"
-import { committedProject, createChecks, waitFor } from "./harness.ts"
+import { committedProject, createChecks, join, waitFor } from "./harness.ts"
 
 const { ok, report } = createChecks()
 const START_AGENT = { mode: "branch", asksAgent: true } as const
@@ -160,7 +158,7 @@ async function mainSection(): Promise<void> {
       if (process.env.PINETA_E2E_LOG === "1") console.log(m)
     },
   })
-  const wu = await connectSession({ url: wh.wsUrl, WebSocket, peerId: "l-uma" })
+  const wu = await join(wh, "uma", "lanes")
   await wu.setName("Uma")
   const tree = () => readTreeIndex(wh.doc)
   const idle = async () => {
@@ -650,11 +648,11 @@ async function sectionHost(input: {
       if (process.env.PINETA_E2E_LOG === "1") console.log(m)
     },
   })
-  const user = await connectSession({
-    url: host.wsUrl,
-    WebSocket,
-    peerId: `section-${process.pid}-${Math.random()}`,
-  })
+  const user = await join(
+    host,
+    `u${Math.random().toString(36).slice(2, 10)}`,
+    `section-${process.pid}`,
+  )
   const idle = async () => {
     await waitFor(
       () =>

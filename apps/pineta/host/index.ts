@@ -14,13 +14,12 @@ import {
   type Store,
   whenHydrated,
 } from "@kyneta/exchange"
-import { stepInPlace, unwrap } from "@kyneta/schema"
+import { unwrap } from "@kyneta/schema"
 import {
   WebsocketServerTransport,
   wrapNodeWebsocket,
 } from "@kyneta/websocket-transport/server"
 import {
-  checkEnvironment,
   type EntryId,
   ERR,
   type Intent,
@@ -35,7 +34,7 @@ import {
   runId,
   threadOf,
   type WriterId,
-  writerId,
+  writerOfPrincipal,
 } from "@pineta/core"
 import { userConfigFile } from "@pineta/lanes"
 import {
@@ -76,7 +75,8 @@ import {
 } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
 import {
-  HOST_PEER_ID,
+  CONTROL_TOPIC,
+  HOST_PRINCIPAL,
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
@@ -124,29 +124,10 @@ import {
   newKey,
   urlHost,
 } from "./admission.ts"
+import { departedSeats, lineDocPrefix } from "./lines.ts"
 import { writePolicy } from "./policy.ts"
 import { openStore } from "./store.ts"
 import { startLaneWork } from "./work.ts"
-
-export interface EnvironmentInfo {
-  readonly node: string
-}
-
-/**
- * Deterministic build guard: refuse to start on a stale Kyneta build. Every
- * host runs it, so a stale build fails the first suite that starts one.
- */
-export function assertEnvironment(): EnvironmentInfo {
-  const result = checkEnvironment({
-    hasStepInPlace: typeof stepInPlace === "function",
-  })
-  if (!result.ok) {
-    throw new Error(
-      `environment gate failed:\n  - ${result.problems.join("\n  - ")}`,
-    )
-  }
-  return { node: process.version }
-}
 
 export interface StartHostOptions {
   readonly port?: number
@@ -187,11 +168,11 @@ export interface StartHostOptions {
    */
   readonly agentDir?: string
   /**
-   * Where the session is kept: a SQLite file; a Kyneta store a caller made (and
-   * closes), as a suite does to control it; or, absent or null, a store in
-   * memory. Every host has a store: Kyneta compacts only a document with one,
-   * and compaction is also what trims the session's in-memory op log
-   * (ADR-0023).
+   * Where the session is kept: a SQLite file; a Kyneta store a caller made, as
+   * a suite does to read it while the host runs; or, absent or null, a store
+   * in memory. Shutting the host down closes the store, whoever made it.
+   * Every host has a store: Kyneta compacts only a document with one, and
+   * compaction is also what trims the session's in-memory op log (ADR-0023).
    */
   readonly store?: string | Store | null
   /** How long presence lasts without a refresh; a suite shortens it. */
@@ -235,25 +216,31 @@ export async function startHost({
   log = console.log,
 }: StartHostOptions): Promise<RunningHost> {
   const key = isLoopback(bind) ? null : (givenKey ?? newKey())
-  const env = assertEnvironment()
-  log(`[host] env ok — node ${env.node}, @kyneta/schema stepInPlace present`)
 
   // --- transport + exchange ------------------------------------------------
   const serverTransport = new WebsocketServerTransport()
-  // The Exchange id is the address a client's Line targets, so it is the
-  // agreed constant. The host has no WRITER identity: writers are the
-  // connected clients, identified by the transport, and they own no lanes;
-  // lanes belong to threads (ADR-0020).
-  const stored =
+  const store =
     storeFile === null
-      ? { store: createInMemoryStore(), close: () => {} }
+      ? createInMemoryStore()
       : typeof storeFile === "string"
         ? openStore(storeFile)
-        : { store: storeFile, close: () => {} }
+        : storeFile
+  // Every stored command Line belongs to a client seat that cannot return: a
+  // client keeps no store and does not reconnect (host/lines.ts).
+  for await (const id of store.listDocIds(lineDocPrefix(CONTROL_TOPIC)))
+    await store.delete(id)
+  // Clients find the host by its principal and address their Lines to the
+  // seat Kyneta issues it (ADR-0037). The host has no WRITER identity:
+  // writers are the connected clients, named by their principals, and they
+  // own no lanes; lanes belong to threads (ADR-0020).
   const exchange = new Exchange({
-    id: HOST_PEER_ID,
+    principal: HOST_PRINCIPAL,
+    type: "service",
     transports: [serverTransport],
-    stores: [stored.store],
+    store,
+    // A client does not reconnect: a closed channel is a seat that has left,
+    // so there is nothing to wait for before its Line goes.
+    departureTimeout: 0,
   })
 
   // The session document is BOTH pi's storage and the thing we replicate.
@@ -757,26 +744,13 @@ export async function startHost({
   const notes = new Map<NoteId, { doc: NoteDocHandle; release: () => void }>()
 
   /**
-   * Every writer the host knows: those connected, and those in the session.
-   * A note's edits are attributed by matching their `clientID`s against these.
-   */
-  function knownWriters(): WriterId[] {
-    const index = readTreeIndex(doc)
-    const inTree = Object.values(index.entries).flatMap(e =>
-      e.message?.writer === undefined ? [] : [e.message.writer],
-    )
-    return [
-      ...[...exchange.peers.keys()].map(writerId),
-      ...readParticipantNames(doc).keys(),
-      ...inTree,
-    ]
-  }
-
-  /**
    * Hold a note's text, seeded with `seed` if it is new, and attribute every
-   * later edit: each change's `clientID`s whose clocks moved are gathered
-   * here, `planNoteEdit` decides, and a changed record is written in a serial
-   * step. The operations themselves say who wrote them (S26 addendum).
+   * later edit: each change's `clientID`s whose clocks moved, and the person
+   * behind each connected seat's `clientID`, are gathered here, `planNoteEdit`
+   * decides, and a changed record is written in a serial step. The operations
+   * themselves say which seat wrote them (S26 addendum, ADR-0037). The authors
+   * are gathered as the edit arrives, while its sender is certainly
+   * connected: by the step, it may have gone.
    */
   async function holdNote(
     id: NoteId,
@@ -797,13 +771,11 @@ export async function startHost({
         clock > (tr.beforeState.get(client) ?? 0) ? [client] : [],
       )
       if (changed.length === 0) return
+      const authors = noteAuthors(exchange.peers.current.values())
       void serially(async () => {
         const record = readNotes(doc).find(n => n.id === id)
         if (record === undefined) return
-        const next = planNoteEdit(record, {
-          changed,
-          authors: noteAuthors(knownWriters()),
-        })
+        const next = planNoteEdit(record, { changed, authors })
         if (next !== null) await agent.setNote(next)
       })
     }
@@ -978,16 +950,23 @@ export async function startHost({
 
   /**
    * One command from one writer. The command is UNTRUSTED text off a socket,
-   * so it is decoded first; the codec owns every shape rule.
+   * so it is decoded first; the codec owns every shape rule. A sender whose
+   * principal names nobody (`writer` undefined) is refused whatever it sends.
    */
   async function handleCommand(
     sender: ControlSender,
-    writer: WriterId,
+    writer: WriterId | undefined,
     wire: WireCommand,
   ): Promise<void> {
     const id = typeof wire.id === "string" ? wire.id : ""
     const respond = (outcome: Outcome) =>
       sender.send(encodeOutcome(id, outcome))
+    if (writer === undefined)
+      return respond({
+        kind: "refused",
+        code: ERR.INVALID_IDENTITY,
+        message: "connect with your email as your principal",
+      })
 
     const intent = decodeCommand(wire)
     if (intent.kind === "refused") return respond(intent)
@@ -1046,14 +1025,25 @@ export async function startHost({
   }
 
   // Identity comes from the TRANSPORT, never the message: `sender.peer` is the
-  // connected client's peer id, so no command field can claim to be someone
-  // else. It is recorded in every message they write; people own no lanes.
-  listener.onReceive((sender, receiver) => {
-    const writer = writerId(sender.peer)
+  // client's seat, and the principal its connection named is who they are
+  // (ADR-0037), so no command field can claim to be someone else. It is
+  // recorded in every message they write; people own no lanes. A principal
+  // that is not an email names nobody, and every command from it is refused.
+  const lines = new Map<string, { destroy(): void }>()
+  listener.onReceive((sender, receiver, manager) => {
+    lines.set(sender.peer, manager)
+    const writer = writerOfPrincipal(exchange.peers.get(sender.peer)?.principal)
     void (async () => {
       for await (const cmd of receiver)
         await serially(() => handleCommand(sender, writer, cmd))
     })()
+  })
+  // A seat that has left never returns, so its Line goes (host/lines.ts).
+  const stopLines = exchange.peers.subscribe(() => {
+    for (const seat of departedSeats(lines.keys(), exchange.peers.current)) {
+      lines.get(seat)?.destroy()
+      lines.delete(seat)
+    }
   })
 
   // --- http + ws -----------------------------------------------------------
@@ -1193,6 +1183,7 @@ export async function startHost({
         await quiet()
       } catch {}
       for (const n of notes.values()) n.release()
+      stopLines()
       try {
         await agent.close()
       } catch {}
@@ -1209,9 +1200,6 @@ export async function startHost({
       await new Promise<void>(resolve => {
         httpServer.close(() => resolve())
       })
-      try {
-        stored.close()
-      } catch {}
     },
   }
 }

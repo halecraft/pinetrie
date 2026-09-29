@@ -4,8 +4,7 @@
 import assert from "node:assert/strict"
 import {
   address,
-  checkEnvironment,
-  type EnvironmentReport,
+  emailLocalPart,
   findSeqKeys,
   handleOf,
   indexTree,
@@ -13,20 +12,48 @@ import {
   latestTip,
   messageText,
   NOBODY,
+  normalizeEmail,
   normalizeName,
   parseMentions,
   projectTranscript,
   THE_AGENT,
   writerId,
+  writerOfPrincipal,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 
-/** First problem from an environment report, asserted present. */
-function firstProblem(report: EnvironmentReport): string {
-  const problem = report.problems[0]
-  assert.ok(problem !== undefined, "expected at least one problem")
-  return problem
-}
+describe("who a principal is (ADR-0037)", () => {
+  test("an email is trimmed and lower-cased", () => {
+    expect(normalizeEmail("  Duane@Example.COM ")).toBe("duane@example.com")
+  })
+
+  test("anything else is refused", () => {
+    for (const text of [
+      "",
+      "duane",
+      "@example.com",
+      "duane@",
+      "duane@example",
+      "duane@.com",
+      "duane@example.",
+      "a@b@example.com",
+      "du ane@example.com",
+      "du:ane@example.com",
+      "_@example.com",
+    ])
+      expect(normalizeEmail(text), text).toBeUndefined()
+  })
+
+  test("the host's principal names no writer", () => {
+    expect(writerOfPrincipal("pineta-host")).toBeUndefined()
+    expect(writerOfPrincipal(undefined)).toBeUndefined()
+    expect(writerOfPrincipal("Ada@X.io")).toBe(writerId("ada@x.io"))
+  })
+
+  test("an unnamed writer's label is the part before the @", () => {
+    expect(emailLocalPart(writerId("ada.l@x.io"))).toBe("ada.l")
+  })
+})
 
 test("latestTip: the newest tip by id, independent of input order", () => {
   // Out of id order on purpose: a helper that returned the first or last tip
@@ -165,15 +192,6 @@ test("messageText: flattens pi's content parts", () => {
   )
   assert.equal(messageText({ content: [{ type: "image" }] }), "")
   assert.equal(messageText(undefined), "")
-})
-
-test("checkEnvironment: the deterministic build guard", () => {
-  assert.equal(checkEnvironment({ hasStepInPlace: true }).ok, true)
-  // Published @kyneta/schema 3.0.0 lacks stepInPlace — that is the whole point.
-  assert.match(
-    firstProblem(checkEnvironment({ hasStepInPlace: false })),
-    /stepInPlace/,
-  )
 })
 
 describe("address: mentions pick who a message is for (ADR-0021)", () => {

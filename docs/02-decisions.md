@@ -1247,9 +1247,9 @@ for a Claude subscription works only through a pi extension (S23).
   invite link (`?key=`), which sets an `HttpOnly` cookie and redirects to the
   page without it. Hot reload runs on loopback only, because Vite's socket
   would bypass admission. Two limits:
-  - The key decides who gets in, not who is who. Peer ids are chosen by
-    clients, so a collaborator can pose as another. Per-person invites are for
-    the presence work.
+  - The key decides who gets in, not who is who. A person is the email their
+    client names (ADR-0037), unverified, so a collaborator can pose as
+    another. Per-person invites are for the presence work.
   - The key crosses a network in the clear. That is fine on a trusted network
     or a tunnel; the open internet needs a TLS-terminating proxy.
   - With tools on, anyone with the link can run commands on the machine as the
@@ -1343,7 +1343,9 @@ missing. Loro without compaction: the store and memory grow for good.
 ## ADR-0024 — Presence is ephemeral, per open column, written by each client
 
 **Status:** Accepted. Implemented by `PLAN-2026-09-27-presence`. Amended by
-ADR-0029: only the columns of the root tab you are on report.
+ADR-0029: only the columns of the root tab you are on report; and by
+ADR-0037: every key is per seat, so a person here from two tabs has two sets
+of entries, shown once.
 
 **Context.** Several people share a session, each with their own columns, and
 nothing showed who else was there. The composer's "seen by" was removed because,
@@ -1356,12 +1358,14 @@ without presence, any list was a guess. Notes will need "who is editing this".
   which is also what a crashed tab does.
 - **Thread-level, and per open column.** Pineta has no focused column: every
   open column reports the end of the thread it follows (`reading`, keyed
-  `${writer}:${columnKey}`), refreshed every 10 s while the page is visible and
-  deleted when the column closes. `typing` and `editing` are one per writer.
+  `${writer}:${seat}:${columnKey}` since ADR-0037), refreshed every 10 s while
+  the page is visible and deleted when the column closes. `typing` and
+  `editing` are one per seat (`${writer}:${seat}`).
   What is on screen, message by message, waits until thread-level proves too
   coarse.
 - **Written by each client, and untrusted.** A client writes only its own keys,
-  but nothing can enforce that, just as peer ids are self-chosen.
+  but nothing can enforce that, just as the principal a client names is
+  unverified (ADR-0037).
 - **The host refuses client writes to the session document.** A policy
   (`host/policy.ts`) accepts presence and refuses the session; until now nothing
   stopped a client writing the session directly.
@@ -1385,7 +1389,8 @@ Initials on the rail's dots (no room). A focused column (Pineta has none).
 
 **Status:** Accepted. Implemented by `PLAN-2026-09-27-notes`. Amended by
 ADR-0026 (a queued state; the host refuses no write to a note that
-has a record).
+has a record), and by ADR-0037 (a `clientID` names a seat, and the seat's
+principal the person).
 
 **Context.** People could only append messages. There was no shared text to work
 on together (a spec, a plan, the next instruction written jointly), no way to
@@ -1414,10 +1419,12 @@ The roadmap's "shared composition" was the same want, started earlier.
   whenever it is needed, so it follows its thread as the thread grows. Each
   person's own composer stays private.
 - **Authorship from the operations.** Kyneta gives each peer's Yjs `clientID`
-  from its peer id (S26 addendum), so the host attributes each edit by matching
-  the `clientID`s whose clocks moved against the writers it knows. A sent draft
-  is its sender's message, "with" its other contributors. This is as
-  trustworthy as peer ids, which are self-chosen.
+  from its seat (S26 addendum, ADR-0037), so the host attributes each edit by
+  matching the `clientID`s whose clocks moved against the seats connected when
+  it arrives, each the person its principal names. A deletion counts: Kyneta
+  ticks a Yjs clock for it. A sent draft is its sender's message, "with" its
+  other contributors. This is as trustworthy as principals, which are
+  unverified.
 - **Done is enforced by the host.** Its write policy accepts a note's document
   while the note is a draft or open, and refuses it once done or when no record
   names it. With presence, that keeps clients to note and presence documents.
@@ -1428,9 +1435,9 @@ recorded as an upstream item. A write the host refused stays in that client's
 replica, and that client's later edits to the note build on it, so they do not
 reach the host either, even after the note is reopened (measured; S26 addendum
 2). The screen never offers a done note for editing, so only a client writing
-directly can do this. Pineta's `clientIdOf` copies Kyneta's
-`hashPeerId`, which it does not export; a test pins the two together. Yjs adds
-about 36 kB gzipped to the page.
+directly can do this. Pineta computes a seat's `clientID` with Kyneta's own
+`yjsClientId`; a test pins it to a real document. Yjs adds about 36 kB
+gzipped to the page.
 
 **Alternatives rejected.** A note as a separate record anchored beside a message
 (a note *is* the message, opened; the conversation about it is its branch).
@@ -1538,7 +1545,8 @@ once a note is taken and having the client recover by fetching the note again
 Amended by ADR-0028, proposed (a stored layout holds the focused piece of
 work), and by ADR-0029, which replaces that: a stored layout holds
 the active root tab and each root's columns; and by ADR-0030: it
-also holds your open roots.
+also holds your open roots. ADR-0037 makes a person their email, so a tab is
+no longer a writer.
 
 **Context.** Which columns are open is view state, never written (ADR-0024's
 reasoning: which paths a person reads is theirs). Nothing else kept it either,
@@ -1563,10 +1571,9 @@ so a reload closed every column but one, and a new tab started from one.
 **Consequences.** Two tabs open at once keep their own layouts across reloads.
 A new tab, or the browser reopened, gets the layout of the tab that last
 changed, and with two tabs open that can be either, since both move their
-columns as messages arrive. Duplicate Tab copies a layout, and, until Kyneta
-fixes `persistentPeerId`, the writer too (S29). A layout does not follow a
-person to another device: a writer is a tab, and people have no identity
-across devices yet.
+columns as messages arrive. Duplicate Tab copies a layout. A layout does not
+follow a person to another device: it is view state, kept per device, though
+since ADR-0037 the person is the same on every device.
 
 **Alternatives rejected.** `localStorage` alone (two tabs overwrite each
 other). `sessionStorage` alone (a new tab starts empty). The session document,
@@ -1835,7 +1842,9 @@ A separate session per root (a session is who is in it, ADR-0021).
 **Status:** Accepted. Implemented by `PLAN-2026-09-27-your-tabs-inbox`.
 Amends ADR-0029 (the tab bar is each person's; closing
 a tab is yours) and ADR-0027 (a stored layout holds your open roots, and the
-device keeps which mentions you have seen).
+device keeps which mentions you have seen). Amended by ADR-0037: you are your
+email, so your other tabs and devices are you, and your tabs are yours per
+device.
 
 **Context.** ADR-0029 gave everyone the same tab bar, every root not archived,
 and rejected tabs each person opens and closes: a collaborator's new root would
@@ -1902,7 +1911,8 @@ are unchanged, and archiving works as built. The inbox is a pass over every
 chat at each change, which is O(entries), as every view is. A mention made
 while you were away counts on your return, on the same device. What is left:
 - **another device, or a cleared browser, starts afresh** from its first load:
-  a person has no identity across devices yet, so the inbox is a device's;
+  the inbox is kept per device, though since ADR-0037 the person is the same
+  on every device;
 - **"you" is a name:** a mention resolves to a handle, and a handle to your
   display name, so renaming yourself changes which mentions are yours, and
   two writers with one name share them;
@@ -2011,6 +2021,9 @@ runs from). Changes the vision's branch kinds (`docs/00-vision.md`): every
 agent lane is a Worktree. **Amended by ADR-0034:** its workspaces, the
 rewrite of the history the model is sent, the refusal of other lanes' paths,
 and dependency setup are replaced by a container per lane on its own disk.
+**Amended by ADR-0038:** a lane with no revision above its fork
+point starts from a copy of your `@`, not your `@-`, and lanes' bookmarks
+leave your repo's config.
 
 **Context.** The agent's tools run in the repo the host runs from, so two
 threads running tools at once share one directory and can collide. ADR-0022
@@ -2324,7 +2337,9 @@ fold does (S36 items 11 and 12).
 ## ADR-0033 — Conflicts are resolved by the agent in its lane, by a policy you can replace, and the repository decides the outcome
 
 **Status:** Accepted. Implemented by `PLAN-2026-09-27-workspaces` (landing;
-the fold's merge comes with `PLAN-2026-09-27-fold`). Builds on ADR-0032 (folds
+the fold's merge comes with `PLAN-2026-09-27-fold`). **Amended by ADR-0038
+(proposed):** landing becomes "update from my work", which runs the agent
+only when the merge conflicts. Builds on ADR-0032 (folds
 and landing are jj merges in a
 lane's workspace) and ADR-0010 (labelled legs, and the destination's is
 mandatory).
@@ -2422,7 +2437,9 @@ still break each other. How cautious to be varies by person and by repo.
 ## ADR-0034 — A lane is a Linux container on its own disk, and a branch clones that disk
 
 **Status:** Accepted. Implemented by `PLAN-2026-09-28-lane-containers`.
-Evidence: S38, S39, S40, S41, S42, S43, S44. Amends ADR-0032:
+Evidence: S38, S39, S40, S41, S42, S43, S44. **Amended by ADR-0038
+(proposed):** work reaches your repo as an offer, and a lane's history as
+remote bookmarks. Amends ADR-0032:
 replaces its jj workspace per lane, the rewrite of the history the model is
 sent, the refusal of other lanes' paths, and dependency setup. Keeps its turn
 revisions, its fork-point rule, landing, working directly, and your working
@@ -2857,3 +2874,262 @@ mounted.
 - Expanding when the model reads a message: a later edit would change what
   an old message meant.
 - Storing only the expansion: people would read a whole skill in the thread.
+
+## ADR-0037 — A person is their email; each tab is a seat
+
+**Status:** Accepted. Implemented by `PLAN-2026-09-28-kyneta-v4`. Evidence:
+S29, S47. Amends ADR-0024 (presence keys per seat), ADR-0025 (authorship by
+seat), ADR-0027 and ADR-0030 (your other tabs are you).
+
+**Context.** Pineta chose each client's Kyneta peer id and made its writer
+from it: a browser tab took one from Kyneta's `persistentPeerId`, a Node
+client made one up. Kyneta v4 takes that choice away. A CRDT replica may
+write under an id only if no other live replica writes under it and it
+holds everything written under it, which a caller cannot promise: a
+duplicated tab shared one id (S29). So Kyneta now issues each Runtime its
+peer id, a *seat*, from its store or fresh per session, and the caller names
+only a *principal*: who the peer says it is, shared by any number of seats,
+carried in `establish`, unverified. A writer needs a new source, and so do
+the host's address, note authorship and presence keys.
+
+**Decision.**
+- **A principal is a person, and a person is their email.** A browser asks
+  for email and name on its first visit (`identity-form.tsx`) and keeps both
+  per device (`localStorage`, `pineta-identity`). The email, normalized
+  (`normalizeEmail`), is the principal; the writer is `w-<email>`
+  (`writerOfPrincipal`). A reload, a second tab and a second device with the
+  same email are one person, each tab its own seat.
+- **The name is a seed.** It is sent with `setName` on joining a session
+  that has no name for you (`nameOnJoin`); afterwards the session's name is
+  yours, renamed in the header as before. A person with no name is shown by
+  the part of their email before the `@`, which a mention reaches.
+- **The host identifies the sender by transport, as before**: the principal
+  of the seat a command's Line comes from. A principal that is not an email
+  names nobody, and its every command is refused (`invalid_identity`).
+- **The host is found by its principal,** `pineta-host`, which is not an
+  email, so no person can claim it. A client addresses its Line to the seat
+  `whenPeer` finds.
+- **Presence is per seat, shown per person.** Every key starts
+  `${writer}:${seat}`, so one tab never overwrites or clears another's; the
+  view shows a person once. The writer must be in the key: a client sees only
+  the host among its peers, so it cannot look up another tab's person.
+- **Note edits are attributed by seat.** A seat's Yjs `clientID` is
+  Kyneta's `yjsClientId(seat)`; the host maps the `clientID`s an edit moved
+  to the principals of the seats connected when it arrives.
+- **A command Line lives only between its ends, and only while its seat
+  does.** The host shares a Line's documents with, and accepts them from, its
+  two ends only; a departed seat's Line is destroyed, and a starting host
+  deletes every stored Line: a client keeps no store and does not reconnect,
+  so none can resume.
+
+**Consequences.**
+- Duplicate Tab is harmless: two tabs share a person, never a seat.
+- Everyone in a session can read everyone's email: writer ids are in every
+  message and replicated to every client. The model reads only display
+  names.
+- Unauthenticated, as before: anyone can type anyone's email. An email and a
+  generated token will verify it later without changing this model.
+- Two unnamed people with one local part share a label, and a mention
+  reaches one of them: the same collision as two people choosing one name.
+- A store-less client is a new seat on every load, so each session that
+  writes a note's Yjs document adds one version-vector entry to it.
+- Your tabs and your inbox are kept per device (ADR-0027, ADR-0030); only
+  who you are follows you.
+
+**Alternatives rejected.**
+- A handle (`duane`) as the principal: a second namespace to keep unique,
+  which an email login would replace.
+- A principal per tab, in `sessionStorage`: your second device would be a
+  stranger, and a duplicated tab would still share a writer.
+- A Web Locks lease per tab: unneeded once a principal is a person.
+- The handle as the display name, with no `setName`: no friendly name, and a
+  rename would be a new person.
+- Presence keyed by writer: one tab would clear another's typing, editing and
+  columns.
+- Leaving Line documents stored: harmless per visit, unbounded over time, and
+  never read again.
+
+## ADR-0038 — A thread's work reaches you as an offer: one commit you can see before you take it
+
+**Status:** Accepted. Evidence: S48. Implementation:
+`PLAN-2026-09-28-offers`. Amends ADR-0032 (where a lane starts, and its
+bookmark), ADR-0033 (landing) and ADR-0034 (how work moves into your repo).
+
+**Context.** Taking a thread's work today rebases your `@` onto the lane's
+merge (ADR-0034). Every turn commit the lane made becomes an ancestor of your
+work, described "edit /workspace/…", and immutable there: `pineta/*` is in
+your repo's `immutable_heads()`, so what you took cannot be squashed. Before
+that, you must "land your work", which merges your `@-` into the lane and
+always runs the agent (ADR-0033). The button points the wrong way: it moves
+your work toward the thread. A lane starts from `@-`, so work you have not
+committed is invisible to it, and "commit before asking" is a step people
+miss. Nothing shows what a take will bring before it happens. Every turn
+also fetches the lane's bookmark into your repo, so your `jj log` and op log
+fill with turns.
+
+Two histories were one. A lane's turn commits are its infrastructure:
+branching from any message, folds and conflict context need them
+(ADR-0032). What you want in your repo is the change, as you would accept a
+pull request.
+
+**Decision.**
+- **Each lane with its own copy keeps one offer in your repo:** a single,
+  mutable commit holding the lane's net change since it started, or since
+  your last take. Precisely: from the newest of the lane tip's ancestors
+  that you already have, your own commits and every lane commit a take has
+  delivered, to the lane's tip. So a branch of a thread you never took
+  offers its parent's work with its own, and a branch of one you took offers
+  only its own. A conversation thread has no lane, and a lane working
+  directly edits your files already; neither has an offer.
+  - **It sits on `pineta-onto`, if you set that bookmark, else on your
+    `@-`.** Not on `@`: `@` is rewritten on every snapshot, and an offer on
+    it would move under you and put your unfinished edits below the thread's.
+  - **Its bookmark is `pineta-offer/<lane>`.** You may reword, squash,
+    split or move it like any commit.
+  - **An agent writes its description, as a commit message.** A one-shot
+    model request, outside the thread: no tools, nothing added to the tree
+    or to the lane's context. It runs under a replaceable skill,
+    `commit-message`, read from your working copy as `resolve-conflicts` is
+    (ADR-0033), and is given the offer's diff, the thread's messages since
+    the last take (budgeted as a fold is, ADR-0010), and your repo's recent
+    descriptions, so it follows your conventions. The host adds the lane and
+    the newest entry as trailers.
+  - **It is written when the offer's content changes:** once a run ends that
+    changed the lane's files. A refresh only moves the offer, and a
+    description depends on what it changes, not where it sits, so a refresh
+    writes nothing. Until the first is written, the offer carries a
+    placeholder naming its thread. "Rewrite description" asks again. A
+    description you edited is never replaced (the edit rule below).
+  - **It is a preview.** It shows in `jj log` and in jjui before you take it.
+    jj records conflicts rather than failing, so an offer that conflicts
+    with your committed work is marked conflicted, and names its files
+    (S48 item 3). An offer that touches files you are editing is flagged
+    from file names (S48 item 4): that conflict only shows at take, in `@`.
+- **The host builds and refreshes offers without touching your working
+  copy.** Every host command runs with `--ignore-working-copy` and
+  `--config operation.username=pineta-host`, and addresses an offer by its
+  change id, never a commit id kept between steps (S48 items 1 and 2).
+  Nothing finds a revision by its description.
+  - **Build:** an empty commit at the lane's fork point, the lane tip's files
+    restored into it, rebased onto the target, bookmarked.
+  - **Refresh:** after each turn, and when your repo's operation head
+    changes (`.jj/repo/op_heads/heads`, S48 item 13), if the target moved.
+  - **Never over your edits.** The host refreshes an offer only when it
+    matches the commit the host last wrote for it: the same description, no
+    `jj interdiff`, and a parent that is an ancestor of the target (S48
+    item 7). Otherwise the offer is yours: the host leaves it, and the
+    thread's later turns become a new offer on top.
+  - **A race is repaired in your favour.** A refresh racing your edit makes
+    the offer divergent; the host abandons the commit its own operation made
+    (`operation.user()`) and keeps yours (S48 item 8).
+- **Take puts the offer on the target, under your edits:** `jj rebase -r
+  <offer> -A <target> -B @` when the target is an ancestor of `@`, otherwise
+  nothing moves but bookmarks. Take runs as you, since it updates your
+  files. `pineta-onto`, when set, then moves to the offer, so accepted offers
+  stack in the order taken, and an offer on a side branch never touches `@`
+  (S48 items 5 and 9). A conflicted offer can be taken anyway: you resolve it
+  in jj, as any conflict.
+- **What you already have is recorded.** A take writes a host-written
+  `pineta.have` value: the lane commit the offer was built from, delivered.
+  So does every copy of your `@` made in a lane. Where an offer starts is
+  read from these, so the next offer holds only what came after, and never
+  your own edits back.
+- **The lane's history stays out of your view.** It is fetched as remote
+  bookmarks (`refs/remotes/pineta-<lane>/…`), which jj shows only on request
+  and treats as immutable with its builtin config: no remote is added and
+  Pineta's line in your `immutable_heads()` is removed (S48 item 11).
+  `jj log -r '::remote_bookmarks(remote=glob:"pineta-*") ~ ::@'` shows it.
+- **Where no revision is above a lane's fork point, it starts from your `@`
+  as it is when you send**, uncommitted edits included, instead of your
+  `@-`. A lane still starts from the nearest revision at or above where it
+  branches (ADR-0032); this changes only the fallback, which is where a root
+  thread, or a branch above any agent work, starts. The copy is made in the
+  lane: a commit on your `@-` with `@`'s files and a change id of its own.
+  Starting at the `@` commit itself brings it back into your repo with the
+  lane's work, and makes your `@` divergent (S48 item 10). The composer's
+  warning that the agent will not see your uncommitted work goes.
+- **"Update from my work" moves your work toward the thread, and only when
+  you ask.** It merges your `@` (through a copy, as above) into the lane. It
+  never happens at the start of a run, and waits while the lane runs.
+  - **It writes a fact into the thread:** a `pineta.update` message listing
+    the commits that came in and the files that changed, which the model
+    reads at its next run. The merge is recorded as that entry's revision, so
+    a branch below it starts with the merged files. Without the entry, the
+    agent would work from files it no longer has.
+  - **A clean merge prefills your composer** with an editable intent, such as
+    "I've merged my latest work (3 commits). Check that yours still fits."
+    Nothing runs unless you send it.
+  - **A conflicted merge offers "Resolve in the thread":** ADR-0033's
+    resolution run, unchanged: labelled sides, the resolution skill, and the
+    repository's verdict.
+- **"Split into a stack" rewrites an offer as a series of revisions.** It is
+  a run on the lane, under a replaceable skill, `offer-stack`, read from your
+  working copy as `resolve-conflicts` is (ADR-0033): how to split, how to
+  describe each step, and which checks each step must pass. The stack is
+  built in the lane from its fork point. The host accepts it only when its
+  top has exactly the lane tip's files (S48 item 12), runs any checks the
+  skill names, and reports which steps fail; the agent's claim is never
+  enough. "Squash to one" returns to a single commit. Turns after a split
+  make the stack stale: split again, or take the stack with the rest as one
+  more commit.
+- **The column shows one state and its buttons:**
+
+  | state | the column says | buttons |
+  |---|---|---|
+  | nothing new since the start or the last take | nothing | Update from my work (menu) |
+  | running | "offer updates after each turn" | Stop |
+  | ready | "offer: N files · `pineta-offer/<lane>`" | **Take**, Split into a stack, Update from my work (menu) |
+  | ready, touching files you are editing | the same, and "conflicts expected in your edits" | the same |
+  | conflicts with your work | "conflicts with your work in N files" | **Resolve in the thread**, Take anyway |
+  | resolving or splitting | the run | Stop |
+  | needs you | the agent's question | a reply; Take anyway |
+  | stack ready | "offer: a stack of K" | **Take stack**, Squash to one |
+  | stack stale | "a stack of K, and changes since" | Split again, Take stack and the rest |
+  | edited by you | "you edited this offer" | **Take**, Refresh (discards your edits) |
+  | taken | "taken as `<change id>`" | none, until the next turn |
+
+  "Land your work" and "take into my working copy" are gone. The page header
+  counts offers ready, as it counts mentions.
+
+**Consequences.**
+- What you take is one commit (or a stack you asked for), mutable, with a
+  real description. The lane's turns stay browsable, and out of your log.
+- Your op log gains the host's offer operations, marked `pineta-host`,
+  instead of one import per turn.
+- A clean update costs no run; a conflicted one costs ADR-0033's run, and a
+  stack costs one more. Each run that changes files costs one short
+  description request.
+- Your repo's config is no longer edited, and the host removes Pineta's old
+  line from it at startup, after moving each lane's history to its remote
+  bookmark (S48 item 21). Commits lanes build on stay immutable in your repo,
+  as ADR-0032 wants: remote bookmarks' ancestors are (S48 item 19). Offers are named `pineta-offer/…`, outside
+  `pineta/*`, which that line makes immutable (S48 item 14).
+- Noticing your jj operations costs a read of your repo's operation head,
+  14 ms (S48 item 13).
+- An offer can be divergent for one jj command's length, and is repaired.
+- A new root thread sees your uncommitted edits, so one started while you
+  are mid-change starts mid-change. Branches inside agent work are unchanged.
+
+**Alternatives rejected.**
+- The offer on `@`: rewritten by every snapshot, and a take would commit your
+  unfinished edits below the thread's.
+- Bringing the turn commits into your history ("take with history"): the
+  noise this ADR removes. The lane's history is one `jj log` away.
+- Deciding who edited an offer from the evolog alone: jj's rebase of the
+  offer, caused by your reword below it, is recorded as your operation
+  (S48 item 7).
+- Finding the host's commit by description after a race: your edit may keep
+  the description (S48 item 8).
+- Updating the thread at the start of every run: files would change under
+  the agent without anyone asking.
+- Running the agent after every update: a clean merge is often nothing to
+  talk about, and you can send the prefilled line when it is.
+- A description from the thread's first request: it says what was asked,
+  not what changed.
+- The description written by the lane's own agent, as a turn in the thread:
+  every thread would end each run with a message about commit messages, in
+  its history and its context.
+- A description written at every refresh: a refresh changes where the offer
+  sits, never what it says.
+- Root lanes starting at the `@` commit itself: your `@` becomes divergent.
+

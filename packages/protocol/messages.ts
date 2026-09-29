@@ -12,11 +12,11 @@ export const SESSION_DOC_ID = "pineta:session"
 export const PRESENCE_DOC_ID = "pineta:presence"
 
 /**
- * Exchange id of the host. A Line is addressed to a peer id, so both sides must
- * agree on this string. The skeleton has exactly one host; discovery is a
- * thickening step, not a skeleton step.
+ * The host's principal. Kyneta issues each peer its id (its seat), so a client
+ * finds the host's seat by this name (`whenPeer`) and addresses its Line
+ * there. It is not an email, so no person can claim it (`writerOfPrincipal`).
  */
-export const HOST_PEER_ID = "host"
+export const HOST_PRINCIPAL = "pineta-host"
 
 /**
  * The verbs. `line.ts` spreads this into a constrained schema literal, so this

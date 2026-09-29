@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import {
+  address,
   atEntry,
   ERR,
   entryId,
@@ -319,9 +320,20 @@ test("renderableMessage: a chat renders as role chat with its author", () => {
   })
 })
 
-test("participants: named writers and every writer in the tree, guests by their label", () => {
+test("participants: named writers and every writer in the tree, the unnamed by their email", () => {
   const names = new Map([[ALICE, "Alice"]])
-  assert.deepEqual(participants(names, [ALICE, BO]), ["Alice", "guest-w-bo"])
+  const bo = writerId("bo.b@x.io")
+  const all = participants(names, [ALICE, bo])
+  assert.deepEqual(all, ["Alice", "bo.b"])
+  // Unnamed, bo is still someone a mention reaches.
+  assert.deepEqual(
+    address({
+      mentions: parseMentions("@bob look"),
+      participants: all,
+      agentByDefault: true,
+    }).people,
+    ["bo.b"],
+  )
 })
 
 describe("outbox", () => {

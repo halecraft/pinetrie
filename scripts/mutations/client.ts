@@ -527,4 +527,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "readersByRoot turns people around",
   },
+  {
+    name: "joining always renames you to the stored name",
+    file: "packages/client/identity.ts",
+    from: "): string | null => (inSession === undefined ? stored.name : null)",
+    to: "): string | null => stored.name",
+    command: unit,
+    expect: "only to a session that has none",
+  },
 ]

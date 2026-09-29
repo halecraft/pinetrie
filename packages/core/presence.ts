@@ -15,12 +15,30 @@ export interface PresenceView {
   seenBy(end: string): readonly WriterId[]
   /** Others typing into the composer at `end`. */
   typingAt(end: string): readonly WriterId[]
+  /** Others editing the note `note`. */
+  editingAt(note: string): readonly WriterId[]
+}
+
+/**
+ * Everyone but `me` whose value is `value`, each once: a person here from two
+ * seats has two entries (ADR-0037).
+ */
+function whoIsAt(
+  entries: readonly (readonly [WriterId, string])[],
+  value: string,
+  me: WriterId,
+): WriterId[] {
+  const out: WriterId[] = []
+  for (const [w, at] of entries)
+    if (w !== me && at === value && !out.includes(w)) out.push(w)
+  return out
 }
 
 export function presenceView(
   facts: {
     readonly reading: readonly (readonly [WriterId, string])[]
-    readonly typing: ReadonlyMap<WriterId, string>
+    readonly typing: readonly (readonly [WriterId, string])[]
+    readonly editing: readonly (readonly [WriterId, string])[]
   },
   me: WriterId,
   index: TreeIndex,
@@ -43,9 +61,7 @@ export function presenceView(
       }
       return seen
     },
-    typingAt: end =>
-      [...facts.typing].flatMap(([w, at]) =>
-        w !== me && at === end ? [w] : [],
-      ),
+    typingAt: end => whoIsAt(facts.typing, end, me),
+    editingAt: note => whoIsAt(facts.editing, note, me),
   }
 }

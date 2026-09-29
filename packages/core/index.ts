@@ -23,25 +23,61 @@
 
 declare const writerIdBrand: unique symbol
 /**
- * A person, as the transport identifies them (`LineSender.peer`), never as a
- * message claims. Authorship is recorded in each message by this id; people
- * own no lanes (ADR-0020).
+ * A person, as the transport identifies them, never as a message claims: the
+ * principal their connection named, which is their email (ADR-0037).
+ * Authorship is recorded in each message by this id; people own no lanes
+ * (ADR-0020).
  */
 export type WriterId = string & { readonly [writerIdBrand]: true }
 
-/** The only way to make a `WriterId`: from the transport's peer id. */
-export function writerId(peerId: string): WriterId {
-  if (typeof peerId !== "string" || peerId.length === 0) {
-    throw new Error("writerId: peerId must be a non-empty string")
+/** The only way to make a `WriterId`: from a person's email. */
+export function writerId(email: string): WriterId {
+  if (typeof email !== "string" || email.length === 0) {
+    throw new Error("writerId: email must be a non-empty string")
   }
-  if (peerId.includes("\u0000")) {
-    throw new Error("writerId: peerId must not contain \\u0000")
+  if (email.includes("\u0000")) {
+    throw new Error("writerId: email must not contain \\u0000")
   }
-  return `w-${peerId}` as WriterId
+  return `w-${email}` as WriterId
 }
 
-/** The peer id a writer was made from: `writerId`'s inverse. */
-export const peerIdOf = (writer: WriterId): string => writer.slice(2)
+/**
+ * An email as typed -> the stored one, or undefined if it is not one: trimmed
+ * and lower-cased, with one `@`, a letter or digit before it (so the part
+ * before it can label and be mentioned), and a dotted domain after it. No
+ * whitespace, and no `:`, since presence keys split on `:` (`seatKey`).
+ * Unverified: it names who a peer says it is.
+ */
+export function normalizeEmail(text: string): string | undefined {
+  const email = text.trim().toLowerCase()
+  const at = email.indexOf("@")
+  if (at <= 0 || at !== email.lastIndexOf("@")) return undefined
+  if (/[\s:]/u.test(email) || email.includes("\u0000")) return undefined
+  const local = email.slice(0, at)
+  const domain = email.slice(at + 1)
+  const dot = domain.indexOf(".")
+  return /[\p{L}\p{N}]/u.test(local) && dot > 0 && dot < domain.length - 1
+    ? email
+    : undefined
+}
+
+/**
+ * The writer a peer's principal names, or undefined for a principal that is
+ * not an email: the host refuses such a peer's commands.
+ */
+export function writerOfPrincipal(
+  principal: string | undefined,
+): WriterId | undefined {
+  const email = principal === undefined ? undefined : normalizeEmail(principal)
+  return email === undefined ? undefined : writerId(email)
+}
+
+/** The part of a writer's email before the `@`: an unnamed writer's label. */
+export const emailLocalPart = (writer: WriterId): string => {
+  const email = writer.slice(2)
+  const at = email.indexOf("@")
+  return at < 0 ? email : email.slice(0, at)
+}
 
 declare const laneNameBrand: unique symbol
 /**
@@ -141,6 +177,8 @@ export const ERR = {
   BAD_DIRECTORY: "bad_directory",
   /** A `/package:name` command that names no command there is (ADR-0036). */
   UNKNOWN_COMMAND: "unknown_command",
+  /** A peer whose principal is not an email: nobody the host can name. */
+  INVALID_IDENTITY: "invalid_identity",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -617,32 +655,6 @@ export function findSeqKeys(value: unknown, path = "$"): string[] {
     hits.push(...findSeqKeys(v, `${path}.${k}`))
   }
   return hits
-}
-
-// --- environment gate -------------------------------------------------------
-
-export interface EnvironmentReport {
-  readonly ok: boolean
-  readonly problems: readonly string[]
-}
-
-/**
- * Deterministic build guards, preferred over a stopwatch (roadmap "Invariants").
- * `stepInPlace` is absent from the published @kyneta/schema 3.0.0, so its
- * presence proves we are on the fixed local build.
- */
-export function checkEnvironment({
-  hasStepInPlace,
-}: {
-  hasStepInPlace: boolean
-}): EnvironmentReport {
-  const problems: string[] = []
-  if (hasStepInPlace !== true) {
-    problems.push(
-      "@kyneta/schema does not export stepInPlace — stale (published 3.0.0) build",
-    )
-  }
-  return { ok: problems.length === 0, problems }
 }
 
 // ── arrival ordering (ADR-0013) ───────────────────────────────────────────

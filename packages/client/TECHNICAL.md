@@ -52,9 +52,11 @@ give labels and each tab's signals.
 - **`columnsOf` is the one place a root gets its first column**
   (`first-<root>`, anchored at the root). `columnsReducer` may leave a root
   with none; the layout then deletes the entry.
-- **Column keys hold no `:`.** A presence key is `${writer}:${columnKey}`, and
-  `readPresence` takes the writer from before the last colon. A colon in a
-  column key makes your own column read as someone else.
+- **Column keys hold no `:`.** A presence key is
+  `${writer}:${seat}:${columnKey}`, and `readPresence` takes the writer from
+  before the first colon (ADR-0037). A writer holds none (`normalizeEmail`
+  refuses one) and a seat is hex; a colon in a column key would still break
+  the rule that a key's parts are its colons.
 - **New tabs** are fresh columns at the root (`anchor: null`), local until
   their first send. `sync` moves one whose message is written to
   `roots[rootOf(anchor)]`, keeping its key, and keeps it active.
@@ -138,9 +140,9 @@ in it opens a tab until you choose.
   partial index, old mentions would count as new (S29). A mention on the
   paths of the tab you are on is seen (`seenOnScreen`), and the effect writes
   nothing when there is none.
-- **"You" is a name.** A second browser tab is a second writer (S29); named
-  the same, it has the same mentions. The browser suite names its sibling
-  tab to share the page's inbox.
+- **"You" is your email** (ADR-0037). Your other tabs and devices are you, so
+  they share your mentions; a mention resolves to your display name, so
+  renaming yourself still changes which mentions are yours.
 - **`Menu`** (`menu.tsx`) is every popover: the header's three, the tab's `⋯`
   and the add tab's. It wraps its trigger in a span that gains `open` while
   open, which keeps `.tab-more.open` visible; its list is `position: fixed`
@@ -160,11 +162,13 @@ value's stored form is its codec's. The layout is its one use, under the key
 `pineta-columns:<session>`, which predates root tabs.
 
 `deviceState` keeps a value in the device's slot only, shared by the device's
-tabs: the inbox's seen state (`pineta-inbox:<session>`). Each save reads what
-is stored and merges into it (`mergeInbox`), so two tabs marking at once both
-keep theirs, and `subscribe` hears another tab's save through the `storage`
-event, which fires only in the other tabs. Both write through `writeSlot`,
-which drops a full quota's error.
+tabs: the inbox's seen state (`pineta-inbox:<session>`), and who you are
+(`pineta-identity`, below). Each save reads what is stored and merges into it
+(`mergeInbox`; the identity's merge takes the new value), so two tabs marking
+at once both keep theirs. `subscribe` hears another tab's save through the
+`storage` event, which fires only in the other tabs, and hears a `clear()`
+as `undefined`. Both write through `writeSlot`, which drops a full quota's
+error.
 
 - **Every change is saved, `sync`'s too.** Saving only what a person does
   would store older anchors, and `followTip` from an older anchor can land on
@@ -189,12 +193,15 @@ which drops a full quota's error.
   no fork point. When the document is there first, a column aligns with its
   fork point, as a new one does.
 - **A failed write is ignored,** each slot on its own. `getItem` is not
-  guarded: where storage is disabled, touching it throws, and
-  `persistentPeerId` does so first.
+  guarded: where storage is disabled, touching it throws, and reading who you
+  are does so first.
 - **In the browser suite,** the main page comes from `browser.newContext()`.
   A page from `browser.newPage()` owns its context, and Playwright refuses a
   second tab in it; each `browser.newPage()` is a new context, with storage of
-  its own.
+  its own, so it is a device of its own that would ask who you are:
+  `asPerson(page, email, name)` stores an identity before it loads. A page
+  from `page.context().newPage()` shares the main page's storage, so it is
+  the same person.
 
 ## Rail runs (ADR-0031)
 
@@ -416,15 +423,17 @@ pipeline keeps the tree a pure function, testable without a DOM.
   people turned around, so each thread end is resolved to its root once.
 - **`presenceView` (core) decides everything shown**, from `readPresence`
   (`@pineta/reads`) and the tree: rings (`readingAt`), a header's avatars
-  (`seenBy`, others whose thread end lies on one path with this column's), and
-  typing (`typingAt`). It always leaves you out.
+  (`seenBy`, others whose thread end lies on one path with this column's),
+  typing (`typingAt`) and a note's editors (`editingAt`). It always leaves you
+  out, and shows a person once however many seats report them (ADR-0037).
 - **A person's colour** (`presenceColors`): the first three people, in the
   order they first wrote (`writerOrder`, the same in every window), get
   magenta, white and yellow, far from each other and from the tracks; anyone
   later, a hue from their writer id at a saturation the tracks don't use. A
   ring on the rail has a dark gap between it and the dot, so it reads against
   any track.
-  Names go through `displayName`, the `guest-…` fallback included.
+  Names go through `displayName`, the fallback to an email's part before the
+  `@` included.
 
 ## Notes (ADR-0025)
 
@@ -454,15 +463,30 @@ pipeline keeps the tree a pure function, testable without a DOM.
   markdown is a run's `span`, not `.text`. The suite finds a plain message by
   `.text > p:only-child > span:only-child:text-is(…)`.
 
-## Who a tab is
+## Who you are (ADR-0037)
 
-A tab's peer id comes from Kyneta's `persistentPeerId("pineta-peer-id")`, as
-Kyneta's examples do. A reload keeps it, so a person keeps their name and is
-not shown to themselves as someone else while the old entries decay. The first
-tab open on a device takes the device's stable id; a tab opened alongside gets
-a fresh one, so two windows are two people. The writer id is `w-` and that id.
-Except a duplicated tab: browsers copy `sessionStorage`, so Duplicate Tab gives
-two live tabs one peer id, and one writer (S29). That is Kyneta's to fix.
+A person is their email: the principal every Exchange of theirs names, and so
+their writer, `w-<email>`. Kyneta issues each tab its own peer id, a seat, so
+the email is the only thing Pineta chooses.
+
+- **Asked once per browser, before anything connects.** `app.tsx` reads
+  `pineta-identity` (a `deviceState`, `identity.ts`), or draws the form
+  (`identity-form.tsx`: **email:** and **name:**) and waits for it. The form's
+  rule is `parseIdentity`, over the host's own `normalizeEmail` and
+  `normalizeName`, so it accepts exactly what the host would; the browser's
+  own validation is off (`noValidate`).
+- **The name is a seed.** Once the document has settled, `nameOnJoin` sends
+  it with `setName` only when the session has no name for you: one set since,
+  here or on another device, stays. A rename in the header is the session's,
+  and is not written back.
+- **not you?** beside the name clears the stored identity and reloads. Every
+  tab subscribes to it, and reloads when another clears it or stores another
+  email, so no tab goes on as the old person.
+- **Presence is per seat** (`seatKey(writer, exchange.peerId)`, as `mine` in
+  `session-view.ts`), so your tabs never overwrite or clear each other's;
+  `presenceView` shows each person once, and never you.
+- **The host is found by principal** (`HOST_PRINCIPAL`, `whenPeer`), since
+  its seat is Kyneta's to issue: a Line is addressed by seat.
 
 ## Names
 
@@ -470,8 +494,9 @@ A message keeps the name its writer had when they sent it: that is what the
 agent read, and rewriting it would change history the agent has seen, and the
 provider's prompt cache. The screen shows the writer's current name, with the
 name the message was sent under in parentheses when they differ
-(`speakerLabel`, `names.ts`): "Duane (guest-x4bu)". Each rendered chat carries
-its `writer` for the lookup.
+(`speakerLabel`, `names.ts`): "Duane (duane)". Someone who set no name is
+shown by their email's part before the `@`. Each rendered chat carries its
+`writer` for the lookup.
 
 ## Gotchas
 

@@ -13,12 +13,16 @@ const storage = (backing = new Map<string, string>()) => ({
   setItem: (k: string, v: string) => {
     backing.set(k, v)
   },
+  removeItem: (k: string) => {
+    backing.delete(k)
+  },
 })
 const full: StorageLike = {
   getItem: () => null,
   setItem: () => {
     throw new Error("QuotaExceededError")
   },
+  removeItem: () => {},
 }
 /** Numbers only, stored as `{ n }`. */
 const numbers: Codec<number> = {
@@ -118,15 +122,24 @@ describe("deviceState: one value per device, shared by its tabs", () => {
   })
 
   test("a subscriber hears another tab's save of its key, and not of another key", () => {
-    const heard: (readonly number[])[] = []
+    const heard: (readonly number[] | undefined)[] = []
     const stop = make(storage()).subscribe(v => heard.push(v))
-    const storageEvent = (key: string, newValue: string) =>
+    const storageEvent = (key: string, newValue: string | null) =>
       Object.assign(new Event("storage"), { key, newValue })
     events.dispatchEvent(storageEvent("other", JSON.stringify({ ns: [9] })))
     events.dispatchEvent(storageEvent("k", JSON.stringify({ ns: [3] })))
     events.dispatchEvent(storageEvent("k", "not json"))
+    events.dispatchEvent(storageEvent("k", null))
     stop()
     events.dispatchEvent(storageEvent("k", JSON.stringify({ ns: [4] })))
-    expect(heard).toEqual([[3]])
+    expect(heard).toEqual([[3], undefined])
+  })
+
+  test("clear removes the stored value", () => {
+    const device = storage()
+    const one = make(device)
+    one.save([1])
+    one.clear()
+    expect([one.load(), device.backing.size]).toEqual([undefined, 0])
   })
 })

@@ -75,6 +75,7 @@ import {
   readValues,
   rowMessage,
   type SessionDocHandle,
+  writerOfKey,
 } from "@pineta/schema"
 
 /**
@@ -184,33 +185,39 @@ export function readReferences(doc: SessionDocHandle): ReferenceIndex {
   return indexReferences(refs)
 }
 
-/** Who is here, as the presence document says it: decayed (null) values dropped. */
+/**
+ * Who is here, as the presence document says it: decayed (null) values
+ * dropped. Each list has one entry per key, so a person here from two seats
+ * (ADR-0037) appears twice; `presenceView` shows them once.
+ */
 export interface PresenceFacts {
   /** One entry per open column: its writer, and the thread end it follows. */
   readonly reading: readonly (readonly [WriterId, string])[]
-  readonly typing: ReadonlyMap<WriterId, string>
-  readonly editing: ReadonlyMap<WriterId, string>
+  /** One entry per seat typing: its writer, and the thread end. */
+  readonly typing: readonly (readonly [WriterId, string])[]
+  /** One entry per seat editing: its writer, and the note. */
+  readonly editing: readonly (readonly [WriterId, string])[]
 }
 
 /**
  * The presence document's live entries. A decayed value is `null` and its key
- * stays, so nulls are skipped here, once. `reading` keys are
- * `${writer}:${columnKey}`; the writer is everything before the last colon.
+ * stays, so nulls are skipped here, once. Every key starts with its seat's
+ * `seatKey`, and the writer is what comes before the first colon
+ * (`writerOfKey`).
  */
 export function readPresence(doc: PresenceDocHandle): PresenceFacts {
-  const reading: [WriterId, string][] = []
-  for (const [key, end] of Object.entries(doc.reading())) {
-    const at = key.lastIndexOf(":")
-    if (end !== null && at > 0)
-      reading.push([key.slice(0, at) as WriterId, end])
-  }
   const live = (record: Record<string, string | null>) =>
-    new Map(
-      Object.entries(record).flatMap(([w, v]) =>
-        v === null ? [] : [[w as WriterId, v] as const],
-      ),
-    )
-  return { reading, typing: live(doc.typing()), editing: live(doc.editing()) }
+    Object.entries(record).flatMap(([key, value]) => {
+      const writer = writerOfKey(key)
+      return value === null || writer === undefined
+        ? []
+        : [[writer as WriterId, value] as const]
+    })
+  return {
+    reading: live(doc.reading()),
+    typing: live(doc.typing()),
+    editing: live(doc.editing()),
+  }
 }
 
 /** Every note's record (`pineta.note`), oldest first. */

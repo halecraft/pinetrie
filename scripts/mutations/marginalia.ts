@@ -263,4 +263,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a held record stored before landings had no kind",
   },
+  {
+    name: "an unnamed writer is a guest again",
+    file: "packages/marginalia/participant.ts",
+    from: "): string => set ?? emailLocalPart(writer)",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "): string => set ?? `guest-${writer.slice(-4)}`",
+    command: unit,
+    expect: "the unnamed by their email",
+  },
 ]

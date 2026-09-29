@@ -49,7 +49,7 @@ export function presenceColors(
   }
 }
 
-/** A writer's name as the screen shows it: the one they set, or `guest-…`. */
+/** A writer's name as the screen shows it: the one they set, or their email's part before the `@`. */
 export const nameFor = (
   nameOf: ReadonlyMap<WriterId, string>,
   writer: WriterId,

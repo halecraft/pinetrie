@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process"
 import { mkdtempSync, realpathSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { type ConnectOptions, connectSession } from "@pineta/client/session"
 
 export interface Checks {
   /** Record an assertion. Truthy passes. */
@@ -46,12 +47,12 @@ export function createChecks(): Checks {
  * timeout. Shared by both suites so each does not grow its own copy.
  */
 export async function waitFor(
-  pred: () => boolean,
+  pred: () => boolean | Promise<boolean>,
   timeoutMs = 60_000,
 ): Promise<number> {
   const t0 = Date.now()
   while (Date.now() - t0 < timeoutMs) {
-    if (pred()) return Date.now() - t0
+    if (await pred()) return Date.now() - t0
     await new Promise(resolve => setTimeout(resolve, 10))
   }
   return -1
@@ -79,3 +80,22 @@ export function committedProject(
   jj("commit", "-m", "the project")
   return dir
 }
+
+/**
+ * A person joining `host` over its WebSocket, as `<name>@<section>.test`: one
+ * domain per section, so no two sections share a person (ADR-0037).
+ */
+export const join = (
+  host: { readonly wsUrl: string },
+  name: string,
+  section: string,
+  options: Partial<
+    Omit<ConnectOptions, "url" | "WebSocket" | "principal">
+  > = {},
+) =>
+  connectSession({
+    url: host.wsUrl,
+    WebSocket,
+    principal: `${name}@${section}.test`,
+    ...options,
+  })

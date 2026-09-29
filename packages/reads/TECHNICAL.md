@@ -35,6 +35,9 @@ in the host and in the browser alike: no pi, no transport.
 - **`readLanes`' `askedBy`** is the writer of the compelled message a running
   lane is answering (the nearest compelled chat on its path), or else of the
   first compelled message waiting for it. It is what a `conflict` names.
+- **`readPresence` gives one entry per key**, as `[writer, value]` pairs for
+  `reading`, `typing` and `editing` alike: a person here from two seats
+  appears twice (ADR-0037), and `presenceView` shows them once.
 - **`readRenderableEntries` decodes chat** (`renderableMessage`), so the index
   carries each chat's writer, whether it compelled the agent, and its send id:
   `threadOf`'s race reads the first two, a fresh column the third.

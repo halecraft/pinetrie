@@ -16,10 +16,10 @@
 import { existsSync, mkdtempSync, readFileSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { DatabaseSync } from "node:sqlite"
-import type { Store } from "@kyneta/exchange"
+import { Exchange, type Store, whenPeer } from "@kyneta/exchange"
 import { batch, subscribe } from "@kyneta/schema"
-import { connectSession, type SessionClient } from "@pineta/client/session"
+import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
+import type { SessionClient } from "@pineta/client/session"
 import {
   ancestry,
   atEntry,
@@ -35,6 +35,7 @@ import {
   projectSpine,
   projectTranscript,
   ROOT,
+  writerId,
 } from "@pineta/core"
 import {
   decodeChat,
@@ -44,8 +45,14 @@ import {
   noteAt,
 } from "@pineta/marginalia"
 import { newId as newHeldId, scriptedModel } from "@pineta/pi"
-import type { Outcome } from "@pineta/protocol/codec"
-import { PRESENCE_DOC_ID, SESSION_DOC_ID } from "@pineta/protocol/messages"
+import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
+import { Control } from "@pineta/protocol/line"
+import {
+  CONTROL_TOPIC,
+  HOST_PRINCIPAL,
+  PRESENCE_DOC_ID,
+  SESSION_DOC_ID,
+} from "@pineta/protocol/messages"
 import {
   readArchive,
   readCommands,
@@ -64,7 +71,6 @@ import {
   readActiveRun,
   readEntries,
   readEntryMessage,
-  readingKey,
   readLaneNames,
   readLaneTip,
   readStreams,
@@ -72,8 +78,9 @@ import {
   writeEntry,
 } from "@pineta/schema"
 import { startHost } from "../host/index.ts"
+import { lineDocPrefix } from "../host/lines.ts"
 import { openStore } from "../host/store.ts"
-import { committedProject, createChecks, waitFor } from "./harness.ts"
+import { committedProject, createChecks, join, waitFor } from "./harness.ts"
 
 const LIVE = process.env.PINETA_LIVE === "1"
 const PROMPT = "Say exactly: PINETA-OK"
@@ -115,49 +122,53 @@ const idle = () =>
     120_000,
   )
 /**
- * The session's records in a Kyneta SQLite store: how many, and their bytes.
- * The store also holds each client's command Line, which the host does not
- * compact (see `settle`), so only the session document is counted.
+ * A document's records in a Kyneta store, and their payloads' size, read
+ * through the store itself: it owns its SQLite file, so no second connection
+ * may read it (S47). The store also holds each client's command Line, which
+ * the host does not compact (see `settle`), so callers count one document.
  */
-const storeSize = (file: string): { records: number; bytes: number } => {
-  const db = new DatabaseSync(file, { readOnly: true })
-  try {
-    const tables = db
-      .prepare("select name from sqlite_master where type = 'table'")
-      .all()
-      .map(r => String(r.name))
-    const records = tables.find(t => t.includes("record")) ?? ""
-    const row = db
-      .prepare(
-        `select count(*) as records, coalesce(sum(length(blob)), 0) + coalesce(sum(length(payload)), 0) as bytes from ${records} where doc_id = ?`,
-      )
-      .get(SESSION_DOC_ID) as { records: number; bytes: number }
-    return { records: row.records, bytes: row.bytes }
-  } finally {
-    db.close()
+const storedRecords = async (
+  store: Store,
+  docId: string,
+): Promise<{ records: number; bytes: number }> => {
+  let records = 0
+  let bytes = 0
+  for await (const r of store.loadAll(docId)) {
+    records++
+    bytes += r.kind === "entry" ? r.payload.data.length : 0
   }
+  return { records, bytes }
+}
+/** Every command Line document a store holds. */
+const storedLines = async (store: Store): Promise<string[]> => {
+  const ids: string[] = []
+  for await (const id of store.listDocIds(lineDocPrefix(CONTROL_TOPIC)))
+    ids.push(id)
+  return ids
 }
 /**
  * `store`, taking `ms` before it starts to load: a host that does not wait for
- * its store to load then starts from an empty session. Every method forwards;
- * a spread would lose them, since stores are class instances.
+ * its store to load then starts from an empty session. A proxy, so everything
+ * else, its seat included, is the store's own.
  */
-const slowToLoad = (store: Store, ms: number): Store => ({
-  append: (docId, record) => store.append(docId, record),
-  loadAll: docId =>
-    (async function* () {
-      await sleep(ms)
-      yield* store.loadAll(docId)
-    })(),
-  replace: (docId, records) => store.replace(docId, records),
-  delete: docId => store.delete(docId),
-  currentMeta: async docId => {
-    await sleep(ms)
-    return store.currentMeta(docId)
-  },
-  listDocIds: prefix => store.listDocIds(prefix),
-  close: () => store.close(),
-})
+const slowToLoad = (store: Store, ms: number): Store =>
+  new Proxy(store, {
+    get(target, key, receiver) {
+      if (key === "loadAll")
+        return (docId: string) =>
+          (async function* () {
+            await sleep(ms)
+            yield* target.loadAll(docId)
+          })()
+      if (key === "currentMeta")
+        return async (docId: string) => {
+          await sleep(ms)
+          return target.currentMeta(docId)
+        }
+      const value = Reflect.get(target, key, receiver)
+      return typeof value === "function" ? value.bind(target) : value
+    },
+  })
 /** A session's size as it stands: what a compacted store should hold. */
 const sessionBytes = (doc: typeof host.doc): number =>
   JSON.stringify({
@@ -187,10 +198,10 @@ const shape = (tip: string | null) =>
   projectTranscript(tree(), tip).map(m =>
     m.role === "chat" ? `${m.author}:${m.text}` : m.role,
   )
-const connect = (peerId: string, onChange?: () => void) =>
-  connectSession({ url: host.wsUrl, WebSocket, peerId, onChange })
-/** A guest's mention handle: their screen label, `guest-…`. */
-const handleOfGuest = (w: Parameters<typeof displayName>[0]) =>
+const connect = (name: string, onChange?: () => void) =>
+  join(host, name, "main", { onChange })
+/** An unnamed person's mention handle: their screen label, from their email. */
+const handleOfUnnamed = (w: Parameters<typeof displayName>[0]) =>
   displayName(w, undefined)
 /** How the two starts send at the root (ADR-0021). */
 const START_AGENT = { mode: "branch", asksAgent: true } as const
@@ -245,6 +256,37 @@ const unsample = subscribe(host.doc, () => {
 const client: SessionClient = await connect("e2e-client")
 ok(true, "client connected over a real websocket and opened the document")
 
+// Who a client is comes from the principal its connection named (ADR-0037).
+// One that is not an email names nobody: the host refuses its every command.
+{
+  const stranger = new Exchange({
+    principal: "nobody-in-particular",
+    transports: [
+      new WebsocketClientTransport({
+        url: host.wsUrl,
+        WebSocket,
+        reconnect: { enabled: false },
+      }),
+    ],
+  })
+  const hostSeat = await whenPeer(stranger, p => p.principal === HOST_PRINCIPAL)
+  const replies = Control.claimReceiver(stranger, hostSeat.peerId)
+  Control.sender(stranger, hostSeat.peerId).send(
+    encodeIntent("stranger-1", { kind: "name", name: "Stranger" }),
+  )
+  const reply = await Promise.race([
+    (async () => {
+      for await (const r of replies) return decodeReply(r)
+    })(),
+    sleep(5_000).then(() => undefined),
+  ])
+  await stranger.shutdown()
+  ok(
+    reply !== undefined && codeOf(reply) === ERR.INVALID_IDENTITY,
+    `a client whose principal is not an email is refused (${reply === undefined ? "no reply" : codeOf(reply)})`,
+  )
+}
+
 const rejected = await client.chat("   ", ROOT)
 ok(
   codeOf(rejected) === ERR.EMPTY_MESSAGE,
@@ -267,6 +309,11 @@ ok(
   tree().bySend.get(HELLO_SEND) === idOf("hello"),
   "the message carries its send's id, so its column can find it",
 )
+ok(
+  client.writer === writerId("e2e-client@main.test") &&
+    tree().entries[idOf("hello") ?? ""]?.message?.writer === client.writer,
+  "a message's writer is the email its client connected as",
+)
 
 const firstLanes = readLaneNames(host.doc)
 ok(
@@ -274,7 +321,7 @@ ok(
   `the thread got a lane of its own: ${firstLanes.join(",")}`,
 )
 ok(
-  !firstLanes.some(l => l.includes(client.peerId)),
+  !firstLanes.some(l => l.includes(client.principal)),
   "no lane is named after the person who wrote",
 )
 const trunk = firstLanes[0] ?? ""
@@ -506,6 +553,17 @@ invariants("first turn")
     "each thread holds its own message and not the other's",
   )
   invariants("concurrency")
+  // A command Line is between the host and one seat: no client holds
+  // another's commands or replies (ADR-0037).
+  const othersLines = [a, b].flatMap(c =>
+    [...c.exchange.documents.keys()].filter(
+      id => id.startsWith("line:") && !id.includes(c.exchange.peerId),
+    ),
+  )
+  ok(
+    othersLines.length === 0,
+    `no client holds another's command Line (${othersLines.length} held)`,
+  )
   await Promise.all([a.close(), b.close()])
 }
 
@@ -741,11 +799,11 @@ invariants("first turn")
     toBob.kind === "appended",
     `in agent work, a message naming only a person is for them: no run (${toBob.kind})`,
   )
-  const guest = handleOfGuest(client.writer)
-  const toGuest = await send(`@${guest} see above`)
+  const unnamed = handleOfUnnamed(client.writer)
+  const toUnnamed = await send(`@${unnamed} see above`)
   ok(
-    toGuest.kind === "appended",
-    `a guest is mentioned by the label the screen shows, @${guest} (${toGuest.kind})`,
+    toUnnamed.kind === "appended",
+    `someone unnamed is mentioned by the label the screen shows, @${unnamed} (${toUnnamed.kind})`,
   )
   const unknown = await send("bump @types/node please")
   ok(
@@ -900,7 +958,9 @@ invariants("end")
     "pineta.db",
   )
   const script = scriptedModel()
-  const open = (log: (m: string) => void, store: string | Store = dbFile) =>
+  // The suite opens the store itself, so it can read it while the host runs.
+  let stored = openStore(dbFile)
+  const open = (log: (m: string) => void, store: Store = stored) =>
     startHost({
       model: { kind: "scripted", script },
       tools: { project: work },
@@ -924,11 +984,7 @@ invariants("end")
   const watch = () =>
     subscribe(th.doc, () => watched.push([...readStreams(th.doc)]))
   let unwatch = watch()
-  const u = await connectSession({
-    url: th.wsUrl,
-    WebSocket,
-    peerId: "tools-user",
-  })
+  const u = await join(th, "uma", "tools")
   await u.setName("Uma")
 
   // 1. Read a file, then answer.
@@ -1015,7 +1071,7 @@ invariants("end")
   // document as it stands, not the run's edits. Whole-value streams are guarded
   // by `planStream`'s unit test, since compaction would hide them here.
   await th.quiet()
-  const compacted = storeSize(dbFile)
+  const compacted = await storedRecords(stored, SESSION_DOC_ID)
   ok(
     compacted.records <= 3 && compacted.bytes <= 2 * sessionBytes(th.doc),
     `after the run, the store holds the compacted session: ${compacted.records} records, ${Math.round(compacted.bytes / 1024)} KB for a ${Math.round(sessionBytes(th.doc) / 1024)} KB session (${Math.round(printed / 1024)} KB printed)`,
@@ -1041,11 +1097,7 @@ invariants("end")
   )
 
   // 5. Stop ends a running command; a message waiting is then taken.
-  const bob = await connectSession({
-    url: th.wsUrl,
-    WebSocket,
-    peerId: "tools-bob",
-  })
+  const bob = await join(th, "bob", "tools")
   await bob.setName("Bob")
   script.use([
     { tool: "bash", args: { command: "sleep 5; echo late" } },
@@ -1108,22 +1160,39 @@ invariants("end")
   // more than the compacted session: its startup must compact again.
   await u.setName("Uma, again")
   unwatch()
-  await u.close()
+  // Bob leaves; Uma is still connected when the host stops.
+  const bobSeat = bob.exchange.peerId
+  const umaSeat = u.exchange.peerId
   await bob.close()
+  const bobGone = await waitFor(
+    async () => !(await storedLines(stored)).some(id => id.includes(bobSeat)),
+    5_000,
+  )
   await th.quiet()
-  const beforeRestart = storeSize(dbFile)
+  const beforeRestart = await storedRecords(stored, SESSION_DOC_ID)
+  ok(
+    bobGone >= 0 &&
+      (await storedLines(stored)).some(id => id.includes(umaSeat)),
+    "a client that leaves takes its command Line with it; one still here keeps it",
+  )
   await th.shutdown()
+  await u.close()
   // The store opens slowly, so a host that did not wait for it would start
   // from an empty session, and leave the held message undrained.
-  const slow = openStore(dbFile)
-  th = await open(() => {}, slowToLoad(slow.store, 3_000))
+  stored = openStore(dbFile)
+  th = await open(() => {}, slowToLoad(stored, 3_000))
+  const linesAfter = await storedLines(stored)
+  ok(
+    linesAfter.length === 0,
+    `a starting host keeps no command Line from before: no client can resume one (${linesAfter.length} stored)`,
+  )
   unwatch = watch()
   await waitFor(
     () => idOfIn(th.doc, "@Bob held across a restart") !== null,
     15_000,
   )
   await th.quiet()
-  const afterRestart = storeSize(dbFile)
+  const afterRestart = await storedRecords(stored, SESSION_DOC_ID)
   ok(
     beforeRestart.records > 3 && afterRestart.records <= 3,
     `a starting host compacts the session it opened (${beforeRestart.records} records -> ${afterRestart.records})`,
@@ -1142,11 +1211,7 @@ invariants("end")
       readOutbox(th.doc).length === 0,
     `after a restart the session is all there, and the held message was drained (${after.entries} entries)`,
   )
-  const u2 = await connectSession({
-    url: th.wsUrl,
-    WebSocket,
-    peerId: "tools-user",
-  })
+  const u2 = await join(th, "uma", "tools")
   script.use([{ text: "back again" }])
   const l7 = tlane()
   const resumed = await u2.chat("still there?", at(l7?.tip ?? null), {
@@ -1184,7 +1249,7 @@ invariants("end")
     userConfig: path.join(project, "no-user-config.json"),
     log: () => {},
   })
-  const cu = await connectSession({ url: ch.wsUrl, WebSocket, peerId: "c-uma" })
+  const cu = await join(ch, "uma", "containers")
   await cu.setName("Uma")
   const cidle = () =>
     waitFor(
@@ -1285,7 +1350,7 @@ invariants("end")
     containers: false,
     log: () => {},
   })
-  const du = await connectSession({ url: dh.wsUrl, WebSocket, peerId: "d-uma" })
+  const du = await join(dh, "uma", "direct")
   await du.setName("Uma")
   const didle = () =>
     waitFor(
@@ -1363,10 +1428,8 @@ invariants("end")
       log: () => {},
     })
   let nh = await open()
-  const join = (peerId: string) =>
-    connectSession({ url: nh.wsUrl, WebSocket, peerId })
-  const ada = await join("n-ada")
-  const bea = await join("n-bea")
+  const ada = await join(nh, "ada", "notes")
+  const bea = await join(nh, "bea", "notes")
   await Promise.all([ada.setName("Ada"), bea.setName("Bea")])
   const noteOf = (o: Outcome) => (o.kind === "noted" ? o.id : null)
   const record = (id: string | null) => readNotes(nh.doc).find(n => n.id === id)
@@ -1564,7 +1627,7 @@ invariants("end")
     noteOf(doneOutcome) === n1 && record(n1)?.state === "done",
     "a note is marked done",
   )
-  const cat = await join("n-cat")
+  const cat = await join(nh, "cat", "notes")
   const catText = cat.noteText(n1)
   await waitFor(() => catText.text() === merged, 5_000)
   catText.text.insert(0, "Cat was here. ")
@@ -1585,6 +1648,21 @@ invariants("end")
     changed >= 0 && record(n1)?.state === "open",
     "a reopened note, edited, is changed since done",
   )
+  // A deletion says who made it too: Kyneta's Yjs clock ticks for it, under
+  // the deleting seat (ADR-0037).
+  const dee = await join(nh, "dee", "notes")
+  const deeText = dee.noteText(n1)
+  await waitFor(() => deeText.text().endsWith(" Reopened."), 5_000)
+  deeText.text.delete(deeText.text().length - " Reopened.".length, 10)
+  const deleted = await waitFor(
+    () => record(n1)?.contributors.includes(dee.writer) === true,
+    5_000,
+  )
+  ok(
+    deleted >= 0 && nh.noteText(n1)?.endsWith(" Reopened.") === false,
+    "a deletion in a note makes its writer a contributor",
+  )
+  await dee.close()
 
   // 7. Restart over the store: records and text are back.
   await waitFor(() => nh.noteText(n1)?.endsWith(" Reopened.") === true, 5_000)
@@ -1595,7 +1673,7 @@ invariants("end")
   await Promise.all([ada.close(), bea.close()])
   await nh.shutdown()
   nh = await open()
-  const eve = await join("n-eve")
+  const eve = await join(nh, "eve", "notes")
   const eveText = eve.noteText(n1)
   const back = await waitFor(() => eveText.text() === before.text, 5_000)
   ok(
@@ -1624,10 +1702,8 @@ invariants("end")
       log: () => {},
     })
   let ah = await open()
-  const join = (peerId: string) =>
-    connectSession({ url: ah.wsUrl, WebSocket, peerId })
-  const ada = await join("a-ada")
-  const bea = await join("a-bea")
+  const ada = await join(ah, "ada", "archive")
+  const bea = await join(ah, "bea", "archive")
   await Promise.all([ada.setName("Ada"), bea.setName("Bea")])
   const aIdle = () =>
     waitFor(
@@ -1725,16 +1801,17 @@ invariants("end")
     mkdtempSync(path.join(tmpdir(), "pineta-presence-")),
     "pineta.db",
   )
+  const phStore = openStore(dbFile)
   const ph = await startHost({
     model: { kind: "scripted", script: scriptedModel() },
-    store: dbFile,
+    store: phStore,
     presenceDecay: decay,
     log: () => {},
   })
-  const join = (peerId: string) =>
-    connectSession({ url: ph.wsUrl, WebSocket, peerId, presenceDecay: decay })
-  const ada = await join("p-ada")
-  const bea = await join("p-bea")
+  const joinHere = (name: string) =>
+    join(ph, name, "presence", { presenceDecay: decay })
+  const ada = await joinHere("ada")
+  const bea = await joinHere("bea")
   ada.setReading("c1", "e-one")
   ada.setReading("c2", "e-two")
   ada.setTyping("e-two")
@@ -1750,14 +1827,14 @@ invariants("end")
         .map(([, e]) => e)
         .sort()
         .join() === "e-one,e-two" &&
-      facts.typing.get(ada.writer) === "e-two",
+      facts.typing.some(([w, e]) => w === ada.writer && e === "e-two"),
     `each open column is reported, and another client sees them (${facts.reading.length} columns)`,
   )
   // Typing decays with no further keystroke; reading, refreshed, stays.
   const stopped = await waitFor(() => {
     ada.setReading("c1", "e-one")
     ada.setReading("c2", "e-two")
-    return !readPresence(bea.presence).typing.has(ada.writer)
+    return !readPresence(bea.presence).typing.some(([w]) => w === ada.writer)
   }, 5_000)
   ok(
     stopped >= 0 && readPresence(bea.presence).reading.length === 2,
@@ -1773,8 +1850,9 @@ invariants("end")
   const closed = await waitFor(() => {
     ada.setReading("c1", "e-one")
     return (
-      !(readingKey(ada.writer, "c2") in bea.presence.reading()) &&
-      readPresence(bea.presence).reading.length === 1
+      !Object.keys(bea.presence.reading()).some(
+        k => k.startsWith(`${ada.writer}:`) && k.endsWith(":c2"),
+      ) && readPresence(bea.presence).reading.length === 1
     )
   }, 5_000)
   ok(closed >= 0, "a closed column's entry is deleted from others' view")
@@ -1796,24 +1874,7 @@ invariants("end")
     "a client's direct write to the session is refused by the host",
   )
   await ph.quiet()
-  const presenceRows = (() => {
-    const db = new DatabaseSync(dbFile, { readOnly: true })
-    try {
-      const table =
-        db
-          .prepare("select name from sqlite_master where type = 'table'")
-          .all()
-          .map(r => String(r.name))
-          .find(t => t.includes("record")) ?? ""
-      return (
-        db
-          .prepare(`select count(*) as n from ${table} where doc_id = ?`)
-          .get(PRESENCE_DOC_ID) as { n: number }
-      ).n
-    } finally {
-      db.close()
-    }
-  })()
+  const presenceRows = (await storedRecords(phStore, PRESENCE_DOC_ID)).records
   ok(presenceRows === 0, `presence is never stored (${presenceRows} records)`)
   await bea.close()
   await sleep(100)
@@ -1859,12 +1920,7 @@ invariants("end")
       200,
     "with the cookie, the page loads",
   )
-  const guest = await connectSession({
-    url: open.wsUrl,
-    WebSocket,
-    peerId: "keyed",
-    key: "k3y",
-  })
+  const guest = await join(open, "keyed", "admission", { key: "k3y" })
   const named = await guest.setName("Keyed")
   ok(named.kind === "named", "a client with the key syncs and sends commands")
   await guest.close()

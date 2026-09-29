@@ -315,9 +315,11 @@ exceptions *inside* it; reads are open with a `denyRead` blacklist.
 
 Local workspace at `~/halecraft/kyneta`, wired by `link:` deps. **Published
 `@kyneta/*` 3.0.0 is unusable** — it predates the O(δ) write fix and declares a
-`loro-crdt` floor of `>=1.8.0` where the real floor is `>=1.13.4`. Every host
-checks for `stepInPlace` when it starts (`assertEnvironment`) and refuses a
-stale build. Since ADR-0023 Pineta uses no Loro, so only that marker remains.
+`loro-crdt` floor of `>=1.8.0` where the real floor is `>=1.13.4`. A stale
+build is refused at load: Node refuses a module whose named import is missing
+before any of it runs (S47), and the host imports what v4 added (`whenPeer`,
+`yjsClientId`). Pineta tracks the local checkout's `needed-by-pineta`
+bookmark, Kyneta v4 as of `PLAN-2026-09-28-kyneta-v4`.
 
 Three issues were filed to the Kyneta team (`docs/findings/kyneta-issues-verification.md`):
 `compact()` throws on live Loro docs (**moot for Pineta** since ADR-0023: the
@@ -401,23 +403,14 @@ context.**
 
 ### Open, non-blocking
 
-- **Kyneta does not export `hashPeerId`.** Pineta's `clientIdOf`
-  (`packages/schema/note.ts`) copies it to attribute note edits, pinned by a
-  test. Ask Kyneta to export it, then delete the copy.
 - **A refused write to a note splits that client's replica.** Its later edits
   build on the refused one and never reach the host, even after the note is
   reopened (S26 addendum 2). The host keeps those later edits as pending
-  structs, and a fresh replica under the same peer id collides with them and
-  corrupts the text (S28). Someone marking a note done while another person
-  types gets there. ADR-0026 stops refusing writes to notes that have a record.
-- **A reload can corrupt a note, and costs attribution.** The browser comes
-  back under the same peer id with a fresh replica. Once the note syncs, Yjs
-  replaces the `clientID` with a random one, so the host credits nobody for
-  that client's later edits. A write made before the sync reuses clocks the
-  host already holds, and corrupts the text (S28). In Pineta: the note's editor
-  should accept no input until the note has synced. Upstream: Kyneta should
-  claim the peer's `clientID` for a network-synced Yjs document only after its
-  first sync, as `createForHydration` does for a store. To file.
+  structs. Before Kyneta v4, a fresh replica under the same peer id collided
+  with them and corrupted the text (S28); a reload is now a new seat, with a
+  `clientID` of its own (ADR-0037). Someone marking a note done while another
+  person types gets there. ADR-0026 stops refusing writes to notes that have a
+  record.
 
 - **Kyneta ephemeral: a write and a deletion in the same millisecond diverge.**
   A peer that sets a key and deletes it within one millisecond applies both in
@@ -443,8 +436,9 @@ context.**
   Compaction clears both when the run ends, so it costs bandwidth during a run,
   not storage. One text would do if pi's `tool_update` carried the checkpoint's
   key (`operationId`/`invocationId`): an upstream request to pi, low priority.
-- **Identity is not authenticated.** The invite key decides who gets in; peer
-  ids are chosen by clients, so a collaborator can pose as another (ADR-0022).
+- **Identity is not authenticated.** The invite key decides who gets in; a
+  person is the email their client names, unverified, so a collaborator can
+  pose as another (ADR-0022, ADR-0037). Next: an email with a generated token.
 
 - **S15** — the trunk winner rule uses wall-clock `ts`; clock skew is
   adversarial. Needs a Lamport clock (S1 deliberately built none).
@@ -486,6 +480,10 @@ context.**
   grants it. Your working copy is yours, so hot reload stays on. It needs
   Apple's `container` running (`docs/05-stack.md` D10); without it, threads
   work directly. Restart the host to pick up changes to host code.
+- **Who you are** (ADR-0037): the page asks for your email and name once per
+  browser. The email is who you are, in every tab and on every device; the
+  name is how you are shown, renamed in the header. **not you?** beside it
+  forgets the email on that browser.
 - **Your pi skills and prompts are commands** (ADR-0036):
   `/<package>:skill:<name>` for a skill, `/<package>:<name>` for a prompt
   template. For example `/duane:skill:plan` or `/duane:comments`. Typing `/`

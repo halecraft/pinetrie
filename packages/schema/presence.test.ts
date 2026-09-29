@@ -3,7 +3,13 @@
 // peers was measured through Exchanges; see the plan's implementation notes.
 import { batch, createDoc, SUBSTRATE } from "@kyneta/schema"
 import { describe, expect, test } from "vitest"
-import { newPresenceDoc, presenceDoc, readingKey } from "./index.ts"
+import {
+  newPresenceDoc,
+  presenceDoc,
+  readingKey,
+  seatKey,
+  writerOfKey,
+} from "./index.ts"
 
 const tick = (doc: object, now: number) =>
   (doc as Record<symbol, { tick?: (n: number) => void }>)[SUBSTRATE]?.tick?.(
@@ -13,13 +19,24 @@ const tick = (doc: object, now: number) =>
 describe("presence: flat records of decaying strings", () => {
   test("the shape binds, and each writer's keys are its own", () => {
     const doc = newPresenceDoc()
+    const me = seatKey("w-ada@x.io", "s1")
     batch(doc, d => {
-      d.reading.set(readingKey("w-ada", "c1"), "e1")
-      d.reading.set(readingKey("w-ada", "c2"), "e2")
-      d.typing.set("w-ada", "e2")
+      d.reading.set(readingKey(me, "c1"), "e1")
+      d.reading.set(readingKey(me, "c2"), "e2")
+      d.typing.set(me, "e2")
     })
-    expect(doc.reading()).toEqual({ "w-ada:c1": "e1", "w-ada:c2": "e2" })
-    expect(doc.typing()).toEqual({ "w-ada": "e2" })
+    expect(doc.reading()).toEqual({
+      "w-ada@x.io:s1:c1": "e1",
+      "w-ada@x.io:s1:c2": "e2",
+    })
+    expect(doc.typing()).toEqual({ "w-ada@x.io:s1": "e2" })
+  })
+  test("every key's writer is before its first colon (ADR-0037)", () => {
+    const me = seatKey("w-ada@x.io", "s1")
+    expect([writerOfKey(me), writerOfKey(readingKey(me, "c1"))]).toEqual([
+      "w-ada@x.io",
+      "w-ada@x.io",
+    ])
   })
   test("a value with no fresh write decays to null; the key stays", () => {
     const doc = createDoc(presenceDoc({ presenceMs: 1_000, typingMs: 100 }))

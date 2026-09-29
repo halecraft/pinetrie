@@ -45,8 +45,15 @@ export function useInbox({
     if (settled && inbox === null) setInbox(store.save(startInbox(index)))
   }, [settled])
 
-  // Another tab of this device saved: take the merged value.
-  useEffect(() => store.subscribe(setInbox), [store])
+  // Another tab of this device saved: take the merged value. Nothing clears
+  // the inbox, so a clear keeps what this tab has.
+  useEffect(
+    () =>
+      store.subscribe(value => {
+        if (value !== undefined) setInbox(value)
+      }),
+    [store],
+  )
 
   const save = useCallback(
     (next: Inbox, from: Inbox) => {

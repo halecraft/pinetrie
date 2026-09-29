@@ -25,7 +25,8 @@ are the only code that builds or reads the shape.
   the thread has a lane or the column is a Start Agent column, and never by a
   lane's default for a `branch`, which is a new thread). A handle resolves
   against `participants`: every named writer and every writer in the tree,
-  guests by their `guest-…` label, through `handleOf`: letters and digits in
+  the unnamed by their email's part before the `@` (ADR-0037), through
+  `handleOf`: letters and digits in
   any script, `_` and `-`, lower-cased and composed (NFC), so "José" typed
   either way is `@josé`. An unknown handle (`@types/node`) is ignored, so it
   never silences the agent; `normalizeName` refuses a name with no handle, or
@@ -125,8 +126,9 @@ record is a host-written `pineta.note` value keyed by note id, typed here as
   its text through `sendChat`, the one send path, and marks it sent on
   `appended`, `started` or `queued`), `done` and `reopen`.
 - **`planNoteEdit` decides what one edit changes**, pure: contributors are the
-  `clientID`s whose clocks moved, as known writers (`noteAuthors`), in order of
-  first edit; an unknown `clientID`, the host's own among them, is nobody's. A
+  `clientID`s whose clocks moved, as the people behind the seats connected
+  when the edit arrived (`noteAuthors`), in order of first edit; an unknown
+  `clientID`, the host's own among them, is nobody's. A
   reopened note, once edited, is `changedSinceDone`. It returns null when
   nothing changes, so an edit writes nothing to the session unless it matters.
   `changedSinceDone` is stored, not derived: deriving it would open every note's
@@ -228,8 +230,9 @@ surprising resolution can be traced to the policy that produced it.
 # Participants (`participant.ts`)
 
 A session is its participants (ADR-0021). `pineta.participant` values are names
-keyed by writer id; `displayName` gives an unnamed writer the `guest-…` label
-the screen shows; `participants` lists every named writer and every writer in
+keyed by writer id, which is `w-<email>` (ADR-0037); `displayName` gives an
+unnamed writer their email's part before the `@`, which the screen shows and
+a mention reaches (`normalizeEmail` requires a letter or digit there); `participants` lists every named writer and every writer in
 the tree, sorted, which is what a mention resolves against.
 
 # References

@@ -305,4 +305,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "PINETA_LANES=0 changes a root lane's default",
   },
+  {
+    name: "an email may hold a colon",
+    file: core,
+    from: '  if (/[\\s:]/u.test(email) || email.includes("\\u0000")) return undefined',
+    to: '  if (/[\\s]/u.test(email) || email.includes("\\u0000")) return undefined',
+    command: unit,
+    expect: "anything else is refused",
+  },
+  {
+    name: "a person typing from two seats shows twice",
+    file: "packages/core/presence.ts",
+    from: "    if (w !== me && at === value && !out.includes(w)) out.push(w)",
+    to: "    if (w !== me && at === value) out.push(w)",
+    command: unit,
+    expect: "shows once",
+  },
 ]

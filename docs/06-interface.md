@@ -209,8 +209,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   naming only people goes to them, in agent work too. A handle that names no
   participant (`@types/node`) is ignored. A person's handle is their name as
   shown, in lower case, keeping only letters and digits (in any script), `_`
-  and `-`: `@adalovelace`, `@josé`, `@日本`, `@guest-x4bu`. A name with no
-  such character, or spelled `agent`, is refused: no mention could reach it.
+  and `-`: `@adalovelace`, `@josé`, `@日本`. Someone who set no name is shown,
+  and mentioned, by their email's part before the `@` (`@ada` for
+  `ada@example.com`, ADR-0037). A name with no such character, or spelled
+  `agent`, is refused: no mention could reach it.
 - **The send button says what the message will do**: "send", "send · to Ada",
   "send · agent will reply", or "queue · agent replies after Bea". It uses the
   host's own decision (`address`, over `threadOf`), so it cannot promise a

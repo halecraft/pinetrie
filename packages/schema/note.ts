@@ -2,16 +2,22 @@
 //
 // Notes are the one place people type together, so their text is a CRDT
 // (ADR-0023); the note's record is a host-written session value
-// (`pineta.note`). Kyneta gives each peer's Yjs `clientID` from its peer id,
-// so the operations in a note say who wrote them (S26 addendum): the host
-// derives contributors from them, and needs nothing from the client.
+// (`pineta.note`). Kyneta gives each peer's Yjs `clientID` from its seat
+// (`yjsClientId`), so the operations in a note say which seat wrote them, and
+// the seat's principal says who that is (ADR-0037): the host derives
+// contributors from them, and needs nothing from the client.
 //
 // A note's document is never compacted: Kyneta cannot compact a live Yjs
 // document (S24). At note sizes its history is small.
 
 import { type BoundSchema, type DocRef, Schema } from "@kyneta/schema"
-import { yjs } from "@kyneta/yjs-schema"
-import { type NoteId, noteId, peerIdOf, type WriterId } from "@pineta/core"
+import { yjs, yjsClientId } from "@kyneta/yjs-schema"
+import {
+  type NoteId,
+  noteId,
+  type WriterId,
+  writerOfPrincipal,
+} from "@pineta/core"
 
 export const NoteDoc = yjs.bind(Schema.struct({ text: Schema.text() }))
 
@@ -31,22 +37,16 @@ export const noteIdOfDoc = (docId: string): NoteId | undefined =>
     : undefined
 
 /**
- * The Yjs `clientID` Kyneta gives a peer: FNV-1a over its id, 32 bits, with 0
- * kept for structure. A copy of Kyneta's `hashPeerId`, which it does not
- * export; `note.test.ts` pins it to a real document, so drift fails a test.
+ * Each seat's Yjs `clientID`, mapped to the person behind it. A seat whose
+ * principal is no email is nobody's, as is any `clientID` not listed: the
+ * host's own among them.
  */
-export function clientIdOf(peerId: string): number {
-  let hash = 0x811c9dc5
-  for (let i = 0; i < peerId.length; i++) {
-    hash ^= peerId.charCodeAt(i)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  const id = hash >>> 0
-  return id === 0 ? 1 : id
-}
-
-/** Each writer, keyed by the `clientID` their edits carry. */
 export const noteAuthors = (
-  writers: Iterable<WriterId>,
+  seats: Iterable<{ readonly peerId: string; readonly principal: string }>,
 ): ReadonlyMap<number, WriterId> =>
-  new Map([...writers].map(w => [clientIdOf(peerIdOf(w)), w]))
+  new Map(
+    [...seats].flatMap(({ peerId, principal }) => {
+      const writer = writerOfPrincipal(principal)
+      return writer === undefined ? [] : [[yjsClientId(peerId), writer]]
+    }),
+  )

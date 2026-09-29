@@ -5,7 +5,7 @@
 // written is a participant, named or not, so everyone shown on screen can be
 // mentioned.
 
-import type { WriterId } from "@pineta/core"
+import { emailLocalPart, type WriterId } from "@pineta/core"
 
 /** pi value namespace for display names. The key is the writer's id. */
 export const PARTICIPANT_NAMESPACE = "pineta.participant"
@@ -25,19 +25,19 @@ export function participantNames(
 }
 
 /**
- * A writer's name for display: the one they set, or a label from their id so a
- * speaker is never blank.
+ * A writer's name for display: the one they set, or the part of their email
+ * before the `@`, so a speaker is never blank (ADR-0037).
  */
 export const displayName = (
   writer: WriterId,
   set: string | undefined,
-): string => set ?? `guest-${writer.slice(-4)}`
+): string => set ?? emailLocalPart(writer)
 
 /**
  * Every participant's display name: each named writer, and each writer in the
- * tree, through `displayName`. The list a mention resolves against, so a guest
- * shown as `guest-x4bu` can be mentioned as `@guest-x4bu`. Sorted, so two
- * readers of one document agree.
+ * tree, through `displayName`. The list a mention resolves against, so someone
+ * unnamed, shown as `ada.l`, can be mentioned as `@ada.l`'s handle, `@adal`.
+ * Sorted, so two readers of one document agree.
  */
 export function participants(
   names: ReadonlyMap<WriterId, string>,

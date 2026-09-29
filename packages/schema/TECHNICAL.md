@@ -108,10 +108,15 @@ pi.
 ## Presence (`presence.ts`, ADR-0024)
 
 `pineta:presence` is a Kyneta `ephemeral` document: never stored, last writer
-wins per field. Its records are flat: `reading` keyed `${writer}:${columnKey}`
-(every column of the tab a person is on reports its thread's end), `typing`
-and `editing` keyed by writer. A column key holds no `:`: readers take the
-writer from before the last colon (`readingKey`). Each field is a
+wins per field. Its records are flat, and every key starts with its seat's
+`seatKey`, `${writer}:${seat}` (ADR-0037): `reading` is keyed
+`readingKey(seatKey, columnKey)` (every column of the tab a person is on
+reports its thread's end), `typing` and `editing` by `seatKey`. A person on
+two tabs is two seats, so one tab never overwrites or clears another's.
+`writerOfKey` takes the writer from before the first colon: a writer holds
+none (`normalizeEmail`), a seat is hex, and a column key holds none. The
+writer must be in the key, because a client sees only the host among its
+peers and cannot look another tab's person up from its seat. Each field is a
 `Schema.string().nullable().decay(ms)`: decay reverts a field to its zero, and
 a nullable's zero is `null`, so absence is `null`, never a sentinel string. Kyneta refuses `.decay()` below a register, so these are
 plain records of scalars.
@@ -131,11 +136,17 @@ A note's text is a Yjs document, `NoteDoc` (`{ text: Schema.text() }`), with id
 people type together, so it is a CRDT (ADR-0023); the record is a session
 value.
 
-- **`clientIdOf` copies Kyneta's `hashPeerId`** (FNV-1a over the peer id, 32
-  bits, 0 kept for structure), which Kyneta does not export. `note.test.ts`
-  pins it to a real document's `clientID`, so drift fails a test. Delete it
-  once Kyneta exports one. `noteAuthors` maps each known writer's `clientID`
-  back to them.
+- **A `clientID` names a seat, and the seat's principal the person**
+  (ADR-0037). `noteAuthors(seats)` maps each seat's `clientID`, Kyneta's own
+  `yjsClientId(peerId)` (53 bits of FNV-1a-64), to `writerOfPrincipal` of its
+  principal; a seat whose principal is no email, the host's included, is
+  nobody. `note.test.ts` pins it to real documents' `clientID`s. The host
+  calls it with the seats connected when an edit arrives, since by its serial
+  step the sender may have gone.
+- **A deletion moves its writer's clock.** Kyneta's Yjs substrate ticks a
+  `kyneta.clock` text after a transaction that only deleted, and a Kyneta
+  delete carries its author's tick, so a deletion is attributed like an
+  insertion.
 - **A note's document is never compacted.** Kyneta cannot compact a live Yjs
   document (S24); at note sizes its history is small.
 - **Yjs costs the page about 36 kB gzipped.** It is plain JavaScript: no wasm.
@@ -145,8 +156,17 @@ value.
 The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`
 over `node:sqlite`, `.pineta/pineta.db` by default. It holds every document the
 host serves, one append-only record stream per document: the `SessionDoc`,
-which is also pi's storage, each note's text, and each client's command Line.
-It is not a pi session file.
+which is also pi's storage, each note's text, and each connected client's
+command Line. It is not a pi session file.
+
+- **The store owns its file** (S47, `apps/pineta/host/store.ts`): exclusive
+  locking mode, taken when it opens, so a second process is refused, and so
+  is any reader. Read a running host's store through the `Store`, as the e2e
+  suite does. Kyneta's SQLite store issues the same seat on every open, so
+  the host keeps its peer id across restarts.
+- **A command Line lives only while its client's seat does** (ADR-0037). A
+  client keeps no store and does not reconnect, so the host destroys a
+  departed seat's Line, and deletes every stored one when it starts.
 
 **A root schema change cannot open an existing store**: Kyneta refuses a schema
 that cannot read what is stored. Migrate (root fields are migratable, S17), or
@@ -167,17 +187,19 @@ receives the whole document once.
 Every host has a store, an in-memory one when no file is given: Kyneta compacts
 only a document with a store.
 
-**Nothing may be written before the startup compaction.** `exchange.compact`
+**Nothing was written before the startup compaction.** `exchange.compact`
 advances the document's base to the least common version of the synced peers,
 or, with none, to the current version. A write compacted with no client
 connected moves the base past offset 0; a client then syncs reporting the
 genesis version (`kyneta.genesis:0`), and every later compaction targets it
-and throws in `advance()` ("target offset 0 is behind base offset 1"). Found
-when the host wrote its project record at startup; the host now writes it
-after the startup compaction, and only when it changed. The fix belongs in
-Kyneta: advancing to a target behind the base should do nothing. Only the session is compacted: a client's
-command Line is half written by the client, and Kyneta cannot compact a replica
-of a document another peer writes.
+and threw in `advance()` ("target offset 0 is behind base offset 1"). Found
+when the host wrote its project record at startup. Kyneta v4 fixed it
+(`planAdvance`: a target behind the base trims nothing), so the ordering is
+no longer needed for correctness; the host still writes the project record
+after the startup compaction, and only when it changed, which saves a write.
+Only the session is compacted: a client's command Line is half written by the
+client, and Kyneta cannot compact a replica of a document another peer
+writes.
 
 ## Telling "no lane" from "a lane at the root"
 

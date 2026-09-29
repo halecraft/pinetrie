@@ -348,8 +348,9 @@ export class KynetaStorage implements Storage {
     this.#peer = options.peerId ?? "p"
     this.#doc = options.doc ?? newSessionDoc()
 
-    // Only REMOTE state (`replay: true` — merge payloads / substrate bridges)
-    // needs reconciling. Local commits index themselves inline.
+    // Only state no writer on this replica made (`replay: true`: a merge, a
+    // reset) needs reconciling. Local commits (`replay: false`) index
+    // themselves inline.
     this.#unsubscribe = subscribe(this.#doc, cs => {
       if (cs.replay !== true) return
       for (const op of cs.changes) {

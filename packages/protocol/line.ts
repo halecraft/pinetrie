@@ -2,9 +2,10 @@
 //
 // Imports Kyneta's PUBLIC schema/Line API only. No pi. No Kyneta internals.
 //
-// Line API note: the surface was renamed — `open()` -> `sender()`,
-// `listen()` -> `claimReceiver()` on the client side, plus `manager()`.
-// `Line.listen(exchange)` (server side, with `.onReceive`) is unchanged.
+// A client opens its Line with `sender()` and `claimReceiver()`, addressed to
+// the host's seat, which Kyneta issues and the client finds by the host's
+// principal (`whenPeer`, ADR-0037). The host accepts Lines with
+// `Line.listen(exchange)` and `.onReceive`, which names the client's seat.
 
 import { Line } from "@kyneta/exchange"
 import { Schema } from "@kyneta/schema"

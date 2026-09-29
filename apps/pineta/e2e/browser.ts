@@ -24,8 +24,15 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, rmSync } from "node:fs"
 import path from "node:path"
-import { connectSession } from "@pineta/client/session"
-import { atEntry, entryId, handleOf, projectRail, ROOT } from "@pineta/core"
+import { IDENTITY_KEY, identityCodec } from "@pineta/client/identity"
+import {
+  atEntry,
+  entryId,
+  handleOf,
+  projectRail,
+  ROOT,
+  writerId,
+} from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
   readLaneRecords,
@@ -35,7 +42,7 @@ import {
 } from "@pineta/reads"
 import { type Browser, chromium, type Page } from "@playwright/test"
 import { startHost } from "../host/index.ts"
-import { committedProject, createChecks, waitFor } from "./harness.ts"
+import { committedProject, createChecks, join, waitFor } from "./harness.ts"
 
 const PW_SERVER = process.env.PW_SERVER ?? "ws://localhost:3100/"
 /** The ⋯ of the tab you are on: every root tab has one, shown on hover. */
@@ -116,6 +123,18 @@ console.log(`  host              : ${host.httpUrl}\n`)
 // An explicit context: a page from `browser.newPage()` owns its context, and
 // Playwright refuses a second tab in it, which the column checks open.
 const page = await (await browser.newContext()).newPage()
+/** The main page's person: the email it gives the form below (ADR-0037). */
+const ME = writerId("ada@browser.test")
+/**
+ * Make `p` a person before it loads: what the identity form would have
+ * stored. A page from `browser.newPage()` has a context, and so a device, of
+ * its own, which would otherwise ask.
+ */
+const asPerson = (p: Page, email: string, name: string) =>
+  p.addInitScript(([key, value]) => localStorage.setItem(key, value), [
+    IDENTITY_KEY,
+    JSON.stringify(identityCodec.encode({ email, name })),
+  ] as const)
 const errors: string[] = []
 page.on("pageerror", e => errors.push(String(e.message)))
 page.on("console", m => m.type() === "error" && errors.push(m.text()))
@@ -125,6 +144,27 @@ try {
     waitUntil: "domcontentloaded",
     timeout: 20_000,
   })
+
+  // A first visit asks who you are, and connects nothing until it knows: your
+  // email is the principal, your name the session's label for you (ADR-0037).
+  await page.waitForSelector("#identity", { timeout: 20_000 })
+  await page.fill('#identity input[name="email"]', "ada")
+  await page.fill('#identity input[name="name"]', "Ada")
+  await page.click('#identity button[type="submit"]')
+  const refusedEmail = await page
+    .waitForSelector('.identity-problem[data-problem="email"]', {
+      timeout: 5_000,
+    })
+    .then(
+      () => true,
+      () => false,
+    )
+  await page.fill('#identity input[name="email"]', " Ada@Browser.Test ")
+  await page.click('#identity button[type="submit"]')
+  ok(
+    refusedEmail,
+    "a first visit asks for your email and name, and refuses what is not an email",
+  )
 
   // The bundle must load and connect before anything renders: a module the
   // browser cannot run fails exactly here, which a browser-free check cannot
@@ -188,16 +228,14 @@ try {
     page.$eval(sel, n => n.getBoundingClientRect().top).catch(() => Number.NaN)
 
   // ── names, and the promise before the first message ─────────────────────
-  await page.fill("#name", "Ada")
-  await page.press("#name", "Enter")
   const named = await waitFor(
-    () =>
-      [...readParticipantNames(host.doc)].some(
-        ([writer, name]) => name === "Ada" && writer.startsWith("w-"),
-      ),
+    () => readParticipantNames(host.doc).get(ME) === "Ada",
     15_000,
   )
-  ok(named >= 0, "the name typed in the header is stored by the writer's id")
+  ok(
+    named >= 0,
+    "the name given on joining is stored by your writer id, your email",
+  )
   ok(
     (await page.locator(".composer .audience").count()) === 0,
     "the composer does not guess an audience: presence will say who is here",
@@ -331,11 +369,7 @@ try {
       n.getAttribute("data-entry"),
     )) ?? ""
   const atReply = `${col(0)} .msg[data-entry="${replyId}"]`
-  const other = await connectSession({
-    url: host.wsUrl,
-    WebSocket,
-    peerId: "browser-other",
-  })
+  const other = await join(host, "other", "browser")
   await other.setName("Bea")
   // A fork on purpose, at the agent's reply: `branch`. A branch starts as a
   // conversation, so it is appended with no run.
@@ -719,11 +753,7 @@ try {
   )
 
   // 2. A root someone else starts opens no tab here (ADR-0030).
-  const api = await connectSession({
-    url: host.wsUrl,
-    WebSocket,
-    peerId: "browser-tabs",
-  })
+  const api = await join(host, "tabs", "browser")
   await api.setName("Bea")
   const third = await api.chat("a third thread", ROOT, { mode: "branch" })
   const thirdRoot = third.kind === "appended" ? third.id : ""
@@ -800,13 +830,27 @@ try {
   )
   await page.click(tabSel(firstRoot))
 
-  // 4. Another window: the header shows it, never yourself, and takes you to it.
-  const myWriter = await page.evaluate(
-    () => `w-${sessionStorage.getItem("pineta-peer-id")}`,
-  )
+  // 4. Another window, another person: the header shows them, never
+  // yourself, and takes you to them.
+  const myWriter = ME
   const tb = await browser.newPage()
+  await asPerson(tb, "tabs-b@browser.test", "Tabby")
   try {
     await tb.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+    const knownHere = await tb
+      .waitForFunction(
+        () => document.getElementById("status")?.textContent === "connected",
+        undefined,
+        { timeout: 20_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      knownHere && (await tb.locator("#identity").count()) === 0,
+      "a browser that knows who you are connects without asking",
+    )
     const landed = await tb
       .waitForSelector('#tabs .tab-archive[aria-selected="true"]', {
         timeout: 20_000,
@@ -1007,10 +1051,8 @@ try {
     const sibling = await page.context().newPage()
     try {
       await sibling.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
-      // A second tab is a second writer (S29), and "you" is a name
-      // (ADR-0030): named as the page is, its mentions are the page's.
-      await sibling.fill("#name", await page.inputValue("#name"))
-      await sibling.press("#name", "Enter")
+      // A second tab of the device is the same person (ADR-0037), so its
+      // mentions are the page's.
       await sibling.waitForSelector("#top .inbox-count", { timeout: 20_000 })
       await chooseFromMenu(sibling, "#top .inbox-trigger", ".inbox-all-seen")
       const cleared = await page
@@ -1191,6 +1233,7 @@ try {
       log: () => {},
     })
     const tp = await browser.newPage()
+    await asPerson(tp, "tools@browser.test", "Tess")
     try {
       await tp.goto(toolHost.httpUrl, { waitUntil: "domcontentloaded" })
       await tp.click("#tabs .add-agent")
@@ -1619,11 +1662,7 @@ try {
       // A column opened level with its fork point, and longer than it is
       // tall, keeps that place as its thread grows: it was placed short of
       // its end, so it does not follow it.
-      const aligner = await connectSession({
-        url: toolHost.wsUrl,
-        WebSocket,
-        peerId: "browser-aligner",
-      })
+      const aligner = await join(toolHost, "aligner", "browser")
       try {
         const forkId =
           (await tp
@@ -1689,11 +1728,7 @@ try {
           n.getAttribute("data-root"),
         )
         .catch(() => null)
-      const starter = await connectSession({
-        url: toolHost.wsUrl,
-        WebSocket,
-        peerId: "browser-starter",
-      })
+      const starter = await join(toolHost, "starter", "browser")
       try {
         script.use([{ text: LONG }])
         const started = await starter.chat(
@@ -1797,11 +1832,7 @@ try {
       // aligning the new column to it alone would not show the message. The
       // aside is one message, so the preview below opens on a short path and
       // its pick scrolls down, which does not stop a column following (S33).
-      const railer = await connectSession({
-        url: toolHost.wsUrl,
-        WebSocket,
-        peerId: "browser-railer",
-      })
+      const railer = await join(toolHost, "railer", "browser")
       try {
         const say3 = (n: string) => `${n}.\nIts second line.\nIts third line.`
         const chain = async (from: string, name: string, n: number) => {
@@ -1977,6 +2008,7 @@ try {
     `alone, no avatars and no rings (${JSON.stringify(alone)})`,
   )
   const second = await browser.newPage()
+  await asPerson(second, "second@browser.test", "Sam")
   try {
     await second.goto(host.httpUrl, {
       waitUntil: "domcontentloaded",
@@ -2216,17 +2248,18 @@ try {
     p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))
   const openKeys = await columnKeys(page)
 
-  // A reload is the same person: the tab keeps its peer id, so its name stays
-  // and it is not shown to itself as someone else.
+  // A reload is the same person: the device keeps your email, so your name
+  // stays and you are not shown to yourself as someone else.
   const myName = await page.inputValue("#name")
-  const me = await page.evaluate(
-    () => `w-${sessionStorage.getItem("pineta-peer-id")}`,
-  )
+  const me = ME
   await page.reload({ waitUntil: "domcontentloaded" })
-  await page.waitForFunction(
-    () => document.getElementById("status")?.textContent === "connected",
-    { timeout: 20_000 },
-  )
+  // Not asked again: a page that asks never connects, which the check says.
+  await page
+    .waitForFunction(
+      () => document.getElementById("status")?.textContent === "connected",
+      { timeout: 20_000 },
+    )
+    .catch(() => null)
   const kept = await page
     .waitForFunction(
       n =>
@@ -2267,6 +2300,15 @@ try {
     ok(
       inNewTab.join() === openKeys.join(),
       `a new tab opens the device's last layout (${inNewTab.length} of ${openKeys.length})`,
+    )
+    // It is you, from another seat: your name, and no avatar of yourself.
+    const asYou =
+      (await newTab.inputValue("#name")) === myName &&
+      (await page.locator(`.avatar[data-writer="${me}"]`).count()) === 0 &&
+      (await newTab.locator(`.avatar[data-writer="${me}"]`).count()) === 0
+    ok(
+      asYou,
+      "a second tab is the same person: your name, and never an avatar of you",
     )
   } finally {
     await newTab.close().catch(() => {})

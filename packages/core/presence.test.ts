@@ -27,7 +27,8 @@ const [me, bea, cy] = [writerId("me"), writerId("bea"), writerId("cy")]
 const view = (
   reading: [WriterId, string][],
   typing: [WriterId, string][] = [],
-) => presenceView({ reading, typing: new Map(typing) }, me, index)
+  editing: [WriterId, string][] = [],
+) => presenceView({ reading, typing, editing }, me, index)
 
 describe("presenceView: others, by thread", () => {
   test("excludes me, everywhere", () => {
@@ -67,5 +68,22 @@ describe("presenceView: others, by thread", () => {
       ],
     )
     expect([v.typingAt("3"), v.typingAt("4")]).toEqual([[bea], [cy]])
+  })
+  test("a person typing or editing from two seats shows once (ADR-0037)", () => {
+    const v = view(
+      [],
+      [
+        [bea, "3"],
+        [bea, "3"],
+        [me, "3"],
+      ],
+      [
+        [bea, "n1"],
+        [bea, "n1"],
+        [cy, "n2"],
+      ],
+    )
+    expect(v.typingAt("3")).toEqual([bea])
+    expect([v.editingAt("n1"), v.editingAt("n2")]).toEqual([[bea], [cy]])
   })
 })

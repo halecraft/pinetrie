@@ -21,6 +21,9 @@
       h1 { font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: #8b93a1; margin: 0 0 .25rem; }
       .meta { font-size: 12px; color: #6f7784; }
       #name { width: 9rem; padding: .2rem .4rem; }
+      .not-you { background: none; border: 0; padding: 0; color: #6f7784; font: inherit; cursor: pointer; }
+      .not-you:hover { color: #aab4c3; text-decoration: underline; }
+
 
       /* A tab per root (ADR-0029): Archive, the open roots, new tabs, and ＋. The
          list scrolls; Archive and ＋ stay put. */
@@ -302,6 +305,14 @@
       .here-at, .inbox-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .inbox-row.unseen .inbox-text { font-weight: 600; }
       .inbox-row.unseen::before { content: "●"; color: #f28b82; font-size: .6rem; }
+      /* Who you are, asked once per device before anything connects (ADR-0037). */
+      #identity { display: flex; flex-direction: column; gap: .6rem; width: 20rem;
+        margin: 20vh auto 0; padding: 1.25rem; border: 1px solid #23272e; border-radius: 8px;
+        background: #1b1e24; }
+      #identity label { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+      #identity input { flex: 1; padding: .3rem .45rem; }
+      #identity button { align-self: flex-end; padding: .3rem .9rem; }
+      .identity-problem { margin: 0; color: #f0a0a0; font-size: .85rem; }
     </style>
   </head>
   <body>

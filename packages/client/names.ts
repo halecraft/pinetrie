@@ -13,7 +13,7 @@
 export const withContributors = (speaker: string, others: readonly string[]) =>
   others.length === 0 ? speaker : `${speaker}, with ${others.join(", ")}`
 
-/** "Duane (guest-x4bu)" when the name has changed since; "Duane" when it has not. */
+/** "Duane (duane)" when the name has changed since; "Duane" when it has not. */
 export function speakerLabel(
   current: ReadonlyMap<string, string>,
   writer: string | undefined,

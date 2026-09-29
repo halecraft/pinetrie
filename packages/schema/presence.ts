@@ -6,11 +6,17 @@
 // string. Leaving needs no message: a person's entries go quiet and decay. A
 // decayed key stays in the record holding `null`, and a peer that shuts down
 // is not removed at once; readers skip nulls. Each client writes only its own
-// keys; nothing can enforce that, so presence is untrusted, like peer ids.
+// keys; nothing can enforce that, so presence is untrusted, like the
+// principals it names.
 //
 // Records are flat and keyed by what writes them (ADR-0016's rule, kept though
-// presence cannot race harmfully): `reading` by `${writer}:${columnKey}`,
-// since every open column is being read; `typing` and `editing` by writer.
+// presence cannot race harmfully). A person may be here from several tabs or
+// devices, each its own seat (ADR-0037), so every key starts with the seat's
+// `seatKey`, `${writer}:${seat}`: one tab never overwrites or clears
+// another's. `reading` adds the column, `${seatKey}:${columnKey}`, since every
+// open column is being read; `typing` and `editing` are keyed by `seatKey`.
+// The writer must be in the key: a browser sees only the host among its
+// peers, so it cannot look another tab's person up from its seat.
 
 import { createDoc, ephemeral, Schema } from "@kyneta/schema"
 
@@ -53,8 +59,19 @@ export const newPresenceDoc = () => createDoc(PresenceDoc)
 export type PresenceDocHandle = ReturnType<typeof newPresenceDoc>
 
 /**
- * The key of one column's reading entry. The writer is what comes before the
- * last `:` (`readPresence`), so a column key holds no `:`.
+ * The key of one seat's entries: its person, then the seat (ADR-0037). A
+ * writer holds no `:` (`normalizeEmail` refuses it) and a seat is hex, so the
+ * writer is everything before the first `:` (`writerOfKey`).
  */
-export const readingKey = (writer: string, columnKey: string): string =>
-  `${writer}:${columnKey}`
+export const seatKey = (writer: string, seat: string): string =>
+  `${writer}:${seat}`
+
+/** The key of one column's reading entry: its seat's key, then the column. */
+export const readingKey = (ofSeat: string, columnKey: string): string =>
+  `${ofSeat}:${columnKey}`
+
+/** The writer of any presence key: everything before its first `:`. */
+export const writerOfKey = (key: string): string | undefined => {
+  const at = key.indexOf(":")
+  return at > 0 ? key.slice(0, at) : undefined
+}

@@ -356,6 +356,33 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S48 — Offers: a thread's work as one commit in your repo ✅ PASS
+
+`findings/S48-offers.md`. An offer is four host operations with
+`--ignore-working-copy`, by change id, and never touches your working copy.
+It previews conflicts with your committed work; take is `jj rebase -r
+<offer> -B @`, and a conflict with your uncommitted edits lands in `@`. The
+host tells your edit of an offer from jj's rebase by comparing it with its
+own earlier version (description, `jj interdiff`, and whether its parent is
+an ancestor of the target); a racing rewrite makes it divergent, and is
+repaired by who made each commit (`operation.user()`), never by description.
+An addendum answered the plan's questions first: where an offer starts is one
+revset (copies of your `@` count as yours), a stack is rebuilt rather than
+duplicated, and retiring the old layout moves lane history before deleting
+bookmarks. A lane
+can start from your `@` only through a copy with its own change id. Lane
+history as remote bookmarks is immutable and out of your default log with
+no config.
+
+### S47 — Owning a SQLite file through `node:sqlite` ✅ PASS
+
+`findings/S47-sqlite-ownership.md`. Exclusive locking mode after `BEGIN
+EXCLUSIVE; COMMIT` refuses every other connection, readers included, even on
+an empty file. `node:sqlite` reports it as `errcode` 5, not Kyneta's
+`code === "SQLITE_BUSY"`. The constructor's `timeout` is the busy timeout.
+Closing releases the file at once. A missing named import refuses the module
+at load, so the host's environment gate could never fail.
+
 ### S46 — Skill files in a lane, under `/mnt/host` ✅ PASS
 
 `findings/S46-skill-files-in-lanes.md`. A read-only mount at `/mnt/host`

@@ -75,8 +75,8 @@ export interface ColumnProps {
   onTyping: () => void
   /** Every note's record (ADR-0025). */
   notes: readonly NoteRecord[]
-  /** Who is editing which note now (presence), others and this window alike. */
-  editing: ReadonlyMap<WriterId, string>
+  /** Others editing a note now (presence), each person once. */
+  editorsOf: (note: string) => readonly WriterId[]
   /** Every lane the agent is replying on. Several threads can run at once. */
   activity: readonly AgentRun[]
   lanes: readonly LaneView[]
@@ -240,9 +240,7 @@ export function Column(p: ColumnProps) {
   const [joined, setJoined] = useState<NoteId | null>(null)
   const card = (note: NoteRecord) => (
     <NoteCard
-      editors={[...p.editing].flatMap(([w, n]) =>
-        n === note.id && w !== p.session.writer ? [w] : [],
-      )}
+      editors={p.editorsOf(note.id)}
       key={note.id}
       nameOf={p.nameOf}
       note={note}

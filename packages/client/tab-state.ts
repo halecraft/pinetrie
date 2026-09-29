@@ -7,7 +7,7 @@
 // save from any tab and is what a new tab starts from. Browsers copy
 // `sessionStorage` into a duplicated tab, so a duplicate starts with its
 // original's value. `deviceState` keeps only the device's slot, merges on every
-// save, and hears other tabs' saves through the `storage` event.
+// save, and hears other tabs' saves and clears through the `storage` event.
 //
 // Generic: it knows nothing of Pineta. A value's stored form is its codec's.
 
@@ -15,6 +15,7 @@
 export interface StorageLike {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
+  removeItem(key: string): void
 }
 
 /** A value's stored form, both ways. `decode` is total: it never throws. */
@@ -83,8 +84,14 @@ export interface DeviceState<T> {
   load(): T | undefined
   /** Merge `value` into what is stored, write the result, and return it. */
   save(value: T): T
-  /** Call `listener` when another tab writes the key. Returns the unsubscribe. */
-  subscribe(listener: (value: T) => void): () => void
+  /** Remove the stored value. */
+  clear(): void
+  /**
+   * Call `listener` when another tab writes the key: with its value, or with
+   * undefined when it was cleared. A write that does not decode is not heard.
+   * Returns the unsubscribe.
+   */
+  subscribe(listener: (value: T | undefined) => void): () => void
 }
 
 /** The part of a `storage` event read here. */
@@ -124,10 +131,12 @@ export function deviceState<T>({
       writeSlot(device, key, JSON.stringify(codec.encode(next)))
       return next
     },
+    clear: () => device.removeItem(key),
     subscribe(listener) {
       // A `storage` event fires only in the other tabs of the device.
       const heard = (e: Event) => {
         if (!isStorageEvent(e) || e.key !== key) return
+        if (e.newValue === null) return listener(undefined)
         const value = readStored(e.newValue, codec.decode)
         if (value !== undefined) listener(value)
       }

@@ -14,7 +14,7 @@
 // stable node identity, which `useText` needs to keep a note's textarea
 // bound while everyone types (ADR-0025).
 
-import { persistentPeerId, whenSettled } from "@kyneta/exchange"
+import { whenSettled } from "@kyneta/exchange"
 import { ExchangeProvider, useDocStatus, useTracked } from "@kyneta/react"
 import {
   branchColors,
@@ -69,6 +69,13 @@ import type { ReadOnly } from "./composer.tsx"
 import { Header } from "./header.tsx"
 import { peopleHere, readersByRoot } from "./here.ts"
 import {
+  IDENTITY_KEY,
+  type Identity,
+  identityCodec,
+  nameOnJoin,
+} from "./identity.ts"
+import { askIdentity } from "./identity-form.tsx"
+import {
   decodeInbox,
   encodeInbox,
   type Inbox,
@@ -121,7 +128,22 @@ const inboxStore = deviceState<Inbox>({
   events: window,
 })
 
-/** A display name: a label for you, never your identity. */
+/**
+ * Who this device says it is (ADR-0037), shared by its tabs. Another tab
+ * clearing it, or storing another email, reloads this one too (at mount).
+ */
+const identityStore = deviceState<Identity>({
+  key: IDENTITY_KEY,
+  codec: identityCodec,
+  device: localStorage,
+  merge: (_, next) => next,
+  events: window,
+})
+
+/**
+ * A display name: a label for you, never your identity, which is your email.
+ * "not you?" forgets the email on this device and asks again.
+ */
 function NameField({ session }: { session: SessionClient }) {
   const names = useTracked(() => readParticipantNames(session.doc))
   const [draft, setDraft] = useState<string | null>(null)
@@ -139,8 +161,24 @@ function NameField({ session }: { session: SessionClient }) {
         if (e.key === "Enter") e.currentTarget.blur()
       }}
       placeholder="your name"
+      title={session.principal}
       value={draft ?? current}
     />
+  )
+}
+
+function NotYou() {
+  return (
+    <button
+      className="not-you"
+      onClick={() => {
+        identityStore.clear()
+        location.reload()
+      }}
+      type="button"
+    >
+      not you?
+    </button>
   )
 }
 
@@ -523,7 +561,7 @@ function App({ session }: { session: SessionClient }) {
   const shared = {
     activity,
     colorOf,
-    editing: presenceFacts.editing,
+    editorsOf: here.editingAt,
     index,
     lanes,
     nameOf,
@@ -571,7 +609,7 @@ function App({ session }: { session: SessionClient }) {
         <div className="header-left">
           <h1>pineta</h1>
           <div className="meta">
-            <NameField session={session} /> · entries{" "}
+            <NameField session={session} /> <NotYou /> · entries{" "}
             <span id="count">{count}</span> ·{" "}
             <span id="status">
               {status === "pending" ? "syncing…" : "connected"}
@@ -868,17 +906,31 @@ function Preview({
 // same function in Node.
 
 const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`
-// Who this tab is: Kyneta's per-tab lease. A reload keeps the id, so you stay
-// yourself, your name with you; a second tab open at once gets its own, except
-// a duplicated one, which shares it (S29).
+const root = document.getElementById("root")
+if (root === null) throw new Error("client/app: missing #root in the page")
+
+// Who you are: your email, asked once per device and shared by its tabs, so a
+// reload, another tab and another device with the same email are one person
+// (ADR-0037). Kyneta gives each tab its own seat.
+const identity =
+  identityStore.load() ?? identityStore.save(await askIdentity(root))
+identityStore.subscribe(next => {
+  if (next?.email !== identity.email) location.reload()
+})
 const session = await connectSession({
   url: wsUrl,
   WebSocket,
-  peerId: persistentPeerId("pineta-peer-id"),
+  principal: identity.email,
 })
-
-const root = document.getElementById("root")
-if (root === null) throw new Error("client/app: missing #root in the page")
+// A session that does not know your name yet learns the one you gave; one set
+// since, here or on another device, stays.
+void whenSettled(session.doc).then(() => {
+  const name = nameOnJoin(
+    identity,
+    readParticipantNames(session.doc).get(session.writer),
+  )
+  if (name !== null) void session.setName(name)
+})
 
 createRoot(root).render(
   <StrictMode>

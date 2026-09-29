@@ -3,7 +3,7 @@
 // Runs unmodified in a browser AND in Node (the e2e check), because the only
 // environment-specific value is the WebSocket constructor. No pi.
 
-import { Exchange } from "@kyneta/exchange"
+import { Exchange, whenPeer } from "@kyneta/exchange"
 import { batch, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 
@@ -20,12 +20,12 @@ import {
   type ReferenceTarget,
   type WorkSetting,
   type WriterId,
-  writerId,
+  writerOfPrincipal,
 } from "@pineta/core"
 import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
 import {
-  HOST_PEER_ID,
+  HOST_PRINCIPAL,
   PRESENCE_DOC_ID,
   type Reply,
   SESSION_DOC_ID,
@@ -41,6 +41,7 @@ import {
   readingKey,
   SessionDoc,
   type SessionDocHandle,
+  seatKey,
 } from "@pineta/schema"
 
 /**
@@ -62,14 +63,19 @@ export interface ConnectOptions {
   /** How long presence lasts without a refresh; a suite shortens it. */
   readonly presenceDecay?: PresenceDecay
   readonly WebSocket: WebSocketCtor
-  readonly peerId?: string
+  /**
+   * Who this client is: a person's email, the principal its Exchange names
+   * (ADR-0037). Kyneta issues the seat.
+   */
+  readonly principal: string
   /** Called on every change to the document; read it through `@pineta/reads`. */
   readonly onChange?: () => void
 }
 
 export interface SessionClient {
-  readonly peerId: string
-  /** Who this client is to the host: derived from the peer id, as the host does. */
+  /** The email this client connected as. */
+  readonly principal: string
+  /** Who this client is to the host: derived from the principal, as the host does. */
   readonly writer: WriterId
   /**
    * The live Exchange and doc, exposed so a React tree can render from the
@@ -134,8 +140,12 @@ export interface ChatHow {
 export async function connectSession(
   options: ConnectOptions,
 ): Promise<SessionClient> {
-  const peerId =
-    options.peerId ?? `client-${Math.random().toString(36).slice(2, 10)}`
+  const { principal } = options
+  const me = writerOfPrincipal(principal)
+  if (me === undefined)
+    throw new Error(
+      `connectSession: the principal must be an email, not ${principal}`,
+    )
 
   const transport = new WebsocketClientTransport({
     url:
@@ -145,17 +155,24 @@ export async function connectSession(
     WebSocket: options.WebSocket,
     reconnect: { enabled: false },
   })
-  const exchange = new Exchange({ id: peerId, transports: [transport] })
+  const exchange = new Exchange({ principal, transports: [transport] })
   await transport.waitForStatus("ready", { timeoutMs: 10_000 })
+  // Kyneta issues the host's seat, so it is found by its principal.
+  const host = await within(
+    10_000,
+    whenPeer(exchange, p => p.principal === HOST_PRINCIPAL),
+    "the host did not introduce itself",
+  )
 
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
   const presence = exchange.get(
     PRESENCE_DOC_ID,
     presenceDoc(options.presenceDecay ?? PRESENCE_DECAY),
   )
-  const me = writerId(peerId)
-  const sender = Control.sender(exchange, HOST_PEER_ID)
-  const receiver = Control.claimReceiver(exchange, HOST_PEER_ID)
+  // This seat's presence key: a person may be here from several (ADR-0037).
+  const mine = seatKey(me, exchange.peerId)
+  const sender = Control.sender(exchange, host.peerId)
+  const receiver = Control.claimReceiver(exchange, host.peerId)
 
   const replies: Reply[] = []
   const replyWaiters = new Map<string, (reply: Reply) => void>()
@@ -183,22 +200,22 @@ export async function connectSession(
   }
 
   return {
-    peerId,
+    principal,
     writer: me,
     presence,
     setReading(columnKey, end) {
-      batch(presence, d => d.reading.set(readingKey(me, columnKey), end))
+      batch(presence, d => d.reading.set(readingKey(mine, columnKey), end))
     },
     clearReading(columnKey) {
-      const key = readingKey(me, columnKey)
+      const key = readingKey(mine, columnKey)
       if (presence.reading()[key] !== undefined)
         batch(presence, d => d.reading.delete(key))
     },
     setTyping(end) {
-      batch(presence, d => d.typing.set(me, end))
+      batch(presence, d => d.typing.set(mine, end))
     },
     setEditing(note) {
-      batch(presence, d => d.editing.set(me, note))
+      batch(presence, d => d.editing.set(mine, note))
     },
     exchange,
     doc,
@@ -246,9 +263,30 @@ export async function connectSession(
       try {
         unsubscribe?.()
       } catch {}
+      // This seat's typing and editing go with it; another seat of the same
+      // person keeps its own.
+      try {
+        batch(presence, d => {
+          if (presence.typing()[mine] !== undefined) d.typing.delete(mine)
+          if (presence.editing()[mine] !== undefined) d.editing.delete(mine)
+        })
+      } catch {}
       try {
         await exchange.shutdown()
       } catch {}
     },
   }
+}
+
+/** `promise`, or a rejection with `message` after `ms`. */
+function within<T>(
+  ms: number,
+  promise: Promise<T>,
+  message: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms)
+  })
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer))
 }

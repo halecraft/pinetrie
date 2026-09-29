@@ -143,3 +143,14 @@ for (let t = 0; t < 50; t++) {
 Closing each late client printed Kyneta's `Failed to decode message: Error:
 Pipeline disposed` many times over: messages arriving after the client's
 pipeline was disposed. Not examined; it doesn't affect the counts.
+
+## Addendum: Kyneta v4 issues seats (ADR-0037)
+
+Answers 3 to 5 are moot. Kyneta v4 removed `persistentPeerId`: every Runtime
+issues itself a peer id, a *seat*, from its store or fresh per session, so no
+two live replicas share one, a duplicated tab included. The caller names only
+a *principal*. In Pineta a principal is a person's email, asked once per
+browser and kept in `localStorage`, so a duplicated tab, a reload, a second
+tab and a second device are the same person on different seats. Answer 6
+stands: `whenSettled` is still the signal that the document has arrived.
+
