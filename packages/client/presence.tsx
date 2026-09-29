@@ -1,4 +1,4 @@
-// client/presence — how other people are drawn (ADR-0024).
+// client/presence — how people are drawn, you included (ADR-0024).
 //
 // A person's colour is kept apart from the branch palette (`rail.tsx`): a ring
 // or an avatar must never read as a track. The first few people in a session
@@ -58,25 +58,36 @@ export const nameFor = (
 /** The most avatars a header shows; the rest are "+n". */
 const MOST = 3
 
-/** One person's circle: their initial, in their colour. */
-export function Avatar({
-  writer,
-  nameOf,
-  colorOf,
-}: {
+interface CircleProps {
   writer: WriterId
   nameOf: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
-}) {
+}
+
+/** A writer's circle: their initial, in their colour. */
+export function Initial({
+  writer,
+  nameOf,
+  colorOf,
+  className,
+}: CircleProps & { className: string }) {
   return (
     <span
-      className="avatar"
+      className={`initial ${className}`}
       data-writer={writer}
       style={{ background: colorOf(writer) }}
     >
       {nameFor(nameOf, writer).slice(0, 1).toUpperCase()}
     </span>
   )
+}
+
+/**
+ * A person shown here. The browser suite counts people by `.avatar`, so
+ * nothing else is drawn with it: not you, not the agent, not "+n".
+ */
+export function Avatar(props: CircleProps) {
+  return <Initial {...props} className="avatar" />
 }
 
 /** Several people's circles, the first few shown, then "+n"; names on hover. */
@@ -100,7 +111,7 @@ export function Avatars({
       {shown.map(w => (
         <Avatar colorOf={colorOf} key={w} nameOf={nameOf} writer={w} />
       ))}
-      {rest > 0 && <span className="avatar more">+{rest}</span>}
+      {rest > 0 && <span className="initial more">+{rest}</span>}
     </span>
   )
 }

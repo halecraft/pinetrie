@@ -131,6 +131,8 @@ in it opens a tab until you choose.
   person, in `writerOrder`. "Never you" is `presenceView`'s rule, not
   repeated here. Each avatar (`Avatar`, the same circle the tabs and columns
   draw) is a `Menu` of the threads that person is in.
+- **You** are the last thing in the header: your profile (`profile.tsx`,
+  below, under Who you are).
 - **The agent:** `activity` (`readAgentActivity`) is its running lanes; the
   header adds nothing of its own, and finds each run's root with `rootOf`.
 - **The inbox** (`inbox.ts`, pure): `mentionsOf` is every chat whose mentions
@@ -147,15 +149,21 @@ in it opens a tab until you choose.
 - **"You" is your email** (ADR-0037). Your other tabs and devices are you, so
   they share your mentions; a mention resolves to your display name, so
   renaming yourself still changes which mentions are yours.
-- **`Menu`** (`menu.tsx`) is every popover: the header's three, the tab's `⋯`
-  and the add tab's. It wraps its trigger in a span that gains `open` while
-  open, which keeps `.tab-more.open` visible; its list is `position: fixed`
-  from the trigger's rect, and a scroll, a resize or a click elsewhere closes
-  it. Items can carry `data-*` attributes (`MenuItem.data`). A heading is
-  drawn above the `role="menu"` list, not in it, since a menu holds only
-  menu items; the list is named by it (`aria-labelledby`).
-- **The agent's mark is not an `.avatar`.** It is not a person, and checks
-  count the people shown by `.avatar`.
+- **`Popover`** (`popover.tsx`) is a trigger and the box it opens. It wraps
+  both in a span that gains `open` while open, which keeps `.tab-more.open`
+  visible; the box is `position: fixed` from the trigger's rect, and Escape,
+  a scroll, a resize or a click elsewhere closes it. `role` is `menu` or
+  `dialog`: a dialog's box takes the role, and a menu's list does.
+- **`Menu`** (`menu.tsx`) is a `Popover` whose box is a `role="menu"` list:
+  the header's people, agent, offers and `@`, the tab's `⋯`, the add tab's
+  menu and the composer's `▾`. Items can carry `data-*` attributes
+  (`MenuItem.data`). A heading is drawn above the list, not in it, since a
+  menu holds only menu items; the list is named by it (`aria-labelledby`).
+- **`.initial` is the circle; `.avatar` is a person shown here.** The browser
+  suite counts people by `.avatar`, and proves you are never among them by
+  it. So your profile's trigger (`.me`), the agent's mark (`.agent-mark`)
+  and the "+n" of `Avatars` (`.more`) are `.initial` and never `.avatar`.
+  The circle's shape is `.initial`'s rule; `.avatar` has none.
 
 ## Kept per tab (`tab-state.ts`, ADR-0027)
 
@@ -167,7 +175,8 @@ value's stored form is its codec's. The layout is its one use, under the key
 
 `deviceState` keeps a value in the device's slot only, shared by the device's
 tabs: the inbox's seen state (`pineta-inbox:<session>`), and who you are
-(`pineta-identity`, below). Each save reads what is stored and merges into it
+(`pineta-identity`, below), which `reconcileName`'s `store` also saves, with
+the same email, so it reloads no tab. Each save reads what is stored and merges into it
 (`mergeInbox`; the identity's merge takes the new value), so two tabs marking
 at once both keep theirs. `subscribe` hears another tab's save through the
 `storage` event, which fires only in the other tabs, and hears a `clear()`
@@ -488,6 +497,9 @@ pipeline keeps the tree a pure function, testable without a DOM.
   any track.
   Names go through `displayName`, the fallback to an email's part before the
   `@` included.
+- **`Initial` is the circle** (`presence.tsx`): a writer's initial in their
+  colour, class `initial`. `Avatar` is an `Initial` with class `avatar`,
+  which means a person shown here (Gotchas).
 
 ## Notes (ADR-0025)
 
@@ -529,13 +541,31 @@ the email is the only thing Pineta chooses.
   rule is `parseIdentity`, over the host's own `normalizeEmail` and
   `normalizeName`, so it accepts exactly what the host would; the browser's
   own validation is off (`noValidate`).
-- **The name is a seed.** Once the document has settled, `nameOnJoin` sends
-  it with `setName` only when the session has no name for you: one set since,
-  here or on another device, stays. A rename in the header is the session's,
-  and is not written back.
-- **not you?** beside the name clears the stored identity and reloads. Every
-  tab subscribes to it, and reloads when another clears it or stores another
-  email, so no tab goes on as the old person.
+- **The stored name follows the session's.** `reconcileName` (`identity.ts`,
+  pure) is one decision with two steps: `send` the stored name to a session
+  that has none for you, or `store` the session's name when it differs from
+  the stored one, whichever device set it. So a session that has no name for
+  you learns the one you go by now, not the one typed on a first visit. One
+  effect in `App` runs it, keyed on `settled` and your session name: before
+  the document settles, a missing name means not yet arrived, as for
+  `prune`. It does nothing when nothing is stored for your email, which is a
+  tab about to reload. Under `StrictMode` a `send` can run twice on a first
+  join; the same name written twice is the same value.
+- **Your profile** (`profile.tsx`) is your avatar at the header's right, a
+  `Popover` with `role="dialog"`, not a `Menu`: a `role="menu"` holds only
+  menu items, and this holds a text field. Its submit is `planRename`
+  (pure): refuse, unchanged, or send. A rename is sent on Enter or save, and
+  Escape or a click elsewhere discards it; saving on blur would race the
+  popover unmounting the field. The trigger's `title` is your name as shown
+  (`nameFor`), the one mentions resolve against.
+- **One name field** (`name-input.tsx`) serves the identification screen and
+  the profile: the rule is `normalizeName`, and the hint is `nameHint`, the
+  handle the typed name gives. The client's words for the rule are its own;
+  the protocol's refusal (`INVALID_NAME`) words it differently, and the
+  profile shows it, under its code, only for a rule the client does not know.
+- **Not you? Sign in as someone else**, in the profile, clears the stored
+  identity and reloads. Every tab subscribes to it, and reloads when another
+  clears it or stores another email, so no tab goes on as the old person.
 - **Presence is per seat** (`seatKey(writer, exchange.peerId)`, as `mine` in
   `session-view.ts`), so your tabs never overwrite or clear each other's;
   `presenceView` shows each person once, and never you.
@@ -560,15 +590,16 @@ shown by their email's part before the `@`. Each rendered chat carries its
   hiding the `⋯` would hide an open menu too.
 - **"close" is `closable`:** hidden on a root tab's only column (`columnsOf`
   would give it back) and in the Archive tab's preview.
-- **A menu opens above its trigger in the window's lower half.** A composer's
-  `▾` is at the window's foot, so a list below it would be out of sight; and
-  since `.menu` sets a `top` in the stylesheet, the upward list sets
-  `top: auto` too, or `top` wins over `bottom`.
+- **A popover opens above its trigger in the window's lower half.** A
+  composer's `▾` is at the window's foot, so a list below it would be out of
+  sight; and since `.popover` sets a `top` in the stylesheet, the upward box
+  sets `top: auto` too, or `top` wins over `bottom`.
 - **Anything that pops out of the tab bar is `position: fixed`.** `.tab-list`
   scrolls sideways, and `overflow-x: auto` makes its vertical overflow `auto`
-  too, so a menu positioned inside it is clipped below the bar. `Menu` places
-  its list from its trigger's rect when opened, and closes on any scroll or a
-  resize, since a fixed list would drift from its trigger.
+  too, so a menu positioned inside it is clipped below the bar. `Popover`
+  places its box from its trigger's rect when opened, and closes on any
+  scroll outside the box or a resize, since a fixed box would drift from its
+  trigger.
 - **Playwright clicks what a person cannot see.** It scrolls a clipped element
   into view before clicking, so a check that a popup can be clicked does not
   show it is visible. Check what `elementFromPoint` finds at its centre: the
@@ -580,7 +611,11 @@ shown by their email's part before the `@`. Each rendered chat carries its
   tab's buttons are `.add-agent`, `.add-menu` and `.add-conversation`. In the
   header: `#top .here-person .here-trigger` per person, `.here-agent`, and
   `.inbox-trigger` with `.inbox-count[data-unseen]`; menu rows are
-  `.here-thread` and `.inbox-row`, each with `data-entry`.
+  `.here-thread` and `.inbox-row`, each with `data-entry`. You are
+  `#top .me-trigger` (its `title` your name), opening `#profile`, with
+  `input[name="name"]`, `.name-handle`, `.name-problem[data-problem]`,
+  `.profile-email` and `.not-you`. The identification screen's email problem
+  is `.identity-problem`.
 - **A page with nothing stored opens on the Archive tab**, so a browser check
   that opens a second page opens its thread from there, or from a person in
   the header. The rail is `.rail`, not `#rail`: the

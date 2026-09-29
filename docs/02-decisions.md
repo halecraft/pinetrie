@@ -2909,9 +2909,13 @@ the host's address, note authorship and presence keys.
   (`writerOfPrincipal`). A reload, a second tab and a second device with the
   same email are one person, each tab its own seat.
 - **The name is a seed.** It is sent with `setName` on joining a session
-  that has no name for you (`nameOnJoin`); afterwards the session's name is
-  yours, renamed in the header as before. A person with no name is shown by
-  the part of their email before the `@`, which a mention reaches.
+  that has no name for you; afterwards the session's name is yours, renamed
+  in your profile (the avatar at the header's right). A person with no name
+  is shown by the part of their email before the `@`, which a mention
+  reaches. *Amended by `PLAN-2026-09-29-profile`:* each device also keeps
+  the session's name for you as its seed, so a session that has none learns
+  the name you go by now. One decision, `reconcileName`, sends the stored
+  name or stores the session's.
 - **The host identifies the sender by transport, as before**: the principal
   of the seat a command's Line comes from. A principal that is not an email
   names nobody, and its every command is refused (`invalid_identity`).

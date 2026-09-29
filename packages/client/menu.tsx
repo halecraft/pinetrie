@@ -1,19 +1,8 @@
-// client/menu — the one popover menu: a trigger button and a list of items.
-//
-// The list is `position: fixed`, placed under its trigger from the trigger's
-// rect when it opens (above it, for a trigger in the window's lower half): the tab list scrolls sideways, which clips it
-// vertically too, so a list positioned inside it would be cut off
-// (`TECHNICAL.md`, Gotchas). Being fixed, it would drift from its trigger on a
-// scroll or a resize, so either closes it.
+// client/menu — a popover whose box is a list of items. Placement and closing
+// are `Popover`'s (`popover.tsx`).
 
-import {
-  type ReactNode,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react"
+import type { ReactNode } from "react"
+import { Popover } from "./popover.tsx"
 
 /** A menu's items that can take focus, in order. */
 const focusable = (list: HTMLElement | null): HTMLButtonElement[] => [
@@ -59,153 +48,65 @@ export function Menu({
   heading?: string
   items: readonly MenuItem[]
 }) {
-  // Below its trigger; above it when the trigger is in the window's lower
-  // half (a composer's), or the list would open past the window's foot.
-  const [at, setAt] = useState<
-    | { readonly top: number; readonly right: number }
-    | { readonly bottom: number; readonly right: number }
-    | null
-  >(null)
-  const open = at !== null
-  const wrapper = useRef<HTMLSpanElement>(null)
-  const button = useRef<HTMLButtonElement>(null)
-  const box = useRef<HTMLDivElement>(null)
-  const list = useRef<HTMLDivElement>(null)
-  const listId = useId()
-  const headingId = useId()
-
-  const show = () => {
-    const r = button.current?.getBoundingClientRect()
-    if (r === undefined) return
-    const right = window.innerWidth - r.right
-    setAt(
-      r.bottom > window.innerHeight / 2
-        ? { bottom: window.innerHeight - r.top, right }
-        : { top: r.bottom, right },
-    )
-  }
-  const close = (refocus: boolean) => {
-    setAt(null)
-    if (refocus) button.current?.focus()
-  }
-
-  // Opened, the first item takes focus.
-  useLayoutEffect(() => {
-    if (open) focusable(list.current)[0]?.focus()
-  }, [open])
-
-  // Closed by a click elsewhere, a scroll anywhere, or a resize.
-  useEffect(() => {
-    if (!open) return
-    const outside = (e: PointerEvent) => {
-      if (e.target instanceof Node && wrapper.current?.contains(e.target))
-        return
-      setAt(null)
-    }
-    const drift = (e: Event) => {
-      if (e.target instanceof Node && box.current?.contains(e.target)) return
-      setAt(null)
-    }
-    const shut = () => setAt(null)
-    document.addEventListener("pointerdown", outside, true)
-    window.addEventListener("scroll", drift, true)
-    window.addEventListener("resize", shut)
-    return () => {
-      document.removeEventListener("pointerdown", outside, true)
-      window.removeEventListener("scroll", drift, true)
-      window.removeEventListener("resize", shut)
-    }
-  }, [open])
-
   return (
-    <span className={open ? `${className} open` : className} ref={wrapper}>
-      <button
-        aria-controls={open ? listId : undefined}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label={label}
-        className={triggerClassName}
-        onClick={() => (open ? close(false) : show())}
-        onKeyDown={e => {
-          if (e.key === "ArrowDown" && !open) {
-            e.preventDefault()
-            show()
-          } else if (e.key === "Escape" && open) {
-            e.preventDefault()
-            close(true)
-          }
-        }}
-        ref={button}
-        title={title}
-        type="button"
-      >
-        {trigger}
-      </button>
-      {at !== null && (
+    <Popover
+      boxClassName="popover menu"
+      className={className}
+      heading={heading}
+      label={label}
+      // Opened, the first item takes focus.
+      onOpen={box => focusable(box)[0]?.focus()}
+      role="menu"
+      title={title}
+      trigger={trigger}
+      triggerClassName={triggerClassName}
+    >
+      {({ close, headingId }) => (
         <div
-          className="menu"
-          ref={box}
-          // `top: auto` too: the stylesheet's `.menu` sets a `top`, which would
-          // win over `bottom`.
-          style={{
-            position: "fixed",
-            ...("bottom" in at ? { top: "auto" } : {}),
-            ...at,
-          }}
-        >
-          {heading !== undefined && (
-            <p className="menu-heading" id={headingId}>
-              {heading}
-            </p>
-          )}
-          <div
-            aria-label={heading === undefined ? label : undefined}
-            aria-labelledby={heading === undefined ? undefined : headingId}
-            onKeyDown={e => {
-              if (e.key === "Escape") {
-                e.preventDefault()
-                close(true)
-                return
-              }
-              if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return
+          aria-label={headingId === undefined ? label : undefined}
+          aria-labelledby={headingId}
+          onKeyDown={e => {
+            if (e.key === "Escape") {
               e.preventDefault()
-              const all = focusable(list.current)
-              // `indexOf` would take `activeElement` only as a button; it is any element.
-              // biome-ignore lint/complexity/useIndexOf: the types differ, see above
-              const here = all.findIndex(b => b === document.activeElement)
-              const step = e.key === "ArrowDown" ? 1 : all.length - 1
-              all[(here + step) % all.length]?.focus()
-            }}
-            className="menu-items"
-            id={listId}
-            ref={list}
-            role="menu"
-          >
-            {items.map(item => (
-              <button
-                {...Object.fromEntries(
-                  Object.entries(item.data ?? {}).map(([k, v]) => [
-                    `data-${k}`,
-                    v,
-                  ]),
-                )}
-                className={item.className}
-                disabled={item.disabled}
-                key={item.key}
-                onClick={() => {
-                  if (!item.keepOpen) close(false)
-                  item.onChoose()
-                }}
-                role="menuitem"
-                title={item.title}
-                type="button"
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+              close(true)
+              return
+            }
+            if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return
+            e.preventDefault()
+            const all = focusable(e.currentTarget)
+            // `indexOf` would take `activeElement` only as a button; it is any element.
+            // biome-ignore lint/complexity/useIndexOf: the types differ, see above
+            const here = all.findIndex(b => b === document.activeElement)
+            const step = e.key === "ArrowDown" ? 1 : all.length - 1
+            all[(here + step) % all.length]?.focus()
+          }}
+          className="menu-items"
+          role="menu"
+        >
+          {items.map(item => (
+            <button
+              {...Object.fromEntries(
+                Object.entries(item.data ?? {}).map(([k, v]) => [
+                  `data-${k}`,
+                  v,
+                ]),
+              )}
+              className={item.className}
+              disabled={item.disabled}
+              key={item.key}
+              onClick={() => {
+                if (!item.keepOpen) close(false)
+                item.onChoose()
+              }}
+              role="menuitem"
+              title={item.title}
+              type="button"
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
       )}
-    </span>
+    </Popover>
   )
 }

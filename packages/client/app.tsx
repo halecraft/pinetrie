@@ -1,8 +1,8 @@
 // client/app — browser entry. Vite transforms and serves this directly.
 //
 // The screen is your tabs, one per root you opened, each a rail beside a strip
-// of columns, under a header showing who is here and your inbox of mentions
-// (docs/06-interface.md, ADR-0029, ADR-0030). The rail draws the root's tree;
+// of columns, under a header showing who is here, your inbox of mentions and
+// you (docs/06-interface.md, ADR-0029, ADR-0030). The rail draws the root's tree;
 // each column is one path, read on its own scroll. What is drawn is a read of
 // the document, through `@pineta/reads` and `projection.ts`. Which tab you are
 // on, your tabs and each root's columns are this window's own view state: a
@@ -73,7 +73,7 @@ import {
   IDENTITY_KEY,
   type Identity,
   identityCodec,
-  nameOnJoin,
+  reconcileName,
 } from "./identity.ts"
 import { askIdentity } from "./identity-form.tsx"
 import {
@@ -132,7 +132,8 @@ const inboxStore = deviceState<Inbox>({
 
 /**
  * Who this device says it is (ADR-0037), shared by its tabs. Another tab
- * clearing it, or storing another email, reloads this one too (at mount).
+ * clearing it, or storing another email, reloads this one too (at mount); a
+ * new name for the same email reloads nothing.
  */
 const identityStore = deviceState<Identity>({
   key: IDENTITY_KEY,
@@ -141,48 +142,6 @@ const identityStore = deviceState<Identity>({
   merge: (_, next) => next,
   events: window,
 })
-
-/**
- * A display name: a label for you, never your identity, which is your email.
- * "not you?" forgets the email on this device and asks again.
- */
-function NameField({ session }: { session: SessionClient }) {
-  const names = useTracked(() => readParticipantNames(session.doc))
-  const [draft, setDraft] = useState<string | null>(null)
-  const current = names.get(session.writer) ?? ""
-  return (
-    <input
-      id="name"
-      onBlur={() => {
-        if (draft !== null && draft.trim() !== current)
-          void session.setName(draft)
-        setDraft(null)
-      }}
-      onChange={e => setDraft(e.target.value)}
-      onKeyDown={e => {
-        if (e.key === "Enter") e.currentTarget.blur()
-      }}
-      placeholder="your name"
-      title={session.principal}
-      value={draft ?? current}
-    />
-  )
-}
-
-function NotYou() {
-  return (
-    <button
-      className="not-you"
-      onClick={() => {
-        identityStore.clear()
-        location.reload()
-      }}
-      type="button"
-    >
-      not you?
-    </button>
-  )
-}
 
 /**
  * Bring a newly opened column's first message level with its fork point in
@@ -341,6 +300,15 @@ function App({ session }: { session: SessionClient }) {
   useEffect(() => {
     if (settled) dispatch({ kind: "prune", index, archive })
   }, [settled])
+  // This device's name for you and the session's, made to agree once the
+  // document has settled: before, a missing name means not yet arrived.
+  const myName = nameOf.get(session.writer)
+  useEffect(() => {
+    if (!settled) return
+    const step = reconcileName(identityStore.load(), session.principal, myName)
+    if (step?.kind === "send") void session.setName(step.name)
+    if (step?.kind === "store") identityStore.save(step.identity)
+  }, [settled, myName, session])
 
   const active = layout.active
   const root = active?.kind === "root" ? active.root : null
@@ -615,8 +583,7 @@ function App({ session }: { session: SessionClient }) {
         <div className="header-left">
           <h1>pineta</h1>
           <div className="meta">
-            <NameField session={session} /> <NotYou /> · entries{" "}
-            <span id="count">{count}</span> ·{" "}
+            entries <span id="count">{count}</span> ·{" "}
             <span id="status">
               {status === "pending" ? "syncing…" : "connected"}
             </span>
@@ -635,6 +602,15 @@ function App({ session }: { session: SessionClient }) {
               ? [{ lane: o.lane, tip }]
               : []
           })}
+          me={{
+            writer: session.writer,
+            email: session.principal,
+            rename: session.setName,
+            signOut: () => {
+              identityStore.clear()
+              location.reload()
+            },
+          }}
           onOpen={openAt}
           people={people}
           runs={activity}
@@ -940,16 +916,6 @@ const session = await connectSession({
   WebSocket,
   principal: identity.email,
 })
-// A session that does not know your name yet learns the one you gave; one set
-// since, here or on another device, stays.
-void whenSettled(session.doc).then(() => {
-  const name = nameOnJoin(
-    identity,
-    readParticipantNames(session.doc).get(session.writer),
-  )
-  if (name !== null) void session.setName(name)
-})
-
 createRoot(root).render(
   <StrictMode>
     <ExchangeProvider exchange={session.exchange}>

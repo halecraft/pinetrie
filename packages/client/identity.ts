@@ -6,11 +6,11 @@
 // for once, with a display name (`identity-form.tsx`). Unverified: anyone
 // can type anyone's email.
 //
-// The stored name is a seed: only `nameOnJoin` reads it, to name a person the
-// session does not know yet. A rename is the session's (`setName`), and is not
-// written back here.
+// The stored name is a seed for a session that does not know you yet, and it
+// follows the session's name for you: `reconcileName` decides which way a
+// difference goes.
 
-import { normalizeEmail, normalizeName } from "@pineta/core"
+import { handleOf, normalizeEmail, normalizeName } from "@pineta/core"
 import { Type } from "typebox"
 import { Value } from "typebox/value"
 import type { Codec } from "./tab-state.ts"
@@ -37,15 +37,54 @@ export function parseIdentity(
   return { ok: true, identity: { email: e, name: n } }
 }
 
+export type NameStep =
+  /** Storage to session: the session has no name for you. */
+  | { readonly kind: "send"; readonly name: string }
+  /** Session to storage: the session's name is not the stored one. */
+  | { readonly kind: "store"; readonly identity: Identity }
+
 /**
- * The name to send on joining: the stored one when the session has none for
- * this writer, else null. A name the session has, set here or on another
- * device, wins.
+ * What to do when this device's stored name and the session's name for you
+ * differ. The session's wins, whichever device set it. Null when they agree,
+ * and when nothing is stored for `email`: another tab cleared it or signed in
+ * as someone else, and this one is reloading.
  */
-export const nameOnJoin = (
-  stored: Identity,
+export function reconcileName(
+  stored: Identity | undefined,
+  email: string,
   inSession: string | undefined,
-): string | null => (inSession === undefined ? stored.name : null)
+): NameStep | null {
+  if (stored === undefined || stored.email !== email) return null
+  if (inSession === undefined) return { kind: "send", name: stored.name }
+  return inSession === stored.name
+    ? null
+    : { kind: "store", identity: { email, name: inSession } }
+}
+
+export type RenamePlan =
+  | { readonly kind: "refuse" }
+  | { readonly kind: "unchanged" }
+  | { readonly kind: "send"; readonly name: string }
+
+/**
+ * The profile's submit. `current` is the session's name for you, undefined
+ * when you set none: you are then shown by your email's part before the `@`,
+ * and typing that text still sets it.
+ */
+export function planRename(
+  draft: string,
+  current: string | undefined,
+): RenamePlan {
+  const name = normalizeName(draft)
+  if (name === undefined) return { kind: "refuse" }
+  return name === current ? { kind: "unchanged" } : { kind: "send", name }
+}
+
+/** The handle a typed name gives you, or null when the name is refused. */
+export function nameHint(draft: string): string | null {
+  const name = normalizeName(draft)
+  return name === undefined ? null : handleOf(name)
+}
 
 const StoredIdentity = Type.Object({
   v: Type.Literal(1),

@@ -483,8 +483,8 @@ context.**
   work directly. Restart the host to pick up changes to host code.
 - **Who you are** (ADR-0037): the page asks for your email and name once per
   browser. The email is who you are, in every tab and on every device; the
-  name is how you are shown, renamed in the header. **not you?** beside it
-  forgets the email on that browser.
+  name is how you are shown, renamed in your profile: the avatar at the
+  header's right. **Not you?** there forgets the email on that browser.
 - **Your pi skills and prompts are commands** (ADR-0036):
   `/<package>:skill:<name>` for a skill, `/<package>:<name>` for a prompt
   template. For example `/duane:skill:plan` or `/duane:comments`. Typing `/`

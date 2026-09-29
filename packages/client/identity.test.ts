@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest"
-import { identityCodec, nameOnJoin, parseIdentity } from "./identity.ts"
+import {
+  identityCodec,
+  nameHint,
+  parseIdentity,
+  planRename,
+  reconcileName,
+} from "./identity.ts"
 
 describe("identity (ADR-0037)", () => {
   test("the form's input is normalized, or names the field that is not usable", () => {
@@ -31,9 +37,41 @@ describe("identity (ADR-0037)", () => {
       expect(identityCodec.decode(raw)).toBeUndefined()
   })
 
-  test("the stored name is sent only to a session that has none", () => {
+  test("the stored name is sent only to a session that has none, and follows the session's", () => {
     const ada = { email: "ada@x.io", name: "Ada" }
-    expect(nameOnJoin(ada, undefined)).toBe("Ada")
-    expect(nameOnJoin(ada, "Ada Lovelace")).toBeNull()
+    const rows: [Parameters<typeof reconcileName>, unknown][] = [
+      [[undefined, "ada@x.io", "Ada"], null],
+      [[ada, "bea@x.io", undefined], null],
+      [[ada, "ada@x.io", undefined], { kind: "send", name: "Ada" }],
+      [[ada, "ada@x.io", "Ada"], null],
+      [
+        [ada, "ada@x.io", "Ada Lovelace"],
+        {
+          kind: "store",
+          identity: { email: "ada@x.io", name: "Ada Lovelace" },
+        },
+      ],
+    ]
+    for (const [args, step] of rows)
+      expect(reconcileName(...args)).toEqual(step)
+  })
+
+  test("a rename is refused, unchanged, or sent normalized", () => {
+    const rows: [string, string | undefined, unknown][] = [
+      ["!!", "Ada", { kind: "refuse" }],
+      ["agent", "Ada", { kind: "refuse" }],
+      ["a".repeat(41), "Ada", { kind: "refuse" }],
+      ["  Ada ", "Ada", { kind: "unchanged" }],
+      ["ada", undefined, { kind: "send", name: "ada" }],
+      [" Ada Lovelace ", "Ada", { kind: "send", name: "Ada Lovelace" }],
+    ]
+    for (const [draft, current, plan] of rows)
+      expect(planRename(draft, current)).toEqual(plan)
+  })
+
+  test("the hint is the handle a typed name gives, or none for a refused name", () => {
+    expect(nameHint("Ada Lovelace")).toBe("adalovelace")
+    expect(nameHint("O'Brien")).toBe("obrien")
+    expect(nameHint("agent")).toBeNull()
   })
 })

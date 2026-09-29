@@ -2,16 +2,15 @@
 //
 // Drawn before anything connects: a person is their email, the principal the
 // Exchange names, so there is nothing to connect as until it is known. The
-// name is a seed for the session's display name (`nameOnJoin`).
+// name is a seed for the session's display name (`reconcileName`); its field
+// is your profile's too (`name-input.tsx`).
 
 import { useState } from "react"
 import { createRoot } from "react-dom/client"
 import { type Identity, parseIdentity } from "./identity.ts"
+import { NAME_PROBLEM, NameInput } from "./name-input.tsx"
 
-const PROBLEMS = {
-  email: "an email address, like ada@example.com",
-  name: "a name with a letter or digit, up to 40 characters, and not “agent”",
-} as const
+const EMAIL_PROBLEM = "an email address, like ada@example.com"
 
 function IdentityForm({ onDone }: { onDone: (identity: Identity) => void }) {
   const [email, setEmail] = useState("")
@@ -40,20 +39,18 @@ function IdentityForm({ onDone }: { onDone: (identity: Identity) => void }) {
           value={email}
         />
       </label>
-      <label>
-        name:{" "}
-        <input
-          autoComplete="name"
-          name="name"
-          onChange={e => setName(e.target.value)}
-          value={name}
-        />
-      </label>
-      {problem !== null && (
-        <p className="identity-problem" data-problem={problem} role="alert">
-          {PROBLEMS[problem]}
+      {problem === "email" && (
+        <p className="identity-problem" data-problem="email" role="alert">
+          {EMAIL_PROBLEM}
         </p>
       )}
+      <NameInput
+        onChange={setName}
+        problem={
+          problem === "name" ? { code: "name", message: NAME_PROBLEM } : null
+        }
+        value={name}
+      />
       <button type="submit">join</button>
     </form>
   )

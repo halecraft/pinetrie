@@ -1,8 +1,9 @@
 // client/header — who is here, what the agent is doing, the threads with an
-// offer in your repo (ADR-0038), and your inbox of mentions (ADR-0030). Your tabs are your view; this is the rest of the
-// session. People and the agent come from live data (presence, the running
-// lanes), the inbox from the tree and this device's seen state. Nothing here
-// opens a tab until you choose.
+// offer in your repo (ADR-0038), your inbox of mentions (ADR-0030), and you
+// (`profile.tsx`). Your tabs are your view; this is the rest of the session.
+// People and the agent come from live data (presence, the running lanes), the
+// inbox from the tree and this device's seen state. Nothing here opens a tab
+// until you choose.
 
 import {
   type AgentRun,
@@ -17,6 +18,7 @@ import type { PersonHere } from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, nameFor } from "./presence.tsx"
+import { type Me, Profile } from "./profile.tsx"
 import type { InboxView } from "./use-inbox.ts"
 
 export function Header({
@@ -30,6 +32,7 @@ export function Header({
   inbox,
   offers,
   onOpen,
+  me,
 }: {
   people: readonly PersonHere[]
   /** The agent's running lanes (`readAgentActivity`). */
@@ -44,6 +47,7 @@ export function Header({
   offers: readonly { readonly lane: string; readonly tip: string }[]
   /** Open an entry as your tab (`planOpen`). */
   onOpen: (id: string) => void
+  me: Me
 }) {
   /** A thread as a row: its root's label, and the start of the message at `end`. */
   const thread = (key: string, end: string, root: string): MenuItem => ({
@@ -88,7 +92,7 @@ export function Header({
             title="the agent is working"
             trigger={
               <>
-                <span className="agent-mark">✦</span>
+                <span className="initial agent-mark">✦</span>
                 <span className="here-count">{runs.length}</span>
               </>
             }
@@ -123,6 +127,7 @@ export function Header({
         nameOf={nameOf}
         onOpen={onOpen}
       />
+      <Profile {...me} colorOf={colorOf} nameOf={nameOf} />
     </div>
   )
 }

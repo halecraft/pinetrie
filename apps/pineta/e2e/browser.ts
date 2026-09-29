@@ -85,6 +85,37 @@ async function chooseFromMenu(
   return true
 }
 
+/** Your name as the page shows it: the one mentions resolve against. */
+const shownName = async (p: Page) =>
+  (await p.getAttribute("#top .me-trigger", "title")) ?? ""
+
+/** The name this device keeps for you (`pineta-identity`), or null. */
+const storedName = (p: Page) =>
+  p.evaluate(key => {
+    const raw = localStorage.getItem(key)
+    return raw === null ? null : (JSON.parse(raw) as { name?: string }).name
+  }, IDENTITY_KEY)
+
+/**
+ * Open your profile, and whether a person could see it: `elementFromPoint`
+ * at its centre, as `seeInMenu` checks a menu.
+ */
+async function openProfile(p: Page): Promise<boolean> {
+  await p.click("#top .me-trigger")
+  const box = await p
+    .waitForSelector("#profile", { timeout: 15_000 })
+    .catch(() => null)
+  if (box === null) return false
+  return box.evaluate(n => {
+    const r = n.getBoundingClientRect()
+    const hit = document.elementFromPoint(
+      r.left + r.width / 2,
+      r.top + r.height / 2,
+    )
+    return hit !== null && n.contains(hit)
+  })
+}
+
 /** In the page: the messages its rail draws, a dot each and a capsule's count. */
 const RAIL_MESSAGES = () =>
   document.querySelectorAll(".rail .rail-dot").length +
@@ -740,9 +771,33 @@ try {
   await idle()
   await other.close()
 
-  // ── a rename shows, and the name each message was sent under stays ─────
-  await page.fill("#name", "Ada Lovelace")
-  await page.press("#name", "Enter")
+  // ── your profile: a rename shows, and the name each message was sent ──
+  // under stays; this device keeps the name you go by (ADR-0037).
+  const profileSeen = await openProfile(page)
+  const nameField = '#profile input[name="name"]'
+  await page.fill(nameField, "agent")
+  await page.press(nameField, "Enter")
+  const refusedName = await page
+    .waitForSelector('#profile .name-problem[data-problem="name"]', {
+      timeout: 5_000,
+    })
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(
+    profileSeen && refusedName,
+    "your profile refuses a name no mention could reach, before sending it",
+  )
+  await page.fill(nameField, "Ada Lovelace")
+  const hint = await page
+    .textContent("#profile .name-handle", { timeout: 5_000 })
+    .catch(() => null)
+  ok(
+    hint === "others mention you as @adalovelace",
+    `your profile shows the handle the name you type gives you (${hint})`,
+  )
+  await page.press(nameField, "Enter")
   const renamed = await page
     .waitForFunction(
       () =>
@@ -760,6 +815,27 @@ try {
     renamed,
     "after a rename, Ada's earlier messages show her current name, then the one she sent under",
   )
+  ok(
+    (await waitFor(
+      async () => (await storedName(page)) === "Ada Lovelace",
+      10_000,
+    )) >= 0,
+    "a rename is kept on this device",
+  )
+  // The page's person, from another device: its rename reaches this one's
+  // storage too. Set back, so the checks below see "Ada Lovelace".
+  const adaElsewhere = await join(host, "ada", "browser")
+  await adaElsewhere.setName("Ada L")
+  const followed = await waitFor(
+    async () =>
+      (await shownName(page)) === "Ada L" &&
+      (await storedName(page)) === "Ada L",
+    15_000,
+  )
+  await adaElsewhere.setName("Ada Lovelace")
+  await waitFor(async () => (await shownName(page)) === "Ada Lovelace", 15_000)
+  await adaElsewhere.close()
+  ok(followed >= 0, "a rename on another device is kept on this one")
 
   // ── ＋ agent: a new tab, an agent thread at the root, and stepping down ──
   const firstRoot = readTreeIndex(host.doc).roots[0] ?? ""
@@ -1080,7 +1156,7 @@ try {
         .$eval("#top .inbox-count", n => Number(n.getAttribute("data-unseen")))
         .catch(() => 0)
     // The page's handle, from its name as it is now (it was renamed above).
-    const handle = `@${handleOf(await page.inputValue("#name"))}`
+    const handle = `@${handleOf(await shownName(page))}`
     const before = await unseen()
     const mention = await api.chat(
       `${handle} a look at this?`,
@@ -1330,6 +1406,33 @@ try {
       .catch(() => null)
   } finally {
     await tb.close().catch(() => {})
+  }
+
+  // Not you: the profile shows the email this device gave, and signing in as
+  // someone else forgets it and asks again. A device of its own, filling the
+  // form itself: `asPerson` would store the identity again on the reload.
+  const nv = await browser.newPage()
+  try {
+    await nv.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+    await nv.waitForSelector("#identity", { timeout: 20_000 })
+    await nv.fill('#identity input[name="email"]', "nobody@browser.test")
+    await nv.fill('#identity input[name="name"]', "Nobody")
+    await nv.click('#identity button[type="submit"]')
+    const nvSeen = await openProfile(nv)
+    const nvEmail = await nv.textContent("#profile .profile-email")
+    await nv.click("#profile .not-you")
+    const askedAgain = await nv
+      .waitForSelector("#identity", { timeout: 20_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      nvSeen && nvEmail === "nobody@browser.test" && askedAgain,
+      `Not you? asks who you are again (${nvEmail})`,
+    )
+  } finally {
+    await nv.close().catch(() => {})
   }
 
   // ── tools: rows, live output, and Stop, on a scripted host ─────────────
@@ -2374,7 +2477,7 @@ try {
 
   // A reload is the same person: the device keeps your email, so your name
   // stays and you are not shown to yourself as someone else.
-  const myName = await page.inputValue("#name")
+  const myName = await shownName(page)
   const me = ME
   await page.reload({ waitUntil: "domcontentloaded" })
   // Not asked again: a page that asks never connects, which the check says.
@@ -2387,8 +2490,7 @@ try {
   const kept = await page
     .waitForFunction(
       n =>
-        (document.getElementById("name") as HTMLInputElement | null)?.value ===
-        n,
+        document.querySelector("#top .me-trigger")?.getAttribute("title") === n,
       myName,
       { timeout: 10_000 },
     )
@@ -2399,7 +2501,7 @@ try {
   // Another window's entries may not have expired yet; none may be mine.
   const ghosts = await page.locator(`.avatar[data-writer="${me}"]`).count()
   ok(
-    myName !== "" && kept && ghosts === 0,
+    myName === "Ada Lovelace" && kept && ghosts === 0,
     `a reload keeps who you are: your name (${myName}), and no ghost of yourself`,
   )
   // The document has arrived (the name shows); give the prune after settling
@@ -2427,7 +2529,7 @@ try {
     )
     // It is you, from another seat: your name, and no avatar of yourself.
     const asYou =
-      (await newTab.inputValue("#name")) === myName &&
+      (await shownName(newTab)) === myName &&
       (await page.locator(`.avatar[data-writer="${me}"]`).count()) === 0 &&
       (await newTab.locator(`.avatar[data-writer="${me}"]`).count()) === 0
     ok(

@@ -58,7 +58,8 @@ the session, from live data only, as a document editor shows the people in it.
 
 - **People here:** an avatar per person with a live presence entry, in their
   colour. Hovering names them and the thread they are in; a click opens that
-  thread as your tab, with a column on their path. You are never shown.
+  thread as your tab, with a column on their path. You are never shown among
+  them.
 - **The agent:** one avatar while it works, pulsing, with the number of
   threads it is working in. A click lists them, and a row opens one. Idle, it
   is not shown.
@@ -72,6 +73,12 @@ the session, from live data only, as a document editor shows the people in it.
 - **The inbox is this device's**, shared by its tabs and kept across reloads.
   A new device, or a cleared browser, starts from its first load, with no
   backlog.
+- **You:** your avatar, at the far right, opens your profile (ADR-0037): your
+  name, and the handle it gives you as you type it; your email; and **Not
+  you? Sign in as someone else**, which forgets who this device says you are
+  and asks again. A rename is sent on Enter or **save**, and Escape or a click
+  elsewhere discards it. A name no mention could reach is refused before it
+  is sent.
 - **Nothing opens a tab by itself.** A mention is a notification: you choose to
   open it.
 
