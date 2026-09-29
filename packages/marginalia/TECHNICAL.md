@@ -31,6 +31,11 @@ are the only code that builds or reads the shape.
   either way is `@josé`. An unknown handle (`@types/node`) is ignored, so it
   never silences the agent; `normalizeName` refuses a name with no handle, or
   the handle `agent`.
+- **`addressChat` is the one rule for who a chat is for:** `address` with
+  `agentByDefault`, and a command for the agent whoever else it names
+  (ADR-0036), keeping the people it names. `planChat` runs it on the host, and
+  the composer's `planSend` (`packages/client/send.ts`) runs it before a send,
+  so the button's promise and the host's decision cannot drift apart.
 - **`planChat` decides what a message does** (ADR-0020), over the thread
   `threadOf` gives, and names exactly where to write:
 

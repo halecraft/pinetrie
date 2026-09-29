@@ -25,7 +25,7 @@ This document fixes the design before any code. It draws E and T directly.
    are peers too: you open the ones you work in, as tabs (ADR-0030).
 4. **Show context, don't describe it.** What the agent will read is a path: the
    column shows it, and marks where the agent joined.
-5. **Say the effect, not a mode name.** "send · agent will reply" says what
+5. **Say the effect, not a mode name.** "ask the agent" says what
    happens. "Working session" is a name someone has to learn. So there is no
    mode to set: the send button says what each message will do (ADR-0021).
 6. **Every control is a choice the user made.** Nothing appears because of
@@ -223,10 +223,11 @@ The rail is E; the column is T. Seeing both at once is the product.
   and mentioned, by their email's part before the `@` (`@ada` for
   `ada@example.com`, ADR-0037). A name with no such character, or spelled
   `agent`, is refused: no mention could reach it.
-- **The send button says what the message will do**: "send", "send · to Ada",
-  "send · agent will reply", or "queue · agent replies after Bea". It uses the
-  host's own decision (`address`, over `threadOf`), so it cannot promise a
-  reply that will not come.
+- **The send button says what the message will do**: "send", "send to Ada",
+  "ask the agent", or "queue after Bea". It uses the host's own decision
+  (`addressChat`, over `threadOf`), so it cannot promise a reply that will
+  not come. When the send starts an agent, a chip beside the button says where
+  it will work ("on a copy ▾"), and opens the choices.
 - **Who else is here** (ADR-0024) shows where there is room for it:
   - the **rail** rings the dot at the end of each thread someone else follows,
     in their colour, with a count when several do; hovering names them. The

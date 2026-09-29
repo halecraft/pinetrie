@@ -94,7 +94,7 @@ counter.
   (a compelled branch at a lane's tip, until its prompt commits). A bound or
   fresh column is `pinned` in `projectColumns`: its path ends at its anchor.
 - **A null anchor** belongs only to a fresh column at the root: a new tab's.
-- **A fresh column** (`openFresh`: `→`, or "Branch here" after a conflict; or
+- **A fresh column** (`openFresh`: `→`, or "branch here" after a conflict; or
   a new tab) has nothing of its own yet. Its first send mints the
   command's id (`sent`), which the host stores with the message (`sendId`), and
   `sync` anchors the column at the entry that send wrote (`TreeIndex.bySend`).
@@ -109,7 +109,7 @@ counter.
   runs in an effect, after the strip's alignment, and scrolls a column opened
   past the strip's edge into view.
   Exact: no other message at the same point, the lane's own next append
-  included, can be mistaken for it. "Branch here" opens one holding the text
+  included, can be mistaken for it. "branch here" opens one holding the text
   (`pending`), and that column's composer sends it, so a refusal shows where
   the message is, like any other send.
 - **`→` at a column's end only in agent work.** Below a conversation's last
@@ -163,7 +163,7 @@ in it opens a tab until you choose.
   `dialog`: a dialog's box takes the role, and a menu's list does.
 - **`Menu`** (`menu.tsx`) is a `Popover` whose box is a `role="menu"` list:
   the header's people, agent, offers and `@`, the tab's `⋯`, the add tab's
-  menu and the composer's `▾`. Items can carry `data-*` attributes
+  menu and the composer's where chip. Items can carry `data-*` attributes
   (`MenuItem.data`). A heading is drawn above the list, not in it, since a
   menu holds only menu items; the list is named by it (`aria-labelledby`).
 - **`.initial` is the circle; `.avatar` is a person shown here.** The browser
@@ -201,7 +201,7 @@ error.
   save, and the page opens on the Archive tab. A lane that is not a lane name
   is left off; `sync` binds the column again.
 - **`fresh.pending` is never stored**, by either side: restoring it would send
-  its message again. A "Branch here" column comes back empty. `fresh.prefill`
+  its message again. A "branch here" column comes back empty. `fresh.prefill`
   is stored: it sends nothing by itself. What was typed over it is not kept:
   the composer's text is its own state, so a reload, or switching root tabs
   (which unmounts the column), starts it from the prefill again.
@@ -372,14 +372,18 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   returns every running lane. The rail pulses at each tip, and each column
   streams the runs whose tip is on its path.
 - **The composer decides before sending, as the host will.** `threadOf` finds
-  the thread (the column's bound lane, or its end) and `address` who the
-  message is for, over `readLanes` and `readParticipants`: the same reads and
-  functions the host decides from. The button says the result: "send", "send ·
-  to Ada", "send · agent will reply", or "queue · agent replies after Bea"
-  (`queue` when the lane runs or has messages waiting). A fresh column sends
-  `branch`.
+  the thread (the column's bound lane, or its end), over `readLanes` and
+  `readParticipants`, the reads the host decides from. `planSend` (`send.ts`)
+  decides the rest: who the message is for is `addressChat`
+  (`@pineta/marginalia`), the function `planChat` runs on the host, so the
+  button cannot promise a reply the host will not start. The button says the
+  result: "send", "send to Ada" ("send to Ada +2", naming everyone in its
+  `title`), "ask the agent", or "queue after Bea" (`queue` when the lane is
+  busy, `isBusy`). A fresh column sends `branch`. The placeholder is
+  `planSend`'s too: the composer holds only its state and draws.
 - **Conflict.** A compelled `reply` another writer raced comes back `conflict`,
-  and the composer keeps the text and offers **Queue after** or **Branch here**.
+  and the composer keeps the text and offers **queue after …**
+  (`queueWords`, the button's words) or **branch here**.
   On one host the page sees another writer's run start almost at once and
   chooses `queue` itself, so a true conflict needs two sends to cross in flight.
   Its outcome is checked in e2e; the prompt's rendering is not exercised in the
@@ -416,11 +420,17 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **Stop** shows in the composer while the thread's lane runs, and sends
   `stop`.
 - **Where a new thread's agent works** (ADR-0032). When a send would create a
-  lane (it asks the agent where no lane is, or it is a branch), the button
-  says where: "send · agent will reply · in its own copy". Its `▾` menu offers
-  its own copy, your working copy, directories other lanes used, and
-  "directly in…". The choice is the composer's state until sent, as
-  `asksAgent` is; its default is `workFor`, the host's own decision.
+  lane (it asks the agent where no lane is, or it is a branch), a chip left of
+  the button says where, in `whereWords`'s words: "on a copy ▾", "in your
+  working copy ▾" or "in <dir> ▾". It opens a menu of `whereChoices` (`send.ts`):
+  a copy, your working copy, directories other lanes used, and "in another
+  directory…", each row the chip's words and what the choice means for your
+  files ("· you take its changes", "· edits your files"). A copy is disabled,
+  with the project's reason, where the project cannot have one. The choice is
+  the composer's state until sent, as `asksAgent` is; its default is
+  `workFor`, the host's own decision. The chip's words are `.where-words`,
+  with `data-work` (`own` or `direct`): `Menu` passes no attributes to its
+  trigger, so they sit on a span inside it.
 - **A lane's column header** names its thread, then says where it works
   ("amber-fox · own copy", or "amber-fox · in <dir> · shared", ADR-0039),
   and, for its own copy, its offer (ADR-0038). It shows no commit: the lane's

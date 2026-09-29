@@ -709,12 +709,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a conflicting update runs the resolution",
   },
   {
-    name: "the send button never says where",
+    name: "the chip hides its choice",
     file: "packages/client/composer.tsx",
-    from: "      : createsLane && work !== null",
-    to: "      : false && work !== null",
+    from: "                    {whereWords(work, project)}\n",
+    to: "",
     command: browser,
-    expect: "the send button says where",
+    expect: "the chip says where",
   },
   {
     name: "a missing directory is worked in anyway",

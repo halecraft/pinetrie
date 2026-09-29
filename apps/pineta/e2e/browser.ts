@@ -290,7 +290,7 @@ try {
   await page.click("#tabs .add-agent")
   await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
   ok(
-    (await label(0)) === "send · agent will reply",
+    (await label(0)) === "ask the agent",
     `＋ agent promises a reply with no mention: "${await label(0)}"`,
   )
   ok(
@@ -366,7 +366,7 @@ try {
   await shows(NOTE)
   await new Promise(r => setTimeout(r, 1500))
   ok(
-    plain === "send · to Ada" &&
+    plain === "send to Ada" &&
       (await page.$$eval(".msg.assistant", n => n.length)) ===
         assistantsBefore &&
       Object.keys(host.doc.activeRuns()).length === 0,
@@ -380,7 +380,7 @@ try {
   const repliesBefore = await page.$$eval(".msg.assistant", n => n.length)
   await page.click(`${col(0)} .composer .send`)
   ok(
-    ask === "send · agent will reply" &&
+    ask === "ask the agent" &&
       (await page
         .waitForFunction(
           n => document.querySelectorAll(".msg.assistant").length > n,
@@ -544,8 +544,7 @@ try {
   const prefilled = await page.inputValue(`${col(1)} .composer .input`)
   const prefilledLabel = await label(1)
   ok(
-    prefilled === "@agent " &&
-      prefilledLabel.startsWith("send · agent will reply"),
+    prefilled === "@agent " && prefilledLabel === "ask the agent",
     `→ in agent work opens a branch with @agent typed ("${prefilled}", "${prefilledLabel}")`,
   )
   const caret = await caretIn(1)
@@ -721,9 +720,8 @@ try {
   const queues = await page
     .waitForFunction(
       c =>
-        document
-          .querySelector(`${c} .composer .send`)
-          ?.textContent?.startsWith("queue · agent replies after Bea") === true,
+        document.querySelector(`${c} .composer .send`)?.textContent ===
+        "queue after Bea",
       col(0),
       { timeout: 15_000 },
     )
@@ -732,7 +730,7 @@ try {
       () => false,
     )
   ok(
-    idleLabel === "send · agent will reply" && queues,
+    idleLabel === "ask the agent" && queues,
     `once Bea's run shows, the composer says it will queue after her ("${await label(0)}")`,
   )
   await page.click(`${col(0)} .composer .send`)
@@ -863,7 +861,7 @@ try {
   const agentCol = col(before)
   await page.waitForSelector(`${agentCol} .composer`, { timeout: 15_000 })
   ok(
-    (await label(before)) === "send · agent will reply" &&
+    (await label(before)) === "ask the agent" &&
       (await page.$$eval(".column", n => n.length)) === 1 &&
       (await page.$$eval(`${agentCol} .msg`, n => n.length)) === 0 &&
       (await page.textContent('#tabs .tab-new[aria-selected="true"]')) ===
@@ -1490,22 +1488,35 @@ try {
         )
 
       // ── where the agent will work, said before sending (ADR-0032) ───────
+      // The button says what the send does; the chip beside it, where the new
+      // thread's agent works.
       const send = `${col(0)} .composer .send`
+      const chip = `${col(0)} .where-trigger`
+      /** The chip's words, its setting, and the button's words. */
+      const said = async () => {
+        const words = tp.locator(`${chip} .where-words`)
+        return [
+          (
+            (await words.textContent({ timeout: 5_000 }).catch(() => "")) ?? ""
+          ).trim(),
+          await words
+            .getAttribute("data-work", { timeout: 5_000 })
+            .catch(() => null),
+          ((await tp.textContent(send)) ?? "").trim(),
+        ].join(" | ")
+      }
       await tp.fill(`${col(0)} .composer .input`, "what is in notes?")
-      const ownWords = await tp.textContent(send)
-      const chose = await chooseFromMenu(
-        tp,
-        `${col(0)} .where-trigger`,
-        ".where-yours",
-      )
-      const directWords = await tp.textContent(send)
-      await chooseFromMenu(tp, `${col(0)} .where-trigger`, ".where-own")
+      const onCopy = await said()
+      const chose = await chooseFromMenu(tp, chip, ".where-yours")
+      const direct = await said()
+      await chooseFromMenu(tp, chip, ".where-own")
+      const again = await said()
       ok(
-        ownWords === "send · agent will reply · in its own copy" &&
+        onCopy === "on a copy | own | ask the agent" &&
           chose &&
-          directWords === "send · agent will reply · in your working copy" &&
-          (await tp.textContent(send)) === ownWords,
-        `the send button says where the new thread's agent works, and the menu changes it (${directWords})`,
+          direct === "in your working copy | direct | ask the agent" &&
+          again === onCopy,
+        `the chip says where the new thread's agent works, and the menu changes it (${onCopy}; ${direct}; ${again})`,
       )
 
       script.use([

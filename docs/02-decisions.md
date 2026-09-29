@@ -1138,7 +1138,8 @@ not show either works).
 **Status:** Accepted. Amends ADR-0018 and ADR-0020. Amended by ADR-0029
 (Start Chat and Start Agent become the add tab), by ADR-0032 (a workspace
 is created with the lane, not as its own step), and in place below (a branch
-from agent work starts with `@agent ` typed).
+from agent work starts with `@agent ` typed; the send button's words, and a
+chip beside it for where a new agent works, `PLAN-2026-09-29-send-button`).
 
 **Context.** ADR-0018 stored a default at an entry (`pineta.thread`): below a
 *working session* entry the agent answers every message, below a
@@ -1193,9 +1194,12 @@ The actions differ in cost, and in how far they can be undone:
   default is the unsent column's view state until then; closing the column
   writes nothing. No lane is created empty, so ADR-0020's invariant, *a lane's
   tip is its thread's end*, holds.
-- **The send button is the one place that says what a message will do** ("send
-  · agent will reply"). There is no mode toggle: a toggle and a button would be
-  two statements of one fact.
+- **The send button is the one place that says what a message will do** ("ask
+  the agent"). There is no mode toggle: a toggle and a button would be two
+  statements of one fact. *Amended:* the button says only what the send does
+  and to whom ("send", "send to Ada", "ask the agent", "queue after Bea"); when
+  the send starts an agent, a chip beside it says where that agent will work
+  (ADR-0032), so the button stays short.
 - **A workspace is its own step**, an explicit action on a thread that is
   already agent work, never implied by `@agent`. Designed with workspaces.
 - **A session is its participants.** A session is one document, and the
@@ -1572,7 +1576,7 @@ so a reload closed every column but one, and a new tab started from one.
 - **A stored layout decodes whole or not at all,** through a TypeBox schema
   with a version. An older one is dropped, not migrated.
 - **A message waiting to be sent is never stored.** Restoring it would send it
-  again; a "Branch here" column comes back empty.
+  again; a "branch here" column comes back empty.
 - **Anchors the document lacks are dropped once, after `whenSettled`.** Before
   then a missing anchor may only not have arrived yet. Entries are immutable
   and compaction keeps them, so an anchor can only be missing at load.
@@ -2030,6 +2034,8 @@ runs from). Changes the vision's branch kinds (`docs/00-vision.md`): every
 agent lane is a Worktree. **Amended by ADR-0034:** its workspaces, the
 rewrite of the history the model is sent, the refusal of other lanes' paths,
 and dependency setup are replaced by a container per lane on its own disk.
+Amended in place (`PLAN-2026-09-29-send-button`): where a new lane works is
+said by a chip beside the send button, not by the button.
 **Amended by ADR-0038:** a lane with no revision above its fork
 point starts from a copy of your `@`, not your `@-`, and lanes' bookmarks
 leave your repo's config.
@@ -2101,8 +2107,9 @@ fold does (S36 items 11 and 12).
     working copy by default, repo or not, with no workspace and no revisions.
 
   The setting is chosen when the lane is created, at the send that first asks
-  the agent (ADR-0021). The send button says where, as it says what: "send ·
-  agent will reply · in its own copy ▾". A new lane inherits the setting, and
+  the agent (ADR-0021). A chip beside the send button says where: "on a copy
+  ▾", and its menu says what each choice means ("on a copy · you take its
+  changes", "in your working copy · edits your files"). A new lane inherits the setting, and
   the directory, from the lane above its fork point. A root lane takes the
   host's default: own copy, unless `PINETA_WORKSPACES=0` or the project could
   not be initialized. The setting never changes on an existing lane, since

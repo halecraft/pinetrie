@@ -273,11 +273,19 @@
       .composer .command-name { color: #d2a8ff; }
       .composer .command-hint, .composer .command-kind, .composer .command-description { color: #8b949e; }
       .msg .command-label { margin-left: .4rem; color: #d2a8ff; font-size: .85em; }
-      /* Under the text: compose together at the left, send at the right. */
+      /* Under the text: compose together at the left; where a new agent works,
+         then send, at the right. A label too wide for the row is cut, and its
+         title names everyone. */
       .compose-row { display: flex; gap: .5rem; align-items: center; justify-content: flex-end;
         margin-top: .4rem; }
       .compose-row .compose-together { margin: 0 auto 0 0; }
-      .where-menu .where-trigger { padding: .2rem .45rem; }
+      .compose-row .send { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .where-menu .where-trigger { padding: .2rem .5rem; background: none; border: 1px solid #3a3f48;
+        color: #aab4c3; font-size: .75rem; white-space: nowrap; }
+      .where-menu .where-trigger:hover { color: #e6e6e6; }
+      .where-menu .where-words { display: inline-block; max-width: 11rem; overflow: hidden;
+        text-overflow: ellipsis; vertical-align: bottom; }
+      .where-menu .where-caret { margin-left: .35rem; }
       .status { font-size: .75rem; color: #d0a15f; }
       input, .composer textarea {
         flex: 1; padding: .5rem .7rem; border-radius: 6px;

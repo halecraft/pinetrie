@@ -322,4 +322,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "where it starts moved",
   },
+  {
+    name: "a command is not for the agent",
+    file: "packages/marginalia/chat.ts",
+    from: '  return input.command\n    ? { ...to, compels: { kind: "agent", agent: THE_AGENT } }\n    : to',
+    to: "  return to",
+    command: unit,
+    expect: "a command is for the agent, and keeps the people it names",
+  },
 ]

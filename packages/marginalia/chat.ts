@@ -12,6 +12,7 @@
 // parse back out of `content`.
 
 import {
+  type Address,
   type AgentId,
   type AgentMessageLike,
   address,
@@ -238,11 +239,36 @@ export type ChatDecision =
     }
 
 /**
+ * Who a chat is for, as the host decides it and the composer foresees it
+ * (ADR-0021, ADR-0036): its mentions, else the thread's default (the agent
+ * where the thread has a lane or the column is a Start Agent column). A
+ * command is for the agent, as `@agent` is, whoever else it names. The people
+ * it names are kept either way: the composer shows them.
+ */
+export function addressChat(input: {
+  readonly mentions: readonly Mention[]
+  readonly participants: readonly string[]
+  readonly mode: ChatMode
+  readonly lane: ThreadLane
+  readonly asksAgent: boolean
+  /** The text is a command. */
+  readonly command: boolean
+}): Address {
+  const to = address({
+    mentions: input.mentions,
+    participants: input.participants,
+    agentByDefault: agentByDefault(input),
+  })
+  return input.command
+    ? { ...to, compels: { kind: "agent", agent: THE_AGENT } }
+    : to
+}
+
+/**
  * Decide what a human message does. Pure; the host gathers every input inside
  * one serial step, so each decision names exactly where to write.
  *
- * - Who it is for is `address`: its mentions, else the thread's default (the
- *   agent where the thread has a lane or the column is a Start Agent column).
+ * - Who it is for is `addressChat`, which the composer runs too.
  * - `branch` starts a thread at `at` and never continues a lane: plain, it is
  *   appended there with no lane; compelled, it creates a new lane there.
  * - A thread lane that is running, or has messages waiting, is busy: a new
@@ -305,19 +331,14 @@ export function planChat(input: {
       code: ERR.UNKNOWN_COMMAND,
       message: `the file of /${command.unreadable} could not be read`,
     }
-  // A command is for the agent, as `@agent` is, whoever else it names.
-  const compels: Responder =
-    command !== null
-      ? { kind: "agent", agent: THE_AGENT }
-      : address({
-          mentions: input.mentions,
-          participants: input.participants,
-          agentByDefault: agentByDefault({
-            mode: input.mode,
-            lane,
-            asksAgent: input.asksAgent,
-          }),
-        }).compels
+  const { compels } = addressChat({
+    mentions: input.mentions,
+    participants: input.participants,
+    mode: input.mode,
+    lane,
+    asksAgent: input.asksAgent,
+    command: command !== null,
+  })
   const details: ChatDetails = {
     author: input.author,
     authorName: input.authorName,

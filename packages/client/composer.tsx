@@ -1,22 +1,25 @@
 // client/composer — one per column, sending at the end of its path.
 
-import {
-  address,
-  agentByDefault,
-  type ChatMode,
-  type CommandSummary,
-  type LaneName,
-  type Position,
-  type ProjectRecord,
-  parseMentions,
-  type ThreadLane,
-  type WorkSetting,
+import type {
+  ChatMode,
+  CommandSummary,
+  LaneName,
+  Position,
+  ProjectRecord,
+  ThreadLane,
+  WorkSetting,
 } from "@pineta/core"
-import { parseCommand } from "@pineta/marginalia"
 import { useEffect, useRef, useState } from "react"
 import { matchCommands } from "./commands.ts"
 import { Menu } from "./menu.tsx"
-import { sendable, settleSend } from "./send.ts"
+import {
+  planSend,
+  queueWords,
+  sendable,
+  settleSend,
+  whereChoices,
+  whereWords,
+} from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
 
 /**
@@ -31,26 +34,15 @@ export interface ReadOnly {
 
 /**
  * Before sending, the composer's button says what the message will do: who it
- * is for, and whether it will wait. The same `address` the host runs decides
- * it, over the thread `threadOf` gives, both read through `@pineta/reads` as
- * the host reads them (ADR-0021).
+ * is for, and whether it will wait (`planSend`, which decides as the host
+ * will, over the thread `threadOf` gives, ADR-0021). When the send starts an
+ * agent, a chip beside it says where that agent will work, and changes it.
  *
  * A reply carries the end its sender saw. If another writer's compelled
  * message got there first, the host writes nothing and says so (`conflict`),
  * and the sender chooses: wait behind them, or branch here. A message the
  * host refuses comes back to the composer too (`settleSend`).
  */
-/** Where a lane works, in the send button's words. */
-export function whereWords(
-  work: WorkSetting,
-  project: ProjectRecord | null,
-): string {
-  if (work.kind === "own") return "in its own copy"
-  return project !== null && work.dir === project.root
-    ? "in your working copy"
-    : `in ${work.dir}`
-}
-
 export function Composer({
   session,
   at,
@@ -142,19 +134,14 @@ export function Composer({
   } | null>(null)
   // Where a lane this send creates works: the column's view state until sent.
   const [choice, setChoice] = useState<WorkSetting | null>(null)
-  const byDefault = agentByDefault({
-    mode: fresh ? "branch" : "reply",
+  const plan = planSend({
+    text,
+    fresh,
     lane,
     asksAgent,
-  })
-  const to = address({
-    mentions: parseMentions(text),
     participants,
-    agentByDefault: byDefault,
+    holderName,
   })
-  // A command is for the agent, as the host decides (`planChat`).
-  const compelled =
-    to.compels.kind === "agent" || parseCommand(text.trim()) !== null
   // The commands matching what is typed; Escape hides them for this text.
   const [hidden, setHidden] = useState<string | null>(null)
   const [picked, setPicked] = useState(0)
@@ -164,25 +151,7 @@ export function Composer({
     setText(`/${name} `)
     setPicked(0)
   }
-  const busy = lane.kind === "lane" && (lane.running || lane.waiting > 0)
-  const mode: ChatMode = fresh
-    ? "branch"
-    : compelled && busy
-      ? "queue"
-      : "reply"
-  // A compelled send creates a lane where there is none, and a branch always
-  // does: then it also says where that lane will work (ADR-0032, ADR-0034).
-  const createsLane = compelled && (fresh || lane.kind === "none")
   const work = choice ?? defaultWork
-  const label = compelled
-    ? busy && !fresh
-      ? `queue · agent replies after ${holderName ?? "the others"}`
-      : createsLane && work !== null
-        ? `send · agent will reply · ${whereWords(work, project)}`
-        : "send · agent will reply"
-    : to.people.length > 0
-      ? `send · to ${to.people.join(", ")}`
-      : "send"
 
   const send = async (message: string, as: ChatMode) => {
     setStatus("sending…")
@@ -192,7 +161,7 @@ export function Composer({
       ...(boundLane === undefined ? {} : { lane: boundLane }),
       asksAgent,
       ...(id === undefined ? {} : { id }),
-      ...(createsLane && choice !== null ? { work: choice } : {}),
+      ...(plan.createsLane && choice !== null ? { work: choice } : {}),
     })
     const settled = settleSend(outcome, message)
     setConflict(settled.conflict)
@@ -229,7 +198,7 @@ export function Composer({
     const message = sendable(text, initialText)
     if (message === null || readOnly !== null) return
     setText("")
-    await send(message, mode)
+    await send(message, plan.mode)
   }
 
   return (
@@ -255,7 +224,7 @@ export function Composer({
             }}
             type="button"
           >
-            {conflict.by === null ? "Queue" : `Queue after ${conflict.by}`}
+            {queueWords(conflict.by)}
           </button>{" "}
           <button
             className="branch-instead"
@@ -266,7 +235,7 @@ export function Composer({
             }}
             type="button"
           >
-            Branch here
+            branch here
           </button>
         </div>
       )}
@@ -355,9 +324,7 @@ export function Composer({
           e.preventDefault()
           void submit()
         }}
-        placeholder={
-          byDefault ? "ask the agent…" : "say something · @agent to ask"
-        }
+        placeholder={plan.placeholder}
         readOnly={readOnly !== null}
         ref={input}
         rows={Math.min(8, Math.max(2, text.split("\n").length))}
@@ -389,57 +356,42 @@ export function Composer({
               compose together
             </button>
           )}
-          <button className="send" type="submit">
-            {label}
-          </button>
-          {createsLane && project !== null && (
+          {plan.createsLane && work !== null && project !== null && (
             <Menu
               className="where-menu"
               heading="where the agent works"
-              items={[
-                {
-                  key: "own",
-                  label: "in its own copy",
-                  className: "where-own",
-                  disabled: project.kind !== "lanes",
-                  ...(project.kind === "direct"
-                    ? { title: project.reason }
-                    : {}),
-                  onChoose: () => setChoice({ kind: "own" }),
+              items={whereChoices(project, usedDirs).map(c => ({
+                key: c.key,
+                label: c.row,
+                className: c.className,
+                disabled: c.disabled,
+                ...(c.title === undefined ? {} : { title: c.title }),
+                onChoose: () => {
+                  if (c.setting !== null) return setChoice(c.setting)
+                  const dir = window.prompt("The directory to work in")?.trim()
+                  if (dir !== undefined && dir !== "")
+                    setChoice({ kind: "direct", dir })
                 },
-                {
-                  key: "yours",
-                  label: "directly in your working copy",
-                  className: "where-yours",
-                  onChoose: () =>
-                    setChoice({ kind: "direct", dir: project.root }),
-                },
-                ...usedDirs
-                  .filter(d => d !== project.root)
-                  .map(dir => ({
-                    key: dir,
-                    label: `directly in ${dir}`,
-                    className: "where-used",
-                    onChoose: () => setChoice({ kind: "direct", dir }),
-                  })),
-                {
-                  key: "other",
-                  label: "directly in…",
-                  className: "where-other",
-                  onChoose: () => {
-                    const dir = window
-                      .prompt("The directory to work in")
-                      ?.trim()
-                    if (dir !== undefined && dir !== "")
-                      setChoice({ kind: "direct", dir })
-                  },
-                },
-              ]}
+              }))}
               label="where the agent works"
-              trigger="▾"
+              trigger={
+                <>
+                  <span className="where-words" data-work={work.kind}>
+                    {whereWords(work, project)}
+                  </span>
+                  <span className="where-caret">▾</span>
+                </>
+              }
               triggerClassName="where-trigger"
             />
           )}
+          <button
+            className="send"
+            title={plan.title ?? undefined}
+            type="submit"
+          >
+            {plan.button}
+          </button>
         </div>
       )}
       <span className="status">{status}</span>

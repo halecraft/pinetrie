@@ -34,7 +34,7 @@ export interface Column {
    * A fresh column: nothing of its own yet. Once its first message is sent,
    * `sendId` is that send's id, and `sync` anchors the column at the entry it
    * wrote (`TreeIndex.bySend`): exactly, whatever else appeared meanwhile.
-   * `pending` is a first message to send on opening ("Branch here" after a
+   * `pending` is a first message to send on opening ("branch here" after a
    * conflict), sent by the column's own composer so its outcome shows there.
    * `prefill` is text its composer starts with, unsent (`branchPrefill`).
    */

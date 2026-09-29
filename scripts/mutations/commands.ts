@@ -33,8 +33,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a command does not compel the agent",
     file: "packages/marginalia/chat.ts",
-    from: "    command !== null\n",
-    to: "    false\n",
+    from: "    command: command !== null,\n",
+    to: "    command: false,\n",
     command: vitest("packages/marginalia"),
     expect: "it is for the agent, whoever else it names",
   },

@@ -665,4 +665,73 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "grows faster nearer the edge",
   },
+  {
+    name: "a command is not for the agent, as the composer sees it",
+    file: send,
+    from: "    command: parseCommand(input.text) !== null,",
+    to: "    command: false,",
+    command: unit,
+    expect: "asking the agent where there is no lane creates one",
+  },
+  {
+    name: "a busy lane never queues",
+    file: send,
+    from: '    : compelled && busy\n      ? "queue"',
+    to: '    : false\n      ? "queue"',
+    command: unit,
+    expect: "a busy lane queues the agent's next question",
+  },
+  {
+    name: "a waiting lane is not busy",
+    file: send,
+    from: '  const busy = lane.kind === "lane" && isBusy(lane)',
+    to: '  const busy = lane.kind === "lane" && lane.running',
+    command: unit,
+    expect: "a busy lane queues the agent's next question",
+  },
+  {
+    name: "the others are left off",
+    file: send,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "            : `send to ${first} +${others.length}`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "            : `send to ${first}`",
+    command: unit,
+    expect: "in a conversation, a message is sent, to whoever it names",
+  },
+  {
+    name: "a queue names no one",
+    file: send,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  by === null ? "queue" : `queue after ${by}`',
+    to: '  by === null ? "queue" : "queue"',
+    command: unit,
+    expect: "names who it waits behind, when anyone",
+  },
+  {
+    name: "the own copy is offered in a direct project",
+    file: send,
+    from: '      disabled: project.kind !== "lanes",',
+    to: "      disabled: false,",
+    command: unit,
+    expect: "a copy cannot be chosen where the project cannot have one",
+  },
+  {
+    name: "the working copy is offered twice",
+    file: send,
+    from: "      .filter(dir => dir !== project.root)",
+    to: "      .filter(dir => dir !== undefined)",
+    command: unit,
+    expect: "the working copy is never a used directory's row",
+  },
+  {
+    name: "a working copy reads as a directory",
+    file: send,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  return work.dir === project.root ? "in your working copy" : `in ${work.dir}`',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "  return `in ${work.dir}`",
+    command: unit,
+    expect: "whereWords says each setting",
+  },
 ]

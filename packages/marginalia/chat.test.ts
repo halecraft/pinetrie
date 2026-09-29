@@ -15,6 +15,7 @@ import {
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
+  addressChat,
   decodeChat,
   detailsFromStored,
   encodeChat,
@@ -78,6 +79,36 @@ const plan = (over: Partial<PlanInput>) => {
 const kind = (d: ReturnType<typeof planChat>) => d.kind
 const textOf = (d: ReturnType<typeof planChat>) =>
   "details" in d ? d.details.text : undefined
+
+describe("addressChat: who a chat is for, host and composer alike", () => {
+  const to = (
+    over: Partial<Parameters<typeof addressChat>[0]> = {},
+  ): ReturnType<typeof addressChat> =>
+    addressChat({
+      mentions: [],
+      participants: ["Alice", "Bo"],
+      mode: "reply",
+      lane: NONE,
+      asksAgent: false,
+      command: false,
+      ...over,
+    })
+  test("a command is for the agent, and keeps the people it names", () => {
+    expect(to({ command: true, mentions: parseMentions("@bo look") })).toEqual({
+      compels: AGENT,
+      people: ["Bo"],
+    })
+    expect(to({ mentions: parseMentions("@bo look") })).toEqual({
+      compels: NOBODY,
+      people: ["Bo"],
+    })
+  })
+  test("no mention asks the agent in agent work, and nobody in a branch", () => {
+    expect(to({ lane: lane() }).compels).toEqual(AGENT)
+    expect(to({ lane: lane(), mode: "branch" }).compels).toEqual(NOBODY)
+    expect(to({ mode: "branch", asksAgent: true }).compels).toEqual(AGENT)
+  })
+})
 
 describe("planChat: a command (ADR-0036)", () => {
   const command = {
