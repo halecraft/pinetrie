@@ -8,7 +8,6 @@ import type {
   ProjectRecord,
   ThreadLane,
   WorkSetting,
-  WriterId,
 } from "@pineta/core"
 import { useEffect, useRef, useState } from "react"
 import type { Prefill } from "./columns.ts"
@@ -23,8 +22,7 @@ import {
 } from "./paste.ts"
 import {
   planSend,
-  type QueuePlace,
-  queueWords,
+  type Reader,
   sendable,
   settleSend,
   whereChoices,
@@ -50,8 +48,8 @@ export interface ReadOnly {
  *
  * A reply carries the end its sender saw. If another writer's compelled
  * message got there first, or the lane became busy, the host writes nothing
- * and says so (`conflict`), and the sender chooses: queue, or branch here. A message the
- * host refuses comes back to the composer too (`settleSend`).
+ * and says so (`conflict`), and the sender chooses: queue, or branch here. A
+ * message the host refuses comes back to the composer too (`settleSend`).
  */
 export function Composer({
   session,
@@ -65,8 +63,7 @@ export function Composer({
   usedDirs,
   fresh,
   participants,
-  nameOf,
-  queue,
+  reader,
   onSend,
   onBranchInstead,
   pending,
@@ -105,10 +102,8 @@ export function Composer({
   prefill: Prefill | undefined
   /** Everyone who can be mentioned, as shown. */
   participants: readonly string[]
-  /** Display names by writer, for a conflict's line. */
-  nameOf: ReadonlyMap<WriterId, string>
-  /** Where a message queued now would wait (`queuePlace`). */
-  queue: QueuePlace
+  /** Who is sending, and everyone's names: for the queue's words and a conflict's. */
+  reader: Reader
   /** A fresh column's send id, recorded before its message is sent. */
   onSend: () => string | undefined
   /** After a conflict: open a branch at `at`, which sends the message. */
@@ -155,9 +150,8 @@ export function Composer({
     lane,
     asksAgent,
     participants,
-    queue,
+    reader,
   })
-  const queueNow = queueWords(queue)
   // The commands matching what is typed; Escape hides them for this text.
   const [hidden, setHidden] = useState<string | null>(null)
   const [picked, setPicked] = useState(0)
@@ -182,10 +176,7 @@ export function Composer({
       ...(id === undefined ? {} : { id }),
       ...(plan.createsLane && choice !== null ? { work: choice } : {}),
     })
-    const settled = settleSend(outcome, message, {
-      me: session.writer,
-      nameOf,
-    })
+    const settled = settleSend(outcome, message, reader)
     setConflict(settled.conflict)
     setStatus(settled.status)
     if (settled.restore !== null) setText(settled.restore)
@@ -270,10 +261,10 @@ export function Composer({
               setText("")
               void send(conflict.text, "queue")
             }}
-            title={queueNow.title ?? undefined}
+            title={plan.queue.title ?? undefined}
             type="button"
           >
-            {queueNow.button}
+            {plan.queue.button}
           </button>{" "}
           <button
             className="branch-instead"

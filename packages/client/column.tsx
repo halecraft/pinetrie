@@ -47,7 +47,6 @@ import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
-import { queuePlace } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
 import { useFollow } from "./use-follow.ts"
 
@@ -212,7 +211,6 @@ export function Column(p: ColumnProps) {
     lanes: p.work.lanes,
     project: p.work.project,
   })
-  const queue = queuePlace(lane, { me: p.session.writer, nameOf: p.nameOf })
 
   const draft =
     fresh || view.tipId === null || !writable
@@ -431,8 +429,7 @@ export function Column(p: ColumnProps) {
         at={at}
         boundLane={p.column.lane}
         fresh={fresh}
-        nameOf={p.nameOf}
-        queue={queue}
+        reader={{ me: p.session.writer, nameOf: p.nameOf }}
         prefill={p.column.fresh?.prefill}
         lane={lane}
         onBranchInstead={text => {

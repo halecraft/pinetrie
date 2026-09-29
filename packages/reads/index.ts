@@ -55,7 +55,6 @@ import {
   LANE_NAMESPACE,
   landingRecords,
   laneRecords,
-  lastHeld,
   NAME_NAMESPACE,
   NOTE_NAMESPACE,
   nameRecords,
@@ -130,7 +129,9 @@ export function readLanes(
     const name = stored as LaneName
     const tip = readLaneTip(doc, name)
     const running = readActiveRun(doc, name) !== undefined
+    // In send order, so the last is whom a message queued now follows.
     const waiting = outbox.filter(h => h.lane === name)
+    const last = waiting.at(-1)
     const asking = running
       ? ancestry(index, tip)
           .path.map(id => index.entries[id]?.message)
@@ -145,10 +146,7 @@ export function readLanes(
       running,
       waiting: waiting.length,
       askedBy: asking ?? null,
-      lastWaiting: (() => {
-        const last = lastHeld(outbox, name)
-        return last === undefined ? null : heldBy(last)
-      })(),
+      lastWaiting: last === undefined ? null : heldBy(last),
     }
   })
 }

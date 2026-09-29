@@ -41,7 +41,7 @@ in the host and in the browser alike: no pi, no transport.
   lane is answering (the nearest compelled chat on its path), or else of the
   first compelled message waiting for it. It is what a `conflict` names.
 - **`readLanes`' `lastWaiting`** is the writer of the newest item held for the
-  lane, of any kind (`lastHeld`): a message queued now waits behind it, so it
+  lane, of any kind: a message queued now waits behind it, so it
   is who the queue button names. It is null exactly when `waiting` is 0. It
   differs from `askedBy` while a run goes: `askedBy` is who the agent
   answers, `lastWaiting` who is last in line.

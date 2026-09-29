@@ -115,9 +115,7 @@ total decoder like every shape here. An update waits there too (ADR-0038): a
 held item is `kind: "chat"` or `kind: "update"`, and a record with no `kind`
 decodes as a chat. `heldBy` and `heldRuns` read either kind; `planDrain`
 takes a held update, which may run the resolution. Ids are uuidv7, so `heldMessages` sorts
-into send order, and `nextHeld` takes a lane's oldest. `lastHeld` is its
-newest, which a message queued now waits behind (the composer's queue button
-names its writer). "A lane with messages
+into send order, and `nextHeld` takes a lane's oldest. "A lane with messages
 waiting" counts as busy even between two of them, or a new message would jump
 the queue. The host executes three pure decisions from here:
 

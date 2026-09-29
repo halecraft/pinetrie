@@ -109,7 +109,7 @@ describe("planSend: the button, as the host will decide (ADR-0021)", () => {
       lane: { kind: "none" },
       asksAgent: false,
       participants: ["Ada", "Bea", "Cy"],
-      queue: { kind: "next" },
+      reader: READER,
       ...over,
     })
   test("in a conversation, a message is sent, to whoever it names", () => {
@@ -119,6 +119,7 @@ describe("planSend: the button, as the host will decide (ADR-0021)", () => {
       button: "send",
       title: null,
       placeholder: "say something · @agent to ask",
+      queue: { button: "queue up next", title: null },
     })
     expect([plan("@ada hi").button, plan("@ada hi").title]).toEqual([
       "send to Ada",
@@ -152,17 +153,13 @@ describe("planSend: the button, as the host will decide (ADR-0021)", () => {
     })
   })
   test("a busy lane queues the agent's next question, never a person's message", () => {
-    for (const busy of [lane({ running: true }), lane({ waiting: 1 })])
-      expect(plan("hi", { lane: busy })).toMatchObject({
-        mode: "queue",
-        button: "queue up next",
-        title: null,
-      })
+    expect(plan("hi", { lane: lane({ running: true }) })).toMatchObject({
+      mode: "queue",
+      button: "queue up next",
+      title: null,
+    })
     expect(
-      plan("hi", {
-        lane: lane({ waiting: 3 }),
-        queue: { kind: "after", name: "Bea", ahead: 3 },
-      }),
+      plan("hi", { lane: lane({ waiting: 3, lastWaiting: BEA }) }),
     ).toMatchObject({
       mode: "queue",
       button: "queue after Bea",

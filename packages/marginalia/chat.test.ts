@@ -24,7 +24,6 @@ import {
   heldBy,
   heldMessages,
   heldRuns,
-  lastHeld,
   nextHeld,
   participants,
   planChat,
@@ -456,15 +455,6 @@ describe("outbox", () => {
       { value: held("3-c", "t-1") },
     ])
     expect(nextHeld(h, laneNameForThread("1"))?.id).toBe("2-b")
-  })
-  test("lastHeld: the newest for the given lane only", () => {
-    const h = heldMessages([
-      { value: held("1-a", "t-1") },
-      { value: held("2-b", "t-1") },
-      { value: held("3-c", "t-other") },
-    ])
-    expect(lastHeld(h, laneNameForThread("1"))?.id).toBe("2-b")
-    expect(lastHeld(h, laneNameForThread("none"))).toBeUndefined()
   })
   test("a held record stored before landings had no kind, and is a chat", () => {
     const [h] = heldMessages([{ value: held("1-a", "t-1") }])

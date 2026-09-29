@@ -335,7 +335,6 @@ export function decodeReply(wire: Reply): Outcome {
     case "queued":
       return { kind: "queued", position: wire.position }
     case "conflict":
-      // Branded here, the one edge a writer id crosses into the client.
       return {
         kind: "conflict",
         by: wire.by === "" ? null : (wire.by as WriterId),

@@ -806,12 +806,8 @@ export async function startHost({
     const message = (details: ChatDetails) => encodeChat(details, Date.now())
     switch (planned.kind) {
       case "refused":
-        return planned
       case "conflict":
-        return {
-          kind: "conflict",
-          by: planned.by,
-        }
+        return planned
       case "hold":
         await agent.hold({
           kind: "chat",

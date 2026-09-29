@@ -103,9 +103,11 @@ export interface SendPlan {
   readonly createsLane: boolean
   /** The button's words. */
   readonly button: string
-  /** Everyone the button names, when it shortens them; else null. */
+  /** Everyone the button names, or the queue's length; null when it shortens nothing. */
   readonly title: string | null
   readonly placeholder: string
+  /** The queue's words: the button's in `queue` mode, and a conflict's. */
+  readonly queue: QueueWords
 }
 
 /**
@@ -125,8 +127,7 @@ export function planSend(input: {
   readonly lane: ThreadLane
   readonly asksAgent: boolean
   readonly participants: readonly string[]
-  /** Where a queued message would wait. */
-  readonly queue: QueuePlace
+  readonly reader: Reader
 }): SendPlan {
   const { fresh, lane } = input
   const how = {
@@ -148,7 +149,7 @@ export function planSend(input: {
       ? "queue"
       : "reply"
   const [first, ...others] = to.people
-  const queue = queueWords(input.queue)
+  const queue = queueWords(queuePlace(lane, input.reader))
   const button =
     mode === "queue"
       ? queue.button
@@ -172,6 +173,7 @@ export function planSend(input: {
     placeholder: agentByDefault(how)
       ? "ask the agent…"
       : "say something · @agent to ask",
+    queue,
   }
 }
 
@@ -200,14 +202,14 @@ export function queuePlace(lane: ThreadLane, reader: Reader): QueuePlace {
   }
 }
 
-/**
- * The queue button's words, the composer's and the conflict prompt's. The
- * title counts the queue when one name stands for more than one waiting.
- */
-export function queueWords(place: QueuePlace): {
+/** The queue button's words, the composer's and the conflict prompt's. */
+export interface QueueWords {
   readonly button: string
+  /** How many wait, when one name stands for more than one; else null. */
   readonly title: string | null
-} {
+}
+
+export function queueWords(place: QueuePlace): QueueWords {
   const button =
     place.kind === "next"
       ? "queue up next"

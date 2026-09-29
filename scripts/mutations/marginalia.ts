@@ -70,14 +70,6 @@ export const mutations: readonly Mutation[] = [
     expect: "the oldest for the given lane only",
   },
   {
-    name: "the last held is the first",
-    file: "packages/marginalia/outbox.ts",
-    from: "): Held | undefined => held.findLast(h => h.lane === lane)",
-    to: "): Held | undefined => held.find(h => h.lane === lane)",
-    command: unit,
-    expect: "the newest for the given lane only",
-  },
-  {
     name: "the drain runs a plain message",
     file: "packages/marginalia/outbox.ts",
     from: '  return next.details.compels.kind === "agent"',
