@@ -151,7 +151,7 @@ describe("lanes in a harness", () => {
     await agent.close()
   })
 
-  test("a lane of its own runs its tools through its helper, and is told where your working copy is", async () => {
+  test("a lane of its own runs its tools through its helper, and is told where your working copy and its shared directories are", async () => {
     const dir = path.join(root, "own")
     const { mkdir } = await import("node:fs/promises")
     await mkdir(dir)
@@ -165,6 +165,7 @@ describe("lanes in a harness", () => {
     const lane = await newLane({
       kind: "lane",
       dir,
+      shared: [".plans"],
       gate: async () => channel,
     })
     script.use([
@@ -185,6 +186,9 @@ describe("lanes in a harness", () => {
     expect(told).toContain(`at ${dir}`)
     expect(told).toContain(
       "working copy is at /mnt/host-working-copy, read-only",
+    )
+    expect(told).toContain(
+      `${dir}/.plans is shared with the person and every other thread`,
     )
     channel.close()
     await channel.closed

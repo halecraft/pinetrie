@@ -9,7 +9,7 @@ file exists to tell you what matters, what is decided, and what to do next.
 > spike reports that are the evidence behind them. This file is the orientation
 > layer over the top.
 >
-> **Implementation plans are not here.** They live in `.jj/plans/`, one per
+> **Implementation plans are not here.** They live in `.plans/`, one per
 > change, and are untracked — see `docs/README.md` § Where documents live.
 > `docs/` explains why the system is shaped as it is; a plan describes one
 > piece of work and is spent once done.
@@ -486,6 +486,14 @@ context.**
   grants it. Your working copy is yours, so hot reload stays on. It needs
   Apple's `container` running (`docs/05-stack.md` D10); without it, threads
   work directly. Restart the host to pick up changes to host code.
+- **Sharing a directory with every thread** (ADR-0035), e.g. your plans:
+  list it in `~/.config/pineta/config.json` as
+  `{ "lanes": { "shared": [".plans"] } }`, and ignore it in
+  `~/.config/git/ignore`. Every thread's agent then reads and writes
+  `/workspace/.plans`, which is your `.plans`, live, and never part of a
+  branch. A project can share a directory for everyone in `pineta.json`'s
+  `lanes.shared`. A changed config reaches existing threads at their next
+  run, after a host restart.
 - **Bringing a thread's work back:** its column's header offers **land your
   work**: the thread merges your committed work into its own, and its agent
   resolves any conflicts, or asks you (ADR-0033). Once resolved, **take into

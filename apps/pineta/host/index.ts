@@ -37,6 +37,7 @@ import {
   type WriterId,
   writerId,
 } from "@pineta/core"
+import { userConfigFile } from "@pineta/lanes"
 import {
   archivedAt,
   CHAT_TYPE,
@@ -167,6 +168,12 @@ export interface StartHostOptions {
    */
   readonly containers?: boolean
   /**
+   * The user's lane config (ADR-0035), by default
+   * `$XDG_CONFIG_HOME/pineta/config.json`. A suite passes its own file rather
+   * than move `XDG_CONFIG_HOME`, which git and jj read too.
+   */
+  readonly userConfig?: string
+  /**
    * Where the session is kept: a SQLite file; a Kyneta store a caller made (and
    * closes), as a suite does to control it; or, absent or null, a store in
    * memory. Every host has a store: Kyneta compacts only a document with one,
@@ -208,6 +215,7 @@ export async function startHost({
   tools = null,
   lanes = true,
   containers = true,
+  userConfig = userConfigFile(),
   store: storeFile = null,
   presenceDecay = PRESENCE_DECAY,
   log = console.log,
@@ -260,6 +268,7 @@ export async function startHost({
     dir: tools?.project ?? null,
     defaultDirect: !lanes,
     containers,
+    userConfig,
     agent: theAgent,
     log,
   })

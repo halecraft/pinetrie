@@ -1155,6 +1155,8 @@ try {
     const toolHost = await startHost({
       model: { kind: "scripted", script },
       tools: { project: work },
+      // A file of its own, so the person's own config never applies here.
+      userConfig: path.join(work, "no-user-config.json"),
       log: () => {},
     })
     const tp = await browser.newPage()

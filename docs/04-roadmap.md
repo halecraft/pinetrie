@@ -296,9 +296,10 @@ one that forces a coordinated upgrade if pi moves it.
 
 1. ~~**These plans are untracked.**~~ **Settled.** Two tiers with different
    lifetimes: `docs/` is the tracked architectural reference (this file
-   included); `.jj/plans/` holds untracked per-change implementation plans.
-   `@halecraft/plans` will later give `.jj/plans/` its own VCS namespace. A
-   plan may cite `docs/` and source paths, never anything under `.jj/`.
+   included); `.plans/` holds untracked per-change implementation plans.
+   `@halecraft/plans` will later give them their own VCS namespace. A
+   plan may cite `docs/` and source paths, never anything under `.plans/`
+   or `.jj/`.
    See `README.md` § Where documents live.
 2. ~~**Repo layout**~~ **Settled.** A pnpm workspace with `packages/core`,
    `packages/schema`, `packages/pi`, `packages/protocol` and `packages/client`,

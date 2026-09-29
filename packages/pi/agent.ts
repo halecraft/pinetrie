@@ -286,8 +286,13 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   // pi's own prompt, with the repo's context files and the person's skills, so
   // an extension that shapes pi's prompt sections finds them (S23). It names
   // the lane's directory, and does not wait for its setup. A lane of its own
-  // is told where your working copy is: the only other files it can see.
-  const promptFor = (toolContext: { dir: string; own: boolean }) =>
+  // is told where your working copy is, read-only, and which of its
+  // directories are shared: the only files beyond its own it can see.
+  const promptFor = (toolContext: {
+    dir: string
+    own: boolean
+    shared: readonly string[]
+  }) =>
     buildSystemPrompt({
       cwd: toolContext.dir,
       selectedTools: toolNames,
@@ -297,6 +302,10 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         ? {
             promptGuidelines: [
               `This thread works in its own copy of the project, at ${toolContext.dir}. The person's own working copy is at ${HOST_WORKING_COPY}, read-only: read it when asked about their files, and never try to write there.`,
+              ...toolContext.shared.map(
+                p =>
+                  `${toolContext.dir}/${p} is shared with the person and every other thread: edits there are live, visible to them at once, and never part of a branch.`,
+              ),
             ],
           }
         : {}),
@@ -316,15 +325,20 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
               env: directEnv(access.dir, access.ready),
               dir: access.dir,
               own: false,
+              shared: [],
             }
           : {
               env: laneEnv(access.dir, access.gate),
               dir: access.dir,
               own: true,
+              shared: access.shared,
             }
       },
-      systemPrompt: (toolContext: { dir: string; own: boolean }) =>
-        promptFor(toolContext),
+      systemPrompt: (toolContext: {
+        dir: string
+        own: boolean
+        shared: readonly string[]
+      }) => promptFor(toolContext),
       // Pineta's outbox means pi's own queue is never used; should it be, it
       // answers one message at a time rather than batching them (S20).
       followUpMode: "one-at-a-time",

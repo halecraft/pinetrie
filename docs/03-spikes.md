@@ -356,6 +356,26 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S46 — Skill files in a lane, under `/mnt/host` ✅ PASS
+
+`findings/S46-skill-files-in-lanes.md`. A read-only mount at `/mnt/host`
+followed by a host path works at any depth the image lacks, beside
+`/mnt/host-working-copy`, with spaces in the path, and a skill's own script
+runs from it. A comma in a source path breaks `--mount`'s syntax; `-v` takes
+it, but not a colon.
+
+### S45 — A host directory shared read-write into every lane ✅ PASS
+
+`findings/S45-a-shared-directory-in-lanes.md`. A bind mount at
+`/workspace/.plans`, inside the lane's volume, works. What a lane writes
+there is yours on the host, and changes are visible at once between the host
+and every lane. A snapshot holds only the empty mount point. The lane's jj
+keeps the directory out of `@` only if `.git/info/exclude` names it before jj
+first snapshots. But `core.excludesFile`, set through `GIT_CONFIG_*`
+variables on the container, keeps it out of both git and jj from the first
+moment, in every repo: no step order has to hold. A container's labels read
+back, so a lane whose spec changed can be recreated on the same disk.
+
 ### S44 — The lane runtime on any image, and fetching your `@-` by id ✅ PASS
 
 `findings/S44-a-lane-runtime-on-any-image.md`. Node from Pineta's image,

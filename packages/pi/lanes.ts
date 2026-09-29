@@ -33,6 +33,11 @@ export type LaneAccess =
       readonly kind: "lane"
       /** `WORKSPACE_ROOT` in a container; the helper's own directory in tests. */
       readonly dir: string
+      /**
+       * Directories shared read-write with the person and every other lane,
+       * relative to `dir` (ADR-0035).
+       */
+      readonly shared: readonly string[]
       readonly gate: () => Promise<LaneChannel>
     }
 

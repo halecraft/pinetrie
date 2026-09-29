@@ -8,7 +8,7 @@
 // ready, and which landing runs asked for guidance.
 
 import { createHash } from "node:crypto"
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises"
+import { mkdtemp, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
@@ -43,10 +43,8 @@ import {
   commitTurn,
   conflictContent,
   conflictsIn,
-  containerState,
+  containerFacts,
   type DiskPaths,
-  decodeGrants,
-  decodeInstall,
   deleteBookmark,
   ensureRuntime,
   entryOfMessage,
@@ -56,19 +54,20 @@ import {
   helperCommand,
   hostGit,
   hostJj,
-  type Install,
   imagePath,
-  type LaneGrants,
   type LaneHandle,
   type LaneSpec,
   laneContainer,
   laneHandle,
+  laneIgnoreDir,
   laneJj,
   type Mount,
   mergeYours,
   NO_GRANTS,
+  normalShared,
   type OpenLink,
   PINETA_INSTALL,
+  planContainer,
   planDisk,
   planFetch,
   planFork,
@@ -77,12 +76,16 @@ import {
   planStart,
   prepareHost,
   prepareImages,
+  prepareShared,
+  readLaneConfig,
   refreshBase,
+  removeContainer,
   removeLane,
   removeSnapshots,
   setBookmark,
   sideHistory,
   snapshotExists,
+  specHashOf,
   takeInto,
   trim,
   volumeExists,
@@ -177,8 +180,6 @@ interface Ready {
   readonly tools: string
   readonly runtime: string
   readonly links: readonly Mount[]
-  readonly grants: LaneGrants
-  readonly install: Install | null
   readonly identity: { readonly name: string; readonly email: string }
 }
 
@@ -196,6 +197,8 @@ export async function startLaneWork(input: {
   readonly defaultDirect: boolean
   /** False: lanes never get containers here, and `container` is not asked. */
   readonly containers: boolean
+  /** The user's lane config file (ADR-0035). */
+  readonly userConfig: string
   readonly agent: () => Agent
   readonly log: (m: string) => void
 }): Promise<LaneWork> {
@@ -267,7 +270,44 @@ export async function startLaneWork(input: {
     }
   }
 
-  // --- the images, runtime, grants and base snapshot, in the background ----
+  // --- the lane configs and shared directories, at startup ---------------
+  // Before the rest, since a run's prompt names the shared directories.
+  const lanes = root === null ? null : await prepareLanes(root)
+
+  async function prepareLanes(at: string) {
+    const pnpmLock = await stat(path.join(at, "pnpm-lock.yaml")).then(
+      () => true,
+      () => false,
+    )
+    const config = await readLaneConfig(
+      path.join(at, "pineta.json"),
+      at,
+      pnpmLock,
+    )
+    const user = await readLaneConfig(input.userConfig, at, false)
+    const { grants } = config
+    const on = [
+      grants.ssh ? "your ssh agent" : null,
+      ...grants.env.map(e => `$${e}`),
+      ...grants.mounts.map(m => m.source),
+    ].filter(g => g !== null)
+    if (on.length > 0) log(`[host] lanes are granted: ${on.join(", ")}`)
+    const sharing = await prepareShared(at, {
+      user: user.shared,
+      project: config.shared,
+    })
+    for (const d of sharing.shared) {
+      const from = user.shared.some(p => normalShared(p) === d.path)
+        ? input.userConfig
+        : "pineta.json"
+      log(`[host] ${d.path}/ is shared read-write with every lane (${from})`)
+    }
+    for (const r of sharing.refused)
+      log(`[host] ${r.path} is not shared: ${r.reason}`)
+    return { config, ...sharing }
+  }
+
+  // --- the images, runtime and base snapshot, in the background ----------
   const ready: Promise<Ready> | null =
     root === null || paths === null ? null : track(prepare(root, paths))
   ready?.catch(error =>
@@ -282,20 +322,6 @@ export async function startLaneWork(input: {
       path.join(at, ".pineta", "runtime"),
       images.runtimeFrom,
     )
-    const json = await readFile(path.join(at, "pineta.json"), "utf8")
-      .then(t => JSON.parse(t) as unknown)
-      .catch(() => null)
-    const grants = json === null ? NO_GRANTS : decodeGrants(json, at)
-    const on = [
-      grants.ssh ? "your ssh agent" : null,
-      ...grants.env.map(e => `$${e}`),
-      ...grants.mounts.map(m => m.source),
-    ].filter(g => g !== null)
-    if (on.length > 0) log(`[host] lanes are granted: ${on.join(", ")}`)
-    const pnpmLock = await stat(path.join(at, "pnpm-lock.yaml")).then(
-      () => true,
-      () => false,
-    )
     const jj = hostJj(at)
     const config = async (key: string, fallback: string) => {
       const ran = await jj(["config", "get", key])
@@ -307,8 +333,6 @@ export async function startLaneWork(input: {
       tools: images.runtimeFrom,
       runtime,
       links: planLinks(at, await gatherLinks(at)),
-      grants,
-      install: decodeInstall(json, pnpmLock),
       identity: {
         name: await config("user.name", "Pineta agent"),
         email: await config("user.email", "agent@pineta.invalid"),
@@ -328,9 +352,11 @@ export async function startLaneWork(input: {
     pineta: PINETA_INSTALL,
     runtime: r.runtime,
     links: r.links,
-    grants: r.grants,
+    grants: lanes?.config.grants ?? NO_GRANTS,
     identity: r.identity,
     memory: LANE_MEMORY,
+    shared: lanes?.shared ?? [],
+    ignoreDir: laneIgnoreDir(at),
   })
 
   /** The base snapshot's refreshes, one at a time. */
@@ -339,14 +365,15 @@ export async function startLaneWork(input: {
     const jj = hostJj(at)
     const yours = await yoursNow(jj)
     let lock: string | null = null
-    if (r.install !== null) {
+    const install = lanes?.config.install ?? null
+    if (install !== null) {
       const shown = await jj([
         "file",
         "show",
         "--ignore-working-copy",
         "-r",
         "@-",
-        `root:${JSON.stringify(r.install.lockfile)}`,
+        `root:${JSON.stringify(install.lockfile)}`,
       ])
       lock = shown.ok
         ? createHash("sha256").update(shown.stdout).digest("hex")
@@ -354,11 +381,12 @@ export async function startLaneWork(input: {
     }
     const made = await refreshBase({
       paths: disk,
-      spec: specOf(BASE_LANE, r, at),
+      // Nothing in the base should see a shared directory.
+      spec: { ...specOf(BASE_LANE, r, at), shared: [] },
       env: process.env,
       yours,
       lock,
-      install: r.install,
+      install,
       open: openLink,
     })
     if (made)
@@ -413,14 +441,28 @@ export async function startLaneWork(input: {
    * Start a lane's container: from its disk if it has one, else from its
    * newest snapshot (a restored root), else it predates lane containers.
    */
+  /**
+   * Start a lane's container, as `planContainer` decides. A container made
+   * from another spec (image, mounts, grants) is recreated on the same
+   * volume. A missing one is made from its volume, else from its newest
+   * snapshot (a restored root), else the lane predates lane containers.
+   */
   async function startContainer(lane: LaneName): Promise<void> {
     if (ready === null || root === null || paths === null)
       throw new Error("lanes of their own are off for this host")
     const r = await ready
     const handle = handleOf(lane)
     const container = handle.container
-    if ((await containerState(container)) === "missing") {
-      const spec = specOf(lane, r, root)
+    const spec = specOf(lane, r, root)
+    const decided = planContainer({
+      facts: await containerFacts(container),
+      want: specHashOf(spec, process.env),
+    })
+    if (decided === "recreate") {
+      await handle.stop()
+      await removeContainer(container)
+    }
+    if (decided === "create" || decided === "recreate") {
       if (await volumeExists(container))
         await executeOrThrow([planStart(spec, process.env)], handle.runners)
       else {
@@ -483,7 +525,8 @@ export async function startLaneWork(input: {
     const at = root
     const handle = handleOf(lane)
     const bundled = handle.queue.enqueue(async () => {
-      const stopped = (await containerState(handle.container)) !== "running"
+      const stopped =
+        (await containerFacts(handle.container)).state !== "running"
       if (stopped) await startContainer(lane)
       try {
         if ((await bookmarkOf(laneJjOf(lane), lane)) === null) return null
@@ -662,6 +705,7 @@ export async function startLaneWork(input: {
       return {
         kind: "lane",
         dir: WORKSPACE_ROOT,
+        shared: lanes?.shared.map(d => d.path) ?? [],
         gate: async () => {
           await handle.queue.idle()
           return (await handle.link()).channel

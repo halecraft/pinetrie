@@ -3,7 +3,9 @@
 //
 // A container runs only while its lane runs: a VM keeps the most memory its
 // guest ever touched until it stops (S39 item 7). Stopping takes 0.3 s and
-// starting 0.7 s; the disk keeps everything.
+// starting 0.7 s. The disk, a volume of its own, keeps everything, so a
+// container is disposable: one made from another spec is recreated on the
+// same disk (`planContainer`).
 //
 // Everything that changes a lane's disk from outside a tool is queued, in
 // order, on one queue per lane: starting the container, a fork's setup, and
@@ -16,7 +18,7 @@
 
 import path from "node:path"
 import type { Runners } from "./execute.ts"
-import { PINETA_MOUNT } from "./plan.ts"
+import { PINETA_MOUNT, SPEC_LABEL } from "./plan.ts"
 import {
   type BytesRunner,
   describeFailure,
@@ -97,19 +99,33 @@ export function createQueue(): LaneQueue {
   }
 }
 
-/** A container's state: running, stopped, or not there. */
-export async function containerState(
+/** What `container inspect` says of a container. */
+export interface ContainerFacts {
+  readonly state: "running" | "stopped" | "missing"
+  /** Its spec label (`SPEC_LABEL`), or null when it has none. */
+  readonly label: string | null
+}
+
+/** A container's state and spec label; missing when it is not there. */
+export async function containerFacts(
   container: string,
-): Promise<"running" | "stopped" | "missing"> {
+): Promise<ContainerFacts> {
+  const missing: ContainerFacts = { state: "missing", label: null }
   const ran = await run("container", ["inspect", container])
-  if (!ran.ok) return "missing"
+  if (!ran.ok) return missing
   try {
     const [found] = JSON.parse(ran.stdout) as {
       status?: { state?: string }
+      configuration?: { labels?: Record<string, unknown> }
     }[]
-    return found?.status?.state === "running" ? "running" : "stopped"
+    if (found === undefined) return missing
+    const label = found.configuration?.labels?.[SPEC_LABEL]
+    return {
+      state: found.status?.state === "running" ? "running" : "stopped",
+      label: typeof label === "string" ? label : null,
+    }
   } catch {
-    return "missing"
+    return missing
   }
 }
 
@@ -158,7 +174,7 @@ export function laneHandle<C>(
     },
     link: opened,
     async start() {
-      if ((await containerState(container)) !== "running") {
+      if ((await containerFacts(container)).state !== "running") {
         const started = await run("container", ["start", container])
         if (!started.ok)
           throw new Error(describeFailure("container start", started))
@@ -174,8 +190,13 @@ export function laneHandle<C>(
   }
 }
 
+/** Delete a lane's container; its volume, the lane's disk, stays. */
+export async function removeContainer(container: string): Promise<void> {
+  await run("container", ["rm", "-f", container])
+}
+
 /** Delete a lane's container and its volume. */
 export async function removeLane(container: string): Promise<void> {
-  await run("container", ["rm", "-f", container])
+  await removeContainer(container)
   await run("container", ["volume", "rm", container])
 }

@@ -56,6 +56,8 @@ the file and put the line back.
 
 ## Plans
 
-Plans live in `.jj/plans/`, named `YYYY-MM-DD-slug.md`, and are referred to as
+Plans live in `.plans/`, named `YYYY-MM-DD-slug.md`, and are referred to as
 `PLAN-YYYY-MM-DD-slug`. Mark each task 🔴/🟡/✅/⛔ as it moves. A plan cites
-`docs/` and source paths, never `.jj/`.
+`docs/` and source paths, never `.plans/` or `.jj/`. `.plans/` is untracked,
+and shared read-write with every thread's lane (ADR-0035), so an agent in a
+lane reads and writes plans at the same path.

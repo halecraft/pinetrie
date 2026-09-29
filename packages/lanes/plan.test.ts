@@ -6,8 +6,7 @@ import {
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
-  decodeGrants,
-  decodeInstall,
+  decodeLaneConfig,
   extendImmutable,
   FETCHED_REF,
   fetchById,
@@ -15,10 +14,12 @@ import {
   imageRefusal,
   type LaneSpec,
   type LaneStep,
+  laneIgnores,
   NO_GRANTS,
   PINETA_HEADS,
   planBaseRefresh,
   planBundle,
+  planContainer,
   planDisk,
   planExclude,
   planFetch,
@@ -28,8 +29,11 @@ import {
   planLinks,
   planRoot,
   planRun,
+  planShared,
   planSnapshot,
+  SPEC_LABEL,
   shellWord,
+  specHashOf,
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
@@ -50,6 +54,8 @@ const spec: LaneSpec = {
   grants: NO_GRANTS,
   identity: { name: "agent", email: "agent@pineta" },
   memory: "2G",
+  shared: [],
+  ignoreDir: "/p/.pineta/lane-git",
 }
 
 /** Each `--mount` value, and each `-e` value, from a `container run`. */
@@ -58,15 +64,57 @@ const valuesOf = (argv: readonly string[], flag: string) =>
 
 describe("planRun: a lane's container", () => {
   const argv = planRun(spec, { HOME, SECRET: "s", GITHUB_TOKEN: "t" })
-  test("--init, the lane's disk at /workspace, and every host path read-only", () => {
-    expect(argv.slice(0, 3)).toEqual(["run", "-d", "--init"])
+  test("--init, the lane's disk at /workspace, and every host path read-only when nothing is shared", () => {
+    expect(argv.slice(0, 5)).toEqual([
+      "run",
+      "--label",
+      `${SPEC_LABEL}=${specHashOf(spec, { HOME, SECRET: "s", GITHUB_TOKEN: "t" })}`,
+      "-d",
+      "--init",
+    ])
     expect(valuesOf(argv, "-v")).toEqual(["pineta-t-1:/workspace"])
     expect(valuesOf(argv, "--mount")).toEqual([
       "type=bind,source=/p,target=/mnt/host-working-copy,readonly",
       "type=bind,source=/opt/pineta,target=/pineta,readonly",
       "type=bind,source=/p/.pineta/runtime/abc,target=/pineta-runtime,readonly",
+      "type=bind,source=/p/.pineta/lane-git,target=/pineta-git,readonly",
       "type=bind,source=/k,target=/k,readonly",
     ])
+  })
+  test("shared directories are mounted read-write, where they are in /workspace", () => {
+    const shared = planRun(
+      { ...spec, shared: [{ path: ".plans", source: "/p/.plans" }] },
+      {},
+    )
+    expect(valuesOf(shared, "--mount")).toContain(
+      "type=bind,source=/p/.plans,target=/workspace/.plans",
+    )
+    expect(valuesOf(shared, "--mount")).toContain(
+      "type=bind,source=/p,target=/mnt/host-working-copy,readonly",
+    )
+  })
+  test("every repo in the lane ignores what the ignore file lists, through git's own variables", () => {
+    expect(valuesOf(argv, "-e")).toEqual(
+      expect.arrayContaining([
+        "GIT_CONFIG_COUNT=1",
+        "GIT_CONFIG_KEY_0=core.excludesFile",
+        "GIT_CONFIG_VALUE_0=/pineta-git/ignore",
+      ]),
+    )
+    expect(laneIgnores([".plans", "notes/shared"])).toBe(
+      "/.pineta-lane/\n/lost+found/\n/.plans/\n/notes/shared/\n",
+    )
+  })
+  test("the spec label: stable, and changed by a mount or the image", () => {
+    const hash = specHashOf(spec, {})
+    expect(specHashOf(spec, {})).toBe(hash)
+    expect(
+      specHashOf(
+        { ...spec, shared: [{ path: ".plans", source: "/p/.plans" }] },
+        {},
+      ),
+    ).not.toBe(hash)
+    expect(specHashOf({ ...spec, image: "pineta-lane:def" }, {})).not.toBe(hash)
   })
   test("never your home directory, and no variable no grant names", () => {
     expect(argv.join(" ")).not.toContain(HOME)
@@ -114,48 +162,110 @@ describe("planRun: a lane's container", () => {
   })
 })
 
-describe("pineta.json: grants and the install, total", () => {
-  test("nothing, or anything malformed, grants nothing", () => {
-    expect(decodeGrants(undefined, "/p")).toEqual(NO_GRANTS)
-    expect(decodeGrants({}, "/p")).toEqual(NO_GRANTS)
-    expect(decodeGrants({ lanes: 3 }, "/p")).toEqual(NO_GRANTS)
+describe("decodeLaneConfig: grants, the install and shared directories, total", () => {
+  const empty = (pnpm: boolean) => decodeLaneConfig(undefined, "/p", pnpm)
+  test("nothing, or anything malformed, grants and shares nothing", () => {
+    for (const json of [undefined, {}, { lanes: 3 }])
+      expect(decodeLaneConfig(json, "/p", false)).toEqual({
+        grants: NO_GRANTS,
+        install: null,
+        shared: [],
+      })
     expect(
-      decodeGrants(
+      decodeLaneConfig(
         {
           lanes: {
             ssh: "yes",
             env: ["OK_1", 4, "no-dash", "A=B"],
             mounts: [{ source: "d" }, { source: "d", target: "rel" }],
+            shared: [".plans", 3, null],
           },
         },
         "/p",
+        false,
       ),
-    ).toEqual({ ssh: false, env: ["OK_1"], mounts: [] })
+    ).toEqual({
+      grants: { ssh: false, env: ["OK_1"], mounts: [] },
+      install: null,
+      shared: [".plans"],
+    })
   })
   test("mount sources are relative to the project", () => {
     expect(
-      decodeGrants(
+      decodeLaneConfig(
         { lanes: { ssh: true, mounts: [{ source: "../d", target: "/d" }] } },
         "/p/app",
-      ),
+        false,
+      ).grants,
     ).toEqual({
       ssh: true,
       env: [],
       mounts: [{ source: "/p/d", target: "/d" }],
     })
   })
-  test("the install: pineta.json's, else pnpm's for a pnpm repo, else none", () => {
+  test("the install: the config's, else pnpm's for a pnpm repo, else none", () => {
     expect(
-      decodeInstall(
+      decodeLaneConfig(
         { lanes: { install: "npm ci", installWhen: "package-lock.json" } },
+        "/p",
         true,
-      ),
+      ).install,
     ).toEqual({ command: "npm ci", lockfile: "package-lock.json" })
-    expect(decodeInstall({ lanes: { install: "npm ci" } }, true)).toEqual({
+    expect(
+      decodeLaneConfig({ lanes: { install: "npm ci" } }, "/p", true).install,
+    ).toEqual({
       command: "pnpm install --frozen-lockfile",
       lockfile: "pnpm-lock.yaml",
     })
-    expect(decodeInstall(null, false)).toBeNull()
+    expect(empty(true).install?.command).toBe("pnpm install --frozen-lockfile")
+    expect(empty(false).install).toBeNull()
+  })
+})
+
+describe("planShared: which shared directories apply, and what the host does for them", () => {
+  const none = new Set<string>()
+  const facts = {
+    user: [".plans", "notes/"],
+    project: [".plans", "shared/data"],
+    exists: new Set([".plans"]),
+    tracked: none,
+    ignored: new Set([".plans"]),
+  }
+  test("the user's, then the project's, normalized, each once", () => {
+    expect(planShared(facts).shared).toEqual([".plans", "notes", "shared/data"])
+  })
+  test("created when missing; excluded in your repo unless already ignored", () => {
+    const planned = planShared(facts)
+    expect(planned.create).toEqual(["notes", "shared/data"])
+    expect(planned.exclude).toEqual(["notes", "shared/data"])
+  })
+  test("refused, with a reason: absolute, leaving the project, in a repo's or Pineta's own, tracked", () => {
+    const planned = planShared({
+      ...facts,
+      user: [
+        "/abs",
+        "../out",
+        ".",
+        ".jj/plans",
+        ".git",
+        ".pineta/x",
+        "node_modules/y",
+        "docs",
+      ],
+      project: [],
+      tracked: new Set(["docs"]),
+    })
+    expect(planned.shared).toEqual([])
+    expect(planned.refused.map(r => `${r.path}: ${r.reason}`)).toEqual([
+      "/abs: it is absolute",
+      "../out: it leaves the project",
+      ".: it leaves the project",
+      ".jj/plans: it is inside .jj",
+      ".git: it is inside .git",
+      ".pineta/x: it is inside .pineta",
+      "node_modules/y: it is inside node_modules",
+      "docs: it holds files jj tracks",
+    ])
   })
 })
 
@@ -301,7 +411,6 @@ describe("planBaseRefresh: the base snapshot at your @-", () => {
     ).toEqual([
       "lane: git init -q",
       "lane: jj git init --colocate",
-      "lane: sh -c printf '%s\\n' /.pineta-lane/ /lost+found/ >> .git/info/exclude",
       `lane: ${fetchById([C1]).argv.join(" ")}`,
       "lane: jj new c1",
       "lane: sh -c pnpm install --frozen-lockfile",
@@ -386,10 +495,26 @@ describe("the host: its root, then container, in order", () => {
       reason: expect.stringContaining("no jj repo"),
     })
   })
-  test("planExclude: adds /.pineta/ once, on a line of its own", () => {
-    expect(planExclude("")).toBe("/.pineta/\n")
-    expect(planExclude("# x")).toBe("# x\n/.pineta/\n")
-    expect(planExclude("a\n/.pineta/\n")).toBeNull()
+  test("planExclude: adds each missing line once, on a line of its own", () => {
+    expect(planExclude("", ["/.pineta/"])).toBe("/.pineta/\n")
+    expect(planExclude("# x", ["/.pineta/", "/.plans/"])).toBe(
+      "# x\n/.pineta/\n/.plans/\n",
+    )
+    expect(planExclude("a\n/.pineta/\n", ["/.pineta/", "/.plans/"])).toBe(
+      "a\n/.pineta/\n/.plans/\n",
+    )
+    expect(planExclude("a\n/.pineta/\n", ["/.pineta/"])).toBeNull()
+  })
+  test("planContainer: create, recreate from another spec, start, or nothing", () => {
+    const decide = (
+      state: "running" | "stopped" | "missing",
+      label: string | null,
+    ) => planContainer({ facts: { state, label }, want: "h1" })
+    expect(decide("missing", null)).toBe("create")
+    expect(decide("stopped", "h0")).toBe("recreate")
+    expect(decide("running", null)).toBe("recreate")
+    expect(decide("stopped", "h1")).toBe("start")
+    expect(decide("running", "h1")).toBe("running")
   })
 })
 

@@ -1,5 +1,6 @@
 import {
   cp,
+  mkdir,
   mkdtemp,
   readFile,
   realpath,
@@ -30,6 +31,7 @@ import {
   hostJj,
   hostRunner,
   type LaneStep,
+  laneIgnores,
   mergeYours,
   planBaseRefresh,
   planFetch,
@@ -122,12 +124,25 @@ describe("a lane's repo, with jj", () => {
       () => true,
       () => false,
     )
+  /** Git's variables as a lane has them: every repo ignores the lane's ignore file. */
+  const GIT_IGNORE_VARS = [
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_KEY_0",
+    "GIT_CONFIG_VALUE_0",
+  ] as const
   beforeAll(async () => {
     top = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-lanes-")))
     process.env.JJ_USER = "Probe"
     process.env.JJ_EMAIL = "probe@example.com"
+    const ignore = path.join(top, "lane-git", "ignore")
+    await mkdir(path.dirname(ignore), { recursive: true })
+    await writeFile(ignore, laneIgnores([".plans"]))
+    process.env.GIT_CONFIG_COUNT = "1"
+    process.env.GIT_CONFIG_KEY_0 = "core.excludesFile"
+    process.env.GIT_CONFIG_VALUE_0 = ignore
   })
   afterAll(async () => {
+    for (const name of GIT_IGNORE_VARS) delete process.env[name]
     await rm(top, { recursive: true, force: true })
   })
 
@@ -209,9 +224,21 @@ describe("a lane's repo, with jj", () => {
       path.join(laneDir, "shared.txt"),
       "one\ntwo (lane)\nthree\n",
     )
+    // A shared directory, as a lane's mount would put it: never committed.
+    await mkdir(path.join(laneDir, ".plans"), { recursive: true })
+    await writeFile(path.join(laneDir, ".plans", "a.md"), "a plan\n")
     const r1 = await commitTurn(laneJj, turn)
     if (r1 === null) throw new Error("the turn committed nothing")
     expect(await bookmarkOf(laneJj, LANE)).toBe(r1)
+    const committed = await laneJj([
+      "file",
+      "list",
+      "--ignore-working-copy",
+      "-r",
+      r1,
+    ])
+    expect(committed.stdout).toContain("shared.txt")
+    expect(committed.stdout).not.toContain(".plans")
 
     // Your repo fetches it by bundle, and cannot rewrite it.
     await fetchInto(laneDir, LANE, base)

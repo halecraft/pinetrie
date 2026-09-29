@@ -5,6 +5,7 @@
 // by `execute.ts`; what is gathered is gathered by `host.ts`, `disk.ts` and
 // the host. So each rule below is tested without `container`, jj or git.
 
+import { createHash } from "node:crypto"
 import path from "node:path"
 import {
   type CommitId,
@@ -74,11 +75,34 @@ export interface LaneSpec {
   readonly grants: LaneGrants
   readonly identity: { readonly name: string; readonly email: string }
   readonly memory: string
+  /** Directories of your working copy, mounted read-write (ADR-0035). */
+  readonly shared: readonly SharedDir[]
+  /** The host directory holding the lane's ignore file, mounted read-only. */
+  readonly ignoreDir: string
 }
+
+/** A directory of your working copy, shared read-write into every lane (ADR-0035). */
+export interface SharedDir {
+  /** Relative to the project's root, normalized, e.g. ".plans". */
+  readonly path: string
+  /** Its absolute path on the host. */
+  readonly source: string
+}
+
+/** Where every lane sees its ignore file's directory. */
+export const IGNORE_MOUNT = "/pineta-git"
+/** The ignore file's name, in `ignoreDir` on the host and `IGNORE_MOUNT` in a lane. */
+export const IGNORE_FILE = "ignore"
+/** The label a container's spec hash is kept under. */
+export const SPEC_LABEL = "pineta.spec"
 
 const readonlyMount = (m: Mount): string[] => [
   "--mount",
   `type=bind,source=${m.source},target=${m.target},readonly`,
+]
+const writableMount = (m: Mount): string[] => [
+  "--mount",
+  `type=bind,source=${m.source},target=${m.target}`,
 ]
 const setEnv = (name: string, value: string): string[] => [
   "-e",
@@ -86,12 +110,35 @@ const setEnv = (name: string, value: string): string[] => [
 ]
 
 /**
- * `container run` arguments for a lane. Your home directory is never mounted,
- * so credentials stay out of reach unless a grant names them (S43 item 7).
- * `--init` reaps the processes a timeout or an abort kills (S39 item 6).
- * Only variables a grant names are copied from `env`.
+ * `container run` arguments for a lane, labelled with their own hash
+ * (`specHash`), so a container made from another spec can be told apart.
+ *
+ * Your home directory is never mounted, so credentials stay out of reach
+ * unless a grant names them (S43 item 7). `--init` reaps the processes a
+ * timeout or an abort kills (S39 item 6). Only variables a grant names are
+ * copied from `env`. Your working copy and Pineta's own directories are
+ * read-only; shared directories are read-write (ADR-0035).
  */
 export function planRun(
+  spec: LaneSpec,
+  env: Readonly<Record<string, string | undefined>>,
+): readonly string[] {
+  const args = runArgs(spec, env)
+  const [first, ...rest] = args
+  return [first ?? "run", "--label", `${SPEC_LABEL}=${specHash(args)}`, ...rest]
+}
+
+/** The hash a lane's container is labelled with: of its arguments, without the label. */
+export const specHash = (args: readonly string[]): string =>
+  createHash("sha256").update(args.join("\0")).digest("hex").slice(0, 16)
+
+/** The hash `planRun` labels a lane's container with. */
+export const specHashOf = (
+  spec: LaneSpec,
+  env: Readonly<Record<string, string | undefined>>,
+): string => specHash(runArgs(spec, env))
+
+function runArgs(
   spec: LaneSpec,
   env: Readonly<Record<string, string | undefined>>,
 ): readonly string[] {
@@ -115,13 +162,27 @@ export function planRun(
     }),
     ...readonlyMount({ source: spec.pineta, target: PINETA_MOUNT }),
     ...readonlyMount({ source: spec.runtime, target: RUNTIME_MOUNT }),
+    ...readonlyMount({ source: spec.ignoreDir, target: IGNORE_MOUNT }),
     ...spec.links.flatMap(readonlyMount),
     ...spec.grants.mounts.flatMap(readonlyMount),
+    ...spec.shared.flatMap(d =>
+      writableMount({
+        source: d.source,
+        target: path.posix.join(WORKSPACE_ROOT, d.path),
+      }),
+    ),
     ...(spec.grants.ssh ? ["--ssh"] : []),
     ...passed,
     ...setEnv("JJ_USER", spec.identity.name),
     ...setEnv("JJ_EMAIL", spec.identity.email),
     ...setEnv("JJ_CONFIG", LANE_JJ_CONFIG),
+    // Every repo in the lane ignores what the ignore file lists, from the
+    // container's first moment: git's own variables, which jj reads too
+    // (S45 item 7). An exclude line written by a step would come too late
+    // for a jj command that ran first (S45 item 4).
+    ...setEnv("GIT_CONFIG_COUNT", "1"),
+    ...setEnv("GIT_CONFIG_KEY_0", "core.excludesFile"),
+    ...setEnv("GIT_CONFIG_VALUE_0", `${IGNORE_MOUNT}/${IGNORE_FILE}`),
     ...Object.entries(NO_EDITOR).flatMap(([k, v]) => setEnv(k, v)),
     // Last, so the image's own programs win: the runtime brings jj for an
     // image that has none, and never Node.
@@ -134,19 +195,47 @@ export function planRun(
   ]
 }
 
+/**
+ * The lane's ignore file: what no repo in a lane may track. Pineta's own
+ * config, the file system's own directory, and each shared directory.
+ */
+export const laneIgnores = (shared: readonly string[]): string =>
+  ["/.pineta-lane/", "/lost+found/", ...shared.map(p => `/${p}/`)]
+    .map(l => `${l}\n`)
+    .join("")
+
 const isRecord = (v: unknown): v is Readonly<Record<string, unknown>> =>
   typeof v === "object" && v !== null && !Array.isArray(v)
 const strings = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
 
+/** A `lanes` key: the project's `pineta.json`, or the user's config. */
+export interface LaneConfig {
+  readonly grants: LaneGrants
+  /** How the base snapshot installs; null with nothing to install. */
+  readonly install: Install | null
+  /** Relative paths, as written; `planShared` decides which apply. */
+  readonly shared: readonly string[]
+}
+
 /**
- * The grants in a parsed `pineta.json`, total: anything missing or malformed
- * grants nothing. A mount's source is relative to the project's root, and its
- * target must be absolute.
+ * A parsed lane config, total: anything missing or malformed grants, installs
+ * and shares nothing.
+ * - A grant's mount source is relative to the project's root, and its target
+ *   must be absolute.
+ * - The install is `lanes.install` with `lanes.installWhen` (its lockfile),
+ *   else pnpm for a repo with a `pnpm-lock.yaml`.
  */
-export function decodeGrants(json: unknown, root: string): LaneGrants {
+export function decodeLaneConfig(
+  json: unknown,
+  root: string,
+  pnpmLock: boolean,
+): LaneConfig {
   const lanes = isRecord(json) ? json.lanes : undefined
-  if (!isRecord(lanes)) return NO_GRANTS
+  const pnpm: Install | null = pnpmLock
+    ? { command: "pnpm install --frozen-lockfile", lockfile: "pnpm-lock.yaml" }
+    : null
+  if (!isRecord(lanes)) return { grants: NO_GRANTS, install: pnpm, shared: [] }
   const mounts = Array.isArray(lanes.mounts)
     ? lanes.mounts.flatMap(m =>
         isRecord(m) &&
@@ -158,37 +247,110 @@ export function decodeGrants(json: unknown, root: string): LaneGrants {
           : [],
       )
     : []
-  return {
-    ssh: lanes.ssh === true,
-    env: strings(lanes.env).filter(n => /^[A-Za-z_][A-Za-z0-9_]*$/.test(n)),
-    mounts,
-  }
-}
-
-/**
- * How the base snapshot installs: `pineta.json`'s `lanes.install` and
- * `lanes.installWhen`, else pnpm for a repo with a `pnpm-lock.yaml`, else
- * nothing.
- */
-export function decodeInstall(
-  json: unknown,
-  pnpmLock: boolean,
-): Install | null {
-  const lanes = isRecord(json) ? json.lanes : undefined
-  if (
-    isRecord(lanes) &&
+  const install =
     typeof lanes.install === "string" &&
     lanes.install !== "" &&
     typeof lanes.installWhen === "string" &&
     lanes.installWhen !== ""
-  )
-    return { command: lanes.install, lockfile: lanes.installWhen }
-  return pnpmLock
-    ? {
-        command: "pnpm install --frozen-lockfile",
-        lockfile: "pnpm-lock.yaml",
-      }
-    : null
+      ? { command: lanes.install, lockfile: lanes.installWhen }
+      : pnpm
+  return {
+    grants: {
+      ssh: lanes.ssh === true,
+      env: strings(lanes.env).filter(n => /^[A-Za-z_][A-Za-z0-9_]*$/.test(n)),
+      mounts,
+    },
+    install,
+    shared: strings(lanes.shared),
+  }
+}
+
+/** Where a shared directory may never be: repos, Pineta's own, dependencies. */
+const NEVER_SHARED = [".git", ".jj", ".pineta", "node_modules"]
+
+/**
+ * Which shared directories apply, and what to do for them on the host. The
+ * user's entries come first, then the project's, normalized and without
+ * duplicates. Refused: absolute paths, paths that leave the project, those
+ * in `.git`, `.jj`, `.pineta` or `node_modules`, and those holding files jj
+ * tracks. A missing directory is created; one your repo does not already
+ * ignore is added to its exclude file.
+ */
+export function planShared(facts: {
+  readonly user: readonly string[]
+  readonly project: readonly string[]
+  /** Normalized paths that exist. */
+  readonly exists: ReadonlySet<string>
+  /** Normalized paths holding files jj tracks. */
+  readonly tracked: ReadonlySet<string>
+  /** Normalized paths your repo already ignores. */
+  readonly ignored: ReadonlySet<string>
+}): {
+  readonly shared: readonly string[]
+  readonly refused: readonly {
+    readonly path: string
+    readonly reason: string
+  }[]
+  readonly create: readonly string[]
+  readonly exclude: readonly string[]
+} {
+  const { candidates, refused } = sharedCandidates(facts)
+  const shared = candidates.filter(p => !facts.tracked.has(p))
+  return {
+    shared,
+    refused: [
+      ...refused,
+      ...candidates
+        .filter(p => facts.tracked.has(p))
+        .map(p => ({ path: p, reason: "it holds files jj tracks" })),
+    ],
+    create: shared.filter(p => !facts.exists.has(p)),
+    exclude: shared.filter(p => !facts.ignored.has(p)),
+  }
+}
+
+/**
+ * The entries whose paths may be shared, normalized and each once, the user's
+ * first; and those refused by their path alone. What they hold is for
+ * `planShared` to judge, from what the host gathers of these candidates.
+ */
+export function sharedCandidates(entries: {
+  readonly user: readonly string[]
+  readonly project: readonly string[]
+}): {
+  readonly candidates: readonly string[]
+  readonly refused: readonly {
+    readonly path: string
+    readonly reason: string
+  }[]
+} {
+  const candidates: string[] = []
+  const refused: { path: string; reason: string }[] = []
+  for (const given of [...entries.user, ...entries.project]) {
+    const reason = sharedRefusal(given)
+    if (reason !== null) refused.push({ path: given, reason })
+    else if (!candidates.includes(normalShared(given)))
+      candidates.push(normalShared(given))
+  }
+  return { candidates, refused }
+}
+
+/** Where the host keeps a project's lane ignore file (`laneIgnores`). */
+export const laneIgnoreDir = (root: string): string =>
+  path.join(root, ".pineta", "lane-git")
+
+/** A shared path as relative, normalized, with no trailing slash. */
+export const normalShared = (given: string): string =>
+  path.posix.normalize(given).replace(/\/+$/, "")
+
+function sharedRefusal(given: string): string | null {
+  if (given.trim() === "") return "it is empty"
+  if (path.posix.isAbsolute(given)) return "it is absolute"
+  const p = normalShared(given)
+  if (p === "." || p === ".." || p.startsWith("../"))
+    return "it leaves the project"
+  const top = p.split("/")[0] ?? ""
+  return NEVER_SHARED.includes(top) ? `it is inside ${top}` : null
 }
 
 /** A symlink in your working copy, relative to its root, and its stored target. */
@@ -332,9 +494,6 @@ const restoreVolume = (
   createVolume(volume),
   ...cloneFile(snapshotFile(paths, id), volumeImage(paths, volume)),
 ]
-
-/** The lane's repo ignores Pineta's config and the file system's own directory. */
-const EXCLUDE = `printf '%s\\n' /.pineta-lane/ /lost+found/ >> .git/info/exclude`
 
 /**
  * The lane steps that make a disk a fork at `commits`: a change of its own on
@@ -499,11 +658,7 @@ export function planBaseRefresh(input: {
   const { base, yours, install } = input
   const init =
     base === null
-      ? [
-          inLane("git", "init", "-q"),
-          inLane("jj", "git", "init", "--colocate"),
-          laneShell(EXCLUDE),
-        ]
+      ? [inLane("git", "init", "-q"), inLane("jj", "git", "init", "--colocate")]
       : []
   const moved =
     base === null ||
@@ -584,15 +739,43 @@ export function planRoot(f: RootFacts): HostFacts["root"] {
   return { ok: f.jjRoot }
 }
 
-/** Snapshots and the lane runtime live under `.pineta/`, which git ignores. */
-const EXCLUDE_LINE = "/.pineta/"
-
-/** git's exclude file with `/.pineta/` in it, or null when it is already there. */
-export function planExclude(current: string): string | null {
-  if (current.split("\n").some(l => l.trim() === EXCLUDE_LINE)) return null
+/**
+ * Your repo's exclude file with each of `lines` in it, appended in order, or
+ * null when they are all there already. `/.pineta/` holds snapshots and the
+ * runtime; shared directories are added as `/<path>/`.
+ */
+export function planExclude(
+  current: string,
+  lines: readonly string[],
+): string | null {
+  const have = new Set(current.split("\n").map(l => l.trim()))
+  const missing = lines.filter(l => !have.has(l))
+  if (missing.length === 0) return null
   const base =
     current === "" || current.endsWith("\n") ? current : `${current}\n`
-  return `${base}${EXCLUDE_LINE}\n`
+  return `${base}${missing.map(l => `${l}\n`).join("")}`
+}
+
+/** What starting a lane's container takes, from its state and label. */
+export type ContainerPlan = "create" | "recreate" | "start" | "running"
+
+/**
+ * Missing: create it. Its label differs, or it has none: recreate it on the
+ * same volume, since it was made from another spec (another image, mounts
+ * or grants). Stopped: start it. The container holds nothing its volume
+ * does not, so recreating it loses nothing.
+ */
+export function planContainer(input: {
+  readonly facts: {
+    readonly state: "running" | "stopped" | "missing"
+    readonly label: string | null
+  }
+  readonly want: string
+}): ContainerPlan {
+  const { state, label } = input.facts
+  if (state === "missing") return "create"
+  if (label !== input.want) return "recreate"
+  return state === "running" ? "running" : "start"
 }
 
 /** The oldest git a lane's image may have: jj's fetch needs 2.41 (S42 item 7). */

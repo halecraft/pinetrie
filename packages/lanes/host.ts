@@ -21,20 +21,29 @@ import path from "node:path"
 import type { ProjectRecord } from "@pineta/core"
 import {
   type DiskPaths,
+  decodeLaneConfig,
   extendImmutable,
   type HostFacts,
+  IGNORE_FILE,
+  type LaneConfig,
   type Link,
+  laneIgnoreDir,
+  laneIgnores,
   PINETA_HEADS,
   planExclude,
   planHost,
   planRoot,
+  planShared,
   type RootFacts,
+  type SharedDir,
+  sharedCandidates,
 } from "./plan.ts"
 import {
   describeFailure,
   hostGit,
   hostJj,
   jjIn,
+  lines,
   type Runner,
   run,
 } from "./run.ts"
@@ -139,7 +148,8 @@ export async function prepareHost(dir: string): Promise<{
   }
   const project = planHost(facts)
   if (project.kind === "direct" || app === null) return { project, paths: null }
-  const excluded = await excludePineta(project.root)
+  // Snapshots and the runtime live under `.pineta/`: no tracked file changes.
+  const excluded = await excludeInYours(project.root, ["/.pineta/"])
   if (excluded !== null)
     return {
       project: { kind: "direct", root: project.root, reason: excluded },
@@ -161,21 +171,112 @@ export async function prepareHost(dir: string): Promise<{
 }
 
 /**
- * Add `/.pineta/` to git's exclude file, found with
- * `git rev-parse --git-path info/exclude`, so snapshots and the runtime change
- * no tracked file. Returns why it could not, or null.
+ * Add `lines` to your repo's exclude file, found with
+ * `git rev-parse --git-path info/exclude`, so what they name changes no
+ * tracked file. Returns why it could not, or null.
  */
-async function excludePineta(root: string): Promise<string | null> {
+async function excludeInYours(
+  root: string,
+  lines: readonly string[],
+): Promise<string | null> {
   const where = await hostGit(root)(["rev-parse", "--git-path", "info/exclude"])
   if (!where.ok)
     return "the repo has no git directory beside it to exclude .pineta/ in"
   const file = path.resolve(root, where.stdout.trim())
-  const next = planExclude(await readFile(file, "utf8").catch(() => ""))
+  const next = planExclude(await readFile(file, "utf8").catch(() => ""), lines)
   if (next !== null) {
     await mkdir(path.dirname(file), { recursive: true })
     await writeFile(file, next)
   }
   return null
+}
+
+/** A lane config file, read and decoded; an empty one when missing or malformed. */
+export async function readLaneConfig(
+  file: string,
+  root: string,
+  pnpmLock: boolean,
+): Promise<LaneConfig> {
+  const json = await readFile(file, "utf8")
+    .then(t => JSON.parse(t) as unknown)
+    .catch(() => null)
+  return decodeLaneConfig(json, root, pnpmLock)
+}
+
+/** The user's lane config file: `$XDG_CONFIG_HOME/pineta/config.json`. */
+export const userConfigFile = (
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string =>
+  path.join(
+    env.XDG_CONFIG_HOME ?? path.join(homedir(), ".config"),
+    "pineta",
+    "config.json",
+  )
+
+/**
+ * Gather what `planShared` needs, plan, then execute: create missing
+ * directories, add unignored ones to your repo's exclude file, and write the
+ * lanes' ignore file (`laneIgnores`) in `laneIgnoreDir`. jj, not git's
+ * index, says what is tracked: in a colocated repo the index can lag. Ignore
+ * rules are git's, and jj applies them, the global file included (S45).
+ */
+export async function prepareShared(
+  root: string,
+  entries: {
+    readonly user: readonly string[]
+    readonly project: readonly string[]
+  },
+): Promise<{
+  readonly shared: readonly SharedDir[]
+  readonly refused: readonly {
+    readonly path: string
+    readonly reason: string
+  }[]
+}> {
+  const { candidates } = sharedCandidates(entries)
+  const jj = hostJj(root)
+  const git = hostGit(root)
+  const exists = new Set<string>()
+  const tracked = new Set<string>()
+  const ignored = new Set<string>()
+  for (const p of candidates) {
+    if (
+      await stat(path.join(root, p)).then(
+        () => true,
+        () => false,
+      )
+    )
+      exists.add(p)
+    const files = await jj([
+      "file",
+      "list",
+      "--ignore-working-copy",
+      "-r",
+      "@",
+      `root:${JSON.stringify(p)}`,
+    ])
+    if (files.ok && lines(files.stdout).length > 0) tracked.add(p)
+    if ((await git(["check-ignore", "-q", "--no-index", `${p}/`])).ok)
+      ignored.add(p)
+  }
+  const planned = planShared({ ...entries, exists, tracked, ignored })
+  for (const p of planned.create)
+    await mkdir(path.join(root, p), { recursive: true })
+  if (planned.exclude.length > 0)
+    await excludeInYours(
+      root,
+      planned.exclude.map(p => `/${p}/`),
+    )
+  const ignoreDir = laneIgnoreDir(root)
+  await mkdir(ignoreDir, { recursive: true })
+  await writeFile(
+    path.join(ignoreDir, IGNORE_FILE),
+    laneIgnores(planned.shared),
+  )
+  return {
+    shared: planned.shared.map(p => ({ path: p, source: path.join(root, p) })),
+    refused: planned.refused,
+  }
 }
 
 /**

@@ -2,7 +2,7 @@
 //
 //   pnpm run e2e:lanes    needs Apple's `container` running (macOS 26, Apple
 //                         silicon), as `e2e:browser` needs a Playwright server
-//   PINETA_LANES_SECTION=main,images,contract
+//   PINETA_LANES_SECTION=main,images,shared,contract
 //                         runs only the sections named, as a mutation that
 //                         one section catches does
 //
@@ -11,6 +11,7 @@
 //   threads' agents each work in a Linux container on a disk cloned from
 //   where they branched;
 // - images: project images with no Node, and with no git;
+// - shared: directories every lane and you see, never branched (ADR-0035);
 // - contract: `container` does not promise that a clone written into a volume
 //   it made works, so every upgrade reruns a small soak.
 
@@ -21,6 +22,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs"
 import { homedir, tmpdir } from "node:os"
@@ -149,6 +151,8 @@ async function mainSection(): Promise<void> {
   const wh = await startHost({
     model: { kind: "scripted", script },
     tools: { project },
+    // A file of its own, so the person's own config never applies here.
+    userConfig: path.join(project, "no-user-config.json"),
     log: m => {
       logs.push(m)
       if (process.env.PINETA_E2E_LOG === "1") console.log(m)
@@ -616,25 +620,38 @@ async function mainSection(): Promise<void> {
 // ── 9. Any image with sh and git: Pineta brings Node and jj ──────────────
 // Alpine has musl and no Node; the helper runs on the lane runtime's Node,
 // through its own loader. An image with no git cannot host a lane.
-async function imageHost(containerfile: string) {
-  const dir = committedProject("pineta-image-", {
-    "pineta.Containerfile": containerfile,
-    "notes.txt": "the secret word is MANGO\n",
-  })
-  const imageScript = scriptedModel()
+/**
+ * A host of its own for a section: a project (`files`, or an existing `dir`),
+ * its own scripted model and user, and reads by message text. `close` removes
+ * its lanes; `keep` leaves the project, for a host to restart over.
+ */
+async function sectionHost(input: {
+  readonly files?: Readonly<Record<string, string>>
+  readonly dir?: string
+  readonly store?: string
+  readonly userConfig?: string
+  readonly logs?: string[]
+}) {
+  const dir =
+    input.dir ?? committedProject("pineta-section-", input.files ?? {})
+  const script = scriptedModel()
   const host = await startHost({
-    model: { kind: "scripted", script: imageScript },
+    model: { kind: "scripted", script },
     tools: { project: dir },
+    ...(input.store === undefined ? {} : { store: input.store }),
+    // A file of its own, so the person's own config never applies here.
+    userConfig: input.userConfig ?? path.join(dir, "no-user-config.json"),
     log: m => {
+      input.logs?.push(m)
       if (process.env.PINETA_E2E_LOG === "1") console.log(m)
     },
   })
   const user = await connectSession({
     url: host.wsUrl,
     WebSocket,
-    peerId: `img-${process.pid}-${Math.random()}`,
+    peerId: `section-${process.pid}-${Math.random()}`,
   })
-  const results = async (text: string) => {
+  const idle = async () => {
     await waitFor(
       () =>
         Object.keys(host.doc.activeRuns()).length === 0 &&
@@ -642,15 +659,23 @@ async function imageHost(containerfile: string) {
       300_000,
     )
     await host.quiet()
+  }
+  /** The lane whose thread holds the message with `text`. */
+  const laneWith = (text: string) => {
     const index = readTreeIndex(host.doc)
     const id =
       Object.keys(index.entries).find(
         e => projectTranscript(index, e).at(-1)?.text === text,
       ) ?? null
-    const lane = readLanes(host.doc, index).find(
+    return readLanes(host.doc, index).find(
       l => id !== null && ancestry(index, l.tip).path.includes(id),
     )
-    const onPath = new Set(ancestry(index, lane?.tip ?? null).path)
+  }
+  /** Every tool result's text in the thread holding `text`, oldest first. */
+  const results = async (text: string) => {
+    await idle()
+    const index = readTreeIndex(host.doc)
+    const onPath = new Set(ancestry(index, laneWith(text)?.tip ?? null).path)
     return Object.values(readEntries(host.doc))
       .filter(r => onPath.has(r.id))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
@@ -658,13 +683,22 @@ async function imageHost(containerfile: string) {
       .filter(m => m.role === "toolResult")
       .map(m => messageText(m as never))
   }
-  const close = async () => {
+  const close = async (keep = false) => {
     await user.close().catch(() => {})
     await host.shutdown().catch(() => {})
-    cleanUp(host.doc, dir)
+    // Kept for a restart: the lanes' containers too, as a host leaves them.
+    if (!keep) cleanUp(host.doc, dir)
   }
-  return { script: imageScript, host, user, results, close }
+  return { dir, script, host, user, idle, laneWith, results, close }
 }
+
+const imageHost = (containerfile: string) =>
+  sectionHost({
+    files: {
+      "pineta.Containerfile": containerfile,
+      "notes.txt": "the secret word is MANGO\n",
+    },
+  })
 async function imagesSection(): Promise<void> {
   const alpine = await imageHost(
     "FROM docker.io/library/alpine:3.22\nRUN apk add --no-cache git\n",
@@ -729,10 +763,146 @@ async function imagesSection(): Promise<void> {
 // read by path. Twenty clones of a journaled volume, taken while a writer
 // appends fsynced records, must each check clean and hold every record
 // fsynced before it was taken (S41's soak, in small).
+/** An image with `e2fsck` and `debugfs`, to read a lane's disk: built once and kept. */
+const FSCK_IMAGE = "pineta-fsck:1"
+
+function ensureFsckImage(): void {
+  if (sh(`container image list --quiet`).includes("pineta-fsck")) return
+  const context = realpathSync(mkdtempSync(path.join(tmpdir(), "pineta-fsck-")))
+  try {
+    writeFileSync(
+      path.join(context, "Containerfile"),
+      "FROM docker.io/library/alpine:3.22\nRUN apk add --no-cache e2fsprogs e2fsprogs-extra\n",
+    )
+    sh(
+      `container build -t ${FSCK_IMAGE} -f ${context}/Containerfile ${context} >/dev/null 2>&1; container builder stop >/dev/null 2>&1; true`,
+    )
+  } finally {
+    rmSync(context, { recursive: true, force: true })
+  }
+}
+
+// ── shared: directories every lane and you see, never branched (ADR-0035) ──
+async function sharedSection(): Promise<void> {
+  const logs: string[] = []
+  const store = path.join(
+    realpathSync(mkdtempSync(path.join(tmpdir(), "pineta-store-"))),
+    "pineta.db",
+  )
+  const userConfig = path.join(path.dirname(store), "config.json")
+  writeFileSync(
+    userConfig,
+    JSON.stringify({ lanes: { shared: [".plans", ".jj/x"] } }),
+  )
+  let h = await sectionHost({
+    files: { "shared.txt": "one\n" },
+    store,
+    userConfig,
+    logs,
+  })
+  const { dir } = h
+  try {
+    ok(
+      logs.some(l => l.includes(".plans/ is shared read-write")) &&
+        logs.some(l => l.includes(".jj/x is not shared: it is inside .jj")),
+      "the user's shared directories apply, and a refused one is logged with its reason",
+    )
+
+    // 1. One lane writes a plan; you see it at once, as yours; another reads it.
+    h.script.use([
+      { tool: "write", args: { path: ".plans/a.md", content: "the plan\n" } },
+      { tool: "bash", args: { command: "echo lane > shared.txt" } },
+      { text: "planned" },
+    ])
+    await h.user.chat("write a plan", ROOT, START_AGENT)
+    await h.idle()
+    const plan = path.join(dir, ".plans", "a.md")
+    ok(
+      existsSync(plan) &&
+        readFileSync(plan, "utf8") === "the plan\n" &&
+        statSync(plan).uid === process.getuid?.(),
+      "a plan a lane writes is in your working copy at once, and yours",
+    )
+    h.script.use([
+      { tool: "bash", args: { command: "cat .plans/a.md" } },
+      { text: "read" },
+    ])
+    await h.user.chat("read the plan", ROOT, START_AGENT)
+    ok(
+      (await h.results("read the plan")).at(-1)?.includes("the plan") === true,
+      "another lane reads it",
+    )
+
+    // 2. Never branched: not in the lane's commit, your repo, a snapshot or @.
+    const writer = h.laneWith("write a plan")
+    const files = (rev: string) =>
+      jj(dir, "file", "list", "--ignore-working-copy", "-r", rev)
+    const newest = [...readRevisions(h.host.doc).values()]
+      .filter(r => r.lane === writer?.name && r.snapshot !== null)
+      .sort((a, b) => (a.entry < b.entry ? 1 : -1))[0]
+    const snapshots = path.join(dir, ".pineta", "snapshots")
+    ensureFsckImage()
+    const inSnapshot = sh(
+      `container run --rm --mount type=bind,source=${snapshots},target=/s,readonly ${FSCK_IMAGE} debugfs -R "ls /.plans" /s/${newest?.snapshot}.img 2>/dev/null || true`,
+    )
+    // A branch at that turn: its .plans is the live mount, not the snapshot's.
+    writeFileSync(path.join(dir, ".plans", "later.md"), "after the fork\n")
+    h.script.use([
+      { tool: "bash", args: { command: "cat .plans/later.md" } },
+      { text: "branched" },
+    ])
+    await h.user.chat(
+      "@agent look from a branch",
+      atEntry(entryId(writer?.tip ?? "")),
+      BRANCH,
+    )
+    ok(
+      writer !== undefined &&
+        newest !== undefined &&
+        files(`pineta/${writer.name}`).includes("shared.txt") &&
+        !files(`pineta/${writer.name}`).includes(".plans") &&
+        !files("@").includes(".plans") &&
+        !inSnapshot.includes("a.md") &&
+        (await h.results("@agent look from a branch"))
+          .at(-1)
+          ?.includes("after the fork") === true,
+      "a shared directory is never in a lane's commit, your @ or a snapshot, and a branch sees it live",
+    )
+
+    // 3. The project shares one more; after a restart, the existing lane has it.
+    writeFileSync(
+      path.join(dir, "pineta.json"),
+      JSON.stringify({ lanes: { shared: ["notes"] } }),
+    )
+    await h.close(true)
+    h = await sectionHost({ dir, store, userConfig, logs })
+    h.script.use([
+      {
+        tool: "bash",
+        args: {
+          command: "echo from-lane > notes/n.md && cat shared.txt && ls .plans",
+        },
+      },
+      { text: "noted" },
+    ])
+    await h.user.chat("take a note", atEntry(entryId(writer?.tip ?? "")), {
+      lane: writer?.name,
+    })
+    const noted = (await h.results("take a note")).at(-1) ?? ""
+    ok(
+      existsSync(path.join(dir, "notes", "n.md")) &&
+        noted.includes("lane") &&
+        noted.includes("a.md"),
+      `after a restart, an existing lane has the newly shared directory, with its disk as it was (${noted.replaceAll("\n", " ")})`,
+    )
+  } finally {
+    await h.close()
+    rmSync(path.dirname(store), { recursive: true, force: true })
+  }
+}
+
 /** Clones the contract checks. */
 const CLONES = 20
-/** An image with `e2fsck` and `debugfs`, built once and kept. */
-const FSCK_IMAGE = "pineta-fsck:1"
 
 async function contractSection(): Promise<void> {
   const status = JSON.parse(sh("container system status --format json")) as {
@@ -774,17 +944,7 @@ echo "$img repairs=$repairs clean=$clean promised=$n have=$have bad=$bad"
 rm -rf $w
 `,
   )
-  if (
-    !sh(`container image list --quiet`).includes(FSCK_IMAGE.split(":")[0] ?? "")
-  ) {
-    writeFileSync(
-      path.join(probe, "Containerfile"),
-      "FROM docker.io/library/alpine:3.22\nRUN apk add --no-cache e2fsprogs e2fsprogs-extra\n",
-    )
-    sh(
-      `container build -t ${FSCK_IMAGE} -f ${probe}/Containerfile ${probe} >/dev/null 2>&1; container builder stop >/dev/null 2>&1; true`,
-    )
-  }
+  ensureFsckImage()
   // Small, so each check is quick: `e2fsck -f` walks every block group of a
   // volume, however little it holds. The journal is what is under test.
   await executeOrThrow([createVolume(volume, "4G")], {
@@ -865,6 +1025,7 @@ rm -rf $w
 const SECTIONS: Readonly<Record<string, () => Promise<void>>> = {
   main: mainSection,
   images: imagesSection,
+  shared: sharedSection,
   contract: contractSection,
 }
 const chosen = (

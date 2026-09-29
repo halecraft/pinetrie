@@ -41,11 +41,11 @@ Two tiers, with different lifetimes:
 | | | |
 |---|---|---|
 | `docs/` | **tracked** | Architectural reference. Vision, architecture, ADRs, spike findings, stack decisions. Long-lived: these explain *why the system is shaped as it is*. |
-| `.jj/plans/` | untracked | Implementation plans, one per change, named `YYYY-MM-DD-slug.md`. Short-lived: they describe *work to be done* and are spent once done. |
+| `.plans/` | untracked | Implementation plans, one per change, named `YYYY-MM-DD-slug.md`. Short-lived: they describe *work to be done* and are spent once done. Shared read-write with every thread's lane (ADR-0035). |
 
 An implementation plan may cite anything in `docs/` or any source path. It must
-**not** cite anything under `.jj/`, since that is not shared — a plan has to be
-readable by someone who only has the repository.
+**not** cite anything under `.plans/` or `.jj/`, since neither is in the
+repository: a plan has to be readable by someone who only has the repository.
 
-`.gitignore` excludes `.jj`, so plans are deliberately not versioned here.
-`@halecraft/plans` will later store `.jj/plans/` in its own VCS namespace.
+`.gitignore` excludes `.plans/`, so plans are deliberately not versioned here.
+`@halecraft/plans` will later store them in their own VCS namespace.

@@ -30,3 +30,4 @@ client/dist/
 
 # The session store (host/store.ts)
 .pineta/
+.plans/

@@ -12,7 +12,9 @@
       "!!**/dist",
       "!!**/.pnpm-store",
       "!!**/.playwright-browsers",
-      "!!sandbox"
+      "!!sandbox",
+      "!!.pineta",
+      "!!.plans"
     ]
   },
   "formatter": {

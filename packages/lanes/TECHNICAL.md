@@ -19,8 +19,8 @@ containers, disks and the helper.
   lane.
 - `run.ts`, `bookmarks.ts`, `revisions.ts`, `merge.ts`: jj and git as
   `Runner`s, and the jj logic over them.
-- `host.ts`: startup facts. `image.ts`, `runtime.ts`: the image and the lane
-  runtime.
+- `host.ts`: startup facts, lane configs and shared directories.
+- `image.ts`, `runtime.ts`: the image and the lane runtime.
 - `disk.ts`: snapshots, deletion, trim. `lane.ts`: the container, the queue,
   and the handle. `base.ts`: the base snapshot.
 
@@ -112,6 +112,56 @@ containers, disks and the helper.
   it cannot be carried in from outside the image. `checkImage` refuses an
   image without them, naming what it lacks.
 
+## Containers
+
+- **A container is disposable; the disk is the lane.** Each lane's container
+  is labelled `pineta.spec=<hash>` (`SPEC_LABEL`), a hash of its
+  `container run` arguments. `planContainer` decides at each start:
+  - missing: create it;
+  - its label differs, or it has none: recreate it on the same volume;
+  - stopped: start it;
+  - running with the same label: nothing to do.
+- **What reaches existing lanes this way:** a rebuilt image, changed grants,
+  links or shared directories. The arguments are fixed when a container is
+  created, and before labels existed the host only restarted it. A container
+  made before labels is recreated once, at its next start: about a second,
+  with the disk untouched (S45 item 6).
+
+## Shared directories (ADR-0035)
+
+- **A shared directory is your working copy's, mounted read-write** at the
+  same relative path under `/workspace`, e.g. `/workspace/.plans` (S45 item
+  1). It is a bind mount inside the lane's volume, not on the lane's disk, so
+  it is never snapshotted, cloned, committed or landed. A snapshot holds only
+  the empty mount point (S45 item 5).
+- **Ownership and visibility.** The lane runs as root, but what it writes
+  there arrives on the host owned by you. Changes are visible at once
+  between the host and every lane (S45 items 2 and 3).
+- **Two levels, merged:** the user's lane config
+  (`$XDG_CONFIG_HOME/pineta/config.json`, only its `lanes.shared`), then the
+  project's `pineta.json`. `planShared` refuses:
+  - absolute paths, and paths that leave the project;
+  - anything in `.git`, `.jj`, `.pineta` or `node_modules`;
+  - a path holding files jj tracks. Checked with `jj file list`, not git's
+    index, which can lag in a colocated repo.
+
+  Each refusal is logged with its reason, and the rest still apply.
+- **No repo may track a shared directory.**
+  - **In a lane,** the host writes `.pineta/lane-git/ignore` (`laneIgnores`:
+    `/.pineta-lane/`, `/lost+found/`, each shared directory). It mounts its
+    directory read-only at `/pineta-git`, and names the file as git's
+    `core.excludesFile` through `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0` and
+    `GIT_CONFIG_VALUE_0`. jj reads it too (S45 item 7), so every repo in the
+    lane ignores those paths from the container's first moment: the base,
+    every fork, and disks made before a directory was shared.
+  - **Why not the lane repo's `.git/info/exclude`:** a line there works only
+    if it is written before jj first snapshots with the mount present. A jj
+    command that ran first tracks the files, and adding the line later does
+    not untrack them (S45 item 4).
+  - **In your repo,** a shared directory nothing already ignores is added to
+    `.git/info/exclude`, as `/.pineta/` is. `git check-ignore` decides, so
+    your global git ignore counts.
+
 ## The queue
 
 - **One serial queue per lane** (`createQueue`) carries everything that
@@ -162,8 +212,10 @@ containers, disks and the helper.
   a turn, a bundle fetch into your repo, a landing with a conflict, the take,
   a clean landing, and a fork, checked for divergence and immutability.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
-  with the contract test, in about 70 s. It has three sections, `main`,
-  `images` and `contract`, and `PINETA_LANES_SECTION` picks some. Each
+  with the contract test, in about 85 s. It has four sections, `main`,
+  `images`, `shared` and `contract`, and `PINETA_LANES_SECTION` picks some.
+  Its hosts pass their own `userConfig`, so the person's own lane config
+  never applies. Each
   suite-level mutation in `scripts/mutations/lanes.ts` runs only the section
   its check is in.
 - **The contract test takes about 7 s:**

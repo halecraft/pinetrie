@@ -4,7 +4,7 @@ import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
 /** One section of `e2e:lanes`; needs `container` running. */
-const lanes = (section: "main" | "images" | "contract") => [
+const lanes = (section: "main" | "images" | "shared" | "contract") => [
   "env",
   `PINETA_LANES_SECTION=${section}`,
   "pnpm",
@@ -161,5 +161,55 @@ export const mutations: readonly Mutation[] = [
     command: lanes("main"),
     expect:
       "a lane with no disk and no snapshot says it predates lane containers",
+  },
+  {
+    name: "the lane's ignore file leaves out the shared directories",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  ["/.pineta-lane/", "/lost+found/", ...shared.map(p => `/${p}/`)]',
+    to: '  ["/.pineta-lane/", "/lost+found/"]',
+    command: unit,
+    expect: "every repo in the lane ignores what the ignore file lists",
+  },
+  {
+    name: "git's variables naming the ignore file are not set",
+    file: plan,
+    from: '    ...setEnv("GIT_CONFIG_COUNT", "1"),\n',
+    to: "",
+    command: lanes("shared"),
+    expect: "a shared directory is never in a lane's commit",
+  },
+  {
+    name: "shared directories are mounted read-only",
+    file: plan,
+    from: "      writableMount({",
+    to: "      readonlyMount({",
+    command: lanes("shared"),
+    expect: "a plan a lane writes is in your working copy at once",
+  },
+  {
+    name: "a container made from another spec is only restarted",
+    file: plan,
+    from: '  if (label !== input.want) return "recreate"\n',
+    to: "",
+    command: lanes("shared"),
+    expect: "after a restart, an existing lane has the newly shared directory",
+  },
+  {
+    name: "a path jj tracks is shared",
+    file: plan,
+    from: "  const shared = candidates.filter(p => !facts.tracked.has(p))",
+    to: "  const shared = candidates",
+    command: unit,
+    expect: "refused, with a reason",
+  },
+  {
+    name: "a shared directory your repo does not ignore is not excluded",
+    file: plan,
+    from: "    exclude: shared.filter(p => !facts.ignored.has(p)),",
+    to: "    exclude: [],",
+    command: unit,
+    expect:
+      "created when missing; excluded in your repo unless already ignored",
   },
 ]
