@@ -27,6 +27,11 @@ first, each with where it sits now (`noteAt`). The Archive tab's rows are a
 client-only read, in `packages/client/archive-rows.ts`. Live streams are read with `readStreams` in
 `@pineta/schema`; an entry count stays in `packages/client/projection.ts`.
 
+`readReferencedBlobs` is every image something still shows (ADR-0042): each
+chat's, each held message's, and each in the notes' texts, which its caller
+must pass for every note, not only those it holds. `planSweep` decides which
+stored images to delete from it.
+
 It declares core, schema and marginalia only (`workspace.test.ts`), so it runs
 in the host and in the browser alike: no pi, no transport.
 

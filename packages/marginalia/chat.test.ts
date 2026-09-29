@@ -8,6 +8,7 @@ import {
   NOBODY,
   parseMentions,
   type Responder,
+  type Sha256,
   THE_AGENT,
   type ThreadLane,
   type WriterId,
@@ -16,6 +17,7 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   addressChat,
+  chatImageShas,
   decodeChat,
   detailsFromStored,
   encodeChat,
@@ -31,6 +33,7 @@ import {
   planStartup,
   renderableMessage,
   settleRun,
+  withChatImages,
 } from "./index.ts"
 
 const ALICE: WriterId = writerId("alice")
@@ -65,6 +68,7 @@ const plan = (over: Partial<PlanInput>) => {
     at: atEntry(E1),
     end: atEntry(E1),
     contributors: [],
+    images: [],
     hostWorkingCopy: null,
     command: null,
     race: null,
@@ -326,6 +330,67 @@ test("encodeChat: the model reads the speaker; details keep the author's words",
   const m = encodeChat(details, 1)
   assert.equal(m.content, "Alice: the plum")
   assert.deepEqual(decodeChat(m), details)
+})
+
+const IMG = {
+  sha256: "a".repeat(64) as Sha256,
+  mimeType: "image/png",
+  width: 4,
+  height: 3,
+} as const
+const OTHER = { ...IMG, sha256: "b".repeat(64) as Sha256 }
+
+test("a chat's images round-trip in its details; one stored without them decodes as before", () => {
+  const withImages = { ...details, images: [IMG, OTHER] }
+  const m = encodeChat(withImages, 1)
+  assert.equal(m.content, "Alice: the plum")
+  assert.deepEqual(decodeChat(m), withImages)
+  assert.equal(decodeChat(encodeChat(details, 1))?.images, undefined)
+  // A malformed image makes the whole chat undecodable, as any bad field does.
+  assert.equal(
+    decodeChat({
+      ...m,
+      details: { ...withImages, images: [{ ...IMG, sha256: "x" }] },
+    }),
+    undefined,
+  )
+})
+
+test("planChat copies the images it is given into the details, and none as absent", () => {
+  const withImages = plan({ images: [IMG] })
+  assert.ok("details" in withImages)
+  assert.deepEqual(withImages.details.images, [IMG])
+  const without = plan({})
+  assert.ok("details" in without)
+  assert.equal(without.details.images, undefined)
+})
+
+test("chatImageShas: every chat's images, each once; other messages have none", () => {
+  const messages = [
+    encodeChat({ ...details, images: [IMG, OTHER] }, 1),
+    { role: "user", content: "hi" },
+    encodeChat({ ...details, images: [OTHER] }, 2),
+    encodeChat(details, 3),
+  ]
+  assert.deepEqual(chatImageShas(messages), [IMG.sha256, OTHER.sha256])
+})
+
+test("withChatImages: a chat's text, then its images in order; a missing one named; others untouched", () => {
+  const chat = encodeChat({ ...details, images: [IMG, OTHER] }, 1)
+  const plain = encodeChat(details, 2)
+  const user = { role: "user", content: "hi" }
+  const [attached, same, alsoSame] = withChatImages(
+    [chat, plain, user],
+    new Map([[IMG.sha256, { data: "AAAA", mimeType: "image/png" as const }]]),
+  )
+  assert.deepEqual((attached as { content: unknown }).content, [
+    { type: "text", text: "Alice: the plum" },
+    { type: "image", data: "AAAA", mimeType: "image/png" },
+    { type: "text", text: `[image ${OTHER.sha256} is no longer stored]` },
+  ])
+  assert.deepEqual(decodeChat(attached), decodeChat(chat))
+  assert.equal(same, plain)
+  assert.equal(alsoSame, user)
 })
 
 test("decodeChat is total: a malformed or foreign message is not a chat", () => {

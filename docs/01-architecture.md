@@ -277,6 +277,11 @@ branches from the op log. Our mapping is exact. (ADR-0008)
   it is a whole-value LWW register, so appending to it is O(n²) **on every
   substrate**, durable included (measured: 144 582 B vs 18 131 B for the same
   stream).
+- **images** — not in the document at all (ADR-0042). Their bytes are rows
+  of `pineta_blobs` in the host's SQLite file, keyed by SHA-256; a chat holds
+  `ImageRef`s in `details.images`, and the model is given the bytes when its
+  context is built. So compaction never rewrites an image, and a late joiner
+  loads one only when it is drawn.
 - **presence** — ephemeral: per-peer selection, scroll, live typing.
   Ephemeral holds **only** scalars/structs/records — no `text`, `list`,
   `counter`, or other ordered/counted container, by design.
@@ -291,7 +296,8 @@ Determined entirely by target mutability:
 - **Entries are immutable** → plain offsets are permanently stable. No Loro
   cursor needed. A gift from pi's data model.
 - **Files are mutable** → need content addressing (blob hash or jj change ID),
-  or references rot silently.
+  or references rot silently. A pasted image is content-addressed by
+  construction: `/blob/<sha256>` names bytes that never change (ADR-0042).
 - **Composer text is mutable and multi-writer** → the one place that genuinely
   needs `Schema.text()` + Loro cursors.
 

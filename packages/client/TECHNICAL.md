@@ -448,6 +448,24 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **Waiting messages** from `pineta.outbox` show dimmed in their column, in the
   order they will be taken. They are not in the tree yet.
 
+## Pasting an image (`paste.ts`, ADR-0042)
+
+- **A paste with image files is an upload.** `pastedFiles` keeps the
+  `image/*` files; with none, the paste is the browser's own. With some, the
+  composer prevents the default, records the selection, and `POST`s each
+  file to `/blob` (`uploadImage`, same origin, so the key cookie goes too).
+  When all are answered, `insertAt` puts every accepted one's
+  `![name](/blob/<sha256>)` (`imageMarkdown`) in place of that selection, on
+  lines of their own, at once. A refused one is left out, and the host's
+  reason shown in the status line.
+- **Sending waits for uploads.** `sendable` is null while one is out, and the
+  send button is disabled and reads "uploading image…": a message sent then
+  would lack the image's markdown.
+- **The host decides what a message shows.** The composer shows markdown,
+  not thumbnails. On send, the host reads the `/blob/` images from the text,
+  and refuses the send if one is no longer stored (`image_missing`), which
+  `settleSend` returns to the box.
+
 ## Commands in the composer (ADR-0036)
 
 - **Completion** (`commands.ts`, `matchCommands`): while the text is a `/`
@@ -532,6 +550,15 @@ pipeline keeps the tree a pure function, testable without a DOM.
   only http, https, mailto, relative and `#` targets (`safeUrl`, react-markdown's
   `defaultUrlTransform`; micromark's `sanitizeUri` HTML-encodes `&`, which a
   React prop would carry literally).
+- **A pasted image is sized in the tree** (ADR-0042). `messageTree` takes the
+  message's images by hash, and `finish` gives a `/blob/` image it finds there
+  its stored `width` and `height`, `loading="lazy"` and `decoding="async"`.
+  The box has its final shape before the image loads, so `alignOnOpen`
+  measures stable offsets and following sees one size, not two. The CSS caps
+  it at the column's width with `height: auto`, which keeps the ratio the
+  attributes give. A blob image the message does not hold (a note's, a
+  streaming one's) is drawn unsized. `MessageText` opens a blob image in a
+  new tab on a click (`.blob-image`).
 - **Committed text is wrapped in runs:** each text node becomes
   `span[data-s][data-e]`, the source range it came from (`data-code` in code).
   `align` maps a run's characters to the tokens that produced them (a literal,

@@ -2,7 +2,13 @@
 // character came from, so a selection in it still cites `entryText` offsets
 // (ADR-0017, docs/findings/S27-markdown-rendering.md).
 
-import type { EntryId, ReferenceTarget } from "@pineta/core"
+import {
+  blobOfUrl,
+  type EntryId,
+  type ImageRef,
+  type ReferenceTarget,
+  type Sha256,
+} from "@pineta/core"
 import { decodeNamedCharacterReference } from "decode-named-character-reference"
 import type { Element, ElementContent, Root, RootContent } from "hast"
 import { decodeNumericCharacterReference } from "micromark-util-decode-numeric-character-reference"
@@ -64,8 +70,21 @@ const toHast = unified()
   .use(remarkRehype, { allowDangerousHtml: true })
   .freeze()
 
-/** The tree to draw for a message's text. */
-export function messageTree(source: string, mode: TextMode): Root {
+/** The images a text's `/blob/` sources name, as its message holds them. */
+export type ImageLookup = ReadonlyMap<Sha256, ImageRef>
+
+export const NO_IMAGES: ImageLookup = new Map()
+
+/**
+ * The tree to draw for a message's text. A `/blob/` image found in `images`
+ * gets its stored size, so its box is laid out before it loads: alignment
+ * and following measure a message once (ADR-0042).
+ */
+export function messageTree(
+  source: string,
+  mode: TextMode,
+  images: ImageLookup = NO_IMAGES,
+): Root {
   const text = mode === "streaming" ? remend(source, REMEND) : source
   const tree = toHast.runSync(toHast.parse(text))
   tree.children = finish(tree.children, {
@@ -74,6 +93,7 @@ export function messageTree(source: string, mode: TextMode): Root {
     parent: undefined,
     inPre: false,
     inherited: undefined,
+    images,
   })
   return tree
 }
@@ -85,6 +105,7 @@ interface Walk {
   readonly inPre: boolean
   /** The nearest positioned ancestor's range: code text has none of its own. */
   readonly inherited: SourceRange | undefined
+  readonly images: ImageLookup
 }
 
 function finish(children: readonly RootContent[], w: Walk): ElementContent[] {
@@ -95,6 +116,7 @@ function finish(children: readonly RootContent[], w: Walk): ElementContent[] {
         const url = child.properties[key]
         if (typeof url === "string") child.properties[key] = safeUrl(url)
       }
+      if (child.tagName === "img") sizeImage(child, w.images)
       child.children = finish(child.children, {
         ...w,
         parent: child,
@@ -209,6 +231,18 @@ export function safeUrl(url: string): string {
   )
     return url
   return ""
+}
+
+/** A `/blob/` image its message holds: its stored size, and loaded lazily. */
+function sizeImage(img: Element, images: ImageLookup): void {
+  const src = img.properties.src
+  const sha = typeof src === "string" ? blobOfUrl(src) : null
+  const ref = sha === null ? undefined : images.get(sha)
+  if (ref === undefined) return
+  img.properties.width = ref.width
+  img.properties.height = ref.height
+  img.properties.loading = "lazy"
+  img.properties.decoding = "async"
 }
 
 /** For each code unit of a run, the source token that produced it. */

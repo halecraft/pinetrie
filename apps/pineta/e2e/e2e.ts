@@ -14,6 +14,7 @@
 // person's pi setup.
 
 import { existsSync, mkdtempSync, readFileSync, realpathSync } from "node:fs"
+import { request as httpRequest } from "node:http"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { Exchange, type Store, whenPeer } from "@kyneta/exchange"
@@ -27,6 +28,7 @@ import {
   entryId,
   findSeqKeys,
   followTip,
+  type ImageRef,
   laneNameForThread,
   NOBODY,
   noteId,
@@ -78,6 +80,8 @@ import {
   rowMessage,
   writeEntry,
 } from "@pineta/schema"
+import { WebSocket as WsClient } from "ws"
+import { sha256Of } from "../host/blobs.ts"
 import { startHost } from "../host/index.ts"
 import { lineDocPrefix } from "../host/lines.ts"
 import { openStore } from "../host/store.ts"
@@ -88,6 +92,7 @@ import {
   suiteModel,
   waitFor,
 } from "./harness.ts"
+import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "./images.ts"
 
 const LIVE = process.env.PINETA_LIVE === "1"
 const PROMPT = "Say exactly: PINETA-OK"
@@ -956,6 +961,32 @@ if (LIVE) {
     last?.role === "assistant" && last.text.includes("PINETA-OK"),
     "the model's reply contains the requested token",
   )
+  // A pasted image reaches a real model (ADR-0042): it says what it shows.
+  const uploaded = await fetch(`${live.httpUrl}blob`, {
+    method: "POST",
+    headers: { "content-type": "image/png" },
+    body: new Uint8Array(RED_PNG),
+  })
+  const red = (await uploaded.json()) as ImageRef
+  const shown = await asker.chat(
+    `What colour is this image? Answer in one word. ![square](/blob/${red.sha256})`,
+    ROOT,
+    START_AGENT,
+  )
+  await waitFor(() => Object.keys(live.doc.activeRuns()).length === 0, 120_000)
+  // A Start Agent message begins a thread of its own: its lane is the new one.
+  const imageLane = readLaneNames(live.doc).find(l => l !== lane)
+  const seenBy = projectTranscript(
+    readTreeIndex(live.doc),
+    imageLane === undefined ? null : readLaneTip(live.doc, imageLane),
+  ).at(-1)
+  console.log(`  model said of the image: ${JSON.stringify(seenBy?.text)}`)
+  ok(
+    runOf(shown) !== "" &&
+      seenBy?.role === "assistant" &&
+      /red/i.test(seenBy.text),
+    "a real model reads a pasted image: it names its colour",
+  )
   await asker.close()
   await live.shutdown()
 }
@@ -975,7 +1006,8 @@ invariants("end")
   )
   const script = scriptedModel()
   // The suite opens the store itself, so it can read it while the host runs.
-  let stored = openStore(dbFile)
+  let opened = openStore(dbFile)
+  let stored = opened.store
   const open = (log: (m: string) => void, store: Store = stored) =>
     startHost({
       model: { kind: "scripted", script },
@@ -983,6 +1015,7 @@ invariants("end")
       // `verify` runs anywhere: lanes of their own are `e2e:lanes`'s.
       containers: false,
       store,
+      blobs: opened.blobs,
       log,
     })
   let th = await open(() => {})
@@ -1199,7 +1232,8 @@ invariants("end")
   await u.close()
   // The store opens slowly, so a host that did not wait for it would start
   // from an empty session, and leave the held message undrained.
-  stored = openStore(dbFile)
+  opened = openStore(dbFile)
+  stored = opened.store
   th = await open(() => {}, slowToLoad(stored, 3_000))
   const linesAfter = await storedLines(stored)
   ok(
@@ -1825,7 +1859,7 @@ invariants("end")
     mkdtempSync(path.join(tmpdir(), "pineta-presence-")),
     "pineta.db",
   )
-  const phStore = openStore(dbFile)
+  const phStore = openStore(dbFile).store
   const ph = await startHost({
     model: { kind: "scripted", script: scriptedModel() },
     store: phStore,
@@ -1905,6 +1939,240 @@ invariants("end")
   await ph.shutdown()
 }
 
+// ── images: pasted, kept by content, read by the model (ADR-0042) ──────────
+{
+  const dbFile = path.join(
+    mkdtempSync(path.join(tmpdir(), "pineta-images-")),
+    "pineta.db",
+  )
+  const script = scriptedModel()
+  let opened = openStore(dbFile)
+  const GRACE_MS = 1_500
+  const start = () =>
+    startHost({
+      model: { kind: "scripted", script },
+      store: opened.store,
+      blobs: opened.blobs,
+      blobGraceMs: GRACE_MS,
+      log: () => {},
+    })
+  let ih = await start()
+  const upload = async (bytes: Buffer): Promise<ImageRef> => {
+    const response = await fetch(`${ih.httpUrl}blob`, {
+      method: "POST",
+      headers: { "content-type": "image/png" },
+      body: new Uint8Array(bytes),
+    })
+    if (response.status !== 201)
+      throw new Error(`upload refused: ${response.status}`)
+    return (await response.json()) as ImageRef
+  }
+  const blobAt = (sha: string) => fetch(`${ih.httpUrl}blob/${sha}`)
+
+  // 1. Upload and serve.
+  const red = await upload(RED_PNG)
+  const served = await blobAt(red.sha256)
+  const servedBytes = Buffer.from(await served.arrayBuffer())
+  ok(
+    red.sha256 === sha256Of(RED_PNG) &&
+      red.mimeType === "image/png" &&
+      red.width === 40 &&
+      red.height === 30 &&
+      served.status === 200 &&
+      served.headers.get("content-type") === "image/png" &&
+      served.headers.get("x-content-type-options") === "nosniff" &&
+      served.headers.get("content-security-policy") === "default-src 'none'" &&
+      (served.headers.get("cache-control") ?? "").includes("immutable") &&
+      servedBytes.equals(RED_PNG),
+    "an uploaded PNG is kept by the SHA-256 of its bytes, with its size, and served back as it was",
+  )
+  ok(
+    (await blobAt("0".repeat(64))).status === 404 &&
+      (await blobAt("nope")).status === 404,
+    "an unknown or malformed blob is a 404",
+  )
+
+  // 2. What an upload may be.
+  const blobUrlOf = `${ih.httpUrl}blob`
+  ok(
+    (await rawPost(blobUrlOf, { "content-type": "text/plain" }, "headers")) ===
+      415 &&
+      (await rawPost(
+        blobUrlOf,
+        { "content-type": "image/png", "content-length": 33 * 1024 * 1024 },
+        "headers",
+      )) === 413,
+    "an upload that is not an image type, or declares too much, is refused before its body is read",
+  )
+  ok(
+    (await rawPost(
+      blobUrlOf,
+      { "content-type": "image/png" },
+      Buffer.from("not an image at all"),
+    )) === 415 &&
+      (await rawPost(
+        blobUrlOf,
+        { "content-type": "image/png", "transfer-encoding": "chunked" },
+        Buffer.alloc(33 * 1024 * 1024),
+      )) === 413,
+    "bytes that are not an image are refused, and a body past 32 MB is cut off",
+  )
+
+  // 3. A message shows it; the model reads it after the text.
+  const iu = await join(ih, "ivy", "images")
+  await iu.setName("Ivy")
+  const iidle = () =>
+    waitFor(
+      () =>
+        Object.keys(ih.doc.activeRuns()).length === 0 &&
+        readOutbox(ih.doc).length === 0,
+      30_000,
+    )
+  let seen: readonly string[] = []
+  script.use([
+    {
+      reply: context => {
+        seen = context
+        return "a red one"
+      },
+    },
+  ])
+  const asked = `what colour is this? ![red](/blob/${red.sha256})`
+  const sentRed = await iu.chat(asked, ROOT, START_AGENT)
+  await iidle()
+  const chatOf = (text: string) =>
+    Object.values(readEntries(ih.doc))
+      .map(rowMessage)
+      .find(m => decodeChat(m)?.text === text) as
+      | { readonly content?: unknown }
+      | undefined
+  const storedRed = chatOf(asked)
+  ok(
+    sentRed.kind === "started" &&
+      typeof storedRed?.content === "string" &&
+      JSON.stringify(decodeChat(storedRed)?.images) === JSON.stringify([red]),
+    "a sent message keeps its images as references, and its content as text",
+  )
+  ok(
+    seen.at(-1) === `Ivy: ${asked}[image image/png ${red.sha256}]`,
+    `the model reads the message's text, then its image (${seen.at(-1)?.slice(-80)})`,
+  )
+
+  // 4. A message that waits for its lane carries its images when drained.
+  const green = await upload(GREEN_PNG)
+  const replyId = idOfIn(ih.doc, "a red one")
+  const paused = script.pause("hold on")
+  let seenHeld: readonly string[] = []
+  script.use([
+    { text: "held" },
+    {
+      reply: context => {
+        seenHeld = context
+        return "a green one"
+      },
+    },
+  ])
+  const holding = await iu.chat("@agent hold on", at(replyId), {
+    mode: "reply",
+  })
+  await waitFor(() => paused.reached, 10_000)
+  const queuedText = `@agent and this? ![green](/blob/${green.sha256})`
+  const queued = await iu.chat(queuedText, at(replyId), { mode: "queue" })
+  const heldImages = readOutbox(ih.doc).flatMap(h =>
+    h.kind === "chat" ? (h.details.images ?? []) : [],
+  )
+  paused.resume()
+  await iidle()
+  ok(
+    holding.kind === "started" &&
+      queued.kind === "queued" &&
+      heldImages[0]?.sha256 === green.sha256 &&
+      seenHeld.at(-1) === `Ivy: ${queuedText}[image image/png ${green.sha256}]`,
+    "a message held for a busy lane keeps its images, and the model reads them when it is drained",
+  )
+
+  // 5. An image the host does not store refuses the send.
+  const missing = "9".repeat(64)
+  const refusedSend = await iu.chat(
+    `![gone](/blob/${missing})`,
+    at(idOfIn(ih.doc, "a green one")),
+    { mode: "reply" },
+  )
+  ok(
+    codeOf(refusedSend) === ERR.IMAGE_MISSING &&
+      chatOf(`![gone](/blob/${missing})`) === undefined,
+    "a message showing an image the host does not store is refused, and nothing is written",
+  )
+
+  // 6. No image bytes in the session's records, compacted.
+  await ih.quiet()
+  const base64Slice = RED_PNG.toString("base64").slice(20, 70)
+  let inRecords = false
+  for await (const r of opened.store.loadAll(SESSION_DOC_ID))
+    if (
+      r.kind === "entry" &&
+      Buffer.from(r.payload.data as Uint8Array | string)
+        .toString("latin1")
+        .includes(base64Slice)
+    )
+      inRecords = true
+  ok(!inRecords, "the session's stored records hold no image's bytes")
+
+  // 7. Deleting what nothing shows, after the grace; a draft's image stays,
+  // across a restart.
+  const blue = await upload(BLUE_PNG)
+  const yellow = await upload(YELLOW_PNG)
+  const drafted = await iu.note({
+    kind: "draft",
+    at: at(idOfIn(ih.doc, "a green one")),
+    lane: null,
+    text: `next: ![yellow](/blob/${yellow.sha256})`,
+  })
+  await iu.close()
+  await sleep(100)
+  await ih.shutdown()
+  opened = openStore(dbFile)
+  ih = await start()
+  await sleep(GRACE_MS + 200)
+  const iv = await join(ih, "ivy", "images")
+  script.use([{ text: "swept" }])
+  await iv.chat("@agent anything", at(idOfIn(ih.doc, "a green one")), {
+    mode: "reply",
+  })
+  await iidle()
+  await ih.quiet()
+  const kept = new Set(opened.blobs.list().map(b => b.sha256))
+  ok(
+    drafted.kind !== "refused" &&
+      !kept.has(blue.sha256) &&
+      kept.has(red.sha256) &&
+      kept.has(green.sha256) &&
+      kept.has(yellow.sha256),
+    `after the grace, an image nothing shows is deleted; a message's, a held one's and a draft's stay, across a restart (${[...kept].map(s => s.slice(0, 6)).join(", ")})`,
+  )
+  let seenAfter: readonly string[] = []
+  script.use([
+    {
+      reply: context => {
+        seenAfter = context
+        return "still red"
+      },
+    },
+  ])
+  await iv.chat("@agent and the first one?", at(idOfIn(ih.doc, "swept")), {
+    mode: "reply",
+  })
+  await iidle()
+  ok(
+    (await blobAt(red.sha256)).status === 200 &&
+      seenAfter.includes(`Ivy: ${asked}[image image/png ${red.sha256}]`),
+    "after a restart on the same file, an image is still served, and still reaches the model",
+  )
+  await iv.close()
+  await sleep(100)
+  await ih.shutdown()
+}
+
 // ── admission: off loopback, only the invite key gets in ───────────────────
 {
   const script = scriptedModel()
@@ -1930,6 +2198,18 @@ invariants("end")
       wsRefused,
     "without the key: no page, no source file, no websocket",
   )
+  ok(
+    (await status(`${open.httpUrl}blob/${"0".repeat(64)}`)) === 403 &&
+      (await status(`${open.httpUrl}blob`, {
+        method: "POST",
+        headers: { "content-type": "image/png" },
+        body: new Uint8Array(RED_PNG),
+      })) === 403 &&
+      (await status(`${open.httpUrl}blob/${"0".repeat(64)}`, {
+        headers: { cookie: "pineta_key=k3y" },
+      })) === 404,
+    "without the key, no blob is served or taken; with it, an unknown one is a 404",
+  )
   const invited = await fetch(`${open.httpUrl}?key=k3y`, { redirect: "manual" })
   const cookie = invited.headers.get("set-cookie") ?? ""
   ok(
@@ -1951,6 +2231,84 @@ invariants("end")
   await sleep(100)
   await open.shutdown()
   ok((await status(host.httpUrl)) === 200, "a loopback host needs no key")
+
+  // On loopback there is no key: a page elsewhere, or a name rebound to this
+  // machine, must still not reach the socket (ADR-0042).
+  const hostHeader = new URL(host.httpUrl).host
+  ok(
+    (await upgradeStatus(host.wsUrl, { origin: "https://evil.example" })) ===
+      403 &&
+      (await upgradeStatus(host.wsUrl, {
+        origin: `http://${hostHeader}`,
+      })) === 101,
+    "on loopback, a websocket from another origin is refused, and from the page's own admitted",
+  )
+  ok(
+    (await upgradeStatus(host.wsUrl, { host: "rebound.example" })) === 403 &&
+      (await requestStatus(host.httpUrl, { host: "rebound.example" })) === 403,
+    "on loopback, a Host that is not this machine's name is refused: a rebound name",
+  )
+}
+
+/** The status a websocket upgrade to `url` gets with `headers`: 101 when it opens. */
+function upgradeStatus(
+  url: string,
+  headers: Record<string, string>,
+): Promise<number> {
+  return new Promise(resolve => {
+    const ws = new WsClient(url, { headers })
+    ws.on("open", () => {
+      ws.close()
+      resolve(101)
+    })
+    ws.on("unexpected-response", (_req, res) => {
+      res.resume()
+      resolve(res.statusCode ?? 0)
+    })
+    ws.on("error", () => resolve(0))
+  })
+}
+
+/**
+ * The status a raw POST to `url` gets. With "headers", only the headers are
+ * sent, and the body never: a host that waits to read one never answers. A
+ * reset connection is -1; no answer in 10 s, 0.
+ */
+function rawPost(
+  url: string,
+  headers: Record<string, string | number>,
+  body: Buffer | "headers",
+): Promise<number> {
+  return new Promise(resolve => {
+    const done = (status: number) => {
+      clearTimeout(timer)
+      resolve(status)
+      req.destroy()
+    }
+    const req = httpRequest(url, { method: "POST", headers }, res => {
+      res.resume()
+      done(res.statusCode ?? 0)
+    })
+    req.on("error", () => done(-1))
+    const timer = setTimeout(() => done(0), 10_000)
+    if (body === "headers") req.flushHeaders()
+    else req.end(body)
+  })
+}
+
+/** The status of a plain GET to `url` with `headers`, which fetch may not set (`Host`). */
+function requestStatus(
+  url: string,
+  headers: Record<string, string>,
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    httpRequest(url, { headers }, res => {
+      res.resume()
+      resolve(res.statusCode ?? 0)
+    })
+      .on("error", reject)
+      .end()
+  })
 }
 
 // Shut the client down first, then let the socket settle before tearing down

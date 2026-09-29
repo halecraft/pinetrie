@@ -164,6 +164,12 @@ command Line. It is not a pi session file.
   is any reader. Read a running host's store through the `Store`, as the e2e
   suite does. Kyneta's SQLite store issues the same seat on every open, so
   the host keeps its peer id across restarts.
+- **Images are beside the documents, not in them** (ADR-0042). The same file
+  holds `pineta_blobs` (`apps/pineta/host/blobs.ts`), on the store's own
+  connection, since the store holds the file's lock: one row per image,
+  keyed by its SHA-256, with its type, size, bytes and when it was last
+  stored. A chat holds only references, so compaction never rewrites an
+  image. `openStore` returns the `Store` and the `BlobStore` together.
 - **A command Line lives only while its client's seat does** (ADR-0037). A
   client keeps no store and does not reconnect, so the host destroys a
   departed seat's Line, and deletes every stored one when it starts.

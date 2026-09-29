@@ -121,6 +121,27 @@ The harness's tool events are `tool_start`, `tool_update` and `tool_end`. The
 harness never emits them (S22). What each event does to the document is
 `planStream`'s decision, in `@pineta/schema`.
 
+### What the model reads: a chat's images (ADR-0042)
+
+`createAgent` passes pi's `toProviderMessages` our own: it gathers the bytes
+of every chat's `details.images` from `CreateAgentOptions.blobs`, encodes
+them, and runs `withChatImages` (`@pineta/marginalia`) before pi's own
+`convertToLlm`, which it must still call so every other role converts as pi
+does. It runs once per request, and reads the store each time: no cache
+(S53 item 7). pi's compaction and branch summaries call `convertToLlm`
+directly, so a summary reads a chat's text and never its images. For a model
+whose `input` lacks `"image"`, pi-ai replaces each image with a line of text.
+
+`prepareImage` (`images.ts`) fits an upload for the store: the type from the
+bytes (`detectSupportedImageMimeType`), then `resizeImage`, in a worker
+thread, to 2000×2000 and 4.5 MB of base64. A type no provider takes inline
+(BMP) is "not an image"; a resize that returns null is "unreadable", since
+pi's null means either undecodable or impossible to fit.
+
+The scripted model's `reply` shows an image part as
+`[image <mimeType> <sha256 of its bytes>]`, so a suite can check which image
+the model was given.
+
 ### Models, tools and the prompt (`config.ts`, S23)
 
 `ModelChoice` is one of three:
@@ -341,7 +362,8 @@ into `node_modules`: `createAgentHarness`, `addUsage`/`emptyUsage`,
 `ModelRuntime`, and, for the person's pi setup, `SettingsManager`,
 `DefaultResourceLoader` and `buildSystemPrompt`. For commands:
 `loadSkillsFromDir`, `loadPromptTemplates`, `substituteArgs`,
-`parseCommandArgs` and `stripFrontmatter`. Those paths are depth-sensitive: they broke when this
+`parseCommandArgs` and `stripFrontmatter`. For images (ADR-0042):
+`detectSupportedImageMimeType` and `resizeImage`. Those paths are depth-sensitive: they broke when this
 package moved under `packages/`. If they break again, the failure is
 `ERR_MODULE_NOT_FOUND` at import time, not a type error.
 

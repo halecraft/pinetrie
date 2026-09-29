@@ -406,7 +406,11 @@ export function Column(p: ColumnProps) {
               {h.kind === "update" ? (
                 <div className="update-waiting">merging your work</div>
               ) : (
-                <MessageText mode="committed" text={h.details.text} />
+                <MessageText
+                  images={h.details.images}
+                  mode="committed"
+                  text={h.details.text}
+                />
               )}
             </div>
           ))}

@@ -329,4 +329,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a branch's first prompt is its own",
   },
+  {
+    name: "blobOfUrl accepts upper-case hex",
+    file: "packages/core/images.ts",
+    from: "export const isSha256 = (s: string): s is Sha256 => /^[0-9a-f]{64}$/.test(s)",
+    to: "export const isSha256 = (s: string): s is Sha256 => /^[0-9a-fA-F]{64}$/.test(s)",
+    command: unit,
+    expect: "blobOfUrl refuses a near miss",
+  },
 ]

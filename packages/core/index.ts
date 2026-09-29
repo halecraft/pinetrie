@@ -179,6 +179,8 @@ export const ERR = {
   UNKNOWN_COMMAND: "unknown_command",
   /** A peer whose principal is not an email: nobody the host can name. */
   INVALID_IDENTITY: "invalid_identity",
+  /** A message shows a `/blob/` image the host does not store (ADR-0042). */
+  IMAGE_MISSING: "image_missing",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -824,6 +826,7 @@ export function orderNewEntries(
 // ── the tree ──────────────────────────────────────────────────────────────
 
 export * from "./edits.ts"
+export * from "./images.ts"
 export * from "./presence.ts"
 export * from "./roots.ts"
 export * from "./tools.ts"

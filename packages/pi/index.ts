@@ -11,6 +11,7 @@ export {
   type WriteOutcome,
 } from "./agent.ts"
 export { type ModelChoice, pickModel } from "./config.ts"
+export { type PreparedImage, prepareImage } from "./images.ts"
 export {
   type LaneChannel,
   laneRunner,

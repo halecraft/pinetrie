@@ -9,7 +9,9 @@
 // from whether its thread has a lane (`address`, ADR-0021).
 //
 // `details` holds the structured fields, which readers decode here and never
-// parse back out of `content`.
+// parse back out of `content`. Its images are references: the model is given
+// their bytes after `content`, by `withChatImages` (ADR-0042), and `content`
+// itself stays text.
 
 import {
   type Address,
@@ -21,12 +23,16 @@ import {
   type CommandRef,
   ERR,
   type ErrCode,
+  IMAGE_MIMES,
+  type ImageMime,
+  type ImageRef,
   isBusy,
   type LaneName,
   type Mention,
   messageText,
   type Position,
   type Responder,
+  type Sha256,
   THE_AGENT,
   type ThreadLane,
   type WriterId,
@@ -43,6 +49,13 @@ const ResponderSchema = Type.Union([
   Type.Object({ kind: Type.Literal("none") }),
   Type.Object({ kind: Type.Literal("agent"), agent: Type.String() }),
 ])
+
+const ImageRefSchema = Type.Object({
+  sha256: Type.String({ pattern: "^[0-9a-f]{64}$" }),
+  mimeType: Type.Union(IMAGE_MIMES.map(m => Type.Literal(m))),
+  width: Type.Integer({ minimum: 1 }),
+  height: Type.Integer({ minimum: 1 }),
+})
 
 export const DetailsSchema = Type.Object({
   /** The author, from the transport: a `WriterId`. */
@@ -65,6 +78,8 @@ export const DetailsSchema = Type.Object({
       expanded: Type.String(),
     }),
   ),
+  /** The images its text shows, by reference (ADR-0042). */
+  images: Type.Optional(Type.Array(ImageRefSchema)),
 })
 
 const ChatSchema = Type.Object({
@@ -88,6 +103,11 @@ export interface ChatDetails {
   readonly contributors?: readonly WriterId[]
   /** The command it ran (ADR-0036); `text` stays as typed. */
   readonly command?: CommandRef
+  /**
+   * The `/blob/` images its text shows, in order (ADR-0042): the model reads
+   * their bytes after `content`. Absent when it shows none.
+   */
+  readonly images?: readonly ImageRef[]
 }
 
 /** The pi `CustomMessage` a chat is stored as. */
@@ -122,6 +142,60 @@ export const encodeChat = (
   timestamp,
 })
 
+/** An image part, as pi's messages carry one. */
+interface ImagePart {
+  readonly type: "image"
+  readonly data: string
+  readonly mimeType: ImageMime
+}
+
+/** The blobs every chat among `messages` shows, each once. */
+export function chatImageShas(messages: readonly unknown[]): Sha256[] {
+  const shas = new Set<Sha256>()
+  for (const message of messages)
+    for (const image of decodeChat(message)?.images ?? [])
+      shas.add(image.sha256)
+  return [...shas]
+}
+
+/**
+ * `messages` as the model reads them: each chat with images carries them
+ * after its text, as image parts, in the order its text shows them, their
+ * base64 from `blobs`. A blob `blobs` lacks is named as text in its place.
+ * Every other message is returned as it is. Pure.
+ */
+export function withChatImages<M>(
+  messages: readonly M[],
+  blobs: ReadonlyMap<
+    Sha256,
+    { readonly data: string; readonly mimeType: ImageMime }
+  >,
+): M[] {
+  return messages.map(message => {
+    const chat = decodeChat(message)
+    if (chat?.images === undefined || chat.images.length === 0) return message
+    const text = (message as { content: unknown }).content
+    const parts: ({ type: "text"; text: string } | ImagePart)[] = [
+      {
+        type: "text",
+        text: typeof text === "string" ? text : attributed(chat),
+      },
+    ]
+    for (const image of chat.images) {
+      const blob = blobs.get(image.sha256)
+      parts.push(
+        blob === undefined
+          ? {
+              type: "text",
+              text: `[image ${image.sha256} is no longer stored]`,
+            }
+          : { type: "image", data: blob.data, mimeType: blob.mimeType },
+      )
+    }
+    return { ...message, content: parts }
+  })
+}
+
 /**
  * Details that matched `DetailsSchema` -> `ChatDetails`, branding the ids. The
  * one conversion, for a chat in the tree and a message held in the outbox.
@@ -141,6 +215,11 @@ export const detailsFromStored = (
     ? {}
     : { contributors: d.contributors as WriterId[] }),
   ...(d.command === undefined ? {} : { command: d.command }),
+  ...(d.images === undefined
+    ? {}
+    : {
+        images: d.images.map(i => ({ ...i, sha256: i.sha256 as Sha256 })),
+      }),
 })
 
 /** A stored message -> its chat details, or undefined if it is not a chat. */
@@ -194,6 +273,7 @@ export function renderableMessage(message: unknown): AgentMessageLike {
           ? {}
           : { contributors: chat.contributors }),
         ...(chat.command === undefined ? {} : { command: chat.command.name }),
+        ...(chat.images === undefined ? {} : { images: chat.images }),
       }
 }
 
@@ -299,6 +379,8 @@ export function planChat(input: {
   readonly sendId: string
   /** A sent draft's other editors; empty for a message written alone. */
   readonly contributors: readonly WriterId[]
+  /** The images its text shows, as `planImages` found them in the store. */
+  readonly images: readonly ImageRef[]
   /**
    * Your working copy's root when the thread works, or will work, in its own
    * copy: paths under it are stored as the lane sees them, under `/mnt/host-working-copy`, so
@@ -352,6 +434,7 @@ export function planChat(input: {
       ? {}
       : { contributors: input.contributors }),
     ...(command === null ? {} : { command }),
+    ...(input.images.length === 0 ? {} : { images: input.images }),
   }
   const compelled = compels.kind === "agent"
 

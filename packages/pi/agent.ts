@@ -12,7 +12,9 @@ import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import {
+  type AgentMessage,
   BACKGROUND_CONTEXT,
+  convertToLlm,
   createBashTool,
   createEditTool,
   createReadTool,
@@ -24,6 +26,7 @@ import {
 import { insertEntry } from "@earendil-works/pi-agent-core/harness/session"
 import {
   type ArchiveRecord,
+  type BlobStore,
   type CommandRef,
   type EntryId,
   ERR,
@@ -43,6 +46,7 @@ import {
   ARCHIVE_NAMESPACE,
   type ChatMessage,
   type CommandSource,
+  chatImageShas,
   encodeArchive,
   encodeHeld,
   encodeNote,
@@ -62,6 +66,7 @@ import {
   type StackMessage,
   type UpdateMessage,
   type WorkRecord,
+  withChatImages,
 } from "@pineta/marginalia"
 import {
   hasLaneRecord,
@@ -90,6 +95,8 @@ import {
 import { KynetaStorage } from "./storage.ts"
 
 export { KynetaStorage }
+
+const NO_BLOBS: Pick<BlobStore, "get"> = { get: () => undefined }
 
 /** pi's ambient context. Opaque to host/. */
 export const CTX = BACKGROUND_CONTEXT
@@ -158,6 +165,39 @@ export interface CreateAgentOptions {
   readonly agentDir?: string
   /** The user config's `commands.names`: pi's `source` → a label (ADR-0036). */
   readonly commandRenames?: Readonly<Record<string, string>>
+  /**
+   * Where a chat's images are read from, for every request (ADR-0042).
+   * Without it, each image reaches the model as "no longer stored".
+   */
+  readonly blobs?: Pick<BlobStore, "get">
+}
+
+/**
+ * What the model reads: pi's own conversion, after each chat's images are
+ * attached. Gathers the blobs, then `withChatImages` places them. Read from
+ * the store for every request, uncached (S53 item 7).
+ */
+function providerMessages(
+  messages: AgentMessage[],
+  blobs: Pick<BlobStore, "get">,
+): ReturnType<typeof convertToLlm> {
+  const found = new Map(
+    chatImageShas(messages).flatMap(sha => {
+      const blob = blobs.get(sha)
+      return blob === undefined
+        ? []
+        : [
+            [
+              sha,
+              {
+                data: Buffer.from(blob.bytes).toString("base64"),
+                mimeType: blob.mimeType,
+              },
+            ] as const,
+          ]
+    }),
+  )
+  return convertToLlm(withChatImages(messages, found))
 }
 
 /** The result of a run: pi may refuse to admit it. */
@@ -421,6 +461,8 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         shared: readonly string[]
         hostPaths: readonly string[]
       }) => promptFor(toolContext),
+      toProviderMessages: messages =>
+        providerMessages(messages, options.blobs ?? NO_BLOBS),
       // Pineta's outbox means pi's own queue is never used; should it be, it
       // answers one message at a time rather than batching them (S20).
       followUpMode: "one-at-a-time",

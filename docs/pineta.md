@@ -378,6 +378,14 @@ a reducer in `packages/client/layout.ts`, never written, and the inbox is
 `useText` binds each note's textarea to its Yjs text (ADR-0025): the first
 genuinely collaborative edit. Each person's composer stays local `useState`.
 
+**An image pasted into a composer reaches the agent** (ADR-0042): uploaded
+to `POST /blob`, kept by SHA-256 in `pineta_blobs` beside the session in
+the host's SQLite file, referred to by the message's markdown and its
+`details.images`, and handed to the model as image parts by pi's
+`toProviderMessages`. Admission now also refuses another origin, and on
+loopback a rebound name. Images in tool results, workspace paths, remote
+images, and pasting into notes are still to do.
+
 **Steps 1–5 are done** (ADR-0018). Now continue thickening (`docs/04-roadmap.md`), each step
 independently shippable:
 

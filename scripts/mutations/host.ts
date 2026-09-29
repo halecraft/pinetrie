@@ -28,4 +28,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "its two ends only",
   },
+  {
+    name: "planUploadHeaders reads any type",
+    file: "apps/pineta/host/blobs.ts",
+    from: "  if (type === undefined || !isImageMime(type))",
+    to: "  if (type === undefined)",
+    command: unit,
+    expect: "planUploadHeaders reads a body only",
+  },
+  {
+    name: "sqliteBlobs.ref reads no dimensions",
+    file: "apps/pineta/host/blobs.ts",
+    from: '    "SELECT sha256, mime, width, height FROM pineta_blobs WHERE sha256 = ?",',
+    to: '    "SELECT sha256, mime, 1 AS width, 1 AS height FROM pineta_blobs WHERE sha256 = ?",',
+    command: unit,
+    expect: "ref reads the dimensions without the bytes",
+  },
 ]

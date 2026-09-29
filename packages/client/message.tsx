@@ -104,7 +104,11 @@ export function Message(p: MessageProps) {
         {/* A message that only called tools shows only its tool rows. */}
         {p.note ??
           ((node.text !== "" || node.toolCalls === undefined) && (
-            <MessageText mode="committed" text={node.text} />
+            <MessageText
+              images={node.images}
+              mode="committed"
+              text={node.text}
+            />
           ))}
         {node.toolCalls?.map(call => (
           <ToolRow call={call} key={call.id} />

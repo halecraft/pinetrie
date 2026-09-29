@@ -816,4 +816,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "whereWords says each setting",
   },
+  {
+    name: "sendable ignores uploading",
+    file: "packages/client/send.ts",
+    from: "  if (uploading) return null",
+    to: '  if (uploading && text === "\\u0000") return null',
+    command: unit,
+    expect: "while an image is uploading",
+  },
+  {
+    name: "finish leaves blob images unsized",
+    file: "packages/client/markdown.ts",
+    from: '      if (child.tagName === "img") sizeImage(child, w.images)',
+    to: '      if (child.tagName === "none") sizeImage(child, w.images)',
+    command: unit,
+    expect: "a /blob/ image the message holds gets its stored size",
+  },
 ]

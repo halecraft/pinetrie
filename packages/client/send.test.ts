@@ -80,13 +80,16 @@ describe("settleSend", () => {
 describe("sendable", () => {
   test("nothing, blank text, or only the prefill sends nothing", () => {
     for (const text of ["", "  \n ", "@agent ", "@agent", " @agent \n"])
-      expect(sendable(text, "@agent ")).toBeNull()
-    expect(sendable("  ", undefined)).toBeNull()
+      expect(sendable(text, "@agent ", false)).toBeNull()
+    expect(sendable("  ", undefined, false)).toBeNull()
   })
   test("anything more is sent, trimmed", () => {
-    expect(sendable("@agent fix it ", "@agent ")).toBe("@agent fix it")
-    expect(sendable("just us", "@agent ")).toBe("just us")
-    expect(sendable("@agent", undefined)).toBe("@agent")
+    expect(sendable("@agent fix it ", "@agent ", false)).toBe("@agent fix it")
+    expect(sendable("just us", "@agent ", false)).toBe("just us")
+    expect(sendable("@agent", undefined, false)).toBe("@agent")
+  })
+  test("while an image is uploading, nothing is sent", () => {
+    expect(sendable("look at this", undefined, true)).toBeNull()
   })
 })
 

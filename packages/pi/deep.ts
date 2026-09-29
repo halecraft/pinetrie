@@ -48,6 +48,10 @@ type PromptTemplatesModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/prompt-templates.js")
 type FrontmatterModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/frontmatter.js")
+type MimeModule =
+  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/mime.js")
+type ImageResizeModule =
+  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/image-resize.js")
 
 const base = new URL("./node_modules/", import.meta.url)
 const deep = (p: string): Promise<unknown> => import(new URL(p, base).href)
@@ -81,6 +85,12 @@ const promptTemplates = (await deep(
 const frontmatter = (await deep(
   "@earendil-works/pi-coding-agent/dist/utils/frontmatter.js",
 )) as FrontmatterModule
+const mime = (await deep(
+  "@earendil-works/pi-coding-agent/dist/utils/mime.js",
+)) as MimeModule
+const imageResize = (await deep(
+  "@earendil-works/pi-coding-agent/dist/utils/image-resize.js",
+)) as ImageResizeModule
 
 export const { addUsage, emptyUsage } = usage
 export const { loadSkillsFromDir } = skills
@@ -91,6 +101,8 @@ export const {
   substituteArgs,
 } = promptTemplates
 export const { stripFrontmatter } = frontmatter
+export const { detectSupportedImageMimeType } = mime
+export const { resizeImage } = imageResize
 export const { SettingsManager } = settings
 export const { DefaultResourceLoader } = resourceLoader
 export const { buildSystemPrompt } = systemPrompt

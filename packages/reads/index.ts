@@ -31,6 +31,7 @@ import {
   type ProjectRecord,
   type RevisionRecord,
   rootOf,
+  type Sha256,
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
@@ -43,6 +44,7 @@ import {
   archiveRecords,
   COMMANDS_NAMESPACE,
   commandsRecord,
+  decodeChat,
   decodeReference,
   HAVE_NAMESPACE,
   type Held,
@@ -68,6 +70,7 @@ import {
   PROJECT_NAMESPACE,
   participantNames,
   participants,
+  pastedImages,
   projectRecord,
   REFERENCE_NAMESPACE,
   REVISION_NAMESPACE,
@@ -398,4 +401,62 @@ export function workAt(
     project: readProject(doc),
   })
   return { work, above }
+}
+
+// --- blobs (ADR-0042) ---------------------------------------------------------
+
+/**
+ * Every blob something still shows: each chat's images, each held message's,
+ * and each `/blob/` image in the notes' texts. A draft is a note, and can be
+ * seeded from a composer's text, so the caller passes every note's text, not
+ * only those it has loaded. Pure.
+ */
+export function referencedBlobs(facts: {
+  readonly messages: Iterable<unknown>
+  readonly held: readonly Held[]
+  readonly noteTexts: Iterable<string>
+}): ReadonlySet<Sha256> {
+  const shas = new Set<Sha256>()
+  for (const message of facts.messages)
+    for (const image of decodeChat(message)?.images ?? [])
+      shas.add(image.sha256)
+  for (const held of facts.held)
+    if (held.kind === "chat")
+      for (const image of held.details.images ?? []) shas.add(image.sha256)
+  for (const text of facts.noteTexts)
+    for (const sha of pastedImages(text)) shas.add(sha)
+  return shas
+}
+
+/** `referencedBlobs` over the session as it stands, and the notes' texts. */
+export const readReferencedBlobs = (
+  doc: SessionDocHandle,
+  noteTexts: Iterable<string>,
+): ReadonlySet<Sha256> =>
+  referencedBlobs({
+    messages: Object.values(readEntries(doc)).map(rowMessage),
+    held: readOutbox(doc),
+    noteTexts,
+  })
+
+/**
+ * The blobs to delete: those nothing shows and nobody has stored or touched
+ * within `grace`. The grace covers an image pasted and not yet sent, which
+ * only a composer holds. Pure.
+ */
+export function planSweep(input: {
+  readonly stored: readonly {
+    readonly sha256: Sha256
+    readonly touched: number
+  }[]
+  readonly referenced: ReadonlySet<Sha256>
+  readonly now: number
+  readonly grace: number
+}): Sha256[] {
+  return input.stored
+    .filter(
+      b =>
+        !input.referenced.has(b.sha256) && input.now - b.touched > input.grace,
+    )
+    .map(b => b.sha256)
 }

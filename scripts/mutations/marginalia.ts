@@ -346,4 +346,28 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "the facts",
   },
+  {
+    name: "imageSources skips imageReference",
+    file: "packages/marginalia/images.ts",
+    from: '      node.type === "imageReference" &&',
+    to: '      node.type === "imageRef" &&',
+    command: unit,
+    expect: "imageSources: inline, titled",
+  },
+  {
+    name: "withChatImages drops the image parts",
+    file: "packages/marginalia/chat.ts",
+    from: '          : { type: "image", data: blob.data, mimeType: blob.mimeType },',
+    to: '          : { type: "text", text: "" },',
+    command: unit,
+    expect: "withChatImages: a chat's text, then its images",
+  },
+  {
+    name: "planImages ignores missing hashes",
+    file: "packages/marginalia/images.ts",
+    from: "    if (ref === undefined)\n      return {",
+    to: "    if (ref === undefined && shas.length < 0)\n      return {",
+    command: unit,
+    expect: "planImages: one not stored refuses",
+  },
 ]

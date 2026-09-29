@@ -61,9 +61,33 @@ are the only code that builds or reads the shape.
 - **`renderableMessage`** turns a stored chat into role `chat` with its author
   and whether it compelled the agent, for `core`'s projections, which only
   admit the role and so need no schema library.
+- **A chat's images are references** (ADR-0042). `details.images` lists an
+  `ImageRef` (hash, type, size) for each `/blob/` image its text shows, in
+  order: the host fills it when the message is sent, and a held message keeps
+  it. `content` stays the attributed text, so no image's bytes are stored.
+  `withChatImages` is what the model reads: each chat with images gets
+  `[text, ...image parts]`, from base64 the caller gathered
+  (`chatImageShas` says which), with a missing blob named as text.
+  `packages/pi` runs it in pi's `toProviderMessages`. It takes base64, not
+  bytes, because this package ships to the browser.
 - **Names are labels, never identities** (`participant.ts`). The name is copied
   into each message, so a rename never rewrites what the agent already read,
   nor invalidates the provider's prompt cache.
+
+# Images (`images.ts`, ADR-0042)
+
+- **`imageSources` is which images a text shows**: `image` nodes, and
+  `imageReference` nodes resolved through the text's definitions (the first
+  definition of an identifier wins), in order, each once. It parses with
+  `mdast-util-from-markdown` and the GFM extensions, the packages under the
+  client's remark-parse and remark-gfm at the same versions
+  (`workspace.test.ts`), so the host and the drawing read one tree. An image
+  in code is text; a link to an image is a link.
+- **`pastedImages`** keeps the sources `blobOfUrl` accepts: exactly
+  `/blob/<64 lower-case hex>`.
+- **`planImages`** turns those hashes and the store's refs into the message's
+  images, or refuses it with `ERR.IMAGE_MISSING`. The host gathers the refs
+  first; the decision is pure.
 
 # Commands (`commands.ts`, ADR-0036)
 

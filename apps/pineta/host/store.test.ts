@@ -13,9 +13,9 @@ test("a store owns its file: a second is refused until the first closes (S47)", 
   expect(() => openStore(file, { busyTimeoutMs: 50 })).toThrow(
     /one owner at a time/,
   )
-  await first.close()
+  await first.store.close()
   const second = openStore(file, { busyTimeoutMs: 50 })
-  await second.close()
+  await second.store.close()
 })
 
 test("isBusyError reads node:sqlite's SQLITE_BUSY", () => {

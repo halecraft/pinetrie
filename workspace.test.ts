@@ -64,9 +64,15 @@ test("the protocol declares only Kyneta and core", () => {
   assert.deepEqual(extra, [])
 })
 
-test("marginalia declares only TypeBox and core", () => {
+test("marginalia declares only TypeBox, core, and the markdown parser the client's remark wraps", () => {
+  // Which images a message shows is read from its markdown on the host, by
+  // the parser under the client's remark-parse and remark-gfm, at the same
+  // versions, so both read one tree and the bundle holds one copy (ADR-0042).
   assert.deepEqual(deps(read("packages/marginalia")).sort(), [
     "@pineta/core",
+    "mdast-util-from-markdown",
+    "mdast-util-gfm",
+    "micromark-extension-gfm",
     "typebox",
   ])
 })

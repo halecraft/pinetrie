@@ -1,11 +1,13 @@
-// host/admission — who may reach the page, Vite and the Exchange.
+// host/admission — who may reach the page, Vite, the blobs and the Exchange.
 //
 // Pineta is multiplayer, so the host can bind to a network address. Reaching
 // the port must not be enough: whoever does gets the whole session, the
 // client's source and the command channel, and with tools, a shell. Off
 // loopback, an invite key is required: whoever has the link is a collaborator,
-// and nobody else gets anything. It decides who gets in, not who is who: peer
-// ids are chosen by clients (ADR-0022).
+// and nobody else gets anything. On loopback there is no key, so a request
+// must come from this machine's own names, and from a page of this host
+// (ADR-0042). It decides who gets in, not who is who: peer ids are chosen by
+// clients (ADR-0022).
 
 import { randomBytes, timingSafeEqual } from "node:crypto"
 
@@ -54,15 +56,31 @@ function cookieValue(
 }
 
 /**
- * Whether a request may reach the page, Vite or the Exchange. Pure. With no
- * key (loopback), everything is admitted. Otherwise the key must come as
- * `?key=` (an invite link, or a Node client) or as the cookie a link sets.
+ * Whether a request may reach the page, Vite, the blobs or the Exchange. Pure.
+ *
+ * First, where it comes from. A browser names the page that made a request in
+ * `Origin`, and a page on another origin must not reach this one: a WebSocket
+ * is exempt from the same-origin policy, and the socket carries every command.
+ * With no key the host is on loopback, and a name rebound to 127.0.0.1 would
+ * reach it as its own origin, so there the `Host` must be a loopback name
+ * too. A request without `Origin` (a Node client, a navigation) passes the
+ * first check.
+ *
+ * Then the key. With none, everything left is admitted. Otherwise it must come
+ * as `?key=` (an invite link, or a Node client) or as the cookie a link sets.
  */
 export function admits(
-  request: { readonly url: string; readonly cookie?: string },
+  request: {
+    readonly url: string
+    readonly cookie?: string | undefined
+    readonly origin?: string | undefined
+    readonly host?: string | undefined
+  },
   key: string | null,
 ): Admission {
-  if (key === null) return ADMIT
+  if (request.origin !== undefined && !sameHost(request.origin, request.host))
+    return REFUSE
+  if (key === null) return isLoopbackHost(request.host) ? ADMIT : REFUSE
   const url = new URL(request.url, "http://host")
   const given = url.searchParams.get("key")
   if (given !== null) {
@@ -72,6 +90,49 @@ export function admits(
   }
   const cookie = cookieValue(request.cookie, KEY_COOKIE)
   return cookie !== undefined && same(cookie, key) ? ADMIT : REFUSE
+}
+
+/** What `admits` reads of a Node request or upgrade. */
+export const requestFacts = (req: {
+  readonly url?: string | undefined
+  readonly headers: {
+    readonly cookie?: string | undefined
+    readonly origin?: string | undefined
+    readonly host?: string | undefined
+  }
+}) => ({
+  url: req.url ?? "/",
+  cookie: req.headers.cookie,
+  origin: req.headers.origin,
+  host: req.headers.host,
+})
+
+/** A `Host` header as a URL, or undefined if it names no host. */
+function hostUrl(host: string | undefined): URL | undefined {
+  if (host === undefined || host === "") return undefined
+  try {
+    return new URL(`http://${host}`)
+  } catch {
+    return undefined
+  }
+}
+
+/** Whether an `Origin` names the host the request was sent to. "null" never does. */
+function sameHost(origin: string, host: string | undefined): boolean {
+  const to = hostUrl(host)
+  if (to === undefined) return false
+  try {
+    return new URL(origin).host === to.host
+  } catch {
+    return false
+  }
+}
+
+/** Whether a `Host` header names this machine: `localhost`, 127.0.0.0/8 or [::1]. */
+export function isLoopbackHost(host: string | undefined): boolean {
+  const name = hostUrl(host)?.hostname
+  if (name === undefined) return false
+  return name === "localhost" || name === "[::1]" || isLoopback(name)
 }
 
 /** How to write a bound address in a URL this machine can open. */

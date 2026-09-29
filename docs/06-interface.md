@@ -302,6 +302,13 @@ The rail is E; the column is T. Seeing both at once is the product.
   written, and each running command's output, following its end as a column
   does.
   **Stop** ends the turn; messages waiting are then taken.
+- **Pasting an image into a composer puts it in the message** (ADR-0042).
+  It is uploaded as it is pasted, and its markdown, `![name](/blob/…)`, goes
+  in where the cursor was; the send button reads "uploading image…" until
+  it is done. Sent, the message draws the image at its stored size, capped
+  at the column's width, and a click opens it in a new tab. The agent is
+  given the image itself, after the text. An image no longer stored refuses
+  the send, and the text comes back to the box.
 - A message's tools (cite, and `→` in the margin) appear on hover or focus;
   beneath it stay only branch buttons and citation counts.
 - **Cite** stays an action on a message or a text selection. It is attached at

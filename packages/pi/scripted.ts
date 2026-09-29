@@ -6,6 +6,7 @@
 // request with nothing queued (`answer`), and pause the reply to a prompt, so
 // a check sees its run in progress for as long as it needs (`pause`).
 
+import { createHash } from "node:crypto"
 import {
   type AssistantMessage,
   type FauxProviderHandle,
@@ -20,8 +21,9 @@ import {
 
 /**
  * One scripted reply: text; text made from the context the model was given,
- * each message's text in order, so a suite can see what the model saw; or a
- * tool call with optional text before it.
+ * each message's text in order (an image as `[image <mime> <sha256>]`), so
+ * a suite can see what the model saw; or a tool call with optional text
+ * before it.
  */
 export type ScriptStep =
   | { readonly text: string }
@@ -211,7 +213,11 @@ const aborted = (signal: AbortSignal | undefined): Promise<void> =>
     signal?.addEventListener("abort", () => resolve(), { once: true })
   })
 
-/** A message's content as text: a string, or its text parts joined. */
+/**
+ * A message's content as text: a string, or its parts joined, an image part
+ * as `[image <mimeType> <sha256 of its bytes>]`, so a suite can see which
+ * image the model was given.
+ */
 const textOf = (content: unknown): string =>
   typeof content === "string"
     ? content
@@ -220,7 +226,11 @@ const textOf = (content: unknown): string =>
           .flatMap(part =>
             part?.type === "text" && typeof part.text === "string"
               ? [part.text]
-              : [],
+              : part?.type === "image" && typeof part.data === "string"
+                ? [
+                    `[image ${part.mimeType} ${createHash("sha256").update(Buffer.from(part.data, "base64")).digest("hex")}]`,
+                  ]
+                : [],
           )
           .join("")
       : ""

@@ -178,6 +178,11 @@
       .text th, .text td { padding: .15rem .45rem; border: 1px solid #23272e; }
       .text a { color: #9ecbff; }
       .text hr { border: 0; border-top: 1px solid #23272e; }
+      /* An image is capped at the column's width. Its width and height
+         attributes (a pasted image's stored size) keep its box's shape while
+         it loads (ADR-0042). */
+      .text img { max-width: 100%; height: auto; vertical-align: middle; }
+      .text img.blob-image { cursor: zoom-in; border: 1px solid #23272e; }
       .text img { max-width: 100%; }
       .text .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
       .fork-dot { display: inline-block; width: 10px; height: 10px; padding: 0; margin-left: .4rem;

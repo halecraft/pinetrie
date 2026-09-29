@@ -95,4 +95,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "three requests in one tick are each answered",
   },
+  {
+    name: "prepareImage keeps any type pi recognizes",
+    file: "packages/pi/images.ts",
+    from: "  if (sniffed === null || !isImageMime(sniffed))",
+    to: "  if (sniffed === null)",
+    command: unit,
+    expect: "SVG, BMP and text are not images",
+  },
+  {
+    name: "createAgent leaves pi's own conversion",
+    file: "packages/pi/agent.ts",
+    from: "      toProviderMessages: messages =>\n        providerMessages(messages, options.blobs ?? NO_BLOBS),",
+    to: "      toProviderMessages: messages => convertToLlm(messages),",
+    command: e2e,
+    expect: "the model reads the message's text, then its image",
+  },
 ]

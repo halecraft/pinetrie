@@ -77,12 +77,15 @@ export function settleSend(
 /**
  * What a composer sends: its text trimmed, or null for nothing to send. A
  * text that is only its column's prefill is nothing: `@agent ` alone would ask
- * the agent with no question.
+ * the agent with no question. Nothing is sent while an image is uploading:
+ * its markdown is not in the text yet.
  */
 export function sendable(
   text: string,
   prefill: string | undefined,
+  uploading: boolean,
 ): string | null {
+  if (uploading) return null
   const message = text.trim()
   return message === "" || message === prefill?.trim() ? null : message
 }

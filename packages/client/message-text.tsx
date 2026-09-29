@@ -2,12 +2,14 @@
 // citing a selection in it. What is drawn, and what a selection cites, are
 // decided in markdown.ts.
 
+import { blobOfUrl, type ImageRef } from "@pineta/core"
 import { toJsxRuntime } from "hast-util-to-jsx-runtime"
-import { useMemo } from "react"
+import { type ComponentProps, useMemo } from "react"
 import { Fragment, jsx, jsxs } from "react/jsx-runtime"
 import {
   type Boundary,
   messageTree,
+  NO_IMAGES,
   type Run,
   type TextMode,
 } from "./markdown.ts"
@@ -15,25 +17,59 @@ import {
 /**
  * Model output and people's text are never HTML: raw HTML is drawn as text,
  * and a link or image keeps only an http, https, mailto, relative or `#` URL.
+ * A `/blob/` image in `images` is drawn at its stored size, and opens in a
+ * new tab when clicked.
  */
 export function MessageText({
   text,
   mode,
   className,
+  images,
 }: {
   text: string
   mode: TextMode
   /** Beside `text`, which the cite button and the browser suite look for. */
   className?: string
+  /** The message's images (ADR-0042); none for streaming text and notes. */
+  images?: readonly ImageRef[] | undefined
 }) {
+  const lookup = useMemo(
+    () =>
+      images === undefined
+        ? NO_IMAGES
+        : new Map(images.map(image => [image.sha256, image])),
+    [images],
+  )
   const drawn = useMemo(
-    () => toJsxRuntime(messageTree(text, mode), { Fragment, jsx, jsxs }),
-    [text, mode],
+    () =>
+      toJsxRuntime(messageTree(text, mode, lookup), {
+        Fragment,
+        jsx,
+        jsxs,
+        components: { img: BlobImage },
+      }),
+    [text, mode, lookup],
   )
   return (
     <div className={className === undefined ? "text" : `text ${className}`}>
       {drawn}
     </div>
+  )
+}
+
+/** An image; a `/blob/` one, clicked, opens alone in a new tab. */
+function BlobImage(props: ComponentProps<"img">) {
+  const { src, alt } = props
+  if (typeof src !== "string" || blobOfUrl(src) === null)
+    return <img {...props} alt={alt ?? ""} />
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: a shortcut for the mouse; the image is not a control
+    <img
+      {...props}
+      alt={alt ?? ""}
+      className="blob-image"
+      onClick={() => window.open(src, "_blank", "noopener")}
+    />
   )
 }
 

@@ -31,6 +31,7 @@ import {
   readTreeIndex,
 } from "@pineta/reads"
 import { type Browser, chromium, type Page } from "@playwright/test"
+import { sha256Of } from "../host/blobs.ts"
 import { startHost } from "../host/index.ts"
 import {
   committedProject,
@@ -39,6 +40,7 @@ import {
   suiteModel,
   waitFor,
 } from "./harness.ts"
+import { RED_PNG } from "./images.ts"
 
 /** The ⋯ of the tab you are on: every root tab has one, shown on hover. */
 const OWN_MENU = '#tabs .tab[aria-selected="true"] ~ .tab-more .tab-menu'
@@ -1637,6 +1639,138 @@ try {
     } finally {
       await lp.close().catch(() => {})
       await writer.close()
+    }
+  }
+
+  // ── pasting an image into the composer (ADR-0042) ──────────────────────
+  {
+    const imageHost = await startHost({
+      model: { kind: "scripted", script: suiteModel() },
+      log: () => {},
+    })
+    const pp = await (await browser.newContext()).newPage()
+    await asPerson(pp, "pia@browser.test", "Pia")
+    const qp = await (await browser.newContext()).newPage()
+    await asPerson(qp, "quinn@browser.test", "Quinn")
+    try {
+      await pp.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
+      await pp.click("#tabs .add-agent")
+      const box = `${col(0)} .composer .input`
+      const sendButton = `${col(0)} .composer .send`
+      await pp.fill(box, "what colour is this?")
+      // Uploads are held a moment, so the composer is seen waiting for one.
+      let release = () => {}
+      const held = new Promise<void>(resolve => {
+        release = resolve
+      })
+      await pp.route("**/blob", async route => {
+        await held
+        await route.continue()
+      })
+      /** Paste `base64` as a PNG file named `name` into column 0's box. */
+      const paste = (base64: string, name: string) =>
+        pp.evaluate(
+          ([sel, b64, fileName]) => {
+            const input = document.querySelector(sel)
+            if (!(input instanceof HTMLTextAreaElement)) return false
+            input.focus()
+            input.setSelectionRange(input.value.length, input.value.length)
+            const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+            const data = new DataTransfer()
+            data.items.add(new File([bytes], fileName, { type: "image/png" }))
+            const event = new ClipboardEvent("paste", {
+              clipboardData: data,
+              bubbles: true,
+              cancelable: true,
+            })
+            input.dispatchEvent(event)
+            return event.defaultPrevented
+          },
+          [box, base64, name] as const,
+        )
+      const prevented = await paste(RED_PNG.toString("base64"), "red.png")
+      const waiting = await pp
+        .waitForFunction(
+          sel => {
+            const b = document.querySelector(sel)
+            return (
+              b instanceof HTMLButtonElement &&
+              b.disabled &&
+              b.textContent?.trim() === "uploading image…"
+            )
+          },
+          sendButton,
+          { timeout: 5_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      release()
+      const sha = sha256Of(RED_PNG)
+      const markdown = `![red.png](/blob/${sha})`
+      const inserted = await pp
+        .waitForFunction(
+          ([sel, md]) =>
+            (document.querySelector(sel) as HTMLTextAreaElement | null)
+              ?.value === `what colour is this?\n${md}`,
+          [box, markdown] as const,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      ok(
+        prevented && waiting && inserted,
+        `pasting an image uploads it, the send waits for it, and its markdown goes in at the cursor (${prevented}, ${waiting}, ${inserted})`,
+      )
+      await pp.click(sendButton)
+      const drawn = `${col(0)} .msg img.blob-image[src="/blob/${sha}"]`
+      /** The image in `p`'s column, once it has loaded: its sizes. */
+      const loaded = (p: Page) =>
+        p
+          .waitForFunction(
+            sel => {
+              const img = document.querySelector(sel)
+              return img instanceof HTMLImageElement &&
+                img.complete &&
+                img.naturalWidth > 0
+                ? [img.naturalWidth, img.getAttribute("width")]
+                : null
+            },
+            drawn,
+            { timeout: 15_000 },
+          )
+          .then(
+            h => h.jsonValue(),
+            () => null,
+          )
+      const mine = await loaded(pp)
+      ok(
+        JSON.stringify(mine) === JSON.stringify([40, "40"]),
+        `the sent message draws the image, at its stored width (${JSON.stringify(mine)})`,
+      )
+      await qp.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
+      await qp
+        .waitForSelector("#top .here-person .here-trigger", {
+          timeout: 20_000,
+        })
+        .catch(() => null)
+      await chooseFromMenu(
+        qp,
+        "#top .here-person .here-trigger",
+        ".here-thread",
+      )
+      const theirs = await loaded(qp)
+      ok(
+        JSON.stringify(theirs) === JSON.stringify([40, "40"]),
+        `another window draws it too (${JSON.stringify(theirs)})`,
+      )
+    } finally {
+      await pp.context().close()
+      await qp.context().close()
+      await imageHost.shutdown()
     }
   }
 

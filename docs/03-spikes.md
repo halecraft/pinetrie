@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S53 — Pasted images: pi's image path, and the model's seam ✅ PASS
+
+`findings/S53-pasted-images.md`. pi's `detectSupportedImageMimeType` reads
+the type from the bytes, and `resizeImage`, in a worker thread that loads
+here, fits a 3000×2000 PNG to a 2000×1333 JPEG in 1.4 s, with its
+dimensions as numbers. `toProviderMessages` runs once per request, and pi's
+summaries bypass it. Reading 20 MB of blobs and encoding them takes about
+20 ms a request, so there is no cache. Produced ADR-0042.
+
 ### S49 — An offer updated in place while its thread works ✅ PASS
 
 `findings/S49-offer-in-place.md`. Rebuilding an offer after every lane commit

@@ -14,6 +14,13 @@ import { useEffect, useRef, useState } from "react"
 import { matchCommands } from "./commands.ts"
 import { Menu } from "./menu.tsx"
 import {
+  imageMarkdown,
+  insertAt,
+  pastedFiles,
+  type Selection,
+  uploadImage,
+} from "./paste.ts"
+import {
   planSend,
   type QueuePlace,
   queueWords,
@@ -136,6 +143,8 @@ export function Composer({
     pending === undefined ? (initialText ?? "") : "",
   )
   const [status, setStatus] = useState("")
+  // Pastes whose images are still uploading: sending waits for them.
+  const [uploading, setUploading] = useState(0)
   const [conflict, setConflict] = useState<{
     text: string
     line: string
@@ -210,10 +219,40 @@ export function Composer({
   }, [prefill?.key])
 
   const submit = async () => {
-    const message = sendable(text, initialText)
+    const message = sendable(text, initialText, uploading > 0)
     if (message === null || readOnly !== null) return
     setText("")
     await send(message, plan.mode)
+  }
+
+  /**
+   * Upload pasted images, then put their markdown where the selection was
+   * when they were pasted, all at once and in order. A refused one is left
+   * out, and the host's reason shown.
+   */
+  const pasteImages = async (files: readonly File[], at: Selection) => {
+    setUploading(n => n + 1)
+    setStatus("uploading image…")
+    const uploads = await Promise.all(files.map(uploadImage))
+    setUploading(n => n - 1)
+    const snippets = uploads.flatMap((u, i) =>
+      u.ok ? [imageMarkdown(files[i]?.name ?? "", u.ref)] : [],
+    )
+    const refused = uploads.flatMap(u => (u.ok ? [] : [u.reason]))
+    setStatus(
+      refused.length === 0 ? "" : `image not added: ${refused.join("; ")}`,
+    )
+    if (snippets.length === 0) return
+    let cursor = 0
+    setText(t => {
+      const inserted = insertAt(t, at, snippets.join("\n"))
+      cursor = inserted.cursor
+      return inserted.text
+    })
+    onTyping()
+    requestAnimationFrame(() =>
+      input.current?.setSelectionRange(cursor, cursor),
+    )
   }
 
   return (
@@ -311,6 +350,16 @@ export function Composer({
           const end = e.currentTarget.value.length
           e.currentTarget.setSelectionRange(end, end)
         }}
+        onPaste={e => {
+          const files = pastedFiles(e.clipboardData)
+          if (files.length === 0) return
+          e.preventDefault()
+          const box = e.currentTarget
+          void pasteImages(files, {
+            start: box.selectionStart,
+            end: box.selectionEnd,
+          })
+        }}
         onKeyDown={e => {
           if (e.nativeEvent.isComposing) return
           // While commands are offered, the keys move through them.
@@ -399,10 +448,11 @@ export function Composer({
           )}
           <button
             className="send"
+            disabled={uploading > 0}
             title={plan.title ?? undefined}
             type="submit"
           >
-            {plan.button}
+            {uploading > 0 ? "uploading image…" : plan.button}
           </button>
         </div>
       )}

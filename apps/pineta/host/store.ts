@@ -5,7 +5,8 @@
 // document the host serves, one append-only record stream per document: today
 // the one `SessionDoc`, which is also pi's storage. It is not a pi session
 // file. A later change to the document's root schema cannot open an existing
-// store: migrate it, or start a new file.
+// store: migrate it, or start a new file. The host's images are in the same
+// file, in `pineta_blobs` (`blobs.ts`, ADR-0042), on the same connection.
 //
 // The store owns its file (S47). Kyneta's SQLite store issues the same seat on
 // every open, so the host keeps its peer id across restarts; that is sound
@@ -19,6 +20,8 @@ import path from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import type { Store } from "@kyneta/exchange"
 import { createSqliteStore } from "@kyneta/sqlite-store"
+import type { BlobStore } from "@pineta/core"
+import { sqliteBlobs } from "./blobs.ts"
 
 /** How long taking the file waits for another owner to close it. */
 const BUSY_TIMEOUT_MS = 5_000
@@ -33,10 +36,14 @@ export const isBusyError = (error: unknown): boolean =>
   "errcode" in error &&
   error.errcode === 5
 
-export function openStore(
+/**
+ * The session's file, opened and locked: this connection is its only owner
+ * until it closes (S47).
+ */
+export function openDatabase(
   file: string,
   { busyTimeoutMs = BUSY_TIMEOUT_MS }: { readonly busyTimeoutMs?: number } = {},
-): Store {
+): DatabaseSync {
   mkdirSync(path.dirname(file), { recursive: true })
   const db = new DatabaseSync(file, { timeout: busyTimeoutMs })
   // Exclusive locking mode keeps every lock once taken; the empty exclusive
@@ -52,7 +59,19 @@ export function openStore(
       { cause: error },
     )
   }
-  return createSqliteStore({
+  return db
+}
+
+/**
+ * The session's store and the host's blobs, over one connection to `file`.
+ * Closing the store closes the connection, and with it the blobs.
+ */
+export function openStore(
+  file: string,
+  options: { readonly busyTimeoutMs?: number } = {},
+): { readonly store: Store; readonly blobs: BlobStore } {
+  const db = openDatabase(file, options)
+  const store = createSqliteStore({
     exec: (sql, ...params) => void db.prepare(sql).run(...(params as never[])),
     iterate: <T>(sql: string, ...params: unknown[]) =>
       db.prepare(sql).iterate(...(params as never[])) as Iterable<T>,
@@ -69,4 +88,5 @@ export function openStore(
     },
     close: () => db.close(),
   })
+  return { store, blobs: sqliteBlobs(db) }
 }

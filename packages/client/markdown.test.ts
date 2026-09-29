@@ -1,4 +1,4 @@
-import { entryId } from "@pineta/core"
+import { entryId, type Sha256 } from "@pineta/core"
 import type { Element, ElementContent, Root } from "hast"
 import { describe, expect, test } from "vitest"
 import {
@@ -446,5 +446,41 @@ describe("streaming", () => {
       expect(shown(messageTree(source, "streaming")), source).toBe(
         shown(committed(source)),
       )
+  })
+})
+
+describe("images (ADR-0042)", () => {
+  const SHA = "c".repeat(64) as Sha256
+  const images = new Map([
+    [
+      SHA,
+      { sha256: SHA, mimeType: "image/png", width: 40, height: 30 } as const,
+    ],
+  ])
+  const img = (source: string) =>
+    elements(messageTree(source, "committed", images), "img")[0]?.properties
+
+  test("a /blob/ image the message holds gets its stored size, loaded lazily", () => {
+    expect(img(`![shot](/blob/${SHA})`)).toMatchObject({
+      src: `/blob/${SHA}`,
+      alt: "shot",
+      width: 40,
+      height: 30,
+      loading: "lazy",
+      decoding: "async",
+    })
+  })
+
+  test("an unknown blob, a relative image and a streaming one stay unsized", () => {
+    const unknown = img(`![](/blob/${"d".repeat(64)})`)
+    const relative = img("![](shot.png)")
+    const streaming = elements(
+      messageTree(`![](/blob/${SHA})`, "streaming"),
+      "img",
+    )[0]?.properties
+    for (const p of [unknown, relative, streaming]) {
+      expect(p?.width).toBeUndefined()
+      expect(p?.loading).toBeUndefined()
+    }
   })
 })

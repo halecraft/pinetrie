@@ -10,7 +10,7 @@
 //                    reload stays on
 //   PINETA_LANES=0   new threads' agents work directly in this repo instead,
 //                    as you, sharing it; hot reload waits while one runs
-//   PINETA_STORE     the SQLite file the session is kept in
+//   PINETA_STORE     the SQLite file the session and pasted images are kept in
 //                    (default .pineta/pineta.db in the repo)
 //   PINETA_PROVIDER, PINETA_MODEL
 //                    override the model; by default, pi's settings' default,

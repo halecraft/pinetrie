@@ -12,6 +12,7 @@
 // A tool's result is its own entry, but it belongs to its call: `projectSpine`
 // pairs it with the call on the same path, and it is never a message itself.
 
+import type { ImageRef } from "./images.ts"
 import {
   atEntry,
   type ChatMode,
@@ -49,6 +50,8 @@ export interface AgentMessageLike {
   readonly contributors?: readonly WriterId[]
   /** Role `chat` only: the command it ran, qualified (ADR-0036). */
   readonly command?: string
+  /** Role `chat` only: the `/blob/` images its text shows (ADR-0042). */
+  readonly images?: readonly ImageRef[]
   /** Role `toolResult` only: the call it answers, and whether it failed. */
   readonly toolCallId?: string
   readonly isError?: boolean
@@ -78,6 +81,8 @@ export interface TranscriptMessage {
   readonly contributors?: readonly WriterId[]
   /** Role `chat` only: the command it ran, qualified (ADR-0036). */
   readonly command?: string
+  /** Role `chat` only: the `/blob/` images its text shows (ADR-0042). */
+  readonly images?: readonly ImageRef[]
   /** Role `assistant` only: the tools it called, each with its result once known. */
   readonly toolCalls?: readonly ToolCallView[]
 }
@@ -154,6 +159,9 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
       ...(entry.message?.command === undefined
         ? {}
         : { command: entry.message.command }),
+      ...(entry.message?.images === undefined
+        ? {}
+        : { images: entry.message.images }),
     }
   }
   // A land, update or stack message (ADR-0033, ADR-0038) shows as its short

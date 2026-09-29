@@ -4,7 +4,7 @@
 // FC/IS: this file gathers and executes; the deciding is done by core/.
 
 import { readFile } from "node:fs/promises"
-import http from "node:http"
+import http, { type IncomingMessage, type ServerResponse } from "node:http"
 import { createRequire } from "node:module"
 import { networkInterfaces } from "node:os"
 import path from "node:path"
@@ -20,8 +20,10 @@ import {
   wrapNodeWebsocket,
 } from "@kyneta/websocket-transport/server"
 import {
+  type BlobStore,
   type EntryId,
   ERR,
+  type ImageRef,
   type Intent,
   isBusy,
   type LaneName,
@@ -34,6 +36,7 @@ import {
   type RunId,
   referenceId,
   runId,
+  type Sha256,
   threadOf,
   type WriterId,
   writerOfPrincipal,
@@ -53,9 +56,11 @@ import {
   LAND_TYPE,
   type LandMessage,
   parseCommand,
+  pastedImages,
   planArchive,
   planChat,
   planDrain,
+  planImages,
   planNote,
   planNoteEdit,
   planReference,
@@ -69,7 +74,13 @@ import {
   type WorkRecord,
   writesAt,
 } from "@pineta/marginalia"
-import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
+import {
+  type Agent,
+  createAgent,
+  type ModelChoice,
+  newId,
+  prepareImage,
+} from "@pineta/pi"
 import {
   decodeCommand,
   encodeOutcome,
@@ -84,6 +95,7 @@ import {
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
 import {
+  planSweep,
   readArchive,
   readLaneRecords,
   readLanes,
@@ -91,6 +103,7 @@ import {
   readOutbox,
   readParticipantNames,
   readParticipants,
+  readReferencedBlobs,
   readThreadName,
   readTreeIndex,
   workAt,
@@ -126,12 +139,22 @@ import {
   isLoopback,
   KEY_COOKIE,
   newKey,
+  requestFacts,
   urlHost,
 } from "./admission.ts"
+import {
+  MAX_UPLOAD_BYTES,
+  memoryBlobs,
+  planUploadHeaders,
+  route,
+} from "./blobs.ts"
 import { departedSeats, lineDocPrefix } from "./lines.ts"
 import { writePolicy } from "./policy.ts"
 import { openStore } from "./store.ts"
 import { startLaneWork } from "./work.ts"
+
+/** How long an unreferenced image is kept (ADR-0042). */
+const BLOB_GRACE_MS = 24 * 60 * 60 * 1000
 
 export interface StartHostOptions {
   readonly port?: number
@@ -179,6 +202,17 @@ export interface StartHostOptions {
    * compaction is also what trims the session's in-memory op log (ADR-0023).
    */
   readonly store?: string | Store | null
+  /**
+   * The images (ADR-0042), for a caller that gives a `Store` it made: pass
+   * the `blobs` `openStore` gave with it, so a restart keeps them. A store
+   * given as a file keeps its own; otherwise they are held in memory.
+   */
+  readonly blobs?: BlobStore
+  /**
+   * How long an image nothing shows is kept, from its upload or last touch:
+   * a day by default, for one pasted and not yet sent. A suite shortens it.
+   */
+  readonly blobGraceMs?: number
   /** How long presence lasts without a refresh; a suite shortens it. */
   readonly presenceDecay?: PresenceDecay
   readonly log?: (message: string) => void
@@ -216,6 +250,8 @@ export async function startHost({
   userConfig = userConfigFile(),
   agentDir,
   store: storeFile = null,
+  blobs: givenBlobs,
+  blobGraceMs = BLOB_GRACE_MS,
   presenceDecay = PRESENCE_DECAY,
   log = console.log,
 }: StartHostOptions): Promise<RunningHost> {
@@ -223,12 +259,14 @@ export async function startHost({
 
   // --- transport + exchange ------------------------------------------------
   const serverTransport = new WebsocketServerTransport()
-  const store =
-    storeFile === null
-      ? createInMemoryStore()
-      : typeof storeFile === "string"
-        ? openStore(storeFile)
-        : storeFile
+  const opened =
+    typeof storeFile === "string"
+      ? openStore(storeFile)
+      : {
+          store: storeFile ?? createInMemoryStore(),
+          blobs: givenBlobs ?? memoryBlobs(),
+        }
+  const { store, blobs } = opened
   // Every stored command Line belongs to a client seat that cannot return: a
   // client keeps no store and does not reconnect (host/lines.ts).
   for await (const id of store.listDocIds(lineDocPrefix(CONTROL_TOPIC)))
@@ -290,6 +328,7 @@ export async function startHost({
     replicaId: newId(),
     model,
     commandRenames,
+    blobs,
     ...(agentDir === undefined ? {} : { agentDir }),
     tools:
       tools === null
@@ -401,7 +440,34 @@ export async function startHost({
           `[host] compaction failed: ${error instanceof Error ? error.message : String(error)}`,
         )
       }
+      try {
+        await sweepBlobs()
+      } catch (error) {
+        log(
+          `[host] deleting unreferenced images failed: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
     })
+  }
+
+  /**
+   * Delete the images nothing shows any more (ADR-0042): gather every note's
+   * text, then the store's list and the session's references with no await
+   * between them, `planSweep`, delete. Runs in `settle`'s serial step.
+   */
+  async function sweepBlobs(): Promise<void> {
+    const noteTexts: string[] = []
+    for (const n of readNotes(doc))
+      noteTexts.push((await holdNote(n.id, null)).text())
+    const doomed = planSweep({
+      stored: blobs.list(),
+      referenced: readReferencedBlobs(doc, noteTexts),
+      now: Date.now(),
+      grace: blobGraceMs,
+    })
+    if (doomed.length === 0) return
+    blobs.delete(doomed)
+    log(`[host] deleted ${doomed.length} unreferenced image(s)`)
   }
 
   /**
@@ -712,8 +778,21 @@ export async function startHost({
           : ((await agent.expand(source, typed.args, own)) ?? {
               unreadable: typed.name,
             })
+    // gather: the store's refs of the images its text shows (ADR-0042)
+    const shas = pastedImages(chat.text)
+    const refs = new Map(
+      shas.flatMap(sha => {
+        const ref = blobs.ref(sha)
+        return ref === undefined ? [] : [[sha, ref] as const]
+      }),
+    )
+
+    // plan: a missing image refuses the send before planChat decides the rest
+    const images = planImages(shas, refs)
+    if (images.kind === "refused") return images
     const planned = planChat({
       command,
+      images: images.images,
       hostWorkingCopy: own ? (work.project?.root ?? null) : null,
       author: writer,
       authorName: nameOf(writer),
@@ -1129,12 +1208,9 @@ export async function startHost({
     },
   })
   hotReload.attach(() => vite.ws.send({ type: "full-reload" }))
-  // Admission comes first: nothing reaches Vite or the Exchange without it.
+  // Admission comes first: nothing reaches Vite, the blobs or the Exchange without it.
   httpServer.on("request", (req, res) => {
-    const admission = admits(
-      { url: req.url ?? "/", cookie: req.headers.cookie },
-      key,
-    )
+    const admission = admits(requestFacts(req), key)
     if (admission.kind === "refuse") {
       res.writeHead(403).end()
       return
@@ -1148,8 +1224,90 @@ export async function startHost({
         .end()
       return
     }
+    const to = route(
+      req.method,
+      new URL(req.url ?? "/", "http://host").pathname,
+    )
+    if (to.kind === "blob-get") return serveBlob(to.sha, res)
+    if (to.kind === "blob-post") return void receiveBlob(req, res)
     vite.middlewares(req, res)
   })
+
+  /** `GET /blob/<sha256>`: the stored bytes, which never change. */
+  function serveBlob(sha: Sha256 | null, res: ServerResponse): void {
+    const blob = sha === null ? undefined : blobs.get(sha)
+    if (blob === undefined) {
+      res.writeHead(404).end()
+      return
+    }
+    res
+      .writeHead(200, {
+        "content-type": blob.mimeType,
+        "content-length": blob.bytes.byteLength,
+        "cache-control": "private, max-age=31536000, immutable",
+        "x-content-type-options": "nosniff",
+        "content-security-policy": "default-src 'none'",
+      })
+      .end(blob.bytes)
+  }
+
+  /**
+   * `POST /blob`: the headers decide whether to read; the body is read up to
+   * `MAX_UPLOAD_BYTES`; pi judges and fits the bytes; the store keeps them.
+   * Answers the `ImageRef`, or a status with the reason as text.
+   */
+  async function receiveBlob(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const refuse = (status: number, reason: string) => {
+      res.writeHead(status, { "content-type": "text/plain" }).end(reason)
+    }
+    const headers = planUploadHeaders({
+      contentType: req.headers["content-type"],
+      contentLength: req.headers["content-length"],
+    })
+    if (headers.kind === "refuse") {
+      // Not read, so the connection cannot be reused for another request.
+      res.setHeader("connection", "close")
+      refuse(headers.status, headers.reason)
+      req.destroy()
+      return
+    }
+    const chunks: Buffer[] = []
+    let size = 0
+    try {
+      for await (const chunk of req as AsyncIterable<Buffer>) {
+        size += chunk.byteLength
+        if (size > MAX_UPLOAD_BYTES) {
+          res.setHeader("connection", "close")
+          refuse(413, "too large")
+          req.destroy()
+          return
+        }
+        chunks.push(chunk)
+      }
+    } catch {
+      return
+    }
+    const prepared = await prepareImage(Buffer.concat(chunks))
+    if (!prepared.ok) {
+      refuse(415, prepared.reason)
+      return
+    }
+    const { ok: _, ...image } = prepared
+    let ref: ImageRef
+    try {
+      ref = blobs.put(image)
+    } catch (error) {
+      // The store closes with the host: an upload can outlive it.
+      refuse(503, error instanceof Error ? error.message : String(error))
+      return
+    }
+    res
+      .writeHead(201, { "content-type": "application/json" })
+      .end(JSON.stringify(ref))
+  }
 
   // ROUTE the upgrade. `noServer` + an explicit /ws test is what lets our sync
   // socket and Vite's HMR socket share a port: anything that is not /ws falls
@@ -1157,10 +1315,7 @@ export async function startHost({
   // Handling every upgrade here — which is what this did before Vite — would
   // swallow HMR silently.
   httpServer.on("upgrade", (req, socket, head) => {
-    const admission = admits(
-      { url: req.url ?? "/", cookie: req.headers.cookie },
-      key,
-    )
+    const admission = admits(requestFacts(req), key)
     if (admission.kind === "refuse") {
       socket.end("HTTP/1.1 403 Forbidden\r\n\r\n")
       return
