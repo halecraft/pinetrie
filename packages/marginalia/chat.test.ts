@@ -369,25 +369,28 @@ describe("outbox", () => {
     const [h] = heldMessages([{ value: held("1-a", "t-1") }])
     expect(h?.kind).toBe("chat")
   })
-  test("a held landing decodes as one, runs the agent, and is its asker's", () => {
-    const land = {
-      kind: "land",
+  test("a held update decodes as one, may run the agent, and is its asker's", () => {
+    const update = {
+      kind: "update",
       id: "1-a",
       lane: "t-1",
       by: ALICE,
       timestamp: 1,
     }
     const [h] = heldMessages([
-      { value: land },
-      { value: { ...land, id: "2-b", by: 3 } },
+      { value: update },
+      { value: { ...update, id: "2-b", by: 3 } },
     ])
-    expect(h).toMatchObject({ kind: "land", by: ALICE })
+    expect(h).toMatchObject({ kind: "update", by: ALICE })
     expect(h === undefined ? null : [heldRuns(h), heldBy(h)]).toEqual([
       true,
       ALICE,
     ])
     expect(
-      heldMessages([{ value: land }, { value: { ...land, id: "2-b", by: 3 } }]),
+      heldMessages([
+        { value: update },
+        { value: { ...update, id: "2-b", by: 3 } },
+      ]),
     ).toHaveLength(1)
   })
 })
@@ -415,15 +418,15 @@ describe("draining, settling and starting up", () => {
       kind: "run",
     })
     expect(planDrain([], LANE1)).toEqual({ kind: "idle" })
-    const land = {
-      kind: "land" as const,
+    const update = {
+      kind: "update" as const,
       id: "0-z",
       lane: LANE1,
       by: ALICE,
       timestamp: 1,
     }
-    expect(planDrain([land, held("1-a", NOBODY)], LANE1)).toMatchObject({
-      kind: "land",
+    expect(planDrain([update, held("1-a", NOBODY)], LANE1)).toMatchObject({
+      kind: "update",
     })
   })
   test("settleRun: a refused run keeps the message; an admitted one is done", () => {

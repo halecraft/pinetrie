@@ -156,9 +156,16 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
         : { command: entry.message.command }),
     }
   }
-  // A land message (ADR-0033) shows as its short line: the reader decodes it
-  // into role `land` with that line as its content.
-  if (role !== "user" && role !== "assistant" && role !== "land") return null
+  // A land, update or stack message (ADR-0033, ADR-0038) shows as its short
+  // line: the reader decodes it into its role with that line as its content.
+  if (
+    role !== "user" &&
+    role !== "assistant" &&
+    role !== "land" &&
+    role !== "update" &&
+    role !== "stack"
+  )
+    return null
   const message = { id: entry.id, role, text: messageText(entry.message) }
   const calls = role === "assistant" ? toolCallsOf(entry.message) : []
   return calls.length === 0 ? message : { ...message, toolCalls: calls }
@@ -217,8 +224,16 @@ export function turnEntry(index: TreeIndex, tip: string): EntryId {
   }
 }
 
-/** The roles a run can start with: a person's message, pi's own, or a land message. */
-const PROMPT_ROLES: ReadonlySet<string> = new Set(["chat", "user", "land"])
+/**
+ * The roles a run can start with: a person's message, pi's own, a land message
+ * or a stack message. An update never starts one: it is a fact in the thread.
+ */
+const PROMPT_ROLES: ReadonlySet<string> = new Set([
+  "chat",
+  "user",
+  "land",
+  "stack",
+])
 
 /**
  * The prompt of the run that wrote `tip`: its nearest ancestor-or-self a run

@@ -86,10 +86,10 @@ are the only code that builds or reads the shape.
 
 A thread's lane is never written while it runs (S21), so every message for a
 busy thread waits in `pineta.outbox`, keyed by its own id (ADR-0016), with a
-total decoder like every shape here. A landing waits there too (ADR-0033): a
-held item is `kind: "chat"` or `kind: "land"`, and a record stored before
-landings, with no `kind`, decodes as a chat. `heldBy` and `heldRuns` read
-either kind; `planDrain` takes a held landing as a run. Ids are uuidv7, so `heldMessages` sorts
+total decoder like every shape here. An update waits there too (ADR-0038): a
+held item is `kind: "chat"` or `kind: "update"`, and a record with no `kind`
+decodes as a chat. `heldBy` and `heldRuns` read either kind; `planDrain`
+takes a held update, which may run the resolution. Ids are uuidv7, so `heldMessages` sorts
 into send order, and `nextHeld` takes a lane's oldest. "A lane with messages
 waiting" counts as busy even between two of them, or a new message would jump
 the queue. The host executes three pure decisions from here:
@@ -161,9 +161,9 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   root stays writable to the host's policy, as ADR-0026 requires (a refused
   write cannot be recovered from, S28); the screen offers no editor there.
 
-# Where lanes work (`work.ts`, ADR-0032, ADR-0034)
+# Where lanes work (`work.ts`, ADR-0032 to ADR-0034, ADR-0038)
 
-Four host-written records, each with a total decoder. `encodeWorkRecord` is
+Host-written records, each with a total decoder. `encodeWorkRecord` is
 the one place their namespaces and keys are chosen, and the agent writes them
 through one `setWorkRecord`:
 
@@ -171,7 +171,9 @@ through one `setWorkRecord`:
 |---|---|---|---|
 | a lane's setting: its own copy, or directly in a directory | `pineta.lane` | the lane | once, when the lane is created |
 | the commit and disk at an entry | `pineta.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
-| how a landing ended | `pineta.landing` | its own id | when its run ends; again when taken |
+| how a resolution ended | `pineta.landing` | its own id | when its run ends |
+| a lane's offer in your repo | `pineta.offer` | the lane | when a trigger changed it, or it was taken |
+| a commit you have of a lane: delivered by a take, or a copy of your `@` | `pineta.have` | the commit | at a take, a fork from your `@`, and an update |
 | what the host found where it runs: `lanes`, or `direct` and why | `pineta.project` | `project` | at every start |
 
 - **Every run's prompt has a revision record**, so the nearest record above
@@ -189,30 +191,63 @@ through one `setWorkRecord`:
     as null. A project record of kind `workspaces` no longer decodes; the
     host rewrites it at start.
 - **`forkPoint`** is where a new lane of its own starts: the nearest snapshot
-  above it, else the base snapshot; and the nearest commit, else your `@-`,
-  with several commits when your `@` is a merge. The commit is always named:
-  a cloned disk carries its parent's working-copy change, and the fork's
-  first `jj new` must leave it.
+  above it, else the base snapshot; and the nearest commit, else a copy of
+  your `@` (ADR-0038), made in the lane on `@`'s parents so the lane sees your
+  uncommitted edits. The start is always named: a cloned disk carries its
+  parent's working-copy change, and the fork must leave it.
 - **`planRetention`** keeps every snapshot of an open root, and each lane's
   newest when the root is archived; the base snapshot is never deleted.
 - **`showHostWorkingCopy`** shows a path under your working copy's root as the same
   path under `/mnt/host-working-copy`, whole path prefixes only. `planChat` applies it to a
   message's text when its thread works, or will work, in its own copy, so
   people and the model read the same stored text (ADR-0034).
-- **A landing in progress has no record**: it is a running lane whose prompt is
-  a land message. A `running` state would repeat that, and a crash would
-  leave it stale. A run whose prompt is a land message ends with the
-  landing's outcome, however it started: from a send, the outbox or a resume.
-- **`planLand`** refuses a lane with no copy of its own, and holds a
-  landing for a busy lane as it would a message (`isBusy`).
-- **`planTake`** takes only a resolved landing, and only while your `@-` is
-  the one it merged: `jj rebase -r @` moves only `@`, so a commit you made
-  since would drop out of `@`'s ancestry.
+- **A resolution in progress has no record**: it is a running lane whose
+  prompt is a land message. A `running` state would repeat that, and a crash
+  would leave it stale. A run whose prompt is a land message ends with its
+  outcome, however it started: from an update, the outbox or a resume.
+- **`planUpdate`** refuses a lane with no copy of its own, and holds an
+  update for a busy lane as it would a message (`isBusy`).
 - **`landingOutcome`** is resolved only when the agent did not ask for
   guidance and jj finds no conflicts: the agent can always stop, and can never
   claim a success the repository contradicts (ADR-0033).
 
-# Landing's prompt (`land.ts`, ADR-0033)
+# Offers (`offer.ts`, ADR-0038)
+
+A lane's work reaches you as an offer: one revision, or a stack, in your
+repo. The decisions are here; the jj steps that carry them out, and where an
+offer starts (`offerStart`), are `@pineta/lanes`'s.
+
+- **`planRefresh`** decides what a trigger does, from the lane's tip, where an
+  offer would start, and the offer's facts: `build` (none, or the last was
+  taken), `rebuild` (the lane moved under a single offer), `stale` (under a
+  stack), `refresh` (only the target moved), `leave` (you edited it), `repair`
+  (a race left it divergent), or `none`. An offer is edited when any of its
+  revisions fails any of three tests against what the host last wrote: the
+  description, `jj interdiff`, and the bottom's parent an ancestor of the
+  target (S48 item 7). A revision you edit is never touched again.
+- **`offerView`** is ADR-0038's state table: the column's line, its buttons,
+  and its menu. A resolution that asked for you counts only when newer than
+  the offer.
+- **`acceptStack`** takes an agent's stack only when its top has exactly the
+  tip's files.
+- **`describeRequest`** is the commit-message request: the skill, your
+  repo's recent messages, the thread's messages and the diff. Over its
+  budget, the thread's oldest messages go first, then the diff is cut; the
+  skill never is. `withTrailers` adds the host's own trailers, and
+  `placeholderDescription` is the line an offer carries until an agent
+  describes it.
+
+# Updates and stacks (`update.ts`, ADR-0038)
+
+Two pi `CustomMessage`s in `land.ts`'s pattern. An update (`pineta.update`,
+role `update`) is a fact in the thread, never a prompt: which of your commits
+came in and which files changed, so the agent's next run reads them again.
+`updatePrefill` is the composer's editable intent after a clean update. A
+stack message (`pineta.stack`, role `stack`) is the prompt of the run that
+splits an offer: the `offer-stack` skill, the commit the stack starts from,
+the tip it must match, and the bookmark to leave on it.
+
+# The resolution's prompt (`land.ts`, ADR-0033)
 
 A land message is a pi `CustomMessage`, `customType: "pineta.land"`, like a
 chat. Its `content` is what the model reads: the resolution skill, then each

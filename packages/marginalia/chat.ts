@@ -33,6 +33,7 @@ import {
 import { type Static, Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { decodeLand, landLine } from "./land.ts"
+import { decodeStack, decodeUpdate, stackLine, updateLine } from "./update.ts"
 import { showHostWorkingCopy } from "./work.ts"
 
 export const CHAT_TYPE = "pineta.chat"
@@ -147,8 +148,9 @@ export const decodeChat = (message: unknown): ChatDetails | undefined =>
 
 /**
  * The text of any citable message: a chat's own `text`, never its attributed
- * `content`, so a span covers exactly what its author wrote; a land message's
- * one line, never the prompt the model read; otherwise pi's message text. The
+ * `content`, so a span covers exactly what its author wrote; a land, update
+ * or stack message's one line, never what the model read; otherwise pi's
+ * message text. The
  * one definition shared by citing and rendering.
  */
 export function entryText(message: unknown): string {
@@ -156,17 +158,27 @@ export function entryText(message: unknown): string {
   if (chat !== undefined) return chat.text
   const land = decodeLand(message)
   if (land !== undefined) return landLine(land)
+  const update = decodeUpdate(message)
+  if (update !== undefined) return updateLine(update)
+  const stack = decodeStack(message)
+  if (stack !== undefined) return stackLine(stack)
   return messageText(message as AgentMessageLike)
 }
 
 /**
  * A stored message -> what the projections render. A chat becomes role `chat`
- * with its author; a land message becomes role `land` with its one line
- * (ADR-0033); anything else passes through unchanged for `core` to judge.
+ * with its author; a land, update or stack message becomes role `land`,
+ * `update` or `stack` with its one line (ADR-0033, ADR-0038); anything else
+ * passes through unchanged for `core` to judge.
  */
 export function renderableMessage(message: unknown): AgentMessageLike {
   const land = decodeLand(message)
   if (land !== undefined) return { role: "land", content: landLine(land) }
+  const update = decodeUpdate(message)
+  if (update !== undefined)
+    return { role: "update", content: updateLine(update) }
+  const stack = decodeStack(message)
+  if (stack !== undefined) return { role: "stack", content: stackLine(stack) }
   const chat = decodeChat(message)
   return chat === undefined
     ? (message as AgentMessageLike)

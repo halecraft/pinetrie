@@ -59,6 +59,7 @@ import {
   readLaneRecords,
   readLanes,
   readNotes,
+  readOffers,
   readOutbox,
   readParticipantNames,
   readPresence,
@@ -1067,6 +1068,10 @@ invariants("end")
     `a running command's output streamed live (${toolTexts.length} updates), matching its result`,
   )
   ok(readStreams(th.doc).length === 0, "when the tool ended, its stream closed")
+  ok(
+    readOffers(th.doc).size === 0,
+    "a thread working directly has no offer: its work is already in your files",
+  )
   // The run's end compacted the session (ADR-0023): the store holds the
   // document as it stands, not the run's edits. Whole-value streams are guarded
   // by `planStream`'s unit test, since compaction would hide them here.

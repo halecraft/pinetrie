@@ -1,7 +1,8 @@
-// land — the prompt of a landing run (ADR-0033).
+// land — the prompt of a resolution run (ADR-0033, ADR-0038).
 //
-// Landing merges your work into a lane, in the lane's own copy, and the agent
-// then resolves what conflicts. The run starts with a land message: a pi
+// An update that conflicts merges your work into a lane, in the lane's own
+// copy, and the agent then resolves what conflicts. The run starts with a land
+// message: a pi
 // `CustomMessage`, like chat, whose `content` is what the model reads (the
 // resolution skill and the conflict material) and whose `details` are what the
 // column shows (one short line, and the files). The model never reads the
@@ -19,10 +20,10 @@ import { decodeWith } from "./decode.ts"
 export const LAND_TYPE = "pineta.land"
 
 const LandDetailsSchema = Type.Object({
-  /** The landing's id: its record takes it when the run ends. */
+  /** The resolution's id: its record takes it when the run ends. */
   landing: Type.String({ minLength: 1 }),
   lane: Type.String({ minLength: 1 }),
-  /** Your `@-` when it merged. */
+  /** The copy of your `@` that was merged. */
   yours: Type.Array(Type.String({ minLength: 1 })),
   /** The files that conflicted when it merged. */
   files: Type.Array(Type.String()),
@@ -49,7 +50,7 @@ export interface LandDetails {
   readonly by: WriterId
 }
 
-/** The pi `CustomMessage` a landing's prompt is stored as. */
+/** The pi `CustomMessage` a resolution's prompt is stored as. */
 export interface LandMessage {
   readonly role: "custom"
   readonly customType: typeof LAND_TYPE
@@ -75,8 +76,8 @@ export const decodeLand = (message: unknown): LandDetails | undefined =>
 /** The one line a column shows for a land message. */
 export const landLine = (d: LandDetails): string =>
   d.files.length === 0
-    ? "✓ landing your work: no conflicts"
-    : `⚠ landing your work: ${d.files.length} ${d.files.length === 1 ? "file conflicts" : "files conflict"}`
+    ? "✓ resolving your work: no conflicts"
+    : `⚠ resolving your work: ${d.files.length} ${d.files.length === 1 ? "file conflicts" : "files conflict"}`
 
 /** One side of a conflicted file, labelled: why it changed, as the tree says. */
 export interface Side {
@@ -98,7 +99,7 @@ export interface ConflictFile {
 }
 
 /**
- * The land message for a landing: the skill's text, then each conflicted
+ * The land message for a resolution: the skill's text, then each conflicted
  * file with both sides labelled (ADR-0010: the labels are always present and
  * the destination's side is never dropped). Over `budget` characters, each
  * side's reasons are trimmed, oldest first; a file's content never is.

@@ -17,8 +17,10 @@ import {
   type NoteId,
   type NoteRecord,
   nearestRevision,
+  type OfferRecord,
   type Position,
   type ProjectRecord,
+  promptOf,
   type ReferenceTarget,
   type RevisionRecord,
   ROOT,
@@ -33,12 +35,17 @@ import {
   draftFor,
   type Held,
   noteEntry,
+  type OfferActivity,
+  type OfferButton,
+  type OfferView,
+  offerView,
   type ReferenceIndex,
 } from "@pineta/marginalia"
 import { readStreams, type SessionDocHandle } from "@pineta/schema"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { Column as ColumnSpec } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
+import { Menu } from "./menu.tsx"
 import { Message } from "./message.tsx"
 import { MessageText } from "./message-text.tsx"
 import { speakerLabel, withContributors } from "./names.ts"
@@ -114,6 +121,8 @@ export interface WorkFacts {
   readonly lanes: ReadonlyMap<string, LaneRecord>
   readonly revisions: ReadonlyMap<string, RevisionRecord>
   readonly landings: readonly LandingRecord[]
+  /** Each lane's offer in your repo (ADR-0038). */
+  readonly offers: ReadonlyMap<string, OfferRecord>
 }
 
 /**
@@ -181,7 +190,8 @@ export function Column(p: ColumnProps) {
     thread.kind === "thread" ? thread.lane : { kind: "none" }
   const waiting =
     lane.kind === "lane" ? p.outbox.filter(h => h.lane === lane.name) : []
-  // Where this thread's lane works, and its latest landing (ADR-0032, 0033).
+  // Where this thread's lane works, its latest resolution and its offer
+  // (ADR-0032, ADR-0033, ADR-0038).
   const laneRecord =
     lane.kind === "lane" ? p.work.lanes.get(lane.name) : undefined
   const where = whereLabel(
@@ -194,11 +204,33 @@ export function Column(p: ColumnProps) {
     lane.kind === "lane"
       ? p.work.landings.filter(l => l.lane === lane.name).at(-1)
       : undefined
-  const canLand =
+  const laneView =
+    lane.kind === "lane" ? p.lanes.find(l => l.name === lane.name) : undefined
+  const offer =
     writable &&
     lane.kind === "lane" &&
     laneRecord?.work.kind === "own" &&
     p.work.project?.kind === "lanes"
+      ? offerView({
+          offer: p.work.offers.get(lane.name),
+          activity: activityOf(index, laneView),
+          landing,
+        })
+      : null
+  // An update's intent, put in this column's composer (ADR-0038).
+  const [prefill, setPrefill] = useState<{
+    readonly text: string
+    readonly key: number
+  } | null>(null)
+  const act = (button: OfferButton) => {
+    if (lane.kind !== "lane") return
+    if (button === "update" || button === "resolve")
+      void p.session.update(lane.name).then(outcome => {
+        if (outcome.kind === "updated" && outcome.text !== "")
+          setPrefill({ text: outcome.text, key: Date.now() })
+      })
+    else void p.session.offer(lane.name, button)
+  }
   // Where a lane this column's next send creates would work, before a choice.
   const defaultWork = workFor({
     choice: null,
@@ -294,27 +326,9 @@ export function Column(p: ColumnProps) {
             {where}
           </span>
         )}
-        {canLand &&
-          lane.kind === "lane" &&
-          (landing?.state === "resolved" ? (
-            <button
-              className="take"
-              onClick={() => void p.session.take(lane.name)}
-              title={`put your working copy on this thread's work: jj rebase -r @ -d ${landing.result.slice(0, 12)}`}
-              type="button"
-            >
-              take into my working copy
-            </button>
-          ) : (
-            <button
-              className="land"
-              onClick={() => void p.session.land(lane.name)}
-              title="merge your committed work into this thread's own copy; the agent resolves any conflicts"
-              type="button"
-            >
-              {landing?.state === "needs_you" ? "land again" : "land your work"}
-            </button>
-          ))}
+        {offer !== null && lane.kind === "lane" && (
+          <OfferLine act={act} lane={lane.name} view={offer} />
+        )}
         <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={p.seenBy} />
         {p.position > 0 && (
           <button className="make-main" onClick={p.onMakeMain} type="button">
@@ -412,7 +426,7 @@ export function Column(p: ColumnProps) {
           {waiting.map((h, n) => (
             <div className="msg waiting" data-held={h.id} key={h.id}>
               <span className="role">
-                {h.kind === "land"
+                {h.kind === "update"
                   ? displayName(h.by, p.nameOf.get(h.by))
                   : withContributors(
                       speakerLabel(
@@ -426,8 +440,8 @@ export function Column(p: ColumnProps) {
                     )}{" "}
                 · waiting · {n + 1} of {waiting.length}
               </span>
-              {h.kind === "land" ? (
-                <div className="land-waiting">landing your work</div>
+              {h.kind === "update" ? (
+                <div className="update-waiting">merging your work</div>
               ) : (
                 <MessageText mode="committed" text={h.details.text} />
               )}
@@ -502,6 +516,7 @@ export function Column(p: ColumnProps) {
         onTyping={p.onTyping}
         participants={p.participants}
         pending={p.column.fresh?.pending}
+        prefill={prefill}
         readOnly={p.readOnly}
         typing={p.typing.map(w => nameFor(p.nameOf, w))}
         session={p.session}
@@ -556,5 +571,84 @@ function LiveOutput({ text }: { text: string }) {
         {text}
       </code>
     </pre>
+  )
+}
+
+/** What a lane is running now, as its offer cares: a turn, a resolution, a split. */
+function activityOf(
+  index: TreeIndex,
+  view: LaneView | undefined,
+): OfferActivity {
+  if (view === undefined || !view.running) return "idle"
+  const prompt = promptOf(index, view.tip)
+  const role =
+    prompt === null ? undefined : index.entries[prompt]?.message?.role
+  return role === "land" ? "resolution" : role === "stack" ? "split" : "turn"
+}
+
+const BUTTON_LABEL: Record<OfferButton, string> = {
+  take: "take",
+  split: "split into a stack",
+  squash: "squash to one",
+  describe: "rewrite description",
+  refresh: "refresh (discards your edits)",
+  resolve: "resolve in the thread",
+  update: "update from my work",
+}
+
+/**
+ * A lane's offer in your repo, in its column's header (ADR-0038): its line,
+ * its buttons, and a menu for the rest. The bookmark it names is the one to
+ * look for in jj or jjui.
+ */
+function OfferLine({
+  view,
+  lane,
+  act,
+}: {
+  view: OfferView
+  lane: string
+  act: (button: OfferButton) => void
+}) {
+  const label = (b: OfferButton) =>
+    b === "take" && view.state === "stack"
+      ? "take stack"
+      : b === "take" && view.state === "stale"
+        ? "take stack and the rest"
+        : b === "take" &&
+            (view.state === "conflicts" || view.state === "needs_you")
+          ? "take anyway"
+          : b === "split" && view.state === "stale"
+            ? "split again"
+            : BUTTON_LABEL[b]
+  return (
+    <span className="offer" data-lane={lane} data-state={view.state}>
+      {view.line !== "" && <span className="offer-line">{view.line}</span>}
+      {view.buttons.map(b => (
+        <button
+          className={`offer-${b}`}
+          key={b}
+          onClick={() => act(b)}
+          type="button"
+        >
+          {label(b)}
+        </button>
+      ))}
+      {view.menu.length > 0 && (
+        <Menu
+          className="offer-more"
+          items={view.menu.map(b => ({
+            key: b,
+            label: BUTTON_LABEL[b],
+            className: `offer-${b}`,
+            onChoose: () => act(b),
+          }))}
+          label="more for this thread's offer"
+          title="this thread's offer"
+          trigger="⋯"
+          triggerClassName="offer-more-trigger"
+        />
+      )}
+    </span>
   )
 }

@@ -40,9 +40,11 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     the note `targetId`.
  *   - `archive` hides the root `targetId` for everyone, or restores it
  *     (ADR-0029); `mode` names the action, `archive` or `restore`.
- *   - `land` merges your work into the thread whose lane is `lane`, and runs
- *     the agent's resolution (ADR-0033); `take` puts your working copy on that
- *     lane's resolved landing.
+ *   - `update` merges your work into the thread whose lane is `lane`
+ *     (ADR-0038); the agent's resolution runs only when it conflicts
+ *     (ADR-0033).
+ *   - `offer` acts on that lane's offer in your repo; `mode` names the
+ *     action: `take`, `split`, `squash`, `describe` or `refresh`.
  */
 export const COMMAND_KINDS = [
   "chat",
@@ -51,8 +53,8 @@ export const COMMAND_KINDS = [
   "stop",
   "note",
   "archive",
-  "land",
-  "take",
+  "update",
+  "offer",
 ] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -109,6 +111,8 @@ export const OUTCOME_KINDS = [
   "archived",
   "restored",
   "taken",
+  "updated",
+  "offered",
   "refused",
 ] as const
 export type OutcomeKind = (typeof OUTCOME_KINDS)[number]
@@ -129,6 +133,8 @@ export interface Reply {
   readonly by: string
   /** `noted`: the note's id; "" otherwise. */
   readonly noteId: string
+  /** `updated`: the composer's prefill after a clean update; "" otherwise. */
+  readonly text: string
 }
 
 /**
@@ -162,6 +168,7 @@ export const EMPTY_REPLY: Reply = Object.freeze({
   position: -1,
   by: "",
   noteId: "",
+  text: "",
 })
 
 export const command = (fields: Partial<Command>): Command => ({

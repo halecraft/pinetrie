@@ -1,5 +1,5 @@
-// client/header — who is here, what the agent is doing, and your inbox of
-// mentions (ADR-0030). Your tabs are your view; this is the rest of the
+// client/header — who is here, what the agent is doing, the threads with an
+// offer in your repo (ADR-0038), and your inbox of mentions (ADR-0030). Your tabs are your view; this is the rest of the
 // session. People and the agent come from live data (presence, the running
 // lanes), the inbox from the tree and this device's seen state. Nothing here
 // opens a tab until you choose.
@@ -28,6 +28,7 @@ export function Header({
   colorOf,
   mentions,
   inbox,
+  offers,
   onOpen,
 }: {
   people: readonly PersonHere[]
@@ -39,6 +40,8 @@ export function Header({
   colorOf: (writer: WriterId) => string
   mentions: readonly InboxItem[]
   inbox: InboxView
+  /** Threads with an offer open in your repo, at their lane's tip (ADR-0038). */
+  offers: readonly { readonly lane: string; readonly tip: string }[]
   /** Open an entry as your tab (`planOpen`). */
   onOpen: (id: string) => void
 }) {
@@ -93,6 +96,26 @@ export function Header({
           />
         )}
       </div>
+      {offers.length > 0 && (
+        <Menu
+          className="offers"
+          heading="Offers in your repo"
+          items={offers.map(o =>
+            thread(o.lane, o.tip, rootOf(index, o.tip) ?? o.tip),
+          )}
+          label={`${offers.length} ${offers.length === 1 ? "offer" : "offers"} ready in your repo`}
+          title="offers ready to take"
+          trigger={
+            <>
+              <span className="offer-mark">⇣</span>
+              <span className="offers-count" data-offers={offers.length}>
+                {offers.length}
+              </span>
+            </>
+          }
+          triggerClassName="offers-trigger"
+        />
+      )}
       <InboxMenu
         inbox={inbox}
         labelOf={labelOf}

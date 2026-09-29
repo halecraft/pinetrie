@@ -1,11 +1,12 @@
 // host/work — lanes' containers and disks, as the host carries them out
-// (ADR-0032, ADR-0033, ADR-0034).
+// (ADR-0032 to ADR-0034, ADR-0038).
 //
 // The decisions are pure and live in core, marginalia and lanes; this module
 // gathers what they need, calls them, and executes. It holds the only state
 // that is not in the document, in jj, or on a lane's disk: each running lane's
 // handle (its queue, and its channel once open), the images and runtime once
-// ready, and which landing runs asked for guidance.
+// ready, and which resolution runs asked for guidance. Offers are
+// `offers.ts`'s.
 
 import { createHash } from "node:crypto"
 import { mkdtemp, rm, stat } from "node:fs/promises"
@@ -38,6 +39,7 @@ import {
 import {
   BASE_LANE,
   bookmarkOf,
+  COPY_MESSAGE,
   checkImage,
   commitsOf,
   commitTurn,
@@ -46,15 +48,15 @@ import {
   containerFacts,
   type DiskPaths,
   decodeLaneConfig,
-  deleteBookmark,
   ensureRuntime,
   entryOfMessage,
+  executeOnHost,
   executeOrThrow,
-  fetchById,
   gatherLinks,
   helperCommand,
   hostGit,
   hostJj,
+  hostOps,
   imagePath,
   type LaneHandle,
   type LaneSpec,
@@ -62,6 +64,9 @@ import {
   laneHandle,
   laneIgnoreDir,
   laneJj,
+  laneRefSteps,
+  laneStackName,
+  lines,
   type Mount,
   mergeYours,
   NO_GRANTS,
@@ -77,6 +82,7 @@ import {
   planMounts,
   planSnapshot,
   planStart,
+  planYourCopy,
   prepareHost,
   prepareImages,
   prepareShared,
@@ -85,25 +91,29 @@ import {
   removeContainer,
   removeLane,
   removeSnapshots,
-  setBookmark,
   sideHistory,
   snapshotExists,
   specHashOf,
-  takeInto,
+  stackBookmark,
   trim,
   volumeExists,
+  yoursAt,
   yoursNow,
 } from "@pineta/lanes"
 import {
   type ConflictFile,
   decodeLand,
+  decodeStack,
+  encodeUpdate,
   forkPoint,
   type LandMessage,
   landingOutcome,
   planResolution,
   planRetention,
-  planTake,
+  planStack,
   planTurnRecord,
+  type StackMessage,
+  updatePrefill,
 } from "@pineta/marginalia"
 import {
   type Agent,
@@ -115,7 +125,6 @@ import {
   openChannel,
 } from "@pineta/pi"
 import {
-  readLandings,
   readLaneRecords,
   readLanes,
   readRevisions,
@@ -126,6 +135,7 @@ import {
   readLaneTip,
   type SessionDocHandle,
 } from "@pineta/schema"
+import { type Offers, startOffers } from "./offers.ts"
 
 /** How long a resolution prompt's reasons may run before the oldest go (ADR-0033). */
 const RESOLUTION_BUDGET = 60_000
@@ -152,17 +162,33 @@ export interface LaneWork {
   ): Promise<void>
   /** Before any run: queue a lane of its own's container to start. */
   beforeRun(lane: LaneName): void
-  /** After a run: stop its container and trim its disk, in the background. */
+  /** After a run: stop its container, trim its disk, and follow its offer. */
   runEnded(lane: LaneName): void
-  /** Merge your work into the lane and build its land message; or why not. */
-  prepareLanding(
+  /**
+   * Merge a copy of your `@` into the lane (ADR-0038). Clean: the update is
+   * appended to the thread, and its prefill returned. Conflicted: the land
+   * message for the resolution run. Nothing new: nothing to do.
+   */
+  prepareUpdate(
     lane: LaneName,
     by: WriterId,
-  ): Promise<LandMessage | { readonly refused: string }>
-  /** A landing run ended: its outcome, from the repository. */
+  ): Promise<
+    | { readonly kind: "clean"; readonly prefill: string }
+    | { readonly kind: "conflicted"; readonly message: LandMessage }
+    | { readonly kind: "nothing" }
+    | { readonly refused: string }
+  >
+  /** A resolution run ended: its outcome, from the repository. */
   landingEnded(lane: LaneName, prompt: EntryId): Promise<void>
-  /** Take a lane's resolved landing into your working copy. */
-  take(lane: LaneName): Promise<ErrCode | null>
+  /** The prompt of a split's run: the stack's span and the skill. */
+  prepareSplit(
+    lane: LaneName,
+    by: WriterId,
+  ): Promise<StackMessage | { readonly refused: string }>
+  /** A split's run ended: its stack, checked, becomes the offer, or why not. */
+  splitEnded(lane: LaneName, prompt: EntryId): Promise<string | null>
+  /** Each lane's offer in your repo; null with no lanes of their own. */
+  readonly offers: Offers | null
   /** A root was archived or restored: its lanes' disks and bookmarks follow. */
   archived(root: string): Promise<void>
   restored(root: string): Promise<void>
@@ -237,7 +263,7 @@ export async function startLaneWork(input: {
     else log(`[host] lanes work directly in ${project.root}: ${project.reason}`)
   }
 
-  /** Landing runs whose agent called `ask_for_guidance`. */
+  /** Resolution runs whose agent called `ask_for_guidance`. */
   const asked = new Set<LaneName>()
   /** Each lane of its own's handle, while the host may run it. */
   const handles = new Map<LaneName, LaneHandle<LaneChannel>>()
@@ -547,15 +573,17 @@ export async function startLaneWork(input: {
   }
 
   /**
-   * Fetch the lane's bookmark into your repo. The bundle is made on the lane's
+   * Fetch the lane's bookmark into your repo, as its remote bookmark, or with
+   * `stack` a split's stack (ADR-0038). The bundle is made on the lane's
    * queue, since it needs the lane running: about 30 ms (S43 item 8), and a
    * container stopped since is started for it, then stopped. Your repo
-   * fetches it on the lane's fetch queue, which tools never wait on; `take`
-   * does.
+   * fetches it on the lane's fetch queue, which tools never wait on; then the
+   * lane's offer follows.
    */
   function fetchLane(
     lane: LaneName,
     have: readonly (CommitId | null)[],
+    stack = false,
   ): Promise<void> {
     if (root === null) return Promise.resolve()
     const at = root
@@ -565,13 +593,20 @@ export async function startLaneWork(input: {
         (await containerFacts(handle.container)).state !== "running"
       if (stopped) await startContainer(lane)
       try {
-        if ((await bookmarkOf(laneJjOf(lane), lane)) === null) return null
+        const bookmark = stack
+          ? await commitsOf(
+              laneJjOf(lane),
+              `present(bookmarks(exact:"${stackBookmark(lane)}"))`,
+            ).then(c => c[0] ?? null)
+          : await bookmarkOf(laneJjOf(lane), lane)
+        if (bookmark === null) return null
         const dir = await mkdtemp(path.join(tmpdir(), "pineta-bundle-"))
         const steps = planFetch({
           lane,
           have: await yoursHas(have),
           root: at,
           bundle: path.join(dir, "lane.bundle"),
+          stack,
         })
         await executeOrThrow(
           steps.filter(s => s.in === "lane"),
@@ -592,6 +627,7 @@ export async function startLaneWork(input: {
         } finally {
           await rm(made.dir, { recursive: true, force: true })
         }
+        if (!stack) offers?.touch(lane)
       }),
     ).catch(error =>
       log(
@@ -702,6 +738,111 @@ export async function startLaneWork(input: {
   const writeRevision = (record: RevisionRecord) =>
     input.agent().setWorkRecord({ kind: "revision", record })
 
+  /** A copy of your `@` made in a lane: a commit you have (ADR-0038). */
+  const writeCopy = (lane: LaneName, commit: CommitId) =>
+    input.agent().setWorkRecord({
+      kind: "have",
+      record: { lane, commit, kind: "copy", at: Date.now() },
+    })
+
+  /**
+   * An update's entry recorded as a revision, the merge its commit, with a
+   * snapshot, so a branch below it starts with the merged files. Your repo
+   * then fetches the merge, and the offer follows.
+   */
+  async function recordUpdate(
+    lane: LaneName,
+    entry: EntryId,
+    merge: CommitId,
+  ): Promise<void> {
+    const handle = handleOf(lane)
+    const disk = paths
+    const snapped =
+      disk === null
+        ? false
+        : await handle.queue
+            .enqueue(async () => {
+              await executeOrThrow(
+                planSnapshot({
+                  volume: handle.container,
+                  snapshot: snapshotId(entry),
+                  paths: disk,
+                }),
+                handle.runners,
+              )
+              return true
+            })
+            .catch(() => false)
+    await writeRevision({
+      entry,
+      lane,
+      commit: merge,
+      snapshot: snapped ? snapshotId(entry) : null,
+    })
+    void fetchLane(lane, [merge])
+  }
+
+  /**
+   * The install to run in a fork from a copy of your `@`: the base disk was
+   * installed at your `@-`, so a lockfile you changed since needs its own.
+   */
+  async function installIfLockMoved(at: string): Promise<string | null> {
+    const install = lanes?.config.install ?? null
+    if (install === null) return null
+    const jj = hostJj(at)
+    const hashAt = async (rev: string) => {
+      const shown = await jj([
+        "file",
+        "show",
+        "--ignore-working-copy",
+        "-r",
+        rev,
+        `root:${JSON.stringify(install.lockfile)}`,
+      ])
+      return shown.ok
+        ? createHash("sha256").update(shown.stdout).digest("hex")
+        : null
+    }
+    return (await hashAt("@")) === (await hashAt("@-")) ? null : install.command
+  }
+
+  /**
+   * After a run, or a clean update: stop the lane's container and trim its
+   * disk, and bring the lane's offer up to date and describe it.
+   */
+  function runEnded(lane: LaneName): void {
+    if (!isOwn(lane) || ready === null) return
+    offers?.runEnded(lane)
+    const handle = handleOf(lane)
+    void track(
+      handle.queue
+        .enqueue(async () => {
+          await handle.stop()
+          await trim(handle.container, (await ready).tools)
+        })
+        .catch(error =>
+          log(
+            `[host] lane ${lane.slice(-8)}: stopping or trimming failed: ${messageOf(error)}`,
+          ),
+        ),
+    )
+  }
+
+  /** Each lane's offer in your repo (ADR-0038); none without lanes of their own. */
+  const offers: Offers | null =
+    root === null
+      ? null
+      : startOffers({
+          root,
+          doc,
+          agent: input.agent,
+          running: lane =>
+            readLanes(doc, readTreeIndex(doc)).find(l => l.name === lane)
+              ?.running === true,
+          taken: () => refreshBaseSoon(),
+          log,
+        })
+
   function beforeRun(lane: LaneName): void {
     if (!isOwn(lane)) return
     const handle = handleOf(lane)
@@ -779,7 +920,7 @@ export async function startLaneWork(input: {
               )
               const point = forkPoint({
                 above,
-                yours: await yoursNow(hostJj(base)),
+                yours: await yoursAt(hostJj(base)),
               })
               await removeLane(handle.container)
               await executeOrThrow(
@@ -788,10 +929,20 @@ export async function startLaneWork(input: {
                   paths: disk,
                   spec: specOf(lane, r, base),
                   env: process.env,
+                  install:
+                    point.start.kind === "copy"
+                      ? await installIfLockMoved(base)
+                      : null,
                 }),
                 handle.runners,
               )
               await handle.start()
+              // A copy of your `@` is a commit you have: an offer starts
+              // above it, never handing your own edits back (ADR-0038).
+              if (point.start.kind === "copy") {
+                const copy = await bookmarkOf(laneJjOf(lane), lane)
+                if (copy !== null) await writeCopy(lane, copy)
+              }
               if (point.snapshot === BASE_SNAPSHOT) refreshBaseSoon()
             },
             { fatal: true },
@@ -806,33 +957,18 @@ export async function startLaneWork(input: {
 
     beforeRun,
 
-    runEnded(lane) {
-      if (!isOwn(lane) || ready === null) return
-      const handle = handleOf(lane)
-      void track(
-        handle.queue
-          .enqueue(async () => {
-            await handle.stop()
-            await trim(handle.container, (await ready).tools)
-          })
-          .catch(error =>
-            log(
-              `[host] lane ${lane.slice(-8)}: stopping or trimming failed: ${messageOf(error)}`,
-            ),
-          ),
-      )
-    },
+    runEnded,
 
-    async prepareLanding(lane, by) {
+    async prepareUpdate(lane, by) {
       if (!isOwn(lane) || root === null)
         return { refused: "the lane has no copy of its own" }
       try {
         beforeRun(lane)
         const handle = handleOf(lane)
         const jj = laneJjOf(lane)
-        const yours = await yoursNow(hostJj(root))
-        // execute: anything edited since the last run, your work fetched, the merge
-        const { ours } = await handle.queue.enqueue(async () => {
+        const yours = await yoursAt(hostJj(root))
+        // execute: anything edited since the last run, a copy of your @, the merge
+        const merged = await handle.queue.enqueue(async () => {
           const tip = readLaneTip(doc, lane)
           if (tip !== null)
             await commitTurn(jj, {
@@ -840,17 +976,66 @@ export async function startLaneWork(input: {
               entry: turnEntry(readTreeIndex(doc), tip),
               lane,
             })
-          await executeOrThrow([fetchById(yours)], handle.runners)
-          return mergeYours(jj, lane, yours)
+          await executeOrThrow(planYourCopy(yours), handle.runners)
+          const [copy] = await commitsOf(jj, "@-")
+          if (copy === undefined)
+            throw new Error("the copy of your @ is missing")
+          return { copy, ...(await mergeYours(jj, lane, [copy])) }
         })
+        const { copy, ours, merge } = merged
+        await writeCopy(lane, copy)
+        if (merge === null) return { kind: "nothing" }
+        const conflicted = await conflictsIn(jj)
+        if (conflicted.length === 0) {
+          // gather: what changed under the agent, and your commits that came in
+          const files = lines(
+            (
+              await handle.runners.lane([
+                "git",
+                "-C",
+                WORKSPACE_ROOT,
+                "diff",
+                "--name-only",
+                ours,
+                merge,
+              ])
+            ).stdout,
+          )
+          const commits = (
+            await commitsOf(jj, `fork_point(${ours} | ${copy})..${copy}`)
+          ).filter(c => c !== copy)
+          const titles: string[] = []
+          for (const c of commits) {
+            const ran = await jj([
+              "log",
+              "--ignore-working-copy",
+              "--no-graph",
+              "-r",
+              c,
+              "-T",
+              "description.first_line()",
+            ])
+            if (ran.ok && ran.stdout.trim() !== COPY_MESSAGE)
+              titles.push(ran.stdout.trim())
+          }
+          const details = { lane, copy, commits: titles, files, by }
+          const appended = await input
+            .agent()
+            .lane(lane)
+            .append(encodeUpdate(details, Date.now()))
+          if (appended.kind === "appended")
+            await recordUpdate(lane, appended.id, merge)
+          runEnded(lane)
+          return { kind: "clean", prefill: updatePrefill(details) }
+        }
         // gather: each conflicted file, and why each side changed it
         const files: ConflictFile[] = []
-        for (const file of await conflictsIn(jj)) {
+        for (const file of conflicted) {
           const reasons = async (
             side: readonly CommitId[],
             asMessages: boolean,
           ) =>
-            (await sideHistory(jj, { ours, theirs: yours }, side, file)).map(
+            (await sideHistory(jj, { ours, theirs: [copy] }, side, file)).map(
               description =>
                 asMessages
                   ? reasonOf(description)
@@ -867,7 +1052,7 @@ export async function startLaneWork(input: {
             theirs: {
               label: "theirs",
               who: "your working copy",
-              reasons: await reasons(yours, false),
+              reasons: await reasons([copy], false),
             },
           })
         }
@@ -875,13 +1060,16 @@ export async function startLaneWork(input: {
           .agent()
           .skill("pineta:skill:resolve-conflicts")
         // plan
-        return planResolution({
-          skill,
-          files,
-          budget: RESOLUTION_BUDGET,
-          details: { landing: newId(), lane, yours, by },
-          timestamp: Date.now(),
-        })
+        return {
+          kind: "conflicted",
+          message: planResolution({
+            skill,
+            files,
+            budget: RESOLUTION_BUDGET,
+            details: { landing: newId(), lane, yours: [copy], by },
+            timestamp: Date.now(),
+          }),
+        }
       } catch (error) {
         return { refused: messageOf(error) }
       }
@@ -895,21 +1083,13 @@ export async function startLaneWork(input: {
       try {
         // The run recorded its last turn already, as every run does.
         const jj = laneJjOf(lane)
-        const [left, result] = await handleOf(lane).queue.enqueue(
-          async () =>
-            [await conflictsIn(jj), await bookmarkOf(jj, lane)] as const,
-        )
-        if (result === null) throw new Error("the lane has no bookmark")
-        // A merge with nothing to resolve made no turn: fetch it for `take`.
-        fetchLane(lane, [await bookmarkOf(hostJj(root), lane)])
+        const left = await handleOf(lane).queue.enqueue(() => conflictsIn(jj))
         await input.agent().setWorkRecord({
           kind: "landing",
           record: {
             id: details.landing,
             lane,
             prompt,
-            yours: details.yours,
-            result,
             state: landingOutcome({
               askedForGuidance: wasAsked,
               conflictsLeft: left.length,
@@ -920,49 +1100,82 @@ export async function startLaneWork(input: {
         })
       } catch (error) {
         log(
-          `[host] lane ${lane.slice(-8)}: the landing's outcome failed: ${messageOf(error)}`,
+          `[host] lane ${lane.slice(-8)}: the resolution's outcome failed: ${messageOf(error)}`,
         )
       }
     },
 
-    async take(lane) {
-      if (root === null) return ERR.NOT_OWN_COPY
-      const jj = hostJj(root)
-      const landing = readLandings(doc)
-        .filter(l => l.lane === lane)
-        .at(-1)
-      const planned = planTake({ landing, yoursNow: await yoursNow(jj) })
-      if (planned.kind === "refused" || landing === undefined)
-        return planned.kind === "refused" ? planned.code : ERR.REFUSED
-      await fetches.get(lane)
-      if ((await commitsOf(jj, `present(${planned.result})`)).length === 0)
-        fetchLane(lane, [await bookmarkOf(jj, lane)])
-      await fetches.get(lane)
-      await takeInto(jj, planned.result)
-      await input.agent().setWorkRecord({
-        kind: "landing",
-        record: { ...landing, state: "taken", at: Date.now() },
+    async prepareSplit(lane, by) {
+      if (!isOwn(lane) || root === null || offers === null)
+        return { refused: "the lane has no copy of its own" }
+      const span = await offers.stackSpan(lane)
+      if (span === null) return { refused: "the lane has nothing to offer" }
+      beforeRun(lane)
+      const skill = await input.agent().skill("pineta:skill:offer-stack")
+      return planStack({
+        skill,
+        bookmark: stackBookmark(lane),
+        details: { lane, start: span.start, tip: span.tip, by },
+        timestamp: Date.now(),
       })
-      refreshBaseSoon()
-      return null
+    },
+
+    async splitEnded(lane, prompt) {
+      const stored = readEntryMessage(doc, prompt)
+      const details = stored.present ? decodeStack(stored.message) : undefined
+      if (
+        !isOwn(lane) ||
+        root === null ||
+        details === undefined ||
+        offers === null
+      )
+        return null
+      try {
+        await fetchLane(lane, [details.tip, ...details.start], true)
+        const [top] = await commitsOf(
+          hostOps(root),
+          `present(${laneStackName(lane)})`,
+        )
+        const refused = await offers.stackEnded(lane, {
+          start: details.start,
+          tip: details.tip,
+          top: top ?? null,
+        })
+        // The lane goes on from its own tip, not from the stack's.
+        const jj = laneJjOf(lane)
+        await handleOf(lane).queue.enqueue(async () => {
+          const tip = await bookmarkOf(jj, lane)
+          if (tip !== null) await jj(["new", tip])
+        })
+        if (refused !== null)
+          log(`[host] lane ${lane.slice(-8)}: stack refused: ${refused}`)
+        return refused
+      } catch (error) {
+        return messageOf(error)
+      }
     },
 
     async archived(archivedRoot) {
       if (root === null || paths === null) return
       const disk = paths
       const lanes = lanesIn(archivedRoot)
-      const jj = hostJj(root)
       for (const lane of lanes) {
         const handle = handles.get(lane)
         handles.delete(lane)
         await handle?.stop().catch(() => {})
         await removeLane(laneContainer(lane))
-        await deleteBookmark(jj, lane).catch(error =>
-          log(
-            `[host] deleting ${lane.slice(-8)}'s bookmark failed: ${messageOf(error)}`,
-          ),
-        )
       }
+      // Their history leaves your repo: readable by id, out of every log.
+      await executeOnHost(
+        laneRefSteps(
+          root,
+          lanes.map(lane => ({ lane, commit: null })),
+        ),
+      ).catch(error =>
+        log(
+          `[host] deleting archived lanes' history failed: ${messageOf(error)}`,
+        ),
+      )
       const inRoot = new Set<string>(lanes)
       const doomed = planRetention({
         records: [...readRevisions(doc).values()].filter(r =>
@@ -979,30 +1192,31 @@ export async function startLaneWork(input: {
 
     async restored(restoredRoot) {
       if (root === null) return
-      const jj = hostJj(root)
       const index = readTreeIndex(doc)
       const revisions = readRevisions(doc)
-      for (const lane of lanesIn(restoredRoot)) {
+      const updates = lanesIn(restoredRoot).flatMap(lane => {
         const tip = readLaneTip(doc, lane)
-        if (tip === null) continue
+        if (tip === null) return []
         const { commit } = nearestRevision(index, revisions, {
           kind: "entry",
           id: tip as EntryId,
         })
-        if (commit !== null)
-          await setBookmark(jj, lane, commit).catch(error =>
-            log(
-              `[host] restoring ${lane.slice(-8)}'s bookmark failed: ${messageOf(error)}`,
-            ),
-          )
-      }
+        return commit === null ? [] : [{ lane, commit }]
+      })
+      await executeOnHost(laneRefSteps(root, updates)).catch(error =>
+        log(`[host] restoring lanes' history failed: ${messageOf(error)}`),
+      )
     },
 
     async quiet() {
       while (background.size > 0) await Promise.allSettled([...background])
+      await offers?.quiet()
     },
 
+    offers,
+
     async close() {
+      offers?.close()
       await Promise.all(
         [...handles.values()].map(h => h.stop().catch(() => {})),
       )

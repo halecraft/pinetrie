@@ -1,12 +1,12 @@
-// work — where lanes work, the disk and files at each entry, and landings
-// (ADR-0032, ADR-0033, ADR-0034).
+// work — where lanes work, the disk and files at each entry, resolutions,
+// offers, and what you have of lanes (ADR-0032 to ADR-0034, ADR-0038).
 //
-// Four host-written records, each a pi value under a `pineta.` namespace.
+// Host-written records, each a pi value under a `pineta.` namespace.
 // `encodeWorkRecord` is the one place their namespaces and keys are chosen;
-// each has a total decoder. The decisions a landing needs (`planLand`,
-// `planTake`, `landingOutcome`), what a turn records (`planTurnRecord`),
-// where a fork starts (`forkPoint`) and which snapshots go (`planRetention`)
-// are pure, over what the host gathers.
+// each has a total decoder. The decisions an update needs (`planUpdate`,
+// `landingOutcome`), what a turn records (`planTurnRecord`), where a fork
+// starts (`forkPoint`) and which snapshots go (`planRetention`) are pure,
+// over what the host gathers. An offer's own decisions are in `offer.ts`.
 
 import {
   type Above,
@@ -18,17 +18,21 @@ import {
   ERR,
   type ErrCode,
   entryId,
+  type ForkStart,
+  type HaveRecord,
   HOST_WORKING_COPY,
   isBusy,
   type LandingRecord,
   type LaneName,
   type LaneRecord,
   type LaneView,
+  type OfferRecord,
   type ProjectRecord,
   type RevisionRecord,
   type SnapshotId,
   snapshotId,
   type WriterId,
+  type YoursNow,
 } from "@pineta/core"
 import { Type } from "typebox"
 import { decodeAll, decodeWith } from "./decode.ts"
@@ -36,6 +40,8 @@ import { decodeAll, decodeWith } from "./decode.ts"
 export const LANE_NAMESPACE = "pineta.lane"
 export const REVISION_NAMESPACE = "pineta.revision"
 export const LANDING_NAMESPACE = "pineta.landing"
+export const OFFER_NAMESPACE = "pineta.offer"
+export const HAVE_NAMESPACE = "pineta.have"
 export const PROJECT_NAMESPACE = "pineta.project"
 /** The one `pineta.project` value's key: a host has one project. */
 export const PROJECT_KEY = "project"
@@ -96,14 +102,36 @@ const LandingRecordSchema = Type.Object({
   id: Type.String({ minLength: 1 }),
   lane: Type.String({ minLength: 1 }),
   prompt: Type.String({ minLength: 1 }),
-  yours: Type.Array(Type.String({ minLength: 1 })),
-  result: Type.String({ minLength: 1 }),
-  state: Type.Union([
-    Type.Literal("resolved"),
-    Type.Literal("needs_you"),
-    Type.Literal("taken"),
-  ]),
+  state: Type.Union([Type.Literal("resolved"), Type.Literal("needs_you")]),
   by: Type.String(),
+  at: Type.Number(),
+})
+
+const Commit = Type.String({ minLength: 1 })
+
+const OfferRecordSchema = Type.Object({
+  lane: Type.String({ minLength: 1 }),
+  size: Type.Integer({ minimum: 1 }),
+  stale: Type.Boolean(),
+  files: Type.Array(Type.String()),
+  conflicts: Type.Array(Type.String()),
+  yourEdits: Type.Array(Type.String()),
+  described: Type.Boolean(),
+  edited: Type.Boolean(),
+  bookmark: Type.String({ minLength: 1 }),
+  taken: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  at: Type.Number(),
+  host: Type.Object({
+    changes: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
+    wrote: Type.Array(Commit, { minItems: 1 }),
+    tip: Commit,
+  }),
+})
+
+const HaveRecordSchema = Type.Object({
+  lane: Type.String({ minLength: 1 }),
+  commit: Commit,
+  kind: Type.Union([Type.Literal("delivered"), Type.Literal("copy")]),
   at: Type.Number(),
 })
 
@@ -139,9 +167,25 @@ export const decodeLandingRecord = (
     ...r,
     lane: r.lane as LaneName,
     prompt: entryId(r.prompt),
-    yours: r.yours.map(commitId),
-    result: commitId(r.result),
     by: r.by as WriterId,
+  }))
+
+export const decodeOfferRecord = (value: unknown): OfferRecord | undefined =>
+  decodeWith(OfferRecordSchema, value, r => ({
+    ...r,
+    lane: r.lane as LaneName,
+    host: {
+      changes: r.host.changes,
+      wrote: r.host.wrote.map(commitId),
+      tip: commitId(r.host.tip),
+    },
+  }))
+
+export const decodeHaveRecord = (value: unknown): HaveRecord | undefined =>
+  decodeWith(HaveRecordSchema, value, r => ({
+    ...r,
+    lane: r.lane as LaneName,
+    commit: commitId(r.commit),
   }))
 
 /** The commands the host's pi loaded, as people see them (ADR-0036). */
@@ -158,6 +202,8 @@ export type WorkRecord =
   | { readonly kind: "lane"; readonly record: LaneRecord }
   | { readonly kind: "revision"; readonly record: RevisionRecord }
   | { readonly kind: "landing"; readonly record: LandingRecord }
+  | { readonly kind: "offer"; readonly record: OfferRecord }
+  | { readonly kind: "have"; readonly record: HaveRecord }
   | { readonly kind: "project"; readonly record: ProjectRecord }
   | { readonly kind: "commands"; readonly record: CommandsRecord }
 
@@ -184,6 +230,28 @@ export function encodeWorkRecord(r: WorkRecord): {
       return {
         namespace: LANDING_NAMESPACE,
         key: r.record.id,
+        value: { ...r.record },
+      }
+    case "offer":
+      return {
+        namespace: OFFER_NAMESPACE,
+        key: r.record.lane,
+        value: {
+          ...r.record,
+          files: [...r.record.files],
+          conflicts: [...r.record.conflicts],
+          yourEdits: [...r.record.yourEdits],
+          host: {
+            changes: [...r.record.host.changes],
+            wrote: [...r.record.host.wrote],
+            tip: r.record.host.tip,
+          },
+        },
+      }
+    case "have":
+      return {
+        namespace: HAVE_NAMESPACE,
+        key: r.record.commit,
         value: { ...r.record },
       }
     case "project":
@@ -228,6 +296,16 @@ export const landingRecords = (values: Stored): readonly LandingRecord[] =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
   )
 
+/** Stored `pineta.offer` values -> each lane's offer, by lane. */
+export const offerRecords = (
+  values: Stored,
+): ReadonlyMap<string, OfferRecord> =>
+  new Map(decodeAll(values, decodeOfferRecord).map(r => [r.lane, r]))
+
+/** Stored `pineta.have` values -> every commit you have of lanes. */
+export const haveRecords = (values: Stored): readonly HaveRecord[] =>
+  decodeAll(values, decodeHaveRecord)
+
 /** The stored `pineta.commands` value's commands; none before a host wrote one. */
 export const commandsRecord = (values: Stored): readonly CommandSummary[] =>
   decodeAll(values, decodeCommandsRecord)[0]?.commands ?? []
@@ -236,13 +314,14 @@ export const commandsRecord = (values: Stored): readonly CommandSummary[] =>
 export const projectRecord = (values: Stored): ProjectRecord | null =>
   decodeAll(values, decodeProjectRecord)[0] ?? null
 
-// ── landing ────────────────────────────────────────────────────────────────
+// ── updates ───────────────────────────────────────────────────────────────
 
 /**
- * What a `land` does. Only a lane with its own copy lands; a busy lane holds
- * it, as it would a message, which also covers a landing already running.
+ * What an `update` does. Only a lane with its own copy takes your work; a busy
+ * lane holds it, as it would a message, which also covers an update or a
+ * resolution already running.
  */
-export function planLand(input: {
+export function planUpdate(input: {
   readonly record: LaneRecord | undefined
   readonly view: LaneView | undefined
 }):
@@ -258,30 +337,8 @@ export function planLand(input: {
 }
 
 /**
- * What a `take` does: only a resolved landing, and only while your `@-` is
- * the one it merged. `jj rebase -r @` moves only `@`, so a commit you made
- * after landing would drop out of `@`'s ancestry.
- */
-export function planTake(input: {
-  readonly landing: LandingRecord | undefined
-  readonly yoursNow: readonly CommitId[]
-}):
-  | { readonly kind: "take"; readonly result: CommitId }
-  | { readonly kind: "refused"; readonly code: ErrCode } {
-  const { landing, yoursNow } = input
-  if (landing === undefined || landing.state !== "resolved")
-    return { kind: "refused", code: ERR.REFUSED }
-  const same =
-    landing.yours.length === yoursNow.length &&
-    landing.yours.every(c => yoursNow.includes(c))
-  return same
-    ? { kind: "take", result: landing.result }
-    : { kind: "refused", code: ERR.MOVED }
-}
-
-/**
- * How a landing ended. The agent can always stop by asking; it can never
- * claim a success the repository contradicts (ADR-0033).
+ * How a resolution run ended. The agent can always stop by asking; it can
+ * never claim a success the repository contradicts (ADR-0033).
  */
 export const landingOutcome = (input: {
   readonly askedForGuidance: boolean
@@ -323,22 +380,32 @@ export function planTurnRecord(input: {
 }
 
 /**
- * Where a new lane of its own starts: the nearest snapshot above it, else the
- * base snapshot; and the nearest commit above it, else your `@-`. The commit
- * is always named, because a cloned disk carries its parent's working-copy
- * change, and the fork's first `jj new` must leave it (S42 item 2). Several
- * commits when your `@` is a merge.
+ * Where a new lane of its own starts. With a revision above it: the nearest
+ * snapshot above, else the base snapshot, and that revision's commit. With
+ * none (a root thread, or a branch above any agent work): the base snapshot,
+ * and a copy of your `@` as it is now, made in the lane on `@`'s parents, so
+ * the lane sees your uncommitted edits (ADR-0038). Never `@` itself: that
+ * commit would come back into your repo with the lane's work and make your
+ * `@` divergent (S48 item 10). Either way the fork starts on a commit of its
+ * own, because a cloned disk carries its parent's working-copy change, which
+ * the fork must leave (S42 item 2).
  */
 export const forkPoint = (input: {
   readonly above: Above
-  readonly yours: readonly CommitId[]
+  readonly yours: YoursNow
 }): {
   readonly snapshot: SnapshotId
-  readonly commits: readonly CommitId[]
-} => ({
-  snapshot: input.above.snapshot ?? BASE_SNAPSHOT,
-  commits: input.above.commit === null ? input.yours : [input.above.commit],
-})
+  readonly start: ForkStart
+} =>
+  input.above.commit === null
+    ? {
+        snapshot: input.above.snapshot ?? BASE_SNAPSHOT,
+        start: { kind: "copy", ...input.yours },
+      }
+    : {
+        snapshot: input.above.snapshot ?? BASE_SNAPSHOT,
+        start: { kind: "commits", commits: [input.above.commit] },
+      }
 
 /**
  * The snapshots to delete. An open root keeps every one: any visible turn can

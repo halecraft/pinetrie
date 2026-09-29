@@ -18,6 +18,7 @@ import {
   type ChatMode,
   type CommandSummary,
   type EntryLike,
+  type HaveRecord,
   indexTree,
   type LandingRecord,
   type LaneName,
@@ -25,6 +26,7 @@ import {
   type LaneView,
   type NoteRecord,
   nearestRevision,
+  type OfferRecord,
   type Position,
   type ProjectRecord,
   type RevisionRecord,
@@ -41,7 +43,9 @@ import {
   COMMANDS_NAMESPACE,
   commandsRecord,
   decodeReference,
+  HAVE_NAMESPACE,
   type Held,
+  haveRecords,
   heldBy,
   heldMessages,
   heldRuns,
@@ -53,7 +57,9 @@ import {
   NOTE_NAMESPACE,
   noteAt,
   noteRecords,
+  OFFER_NAMESPACE,
   OUTBOX_NAMESPACE,
+  offerRecords,
   PARTICIPANT_NAMESPACE,
   PROJECT_NAMESPACE,
   participantNames,
@@ -298,9 +304,19 @@ export const readRevisions = (
 ): ReadonlyMap<string, RevisionRecord> =>
   revisionRecords(readValues(doc, REVISION_NAMESPACE))
 
-/** Every landing's record (`pineta.landing`), oldest first. */
+/** Every resolution's record (`pineta.landing`), oldest first. */
 export const readLandings = (doc: SessionDocHandle): readonly LandingRecord[] =>
   landingRecords(readValues(doc, LANDING_NAMESPACE))
+
+/** Each lane's offer in your repo (ADR-0038), by lane. */
+export const readOffers = (
+  doc: SessionDocHandle,
+): ReadonlyMap<string, OfferRecord> =>
+  offerRecords(readValues(doc, OFFER_NAMESPACE))
+
+/** The commits you have of lanes: delivered by a take, or copies of your `@`. */
+export const readHaves = (doc: SessionDocHandle): readonly HaveRecord[] =>
+  haveRecords(readValues(doc, HAVE_NAMESPACE))
 
 /** What the host found where it runs (`pineta.project`); null with no tools. */
 export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>

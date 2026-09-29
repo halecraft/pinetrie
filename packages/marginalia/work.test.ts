@@ -22,11 +22,10 @@ import {
   forkPoint,
   LAND_TYPE,
   landingOutcome,
-  planLand,
   planResolution,
   planRetention,
-  planTake,
   planTurnRecord,
+  planUpdate,
   recordChanged,
   renderableMessage,
   showHostWorkingCopy,
@@ -61,8 +60,6 @@ describe("records: one encoder, total decoders", () => {
     id: "l1",
     lane: LANE,
     prompt: entryId("e2"),
-    yours: [C1],
-    result: C2,
     state: "resolved",
     by: ADA,
     at: 2,
@@ -125,46 +122,21 @@ describe("landing", () => {
     by: ADA,
     createdAt: 1,
   }
-  test("planLand: an idle own lane starts, a busy one holds, a direct one is refused", () => {
-    expect(planLand({ record: own, view })).toEqual({ kind: "start" })
-    expect(planLand({ record: own, view: { ...view, running: true } })).toEqual(
-      {
-        kind: "hold",
-        position: 0,
-      },
-    )
+  test("planUpdate: an idle own lane starts, a busy one holds, a direct one is refused", () => {
+    expect(planUpdate({ record: own, view })).toEqual({ kind: "start" })
     expect(
-      planLand({
+      planUpdate({ record: own, view: { ...view, running: true } }),
+    ).toEqual({
+      kind: "hold",
+      position: 0,
+    })
+    expect(
+      planUpdate({
         record: { ...own, work: { kind: "direct", dir: "/x" } },
         view,
       }),
     ).toEqual({ kind: "refused", code: ERR.NOT_OWN_COPY })
-    expect(planLand({ record: undefined, view })).toMatchObject({
-      kind: "refused",
-    })
-  })
-  const landing: LandingRecord = {
-    id: "l1",
-    lane: LANE,
-    prompt: entryId("e2"),
-    yours: [C1],
-    result: C2,
-    state: "resolved",
-    by: ADA,
-    at: 2,
-  }
-  test("planTake: a resolved landing, while your @- is the one it merged", () => {
-    expect(planTake({ landing, yoursNow: [C1] })).toEqual({
-      kind: "take",
-      result: C2,
-    })
-    expect(planTake({ landing, yoursNow: [commitId("c9")] })).toEqual({
-      kind: "refused",
-      code: ERR.MOVED,
-    })
-    expect(
-      planTake({ landing: { ...landing, state: "needs_you" }, yoursNow: [C1] }),
-    ).toMatchObject({
+    expect(planUpdate({ record: undefined, view })).toMatchObject({
       kind: "refused",
     })
   })
@@ -239,23 +211,32 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
   })
 })
 
-describe("forkPoint: a snapshot to clone, and the commits to start on", () => {
+describe("forkPoint: a snapshot to clone, and what to start on", () => {
   const S = snapshotId("e")
-  const yours = [commitId("y1"), commitId("y2")]
+  const yours = {
+    at: commitId("w"),
+    parents: [commitId("y1"), commitId("y2")],
+  }
   test("from a turn: its snapshot and the commit above", () => {
     expect(
       forkPoint({ above: { lane: LANE, commit: C2, snapshot: S }, yours }),
-    ).toEqual({ snapshot: S, commits: [C2] })
+    ).toEqual({ snapshot: S, start: { kind: "commits", commits: [C2] } })
   })
   test("from a lane before lane containers: the base snapshot at its commit", () => {
     expect(
       forkPoint({ above: { lane: LANE, commit: C2, snapshot: null }, yours }),
-    ).toEqual({ snapshot: BASE_SNAPSHOT, commits: [C2] })
+    ).toEqual({
+      snapshot: BASE_SNAPSHOT,
+      start: { kind: "commits", commits: [C2] },
+    })
   })
-  test("from nothing: the base snapshot at your @-, every parent of it", () => {
+  test("from nothing: the base snapshot and a copy of your @, never @ itself (ADR-0038)", () => {
     expect(
       forkPoint({ above: { lane: null, commit: null, snapshot: null }, yours }),
-    ).toEqual({ snapshot: BASE_SNAPSHOT, commits: yours })
+    ).toEqual({
+      snapshot: BASE_SNAPSHOT,
+      start: { kind: "copy", at: yours.at, parents: yours.parents },
+    })
   })
 })
 
@@ -368,10 +349,10 @@ describe("planResolution: the land message", () => {
     expect(m.customType).toBe(LAND_TYPE)
     const shown = renderableMessage(m)
     expect(shown.role).toBe("land")
-    expect(shown.content).toBe("⚠ landing your work: 2 files conflict")
-    expect(entryText(m)).toBe("⚠ landing your work: 2 files conflict")
+    expect(shown.content).toBe("⚠ resolving your work: 2 files conflict")
+    expect(entryText(m)).toBe("⚠ resolving your work: 2 files conflict")
     expect(renderableMessage(plan([], 100_000)).content).toBe(
-      "✓ landing your work: no conflicts",
+      "✓ resolving your work: no conflicts",
     )
   })
 })

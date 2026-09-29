@@ -1,7 +1,7 @@
 # `@pineta/lanes`: technical notes
 
 This package covers a lane's Linux container on its own disk, and the jj and
-git run in it and in your repo (ADR-0032, ADR-0033, ADR-0034). It is the one
+git run in it and in your repo (ADR-0032 to ADR-0034, ADR-0038). It is the one
 package that runs `container`, `jj`, `git` and `cp`. It declares only
 `@pineta/core` (`workspace.test.ts`), and the client may not depend on it. It
 never imports pi (ADR-0003): the channel into a lane is `packages/pi`'s, and
@@ -13,12 +13,13 @@ containers, disks and the helper.
 ## Where things are
 
 - `plan.ts`: every decision, pure. It covers the container's arguments,
-  grants, link mounts, fork, turn, fetch and base steps, and what the host
-  finds at startup.
+  grants, link mounts, fork, turn, fetch and base steps, what the host
+  finds at startup, and every jj step on an offer in your repo.
 - `execute.ts`: runs a list of `LaneStep`s in order, on the host or in the
   lane.
 - `run.ts`, `bookmarks.ts`, `revisions.ts`, `merge.ts`: jj and git as
-  `Runner`s, and the jj logic over them.
+  `Runner`s, and the jj logic over them. `offer.ts`: the reads an offer's
+  decisions are made from.
 - `host.ts`: startup facts, lane configs and shared directories.
 - `image.ts`, `runtime.ts`: the image and the lane runtime.
 - `disk.ts`: snapshots, deletion, trim. `lane.ts`: the container, the queue,
@@ -53,6 +54,14 @@ containers, disks and the helper.
 
 ## Forks
 
+- **A fork with no revision above it starts from a copy of your `@`**
+  (`planYourCopy`, ADR-0038): a commit on `@`'s parents with `@`'s files, made
+  in the lane, so the lane sees your uncommitted edits. Never `@` itself: that
+  commit would come back into your repo with the lane's work, and your `@`
+  would be divergent (S48 item 10). Its id is known only once made, so the
+  fork's config reads it (`jj log -r @-`) when it writes the file. When your
+  `@`'s lockfile differs from the base disk's (installed at `@-`), the fork
+  installs.
 - **`jj new` runs first in a fork** (`planForkSetup`). A clone carries its
   parent's working-copy change. Without `jj new`, the fork's first turn reuses
   that change's id, and your repo sees a divergent change (S42 item 2).
@@ -76,10 +85,23 @@ containers, disks and the helper.
   and tags, so it does not see a commit fetched with no ref (S44 item 7).
 - **By bundle, into your repo** (`planFetch`): `git bundle create -` in the
   lane, written to a host file through the channel as bytes, then
-  `git -C <root> fetch <file> +refs/heads/pineta/<lane>:…`. The bundle
-  excludes what your repo has (`^<have>`). A bundle of the whole history is
-  1.1 MB and 253 ms on Pineta's repo, against 8 KB and 29 ms for one commit
-  (S43 item 8).
+  `git -C <root> fetch <file> +refs/heads/pineta/<lane>:refs/remotes/pineta-<lane>/tip`.
+  The bundle excludes what your repo has (`^<have>`). A bundle of the whole
+  history is 1.1 MB and 253 ms on Pineta's repo, against 8 KB and 29 ms for
+  one commit (S43 item 8).
+- **In your repo a lane's history is a remote bookmark**, `tip@pineta-<lane>`
+  (ADR-0038). jj imports a ref under `refs/remotes/` with no git remote
+  configured, keeps its commits out of your default log, and treats them,
+  and their ancestors, as immutable with its builtin config (S48 items 11 and
+  19). `laneRefSteps` is the one writer of the ref besides the fetch:
+  archiving deletes it, restoring writes it back. In the lane's own repo the
+  bookmark stays a local `pineta/<lane>`; `laneTipIn` reads the one in yours,
+  `bookmarkOf` the lane's.
+- **Pineta used to keep lane bookmarks local in your repo**, made immutable by
+  a line in your repo's `immutable_heads()`. `planRetire` undoes that at
+  startup, in S48 item 21's order: each `pineta/<lane>` becomes its remote
+  bookmark, then the local bookmarks go, then the line. Deleting first would
+  leave the lanes' commits in your default log.
 - **Every fetch into a colocated repo ends with
   `jj --ignore-working-copy git import`.** A jj command run with
   `--ignore-working-copy` imports no git refs. A plain `jj git import`
@@ -191,7 +213,8 @@ containers, disks and the helper.
   failed start or fork (`fatal`) breaks the gate, so tools fail with its
   error, until the lane is started again.
 - **Your repo's fetch is on a second queue per lane,** in the host, which
-  tools never wait on and `take` does.
+  tools never wait on. Each fetch then refreshes the lane's offer, on the
+  host's one queue for your repo (`host/offers.ts`).
 
 ## Running jj and git (`run.ts`)
 
@@ -208,20 +231,49 @@ containers, disks and the helper.
   an editor fail at once rather than hang (S36 items 13, 21). A lane's
   container sets the same variables.
 
-## Revisions and landing (`revisions.ts`, `merge.ts`)
+## Revisions and updates (`revisions.ts`, `merge.ts`)
 
 - **`commitTurn`** snapshots. If `@` is `empty`, it commits nothing and
   returns null; otherwise it runs `jj commit` with the title and two trailers,
   `Pineta-Entry` and `Pineta-Lane`, then moves the lane's bookmark.
-- **The landing merge is committed at once,** even with nothing to resolve.
+- **An update merges a copy of your `@`**, made in the lane (`planYourCopy`),
+  never your `@-`: the lane takes what you have, committed or not.
+- **The merge is committed at once,** even with nothing to resolve.
   Otherwise an empty merge stays the lane's working copy, which every snapshot
-  rewrites. `lanes.test.ts` lands cleanly after both sides moved on and checks
-  both are under the bookmark. A mutation shows it can fail.
+  rewrites. A mutation shows `lanes.test.ts` fails without it.
 - **Conflicts** are read with `jj file list -T 'if(conflict, path ++ "\n")'`,
   and a conflicted file's content with `jj file show`: the host cannot read a
   lane's disk.
-- **`takeInto`** is `jj rebase -r @ -d <result>` in your working copy, once
-  your repo has fetched the result. Your uncommitted changes stay in `@`.
+- **A clean update's changed files come from git** (`git -C /workspace diff
+  --name-only`): jj's `--name-only` prints paths from the process's
+  directory, which in a lane is not the repo's.
+
+## Offers in your repo (`offer.ts`, `plan.ts`, ADR-0038)
+
+- **Every host command on your repo carries `--ignore-working-copy` and
+  `--config operation.username=pineta-host`** (`hostOps`, `hostOp`): it never
+  snapshots your working copy, and the evolog says which commits the host
+  made (S48 items 1 and 8). Take is the exception: it updates your files, so
+  it runs as you (`hostJj`).
+- **An offer is built by nonce, never by a commit id kept between steps**
+  (`planOffer`): `jj new` has no template, so each commit is named by a
+  unique description (`nonceRevset`) until its last step describes it
+  (S48 item 18). A step given an old commit id acts on a hidden commit and
+  forks the change (S48 item 2).
+- **A single offer is a stack of one**: `planOffer` makes one commit per
+  source, each with that source's files restored, on the one before; the
+  first on the start (a merge when the start names several heads), then all
+  rebased onto the target. A stack's sources are the agent's revisions.
+- **Where an offer starts is `offerStart`'s revset**: the newest ancestors of
+  the lane's tip you already have, your commits and every `pineta.have`
+  (delivered lane commits, copies of your `@`), S48 items 15 to 17.
+- **Take is `jj rebase -r <bottom>::<top> -A <target> -B @`** when the target
+  is an ancestor of `@`; otherwise only bookmarks move (`planTakeOffer`).
+- **`offerFacts` reads an offer by change id once, then names commits**: its
+  three edit tests (description, `jj interdiff`, the bottom's parent an
+  ancestor of the target), files, conflicts and divergence.
+- **`hostCommitIn`** splits a divergent revision's commits by the user of
+  each one's newest evolog operation: the host's is abandoned, yours kept.
 
 ## Tests
 
@@ -229,8 +281,11 @@ containers, disks and the helper.
 - **`lane.test.ts`**: the queue.
 - **`lanes.test.ts`**: the executor, and a lane's whole life against jj and
   git, in throwaway repos on the host, with no container. It covers the base,
-  a turn, a bundle fetch into your repo, a landing with a conflict, the take,
-  a clean landing, and a fork, checked for divergence and immutability.
+  a turn, a bundle fetch into your repo as a remote bookmark, an update with a
+  conflict, forks from a turn and from a copy of your `@`, checked for
+  divergence and immutability; an offer built, refreshed, left, repaired,
+  taken under your edits and beside them, the next offer, and a stack; and
+  retiring a repo from before offers.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
   with the contract test, in about 85 s. It has four sections, `main`,
   `images`, `shared` and `contract`, and `PINETA_LANES_SECTION` picks some.

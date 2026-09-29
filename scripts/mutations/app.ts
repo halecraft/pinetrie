@@ -613,12 +613,12 @@ export const mutations: readonly Mutation[] = [
     expect: "an archived root leaves the other window's bar",
   },
   {
-    name: "a landing's outcome is never written",
+    name: "a resolution's outcome is never written",
     file: "apps/pineta/host/index.ts",
-    from: "          if (prompt?.land === true) await work.landingEnded(lane, prompt.id)",
+    from: '          if (prompt?.role === "land") await work.landingEnded(lane, prompt.id)',
     to: "          if (false) await work.landingEnded(lane, prompt.id)",
     command: e2eLanes,
-    expect: "landing merges your work",
+    expect: "a conflicting update runs the resolution",
   },
   {
     name: "the send button never says where",

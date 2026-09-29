@@ -15,6 +15,7 @@ import {
   type LaneName,
   type NoteAction,
   type NoteId,
+  type OfferAction,
   type Position,
   parseMentions,
   type ReferenceTarget,
@@ -115,10 +116,13 @@ export interface SessionClient {
   noteText(id: NoteId): NoteDocHandle
   /** Hide the root `root` for everyone, or bring it back (ADR-0029). */
   archive(action: ArchiveAction, root: EntryId): Promise<Outcome>
-  /** Merge your work into a lane, and have the agent resolve it (ADR-0033). */
-  land(lane: LaneName): Promise<Outcome>
-  /** Put your working copy on a lane's resolved landing. */
-  take(lane: LaneName): Promise<Outcome>
+  /**
+   * Merge your work into a lane (ADR-0038): `updated`, with the composer's
+   * prefill, when clean; `started`, the resolution run, when it conflicts.
+   */
+  update(lane: LaneName): Promise<Outcome>
+  /** Act on a lane's offer in your repo: take it, split it, and so on. */
+  offer(lane: LaneName, action: OfferAction): Promise<Outcome>
   /** Every reply as it arrived on the wire, for wire-level checks. */
   readonly replies: readonly Reply[]
   close(): Promise<void>
@@ -249,11 +253,11 @@ export async function connectSession(
     noteText(id) {
       return exchange.get(noteDocId(id), NoteDoc)
     },
-    land(lane) {
-      return send({ kind: "land", lane })
+    update(lane) {
+      return send({ kind: "update", lane })
     },
-    take(lane) {
-      return send({ kind: "take", lane })
+    offer(lane, action) {
+      return send({ kind: "offer", lane, action })
     },
     archive(action, root) {
       return send({ kind: "archive", action, root })

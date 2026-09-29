@@ -49,9 +49,11 @@ import {
 } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
 import {
+  readHaves,
   readLandings,
   readLaneRecords,
   readLanes,
+  readOffers,
   readOutbox,
   readProject,
   readRevisions,
@@ -187,6 +189,8 @@ async function mainSection(): Promise<void> {
     )
   }
   const tipOf = (text: string) => laneWith(text)?.tip ?? null
+  const laneTip = (lane: LaneName) =>
+    readLanes(wh.doc, tree()).find(l => l.name === lane)?.tip ?? null
   /** Every tool result's text in a lane's thread, oldest first. */
   const toolResults = (lane: LaneName | undefined): string[] => {
     if (lane === undefined) return []
@@ -287,7 +291,8 @@ async function mainSection(): Promise<void> {
 
     // ── revisions: in the document, and in your repo by bundle ─────────────
     // Lane one's first run committed who.txt; its prompt and that message each
-    // have a record with a snapshot, and your repo holds its bookmark.
+    // have a record with a snapshot, and your repo holds its history as a
+    // remote bookmark (ADR-0038).
     const ofOne = [...readRevisions(wh.doc).values()].filter(
       r => r.lane === one?.name,
     )
@@ -299,7 +304,7 @@ async function mainSection(): Promise<void> {
             "log",
             "--no-graph",
             "-r",
-            `present(bookmarks(exact:"pineta/${lane}"))`,
+            `present(tip@pineta-${lane})`,
             "-T",
             "commit_id",
           ).trim()
@@ -495,8 +500,17 @@ async function mainSection(): Promise<void> {
       `a bash timeout and an aborted run leave no process in the guest (${left} left)`,
     )
 
-    // ── 6. Landing and taking ──────────────────────────────────────────────
-    // You change line two, commit, and keep editing; lane two changed it too.
+    // ── 6. Offers: the thread's work as one commit you take (ADR-0038) ────
+    const offerOf = () =>
+      two === undefined ? undefined : readOffers(wh.doc).get(two.name)
+    const defaultLog = () =>
+      jj(
+        project,
+        "log",
+        "--no-graph",
+        "-T",
+        'description.first_line() ++ "\\n"',
+      )
     script.use([
       {
         tool: "bash",
@@ -508,9 +522,32 @@ async function mainSection(): Promise<void> {
       lane: two?.name,
     })
     await idle()
+    const offered = await waitFor(
+      () => offerOf()?.files.includes("shared.txt") === true,
+      30_000,
+    )
+    await wh.quiet()
+    ok(
+      offered >= 0 &&
+        offerOf()?.described === true &&
+        !defaultLog().includes("edit line two") &&
+        defaultLog().includes("offer: scripted"),
+      `a turn's work is an offer in your repo, described, and its turns are not in your log (${JSON.stringify({ files: offerOf()?.files, described: offerOf()?.described, log: defaultLog().split("\n").slice(0, 4) })})`,
+    )
+    // You change the same line, commit, and keep editing: the offer shows the
+    // conflict before you take it.
     writeFileSync(path.join(project, "shared.txt"), "one\ntwo (you)\nthree\n")
     jj(project, "commit", "-m", "you edit line two")
     writeFileSync(path.join(project, "still-editing.txt"), "wip\n")
+    const conflicted = await waitFor(
+      () => offerOf()?.conflicts.includes("shared.txt") === true,
+      30_000,
+    )
+    ok(
+      conflicted >= 0,
+      `the offer follows your commit, and says it conflicts with your work (${JSON.stringify(offerOf()?.conflicts)})`,
+    )
+    // Resolve in the thread: your work merged into the lane, the agent resolves.
     script.use([
       {
         tool: "write",
@@ -521,26 +558,158 @@ async function mainSection(): Promise<void> {
       },
       { text: "resolved: both kept" },
     ])
-    const landed = two === undefined ? null : await wu.land(two.name)
+    const resolving = two === undefined ? null : await wu.update(two.name)
     await idle()
     const landing = readLandings(wh.doc).at(-1)
     const landMessage = projectTranscript(tree(), landing?.prompt ?? null).at(
       -1,
     )
-    ok(
-      landed?.kind === "started" &&
-        landMessage?.text.includes("1 file conflicts") === true &&
-        landing?.state === "resolved",
-      `landing merges your work in the lane, and the agent resolves the conflict (${landing?.state ?? JSON.stringify(landed)})`,
+    const clean = await waitFor(
+      () =>
+        offerOf()?.conflicts.length === 0 &&
+        offerOf()?.files.includes("shared.txt") === true,
+      30_000,
     )
-    const taken = two === undefined ? null : await wu.take(two.name)
+    ok(
+      resolving?.kind === "started" &&
+        landMessage?.text.includes("1 file conflicts") === true &&
+        landing?.state === "resolved" &&
+        clean >= 0,
+      `a conflicting update runs the resolution, and the offer comes back clean (${landing?.state ?? JSON.stringify(resolving)})`,
+    )
+    // Take: one commit under your edits; your uncommitted file kept.
+    await wh.quiet()
+    const taken = two === undefined ? null : await wu.offer(two.name, "take")
+    const below = jj(
+      project,
+      "log",
+      "--no-graph",
+      "-r",
+      "@--",
+      "-T",
+      "description.first_line()",
+    )
     ok(
       taken?.kind === "taken" &&
         readFileSync(path.join(project, "shared.txt"), "utf8") ===
           "one\ntwo (you, and lane)\nthree\n" &&
         readFileSync(path.join(project, "still-editing.txt"), "utf8") ===
-          "wip\n",
-      `taking it rebases your @ onto the lane's merge, keeping your uncommitted file (${JSON.stringify(taken)})`,
+          "wip\n" &&
+        below === "you edit line two",
+      `taking the offer puts one commit under your edits, your uncommitted file kept (${JSON.stringify(taken)}, below: ${below})`,
+    )
+    // The next turn's offer holds only what came after.
+    script.use([
+      { tool: "bash", args: { command: "echo after > after.txt" } },
+      { text: "more" },
+    ])
+    await wu.chat(
+      "one more",
+      at(two === undefined ? null : laneTip(two.name)),
+      {
+        lane: two?.name,
+      },
+    )
+    await idle()
+    const next = await waitFor(
+      () =>
+        offerOf()?.taken === null &&
+        JSON.stringify(offerOf()?.files) === JSON.stringify(["after.txt"]),
+      30_000,
+    )
+    ok(
+      next >= 0,
+      `after a take, the next offer holds only the new work (${JSON.stringify(offerOf()?.files)})`,
+    )
+    // A clean update: a fact in the thread, and the composer's prefill.
+    writeFileSync(path.join(project, "yours.txt"), "yours\n")
+    jj(project, "commit", "-m", "you add yours.txt")
+    const updated = two === undefined ? null : await wu.update(two.name)
+    const updateEntry = projectTranscript(
+      tree(),
+      two === undefined ? null : laneTip(two.name),
+    ).at(-1)
+    ok(
+      updated?.kind === "updated" &&
+        updated.text.includes("merged my latest work") &&
+        updateEntry?.role === "update",
+      `a clean update writes a fact in the thread and returns the composer's prefill (${JSON.stringify(updated)})`,
+    )
+    // Split into a stack: the agent builds it in the lane; the host checks it
+    // against the tip and makes it the offer. Squash brings it back to one.
+    await wh.quiet()
+    const lane2 = two?.name
+    const haves = readHaves(wh.doc).map(h => h.commit)
+    const start =
+      lane2 === undefined
+        ? ""
+        : jj(
+            project,
+            "log",
+            "--no-graph",
+            "-r",
+            `heads(::tip@pineta-${lane2} & ::(@- | ${["root()", ...haves].join(" | ")}))`,
+            "-T",
+            'commit_id ++ " "',
+          ).trim()
+    const laneTipCommit =
+      lane2 === undefined
+        ? ""
+        : jj(
+            project,
+            "log",
+            "--no-graph",
+            "-r",
+            `tip@pineta-${lane2}`,
+            "-T",
+            "commit_id",
+          )
+    script.use([
+      {
+        tool: "bash",
+        args: {
+          command: `jj new ${start} -m s && jj restore --from ${laneTipCommit} 'root:"after.txt"' && jj commit -m 'stack 1: after.txt' && jj restore --from ${laneTipCommit} && jj commit -m 'stack 2: the rest' && jj bookmark set pineta/${lane2}-stack -r @-`,
+        },
+      },
+      { text: "split" },
+    ])
+    const split = lane2 === undefined ? null : await wu.offer(lane2, "split")
+    await idle()
+    const stacked = await waitFor(() => offerOf()?.size === 2, 30_000)
+    const squashed =
+      stacked >= 0 && lane2 !== undefined
+        ? await wu.offer(lane2, "squash")
+        : null
+    await wh.quiet()
+    ok(
+      split?.kind === "started" &&
+        stacked >= 0 &&
+        squashed?.kind === "offered" &&
+        offerOf()?.size === 1,
+      `split into a stack: the agent's stack becomes the offer, and squash makes it one again (${JSON.stringify({ split, size: offerOf()?.size })})`,
+    )
+
+    // A new root thread sees work you have not committed.
+    writeFileSync(path.join(project, "unsaved.txt"), "not committed\n")
+    script.use([
+      { tool: "bash", args: { command: "cat unsaved.txt" } },
+      { text: "seen" },
+    ])
+    await wu.chat("read my unsaved file", ROOT, START_AGENT)
+    await idle()
+    const seenUnsaved = toolResults(laneWith("read my unsaved file")?.name)
+    ok(
+      seenUnsaved.some(t => t.includes("not committed")) &&
+        jj(
+          project,
+          "log",
+          "--no-graph",
+          "-r",
+          "divergent()",
+          "-T",
+          "commit_id",
+        ) === "",
+      `a new root thread starts from a copy of your @: it sees your uncommitted file (${seenUnsaved.join(" | ").slice(0, 80)})`,
     )
 
     // ── 7. Archiving keeps each lane's newest snapshot; restoring runs again ─
@@ -861,8 +1030,8 @@ async function sharedSection(): Promise<void> {
     ok(
       writer !== undefined &&
         newest !== undefined &&
-        files(`pineta/${writer.name}`).includes("shared.txt") &&
-        !files(`pineta/${writer.name}`).includes(".plans") &&
+        files(`tip@pineta-${writer.name}`).includes("shared.txt") &&
+        !files(`tip@pineta-${writer.name}`).includes(".plans") &&
         !files("@").includes(".plans") &&
         !inSnapshot.includes("a.md") &&
         (await h.results("@agent look from a branch"))

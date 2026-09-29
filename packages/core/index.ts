@@ -171,8 +171,8 @@ export const ERR = {
   BUSY: "busy",
   /** Landing a lane that has no copy of its own: it works directly. */
   NOT_OWN_COPY: "not_own_copy",
-  /** Taking a landing after your `@-` moved on: land again. */
-  MOVED: "moved",
+  /** An offer action on a lane with no offer in your repo (ADR-0038). */
+  NO_OFFER: "no_offer",
   /** A lane asked to work directly in a directory that is not one. */
   BAD_DIRECTORY: "bad_directory",
   /** A `/package:name` command that names no command there is (ADR-0036). */
@@ -250,10 +250,31 @@ export type Intent =
       readonly action: ArchiveAction
       readonly root: EntryId
     }
-  /** Merge your work into a lane, and have the agent resolve it (ADR-0033). */
-  | { readonly kind: "land"; readonly lane: LaneName }
-  /** Put your working copy on a lane's resolved landing (ADR-0033). */
-  | { readonly kind: "take"; readonly lane: LaneName }
+  /**
+   * Merge your work into a lane: a fact in the thread when it merges cleanly,
+   * the resolution run when it conflicts (ADR-0038, ADR-0033).
+   */
+  | { readonly kind: "update"; readonly lane: LaneName }
+  /** Act on a lane's offer in your repo (ADR-0038). */
+  | {
+      readonly kind: "offer"
+      readonly lane: LaneName
+      readonly action: OfferAction
+    }
+
+/**
+ * What can be done with an offer: take it into your repo, have the agent split
+ * it into a stack, squash a stack back to one revision, have the agent write
+ * its description again, or rebuild it, discarding your edits (ADR-0038).
+ */
+export type OfferAction = "take" | "split" | "squash" | "describe" | "refresh"
+export const OFFER_ACTIONS: readonly OfferAction[] = [
+  "take",
+  "split",
+  "squash",
+  "describe",
+  "refresh",
+]
 
 // --- the archive (ADR-0029) --------------------------------------------------
 
@@ -284,6 +305,12 @@ export const NO_EDITOR = {
   VISUAL: "false",
   EDITOR: "false",
 } as const
+
+/**
+ * The user every host operation on your repo carries, so the evolog says which
+ * commits the host made, and a race is repaired in your favour (S48 item 8).
+ */
+export const HOST_OPERATOR = "pineta-host"
 
 declare const commitIdBrand: unique symbol
 /**
@@ -397,21 +424,77 @@ export type ProjectRecord =
   | { readonly kind: "direct"; readonly root: string; readonly reason: string }
 
 /**
- * How a landing ended: a host-written `pineta.landing` value keyed by its own
- * id, written when its run ends. A landing in progress has no record: it is a
- * running lane whose prompt is a land message.
+ * How a resolution run ended: a host-written `pineta.landing` value keyed by
+ * its own id, written when its run ends. A resolution in progress has no
+ * record: it is a running lane whose prompt is a land message (ADR-0033).
  */
 export interface LandingRecord {
   readonly id: string
   readonly lane: LaneName
   /** The land message that started it. */
   readonly prompt: EntryId
-  /** Your `@-` when it merged: taking it is refused once that moves. */
-  readonly yours: readonly CommitId[]
-  /** The lane's newest revision when the run ended. */
-  readonly result: CommitId
-  readonly state: "resolved" | "needs_you" | "taken"
+  readonly state: "resolved" | "needs_you"
   readonly by: WriterId
+  readonly at: number
+}
+
+/**
+ * A lane's offer: one revision, or a stack, in your repo, holding the lane's
+ * work you do not have yet (ADR-0038). A host-written `pineta.offer` value
+ * keyed by lane. The page reads the top-level fields; `host` is what the host
+ * remembers of what it wrote, and nothing else reads it.
+ */
+export interface OfferRecord {
+  readonly lane: LaneName
+  /** Its revisions: 1 for a single offer, more for a stack. */
+  readonly size: number
+  /** The lane turned since the stack was made: it no longer holds all of it. */
+  readonly stale: boolean
+  readonly files: readonly string[]
+  /** Files that conflict with your committed work (S48 item 3). */
+  readonly conflicts: readonly string[]
+  /** Files it touches that you are editing in `@` (S48 item 4). */
+  readonly yourEdits: readonly string[]
+  /** An agent wrote its description; false while it carries the placeholder. */
+  readonly described: boolean
+  /** You edited it since the host last wrote it: the host leaves it alone. */
+  readonly edited: boolean
+  /** Its bookmark in your repo, as jjui shows it. */
+  readonly bookmark: string
+  /** The change id its top became when you took it; null while it is open. */
+  readonly taken: string | null
+  readonly at: number
+  readonly host: {
+    /** Each revision's change id, bottom first: its identity across rewrites. */
+    readonly changes: readonly string[]
+    /** The commit the host last wrote for each, bottom first. */
+    readonly wrote: readonly CommitId[]
+    /** The lane commit it was built from. */
+    readonly tip: CommitId
+  }
+}
+
+/** Your working copy as the host snapshotted it: `@`, and `@`'s parents. */
+export interface YoursNow {
+  readonly at: CommitId
+  readonly parents: readonly CommitId[]
+}
+
+/** What a fork starts on: a commit a lane recorded, or a copy of your `@`. */
+export type ForkStart =
+  | { readonly kind: "commits"; readonly commits: readonly CommitId[] }
+  | ({ readonly kind: "copy" } & YoursNow)
+
+/**
+ * A commit you already have, though your repo holds it only as lane history:
+ * a lane commit a take delivered, or a copy of your `@` made in a lane at a
+ * fork or an update. A host-written `pineta.have` value keyed by commit.
+ * Where an offer starts is read from these (ADR-0038).
+ */
+export interface HaveRecord {
+  readonly lane: LaneName
+  readonly commit: CommitId
+  readonly kind: "delivered" | "copy"
   readonly at: number
 }
 

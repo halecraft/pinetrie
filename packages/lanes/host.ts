@@ -18,35 +18,27 @@ import {
 } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
-import type { ProjectRecord } from "@pineta/core"
+import { commitId, type ProjectRecord } from "@pineta/core"
+import { executeOnHost } from "./execute.ts"
 import {
   type DiskPaths,
   decodeLaneConfig,
-  extendImmutable,
   type HostFacts,
   IGNORE_FILE,
   type LaneConfig,
   type Link,
   laneIgnoreDir,
   laneIgnores,
-  PINETA_HEADS,
   planExclude,
   planHost,
+  planRetire,
   planRoot,
   planShared,
   type RootFacts,
   type SharedDir,
   sharedCandidates,
 } from "./plan.ts"
-import {
-  describeFailure,
-  hostGit,
-  hostJj,
-  jjIn,
-  lines,
-  type Runner,
-  run,
-} from "./run.ts"
+import { describeFailure, hostGit, hostJj, jjIn, lines, run } from "./run.ts"
 
 /** Gather what jj, then git, say from `dir`. */
 async function gatherRoot(dir: string): Promise<RootFacts> {
@@ -156,7 +148,7 @@ export async function prepareHost(dir: string): Promise<{
       paths: null,
     }
   try {
-    await protectLaneBookmarks(hostJj(project.root))
+    await retireLaneBookmarks(project.root)
   } catch (error) {
     return {
       project: {
@@ -280,26 +272,40 @@ export async function prepareShared(
 }
 
 /**
- * Extend your repo's `immutable_heads()` with the lanes' bookmarks, keeping
- * whatever it was. `jj config get` returns the effective value, jj's
- * built-in default included.
+ * Retire what Pineta wrote into your repo before ADR-0038: its local
+ * `pineta/*` bookmarks, moved to remote bookmarks first, and its line in
+ * `immutable_heads()` (`planRetire`). `jj config get` returns the effective
+ * value, jj's built-in default included.
  */
-export async function protectLaneBookmarks(jj: Runner): Promise<void> {
+export async function retireLaneBookmarks(root: string): Promise<void> {
+  const jj = hostJj(root)
   const heads = await jj([
     "config",
     "get",
     'revset-aliases."immutable_heads()"',
   ])
-  const next = extendImmutable(heads.ok ? heads.stdout : "", PINETA_HEADS)
-  if (next === null) return
-  const set = await jj([
-    "config",
-    "set",
-    "--repo",
-    'revset-aliases."immutable_heads()"',
-    next,
+  const listed = await jj([
+    "bookmark",
+    "list",
+    "--ignore-working-copy",
+    "-T",
+    'if(!remote && normal_target, name ++ " " ++ normal_target.commit_id() ++ "\n")',
+    "glob:pineta/*",
   ])
-  if (!set.ok) throw new Error(describeFailure("jj config set", set))
+  if (!listed.ok) throw new Error(describeFailure("jj bookmark list", listed))
+  const bookmarks = lines(listed.stdout).flatMap(line => {
+    const [name, commit] = line.split(" ")
+    return name === undefined || commit === undefined
+      ? []
+      : [{ name, commit: commitId(commit) }]
+  })
+  await executeOnHost(
+    planRetire({
+      root,
+      bookmarks,
+      heads: heads.ok ? heads.stdout : "",
+    }),
+  )
 }
 
 /** Every `node_modules` directory up to three levels down, never inside another. */

@@ -27,6 +27,8 @@ import {
   type NoteId,
   normalizeName,
   noteId,
+  OFFER_ACTIONS,
+  type OfferAction,
   type Position,
   parseMentions,
   type ReferenceId,
@@ -64,8 +66,15 @@ export type Outcome =
   /** A root is archived, or restored (ADR-0029); also when it already was. */
   | { readonly kind: "archived" }
   | { readonly kind: "restored" }
-  /** Your working copy is on the lane's landing (ADR-0033). */
+  /** The lane's offer is in your history now (ADR-0038). */
   | { readonly kind: "taken" }
+  /**
+   * Your work was merged into the thread (ADR-0038). `text` is the composer's
+   * prefill after a clean merge; "" when there was nothing to merge.
+   */
+  | { readonly kind: "updated"; readonly text: string }
+  /** An offer action was carried out (squash, describe, refresh). */
+  | { readonly kind: "offered" }
   | Refusal
 
 /**
@@ -171,11 +180,15 @@ export function decodeCommand(
       work,
     }
   }
-  if (kind === "land" || kind === "take") {
+  if (kind === "update" || kind === "offer") {
     const lane = text(wire?.lane)
-    return isLaneName(lane)
-      ? { kind, lane }
-      : refuse(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+    if (!isLaneName(lane))
+      return refuse(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+    if (kind === "update") return { kind, lane }
+    const action = text(wire?.mode)
+    return isOfferAction(action)
+      ? { kind, lane, action }
+      : refuse(ERR.UNKNOWN_KIND, `unknown offer action: ${action}`)
   }
   if (kind === "note") return decodeNote(wire, at)
   if (kind === "archive") {
@@ -226,6 +239,9 @@ function decodeNote(
 
 const isNoteAction = (a: string): a is (typeof NOTE_ACTIONS)[number] =>
   (NOTE_ACTIONS as readonly string[]).includes(a)
+
+const isOfferAction = (a: string): a is OfferAction =>
+  (OFFER_ACTIONS as readonly string[]).includes(a)
 
 const isArchiveAction = (a: string): a is ArchiveAction =>
   (ARCHIVE_ACTIONS as readonly string[]).includes(a)
@@ -285,9 +301,15 @@ export function encodeIntent(id: string, intent: Intent): Command {
         mode: intent.action,
         targetId: intent.root,
       })
-    case "land":
-    case "take":
-      return command({ id, kind: intent.kind, lane: intent.lane })
+    case "update":
+      return command({ id, kind: "update", lane: intent.lane })
+    case "offer":
+      return command({
+        id,
+        kind: "offer",
+        lane: intent.lane,
+        mode: intent.action,
+      })
   }
 }
 
@@ -332,6 +354,10 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "restored" })
     case "taken":
       return reply({ id, outcome: "taken" })
+    case "updated":
+      return reply({ id, outcome: "updated", text: outcome.text })
+    case "offered":
+      return reply({ id, outcome: "offered" })
     case "refused":
       return reply({
         id,
@@ -367,6 +393,10 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "restored" }
     case "taken":
       return { kind: "taken" }
+    case "updated":
+      return { kind: "updated", text: wire.text }
+    case "offered":
+      return { kind: "offered" }
     case "refused":
       return refuse(asErrCode(wire.errorCode), wire.errorMessage)
   }

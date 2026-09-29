@@ -1404,7 +1404,8 @@ try {
         `a long code line and a long tool label leave the column at 28rem, with nothing past its side (${JSON.stringify(widths)})`,
       )
 
-      // ── landing, and taking it, from the column's header (ADR-0033) ─────
+      // ── the thread's offer, and taking it, from the column's header ─────
+      // (ADR-0038)
       ok(
         (await tp.textContent(`${col(0)} .column-head .where`))?.startsWith(
           "own copy",
@@ -1417,18 +1418,22 @@ try {
       ])
       await say("write a file")
       await toolIdle()
-      script.use([{ text: "nothing conflicts" }])
-      await tp.click(`${col(0)} .column-head .land`)
-      const takeShown = await appears(`${col(0)} .column-head .take`)
-      if (takeShown) await tp.click(`${col(0)} .column-head .take`)
+      const takeShown = await appears(
+        `${col(0)} .column-head .offer[data-state="ready"] .offer-take`,
+      )
+      const line =
+        (await tp
+          .textContent(`${col(0)} .column-head .offer-line`)
+          .catch(() => "")) ?? ""
+      if (takeShown) await tp.click(`${col(0)} .column-head .offer-take`)
       const took =
         (await waitFor(
           () => existsSync(path.join(work, "from-lane.txt")),
           10_000,
         )) >= 0
       ok(
-        takeShown && took,
-        "land shows Take once resolved, and Take brings the thread's work into your working copy",
+        takeShown && line.includes("pineta-offer/") && took,
+        `the column shows the thread's offer, its bookmark, and Take brings it into your working copy (${line})`,
       )
 
       // ── markdown: drawn, and a selection in it cites its source ───────────

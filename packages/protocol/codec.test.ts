@@ -155,8 +155,9 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "note", action: { kind: "reopen", note: noteId("n-1") } },
     { kind: "archive", action: "archive", root: entryId("e-1") },
     { kind: "archive", action: "restore", root: entryId("e-1") },
-    { kind: "land", lane: laneNameForThread("abc") },
-    { kind: "take", lane: laneNameForThread("abc") },
+    { kind: "update", lane: laneNameForThread("abc") },
+    { kind: "offer", lane: laneNameForThread("abc"), action: "take" },
+    { kind: "offer", lane: laneNameForThread("abc"), action: "split" },
   ] as const
   for (const intent of intents) {
     assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
@@ -176,6 +177,10 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "noted", id: noteId("n-1") },
     { kind: "archived" },
     { kind: "restored" },
+    { kind: "taken" },
+    { kind: "updated", text: "I've merged my latest work" },
+    { kind: "updated", text: "" },
+    { kind: "offered" },
     { kind: "refused", code: ERR.ARCHIVED, message: "archived by Bea" },
     { kind: "refused", code: ERR.ROOT_BUSY, message: "busy" },
   ]

@@ -1,9 +1,9 @@
-// lanes/bookmarks — `pineta/<lane>`, in a lane's repo and in yours.
+// lanes/bookmarks — `pineta/<lane>`, in a lane's own repo.
 //
-// In a lane's repo, the bookmark moves with every revision (`commitTurn`,
-// `mergeYours`). In your repo it arrives by bundle fetch after each turn, and
-// `bookmarks(glob:"pineta/*")` is in your `immutable_heads()`, so a lane's
-// work there cannot be rewritten by accident.
+// The bookmark moves with every revision (`commitTurn`, `mergeYours`). In your
+// repo a lane's history is not a bookmark of yours but a remote bookmark,
+// `tip@pineta-<lane>` (`laneTipIn`, `laneRefSteps`), which jj keeps out of
+// your default log and immutable (ADR-0038, S48 item 11).
 
 import { type CommitId, commitId, type LaneName } from "@pineta/core"
 import { bookmarkName } from "./plan.ts"

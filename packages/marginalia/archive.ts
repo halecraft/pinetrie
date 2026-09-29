@@ -123,9 +123,10 @@ export function writesAt(
       return intent.at.kind === "root" ? null : intent.at.id
     case "note":
       return noteWritesAt(intent.action, notes, index, lanes)
-    // A landing writes at its lane's tip: an archived root's lanes do not land.
-    case "land":
-    case "take":
+    // An update and an offer act at their lane's tip: an archived root's lanes
+    // take no work in and offer none out.
+    case "update":
+    case "offer":
       return lanes.find(l => l.name === intent.lane)?.tip ?? null
     case "name":
     case "stop":

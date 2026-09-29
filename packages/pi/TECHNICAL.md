@@ -133,6 +133,11 @@ harness never emits them (S22). What each event does to the document is
 - **`named`:** `models.json` and `auth.json` only, for suites that call a real
   model.
 - **`scripted`:** pi-ai's faux provider (`scripted.ts`), for repeatable suites.
+  A second faux provider answers commit-message requests (`describe`, by
+  default `SCRIPTED_DESCRIPTION`) from a response that queues itself again,
+  so a describe request never takes a reply from the run's script (S48
+  item 22). `ModelSetup.describeModel` is that model when scripted, and the
+  run's model otherwise.
   Its handle never leaves this package.
 
 Loading runs every package's factory, so side effects happen (`pi-subagents`
@@ -225,8 +230,11 @@ item 18, and in `lanes.test.ts` against the harness.
   turns it on exactly while the run's prompt is a land message, and off at
   every run's end, so a crash cannot leave it on for a later run.
 - **Pineta's own skills** are in `skills/`, loaded after yours and the repo's
-  (`additionalSkillPaths`; pi's loader keeps the first of a name). So a
-  `resolve-conflicts` of yours or the repo's replaces Pineta's.
+  (`additionalSkillPaths`; pi's loader keeps the first of a name):
+  `resolve-conflicts` (ADR-0033), `commit-message` and `offer-stack`
+  (ADR-0038). So one of yours or the repo's of the same name replaces
+  Pineta's. All three are `disable-model-invocation: true`: only the host
+  asks for them.
   `Agent.skill(name)` reads the file at call time, without its frontmatter,
   and hashes it. The scripted and named model choices load no resources, so
   it falls back to the file in `skills/`.
@@ -247,7 +255,8 @@ item 18, and in `lanes.test.ts` against the harness.
 - **`createAgent` labels them** with the user config's renames
   (`commandRenames`) through marginalia's `labelCommands`. `commands()` is
   the list, `refusedCommands()` what clashed, and `skill(name)` takes a
-  qualified name: the landing asks for `pineta:skill:resolve-conflicts`.
+  qualified name: a conflicted update asks for
+  `pineta:skill:resolve-conflicts`.
 - **`expand(command, args, inLane)`** reads the file now and hashes it:
   - a skill becomes pi's block through marginalia's `expandSkill`, which
     copies the format of `_expandSkillCommand` in pi-coding-agent's
@@ -338,3 +347,12 @@ It survived 0.85 → 0.87.1 and the ADR-0015 typed-row change unchanged.
 Note what it does **not** do: it detects change, it does not design for it.
 Probes P1 and P2 in `sandbox/s17-typed-entries/` could each have failed while
 conformance stayed green, which is why they ran first.
+
+### Commit messages (`Agent.describe`, ADR-0038)
+
+`describe({ system, user })` is one `completeSimple` request on
+`describeModel`, with no tools and no session: nothing enters the tree or a
+lane's context. The host builds the request (`describeRequest`, in
+marginalia) and adds the trailers; this package only carries it out. A failed
+request returns null, and the offer keeps its placeholder.
+

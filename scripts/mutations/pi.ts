@@ -69,4 +69,12 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/pi/lane-env.test.ts"],
     expect: "an abort kills the command and its children",
   },
+  {
+    name: "a scripted commit message takes from the run's script",
+    file: "packages/pi/scripted.ts",
+    from: "    describer.appendResponses([answer])",
+    to: "    faux.appendResponses([answer])",
+    command: unit,
+    expect: "commit messages from a provider of its own",
+  },
 ]

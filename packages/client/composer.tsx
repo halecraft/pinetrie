@@ -67,6 +67,7 @@ export function Composer({
   onSend,
   onBranchInstead,
   pending,
+  prefill,
   typing,
   onTyping,
   onComposeTogether,
@@ -104,6 +105,11 @@ export function Composer({
   onBranchInstead: (text: string) => void
   /** A first message to send at once: this column was opened to send it. */
   pending: string | undefined
+  /**
+   * Text to put in the box, unsent and editable: an update's intent
+   * (ADR-0038). Each new `key` puts it there once, after what is typed.
+   */
+  prefill: { readonly text: string; readonly key: number } | null
   /** Others typing here, by name (presence). */
   typing: readonly string[]
   /** Called on each keystroke; presence is written at most once a second. */
@@ -190,6 +196,13 @@ export function Composer({
     sentPending.current = true
     void send(pending, "branch")
   }, [])
+
+  // A prefill is put in the box once per key, after whatever is already typed.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per prefill
+  useEffect(() => {
+    if (prefill === null || prefill.text === "") return
+    setText(t => (t.trim() === "" ? prefill.text : `${t}\n\n${prefill.text}`))
+  }, [prefill?.key])
 
   const submit = async () => {
     const message = text.trim()

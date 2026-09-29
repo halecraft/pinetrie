@@ -5,7 +5,7 @@ import path from "node:path"
 import { labelCommands } from "@pineta/marginalia"
 import { expect, test } from "vitest"
 import { setUpModel } from "./config.ts"
-import { scriptedModel } from "./scripted.ts"
+import { fauxOf, scriptedModel } from "./scripted.ts"
 
 const agentDir = path.join(import.meta.dirname, "fixtures", "pi-agent")
 
@@ -40,7 +40,32 @@ test("a scripted model given no agent directory loads nothing of pi's, and still
     },
   )
   expect(setup.skills).toEqual([])
-  expect(labelCommands(setup.commands, {}).commands.map(c => c.name)).toEqual([
+  expect(
+    labelCommands(setup.commands, {})
+      .commands.map(c => c.name)
+      .sort(),
+  ).toEqual([
+    "pineta:skill:commit-message",
+    "pineta:skill:offer-stack",
     "pineta:skill:resolve-conflicts",
   ])
+})
+
+test("a scripted model answers commit messages from a provider of its own: the run's script is untouched (S48 item 22)", async () => {
+  const script = scriptedModel({ describe: user => `feat: ${user.length}` })
+  script.use([{ text: "the run's reply" }])
+  const setup = await setUpModel(
+    { kind: "scripted", script },
+    { cwd: agentDir },
+  )
+  const ask = (text: string) =>
+    setup.models.completeSimple(setup.describeModel, {
+      systemPrompt: "write one",
+      messages: [{ role: "user", content: text, timestamp: 0 }],
+    })
+  const text = (m: Awaited<ReturnType<typeof ask>>) =>
+    m.content.flatMap(p => (p.type === "text" ? [p.text] : [])).join("")
+  expect(text(await ask("abc"))).toBe("feat: 3")
+  expect(text(await ask("abcd"))).toBe("feat: 4")
+  expect(fauxOf(script).getPendingResponseCount()).toBe(1)
 })

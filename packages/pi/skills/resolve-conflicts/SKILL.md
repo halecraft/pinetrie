@@ -1,10 +1,10 @@
 ---
 name: resolve-conflicts
-description: How Pineta's agent resolves the conflicts of a landing. Pineta runs it; the agent does not choose it.
+description: How Pineta's agent resolves the conflicts of merging someone's work into a thread. Pineta runs it; the agent does not choose it.
 disable-model-invocation: true
 ---
 
-# Resolving a landing's conflicts
+# Resolving the conflicts of an update
 
 Someone's work was merged into this thread's own copy. Where both sides changed the same lines, jj left conflict markers in the files. Each file below is shown with its markers, followed by both sides:
 
@@ -20,4 +20,4 @@ Someone's work was merged into this thread's own copy. Where both sides changed 
 5. When nothing is left unresolved, run the project's checks (see `AGENTS.md`), and fix what the merge broke.
 6. Finish with a short summary of how you resolved each file, and why.
 
-Pineta decides the outcome from the repository, not from your summary. The landing counts as resolved only when jj finds no conflicts left and you did not ask for guidance.
+Pineta decides the outcome from the repository, not from your summary. The update counts as resolved only when jj finds no conflicts left and you did not ask for guidance.

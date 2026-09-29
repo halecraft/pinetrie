@@ -18,7 +18,7 @@ import {
   ModelRuntime,
   SettingsManager,
 } from "./deep.ts"
-import { fauxOf, type ScriptedModel } from "./scripted.ts"
+import { describeFauxOf, fauxOf, type ScriptedModel } from "./scripted.ts"
 
 export type ModelChoice =
   /** The person's pi setup: settings' default model and the extensions' providers. */
@@ -70,6 +70,12 @@ type PromptInput = Parameters<typeof buildSystemPrompt>[0]
 export interface ModelSetup {
   readonly models: Models
   readonly model: Model
+  /**
+   * The model a commit message is asked of (ADR-0038): the run's, except for
+   * a scripted model, whose describe requests have a provider of their own so
+   * they never take a reply from the run's script (S48 item 22).
+   */
+  readonly describeModel: Model
   /** Context files for the system prompt, such as the repo's `AGENTS.md`. */
   readonly contextFiles: PromptInput["contextFiles"]
   readonly skills: PromptInput["skills"]
@@ -128,17 +134,25 @@ export async function setUpModel(
   switch (choice.kind) {
     case "scripted": {
       const faux = fauxOf(choice.script)
+      const describe = describeFauxOf(choice.script)
       const models = createModels()
       models.setProvider(faux.provider)
+      models.setProvider(describe.provider)
       const resources =
         where.agentDir === undefined ? none : (await load()).resources
-      return { models, model: faux.getModel(), ...resources }
+      return {
+        models,
+        model: faux.getModel(),
+        describeModel: describe.getModel(),
+        ...resources,
+      }
     }
     case "named": {
       const models = await openRuntime(agentDir)
       const resources =
         where.agentDir === undefined ? none : (await load()).resources
-      return { models, model: found(models, choice), ...resources }
+      const model = found(models, choice)
+      return { models, model, describeModel: model, ...resources }
     }
     case "configured": {
       const { settingsManager, loader, resources } = await load()
@@ -159,11 +173,8 @@ export async function setUpModel(
         throw new Error(
           "no model: set defaultProvider and defaultModel in pi's settings, or PINETA_PROVIDER and PINETA_MODEL",
         )
-      return {
-        models,
-        model: found(models, picked),
-        ...resources,
-      }
+      const model = found(models, picked)
+      return { models, model, describeModel: model, ...resources }
     }
   }
 }

@@ -23,9 +23,11 @@ import {
   type EntryId,
   ERR,
   type Intent,
+  isBusy,
   type LaneName,
   type NoteId,
   noteId,
+  type OfferAction,
   parseMentions,
   planStop,
   promptOf,
@@ -54,13 +56,14 @@ import {
   planArchive,
   planChat,
   planDrain,
-  planLand,
   planNote,
   planNoteEdit,
   planReference,
   planStartup,
+  planUpdate,
   recordChanged,
   resolveCommand,
+  type StackMessage,
   sentNote,
   settleRun,
   type WorkRecord,
@@ -405,14 +408,18 @@ export async function startHost({
    * prompt, or resuming what a crash interrupted. The one way a run starts.
    * Before it, a lane of its own's container is queued to start;
    * `ask_for_guidance` is on exactly while the prompt is a land message.
-   * After it, a landing's run records its outcome, its container is stopped,
-   * and one drain step is enqueued for the lane: "a run ended" is the only
-   * state the outbox's loop needs.
+   * After it, a resolution records its outcome, a split's stack is checked,
+   * the lane's offer follows, its container is stopped, and one drain step is
+   * enqueued for the lane: "a run ended" is the only state the outbox's loop
+   * needs.
    */
   function startRun(
     lane: LaneName,
     start:
-      | { readonly kind: "prompt"; readonly message: ChatMessage | LandMessage }
+      | {
+          readonly kind: "prompt"
+          readonly message: ChatMessage | LandMessage | StackMessage
+        }
       | { readonly kind: "resume" },
   ): RunId {
     const id = runId(newId())
@@ -424,7 +431,7 @@ export async function startHost({
         await handle.withGuidance(
           start.kind === "prompt"
             ? start.message.customType === LAND_TYPE
-            : latestPrompt(lane)?.land === true,
+            : latestPrompt(lane)?.role === "land",
         )
         const ran =
           start.kind === "prompt"
@@ -447,9 +454,11 @@ export async function startHost({
       } finally {
         try {
           await handle.withGuidance(false)
-          // A landing's run ends with its outcome, however it started.
+          // A resolution ends with its outcome, and a split with its stack
+          // checked, however they started.
           const prompt = latestPrompt(lane)
-          if (prompt?.land === true) await work.landingEnded(lane, prompt.id)
+          if (prompt?.role === "land") await work.landingEnded(lane, prompt.id)
+          if (prompt?.role === "stack") await work.splitEnded(lane, prompt.id)
         } catch (error) {
           log(
             `[host] run end failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -465,24 +474,24 @@ export async function startHost({
     return id
   }
 
-  /** The prompt of the lane's latest run, and whether it is a land message. */
+  /** The prompt of the lane's latest run, and its role: `land` and `stack` end specially. */
   function latestPrompt(
     lane: LaneName,
-  ): { readonly id: EntryId; readonly land: boolean } | null {
+  ): { readonly id: EntryId; readonly role: string | undefined } | null {
     const index = readTreeIndex(doc)
     const id = promptOf(index, readLaneTip(doc, lane))
-    return id === null
-      ? null
-      : { id, land: index.entries[id]?.message?.role === "land" }
+    return id === null ? null : { id, role: index.entries[id]?.message?.role }
   }
 
   /**
-   * A landing (ADR-0033): a busy lane holds it, as it would a message;
-   * otherwise your work is merged into the lane and its resolution runs.
+   * An update (ADR-0038): a busy lane holds it, as it would a message;
+   * otherwise a copy of your work is merged into the lane. Clean: a fact in
+   * the thread, and the composer's prefill. Conflicted: the resolution runs
+   * (ADR-0033).
    */
-  async function startLanding(lane: LaneName, by: WriterId): Promise<Outcome> {
+  async function startUpdate(lane: LaneName, by: WriterId): Promise<Outcome> {
     const index = readTreeIndex(doc)
-    const planned = planLand({
+    const planned = planUpdate({
       record: readLaneRecords(doc).get(lane),
       view: readLanes(doc, index).find(l => l.name === lane),
     })
@@ -490,11 +499,11 @@ export async function startHost({
       return {
         kind: "refused",
         code: planned.code,
-        message: "only a thread with its own copy can land",
+        message: "only a thread with its own copy takes your work",
       }
     if (planned.kind === "hold") {
       await agent.hold({
-        kind: "land",
+        kind: "update",
         id: newId(),
         lane,
         by,
@@ -502,15 +511,62 @@ export async function startHost({
       })
       return { kind: "queued", position: planned.position }
     }
-    const message = await work.prepareLanding(lane, by)
-    if ("refused" in message) {
-      log(`[host] landing ${lane.slice(-8)} refused: ${message.refused}`)
-      return { kind: "refused", code: ERR.REFUSED, message: message.refused }
+    const updated = await work.prepareUpdate(lane, by)
+    if ("refused" in updated) {
+      log(`[host] update ${lane.slice(-8)} refused: ${updated.refused}`)
+      return { kind: "refused", code: ERR.REFUSED, message: updated.refused }
     }
+    if (updated.kind === "conflicted")
+      return {
+        kind: "started",
+        runId: startRun(lane, { kind: "prompt", message: updated.message }),
+      }
     return {
-      kind: "started",
-      runId: startRun(lane, { kind: "prompt", message }),
+      kind: "updated",
+      text: updated.kind === "clean" ? updated.prefill : "",
     }
+  }
+
+  /**
+   * An offer action (ADR-0038). A split is a run on the lane, so a busy lane
+   * refuses it; every other action is the offer shell's, on your repo.
+   */
+  async function actOnOffer(
+    lane: LaneName,
+    action: OfferAction,
+    by: WriterId,
+  ): Promise<Outcome> {
+    const offers = work.offers
+    if (offers === null)
+      return {
+        kind: "refused",
+        code: ERR.NOT_OWN_COPY,
+        message: "this host has no lanes of their own",
+      }
+    if (action === "split") {
+      const view = readLanes(doc, readTreeIndex(doc)).find(l => l.name === lane)
+      if (view === undefined || isBusy(view))
+        return {
+          kind: "refused",
+          code: ERR.BUSY,
+          message: "the thread is working: split its offer when it stops",
+        }
+      const message = await work.prepareSplit(lane, by)
+      if ("refused" in message)
+        return { kind: "refused", code: ERR.REFUSED, message: message.refused }
+      return {
+        kind: "started",
+        runId: startRun(lane, { kind: "prompt", message }),
+      }
+    }
+    const refused = await offers.act(lane, action, by)
+    if (refused !== null)
+      return {
+        kind: "refused",
+        code: refused,
+        message: "this thread has no offer in your repo",
+      }
+    return action === "take" ? { kind: "taken" } : { kind: "offered" }
   }
 
   /**
@@ -522,13 +578,14 @@ export async function startHost({
     for (;;) {
       const step = planDrain(readOutbox(doc), lane)
       if (step.kind === "idle") return
-      if (step.kind === "land") {
-        // Released first: the landing owns it from here, as a run owns its
-        // message. Its run's end brings the next step.
+      if (step.kind === "update") {
+        // Released first: the update owns it from here, as a run owns its
+        // message. A resolution run's end brings the next step; a clean one
+        // goes on to the next held item.
         await agent.release(step.held.id)
-        const outcome = await startLanding(lane, step.held.by)
-        if (outcome.kind === "refused") continue
-        return
+        const outcome = await startUpdate(lane, step.held.by)
+        if (outcome.kind === "started") return
+        continue
       }
       const message = encodeChat(step.held.details, step.held.timestamp)
       if (step.kind === "append") {
@@ -1004,23 +1061,10 @@ export async function startHost({
       }
       case "archive":
         return respond(await handleArchive(writer, intent))
-      case "land":
-        return respond(await startLanding(intent.lane, writer))
-      case "take": {
-        const refused = await work.take(intent.lane)
-        return respond(
-          refused === null
-            ? { kind: "taken" }
-            : {
-                kind: "refused",
-                code: refused,
-                message:
-                  refused === ERR.MOVED
-                    ? "your work moved on since this landing: land again"
-                    : "there is no resolved landing to take",
-              },
-        )
-      }
+      case "update":
+        return respond(await startUpdate(intent.lane, writer))
+      case "offer":
+        return respond(await actOnOffer(intent.lane, intent.action, writer))
     }
   }
 

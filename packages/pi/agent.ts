@@ -58,6 +58,8 @@ import {
   REFERENCE_NAMESPACE,
   type Reference,
   resolveCommand,
+  type StackMessage,
+  type UpdateMessage,
   type WorkRecord,
 } from "@pineta/marginalia"
 import {
@@ -94,7 +96,10 @@ export const CTX = BACKGROUND_CONTEXT
 /** Coordination-free id, used for peer ids. Same generator pi uses for entries. */
 export const newId = (): string => uuidv7()
 
-/** Pineta's own skills, loaded after yours and the repo's: `resolve-conflicts`. */
+/**
+ * Pineta's own skills, loaded after yours and the repo's: `resolve-conflicts`,
+ * `commit-message` and `offer-stack`.
+ */
 const SKILLS_DIR = path.join(import.meta.dirname, "skills")
 
 /**
@@ -213,12 +218,12 @@ export interface ThreadLaneHandle {
    * Append with no run, through the pi `Lane`: it plans from its own cached
    * tip, so a write that bypasses it would be dropped from its next turn (S19).
    */
-  append(message: ChatMessage): Promise<AppendOutcome>
+  append(message: ChatMessage | UpdateMessage): Promise<AppendOutcome>
   /**
    * Run one turn with `message` as the prompt itself (S19): a compelled chat,
-   * or a land message (ADR-0033).
+   * a land message (ADR-0033), or a stack message (ADR-0038).
    */
-  run(message: ChatMessage | LandMessage): Promise<WriteOutcome>
+  run(message: ChatMessage | LandMessage | StackMessage): Promise<WriteOutcome>
   /** Resume the operation a crash interrupted, in the lane's own directory. */
   resume(): Promise<WriteOutcome>
   /** Turn `ask_for_guidance` on or off for this lane's runs. */
@@ -292,6 +297,14 @@ export interface Agent {
     inLane: boolean,
   ): Promise<CommandRef | null>
   stats(): Promise<{ messageCount: number }>
+  /**
+   * One request for a commit message (ADR-0038): no tools, no session, so
+   * nothing enters the tree or a lane's context. Null when it fails.
+   */
+  describe(request: {
+    readonly system: string
+    readonly user: string
+  }): Promise<string | null>
   close(): Promise<void>
 }
 
@@ -556,6 +569,22 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   return {
     modelLabel: `${resolved.provider}/${resolved.id}`,
     lane: threadLane,
+
+    async describe({ system, user }) {
+      try {
+        const reply = await setup.models.completeSimple(setup.describeModel, {
+          systemPrompt: system,
+          messages: [{ role: "user", content: user, timestamp: Date.now() }],
+        })
+        const text = reply.content
+          .flatMap(p => (p.type === "text" ? [p.text] : []))
+          .join("")
+          .trim()
+        return reply.stopReason === "error" || text === "" ? null : text
+      } catch {
+        return null
+      }
+    },
 
     async appendToTree(message, parent) {
       const id = session.idGenerator.next()

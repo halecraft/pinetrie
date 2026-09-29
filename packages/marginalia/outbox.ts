@@ -13,8 +13,8 @@ import { decodeAll, decodeWith } from "./decode.ts"
 
 export const OUTBOX_NAMESPACE = "pineta.outbox"
 
-// A held landing (ADR-0033) waits like a message. Records stored before
-// landings had no `kind`, and they are all chats.
+// A held update (ADR-0038) waits like a message. Records stored before
+// updates had no `kind`, and they are all chats.
 const HeldChatSchema = Type.Object({
   kind: Type.Optional(Type.Literal("chat")),
   id: Type.String(),
@@ -23,15 +23,15 @@ const HeldChatSchema = Type.Object({
   timestamp: Type.Number(),
 })
 
-const HeldLandSchema = Type.Object({
-  kind: Type.Literal("land"),
+const HeldUpdateSchema = Type.Object({
+  kind: Type.Literal("update"),
   id: Type.String(),
   lane: Type.String(),
   by: Type.String(),
   timestamp: Type.Number(),
 })
 
-/** What waits for a lane: a person's message, or a landing someone asked for. */
+/** What waits for a lane: a person's message, or an update someone asked for. */
 export type Held =
   | {
       readonly kind: "chat"
@@ -42,10 +42,10 @@ export type Held =
       readonly timestamp: number
     }
   | {
-      readonly kind: "land"
+      readonly kind: "update"
       readonly id: string
       readonly lane: LaneName
-      /** Who asked for the landing. */
+      /** Who asked for the update. */
       readonly by: WriterId
       readonly timestamp: number
     }
@@ -55,10 +55,10 @@ export const encodeHeld = (h: Held) => ({ ...h })
 
 export const decodeHeld = (value: unknown): Held | undefined =>
   decodeWith(
-    HeldLandSchema,
+    HeldUpdateSchema,
     value,
     (h): Held => ({
-      kind: "land",
+      kind: "update",
       id: h.id,
       lane: h.lane as LaneName,
       by: h.by as WriterId,
@@ -85,13 +85,16 @@ export const heldMessages = (
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
   )
 
-/** Who a held item is from: the message's author, or who asked to land. */
+/** Who a held item is from: the message's author, or who asked to update. */
 export const heldBy = (h: Held): WriterId =>
-  h.kind === "land" ? h.by : h.details.author
+  h.kind === "update" ? h.by : h.details.author
 
-/** Whether a held item runs the agent: a compelled message, or any landing. */
+/**
+ * Whether a held item may run the agent: a compelled message, or an update,
+ * which runs the resolution when your work conflicts.
+ */
 export const heldRuns = (h: Held): boolean =>
-  h.kind === "land" || h.details.compels.kind === "agent"
+  h.kind === "update" || h.details.compels.kind === "agent"
 
 /** The next message to take for an idle lane: its oldest held one. Pure. */
 export const nextHeld = (
@@ -100,7 +103,7 @@ export const nextHeld = (
 ): Held | undefined => held.find(h => h.lane === lane)
 
 type HeldChat = Extract<Held, { kind: "chat" }>
-type HeldLand = Extract<Held, { kind: "land" }>
+type HeldUpdate = Extract<Held, { kind: "update" }>
 
 /** One step of draining an idle lane: take its oldest held item, or stop. */
 export type DrainStep =
@@ -109,14 +112,14 @@ export type DrainStep =
   | { readonly kind: "append"; readonly held: HeldChat }
   /** A compelled message: run it; the run's end brings the next step. */
   | { readonly kind: "run"; readonly held: HeldChat }
-  /** A landing: start it; its run's end brings the next step. */
-  | { readonly kind: "land"; readonly held: HeldLand }
+  /** An update: carry it out; a resolution run's end brings the next step. */
+  | { readonly kind: "update"; readonly held: HeldUpdate }
 
 /** The next drain step for an idle lane. Pure. */
 export function planDrain(held: readonly Held[], lane: LaneName): DrainStep {
   const next = nextHeld(held, lane)
   if (next === undefined) return { kind: "idle" }
-  if (next.kind === "land") return { kind: "land", held: next }
+  if (next.kind === "update") return { kind: "update", held: next }
   return next.details.compels.kind === "agent"
     ? { kind: "run", held: next }
     : { kind: "append", held: next }

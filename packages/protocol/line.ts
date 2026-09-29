@@ -43,6 +43,7 @@ const Reply = Schema.struct({
   position: Schema.number(),
   by: Schema.string(),
   noteId: Schema.string(),
+  text: Schema.string(),
 })
 
 /** Asymmetric: client sends Command, host sends Reply. */

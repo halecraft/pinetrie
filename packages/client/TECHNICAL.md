@@ -366,10 +366,24 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   "directly in…". The choice is the composer's state until sent, as
   `asksAgent` is; its default is `workFor`, the host's own decision.
 - **A lane's column header** says where it works ("own copy · <commit>", or
-  "in <dir> · shared"), and, for its own copy, offers **land your work**, then
-  **take into my working copy** once a landing resolved (ADR-0033). A landing
-  that needs you offers **land again**. A land message shows as one line, role
-  `land`.
+  "in <dir> · shared"), and, for its own copy, its offer (ADR-0038).
+- **The offer line** is `offerView`'s (`@pineta/marginalia`), drawn by
+  `OfferLine`: a line naming the offer's bookmark, so you can find it in jj
+  or jjui, its buttons, and a `⋯` menu for the rest ("update from my work",
+  "rewrite description"). What the lane runs now (`activityOf`: a turn, a
+  resolution, or a split, from its latest prompt's role) comes first: while
+  it runs, the line says so and offers nothing.
+- **An update's prefill** goes into that column's composer, unsent: `update`
+  answers `updated` with the text, and the column hands it to the composer
+  as `prefill` with a fresh key, which lands once after whatever is typed.
+- **Land, update and stack messages** show as one line each, roles `land`
+  ("resolving your work"), `update` ("your work") and `stack`.
+- **The page header counts offers open** in your repo, as it counts
+  mentions; each row opens its thread.
+- **Selectors in the browser suite:** a column's offer is
+  `.column-head .offer`, with `data-state` (`ready`, `conflicts`, `stack`,
+  and the rest of `offerView`'s states); its line is `.offer-line`, and each
+  button `.offer-<action>`, Take being `.offer-take`.
 - **The invite key** needs no client code: the host's redirect sets a cookie
   that same-origin requests and upgrades carry. `connectSession({ key })` is
   for Node clients.

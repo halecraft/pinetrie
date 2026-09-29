@@ -9,6 +9,9 @@ import { createHash } from "node:crypto"
 import path from "node:path"
 import {
   type CommitId,
+  type ForkStart,
+  type HaveRecord,
+  HOST_OPERATOR,
   HOST_WORKING_COPY,
   hostPathInLane,
   type LaneName,
@@ -30,8 +33,31 @@ export const FETCHED_REF = "refs/heads/pineta/fetched"
 /** A new volume's size. The image is sparse: only written blocks take space. */
 const DISK_SIZE = "64G"
 
-/** The bookmark that holds a lane's newest revision, in its repo and in yours. */
+/** The bookmark that holds a lane's newest revision, in the lane's own repo. */
 export const bookmarkName = (lane: LaneName): string => `pineta/${lane}`
+
+/**
+ * A lane's history in your repo: a remote bookmark, `tip@pineta-<lane>`,
+ * which jj keeps out of your default log and immutable with its builtin
+ * config, ancestors included (S48 items 11 and 19). No git remote is added.
+ */
+const laneRemote = (lane: LaneName): string => `pineta-${lane}`
+const laneTipRef = (lane: LaneName): string =>
+  `refs/remotes/${laneRemote(lane)}/tip`
+export const laneTipName = (lane: LaneName): string => `tip@${laneRemote(lane)}`
+
+/**
+ * A split's stack (ADR-0038): the bookmark its run leaves in the lane's own
+ * repo, and the remote bookmark it arrives as in yours.
+ */
+export const stackBookmark = (lane: LaneName): string => `pineta/${lane}-stack`
+const laneStackRef = (lane: LaneName): string =>
+  `refs/remotes/${laneRemote(lane)}/stack`
+export const laneStackName = (lane: LaneName): string =>
+  `stack@${laneRemote(lane)}`
+
+/** A lane's offer in your repo (ADR-0038). Not `pineta/…`: see `PINETA_HEADS`. */
+export const offerBookmark = (lane: LaneName): string => `pineta-offer/${lane}`
 
 /** The container and the volume of a lane share one name. */
 export const laneContainer = (lane: LaneName): string => `pineta-${lane}`
@@ -474,16 +500,29 @@ export function planLinks(root: string, links: readonly Link[]): Mount[] {
   }))
 }
 
+/**
+ * What Pineta added to your repo's `immutable_heads()` before ADR-0038, to
+ * keep lane bookmarks immutable. Remote bookmarks need no line, and a
+ * bookmark under `pineta/` is immutable while it is there, so offers are
+ * named outside it (S48 item 14).
+ */
 export const PINETA_HEADS = 'bookmarks(glob:"pineta/*")'
 
 /**
- * Your repo's `immutable_heads()` with `heads` added, keeping whatever it
- * already was; null when they are already there.
+ * Your repo's `immutable_heads()` without Pineta's line, keeping anything
+ * else in it: null when the line is not there, "" when only jj's builtin
+ * would remain, so the setting is unset (S48 item 21).
  */
-export function extendImmutable(current: string, heads: string): string | null {
+export function withoutPinetaHeads(current: string): string | null {
   const now = current.trim()
-  if (now.includes(heads)) return null
-  return now === "" ? heads : `(${now}) | ${heads}`
+  if (!now.includes(PINETA_HEADS)) return null
+  const rest = now
+    .split("|")
+    .map(p => p.trim())
+    .filter(p => p !== PINETA_HEADS && p !== "")
+    .map(p => p.replace(/^\((.*)\)$/, "$1").trim())
+    .join(" | ")
+  return rest === "" || rest === "builtin_immutable_heads()" ? "" : rest
 }
 
 /**
@@ -494,6 +533,9 @@ export function extendImmutable(current: string, heads: string): string | null {
  */
 export const forkConfig = (commits: readonly CommitId[]): string =>
   `[revset-aliases]\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\n`
+
+/** `forkConfig` with its one commit left to `printf`'s `%s`. */
+const FORK_CONFIG_TEMPLATE = forkConfig(["%s" as CommitId])
 
 /** One command, as data. `lane` runs through the lane's runner, `host` on the host. */
 export type LaneStep =
@@ -580,24 +622,56 @@ const restoreVolume = (
   ...cloneFile(snapshotFile(paths, id), volumeImage(paths, volume)),
 ]
 
+/** The description of a copy of your `@` made in a lane. */
+export const COPY_MESSAGE = "your working copy"
+
 /**
- * The lane steps that make a disk a fork at `commits`: a change of its own on
- * them, before anything else runs there (S42 item 2), the lane's bookmark at
- * its base, and inherited history made immutable. Without `jj new`, the fork's
- * first turn reuses its parent's change id, and your repo sees a divergent
- * change. A base with several parents (your `@` is a merge) is committed once,
- * empty, so the bookmark names one commit.
+ * The lane steps that make a copy of your `@`: a commit on `@`'s parents with
+ * `@`'s files and a change id of its own, left as `@-`. Never `@` itself,
+ * which would come back into your repo with the lane's work and make your
+ * `@` divergent (S48 item 10).
+ */
+export const planYourCopy = (yours: {
+  readonly at: CommitId
+  readonly parents: readonly CommitId[]
+}): LaneStep[] => [
+  fetchById([yours.at, ...yours.parents]),
+  inLane("jj", "new", ...yours.parents, "-m", COPY_MESSAGE),
+  inLane("jj", "restore", "--from", yours.at),
+  inLane("jj", "commit", "-m", COPY_MESSAGE),
+]
+
+/**
+ * The lane steps that make a disk a fork: a change of its own, before
+ * anything else runs there (S42 item 2), the lane's bookmark at its base, and
+ * inherited history made immutable. Without it, the fork's first turn reuses
+ * its parent's change id, and your repo sees a divergent change. A base with
+ * several parents is committed once, empty, so the bookmark names one commit.
+ * A copy of your `@` is its own base, installing dependencies when your `@`'s
+ * lockfile differs from the base disk's (`install`).
  */
 export function planForkSetup(
   lane: LaneName,
-  commits: readonly CommitId[],
+  start: ForkStart,
+  install: string | null = null,
 ): LaneStep[] {
+  const base: LaneStep[] =
+    start.kind === "copy"
+      ? planYourCopy(start)
+      : [
+          fetchById(start.commits),
+          inLane("jj", "new", ...start.commits),
+          ...(start.commits.length > 1
+            ? [inLane("jj", "commit", "-m", `base: ${lane}`)]
+            : []),
+        ]
+  // A copy's id is known only once made: the config names it by reading @-.
+  const immutable =
+    start.kind === "copy" || start.commits.length > 1
+      ? `"$(jj --ignore-working-copy log --no-graph -r @- -T commit_id)"`
+      : shellWord(start.commits[0] ?? "")
   return [
-    fetchById(commits),
-    inLane("jj", "new", ...commits),
-    ...(commits.length > 1
-      ? [inLane("jj", "commit", "-m", `base: ${lane}`)]
-      : []),
+    ...base,
     inLane(
       "jj",
       "bookmark",
@@ -608,8 +682,9 @@ export function planForkSetup(
       "@-",
     ),
     laneShell(
-      `mkdir -p ${LANE_CONFIG_DIR} && printf '%s' ${shellWord(forkConfig(commits))} > ${LANE_JJ_CONFIG}`,
+      `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} ${immutable} > ${LANE_JJ_CONFIG}`,
     ),
+    ...(install === null ? [] : [laneShell(install)]),
   ]
 }
 
@@ -639,14 +714,16 @@ export const planDisk = (input: {
 export const planFork = (input: {
   readonly point: {
     readonly snapshot: SnapshotId
-    readonly commits: readonly CommitId[]
+    readonly start: ForkStart
   }
   readonly paths: DiskPaths
   readonly spec: LaneSpec
   readonly env: Readonly<Record<string, string | undefined>>
+  /** The install to run when your `@`'s lockfile differs from the base's. */
+  readonly install?: string | null
 }): LaneStep[] => [
   ...planDisk({ ...input, from: input.point.snapshot }),
-  ...planForkSetup(input.spec.lane, input.point.commits),
+  ...planForkSetup(input.spec.lane, input.point.start, input.install ?? null),
 ]
 
 /**
@@ -657,12 +734,13 @@ export const planFork = (input: {
 export const planBundle = (
   lane: LaneName,
   have: readonly CommitId[],
+  bookmark: string = bookmarkName(lane),
 ): readonly string[] => [
   "git",
   "bundle",
   "create",
   "-",
-  `refs/heads/${bookmarkName(lane)}`,
+  `refs/heads/${bookmark}`,
   ...have.map(c => `^${c}`),
 ]
 
@@ -683,8 +761,9 @@ export const planSnapshot = (input: {
 ]
 
 /**
- * The lane's bookmark into your repo: the lane's bundle to a host file, your
- * repo fetching the bookmark from it, and jj importing it.
+ * The lane's bookmark into your repo, as its remote bookmark: the lane's
+ * bundle to a host file, your repo fetching the bookmark from it into
+ * `laneTipRef`, and jj importing it.
  */
 export function planFetch(input: {
   readonly lane: LaneName
@@ -694,12 +773,17 @@ export function planFetch(input: {
   readonly root: string
   /** A host file for the bundle. */
   readonly bundle: string
+  /** A split's stack instead of the lane's tip (`stackBookmark`). */
+  readonly stack?: boolean
 }): LaneStep[] {
-  const ref = `refs/heads/${bookmarkName(input.lane)}`
+  const bookmark = input.stack
+    ? stackBookmark(input.lane)
+    : bookmarkName(input.lane)
+  const to = input.stack ? laneStackRef(input.lane) : laneTipRef(input.lane)
   return [
     {
       in: "lane",
-      argv: planBundle(input.lane, input.have),
+      argv: planBundle(input.lane, input.have, bookmark),
       stdoutTo: input.bundle,
     },
     onHost(
@@ -709,14 +793,285 @@ export function planFetch(input: {
       "fetch",
       "-q",
       input.bundle,
-      `+${ref}:${ref}`,
+      `+refs/heads/${bookmark}:${to}`,
     ),
-    // A jj command with `--ignore-working-copy` imports no git refs, so
-    // import at once. With the flag, the import leaves your working copy
-    // unsnapshotted: 12-47 ms, where a plain `jj git import` snapshots it
-    // too (about 100 ms, S44 item 8).
-    onHost("jj", "-R", input.root, "--ignore-working-copy", "git", "import"),
+    importInto(input.root),
     onHost("rm", "-f", input.bundle),
+  ]
+}
+
+/**
+ * `jj git import` into your repo. A jj command with `--ignore-working-copy`
+ * imports no git refs, so every ref Pineta writes is imported at once. With
+ * the flag, the import leaves your working copy unsnapshotted: 12-47 ms,
+ * where a plain `jj git import` snapshots it too (about 100 ms, S44 item 8).
+ */
+const importInto = (root: string): LaneStep =>
+  onHost("jj", "-R", root, "--ignore-working-copy", "git", "import")
+
+/**
+ * Point lanes' remote bookmarks in your repo at commits, or delete them
+ * (null), then import: the one writer of `laneTipRef` besides the fetch.
+ * Archiving a root deletes its lanes' refs; restoring it writes them back
+ * (S48 item 20).
+ */
+export const laneRefSteps = (
+  root: string,
+  updates: readonly {
+    readonly lane: LaneName
+    readonly commit: CommitId | null
+  }[],
+): LaneStep[] =>
+  updates.length === 0
+    ? []
+    : [
+        ...updates.map(u =>
+          u.commit === null
+            ? onHost("git", "-C", root, "update-ref", "-d", laneTipRef(u.lane))
+            : onHost(
+                "git",
+                "-C",
+                root,
+                "update-ref",
+                laneTipRef(u.lane),
+                u.commit,
+              ),
+        ),
+        importInto(root),
+      ]
+
+/**
+ * jj on your repo as the host acts on it: never snapshotting your working
+ * copy, and every operation marked as the host's (S48 items 1 and 8).
+ */
+export const hostOp = (root: string, ...args: string[]): LaneStep =>
+  onHost(
+    "jj",
+    "-R",
+    root,
+    "--ignore-working-copy",
+    "--config",
+    `operation.username=${HOST_OPERATOR}`,
+    ...args,
+  )
+
+/**
+ * Where an offer starts, as a revset: the newest ancestors of the lane's tip
+ * you already have. That is your commits (`::target`) and every commit a
+ * `pineta.have` records: lane commits a take delivered, and copies of your
+ * `@` made in a lane (ADR-0038, S48 items 15 to 17). Without the copies, an
+ * offer would hand your own uncommitted edits back to you. Several heads
+ * start the offer from their merge.
+ */
+export function offerStart(input: {
+  readonly tip: CommitId
+  readonly target: string
+  readonly haves: readonly HaveRecord[]
+}): string {
+  const had = [input.target, ...input.haves.map(h => h.commit)].join(" | ")
+  return `heads(::${input.tip} & ::(${had}))`
+}
+
+/** One revision of an offer: the lane commit whose files it has, and its message. */
+export interface OfferSource {
+  readonly commit: CommitId
+  readonly description: string
+}
+
+/**
+ * The revset naming the `i`th commit an offer's plan makes, until the plan's
+ * last steps describe it. `jj new` has no template, so a commit it makes can
+ * be found again only by something unique the plan chose (S48 item 18).
+ */
+export const nonceRevset = (nonce: string, i: number): string =>
+  `description(exact:"${nonce}-${i}\n")`
+
+/**
+ * An offer in your repo: for each source, a commit on the one before (the
+ * first on `start`, a merge when it names several heads), with that source's
+ * files restored into it; the whole of it rebased onto `target`; the top
+ * bookmarked; then each described, which retires its nonce. A single offer
+ * has one source, the lane's tip; a stack has one per lane revision
+ * (ADR-0038, S48 items 16 and 18). Every step is the host's, by nonce, never
+ * a commit id kept across steps (S48 item 2).
+ */
+export function planOffer(input: {
+  readonly root: string
+  readonly lane: LaneName
+  readonly start: readonly CommitId[]
+  readonly sources: readonly OfferSource[]
+  readonly target: string
+  readonly nonce: string
+}): LaneStep[] {
+  const { root, nonce, sources } = input
+  const at = (i: number) => nonceRevset(nonce, i)
+  const made = sources.flatMap((source, i) => [
+    hostOp(
+      root,
+      "new",
+      "--no-edit",
+      ...(i === 0 ? input.start : [at(i - 1)]),
+      "-m",
+      `${nonce}-${i}`,
+    ),
+    hostOp(root, "restore", "--from", source.commit, "--into", at(i)),
+  ])
+  const top = sources.length - 1
+  return [
+    ...made,
+    hostOp(root, "rebase", "-s", at(0), "-o", input.target),
+    hostOp(
+      root,
+      "bookmark",
+      "set",
+      "--allow-backwards",
+      offerBookmark(input.lane),
+      "-r",
+      at(top),
+    ),
+    ...sources.map((source, i) =>
+      hostOp(root, "describe", "-r", at(i), "-m", source.description),
+    ),
+  ]
+}
+
+/** An offer moved onto the target: its bottom, and the rest with it. */
+export const planRefreshOffer = (
+  root: string,
+  bottom: string,
+  target: string,
+): LaneStep[] => [hostOp(root, "rebase", "-s", bottom, "-o", target)]
+
+/** An offer's revisions abandoned, to build it again. */
+export const planAbandonOffer = (
+  root: string,
+  changes: readonly string[],
+): LaneStep[] =>
+  changes.length === 0 ? [] : [hostOp(root, "abandon", ...changes)]
+
+/** One revision of an offer described again (an agent's commit message). */
+export const planDescribe = (
+  root: string,
+  change: string,
+  message: string,
+): LaneStep[] => [hostOp(root, "describe", "-r", change, "-m", message)]
+
+/**
+ * After a race left a revision divergent: abandon the commit the host's own
+ * operation made, and point the offer's bookmark at yours (S48 item 8).
+ */
+export const planRepair = (input: {
+  readonly root: string
+  readonly lane: LaneName
+  readonly hosts: CommitId
+  readonly yours: CommitId
+  readonly top: boolean
+}): LaneStep[] => [
+  hostOp(input.root, "abandon", input.hosts),
+  ...(input.top
+    ? [
+        hostOp(
+          input.root,
+          "bookmark",
+          "set",
+          "--allow-backwards",
+          offerBookmark(input.lane),
+          "-r",
+          input.yours,
+        ),
+      ]
+    : []),
+]
+
+/**
+ * Take an offer. Under your edits when the target is an ancestor of `@`:
+ * `jj rebase -r <bottom>::<top> -A <target> -B @`, run as you, since it
+ * updates your files (S48 items 5 and 18). Otherwise it already sits on the
+ * target, beside `@`, and only bookmarks move. Then `pineta-onto`, when you
+ * set it, moves to the top, so offers taken stack in the order taken, and the
+ * offer's bookmark goes.
+ */
+export function planTakeOffer(input: {
+  readonly root: string
+  readonly lane: LaneName
+  readonly bottom: string
+  readonly top: string
+  readonly target: string
+  readonly underYou: boolean
+  readonly onto: boolean
+}): LaneStep[] {
+  const { root } = input
+  return [
+    ...(input.underYou
+      ? [
+          onHost(
+            "jj",
+            "-R",
+            root,
+            "rebase",
+            "-r",
+            `${input.bottom}::${input.top}`,
+            "-A",
+            input.target,
+            "-B",
+            "@",
+          ),
+        ]
+      : []),
+    ...(input.onto
+      ? [
+          hostOp(
+            root,
+            "bookmark",
+            "set",
+            "--allow-backwards",
+            ONTO_BOOKMARK,
+            "-r",
+            input.top,
+          ),
+        ]
+      : []),
+    hostOp(root, "bookmark", "delete", offerBookmark(input.lane)),
+  ]
+}
+
+/** The bookmark you set to say where offers go; `@-` without it (ADR-0038). */
+export const ONTO_BOOKMARK = "pineta-onto"
+
+/**
+ * Retire what Pineta wrote into your repo before ADR-0038, in S48 item 21's
+ * order: each local `pineta/<lane>` becomes the lane's remote bookmark, then
+ * the local bookmarks go, then Pineta's line leaves `immutable_heads()`.
+ * Deleting first would leave the lanes' commits in your default log. A
+ * config change is not a jj operation.
+ */
+export function planRetire(input: {
+  readonly root: string
+  readonly bookmarks: readonly {
+    readonly name: string
+    readonly commit: CommitId
+  }[]
+  readonly heads: string
+}): LaneStep[] {
+  const { root } = input
+  const lanes = input.bookmarks.flatMap(b => {
+    const lane = b.name.startsWith("pineta/") ? b.name.slice(7) : ""
+    return lane.startsWith("t-")
+      ? [{ lane: lane as LaneName, commit: b.commit }]
+      : []
+  })
+  const next = withoutPinetaHeads(input.heads)
+  const key = 'revset-aliases."immutable_heads()"'
+  return [
+    ...laneRefSteps(root, lanes),
+    ...(input.bookmarks.length === 0
+      ? []
+      : [hostOp(root, "bookmark", "delete", "glob:pineta/*")]),
+    ...(next === null
+      ? []
+      : next === ""
+        ? [onHost("jj", "-R", root, "config", "unset", "--repo", key)]
+        : [onHost("jj", "-R", root, "config", "set", "--repo", key, next)]),
   ]
 }
 

@@ -15,13 +15,12 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "the immutable heads replace yours",
+    name: "retiring removes nothing of Pineta's line",
     file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '  return now === "" ? heads : `(${now}) | ${heads}`',
-    to: "  return heads",
+    from: '    .filter(p => p !== PINETA_HEADS && p !== "")',
+    to: '    .filter(p => p !== "")',
     command: unit,
-    expect: "extendImmutable: keeps your value",
+    expect: "withoutPinetaHeads",
   },
   {
     name: "planBundle drops the ^<have> exclusion",
@@ -66,9 +65,9 @@ export const mutations: readonly Mutation[] = [
     expect: "the whole life of a lane",
   },
   {
-    name: "a landing's merge is left uncommitted",
+    name: "an update's merge is left uncommitted",
     file: "packages/lanes/merge.ts",
-    from: '  const commit = await jj(["commit", "-m", "land: your work"])',
+    from: '  const commit = await jj(["commit", "-m", "update: your work"])',
     to: '  const commit = await jj(["log", "-r", "@"])',
     command: unit,
     expect: "the whole life of a lane",
@@ -76,8 +75,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fork skips jj new",
     file: plan,
-    from: '    inLane("jj", "new", ...commits),',
-    to: '    inLane("true"),',
+    from: '          inLane("jj", "new", ...start.commits),',
+    to: '          inLane("true"),',
     command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
     expect: "the whole life of a lane",
   },
@@ -85,7 +84,7 @@ export const mutations: readonly Mutation[] = [
     name: "the fork's immutable_heads() is not written",
     file: plan,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "      `mkdir -p ${LANE_CONFIG_DIR} && printf '%s' ${shellWord(forkConfig(commits))} > ${LANE_JJ_CONFIG}`,",
+    from: "      `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} ${immutable} > ${LANE_JJ_CONFIG}`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "      `mkdir -p ${LANE_CONFIG_DIR}`,",
     command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
@@ -210,5 +209,87 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "created when missing; excluded in your repo unless already ignored",
+  },
+  {
+    name: "host operations on your repo snapshot your working copy",
+    file: plan,
+    from: '    root,\n    "--ignore-working-copy",\n    "--config",',
+    to: '    root,\n    "--config",',
+    command: unit,
+    expect: "planOffer: a commit per source",
+  },
+  {
+    name: "planOffer rebases only the bottom revision",
+    file: plan,
+    from: '    hostOp(root, "rebase", "-s", at(0), "-o", input.target),',
+    to: '    hostOp(root, "rebase", "-r", at(0), "-o", input.target),',
+    command: unit,
+    expect: "planOffer: a commit per source",
+  },
+  {
+    name: "the repair keeps the host's commit",
+    file: plan,
+    from: '  hostOp(input.root, "abandon", input.hosts),',
+    to: '  hostOp(input.root, "abandon", input.yours),',
+    command: unit,
+    expect: "an offer: built",
+  },
+  {
+    name: "pineta-onto does not follow a take",
+    file: plan,
+    from: "    ...(input.onto\n      ? [",
+    to: "    ...(false\n      ? [",
+    command: unit,
+    expect: "planTakeOffer",
+  },
+  {
+    name: "retiring deletes before it moves",
+    file: plan,
+    from: "    ...laneRefSteps(root, lanes),",
+    to: "    ...laneRefSteps(root, []),",
+    command: unit,
+    expect: "retiring a repo",
+  },
+  {
+    name: "a fork's copy is a child of your @ itself",
+    file: plan,
+    from: '  inLane("jj", "new", ...yours.parents, "-m", COPY_MESSAGE),',
+    to: '  inLane("jj", "new", yours.at, "-m", COPY_MESSAGE),',
+    command: unit,
+    expect: "planForkSetup: a copy of your @",
+  },
+  {
+    name: "a lane's tip is fetched as a local bookmark",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "      `+refs/heads/${bookmark}:${to}`,",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "      `+refs/heads/${bookmark}:refs/heads/${bookmark}`,",
+    command: unit,
+    expect: "planFetch",
+  },
+  {
+    name: "a delivery is not recorded as a have",
+    file: "apps/pineta/host/offers.ts",
+    from: "          await writeHave({",
+    to: "          void ({",
+    command: lanes("main"),
+    expect: "the next offer holds only the new work",
+  },
+  {
+    name: "a clean update writes no entry",
+    file: "apps/pineta/host/work.ts",
+    from: "            .append(encodeUpdate(details, Date.now()))",
+    to: '            .append({ ...encodeUpdate(details, Date.now()), customType: "pineta.none" } as never)',
+    command: lanes("main"),
+    expect: "a clean update writes a fact",
+  },
+  {
+    name: "a split's stack is never fetched",
+    file: "apps/pineta/host/work.ts",
+    from: "        await fetchLane(lane, [details.tip, ...details.start], true)",
+    to: "        void details.tip",
+    command: lanes("main"),
+    expect: "split into a stack",
   },
 ]

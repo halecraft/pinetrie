@@ -25,7 +25,7 @@
 // so they never carry it.
 
 import { execFile } from "node:child_process"
-import { NO_EDITOR, WORKSPACE_ROOT } from "@pineta/core"
+import { HOST_OPERATOR, NO_EDITOR, WORKSPACE_ROOT } from "@pineta/core"
 
 export interface Ran<Out = string> {
   readonly ok: boolean
@@ -107,6 +107,30 @@ export const hostJj =
   (root: string): Runner =>
   args =>
     run("jj", ["-R", root, ...JJ_FLAGS, ...args], { env: NO_EDITOR })
+
+/**
+ * jj on your repo as the host acts on it while you work: never snapshotting
+ * your working copy, and every operation marked as the host's, so the evolog
+ * says which commits it made (S48 items 1 and 8). Run from the repo's root,
+ * so paths it prints are the repo's. A command that must update your files,
+ * a take, runs through `hostJj` instead.
+ */
+export const hostOps =
+  (root: string): Runner =>
+  args =>
+    run(
+      "jj",
+      [
+        "-R",
+        root,
+        ...JJ_FLAGS,
+        "--ignore-working-copy",
+        "--config",
+        `operation.username=${HOST_OPERATOR}`,
+        ...args,
+      ],
+      { cwd: root, env: NO_EDITOR },
+    )
 
 /** jj in a lane, over the lane's runner: always on `/workspace`. */
 export const laneJj =

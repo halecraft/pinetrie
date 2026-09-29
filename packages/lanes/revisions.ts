@@ -11,6 +11,7 @@ import {
   commitId,
   type EntryId,
   type LaneName,
+  type YoursNow,
 } from "@pineta/core"
 import { setBookmark } from "./bookmarks.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
@@ -85,5 +86,18 @@ export async function commitTurn(
   return id
 }
 
-/** Your `@-`: what a root lane starts from, and what landing merges. */
+/** Your `@-`: what the base snapshot is made from. */
 export const yoursNow = (jj: Runner): Promise<CommitId[]> => commitsOf(jj, "@-")
+
+/**
+ * Your `@` as it is now, and its parents: what a copy of it is made from
+ * (ADR-0038). `jj` must snapshot your working copy (`hostJj`, not
+ * `hostOps`): the copy must hold the edits you have not committed.
+ */
+export async function yoursAt(jj: Runner): Promise<YoursNow> {
+  const snap = await jj(["util", "snapshot"])
+  if (!snap.ok) throw new Error(describeFailure("jj util snapshot", snap))
+  const [at] = await commitsOf(jj, "@")
+  if (at === undefined) throw new Error("your repo has no @")
+  return { at, parents: await commitsOf(jj, "@-") }
+}
