@@ -46,8 +46,9 @@ import {
   createVolume,
   executeOrThrow,
   hostBytesRunner,
+  hostOps,
   hostRunner,
-  offerStart,
+  startOfOffer,
 } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
 import {
@@ -734,19 +735,13 @@ async function mainSection(): Promise<void> {
             "commit_id",
           )
     // Where the host starts the offer, as it computes it.
-    const start = jj(
-      project,
-      "log",
-      "--no-graph",
-      "-r",
-      offerStart({
+    const start = (
+      await startOfOffer(hostOps(project), {
         tip: commitId(laneTipCommit),
         target: "@-",
         haves: readHaves(wh.doc),
-      }),
-      "-T",
-      'commit_id ++ " "',
-    ).trim()
+      })
+    ).join(" ")
     script.use([
       {
         tool: "bash",

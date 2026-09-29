@@ -6,7 +6,7 @@
 // what can be done in it (`offerView`), whether the agent's stack may replace it
 // (`acceptStack`), and the commit-message request (`describeRequest`,
 // `withTrailers`, `wipDescription`). The jj steps that carry them out, and
-// where an offer starts (`offerStart`), are planned in `@pineta/lanes`.
+// where an offer starts (`startOfOffer`), are in `@pineta/lanes`.
 
 import {
   type CommitId,

@@ -48,7 +48,6 @@ import {
   offerBookmark,
   offerFacts,
   offerRevisions,
-  offerStart,
   planAbandonOffer,
   planBaseRefresh,
   planFetch,
@@ -65,7 +64,7 @@ import {
   revisionMessage,
   run,
   sideHistory,
-  startOf,
+  startOfOffer,
   yoursAt,
   yoursNow,
 } from "./index.ts"
@@ -435,9 +434,13 @@ describe("a lane's repo, with jj", () => {
     expect(await commitsOf(yoursJj, "divergent()")).toEqual([])
   }, 60_000)
 
-  test("an offer: built, refreshed, left, repaired, taken, and the next one", async () => {
-    const yoursDir = path.join(top, "offer-yours")
-    const laneDir = path.join(top, "offer-lane")
+  /**
+   * Your repo and one lane's, in `top/<tag>-…`, with the lane's steps run on
+   * the host, and an offer built as the host builds it.
+   */
+  const offerRig = async (tag: string) => {
+    const yoursDir = path.join(top, `${tag}-yours`)
+    const laneDir = path.join(top, `${tag}-lane`)
     await run("mkdir", ["-p", yoursDir, laneDir])
     await run("jj", ["git", "init", "--colocate", yoursDir])
     const yoursJj = hostJj(yoursDir)
@@ -462,12 +465,66 @@ describe("a lane's repo, with jj", () => {
           lane: LANE,
           have,
           root: yoursDir,
-          bundle: path.join(top, "offer.bundle"),
+          bundle: path.join(top, `${tag}.bundle`),
         }),
         runners,
       )
     const edit = async (dir: string, file: string, text: string) =>
       writeFile(path.join(dir, file), text)
+    const build = async (
+      sources: readonly OfferSource[],
+      haves: readonly HaveRecord[] = [],
+      target = "@-",
+      name = NAME,
+    ) => {
+      const tip = await laneTipIn(ops, LANE)
+      if (tip === null) throw new Error("no tip")
+      const start = await startOfOffer(ops, { tip, target, haves })
+      await executeOnHost(
+        planOffer({
+          root: yoursDir,
+          name,
+          start,
+          sources,
+          target,
+          nonce: `n-${Math.random().toString(36).slice(2)}`,
+        }),
+      )
+      const revs = await offerRevisions(
+        ops,
+        offerBookmark(name),
+        sources.length,
+      )
+      return {
+        commits: revs,
+        changes: await Promise.all(revs.map(c => changeOf(ops, c))),
+      }
+    }
+    return {
+      yoursDir,
+      laneDir,
+      yoursJj,
+      ops,
+      laneJj,
+      inLane,
+      fetch,
+      edit,
+      build,
+    }
+  }
+
+  test("an offer: built, refreshed, left, repaired, taken, and the next one", async () => {
+    const {
+      yoursDir,
+      laneDir,
+      yoursJj,
+      ops,
+      laneJj,
+      inLane,
+      fetch,
+      edit,
+      build,
+    } = await offerRig("offer")
     const opNow = async () =>
       (
         await yoursJj([
@@ -498,35 +555,6 @@ describe("a lane's repo, with jj", () => {
       return out
     }
     const bookmark = offerBookmark(NAME)
-    const build = async (
-      sources: readonly OfferSource[],
-      haves: readonly HaveRecord[] = [],
-      target = "@-",
-      name = NAME,
-    ) => {
-      const tip = await laneTipIn(ops, LANE)
-      if (tip === null) throw new Error("no tip")
-      const start = await startOf(ops, offerStart({ tip, target, haves }))
-      await executeOnHost(
-        planOffer({
-          root: yoursDir,
-          name,
-          start,
-          sources,
-          target,
-          nonce: `n-${Math.random().toString(36).slice(2)}`,
-        }),
-      )
-      const revs = await offerRevisions(
-        ops,
-        offerBookmark(name),
-        sources.length,
-      )
-      return {
-        commits: revs,
-        changes: await Promise.all(revs.map(c => changeOf(ops, c))),
-      }
-    }
 
     for (const f of ["a.txt", "b.txt", "c.txt"])
       await edit(yoursDir, f, `${f} 1\n${f} 2\n${f} 3\n`)
@@ -761,7 +789,7 @@ describe("a lane's repo, with jj", () => {
     const follow = async () => {
       const tip = await laneTipIn(ops, LANE)
       if (tip === null) throw new Error("no tip")
-      const start = await startOf(ops, offerStart({ tip, target: "@-", haves }))
+      const start = await startOfOffer(ops, { tip, target: "@-", haves })
       const at = await commitsOf(yoursJj, "@")
       await executeOnHost(
         planFollowOffer({
@@ -818,6 +846,109 @@ describe("a lane's repo, with jj", () => {
     // parent thread's take would.
     haves = [...haves, { ...delivered, commit: t3 }]
     expect((await follow()).files).toEqual(["h.txt", "i.txt"])
+  }, 60_000)
+
+  test("an offer after you committed your edits differently starts at the newest copy (S51)", async () => {
+    const {
+      yoursDir,
+      laneDir,
+      yoursJj,
+      ops,
+      laneJj,
+      inLane,
+      fetch,
+      edit,
+      build,
+    } = await offerRig("s51")
+    const haves: HaveRecord[] = []
+    const have = (commit: CommitId, kind: HaveRecord["kind"]) =>
+      haves.push({ lane: LANE, commit, kind, at: haves.length + 1 })
+    let entry = 0
+    const turn = async () => {
+      const t = await commitTurn(laneJj, {
+        ...TURN,
+        entry: entryId(`e-s${++entry}`),
+      })
+      if (t === null) throw new Error("the turn committed nothing")
+      return t
+    }
+    /** "Update from my work": a copy of your @ merged into the lane; the lane takes yours where they conflict. */
+    const update = async (yours: Record<string, string>) => {
+      await inLane(planYourCopy(await yoursAt(yoursJj)))
+      const [copy] = await commitsOf(laneJj, "@-")
+      if (copy === undefined) throw new Error("no copy")
+      await mergeYours(laneJj, LANE, [copy])
+      for (const [file, text] of Object.entries(yours))
+        await edit(laneDir, file, text)
+      await turn()
+      have(copy, "copy")
+    }
+    /** The offer's conflicts and files, as built from the lane's tip now. */
+    const offer = async () => {
+      await fetch(base)
+      const tip = await laneTipIn(ops, LANE)
+      if (tip === null) throw new Error("no tip")
+      const built = await build([{ commit: tip, description: "WIP" }], haves)
+      const [commit] = built.commits
+      if (commit === undefined) throw new Error("no offer")
+      return {
+        built,
+        conflicted:
+          (await commitsOf(ops, `${commit} & conflicts()`)).length > 0,
+        files: lines((await ops(["diff", "-r", commit, "--name-only"])).stdout),
+      }
+    }
+
+    for (const f of ["a.txt", "b.txt", "c.txt"])
+      await edit(yoursDir, f, `${f}\n`)
+    await yoursJj(["commit", "-m", "base"])
+    const base = await yoursNow(yoursJj)
+    await inLane(
+      planBaseRefresh({ base: null, yours: base, lock: null, install: null }),
+    )
+    // The lane starts from a copy of your @, holding an edit you have not
+    // committed.
+    await edit(yoursDir, "a.txt", "a, as you were trying it\n")
+    await inLane(
+      planForkSetup(LANE, { kind: "copy", ...(await yoursAt(yoursJj)) }),
+    )
+    const [first] = await commitsOf(laneJj, `bookmarks(exact:"pineta/${LANE}")`)
+    if (first === undefined) throw new Error("no copy")
+    have(first, "copy")
+    await edit(laneDir, "b.txt", "b, the lane's\n")
+    await turn()
+    // You commit that edit, differently, then update the lane.
+    await edit(yoursDir, "a.txt", "a, as you kept it\n")
+    await yoursJj(["commit", "-m", "yours: a.txt"])
+    await update({ "a.txt": "a, as you kept it\n" })
+    const clean = await offer()
+    expect([clean.conflicted, clean.files]).toEqual([false, ["b.txt"]])
+
+    // Delivered: you take it, change its line in a commit of yours, and
+    // update again.
+    const [change] = clean.built.changes
+    if (change === undefined) throw new Error("no offer")
+    await executeOnHost(
+      planTakeOffer({
+        root: yoursDir,
+        bookmark: offerBookmark(NAME),
+        bottom: change,
+        top: change,
+        target: "@-",
+        underYou: true,
+        onto: false,
+      }),
+    )
+    const taken = await laneTipIn(ops, LANE)
+    if (taken === null) throw new Error("no tip")
+    have(taken, "delivered")
+    await edit(yoursDir, "b.txt", "b, as you changed it\n")
+    await yoursJj(["commit", "-m", "yours: b.txt"])
+    await update({ "b.txt": "b, as you changed it\n" })
+    await edit(laneDir, "c.txt", "c, the lane's\n")
+    await turn()
+    const again = await offer()
+    expect([again.conflicted, again.files]).toEqual([false, ["c.txt"]])
   }, 60_000)
 
   test("retiring a repo from before offers: history kept, out of your log", async () => {

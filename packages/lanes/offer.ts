@@ -1,7 +1,7 @@
 // lanes/offer — what the host reads of an offer in your repo (ADR-0038).
 //
 // Reads only, each a query over `hostOps` returning values: the facts a
-// trigger plans from (`offerFacts`, `startOf`, `laneTipIn`), your edits
+// trigger plans from (`offerFacts`, `startOfOffer`, `laneTipIn`), your edits
 // (`yourEditsIn`), and which of a divergent revision's commits the host made
 // (`hostCommitIn`). What the host then does is planned in `plan.ts`
 // (`planOffer`, `planTakeOffer`, `planRepair`) and decided in
@@ -9,11 +9,12 @@
 
 import {
   type CommitId,
-  commitId,
+  type HaveRecord,
   HOST_OPERATOR,
   type LaneName,
 } from "@pineta/core"
-import { laneTipName } from "./plan.ts"
+import { anyHave, laneTipName, offerStart, startHaves } from "./plan.ts"
+import { commitsOf } from "./revisions.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
 
 async function query(jj: Runner, args: readonly string[]): Promise<string> {
@@ -21,18 +22,6 @@ async function query(jj: Runner, args: readonly string[]): Promise<string> {
   if (!ran.ok) throw new Error(describeFailure(`jj ${args[0]}`, ran))
   return ran.stdout
 }
-
-const commitsOf = async (jj: Runner, revset: string): Promise<CommitId[]> =>
-  lines(
-    await query(jj, [
-      "log",
-      "--no-graph",
-      "-r",
-      revset,
-      "-T",
-      'commit_id ++ "\\n"',
-    ]),
-  ).map(commitId)
 
 /** The lane's tip in your repo, its remote bookmark; null before its first fetch. */
 export async function laneTipIn(
@@ -43,9 +32,26 @@ export async function laneTipIn(
   return tip ?? null
 }
 
-/** The commits a revset names: where an offer starts (`offerStart`). */
-export const startOf = (jj: Runner, revset: string): Promise<CommitId[]> =>
-  commitsOf(jj, revset)
+/**
+ * Where an offer starts, as commits: which haves the lane tip's history holds
+ * (read), the ones `startHaves` keeps of them (pure), then `offerStart`'s
+ * revset (read). The host's every start comes from here, so an offer is
+ * built, followed and split from one start.
+ */
+export async function startOfOffer(
+  jj: Runner,
+  input: {
+    readonly tip: CommitId
+    readonly target: string
+    readonly haves: readonly HaveRecord[]
+  },
+): Promise<CommitId[]> {
+  const any = anyHave(input.haves)
+  const inTip =
+    any === null ? [] : await commitsOf(jj, `::${input.tip} & (${any})`)
+  const haves = startHaves(input.haves, new Set(inTip))
+  return commitsOf(jj, offerStart({ ...input, haves }))
+}
 
 /** Whether a bookmark exists in your repo. */
 export async function hasBookmark(jj: Runner, name: string): Promise<boolean> {

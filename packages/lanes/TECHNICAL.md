@@ -276,10 +276,23 @@ containers, disks and the helper.
   first on the start (a merge when the start names several heads), then all
   rebased onto the target. A stack's sources are the agent's revisions.
 - **Where an offer starts is `offerStart`'s revset**: the newest ancestors of
-  the lane's tip you already have, your commits and every `pineta.have`
-  (delivered lane commits, copies of your `@`), S48 items 15 to 17. Each have
-  is `present()`: a copy is made in a lane and reaches your repo only with
-  that lane's work, and one never fetched would fail every lane's revset.
+  the lane's tip you already have, your commits and the `pineta.have`
+  commits (delivered lane commits, copies of your `@`), S48 items 15 to 17.
+  Each have is `present()` (`anyHave`): a copy is made in a lane and reaches
+  your repo only with that lane's work, and one never fetched would fail every
+  lane's revset.
+- **The newest copy of your `@` in the tip's history supersedes older haves**
+  (`startHaves`, S51). A copy holds everything you had when it was made. An
+  older copy's uncommitted edits, or a delivered commit, may since have
+  become commits of yours with other content, and a start merging both
+  conflicts where they differ. "Newest in the tip's history", not the lane's
+  newest: a branch forked before its parent's update holds only the older
+  copy, and must keep it.
+- **`startOfOffer` is the one path to a start:** a read of which haves the
+  tip's history holds, `startHaves`, then `offerStart`'s revset. The host's
+  refresh, its `squash` and `refresh` actions and `stackSpan` all use it: a
+  start from another rule would read as a moved start to `planRefresh`, and
+  a split would build on it.
 - **An offer follows its lane in place** (`planFollowOffer`, S49): `rebase -s`
   back onto the start, `restore --from <tip>`, `rebase -s` onto the target.
   Restoring where it sits would give it the tip's tree, dropping your work

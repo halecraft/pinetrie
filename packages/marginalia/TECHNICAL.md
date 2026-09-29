@@ -178,7 +178,7 @@ through one `setWorkRecord`:
 | the commit and disk at an entry | `pineta.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
 | how a resolution ended | `pineta.landing` | its own id | when its run ends |
 | a lane's offer in your repo | `pineta.offer` | the lane | when a trigger changed it, or it was taken |
-| a commit you have of a lane: delivered by a take, or a copy of your `@` | `pineta.have` | the commit | at a take, a fork from your `@`, and an update |
+| a commit you have of a lane: delivered by a take, or a copy of your `@`; a start until a newer copy in the lane's history supersedes it (S51) | `pineta.have` | the commit | at a take, a fork from your `@`, and an update |
 | a lane's name, `word-word` | `pineta.name` | the lane | once, at the host's start or before the lane's first run |
 | what the host found where it runs: `lanes`, or `direct` and why | `pineta.project` | `project` | at every start |
 

@@ -869,24 +869,50 @@ export const hostOp = (root: string, ...args: string[]): LaneStep =>
 
 /**
  * Where an offer starts, as a revset: the newest ancestors of the lane's tip
- * you already have. That is your commits (`::target`) and every commit a
- * `pineta.have` records: lane commits a take delivered, and copies of your
- * `@` made in a lane (ADR-0038, S48 items 15 to 17). Without the copies, an
- * offer would hand your own uncommitted edits back to you. Several heads
- * start the offer from their merge. A copy is made in a lane, so your repo
- * holds it only once that lane's work is fetched: each have is `present()`,
- * or one copy never fetched would fail every lane's revset.
+ * you already have. That is your commits (`::target`) and the `pineta.have`
+ * commits `startHaves` keeps: lane commits a take delivered, and copies of
+ * your `@` made in a lane (ADR-0038, S48 items 15 to 17). Without the
+ * copies, an offer would hand your own uncommitted edits back to you. Several
+ * heads start the offer from their merge.
  */
 export function offerStart(input: {
   readonly tip: CommitId
   readonly target: string
   readonly haves: readonly HaveRecord[]
 }): string {
-  const had = [
-    input.target,
-    ...input.haves.map(h => `present(${h.commit})`),
-  ].join(" | ")
+  const had = [input.target, anyHave(input.haves)]
+    .filter(r => r !== null)
+    .join(" | ")
   return `heads(::${input.tip} & ::(${had}))`
+}
+
+/**
+ * Any of the haves' commits, as a revset; null for none. A copy is made in a
+ * lane, so your repo holds it only once that lane's work is fetched: each is
+ * `present()`, or one copy never fetched would fail the whole revset.
+ */
+export const anyHave = (haves: readonly HaveRecord[]): string | null =>
+  haves.length === 0 ? null : haves.map(h => `present(${h.commit})`).join(" | ")
+
+/**
+ * The haves an offer can start from, given which of them the lane tip's
+ * history holds (S51). A copy of your `@` holds everything you had when it
+ * was made, so the newest copy in the tip's history supersedes every have
+ * recorded before it: an older copy's uncommitted edits, or a delivered
+ * commit, may since have become commits of yours with other content.
+ */
+export function startHaves(
+  haves: readonly HaveRecord[],
+  inTip: ReadonlySet<CommitId>,
+): readonly HaveRecord[] {
+  const held = haves.filter(h => inTip.has(h.commit))
+  const newest = held
+    .filter(h => h.kind === "copy")
+    .reduce<HaveRecord | null>(
+      (n, h) => (n === null || h.at > n.at ? h : n),
+      null,
+    )
+  return newest === null ? held : held.filter(h => h.at >= newest.at)
 }
 
 /** One revision of an offer: the lane commit whose files it has, and its message. */

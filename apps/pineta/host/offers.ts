@@ -24,6 +24,7 @@ import {
 } from "@pineta/core"
 import {
   changeOf,
+  commitsOf,
   executeOnHost,
   hasBookmark,
   hostCommitIn,
@@ -36,7 +37,6 @@ import {
   offerBookmark,
   offerFacts,
   offerRevisions,
-  offerStart,
   planAbandonOffer,
   planDescribe,
   planFollowOffer,
@@ -44,7 +44,7 @@ import {
   planRefreshOffer,
   planRepair,
   planTakeOffer,
-  startOf,
+  startOfOffer,
   yourEditsIn,
 } from "@pineta/lanes"
 import {
@@ -244,7 +244,7 @@ export function startOffers(input: {
     if (tip === null || name === undefined) return "other"
     const target = await targetNow()
     const haves = readHaves(doc)
-    const start = await startOf(ops, offerStart({ tip, target, haves }))
+    const start = await startOfOffer(ops, { tip, target, haves })
     const stored = offerOf(lane)
     const open = stored !== undefined && stored.taken === null ? stored : null
     const facts = open === null ? null : await factsOf(open, target)
@@ -518,7 +518,7 @@ export function startOffers(input: {
         const top = o.host.changes.at(-1)
         if (bottom === undefined || top === undefined) return ERR.NO_OFFER
         if (action === "take") {
-          const under = await startOf(ops, `(${target}) & ::@`)
+          const under = await commitsOf(ops, `(${target}) & ::@`)
           await executeOnHost(
             planTakeOffer({
               root,
@@ -551,10 +551,11 @@ export function startOffers(input: {
         if (name === undefined) return ERR.NO_OFFER
         await executeOnHost(planAbandonOffer(root, o.host.changes))
         const tip = (await laneTipIn(ops, lane)) ?? o.host.tip
-        const start = await startOf(
-          ops,
-          offerStart({ tip, target, haves: readHaves(doc) }),
-        )
+        const start = await startOfOffer(ops, {
+          tip,
+          target,
+          haves: readHaves(doc),
+        })
         await build(
           lane,
           name,
@@ -576,10 +577,11 @@ export function startOffers(input: {
         const tip = await laneTipIn(ops, lane)
         if (tip === null) return null
         const target = await targetNow()
-        const start = await startOf(
-          ops,
-          offerStart({ tip, target, haves: readHaves(doc) }),
-        )
+        const start = await startOfOffer(ops, {
+          tip,
+          target,
+          haves: readHaves(doc),
+        })
         return { start, tip }
       })
     },
@@ -587,7 +589,7 @@ export function startOffers(input: {
     async stackEnded(lane, stack) {
       return serially(async () => {
         if (stack.top === null) return "the stack's bookmark was not set"
-        const revisions = await startOf(
+        const revisions = await commitsOf(
           ops,
           `(${stack.start.join(" | ")})..${stack.top}`,
         )

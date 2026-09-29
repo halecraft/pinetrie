@@ -2979,6 +2979,8 @@ the host's address, note authorship and presence keys.
 bookmark), ADR-0033 (landing) and ADR-0034 (how work moves into your repo).
 **Amended by ADR-0040:** the offer moves from the column's header to its work
 strip, and its lines become plain words, with the bookmark shown apart.
+Amended in place (S51, `PLAN-2026-09-29-offer-start`): the newest copy of
+your `@` in a lane's history supersedes the haves recorded before it.
 
 **Context.** Taking a thread's work today rebases your `@` onto the lane's
 merge (ADR-0034). Every turn commit the lane made becomes an ancestor of your
@@ -3058,7 +3060,11 @@ pull request.
   `pineta.have` value: the lane commit the offer was built from, delivered.
   So does every copy of your `@` made in a lane. Where an offer starts is
   read from these, so the next offer holds only what came after, and never
-  your own edits back.
+  your own edits back. *Amended (S51):* a copy holds everything you had when
+  it was made, so the newest copy in the lane's history supersedes every have
+  recorded before it. An older copy's uncommitted edits, or a delivered
+  commit, may since have become commits of yours with other content, and
+  starting from both would put the two versions in conflict.
 - **The lane's history stays out of your view.** It is fetched as remote
   bookmarks (`refs/remotes/pineta-<lane>/…`), which jj shows only on request
   and treats as immutable with its builtin config: no remote is added and

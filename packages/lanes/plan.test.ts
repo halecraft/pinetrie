@@ -1,12 +1,14 @@
 import {
   BASE_SNAPSHOT,
   commitId,
+  type HaveRecord,
   laneNameForThread,
   snapshotId,
   type ThreadName,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
+  anyHave,
   COPY_MESSAGE,
   decodeLaneConfig,
   FETCHED_REF,
@@ -46,6 +48,7 @@ import {
   SPEC_LABEL,
   shellWord,
   specHashOf,
+  startHaves,
   withoutPinetaHeads,
 } from "./index.ts"
 
@@ -444,6 +447,58 @@ describe("offers (ADR-0038)", () => {
         ],
       }),
     ).toBe("heads(::c1 & ::(pineta-onto | present(c2) | present(d)))")
+  })
+  test("anyHave: each commit present(), or null for none", () => {
+    expect(anyHave([])).toBeNull()
+    expect(
+      anyHave([
+        { lane: LANE, commit: C1, kind: "copy", at: 1 },
+        { lane: LANE, commit: C2, kind: "delivered", at: 2 },
+      ]),
+    ).toBe("present(c1) | present(c2)")
+  })
+  describe("startHaves: the newest copy in the tip's history supersedes older haves", () => {
+    const have = (
+      commit: string,
+      kind: HaveRecord["kind"],
+      at: number,
+    ): HaveRecord => ({ lane: LANE, commit: commitId(commit), kind, at })
+    const kept = (haves: readonly HaveRecord[], inTip: readonly string[]) =>
+      startHaves(haves, new Set(inTip.map(commitId))).map(h => h.commit)
+    const c1 = have("c1", "copy", 1)
+    const d2 = have("d2", "delivered", 2)
+    const c3 = have("c3", "copy", 3)
+    const d4 = have("d4", "delivered", 4)
+    test.each([
+      ["none in the tip: none kept", [c1, d2], [], []],
+      ["delivered only: all kept", [d2, d4], ["d2", "d4"], ["d2", "d4"]],
+      [
+        "copies and delivered: the newest copy, and what came after it",
+        [c1, d2, c3, d4],
+        ["c1", "d2", "c3", "d4"],
+        ["c3", "d4"],
+      ],
+      [
+        "the newest copy outside the tip (a branch forked before its lane's update): the older one kept",
+        [c1, c3],
+        ["c1"],
+        ["c1"],
+      ],
+      [
+        "a have outside the tip, however new: never kept",
+        [c1, d4],
+        ["c1"],
+        ["c1"],
+      ],
+      [
+        "two copies recorded at once: both kept",
+        [c1, have("c1b", "copy", 1)],
+        ["c1", "c1b"],
+        ["c1", "c1b"],
+      ],
+    ] as const)("%s", (_, haves, inTip, expected) => {
+      expect(kept(haves, inTip)).toEqual(expected)
+    })
   })
   test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {
     const n = (i: number) => nonceRevset("N", i)

@@ -505,7 +505,8 @@ export interface NameRecord {
  * A commit you already have, though your repo holds it only as lane history:
  * a lane commit a take delivered, or a copy of your `@` made in a lane at a
  * fork or an update. A host-written `pineta.have` value keyed by commit.
- * Where an offer starts is read from these (ADR-0038).
+ * Where an offer starts is read from these (ADR-0038); the newest copy in a
+ * lane's history supersedes the haves recorded before it (`startHaves`, S51).
  */
 export interface HaveRecord {
   readonly lane: LaneName
