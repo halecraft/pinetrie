@@ -73,6 +73,7 @@ export function Composer({
   onTyping,
   onComposeTogether,
   readOnly,
+  takeFocus,
 }: {
   session: SessionClient
   /** Where the message attaches: the column's end, or its branch point. */
@@ -127,6 +128,8 @@ export function Composer({
    */
   onComposeTogether: ((text: string) => void) | undefined
   readOnly: ReadOnly | null
+  /** Whether this column was just opened: then the box takes focus, once. */
+  takeFocus: () => boolean
 }) {
   // A column opened to send `pending` sends it at once, so it starts empty.
   const [text, setText] = useState(
@@ -204,6 +207,15 @@ export function Composer({
     if (pending === undefined || sentPending.current) return
     sentPending.current = true
     void send(pending, "branch")
+  }, [])
+
+  // A column you just opened is for typing in: focus lands after its
+  // prefill (`onFocus`). After the strip's alignment, which is a layout
+  // effect; the focus scrolls a column opened past the strip's edge into view.
+  const input = useRef<HTMLTextAreaElement>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, on opening
+  useEffect(() => {
+    if (takeFocus()) input.current?.focus()
   }, [])
 
   // A prefill is put in the box once per key, after whatever is already typed.
@@ -347,6 +359,7 @@ export function Composer({
           byDefault ? "ask the agent…" : "say something · @agent to ask"
         }
         readOnly={readOnly !== null}
+        ref={input}
         rows={Math.min(8, Math.max(2, text.split("\n").length))}
         value={text}
       />

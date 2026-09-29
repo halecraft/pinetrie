@@ -246,6 +246,13 @@ try {
   }
   const idle = () =>
     waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+  /** Where the caret is in column `n`'s box, or null if it is not focused. */
+  const caretIn = (n: number) =>
+    page.$eval(`${col(n)} .composer .input`, box =>
+      document.activeElement === box
+        ? (box as HTMLTextAreaElement).selectionStart
+        : null,
+    )
   const shows = (text: string, scope = "") =>
     page
       .waitForSelector(`${scope} ${msg(text)}`.trim(), { timeout: 60_000 })
@@ -285,6 +292,10 @@ try {
   ok(
     (await label(0)) === "send · agent will reply",
     `＋ agent promises a reply with no mention: "${await label(0)}"`,
+  )
+  ok(
+    (await caretIn(0)) === 0,
+    "＋ agent's new tab is ready to type in: its box has focus",
   )
   /** Where the columns start: the rail's width, plus its border. */
   const stripLeft = () =>
@@ -536,6 +547,11 @@ try {
     prefilled === "@agent " &&
       prefilledLabel.startsWith("send · agent will reply"),
     `→ in agent work opens a branch with @agent typed ("${prefilled}", "${prefilledLabel}")`,
+  )
+  const caret = await caretIn(1)
+  ok(
+    caret === "@agent ".length,
+    `→ opens a branch ready to type in: its box has focus, the caret after @agent (${caret})`,
   )
   const railBefore = await railCount()
   await send(1, "deeper")
@@ -2518,6 +2534,10 @@ try {
   // time to run before comparing.
   await waitFor(() => false, 1_000)
   const reopened = await columnKeys(page)
+  const focusedBox = await page.evaluate(
+    () => document.activeElement?.closest(".composer") != null,
+  )
+  ok(!focusedBox, "a reload focuses no box: only a column you open takes focus")
   ok(
     openKeys.length >= 2 && reopened.join() === openKeys.join(),
     `a reload keeps the tab's open columns, in order (${reopened.length} of ${openKeys.length})`,

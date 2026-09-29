@@ -101,6 +101,13 @@ counter.
   A branch from agent work carries `prefill` (`branchPrefill`: `@agent `),
   which its composer starts with; `sendable` (`send.ts`) sends nothing while
   the text is only that.
+- **A column you open takes focus, once.** `→`, "Branch here" and ＋ open
+  their column with `App`'s `opening()` key, and its composer focuses its box
+  when it mounts (`takeFocus`); `onFocus` puts the caret after the prefill.
+  The key lives in a ref, never in the layout: a column restored on reload,
+  or mounted again when its tab is shown, leaves focus where it is. The focus
+  runs in an effect, after the strip's alignment, and scrolls a column opened
+  past the strip's edge into view.
   Exact: no other message at the same point, the lane's own next append
   included, can be mistaken for it. "Branch here" opens one holding the text
   (`pending`), and that column's composer sends it, so a refusal shows where

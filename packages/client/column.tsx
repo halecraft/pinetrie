@@ -111,6 +111,11 @@ export interface ColumnProps {
   readOnly: ReadOnly | null
   /** A fresh column's first send, by id. */
   onSent: (sendId: string) => void
+  /**
+   * Whether the column keyed `key` was just opened, so its composer takes
+   * focus. True once per opening.
+   */
+  takeFocus: (key: string) => boolean
   onOpen: (anchor: string) => void
   /** Move this column to index `to`, from its grip's keys (`keyMove`). */
   onMove: (to: number) => void
@@ -554,6 +559,7 @@ export function Column(p: ColumnProps) {
                 })
         }
         onTyping={p.onTyping}
+        takeFocus={() => p.takeFocus(p.column.key)}
         participants={p.participants}
         pending={p.column.fresh?.pending}
         prefill={prefill}

@@ -344,6 +344,22 @@ function App({ session }: { session: SessionClient }) {
   }
   const closeNewTab = (key: string) => dispatch({ kind: "closeNewTab", key })
 
+  // The column you just opened, whose composer takes focus once when it
+  // mounts. Never stored: a column restored, or shown again with its tab,
+  // leaves focus where it is.
+  const focusNext = useRef<string | null>(null)
+  /** A key for a column you open, whose composer then takes focus. */
+  const opening = () => {
+    const key = crypto.randomUUID()
+    focusNext.current = key
+    return key
+  }
+  const takeFocus = (key: string) => {
+    if (focusNext.current !== key) return false
+    focusNext.current = null
+    return true
+  }
+
   const views = useMemo(
     () =>
       projectColumns(
@@ -546,6 +562,7 @@ function App({ session }: { session: SessionClient }) {
     participants,
     refs,
     session,
+    takeFocus,
     work: workFacts,
   }
 
@@ -643,7 +660,7 @@ function App({ session }: { session: SessionClient }) {
                 : "new conversation"
             }
             onAdd={asksAgent =>
-              dispatch({ kind: "newTab", key: crypto.randomUUID(), asksAgent })
+              dispatch({ kind: "newTab", key: opening(), asksAgent })
             }
             onArchive={r => void session.archive("archive", entryId(r))}
             onCloseNew={closeNewTab}
@@ -743,7 +760,7 @@ function App({ session }: { session: SessionClient }) {
                         onBranch={(at, prefill) =>
                           act({
                             kind: "openFresh",
-                            key: crypto.randomUUID(),
+                            key: opening(),
                             at,
                             after: i,
                             ...(prefill === undefined ? {} : { prefill }),
@@ -752,7 +769,7 @@ function App({ session }: { session: SessionClient }) {
                         onBranchInstead={(at, text) =>
                           act({
                             kind: "openFresh",
-                            key: crypto.randomUUID(),
+                            key: opening(),
                             at,
                             after: i,
                             text,
