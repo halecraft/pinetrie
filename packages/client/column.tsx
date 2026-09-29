@@ -6,6 +6,7 @@ import {
   ancestry,
   atEntry,
   type ColumnView,
+  type CommandSummary,
   type EntryId,
   entryId,
   firstLine,
@@ -108,6 +109,8 @@ export interface ColumnProps {
 /** What the host records about where lanes work, read with everything else. */
 export interface WorkFacts {
   readonly project: ProjectRecord | null
+  /** The commands the host's pi loaded (ADR-0036). */
+  readonly commands: readonly CommandSummary[]
   readonly lanes: ReadonlyMap<string, LaneRecord>
   readonly revisions: ReadonlyMap<string, RevisionRecord>
   readonly landings: readonly LandingRecord[]
@@ -464,6 +467,7 @@ export function Column(p: ColumnProps) {
         asksAgent={p.column.asksAgent === true}
         defaultWork={defaultWork}
         project={p.work.project}
+        commands={p.work.commands}
         usedDirs={[
           ...new Set(
             [...p.work.lanes.values()].flatMap(r =>

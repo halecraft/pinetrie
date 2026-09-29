@@ -27,6 +27,7 @@ import {
   planRetention,
   planTake,
   planTurnRecord,
+  recordChanged,
   renderableMessage,
   showHostWorkingCopy,
 } from "./index.ts"
@@ -373,4 +374,28 @@ describe("planResolution: the land message", () => {
       "✓ landing your work: no conflicts",
     )
   })
+})
+
+test("recordChanged: an unchanged host record is not written again", () => {
+  const record = {
+    kind: "commands" as const,
+    record: {
+      commands: [
+        {
+          name: "a:skill:b",
+          kind: "skill" as const,
+          description: "d",
+          argumentHint: null,
+        },
+      ],
+    },
+  }
+  const stored = encodeWorkRecord(record).value
+  expect(recordChanged(record, structuredClone(stored))).toBe(false)
+  expect(recordChanged(record, undefined)).toBe(true)
+  expect(
+    recordChanged(record, {
+      commands: [{ ...record.record.commands[0], description: "e" }],
+    }),
+  ).toBe(true)
 })

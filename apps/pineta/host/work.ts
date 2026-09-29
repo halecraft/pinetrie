@@ -9,7 +9,7 @@
 
 import { createHash } from "node:crypto"
 import { mkdtemp, rm, stat } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import {
   BASE_SNAPSHOT,
@@ -45,6 +45,7 @@ import {
   conflictsIn,
   containerFacts,
   type DiskPaths,
+  decodeLaneConfig,
   deleteBookmark,
   ensureRuntime,
   entryOfMessage,
@@ -71,7 +72,9 @@ import {
   planDisk,
   planFetch,
   planFork,
+  planHostMounts,
   planLinks,
+  planMounts,
   planSnapshot,
   planStart,
   prepareHost,
@@ -197,8 +200,8 @@ export async function startLaneWork(input: {
   readonly defaultDirect: boolean
   /** False: lanes never get containers here, and `container` is not asked. */
   readonly containers: boolean
-  /** The user's lane config file (ADR-0035). */
-  readonly userConfig: string
+  /** The user's config, as read at startup (ADR-0035): its file, for logs. */
+  readonly userConfig: { readonly file: string; readonly json: unknown }
   readonly agent: () => Agent
   readonly log: (m: string) => void
 }): Promise<LaneWork> {
@@ -284,7 +287,7 @@ export async function startLaneWork(input: {
       at,
       pnpmLock,
     )
-    const user = await readLaneConfig(input.userConfig, at, false)
+    const user = decodeLaneConfig(input.userConfig.json, at, false)
     const { grants } = config
     const on = [
       grants.ssh ? "your ssh agent" : null,
@@ -298,7 +301,7 @@ export async function startLaneWork(input: {
     })
     for (const d of sharing.shared) {
       const from = user.shared.some(p => normalShared(p) === d.path)
-        ? input.userConfig
+        ? input.userConfig.file
         : "pineta.json"
       log(`[host] ${d.path}/ is shared read-write with every lane (${from})`)
     }
@@ -343,21 +346,54 @@ export async function startLaneWork(input: {
     return result
   }
 
-  const specOf = (lane: LaneName, r: Ready, at: string): LaneSpec => ({
-    lane,
-    volume: laneContainer(lane),
-    image: r.image,
-    imagePath: r.imagePath,
-    hostWorkingCopy: at,
-    pineta: PINETA_INSTALL,
-    runtime: r.runtime,
-    links: r.links,
-    grants: lanes?.config.grants ?? NO_GRANTS,
-    identity: r.identity,
-    memory: LANE_MEMORY,
-    shared: lanes?.shared ?? [],
-    ignoreDir: laneIgnoreDir(at),
-  })
+  /**
+   * The host paths every lane of its own is granted, read-only: the roots of
+   * the commands pi loaded (ADR-0036). Read once the agent exists, which is
+   * before any lane's spec or access is asked for; logged once.
+   */
+  let hostMounts: ReturnType<typeof planHostMounts> | null = null
+  const hostPaths = (): readonly string[] => {
+    if (hostMounts === null) {
+      const agent = input.agent()
+      hostMounts = planHostMounts({
+        roots: agent.commands().map(c => c.root),
+        home: homedir(),
+        agentDir: agent.agentDir(),
+      })
+      for (const r of hostMounts.refused)
+        log(`[host] ${r.path} is not readable in lanes: ${r.reason}`)
+    }
+    return hostMounts.mounts
+  }
+
+  /** A lane's spec. The base lane gets no shared directories and no host paths. */
+  const specOf = (
+    lane: LaneName,
+    r: Ready,
+    at: string,
+    base = false,
+  ): LaneSpec => {
+    const grants = lanes?.config.grants ?? NO_GRANTS
+    return {
+      lane,
+      volume: laneContainer(lane),
+      image: r.image,
+      imagePath: r.imagePath,
+      mounts: planMounts({
+        hostWorkingCopy: at,
+        pineta: PINETA_INSTALL,
+        runtime: r.runtime,
+        ignoreDir: laneIgnoreDir(at),
+        links: r.links,
+        grants: grants.mounts,
+        shared: base ? [] : (lanes?.shared ?? []),
+        hostPaths: base ? [] : hostPaths(),
+      }),
+      grants: { ssh: grants.ssh, env: grants.env },
+      identity: r.identity,
+      memory: LANE_MEMORY,
+    }
+  }
 
   /** The base snapshot's refreshes, one at a time. */
   let baseTail: Promise<unknown> = Promise.resolve()
@@ -382,7 +418,7 @@ export async function startLaneWork(input: {
     const made = await refreshBase({
       paths: disk,
       // Nothing in the base should see a shared directory.
-      spec: { ...specOf(BASE_LANE, r, at), shared: [] },
+      spec: specOf(BASE_LANE, r, at, true),
       env: process.env,
       yours,
       lock,
@@ -706,6 +742,7 @@ export async function startLaneWork(input: {
         kind: "lane",
         dir: WORKSPACE_ROOT,
         shared: lanes?.shared.map(d => d.path) ?? [],
+        hostPaths: hostPaths(),
         gate: async () => {
           await handle.queue.idle()
           return (await handle.link()).channel
@@ -834,7 +871,9 @@ export async function startLaneWork(input: {
             },
           })
         }
-        const skill = await input.agent().skill("resolve-conflicts")
+        const skill = await input
+          .agent()
+          .skill("pineta:skill:resolve-conflicts")
         // plan
         return planResolution({
           skill,

@@ -166,6 +166,7 @@ describe("lanes in a harness", () => {
       kind: "lane",
       dir,
       shared: [".plans"],
+      hostPaths: [],
       gate: async () => channel,
     })
     script.use([

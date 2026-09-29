@@ -239,6 +239,13 @@
       .preview-strip { display: flex; min-width: 0; }
       .typing { font-size: .75rem; color: #8b93a1; margin-bottom: .3rem; font-style: italic; }
       .composer .input { display: block; width: 100%; resize: vertical; }
+      /* Commands matching what is typed (ADR-0036), above the input. */
+      .composer .command-menu { margin: 0 0 .25rem; padding: .25rem 0; max-height: 12rem; overflow-y: auto; background: #1b1f25; border: 1px solid #2d333b; border-radius: 4px; }
+      .composer .command { padding: .15rem .5rem; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .composer .command.highlighted { background: #2d333b; }
+      .composer .command-name { color: #d2a8ff; }
+      .composer .command-hint, .composer .command-kind, .composer .command-description { color: #8b949e; }
+      .msg .command-label { margin-left: .4rem; color: #d2a8ff; font-size: .85em; }
       /* Under the text: compose together at the left, send at the right. */
       .compose-row { display: flex; gap: .5rem; align-items: center; justify-content: flex-end;
         margin-top: .4rem; }

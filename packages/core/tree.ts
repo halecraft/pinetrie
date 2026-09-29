@@ -47,6 +47,8 @@ export interface AgentMessageLike {
   readonly sendId?: string
   /** Role `chat` only: a sent draft's other editors. */
   readonly contributors?: readonly WriterId[]
+  /** Role `chat` only: the command it ran, qualified (ADR-0036). */
+  readonly command?: string
   /** Role `toolResult` only: the call it answers, and whether it failed. */
   readonly toolCallId?: string
   readonly isError?: boolean
@@ -74,6 +76,8 @@ export interface TranscriptMessage {
   readonly sendId?: string
   /** Role `chat` only: a sent draft's other editors, in order of first edit. */
   readonly contributors?: readonly WriterId[]
+  /** Role `chat` only: the command it ran, qualified (ADR-0036). */
+  readonly command?: string
   /** Role `assistant` only: the tools it called, each with its result once known. */
   readonly toolCalls?: readonly ToolCallView[]
 }
@@ -147,6 +151,9 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
       ...(entry.message?.contributors === undefined
         ? {}
         : { contributors: entry.message.contributors }),
+      ...(entry.message?.command === undefined
+        ? {}
+        : { command: entry.message.command }),
     }
   }
   // A land message (ADR-0033) shows as its short line: the reader decodes it

@@ -1157,6 +1157,11 @@ try {
       tools: { project: work },
       // A file of its own, so the person's own config never applies here.
       userConfig: path.join(work, "no-user-config.json"),
+      // A fixture pi directory, for commands (ADR-0036).
+      agentDir: path.join(
+        import.meta.dirname,
+        "../../../packages/pi/fixtures/pi-agent",
+      ),
       log: () => {},
     })
     const tp = await browser.newPage()
@@ -1281,6 +1286,24 @@ try {
         `Stop ends a running command, shown as ✗ "Command aborted" (${why?.slice(-16) ?? "none"})`,
       )
       await toolIdle()
+
+      // ── commands: found as you type, sent in full (ADR-0036) ─────────────
+      await tp.fill(`${col(0)} .composer .input`, "/hel")
+      const commandOffered = await appears(
+        `${col(0)} .command-menu [data-command="fixture:skill:hello"]`,
+      )
+      await tp.press(`${col(0)} .composer .input`, "Tab")
+      const inserted = await tp.inputValue(`${col(0)} .composer .input`)
+      script.use([{ text: "hello back" }])
+      await tp.press(`${col(0)} .composer .input`, "Enter")
+      const labelled = await appears(
+        `${col(0)} .msg .command-label:has-text("/fixture:skill:hello")`,
+      )
+      await toolIdle()
+      ok(
+        commandOffered && inserted === "/fixture:skill:hello " && labelled,
+        `typing /hel offers /fixture:skill:hello; Tab inserts it, and the sent message shows it (${inserted})`,
+      )
 
       // ── a column keeps its width, whatever its content (S37) ─────────────
       script.use([

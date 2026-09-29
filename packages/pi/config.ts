@@ -10,6 +10,8 @@
 import { homedir } from "node:os"
 import path from "node:path"
 import { createModels } from "@earendil-works/pi-ai"
+import type { GatheredCommand } from "@pineta/marginalia"
+import { gatherCommands, pinetaCommands } from "./commands.ts"
 import {
   type buildSystemPrompt,
   DefaultResourceLoader,
@@ -49,7 +51,7 @@ export function pickModel(
     : { provider, model }
 }
 
-const DEFAULT_AGENT_DIR = path.join(homedir(), ".pi", "agent")
+export const DEFAULT_AGENT_DIR = path.join(homedir(), ".pi", "agent")
 
 /** A `ModelRuntime` over the person's `auth.json` and `models.json`. */
 const openRuntime = (agentDir: string) =>
@@ -71,45 +73,75 @@ export interface ModelSetup {
   /** Context files for the system prompt, such as the repo's `AGENTS.md`. */
   readonly contextFiles: PromptInput["contextFiles"]
   readonly skills: PromptInput["skills"]
+  /** Every skill and prompt template pi loaded, as commands (ADR-0036). */
+  readonly commands: readonly GatheredCommand[]
 }
 
 export async function setUpModel(
   choice: ModelChoice,
   where: {
     readonly cwd: string
+    /**
+     * pi's agent directory. A scripted or named model loads skills and
+     * prompts from it only when it is given: a suite points it at a fixture,
+     * and never reads the person's own.
+     */
     readonly agentDir?: string
-    /** Pineta's own skills: loaded after yours and the repo's, so yours win by name. */
+    /**
+     * Pineta's own skills. pi keeps one skill per name for the model, and
+     * these come after yours and the repo's; as commands, each is reachable
+     * under its own package (ADR-0036).
+     */
     readonly skillsDir?: string
   },
 ): Promise<ModelSetup> {
   const agentDir = where.agentDir ?? DEFAULT_AGENT_DIR
+  const load = async () => {
+    const settingsManager = SettingsManager.create(where.cwd, agentDir)
+    const loader = new DefaultResourceLoader({
+      cwd: where.cwd,
+      agentDir,
+      settingsManager,
+      ...(where.skillsDir === undefined
+        ? {}
+        : { additionalSkillPaths: [where.skillsDir] }),
+    })
+    await loader.reload()
+    const resources = {
+      contextFiles: loader.getAgentsFiles().agentsFiles,
+      skills: loader.getSkills().skills,
+      commands: await gatherCommands(
+        loader,
+        { cwd: where.cwd, agentDir },
+        where.skillsDir ?? "",
+      ),
+    }
+    return { settingsManager, loader, resources }
+  }
+  // Loading nothing of pi's still leaves Pineta's own skills as commands.
+  const none = {
+    contextFiles: [],
+    skills: [],
+    commands:
+      where.skillsDir === undefined ? [] : pinetaCommands(where.skillsDir),
+  }
   switch (choice.kind) {
     case "scripted": {
       const faux = fauxOf(choice.script)
       const models = createModels()
       models.setProvider(faux.provider)
-      return { models, model: faux.getModel(), contextFiles: [], skills: [] }
+      const resources =
+        where.agentDir === undefined ? none : (await load()).resources
+      return { models, model: faux.getModel(), ...resources }
     }
     case "named": {
       const models = await openRuntime(agentDir)
-      return {
-        models,
-        model: found(models, choice),
-        contextFiles: [],
-        skills: [],
-      }
+      const resources =
+        where.agentDir === undefined ? none : (await load()).resources
+      return { models, model: found(models, choice), ...resources }
     }
     case "configured": {
-      const settingsManager = SettingsManager.create(where.cwd, agentDir)
-      const loader = new DefaultResourceLoader({
-        cwd: where.cwd,
-        agentDir,
-        settingsManager,
-        ...(where.skillsDir === undefined
-          ? {}
-          : { additionalSkillPaths: [where.skillsDir] }),
-      })
-      await loader.reload()
+      const { settingsManager, loader, resources } = await load()
       const models = await openRuntime(agentDir)
       const { runtime } = loader.getExtensions()
       for (const { name, config } of runtime.pendingProviderRegistrations)
@@ -130,8 +162,7 @@ export async function setUpModel(
       return {
         models,
         model: found(models, picked),
-        contextFiles: loader.getAgentsFiles().agentsFiles,
-        skills: loader.getSkills().skills,
+        ...resources,
       }
     }
   }

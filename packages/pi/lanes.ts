@@ -38,6 +38,11 @@ export type LaneAccess =
        * relative to `dir` (ADR-0035).
        */
       readonly shared: readonly string[]
+      /**
+       * Host paths mounted read-only at `/mnt/host` and their path
+       * (ADR-0036): the roots of the skills this lane can read.
+       */
+      readonly hostPaths: readonly string[]
       readonly gate: () => Promise<LaneChannel>
     }
 

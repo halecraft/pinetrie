@@ -10,6 +10,7 @@ import path from "node:path"
 import {
   type CommitId,
   HOST_WORKING_COPY,
+  hostPathInLane,
   type LaneName,
   NO_EDITOR,
   type ProjectRecord,
@@ -44,9 +45,11 @@ export interface LaneGrants {
   readonly mounts: readonly Mount[]
 }
 
+/** A host path mounted into a lane: every mount a lane gets is one of these. */
 export interface Mount {
   readonly source: string
   readonly target: string
+  readonly readonly: boolean
 }
 
 export const NO_GRANTS: LaneGrants = { ssh: false, env: [], mounts: [] }
@@ -65,20 +68,116 @@ export interface LaneSpec {
   readonly image: string
   /** The image's own `PATH`; the runtime's `bin` is added after it. */
   readonly imagePath: string
-  /** Your working copy's root, mounted read-only at `/mnt/host-working-copy`. */
-  readonly hostWorkingCopy: string
-  /** Pineta's own install, read-only at `/pineta`, for the helper. */
-  readonly pineta: string
-  /** Pineta's lane runtime, read-only at `/pineta-runtime`. */
-  readonly runtime: string
-  readonly links: readonly Mount[]
-  readonly grants: LaneGrants
+  /** Every host path the lane sees, from `planMounts`. */
+  readonly mounts: readonly Mount[]
+  /** The grants that are not mounts: your ssh agent, named variables. */
+  readonly grants: Pick<LaneGrants, "ssh" | "env">
   readonly identity: { readonly name: string; readonly email: string }
   readonly memory: string
-  /** Directories of your working copy, mounted read-write (ADR-0035). */
-  readonly shared: readonly SharedDir[]
-  /** The host directory holding the lane's ignore file, mounted read-only. */
+}
+
+/**
+ * Every mount a lane gets, in one list:
+ * - your working copy, read-only at `/mnt/host-working-copy`;
+ * - Pineta's own install at `/pineta` and its runtime at `/pineta-runtime`,
+ *   and the directory of the lane's ignore file at `/pineta-git`, read-only;
+ * - links' and grants' mounts, read-only where they say;
+ * - shared directories, read-write at their place in `/workspace` (ADR-0035);
+ * - granted host paths, read-only at `/mnt/host` and their path (ADR-0036).
+ */
+export function planMounts(parts: {
+  readonly hostWorkingCopy: string
+  readonly pineta: string
+  readonly runtime: string
   readonly ignoreDir: string
+  readonly links: readonly Mount[]
+  readonly grants: readonly Mount[]
+  readonly shared: readonly SharedDir[]
+  readonly hostPaths: readonly string[]
+}): readonly Mount[] {
+  const at = (source: string, target: string): Mount => ({
+    source,
+    target,
+    readonly: true,
+  })
+  return [
+    at(parts.hostWorkingCopy, HOST_WORKING_COPY),
+    at(parts.pineta, PINETA_MOUNT),
+    at(parts.runtime, RUNTIME_MOUNT),
+    at(parts.ignoreDir, IGNORE_MOUNT),
+    ...parts.links,
+    ...parts.grants,
+    ...parts.shared.map(d => ({
+      source: d.source,
+      target: path.posix.join(WORKSPACE_ROOT, d.path),
+      readonly: false,
+    })),
+    ...parts.hostPaths.map(p => at(p, hostPathInLane(p))),
+  ]
+}
+
+/**
+ * A mount's `container run` arguments. `--mount` separates its fields with
+ * commas, and `-v` with colons, so a path with a comma takes `-v`, and one
+ * with both cannot be mounted (S46 item 4). `planHostMounts` refuses such
+ * paths before they get here.
+ */
+export function mountArgs(m: Mount): readonly string[] {
+  const paths = `${m.source}${m.target}`
+  if (!paths.includes(","))
+    return [
+      "--mount",
+      `type=bind,source=${m.source},target=${m.target}${m.readonly ? ",readonly" : ""}`,
+    ]
+  if (!paths.includes(":"))
+    return ["-v", `${m.source}:${m.target}${m.readonly ? ":ro" : ""}`]
+  throw new Error(
+    `${m.source} has both a comma and a colon: container cannot mount it`,
+  )
+}
+
+/**
+ * Which host paths a lane is granted, read-only (ADR-0036): the roots a
+ * command's files live in. Nested roots collapse into the outermost. A root
+ * that is, or contains, your home directory, `/` or pi's agent directory
+ * (which holds `auth.json`) is refused, as is one `container` cannot mount.
+ * A root inside the agent directory, such as a package it installed, is not
+ * refused: it lies inside it, and does not contain it.
+ */
+export function planHostMounts(input: {
+  readonly roots: readonly string[]
+  readonly home: string
+  readonly agentDir: string
+}): {
+  readonly mounts: readonly string[]
+  readonly refused: readonly {
+    readonly path: string
+    readonly reason: string
+  }[]
+} {
+  const contains = (outer: string, inner: string) =>
+    inner === outer ||
+    inner.startsWith(outer.endsWith("/") ? outer : `${outer}/`)
+  const refused: { path: string; reason: string }[] = []
+  const allowed: string[] = []
+  for (const root of new Set(input.roots.map(r => path.resolve(r)))) {
+    const reason =
+      root === "/"
+        ? "it is the file system's root"
+        : contains(root, input.home)
+          ? "it is, or holds, your home directory"
+          : contains(root, input.agentDir)
+            ? "it is, or holds, pi's agent directory"
+            : root.includes(",") && root.includes(":")
+              ? "it has both a comma and a colon, which container cannot mount"
+              : null
+    if (reason === null) allowed.push(root)
+    else refused.push({ path: root, reason })
+  }
+  const mounts = allowed
+    .filter(r => !allowed.some(o => o !== r && contains(o, r)))
+    .sort()
+  return { mounts, refused }
 }
 
 /** A directory of your working copy, shared read-write into every lane (ADR-0035). */
@@ -96,14 +195,6 @@ export const IGNORE_FILE = "ignore"
 /** The label a container's spec hash is kept under. */
 export const SPEC_LABEL = "pineta.spec"
 
-const readonlyMount = (m: Mount): string[] => [
-  "--mount",
-  `type=bind,source=${m.source},target=${m.target},readonly`,
-]
-const writableMount = (m: Mount): string[] => [
-  "--mount",
-  `type=bind,source=${m.source},target=${m.target}`,
-]
 const setEnv = (name: string, value: string): string[] => [
   "-e",
   `${name}=${value}`,
@@ -113,11 +204,11 @@ const setEnv = (name: string, value: string): string[] => [
  * `container run` arguments for a lane, labelled with their own hash
  * (`specHash`), so a container made from another spec can be told apart.
  *
- * Your home directory is never mounted, so credentials stay out of reach
- * unless a grant names them (S43 item 7). `--init` reaps the processes a
+ * It mounts what `planMounts` listed, each through `mountArgs`: nothing of
+ * your home directory unless a grant or a skill's root names it, so
+ * credentials stay out of reach (S43 item 7). `--init` reaps the processes a
  * timeout or an abort kills (S39 item 6). Only variables a grant names are
- * copied from `env`. Your working copy and Pineta's own directories are
- * read-only; shared directories are read-write (ADR-0035).
+ * copied from `env`.
  */
 export function planRun(
   spec: LaneSpec,
@@ -156,21 +247,7 @@ function runArgs(
     spec.memory,
     "-v",
     `${spec.volume}:${WORKSPACE_ROOT}`,
-    ...readonlyMount({
-      source: spec.hostWorkingCopy,
-      target: HOST_WORKING_COPY,
-    }),
-    ...readonlyMount({ source: spec.pineta, target: PINETA_MOUNT }),
-    ...readonlyMount({ source: spec.runtime, target: RUNTIME_MOUNT }),
-    ...readonlyMount({ source: spec.ignoreDir, target: IGNORE_MOUNT }),
-    ...spec.links.flatMap(readonlyMount),
-    ...spec.grants.mounts.flatMap(readonlyMount),
-    ...spec.shared.flatMap(d =>
-      writableMount({
-        source: d.source,
-        target: path.posix.join(WORKSPACE_ROOT, d.path),
-      }),
-    ),
+    ...spec.mounts.flatMap(mountArgs),
     ...(spec.grants.ssh ? ["--ssh"] : []),
     ...passed,
     ...setEnv("JJ_USER", spec.identity.name),
@@ -243,7 +320,13 @@ export function decodeLaneConfig(
         typeof m.target === "string" &&
         m.source !== "" &&
         path.posix.isAbsolute(m.target)
-          ? [{ source: path.resolve(root, m.source), target: m.target }]
+          ? [
+              {
+                source: path.resolve(root, m.source),
+                target: m.target,
+                readonly: true,
+              },
+            ]
           : [],
       )
     : []
@@ -384,9 +467,11 @@ export function planLinks(root: string, links: readonly Link[]): Mount[] {
       path.posix.resolve(WORKSPACE_ROOT, ...parts.slice(0, ups + 1)),
     )
   }
-  return [...found.keys()]
-    .sort()
-    .map(source => ({ source, target: found.get(source) ?? source }))
+  return [...found.keys()].sort().map(source => ({
+    source,
+    target: found.get(source) ?? source,
+    readonly: true,
+  }))
 }
 
 export const PINETA_HEADS = 'bookmarks(glob:"pineta/*")'

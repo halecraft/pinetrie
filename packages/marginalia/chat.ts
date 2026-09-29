@@ -17,12 +17,16 @@ import {
   address,
   agentByDefault,
   type ChatMode,
+  type CommandRef,
+  ERR,
+  type ErrCode,
   isBusy,
   type LaneName,
   type Mention,
   messageText,
   type Position,
   type Responder,
+  THE_AGENT,
   type ThreadLane,
   type WriterId,
 } from "@pineta/core"
@@ -49,6 +53,16 @@ export const DetailsSchema = Type.Object({
   sendId: Type.String(),
   /** A sent draft's other editors (`WriterId`s), in order of first edit. */
   contributors: Type.Optional(Type.Array(Type.String())),
+  /** The command it ran, and what the model read for it (ADR-0036). */
+  command: Type.Optional(
+    Type.Object({
+      name: Type.String({ minLength: 1 }),
+      kind: Type.Union([Type.Literal("skill"), Type.Literal("prompt")]),
+      file: Type.String(),
+      hash: Type.String(),
+      expanded: Type.String(),
+    }),
+  ),
 })
 
 const ChatSchema = Type.Object({
@@ -70,6 +84,8 @@ export interface ChatDetails {
   readonly sendId: string
   /** Absent when the sender wrote it alone. */
   readonly contributors?: readonly WriterId[]
+  /** The command it ran (ADR-0036); `text` stays as typed. */
+  readonly command?: CommandRef
 }
 
 /** The pi `CustomMessage` a chat is stored as. */
@@ -83,12 +99,14 @@ export interface ChatMessage {
 }
 
 /**
- * The text the model reads. The speaker's name is part of it, so pi's own
+ * The text the model reads: what was typed, or for a command its expansion,
+ * frozen when it was sent. The speaker's name is part of it, so pi's own
  * conversion carries attribution into context and a rename later cannot
- * rewrite what the agent already saw.
+ * rewrite what the agent already saw. Read from `details`, so a held message
+ * encoded later reads the same.
  */
 export const attributed = (d: ChatDetails): string =>
-  `${d.authorName}: ${d.text}`
+  `${d.authorName}: ${d.command?.expanded ?? d.text}`
 
 export const encodeChat = (
   details: ChatDetails,
@@ -120,6 +138,7 @@ export const detailsFromStored = (
   ...(d.contributors === undefined
     ? {}
     : { contributors: d.contributors as WriterId[] }),
+  ...(d.command === undefined ? {} : { command: d.command }),
 })
 
 /** A stored message -> its chat details, or undefined if it is not a chat. */
@@ -161,6 +180,7 @@ export function renderableMessage(message: unknown): AgentMessageLike {
         ...(chat.contributors === undefined
           ? {}
           : { contributors: chat.contributors }),
+        ...(chat.command === undefined ? {} : { command: chat.command.name }),
       }
 }
 
@@ -198,6 +218,12 @@ export type ChatDecision =
     }
   /** Another writer took the slot. Nothing is written; the sender chooses. */
   | { readonly kind: "conflict"; readonly by: WriterId | null }
+  /** Nothing is written: a `/package:name` that names no command. */
+  | {
+      readonly kind: "refused"
+      readonly code: ErrCode
+      readonly message: string
+    }
 
 /**
  * Decide what a human message does. Pure; the host gathers every input inside
@@ -241,18 +267,45 @@ export function planChat(input: {
    * people and the model read the same text (ADR-0034). Null otherwise.
    */
   readonly hostWorkingCopy: string | null
+  /**
+   * The command its first word names, expanded (ADR-0036); `unknown` when it
+   * has the form of one and names none; `unreadable` when its file could not
+   * be read; null when it is not one.
+   */
+  readonly command:
+    | CommandRef
+    | { readonly unknown: string }
+    | { readonly unreadable: string }
+    | null
 }): ChatDecision {
   const { lane, end, race } = input.thread
   const branch = input.mode === "branch"
-  const { compels } = address({
-    mentions: input.mentions,
-    participants: input.participants,
-    agentByDefault: agentByDefault({
-      mode: input.mode,
-      lane,
-      asksAgent: input.asksAgent,
-    }),
-  })
+  const { command } = input
+  if (command !== null && "unknown" in command)
+    return {
+      kind: "refused",
+      code: ERR.UNKNOWN_COMMAND,
+      message: `no command /${command.unknown}`,
+    }
+  if (command !== null && "unreadable" in command)
+    return {
+      kind: "refused",
+      code: ERR.UNKNOWN_COMMAND,
+      message: `the file of /${command.unreadable} could not be read`,
+    }
+  // A command is for the agent, as `@agent` is, whoever else it names.
+  const compels: Responder =
+    command !== null
+      ? { kind: "agent", agent: THE_AGENT }
+      : address({
+          mentions: input.mentions,
+          participants: input.participants,
+          agentByDefault: agentByDefault({
+            mode: input.mode,
+            lane,
+            asksAgent: input.asksAgent,
+          }),
+        }).compels
   const details: ChatDetails = {
     author: input.author,
     authorName: input.authorName,
@@ -265,6 +318,7 @@ export function planChat(input: {
     ...(input.contributors.length === 0
       ? {}
       : { contributors: input.contributors }),
+    ...(command === null ? {} : { command }),
   }
   const compelled = compels.kind === "agent"
 

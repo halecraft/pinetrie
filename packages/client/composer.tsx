@@ -4,6 +4,7 @@ import {
   address,
   agentByDefault,
   type ChatMode,
+  type CommandSummary,
   type LaneName,
   type Position,
   type ProjectRecord,
@@ -11,7 +12,9 @@ import {
   type ThreadLane,
   type WorkSetting,
 } from "@pineta/core"
+import { parseCommand } from "@pineta/marginalia"
 import { useEffect, useRef, useState } from "react"
+import { matchCommands } from "./commands.ts"
 import { Menu } from "./menu.tsx"
 import { settleSend } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
@@ -56,6 +59,7 @@ export function Composer({
   asksAgent,
   defaultWork,
   project,
+  commands,
   usedDirs,
   fresh,
   participants,
@@ -84,6 +88,8 @@ export function Composer({
    */
   defaultWork: WorkSetting | null
   project: ProjectRecord | null
+  /** The commands the host's pi loaded, for completion (ADR-0036). */
+  commands: readonly CommandSummary[]
   /** Directories other lanes work in directly: offered again. */
   usedDirs: readonly string[]
   /** A fresh column: its first message starts the thread (`branch`). */
@@ -128,7 +134,18 @@ export function Composer({
     participants,
     agentByDefault: byDefault,
   })
-  const compelled = to.compels.kind === "agent"
+  // A command is for the agent, as the host decides (`planChat`).
+  const compelled =
+    to.compels.kind === "agent" || parseCommand(text.trim()) !== null
+  // The commands matching what is typed; Escape hides them for this text.
+  const [hidden, setHidden] = useState<string | null>(null)
+  const [picked, setPicked] = useState(0)
+  const matches = hidden === text ? [] : matchCommands(text, commands)
+  const highlighted = matches[Math.min(picked, matches.length - 1)]
+  const choose = (name: string) => {
+    setText(`/${name} `)
+    setPicked(0)
+  }
   const busy = lane.kind === "lane" && (lane.running || lane.waiting > 0)
   const mode: ChatMode = fresh
     ? "branch"
@@ -234,6 +251,35 @@ export function Composer({
           {typing.join(", ")} {typing.length === 1 ? "is" : "are"} typing…
         </div>
       )}
+      {matches.length > 0 && readOnly === null && (
+        <div className="command-menu" role="listbox">
+          {matches.map(c => (
+            <div
+              aria-selected={c === highlighted}
+              className={c === highlighted ? "command highlighted" : "command"}
+              data-command={c.name}
+              key={c.name}
+              onMouseDown={e => {
+                // Before the input loses focus.
+                e.preventDefault()
+                choose(c.name)
+              }}
+              role="option"
+              // Focus stays in the input; the keys there move the choice.
+              tabIndex={-1}
+            >
+              <span className="command-name">/{c.name}</span>
+              {c.argumentHint !== null && (
+                <span className="command-hint"> {c.argumentHint}</span>
+              )}
+              <span className="command-kind"> · {c.kind}</span>
+              {c.description !== "" && (
+                <span className="command-description"> {c.description}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       {/* Enter sends; Shift+Enter is a new line. It grows with what is
           typed, up to a limit, then scrolls. */}
       <textarea
@@ -241,11 +287,31 @@ export function Composer({
         className="input"
         onChange={e => {
           setText(e.target.value)
+          setPicked(0)
           onTyping()
         }}
         onKeyDown={e => {
-          if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing)
-            return
+          if (e.nativeEvent.isComposing) return
+          // While commands are offered, the keys move through them.
+          if (highlighted !== undefined) {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault()
+              const step = e.key === "ArrowDown" ? 1 : -1
+              setPicked((picked + step + matches.length) % matches.length)
+              return
+            }
+            if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+              e.preventDefault()
+              choose(highlighted.name)
+              return
+            }
+            if (e.key === "Escape") {
+              e.preventDefault()
+              setHidden(text)
+              return
+            }
+          }
+          if (e.key !== "Enter" || e.shiftKey) return
           e.preventDefault()
           void submit()
         }}

@@ -48,6 +48,7 @@ import type { Outcome } from "@pineta/protocol/codec"
 import { PRESENCE_DOC_ID, SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
   readArchive,
+  readCommands,
   readLaneRecords,
   readLanes,
   readNotes,
@@ -67,6 +68,7 @@ import {
   readLaneNames,
   readLaneTip,
   readStreams,
+  rowMessage,
   writeEntry,
 } from "@pineta/schema"
 import { startHost } from "../host/index.ts"
@@ -1163,6 +1165,107 @@ invariants("end")
   await sleep(100)
   // The host's Exchange closes its stores when it shuts down, this one too.
   await th.shutdown()
+}
+
+// ── commands: your pi skills and prompts, /package:name (ADR-0036) ─────────
+// A fixture pi directory whose settings list two packages; no containers.
+{
+  const fixtures = path.join(
+    import.meta.dirname,
+    "../../../packages/pi/fixtures",
+  )
+  const project = committedProject("pineta-commands-", { "a.txt": "a\n" })
+  const script = scriptedModel()
+  const ch = await startHost({
+    model: { kind: "scripted", script },
+    tools: { project },
+    containers: false,
+    agentDir: path.join(fixtures, "pi-agent"),
+    userConfig: path.join(project, "no-user-config.json"),
+    log: () => {},
+  })
+  const cu = await connectSession({ url: ch.wsUrl, WebSocket, peerId: "c-uma" })
+  await cu.setName("Uma")
+  const cidle = () =>
+    waitFor(
+      () =>
+        Object.keys(ch.doc.activeRuns()).length === 0 &&
+        readOutbox(ch.doc).length === 0,
+      60_000,
+    )
+  await waitFor(() => readCommands(ch.doc).length > 0, 10_000)
+  ok(
+    readCommands(ch.doc)
+      .map(c => c.name)
+      .includes("fixture:skill:hello") &&
+      readCommands(ch.doc)
+        .map(c => c.name)
+        .includes("pi-other:skill:hello"),
+    "the host lists every command its pi loaded, each under its package",
+  )
+
+  // A skill: the model reads pi's block and the arguments; people see what
+  // was typed.
+  let told = ""
+  script.use([
+    {
+      reply: context => {
+        told = context.at(-1) ?? ""
+        return "said hello"
+      },
+    },
+  ])
+  const sent = await cu.chat("/fixture:skill:hello the world", ROOT, START_CHAT)
+  await cidle()
+  const hello = path.join(fixtures, "fixture-pkg", "skills", "hello")
+  const typed = Object.values(readEntries(ch.doc))
+    .map(
+      r =>
+        rowMessage(r) as {
+          details?: { text?: string; command?: { name?: string } }
+        },
+    )
+    .find(m => m.details?.command !== undefined)
+  ok(
+    sent.kind === "started" &&
+      told.includes(
+        `<skill name="hello" location="${hello}/SKILL.md">\nReferences are relative to ${hello}.`,
+      ) &&
+      told.includes("run `scripts/hello.sh`") &&
+      told.trimEnd().endsWith("the world") &&
+      typed?.details?.text === "/fixture:skill:hello the world" &&
+      typed.details.command?.name === "fixture:skill:hello",
+    `a skill command gives the model pi's block and its arguments, and is stored as typed (${told.slice(0, 60)})`,
+  )
+
+  // A prompt template, with its argument.
+  script.use([
+    {
+      reply: context => {
+        told = context.at(-1) ?? ""
+        return "greeted"
+      },
+    },
+  ])
+  await cu.chat("/fixture:greet Ada", ROOT, START_CHAT)
+  await cidle()
+  ok(
+    told.includes("Greet Ada warmly."),
+    `a prompt command gives the model its template, with its arguments (${told})`,
+  )
+
+  const unknown = await cu.chat("/fixture:skill:nope", ROOT, START_CHAT)
+  ok(
+    unknown.kind === "refused" && unknown.code === ERR.UNKNOWN_COMMAND,
+    "an unknown command is refused, naming it",
+  )
+  const plain = await cu.chat("/etc/hosts is odd", ROOT, BRANCH)
+  ok(
+    plain.kind === "appended",
+    "a path at the start of a message is ordinary text",
+  )
+  await cu.close()
+  await ch.shutdown()
 }
 
 // ── working directly: a lane in a directory you name (ADR-0032) ─────────────

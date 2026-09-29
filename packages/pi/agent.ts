@@ -24,11 +24,13 @@ import {
 import { insertEntry } from "@earendil-works/pi-agent-core/harness/session"
 import {
   type ArchiveRecord,
+  type CommandRef,
   type EntryId,
   ERR,
   type ErrCode,
   entryId,
   HOST_WORKING_COPY,
+  hostPathInLane,
   type LaneName,
   laneNameForThread,
   type NoteRecord,
@@ -40,18 +42,22 @@ import {
 import {
   ARCHIVE_NAMESPACE,
   type ChatMessage,
+  type CommandSource,
   encodeArchive,
   encodeHeld,
   encodeNote,
   encodeReference,
   encodeWorkRecord,
+  expandSkill,
   type Held,
   type LandMessage,
+  labelCommands,
   NOTE_NAMESPACE,
   OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
   REFERENCE_NAMESPACE,
   type Reference,
+  resolveCommand,
   type WorkRecord,
 } from "@pineta/marginalia"
 import {
@@ -60,8 +66,14 @@ import {
   readLaneTip,
   type SessionDocHandle,
 } from "@pineta/schema"
-import { type ModelChoice, setUpModel } from "./config.ts"
-import { buildSystemPrompt, createAgentHarness } from "./deep.ts"
+import { DEFAULT_AGENT_DIR, type ModelChoice, setUpModel } from "./config.ts"
+import {
+  buildSystemPrompt,
+  createAgentHarness,
+  parseCommandArgs,
+  stripFrontmatter,
+  substituteArgs,
+} from "./deep.ts"
 import { laneEnv } from "./lane-env.ts"
 import {
   directEnv,
@@ -84,6 +96,25 @@ export const newId = (): string => uuidv7()
 
 /** Pineta's own skills, loaded after yours and the repo's: `resolve-conflicts`. */
 const SKILLS_DIR = path.join(import.meta.dirname, "skills")
+
+/**
+ * The skills a lane of its own can read, at the paths it reads them: those
+ * under a host path it has mounted, at `/mnt/host` and their path (ADR-0036).
+ */
+function skillsInLane<S extends { filePath: string; baseDir: string }>(
+  skills: readonly S[] | undefined,
+  hostPaths: readonly string[],
+): S[] {
+  const mounted = (p: string) =>
+    hostPaths.some(r => p === r || p.startsWith(`${r}/`))
+  return (skills ?? [])
+    .filter(s => mounted(s.filePath))
+    .map(s => ({
+      ...s,
+      filePath: hostPathInLane(s.filePath),
+      baseDir: hostPathInLane(s.baseDir),
+    }))
+}
 
 /** A skill file's instructions: its text after the frontmatter block. */
 export function withoutFrontmatter(text: string): string {
@@ -114,6 +145,13 @@ export interface CreateAgentOptions {
   } | null
   /** What a running turn writes, in Pineta's own words, per lane. */
   readonly onStream?: (event: StreamEvent) => void
+  /**
+   * pi's agent directory. With a scripted or named model, skills and prompts
+   * load only when this is given: a suite's fixture, never the person's own.
+   */
+  readonly agentDir?: string
+  /** The user config's `commands.names`: pi's `source` → a label (ADR-0036). */
+  readonly commandRenames?: Readonly<Record<string, string>>
 }
 
 /** The result of a run: pi may refuse to admit it. */
@@ -226,14 +264,33 @@ export interface Agent {
   /** Lanes pi holds an operation open on: a crash interrupted them. */
   interrupted(): Promise<readonly LaneName[]>
   /**
-   * A skill by name, read now: yours, then the repo's, then Pineta's own
-   * (pi's loader keeps the first of a name). Null if none has that name.
+   * A skill by its qualified name, e.g. `pineta:skill:resolve-conflicts`,
+   * read now. Null if no command has that name.
    */
   skill(name: string): Promise<{
     readonly path: string
     readonly content: string
     readonly hash: string
   } | null>
+  /** Every command pi loaded, labelled by package (ADR-0036). */
+  commands(): readonly CommandSource[]
+  /** pi's agent directory: settings, packages, and `auth.json`. Never mounted into a lane. */
+  agentDir(): string
+  /** Commands refused for their labels, with why. */
+  refusedCommands(): readonly {
+    readonly name: string
+    readonly reason: string
+  }[]
+  /**
+   * A command as the model reads it, from its file as it is now: a skill's
+   * block (pi's format), or a template with its arguments. `inLane`: the
+   * thread works in its own copy, so the paths are the lane's (`/mnt/host`).
+   */
+  expand(
+    command: CommandSource,
+    args: string,
+    inLane: boolean,
+  ): Promise<CommandRef | null>
   stats(): Promise<{ messageCount: number }>
   close(): Promise<void>
 }
@@ -257,7 +314,9 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   const setup = await setUpModel(options.model, {
     cwd: project,
     skillsDir: SKILLS_DIR,
+    ...(options.agentDir === undefined ? {} : { agentDir: options.agentDir }),
   })
+  const labelled = labelCommands(setup.commands, options.commandRenames ?? {})
   const resolved = setup.model
   // pi-agent-core's own tools, built for this harness. Each lane uses them in
   // its own directory: `toolContext` below.
@@ -287,17 +346,21 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   // an extension that shapes pi's prompt sections finds them (S23). It names
   // the lane's directory, and does not wait for its setup. A lane of its own
   // is told where your working copy is, read-only, and which of its
-  // directories are shared: the only files beyond its own it can see.
+  // directories are shared, and sees its skills at the paths it can read
+  // them (`skillsInLane`, ADR-0036).
   const promptFor = (toolContext: {
     dir: string
     own: boolean
     shared: readonly string[]
+    hostPaths: readonly string[]
   }) =>
     buildSystemPrompt({
       cwd: toolContext.dir,
       selectedTools: toolNames,
       contextFiles: setup.contextFiles,
-      skills: setup.skills,
+      skills: toolContext.own
+        ? skillsInLane(setup.skills, toolContext.hostPaths)
+        : setup.skills,
       ...(toolContext.own
         ? {
             promptGuidelines: [
@@ -326,18 +389,21 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
               dir: access.dir,
               own: false,
               shared: [],
+              hostPaths: [],
             }
           : {
               env: laneEnv(access.dir, access.gate),
               dir: access.dir,
               own: true,
               shared: access.shared,
+              hostPaths: access.hostPaths,
             }
       },
       systemPrompt: (toolContext: {
         dir: string
         own: boolean
         shared: readonly string[]
+        hostPaths: readonly string[]
       }) => promptFor(toolContext),
       // Pineta's outbox means pi's own queue is never used; should it be, it
       // answers one message at a time rather than batching them (S20).
@@ -570,14 +636,51 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     },
 
     async skill(name) {
-      const found = (setup.skills ?? []).find(s => s.name === name)?.filePath
-      const file = found ?? path.join(SKILLS_DIR, name, "SKILL.md")
+      const file = resolveCommand(name, labelled.commands)?.file
+      if (file === undefined) return null
       const text = await readFile(file, "utf8").catch(() => null)
       if (text === null) return null
       return {
         path: file,
         content: withoutFrontmatter(text),
         hash: createHash("sha256").update(text).digest("hex"),
+      }
+    },
+
+    commands() {
+      return labelled.commands
+    },
+
+    agentDir() {
+      return options.agentDir ?? DEFAULT_AGENT_DIR
+    },
+
+    refusedCommands() {
+      return labelled.refused
+    },
+
+    async expand(command, args, inLane) {
+      const text = await readFile(command.file, "utf8").catch(() => null)
+      if (text === null) return null
+      const where = (p: string) => (inLane ? hostPathInLane(p) : p)
+      // pi's name for it: the last part of the qualified name.
+      const name = command.name.split(":").at(-1) ?? command.name
+      const expanded =
+        command.kind === "skill"
+          ? expandSkill({
+              name,
+              file: where(command.file),
+              dir: where(command.dir),
+              body: stripFrontmatter(text).trim(),
+              args,
+            })
+          : substituteArgs(stripFrontmatter(text), parseCommandArgs(args))
+      return {
+        name: command.name,
+        kind: command.kind,
+        file: command.file,
+        hash: createHash("sha256").update(text).digest("hex"),
+        expanded,
       }
     },
 

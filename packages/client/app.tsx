@@ -37,6 +37,7 @@ import {
   notesIndex,
   readAgentActivity,
   readArchive,
+  readCommands,
   readLandings,
   readLaneRecords,
   readLanes,
@@ -229,6 +230,7 @@ function App({ session }: { session: SessionClient }) {
       archive: readArchive(doc),
       workFacts: {
         project: readProject(doc),
+        commands: readCommands(doc),
         lanes: readLaneRecords(doc),
         revisions: readRevisions(doc),
         landings: readLandings(doc),

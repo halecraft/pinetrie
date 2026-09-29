@@ -15,6 +15,8 @@ import {
   type ArchiveRecord,
   agentActivity,
   ancestry,
+  type ChatMode,
+  type CommandSummary,
   type EntryLike,
   indexTree,
   type LandingRecord,
@@ -27,6 +29,7 @@ import {
   type ProjectRecord,
   type RevisionRecord,
   rootOf,
+  type ThreadLane,
   type TreeIndex,
   type WorkSetting,
   type WriterId,
@@ -35,6 +38,8 @@ import {
 import {
   ARCHIVE_NAMESPACE,
   archiveRecords,
+  COMMANDS_NAMESPACE,
+  commandsRecord,
   decodeReference,
   type Held,
   heldBy,
@@ -293,6 +298,41 @@ export const readLandings = (doc: SessionDocHandle): readonly LandingRecord[] =>
 /** What the host found where it runs (`pineta.project`); null with no tools. */
 export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>
   projectRecord(readValues(doc, PROJECT_NAMESPACE))
+
+/** The commands the host's pi loaded (ADR-0036); none before a host wrote them. */
+export const readCommands = (
+  doc: SessionDocHandle,
+): readonly CommandSummary[] =>
+  commandsRecord(readValues(doc, COMMANDS_NAMESPACE))
+
+/**
+ * Whether a send's thread works, or will work, in its own copy: its lane is
+ * one of its own, or the lane the send would create would be. Paths to your
+ * working copy, and to granted host paths, are then written as the lane sees
+ * them (ADR-0034, ADR-0036). A lane of its own where the host has no lanes
+ * of their own now works directly, so it is not.
+ */
+export function worksOwn(
+  doc: SessionDocHandle,
+  index: TreeIndex,
+  send: {
+    readonly lane: ThreadLane
+    /** The thread's end: where a reply would create its lane. */
+    readonly end: Position
+    readonly mode: ChatMode
+    /** Where a branch would start. */
+    readonly at: Position
+    readonly work: WorkSetting | null
+  },
+): boolean {
+  if (readProject(doc)?.kind !== "lanes") return false
+  if (send.lane.kind === "lane" && send.mode !== "branch")
+    return readLaneRecords(doc).get(send.lane.name)?.work.kind === "own"
+  return (
+    workAt(doc, index, send.mode === "branch" ? send.at : send.end, send.work)
+      .work?.kind === "own"
+  )
+}
 
 /**
  * Where a lane created at `at` would work, and the files it would start

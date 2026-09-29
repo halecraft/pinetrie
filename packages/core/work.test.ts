@@ -5,6 +5,7 @@ import {
   type EntryLike,
   entryId,
   firstLine,
+  hostPathInLane,
   indexTree,
   isBusy,
   type LaneName,
@@ -223,4 +224,10 @@ test("firstLine: the first non-empty line, cut with an ellipsis only when longer
   expect(firstLine("abcdef", 3)).toBe("abc…")
   expect(firstLine("abc", 3)).toBe("abc")
   expect(firstLine("  \n ", 3)).toBe("")
+})
+
+test("hostPathInLane: a granted host path sits under /mnt/host at its own path", () => {
+  expect(hostPathInLane("/Users/ada/skills/plan")).toBe(
+    "/mnt/host/Users/ada/skills/plan",
+  )
 })

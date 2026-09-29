@@ -162,6 +162,26 @@ containers, disks and the helper.
     `.git/info/exclude`, as `/.pineta/` is. `git check-ignore` decides, so
     your global git ignore counts.
 
+## Mounts, and granted host paths (ADR-0036)
+
+- **Every mount is one `Mount { source, target, readonly }`**, in one list
+  from `planMounts`: your working copy, Pineta's install and runtime, the
+  ignore file's directory, links, grants, shared directories and granted
+  host paths. `planRun` renders each with `mountArgs`, and does not know what
+  a mount is for.
+- **`mountArgs`:** `--mount` separates its fields with commas and `-v` with
+  colons, so a path with a comma takes `-v`, and one with both cannot be
+  mounted at all (S46 item 4).
+- **Granted host paths** (`planHostMounts`) are the roots of the commands pi
+  loaded, read-only at `/mnt/host` and their host path (`hostPathInLane`), so
+  none can shadow a directory of the image's (S46). Nested roots collapse. A
+  root that is, or holds, your home directory, `/` or pi's agent directory
+  (`auth.json`) is refused, and so is one with both a comma and a colon. A
+  package inside the agent directory is allowed: it lies inside, and does not
+  hold it.
+- **A change to them recreates lanes:** they are in `container run`'s
+  arguments, and so in the spec hash.
+
 ## The queue
 
 - **One serial queue per lane** (`createQueue`) carries everything that

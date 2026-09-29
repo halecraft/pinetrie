@@ -119,9 +119,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "/mnt/host-working-copy is mounted writable",
     file: plan,
-    from: "    ...readonlyMount({\n      source: spec.hostWorkingCopy,\n      target: HOST_WORKING_COPY,\n    }),",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: '    "--mount",\n    `type=bind,source=${spec.hostWorkingCopy},target=${HOST_WORKING_COPY}`,',
+    from: "    at(parts.hostWorkingCopy, HOST_WORKING_COPY),",
+    to: "    { source: parts.hostWorkingCopy, target: HOST_WORKING_COPY, readonly: false },",
     command: lanes("main"),
     expect:
       "a write to /mnt/host-working-copy fails, through bash and through write",
@@ -182,8 +181,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "shared directories are mounted read-only",
     file: plan,
-    from: "      writableMount({",
-    to: "      readonlyMount({",
+    from: "      readonly: false,",
+    to: "      readonly: true,",
     command: lanes("shared"),
     expect: "a plan a lane writes is in your working copy at once",
   },

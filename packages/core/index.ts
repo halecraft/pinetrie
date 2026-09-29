@@ -139,6 +139,8 @@ export const ERR = {
   MOVED: "moved",
   /** A lane asked to work directly in a directory that is not one. */
   BAD_DIRECTORY: "bad_directory",
+  /** A `/package:name` command that names no command there is (ADR-0036). */
+  UNKNOWN_COMMAND: "unknown_command",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -258,6 +260,41 @@ export const commitId = (id: string): CommitId => id as CommitId
 export const WORKSPACE_ROOT = "/workspace"
 /** Where every lane of its own sees your working copy, read-only. */
 export const HOST_WORKING_COPY = "/mnt/host-working-copy"
+
+/**
+ * Where every lane of its own sees host paths it is granted: `HOST_MOUNT` and
+ * then the host path (ADR-0036). One rule, so no granted path can shadow a
+ * directory of the image's.
+ */
+export const HOST_MOUNT = "/mnt/host"
+
+/** A host path, as a lane of its own sees it. */
+export const hostPathInLane = (hostPath: string): string =>
+  `${HOST_MOUNT}${hostPath}`
+
+/** A command runs a pi skill or expands a pi prompt template (ADR-0036). */
+export type CommandKind = "skill" | "prompt"
+
+/** A command as people see it: in the composer's completion and on a sent message. */
+export interface CommandSummary {
+  /** Qualified, without the slash: "duane:comments" or "duane:skill:plan". */
+  readonly name: string
+  readonly kind: CommandKind
+  readonly description: string
+  readonly argumentHint: string | null
+}
+
+/** What a command message stores: which file it ran, and what it expanded to. */
+export interface CommandRef {
+  readonly name: string
+  readonly kind: CommandKind
+  /** The skill's or template's file on the host: its identity. */
+  readonly file: string
+  /** sha256 of the file's text when it was sent. */
+  readonly hash: string
+  /** What the model reads in place of the typed text. */
+  readonly expanded: string
+}
 
 declare const snapshotIdBrand: unique symbol
 /**

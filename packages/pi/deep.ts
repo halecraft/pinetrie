@@ -42,6 +42,12 @@ type ResourceLoaderModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js")
 type SystemPromptModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/system-prompt.js")
+type SkillsModule =
+  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/skills.js")
+type PromptTemplatesModule =
+  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/prompt-templates.js")
+type FrontmatterModule =
+  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/frontmatter.js")
 
 const base = new URL("./node_modules/", import.meta.url)
 const deep = (p: string): Promise<unknown> => import(new URL(p, base).href)
@@ -66,7 +72,25 @@ const systemPrompt = (await deep(
   "@earendil-works/pi-coding-agent/dist/core/system-prompt.js",
 )) as SystemPromptModule
 
+const skills = (await deep(
+  "@earendil-works/pi-coding-agent/dist/core/skills.js",
+)) as SkillsModule
+const promptTemplates = (await deep(
+  "@earendil-works/pi-coding-agent/dist/core/prompt-templates.js",
+)) as PromptTemplatesModule
+const frontmatter = (await deep(
+  "@earendil-works/pi-coding-agent/dist/utils/frontmatter.js",
+)) as FrontmatterModule
+
 export const { addUsage, emptyUsage } = usage
+export const { loadSkillsFromDir } = skills
+export const {
+  loadPromptTemplates,
+  expandPromptTemplate,
+  parseCommandArgs,
+  substituteArgs,
+} = promptTemplates
+export const { stripFrontmatter } = frontmatter
 export const { SettingsManager } = settings
 export const { DefaultResourceLoader } = resourceLoader
 export const { buildSystemPrompt } = systemPrompt

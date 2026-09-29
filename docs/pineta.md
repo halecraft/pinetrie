@@ -486,6 +486,14 @@ context.**
   grants it. Your working copy is yours, so hot reload stays on. It needs
   Apple's `container` running (`docs/05-stack.md` D10); without it, threads
   work directly. Restart the host to pick up changes to host code.
+- **Your pi skills and prompts are commands** (ADR-0036):
+  `/<package>:skill:<name>` for a skill, `/<package>:<name>` for a prompt
+  template. For example `/duane:skill:plan` or `/duane:comments`. Typing `/`
+  and part of a name offers them. The package's name is its
+  `.claude-plugin/plugin.json` name, else its package name without the
+  scope. `commands.names` in `~/.config/pineta/config.json` renames one, keyed
+  by the path or source in pi's `packages` setting. Their files are readable
+  in every thread's lane, read-only.
 - **Sharing a directory with every thread** (ADR-0035), e.g. your plans:
   list it in `~/.config/pineta/config.json` as
   `{ "lanes": { "shared": [".plans"] } }`, and ignore it in

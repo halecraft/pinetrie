@@ -318,6 +318,19 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **Waiting messages** from `pineta.outbox` show dimmed in their column, in the
   order they will be taken. They are not in the tree yet.
 
+## Commands in the composer (ADR-0036)
+
+- **Completion** (`commands.ts`, `matchCommands`): while the text is a `/`
+  and a first word, the commands whose name has every typed part in some
+  part of it are offered. Those whose own name starts with what was typed
+  come first. The list is `pineta.commands`, read with `readCommands`.
+- **Keys:** arrows move, Tab or Enter chooses (inserting the full name and a
+  space), Escape hides the list for that text. Enter sends only when the
+  list is closed.
+- **A command is for the agent:** the send button says so, as the host
+  decides.
+- **A sent command** shows its name as a label beside its speaker (`node.command`).
+
 ## Tools and live work (ADR-0022)
 
 - **A tool call is a row under the agent's message** (`ToolRow` in

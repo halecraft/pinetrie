@@ -24,8 +24,8 @@ export const mutations: readonly Mutation[] = [
     name: "the model reads no speaker",
     file: "packages/marginalia/chat.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  `${d.authorName}: ${d.text}`",
-    to: "  d.text",
+    from: "  `${d.authorName}: ${d.command?.expanded ?? d.text}`",
+    to: "  d.command?.expanded ?? d.text",
     command: unit,
     expect: "the model reads the speaker",
   },

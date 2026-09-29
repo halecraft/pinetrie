@@ -59,6 +59,28 @@ are the only code that builds or reads the shape.
   into each message, so a rename never rewrites what the agent already read,
   nor invalidates the provider's prompt cache.
 
+# Commands (`commands.ts`, ADR-0036)
+
+- **The syntax is pi's, qualified by package:** `/<package>:<name>` for a
+  prompt template, `/<package>:skill:<name>` for a skill. `parseCommand`
+  reads the first word: two `:`-separated parts is a prompt, three with
+  `skill` in the middle a skill; anything else is text, `/etc/hosts`
+  included.
+- **`labelCommands`** gives each package its label: the user config's rename
+  (keyed by pi's `source`), else `pineta`, else `plugin.json`'s name, else
+  the unscoped package name, else pi's scope. Two sources with one label are
+  refused together, as are two commands with one full name in one package.
+- **`expandSkill`** is pi's block, byte for byte. **`resolveCommand`** is an
+  exact match.
+- **A command message** keeps `details.text` as typed and `details.command`
+  (`CommandRef`: name, kind, file, hash, expansion). `attributed` reads the
+  expansion, so a message held in the outbox, whose details are encoded
+  later, gives the model the same text. `planChat` makes a command compel
+  the agent, and refuses an unknown one (`ERR.UNKNOWN_COMMAND`).
+- **`pineta.commands`** is a host-written record of every command's summary,
+  for the composer's completion. `recordChanged` is how the host writes a
+  record at start only when it changed.
+
 # The outbox (`outbox.ts`)
 
 A thread's lane is never written while it runs (S21), so every message for a

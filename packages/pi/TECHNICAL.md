@@ -231,6 +231,42 @@ item 18, and in `lanes.test.ts` against the harness.
   and hashes it. The scripted and named model choices load no resources, so
   it falls back to the file in `skills/`.
 
+### Commands: your skills and prompts (`commands.ts`, ADR-0036)
+
+- **Every skill and prompt template pi loaded** comes back from
+  `setUpModel` as a command to be labelled, those pi's collision handling
+  dropped included:
+  - pi keeps one of each name and records the loser's file in a `collision`
+    diagnostic;
+  - `gatherCommands` loads each loser again, with `loadSkillsFromDir` or
+    `loadPromptTemplates`, and finds its package root above it.
+  - A label's sources, `.claude-plugin/plugin.json` and `package.json`, are
+    read from the package root pi records (`sourceInfo.baseDir`).
+  - A skill under Pineta's own skills directory is `pineta`.
+  - The model's own skill list keeps pi's precedence: one per name.
+- **`createAgent` labels them** with the user config's renames
+  (`commandRenames`) through marginalia's `labelCommands`. `commands()` is
+  the list, `refusedCommands()` what clashed, and `skill(name)` takes a
+  qualified name: the landing asks for `pineta:skill:resolve-conflicts`.
+- **`expand(command, args, inLane)`** reads the file now and hashes it:
+  - a skill becomes pi's block through marginalia's `expandSkill`, which
+    copies the format of `_expandSkillCommand` in pi-coding-agent's
+    `dist/core/agent-session.js`. That method is private to pi's session, so
+    the format is copied, and pinned by a golden test. Diff it on every pi
+    upgrade. A bundle chunk has another variant, built from
+    `dirnameEnvPath`; it is not the one;
+  - a template becomes its text with pi's `substituteArgs` and
+    `parseCommandArgs`;
+  - with `inLane`, a skill's file and directory are written at `/mnt/host`
+    and their host path.
+- **A lane of its own's system prompt** lists only the skills under a host
+  path it has mounted, at `/mnt/host` and their path (`skillsInLane`).
+  `LaneAccess` carries those host paths.
+- **Suites never read your pi configuration.** A scripted or named model
+  loads skills and prompts only when `agentDir` is given. Suites give
+  `fixtures/pi-agent`, whose settings list two fixture packages, each with a
+  skill `hello`.
+
 ### pi's checkpoints, stored as text (`checkpoint.ts`)
 
 While a tool runs, pi writes its whole output view to `pi.pending.tool_output`
@@ -283,7 +319,9 @@ and holds the subtle logic.
 Reaches pi entry points that are absent from its `exports` map, by relative path
 into `node_modules`: `createAgentHarness`, `addUsage`/`emptyUsage`,
 `ModelRuntime`, and, for the person's pi setup, `SettingsManager`,
-`DefaultResourceLoader` and `buildSystemPrompt`. Those paths are depth-sensitive: they broke when this
+`DefaultResourceLoader` and `buildSystemPrompt`. For commands:
+`loadSkillsFromDir`, `loadPromptTemplates`, `substituteArgs`,
+`parseCommandArgs` and `stripFrontmatter`. Those paths are depth-sensitive: they broke when this
 package moved under `packages/`. If they break again, the failure is
 `ERR_MODULE_NOT_FOUND` at import time, not a type error.
 

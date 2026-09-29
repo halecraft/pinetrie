@@ -2,7 +2,7 @@
 //
 //   pnpm run e2e:lanes    needs Apple's `container` running (macOS 26, Apple
 //                         silicon), as `e2e:browser` needs a Playwright server
-//   PINETA_LANES_SECTION=main,images,shared,contract
+//   PINETA_LANES_SECTION=main,images,shared,commands,contract
 //                         runs only the sections named, as a mutation that
 //                         one section catches does
 //
@@ -12,6 +12,8 @@
 //   where they branched;
 // - images: project images with no Node, and with no git;
 // - shared: directories every lane and you see, never branched (ADR-0035);
+// - commands: your pi skills' files, readable in a lane at /mnt/host
+//   (ADR-0036);
 // - contract: `container` does not promise that a clone written into a volume
 //   it made works, so every upgrade reruns a small soak.
 
@@ -630,6 +632,7 @@ async function sectionHost(input: {
   readonly dir?: string
   readonly store?: string
   readonly userConfig?: string
+  readonly agentDir?: string
   readonly logs?: string[]
 }) {
   const dir =
@@ -641,6 +644,7 @@ async function sectionHost(input: {
     ...(input.store === undefined ? {} : { store: input.store }),
     // A file of its own, so the person's own config never applies here.
     userConfig: input.userConfig ?? path.join(dir, "no-user-config.json"),
+    ...(input.agentDir === undefined ? {} : { agentDir: input.agentDir }),
     log: m => {
       input.logs?.push(m)
       if (process.env.PINETA_E2E_LOG === "1") console.log(m)
@@ -901,6 +905,72 @@ async function sharedSection(): Promise<void> {
   }
 }
 
+// ── commands: skill files at /mnt/host in a lane (ADR-0036) ─────────────────
+async function commandsSection(): Promise<void> {
+  const fixtures = path.join(
+    import.meta.dirname,
+    "../../../packages/pi/fixtures",
+  )
+  const agentDir = path.join(fixtures, "pi-agent")
+  const hello = path.join(fixtures, "fixture-pkg", "skills", "hello")
+  const h = await sectionHost({ files: { "a.txt": "a\n" }, agentDir })
+  try {
+    let told = ""
+    let system = ""
+    h.script.use([
+      {
+        reply: context => {
+          system = context[0] ?? ""
+          told = context.at(-1) ?? ""
+          return "read it"
+        },
+      },
+    ])
+    await h.user.chat("/fixture:skill:hello", ROOT, START_AGENT)
+    await h.idle()
+    const inLane = `/mnt/host${hello}`
+    ok(
+      told.includes(
+        `<skill name="hello" location="${inLane}/SKILL.md">\nReferences are relative to ${inLane}.`,
+      ),
+      `in a lane of its own, an expanded skill names its files at /mnt/host (${told.slice(0, 90)})`,
+    )
+    ok(
+      system.includes(
+        `/mnt/host${path.join(fixtures, "fixture-pkg", "skills", "explain")}/SKILL.md`,
+      ),
+      "the system prompt lists the skills the model may use at /mnt/host",
+    )
+    h.script.use([
+      {
+        tool: "bash",
+        args: {
+          command: `cat ${inLane}/references/note.md; sh ${inLane}/scripts/hello.sh; ls /mnt/host${agentDir} 2>&1 | head -1`,
+        },
+      },
+      { text: "ran it" },
+    ])
+    await h.user.chat(
+      "@agent follow it",
+      atEntry(entryId(h.laneWith("read it")?.tip ?? "")),
+      {
+        lane: h.laneWith("read it")?.name,
+      },
+    )
+    const ran = (await h.results("ran it")).at(-1) ?? ""
+    ok(
+      ran.includes("HELLO-NOTE") && ran.includes("HELLO-SCRIPT"),
+      "the lane reads the skill's references and runs its scripts there",
+    )
+    ok(
+      ran.includes("No such file or directory"),
+      `pi's agent directory is never mounted (${ran.trim().split("\n").at(-1)})`,
+    )
+  } finally {
+    await h.close()
+  }
+}
+
 /** Clones the contract checks. */
 const CLONES = 20
 
@@ -1026,6 +1096,7 @@ const SECTIONS: Readonly<Record<string, () => Promise<void>>> = {
   main: mainSection,
   images: imagesSection,
   shared: sharedSection,
+  commands: commandsSection,
   contract: contractSection,
 }
 const chosen = (

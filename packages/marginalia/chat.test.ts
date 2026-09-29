@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import {
   atEntry,
+  ERR,
   entryId,
   laneNameForThread,
   NOBODY,
@@ -14,6 +15,7 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   decodeChat,
+  detailsFromStored,
   encodeChat,
   entryText,
   heldBy,
@@ -60,6 +62,7 @@ const plan = (over: Partial<PlanInput>) => {
     end: atEntry(E1),
     contributors: [],
     hostWorkingCopy: null,
+    command: null,
     race: null,
     lane: NONE,
     mentions: [],
@@ -74,6 +77,55 @@ const plan = (over: Partial<PlanInput>) => {
 const kind = (d: ReturnType<typeof planChat>) => d.kind
 const textOf = (d: ReturnType<typeof planChat>) =>
   "details" in d ? d.details.text : undefined
+
+describe("planChat: a command (ADR-0036)", () => {
+  const command = {
+    name: "duane:skill:plan",
+    kind: "skill" as const,
+    file: "/s/plan/SKILL.md",
+    hash: "h",
+    expanded:
+      '<skill name="plan" location="/s/plan/SKILL.md">…</skill>\n\nmake it so',
+  }
+  test("the model reads its expansion; people see what was typed", () => {
+    const d = plan({ text: "/duane:skill:plan make it so", command })
+    const details = "details" in d ? d.details : undefined
+    expect(details?.text).toBe("/duane:skill:plan make it so")
+    expect(details === undefined ? "" : encodeChat(details, 1).content).toBe(
+      `Alice: ${command.expanded}`,
+    )
+  })
+  test("it is for the agent, whoever else it names", () => {
+    expect(
+      plan({ command, mentions: parseMentions("@bo look") }),
+    ).toMatchObject({ kind: "createAndRun" })
+  })
+  test("held, its details still encode to the expansion", () => {
+    const d = plan({ command, mode: "queue", lane: lane({ running: true }) })
+    expect(d.kind).toBe("hold")
+    const held = "details" in d ? d.details : undefined
+    expect(
+      held === undefined
+        ? ""
+        : encodeChat(detailsFromStored(held as never), 1).content,
+    ).toContain(command.expanded)
+  })
+  test("a command whose file cannot be read is refused, saying so", () => {
+    expect(plan({ command: { unreadable: "duane:skill:plan" } })).toMatchObject(
+      {
+        kind: "refused",
+        message: "the file of /duane:skill:plan could not be read",
+      },
+    )
+  })
+  test("an unknown command is refused, naming it", () => {
+    expect(plan({ command: { unknown: "duane:skill:nope" } })).toEqual({
+      kind: "refused",
+      code: ERR.UNKNOWN_COMMAND,
+      message: "no command /duane:skill:nope",
+    })
+  })
+})
 
 describe("planChat: paths to your working copy, in a thread with its own copy", () => {
   const text = "look at /home/p/src/a.ts, not /home/p2/b"

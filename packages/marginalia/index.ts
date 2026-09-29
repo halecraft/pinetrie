@@ -4,6 +4,7 @@
 
 export * from "./archive.ts"
 export * from "./chat.ts"
+export * from "./commands.ts"
 export * from "./decode.ts"
 export * from "./land.ts"
 export * from "./note.ts"

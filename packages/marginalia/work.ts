@@ -11,6 +11,7 @@
 import {
   type Above,
   BASE_SNAPSHOT,
+  type CommandSummary,
   type CommitId,
   commitId,
   type EntryId,
@@ -38,6 +39,9 @@ export const LANDING_NAMESPACE = "pineta.landing"
 export const PROJECT_NAMESPACE = "pineta.project"
 /** The one `pineta.project` value's key: a host has one project. */
 export const PROJECT_KEY = "project"
+export const COMMANDS_NAMESPACE = "pineta.commands"
+/** The one `pineta.commands` value's key: what the host's pi loaded. */
+export const COMMANDS_KEY = "commands"
 
 const WorkSettingSchema = Type.Union([
   Type.Object({ kind: Type.Literal("own") }),
@@ -76,6 +80,17 @@ const ProjectRecordSchema = Type.Union([
     reason: Type.String(),
   }),
 ])
+
+const CommandSummarySchema = Type.Object({
+  name: Type.String({ minLength: 1 }),
+  kind: Type.Union([Type.Literal("skill"), Type.Literal("prompt")]),
+  description: Type.String(),
+  argumentHint: Type.Union([Type.String(), Type.Null()]),
+})
+
+const CommandsRecordSchema = Type.Object({
+  commands: Type.Array(CommandSummarySchema),
+})
 
 const LandingRecordSchema = Type.Object({
   id: Type.String({ minLength: 1 }),
@@ -129,12 +144,22 @@ export const decodeLandingRecord = (
     by: r.by as WriterId,
   }))
 
-/** Any of the four, tagged: what the host writes through one method. */
+/** The commands the host's pi loaded, as people see them (ADR-0036). */
+export interface CommandsRecord {
+  readonly commands: readonly CommandSummary[]
+}
+
+export const decodeCommandsRecord = (
+  value: unknown,
+): CommandsRecord | undefined => decodeWith(CommandsRecordSchema, value, r => r)
+
+/** Any of the host's records, tagged: what the host writes through one method. */
 export type WorkRecord =
   | { readonly kind: "lane"; readonly record: LaneRecord }
   | { readonly kind: "revision"; readonly record: RevisionRecord }
   | { readonly kind: "landing"; readonly record: LandingRecord }
   | { readonly kind: "project"; readonly record: ProjectRecord }
+  | { readonly kind: "commands"; readonly record: CommandsRecord }
 
 /** A record -> where it is stored and the plain value stored there. */
 export function encodeWorkRecord(r: WorkRecord): {
@@ -167,8 +192,23 @@ export function encodeWorkRecord(r: WorkRecord): {
         key: PROJECT_KEY,
         value: { ...r.record },
       }
+    case "commands":
+      return {
+        namespace: COMMANDS_NAMESPACE,
+        key: COMMANDS_KEY,
+        value: { commands: r.record.commands.map(c => ({ ...c })) },
+      }
   }
 }
+
+/**
+ * Whether a host-written record's value differs from what is stored: the
+ * host writes a record at start only when it changed. A write compacted with
+ * no client connected moves the document's base past what a new client
+ * reports, so an unchanged record must not be written.
+ */
+export const recordChanged = (record: WorkRecord, stored: unknown): boolean =>
+  JSON.stringify(encodeWorkRecord(record).value) !== JSON.stringify(stored)
 
 type Stored = Iterable<{ readonly value: unknown }>
 
@@ -187,6 +227,10 @@ export const landingRecords = (values: Stored): readonly LandingRecord[] =>
   decodeAll(values, decodeLandingRecord).sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
   )
+
+/** The stored `pineta.commands` value's commands; none before a host wrote one. */
+export const commandsRecord = (values: Stored): readonly CommandSummary[] =>
+  decodeAll(values, decodeCommandsRecord)[0]?.commands ?? []
 
 /** The stored `pineta.project` value, or null before a host with tools wrote one. */
 export const projectRecord = (values: Stored): ProjectRecord | null =>

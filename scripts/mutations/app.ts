@@ -29,8 +29,8 @@ export const mutations: readonly Mutation[] = [
     name: "the stored content drops the speaker",
     file: "packages/marginalia/chat.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  `${d.authorName}: ${d.text}`",
-    to: "  d.text",
+    from: "  `${d.authorName}: ${d.command?.expanded ?? d.text}`",
+    to: "  d.command?.expanded ?? d.text",
     command: e2e,
     expect: "the stored content carries the speaker",
   },

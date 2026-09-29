@@ -3,6 +3,7 @@
 // Imports NO pi. Everything pi-shaped arrives through pi/.
 // FC/IS: this file gathers and executes; the deciding is done by core/.
 
+import { readFile } from "node:fs/promises"
 import http from "node:http"
 import { createRequire } from "node:module"
 import { networkInterfaces } from "node:os"
@@ -26,7 +27,6 @@ import {
   type LaneName,
   type NoteId,
   noteId,
-  type ProjectRecord,
   parseMentions,
   planStop,
   promptOf,
@@ -44,11 +44,14 @@ import {
   type ChatDetails,
   type ChatMessage,
   type CitedEntry,
+  decodeCommandRenames,
   displayName,
   encodeChat,
+  encodeWorkRecord,
   entryText,
   LAND_TYPE,
   type LandMessage,
+  parseCommand,
   planArchive,
   planChat,
   planDrain,
@@ -57,8 +60,11 @@ import {
   planNoteEdit,
   planReference,
   planStartup,
+  recordChanged,
+  resolveCommand,
   sentNote,
   settleRun,
+  type WorkRecord,
   writesAt,
 } from "@pineta/marginalia"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
@@ -82,9 +88,9 @@ import {
   readOutbox,
   readParticipantNames,
   readParticipants,
-  readProject,
   readTreeIndex,
   workAt,
+  worksOwn,
 } from "@pineta/reads"
 import {
   applyStreamOps,
@@ -104,6 +110,7 @@ import {
   readEntryMessage,
   readLaneTip,
   readStreams,
+  readValues,
   SessionDoc,
   type SessionDocHandle,
 } from "@pineta/schema"
@@ -174,6 +181,12 @@ export interface StartHostOptions {
    */
   readonly userConfig?: string
   /**
+   * pi's agent directory, by default pi's own. With a scripted or named
+   * model, skills and prompts load only from one given here: a suite's
+   * fixture (ADR-0036).
+   */
+  readonly agentDir?: string
+  /**
    * Where the session is kept: a SQLite file; a Kyneta store a caller made (and
    * closes), as a suite does to control it; or, absent or null, a store in
    * memory. Every host has a store: Kyneta compacts only a document with one,
@@ -216,6 +229,7 @@ export async function startHost({
   lanes = true,
   containers = true,
   userConfig = userConfigFile(),
+  agentDir,
   store: storeFile = null,
   presenceDecay = PRESENCE_DECAY,
   log = console.log,
@@ -263,21 +277,29 @@ export async function startHost({
     if (created === undefined) throw new Error("the agent is not created yet")
     return created
   }
+  // The user config, read once: its shared directories (ADR-0035) and its
+  // renames for command packages (ADR-0036). Missing or malformed is empty.
+  const userJson = await readFile(userConfig, "utf8")
+    .then(t => JSON.parse(t) as unknown)
+    .catch(() => null)
   const work = await startLaneWork({
     doc,
     dir: tools?.project ?? null,
     defaultDirect: !lanes,
     containers,
-    userConfig,
+    userConfig: { file: userConfig, json: userJson },
     agent: theAgent,
     log,
   })
 
   // --- pi stack ------------------------------------------------------------
+  const commandRenames = decodeCommandRenames(userJson)
   const agent = await createAgent({
     doc,
     replicaId: newId(),
     model,
+    commandRenames,
+    ...(agentDir === undefined ? {} : { agentDir }),
     tools:
       tools === null
         ? null
@@ -559,15 +581,28 @@ export async function startHost({
       lane => !interrupted.includes(lane),
     ),
   )
-  // What the host found, written only when it changed, and after the startup
-  // compaction: a write compacted with no client connected moves the base
-  // past the genesis version a new client reports, and Kyneta's `advance()`
-  // then throws on every later compaction.
-  const { project } = work
-  if (project !== null && !sameProject(readProject(doc), project))
-    void serially(() =>
-      agent.setWorkRecord({ kind: "project", record: project }),
-    )
+  // What the host found, and the commands its pi loaded, each written after
+  // the startup compaction and only when it changed (`recordChanged`).
+  const writeIfChanged = (record: WorkRecord) => {
+    const { namespace } = encodeWorkRecord(record)
+    if (recordChanged(record, readValues(doc, namespace)[0]?.value))
+      void serially(() => agent.setWorkRecord(record))
+  }
+  if (work.project !== null)
+    writeIfChanged({ kind: "project", record: work.project })
+  writeIfChanged({
+    kind: "commands",
+    record: {
+      commands: agent.commands().map(c => ({
+        name: c.name,
+        kind: c.kind,
+        description: c.description,
+        argumentHint: c.argumentHint,
+      })),
+    },
+  })
+  for (const r of agent.refusedCommands())
+    log(`[host] command ${r.name} is refused: ${r.reason}`)
 
   /**
    * A human message, from a `chat` command or a sent draft: gather, `threadOf`
@@ -604,19 +639,30 @@ export async function startHost({
     // Two lanes end here for a moment (a new one, just branched): which thread
     // the sender meant cannot be told, so they are asked, as for a race.
     if (thread.kind === "ambiguous") return { kind: "conflict", by: null }
-    // A thread that works, or will work, in its own copy stores paths under
-    // your working copy as the lane sees them (ADR-0034).
-    const own =
-      work.project?.kind === "lanes" &&
-      (thread.lane.kind === "lane" && chat.mode !== "branch"
-        ? readLaneRecords(doc).get(thread.lane.name)?.work.kind === "own"
-        : workAt(
-            doc,
-            index,
-            chat.mode === "branch" ? chat.at : thread.end,
-            chat.work,
-          ).work?.kind === "own")
+    // A thread that works, or will work, in its own copy is sent paths as
+    // its lane sees them: your working copy's (ADR-0034), and a command's
+    // files (ADR-0036).
+    const own = worksOwn(doc, index, {
+      lane: thread.lane,
+      end: thread.end,
+      mode: chat.mode,
+      at: chat.at,
+      work: chat.work,
+    })
+    // gather: the command its first word names, from its file as it is now
+    const typed = parseCommand(chat.text)
+    const source =
+      typed === null ? null : resolveCommand(typed.name, agent.commands())
+    const command =
+      typed === null
+        ? null
+        : source === null
+          ? { unknown: typed.name }
+          : ((await agent.expand(source, typed.args, own)) ?? {
+              unreadable: typed.name,
+            })
     const planned = planChat({
+      command,
       hostWorkingCopy: own ? (work.project?.root ?? null) : null,
       author: writer,
       authorName: nameOf(writer),
@@ -634,6 +680,8 @@ export async function startHost({
     // execute
     const message = (details: ChatDetails) => encodeChat(details, Date.now())
     switch (planned.kind) {
+      case "refused":
+        return planned
       case "conflict":
         return {
           kind: "conflict",
@@ -1169,8 +1217,6 @@ export async function startHost({
 }
 
 /** Whether two project records say the same. */
-const sameProject = (a: ProjectRecord | null, b: ProjectRecord): boolean =>
-  a !== null && JSON.stringify(a) === JSON.stringify(b)
 
 /** Whether `dir` is `root` or inside it. */
 const isWithin = (dir: string, root: string): boolean => {

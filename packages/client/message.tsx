@@ -69,6 +69,14 @@ export function Message(p: MessageProps) {
       )}
       <div className={classes.join(" ")} data-entry={node.id}>
         <span className="role">{speaker}</span>
+        {node.command !== undefined && (
+          <span
+            className="command-label"
+            title="a command: the agent read its skill or prompt"
+          >
+            /{node.command}
+          </span>
+        )}
         {p.forkTracks.map(t => (
           <button
             aria-label="show the branch that forks here"

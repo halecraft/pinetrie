@@ -15,6 +15,7 @@ import {
   type LaneSpec,
   type LaneStep,
   laneIgnores,
+  mountArgs,
   NO_GRANTS,
   PINETA_HEADS,
   planBaseRefresh,
@@ -26,7 +27,9 @@ import {
   planFork,
   planForkSetup,
   planHost,
+  planHostMounts,
   planLinks,
+  planMounts,
   planRoot,
   planRun,
   planShared,
@@ -42,29 +45,127 @@ const C2 = commitId("c2")
 const HOME = "/Users/ada"
 const paths = { volumes: "/v", snapshots: "/p/.pineta/snapshots" }
 
+const parts = {
+  hostWorkingCopy: "/p",
+  pineta: "/opt/pineta",
+  runtime: "/p/.pineta/runtime/abc",
+  ignoreDir: "/p/.pineta/lane-git",
+  links: [{ source: "/k", target: "/k", readonly: true }],
+  grants: [],
+  shared: [],
+  hostPaths: [],
+}
+
 const spec: LaneSpec = {
   lane: LANE,
   volume: "pineta-t-1",
   image: "pineta-lane:abc",
   imagePath: "/usr/local/bin:/usr/bin:/bin",
-  hostWorkingCopy: "/p",
-  pineta: "/opt/pineta",
-  runtime: "/p/.pineta/runtime/abc",
-  links: [{ source: "/k", target: "/k" }],
-  grants: NO_GRANTS,
+  mounts: planMounts(parts),
+  grants: { ssh: false, env: [] },
   identity: { name: "agent", email: "agent@pineta" },
   memory: "2G",
-  shared: [],
-  ignoreDir: "/p/.pineta/lane-git",
 }
 
 /** Each `--mount` value, and each `-e` value, from a `container run`. */
 const valuesOf = (argv: readonly string[], flag: string) =>
   argv.flatMap((a, i) => (a === flag ? [argv[i + 1] ?? ""] : []))
 
+describe("planMounts: every host path a lane sees, in one list", () => {
+  test("your working copy, Pineta's own and the ignore file's directory, read-only", () => {
+    expect(planMounts(parts)).toEqual([
+      { source: "/p", target: "/mnt/host-working-copy", readonly: true },
+      { source: "/opt/pineta", target: "/pineta", readonly: true },
+      {
+        source: "/p/.pineta/runtime/abc",
+        target: "/pineta-runtime",
+        readonly: true,
+      },
+      { source: "/p/.pineta/lane-git", target: "/pineta-git", readonly: true },
+      { source: "/k", target: "/k", readonly: true },
+    ])
+  })
+  test("shared directories read-write in /workspace; granted host paths read-only under /mnt/host", () => {
+    const mounts = planMounts({
+      ...parts,
+      shared: [{ path: ".plans", source: "/p/.plans" }],
+      hostPaths: ["/Users/ada/skills"],
+    })
+    expect(mounts).toContainEqual({
+      source: "/p/.plans",
+      target: "/workspace/.plans",
+      readonly: false,
+    })
+    expect(mounts).toContainEqual({
+      source: "/Users/ada/skills",
+      target: "/mnt/host/Users/ada/skills",
+      readonly: true,
+    })
+  })
+})
+
+test("mountArgs: --mount; -v for a path with a comma; neither for a comma and a colon", () => {
+  expect(mountArgs({ source: "/a b", target: "/t", readonly: true })).toEqual([
+    "--mount",
+    "type=bind,source=/a b,target=/t,readonly",
+  ])
+  expect(mountArgs({ source: "/a", target: "/t", readonly: false })).toEqual([
+    "--mount",
+    "type=bind,source=/a,target=/t",
+  ])
+  expect(
+    mountArgs({ source: "/a,b", target: "/t/a,b", readonly: true }),
+  ).toEqual(["-v", "/a,b:/t/a,b:ro"])
+  expect(() =>
+    mountArgs({ source: "/a,b:c", target: "/t", readonly: true }),
+  ).toThrow("both a comma and a colon")
+})
+
+describe("planHostMounts: granted host paths, and the ones never mounted", () => {
+  const home = "/Users/ada"
+  const agentDir = "/Users/ada/.pi/agent"
+  test("nested roots collapse into the outermost", () => {
+    expect(
+      planHostMounts({
+        roots: [
+          "/Users/ada/ai/duane",
+          "/Users/ada/ai/duane/skills/plan",
+          "/opt/x",
+        ],
+        home,
+        agentDir,
+      }),
+    ).toEqual({ mounts: ["/Users/ada/ai/duane", "/opt/x"], refused: [] })
+  })
+  test("never your home directory, / or pi's agent directory; a package inside the agent directory is fine", () => {
+    const planned = planHostMounts({
+      roots: [
+        "/",
+        "/Users",
+        "/Users/ada",
+        "/Users/ada/.pi",
+        "/Users/ada/.pi/agent/npm/node_modules/pi-subagents",
+        "/x/a,b:c",
+      ],
+      home,
+      agentDir,
+    })
+    expect(planned.mounts).toEqual([
+      "/Users/ada/.pi/agent/npm/node_modules/pi-subagents",
+    ])
+    expect(planned.refused.map(r => `${r.path}: ${r.reason}`)).toEqual([
+      "/: it is the file system's root",
+      "/Users: it is, or holds, your home directory",
+      "/Users/ada: it is, or holds, your home directory",
+      "/Users/ada/.pi: it is, or holds, pi's agent directory",
+      "/x/a,b:c: it has both a comma and a colon, which container cannot mount",
+    ])
+  })
+})
+
 describe("planRun: a lane's container", () => {
   const argv = planRun(spec, { HOME, SECRET: "s", GITHUB_TOKEN: "t" })
-  test("--init, the lane's disk at /workspace, and every host path read-only when nothing is shared", () => {
+  test("--init, the lane's disk at /workspace, and every mount planMounts gave", () => {
     expect(argv.slice(0, 5)).toEqual([
       "run",
       "--label",
@@ -73,24 +174,8 @@ describe("planRun: a lane's container", () => {
       "--init",
     ])
     expect(valuesOf(argv, "-v")).toEqual(["pineta-t-1:/workspace"])
-    expect(valuesOf(argv, "--mount")).toEqual([
-      "type=bind,source=/p,target=/mnt/host-working-copy,readonly",
-      "type=bind,source=/opt/pineta,target=/pineta,readonly",
-      "type=bind,source=/p/.pineta/runtime/abc,target=/pineta-runtime,readonly",
-      "type=bind,source=/p/.pineta/lane-git,target=/pineta-git,readonly",
-      "type=bind,source=/k,target=/k,readonly",
-    ])
-  })
-  test("shared directories are mounted read-write, where they are in /workspace", () => {
-    const shared = planRun(
-      { ...spec, shared: [{ path: ".plans", source: "/p/.plans" }] },
-      {},
-    )
-    expect(valuesOf(shared, "--mount")).toContain(
-      "type=bind,source=/p/.plans,target=/workspace/.plans",
-    )
-    expect(valuesOf(shared, "--mount")).toContain(
-      "type=bind,source=/p,target=/mnt/host-working-copy,readonly",
+    expect(valuesOf(argv, "--mount")).toEqual(
+      spec.mounts.map(m => mountArgs(m)[1]),
     )
   })
   test("every repo in the lane ignores what the ignore file lists, through git's own variables", () => {
@@ -110,7 +195,10 @@ describe("planRun: a lane's container", () => {
     expect(specHashOf(spec, {})).toBe(hash)
     expect(
       specHashOf(
-        { ...spec, shared: [{ path: ".plans", source: "/p/.plans" }] },
+        {
+          ...spec,
+          mounts: planMounts({ ...parts, hostPaths: ["/opt/skills"] }),
+        },
         {},
       ),
     ).not.toBe(hash)
@@ -123,23 +211,13 @@ describe("planRun: a lane's container", () => {
   })
   test("each grant applies", () => {
     const granted = planRun(
-      {
-        ...spec,
-        grants: {
-          ssh: true,
-          env: ["GITHUB_TOKEN", "MISSING"],
-          mounts: [{ source: "/data", target: "/data" }],
-        },
-      },
+      { ...spec, grants: { ssh: true, env: ["GITHUB_TOKEN", "MISSING"] } },
       { GITHUB_TOKEN: "t" },
     )
     expect(granted).toContain("--ssh")
     expect(valuesOf(granted, "-e")).toContain("GITHUB_TOKEN=t")
     expect(valuesOf(granted, "-e").some(e => e.startsWith("MISSING"))).toBe(
       false,
-    )
-    expect(valuesOf(granted, "--mount")).toContain(
-      "type=bind,source=/data,target=/data,readonly",
     )
   })
   test("jj's identity and config, no editor, and the runtime's bin last on the PATH", () => {
@@ -200,7 +278,7 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
     ).toEqual({
       ssh: true,
       env: [],
-      mounts: [{ source: "/p/d", target: "/d" }],
+      mounts: [{ source: "/p/d", target: "/d", readonly: true }],
     })
   })
   test("the install: the config's, else pnpm's for a pnpm repo, else none", () => {
@@ -282,8 +360,8 @@ test("planLinks: the directory beside the project that a link leaves for, mounte
       { path: "node_modules/abs", target: "/opt/abs" },
     ]),
   ).toEqual([
-    { source: "/other", target: "/other" },
-    { source: "/w/kyneta", target: "/kyneta" },
+    { source: "/other", target: "/other", readonly: true },
+    { source: "/w/kyneta", target: "/kyneta", readonly: true },
   ])
 })
 
