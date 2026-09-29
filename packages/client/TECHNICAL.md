@@ -222,6 +222,12 @@ those rows (tab summaries, archive search, `branchColors`).
   The browser suite's `railCount`
   counts messages, as dots plus each run's `data-count`; a check counting
   `.rail-dot` alone misses every message inside a run.
+- **A new tab's rail is `EmptyRail`:** a `.rail-start`, not a `.rail-dot`, so
+  `railCount` never counts it, and a disabled `notes (0)` toggle, which sets
+  the rail's width. The first message's rail has the same toggle, so the
+  columns keep their place; the browser suite checks `#strip`'s left edge
+  across that send. `.rail-tree` is `fit-content` and centred, and the SVG is
+  `PAD` wide on both sides of its outer tracks.
 - **A capsule's background depends on its fill** (the panel's colour, the
   track's, or the two blended half and half), so a colour check reads a `.rail-dot`. Signals (`.pulse`, `[data-here]`, `.noted`) are always on dots.
 

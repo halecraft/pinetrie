@@ -88,7 +88,7 @@ import {
 import { NotesIndex } from "./note.tsx"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { readEntryCount } from "./projection.ts"
-import { Rail } from "./rail.tsx"
+import { EmptyRail, Rail } from "./rail.tsx"
 import { railKeep } from "./rail-view.ts"
 import { connectSession, type SessionClient } from "./session-view.ts"
 import { deviceState, tabState } from "./tab-state.ts"
@@ -672,6 +672,7 @@ function App({ session }: { session: SessionClient }) {
                     open={shown}
                   />
                 )}
+                {newTab !== null && <EmptyRail />}
                 {/* Over the columns, beside the rail: inside the rail, whose own
                     scroll clips what overflows it, only a sliver of it showed. */}
                 {notesOpen && root !== null && (

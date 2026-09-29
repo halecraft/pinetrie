@@ -215,6 +215,14 @@ try {
     (await label(0)) === "send · agent will reply",
     `＋ agent promises a reply with no mention: "${await label(0)}"`,
   )
+  /** Where the columns start: the rail's width, plus its border. */
+  const stripLeft = () =>
+    page.$eval("#strip", n => Math.round(n.getBoundingClientRect().left))
+  const emptyLeft = await stripLeft()
+  ok(
+    (await page.locator(".rail .rail-start").count()) === 1 && emptyLeft > 0,
+    `a new tab has a rail, with a hollow dot where its first message will be (columns at ${emptyLeft}px)`,
+  )
 
   // ── the first turn: the reply, the agent joining ────────────────────────
   // Whether a reply streams live is checked on the scripted host below, where
@@ -246,6 +254,24 @@ try {
   ok(
     (await page.$$eval(".joined", n => n.length)) === 1,
     "the column shows where the agent joined",
+  )
+  const filledLeft = await stripLeft()
+  // One track: its dots are centred in the rail, not against its left edge.
+  const offCentre = await page.$eval(".rail", rail => {
+    const dot = rail.querySelector(".rail-dot")?.getBoundingClientRect()
+    const box = rail.getBoundingClientRect()
+    return dot === undefined
+      ? Number.POSITIVE_INFINITY
+      : Math.abs(dot.left + dot.width / 2 - (box.left + rail.clientWidth / 2))
+  })
+  ok(
+    filledLeft === emptyLeft &&
+      (await page.locator(".rail-start").count()) === 0,
+    `the first message takes the new tab's hollow dot, and the columns stay put (${emptyLeft}px → ${filledLeft}px)`,
+  )
+  ok(
+    offCentre <= 1,
+    `one track's dots are centred in the rail (${offCentre.toFixed(1)}px off)`,
   )
 
   // ── mentions pick the addressee, and the button says so ────────────────

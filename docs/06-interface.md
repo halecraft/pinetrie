@@ -169,7 +169,10 @@ so it is the one behind the menu. What each does is under "Starting" below.
 
 - A git-graph strip at the left edge draws every branch in the tab's root as a
   line, and every message as a dot, in tree order, except for uneventful
-  stretches (below).
+  stretches (below). The tree is centred in the rail.
+- **A new tab has a rail too**: a hollow dot where its first message will be,
+  and the notes toggle, disabled. It is as wide as the rail it becomes, so the
+  columns do not move when the first message lands.
 - **A column wears its rail track's colour**, so you can see which branches are
   on screen and where they sit in the whole.
 - **Clicking a message in the rail brings it into view**: in the column that

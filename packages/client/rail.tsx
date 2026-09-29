@@ -100,7 +100,7 @@ export function Rail({
         </button>
       )}
       <div className="rail-tree">
-        <svg height={y(slots)} width={x(tracks)}>
+        <svg height={y(slots)} width={x(tracks - 1) + PAD}>
           <title>
             every message, as a dot on its branch's track, or in a capsule
           </title>
@@ -152,6 +152,31 @@ export function Rail({
             />
           ),
         )}
+      </div>
+    </nav>
+  )
+}
+
+/**
+ * A new tab's rail, before its first message: a hollow dot where that message
+ * will be drawn, and the notes toggle, disabled. It is as wide as the rail it
+ * turns into, so the columns do not move when the first message lands.
+ */
+export function EmptyRail() {
+  return (
+    <nav aria-label="this thread's tree" className="rail">
+      <button className="notes-toggle" disabled type="button">
+        notes (0)
+      </button>
+      <div
+        className="rail-tree"
+        style={{ width: x(0) + PAD, height: y(0) + PAD }}
+      >
+        <span
+          className="rail-start"
+          style={{ left: x(0) - DOT, top: y(0) - DOT }}
+          title="the first message goes here"
+        />
       </div>
     </nav>
   )
