@@ -167,16 +167,31 @@ describe("columnsReducer", () => {
     expect(s).toEqual([])
   })
 
-  test("makeMain moves a column to the front, keeping its key", () => {
-    const s = columnsReducer(
-      [
-        { key: "a", anchor: "x" },
-        { key: "b", anchor: "y" },
-        { key: "c", anchor: "z" },
-      ],
-      { kind: "makeMain", index: 2 },
-    )
-    expect(s.map(c => c.key)).toEqual(["c", "a", "b"])
+  describe("move", () => {
+    const abcd: readonly Column[] = [
+      { key: "a", anchor: "w" },
+      { key: "b", anchor: "x" },
+      { key: "c", anchor: "y" },
+      { key: "d", anchor: "z" },
+    ]
+    const keys = (from: number, to: number) =>
+      columnsReducer(abcd, { kind: "move", from, to }).map(c => c.key)
+
+    test("moves a column left or right, keeping its key and the others' order", () => {
+      expect(keys(2, 0)).toEqual(["c", "a", "b", "d"])
+      expect(keys(0, 2)).toEqual(["b", "c", "a", "d"])
+      expect(keys(1, 3)).toEqual(["a", "c", "d", "b"])
+    })
+
+    test("clamps `to` to the list", () => {
+      expect(keys(1, 9)).toEqual(["a", "c", "d", "b"])
+      expect(keys(2, -1)).toEqual(["c", "a", "b", "d"])
+    })
+
+    test("a move to where the column is, or of no column, returns the same state", () => {
+      expect(columnsReducer(abcd, { kind: "move", from: 1, to: 1 })).toBe(abcd)
+      expect(columnsReducer(abcd, { kind: "move", from: 7, to: 0 })).toBe(abcd)
+    })
   })
 
   test("sync leaves a column whose anchor has not arrived, and settles it once it has", () => {

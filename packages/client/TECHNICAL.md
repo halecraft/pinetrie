@@ -287,6 +287,39 @@ point in the column showing it. A shared vertical scroll was tried in design
 and dropped: forks far apart could not be seen together
 (`docs/06-interface.md`).
 
+## Moving columns (`reorder.ts`, `use-column-drag.ts`)
+
+A column's header is its drag handle, once the tab has two columns. Its grip
+(`.grip`) moves it from the keyboard. `move` in `columnsReducer` is the one
+action; `reorder.ts` decides, purely, which gap a pointer is in (`gapAt`),
+where a drop there lands (`landing`), what a key does (`keyMove`), and how
+fast the strip scrolls near an edge (`edgeScroll`).
+
+- **Nothing moves until the drop.** Moving a column changes what the columns
+  right of it show (`projectColumns`), so a live reorder would redraw the
+  columns under the pointer. During a drag, the column slides with the pointer
+  and `data-drop` (`before`, or `after` on the last column) marks the gap.
+- **A drag writes to the DOM, not to React state:** a transform,
+  `data-dragging` on the column, `data-reordering` on the strip. A render of
+  `App` per pointer move would redraw every column. The column's centres are
+  measured once, when the drag starts, in the strip's content coordinates, so
+  edge scrolling does not skew them.
+- **The slide is clamped to the strip's ends.** A transform widens a scroll
+  container's overflow, so an unclamped column dragged right would keep
+  widening the strip that the edge scroll is chasing.
+- **A press on a control, `.where` or `.offer` starts no drag**
+  (`NOT_A_HANDLE`): those two stay selectable, to copy. The rest of the header
+  is `user-select: none`. A press is a drag only once it has moved 5 px, so
+  clicks still reach the header.
+- **Escape or a cancelled pointer moves nothing.** A drop in the gap on either
+  side of the column also moves nothing, and marks nothing.
+- **After a move by key, the column is scrolled into view.** Its grip keeps
+  focus through React's DOM move in Chromium, which the browser suite checks.
+  Its mutation removing an explicit `focus()` survived, so there is none.
+- **The order is never realigned.** A column moved right keeps its scroll,
+  though it now starts after its fork point. A column moved first loses its
+  spacer (`column.tsx`).
+
 ## Following a column's end (S32)
 
 A column at its end stays there as it grows; once the reader scrolls up, it

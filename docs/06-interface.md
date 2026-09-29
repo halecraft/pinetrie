@@ -155,9 +155,12 @@ so it is the one behind the menu. What each does is under "Starting" below.
   message below it, including the agent's reply, which may have been written on
   another lane (`followTip`). A branch off an earlier message, however new,
   never pulls it away. This replaces "follow the newest".
-- **Making a branch the main thread is moving its column to the left.** Nothing
-  in the document changes; which path reads as the trunk is a view choice, kept
-  client-side, like selection today.
+- **Columns are reordered by dragging their headers.** Whichever column is
+  first shows its whole path, so moving a branch to the far left makes it read
+  as the trunk. Nothing in the document changes: which path reads as the trunk
+  is a view choice, kept client-side, like selection today. A grip (⠿) leads
+  each header, and is the keyboard's way to do the same: ←/→ move a column one
+  place, and Home/End move it to either end.
 - **Closing a column** removes it from the view, never from the document. Its
   branch is still in the rail. A root tab's only column has no close, since
   the tab would show that path again; a new tab's closes the new tab.

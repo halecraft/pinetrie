@@ -75,7 +75,8 @@ export type ColumnAction =
   /** A fresh column sent its first message, as send `sendId`. */
   | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
   | { readonly kind: "close"; readonly index: number }
-  | { readonly kind: "makeMain"; readonly index: number }
+  /** Move column `from` to index `to` (`reorder.ts`); the rest keep their order. */
+  | { readonly kind: "move"; readonly from: number; readonly to: number }
   | {
       readonly kind: "sync"
       readonly index: TreeIndex
@@ -129,10 +130,12 @@ export function columnsReducer(
       )
     case "close":
       return state.filter((_, i) => i !== action.index)
-    case "makeMain": {
-      const column = state[action.index]
-      if (column === undefined || action.index === 0) return state
-      return [column, ...state.filter((_, i) => i !== action.index)]
+    case "move": {
+      const column = state[action.from]
+      const to = Math.min(Math.max(action.to, 0), state.length - 1)
+      if (column === undefined || to === action.from) return state
+      const rest = state.filter((_, i) => i !== action.from)
+      return [...rest.slice(0, to), column, ...rest.slice(to)]
     }
     case "sync":
       return syncColumns(state, action.index, action.lanes)

@@ -101,6 +101,7 @@ import { railKeep } from "./rail-view.ts"
 import { connectSession, type SessionClient } from "./session-view.ts"
 import { deviceState, tabState } from "./tab-state.ts"
 import { TabBar } from "./tabs.tsx"
+import { useColumnDrag } from "./use-column-drag.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { useReveal } from "./use-reveal.ts"
@@ -515,6 +516,9 @@ function App({ session }: { session: SessionClient }) {
   // After the alignment above: a picked message the alignment left out of
   // view is scrolled to.
   const reveal = useReveal(strip)
+  const dragColumn = useColumnDrag(strip, (from, to) =>
+    act({ kind: "move", from, to }),
+  )
 
   // The Archive tab's own state: never stored.
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("all")
@@ -742,7 +746,9 @@ function App({ session }: { session: SessionClient }) {
                     session={session}
                   />
                 )}
-                <div id="strip" ref={strip}>
+                {/* A column's header is its drag handle; its grip is the
+                    keyboard's way to move it. */}
+                <div id="strip" onPointerDown={dragColumn} ref={strip}>
                   {views.map((view, i) => {
                     const column = columns[i]
                     if (column === undefined) return null
@@ -752,6 +758,7 @@ function App({ session }: { session: SessionClient }) {
                         // A new tab's column closes the new tab.
                         closable={newTab !== null || columns.length > 1}
                         column={column}
+                        count={columns.length}
                         forks={colors.forks}
                         key={column.key}
                         onBranch={(at, prefill) =>
@@ -777,7 +784,7 @@ function App({ session }: { session: SessionClient }) {
                             ? closeNewTab(newTab.key)
                             : act({ kind: "close", index: i })
                         }
-                        onMakeMain={() => act({ kind: "makeMain", index: i })}
+                        onMove={to => act({ kind: "move", from: i, to })}
                         onOpen={openAt}
                         onSent={sendId =>
                           act({ kind: "sent", key: column.key, sendId })
@@ -831,7 +838,8 @@ function Preview({
     | "onBranch"
     | "onBranchInstead"
     | "onClose"
-    | "onMakeMain"
+    | "onMove"
+    | "count"
     | "onOpen"
     | "onSent"
     | "onTyping"
@@ -886,11 +894,12 @@ function Preview({
           {...shared}
           closable={false}
           column={column}
+          count={1}
           forks={new Map()}
           onBranch={none}
           onBranchInstead={none}
           onClose={none}
-          onMakeMain={none}
+          onMove={none}
           onOpen={pick}
           onSent={none}
           onTyping={none}

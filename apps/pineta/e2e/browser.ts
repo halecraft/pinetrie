@@ -533,8 +533,60 @@ try {
     `→ at a column's end only in agent work (${lasts.join(" | ")})`,
   )
 
-  // ── make main ────────────────────────────────────────────────────────────
-  await page.click(`${col(2)} .make-main`)
+  // ── moving a column: drag its header, or its grip's keys ───────────────
+  const keys = () =>
+    page.$$eval(".column", ns => ns.map(n => n.getAttribute("data-key")))
+  /** Press column `n`'s header, and move to `dx` px into column `into`. */
+  const dragHeader = async (n: number, into: number, dx: number) => {
+    const head = await page.locator(`${col(n)} .column-head`).boundingBox()
+    const target = await page.locator(col(into)).boundingBox()
+    if (head === null || target === null) return false
+    const y = head.y + head.height / 2
+    await page.mouse.move(head.x + 40, y)
+    await page.mouse.down()
+    await page.mouse.move(target.x + dx, y, { steps: 12 })
+    return true
+  }
+  const marked = () =>
+    page.evaluate(() => ({
+      dragging:
+        document
+          .querySelector(".column[data-dragging]")
+          ?.getAttribute("data-position") ?? null,
+      drop: [...document.querySelectorAll(".column[data-drop]")]
+        .map(
+          n =>
+            `${n.getAttribute("data-position")}:${n.getAttribute("data-drop")}`,
+        )
+        .join(),
+    }))
+  const unmoved = await keys()
+  const pressed = await dragHeader(2, 0, 60)
+  const mid = await marked()
+  ok(
+    pressed &&
+      mid.dragging === "2" &&
+      mid.drop === "0:before" &&
+      (await keys()).join() === unmoved.join(),
+    `a dragged header's column is lifted and a bar marks where it will land; nothing moves before the drop (${JSON.stringify(mid)})`,
+  )
+  await page.keyboard.press("Escape")
+  await page.mouse.up()
+  const after = await marked()
+  ok(
+    (await keys()).join() === unmoved.join() &&
+      after.dragging === null &&
+      after.drop === "",
+    `Escape cancels a drag: nothing moves, and nothing stays marked (${JSON.stringify(after)})`,
+  )
+  await dragHeader(2, 0, 60)
+  await page.mouse.up()
+  const dropped = await keys()
+  ok(
+    dropped.join() ===
+      [unmoved[2], unmoved[0], unmoved[1], ...unmoved.slice(3)].join(),
+    `a dropped column moves there, and the others keep their order (${unmoved.length} columns)`,
+  )
   await page.waitForFunction(
     c =>
       document.querySelector(`${c} .msg`)?.textContent?.includes("BROWSER-OK"),
@@ -547,7 +599,7 @@ try {
     main.includes("an aside") &&
       former.some(t => t.includes("BROWSER-TWO")) &&
       !former.includes("Say exactly: BROWSER-OK"),
-    "make main puts the branch first, and the old first column now starts after its fork point",
+    "moved first, a branch shows its whole path, and the old first column now starts after its fork point",
   )
   const leftover = await page.$eval(
     `${col(0)} .spacer`,
@@ -556,6 +608,45 @@ try {
   ok(
     leftover === 0,
     `the new first column keeps no alignment spacer: it has no fork point (${leftover}px)`,
+  )
+  await page.focus(`${col(0)} .grip`)
+  await page.keyboard.press("ArrowRight")
+  const stepped = await keys()
+  const focused = await page.evaluate(() => {
+    const a = document.activeElement
+    return a?.classList.contains("grip") === true
+      ? (a.closest(".column")?.getAttribute("data-key") ?? null)
+      : null
+  })
+  ok(
+    stepped.join() === [dropped[1], dropped[0], ...dropped.slice(2)].join() &&
+      focused === dropped[0],
+    `→ on a column's grip moves it one place right, and its grip keeps focus (${focused})`,
+  )
+  // The strip is wider than the page, so the last column starts cut off.
+  await page.keyboard.press("End")
+  const shown = await page.evaluate(() => {
+    const strip = document.querySelector("#strip")
+    const moved = document.activeElement?.closest(".column")
+    if (strip === null || moved === null || moved === undefined) return null
+    const s = strip.getBoundingClientRect()
+    const c = moved.getBoundingClientRect()
+    return {
+      overflows: strip.scrollWidth > strip.clientWidth,
+      last: moved.getAttribute("data-position"),
+      inView: c.left >= s.left - 1 && c.right <= s.right + 1,
+    }
+  })
+  ok(
+    shown?.overflows === true &&
+      shown.last === String(dropped.length - 1) &&
+      shown.inView,
+    `End on its grip moves it last, and scrolls the strip to show it (${JSON.stringify(shown)})`,
+  )
+  await page.keyboard.press("Home")
+  ok(
+    (await keys()).join() === dropped.join(),
+    "Home on its grip moves it back to the front",
   )
 
   // ── a busy thread: the composer says it will queue, and it does ────────

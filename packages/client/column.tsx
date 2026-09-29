@@ -52,6 +52,7 @@ import { speakerLabel, withContributors } from "./names.ts"
 import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackColor } from "./rail.tsx"
+import { keyMove } from "./reorder.ts"
 import type { SessionClient } from "./session-view.ts"
 import { useFollow } from "./use-follow.ts"
 
@@ -60,6 +61,8 @@ export interface ColumnProps {
   /** The column as the reducer holds it: its lane, and whether it is fresh. */
   column: ColumnSpec
   position: number
+  /** How many columns the strip holds: with two or more, a column can move. */
+  count: number
   view: ColumnView
   index: TreeIndex
   /** This column's colour track; its header carries it. */
@@ -107,7 +110,8 @@ export interface ColumnProps {
   /** A fresh column's first send, by id. */
   onSent: (sendId: string) => void
   onOpen: (anchor: string) => void
-  onMakeMain: () => void
+  /** Move this column to index `to`, from its grip's keys (`keyMove`). */
+  onMove: (to: number) => void
   onClose: () => void
   /**
    * Whether "close" does anything: not on a root tab's only column, which the
@@ -148,9 +152,22 @@ export function Column(p: ColumnProps) {
   const spacer = useRef<HTMLDivElement>(null)
   const end = useFollow(body, content)
 
+  // A move from the grip's keys brings the column into view: End can put it
+  // past the strip's edge. Its grip keeps focus through React's move.
+  const grip = useRef<HTMLButtonElement>(null)
+  const movedByKey = useRef(false)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the column has moved
+  useLayoutEffect(() => {
+    if (!movedByKey.current) return
+    movedByKey.current = false
+    grip.current
+      ?.closest(".column")
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" })
+  }, [p.position])
+
   // The spacer exists to line a new column up with its fork point. A column
-  // with no fork point (the first, or one moved there by "make main") has
-  // nothing to line up with, so it keeps no spacer.
+  // with no fork point (the first, or one moved there) has nothing to line up
+  // with, so it keeps no spacer.
   useLayoutEffect(() => {
     if (view.forkFrom === null && spacer.current !== null)
       spacer.current.style.height = "0px"
@@ -315,6 +332,25 @@ export function Column(p: ColumnProps) {
         data-color={colorSlot(p.track)}
         style={{ borderTopColor: trackColor(p.track) }}
       >
+        {p.count > 1 && (
+          <button
+            aria-keyshortcuts="ArrowLeft ArrowRight Home End"
+            aria-label="move column"
+            className="grip"
+            onKeyDown={e => {
+              const to = keyMove(p.position, p.count, e.key)
+              if (to === null) return
+              e.preventDefault()
+              movedByKey.current = true
+              p.onMove(to)
+            }}
+            ref={grip}
+            title="drag to move · ← → Home End"
+            type="button"
+          >
+            ⠿
+          </button>
+        )}
         <span className="fork-label">
           {fork === undefined
             ? fresh
@@ -333,11 +369,6 @@ export function Column(p: ColumnProps) {
           <OfferLine act={act} lane={lane.name} view={offer} />
         )}
         <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={p.seenBy} />
-        {p.position > 0 && (
-          <button className="make-main" onClick={p.onMakeMain} type="button">
-            make main
-          </button>
-        )}
         {p.closable && (
           <button className="close" onClick={p.onClose} type="button">
             close

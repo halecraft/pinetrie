@@ -9,6 +9,7 @@ const inbox = "packages/client/inbox.ts"
 const tabStateFile = "packages/client/tab-state.ts"
 const markdown = "packages/client/markdown.ts"
 const tabState = "packages/client/tab-state.ts"
+const reorder = "packages/client/reorder.ts"
 
 export const mutations: readonly Mutation[] = [
   {
@@ -575,5 +576,69 @@ export const mutations: readonly Mutation[] = [
     to: "): string | null => stored.name",
     command: unit,
     expect: "only to a session that has none",
+  },
+  {
+    name: "a move past either end is not clamped",
+    file: file,
+    from: "      const to = Math.min(Math.max(action.to, 0), state.length - 1)",
+    to: "      const to = action.to",
+    command: unit,
+    expect: "clamps `to` to the list",
+  },
+  {
+    name: "a moved column goes to the far right",
+    file: file,
+    from: "      return [...rest.slice(0, to), column, ...rest.slice(to)]",
+    to: "      return [...rest, column]",
+    command: unit,
+    expect: "moves a column left or right",
+  },
+  {
+    name: "a pointer on a column's centre is after it",
+    file: reorder,
+    from: "  return mids.filter(mid => mid < x).length",
+    to: "  return mids.filter(mid => mid <= x).length",
+    command: unit,
+    expect: "a pointer on a centre is before that column",
+  },
+  {
+    name: "the gap right of a column moves it",
+    file: reorder,
+    from: "  if (gap === from || gap === from + 1) return null",
+    to: "  if (gap === from) return null",
+    command: unit,
+    expect: "the gaps either side of a column",
+  },
+  {
+    name: "a column dropped to its right lands one too far",
+    file: reorder,
+    from: "  return gap > from ? gap - 1 : gap",
+    to: "  return gap",
+    command: unit,
+    expect: "a gap to the right lands one short",
+  },
+  {
+    name: "a grip's keys move a column past either end",
+    file: reorder,
+    from: "  return to === null || to < 0 || to >= count || to === from ? null : to",
+    to: "  return to === null || to === from ? null : to",
+    command: unit,
+    expect: "no move past either end",
+  },
+  {
+    name: "the strip scrolls left near its right edge",
+    file: reorder,
+    from: "  if (right - x < EDGE_ZONE) return pull(right - x)",
+    to: "  if (right - x < EDGE_ZONE) return 0 - pull(right - x)",
+    command: unit,
+    expect: "scrolls left near the left edge and right near the right",
+  },
+  {
+    name: "the strip scrolls as fast anywhere near an edge",
+    file: reorder,
+    from: "    Math.round(EDGE_SPEED * (1 - Math.max(away, 0) / EDGE_ZONE))",
+    to: "    EDGE_SPEED",
+    command: unit,
+    expect: "grows faster nearer the edge",
   },
 ]

@@ -93,6 +93,21 @@
       .column-head { display: flex; gap: .5rem; align-items: center; padding: .4rem .75rem;
         border-top: 3px solid #777; font-size: .8rem; color: #aaa; }
       .column-head .fork-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      /* A header is its column's drag handle (use-column-drag.ts), once there are
+         two columns. Where it works and its offer stay selectable, to copy. */
+      .column-head { user-select: none; }
+      .column-head .where, .column-head .offer { user-select: text; }
+      #strip:has(> .column + .column) .column-head { cursor: grab; }
+      .column-head .grip { border: none; padding: 0 .1rem; color: #6f7784; cursor: grab;
+        font-size: .9rem; line-height: 1; }
+      .column-head .grip:hover, .column-head .grip:focus-visible { color: #e6e6e6; }
+      /* The header holds the pointer while it drags, so its cursor is the one shown. */
+      #strip[data-reordering] .column[data-dragging] .column-head,
+      #strip[data-reordering] .column[data-dragging] .grip { cursor: grabbing; }
+      .column[data-dragging] { position: relative; z-index: 2; background: #14161a; opacity: .92;
+        box-shadow: 0 0 0 1px #3a3f48, 0 8px 24px rgb(0 0 0 / .5); }
+      .column[data-drop="before"] { box-shadow: inset 3px 0 0 #8ab4f8; }
+      .column[data-drop="after"] { box-shadow: inset -3px 0 0 #8ab4f8; }
       .avatars { display: inline-flex; gap: 2px; flex: 0 0 auto; }
       .avatar { width: 16px; height: 16px; border-radius: 50%; font-size: 10px; line-height: 16px;
         text-align: center; color: #111; font-weight: 600; }
