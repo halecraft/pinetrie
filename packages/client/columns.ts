@@ -8,6 +8,8 @@ import {
   followTip,
   type LaneName,
   type LaneView,
+  THE_AGENT,
+  type ThreadLane,
   type TreeIndex,
 } from "@pineta/core"
 
@@ -34,9 +36,22 @@ export interface Column {
    * wrote (`TreeIndex.bySend`): exactly, whatever else appeared meanwhile.
    * `pending` is a first message to send on opening ("Branch here" after a
    * conflict), sent by the column's own composer so its outcome shows there.
+   * `prefill` is text its composer starts with, unsent (`branchPrefill`).
    */
-  readonly fresh?: { readonly sendId?: string; readonly pending?: string }
+  readonly fresh?: {
+    readonly sendId?: string
+    readonly pending?: string
+    readonly prefill?: string
+  }
 }
+
+/**
+ * What a branch's composer starts with: `@agent ` in agent work, so going on
+ * with the agent is already typed, and deleting it makes the branch a
+ * conversation (ADR-0021). Nothing in a conversation.
+ */
+export const branchPrefill = (lane: ThreadLane): string | undefined =>
+  lane.kind === "lane" ? `@${THE_AGENT} ` : undefined
 
 export type ColumnAction =
   /** Open a path next to the column it forks from. `key` comes from the shell. */
@@ -54,6 +69,8 @@ export type ColumnAction =
       readonly after: number
       /** A first message the column sends as soon as it opens. */
       readonly text?: string
+      /** Text its composer starts with, unsent. */
+      readonly prefill?: string
     }
   /** A fresh column sent its first message, as send `sendId`. */
   | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
@@ -99,7 +116,10 @@ export function columnsReducer(
       return placeAfter(state, action.after, {
         key: action.key,
         anchor: action.at,
-        fresh: action.text === undefined ? {} : { pending: action.text },
+        fresh: {
+          ...(action.text === undefined ? {} : { pending: action.text }),
+          ...(action.prefill === undefined ? {} : { prefill: action.prefill }),
+        },
       })
     case "sent":
       return state.map(c =>

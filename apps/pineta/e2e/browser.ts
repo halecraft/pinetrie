@@ -497,6 +497,13 @@ try {
     beside,
     "→ opens an empty column next to the column it forks from, not at the far right",
   )
+  const prefilled = await page.inputValue(`${col(1)} .composer .input`)
+  const prefilledLabel = await label(1)
+  ok(
+    prefilled === "@agent " &&
+      prefilledLabel.startsWith("send · agent will reply"),
+    `→ in agent work opens a branch with @agent typed ("${prefilled}", "${prefilledLabel}")`,
+  )
   const railBefore = await railCount()
   await send(1, "deeper")
   ok(
@@ -522,8 +529,8 @@ try {
     }),
   )
   ok(
-    lasts.join(" | ") === "continue as a conversation | no | no",
-    `→ at a column's end only in agent work, where it steps down (${lasts.join(" | ")})`,
+    lasts.join(" | ") === "open a branch here | no | no",
+    `→ at a column's end only in agent work (${lasts.join(" | ")})`,
   )
 
   // ── make main ────────────────────────────────────────────────────────────
@@ -681,15 +688,18 @@ try {
   await send(before, "say exactly: DOWN-ONE")
   await page.waitForSelector(`${agentCol} .msg.assistant`, { timeout: 60_000 })
   await idle()
-  // → at the agent thread's end: a conversation continuing from there.
+  // → at the agent thread's end opens a branch with @agent typed; deleting
+  // it steps down to a conversation continuing from there.
   const end = `${agentCol} .msg.assistant`
   await page.hover(end)
   await page.click(`${end} > .branch`)
   const downCol = col(before + 1)
   await page.waitForSelector(`${downCol} .composer`, { timeout: 15_000 })
+  const downStart = await page.inputValue(`${downCol} .composer .input`)
+  await page.fill(`${downCol} .composer .input`, "")
   ok(
-    (await label(before + 1)) === "send",
-    `the stepped-down column is a conversation: "${await label(before + 1)}"`,
+    downStart === "@agent " && (await label(before + 1)) === "send",
+    `with @agent deleted, the branch at the end is a conversation ("${downStart}", "${await label(before + 1)}")`,
   )
   await send(before + 1, "off the record")
   await shows("off the record", downCol)
@@ -716,6 +726,24 @@ try {
     downTexts.includes("off the record") &&
       !downTexts.includes("say exactly: DOWN-TWO"),
     "the conversation's column keeps only its own thread",
+  )
+  // A branch from a conversation opens with nothing typed.
+  await send(before + 1, "still off it")
+  await shows("still off it", downCol)
+  await page.hover(`${downCol} ${msg("off the record")}`)
+  await page.click(`${downCol} ${msg("off the record")} > .branch`)
+  const asideCol = col(before + 2)
+  await page.waitForSelector(`${asideCol} .composer`, { timeout: 15_000 })
+  const asideStart = await page.inputValue(`${asideCol} .composer .input`)
+  ok(
+    asideStart === "" && (await label(before + 2)) === "send",
+    `→ in a conversation opens a branch with nothing typed ("${asideStart}", "${await label(before + 2)}")`,
+  )
+  await page.click(`${asideCol} .close`)
+  await page.waitForFunction(
+    () => document.querySelectorAll(".column").length === 2,
+    undefined,
+    { timeout: 15_000 },
   )
 
   // ── your tabs, the header and the inbox (ADR-0029, ADR-0030) ───────────

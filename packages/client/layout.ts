@@ -376,13 +376,19 @@ export function planOpen(
 // Kept per browser tab through `tab-state.ts`. Built field by field both ways,
 // so a field the schema does not name is never stored or restored.
 // `fresh.pending` is one: restoring it would send its message again.
+// `fresh.prefill` is stored: it sends nothing by itself.
 
 const StoredColumn = Type.Object({
   key: Type.String(),
   anchor: Type.Union([Type.String(), Type.Null()]),
   lane: Type.Optional(Type.String()),
   asksAgent: Type.Optional(Type.Literal(true)),
-  fresh: Type.Optional(Type.Object({ sendId: Type.Optional(Type.String()) })),
+  fresh: Type.Optional(
+    Type.Object({
+      sendId: Type.Optional(Type.String()),
+      prefill: Type.Optional(Type.String()),
+    }),
+  ),
 })
 
 const StoredTab = Type.Union([
@@ -410,7 +416,12 @@ const toStored = (c: Column): Stored => ({
   ...(c.fresh === undefined
     ? {}
     : {
-        fresh: c.fresh.sendId === undefined ? {} : { sendId: c.fresh.sendId },
+        fresh: {
+          ...(c.fresh.sendId === undefined ? {} : { sendId: c.fresh.sendId }),
+          ...(c.fresh.prefill === undefined
+            ? {}
+            : { prefill: c.fresh.prefill }),
+        },
       }),
 })
 
@@ -424,7 +435,12 @@ const fromStored = (s: Stored): Column => ({
   ...(s.fresh === undefined
     ? {}
     : {
-        fresh: s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId },
+        fresh: {
+          ...(s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId }),
+          ...(s.fresh.prefill === undefined
+            ? {}
+            : { prefill: s.fresh.prefill }),
+        },
       }),
 })
 

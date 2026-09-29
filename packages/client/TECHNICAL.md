@@ -98,13 +98,17 @@ counter.
   a new tab) has nothing of its own yet. Its first send mints the
   command's id (`sent`), which the host stores with the message (`sendId`), and
   `sync` anchors the column at the entry that send wrote (`TreeIndex.bySend`).
+  A branch from agent work carries `prefill` (`branchPrefill`: `@agent `),
+  which its composer starts with; `sendable` (`send.ts`) sends nothing while
+  the text is only that.
   Exact: no other message at the same point, the lane's own next append
   included, can be mistaken for it. "Branch here" opens one holding the text
   (`pending`), and that column's composer sends it, so a refusal shows where
   the message is, like any other send.
 - **`→` at a column's end only in agent work.** Below a conversation's last
   message, a branch would be the same as replying. At an agent thread's end
-  it steps back down to a conversation (ADR-0021).
+  it is "open a branch here", as on every message; its `@agent ` deleted, it
+  steps back down to a conversation (ADR-0021).
 - **`asksAgent`** is a new tab from **＋ agent** (ADR-0021's Start Agent): a
   message with no mention asks the agent, as if `@agent` were written, until
   the thread has a lane of its own.
@@ -181,7 +185,10 @@ error.
   save, and the page opens on the Archive tab. A lane that is not a lane name
   is left off; `sync` binds the column again.
 - **`fresh.pending` is never stored**, by either side: restoring it would send
-  its message again. A "Branch here" column comes back empty.
+  its message again. A "Branch here" column comes back empty. `fresh.prefill`
+  is stored: it sends nothing by itself. What was typed over it is not kept:
+  the composer's text is its own state, so a reload, or switching root tabs
+  (which unmounts the column), starts it from the prefill again.
 - **Restored anchors the document lacks are pruned once, after
   `whenSettled`.** Until then, missing means not yet arrived: `connectSession`
   returns before the document does (S29: 0 of 50 had it). Neither

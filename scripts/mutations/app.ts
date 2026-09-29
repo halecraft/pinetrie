@@ -18,6 +18,38 @@ const e2eLanes = [
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "→ in agent work opens a branch with nothing typed",
+    file: "packages/client/column.tsx",
+    from: "                        go: () => p.onBranch(node.id, branchPrefill(lane)),",
+    to: "                        go: () => p.onBranch(node.id, undefined),",
+    command: browser,
+    expect: "→ in agent work opens a branch with @agent typed",
+  },
+  {
+    name: "a composer ignores the text it starts with",
+    file: "packages/client/composer.tsx",
+    from: '    pending === undefined ? (initialText ?? "") : "",',
+    to: '    pending === undefined ? "" : "",',
+    command: browser,
+    expect: "→ in agent work opens a branch with @agent typed",
+  },
+  {
+    name: "→ is hidden again at agent work's end",
+    file: "packages/client/column.tsx",
+    from: '                  (i === view.nodes.length - 1 && lane.kind !== "lane")',
+    to: "                  i === view.nodes.length - 1",
+    command: browser,
+    expect: "→ at a column's end only in agent work",
+  },
+  {
+    name: "→ shows at a conversation's end",
+    file: "packages/client/column.tsx",
+    from: '                  (i === view.nodes.length - 1 && lane.kind !== "lane")',
+    to: "                  false",
+    command: browser,
+    expect: "→ at a column's end only in agent work",
+  },
+  {
     name: "every message compels the agent",
     file: "packages/core/index.ts",
     from: '        ? NOBODY\n        : { kind: "agent", agent: THE_AGENT }',
@@ -45,8 +77,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "→ opens its column at the far right",
     file: "packages/client/app.tsx",
-    from: "                            at,\n                            after: i,\n                          })\n                        }\n                        onBranchInstead",
-    to: "                            at,\n                            after: columns.length,\n                          })\n                        }\n                        onBranchInstead",
+    from: "                            at,\n                            after: i,\n                            ...(prefill",
+    to: "                            at,\n                            after: columns.length,\n                            ...(prefill",
     command: browser,
     expect: "opens an empty column next to the column it forks from",
   },

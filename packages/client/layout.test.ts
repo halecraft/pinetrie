@@ -364,6 +364,22 @@ describe("encodeLayout / decodeLayout", () => {
     ])
   })
 
+  test("a branch's prefill is stored and restored: it sends nothing by itself", () => {
+    const l = {
+      ...initialLayout(),
+      roots: new Map([
+        [
+          "1-r1",
+          [
+            { key: "a", anchor: "1-r1" },
+            { key: "b", anchor: "1-r1", fresh: { prefill: "@agent " } },
+          ],
+        ],
+      ]),
+    }
+    expect(decodeLayout(encodeLayout(l))).toEqual(l)
+  })
+
   test("a layout that is another version, or partly malformed, restores nothing", () => {
     const good = { key: "a", anchor: "1-r1" }
     for (const raw of [

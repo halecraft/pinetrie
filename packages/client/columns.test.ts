@@ -5,7 +5,7 @@ import {
   laneNameForThread,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { type Column, columnsReducer } from "./columns.ts"
+import { branchPrefill, type Column, columnsReducer } from "./columns.ts"
 
 /** A tree from `child: parent` pairs; `sends` gives some entries a send id. */
 const tree = (
@@ -132,6 +132,19 @@ describe("columnsReducer", () => {
     expect(sent[1]?.fresh).toEqual({ sendId: "s" })
   })
 
+  test("a branch's column holds its prefill until its first send", () => {
+    const opened = columnsReducer([{ key: "k", anchor: "2-t" }], {
+      kind: "openFresh",
+      key: "b",
+      at: "2-t",
+      after: 0,
+      prefill: "@agent ",
+    })
+    expect(opened[1]?.fresh).toEqual({ prefill: "@agent " })
+    const sent = columnsReducer(opened, { kind: "sent", key: "b", sendId: "s" })
+    expect(sent[1]).toEqual({ key: "b", anchor: "2-t", fresh: { sendId: "s" } })
+  })
+
   test("open inserts next to the column it forks from", () => {
     const three: Column[] = [
       { key: "a", anchor: "x" },
@@ -187,5 +200,12 @@ describe("columnsReducer", () => {
     expect(
       columnsReducer(pruned, { kind: "prune", index: tree({ "1-a": null }) }),
     ).toBe(pruned)
+  })
+})
+
+describe("branchPrefill", () => {
+  test("a branch from agent work starts with @agent; one from a conversation, empty", () => {
+    expect(branchPrefill({ kind: "lane", ...lane("2-t") })).toBe("@agent ")
+    expect(branchPrefill({ kind: "none" })).toBeUndefined()
   })
 })

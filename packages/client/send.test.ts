@@ -1,6 +1,6 @@
 import { ERR, entryId, runId } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { settleSend } from "./send.ts"
+import { sendable, settleSend } from "./send.ts"
 
 describe("settleSend", () => {
   test("a conflict and a refusal put the message back", () => {
@@ -32,5 +32,18 @@ describe("settleSend", () => {
       status: "waiting · 2nd in line",
       conflict: null,
     })
+  })
+})
+
+describe("sendable", () => {
+  test("nothing, blank text, or only the prefill sends nothing", () => {
+    for (const text of ["", "  \n ", "@agent ", "@agent", " @agent \n"])
+      expect(sendable(text, "@agent ")).toBeNull()
+    expect(sendable("  ", undefined)).toBeNull()
+  })
+  test("anything more is sent, trimmed", () => {
+    expect(sendable("@agent fix it ", "@agent ")).toBe("@agent fix it")
+    expect(sendable("just us", "@agent ")).toBe("just us")
+    expect(sendable("@agent", undefined)).toBe("@agent")
   })
 })

@@ -44,3 +44,16 @@ export function settleSend(outcome: Outcome, message: string): SendSettled {
       return { restore: null, status: "", conflict: null }
   }
 }
+
+/**
+ * What a composer sends: its text trimmed, or null for nothing to send. A
+ * text that is only its column's prefill is nothing: `@agent ` alone would ask
+ * the agent with no question.
+ */
+export function sendable(
+  text: string,
+  prefill: string | undefined,
+): string | null {
+  const message = text.trim()
+  return message === "" || message === prefill?.trim() ? null : message
+}

@@ -754,12 +754,13 @@ function App({ session }: { session: SessionClient }) {
                         column={column}
                         forks={colors.forks}
                         key={column.key}
-                        onBranch={at =>
+                        onBranch={(at, prefill) =>
                           act({
                             kind: "openFresh",
                             key: crypto.randomUUID(),
                             at,
                             after: i,
+                            ...(prefill === undefined ? {} : { prefill }),
                           })
                         }
                         onBranchInstead={(at, text) =>

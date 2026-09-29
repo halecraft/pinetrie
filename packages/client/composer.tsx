@@ -16,7 +16,7 @@ import { parseCommand } from "@pineta/marginalia"
 import { useEffect, useRef, useState } from "react"
 import { matchCommands } from "./commands.ts"
 import { Menu } from "./menu.tsx"
-import { settleSend } from "./send.ts"
+import { sendable, settleSend } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
 
 /**
@@ -62,6 +62,7 @@ export function Composer({
   commands,
   usedDirs,
   fresh,
+  initialText,
   participants,
   holderName,
   onSend,
@@ -95,6 +96,11 @@ export function Composer({
   usedDirs: readonly string[]
   /** A fresh column: its first message starts the thread (`branch`). */
   fresh: boolean
+  /**
+   * Text the box starts with, unsent: a branch's `@agent ` (`branchPrefill`).
+   * Alone, it sends nothing.
+   */
+  initialText: string | undefined
   /** Everyone who can be mentioned, as shown. */
   participants: readonly string[]
   /** Who the agent is answering, or who waits first, by name. */
@@ -122,7 +128,10 @@ export function Composer({
   onComposeTogether: ((text: string) => void) | undefined
   readOnly: ReadOnly | null
 }) {
-  const [text, setText] = useState("")
+  // A column opened to send `pending` sends it at once, so it starts empty.
+  const [text, setText] = useState(
+    pending === undefined ? (initialText ?? "") : "",
+  )
   const [status, setStatus] = useState("")
   const [conflict, setConflict] = useState<{
     text: string
@@ -205,8 +214,8 @@ export function Composer({
   }, [prefill?.key])
 
   const submit = async () => {
-    const message = text.trim()
-    if (message === "" || readOnly !== null) return
+    const message = sendable(text, initialText)
+    if (message === null || readOnly !== null) return
     setText("")
     await send(message, mode)
   }
@@ -302,6 +311,12 @@ export function Composer({
           setText(e.target.value)
           setPicked(0)
           onTyping()
+        }}
+        onFocus={e => {
+          // Focused while it holds only what it started with: type after it.
+          if (initialText === undefined || text !== initialText) return
+          const end = e.currentTarget.value.length
+          e.currentTarget.setSelectionRange(end, end)
         }}
         onKeyDown={e => {
           if (e.nativeEvent.isComposing) return

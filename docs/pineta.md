@@ -193,8 +193,9 @@ document. Nothing opens a tab by itself.
 **ADR-0021 — a thread's mode is its lane; a mention picks the addressee.** A
 thread with a lane is agent work, one without is a conversation; nothing is
 stored. Mentions pick who a message is for (naming only people leaves the
-agent out); with none, the mode fills in. Branches start as conversations, and
-branching at an agent thread's end steps back down to one; the add tab offers
+agent out); with none, the mode fills in. Branches start as conversations; one
+from agent work starts with `@agent ` typed, and deleting it at an agent
+thread's end steps back down to a conversation; the add tab offers
 agent work, or a conversation (ADR-0029). A session is its participants; threads
 are topics inside it. Amends ADR-0018 and ADR-0020.
 

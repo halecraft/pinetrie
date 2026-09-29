@@ -43,7 +43,7 @@ import {
 } from "@pineta/marginalia"
 import { readStreams, type SessionDocHandle } from "@pineta/schema"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import type { Column as ColumnSpec } from "./columns.ts"
+import { branchPrefill, type Column as ColumnSpec } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
 import { Menu } from "./menu.tsx"
 import { Message } from "./message.tsx"
@@ -92,8 +92,11 @@ export interface ColumnProps {
   work: WorkFacts
   /** The ids on this column's path, which the app has already computed. */
   path: ReadonlySet<string>
-  /** Open a fresh column to the right, forked at `at`. */
-  onBranch: (at: string) => void
+  /**
+   * Open a fresh column to the right, forked at `at`, its composer starting
+   * with `prefill`.
+   */
+  onBranch: (at: string, prefill: string | undefined) => void
   /**
    * After a conflict: a fresh column at `at`, which sends `text` there. A
    * conflict needs a reply at an entry: a `branch` never conflicts.
@@ -386,21 +389,16 @@ export function Column(p: ColumnProps) {
                     : () => void p.session.note({ kind: "open", entry: id })
                 }
                 onBranch={
-                  !writable
+                  // Below a conversation's last message, a branch would be
+                  // the same as replying. Agent work follows its lane, so
+                  // there a branch at the end is a thread of its own.
+                  !writable ||
+                  (i === view.nodes.length - 1 && lane.kind !== "lane")
                     ? undefined
-                    : i < view.nodes.length - 1
-                      ? {
-                          title: "open a branch here",
-                          go: () => p.onBranch(node.id),
-                        }
-                      : // At the end, a branch differs from replying only in agent
-                        // work: there it steps back down to a conversation.
-                        p.column.lane !== undefined
-                        ? {
-                            title: "continue as a conversation",
-                            go: () => p.onBranch(node.id),
-                          }
-                        : undefined
+                    : {
+                        title: "open a branch here",
+                        go: () => p.onBranch(node.id, branchPrefill(lane)),
+                      }
                 }
                 // A citation is written where its author reads: here.
                 onCite={
@@ -491,6 +489,7 @@ export function Column(p: ColumnProps) {
         boundLane={p.column.lane}
         fresh={fresh}
         holderName={holder}
+        initialText={p.column.fresh?.prefill}
         lane={lane}
         onBranchInstead={text => {
           if (at.kind === "entry") p.onBranchInstead(at.id, text)

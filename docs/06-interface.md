@@ -251,11 +251,14 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **`→` in a message's right margin opens a branch** as a column to its right,
   empty until something is sent there. What it opens appears to the right, so
   the button sits on that side. A branch starts as a conversation; `@agent`
-  there makes it agent work.
-- **At an agent thread's end, `→` steps back down**: a conversation continuing
-  from there, reading everything above. The agent thread's column keeps
-  following its lane. At a conversation's end `→` is hidden, since it would be
-  the same as replying.
+  there makes it agent work. **A branch from agent work starts with `@agent `
+  typed**, so going on with the agent is one Enter away; alone it sends
+  nothing, and deleting it makes the branch a conversation.
+- **At an agent thread's end, `→` opens a branch too**, the same as on any
+  other message: with `@agent ` kept, the agent's work forks there; with it
+  deleted, a conversation steps back down from the end, reading everything
+  above. The agent thread's column keeps following its lane. At a
+  conversation's end `→` is hidden, since it would be the same as replying.
 - Every one of these only opens a column. Nothing is written until the first
   send, and closing the column first leaves no trace.
 

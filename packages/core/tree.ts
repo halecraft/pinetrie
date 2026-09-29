@@ -957,7 +957,8 @@ export function planStop(
 /**
  * Whether a message with no mention asks the agent: in a thread with a lane,
  * or from a Start Agent column. A branch is a new thread, with no lane of its
- * own yet, so only a Start Agent column makes it ask (ADR-0021).
+ * own yet, so only a Start Agent column makes it ask (ADR-0021). A branch from
+ * agent work asks through the `@agent ` its composer starts with.
  */
 export const agentByDefault = (send: {
   readonly mode: ChatMode

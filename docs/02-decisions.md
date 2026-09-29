@@ -1136,8 +1136,9 @@ not show either works).
 ## ADR-0021 — A thread's mode is its lane; a mention picks the addressee
 
 **Status:** Accepted. Amends ADR-0018 and ADR-0020. Amended by ADR-0029
-(Start Chat and Start Agent become the add tab), and by ADR-0032 (a workspace
-is created with the lane, not as its own step).
+(Start Chat and Start Agent become the add tab), by ADR-0032 (a workspace
+is created with the lane, not as its own step), and in place below (a branch
+from agent work starts with `@agent ` typed).
 
 **Context.** ADR-0018 stored a default at an entry (`pineta.thread`): below a
 *working session* entry the agent answers every message, below a
@@ -1170,7 +1171,12 @@ The actions differ in cost, and in how far they can be undone:
   ADR-0018's "a mention can add an obligation but never remove one".
 - **A branch starts as a conversation.** One action on any past message opens
   an empty column to the right, forked there; nothing is written until the
-  first send, and that message decides what the thread is.
+  first send, and that message decides what the thread is. *Amended:* a
+  branch from agent work starts with `@agent ` typed in its composer, unsent
+  and deletable, since going on with the agent is the usual intent. The
+  thread is still decided by the first message, and `@agent ` alone sends
+  nothing. Nothing is a hidden default, as `asksAgent` would be: what will
+  happen is typed where it can be read and changed.
 - **At an agent thread's end, the same action steps back down.** It opens a
   conversation that continues from the end: a new thread with no lane, which
   reads everything above it. The agent thread's lane stays where it is, idle,
@@ -1178,6 +1184,9 @@ The actions differ in cost, and in how far they can be undone:
   the conversation later creates the new thread's own lane. At a
   conversation's end the action is hidden: there it would be the same as
   replying. A brief aside in agent work needs no branch: name the people.
+  *Amended:* the action at an agent thread's end is "open a branch here",
+  like on every other message, and its branch starts with `@agent ` typed.
+  Deleting `@agent` is how you step down; the rest of this still holds.
 - **At the root, two actions: Start Chat and Start Agent.** Both open an empty
   column at the root. In a Start Agent column, a message with no mention asks
   the agent, as if `@agent` had been written, and so creates the lane. That
