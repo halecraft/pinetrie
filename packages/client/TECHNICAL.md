@@ -13,9 +13,10 @@ the document's entries, and returns the same index until one changes. The
 columns, the rail and the agent's path all read that one index
 (`packages/core/tree.ts`). `App` reads it through `readSessionFacts`
 (`projection.ts`), together with the entry count, the agent's activity, the
-lanes, the outbox, the participants, the notes, the archive and the work facts,
-so they are always from the same moment; `sync` takes the index and the lanes
-together.
+streams to draw (`liveWork`, over the stream records alone), the lanes, the
+outbox, the participants, the notes, the archive and the work facts, so they
+are always from the same moment. `resolveLayout` takes the index, the lanes
+and the archive together.
 
 ## Renders (S54)
 
@@ -30,21 +31,27 @@ minutes).
   function, so an inline one reads the document again on every render,
   whatever caused it, and gives the index and everything projected from it a
   new identity (`@kyneta/react`'s identity rule). `useSelector` memoises its
-  thunk on the ref and the read, and a module-level read never changes.
+  thunk on the ref and the read, and a module-level read never changes. A
+  read that takes an id (a stream's text) is a `useCallback` on that id.
 - **`Message` is `memo(MessageView, sameMessageProps)`** (`message-props.ts`,
   pure). `MESSAGE_PROPS` says how each prop is compared, and its type refuses
-  a prop that is not in it. The node, its tools, its join, its fork tracks and
-  its closed branches are compared by value, since `projectSpine` builds new
-  nodes on every projection. The rest are compared by identity.
+  a prop that is not in it. The node, its tools, its join, its fork tracks,
+  its closed branches and its calls' streams (`callStreams`) are compared by
+  value, since `projectSpine` builds new nodes on every projection. The rest
+  are compared by identity.
+- **A message is given only its own calls' streams** (`callStreams`), never
+  `liveWork`'s map: the map is new whenever the facts are, and would redraw
+  every message.
 - **A message reports what its reader asks as a `MessageAct`**
   (`message-tools.ts`) through one `onAct`, which `Column` makes once with
   `useStable` and carries out in one `switch`. A handler per message would be
   new on every render of the column.
 - **A message with a note card still redraws with its column**: the card is a
   new element each render, compared by identity.
-- **`sync` runs on a layout change too**, not only on a new index: a column
-  opened at a lane's tip is bound at once. It returns the same state when
-  nothing moves, so it settles after one pass.
+- **A layout change is resolved in the same render,** not only a new index:
+  `resolveLayout` runs on `stored` too, so a column opened at a lane's tip
+  is drawn bound at once. It returns the same state when nothing moves, so
+  the effect that stores it settles after one pass.
 - **The browser suite counts renders** from React's development build, which
   the host's Vite serves: it measures every render whose props changed on its
   "Components ⚛" track, with the changed props' diff
@@ -71,21 +78,21 @@ give labels and each tab's signals.
   have opened, bounded by the roots you visit. Closing the tab you are on
   shows `afterClosing`'s choice: its right neighbour, else its left, else
   Archive; closing an unsent new tab does the same.
-- **`forgetArchived` takes archived roots out of `open`, except the one you are
-  on.** `App` dispatches it when the archive or the active tab changes, so an
-  archived root you are on leaves when you do. Removing it, not hiding it,
+- **`resolveLayout` takes archived roots out of `open`, except the one you are
+  on.** It runs every render, so an archived root you are on leaves when you
+  do. Removing it, not hiding it,
   means a restore opens it again only for whoever restores it.
 - **`active` is null only before the first `prune`.** A browser tab with
   nothing stored has not chosen a tab, and the document has not arrived.
   `App` draws "connecting…" meanwhile. `prune`, once after `whenSettled`,
-  drops roots the document lacks, applies `forgetArchived`'s rule, and
+  drops roots the document lacks, takes archived roots out of `open`, and
   replaces a null, gone or archived active tab with your last open tab, else
   Archive. With nothing stored, that is Archive: nothing opens a tab by
   itself. No action sets `active` back to null.
 - **A landed new tab moves left of any unsent ones**: its root joins `open` at
   the end, and new tabs are drawn after `open`.
 - **An archived active root stays active** until you switch or reload, and
-  keeps its place in the bar (`forgetArchived` keeps it). Its columns are drawn with `readOnly`: the
+  keeps its place in the bar (`resolveLayout` keeps it). Its columns are drawn with `readOnly`: the
   composer stays mounted, disabled, so what was typed survives; Restore brings
   it back in place.
 - **`columnsOf` is the one place a root gets its first column**
@@ -101,6 +108,15 @@ give labels and each tab's signals.
   `roots[rootOf(anchor)]`, keeping its key, and keeps it active.
 - **`sync` runs on every root's columns**, not only the active one's: an anchor
   left behind can later follow a newer branch below it (ADR-0027).
+- **The layout drawn is `resolveLayout(stored, facts)`, computed in render**
+  (ADR-0044): `sync`, then the archived roots leave `open`. An effect stores
+  it with `resolve`, the same function, so an action reduces from it: React
+  runs pending effects before it handles the next event. `App` draws
+  `layout`, never `stored`.
+- **No effect dispatches from document facts,** except `prune`, once at
+  settle. An effect runs a render after the facts it reads. When the layout
+  was synced that way, a slow render painted new entries under the old
+  anchor: a `⑂ 0 messages` chip and a row stuck at `…` (S35).
 - **`planOpen` is the deduplication `App` used to do**, pure: scroll to an
   entry a column of its root already shows, open a column beside the deepest
   sharer (`openBeside`), or preview an archived root in the Archive tab. The
@@ -234,7 +250,8 @@ at once both keep theirs. `subscribe` hears another tab's save through the
 as `undefined`. Both write through `writeSlot`, which drops a full quota's
 error.
 
-- **Every change is saved, `sync`'s too.** Saving only what a person does
+- **Every change is saved, the document's too:** the resolved layout, each
+  time it changes. Saving only what a person does
   would store older anchors, and `followTip` from an older anchor can land on
   a newer branch below it. So with two tabs open, the device slot holds
   whichever changed last: both move their columns as messages arrive.
@@ -471,6 +488,19 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   column follows only if it was placed at its end. Without it, a column
   aligned short of its end would jump there on its first ResizeObserver
   callback. `useReveal` dispatches it too (below).
+- **While a lane runs on its path, a following column does not get shorter**
+  (`holding`, ADR-0044). A shrink is taken up by `.column-floor`, below the
+  content: its height is what the content lost since it was last set
+  (`held`), and what grows next uses it up. The ResizeObserver callback runs
+  after layout and before paint, so the floor is painted in the frame the
+  content shrank in. The rule reads `.column-content`'s own height:
+  `scrollHeight` is at least the view's, so it cannot say how far short
+  content shrank.
+- **The floor keeps its height while released, and goes when the run ends or
+  on `PLACED`.** Turning `holding` off never scrolls: at the end, the browser's
+  clamp keeps the column there. If a run ends shorter than its floor, the
+  column moves once, then. A column that shrinks mid-run for another reason,
+  such as a column opened to its left, keeps its floor until the run ends.
 
 ## Threads, lanes and the composer (ADR-0020)
 
@@ -546,14 +576,23 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   a `<details>`, capped for display. A result is its own entry in the tree;
   `projectSpine` pairs it with its call on the same path, so it adds no column
   row and no rail row. A message that only called tools shows only its rows.
-- **Live work is one component** (`Streams` in `column.tsx`), reading
-  `readStreams` for the lanes running on the column's path: the reply as it is
-  written, and each running tool's output, following its end as a column
-  does. A reply's
-  stream closes when its message ends, which a fast model can do between two
-  renders, so a check that must see one uses a slow scripted model. A check
-  that must see a run in progress, not its reply, pauses the reply
+- **Live work hands over to its entry in one render** (ADR-0044). `App`
+  reads the stream records with the index (`readSessionFacts`), and
+  `liveWork` (`live.ts`, pure) decides what is drawn. Each reads its own text
+  (`readStreamText`), so a delta re-renders only it.
+  - A reply is drawn at the column's end (`Reply` in `column.tsx`) while it
+    is its lane's current reply (`isCurrentReply`, the host's own rule). Its
+    entry moves the lane's tip, so the entry and the stream's end are one
+    change.
+  - A tool's output is drawn in its own row (`ToolRow`), open, while the call
+    has a stream and no result. The result replaces it in the same element.
+- **A stream goes when its entry arrives,** which a fast model can do between
+  two renders, so a check that must see one uses a slow scripted model. A
+  check that must see a run in progress, not its reply, pauses the reply
   (`ScriptedModel.pause`).
+- **Live work is drawn in its committed form's box.** A streaming reply is a
+  `.msg.assistant.streaming`, and its mark and a live row's are a 2px shadow
+  in the gutter, which takes no width: text wraps as its entry will.
 - **Stop** shows in the composer while the thread's lane runs, and sends
   `stop`.
 - **Where a new thread's agent works** (ADR-0032). When a send would create a
@@ -749,6 +788,14 @@ shown by their email's part before the `@`. Each rendered chat carries its
 
 ## Gotchas
 
+- **`.column-floor` is not `.spacer`.** The spacer, inside `.column-content`,
+  lines a column up on opening; the floor, after it, holds a following
+  column's height (`useFollow`). The floor's rule measures `.column-content`,
+  spacer included.
+- **A streaming reply is a `.msg` with no `data-entry`**, as a waiting message
+  is. Anything that means "a message in the tree" looks for
+  `.msg[data-entry]`; the browser suite counts the agent's steps by
+  `.msg.assistant`, streaming or not.
 - **A column mounts at `scrollTop` 0, and stays there through layout
   effects.** `useFollow`'s first scroll to its end comes in its
   ResizeObserver callback, a step later. Anything a layout effect measures

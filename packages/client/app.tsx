@@ -78,6 +78,7 @@ import {
   type LayoutAction,
   layoutReducer,
   planOpen,
+  resolveLayout,
   tabBar,
 } from "./layout.ts"
 import { NotesIndex } from "./note.tsx"
@@ -205,6 +206,7 @@ function App({ session }: { session: SessionClient }) {
     index,
     count,
     activity,
+    live,
     lanes,
     outbox,
     participants,
@@ -234,28 +236,26 @@ function App({ session }: { session: SessionClient }) {
     )
   }
 
-  const [layout, dispatch] = useReducer(
+  const [stored, dispatch] = useReducer(
     layoutReducer,
     undefined,
     () => layoutStore.load() ?? initialLayout(),
   )
-  // After a layout change too, not only a document change: a column opened at
-  // a lane's tip is bound at once. `sync` returns the same state when nothing
-  // moves, so this settles after one pass.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a layout change is a reason to sync; the reducer reads the layout from state
-  useEffect(
-    () => dispatch({ kind: "sync", index, lanes }),
-    [index, lanes, layout],
+  // Drawn from this render's facts, never `stored`: an effect runs a render
+  // after the facts it reads, and a slow render painted new entries under an
+  // old anchor (S35). A layout change is resolved in the same render too, so
+  // a column opened at a lane's tip is bound at once. The effect below stores
+  // it, so an action reduces from it: React runs pending effects before it
+  // handles the next event.
+  const layout = useMemo(
+    () => resolveLayout(stored, { index, lanes, archive }),
+    [stored, index, lanes, archive],
   )
-  // Archived roots leave your tabs; the one you are on stays until you leave
-  // it, which is a change of the active tab.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: leaving a tab is a change of the active tab; the reducer reads it from state
-  useEffect(
-    () => dispatch({ kind: "forgetArchived", archive }),
-    [archive, layout.active],
-  )
-  // Every change is saved, `sync`'s too: restored from an older anchor,
-  // `followTip` could land on a newer branch below it.
+  useEffect(() => {
+    if (layout !== stored) dispatch({ kind: "resolve", index, lanes, archive })
+  }, [layout, stored, index, lanes, archive])
+  // Every change is saved, the document's too: restored from an older
+  // anchor, `followTip` could land on a newer branch below it.
   useEffect(() => layoutStore.save(layout), [layout])
   // Restored anchors the document lacks are dropped once, when it has
   // settled, and the tab to show is chosen then: before, missing means not
@@ -535,6 +535,7 @@ function App({ session }: { session: SessionClient }) {
   /** The props every column shares, whichever tab draws it. */
   const shared = {
     activity,
+    live,
     colorOf,
     editorsOf: here.editingAt,
     index,

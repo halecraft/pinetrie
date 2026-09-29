@@ -333,15 +333,16 @@ export async function startHost({
             access: work.access,
             hooks: work.hooks,
           },
-    // Gather the lane's streams from the document, plan, execute. The document
-    // records what each lane is running and streaming; a second copy here
-    // would be two sources of truth.
+    // Gather the lane's streams and tip from the document, plan, execute. The
+    // document records what each lane is running and streaming; a second copy
+    // here would be two sources of truth.
     onStream: event => {
       applyStreamOps(
         doc,
         planStream({
           event,
-          open: readStreams(doc),
+          streams: readStreams(doc),
+          tip: readLaneTip(doc, event.lane),
           running: readActiveRun(doc, event.lane) !== undefined,
           newId,
         }),

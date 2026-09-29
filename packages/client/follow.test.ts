@@ -1,4 +1,4 @@
-import { expect, test } from "vitest"
+import { describe, expect, test } from "vitest"
 import {
   FOLLOW_SLACK,
   type FollowState,
@@ -7,8 +7,14 @@ import {
   type Metrics,
 } from "./follow.ts"
 
-const at = (scrollTop: number, scrollHeight: number, clientHeight = 300) =>
-  ({ scrollTop, scrollHeight, clientHeight }) satisfies Metrics
+/** A scroller whose content is all of its height, and no floor, unless given. */
+const at = (
+  scrollTop: number,
+  scrollHeight: number,
+  clientHeight = 300,
+  { content = scrollHeight, floor = 0 } = {},
+) =>
+  ({ scrollTop, scrollHeight, clientHeight, content, floor }) satisfies Metrics
 
 /** Following, left at the end of 1000 px of content in a 300 px viewport. */
 const atEnd = follow(initialFollow, {
@@ -25,6 +31,8 @@ test("following, a change of size scrolls to the end, and a narrower viewport do
     unseen: false,
     lastTop: 700,
     lastHeight: 1000,
+    holding: false,
+    held: 1000,
   })
   const shorter = follow(atEnd, { kind: "resized", at: at(700, 1000, 200) })
   expect(shorter.scrollTo).toBe(800)
@@ -60,7 +68,7 @@ test("a scroll up while content shrank is still leaving", () => {
 test("released, it holds as content grows, and marks what arrived unseen", () => {
   expect(released.following).toBe(false)
   const same = follow(released, { kind: "resized", at: at(300, 1000, 250) })
-  expect(same).toEqual({ state: released, scrollTo: null })
+  expect(same).toEqual({ state: released, scrollTo: null, floor: 0 })
   const grew = follow(released, { kind: "resized", at: at(300, 1400) })
   expect(grew.scrollTo).toBeNull()
   expect(grew.state.unseen).toBe(true)
@@ -94,4 +102,90 @@ test("follow from released scrolls to the end and clears what was unseen", () =>
   )
   expect(plan.scrollTo).toBe(1100)
   expect(plan.state).toMatchObject({ following: true, unseen: false })
+})
+
+describe("the floor, while work is written at the end", () => {
+  /** Following at the end of 1000 px of content, with work running. */
+  const holding = follow(atEnd, {
+    kind: "holding",
+    value: true,
+    at: at(700, 1000),
+  }).state
+
+  test("a shrink while following sets a floor of the shrink, and the scroll stays where it was", () => {
+    const shrank = follow(holding, {
+      kind: "resized",
+      at: at(430, 730, 300, { content: 730 }),
+    })
+    expect(shrank.floor).toBe(270)
+    expect(shrank.scrollTo).toBe(700)
+  })
+
+  test("content that grows back uses the floor up", () => {
+    const shrank = follow(holding, {
+      kind: "resized",
+      at: at(430, 730, 300, { content: 730 }),
+    }).state
+    const grew = follow(shrank, {
+      kind: "resized",
+      at: at(700, 1100, 300, { content: 830, floor: 270 }),
+    })
+    expect(grew.floor).toBe(170)
+    expect(grew.scrollTo).toBe(700)
+    const past = follow(grew.state, {
+      kind: "resized",
+      at: at(700, 1200, 300, { content: 1200 - 170, floor: 170 }),
+    })
+    expect(past.floor).toBe(0)
+  })
+
+  test("short content measures by its own height, not the viewport's", () => {
+    // 600 px of content in a 500 px view shrinks to 450: scrollHeight says 500.
+    const tall = follow(
+      follow(initialFollow, { kind: "resized", at: at(0, 600, 500) }).state,
+      { kind: "holding", value: true, at: at(100, 600, 500) },
+    ).state
+    const shrank = follow(tall, {
+      kind: "resized",
+      at: at(0, 500, 500, { content: 450 }),
+    })
+    expect(shrank.floor).toBe(150)
+    // 450 + 150 in a 500 px view ends at 100. From a view that did not
+    // scroll, the height below the content is unknown, so the plan can ask for
+    // more: the browser clamps a scroll past the end to the end.
+    expect(shrank.scrollTo).toBeGreaterThanOrEqual(100)
+  })
+
+  test("the work ending releases the floor; so does a placement", () => {
+    const floored = { ...holding, held: 1000 }
+    const m = at(700, 1000, 300, { content: 730, floor: 270 })
+    expect(
+      follow(floored, { kind: "holding", value: false, at: m }).floor,
+    ).toBe(0)
+    expect(follow(floored, { kind: "placed", at: m }).floor).toBe(0)
+  })
+
+  test("released, the floor keeps its height and grows no more", () => {
+    const shrank = follow(holding, {
+      kind: "resized",
+      at: at(430, 730, 300, { content: 730 }),
+    }).state
+    const up = follow(shrank, {
+      kind: "scrolled",
+      at: at(500, 1000, 300, { content: 730, floor: 270 }),
+    }).state
+    const again = follow(up, {
+      kind: "resized",
+      at: at(500, 900, 300, { content: 630, floor: 270 }),
+    })
+    expect([again.floor, again.scrollTo]).toEqual([270, null])
+  })
+
+  test("a shrink with no work running sets no floor", () => {
+    const shrank = follow(atEnd, {
+      kind: "resized",
+      at: at(430, 730, 300, { content: 730 }),
+    })
+    expect([shrank.floor, shrank.scrollTo]).toEqual([0, 430])
+  })
 })

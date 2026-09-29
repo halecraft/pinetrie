@@ -3,6 +3,7 @@ import {
   type EntryLike,
   entryId,
   indexTree,
+  type LaneView,
   laneNameForThread,
   writerId,
 } from "@pineta/core"
@@ -16,6 +17,7 @@ import {
   type Layout,
   layoutReducer,
   planOpen,
+  resolveLayout,
   tabBar,
 } from "./layout.ts"
 
@@ -56,8 +58,13 @@ const R1: ActiveTab = { kind: "root", root: "1-r1" }
 const ARCHIVE: ActiveTab = { kind: "archive" }
 const at = (l: Layout, tab: ActiveTab = R1): Layout =>
   layoutReducer(l, { kind: "show", tab })
-const sync = (l: Layout, i = index) =>
-  layoutReducer(l, { kind: "sync", index: i, lanes: [] })
+const resolve = (
+  l: Layout,
+  i = index,
+  archive: ReadonlyMap<string, ArchiveRecord> = new Map(),
+  lanes: readonly LaneView[] = [],
+) => resolveLayout(l, { index: i, lanes, archive })
+const sync = (l: Layout, i = index) => resolve(l, i)
 const prune = (
   l: Layout,
   archive: ReadonlyMap<string, ArchiveRecord> = new Map(),
@@ -65,7 +72,7 @@ const prune = (
 ) => layoutReducer(l, { kind: "prune", index: i, archive })
 const R2: ActiveTab = { kind: "root", root: "5-r2" }
 const forget = (l: Layout, archive: ReadonlyMap<string, ArchiveRecord>) =>
-  layoutReducer(l, { kind: "forgetArchived", archive })
+  resolve(l, index, archive)
 const archived = (root: string): ArchiveRecord => ({
   root: entryId(root),
   state: "archived",
@@ -242,6 +249,52 @@ describe("layoutReducer", () => {
     // Both columns of r2 end at its newest leaf, which a reply then moves on.
     const grown = sync(l, tree({ ...parents, "8-e": "6-d" }))
     expect(columnsOf(grown, "5-r2").map(c => c.anchor)).toEqual(["8-e", "8-e"])
+  })
+
+  test("resolve is idempotent, and the stored state catches up to what it drew", () => {
+    const l = withColumn(at(initialLayout()))
+    const grown = tree({ ...parents, "8-e": "4-c" })
+    const archive = new Map([["5-r2", archived("5-r2")]])
+    const drawn = resolve(at(l, R2), grown, archive)
+    expect(resolve(drawn, grown, archive)).toBe(drawn)
+    const stored = layoutReducer(at(l, R2), {
+      kind: "resolve",
+      index: grown,
+      lanes: [],
+      archive,
+    })
+    expect(stored).toEqual(drawn)
+  })
+
+  test("a bound column's anchor moves with its lane's tip in the layout drawn", () => {
+    const L = laneNameForThread("l")
+    const lane = (tip: string): LaneView => ({
+      name: L,
+      tip,
+      running: true,
+      waiting: 0,
+      askedBy: null,
+      lastWaiting: null,
+    })
+    const bound = resolve(withColumn(at(initialLayout())), index, new Map(), [
+      lane("4-c"),
+    ])
+    expect(columnsOf(bound, "1-r1")[1]).toMatchObject({
+      anchor: "4-c",
+      lane: L,
+    })
+    const replied = tree({ ...parents, "8-e": "4-c" })
+    const next = resolve(bound, replied, new Map(), [lane("8-e")])
+    expect(columnsOf(next, "1-r1")[1]?.anchor).toBe("8-e")
+  })
+
+  test("resolve drops archived roots you are not on, and keeps the one you are", () => {
+    const l = at(at(initialLayout()), R2)
+    const archive = new Map([
+      ["1-r1", archived("1-r1")],
+      ["5-r2", archived("5-r2")],
+    ])
+    expect(resolve(l, index, archive).open).toEqual(["5-r2"])
   })
 
   test("prune with nothing stored lands on Archive: nothing opens a tab by itself", () => {

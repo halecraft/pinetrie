@@ -4,8 +4,9 @@
 // The facts the host also decides from (the tree, lanes, the outbox, rules,
 // names, references) are read by `@pineta/reads`, shared with the host, so a
 // composer cannot promise what the host will not do. This only gathers them.
-// Live replies and tool output are read with `readStreams` in
-// `@pineta/schema`.
+// Which streams are drawn is `liveWork` (`live.ts`), over the stream records
+// alone: a stream's text is read where it is drawn, so a delta does not
+// re-run this (S55).
 //
 // Pure reads: no subscription, no pi.
 
@@ -33,8 +34,9 @@ import {
   readRevisions,
   readTreeIndex,
 } from "@pineta/reads"
-import type { SessionDocHandle } from "@pineta/schema"
+import { readStreamRecords, type SessionDocHandle } from "@pineta/schema"
 import type { WorkFacts } from "./column-view.ts"
+import { type LiveWork, liveWork } from "./live.ts"
 
 /** The session's facts from one moment: the same reads the host decides from. */
 export interface SessionFacts {
@@ -42,6 +44,8 @@ export interface SessionFacts {
   /** How many entries the document holds, messages or not. */
   readonly count: number
   readonly activity: readonly AgentRun[]
+  /** The streams to draw, from the same moment as `index`. */
+  readonly live: LiveWork
   readonly lanes: readonly LaneView[]
   readonly outbox: readonly Held[]
   readonly participants: readonly string[]
@@ -52,10 +56,12 @@ export interface SessionFacts {
 
 export function readSessionFacts(doc: SessionDocHandle): SessionFacts {
   const index = readTreeIndex(doc)
+  const activity = readAgentActivity(doc, index)
   return {
     index,
     count: Object.keys(index.entries).length,
-    activity: readAgentActivity(doc, index),
+    activity,
+    live: liveWork(readStreamRecords(doc), activity),
     lanes: readLanes(doc, index),
     outbox: readOutbox(doc),
     participants: readParticipants(doc, index),

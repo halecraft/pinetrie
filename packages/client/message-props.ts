@@ -2,12 +2,21 @@
 // props draw the same: `React.memo`'s rule for `Message`, kept pure.
 
 import type { BranchSummary, SpineNode, WriterId } from "@pineta/core"
+import type { SessionDocHandle } from "@pineta/schema"
 import type { ReactNode } from "react"
 import type { LaneJoin } from "./column-view.ts"
 import type { MessageAct, MessageTools } from "./message-tools.ts"
 
 export interface MessageProps {
   node: SpineNode
+  /**
+   * The stream of each of its tool calls that is running, by call id
+   * (`liveWork`): its own calls' only, so a stream elsewhere redraws nothing
+   * here.
+   */
+  streams: Readonly<Record<string, string>>
+  /** Where a running call's output is read. */
+  doc: SessionDocHandle
   /** Current display names, by writer. */
   nameOf: ReadonlyMap<WriterId, string>
   /** Its note's card (ADR-0025), drawn below it. */
@@ -35,6 +44,8 @@ export interface MessageProps {
  */
 const MESSAGE_PROPS = {
   node: "value",
+  streams: "value",
+  doc: "identity",
   tools: "value",
   join: "value",
   forkTracks: "value",

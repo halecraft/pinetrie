@@ -386,6 +386,13 @@ the host's SQLite file, referred to by the message's markdown and its
 loopback a rebound name. Images in tool results, workspace paths, remote
 images, and pasting into notes are still to do.
 
+**Live work hands over to its entry in one render** (ADR-0044). A reply is
+its lane's current reply while the lane's tip is where it opened, and its
+entry moves the tip. A tool's output streams in its own row. The layout is
+drawn from the render's own facts. A column at its end does not get shorter
+while the agent works: a floor takes up a shrink. The browser suite checks
+this frame by frame at 20× CPU throttle.
+
 **Steps 1–5 are done** (ADR-0018). Now continue thickening (`docs/04-roadmap.md`), each step
 independently shippable:
 

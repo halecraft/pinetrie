@@ -111,10 +111,12 @@ declared in `@pineta/core`, so pi's events never leave this package. Every pi
 | pi's event | `StreamEvent` |
 |---|---|
 | `message_update` (a `text_delta`) | `text` |
-| `message_end` | `messageEnd` |
 | `tool_start` | `toolStart`, labelled `toolLabel(name, args)` here |
 | `tool_update` (the first text part of `partialResult`) | `toolOutput`, a whole snapshot |
-| `tool_end` | `toolEnd` |
+
+`message_end` and `tool_end` are not mapped. The entry pi commits after each
+is what ends its stream on screen (ADR-0044), and an end event comes before
+it (S35).
 
 The harness's tool events are `tool_start`, `tool_update` and `tool_end`. The
 `tool_execution_*` events in pi's types belong to its older agent loop, and the

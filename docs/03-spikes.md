@@ -356,6 +356,16 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S55 — The order a turn's streams and entries are written in ✅ PASS
+
+`findings/S55-live-work-handover.md`. A message's entry is written before its
+tools start, its tool results before the next reply, and a run's entries
+before `endRun`. From a reply's first text to its entry the lane's tip does
+not move, and the entry moves it. So a reply is current while its lane's tip
+is where it opened, and a client that holds the entry holds a tip that says
+so. A stopped reply's partial message is written as an entry. Produced
+ADR-0044.
+
 ### S54 — Why the page's memory grew, and what re-rendered ✅ PASS
 
 `findings/S54-render-cascade.md`. 96% of a session's heap growth (255 MB in
@@ -531,6 +541,7 @@ five or six times, and each shrink slides the whole column down. Live work
 closes before its entry arrives. The column's anchor follows the new tip one
 render later, and that render shows a `⑂ 0 messages` chip and no live panel.
 When rendering is slow, as in a long session, each of these states is painted.
+With S55, produced ADR-0044.
 
 ### S34 — Links to a thread, off loopback ✅ PASS
 

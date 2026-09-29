@@ -1,4 +1,5 @@
 import { type EntryLike, indexTree, projectColumns } from "@pineta/core"
+import { newSessionDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 import { messageTools } from "./message-tools.ts"
@@ -28,6 +29,8 @@ const props = (
   if (node === undefined) throw new Error("no node")
   return {
     node,
+    streams: {},
+    doc: DOC,
     nameOf: NAMES,
     about: undefined,
     origin: undefined,
@@ -46,6 +49,7 @@ const props = (
   }
 }
 const NAMES = new Map()
+const DOC = newSessionDoc()
 const ACT = () => {}
 
 test("props rebuilt from an unchanged message draw the same", () => {
@@ -72,4 +76,17 @@ test("a change to what a message shows, or a new handler, draws again", () => {
     ),
   ).toBe(false)
   expect(sameMessageProps(was, props("hello", { onAct: () => {} }))).toBe(false)
+  // One of its own calls starts streaming.
+  expect(sameMessageProps(was, props("hello", { streams: { c1: "s1" } }))).toBe(
+    false,
+  )
+})
+
+test("its calls' streams, rebuilt unchanged, draw the same", () => {
+  expect(
+    sameMessageProps(
+      props("hello", { streams: { c1: "s1" } }),
+      props("hello", { streams: { c1: "s1" } }),
+    ),
+  ).toBe(true)
 })

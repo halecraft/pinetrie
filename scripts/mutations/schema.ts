@@ -6,12 +6,36 @@ const file = "packages/schema/index.ts"
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "a reply stream is not closed when its message ends",
+    name: "every reply is current: a second message appends to the first",
     file: file,
-    from: '      return reply === undefined ? [] : [{ kind: "close", id: reply.id }]',
-    to: "      return reply === undefined ? [] : []",
+    from: '  s.kind === "reply" && s.under === tip',
+    to: '  s.kind === "reply"',
     command: unit,
-    expect: "closes when its message ends",
+    expect: "the next text opens a new one",
+  },
+  {
+    name: "a tool opening closes nothing",
+    file: file,
+    from: '          mine.filter(s => s.kind === "reply" && !isCurrentReply(s, tip)),',
+    to: "          [],",
+    command: unit,
+    expect: "closes the reply its entry replaced",
+  },
+  {
+    name: "a reply opening keeps its lane's tools",
+    file: file,
+    from: "        ...closeStreams(mine),",
+    to: '        ...closeStreams(mine.filter(s => s.kind === "reply")),',
+    command: unit,
+    expect: "a reply opening closes its lane's tools",
+  },
+  {
+    name: "endRun keeps the lane's streams",
+    file: file,
+    from: "    applyOps(d, closing)\n  })\n}\n\n/** A stream as stored",
+    to: "    void closing\n  })\n}\n\n/** A stream as stored",
+    command: unit,
+    expect: "endRun deletes the lane's streams",
   },
   {
     name: "tool output is written whole, not as tail edits",
@@ -24,10 +48,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "closing a stream leaves its record",
     file: file,
-    from: "          d.streams.delete(op.id)",
-    to: "          void op.id",
+    from: "        d.streams.delete(op.id)",
+    to: "        void op.id",
     command: unit,
-    expect: "closes when its message ends",
+    expect: "a tool opening closes the reply its entry replaced",
   },
   {
     name: "noteAuthors hashes the principal, not the seat",

@@ -89,14 +89,35 @@ were no users. Recorded precisely so it does not blur S17's finding that
 `streamText` (a `Schema.text()` per stream) replaced `pendingText`, which held
 one text per run. Keys are fresh uuidv7s (ADR-0016), written only by the host.
 
-- A reply stream opens on its message's first text and closes when the message
-  ends, so each assistant message is its own stream. Per run, a second message
-  would have shown the first one's committed text again.
-- A tool stream opens and closes with the tool. Its output arrives as whole
-  snapshots of a tail-kept view and is written with `tailEdit` (`@pineta/core`).
-- `planStream` is the pure decision per event; `applyStreamOps` is the one
-  writer; `readStreams` the one reader; `clearStreams` what a starting host
-  calls, since nothing streams across a process.
+- A reply stream opens on its message's first text, recording the lane's tip
+  as `under`. It is the lane's current reply while the tip is still there
+  (`isCurrentReply`). The commit that writes its entry moves the tip (S55), so
+  the next message's text opens a stream of its own, and a reader stops
+  drawing the first in the change that adds its entry (ADR-0044). Per run, one
+  stream would have shown the first message's committed text again.
+- A tool stream opens with the tool. Its output arrives as whole snapshots of
+  a tail-kept view and is written with `tailEdit` (`@pineta/core`).
+- **Nothing happens when a message or a tool ends.** A stream stays until its
+  entry is written, so a reader never sees neither. `closeStreams` is the one
+  way a stream is deleted, and each caller knows the entry is written:
+  - a reply opening closes its lane's streams: a message's tool results are
+    written before the next request (S55);
+  - a tool opening closes its lane's replies that are no longer current: a
+    message's entry is written before its tools start (S55);
+  - `endRun` closes the lane's streams with its `activeRuns` key: a run's
+    entries are written before it ends, a stopped reply's partial message
+    included (S55);
+  - `clearStreams`, at a host's start, closes every stream and every text.
+- So a lane has at most one reply stream at a time.
+- `planStream` is the pure decision per event, and `applyStreamOps` the one
+  writer (`applyOps` inside a caller's batch). `readStreamRecords` is the one
+  parser of the row, and reads no text: a `useTracked` over it does not re-run
+  on a delta (S55). `readStreams` adds each text, and `readStreamText` reads
+  one.
+- `under` is the storage shape's `""` for a tool or a tipless lane, and
+  `StreamRecord` is a union. The row is inside a `Schema.record`, so adding
+  `under` was not migratable (Gotchas). A store written before it still opened
+  (S55), since a starting host clears every stream.
 - `activeRuns` keeps one meaning: this lane is running.
 - `checkpointText` holds pi's tool-output checkpoints' text, keyed by
   `physicalKey`, written by `KynetaStorage` (`packages/pi/TECHNICAL.md`).

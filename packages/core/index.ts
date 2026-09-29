@@ -675,13 +675,12 @@ export function normalizeName(name: string): string | undefined {
 /**
  * What a running turn streams, in Pineta's own words (ADR-0003: no pi type
  * crosses). `packages/pi` maps pi's harness events onto it; `planStream` in
- * `@pineta/schema` decides what each does to the document.
+ * `@pineta/schema` decides what each does to the document. There is no end
+ * event: a stream stays until the entry that replaces it is written.
  */
 export type StreamEvent =
   /** Text the model is writing, as a delta. */
   | { readonly kind: "text"; readonly lane: string; readonly delta: string }
-  /** A message ended: its committed entry is the record from here on. */
-  | { readonly kind: "messageEnd"; readonly lane: string }
   | {
       readonly kind: "toolStart"
       readonly lane: string
@@ -696,7 +695,6 @@ export type StreamEvent =
       readonly callId: string
       readonly text: string
     }
-  | { readonly kind: "toolEnd"; readonly lane: string; readonly callId: string }
 
 // --- wire hygiene (ADR-0013) ------------------------------------------------
 

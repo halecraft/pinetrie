@@ -245,8 +245,8 @@ function invariants(section: string) {
 // ── the first turn ────────────────────────────────────────────────────────
 // Every reply stream's text at each change of the host's document, by stream:
 // each assistant message is its own stream, so growth is judged within one.
-// Sampled on the host's own changes: a reply's stream closes when its message
-// ends, which can fall between two of a client's syncs.
+// Sampled on the host's own changes, so every edit is seen, however many a
+// client's sync folds together.
 const streamSamples = new Map<string, string[]>()
 const unsample = subscribe(host.doc, () => {
   for (const s of readStreams(host.doc))
@@ -344,7 +344,8 @@ ok(
   "the message records its writer, from the transport",
 )
 
-// ADR-0014: the stream went through Schema.text(), and cleared on commit.
+// ADR-0014: the stream went through Schema.text(), and none is left once the
+// run ends.
 unsample()
 const samples = [...streamSamples.values()]
 ok(
@@ -363,7 +364,7 @@ ok(
 ok(
   readActiveRun(host.doc, trunk) === undefined &&
     readStreams(host.doc).length === 0,
-  "the run ended, and its stream closed when its message did",
+  "when the run ended, the lane had no streams",
 )
 
 // ADR-0013: seq never escapes the replica.
@@ -1041,7 +1042,10 @@ invariants("end")
       result.includes(lastLive.slice(-300)),
     `a running command's output streamed live (${toolTexts.length} updates), matching its result`,
   )
-  ok(readStreams(th.doc).length === 0, "when the tool ended, its stream closed")
+  ok(
+    readStreams(th.doc).length === 0,
+    "when the run ended, the lane had no streams",
+  )
   ok(
     readOffers(th.doc).size === 0,
     "a thread working directly has no offer: its work is already in your files",

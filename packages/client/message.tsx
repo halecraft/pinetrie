@@ -2,8 +2,10 @@
 // redraws only when `sameMessageProps` says what it shows changed, and reports
 // what the reader asks as a `MessageAct`.
 
+import { useSelector } from "@kyneta/react"
 import { entryId, type ToolCallView } from "@pineta/core"
-import { memo } from "react"
+import { readStreamText, type SessionDocHandle } from "@pineta/schema"
+import { memo, useCallback, useRef } from "react"
 import { joinWords } from "./column-view.ts"
 import { plural } from "./counts.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
@@ -12,6 +14,7 @@ import type { MessageAct, MessageTools } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
 import { nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
+import { useFollow } from "./use-follow.ts"
 
 function MessageView(p: MessageProps) {
   const { node } = p
@@ -74,7 +77,12 @@ function MessageView(p: MessageProps) {
           <MessageText images={node.images} mode="committed" text={node.text} />
         )}
         {node.toolCalls?.map(call => (
-          <ToolRow call={call} key={call.id} />
+          <ToolRow
+            call={call}
+            doc={p.doc}
+            key={call.id}
+            stream={p.streams[call.id]}
+          />
         ))}
         <Tools id={node.id} onAct={p.onAct} tools={p.tools} />
         {p.about}
@@ -179,18 +187,36 @@ const SHOWN = 20_000
  * One tool call: what it touched, whether it worked, and, folded, what it
  * returned. The result is its own entry in the tree, paired here by
  * `projectSpine`; with none yet, the call is still running or was cut off.
+ * While it runs, its output streams here, open: the result replaces it in
+ * the render that holds the result, in the same element (S35).
  */
-function ToolRow({ call }: { call: ToolCallView }) {
+function ToolRow({
+  call,
+  stream,
+  doc,
+}: {
+  call: ToolCallView
+  stream: string | undefined
+  doc: SessionDocHandle
+}) {
   const status =
     call.result === undefined ? "pending" : call.result.isError ? "error" : "ok"
   const mark = status === "pending" ? "…" : status === "error" ? "✗" : "✓"
   const text = call.result?.text ?? ""
+  // A result replaces the stream, whether or not the stream has gone yet.
+  const live = call.result === undefined ? stream : undefined
   return (
-    <details className="tool" data-status={status} data-tool={call.name}>
+    <details
+      className={live === undefined ? "tool" : "tool live"}
+      data-status={status}
+      data-tool={call.name}
+      open={live !== undefined}
+    >
       <summary>
         <span className="tool-label">{call.label}</span>{" "}
         <span className="tool-status">{mark}</span>
       </summary>
+      {live !== undefined && <LiveOutput doc={doc} id={live} />}
       {call.result !== undefined && (
         <pre className="tool-output">
           {text.length > SHOWN
@@ -199,5 +225,23 @@ function ToolRow({ call }: { call: ToolCallView }) {
         </pre>
       )}
     </details>
+  )
+}
+
+/** A running tool's output, following its end as a column does. */
+function LiveOutput({ doc, id }: { doc: SessionDocHandle; id: string }) {
+  const text = useSelector(
+    doc,
+    useCallback((d: SessionDocHandle) => readStreamText(d, id), [id]),
+  )
+  const pre = useRef<HTMLPreElement>(null)
+  const inner = useRef<HTMLElement>(null)
+  useFollow(pre, inner)
+  return (
+    <pre className="tool-output" ref={pre}>
+      <code className="tool-output-text" ref={inner}>
+        {text}
+      </code>
+    </pre>
   )
 }

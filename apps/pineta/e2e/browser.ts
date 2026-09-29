@@ -20,6 +20,7 @@ import {
   projectRail,
   ROOT,
   type ThreadName,
+  toolLabel,
   writerId,
 } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
@@ -119,6 +120,79 @@ const RAIL_MESSAGES = () =>
     (n, run) => n + Number(run.getAttribute("data-count")),
     0,
   )
+
+/** One sample of a column, as `recordFrames` takes it. */
+interface ColumnFrame {
+  /**
+   * `frame`: at an animation frame, before layout, so its DOM is what is
+   * painted but its height may not be. `resize`: in a ResizeObserver callback
+   * after `useFollow`'s, so its height is what is painted.
+   */
+  readonly at: "frame" | "resize"
+  /** The column body's scroll height. */
+  readonly height: number
+  readonly clientHeight: number
+  /** Branch chips drawn in it (`.open-branch`). */
+  readonly chips: number
+  /** The agent's messages drawn in it, a reply being written included. */
+  readonly steps: number
+  /** Its thread's lane is running: its composer offers Stop. */
+  readonly running: boolean
+  /** Each tool label drawn, as text. */
+  readonly labels: readonly string[]
+}
+
+/**
+ * Sample column `c` on every animation frame and every change of its size, in
+ * the page, until the returned function stops it and hands back what it saw:
+ * a slow render's frames are each seen, as a person sees them (S35). The
+ * column must be mounted already, so this observer runs after its own.
+ */
+async function recordFrames(
+  p: Page,
+  c: string,
+): Promise<() => Promise<readonly ColumnFrame[]>> {
+  await p.evaluate(sel => {
+    const w = window as unknown as { __frames: unknown[]; __recording: boolean }
+    w.__frames = []
+    w.__recording = true
+    const column = document.querySelector(sel)
+    const body = column?.querySelector(".column-body")
+    const sample = (at: "frame" | "resize") =>
+      w.__frames.push({
+        at,
+        height: body?.scrollHeight ?? 0,
+        clientHeight: body?.clientHeight ?? 0,
+        chips: column?.querySelectorAll(".open-branch").length ?? 0,
+        steps: column?.querySelectorAll(".msg.assistant").length ?? 0,
+        running: column?.querySelector(".stop") != null,
+        labels: [...(column?.querySelectorAll(".tool-label") ?? [])].map(
+          l => l.textContent ?? "",
+        ),
+      })
+    const tick = () => {
+      if (!w.__recording) return
+      sample("frame")
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+    const resized = new ResizeObserver(() => {
+      if (w.__recording) sample("resize")
+    })
+    const content = column?.querySelector(".column-content")
+    if (content != null) resized.observe(content)
+    if (body != null) resized.observe(body)
+  }, c)
+  return () =>
+    p.evaluate(() => {
+      const w = window as unknown as {
+        __frames: ColumnFrame[]
+        __recording: boolean
+      }
+      w.__recording = false
+      return w.__frames
+    })
+}
 
 /**
  * The component renders React recorded since the last call, and clears them.
@@ -2038,10 +2112,87 @@ try {
         )
       ok(live, "a running command's output shows live in its column")
       await toolIdle()
+      const ticked = `${col(0)} .tool[data-tool="bash"]`
       ok(
-        (await tp.locator(`${col(0)} .tool.live`).count()) === 0,
-        "when the command ends, its live row gives way to the committed one",
+        (await tp.locator(`${col(0)} .tool.live`).count()) === 0 &&
+          (await tp.locator(ticked).last().getAttribute("data-status")) ===
+            "ok" &&
+          (await tp.locator(ticked).last().getAttribute("open")) === null,
+        "when the command ends, its row stops being live, folds, and shows ✓",
       )
+
+      // ── a following column never gets shorter while its agent works (S35) ─
+      // At 20× CPU throttle every render is painted, as in a long session, so
+      // a render that disagrees with the document would be seen here.
+      {
+        const bodyOf = `${col(0)} .column-body`
+        await tp.$eval(bodyOf, b => {
+          b.scrollTop = b.scrollHeight
+        })
+        const COMMAND = "for s in a b c d e f; do echo step $s; sleep 0.1; done"
+        script.use([
+          {
+            text: "Now the tests for this, which take a moment.",
+            tool: "bash",
+            args: { command: COMMAND },
+          },
+          { text: "They passed: every step printed, and nothing failed." },
+        ])
+        const cdp = await tp.context().newCDPSession(tp)
+        const stop = await recordFrames(tp, col(0))
+        await cdp.send("Emulation.setCPUThrottlingRate", { rate: 20 })
+        await say("run the tests")
+        await toolIdle()
+        await tp.waitForSelector(`${col(0)} .stop`, {
+          state: "detached",
+          timeout: 30_000,
+        })
+        await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 })
+        const samples = await stop()
+        await cdp.detach()
+        const frames = samples.filter(f => f.at === "frame")
+        const during = frames.filter(f => f.running)
+        const painted = samples.filter(f => f.at === "resize" && f.running)
+        const shrinks = painted.flatMap((f, i) => {
+          const before = painted[i - 1]
+          return before !== undefined && f.height < before.height
+            ? [`${before.height}→${f.height}`]
+            : []
+        })
+        const drops = frames.flatMap((f, i) => {
+          const before = frames[i - 1]
+          return before !== undefined && f.steps < before.steps
+            ? [`${before.steps}→${f.steps}`]
+            : []
+        })
+        const label = toolLabel("bash", { command: COMMAND })
+        const twice = during.filter(
+          f => f.labels.filter(l => l === label).length > 1,
+        ).length
+        const seen = during.some(f => f.labels.includes(label))
+        const scrolls = during.some(f => f.height > f.clientHeight)
+        ok(
+          during.length > 10 && scrolls,
+          `the column was sampled through the run, taller than its view (${during.length} frames)`,
+        )
+        const chips = frames[0]?.chips ?? 0
+        ok(
+          frames.every(f => f.chips === chips),
+          `no branch chip is painted in the agent's column while it works (${frames.filter(f => f.chips !== chips).length} frames)`,
+        )
+        ok(
+          drops.length === 0,
+          `the agent's step is never missing from its column: the entry replaces its stream in one frame (${drops.join(" ") || "no drops"})`,
+        )
+        ok(
+          shrinks.length === 0,
+          `a column following its end never gets shorter while its agent works (${shrinks.join(" ") || "no shrinks"})`,
+        )
+        ok(
+          seen && twice === 0,
+          `a running command's label shows once, in its row (${twice} frames with two)`,
+        )
+      }
 
       script.use([
         { tool: "bash", args: { command: "sleep 5" } },
@@ -2184,7 +2335,7 @@ try {
       script.use([{ text: REPLY }])
       await say("show me markdown")
       await toolIdle()
-      const drawn = `${col(0)} .msg:has(> .text strong)`
+      const drawn = `${col(0)} .msg[data-entry]:has(> .text strong)`
       await appears(drawn)
       const replyId =
         (await tp.locator(drawn).last().getAttribute("data-entry")) ?? ""

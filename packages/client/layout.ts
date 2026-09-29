@@ -64,11 +64,6 @@ export type LayoutAction =
   | { readonly kind: "closeNewTab"; readonly key: string }
   /** Close a root's tab for you: nothing is written, and its columns are kept. */
   | { readonly kind: "closeRoot"; readonly root: string }
-  /** Archived roots leave your tabs, except the one you are on (ADR-0030). */
-  | {
-      readonly kind: "forgetArchived"
-      readonly archive: ReadonlyMap<string, ArchiveRecord>
-    }
   /** A column action on one root's columns; `sync` and `prune` are the layout's. */
   | {
       readonly kind: "columns"
@@ -77,17 +72,21 @@ export type LayoutAction =
     }
   /** A new tab's first send, as send `sendId`. */
   | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
-  | {
-      readonly kind: "sync"
-      readonly index: TreeIndex
-      readonly lanes: readonly LaneView[]
-    }
+  /** Store what `resolveLayout` draws for these facts. */
+  | ({ readonly kind: "resolve" } & LayoutFacts)
   /** Once, after the document settles: the roots it lacks go, and `active` is chosen. */
   | {
       readonly kind: "prune"
       readonly index: TreeIndex
       readonly archive: ReadonlyMap<string, ArchiveRecord>
     }
+
+/** The document facts a layout follows: one moment's, read together. */
+export interface LayoutFacts {
+  readonly index: TreeIndex
+  readonly lanes: readonly LaneView[]
+  readonly archive: ReadonlyMap<string, ArchiveRecord>
+}
 
 export const initialLayout = (): Layout => ({
   active: null,
@@ -199,10 +198,6 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
           : state.active,
       }
     }
-    case "forgetArchived": {
-      const open = withoutArchived(state.open, action.archive, state.active)
-      return open === state.open ? state : { ...state, open }
-    }
     case "columns": {
       const before = columnsOf(state, action.root)
       const after = columnsReducer(before, action.action)
@@ -217,11 +212,23 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
           c.key === action.key ? (columnsReducer([c], action)[0] ?? c) : c,
         ),
       }
-    case "sync":
-      return syncLayout(state, action.index, action.lanes)
+    case "resolve":
+      return resolveLayout(state, action)
     case "prune":
       return pruneLayout(state, action.index, action.archive)
   }
+}
+
+/**
+ * The layout to draw: `stored` brought up to `facts`. `App` draws this in the
+ * render that reads the facts, and stores it after, so no render pairs new
+ * entries with an old anchor (S35). Archived roots leave your tabs, except
+ * the one you are on (ADR-0030). Returns `stored` itself when nothing changes.
+ */
+export function resolveLayout(stored: Layout, facts: LayoutFacts): Layout {
+  const synced = syncLayout(stored, facts.index, facts.lanes)
+  const open = withoutArchived(synced.open, facts.archive, synced.active)
+  return open === synced.open ? synced : { ...synced, open }
 }
 
 /**
@@ -303,7 +310,7 @@ function pruneLayout(
 
 /**
  * Archive, your open roots in the order you opened them, then new tabs. An
- * archived root you are on is still in `open` (`forgetArchived` keeps it), so
+ * archived root you are on is still in `open` (`resolveLayout` keeps it), so
  * it keeps its place.
  */
 export function tabBar(layout: Layout): readonly ActiveTab[] {

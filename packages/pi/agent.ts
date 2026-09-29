@@ -486,6 +486,8 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   // concurrent threads' streams stay apart. pi's events become `StreamEvent`s
   // here; nothing else of them leaves this module. The harness's tool events
   // are `tool_*`: the `tool_execution_*` in pi's types are its older loop's.
+  // `message_end` and `tool_end` are not mapped: the entry pi commits after
+  // each is what ends its stream on screen (`planStream`).
   const emit = (event: StreamEvent) => options.onStream?.(event)
   const offs = [
     harness.events.on("message_update", event => {
@@ -494,9 +496,6 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       const delta = typeof inner.delta === "string" ? inner.delta : ""
       if (delta.length > 0) emit({ kind: "text", lane: event.lane, delta })
     }),
-    harness.events.on("message_end", event =>
-      emit({ kind: "messageEnd", lane: event.lane }),
-    ),
     harness.events.on("tool_start", event =>
       emit({
         kind: "toolStart",
@@ -512,9 +511,6 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         callId: event.toolCallId,
         text: firstText(event.partialResult),
       }),
-    ),
-    harness.events.on("tool_end", event =>
-      emit({ kind: "toolEnd", lane: event.lane, callId: event.toolCallId }),
     ),
   ]
 

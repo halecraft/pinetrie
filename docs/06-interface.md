@@ -298,8 +298,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   entry in the tree, but it belongs to its call, so it adds no message and no
   row on the rail.
 - **While the agent works, its column shows it live**: the reply as it is
-  written, and each running command's output, following its end as a column
-  does.
+  written, and each running command's output in its own row, open, following
+  its end as a column does. Each becomes the committed message or result in
+  place, and a column at its end does not get shorter while the agent works
+  (ADR-0044).
   **Stop** ends the turn; messages waiting are then taken.
 - **Pasting an image into a composer puts it in the message** (ADR-0042).
   It is uploaded as it is pasted, and its markdown, `![name](/blob/…)`, goes

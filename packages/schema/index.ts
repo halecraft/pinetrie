@@ -56,7 +56,7 @@ const StoredEntryRowSchema = Schema.struct.json({
  *
  * `streams` and `streamText` are what a running turn is writing right now: a
  * reply, or a tool's output, one `Schema.text()` per stream, written as edits
- * and deleted when it ends (ADR-0014). NOT `Schema.string()`: a whole-value
+ * and deleted once its entry is written (ADR-0014, `planStream`). NOT `Schema.string()`: a whole-value
  * register is O(n^2) on every substrate, and stores every snapshot (S22).
  * `checkpointText` holds pi's tool-output checkpoints, written the same way by
  * `KynetaStorage`.
@@ -67,14 +67,17 @@ export const SessionDoc = json.bind(
     usageRows: Schema.record(Schema.any()),
     values: Schema.record(Schema.any()),
     lists: Schema.record(Schema.list(Schema.any())),
-    // One per open stream, keyed by a fresh uuidv7 (ADR-0016): which lane,
-    // a reply or a tool, and the tool's call and label.
+    // One per stream, keyed by a fresh uuidv7 (ADR-0016): which lane, a
+    // reply or a tool, the tool's call and label, and the lane's tip when a
+    // reply opened ("" for a tool, or a lane with none). `StreamRecord` is
+    // the typed read.
     streams: Schema.record(
       Schema.struct.json({
         lane: Schema.string(),
         kind: Schema.string("reply", "tool"),
         callId: Schema.string(),
         label: Schema.string(),
+        under: Schema.string(),
       }),
     ),
     streamText: Schema.record(Schema.text()),
@@ -98,7 +101,7 @@ export const newSessionDoc = () => createDoc(SessionDoc)
  */
 export type SessionDocHandle = ReturnType<typeof newSessionDoc>
 
-// --- runs and streams (ADR-0014, S22) -------------------------------------
+// --- runs and streams (ADR-0014, S22, S55) --------------------------------
 
 /** Mark a lane as running `runId`. Its streams open as it writes. */
 export function beginRun(
@@ -119,38 +122,55 @@ export function readActiveRun(
 
 /**
  * The run ended. The lane's key is DELETED, not set to "": absence is what
- * "idle" means. Its streams were closed as their messages and tools ended.
+ * "idle" means. Its streams go in the same batch: every entry of the run is
+ * already written (S55), and a stopped run's may never come.
  */
 export function endRun(
   doc: SessionDocHandle,
   lane: string,
   runId: string,
 ): void {
+  const closing = closeStreams(
+    readStreamRecords(doc).filter(s => s.lane === lane),
+  )
   batch(doc, d => {
-    if (d.activeRuns.get(lane) === runId) d.activeRuns.delete(lane)
+    if (d.activeRuns.get(lane) !== runId) return
+    d.activeRuns.delete(lane)
+    applyOps(d, closing)
   })
 }
 
-/** An open stream, with what it has written so far. */
-export interface OpenStream {
-  readonly id: string
-  readonly lane: string
-  readonly kind: "reply" | "tool"
-  /** A tool stream's call; "" for a reply. */
-  readonly callId: string
-  readonly label: string
-  readonly text: string
-}
-
-export type StreamOp =
+/** A stream as stored, without its text. */
+export type StreamRecord =
   | {
-      readonly kind: "open"
       readonly id: string
       readonly lane: string
-      readonly stream: "reply" | "tool"
+      readonly kind: "reply"
+      /** The lane's tip when the reply opened. */
+      readonly under: string | null
+    }
+  | {
+      readonly id: string
+      readonly lane: string
+      readonly kind: "tool"
       readonly callId: string
       readonly label: string
     }
+
+/** A stream, with what it has written so far. */
+export type Stream = StreamRecord & { readonly text: string }
+
+/**
+ * Whether `s` is its lane's reply being written now: the lane's tip has not
+ * moved since it opened. The reply's own entry moves the tip, in the commit
+ * that writes it (S35), so the entry and the end of this are one change. The
+ * host appends to this reply, and the reader draws it.
+ */
+export const isCurrentReply = (s: StreamRecord, tip: string | null): boolean =>
+  s.kind === "reply" && s.under === tip
+
+export type StreamOp =
+  | { readonly kind: "open"; readonly stream: StreamRecord }
   | {
       readonly kind: "edit"
       readonly id: string
@@ -158,49 +178,54 @@ export type StreamOp =
     }
   | { readonly kind: "close"; readonly id: string }
 
+/** Close each stream given: the one way a stream is deleted. */
+export const closeStreams = (
+  streams: readonly { readonly id: string }[],
+): StreamOp[] => streams.map(s => ({ kind: "close", id: s.id }))
+
 /**
  * What one stream event does to the document. Pure.
  *
- * A reply stream opens on its message's first text and closes when the message
- * ends, so each assistant message is its own stream and a run never shows a
- * committed message's text again. A tool stream opens when the tool starts;
- * its output arrives as whole snapshots of a view that keeps only the tail,
- * written as `tailEdit`s. An event for a lane that is not running changes
- * nothing.
+ * A reply stream opens on its message's first text, `under` the lane's tip,
+ * and takes the message's text while it is current (`isCurrentReply`). Nothing
+ * happens when a message or a tool ends: a stream stays until its entry is
+ * written, so a reader never sees neither. Streams go when they can no longer
+ * be drawn: a new reply closes its lane's streams, whose entries are written
+ * before its request (S55); a tool closes its lane's replies that are no longer
+ * current. A tool's output arrives as whole snapshots of a view that keeps only
+ * the tail, written as `tailEdit`s. An event for a lane that is not running
+ * changes nothing.
  */
 export function planStream(input: {
   readonly event: StreamEvent
-  /** The lane's open streams. */
-  readonly open: readonly OpenStream[]
+  /** Every stream, with its text. */
+  readonly streams: readonly Stream[]
+  /** The event's lane's tip. */
+  readonly tip: string | null
   readonly running: boolean
   readonly newId: () => string
 }): readonly StreamOp[] {
-  const { event, running } = input
+  const { event, tip, running } = input
   if (!running) return []
-  const open = input.open.filter(s => s.lane === event.lane)
-  const reply = open.find(s => s.kind === "reply")
+  const mine = input.streams.filter(s => s.lane === event.lane)
   switch (event.kind) {
     case "text": {
       if (event.delta.length === 0) return []
-      if (reply !== undefined) {
-        const at = reply.text.length
+      const reply = mine.find(s => isCurrentReply(s, tip))
+      if (reply !== undefined)
         return [
           {
             kind: "edit",
             id: reply.id,
-            edits: [{ at, remove: 0, insert: event.delta }],
+            edits: [{ at: reply.text.length, remove: 0, insert: event.delta }],
           },
         ]
-      }
       const id = input.newId()
       return [
+        ...closeStreams(mine),
         {
           kind: "open",
-          id,
-          lane: event.lane,
-          stream: "reply",
-          callId: "",
-          label: "",
+          stream: { id, lane: event.lane, kind: "reply", under: tip },
         },
         {
           kind: "edit",
@@ -209,32 +234,29 @@ export function planStream(input: {
         },
       ]
     }
-    case "messageEnd":
-      return reply === undefined ? [] : [{ kind: "close", id: reply.id }]
     case "toolStart":
       return [
+        ...closeStreams(
+          mine.filter(s => s.kind === "reply" && !isCurrentReply(s, tip)),
+        ),
         {
           kind: "open",
-          id: input.newId(),
-          lane: event.lane,
-          stream: "tool",
-          callId: event.callId,
-          label: event.label,
+          stream: {
+            id: input.newId(),
+            lane: event.lane,
+            kind: "tool",
+            callId: event.callId,
+            label: event.label,
+          },
         },
       ]
     case "toolOutput": {
-      const tool = open.find(
+      const tool = mine.find(
         s => s.kind === "tool" && s.callId === event.callId,
       )
       if (tool === undefined) return []
       const edits = tailEdit(tool.text, event.text)
       return edits.length === 0 ? [] : [{ kind: "edit", id: tool.id, edits }]
-    }
-    case "toolEnd": {
-      const tool = open.find(
-        s => s.kind === "tool" && s.callId === event.callId,
-      )
-      return tool === undefined ? [] : [{ kind: "close", id: tool.id }]
     }
   }
 }
@@ -253,63 +275,83 @@ export function applyTextEdits(
   }
 }
 
+/** Apply `ops` inside a batch the caller has opened. */
+function applyOps(d: SessionDocHandle, ops: readonly StreamOp[]): void {
+  for (const op of ops) {
+    switch (op.kind) {
+      case "open": {
+        const s = op.stream
+        d.streams.set(s.id, {
+          lane: s.lane,
+          kind: s.kind,
+          callId: s.kind === "tool" ? s.callId : "",
+          label: s.kind === "tool" ? s.label : "",
+          under: s.kind === "reply" ? (s.under ?? "") : "",
+        })
+        d.streamText.set(s.id, "")
+        break
+      }
+      case "edit": {
+        const ref = d.streamText.at(op.id)
+        if (ref !== undefined) applyTextEdits(ref, op.edits)
+        break
+      }
+      case "close":
+        d.streams.delete(op.id)
+        d.streamText.delete(op.id)
+        break
+    }
+  }
+}
+
 /** The one place stream records and their text are written. */
 export function applyStreamOps(
   doc: SessionDocHandle,
   ops: readonly StreamOp[],
 ): void {
   if (ops.length === 0) return
-  batch(doc, d => {
-    for (const op of ops) {
-      switch (op.kind) {
-        case "open":
-          d.streams.set(op.id, {
-            lane: op.lane,
-            kind: op.stream,
-            callId: op.callId,
-            label: op.label,
-          })
-          d.streamText.set(op.id, "")
-          break
-        case "edit": {
-          const ref = d.streamText.at(op.id)
-          if (ref !== undefined) applyTextEdits(ref, op.edits)
-          break
-        }
-        case "close":
-          d.streams.delete(op.id)
-          d.streamText.delete(op.id)
-          break
-      }
-    }
-  })
+  batch(doc, d => applyOps(d, ops))
 }
 
-/** Every open stream with its text, oldest first (ids are uuidv7). */
-export function readStreams(doc: SessionDocHandle): readonly OpenStream[] {
+/** Every stream's record, in id order, without reading any text. */
+export function readStreamRecords(
+  doc: SessionDocHandle,
+): readonly StreamRecord[] {
   return Object.entries(doc.streams())
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([id, s]) => ({
-      id,
-      lane: s.lane,
-      kind: s.kind === "tool" ? "tool" : "reply",
-      callId: s.callId,
-      label: s.label,
-      text: doc.streamText.at(id)?.() ?? "",
-    }))
+    .map(
+      ([id, s]): StreamRecord =>
+        s.kind === "tool"
+          ? { id, lane: s.lane, kind: "tool", callId: s.callId, label: s.label }
+          : { id, lane: s.lane, kind: "reply", under: s.under || null },
+    )
+}
+
+/** What a stream has written so far; "" once it is gone. */
+export const readStreamText = (doc: SessionDocHandle, id: string): string =>
+  doc.streamText.at(id)?.() ?? ""
+
+/** Every stream, with its text. */
+export function readStreams(doc: SessionDocHandle): readonly Stream[] {
+  return readStreamRecords(doc).map(s => ({
+    ...s,
+    text: readStreamText(doc, s.id),
+  }))
 }
 
 /**
- * Nothing streams across a process: delete every stream and every running
- * lane's key. A starting host calls this before it drains any lane.
+ * Nothing streams across a process: delete every stream, every text (one
+ * whose record is gone included), and every running lane's key. A starting
+ * host calls this before it drains any lane.
  */
 export function clearStreams(doc: SessionDocHandle): void {
+  const ids = new Set([
+    ...Object.keys(doc.streams()),
+    ...Object.keys(doc.streamText()),
+  ])
+  const closing = closeStreams([...ids].map(id => ({ id })))
   batch(doc, d => {
-    for (const id of Object.keys(d.streams())) {
-      d.streams.delete(id)
-      d.streamText.delete(id)
-    }
-    for (const id of Object.keys(d.streamText())) d.streamText.delete(id)
+    applyOps(d, closing)
     for (const lane of Object.keys(d.activeRuns())) d.activeRuns.delete(lane)
   })
 }

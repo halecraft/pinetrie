@@ -2,45 +2,130 @@ import type { StreamEvent } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   applyStreamOps,
+  beginRun,
   clearStreams,
+  endRun,
   newSessionDoc,
-  type OpenStream,
   planStream,
   readStreams,
+  type Stream,
 } from "./index.ts"
 
 const L = "t-lane"
+const M = "t-other"
 let n = 0
 const newId = () => {
   n += 1
   return `s-${n.toString().padStart(3, "0")}`
 }
 
-/** Run events through plan → apply on a real document, as the host does. */
-function drive(events: readonly StreamEvent[], running = true) {
-  const doc = newSessionDoc()
-  const seen: OpenStream[][] = []
-  for (const event of events) {
-    const ops = planStream({ event, open: readStreams(doc), running, newId })
-    applyStreamOps(doc, ops)
-    seen.push([...readStreams(doc)])
+/** An entry written on `lane`: its tip moves, as pi's commit moves it. */
+interface Commit {
+  readonly commit: string
+  readonly lane?: string
+}
+
+/**
+ * Run events through gather → plan → apply on a real document, as the host
+ * does. A `Commit` step moves a lane's tip, standing for the entry pi writes.
+ */
+function drive(
+  steps: readonly (StreamEvent | Commit)[],
+  running = true,
+  doc = newSessionDoc(),
+) {
+  const tips = new Map<string, string | null>([
+    [L, "p"],
+    [M, "q"],
+  ])
+  const seen: (readonly Stream[])[] = []
+  for (const step of steps) {
+    if ("commit" in step) tips.set(step.lane ?? L, step.commit)
+    else
+      applyStreamOps(
+        doc,
+        planStream({
+          event: step,
+          streams: readStreams(doc),
+          tip: tips.get(step.lane) ?? null,
+          running,
+          newId,
+        }),
+      )
+    seen.push(readStreams(doc))
   }
   return { doc, seen }
 }
 
+const replies = (s: readonly Stream[] | undefined) =>
+  (s ?? []).filter(x => x.kind === "reply")
+
 describe("planStream: replies and tools are streams of edits", () => {
-  test("a reply opens on its first text, appends, and closes when its message ends", () => {
+  test("a reply opens under the lane's tip on its first text, and appends while the tip stays", () => {
     const { seen } = drive([
       { kind: "text", lane: L, delta: "Hel" },
       { kind: "text", lane: L, delta: "lo" },
-      { kind: "messageEnd", lane: L },
+    ])
+    expect(seen[1]).toMatchObject([
+      { kind: "reply", under: "p", text: "Hello" },
+    ])
+  })
+
+  test("a message's end changes nothing: its reply stays until its entry moves the tip, and the next text opens a new one", () => {
+    const { seen } = drive([
+      { kind: "text", lane: L, delta: "First." },
+      { commit: "a1" },
       { kind: "text", lane: L, delta: "Next." },
     ])
-    expect(seen[1]?.map(s => [s.kind, s.text])).toEqual([["reply", "Hello"]])
-    expect(seen[2]).toEqual([])
+    // Its entry is written: the reply is still stored, and no longer current.
+    expect(seen[1]?.map(s => s.text)).toEqual(["First."])
     // The next message is its own stream: nothing of the first is shown again.
-    expect(seen[3]?.map(s => s.text)).toEqual(["Next."])
-    expect(seen[3]?.[0]?.id).not.toBe(seen[1]?.[0]?.id)
+    expect(seen[2]).toMatchObject([{ under: "a1", text: "Next." }])
+    expect(seen[2]?.[0]?.id).not.toBe(seen[0]?.[0]?.id)
+  })
+
+  test("a tool opening closes the reply its entry replaced, and keeps a current one", () => {
+    const replaced = drive([
+      { kind: "text", lane: L, delta: "Let me run it." },
+      { commit: "a1" },
+      { kind: "toolStart", lane: L, callId: "c1", label: "bash x" },
+    ]).seen[2]
+    expect(replaced?.map(s => s.kind)).toEqual(["tool"])
+    const current = drive([
+      { kind: "text", lane: L, delta: "still going" },
+      { kind: "toolStart", lane: L, callId: "c1", label: "bash x" },
+    ]).seen[1]
+    expect(current?.map(s => s.kind)).toEqual(["reply", "tool"])
+  })
+
+  test("a reply opening closes its lane's tools, whose results are written, and no other lane's", () => {
+    const { seen } = drive([
+      { kind: "toolStart", lane: M, callId: "m1", label: "read m" },
+      { kind: "toolStart", lane: L, callId: "c1", label: "bash a" },
+      { kind: "toolStart", lane: L, callId: "c2", label: "bash b" },
+      { commit: "r2" },
+      { kind: "text", lane: L, delta: "Both ran." },
+    ])
+    expect(seen[2]?.map(s => s.kind)).toEqual(["tool", "tool", "tool"])
+    expect(seen[4]?.map(s => [s.lane, s.kind])).toEqual([
+      [M, "tool"],
+      [L, "reply"],
+    ])
+  })
+
+  test("a lane has at most one reply at every step of a turn", () => {
+    const { seen } = drive([
+      { kind: "text", lane: L, delta: "Now the tests." },
+      { commit: "a1" },
+      { kind: "toolStart", lane: L, callId: "c1", label: "bash t" },
+      { kind: "toolOutput", lane: L, callId: "c1", text: "ok\n" },
+      { commit: "r1" },
+      { kind: "text", lane: L, delta: "And " },
+      { kind: "text", lane: L, delta: "done." },
+      { commit: "a2" },
+      { kind: "text", lane: L, delta: "Also this." },
+    ])
+    for (const s of seen) expect(replies(s).length).toBeLessThanOrEqual(1)
   })
 
   test("a tool's snapshots become edits; past the view's limit, a front cut and an append", () => {
@@ -53,36 +138,31 @@ describe("planStream: replies and tools are streams of edits", () => {
       { kind: "toolStart", lane: L, callId: "c1", label: "bash pnpm test" },
       { kind: "toolOutput", lane: L, callId: "c1", text: view(1, 5) },
       { kind: "toolOutput", lane: L, callId: "c1", text: view(3, 9) },
-      { kind: "toolEnd", lane: L, callId: "c1" },
     ])
     expect(seen[2]?.[0]).toMatchObject({
       kind: "tool",
       label: "bash pnpm test",
       text: view(3, 9),
     })
-    expect(seen[3]).toEqual([])
-    const doc = newSessionDoc()
-    applyStreamOps(
-      doc,
-      planStream({
-        event: { kind: "toolStart", lane: L, callId: "c", label: "x" },
-        open: [],
-        running: true,
-        newId,
-      }),
-    )
-    const open = readStreams(doc)
-    const withText = open.map(s => ({ ...s, text: view(1, 5) }))
+    const tool: Stream = {
+      id: "t",
+      lane: L,
+      kind: "tool",
+      callId: "c",
+      label: "x",
+      text: view(1, 5),
+    }
     const ops = planStream({
       event: { kind: "toolOutput", lane: L, callId: "c", text: view(3, 9) },
-      open: withText,
+      streams: [tool],
+      tip: "p",
       running: true,
       newId,
     })
     expect(ops).toEqual([
       {
         kind: "edit",
-        id: open[0]?.id,
+        id: "t",
         edits: [
           { at: 0, remove: view(1, 2).length, insert: "" },
           { at: view(3, 5).length, remove: 0, insert: view(6, 9) },
@@ -96,14 +176,43 @@ describe("planStream: replies and tools are streams of edits", () => {
       drive([{ kind: "text", lane: L, delta: "late" }], false).seen[0],
     ).toEqual([])
   })
+})
 
-  test("clearStreams leaves no stream and no running lane", () => {
+describe("the end of a run", () => {
+  test("endRun deletes the lane's streams with its key, and leaves other lanes' alone", () => {
+    const doc = newSessionDoc()
+    beginRun(doc, L, "r-1")
+    beginRun(doc, M, "r-2")
+    drive(
+      [
+        { kind: "text", lane: L, delta: "half" },
+        { kind: "toolStart", lane: M, callId: "m", label: "read m" },
+      ],
+      true,
+      doc,
+    )
+    endRun(doc, L, "r-other")
+    expect(readStreams(doc).length).toBe(2)
+    endRun(doc, L, "r-1")
+    expect([
+      readStreams(doc).map(s => s.lane),
+      Object.keys(doc.activeRuns()),
+    ]).toEqual([[M], [M]])
+  })
+
+  test("clearStreams leaves no stream, no text and no running lane", () => {
     const { doc } = drive([
       { kind: "text", lane: L, delta: "half" },
       { kind: "toolStart", lane: L, callId: "c", label: "read a" },
     ])
     doc.activeRuns.set(L, "r-1")
+    // A text whose record is gone.
+    doc.streamText.set("orphan", "left over")
     clearStreams(doc)
-    expect([readStreams(doc), Object.keys(doc.activeRuns())]).toEqual([[], []])
+    expect([
+      readStreams(doc),
+      Object.keys(doc.streamText()),
+      Object.keys(doc.activeRuns()),
+    ]).toEqual([[], [], []])
   })
 })

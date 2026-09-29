@@ -26,8 +26,18 @@ import {
   type MessageNotes,
   type OfferButton,
 } from "@pineta/marginalia"
-import { readStreams, type SessionDocHandle } from "@pineta/schema"
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import {
+  readStreamText,
+  type SessionDocHandle,
+  type StreamRecord,
+} from "@pineta/schema"
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
 import {
   AGENT_MARK,
   columnView,
@@ -38,6 +48,7 @@ import {
 } from "./column-view.ts"
 import type { Column as ColumnSpec, Prefill } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
+import { callStreams, type LiveWork } from "./live.ts"
 import { Menu } from "./menu.tsx"
 import { Message } from "./message.tsx"
 import { MessageText } from "./message-text.tsx"
@@ -85,6 +96,8 @@ export interface ColumnProps {
   editorsOf: (note: string) => readonly WriterId[]
   /** Every lane the agent is replying on. Several threads can run at once. */
   activity: readonly AgentRun[]
+  /** The streams to draw, from the same moment as `index` (`liveWork`). */
+  live: LiveWork
   lanes: readonly LaneView[]
   outbox: readonly Held[]
   /** Where lanes work, the files at each entry, and landings (ADR-0032). */
@@ -128,7 +141,7 @@ export function Column(p: ColumnProps) {
   const body = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
   const spacer = useRef<HTMLDivElement>(null)
-  const end = useFollow(body, content)
+  const floor = useRef<HTMLDivElement>(null)
 
   // A move from the grip's keys brings the column into view: End can put it
   // past the strip's edge. Its grip keeps focus through React's move.
@@ -166,6 +179,11 @@ export function Column(p: ColumnProps) {
   const streamingLanes = p.activity
     .filter(r => p.path.has(r.tip))
     .map(r => r.lane)
+  // While they do, the column does not get shorter at its end (S35).
+  const end = useFollow(body, content, {
+    floor,
+    holding: streamingLanes.length > 0,
+  })
   // This thread's lane, as the host will find it: busy means a compelled
   // message waits.
   const thread = threadOf(p.index, p.lanes, {
@@ -345,6 +363,8 @@ export function Column(p: ColumnProps) {
             const drawn = p.notesOf.get(node.id)
             return (
               <Message
+                doc={p.session.doc}
+                streams={callStreams(node.toolCalls, p.live.tools)}
                 closedBranches={node.branches.filter(
                   b => !p.shown.has(b.rootId),
                 )}
@@ -366,9 +386,14 @@ export function Column(p: ColumnProps) {
               />
             )
           })}
-          {streamingLanes.length > 0 && (
-            <Streams doc={p.session.doc} lanes={streamingLanes} />
-          )}
+          {streamingLanes.map(l => {
+            const reply = p.live.replies.get(l)
+            return (
+              reply !== undefined && (
+                <Reply doc={p.session.doc} key={reply.id} stream={reply} />
+              )
+            )
+          })}
           {/* Messages waiting for this thread's lane, in the order they will
             be taken. They are not in the tree yet. */}
           {waiting.map((h, n) => (
@@ -400,6 +425,9 @@ export function Column(p: ColumnProps) {
             </div>
           ))}
         </div>
+        {/* What the content shrank by while the agent works (`useFollow`).
+          Not the spacer above: that one lines the column up on opening. */}
+        <div className="column-floor" ref={floor} />
         {end.unseen && (
           <div className="jump-slot">
             <button className="jump-latest" onClick={end.follow} type="button">
@@ -482,49 +510,29 @@ export function Column(p: ColumnProps) {
 }
 
 /**
- * What the lanes on this path are writing now: the agent's reply, and each
- * running tool's output. Its own component, reading the streams on its own, so
- * a delta re-renders only this, not the column above it.
+ * The agent's reply as it is written, in a committed reply's markup, so it
+ * wraps the same when its entry replaces it. It reads its own text, so a delta
+ * re-renders only this, not the column above it.
  */
-function Streams({
+function Reply({
   doc,
-  lanes,
+  stream,
 }: {
   doc: SessionDocHandle
-  lanes: readonly string[]
+  stream: StreamRecord
 }) {
-  const open = useSelector(doc, readStreams).filter(s => lanes.includes(s.lane))
-  return (
-    <>
-      {open.map(s =>
-        s.kind === "reply" ? (
-          <div className="streaming" key={s.id}>
-            <span className="role">agent</span>
-            <MessageText mode="streaming" text={s.text} />
-          </div>
-        ) : (
-          <div className="tool live" data-stream={s.id} key={s.id}>
-            <span className="tool-label">{s.label}</span>{" "}
-            <span className="tool-status">…</span>
-            <LiveOutput text={s.text} />
-          </div>
-        ),
-      )}
-    </>
+  const text = useSelector(
+    doc,
+    useCallback(
+      (d: SessionDocHandle) => readStreamText(d, stream.id),
+      [stream.id],
+    ),
   )
-}
-
-/** A running tool's output, following its end as a column does. */
-function LiveOutput({ text }: { text: string }) {
-  const pre = useRef<HTMLPreElement>(null)
-  const inner = useRef<HTMLElement>(null)
-  useFollow(pre, inner)
   return (
-    <pre className="tool-output" ref={pre}>
-      <code className="tool-output-text" ref={inner}>
-        {text}
-      </code>
-    </pre>
+    <div className="msg assistant streaming" data-stream={stream.id}>
+      <span className="role">agent</span>
+      <MessageText mode="streaming" text={text} />
+    </div>
   )
 }
 
