@@ -117,6 +117,7 @@ packages/pi/           @pineta/pi           THE pi boundary
 packages/protocol/     @pineta/protocol     the wire contract and its codec
 packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: references, chat, notes, outbox
 packages/reads/        @pineta/reads        document reads shared by host and client
+packages/lanes/        @pineta/lanes        lane containers, disks, and jj/git (ADR-0032–0034, 0038)
 packages/client/       @pineta/client       browser UI; owns its Vite build
 (root)                                      development tooling only
 ```
