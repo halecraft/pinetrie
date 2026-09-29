@@ -1,0 +1,38 @@
+# Architecture
+
+Pineta is a coding agent whose conversation is a tree. People branch from any
+message, work in the same tree together, and take the agent's file changes
+when they are ready. The detail is in `docs/01-architecture.md` and the ADRs
+in `docs/02-decisions.md`.
+
+```
+browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
+   ▲                                  │
+   └──── session document ◀───────────┤ (pi's Storage, over Kyneta)
+                                      │
+                                      └──▶ lanes: a container, disk and jj repo each
+```
+
+- **The host** runs the one pi harness and is the only writer of the session
+  document. Clients read the document and send commands.
+- **A command** is decoded, planned by a pure function into a decision, and
+  executed in one serial step.
+- **The tree** is entries linked by `parentId`. A branch is a new entry with an
+  earlier parent. What the model sees is the path to a tip.
+- **A lane** is a thread's line of agent work: a Linux container on its own
+  disk, where pi's tools run. A branch clones its parent's disk. A lane's work
+  reaches your repo as an offer, a single commit you can review first.
+
+## Packages
+
+| package | role |
+|---|---|
+| `core` | pure types and decisions; depends on nothing |
+| `schema` | the document's shape |
+| `pi` | the only package that imports pi |
+| `protocol` | the wire contract |
+| `marginalia` | chat, notes and offers, and the plans over them |
+| `reads` | document reads shared by host and client |
+| `lanes` | containers, disks, jj and git |
+| `client` | the browser UI |
+| `apps/pineta` | the host |
