@@ -471,6 +471,8 @@ export interface OfferRecord {
     readonly wrote: readonly CommitId[]
     /** The lane commit it was built from. */
     readonly tip: CommitId
+    /** Where it started when built or last followed: what it holds is the tip's change since. */
+    readonly start: readonly CommitId[]
   }
 }
 
@@ -484,6 +486,20 @@ export interface YoursNow {
 export type ForkStart =
   | { readonly kind: "commits"; readonly commits: readonly CommitId[] }
   | ({ readonly kind: "copy" } & YoursNow)
+
+declare const threadNameBrand: unique symbol
+/**
+ * A thread's name as people say it: two words, `amber-fox` (ADR-0039). Minted
+ * by `@pineta/marginalia`'s naming and its decoder; stored, never recomputed.
+ */
+export type ThreadName = string & { readonly [threadNameBrand]: true }
+
+/** A lane's name: a host-written `pineta.name` value keyed by the lane (ADR-0039). */
+export interface NameRecord {
+  readonly lane: LaneName
+  readonly name: ThreadName
+  readonly at: number
+}
 
 /**
  * A commit you already have, though your repo holds it only as lane history:

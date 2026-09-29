@@ -161,7 +161,7 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   root stays writable to the host's policy, as ADR-0026 requires (a refused
   write cannot be recovered from, S28); the screen offers no editor there.
 
-# Where lanes work (`work.ts`, ADR-0032 to ADR-0034, ADR-0038)
+# Where lanes work (`work.ts`, ADR-0032 to ADR-0034, ADR-0038, ADR-0039)
 
 Host-written records, each with a total decoder. `encodeWorkRecord` is
 the one place their namespaces and keys are chosen, and the agent writes them
@@ -174,6 +174,7 @@ through one `setWorkRecord`:
 | how a resolution ended | `pineta.landing` | its own id | when its run ends |
 | a lane's offer in your repo | `pineta.offer` | the lane | when a trigger changed it, or it was taken |
 | a commit you have of a lane: delivered by a take, or a copy of your `@` | `pineta.have` | the commit | at a take, a fork from your `@`, and an update |
+| a lane's name, `word-word` | `pineta.name` | the lane | once, at the host's start or before the lane's first run |
 | what the host found where it runs: `lanes`, or `direct` and why | `pineta.project` | `project` | at every start |
 
 - **Every run's prompt has a revision record**, so the nearest record above
@@ -219,9 +220,13 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
 
 - **`planRefresh`** decides what a trigger does, from the lane's tip, where an
   offer would start, and the offer's facts: `build` (none, or the last was
-  taken), `rebuild` (the lane moved under a single offer), `stale` (under a
-  stack), `refresh` (only the target moved), `leave` (you edited it), `repair`
-  (a race left it divergent), or `none`. An offer is edited when any of its
+  taken), `follow` (the lane, or where the offer starts, moved under a single
+  offer: updated in place, ADR-0039), `withdraw` (where it starts reached the
+  tip: nothing left), `stale` (either moved under a stack), `refresh` (only
+  the target moved), `leave` (you edited it), `repair` (a race left it
+  divergent), or `none`. Where it starts is compared as a set: a merge's
+  parents come in any order. `follow` is not `update`, which is "update from
+  my work" (`planUpdate`). An offer is edited when any of its
   revisions fails any of three tests against what the host last wrote: the
   description, `jj interdiff`, and the bottom's parent an ancestor of the
   target (S48 item 7). A revision you edit is never touched again.
@@ -233,9 +238,30 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
 - **`describeRequest`** is the commit-message request: the skill, your
   repo's recent messages, the thread's messages and the diff. Over its
   budget, the thread's oldest messages go first, then the diff is cut; the
-  skill never is. `withTrailers` adds the host's own trailers, and
-  `placeholderDescription` is the line an offer carries until an agent
-  describes it.
+  skill never is. `withTrailers` adds the host's own trailers:
+  `Pineta-Thread`, `Pineta-Lane` and `Pineta-Entry`.
+- **`wipDescription`** is the line an offer carries until an agent describes
+  it: `WIP (<name>): <first line>`, the first line being the lane's own first
+  prompt (`firstPromptOf`, in `@pineta/core`), not its root's, which every
+  branch shares. A follow puts it back when the offer carried the agent's
+  message, which no longer describes it.
+
+# Thread names (`names.ts`, ADR-0039)
+
+- **A name is two words**, from `ADJECTIVES` and `NOUNS`, 256 each,
+  disjoint, lowercase, 3 to 7 letters: `amber-fox`. The unit test holds the
+  lists to that.
+- **`threadNameFor`** hashes the lane's id (FNV-1a, 32 bits) into the 65,536
+  pairs and takes the next free one, wrapping. The hash spreads ids that
+  differ only near their end, as uuidv7s made a minute apart do.
+- **`planNames`** names every lane that has none, oldest first, each
+  avoiding the stored names and those planned before it. The host runs it
+  through one queue, at start and before a new lane's first run, so two
+  lanes never plan the same name.
+- **A name is stored, never recomputed**, so a changed word list renames
+  nothing, and never changes: the offer's bookmark and older trailers name
+  it. The decoder accepts only `word-word`; `ThreadName` is branded in
+  `@pineta/core`, and minted only here.
 
 # Updates and stacks (`update.ts`, ADR-0038)
 

@@ -9,7 +9,7 @@ with a conversation **tree** as the primary object rather than a transcript.
 |---|---|
 | `00-vision.md` | What we are building and why. Product thesis. |
 | `01-architecture.md` | Layer cake, thin waist, data model, evidence base. |
-| `02-decisions.md` | ADR-0001..0038. Decisions already made, with rationale. |
+| `02-decisions.md` | ADR-0001..0039. Decisions already made, with rationale. |
 | `03-spikes.md` | Open unknowns as falsifiable, time-boxed experiments. |
 | `04-roadmap.md` | Sequencing: spikes → walking skeleton → v1 demo. |
 | `05-stack.md` | Stack decisions and why: TypeScript on Node, pnpm, Vite, React. |

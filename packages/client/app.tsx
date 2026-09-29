@@ -41,6 +41,7 @@ import {
   readLandings,
   readLaneRecords,
   readLanes,
+  readNames,
   readNotes,
   readOffers,
   readOutbox,
@@ -234,6 +235,7 @@ function App({ session }: { session: SessionClient }) {
         revisions: readRevisions(doc),
         landings: readLandings(doc),
         offers: readOffers(doc),
+        names: readNames(doc),
       },
     }
   })
@@ -596,6 +598,7 @@ function App({ session }: { session: SessionClient }) {
           labelOf={labelOf}
           mentions={mentions}
           nameOf={nameOf}
+          names={workFacts.names}
           offers={[...workFacts.offers.values()].flatMap(o => {
             const tip = lanes.find(l => l.name === o.lane)?.tip
             return o.taken === null && tip != null

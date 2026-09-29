@@ -765,4 +765,12 @@ export const mutations: readonly Mutation[] = [
     command: browser,
     expect: "Not you? asks who you are again",
   },
+  {
+    name: "the column header leaves out the thread's name",
+    file: "packages/client/column.tsx",
+    from: "  const parts = [name, where].filter(p => p !== undefined)",
+    to: "  const parts = [where].filter(p => p !== undefined)",
+    command: browser,
+    expect: "the column's header names the thread",
+  },
 ]

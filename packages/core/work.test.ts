@@ -5,6 +5,7 @@ import {
   type EntryLike,
   entryId,
   firstLine,
+  firstPromptOf,
   hostPathInLane,
   indexTree,
   isBusy,
@@ -79,6 +80,20 @@ const revisions: ReadonlyMap<string, RevisionRecord> = new Map(
 )
 const near = (id: string) =>
   nearestRevision(index, revisions, atEntry(entryId(id)))
+
+describe("firstPromptOf: a lane's own first prompt (ADR-0039)", () => {
+  test("a branch's first prompt is its own, below its parent's", () => {
+    expect(firstPromptOf(index, revisions, B, "7-mb")).toBe("6-pb")
+    expect(firstPromptOf(index, revisions, D, "a-ld")).toBe("8-pd")
+  })
+  test("the root lane's first prompt is the root's", () => {
+    expect(firstPromptOf(index, revisions, A, "4-m2")).toBe("1-p1")
+  })
+  test("no run of the lane on the path, or no tip: none", () => {
+    expect(firstPromptOf(index, revisions, B, "4-m2")).toBeNull()
+    expect(firstPromptOf(index, revisions, B, null)).toBeNull()
+  })
+})
 
 describe("nearestRevision: the lane, commit and disk above an entry", () => {
   test("an assistant message's own record gives its commit and disk", () => {

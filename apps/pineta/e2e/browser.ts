@@ -31,11 +31,13 @@ import {
   handleOf,
   projectRail,
   ROOT,
+  type ThreadName,
   writerId,
 } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
   readLaneRecords,
+  readNames,
   readParticipantNames,
   readReferences,
   readTreeIndex,
@@ -1628,11 +1630,19 @@ try {
 
       // ── the thread's offer, and taking it, from the column's header ─────
       // (ADR-0038)
+      // Its name leads, as the host stored it; no commit follows (ADR-0039).
+      const whereText = await tp.textContent(`${col(0)} .column-head .where`)
+      const threadName = await tp.getAttribute(
+        `${col(0)} .column-head .where`,
+        "data-thread",
+      )
       ok(
-        (await tp.textContent(`${col(0)} .column-head .where`))?.startsWith(
-          "own copy",
-        ) === true,
-        "the column's header says the thread works in its own copy",
+        threadName !== null &&
+          [...readNames(toolHost.doc).values()].includes(
+            threadName as ThreadName,
+          ) &&
+          whereText === `${threadName} · own copy`,
+        `the column's header names the thread, then says it works in its own copy (${whereText})`,
       )
       script.use([
         { tool: "write", args: { path: "from-lane.txt", content: "lane\n" } },

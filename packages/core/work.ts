@@ -8,15 +8,17 @@
 // that works directly records its prompts with neither: it still counts as
 // the lane above, but the walk passes it for commit and disk.
 
-import type {
-  CommitId,
-  LaneName,
-  LaneRecord,
-  Position,
-  ProjectRecord,
-  RevisionRecord,
-  SnapshotId,
-  WorkSetting,
+import {
+  type CommitId,
+  type EntryId,
+  entryId,
+  type LaneName,
+  type LaneRecord,
+  type Position,
+  type ProjectRecord,
+  type RevisionRecord,
+  type SnapshotId,
+  type WorkSetting,
 } from "./index.ts"
 import { ancestry, type TreeIndex } from "./tree.ts"
 
@@ -54,6 +56,27 @@ export function nearestRevision(
     if (commit !== null && snapshot !== null) break
   }
   return { lane, commit, snapshot }
+}
+
+/**
+ * The lane's first prompt on the path to `tip`: the entry nearest the root
+ * whose revision record names `lane`. A branch's path passes its parent's
+ * prompts first, which name the parent's lane, so this is the branch's own
+ * (ADR-0039). Null when no run of the lane is on the path.
+ */
+export function firstPromptOf(
+  index: TreeIndex,
+  revisions: ReadonlyMap<string, RevisionRecord>,
+  lane: LaneName,
+  tip: string | null,
+): EntryId | null {
+  if (tip === null) return null
+  const path = ancestry(index, tip).path
+  for (let i = path.length - 1; i >= 0; i -= 1) {
+    const id = path[i]
+    if (id !== undefined && revisions.get(id)?.lane === lane) return entryId(id)
+  }
+  return null
 }
 
 /**

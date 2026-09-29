@@ -1,22 +1,25 @@
 // host/offers — each lane's offer in your repo, as the host keeps it
-// (ADR-0038).
+// (ADR-0038, ADR-0039).
 //
 // One serial queue for your repo carries every offer operation and every
 // take, so no two of them interleave. Each trigger gathers (the lane's tip,
 // where an offer starts, the offer's facts), plans (`planRefresh`), and
-// executes planned jj steps (`planOffer`, `planRefreshOffer`, `planRepair`),
-// then writes the `pineta.offer` record when it changed. Triggers: a lane's
-// fetch, a run's end, an offer action, and your own jj operations, noticed by
-// reading your repo's operation head every 2 s while an offer is open.
+// executes planned jj steps (`planOffer`, `planFollowOffer`,
+// `planRefreshOffer`, `planRepair`), then writes the `pineta.offer` record
+// when it changed. Triggers: a lane's fetch, a run's end, an offer action,
+// and your own jj operations, noticed by reading your repo's operation head
+// every 2 s while an offer is open.
 
 import {
   type CommitId,
   ERR,
   type ErrCode,
+  firstPromptOf,
   type HaveRecord,
   type LaneName,
   type OfferRecord,
   projectTranscript,
+  type ThreadName,
   type WriterId,
 } from "@pineta/core"
 import {
@@ -36,6 +39,7 @@ import {
   offerStart,
   planAbandonOffer,
   planDescribe,
+  planFollowOffer,
   planOffer,
   planRefreshOffer,
   planRepair,
@@ -46,13 +50,20 @@ import {
 import {
   acceptStack,
   describeRequest,
-  placeholderDescription,
   planRefresh,
   recordChanged,
+  wipDescription,
   withTrailers,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
-import { readHaves, readOffers, readTreeIndex } from "@pineta/reads"
+import {
+  readHaves,
+  readNames,
+  readOffers,
+  readRevisions,
+  readThreadName,
+  readTreeIndex,
+} from "@pineta/reads"
 import { readLaneTip, type SessionDocHandle } from "@pineta/schema"
 
 /** How often your repo's operation head is read while an offer is open. */
@@ -122,6 +133,14 @@ export function startOffers(input: {
   }
 
   const offerOf = (lane: LaneName) => readOffers(doc).get(lane)
+  const nameOf = (lane: LaneName) => readNames(doc).get(lane)
+  /** An offer's facts now, against what the host last wrote for it. */
+  const factsOf = (offer: OfferRecord, target: string) =>
+    offerFacts(ops, {
+      changes: offer.host.changes,
+      wrote: offer.host.wrote,
+      target,
+    })
   const write = async (record: OfferRecord) => {
     const next = { kind: "offer" as const, record }
     const stored = offerOf(record.lane)
@@ -135,9 +154,13 @@ export function startOffers(input: {
   const targetNow = async () =>
     (await hasBookmark(ops, ONTO_BOOKMARK)) ? ONTO_BOOKMARK : "@-"
 
-  /** A new offer from the lane's tip: one revision, described later. */
+  /**
+   * A new offer from `sources` (the lane's tip, or a stack's revisions) on
+   * `start`, under the lane's name.
+   */
   async function build(
     lane: LaneName,
+    name: ThreadName,
     tip: CommitId,
     start: readonly CommitId[],
     target: string,
@@ -147,20 +170,19 @@ export function startOffers(input: {
     await executeOnHost(
       planOffer({
         root,
-        lane,
+        name,
         start,
         sources,
         target,
         nonce: `pineta-offer-${crypto.randomUUID()}`,
       }),
     )
-    const commits = await offerRevisions(
-      ops,
-      offerBookmark(lane),
-      sources.length,
-    )
+    const bookmark = offerBookmark(name)
+    const commits = await offerRevisions(ops, bookmark, sources.length)
     await record(lane, {
+      bookmark,
       tip,
+      start,
       commits,
       changes: await Promise.all(commits.map(c => changeOf(ops, c))),
       target,
@@ -174,7 +196,9 @@ export function startOffers(input: {
   async function record(
     lane: LaneName,
     at: {
+      readonly bookmark: string
       readonly tip: CommitId
+      readonly start: readonly CommitId[]
       readonly commits: readonly CommitId[]
       readonly changes: readonly string[]
       readonly target: string
@@ -201,34 +225,29 @@ export function startOffers(input: {
       yourEdits: await yourEditsIn(ops, facts.files),
       described: at.described,
       edited: at.edited,
-      bookmark: offerBookmark(lane),
+      bookmark: at.bookmark,
       taken: null,
       at: Date.now(),
       host: {
         changes: [...at.changes],
         wrote: [...at.commits],
         tip: at.tip,
+        start: [...at.start],
       },
     })
   }
 
   /** Gather, plan, execute: what a trigger does to one lane's offer. */
   async function refresh(lane: LaneName): Promise<"built" | "other"> {
+    const name = nameOf(lane)
     const tip = await laneTipIn(ops, lane)
-    if (tip === null) return "other"
+    if (tip === null || name === undefined) return "other"
     const target = await targetNow()
     const haves = readHaves(doc)
     const start = await startOf(ops, offerStart({ tip, target, haves }))
     const stored = offerOf(lane)
     const open = stored !== undefined && stored.taken === null ? stored : null
-    const facts =
-      open === null
-        ? null
-        : await offerFacts(ops, {
-            changes: open.host.changes,
-            wrote: open.host.wrote,
-            target,
-          })
+    const facts = open === null ? null : await factsOf(open, target)
     // An offer you abandoned, or took by hand, is gone: a new one is built.
     const live =
       open !== null && facts !== null && (facts.present || facts.divergent)
@@ -241,6 +260,7 @@ export function startOffers(input: {
               size: open.size,
               taken: open.taken,
               builtFrom: open.host.tip,
+              builtOn: open.host.start,
               revisions: facts.revisions,
               placed: facts.placed,
               onTarget: facts.onTarget,
@@ -248,104 +268,113 @@ export function startOffers(input: {
             }
           : undefined,
     })
-    const placeholder = [
-      { commit: tip, description: placeholderDescription(threadOf(lane)) },
-    ]
+    const wip = wipLine(lane, name)
+    if (planned === "build") {
+      await build(
+        lane,
+        name,
+        tip,
+        start,
+        target,
+        [{ commit: tip, description: wip }],
+        false,
+      )
+      return "built"
+    }
+    if (open === null || facts === null) return "other"
+    // What the record keeps unless the plan changes it.
+    const kept = {
+      bookmark: open.bookmark,
+      tip: open.host.tip,
+      start: open.host.start,
+      commits: open.host.wrote,
+      changes: open.host.changes,
+      target,
+      stale: open.stale,
+      described: open.described,
+      edited: open.edited,
+    }
     switch (planned) {
-      case "none": {
-        if (open === null || !live || facts === null) return "other"
-        await record(
-          lane,
-          {
-            tip: open.host.tip,
-            commits: open.host.wrote,
-            changes: open.host.changes,
-            target,
-            stale: open.stale,
-            described: open.described,
-            edited: open.edited,
-          },
-          facts,
-        )
+      case "none":
+        if (live) await record(lane, kept, facts)
         return "other"
+      case "follow": {
+        const [change] = open.host.changes
+        if (change === undefined) return "other"
+        await executeOnHost(
+          planFollowOffer({
+            root,
+            change,
+            start,
+            tip,
+            target,
+            description: open.described ? wip : null,
+          }),
+        )
+        const now = await factsOf(open, target)
+        await record(lane, {
+          ...kept,
+          tip,
+          start,
+          commits: now.commits,
+          described: false,
+          edited: false,
+        })
+        return "built"
       }
-      case "build":
-        await build(lane, tip, start, target, placeholder, false)
-        return "built"
-      case "rebuild":
-        if (open !== null)
-          await executeOnHost(planAbandonOffer(root, open.host.changes))
-        await build(lane, tip, start, target, placeholder, false)
-        return "built"
+      case "withdraw":
+        await executeOnHost(planAbandonOffer(root, open.host.changes))
+        await input.agent().removeOffer(lane)
+        return "other"
       case "refresh": {
-        if (open === null) return "other"
         const [bottom] = open.host.changes
         if (bottom === undefined) return "other"
         await executeOnHost(planRefreshOffer(root, bottom, target))
-        const commits = (
-          await offerFacts(ops, {
-            changes: open.host.changes,
-            wrote: open.host.wrote,
-            target,
-          })
-        ).commits
-        await record(lane, {
-          tip: open.host.tip,
-          commits,
-          changes: open.host.changes,
-          target,
-          stale: open.stale,
-          described: open.described,
-          edited: false,
-        })
+        const now = await factsOf(open, target)
+        await record(lane, { ...kept, commits: now.commits, edited: false })
         return "other"
       }
       case "stale":
       case "leave":
-        if (open === null || facts === null) return "other"
         await record(lane, {
-          tip: open.host.tip,
-          commits: open.host.wrote,
-          changes: open.host.changes,
-          target,
+          ...kept,
           stale: planned === "stale" || open.stale,
-          described: open.described,
           edited: planned === "leave",
         })
         return "other"
       case "repair": {
-        if (open === null) return "other"
         const last = open.host.changes.length - 1
         for (const [i, change] of open.host.changes.entries()) {
           const split = await hostCommitIn(ops, change)
           if (split === null) continue
           await executeOnHost(
-            planRepair({ root, lane, ...split, top: i === last }),
+            planRepair({
+              root,
+              bookmark: open.bookmark,
+              ...split,
+              top: i === last,
+            }),
           )
         }
         log(
-          `[host] lane ${lane.slice(-8)}: your edit and the host's crossed; kept yours`,
+          `[host] ${readThreadName(doc, lane)}: your edit and the host's crossed; kept yours`,
         )
-        await record(lane, {
-          tip: open.host.tip,
-          commits: open.host.wrote,
-          changes: open.host.changes,
-          target,
-          stale: open.stale,
-          described: open.described,
-          edited: true,
-        })
+        await record(lane, { ...kept, edited: true })
         return "other"
       }
     }
   }
 
-  /** The thread's first line, for a placeholder description. */
-  function threadOf(lane: LaneName): string {
+  /**
+   * An offer's line until an agent describes it: the thread's name and its
+   * own first message, the first prompt its lane ran (ADR-0039).
+   */
+  function wipLine(lane: LaneName, name: ThreadName): string {
     const index = readTreeIndex(doc)
-    const path = projectTranscript(index, readLaneTip(doc, lane))
-    const first = path.find(m => m.role === "chat" || m.role === "user")
-    return first?.text ?? ""
+    const tip = readLaneTip(doc, lane)
+    const first = firstPromptOf(index, readRevisions(doc), lane, tip)
+    const text = projectTranscript(index, tip).find(m => m.id === first)?.text
+    return wipDescription(name, text ?? "")
   }
 
   /**
@@ -397,25 +426,31 @@ export function startOffers(input: {
     await serially(async () => {
       const now = offerOf(lane)
       if (now === undefined || now.taken !== null || now.edited) return
-      if (now.host.changes[0] !== change || now.host.tip !== before.host.tip)
+      const name = nameOf(lane)
+      // The offer followed its lane, or where it starts, while the model
+      // wrote: the message describes what it held then.
+      if (
+        name === undefined ||
+        now.host.changes[0] !== change ||
+        now.host.tip !== before.host.tip ||
+        now.host.start.join() !== before.host.start.join()
+      )
         return
       const target = await targetNow()
-      const facts = await offerFacts(ops, {
-        changes: now.host.changes,
-        wrote: now.host.wrote,
-        target,
-      })
+      const facts = await factsOf(now, target)
       if (facts.revisions.some(r => !r.sameDescription || !r.sameChange)) return
       await executeOnHost(
-        planDescribe(root, change, withTrailers(text, lane, tip ?? "")),
+        planDescribe(
+          root,
+          change,
+          withTrailers(text, { lane, name, entry: tip ?? "" }),
+        ),
       )
-      const after = await offerFacts(ops, {
-        changes: now.host.changes,
-        wrote: now.host.wrote,
-        target,
-      })
+      const after = await factsOf(now, target)
       await record(lane, {
+        bookmark: now.bookmark,
         tip: now.host.tip,
+        start: now.host.start,
         commits: after.commits,
         changes: now.host.changes,
         target,
@@ -428,7 +463,7 @@ export function startOffers(input: {
 
   const report = (lane: LaneName, what: string) => (error: unknown) =>
     log(
-      `[host] lane ${lane.slice(-8)}: ${what} failed: ${error instanceof Error ? error.message : String(error)}`,
+      `[host] ${readThreadName(doc, lane)}: ${what} failed: ${error instanceof Error ? error.message : String(error)}`,
     )
 
   function touch(lane: LaneName): void {
@@ -487,7 +522,7 @@ export function startOffers(input: {
           await executeOnHost(
             planTakeOffer({
               root,
-              lane,
+              bookmark: o.bookmark,
               bottom,
               top,
               target,
@@ -506,12 +541,14 @@ export function startOffers(input: {
             record: { ...o, taken: top, at: Date.now() },
           })
           log(
-            `[host] lane ${lane.slice(-8)}: offer taken by ${by} as ${top.slice(0, 8)}`,
+            `[host] ${readThreadName(doc, lane)}: offer taken by ${by} as ${top.slice(0, 8)}`,
           )
           input.taken()
           return null
         }
         // squash and refresh: the offer rebuilt from the lane's tip, as one.
+        const name = nameOf(lane)
+        if (name === undefined) return ERR.NO_OFFER
         await executeOnHost(planAbandonOffer(root, o.host.changes))
         const tip = (await laneTipIn(ops, lane)) ?? o.host.tip
         const start = await startOf(
@@ -520,15 +557,11 @@ export function startOffers(input: {
         )
         await build(
           lane,
+          name,
           tip,
           start,
           target,
-          [
-            {
-              commit: tip,
-              description: placeholderDescription(threadOf(lane)),
-            },
-          ],
+          [{ commit: tip, description: wipLine(lane, name) }],
           false,
         )
         void track(describe(lane, false)).catch(
@@ -579,11 +612,13 @@ export function startOffers(input: {
           ).stdout
           sources.push({ commit, description })
         }
+        const name = nameOf(lane)
+        if (name === undefined) return "the thread has no name yet"
         const o = offerOf(lane)
         if (o !== undefined && o.taken === null)
           await executeOnHost(planAbandonOffer(root, o.host.changes))
         const target = await targetNow()
-        await build(lane, stack.tip, stack.start, target, sources, true)
+        await build(lane, name, stack.tip, stack.start, target, sources, true)
         return null
       })
     },

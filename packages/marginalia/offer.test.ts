@@ -5,6 +5,7 @@ import {
   type LandingRecord,
   laneNameForThread,
   type OfferRecord,
+  type ThreadName,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
@@ -19,12 +20,12 @@ import {
   encodeWorkRecord,
   entryText,
   offerView,
-  placeholderDescription,
   planRefresh,
   planStack,
   type RefreshFacts,
   renderableMessage,
   updatePrefill,
+  wipDescription,
   withTrailers,
 } from "./index.ts"
 
@@ -47,7 +48,7 @@ const offer: OfferRecord = {
   bookmark: "pineta-offer/t-1",
   taken: null,
   at: 10,
-  host: { changes: ["ch1"], wrote: [commitId("w1")], tip: TIP },
+  host: { changes: ["ch1"], wrote: [commitId("w1")], tip: TIP, start: [BASE] },
 }
 
 describe("offerView: ADR-0038's table", () => {
@@ -130,6 +131,7 @@ describe("planRefresh", () => {
             size: 1,
             taken: null,
             builtFrom: TIP,
+            builtOn: [BASE],
             revisions: [clean],
             placed: true,
             onTarget: true,
@@ -147,11 +149,30 @@ describe("planRefresh", () => {
     expect(planRefresh(facts({ onTarget: false }))).toBe("refresh")
     expect(planRefresh(facts({}))).toBe("none")
   })
-  test("the lane moved on: a single offer is rebuilt, a stack goes stale", () => {
-    expect(planRefresh(facts({ builtFrom: T2 }))).toBe("rebuild")
+  test("the lane moved on: a single offer follows, a stack goes stale", () => {
+    expect(planRefresh(facts({ builtFrom: T2 }))).toBe("follow")
     expect(
       planRefresh(facts({ builtFrom: T2, size: 2, revisions: [clean, clean] })),
     ).toBe("stale")
+  })
+  test("where it starts moved (you took part of it): the same, or withdraw when nothing is left", () => {
+    expect(planRefresh(facts({ builtOn: [T2] }))).toBe("follow")
+    expect(planRefresh(facts({ builtOn: [BASE, T2] }, TIP, [T2, BASE]))).toBe(
+      "none",
+    )
+    expect(
+      planRefresh(facts({ size: 2, revisions: [clean, clean] }, TIP, [T2])),
+    ).toBe("stale")
+    expect(planRefresh(facts({}, TIP, [TIP]))).toBe("withdraw")
+    expect(
+      planRefresh(
+        facts(
+          { revisions: [{ sameDescription: false, sameChange: true }] },
+          TIP,
+          [T2],
+        ),
+      ),
+    ).toBe("leave")
   })
   test("any failed edit test, on any revision, leaves it alone (S48 item 7)", () => {
     expect(planRefresh(facts({ placed: false, onTarget: false }))).toBe("leave")
@@ -219,13 +240,15 @@ describe("the commit message", () => {
     })
     expect(tighter.user).toContain("the rest of the diff left out")
   })
-  test("withTrailers and the placeholder", () => {
-    expect(withTrailers("feat: x\n", LANE, "e9")).toBe(
-      `feat: x\n\nPineta-Lane: ${LANE}\nPineta-Entry: e9\n`,
+  test("withTrailers and the WIP line", () => {
+    const name = "amber-fox" as ThreadName
+    expect(withTrailers("feat: x\n", { lane: LANE, name, entry: "e9" })).toBe(
+      `feat: x\n\nPineta-Thread: amber-fox\nPineta-Lane: ${LANE}\nPineta-Entry: e9\n`,
     )
-    expect(placeholderDescription("add the offer line\nmore")).toBe(
-      "offer: add the offer line",
+    expect(wipDescription(name, "add the offer line\nmore")).toBe(
+      "WIP (amber-fox): add the offer line",
     )
+    expect(wipDescription(name, "")).toBe("WIP (amber-fox): this thread's work")
   })
 })
 

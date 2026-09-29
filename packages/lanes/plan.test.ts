@@ -3,6 +3,7 @@ import {
   commitId,
   laneNameForThread,
   snapshotId,
+  type ThreadName,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
@@ -28,6 +29,7 @@ import {
   planDisk,
   planExclude,
   planFetch,
+  planFollowOffer,
   planFork,
   planForkSetup,
   planHost,
@@ -48,6 +50,7 @@ import {
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
+const NAME = "amber-fox" as ThreadName
 const C1 = commitId("c1")
 const C2 = commitId("c2")
 const HOME = "/Users/ada"
@@ -440,7 +443,7 @@ describe("offers (ADR-0038)", () => {
           { lane: LANE, commit: commitId("d"), kind: "delivered", at: 2 },
         ],
       }),
-    ).toBe("heads(::c1 & ::(pineta-onto | c2 | d))")
+    ).toBe("heads(::c1 & ::(pineta-onto | present(c2) | present(d)))")
   })
   test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {
     const n = (i: number) => nonceRevset("N", i)
@@ -448,7 +451,7 @@ describe("offers (ADR-0038)", () => {
       argvs(
         planOffer({
           root,
-          lane: LANE,
+          name: NAME,
           start: [C1, C2],
           sources: [
             { commit: commitId("s1"), description: "one" },
@@ -468,7 +471,7 @@ describe("offers (ADR-0038)", () => {
         "bookmark",
         "set",
         "--allow-backwards",
-        `pineta-offer/${LANE}`,
+        "pineta-offer/amber-fox",
         "-r",
         n(1),
       ),
@@ -476,12 +479,33 @@ describe("offers (ADR-0038)", () => {
       op("describe", "-r", n(1), "-m", "two"),
     ])
   })
+  test("planFollowOffer: back onto the start, the tip restored, onto the target; described only when asked", () => {
+    const follow = (description: string | null) =>
+      argvs(
+        planFollowOffer({
+          root,
+          change: "ch",
+          start: [C1, C2],
+          tip: commitId("t2"),
+          target: "@-",
+          description,
+        }),
+      )
+    expect(follow(null)).toEqual([
+      op("rebase", "-s", "ch", "-o", "c1", "-o", "c2"),
+      op("restore", "--from", "t2", "--into", "ch"),
+      op("rebase", "-s", "ch", "-o", "@-"),
+    ])
+    expect(follow("WIP (amber-fox): x").at(-1)).toBe(
+      op("describe", "-r", "ch", "-m", "WIP (amber-fox): x"),
+    )
+  })
   test("planTakeOffer: under your edits as you, else bookmarks only; pineta-onto follows", () => {
     const take = (underYou: boolean, onto: boolean) =>
       argvs(
         planTakeOffer({
           root,
-          lane: LANE,
+          bookmark: "pineta-offer/amber-fox",
           bottom: "b",
           top: "t",
           target: "@-",
@@ -491,11 +515,11 @@ describe("offers (ADR-0038)", () => {
       )
     expect(take(true, false)).toEqual([
       "host: jj -R /y rebase -r b::t -A @- -B @",
-      op("bookmark", "delete", `pineta-offer/${LANE}`),
+      op("bookmark", "delete", "pineta-offer/amber-fox"),
     ])
     expect(take(false, true)).toEqual([
       op("bookmark", "set", "--allow-backwards", ONTO_BOOKMARK, "-r", "t"),
-      op("bookmark", "delete", `pineta-offer/${LANE}`),
+      op("bookmark", "delete", "pineta-offer/amber-fox"),
     ])
   })
   test("planRetire: moved to remote bookmarks first, then deleted, then the line (S48 item 21)", () => {

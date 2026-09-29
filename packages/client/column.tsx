@@ -11,6 +11,7 @@ import {
   entryId,
   firstLine,
   type LandingRecord,
+  type LaneName,
   type LaneRecord,
   type LaneView,
   messageText,
@@ -25,6 +26,7 @@ import {
   type RevisionRecord,
   ROOT,
   type ThreadLane,
+  type ThreadName,
   type TreeIndex,
   threadOf,
   type WriterId,
@@ -130,19 +132,26 @@ export interface WorkFacts {
   readonly landings: readonly LandingRecord[]
   /** Each lane's offer in your repo (ADR-0038). */
   readonly offers: ReadonlyMap<string, OfferRecord>
+  /** Each lane's name (ADR-0039). */
+  readonly names: ReadonlyMap<LaneName, ThreadName>
 }
 
 /**
- * Where a lane works, as its column's header says it: its own copy at its
- * newest revision, or the directory it shares.
+ * A lane as its column's header says it: its name, then where it works, its
+ * own copy or the directory it shares (ADR-0039).
  */
 function whereLabel(
+  name: ThreadName | undefined,
   record: LaneRecord | undefined,
-  commit: string | null,
 ): string | null {
-  if (record === undefined) return null
-  if (record.work.kind === "direct") return `in ${record.work.dir} · shared`
-  return commit === null ? "own copy" : `own copy · ${commit.slice(0, 8)}`
+  const where =
+    record === undefined
+      ? undefined
+      : record.work.kind === "direct"
+        ? `in ${record.work.dir} · shared`
+        : "own copy"
+  const parts = [name, where].filter(p => p !== undefined)
+  return parts.length === 0 ? null : parts.join(" · ")
 }
 
 export function Column(p: ColumnProps) {
@@ -214,12 +223,9 @@ export function Column(p: ColumnProps) {
   // (ADR-0032, ADR-0033, ADR-0038).
   const laneRecord =
     lane.kind === "lane" ? p.work.lanes.get(lane.name) : undefined
-  const where = whereLabel(
-    laneRecord,
-    at.kind === "entry"
-      ? nearestRevision(index, p.work.revisions, at).commit
-      : null,
-  )
+  const threadName =
+    lane.kind === "lane" ? p.work.names.get(lane.name) : undefined
+  const where = whereLabel(threadName, laneRecord)
   const landing =
     lane.kind === "lane"
       ? p.work.landings.filter(l => l.lane === lane.name).at(-1)
@@ -361,7 +367,11 @@ export function Column(p: ColumnProps) {
             : `from ${forkLabel}: “${forkText}”`}
         </span>
         {where !== null && (
-          <span className="where" title="where this thread's agent works">
+          <span
+            className="where"
+            data-thread={threadName}
+            title="this thread's name, and where its agent works"
+          >
             {where}
           </span>
         )}

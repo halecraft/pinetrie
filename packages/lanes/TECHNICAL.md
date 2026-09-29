@@ -248,7 +248,11 @@ containers, disks and the helper.
   --name-only`): jj's `--name-only` prints paths from the process's
   directory, which in a lane is not the repo's.
 
-## Offers in your repo (`offer.ts`, `plan.ts`, ADR-0038)
+## Offers in your repo (`offer.ts`, `plan.ts`, ADR-0038, ADR-0039)
+
+- **An offer's bookmark is `pineta-offer/<name>`**, the thread's two-word
+  name (`offerBookmark`). Take and repair use the bookmark the offer's record
+  holds, so an offer built under an older name is still found.
 
 - **Every host command on your repo carries `--ignore-working-copy` and
   `--config operation.username=pineta-host`** (`hostOps`, `hostOp`): it never
@@ -266,7 +270,15 @@ containers, disks and the helper.
   rebased onto the target. A stack's sources are the agent's revisions.
 - **Where an offer starts is `offerStart`'s revset**: the newest ancestors of
   the lane's tip you already have, your commits and every `pineta.have`
-  (delivered lane commits, copies of your `@`), S48 items 15 to 17.
+  (delivered lane commits, copies of your `@`), S48 items 15 to 17. Each have
+  is `present()`: a copy is made in a lane and reaches your repo only with
+  that lane's work, and one never fetched would fail every lane's revset.
+- **An offer follows its lane in place** (`planFollowOffer`, S49): `rebase -s`
+  back onto the start, `restore --from <tip>`, `rebase -s` onto the target.
+  Restoring where it sits would give it the tip's tree, dropping your work
+  under it. The change id and bookmark stay, and jj records no operation for
+  a restore that changes nothing. `planOffer` and the follow both end with
+  `planRefreshOffer`'s rebase.
 - **Take is `jj rebase -r <bottom>::<top> -A <target> -B @`** when the target
   is an ancestor of `@`; otherwise only bookmarks move (`planTakeOffer`).
 - **`offerFacts` reads an offer by change id once, then names commits**: its
@@ -284,8 +296,10 @@ containers, disks and the helper.
   a turn, a bundle fetch into your repo as a remote bookmark, an update with a
   conflict, forks from a turn and from a copy of your `@`, checked for
   divergence and immutability; an offer built, refreshed, left, repaired,
-  taken under your edits and beside them, the next offer, and a stack; and
-  retiring a repo from before offers.
+  taken under your edits and beside them, the next offer, and a stack; an
+  offer following a moved tip, your conflicting commit and a moved start,
+  each checked against a fresh build; and retiring a repo from before
+  offers.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
   with the contract test, in about 85 s. It has four sections, `main`,
   `images`, `shared` and `contract`, and `PINETA_LANES_SECTION` picks some.

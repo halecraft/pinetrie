@@ -32,6 +32,7 @@ import path from "node:path"
 import {
   ancestry,
   atEntry,
+  commitId,
   entryId,
   type LaneName,
   messageText,
@@ -46,6 +47,7 @@ import {
   executeOrThrow,
   hostBytesRunner,
   hostRunner,
+  offerStart,
 } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
 import {
@@ -53,6 +55,7 @@ import {
   readLandings,
   readLaneRecords,
   readLanes,
+  readNames,
   readOffers,
   readOutbox,
   readProject,
@@ -534,6 +537,57 @@ async function mainSection(): Promise<void> {
         defaultLog().includes("offer: scripted"),
       `a turn's work is an offer in your repo, described, and its turns are not in your log (${JSON.stringify({ files: offerOf()?.files, described: offerOf()?.described, log: defaultLog().split("\n").slice(0, 4) })})`,
     )
+    // Every lane has a name, two words, and no two alike; the offer's
+    // bookmark and its message's trailer carry it (ADR-0039).
+    const names = readNames(wh.doc)
+    const twoName = two === undefined ? undefined : names.get(two.name)
+    const offerBookmarkOf = (lane: LaneName | undefined) =>
+      lane === undefined
+        ? ""
+        : `pineta-offer/${readNames(wh.doc).get(lane) ?? ""}`
+    const allNamed = readLanes(wh.doc, tree()).every(l => names.has(l.name))
+    ok(
+      allNamed &&
+        [...names.values()].every(n => /^[a-z]+-[a-z]+$/.test(n)) &&
+        new Set(names.values()).size === names.size &&
+        offerOf()?.bookmark === offerBookmarkOf(two?.name) &&
+        jj(
+          project,
+          "log",
+          "--no-graph",
+          "-r",
+          offerBookmarkOf(two?.name),
+          "-T",
+          "description",
+        ).includes(`Pineta-Thread: ${twoName}\n`),
+      `every lane has a two-word name, unique; the offer's bookmark and trailer carry it (${JSON.stringify({ names: [...names.values()], bookmark: offerOf()?.bookmark })})`,
+    )
+    const offerChange = () =>
+      jj(
+        project,
+        "log",
+        "--no-graph",
+        "-r",
+        offerBookmarkOf(two?.name),
+        "-T",
+        "change_id",
+      )
+    const firstChange = offerChange()
+    /** An offer's descriptions, oldest first, each run of repeats once. */
+    const descriptionsOf = (change: string) =>
+      jj(
+        project,
+        "evolog",
+        "--no-graph",
+        "-r",
+        change,
+        "-T",
+        'commit.description().first_line() ++ "\n"',
+      )
+        .split("\n")
+        .filter(l => l !== "" && !l.startsWith("pineta-offer-"))
+        .reverse()
+        .filter((l, i, all) => l !== all[i - 1])
     // You change the same line, commit, and keep editing: the offer shows the
     // conflict before you take it.
     writeFileSync(path.join(project, "shared.txt"), "one\ntwo (you)\nthree\n")
@@ -577,8 +631,23 @@ async function mainSection(): Promise<void> {
         clean >= 0,
       `a conflicting update runs the resolution, and the offer comes back clean (${landing?.state ?? JSON.stringify(resolving)})`,
     )
-    // Take: one commit under your edits; your uncommitted file kept.
+    // The resolution moved the lane: the offer followed it in place, back to
+    // a work in progress while the run went on, then described again.
     await wh.quiet()
+    const wip = `WIP (${twoName}): lane two: who are you?`
+    const history = descriptionsOf(firstChange)
+    // The update's merge reaches your repo before the resolution runs, so it
+    // is followed, and described, on its own: at least two rounds.
+    ok(
+      offerChange() === firstChange &&
+        history.length >= 4 &&
+        history.every(
+          (d, i) => d === (i % 2 === 0 ? wip : "offer: scripted"),
+        ) &&
+        history.length % 2 === 0,
+      `a run that moves the lane keeps the offer's change id; it is a WIP line until each run ends (${JSON.stringify(history)})`,
+    )
+    // Take: one commit under your edits; your uncommitted file kept.
     const taken = two === undefined ? null : await wu.offer(two.name, "take")
     const below = jj(
       project,
@@ -639,19 +708,6 @@ async function mainSection(): Promise<void> {
     // against the tip and makes it the offer. Squash brings it back to one.
     await wh.quiet()
     const lane2 = two?.name
-    const haves = readHaves(wh.doc).map(h => h.commit)
-    const start =
-      lane2 === undefined
-        ? ""
-        : jj(
-            project,
-            "log",
-            "--no-graph",
-            "-r",
-            `heads(::tip@pineta-${lane2} & ::(@- | ${["root()", ...haves].join(" | ")}))`,
-            "-T",
-            'commit_id ++ " "',
-          ).trim()
     const laneTipCommit =
       lane2 === undefined
         ? ""
@@ -664,6 +720,20 @@ async function mainSection(): Promise<void> {
             "-T",
             "commit_id",
           )
+    // Where the host starts the offer, as it computes it.
+    const start = jj(
+      project,
+      "log",
+      "--no-graph",
+      "-r",
+      offerStart({
+        tip: commitId(laneTipCommit),
+        target: "@-",
+        haves: readHaves(wh.doc),
+      }),
+      "-T",
+      'commit_id ++ " "',
+    ).trim()
     script.use([
       {
         tool: "bash",
@@ -710,6 +780,85 @@ async function mainSection(): Promise<void> {
           "commit_id",
         ) === "",
       `a new root thread starts from a copy of your @: it sees your uncommitted file (${seenUnsaved.join(" | ").slice(0, 80)})`,
+    )
+
+    // A branch's offer holds its parent's work you lack, with its own. Taking
+    // the parent's shrinks it to its own, in place; taking a branch that holds
+    // all of its parent's withdraws the parent's (ADR-0039).
+    const offerFor = (lane: LaneName | undefined) =>
+      lane === undefined ? undefined : readOffers(wh.doc).get(lane)
+    const filesOf = (lane: LaneName | undefined) =>
+      JSON.stringify(offerFor(lane)?.files)
+    const changeOf = (lane: LaneName | undefined) =>
+      jj(
+        project,
+        "log",
+        "--no-graph",
+        "-r",
+        offerBookmarkOf(lane),
+        "-T",
+        "change_id",
+      )
+    const branchWriting = async (text: string, file: string) => {
+      script.use([
+        { tool: "bash", args: { command: `echo ${file} > ${file}` } },
+        { text: "wrote" },
+      ])
+      await wu.chat(
+        text,
+        at(two === undefined ? null : laneTip(two.name)),
+        BRANCH,
+      )
+      await idle()
+      const lane = laneWith(text)?.name
+      await waitFor(() => offerFor(lane)?.files.includes(file) === true, 30_000)
+      await wh.quiet()
+      return lane
+    }
+    const branchA = await branchWriting("@agent branch a", "branch-a.txt")
+    const aBefore = { files: filesOf(branchA), change: changeOf(branchA) }
+    await wu.offer(lane2 ?? ("" as LaneName), "take")
+    const shrunk = await waitFor(
+      () => filesOf(branchA) === JSON.stringify(["branch-a.txt"]),
+      30_000,
+    )
+    await wh.quiet()
+    ok(
+      aBefore.files === JSON.stringify(["after.txt", "branch-a.txt"]) &&
+        shrunk >= 0 &&
+        changeOf(branchA) === aBefore.change,
+      `taking a parent's offer shrinks its branch's offer to its own work, in place (${JSON.stringify({ before: aBefore.files, after: filesOf(branchA) })})`,
+    )
+    script.use([
+      { tool: "bash", args: { command: "echo more > more.txt" } },
+      { text: "more" },
+    ])
+    await wu.chat(
+      "still more",
+      at(lane2 === undefined ? null : laneTip(lane2)),
+      {
+        lane: lane2,
+      },
+    )
+    await idle()
+    await waitFor(() => offerOf()?.files.includes("more.txt") === true, 30_000)
+    const branchB = await branchWriting("@agent branch b", "branch-b.txt")
+    await wh.quiet()
+    const takenB = await wu.offer(branchB ?? ("" as LaneName), "take")
+    const withdrawn = await waitFor(() => offerOf() === undefined, 30_000)
+    ok(
+      takenB.kind === "taken" &&
+        withdrawn >= 0 &&
+        jj(
+          project,
+          "log",
+          "--no-graph",
+          "-r",
+          `bookmarks(exact:"${offerBookmarkOf(lane2)}")`,
+          "-T",
+          "commit_id",
+        ) === "",
+      `taking a branch that holds all its parent's work withdraws the parent's offer: no record, no bookmark (${JSON.stringify({ takenB, parent: offerOf()?.files })})`,
     )
 
     // ── 7. Archiving keeps each lane's newest snapshot; restoring runs again ─

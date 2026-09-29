@@ -108,6 +108,7 @@ import {
   forkPoint,
   type LandMessage,
   landingOutcome,
+  planNames,
   planResolution,
   planRetention,
   planStack,
@@ -127,11 +128,14 @@ import {
 import {
   readLaneRecords,
   readLanes,
+  readNames,
   readRevisions,
+  readThreadName,
   readTreeIndex,
 } from "@pineta/reads"
 import {
   readEntryMessage,
+  readLaneNames,
   readLaneTip,
   type SessionDocHandle,
 } from "@pineta/schema"
@@ -153,7 +157,12 @@ export interface LaneWork {
   readonly hooks: LaneHooks
   /** Refuse a lane asked to work directly in something that is not a directory. */
   checkDirectory(work: WorkSetting | null): Promise<ErrCode | null>
-  /** Record a new lane and, for its own copy, queue its fork. */
+  /**
+   * Name every lane that has none (ADR-0039): at start, and for a new lane,
+   * before its first run. One at a time, so two never plan the same name.
+   */
+  ensureNames(): Promise<void>
+  /** Record a new lane, name it, and, for its own copy, queue its fork. */
   prepareLane(
     lane: LaneName,
     work: WorkSetting | null,
@@ -631,7 +640,7 @@ export async function startLaneWork(input: {
       }),
     ).catch(error =>
       log(
-        `[host] lane ${lane.slice(-8)}: fetching into your repo failed: ${messageOf(error)}`,
+        `[host] ${readThreadName(doc, lane)}: fetching into your repo failed: ${messageOf(error)}`,
       ),
     )
     fetches.set(lane, fetched)
@@ -703,7 +712,7 @@ export async function startLaneWork(input: {
             })
             .catch(error => {
               log(
-                `[host] lane ${lane.slice(-8)}: the turn's snapshot failed: ${messageOf(error)}`,
+                `[host] ${readThreadName(doc, lane)}: the turn's snapshot failed: ${messageOf(error)}`,
               )
               return false
             })
@@ -715,7 +724,7 @@ export async function startLaneWork(input: {
             })
             .catch(error =>
               log(
-                `[host] lane ${lane.slice(-8)}: recording a turn failed: ${messageOf(error)}`,
+                `[host] ${readThreadName(doc, lane)}: recording a turn failed: ${messageOf(error)}`,
               ),
             ),
         )
@@ -726,7 +735,7 @@ export async function startLaneWork(input: {
       } catch (error) {
         // A missing revision only coarsens branching: the run goes on.
         log(
-          `[host] lane ${lane.slice(-8)}: recording a turn failed: ${messageOf(error)}`,
+          `[host] ${readThreadName(doc, lane)}: recording a turn failed: ${messageOf(error)}`,
         )
       }
     },
@@ -822,7 +831,7 @@ export async function startLaneWork(input: {
         })
         .catch(error =>
           log(
-            `[host] lane ${lane.slice(-8)}: stopping or trimming failed: ${messageOf(error)}`,
+            `[host] ${readThreadName(doc, lane)}: stopping or trimming failed: ${messageOf(error)}`,
           ),
         ),
     )
@@ -843,6 +852,26 @@ export async function startLaneWork(input: {
           log,
         })
 
+  let naming: Promise<unknown> = Promise.resolve()
+  function ensureNames(): Promise<void> {
+    const step = async () => {
+      const records = readLaneRecords(doc)
+      const planned = planNames(
+        readLaneNames(doc).map(stored => {
+          const lane = stored as LaneName
+          return { lane, createdAt: records.get(lane)?.createdAt ?? 0 }
+        }),
+        readNames(doc),
+        Date.now(),
+      )
+      for (const record of planned)
+        await input.agent().setWorkRecord({ kind: "name", record })
+    }
+    const run = naming.then(step, step)
+    naming = run.catch(() => {})
+    return run
+  }
+
   function beforeRun(lane: LaneName): void {
     if (!isOwn(lane)) return
     const handle = handleOf(lane)
@@ -852,7 +881,7 @@ export async function startLaneWork(input: {
         .enqueue(() => startContainer(lane), { fatal: true })
         .catch(error =>
           log(
-            `[host] lane ${lane.slice(-8)} cannot start: ${messageOf(error)}`,
+            `[host] ${readThreadName(doc, lane)} cannot start: ${messageOf(error)}`,
           ),
         ),
     )
@@ -897,12 +926,16 @@ export async function startLaneWork(input: {
       return found?.isDirectory() === true ? null : ERR.BAD_DIRECTORY
     },
 
+    ensureNames,
+
     async prepareLane(lane, work, at, by) {
+      if (work !== null)
+        await input.agent().setWorkRecord({
+          kind: "lane",
+          record: { lane, work, by, createdAt: Date.now() },
+        })
+      await ensureNames()
       if (work === null) return
-      await input.agent().setWorkRecord({
-        kind: "lane",
-        record: { lane, work, by, createdAt: Date.now() },
-      })
       if (work.kind !== "own" || root === null || paths === null) return
       const [base, disk] = [root, paths]
       const handle = handleOf(lane)
@@ -949,7 +982,7 @@ export async function startLaneWork(input: {
           )
           .catch(error =>
             log(
-              `[host] lane ${lane.slice(-8)}: forking failed: ${messageOf(error)}`,
+              `[host] ${readThreadName(doc, lane)}: forking failed: ${messageOf(error)}`,
             ),
           ),
       )
@@ -1100,7 +1133,7 @@ export async function startLaneWork(input: {
         })
       } catch (error) {
         log(
-          `[host] lane ${lane.slice(-8)}: the resolution's outcome failed: ${messageOf(error)}`,
+          `[host] ${readThreadName(doc, lane)}: the resolution's outcome failed: ${messageOf(error)}`,
         )
       }
     },
@@ -1148,7 +1181,7 @@ export async function startLaneWork(input: {
           if (tip !== null) await jj(["new", tip])
         })
         if (refused !== null)
-          log(`[host] lane ${lane.slice(-8)}: stack refused: ${refused}`)
+          log(`[host] ${readThreadName(doc, lane)}: stack refused: ${refused}`)
         return refused
       } catch (error) {
         return messageOf(error)

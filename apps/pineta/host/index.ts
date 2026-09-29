@@ -91,6 +91,7 @@ import {
   readOutbox,
   readParticipantNames,
   readParticipants,
+  readThreadName,
   readTreeIndex,
   workAt,
   worksOwn,
@@ -513,7 +514,9 @@ export async function startHost({
     }
     const updated = await work.prepareUpdate(lane, by)
     if ("refused" in updated) {
-      log(`[host] update ${lane.slice(-8)} refused: ${updated.refused}`)
+      log(
+        `[host] ${readThreadName(doc, lane)}: update refused: ${updated.refused}`,
+      )
       return { kind: "refused", code: ERR.REFUSED, message: updated.refused }
     }
     if (updated.kind === "conflicted")
@@ -615,9 +618,13 @@ export async function startHost({
   // A lane a crash interrupted holds its operation open: it is resumed, in its
   // own directory, before anything waiting for it (S36 item 18). Its run's end
   // drains it, as any run's does.
+  // Every lane has a name before anything runs (ADR-0039).
+  await work.ensureNames()
   const interrupted = await agent.interrupted()
   for (const lane of interrupted) {
-    log(`[host] resuming lane ${lane.slice(-8)}, which a crash interrupted`)
+    log(
+      `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,
+    )
     startRun(lane, { kind: "resume" })
   }
   void settle(
@@ -782,8 +789,10 @@ export async function startHost({
             message: "pi refused to start the thread's lane",
           }
         }
-        log(`[host] ${writer.slice(-8)} starts lane ${created.lane.slice(-8)}`)
         await work.prepareLane(created.lane, setting, planned.at, writer)
+        log(
+          `[host] ${writer.slice(-8)} starts ${readThreadName(doc, created.lane)}`,
+        )
         return {
           kind: "started",
           runId: startRun(created.lane, {

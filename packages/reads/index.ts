@@ -32,6 +32,7 @@ import {
   type RevisionRecord,
   rootOf,
   type ThreadLane,
+  type ThreadName,
   type TreeIndex,
   type WorkSetting,
   type WriterId,
@@ -54,7 +55,9 @@ import {
   LANE_NAMESPACE,
   landingRecords,
   laneRecords,
+  NAME_NAMESPACE,
   NOTE_NAMESPACE,
+  nameRecords,
   noteAt,
   noteRecords,
   OFFER_NAMESPACE,
@@ -317,6 +320,19 @@ export const readOffers = (
 /** The commits you have of lanes: delivered by a take, or copies of your `@`. */
 export const readHaves = (doc: SessionDocHandle): readonly HaveRecord[] =>
   haveRecords(readValues(doc, HAVE_NAMESPACE))
+
+/** Each lane's name (`pineta.name`, ADR-0039), by lane. */
+export const readNames = (
+  doc: SessionDocHandle,
+): ReadonlyMap<LaneName, ThreadName> =>
+  nameRecords(readValues(doc, NAME_NAMESPACE))
+
+/**
+ * A lane as people read it: its name, or, before the host has named it, the
+ * last eight characters of its id.
+ */
+export const readThreadName = (doc: SessionDocHandle, lane: LaneName): string =>
+  readNames(doc).get(lane) ?? lane.slice(-8)
 
 /** What the host found where it runs (`pineta.project`); null with no tools. */
 export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>

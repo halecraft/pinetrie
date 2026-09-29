@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S49 — An offer updated in place while its thread works ✅ PASS
+
+`findings/S49-offer-in-place.md`. Rebuilding an offer after every lane commit
+cost six operations in your repo and a new change id each time. Three
+operations update it in place instead (back onto its start, restore the new
+tip into it, onto the target again), keeping its change id and bookmark; the
+result has the tree a fresh build has, from a moved start as from a moved tip,
+conflicts included, and your `@` is untouched.
+
 ### S48 — Offers: a thread's work as one commit in your repo ✅ PASS
 
 `findings/S48-offers.md`. An offer is four host operations with

@@ -1,11 +1,12 @@
-// offer — a lane's work, as one revision or a stack in your repo (ADR-0038).
+// offer — a lane's work, as one revision or a stack in your repo (ADR-0038,
+// ADR-0039).
 //
 // Every decision an offer needs, pure, over what the host gathers from jj and
-// the document: what a trigger does to it (`planRefresh`), what the column shows and offers (`offerView`), whether
-// the agent's stack may replace it (`acceptStack`), and the commit-message
-// request (`describeRequest`, `withTrailers`, `placeholderDescription`). The
-// jj steps that carry them out, and where an offer starts (`offerStart`),
-// are planned in `@pineta/lanes`.
+// the document: what a trigger does to it (`planRefresh`), what the column
+// shows and offers (`offerView`), whether the agent's stack may replace it
+// (`acceptStack`), and the commit-message request (`describeRequest`,
+// `withTrailers`, `wipDescription`). The jj steps that carry them out, and
+// where an offer starts (`offerStart`), are planned in `@pineta/lanes`.
 
 import {
   type CommitId,
@@ -13,6 +14,7 @@ import {
   type LandingRecord,
   type LaneName,
   type OfferRecord,
+  type ThreadName,
 } from "@pineta/core"
 
 /** What the host found of one revision of an offer, against what it wrote. */
@@ -32,6 +34,8 @@ export interface RefreshFacts {
   readonly offer:
     | (Pick<OfferRecord, "size" | "taken"> & {
         readonly builtFrom: CommitId
+        /** Where it started when built or last followed. */
+        readonly builtOn: readonly CommitId[]
         readonly revisions: readonly RevisionFacts[]
         /** Its bottom's parent is an ancestor of the target (S48 item 7). */
         readonly placed: boolean
@@ -47,8 +51,12 @@ export interface RefreshFacts {
  * What a trigger does to a lane's offer:
  * - `none`: nothing to do;
  * - `build`: make an offer (there is none, or the last was taken);
- * - `rebuild`: the lane moved on under an unedited single offer;
- * - `stale`: the lane moved on under a stack: kept, marked stale;
+ * - `follow`: the lane, or where the offer starts, moved under an unedited
+ *   single offer: update it in place (ADR-0039, S49);
+ * - `withdraw`: where it starts reached the lane's tip, so it holds nothing
+ *   you lack: abandon it (S49 item 5);
+ * - `stale`: the lane, or where it starts, moved under a stack: kept, marked
+ *   stale;
  * - `refresh`: only the target moved: rebase the offer onto it;
  * - `leave`: you edited it; the host never touches it again;
  * - `repair`: a race left it divergent; keep yours, abandon the host's.
@@ -56,7 +64,8 @@ export interface RefreshFacts {
 export type RefreshPlan =
   | "none"
   | "build"
-  | "rebuild"
+  | "follow"
+  | "withdraw"
   | "stale"
   | "refresh"
   | "leave"
@@ -73,9 +82,18 @@ export function planRefresh(facts: RefreshFacts): RefreshPlan {
     !offer.placed ||
     offer.revisions.some(r => !r.sameDescription || !r.sameChange)
   if (edited) return "leave"
-  if (offer.builtFrom !== tip) return offer.size > 1 ? "stale" : "rebuild"
+  const moved =
+    offer.builtFrom !== tip || !sameCommits(offer.builtOn, facts.start)
+  if (moved) {
+    if (offer.size > 1) return "stale"
+    return nothingNew ? "withdraw" : "follow"
+  }
   return offer.onTarget ? "none" : "refresh"
 }
+
+/** Two starts name the same commits: a merge's parents in any order. */
+const sameCommits = (a: readonly CommitId[], b: readonly CommitId[]): boolean =>
+  a.length === b.length && a.every(c => b.includes(c))
 
 /** What a stack's check found: how many files differ from the lane's tip. */
 export function acceptStack(input: {
@@ -216,22 +234,30 @@ export function offerView(input: {
 
 // ── the commit message ────────────────────────────────────────────────────
 
+const THREAD_TRAILER = "Pineta-Thread"
 const LANE_TRAILER = "Pineta-Lane"
+const ENTRY_TRAILER = "Pineta-Entry"
 /** Room for "- (N earlier left out)". */
 const LEFT_OUT_NOTE = 32
-const ENTRY_TRAILER = "Pineta-Entry"
 
-/** The one line an offer carries until an agent describes it. */
-export const placeholderDescription = (thread: string): string =>
-  `offer: ${firstLine(thread, 60) || "this thread's work"}`
+/**
+ * The one line an offer carries until an agent describes it: a work in
+ * progress, named by its thread and the thread's own first message
+ * (ADR-0039).
+ */
+export const wipDescription = (name: ThreadName, first: string): string =>
+  `WIP (${name}): ${firstLine(first, 60) || "this thread's work"}`
 
-/** A message with the host's own trailers: the lane and the newest entry. */
+/** A message with the host's own trailers: the thread, the lane and the newest entry. */
 export const withTrailers = (
   message: string,
-  lane: LaneName,
-  entry: string,
+  at: {
+    readonly lane: LaneName
+    readonly name: ThreadName
+    readonly entry: string
+  },
 ): string =>
-  `${message.trim()}\n\n${LANE_TRAILER}: ${lane}\n${ENTRY_TRAILER}: ${entry}\n`
+  `${message.trim()}\n\n${THREAD_TRAILER}: ${at.name}\n${LANE_TRAILER}: ${at.lane}\n${ENTRY_TRAILER}: ${at.entry}\n`
 
 /**
  * The commit-message request: the skill as the system text, then your repo's

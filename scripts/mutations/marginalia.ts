@@ -288,4 +288,38 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "acceptStack",
   },
+  {
+    name: "a taken name is handed out again",
+    file: "packages/marginalia/names.ts",
+    from: "    if (!taken.has(name)) return name as ThreadName",
+    to: "    return name as ThreadName",
+    command: unit,
+    expect: "a taken name moves to the next free pair",
+  },
+  {
+    name: "a lane without a name is skipped",
+    file: "packages/marginalia/names.ts",
+    from: "    if (named.has(lane)) continue",
+    to: "    if (lane !== undefined) continue",
+    command: unit,
+    expect: "names only the unnamed",
+  },
+  {
+    name: "the trailers leave out the thread's name",
+    file: "packages/marginalia/offer.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  `${message.trim()}\\n\\n${THREAD_TRAILER}: ${at.name}\\n${LANE_TRAILER}: ${at.lane}\\n${ENTRY_TRAILER}: ${at.entry}\\n`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "  `${message.trim()}\\n\\n${LANE_TRAILER}: ${at.lane}\\n${ENTRY_TRAILER}: ${at.entry}\\n`",
+    command: unit,
+    expect: "withTrailers and the WIP line",
+  },
+  {
+    name: "an offer ignores a moved start",
+    file: "packages/marginalia/offer.ts",
+    from: "    offer.builtFrom !== tip || !sameCommits(offer.builtOn, facts.start)",
+    to: "    offer.builtFrom !== tip",
+    command: unit,
+    expect: "where it starts moved",
+  },
 ]

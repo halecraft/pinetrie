@@ -18,6 +18,7 @@ import {
   NO_EDITOR,
   type ProjectRecord,
   type SnapshotId,
+  type ThreadName,
   WORKSPACE_ROOT,
 } from "@pineta/core"
 
@@ -57,7 +58,8 @@ export const laneStackName = (lane: LaneName): string =>
   `stack@${laneRemote(lane)}`
 
 /** A lane's offer in your repo (ADR-0038). Not `pineta/…`: see `PINETA_HEADS`. */
-export const offerBookmark = (lane: LaneName): string => `pineta-offer/${lane}`
+export const offerBookmark = (name: ThreadName): string =>
+  `pineta-offer/${name}`
 
 /** The container and the volume of a lane share one name. */
 export const laneContainer = (lane: LaneName): string => `pineta-${lane}`
@@ -861,14 +863,19 @@ export const hostOp = (root: string, ...args: string[]): LaneStep =>
  * `pineta.have` records: lane commits a take delivered, and copies of your
  * `@` made in a lane (ADR-0038, S48 items 15 to 17). Without the copies, an
  * offer would hand your own uncommitted edits back to you. Several heads
- * start the offer from their merge.
+ * start the offer from their merge. A copy is made in a lane, so your repo
+ * holds it only once that lane's work is fetched: each have is `present()`,
+ * or one copy never fetched would fail every lane's revset.
  */
 export function offerStart(input: {
   readonly tip: CommitId
   readonly target: string
   readonly haves: readonly HaveRecord[]
 }): string {
-  const had = [input.target, ...input.haves.map(h => h.commit)].join(" | ")
+  const had = [
+    input.target,
+    ...input.haves.map(h => `present(${h.commit})`),
+  ].join(" | ")
   return `heads(::${input.tip} & ::(${had}))`
 }
 
@@ -897,7 +904,7 @@ export const nonceRevset = (nonce: string, i: number): string =>
  */
 export function planOffer(input: {
   readonly root: string
-  readonly lane: LaneName
+  readonly name: ThreadName
   readonly start: readonly CommitId[]
   readonly sources: readonly OfferSource[]
   readonly target: string
@@ -919,13 +926,13 @@ export function planOffer(input: {
   const top = sources.length - 1
   return [
     ...made,
-    hostOp(root, "rebase", "-s", at(0), "-o", input.target),
+    ...planRefreshOffer(root, at(0), input.target),
     hostOp(
       root,
       "bookmark",
       "set",
       "--allow-backwards",
-      offerBookmark(input.lane),
+      offerBookmark(input.name),
       "-r",
       at(top),
     ),
@@ -941,6 +948,39 @@ export const planRefreshOffer = (
   bottom: string,
   target: string,
 ): LaneStep[] => [hostOp(root, "rebase", "-s", bottom, "-o", target)]
+
+/**
+ * A single offer following its lane in place (ADR-0039): back onto where it
+ * starts now, the lane's tip restored into it, onto the target again. Its
+ * tree is then your target plus the lane's change since the start, which the
+ * tip's files cannot give where it sits; its change id and bookmark stay
+ * (S49). With `description`, it is described again: the WIP line, when the
+ * agent's message no longer describes it.
+ */
+export function planFollowOffer(input: {
+  readonly root: string
+  readonly change: string
+  readonly start: readonly CommitId[]
+  readonly tip: CommitId
+  readonly target: string
+  readonly description: string | null
+}): LaneStep[] {
+  const { root, change } = input
+  return [
+    hostOp(
+      root,
+      "rebase",
+      "-s",
+      change,
+      ...input.start.flatMap(c => ["-o", c]),
+    ),
+    hostOp(root, "restore", "--from", input.tip, "--into", change),
+    ...planRefreshOffer(root, change, input.target),
+    ...(input.description === null
+      ? []
+      : planDescribe(root, change, input.description)),
+  ]
+}
 
 /** An offer's revisions abandoned, to build it again. */
 export const planAbandonOffer = (
@@ -962,7 +1002,8 @@ export const planDescribe = (
  */
 export const planRepair = (input: {
   readonly root: string
-  readonly lane: LaneName
+  /** The offer's bookmark, as its record holds it. */
+  readonly bookmark: string
   readonly hosts: CommitId
   readonly yours: CommitId
   readonly top: boolean
@@ -975,7 +1016,7 @@ export const planRepair = (input: {
           "bookmark",
           "set",
           "--allow-backwards",
-          offerBookmark(input.lane),
+          input.bookmark,
           "-r",
           input.yours,
         ),
@@ -993,7 +1034,8 @@ export const planRepair = (input: {
  */
 export function planTakeOffer(input: {
   readonly root: string
-  readonly lane: LaneName
+  /** The offer's bookmark, as its record holds it. */
+  readonly bookmark: string
   readonly bottom: string
   readonly top: string
   readonly target: string
@@ -1031,7 +1073,7 @@ export function planTakeOffer(input: {
           ),
         ]
       : []),
-    hostOp(root, "bookmark", "delete", offerBookmark(input.lane)),
+    hostOp(root, "bookmark", "delete", input.bookmark),
   ]
 }
 

@@ -53,6 +53,7 @@ import {
   type LandMessage,
   labelCommands,
   NOTE_NAMESPACE,
+  OFFER_NAMESPACE,
   OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
   REFERENCE_NAMESPACE,
@@ -264,8 +265,10 @@ export interface Agent {
   setNote(note: NoteRecord): Promise<void>
   /** Store a root's archive record in `pineta.archive`, keyed by the root (ADR-0029). */
   setArchive(record: ArchiveRecord): Promise<void>
-  /** Store a lane, revision, landing or project record (ADR-0032, ADR-0033). */
+  /** Store one of the host's records (`WorkRecord`), under its namespace and key. */
   setWorkRecord(record: WorkRecord): Promise<void>
+  /** Delete a lane's offer record: the offer was withdrawn (ADR-0039). */
+  removeOffer(lane: LaneName): Promise<void>
   /** Lanes pi holds an operation open on: a crash interrupted them. */
   interrupted(): Promise<readonly LaneName[]>
   /**
@@ -650,6 +653,10 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     async setWorkRecord(record) {
       const { namespace, key, value: stored } = encodeWorkRecord(record)
       await put(namespace, key, stored)
+    },
+
+    async removeOffer(lane) {
+      await session.deleteValue(value(OFFER_NAMESPACE, lane), CTX)
     },
 
     async interrupted() {

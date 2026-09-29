@@ -31,6 +31,7 @@ export function Header({
   mentions,
   inbox,
   offers,
+  names,
   onOpen,
   me,
 }: {
@@ -45,17 +46,28 @@ export function Header({
   inbox: InboxView
   /** Threads with an offer open in your repo, at their lane's tip (ADR-0038). */
   offers: readonly { readonly lane: string; readonly tip: string }[]
+  /** Each lane's name: a thread's row leads with it (ADR-0039). */
+  names: ReadonlyMap<string, string>
   /** Open an entry as your tab (`planOpen`). */
   onOpen: (id: string) => void
   me: Me
 }) {
-  /** A thread as a row: its root's label, and the start of the message at `end`. */
-  const thread = (key: string, end: string, root: string): MenuItem => ({
+  /**
+   * A thread as a row: its lane's name when it has one, its root's label, and
+   * the start of the message at `end`.
+   */
+  const thread = (
+    key: string,
+    end: string,
+    root: string,
+    name?: string,
+  ): MenuItem => ({
     key,
     className: "here-thread",
     data: { entry: end },
     label: (
       <>
+        {name !== undefined && <span className="here-name">{name}</span>}
         <span className="here-root">{labelOf(root)}</span>
         <span className="here-at">
           {firstLine(messageText(index.entries[end]?.message), 48)}
@@ -86,7 +98,12 @@ export function Header({
             className="here-agent running"
             heading="The agent is working in"
             items={runs.map(r =>
-              thread(r.lane, r.tip, rootOf(index, r.tip) ?? r.tip),
+              thread(
+                r.lane,
+                r.tip,
+                rootOf(index, r.tip) ?? r.tip,
+                names.get(r.lane),
+              ),
             )}
             label={`the agent is working in ${runs.length} ${runs.length === 1 ? "thread" : "threads"}`}
             title="the agent is working"
@@ -105,7 +122,12 @@ export function Header({
           className="offers"
           heading="Offers in your repo"
           items={offers.map(o =>
-            thread(o.lane, o.tip, rootOf(index, o.tip) ?? o.tip),
+            thread(
+              o.lane,
+              o.tip,
+              rootOf(index, o.tip) ?? o.tip,
+              names.get(o.lane),
+            ),
           )}
           label={`${offers.length} ${offers.length === 1 ? "offer" : "offers"} ready in your repo`}
           title="offers ready to take"
