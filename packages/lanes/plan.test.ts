@@ -36,6 +36,7 @@ import {
   planForkSetup,
   planHost,
   planHostMounts,
+  planImages,
   planLinks,
   planMounts,
   planOffer,
@@ -818,6 +819,25 @@ describe("the host: its root, then container, in order", () => {
     expect(decide("stopped", "h1")).toBe("start")
     expect(decide("running", "h1")).toBe("running")
   })
+})
+
+test("planImages: Pineta's image is pinned to the app's Playwright, a project's is not", () => {
+  const input = {
+    pineta: { file: "/pineta/Containerfile", content: "FROM node" },
+    project: { file: "/p/pineta.Containerfile", content: "FROM alpine" },
+    jjVersion: "0.44.0",
+    playwrightVersion: "1.56.0",
+  }
+  const plans = planImages(input)
+  const bumped = planImages({ ...input, playwrightVersion: "1.57.0" })
+  expect(plans.pineta.buildArgs).toEqual([
+    "JJ_VERSION=0.44.0",
+    "PLAYWRIGHT_VERSION=1.56.0",
+  ])
+  expect(bumped.pineta.tag).not.toBe(plans.pineta.tag)
+  expect(plans.project?.buildArgs).toEqual(["JJ_VERSION=0.44.0"])
+  expect(bumped.project?.tag).toBe(plans.project?.tag)
+  expect(planImages({ ...input, project: null }).project).toBeNull()
 })
 
 test("imageRefusal: git 2.41 or later, named when missing or old", () => {

@@ -10,6 +10,7 @@
 
 import { createHash } from "node:crypto"
 import { mkdtemp, rm, stat } from "node:fs/promises"
+import { createRequire } from "node:module"
 import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import {
@@ -149,6 +150,18 @@ const TITLE_LENGTH = 72
 const LANE_MEMORY = "4G"
 const RETIRED =
   "this thread's lane predates lane containers (ADR-0034); branch from it to continue with its files"
+
+/**
+ * The `@playwright/test` this app resolves, whose browser the default lane
+ * image carries (ADR-0041). A dev dependency: the host runs from Pineta's
+ * repo, where `pnpm install` installs it.
+ */
+const playwrightVersion = (): string =>
+  (
+    createRequire(import.meta.url)("@playwright/test/package.json") as {
+      version: string
+    }
+  ).version
 
 export interface LaneWork {
   /** What the host found where it runs; null when it has no tools. */
@@ -353,7 +366,7 @@ export async function startLaneWork(input: {
   )
 
   async function prepare(at: string, disk: DiskPaths): Promise<Ready> {
-    const images = await prepareImages(at, log)
+    const images = await prepareImages(at, playwrightVersion(), log)
     const refused = await checkImage(images.lane)
     if (refused !== null) throw new Error(refused)
     const runtime = await ensureRuntime(

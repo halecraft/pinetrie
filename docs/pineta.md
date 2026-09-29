@@ -96,7 +96,7 @@ discharged before any non-disposable code was written.
 | unit (pure core) | `pnpm test` | 240/240 (Vitest) |
 | mutations | `pnpm mutate scripts/mutations/<list>.ts` | 116 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 118/118 |
+| end-to-end | `pnpm run e2e` | 140/140, on the scripted model |
 | with a real model | `pnpm run e2e:live` | 121/121 |
 | **real browser** | `pnpm run e2e:browser` | 71/71 |
 | types | `pnpm run typecheck` | clean (strict) |
@@ -303,15 +303,6 @@ exceptions *inside* it; reads are open with a `denyRead` blacklist.
 - **pnpm 12 cannot reach the registry** — its Rust fetcher validates through the
   macOS keychain and cannot see the sandbox CA. `packageManager: "pnpm@10.18.0"`
   routes through corepack's Node fetcher. **Do not remove that pin.**
-- **Chromium cannot be launched inside the jail.** Seatbelt denies
-  `mach-register`, which Chromium needs for `MachPortRendezvousServer`. Upstream
-  `anthropics/sandbox-runtime#210` is open with zero comments; PR #407
-  implemented `allowMachRegister` and was **closed unmerged**. No pi upgrade
-  fixes it.
-  **Workaround, and it works:** start a Playwright server *outside* the jail —
-  `pnpm exec playwright run-server --port 3100` — then `pnpm run e2e:browser`
-  drives it over loopback. The operator owns the browser; the agent owns the
-  automation.
 
 ### Kyneta
 

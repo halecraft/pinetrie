@@ -38,7 +38,7 @@ reasons are the ADRs in `docs/02-decisions.md`. Each package has a
 |---|---|
 | unit, conformance, e2e | `pnpm run verify` |
 | with a real model | `pnpm run e2e:live` |
-| in a real browser | `pnpm run e2e:browser` (needs `pnpm exec playwright run-server --port 3100` running outside the sandbox, and `container` running) |
+| in a real browser | `pnpm run e2e:browser` (its tools section needs `container` running; on the Mac, `pnpm --filter @pineta/app exec playwright install chromium-headless-shell` once) |
 | lanes of their own, in containers | `pnpm run e2e:lanes` (needs Apple's `container` running, outside the sandbox; `PINETA_LANES_SECTION=main,images,contract` runs some) |
 | deliberate bugs | `pnpm mutate scripts/mutations/<list>.ts [name]` |
 

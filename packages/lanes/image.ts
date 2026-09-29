@@ -1,15 +1,15 @@
-// lanes/image — the image a lane runs (ADR-0034).
+// lanes/image — the image a lane runs (ADR-0034, ADR-0041).
 //
 // Pineta's default image is built from `image/Containerfile`; a project's
 // own `pineta.Containerfile` at its root replaces it for the project's lanes.
-// Either is built once per change of its content (and of the host's jj
-// version, which the default pins), and tagged by that hash. The builder
-// holds 2 GiB while it runs (S42), so it is stopped after a build.
+// Either is built once per change of its content and build arguments: the
+// host's jj version for both, and the app's Playwright version for Pineta's
+// (`planImages`). The builder holds 2 GiB while it runs (S42), so it is
+// stopped after a build.
 
-import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import { imageRefusal } from "./plan.ts"
+import { type ImagePlan, imageRefusal, planImages } from "./plan.ts"
 import { describeFailure, run } from "./run.ts"
 
 const DEFAULT_CONTAINERFILE = path.join(
@@ -21,28 +21,6 @@ const PROJECT_CONTAINERFILE = "pineta.Containerfile"
 /** The `PATH` of an image that names none. */
 const STANDARD_PATH =
   "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-
-interface ImagePlan {
-  readonly file: string
-  readonly tag: string
-  readonly buildArgs: readonly string[]
-}
-
-/** The tag an image is built as: a hash of its Containerfile and build arguments. */
-function planImage(input: {
-  readonly file: string
-  readonly content: string
-  readonly jjVersion: string
-}): ImagePlan {
-  const buildArgs = [`JJ_VERSION=${input.jjVersion}`]
-  const hash = createHash("sha256")
-    .update(input.content)
-    .update("\0")
-    .update(buildArgs.join("\0"))
-    .digest("hex")
-    .slice(0, 12)
-  return { file: input.file, tag: `pineta-lane:${hash}`, buildArgs }
-}
 
 /** The host's jj version, which the default image's jj is pinned to. */
 async function hostJjVersion(): Promise<string> {
@@ -90,25 +68,33 @@ export async function imagePath(tag: string): Promise<string> {
 /**
  * The images a project's lanes need: Pineta's default, always, since the lane
  * runtime comes from it; and the project's own when it has a
- * `pineta.Containerfile`. Returns the tag lanes run.
+ * `pineta.Containerfile`. `playwrightVersion` is the app's
+ * `@playwright/test`, whose browser Pineta's image carries. Returns the tag
+ * lanes run.
  */
 export async function prepareImages(
   root: string,
+  playwrightVersion: string,
   log: (m: string) => void,
 ): Promise<{ readonly lane: string; readonly runtimeFrom: string }> {
-  const jjVersion = await hostJjVersion()
-  const pineta = planImage({
-    file: DEFAULT_CONTAINERFILE,
-    content: await readFile(DEFAULT_CONTAINERFILE, "utf8"),
-    jjVersion,
-  })
-  await ensureImage(pineta, log)
   const own = path.join(root, PROJECT_CONTAINERFILE)
-  const content = await readFile(own, "utf8").catch(() => null)
-  if (content === null) return { lane: pineta.tag, runtimeFrom: pineta.tag }
-  const project = planImage({ file: own, content, jjVersion })
-  await ensureImage(project, log)
-  return { lane: project.tag, runtimeFrom: pineta.tag }
+  const [jjVersion, pineta, project] = await Promise.all([
+    hostJjVersion(),
+    readFile(DEFAULT_CONTAINERFILE, "utf8"),
+    readFile(own, "utf8").catch(() => null),
+  ])
+  const plans = planImages({
+    pineta: { file: DEFAULT_CONTAINERFILE, content: pineta },
+    project: project === null ? null : { file: own, content: project },
+    jjVersion,
+    playwrightVersion,
+  })
+  await ensureImage(plans.pineta, log)
+  if (plans.project !== null) await ensureImage(plans.project, log)
+  return {
+    lane: (plans.project ?? plans.pineta).tag,
+    runtimeFrom: plans.pineta.tag,
+  }
 }
 
 /**

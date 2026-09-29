@@ -130,15 +130,26 @@ harness never emits them (S22). What each event does to the document is
   handlers and UI hooks are pi's coding agent's, and Pineta emits none of its
   events. A Claude subscription token works only through `pi-anthropic-auth`'s
   provider: without it, Anthropic refuses (S23).
-- **`named`:** `models.json` and `auth.json` only, for suites that call a real
-  model.
+- **`named`:** `models.json` and `auth.json` only, for `e2e:live`'s one real
+  run (ADR-0041).
 - **`scripted`:** pi-ai's faux provider (`scripted.ts`), for repeatable suites.
-  A second faux provider answers commit-message requests (`describe`, by
-  default `SCRIPTED_DESCRIPTION`) from a response that queues itself again,
-  so a describe request never takes a reply from the run's script (S48
-  item 22). `ModelSetup.describeModel` is that model when scripted, and the
-  run's model otherwise.
-  Its handle never leaves this package.
+  - A reply is the next step `use` queued, else the standing `answer`, else
+    an error reply. A request takes its step when it arrives.
+  - `pause(prompt)` holds the reply to the next request whose last user
+    message includes `prompt`, until `resume()` or the run's abort. Its
+    `reached` resolves when that request arrives, so a check sees the run in
+    progress for as long as it needs.
+  - A second faux provider answers commit-message requests (`describe`, by
+    default `SCRIPTED_DESCRIPTION`), so a describe request never takes a
+    reply from the run's script (S48 item 22). `ModelSetup.describeModel` is
+    that model when scripted, and the run's model otherwise.
+  - **Each request queues its own response** (`perRequest`): both providers
+    are wrapped so that `stream` and `streamSimple` append one dispatcher,
+    then delegate. Faux takes a response off its queue when a request
+    arrives, but runs a response factory a microtask later, so a factory
+    that queued itself again left the queue empty for a second request in
+    the same tick (S52 item 6).
+  - Its handles never leave this package.
 
 Loading runs every package's factory, so side effects happen (`pi-subagents`
 logs a warning). `pickModel` is the pure choice: an override's fields win over

@@ -1,7 +1,7 @@
 // e2e/lanes — lanes of their own, in real containers (ADR-0034).
 //
 //   pnpm run e2e:lanes    needs Apple's `container` running (macOS 26, Apple
-//                         silicon), as `e2e:browser` needs a Playwright server
+//                         silicon)
 //   PINETA_LANES_SECTION=main,images,shared,commands,contract
 //                         runs only the sections named, as a mutation that
 //                         one section catches does
@@ -10,7 +10,8 @@
 // - main: a host with a scripted model over a throwaway project, whose
 //   threads' agents each work in a Linux container on a disk cloned from
 //   where they branched;
-// - images: project images with no Node, and with no git;
+// - images: project images with no Node, and with no git, and the default
+//   image's browser;
 // - shared: directories every lane and you see, never branched (ADR-0035);
 // - commands: your pi skills' files, readable in a lane at /mnt/host
 //   (ADR-0036);
@@ -48,6 +49,7 @@ import {
   hostBytesRunner,
   hostOps,
   hostRunner,
+  PINETA_MOUNT,
   startOfOffer,
 } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
@@ -1083,6 +1085,32 @@ async function imagesSection(): Promise<void> {
     )
   } finally {
     await bare.close()
+  }
+
+  // Pineta's default image carries the browser its Playwright drives
+  // (ADR-0041). The check is an agent's command, so it sees the image's
+  // environment as an agent does.
+  const pineta = await sectionHost({
+    files: { "notes.txt": "the secret word is MANGO\n" },
+  })
+  try {
+    pineta.script.use([
+      {
+        tool: "bash",
+        args: {
+          command: `node --input-type=module -e 'const { chromium } = await import("${PINETA_MOUNT}/apps/pineta/node_modules/@playwright/test/index.mjs"); const b = await chromium.launch(); const p = await b.newPage(); await p.setContent("<p>LAUNCHED</p>"); console.log(await p.textContent("p"), b.version()); await b.close()'`,
+        },
+      },
+      { text: "done" },
+    ])
+    await pineta.user.chat("open a browser", ROOT, START_AGENT)
+    const launched = (await pineta.results("open a browser")).join("\n")
+    ok(
+      launched.includes("LAUNCHED"),
+      `on the default image, Pineta's Playwright launches Chromium (${launched.slice(0, 90)})`,
+    )
+  } finally {
+    await pineta.close()
   }
 }
 

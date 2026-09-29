@@ -462,7 +462,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   written, and each running tool's output, following its end as a column
   does. A reply's
   stream closes when its message ends, which a fast model can do between two
-  renders, so a check that must see one uses a slow scripted model.
+  renders, so a check that must see one uses a slow scripted model. A check
+  that must see a run in progress, not its reply, pauses the reply
+  (`ScriptedModel.pause`).
 - **Stop** shows in the composer while the thread's lane runs, and sends
   `stop`.
 - **Where a new thread's agent works** (ADR-0032). When a send would create a

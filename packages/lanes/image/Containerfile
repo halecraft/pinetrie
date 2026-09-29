@@ -1,7 +1,13 @@
-# Pineta's default lane image (ADR-0034): Debian trixie, Node 24, git 2.47
-# (jj needs 2.41 or later, S42 item 7), pnpm through corepack, and a static
-# jj pinned to the host's version. A project's own `pineta.Containerfile`
-# replaces it. The lane runtime is copied out of this image (`runtime.ts`).
+# Pineta's default lane image (ADR-0034, ADR-0041): the tools every lane can
+# count on.
+# - Debian trixie and Node 24.
+# - git 2.47: jj needs 2.41 or later (S42 item 7).
+# - pnpm, through corepack.
+# - A static jj, pinned to the host's version.
+# - Chromium's headless shell and its libraries, at the build Pineta's
+#   Playwright drives (`PLAYWRIGHT_VERSION`).
+# A project's own `pineta.Containerfile` replaces it. The lane runtime is
+# copied out of this image (`runtime.ts`).
 FROM docker.io/library/node:24-trixie-slim
 ARG JJ_VERSION
 RUN apt-get update -qq \
@@ -11,3 +17,7 @@ RUN apt-get update -qq \
     | tar -xz -C /usr/local/bin ./jj \
  && corepack enable
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ARG PLAYWRIGHT_VERSION
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium-headless-shell \
+ && rm -rf /var/lib/apt/lists/* /root/.npm

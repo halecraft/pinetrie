@@ -16,8 +16,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a scripted tool call drops its arguments",
     file: "packages/pi/scripted.ts",
-    from: "                    step.args as Parameters<typeof fauxToolCall>[1],",
-    to: "                    {},",
+    from: "          step.args as Parameters<typeof fauxToolCall>[1],",
+    to: "          {},",
     command: e2e,
     expect: "a read is stored as a call paired with its result",
   },
@@ -72,9 +72,27 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a scripted commit message takes from the run's script",
     file: "packages/pi/scripted.ts",
-    from: "    describer.appendResponses([answer])",
-    to: "    faux.appendResponses([answer])",
+    from: "    describe: perRequest(describer, () => describe),",
+    to: "    describe: run,",
     command: unit,
     expect: "commit messages from a provider of its own",
+  },
+  {
+    name: "a paused reply is not paused",
+    file: "packages/pi/scripted.ts",
+    from: "      await Promise.race([paused.resumed.promise, aborted(signal)])",
+    to: "",
+    command: unit,
+    expect: "a paused reply waits until resumed, and others pass it",
+  },
+  {
+    // The mutant: one factory that queues itself again, which faux runs a
+    // microtask after taking it off the queue (S52 item 6).
+    name: "concurrent requests share one dispatcher",
+    file: "packages/pi/scripted.ts",
+    from: "    const step = await choose(context, options?.signal)\n    return step === null ? NO_REPLY : render(step, context)\n  }\n  const base = faux.provider\n  const provider: Provider = {\n    id: base.id,\n    name: base.name,\n    auth: base.auth,\n    getModels: () => base.getModels(),\n    stream: (model, context, streamOptions) => {\n      faux.appendResponses([dispatch])\n      return base.stream(model, context, streamOptions)\n    },\n    streamSimple: (model, context, streamOptions) => {\n      faux.appendResponses([dispatch])\n      return base.streamSimple(model, context, streamOptions)\n    },\n  }\n  return { ...faux, provider }",
+    to: "    faux.appendResponses([dispatch])\n    const step = await choose(context, options?.signal)\n    return step === null ? NO_REPLY : render(step, context)\n  }\n  faux.setResponses([dispatch])\n  return faux",
+    command: unit,
+    expect: "three requests in one tick are each answered",
   },
 ]

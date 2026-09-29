@@ -18,9 +18,6 @@ client/loro_wasm_bg.wasm
 # allowWrite set. See docs/05-stack.md § sandbox.
 .pnpm-store/
 
-# Playwright browsers, redirected here for the same reason.
-.playwright-browsers/
-
 # Browser e2e artifact (regenerated each run)
 browser-screenshot.png
 

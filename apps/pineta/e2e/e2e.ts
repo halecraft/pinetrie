@@ -6,12 +6,12 @@
 // WebSocket stands in for the browser's. What is NOT exercised: any browser
 // runtime.
 //
-//   pnpm run e2e        offline: the model IS called, but its words are not checked
-//   pnpm run e2e:live   also asserts on what the model says
+//   pnpm run e2e        offline: every host's model is scripted
+//   pnpm run e2e:live   also asks a real model once, and checks its words
 //
-// The main host names its model; the tools and admission sections run their
-// own hosts with a scripted model, so their steps are repeatable and cost
-// nothing. No section uses the person's pi setup.
+// Every section but the live one runs on a scripted model, so its steps are
+// repeatable, cost nothing and need no key (ADR-0041). No section uses the
+// person's pi setup.
 
 import { existsSync, mkdtempSync, readFileSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -81,7 +81,13 @@ import {
 import { startHost } from "../host/index.ts"
 import { lineDocPrefix } from "../host/lines.ts"
 import { openStore } from "../host/store.ts"
-import { committedProject, createChecks, join, waitFor } from "./harness.ts"
+import {
+  committedProject,
+  createChecks,
+  join,
+  suiteModel,
+  waitFor,
+} from "./harness.ts"
 
 const LIVE = process.env.PINETA_LIVE === "1"
 const PROMPT = "Say exactly: PINETA-OK"
@@ -93,15 +99,10 @@ console.log(
   `=== Pineta — end to end (${LIVE ? "LIVE model" : "offline"}) ===\n`,
 )
 
-/** The suites' own model: never the person's pi setup, which costs them. */
-const NAMED = {
-  kind: "named",
-  provider: "cerebras",
-  model: "qwen-3.8-27b",
-} as const
+const script = suiteModel()
 const host = await startHost({
   port: 0,
-  model: NAMED,
+  model: { kind: "scripted", script },
   log: m => console.log(m),
 })
 console.log(`[e2e] host at ${host.httpUrl}\n`)
@@ -648,6 +649,9 @@ invariants("first turn")
   // The agent, asked in the conversation, gets a lane there, and reads it.
   // The five replies arrived in whatever order: the end is measured, not assumed.
   const end = followTip(tree(), idOf("five") ?? "")
+  // The reply echoes what the model was given before the prompt, which a
+  // real model would read; the prompt itself is left out, so it shows once.
+  script.use([{ reply: context => context.slice(0, -1).join("\n") }])
   const ask = await bob.chat(
     "@agent who told us a secret word, and what was it?",
     at(end),
@@ -673,15 +677,12 @@ invariants("first turn")
       ).length === 1,
     "the compelled message is the run's prompt, exactly once, where Bob was reading",
   )
-  if (LIVE) {
-    const reply =
-      projectTranscript(tree(), asked?.tip ?? null).at(-1)?.text ?? ""
-    console.log(`  agent said: ${JSON.stringify(reply)}`)
-    ok(
-      /plum/i.test(reply) && /alice/i.test(reply),
-      "LIVE: the agent answered from both speakers' messages",
-    )
-  }
+  const given = projectTranscript(tree(), asked?.tip ?? null).at(-1)?.text ?? ""
+  ok(
+    given.includes("Alice: the secret word is PLUM") &&
+      given.includes("Bob: one"),
+    "the agent is given every speaker's messages, attributed",
+  )
   invariants("conversation")
   await Promise.all([alice.close(), bob.close()])
 }
@@ -697,11 +698,12 @@ invariants("first turn")
     carol.setName("Carol"),
   ])
   const REMARK = "@Carol plain remark"
-  // A long answer, so the lane is still running when Bob and Carol send.
+  // Its reply is paused, so the lane is still running when Bob and Carol send.
   const QUESTION = "name a fruit, then write four sentences about it"
+  const answering = script.pause(QUESTION)
   const start = await alice.chat(QUESTION, ROOT, START_AGENT)
   ok(runOf(start) !== "", "Alice's question starts a thread's run")
-  await waitFor(() => idOf(QUESTION) !== null)
+  await waitFor(() => answering.reached, 10_000)
   const promptId = idOf(QUESTION)
   // This thread is agent work; Bob's remark names Carol, so it is for her only.
   // What Bob and Carol see: the thread ends at Alice's question.
@@ -723,6 +725,7 @@ invariants("first turn")
     `queue waits behind the message already waiting (${queued.kind}${queued.kind === "queued" ? ` ${queued.position}` : ""})`,
   )
   ok(readOutbox(host.doc).length === 2, "the outbox shows both, to everyone")
+  answering.resume()
   await idle()
   const thread = lanes().find(l =>
     projectTranscript(tree(), l.tip).some(m => m.text === QUESTION),
@@ -758,21 +761,22 @@ invariants("first turn")
 
   // Branch, instead of queueing: a separate line of work that runs at once.
   const lanesBefore = readLaneNames(host.doc).length
-  let both = false
+  const trees = script.pause("write four sentences about trees")
+  const aside = script.pause("separately: a tree?")
   const busy = await alice.chat(
     "@agent write four sentences about trees",
     at(thread?.tip ?? null),
   )
-  const watch = setInterval(() => {
-    if (Object.keys(host.doc.activeRuns()).length >= 2) both = true
-  }, 5)
   const branched = await bob.chat(
     "@agent separately: a tree?",
     at(promptId),
     BRANCH,
   )
+  await waitFor(() => trees.reached && aside.reached, 10_000)
+  const both = Object.keys(host.doc.activeRuns()).length >= 2
+  trees.resume()
+  aside.resume()
   await idle()
-  clearInterval(watch)
   ok(
     runOf(busy) !== "" &&
       runOf(branched) !== "" &&
@@ -932,17 +936,28 @@ invariants("first turn")
 // ── LIVE: what the model says ─────────────────────────────────────────────
 if (LIVE) {
   console.log("\n--- live turn ---")
-  const known = new Set(readLaneNames(host.doc))
-  const r = await client.chat(PROMPT, ROOT, START_AGENT)
+  // The suites' own real model: never the person's pi setup, which costs them.
+  const live = await startHost({
+    port: 0,
+    model: { kind: "named", provider: "cerebras", model: "qwen-3.8-27b" },
+    log: () => {},
+  })
+  const asker = await join(live, "asker", "live")
+  const r = await asker.chat(PROMPT, ROOT, START_AGENT)
   ok(runOf(r) !== "", "live prompt accepted")
-  await idle()
-  const lane = readLaneNames(host.doc).find(l => !known.has(l)) ?? ""
-  const last = projectTranscript(tree(), readLaneTip(host.doc, lane)).at(-1)
+  await waitFor(() => Object.keys(live.doc.activeRuns()).length === 0, 120_000)
+  const [lane] = readLaneNames(live.doc)
+  const last = projectTranscript(
+    readTreeIndex(live.doc),
+    lane === undefined ? null : readLaneTip(live.doc, lane),
+  ).at(-1)
   console.log(`  model said: ${JSON.stringify(last?.text)}`)
   ok(
     last?.role === "assistant" && last.text.includes("PINETA-OK"),
     "the model's reply contains the requested token",
   )
+  await asker.close()
+  await live.shutdown()
 }
 
 invariants("end")
@@ -1606,8 +1621,10 @@ invariants("end")
   )
 
   // 5. Sent to a busy lane, a plain draft waits, and is done once queued.
-  script.use([{ text: "A long answer. ".repeat(400) }])
+  script.use([{ text: "A long answer." }])
+  const longOne = script.pause("@agent a long one")
   await ada.chat("@agent a long one", at(grownEnd))
+  await waitFor(() => longOne.reached, 10_000)
   bea.noteText(draft2).text.insert(5, ", @Bea")
   await waitFor(() => nh.noteText(draft2) === "Later, @Bea", 5_000)
   const SEND2 = crypto.randomUUID()
@@ -1616,6 +1633,7 @@ invariants("end")
     sent2.kind === "queued" && record(draft2)?.state === "done",
     `a draft sent to a busy lane waits in its outbox, and is done (${sent2.kind})`,
   )
+  longOne.resume()
   await nIdle()
   const landed = readTreeIndex(nh.doc).bySend.get(SEND2)
   const sent2Note = record(draft2)
@@ -1692,14 +1710,13 @@ invariants("end")
 }
 
 // ── the archive: a root put aside for everyone (ADR-0029) ─────────────────
-// Its own host, with a store to restart over, and a slow scripted model so a
-// run can be caught while it is still going.
+// Its own host, with a store to restart over.
 {
   const dbFile = path.join(
     mkdtempSync(path.join(tmpdir(), "pineta-archive-")),
     "pineta.db",
   )
-  const script = scriptedModel({ tokensPerSecond: 40 })
+  const script = scriptedModel()
   const open = () =>
     startHost({
       model: { kind: "scripted", script },
@@ -1755,9 +1772,10 @@ invariants("end")
   )
 
   // 4. A root the agent is working in, with a message waiting, is not archived.
-  script.use([{ text: "a long slow answer ".repeat(20) }, { text: "ok" }])
+  script.use([{ text: "an answer" }, { text: "ok" }])
+  const answering = script.pause("@agent answer slowly")
   const asked = await bea.chat("@agent answer slowly", at(r2))
-  await waitFor(() => Object.keys(ah.doc.activeRuns()).length === 1, 10_000)
+  await waitFor(() => answering.reached, 10_000)
   const lane = readLanes(ah.doc, readTreeIndex(ah.doc))[0]
   const waiting = await ada.chat("@Bea meanwhile", at(lane?.tip ?? r2), {
     lane: lane?.name,
@@ -1772,6 +1790,7 @@ invariants("end")
       other.kind === "archived",
     `a root the agent works in is not archived, another root is (${refusal(busy)}; ${other.kind})`,
   )
+  answering.resume()
   await aIdle()
 
   // 5. Restored, it takes messages again.

@@ -387,4 +387,22 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "starts at the newest copy (S51)",
   },
+  {
+    name: "the image ignores Pineta's Playwright version",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "      `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,",
+    to: "",
+    command: unit,
+    expect: "planImages: Pineta's image is pinned to the app's Playwright",
+  },
+  {
+    name: "the image's browser is not the one Pineta's Playwright drives",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "      `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,",
+    to: '      "PLAYWRIGHT_VERSION=1.55.0",',
+    command: lanes("images"),
+    expect: "Pineta's Playwright launches Chromium",
+  },
 ]

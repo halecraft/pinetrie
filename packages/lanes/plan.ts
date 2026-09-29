@@ -1313,3 +1313,53 @@ export function imageRefusal(gitVersion: string): string | null {
     ? null
     : `the lane's image has git ${major}.${minor}; it needs 2.41 or later`
 }
+
+/** An image to build: its Containerfile, and the tag its content decides. */
+export interface ImagePlan {
+  readonly file: string
+  readonly tag: string
+  readonly buildArgs: readonly string[]
+}
+
+/** A Containerfile as read: its path and its text. */
+export interface Containerfile {
+  readonly file: string
+  readonly content: string
+}
+
+/**
+ * The images a project's lanes need (ADR-0034, ADR-0041). Pineta's is built
+ * with the host's jj version and the app's Playwright version, so its jj and
+ * its browser match what drives them. A project's own image gets the jj
+ * version only. Each is tagged by a hash of its Containerfile and build
+ * arguments, so a change of either builds it again.
+ */
+export function planImages(input: {
+  readonly pineta: Containerfile
+  /** The project's `pineta.Containerfile`, or null when it has none. */
+  readonly project: Containerfile | null
+  readonly jjVersion: string
+  readonly playwrightVersion: string
+}): { readonly pineta: ImagePlan; readonly project: ImagePlan | null } {
+  const jj = `JJ_VERSION=${input.jjVersion}`
+  return {
+    pineta: imagePlan(input.pineta, [
+      jj,
+      `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,
+    ]),
+    project: input.project === null ? null : imagePlan(input.project, [jj]),
+  }
+}
+
+function imagePlan(
+  containerfile: Containerfile,
+  buildArgs: readonly string[],
+): ImagePlan {
+  const hash = createHash("sha256")
+    .update(containerfile.content)
+    .update("\0")
+    .update(buildArgs.join("\0"))
+    .digest("hex")
+    .slice(0, 12)
+  return { file: containerfile.file, tag: `pineta-lane:${hash}`, buildArgs }
+}

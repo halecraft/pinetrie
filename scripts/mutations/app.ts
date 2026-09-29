@@ -1,6 +1,6 @@
 // Mutations for the host and the interface, checked by the e2e, live and
-// browser suites. Slow: each runs a whole suite. The browser suite needs the
-// Playwright server (see apps/pineta/e2e/browser.ts).
+// browser suites. Slow: each runs a whole suite. The browser suite needs
+// Chromium's headless shell (see apps/pineta/e2e/browser.ts).
 // Run: pnpm mutate scripts/mutations/app.ts [name-substring]
 import type { Mutation } from "../mutate.ts"
 
@@ -89,6 +89,15 @@ export const mutations: readonly Mutation[] = [
     to: "  d.command?.expanded ?? d.text",
     command: e2e,
     expect: "the stored content carries the speaker",
+  },
+  {
+    name: "the model is not told who spoke",
+    file: "packages/marginalia/chat.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  `${d.authorName}: ${d.command?.expanded ?? d.text}`",
+    to: "  d.command?.expanded ?? d.text",
+    command: e2e,
+    expect: "the agent is given every speaker's messages, attributed",
   },
   {
     name: "the live prompt asks for another token",

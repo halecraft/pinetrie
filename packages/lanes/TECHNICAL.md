@@ -13,15 +13,17 @@ containers, disks and the helper.
 ## Where things are
 
 - `plan.ts`: every decision, pure. It covers the container's arguments,
-  grants, link mounts, fork, turn, fetch and base steps, what the host
-  finds at startup, and every jj step on an offer in your repo.
+  grants, link mounts, fork, turn, fetch and base steps, the images and
+  their tags (`planImages`), what the host finds at startup, and every jj
+  step on an offer in your repo.
 - `execute.ts`: runs a list of `LaneStep`s in order, on the host or in the
   lane.
 - `run.ts`, `bookmarks.ts`, `revisions.ts`, `merge.ts`: jj and git as
   `Runner`s, and the jj logic over them. `offer.ts`: the reads an offer's
   decisions are made from.
 - `host.ts`: startup facts, lane configs and shared directories.
-- `image.ts`, `runtime.ts`: the image and the lane runtime.
+- `image.ts`, `runtime.ts`: the image and the lane runtime. `image.ts`
+  gathers what `planImages` needs and builds what it plans.
 - `disk.ts`: snapshots, deletion, trim. `lane.ts`: the container, the queue,
   and the handle. `base.ts`: the base snapshot.
 
@@ -140,6 +142,13 @@ containers, disks and the helper.
   to `sh -c`) and git 2.41 or later. Git launches its own helper programs, so
   it cannot be carried in from outside the image. `checkImage` refuses an
   image without them, naming what it lacks.
+- **Pineta's default image carries Chromium's headless shell** and its
+  libraries, in `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright` (ADR-0041). Its
+  build is pinned by `PLAYWRIGHT_VERSION`: `prepareImages` takes it from the
+  host, which resolves the app's `@playwright/test`, so a Playwright upgrade
+  builds the image again. The image's `ENV` reaches an agent's commands, so
+  `chromium.launch()` finds the browser with nothing set. A project image
+  gets no such argument and no browser.
 
 ## Containers
 
@@ -323,7 +332,8 @@ containers, disks and the helper.
   offers.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
   with a repo in a fork's `/tmp` for the config's scope, and the contract
-  test, in about 85 s. It has four sections, `main`,
+  test, in about 85 s. Its `images` section also launches Chromium,
+  through Pineta's Playwright, on the default image. It has four sections, `main`,
   `images`, `shared` and `contract`, and `PINETA_LANES_SECTION` picks some.
   Its hosts pass their own `userConfig`, so the person's own lane config
   never applies. Each

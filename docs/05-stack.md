@@ -294,7 +294,7 @@ Three consequences, all now handled:
 | D5 | Vitest | ✅ **done** — replaced `node --test` |
 | D6 | Biome | ✅ **done** — Kyneta's settings; caught a real lint bug on day one |
 | D8 | `verify` cascade | ✅ **done** — `lint → check → sanity → test → conformance → e2e` |
-| D9 | Playwright | ✅ **done, with a caveat** — 7/7, but the server must run OUTSIDE the jail (sandbox-runtime#210) |
+| D9 | Playwright | ✅ **done, with a caveat** — 7/7, but the server must run OUTSIDE the jail (sandbox-runtime#210). Since ADR-0041, the suite launches its own Chromium; no server |
 
 D7 (stay on Node) turned out load-bearing in a way we did not anticipate: **Node 24
 strips types natively**, so there is no build step and no `tsx` — `node host/server.ts`
