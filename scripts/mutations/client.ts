@@ -667,6 +667,14 @@ export const mutations: readonly Mutation[] = [
     expect: "grows faster nearer the edge",
   },
   {
+    name: "a fork point below its column's view is still aligned",
+    file: "packages/client/align.ts",
+    from: "  if (fork === null || first === null || fork.top >= fork.shownTo)",
+    to: "  if (fork === null || first === null)",
+    command: unit,
+    expect: "no spacer reaches it",
+  },
+  {
     name: "every asked message starts a stretch",
     file: columnView,
     from: "    if (owner === null || owner === stretches.at(-1)?.lane) continue",

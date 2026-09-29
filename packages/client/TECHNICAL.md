@@ -68,7 +68,8 @@ give labels and each tab's signals.
   rail, fork dots, references and the notes index all go through it; `App`
   carries the plan out.
 - **Columns of other tabs are unmounted.** Alignment forgets their keys, so a
-  tab shown again aligns its columns as if opened.
+  tab shown again aligns its columns as if opened, left to right, the first
+  at its end (Layout, below).
 - **The Archive tab** is `archive.tsx` over `archiveIndex`
   (`archive-rows.ts`, a client-only read like `projection.ts`). Its filter,
   search, selection and preview anchor are component state, never stored. The
@@ -334,6 +335,19 @@ grows a spacer above its first message) so that message is level with its fork
 point in the column showing it. A shared vertical scroll was tried in design
 and dropped: forks far apart could not be seen together
 (`docs/06-interface.md`).
+
+- **`placement` (`align.ts`) is the rule, pure;** `place` in `app.tsx`
+  measures, calls it, and scrolls or sets the spacer.
+- **Columns are placed left to right, the first at its end.** Every column of
+  a tab shown again mounts at the top, and `useFollow` takes the first to its
+  end only in a ResizeObserver callback, after the alignment effect. Measured
+  against an unplaced parent, a branch from far down it got a spacer the
+  height of the parent's content above the fork, with its own messages below
+  it (3141 px of blank in a 445 px view, in the browser suite).
+- **A fork point below the view of the column showing it counts as none:**
+  the column opens at its end. Level with it would be off screen, behind a
+  spacer taller than the view. A fork point above the view is still met, by
+  scrolling alone. So a spacer is never taller than the view it lines up with.
 
 ## Moving columns (`reorder.ts`, `use-column-drag.ts`)
 
@@ -641,6 +655,10 @@ shown by their email's part before the `@`. Each rendered chat carries its
 
 ## Gotchas
 
+- **A column mounts at `scrollTop` 0, and stays there through layout
+  effects.** `useFollow`'s first scroll to its end comes in its
+  ResizeObserver callback, a step later. Anything a layout effect measures
+  against another column (alignment does) must place that column first.
 - **A root tab's `⋯` is always rendered, hidden with `visibility`** except on
   the tab you are on, while hovered or focused, or while its menu is open
   (`Menu`'s wrapper, `.tab-more`, gains `open`). The menu is its child, so

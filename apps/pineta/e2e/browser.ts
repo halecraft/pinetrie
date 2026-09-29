@@ -1515,6 +1515,113 @@ try {
     await nv.close().catch(() => {})
   }
 
+  // ── a branch shown again after a return to its tab ──────────────────────
+  // Every column of a tab shown again mounts at the top. A branch from far
+  // down a long column must be aligned against where its parent ends up, not
+  // where it mounted. A person of their own, so `page`'s tabs are untouched.
+  {
+    const writer = await join(host, "long", "browser")
+    const lp = await browser.newPage()
+    await asPerson(lp, "lee@browser.test", "Lee")
+    try {
+      const ids: string[] = []
+      for (let n = 0; n < 30; n++) {
+        const at = ids.at(-1)
+        const r = await writer.chat(
+          `Message ${n} of a long thread.\nIts second line.\nIts third line.`,
+          at === undefined ? ROOT : atEntry(entryId(at)),
+          at === undefined ? { mode: "branch" } : {},
+        )
+        if (r.kind === "appended") ids.push(r.id)
+      }
+      const longRoot = ids[0] ?? ""
+      const forkId = ids.at(-2) ?? ""
+      await lp.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+      await openFromArchive(lp, longRoot)
+      await lp.waitForSelector(`${col(0)} .msg[data-entry="${ids.at(-1)}"]`, {
+        timeout: 15_000,
+      })
+      // Below its last message, so the branch does not move column 0 on.
+      const fork = `${col(0)} .msg[data-entry="${forkId}"]`
+      const aside = await writer.chat(
+        "a late aside",
+        atEntry(entryId(forkId)),
+        { mode: "branch" },
+      )
+      await lp.waitForSelector(`${fork} .open-branch`, { timeout: 15_000 })
+      await lp.click(`${fork} .open-branch`)
+      await lp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
+      await lp.click("#tabs .tab-archive")
+      await lp.waitForSelector('#tabs .tab-archive[aria-selected="true"]', {
+        timeout: 15_000,
+      })
+      await lp.click(tabSel(longRoot))
+      await lp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
+      await lp.evaluate(
+        () =>
+          new Promise(r =>
+            requestAnimationFrame(() => requestAnimationFrame(r)),
+          ),
+      )
+      const returned = await lp.evaluate(
+        ([parent, branch, forkSel]) => {
+          const pBody = document.querySelector(`${parent} .column-body`)
+          const bBody = document.querySelector(`${branch} .column-body`)
+          const forkMsg = document.querySelector(forkSel)
+          const first = document.querySelector(`${branch} .msg`)
+          const spacer = document.querySelector(`${branch} .spacer`)
+          if (
+            !(pBody instanceof HTMLElement) ||
+            !(bBody instanceof HTMLElement) ||
+            !(forkMsg instanceof HTMLElement) ||
+            first === null ||
+            spacer === null
+          )
+            return null
+          const shown = bBody.getBoundingClientRect()
+          const at = first.getBoundingClientRect().top
+          return {
+            depth: forkMsg.offsetTop - pBody.offsetTop,
+            screen: pBody.clientHeight,
+            drift: Math.abs(at - forkMsg.getBoundingClientRect().top),
+            inView: at >= shown.top && at < shown.bottom,
+            spacer: spacer.getBoundingClientRect().height,
+            height: bBody.clientHeight,
+          }
+        },
+        [col(0), col(1), fork] as const,
+      )
+      ok(
+        ids.length === 30 &&
+          aside.kind === "appended" &&
+          returned !== null &&
+          returned.depth > returned.screen,
+        `a fork far down a long column lies below its first screenful (${returned?.depth ?? "?"}px down, ${returned?.screen ?? "?"}px shown)`,
+      )
+      ok(
+        returned !== null &&
+          returned.drift <= 4 &&
+          returned.inView &&
+          returned.spacer < returned.height,
+        `a branch column is level with its fork point after a return to its tab (off by ${returned?.drift.toFixed(1) ?? "?"}px, in view ${returned?.inView ?? "?"}, spacer ${Math.round(returned?.spacer ?? -1)}px of ${returned?.height ?? "?"}px)`,
+      )
+      // The Archive tab reports no thread: Lee leaves no presence behind.
+      await lp.click("#tabs .tab-archive")
+      await page
+        .waitForFunction(
+          () => document.querySelector(".avatar") === null,
+          undefined,
+          {
+            timeout: 15_000,
+          },
+        )
+        .catch(() => null)
+    } finally {
+      await lp.close().catch(() => {})
+      await writer.close()
+    }
+  }
+
   // ── tools: rows, live output, and Stop, on a scripted host ─────────────
   {
     const work = committedProject("pineta-browser-tools-", {

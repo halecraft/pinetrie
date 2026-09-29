@@ -157,8 +157,9 @@ so it is the one behind the menu. What each does is under "Starting" below.
   scrolls to the branch's column. Sibling branches off one column never cross,
   as drawn lines would.
 - **Each column scrolls on its own.** A new column opens scrolled so its first
-  message is level with its fork point; after that it scrolls freely. Forks far
-  apart (message 2 and message 95 of a long trunk) are both readable at once.
+  message is level with its fork point when the fork point is on screen, and
+  at its end otherwise; after that it scrolls freely. Forks far apart (message
+  2 and message 95 of a long trunk) are both readable at once.
 - **A column at its end follows what is written there**, the agent's reply as
   it streams included. A scroll up holds it still; **↓ new below**, a scroll
   back to the end, or your own send brings it back.

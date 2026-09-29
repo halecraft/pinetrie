@@ -109,10 +109,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new column is not aligned with its fork point",
     file: "packages/client/app.tsx",
-    from: "      if (i > 0) alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)",
+    from: "      alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)",
     to: "      void i",
     command: browser,
     expect: "level with the fork point",
+  },
+  {
+    name: "the first column is placed after its branches are aligned",
+    file: "packages/client/app.tsx",
+    from: "      alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)",
+    to: "      if (i > 0) alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)",
+    command: browser,
+    expect: "after a return to its tab",
   },
   {
     name: "a fork dot takes another track's colour",

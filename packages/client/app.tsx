@@ -63,6 +63,7 @@ import {
   useState,
 } from "react"
 import { createRoot } from "react-dom/client"
+import { placement } from "./align.ts"
 import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { Column, type ColumnProps } from "./column.tsx"
@@ -146,9 +147,10 @@ const identityStore = deviceState<Identity>({
 
 /**
  * Bring a newly opened column's first message level with its fork point in
- * the column that shows it. A column with no fork point opens at its end.
- * Then tell the column it was placed, so it follows its end only if it was
- * placed there (`follow.ts`).
+ * the column that shows it (`placement`, `align.ts`). A column with no fork
+ * point, or with one below the view of the column showing it, opens at its
+ * end. Then tell the column it was placed, so it follows its end only if it
+ * was placed there (`follow.ts`).
  */
 function alignOnOpen(strip: HTMLElement, key: string, forkFrom: string | null) {
   const column = strip.querySelector<HTMLElement>(`.column[data-key="${key}"]`)
@@ -164,7 +166,7 @@ function alignOnOpen(strip: HTMLElement, key: string, forkFrom: string | null) {
   body.dispatchEvent(new Event(PLACED))
 }
 
-/** Scroll the column, or grow its spacer, to meet its fork point. */
+/** Measure the column and its fork point, then scroll it or grow its spacer as `placement` says. */
 function place(
   strip: HTMLElement,
   column: HTMLElement,
@@ -175,30 +177,33 @@ function place(
   const first = body.querySelector<HTMLElement>(".msg")
   const fork =
     forkFrom === null
-      ? null
+      ? undefined
       : [
           ...strip.querySelectorAll<HTMLElement>(
             `.msg[data-entry="${forkFrom}"]`,
           ),
         ].find(el => el.closest(".column") !== column)
-  if (
-    fork === null ||
-    fork === undefined ||
-    first === null ||
-    spacer === null
-  ) {
+  const shownIn = fork?.closest<HTMLElement>(".column-body")
+  const top = body.getBoundingClientRect().top
+  const plan = placement({
+    fork:
+      fork === undefined || shownIn === null || shownIn === undefined
+        ? null
+        : {
+            top: fork.getBoundingClientRect().top - top,
+            shownTo: shownIn.getBoundingClientRect().bottom - top,
+          },
+    first:
+      first === null || spacer === null
+        ? null
+        : first.offsetTop - body.offsetTop - spacer.offsetHeight,
+  })
+  if (plan.kind === "end") {
     body.scrollTop = body.scrollHeight
     return
   }
-  spacer.style.height = "0px"
-  const want =
-    fork.getBoundingClientRect().top - body.getBoundingClientRect().top
-  const offset = first.offsetTop - body.offsetTop
-  if (offset >= want) body.scrollTop = offset - want
-  else {
-    spacer.style.height = `${want - offset}px`
-    body.scrollTop = 0
-  }
+  if (spacer !== null) spacer.style.height = `${plan.spacer}px`
+  body.scrollTop = plan.scrollTop
 }
 
 /** How often a visible page refreshes its presence: well inside its 30 s decay. */
@@ -484,7 +489,12 @@ function App({ session }: { session: SessionClient }) {
   const strip = useRef<HTMLDivElement>(null)
 
   // Align each column once, when it appears. A column of another tab is
-  // unmounted, so it is aligned again when its tab is shown.
+  // unmounted, so it is aligned again when its tab is shown. Columns are
+  // placed left to right, the first at its end. A column mounts at the top,
+  // and `useFollow` scrolls it to its end only in its ResizeObserver
+  // callback, after this effect: unplaced, a column's parent would be
+  // measured at its top, and a fork point far down it would need a spacer
+  // taller than the screen.
   const aligned = useRef(new Set<string>())
   useLayoutEffect(() => {
     const el = strip.current
@@ -495,7 +505,7 @@ function App({ session }: { session: SessionClient }) {
     for (const [i, column] of columns.entries()) {
       if (aligned.current.has(column.key)) continue
       aligned.current.add(column.key)
-      if (i > 0) alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)
+      alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)
     }
   }, [columns, views])
 
