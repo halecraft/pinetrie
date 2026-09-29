@@ -74,6 +74,13 @@ containers, disks and the helper.
   point is an ancestor of its child's, so nothing needs reading from the lane.
   jj's `--repo` config lives in the home directory, which in a lane is the
   container's own and not on its disk.
+- **That setting applies to `/workspace` only.** `JJ_CONFIG` reaches every
+  jj command in the container, and a repo that lacks the fork commit fails
+  every command under it (S50). So `forkConfig` writes it in a
+  `[[--scope]]` with `--when.repositories = ["/workspace"]`. jj matches the
+  repo and every path under it, so a repo nested inside `/workspace` still
+  gets it. A lane made before the scope keeps its unscoped file: only a
+  fork's setup writes it.
 - **A base with several parents** (your `@` is a merge) is committed once,
   empty, so the lane's bookmark names one commit.
 
@@ -295,13 +302,15 @@ containers, disks and the helper.
   git, in throwaway repos on the host, with no container. It covers the base,
   a turn, a bundle fetch into your repo as a remote bookmark, an update with a
   conflict, forks from a turn and from a copy of your `@`, checked for
-  divergence and immutability; an offer built, refreshed, left, repaired,
+  divergence and immutability, and a repo beside a fork that the fork's
+  config leaves alone; an offer built, refreshed, left, repaired,
   taken under your edits and beside them, the next offer, and a stack; an
   offer following a moved tip, your conflicting commit and a moved start,
   each checked against a fresh build; and retiring a repo from before
   offers.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
-  with the contract test, in about 85 s. It has four sections, `main`,
+  with a repo in a fork's `/tmp` for the config's scope, and the contract
+  test, in about 85 s. It has four sections, `main`,
   `images`, `shared` and `contract`, and `PINETA_LANES_SECTION` picks some.
   Its hosts pass their own `userConfig`, so the person's own lane config
   never applies. Each

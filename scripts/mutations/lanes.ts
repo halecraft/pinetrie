@@ -84,11 +84,41 @@ export const mutations: readonly Mutation[] = [
     name: "the fork's immutable_heads() is not written",
     file: plan,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "      `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} ${immutable} > ${LANE_JJ_CONFIG}`,",
+    from: "      `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} ${WORKSPACE_ROOT} ${immutable} > ${LANE_JJ_CONFIG}`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "      `mkdir -p ${LANE_CONFIG_DIR}`,",
     command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
     expect: "the whole life of a lane",
+  },
+  {
+    name: "the fork's config applies to every repo",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  `[[--scope]]\\n--when.repositories = ["${repo}"]\\n[--scope.revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: '  `[revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
+    command: unit,
+    expect: "the whole life of a lane",
+  },
+  {
+    name: "the fork's config names another repo",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "      `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} ${WORKSPACE_ROOT} ${immutable} > ${LANE_JJ_CONFIG}`,",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "      `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} /nowhere ${immutable} > ${LANE_JJ_CONFIG}`,",
+    command: unit,
+    expect: "the whole life of a lane",
+  },
+  {
+    name: "a lane's scratch repo breaks",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  `[[--scope]]\\n--when.repositories = ["${repo}"]\\n[--scope.revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: '  `[revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
+    command: lanes("main"),
+    expect: "a jj repo outside the lane's own works in the lane",
   },
   {
     name: "the lane's queue lets a tool run before the turn's snapshot finishes",

@@ -2537,7 +2537,8 @@ and lanes exchange commits the way separate clones do.
   runs there, the lane:
   1. runs `jj new <the record's commit>`, so it has its own working-copy change;
   2. marks everything at or above its fork point immutable in its own config,
-     a file on its disk (`JJ_CONFIG`), so forks inherit it.
+     a file on its disk (`JJ_CONFIG`) that applies only to the lane's repo,
+     so forks inherit it (S50).
 
   A clone always carries someone else's working-copy change; without step 1,
   its first turn is that change, divergent from its parent's (S42 item 2).

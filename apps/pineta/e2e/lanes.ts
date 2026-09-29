@@ -441,6 +441,19 @@ async function mainSection(): Promise<void> {
         !rewrite.includes("exit 0"),
       `rewriting an inherited commit in a fork is refused (${rewrite.split("\n")[0] ?? ""})`,
     )
+    // The lane's config names a commit only its own repo has: any other repo
+    // it reached would fail every jj command (S50).
+    const scratch =
+      deeper === undefined
+        ? "no fork"
+        : inLane(
+            deeper.name,
+            'cd /tmp && rm -rf scratch && mkdir scratch && cd scratch && jj git init && jj commit -m x 2>&1; echo "exit $?"',
+          )
+    ok(
+      scratch.trim().endsWith("exit 0"),
+      `a jj repo outside the lane's own works in the lane (${scratch.trim().split("\n").at(-1) ?? ""})`,
+    )
 
     // ── 4. A file the agent wrote is whole in a branch at the next turn ─────
     script.use([

@@ -389,9 +389,9 @@ describe("immutable heads", () => {
     expect(withoutPinetaHeads(`(trunk()) | ${PINETA_HEADS}`)).toBe("trunk()")
     expect(withoutPinetaHeads("builtin_immutable_heads()")).toBeNull()
   })
-  test("forkConfig: jj's own heads and the fork point", () => {
-    expect(forkConfig([C1, C2])).toBe(
-      '[revset-aliases]\n"immutable_heads()" = "builtin_immutable_heads() | c1 | c2"\n',
+  test("forkConfig: jj's own heads and the fork point, in its repo only", () => {
+    expect(forkConfig("/workspace", [C1, C2])).toBe(
+      '[[--scope]]\n--when.repositories = ["/workspace"]\n[--scope.revset-aliases]\n"immutable_heads()" = "builtin_immutable_heads() | c1 | c2"\n',
     )
   })
 })
@@ -591,7 +591,7 @@ test("planFork: the clone, the container, then jj new before anything else, then
     `lane: ${fetchById([C1]).argv.join(" ")}`,
     "lane: jj new c1",
     `lane: jj bookmark set --allow-backwards pineta/${LANE} -r @-`,
-    `lane: sh -c mkdir -p /workspace/.pineta-lane && printf ${shellWord(forkConfig(["%s" as never]))} c1 > /workspace/.pineta-lane/jj.toml`,
+    `lane: sh -c mkdir -p /workspace/.pineta-lane && printf ${shellWord(forkConfig("%s", ["%s" as never]))} /workspace c1 > /workspace/.pineta-lane/jj.toml`,
   ])
 })
 

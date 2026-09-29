@@ -528,16 +528,26 @@ export function withoutPinetaHeads(current: string): string | null {
 }
 
 /**
- * A fork's whole jj config: everything at or above its fork point is
- * immutable, so the lane cannot rewrite a commit its parent or your repo
- * holds (S42 item 4). A parent's fork point is an ancestor of its child's, so
- * nothing needs reading from the lane first.
+ * A fork's whole jj config: in the repo at `repo`, everything at or above its
+ * fork point is immutable, so the lane cannot rewrite a commit its parent or
+ * your repo holds (S42 item 4). A parent's fork point is an ancestor of its
+ * child's, so nothing needs reading from the lane first.
+ *
+ * Scoped to `repo` because `JJ_CONFIG` reaches every jj command in the lane,
+ * and jj rejects the whole config in a repo that lacks the commit (S50).
+ * `repo` is a plain path, written into TOML unescaped.
  */
-export const forkConfig = (commits: readonly CommitId[]): string =>
-  `[revset-aliases]\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\n`
+export const forkConfig = (
+  repo: string,
+  commits: readonly CommitId[],
+): string =>
+  `[[--scope]]\n--when.repositories = ["${repo}"]\n[--scope.revset-aliases]\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\n`
 
-/** `forkConfig` with its one commit left to `printf`'s `%s`. */
-const FORK_CONFIG_TEMPLATE = forkConfig(["%s" as CommitId])
+/**
+ * `forkConfig` with the repo and its one commit left to `printf`'s two `%s`,
+ * in that order.
+ */
+const FORK_CONFIG_TEMPLATE = forkConfig("%s", ["%s" as CommitId])
 
 /** One command, as data. `lane` runs through the lane's runner, `host` on the host. */
 export type LaneStep =
@@ -684,7 +694,7 @@ export function planForkSetup(
       "@-",
     ),
     laneShell(
-      `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} ${immutable} > ${LANE_JJ_CONFIG}`,
+      `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} ${WORKSPACE_ROOT} ${immutable} > ${LANE_JJ_CONFIG}`,
     ),
     ...(install === null ? [] : [laneShell(install)]),
   ]

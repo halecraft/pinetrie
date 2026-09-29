@@ -17,6 +17,7 @@ import {
   laneNameForThread,
   NO_EDITOR,
   type ThreadName,
+  WORKSPACE_ROOT,
 } from "@pineta/core"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import {
@@ -36,6 +37,7 @@ import {
   hostJj,
   hostOps,
   hostRunner,
+  LANE_JJ_CONFIG,
   type LaneStep,
   laneIgnores,
   laneTipIn,
@@ -146,12 +148,18 @@ const onHost = (steps: readonly LaneStep[], dirs: Record<string, string>) =>
     ),
   }))
 
-/** jj on a lane's repo, with the lane's own config, as `JJ_CONFIG` gives it in a container. */
+/** Where a lane's jj config is, from the lane's root. */
+const LANE_CONFIG = path.relative(WORKSPACE_ROOT, LANE_JJ_CONFIG)
+
+/**
+ * jj on the repo at `dir`, with `config` as `JJ_CONFIG` gives it in a
+ * container: by default the lane's own, at `dir`.
+ */
 const laneJjAt =
-  (dir: string): Runner =>
+  (dir: string, config = path.join(dir, LANE_CONFIG)): Runner =>
   args =>
     run("jj", ["-R", dir, "--no-pager", "--color=never", ...args], {
-      env: { ...NO_EDITOR, JJ_CONFIG: path.join(dir, ".pineta-lane/jj.toml") },
+      env: { ...NO_EDITOR, JJ_CONFIG: config },
     })
 
 describe("a lane's repo, with jj", () => {
@@ -409,6 +417,18 @@ describe("a lane's repo, with jj", () => {
     expect(
       (await rootJj(["describe", "-r", rootCopy ?? "", "-m", "x"])).ok,
     ).toBe(false)
+    // Only in the lane's repo: another repo under the same config lacks the
+    // fork point, and would fail every command if the config reached it (S50).
+    const scratch = path.join(top, "scratch")
+    await run("jj", ["git", "init", scratch])
+    expect(
+      (
+        await laneJjAt(
+          scratch,
+          path.join(rootDir, LANE_CONFIG),
+        )(["commit", "-m", "x"])
+      ).ok,
+    ).toBe(true)
     await writeFile(path.join(rootDir, "root.txt"), "root\n")
     await commitTurn(rootJj, { ...turn, lane: ROOT, entry: entryId("e-7") })
     await fetchInto(rootDir, ROOT, [])
