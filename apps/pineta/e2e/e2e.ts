@@ -65,6 +65,7 @@ import {
   readTreeIndex,
 } from "@pineta/reads"
 import {
+  noteDocId,
   readActiveRun,
   readEntries,
   readEntryMessage,
@@ -152,18 +153,23 @@ const storedLines = async (store: Store): Promise<string[]> => {
  * its store to load then starts from an empty session. A proxy, so everything
  * else, its seat included, is the store's own.
  */
-const slowToLoad = (store: Store, ms: number): Store =>
+/** A store whose documents (those `only` accepts, else all) take `ms` to load. */
+const slowToLoad = (
+  store: Store,
+  ms: number,
+  only: (docId: string) => boolean = () => true,
+): Store =>
   new Proxy(store, {
     get(target, key, receiver) {
       if (key === "loadAll")
         return (docId: string) =>
           (async function* () {
-            await sleep(ms)
+            if (only(docId)) await sleep(ms)
             yield* target.loadAll(docId)
           })()
       if (key === "currentMeta")
         return async (docId: string) => {
-          await sleep(ms)
+          if (only(docId)) await sleep(ms)
           return target.currentMeta(docId)
         }
       const value = Reflect.get(target, key, receiver)
@@ -1658,7 +1664,22 @@ invariants("end")
   }
   await Promise.all([ada.close(), bea.close()])
   await nh.shutdown()
-  nh = await open()
+  // Only this note's text loads slowly. The startup sweep holds every note
+  // too, but in a step `startHost` does not wait for: a host that held its
+  // notes only there would return with this one not yet held, and a client
+  // could edit it before its edits were attributed.
+  const reopened = openStore(dbFile)
+  nh = await startHost({
+    model: { kind: "scripted", script },
+    store: slowToLoad(reopened.store, 3_000, id => id === noteDocId(n1)),
+    blobs: reopened.blobs,
+    log: () => {},
+  })
+  const heldAtStart = nh.noteText(n1)
+  ok(
+    heldAtStart === before.text,
+    `a starting host holds every note's text before it returns (${heldAtStart === undefined ? "not held" : "held"})`,
+  )
   const eve = await join(nh, "eve", "notes")
   const eveText = eve.noteText(n1)
   const back = await waitFor(() => eveText.text() === before.text, 5_000)

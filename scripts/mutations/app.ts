@@ -401,7 +401,7 @@ export const mutations: readonly Mutation[] = [
     from: "  for (const n of readNotes(doc)) await notes.hold(n.id, null)",
     to: "  void notes.hold",
     command: e2e,
-    expect: "every note's record and text are back",
+    expect: "a starting host holds every note's text before it returns",
   },
   {
     name: "a note's rail dot takes the note card's class",
