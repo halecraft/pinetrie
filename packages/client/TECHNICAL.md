@@ -237,9 +237,18 @@ in it opens a tab until you choose.
   renaming yourself still changes which mentions are yours.
 - **`Popover`** (`popover.tsx`) is a trigger and the box it opens. It wraps
   both in a span that gains `open` while open, which keeps `.tab-more.open`
-  visible; the box is `position: fixed` from the trigger's rect, and Escape,
-  a scroll, a resize or a click elsewhere closes it. `role` is `menu` or
-  `dialog`: a dialog's box takes the role, and a menu's list does.
+  visible; the box is `position: fixed` from the trigger's rect. Escape, a
+  scroll of an element holding the trigger, a resize or a click elsewhere
+  closes it. Escape is one document listener while open, taken with focus in
+  the trigger or the box, or on nothing: live data can remove the item that
+  held focus. `role` is `menu` or `dialog`: a dialog's box takes the role,
+  and a menu's list does.
+- **A trigger from live data is `gone`, not unmounted.** Unmounting a
+  `Popover` takes its open box with it, so a change in the session would
+  close a menu you opened. The header keeps its agent and offers menus
+  mounted with `gone` when there is nothing to list (no trigger drawn unless
+  open), and keeps a person who leaves while their menu is open
+  (`withOpenMenus`, told by `onToggle`) until you close it.
 - **`Menu`** (`menu.tsx`) is a `Popover` whose box is a `role="menu"` list:
   the header's people, agent, offers and `@`, the tab's `⋯`, the add tab's
   menu and the composer's where chip. Items can carry `data-*` attributes
@@ -976,9 +985,11 @@ shown by their email's part before the `@`. Each rendered chat carries its
 - **Anything that pops out of the tab bar is `position: fixed`.** `.tab-list`
   scrolls sideways, and `overflow-x: auto` makes its vertical overflow `auto`
   too, so a menu positioned inside it is clipped below the bar. `Popover`
-  places its box from its trigger's rect when opened, and closes on any
-  scroll outside the box or a resize, since a fixed box would drift from its
-  trigger.
+  places its box from its trigger's rect when opened, and closes on a
+  resize or a scroll of an element holding the trigger, since a fixed box
+  would drift from its trigger. Not on any scroll outside the box: a column
+  following its end scrolls whenever an entry arrives, which closed every
+  open menu (the header's @ among them) without the person doing anything.
 - **Playwright clicks what a person cannot see.** It scrolls a clipped element
   into view before clicking, so a check that a popup can be clicked does not
   show it is visible. Check what `elementFromPoint` finds at its centre: the

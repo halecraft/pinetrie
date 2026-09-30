@@ -1,6 +1,11 @@
 import { type EntryLike, indexTree, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
-import { peopleHere, readersByRoot } from "./here.ts"
+import {
+  peopleHere,
+  readersByRoot,
+  toggleOpenMenu,
+  withOpenMenus,
+} from "./here.ts"
 
 const ADA = writerId("ada")
 const BEA = writerId("bea")
@@ -52,4 +57,41 @@ test("readersByRoot turns people around: each root with its readers, each once",
     ["1-r1", [BEA, CY]],
     ["3-r2", [BEA]],
   ])
+})
+
+test("withOpenMenus keeps a person who left while their menu is open, where they were", () => {
+  const bea = { writer: BEA, threads: [{ end: "2-a", root: "1-r1" }] }
+  const cy = { writer: CY, threads: [{ end: "3-r2", root: "3-r2" }] }
+  expect(withOpenMenus([bea, cy], new Map())).toEqual([
+    { person: bea, gone: false },
+    { person: cy, gone: false },
+  ])
+  // Ada's menu opened when she was first; she has left.
+  expect(withOpenMenus([bea, cy], new Map([[ADA, 0]]))).toEqual([
+    { person: { writer: ADA, threads: [] }, gone: true },
+    { person: bea, gone: false },
+    { person: cy, gone: false },
+  ])
+  // Past the end, a gone person goes last; one still here is only drawn once.
+  expect(
+    withOpenMenus(
+      [bea],
+      new Map([
+        [BEA, 0],
+        [CY, 5],
+      ]),
+    ),
+  ).toEqual([
+    { person: bea, gone: false },
+    { person: { writer: CY, threads: [] }, gone: true },
+  ])
+})
+
+test("toggleOpenMenu records an opening and forgets a closing, the same map when nothing changed", () => {
+  const none = new Map()
+  expect(toggleOpenMenu(none, BEA, 0, false)).toBe(none)
+  const opened = toggleOpenMenu(none, BEA, 1, true)
+  expect([...opened]).toEqual([[BEA, 1]])
+  expect(toggleOpenMenu(opened, BEA, 1, true)).toBe(opened)
+  expect([...toggleOpenMenu(opened, BEA, 1, false)]).toEqual([])
 })

@@ -1028,4 +1028,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a card found attaches; a card gone detaches",
   },
+  {
+    name: "a person who leaves takes their open menu with them",
+    file: "packages/client/here.ts",
+    from: "    .filter(([writer]) => !here.has(writer))",
+    to: "    .filter(() => false)",
+    command: unit,
+    expect: "withOpenMenus keeps a person who left",
+  },
 ]

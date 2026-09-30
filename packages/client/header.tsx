@@ -3,7 +3,8 @@
 // (`profile.tsx`). Your tabs are your view; this is the rest of the session.
 // People and the agent come from live data (presence, the running lanes), the
 // inbox from the tree and this device's seen state. Nothing here opens a tab
-// until you choose.
+// until you choose, and nothing closes a menu you opened: a trigger whose
+// live data has gone stays until you close its menu (`Popover`'s `gone`).
 
 import {
   type AgentRun,
@@ -15,7 +16,12 @@ import {
 } from "@pineta/core"
 import { useState } from "react"
 import { AGENT_MARK } from "./column-view.ts"
-import type { PersonHere } from "./here.ts"
+import {
+  type OpenMenus,
+  type PersonHere,
+  toggleOpenMenu,
+  withOpenMenus,
+} from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, nameFor } from "./presence.tsx"
@@ -53,6 +59,9 @@ export function Header({
   onOpen: (id: string) => void
   me: Me
 }) {
+  const [openMenus, setOpenMenus] = useState<OpenMenus>(new Map())
+  const working = runs.length > 0
+  const offering = offers.length > 0
   /**
    * A thread as a row: its lane's name when it has one, its root's label, and
    * the start of the message at `end`.
@@ -80,13 +89,21 @@ export function Header({
   return (
     <div className="header-right">
       <div className="here">
-        {people.map(p => (
+        {withOpenMenus(people, openMenus).map(({ person: p, gone }, at) => (
           <Menu
             className="here-person"
-            heading={`${nameFor(nameOf, p.writer)} is in`}
+            gone={gone}
+            heading={
+              gone
+                ? `${nameFor(nameOf, p.writer)} has left`
+                : `${nameFor(nameOf, p.writer)} is in`
+            }
             items={p.threads.map(t => thread(t.end, t.end, t.root))}
             key={p.writer}
             label={`${nameFor(nameOf, p.writer)}: where they are`}
+            onToggle={open =>
+              setOpenMenus(m => toggleOpenMenu(m, p.writer, at, open))
+            }
             title={nameFor(nameOf, p.writer)}
             trigger={
               <Avatar colorOf={colorOf} nameOf={nameOf} writer={p.writer} />
@@ -94,55 +111,65 @@ export function Header({
             triggerClassName="here-trigger"
           />
         ))}
-        {runs.length > 0 && (
-          <Menu
-            className="here-agent running"
-            heading="The agent is working in"
-            items={runs.map(r =>
-              thread(
-                r.lane,
-                r.tip,
-                rootOf(index, r.tip) ?? r.tip,
-                names.get(r.lane),
-              ),
-            )}
-            label={`the agent is working in ${runs.length} ${runs.length === 1 ? "thread" : "threads"}`}
-            title="the agent is working"
-            trigger={
-              <>
-                <span className="initial agent-mark">{AGENT_MARK}</span>
-                <span className="here-count">{runs.length}</span>
-              </>
-            }
-            triggerClassName="here-trigger"
-          />
-        )}
-      </div>
-      {offers.length > 0 && (
         <Menu
-          className="offers"
-          heading="Offers in your repo"
-          items={offers.map(o =>
+          className={working ? "here-agent running" : "here-agent"}
+          gone={!working}
+          heading={
+            working ? "The agent is working in" : "The agent has finished"
+          }
+          items={runs.map(r =>
             thread(
-              o.lane,
-              o.tip,
-              rootOf(index, o.tip) ?? o.tip,
-              names.get(o.lane),
+              r.lane,
+              r.tip,
+              rootOf(index, r.tip) ?? r.tip,
+              names.get(r.lane),
             ),
           )}
-          label={`${offers.length} ${offers.length === 1 ? "offer" : "offers"} ready in your repo`}
-          title="offers ready to take"
+          label={
+            working
+              ? `the agent is working in ${runs.length} ${runs.length === 1 ? "thread" : "threads"}`
+              : "the agent has finished"
+          }
+          title={working ? "the agent is working" : "the agent has finished"}
           trigger={
             <>
-              <span className="offer-mark">⇣</span>
+              <span className="initial agent-mark">{AGENT_MARK}</span>
+              {working && <span className="here-count">{runs.length}</span>}
+            </>
+          }
+          triggerClassName="here-trigger"
+        />
+      </div>
+      <Menu
+        className="offers"
+        gone={!offering}
+        heading={offering ? "Offers in your repo" : "No offers left to take."}
+        items={offers.map(o =>
+          thread(
+            o.lane,
+            o.tip,
+            rootOf(index, o.tip) ?? o.tip,
+            names.get(o.lane),
+          ),
+        )}
+        label={
+          offering
+            ? `${offers.length} ${offers.length === 1 ? "offer" : "offers"} ready in your repo`
+            : "no offers left to take"
+        }
+        title={offering ? "offers ready to take" : "no offers left to take"}
+        trigger={
+          <>
+            <span className="offer-mark">⇣</span>
+            {offering && (
               <span className="offers-count" data-offers={offers.length}>
                 {offers.length}
               </span>
-            </>
-          }
-          triggerClassName="offers-trigger"
-        />
-      )}
+            )}
+          </>
+        }
+        triggerClassName="offers-trigger"
+      />
       <InboxMenu
         inbox={inbox}
         labelOf={labelOf}

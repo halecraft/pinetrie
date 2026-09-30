@@ -32,6 +32,8 @@ export function Menu({
   title,
   heading,
   items,
+  onToggle,
+  gone,
 }: {
   /** The wrapper's class; `open` is added while the menu is open. */
   className: string
@@ -47,15 +49,21 @@ export function Menu({
    */
   heading?: string
   items: readonly MenuItem[]
+  /** `Popover`'s: told when the menu opens or closes. */
+  onToggle?: (open: boolean) => void
+  /** `Popover`'s: no trigger is drawn, except while the menu is open. */
+  gone?: boolean
 }) {
   return (
     <Popover
       boxClassName="popover menu"
       className={className}
+      gone={gone}
       heading={heading}
       label={label}
       // Opened, the first item takes focus.
       onOpen={box => focusable(box)[0]?.focus()}
+      onToggle={onToggle}
       role="menu"
       title={title}
       trigger={trigger}
@@ -66,11 +74,6 @@ export function Menu({
           aria-label={headingId === undefined ? label : undefined}
           aria-labelledby={headingId}
           onKeyDown={e => {
-            if (e.key === "Escape") {
-              e.preventDefault()
-              close(true)
-              return
-            }
             if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return
             e.preventDefault()
             const all = focusable(e.currentTarget)

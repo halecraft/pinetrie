@@ -5,8 +5,13 @@
 // rect when it opens (above it, for a trigger in the window's lower half): the
 // tab list scrolls sideways, which clips it vertically too, so a box
 // positioned inside it would be cut off (`TECHNICAL.md`, Gotchas). Being
-// fixed, it would drift from its trigger on a scroll outside it or a resize,
-// so either closes it, as do Escape and a click elsewhere.
+// fixed, it would drift from its trigger on a scroll that moves the trigger
+// or a resize, so either closes it, as do Escape and a click elsewhere. Only
+// a scroll of an element holding the trigger moves it: a column following
+// its end scrolls as entries arrive, and must not close a menu elsewhere.
+//
+// Nothing else closes it, so a trigger drawn from live data that has gone
+// (`gone`) stays while its box is open, and leaves when the person closes it.
 
 import {
   type ReactNode,
@@ -39,6 +44,8 @@ export function Popover({
   boxClassName,
   heading,
   onOpen,
+  onToggle,
+  gone = false,
   children,
 }: {
   /** The wrapper's class; `open` is added while the box is open. */
@@ -61,6 +68,13 @@ export function Popover({
   heading?: string
   /** Called each time the box is drawn anew: where focus goes. */
   onOpen: (box: HTMLElement) => void
+  /** Called when the box opens or closes, and once, closed, when mounted. */
+  onToggle?: (open: boolean) => void
+  /**
+   * What the trigger stood for has gone: it is not drawn, except while its
+   * box is open, which stays until the person closes it.
+   */
+  gone?: boolean
   children: (api: PopoverApi) => ReactNode
 }) {
   // Below its trigger; above it when the trigger is in the window's lower
@@ -94,29 +108,57 @@ export function Popover({
     if (open && box.current !== null) onOpen(box.current)
   }, [open])
 
-  // Closed by a click elsewhere, a scroll anywhere else, or a resize.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per opening and closing, with that render's `onToggle`
+  useEffect(() => {
+    onToggle?.(open)
+  }, [open])
+
+  // Closed by Escape, a click elsewhere, a scroll that moves the trigger, or a
+  // resize. Escape counts from the trigger, the box, or nowhere: the item that
+  // held focus can go from under it (the agent's row, when its work ends).
   useEffect(() => {
     if (!open) return
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return
+      const at = e.target
+      if (
+        at !== document.body &&
+        !(at instanceof Node && wrapper.current?.contains(at))
+      )
+        return
+      e.preventDefault()
+      setAt(null)
+      button.current?.focus()
+    }
     const outside = (e: PointerEvent) => {
       if (e.target instanceof Node && wrapper.current?.contains(e.target))
         return
       setAt(null)
     }
+    // The page's own scroll has the document as its target, which holds it.
     const drift = (e: Event) => {
-      if (e.target instanceof Node && box.current?.contains(e.target)) return
-      setAt(null)
+      const trigger = wrapper.current
+      if (
+        trigger !== null &&
+        e.target instanceof Node &&
+        e.target.contains(trigger)
+      )
+        setAt(null)
     }
     const shut = () => setAt(null)
+    document.addEventListener("keydown", onEscape)
     document.addEventListener("pointerdown", outside, true)
     window.addEventListener("scroll", drift, true)
     window.addEventListener("resize", shut)
     return () => {
+      document.removeEventListener("keydown", onEscape)
       document.removeEventListener("pointerdown", outside, true)
       window.removeEventListener("scroll", drift, true)
       window.removeEventListener("resize", shut)
     }
   }, [open])
 
+  if (gone && !open) return null
   const named = heading === undefined ? undefined : headingId
   const boxProps = (at: Placement) => ({
     className: boxClassName,
@@ -150,13 +192,9 @@ export function Popover({
         className={triggerClassName}
         onClick={() => (open ? close(false) : show())}
         onKeyDown={e => {
-          if (e.key === "ArrowDown" && !open) {
-            e.preventDefault()
-            show()
-          } else if (e.key === "Escape" && open) {
-            e.preventDefault()
-            close(true)
-          }
+          if (e.key !== "ArrowDown" || open) return
+          e.preventDefault()
+          show()
         }}
         ref={button}
         title={title}
@@ -170,17 +208,12 @@ export function Popover({
             {...boxProps(at)}
             aria-label={named === undefined ? label : undefined}
             aria-labelledby={named}
-            onKeyDown={e => {
-              if (e.key !== "Escape") return
-              e.preventDefault()
-              close(true)
-            }}
             role="dialog"
           >
             {body}
           </div>
         ) : (
-          // A menu's list takes the role, and its keys (`menu.tsx`).
+          // A menu's list takes the role, and its arrow keys (`menu.tsx`).
           <div {...boxProps(at)}>{body}</div>
         ))}
     </span>

@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S61 — Menus closed by the session, not by the person ✅ PASS
+
+`findings/S61-menus-closed-by-the-session.md`. A column following its end
+scrolls itself as entries arrive, and `Popover` closed on any scroll outside
+its box, so every open menu closed. Only a scroll of an element holding the
+trigger moves it. A trigger drawn from live data took its open box with it
+when it unmounted, and a removed row left focus on `<body>`, out of Escape's
+reach.
+
 ### S60 — A wide image for a column's header ✅ PASS
 
 `findings/S60-column-banner-aspect.md`. OpenRouter honours

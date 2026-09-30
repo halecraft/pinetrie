@@ -63,6 +63,11 @@ the session, from live data only, as a document editor shows the people in it.
 - **The agent:** one avatar while it works, pulsing, with the number of
   threads it is working in. A click lists them, and a row opens one. Idle, it
   is not shown.
+- **A menu you opened stays open until you close it.** The header's avatars
+  and counts come from live data, but when what one stands for goes while
+  its menu is open (a person leaves, the agent finishes, the last offer is
+  taken), the menu says so ("The agent has finished") and its trigger stays
+  until you close it (principle 6).
 - **`@` is your inbox**: the messages that mention you, newest first, each
   with who, the thread, and the start of the message. A row opens that thread
   as your tab, with a column on the message; a message in an archived root

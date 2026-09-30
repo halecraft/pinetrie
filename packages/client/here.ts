@@ -55,3 +55,53 @@ export function readersByRoot(
     }
   return readers
 }
+
+/** A person in the header: here, or gone and kept while their menu is open. */
+export interface PersonShown {
+  readonly person: PersonHere
+  readonly gone: boolean
+}
+
+/**
+ * The people whose menu is open, each with where they were among those shown
+ * when it opened.
+ */
+export type OpenMenus = ReadonlyMap<WriterId, number>
+
+/**
+ * `people`, and each person whose menu is open but who has left, put back
+ * where they were, with no threads: a menu closes only when you close it.
+ */
+export function withOpenMenus(
+  people: readonly PersonHere[],
+  open: OpenMenus,
+): readonly PersonShown[] {
+  const shown: PersonShown[] = people.map(person => ({ person, gone: false }))
+  const here = new Set(people.map(p => p.writer))
+  const left = [...open]
+    .filter(([writer]) => !here.has(writer))
+    .sort(([, a], [, b]) => a - b)
+  for (const [writer, at] of left)
+    shown.splice(Math.min(at, shown.length), 0, {
+      person: { writer, threads: [] },
+      gone: true,
+    })
+  return shown
+}
+
+/** `open` after `writer`'s menu, shown at `at`, opened or closed; the same map if nothing changed. */
+export function toggleOpenMenu(
+  open: OpenMenus,
+  writer: WriterId,
+  at: number,
+  isOpen: boolean,
+): OpenMenus {
+  if (isOpen) {
+    if (open.get(writer) === at) return open
+    return new Map(open).set(writer, at)
+  }
+  if (!open.has(writer)) return open
+  const next = new Map(open)
+  next.delete(writer)
+  return next
+}

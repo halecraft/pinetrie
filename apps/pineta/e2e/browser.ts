@@ -978,6 +978,53 @@ try {
     "clicking the pulse opens that thread",
   )
   await idle()
+  // A menu open on the agent stays when its work ends: only you close it,
+  // and then the agent, idle, leaves the header.
+  const held = script.pause("say exactly: HELD")
+  await other.chat("@agent say exactly: HELD", atEntry(entryId(noteId)), {
+    mode: "branch",
+  })
+  const heldOpen = await page
+    .waitForSelector("#top .here-agent.running", { timeout: 30_000 })
+    .then(() => page.click("#top .here-agent .here-trigger"))
+    .then(() =>
+      page.waitForSelector("#top .here-agent .menu .here-thread", {
+        timeout: 15_000,
+      }),
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+  held.resume()
+  await idle()
+  const finished = await page
+    .waitForFunction(
+      () =>
+        document.querySelector("#top .here-agent .menu-heading")
+          ?.textContent === "The agent has finished",
+      undefined,
+      { timeout: 15_000 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+  await page.keyboard.press("Escape")
+  const left = await page
+    .waitForFunction(
+      () => document.querySelector("#top .here-agent") === null,
+      undefined,
+      { timeout: 15_000 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(
+    heldOpen && finished && left,
+    `a menu open on the agent stays open when its work ends, and the agent leaves the header once you close it (opened ${heldOpen}, stayed ${finished}, left ${left})`,
+  )
   await other.close()
 
   // ── your profile: a rename shows, and the name each message was sent ──
@@ -1612,6 +1659,43 @@ try {
       (await unseen()) === 0,
       "a mention drawn in the tab you are on is never counted",
     )
+    // A menu stays open while an entry arrives: the column following its end
+    // scrolls, and only a scroll that moves the trigger closes a popover.
+    const hereId =
+      (await page.$eval(msg(`${handle} and here`), n =>
+        n.getAttribute("data-entry"),
+      )) ?? ""
+    await page.click("#top .inbox-trigger")
+    await page.waitForSelector("#top .inbox .menu", { timeout: 15_000 })
+    await page.evaluate(() => {
+      const w = window as { columnScrolls?: number }
+      w.columnScrolls = 0
+      window.addEventListener(
+        "scroll",
+        e => {
+          if (e.target instanceof Element && e.target.matches(".column-body"))
+            w.columnScrolls = (w.columnScrolls ?? 0) + 1
+        },
+        true,
+      )
+    })
+    const arriving = "arriving while a menu is open"
+    await api.chat(
+      `${arriving}\n\n${"a paragraph to fill the column\n\n".repeat(12)}`,
+      atEntry(entryId(hereId)),
+    )
+    await page.waitForSelector(`.msg:has-text(${JSON.stringify(arriving)})`, {
+      timeout: 15_000,
+    })
+    await waitFor(() => false, 500)
+    const columnScrolls = await page.evaluate(
+      () => (window as { columnScrolls?: number }).columnScrolls ?? 0,
+    )
+    ok(
+      columnScrolls > 0 && (await page.$("#top .inbox .menu")) !== null,
+      `an open menu stays open while an entry arrives and its column scrolls to follow it (${columnScrolls} scrolls)`,
+    )
+    await page.keyboard.press("Escape")
     // Seen is kept per device: across a reload, and a mention made meanwhile counts.
     await page.click(tabSel(firstRoot))
     const rootTabs = (p: Page) =>
