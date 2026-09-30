@@ -1,13 +1,21 @@
-// prepareImage: the type from the bytes, the size from pi's resize.
+// prepareImage: the type from the bytes, the size from pi's resize; and
+// `read`'s processor, which stores what it returns.
 
 import { createHash } from "node:crypto"
 import { deflateSync } from "node:zlib"
-import { ROOT, type Sha256, THE_AGENT, writerId } from "@pineta/core"
+import {
+  type ImageRef,
+  ROOT,
+  type Sha256,
+  type StoredImage,
+  THE_AGENT,
+  writerId,
+} from "@pineta/core"
 import { encodeChat } from "@pineta/marginalia"
 import { newSessionDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { createAgent } from "./agent.ts"
-import { prepareImage } from "./images.ts"
+import { prepareImage, readImageProcessor, sha256Of } from "./images.ts"
 import { scriptedModel } from "./scripted.ts"
 
 /** A 40×30 red PNG, 98 bytes. */
@@ -51,17 +59,21 @@ test("a small PNG is kept as it is, with its size", async () => {
   const prepared = await prepareImage(RED)
   expect(prepared).toMatchObject({
     ok: true,
-    mimeType: "image/png",
-    width: 40,
-    height: 30,
+    image: { mimeType: "image/png", width: 40, height: 30 },
+    resized: undefined,
   })
-  expect(prepared.ok && Buffer.from(prepared.bytes).equals(RED)).toBe(true)
+  expect(prepared.ok && Buffer.from(prepared.image.bytes).equals(RED)).toBe(
+    true,
+  )
 })
 
 test("a large image is fitted to 2000 wide, its size read from the resize", async () => {
   const prepared = await prepareImage(greyPng(3000, 20))
-  expect(prepared).toMatchObject({ ok: true, width: 2000 })
-  expect(prepared.ok && prepared.height < 20).toBe(true)
+  expect(prepared).toMatchObject({ ok: true, image: { width: 2000 } })
+  expect(prepared.ok && prepared.image.height < 20).toBe(true)
+  expect(prepared.ok && prepared.resized).toMatch(
+    /^\[Image: original 3000x20, displayed at 2000x\d+\./,
+  )
 })
 
 test("SVG, BMP and text are not images; a truncated PNG is unreadable", async () => {
@@ -104,6 +116,10 @@ test("the model reads a chat's text, then its image's bytes, from the store", as
     tools: null,
     blobs: {
       get: s => (s === sha ? { bytes: RED, mimeType: "image/png" } : undefined),
+      ref: () => undefined,
+      put: () => {
+        throw new Error("no image is read here")
+      },
     },
   })
   let seen: readonly string[] = []
@@ -133,4 +149,75 @@ test("the model reads a chat's text, then its image's bytes, from the store", as
   )
   await agent.close()
   expect(seen.at(-1)).toBe(`Ada: ${text}[image image/png ${sha}]`)
+})
+
+/** A store that records what a processor put in it. */
+function recording() {
+  const put: StoredImage[] = []
+  return {
+    put,
+    blobs: {
+      put(image: StoredImage): ImageRef {
+        put.push(image)
+        return {
+          sha256: sha256Of(image.bytes),
+          mimeType: image.mimeType,
+          width: image.width,
+          height: image.height,
+        }
+      },
+    },
+  }
+}
+
+// The processor reads nothing from pi's context.
+const CONTEXT = {} as never
+const OPTIONS = { autoResizeImages: true }
+
+test("read's processor stores the image it returns", async () => {
+  for (const bytes of [RED, greyPng(3000, 20)]) {
+    const { put, blobs } = recording()
+    const result = await readImageProcessor(blobs)(
+      bytes,
+      "image/png",
+      OPTIONS,
+      CONTEXT,
+    )
+    if (!result.ok) throw new Error(result.message)
+    expect(put).toHaveLength(1)
+    expect(put[0]?.mimeType).toBe(result.mimeType)
+    expect(sha256Of(Buffer.from(result.data, "base64"))).toBe(
+      sha256Of(put[0]?.bytes ?? new Uint8Array()),
+    )
+  }
+})
+
+test("read's processor tells the model of a resize, and only then", async () => {
+  const { blobs } = recording()
+  const hints = async (bytes: Uint8Array) => {
+    const result = await readImageProcessor(blobs)(
+      bytes,
+      "image/png",
+      OPTIONS,
+      CONTEXT,
+    )
+    return result.ok ? result.hints : undefined
+  }
+  expect(await hints(RED)).toEqual([])
+  expect(await hints(greyPng(3000, 20))).toEqual([
+    expect.stringMatching(/^\[Image: original 3000x20, displayed at 2000x/),
+  ])
+})
+
+test("read's processor omits what it cannot keep, and stores nothing", async () => {
+  const { put, blobs } = recording()
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')
+  for (const [bytes, message] of [
+    [svg, "[Image omitted: not an image this harness keeps.]"],
+    [RED.subarray(0, 40), "[Image omitted: could not be read or fitted.]"],
+  ] as const)
+    expect(
+      await readImageProcessor(blobs)(bytes, "image/png", OPTIONS, CONTEXT),
+    ).toEqual({ ok: false, message })
+  expect(put).toEqual([])
 })

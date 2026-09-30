@@ -10,7 +10,7 @@ export const mutations: readonly Mutation[] = [
     from: "    for (const sha of pastedImages(text)) shas.add(sha)",
     to: '    for (const sha of pastedImages("")) shas.add(sha)',
     command: unit,
-    expect: "referencedBlobs: chats, held messages",
+    expect: "referencedBlobs: chats, tool results",
   },
   {
     name: "referencedBlobs skips held messages",
@@ -18,7 +18,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (held.kind === "chat")',
     to: '    if (held.kind === "update")',
     command: unit,
-    expect: "referencedBlobs: chats, held messages",
+    expect: "referencedBlobs: chats, tool results",
   },
   {
     name: "readTreeIndex indexes again on every call",
@@ -51,6 +51,14 @@ export const mutations: readonly Mutation[] = [
     to: "    const last = waiting[0]",
     command: unit,
     expect: "lastWaiting is the writer of the newest item waiting",
+  },
+  {
+    name: "referencedBlobs skips tool results",
+    file: "packages/reads/index.ts",
+    from: "    for (const image of messageImages(message as AgentMessageLike))",
+    to: "    for (const image of messageImages(null))",
+    command: unit,
+    expect: "referencedBlobs: chats, tool results",
   },
   {
     name: "readCards gives an unchanged card a new object",

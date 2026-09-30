@@ -662,7 +662,8 @@ needed**; no renegotiation is required.
 
 **Status:** Accepted. Supersedes the unstated `Schema.any()` choice in
 `packages/schema/index.ts`. Blocks `PLAN-2026-09-24-tree-read`, which was
-written against untyped entries.
+written against untyped entries. Amended by ADR-0051: a message's image
+parts in `payload` are references to the blob store.
 
 **Context.** `SessionDoc` declares the primary content of the document as an
 opaque blob:
@@ -3475,7 +3476,7 @@ money and time. The scripted sections raced too, on long scripted replies.
 **Status:** Accepted. Evidence: S53. Implementation:
 `PLAN-2026-09-29-pasted-images`. Amends ADR-0022 (admission checks where a
 request comes from) and ADR-0023 (image bytes are never part of the
-compacted document).
+compacted document). Extended by ADR-0051: a tool's images are blobs too.
 
 **Context.** A person cannot show the agent or a collaborator an image: a
 screenshot, a mockup, an error dialog. The session document is replicated

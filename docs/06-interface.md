@@ -309,6 +309,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   place. A result is its own
   entry in the tree, but it belongs to its call, so it adds no message and no
   row on the rail.
+- **An image a tool read is drawn in its row** (ADR-0051), which opens on
+  its own, capped at 10rem tall. The image takes the place of the caption
+  ("Read image file [image/png]"), which is its tooltip; a click on the
+  summary shows it whole, and a click on the image opens it in a new tab.
 - **While the agent works, its column shows it live**: the reply as it is
   written, and each running command's output in its own row, open, following
   its end as a column does. Each becomes the committed message or result in

@@ -23,7 +23,7 @@ import {
   toolLabel,
   writerId,
 } from "@pineta/core"
-import { scriptedModel } from "@pineta/pi"
+import { scriptedModel, sha256Of } from "@pineta/pi"
 import {
   readCards,
   readLaneRecords,
@@ -34,11 +34,10 @@ import {
   readTreeIndex,
 } from "@pineta/reads"
 import { type Browser, chromium, type Page } from "@playwright/test"
-import { sha256Of } from "../host/blobs.ts"
 import { startHost } from "../host/index.ts"
 import { createChecks } from "./checks.ts"
 import { committedProject, join, suiteModel, waitFor } from "./harness.ts"
-import { RED_PNG } from "./images.ts"
+import { greyPng, RED_PNG } from "./images.ts"
 
 /** The ⋯ of the tab you are on: every root tab has one, shown on hover. */
 const OWN_MENU = '#tabs .tab[aria-selected="true"] ~ .tab-more .tab-menu'
@@ -2126,6 +2125,105 @@ try {
     } finally {
       await pp.context().close()
       await qp.context().close()
+      await imageHost.shutdown()
+    }
+  }
+
+  // ── a tool's image: drawn in its row, which opens capped (ADR-0051) ──────
+  // No containers, so it runs where `container` can't.
+  {
+    // Taller than a capped row's 10rem.
+    const tall = greyPng(300, 400)
+    const work = committedProject("pineta-browser-tool-images-", {
+      "tall.png": tall,
+    })
+    const script = scriptedModel()
+    const imageHost = await startHost({
+      model: { kind: "scripted", script },
+      tools: { project: work },
+      containers: false,
+      userConfig: path.join(work, "no-user-config.json"),
+      log: () => {},
+    })
+    const ip = await browser.newPage()
+    await asPerson(ip, "ida@browser.test", "Ida")
+    try {
+      await ip.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
+      await ip.click("#tabs .add-agent")
+      const say = async (text: string) => {
+        await ip.fill(`${col(0)} .composer .input`, text)
+        await ip.click(`${col(0)} .composer .send`)
+      }
+      const idle = () =>
+        waitFor(() => Object.keys(imageHost.doc.activeRuns()).length === 0)
+      script.use([
+        { tool: "read", args: { path: "tall.png" } },
+        { text: "A grey rectangle." },
+      ])
+      await say("what is tall.png?")
+      await idle()
+      const row = `${col(0)} .tool[data-tool="read"]`
+      const sha = sha256Of(tall)
+      const img = `${row} .tool-images img[src="/blob/${sha}"]`
+      /** The row's size, and its image once loaded: shown size, alt, title. */
+      const drawn = () =>
+        ip
+          .waitForFunction(
+            ([r, i]) => {
+              const image = document.querySelector(i)
+              const details = document.querySelector(r)
+              if (
+                !(image instanceof HTMLImageElement) ||
+                !image.complete ||
+                image.naturalWidth === 0
+              )
+                return null
+              const box = image.getBoundingClientRect()
+              return {
+                size: details?.getAttribute("data-size"),
+                height: Math.round(box.height),
+                alt: image.alt,
+                title: image.title,
+                text: details?.querySelector(".tool-output") !== null,
+              }
+            },
+            [row, img] as const,
+            { timeout: 15_000 },
+          )
+          .then(
+            h => h.jsonValue(),
+            () => null,
+          )
+      const capped = await drawn()
+      const rem = await ip.evaluate(() =>
+        Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
+      )
+      ok(
+        capped?.size === "capped" &&
+          capped.height <= 10 * rem + 1 &&
+          capped.alt === "tall.png" &&
+          capped.title.startsWith("Read image file [image/png]") &&
+          !capped.text,
+        `a read image opens its row capped, drawn in place of its caption (${JSON.stringify(capped)})`,
+      )
+      await ip.click(`${row} summary`)
+      const full = await drawn()
+      ok(
+        full?.size === "full" && capped !== null && full.height > capped.height,
+        `a click on its summary shows the image whole (${JSON.stringify(full)})`,
+      )
+      await ip.click(`${row} summary`)
+      script.use([{ text: "Still grey." }])
+      await say("@agent and now?")
+      await idle()
+      await ip.waitForTimeout(300)
+      const after = await ip.getAttribute(row, "data-size")
+      ok(
+        after === "closed" && (await ip.$(img)) === null,
+        `folded, it stays folded when another message arrives (${after})`,
+      )
+    } finally {
+      await ip.close()
       await imageHost.shutdown()
     }
   }

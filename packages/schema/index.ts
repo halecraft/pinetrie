@@ -12,7 +12,9 @@ import { type StreamEvent, type TextEdit, tailEdit } from "@pineta/core"
  *
  * Six typed columns plus one sealed leaf. The columns are exactly what Pineta
  * itself reasons about: the tree edge, plus the fields `projectTranscript`,
- * `orderNewEntries` and fold read. Everything pi-specific stays in `payload`.
+ * `orderNewEntries` and fold read. Everything pi-specific stays in `payload`,
+ * except a message's image bytes: an image part there refers to the host's
+ * blob store (ADR-0051).
  *
  *   - `type` is an UNCONSTRAINED string on purpose. A new pi `EntryType` then
  *     needs no schema change here at all. A `discriminatedUnion` would demand

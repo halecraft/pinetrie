@@ -12,7 +12,17 @@
 
 import { findSeqKeys } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { type EntryWithoutSeq, fromStoredRow, toStoredRow } from "./storage.ts"
+import {
+  type EntryWithoutSeq,
+  fromStoredRow as rejoinWith,
+  toStoredRow as splitWith,
+} from "./storage.ts"
+
+// An entry without images, stored where no blob is known.
+const toStoredRow = (entry: EntryWithoutSeq) =>
+  splitWith(entry, () => undefined)
+const fromStoredRow = (row: ReturnType<typeof toStoredRow>, seq: number) =>
+  rejoinWith(row, seq, () => undefined)
 
 const HOISTED = ["id", "parentId", "type", "timestamp", "fromId"]
 

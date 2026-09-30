@@ -6,6 +6,7 @@ import { useSelector } from "@kyneta/react"
 import { entryId, type ToolCallView } from "@pineta/core"
 import { readStreamText, type SessionDocHandle } from "@pineta/schema"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { StoredImage } from "./blob-image.tsx"
 import { joinWords } from "./column-view.ts"
 import { plural } from "./counts.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
@@ -14,7 +15,13 @@ import type { MessageAct, MessageTools } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
 import { nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
-import { click, REVEAL_MS, type ReaderChoice, rowSize } from "./tool-row.ts"
+import {
+  click,
+  REVEAL_MS,
+  type ReaderChoice,
+  rowSize,
+  toolBody,
+} from "./tool-row.ts"
 import { useFollow } from "./use-follow.ts"
 
 function MessageView(p: MessageProps) {
@@ -190,7 +197,9 @@ const SHOWN = 20_000
  * shown twice. The result is its own entry in the tree, paired here by
  * `projectSpine`; with none yet, the call is still running or was cut off.
  * How much is shown is `rowSize`'s: a call whose output streams for
- * `REVEAL_MS` opens its row, capped, and only the reader closes it.
+ * `REVEAL_MS`, or whose result has an image, opens its row, capped, and only
+ * the reader closes it. A result's images are drawn in place of its text
+ * (`toolBody`), which keeps to their `title`.
  */
 function ToolRow({
   call,
@@ -208,7 +217,8 @@ function ToolRow({
   const live = call.result === undefined ? stream : undefined
   const [revealed, setRevealed] = useState(false)
   const [reader, setReader] = useState<ReaderChoice>(null)
-  const size = rowSize({ revealed, reader })
+  const body = toolBody(call.result)
+  const size = rowSize({ revealed, shows: body.kind === "images", reader })
   // Set once and never unset, so the row stays open when the result arrives.
   // A result within REVEAL_MS clears the timer: the row never opened.
   useEffect(() => {
@@ -240,7 +250,18 @@ function ToolRow({
         )}{" "}
         <span className="tool-status">{mark}</span>
       </summary>
-      {size !== "closed" && (
+      {size === "closed" ? null : body.kind === "images" ? (
+        <div className="tool-images">
+          {body.images.map(image => (
+            <StoredImage
+              alt={call.subject ?? call.label}
+              image={image}
+              key={image.sha256}
+              title={body.note}
+            />
+          ))}
+        </div>
+      ) : (
         <ToolOutput doc={doc} result={call.result?.text} stream={live} />
       )}
     </details>

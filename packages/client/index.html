@@ -295,6 +295,12 @@
         background: #11141a; border: 1px solid #23272e; white-space: pre-wrap; font-size: .75rem; }
       /* Block: a ResizeObserver sees an inline element as 0 × 0. */
       .tool-output-text { display: block; }
+      /* A result's images, in place of its text (`toolBody`). A capped row
+         caps an image at 10rem tall, as it caps output, through its width. */
+      .tool-images { margin: .3rem 0 0; }
+      .tool-images img { display: block; max-width: 100%; height: auto; margin-bottom: .3rem;
+        border: 1px solid #23272e; cursor: zoom-in; }
+      .tool[data-size="capped"] .tool-images img { max-width: min(100%, calc(10rem * var(--ratio))); }
       /* A cut label, uncut, in its place while the row is open. */
       .tool-label-whole { display: none; font-family: ui-monospace, monospace;
         white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%;

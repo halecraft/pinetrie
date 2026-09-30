@@ -1,10 +1,34 @@
-// pi/images — an image fitted for the store and the model, by pi (ADR-0042).
+// pi/images — an image fitted for the store and the model, by pi (ADR-0042),
+// and `read`'s images put in the store before pi writes them (ADR-0051).
 
-import { isImageMime, type StoredImage } from "@pineta/core"
-import { detectSupportedImageMimeType, resizeImage } from "./deep.ts"
+import { createHash } from "node:crypto"
+import type { ReadImageProcessor } from "@earendil-works/pi-agent-core"
+import {
+  type BlobStore,
+  isImageMime,
+  type Sha256,
+  type StoredImage,
+} from "@pineta/core"
+import {
+  detectSupportedImageMimeType,
+  formatDimensionNote,
+  resizeImage,
+} from "./deep.ts"
+
+/** The lower-case hex SHA-256 of `bytes`: a blob's key in the store. */
+export const sha256Of = (bytes: Uint8Array): Sha256 =>
+  createHash("sha256").update(bytes).digest("hex") as Sha256
 
 export type PreparedImage =
-  | ({ readonly ok: true } & StoredImage)
+  | {
+      readonly ok: true
+      readonly image: StoredImage
+      /**
+       * pi's note for the model when the image was resized: its original
+       * size, and the scale that maps a coordinate back to it.
+       */
+      readonly resized: string | undefined
+    }
   | { readonly ok: false; readonly reason: "not an image" | "unreadable" }
 
 /**
@@ -24,9 +48,37 @@ export async function prepareImage(bytes: Uint8Array): Promise<PreparedImage> {
   if (!isImageMime(mimeType)) return { ok: false, reason: "not an image" }
   return {
     ok: true,
-    bytes: new Uint8Array(Buffer.from(resized.data, "base64")),
-    mimeType,
-    width: resized.width,
-    height: resized.height,
+    image: {
+      bytes: new Uint8Array(Buffer.from(resized.data, "base64")),
+      mimeType,
+      width: resized.width,
+      height: resized.height,
+    },
+    resized: formatDimensionNote(resized),
   }
 }
+
+const OMITTED: Record<Extract<PreparedImage, { ok: false }>["reason"], string> =
+  {
+    "not an image": "[Image omitted: not an image this harness keeps.]",
+    unreadable: "[Image omitted: could not be read or fitted.]",
+  }
+
+/**
+ * pi's `read`, for an image: fitted as a pasted image is, and put in `blobs`
+ * before it is returned, so every write pi makes of the result finds it there
+ * by hash and stores a reference (S59). pi adds `hints` to the result's text.
+ */
+export const readImageProcessor =
+  (blobs: Pick<BlobStore, "put">): ReadImageProcessor =>
+  async bytes => {
+    const prepared = await prepareImage(bytes)
+    if (!prepared.ok) return { ok: false, message: OMITTED[prepared.reason] }
+    blobs.put(prepared.image)
+    return {
+      ok: true,
+      data: Buffer.from(prepared.image.bytes).toString("base64"),
+      mimeType: prepared.image.mimeType,
+      hints: prepared.resized === undefined ? [] : [prepared.resized],
+    }
+  }

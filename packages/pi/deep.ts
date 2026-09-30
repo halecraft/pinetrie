@@ -102,7 +102,7 @@ export const {
 } = promptTemplates
 export const { stripFrontmatter } = frontmatter
 export const { detectSupportedImageMimeType } = mime
-export const { resizeImage } = imageResize
+export const { resizeImage, formatDimensionNote } = imageResize
 export const { SettingsManager } = settings
 export const { DefaultResourceLoader } = resourceLoader
 export const { buildSystemPrompt } = systemPrompt

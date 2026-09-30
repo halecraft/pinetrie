@@ -2,12 +2,12 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import type { BlobStore, Sha256 } from "@pineta/core"
+import { sha256Of } from "@pineta/pi"
 import { describe, expect, test } from "vitest"
 import {
   MAX_UPLOAD_BYTES,
   memoryBlobs,
   planUploadHeaders,
-  sha256Of,
   sqliteBlobs,
 } from "./blobs.ts"
 import { openDatabase } from "./store.ts"

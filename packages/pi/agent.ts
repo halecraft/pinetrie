@@ -84,6 +84,7 @@ import {
   stripFrontmatter,
   substituteArgs,
 } from "./deep.ts"
+import { readImageProcessor } from "./images.ts"
 import { laneEnv } from "./lane-env.ts"
 import {
   directEnv,
@@ -183,10 +184,12 @@ export interface CreateAgentOptions {
   /** The user config's `commands.names`: pi's `source` → a label (ADR-0036). */
   readonly commandRenames?: Readonly<Record<string, string>>
   /**
-   * Where a chat's images are read from, for every request (ADR-0042).
-   * Without it, each image reaches the model as "no longer stored".
+   * Where images are kept. A chat's are read from it for every request
+   * (ADR-0042); `read` puts each image it reads there, and the session stores
+   * a reference to it (ADR-0051). Without it, a chat's images reach the model
+   * as "no longer stored", and a tool's are stored inline.
    */
-  readonly blobs?: Pick<BlobStore, "get">
+  readonly blobs?: Pick<BlobStore, "get" | "put" | "ref">
 }
 
 /**
@@ -381,7 +384,11 @@ export interface Agent {
 export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   const { doc, replicaId } = options
 
-  const storage = new KynetaStorage({ doc, peerId: replicaId })
+  const storage = new KynetaStorage({
+    doc,
+    peerId: replicaId,
+    ...(options.blobs === undefined ? {} : { blobs: options.blobs }),
+  })
   const session = new StorageBackedSession(
     { id: `pineta-${replicaId}`, createdAt: Date.now(), storageVersion: 1 },
     storage,
@@ -397,13 +404,19 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   })
   const labelled = labelCommands(setup.commands, options.commandRenames ?? {})
   const resolved = setup.model
-  // pi-agent-core's own tools, built for this harness. Each lane uses them in
-  // its own directory: `toolContext` below.
+  // pi-agent-core's own tools. Each lane uses them in its own directory:
+  // `toolContext` below. `read` fits an image and stores it before pi writes
+  // the result, so the session keeps a reference (ADR-0051).
+  const blobs = options.blobs
   const fileTools =
     lanes === null
       ? []
       : [
-          createReadTool(),
+          createReadTool(
+            blobs === undefined
+              ? {}
+              : { imageProcessor: readImageProcessor(blobs) },
+          ),
           createWriteTool(),
           createEditTool(),
           createBashTool(),

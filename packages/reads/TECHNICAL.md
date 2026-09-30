@@ -30,9 +30,10 @@ client-only read, in `packages/client/archive-rows.ts`. Live streams are read wi
 `@pineta/schema`; an entry count stays in `packages/client/projection.ts`.
 
 `readReferencedBlobs` is every image something still shows (ADR-0042): each
-chat's, each held message's, and each in the texts people type, notes' and
-cards', which its caller must pass for every one, not only those it holds
-(the host gathers them all through its card port). `planSweep` decides which
+chat's, each tool result's (`messageImages`, ADR-0051), each held message's,
+and each in the texts people type, notes' and cards', which its caller must
+pass for every one, not only those it holds (the host gathers them all
+through its card port). `planSweep` decides which
 stored images to delete from it.
 
 It declares core, schema and marginalia only (`workspace.test.ts`), so it runs

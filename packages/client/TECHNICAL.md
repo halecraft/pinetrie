@@ -626,6 +626,16 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   makes a closed or capped row `full`, uncapped, and a full one closed.
   `data-size` names the size; a closed row draws no output, so a check reads
   `.tool-output` only after opening its row.
+- **A result with an image opens its row too** (ADR-0051): `rowSize`'s third
+  fact, `shows`, is read from the result, so the row opens `capped` when the
+  result arrives and on every mount after, and the reader's choice still
+  wins. `toolBody` (`tool-row.ts`) draws the images (`.tool-images`,
+  `StoredImage` in `blob-image.tsx`) in place of the text, whose caption and
+  resize note become each image's `title`; the call's path (`subject`) is its
+  `alt`. A capped row caps an image at 10rem tall through its width,
+  `min(100%, 10rem × --ratio)`, which `StoredImage` sets: overriding `width`
+  would drop the box the `width` and `height` attributes give before the
+  image loads.
 - **One `ToolOutput` draws the live output and the result**, and follows its
   end (`useFollow`). The result keeps the live output's element and scroll:
   at its end, or where the reader left it. A result is its own entry in the tree;
@@ -748,8 +758,8 @@ pipeline keeps the tree a pure function, testable without a DOM.
   measures stable offsets and following sees one size, not two. The CSS caps
   it at the column's width with `height: auto`, which keeps the ratio the
   attributes give. A blob image the message does not hold (a note's, a
-  streaming one's) is drawn unsized. `MessageText` opens a blob image in a
-  new tab on a click (`.blob-image`).
+  streaming one's) is drawn unsized. `BlobImage` (`blob-image.tsx`) opens a
+  blob image in a new tab on a click (`.blob-image`).
 - **Streaming text goes through remend**, which closes an unfinished `**`,
   fence or link, with `singleTilde` and `comparisonOperators` off: those
   escape mid-text, and the message would change when it commits. Committed

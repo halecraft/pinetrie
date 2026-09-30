@@ -394,4 +394,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "threadOf: a named lane is its thread",
   },
+  {
+    name: "messageImages admits a part with its bytes inline",
+    file: tree,
+    from: '    part.data === undefined &&\n    typeof part.sha256 === "string" &&',
+    to: '    typeof part.sha256 === "string" &&',
+    command: unit,
+    expect: "bytes beside a reference is not one",
+  },
+  {
+    name: "a tool's result drops its images",
+    file: tree,
+    from: "    images: messageImages(m),",
+    to: "    images: [],",
+    command: unit,
+    expect: "a result's stored images are on its call",
+  },
 ]

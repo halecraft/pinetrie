@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S59 — A tool's image through pi, the session and the store ✅ PASS
+
+`findings/S59-tool-images.md`. An image processor in `read` runs before pi
+writes anything, so it can store the image first. pi writes the result as a
+`pi.pending.entry` value, then as the entry, both with the base64, and a
+deleted value stays in the history (S22). pi rejoins every entry on the
+branch about twice a model request; rejoining an image costs 0.65 ms, so it
+needs no cache.
+
 ### S57 — Reading an offer's revisions and diffs from jj ✅ PASS
 
 `findings/S57-offer-review-reads.md`. A template prints a revision's

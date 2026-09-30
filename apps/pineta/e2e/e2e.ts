@@ -42,7 +42,7 @@ import {
   writerId,
 } from "@pineta/core"
 import { decodeChat, displayName, yourCard } from "@pineta/marginalia"
-import { newId as newHeldId, scriptedModel } from "@pineta/pi"
+import { newId as newHeldId, scriptedModel, sha256Of } from "@pineta/pi"
 import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
 import {
@@ -80,7 +80,6 @@ import {
   writeEntry,
 } from "@pineta/schema"
 import { WebSocket as WsClient } from "ws"
-import { sha256Of } from "../host/blobs.ts"
 import { startHost } from "../host/index.ts"
 import { lineDocPrefix } from "../host/lines.ts"
 import { openStore } from "../host/store.ts"
@@ -2253,6 +2252,143 @@ invariants("end")
   await iv.close()
   await sleep(100)
   await ih.shutdown()
+}
+
+// ── a tool's image: kept by content, a reference in the session (ADR-0051) ──
+{
+  const work = committedProject("pineta-tool-images-", { "shot.png": RED_PNG })
+  const dbFile = path.join(
+    mkdtempSync(path.join(tmpdir(), "pineta-tool-images-db-")),
+    "pineta.db",
+  )
+  const script = scriptedModel()
+  let opened = openStore(dbFile)
+  const GRACE_MS = 1_500
+  const start = () =>
+    startHost({
+      model: { kind: "scripted", script },
+      tools: { project: work },
+      containers: false,
+      store: opened.store,
+      blobs: opened.blobs,
+      blobGraceMs: GRACE_MS,
+      log: () => {},
+    })
+  let th = await start()
+  const tidle = () =>
+    waitFor(
+      () =>
+        Object.keys(th.doc.activeRuns()).length === 0 &&
+        readOutbox(th.doc).length === 0,
+      30_000,
+    )
+  const readCall = () => {
+    const tree = readTreeIndex(th.doc)
+    const spine = projectSpine(
+      tree,
+      readLanes(th.doc, tree)[0]?.tip ?? null,
+    ).spine
+    return spine
+      .flatMap(n => n.toolCalls ?? [])
+      .find(c => c.label === "read shot.png")
+  }
+  const red = sha256Of(RED_PNG)
+  const tu = await join(th, "tia", "tool-images")
+
+  // pi's pending entries, as each change of the document leaves them: a
+  // compaction after the run rewrites the history they were in (S59).
+  const pendings: string[] = []
+  const unwatch = subscribe(th.doc, () => {
+    for (const [key, v] of Object.entries(th.doc.values()))
+      if (key.includes("pi.pending.entry")) pendings.push(JSON.stringify(v))
+  })
+
+  // 1. A read of a PNG: its result holds a reference, and the model the image.
+  let seen: readonly string[] = []
+  script.use([
+    { tool: "read", args: { path: "shot.png" } },
+    {
+      reply: context => {
+        seen = context
+        return "a red square"
+      },
+    },
+  ])
+  await tu.chat("what is in shot.png?", ROOT, START_AGENT)
+  await tidle()
+  const call = readCall()
+  const served = await fetch(`${th.httpUrl}blob/${red}`)
+  ok(
+    call?.subject === "shot.png" &&
+      JSON.stringify(call.result?.images) ===
+        JSON.stringify([
+          { sha256: red, mimeType: "image/png", width: 40, height: 30 },
+        ]) &&
+      served.status === 200 &&
+      Buffer.from(await served.arrayBuffer()).equals(RED_PNG),
+    `a read image is stored by content, and its result holds the reference (${JSON.stringify(call?.result?.images)})`,
+  )
+  ok(
+    seen.includes(`Read image file [image/png][image image/png ${red}]`),
+    `the model reads the image the result refers to (${seen.at(-1)?.slice(-90)})`,
+  )
+
+  // 2. No bytes in the session: not in the entry, nor in pi's pending entry,
+  // which a delete leaves in the history until a compaction (S59).
+  unwatch()
+  await th.quiet()
+  const base64Slice = RED_PNG.toString("base64").slice(20, 70)
+  ok(
+    pendings.some(p => p.includes(red)) &&
+      !pendings.some(p => p.includes(base64Slice)),
+    `pi's pending entry holds the read image's reference, not its bytes (${pendings.length} seen)`,
+  )
+  let inRecords = false
+  for await (const r of opened.store.loadAll(SESSION_DOC_ID))
+    if (
+      r.kind === "entry" &&
+      Buffer.from(r.payload.data as Uint8Array | string)
+        .toString("latin1")
+        .includes(base64Slice)
+    )
+      inRecords = true
+  ok(
+    !inRecords && !JSON.stringify(readEntries(th.doc)).includes(base64Slice),
+    "neither the session's records nor its entries hold a read image's bytes",
+  )
+
+  // 3. After a restart on the same file and the grace, the sweep keeps it,
+  // and it still reaches the model.
+  await tu.close()
+  await sleep(100)
+  await th.shutdown()
+  opened = openStore(dbFile)
+  th = await start()
+  await sleep(GRACE_MS + 200)
+  const tv = await join(th, "tia", "tool-images")
+  let seenAfter: readonly string[] = []
+  script.use([
+    {
+      reply: context => {
+        seenAfter = context
+        return "still red"
+      },
+    },
+  ])
+  const tip = readLanes(th.doc, readTreeIndex(th.doc))[0]
+  await tv.chat("@agent and now?", at(tip?.tip ?? null), {
+    lane: tip?.name,
+  })
+  await tidle()
+  await th.quiet()
+  ok(
+    opened.blobs.list().some(b => b.sha256 === red) &&
+      seenAfter.includes(`Read image file [image/png][image image/png ${red}]`),
+    "after a restart and the grace, a read image is kept, and still reaches the model",
+  )
+  await tv.close()
+  await sleep(100)
+  await th.shutdown()
 }
 
 // ── admission: off loopback, only the invite key gets in ───────────────────

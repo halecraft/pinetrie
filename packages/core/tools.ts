@@ -7,7 +7,7 @@ const MAX_LABEL = 120
  * What a call touches, whole: `bash`'s command, or the path of `read`, `write`
  * and `edit`. Undefined for any other tool.
  */
-function subjectOf(name: string, args: unknown): string | undefined {
+export function subjectOf(name: string, args: unknown): string | undefined {
   const field = (key: string): string | undefined => {
     if (typeof args !== "object" || args === null) return undefined
     const v = (args as Record<string, unknown>)[key]

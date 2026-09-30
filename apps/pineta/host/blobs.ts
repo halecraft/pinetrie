@@ -6,7 +6,6 @@
 // touching it. Whether to read an upload is decided here too, pure; which
 // request is a blob's is `routes.ts`'s.
 
-import { createHash } from "node:crypto"
 import type { DatabaseSync } from "node:sqlite"
 import {
   type BlobStore,
@@ -16,12 +15,10 @@ import {
   type Sha256,
   type StoredImage,
 } from "@pineta/core"
+import { sha256Of } from "@pineta/pi"
 
 /** The largest body `POST /blob` reads, before resizing. */
 export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024
-
-export const sha256Of = (bytes: Uint8Array): Sha256 =>
-  createHash("sha256").update(bytes).digest("hex") as Sha256
 
 const refOf = (
   sha256: Sha256,

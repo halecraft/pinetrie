@@ -1,10 +1,11 @@
 // client/message-text — a message's text drawn as markdown. What is drawn is
 // decided in markdown.ts.
 
-import { blobOfUrl, type ImageRef } from "@pineta/core"
+import type { ImageRef } from "@pineta/core"
 import { toJsxRuntime } from "hast-util-to-jsx-runtime"
-import { type ComponentProps, useMemo } from "react"
+import { useMemo } from "react"
 import { Fragment, jsx, jsxs } from "react/jsx-runtime"
+import { BlobImage } from "./blob-image.tsx"
 import { messageTree, NO_IMAGES, type TextMode } from "./markdown.ts"
 
 /**
@@ -47,21 +48,5 @@ export function MessageText({
     <div className={className === undefined ? "text" : `text ${className}`}>
       {drawn}
     </div>
-  )
-}
-
-/** An image; a `/blob/` one, clicked, opens alone in a new tab. */
-function BlobImage(props: ComponentProps<"img">) {
-  const { src, alt } = props
-  if (typeof src !== "string" || blobOfUrl(src) === null)
-    return <img {...props} alt={alt ?? ""} />
-  return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: a shortcut for the mouse; the image is not a control
-    <img
-      {...props}
-      alt={alt ?? ""}
-      className="blob-image"
-      onClick={() => window.open(src, "_blank", "noopener")}
-    />
   )
 }

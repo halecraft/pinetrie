@@ -169,9 +169,8 @@ export async function startHttp(input: {
       send(res, uploadRefusal(415, prepared.reason))
       return
     }
-    const { ok: _, ...image } = prepared
     try {
-      send(res, uploaded(blobs.put(image)))
+      send(res, uploaded(blobs.put(prepared.image)))
     } catch (error) {
       // The store closes with the host: an upload can outlive it.
       send(res, uploadRefusal(503, messageOf(error)))

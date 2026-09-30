@@ -3,6 +3,8 @@
 **Status:** Accepted. Amends ADR-0044 (when a tool's row opens and closes,
 and the floor's height), and adopts an alternative it rejected (keeping a
 finished tool's output open). Implementation: `PLAN-2026-09-30-column-end`.
+Amended by ADR-0051: a row whose result has an image opens capped too, and
+draws the image in place of its text.
 
 **Context.** ADR-0044 kept a following column from getting shorter while its
 agent works: a shrink is taken up by a floor below the content. But a tool's

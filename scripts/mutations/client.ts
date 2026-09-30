@@ -951,8 +951,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a revealed row stays closed",
     file: "packages/client/tool-row.ts",
-    from: '  f.reader ?? (f.revealed ? "capped" : "closed")',
-    to: '  f.reader ?? "closed"',
+    from: '  f.reader ?? (f.revealed || f.shows ? "capped" : "closed")',
+    to: '  f.reader ?? (f.shows ? "capped" : "closed")',
     command: unit,
     expect: "is capped",
   },
@@ -987,6 +987,22 @@ export const mutations: readonly Mutation[] = [
     to: "seen.unseen",
     command: unit,
     expect: "behind: a column mounted again",
+  },
+  {
+    name: "a result with an image does not open its row",
+    file: "packages/client/tool-row.ts",
+    from: '  f.reader ?? (f.revealed || f.shows ? "capped" : "closed")',
+    to: '  f.reader ?? (f.revealed ? "capped" : "closed")',
+    command: unit,
+    expect: "shows: true, reader: null",
+  },
+  {
+    name: "a result with an image shows its caption instead",
+    file: "packages/client/tool-row.ts",
+    from: "  result !== undefined && result.images.length > 0",
+    to: "  result !== undefined && result.images.length < 0",
+    command: unit,
+    expect: "a result with an image shows the image",
   },
   {
     name: "needsCard keeps a prefill-only box",

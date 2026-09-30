@@ -60,7 +60,12 @@ import {
 // `Usage` is pi-ai's type; pi-agent-core re-uses it but does not re-export it.
 import type { Usage } from "@earendil-works/pi-ai"
 import { batch, type Segment, subscribe } from "@kyneta/schema"
-import { orderNewEntries, tailEdit } from "@pineta/core"
+import {
+  type BlobStore,
+  type ImageRef,
+  orderNewEntries,
+  tailEdit,
+} from "@pineta/core"
 import {
   applyTextEdits,
   newSessionDoc,
@@ -74,6 +79,18 @@ import {
   unsealCheckpoint,
 } from "./checkpoint.ts"
 import { addUsage, emptyUsage } from "./deep.ts"
+import { sha256Of } from "./images.ts"
+import {
+  type BlobOf,
+  inlineImages,
+  PENDING_ENTRY_NAMESPACE,
+  pendingImages,
+  type RefOf,
+  rejoinImages,
+  rejoinPendingEntry,
+  splitImages,
+  splitPendingEntry,
+} from "./stored-images.ts"
 
 // pi orders value keys by Unicode CODE POINT, not UTF-16 code unit.
 function compareKeys(left: string, right: string): number {
@@ -242,11 +259,18 @@ const NEVER_IN_PAYLOAD: readonly string[] = [...HOISTED, "seq"]
  * blob. A round-trip test cannot detect that, because rejoining from either
  * copy yields the same entry. The guard is the disjointness case in
  * `storage.test.ts`.
+ *
+ * A message's image parts whose blob `refOf` finds are stored as references,
+ * without their bytes (ADR-0051).
  */
-export function toStoredRow(entry: EntryWithoutSeq): StoredEntryRow {
+export function toStoredRow(
+  entry: EntryWithoutSeq,
+  refOf: RefOf,
+): StoredEntryRow {
   const payload: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(entry)) {
-    if (!NEVER_IN_PAYLOAD.includes(k)) payload[k] = v
+    if (NEVER_IN_PAYLOAD.includes(k)) continue
+    payload[k] = k === "message" ? splitImages(v, refOf) : v
   }
   return {
     id: entry.id,
@@ -277,6 +301,8 @@ export function toStoredRow(entry: EntryWithoutSeq): StoredEntryRow {
  *     different build materializes missing fields as schema defaults rather
  *     than as garbage (measured in S17/P1c), so they are well-formed.
  *   - the WRITE path is checked by pi's own `validateCommittedWrites`.
+ *   - a reference in `payload` is rejoined with the bytes `blobOf` reads, or
+ *     with a line saying the blob is gone (`rejoinImages`).
  *   - `payload` is unchecked, and is not checkable here. pi ships no schema
  *     for `Entry` \u2014 its typebox use is for tool parameters \u2014 so validating it
  *     would mean hand-writing a copy of pi's shape in this repository, which
@@ -285,9 +311,17 @@ export function toStoredRow(entry: EntryWithoutSeq): StoredEntryRow {
  * So the residual is provenance for `payload`, which is ADR-0015's open
  * question, not a defect in this function.
  */
-export function fromStoredRow(row: StoredEntryRow, seq: number): Entry {
+export function fromStoredRow(
+  row: StoredEntryRow,
+  seq: number,
+  blobOf: BlobOf,
+): Entry {
+  const payload = row.payload as Record<string, unknown>
   const rebuilt: Record<string, unknown> = {
-    ...(row.payload as Record<string, unknown>),
+    ...payload,
+    ...("message" in payload
+      ? { message: rejoinImages(payload.message, blobOf) }
+      : {}),
     id: row.id,
     parentId: row.parentId,
     type: row.type,
@@ -299,6 +333,9 @@ export function fromStoredRow(row: StoredEntryRow, seq: number): Entry {
   return rebuilt as unknown as Entry
 }
 
+/** A commit's writes, each with its seq. */
+type Prepared = ReturnType<typeof prepareStorageCommit>
+
 /** A usage row as stored: pi's `UsageRow` minus the never-stored `seq`. */
 type StoredUsageRow = Omit<UsageRow, "seq">
 
@@ -306,6 +343,11 @@ export interface KynetaStorageOptions {
   readonly doc?: SessionDocHandle
   readonly peerId?: string
   readonly now?: () => number
+  /**
+   * Where a message's images are kept (ADR-0051). Without it, every image
+   * part is stored inline, as pi wrote it.
+   */
+  readonly blobs?: Pick<BlobStore, "get" | "ref">
 }
 
 /**
@@ -316,6 +358,7 @@ export interface KynetaStorageOptions {
  */
 export class KynetaStorage implements Storage {
   #doc: SessionDocHandle
+  #blobs: Pick<BlobStore, "get" | "ref"> | undefined
   #now: () => number
   #peer: string
   #commitQueue: Promise<unknown> = Promise.resolve()
@@ -347,6 +390,7 @@ export class KynetaStorage implements Storage {
     this.#now = options.now ?? Date.now
     this.#peer = options.peerId ?? "p"
     this.#doc = options.doc ?? newSessionDoc()
+    this.#blobs = options.blobs
 
     // Only state no writer on this replica made (`replay: true`: a merge, a
     // reset) needs reconciling. Local commits (`replay: false`) index
@@ -586,9 +630,44 @@ export class KynetaStorage implements Storage {
 
   /** A stored record's value as pi wrote it: a sealed checkpoint rejoined. */
   #valueOf(raw: StoredValueRecord, pkey: string): unknown {
-    return raw.sealed === true
-      ? unsealCheckpoint(raw.value, this.#doc.checkpointText.at(pkey)?.() ?? "")
+    if (raw.sealed === true)
+      return unsealCheckpoint(
+        raw.value,
+        this.#doc.checkpointText.at(pkey)?.() ?? "",
+      )
+    return raw.namespace === PENDING_ENTRY_NAMESPACE
+      ? rejoinPendingEntry(raw.value, this.#blobOf)
       : raw.value
+  }
+
+  /** A blob's bytes, for the rejoin: none without a store. */
+  #blobOf: BlobOf = sha => this.#blobs?.get(sha)
+
+  /**
+   * The stored image of each inline image in `writes`, by its base64: the
+   * lookups the split needs, read before the batch. `read` stores its images
+   * before pi writes them (S59), so each is found by the hash of its bytes.
+   */
+  #imageRefs(writes: Prepared["writes"]): ReadonlyMap<string, ImageRef> {
+    const blobs = this.#blobs
+    const refs = new Map<string, ImageRef>()
+    if (blobs === undefined) return refs
+    for (const write of writes) {
+      const images =
+        write.kind === "entry" && write.type === "message"
+          ? inlineImages(write.message)
+          : write.kind === "value" &&
+              write.op !== "delete" &&
+              write.namespace === PENDING_ENTRY_NAMESPACE
+            ? pendingImages(write.value)
+            : []
+      for (const data of images) {
+        if (refs.has(data)) continue
+        const ref = blobs.ref(sha256Of(Buffer.from(data, "base64")))
+        if (ref !== undefined) refs.set(data, ref)
+      }
+    }
+    return refs
   }
 
   #entry(id: string): Entry | undefined {
@@ -596,7 +675,7 @@ export class KynetaStorage implements Storage {
     if (raw === undefined) return undefined
     const seq = this.#entrySeq.get(id)
     if (seq === undefined) return undefined
-    return fromStoredRow(raw, seq)
+    return fromStoredRow(raw, seq, this.#blobOf)
   }
 
   #storedValue<T>(namespace: string, key: string): StoredValue<T> | undefined {
@@ -642,13 +721,15 @@ export class KynetaStorage implements Storage {
     const stagedLists: Array<[string, { eid: string; seq: number } | null]> = []
     let messageDelta = 0
     let usageTotal = this.#usageTotal
+    const refs = this.#imageRefs(prepared.writes)
+    const refOf: RefOf = data => refs.get(data)
 
     batch(this.#doc, d => {
       for (const write of prepared.writes) {
         switch (write.kind) {
           case "entry": {
             const { kind: _k, seq: _s, ...entry } = write
-            d.entries.set(entry.id, toStoredRow(entry))
+            d.entries.set(entry.id, toStoredRow(entry, refOf))
             stagedEntries.push([entry.id, write.seq])
             if (entry.type === "message") messageDelta += 1
             break
@@ -674,10 +755,14 @@ export class KynetaStorage implements Storage {
                 write.namespace === CHECKPOINT_NAMESPACE
                   ? sealCheckpoint(write.value)
                   : undefined
+              const stored =
+                write.namespace === PENDING_ENTRY_NAMESPACE
+                  ? splitPendingEntry(write.value, refOf)
+                  : write.value
               d.values.set(pkey, {
                 namespace: write.namespace,
                 key: write.key,
-                value: sealed === undefined ? write.value : sealed.shell,
+                value: sealed === undefined ? stored : sealed.shell,
                 wid,
                 ...(sealed === undefined ? {} : { sealed: true }),
               })
@@ -912,7 +997,7 @@ export class KynetaStorage implements Storage {
         (raw.payload as { customType?: string }).customType !== query.customType
       )
         continue
-      out.push(fromStoredRow(raw, seq))
+      out.push(fromStoredRow(raw, seq, this.#blobOf))
     }
     return out
   }

@@ -21,6 +21,12 @@ plus one sealed `payload`.
 Everything Pineta reasons about is a column. Everything pi owns is in
 `payload`. We type what we traverse.
 
+One thing pi wrote is not in `payload`: a message's image bytes. An image
+part there is a reference, `{type: "image", mimeType, sha256, width,
+height}`, to the host's blob store, and `KynetaStorage` restores the bytes
+when pi reads the entry (ADR-0051). A part stored before that holds its
+bytes as `data`.
+
 ### Why `type` is an unconstrained string
 
 A new pi `EntryType` then requires **no schema change here at all**. A

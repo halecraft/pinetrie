@@ -36,7 +36,7 @@ export async function waitFor(
  */
 export function committedProject(
   prefix: string,
-  files: Readonly<Record<string, string>>,
+  files: Readonly<Record<string, string | Uint8Array>>,
 ): string {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), prefix)))
   const jj = (...args: string[]) =>

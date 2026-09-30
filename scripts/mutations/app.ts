@@ -791,6 +791,22 @@ export const mutations: readonly Mutation[] = [
     expect: "a starting host holds every note's text before it returns",
   },
   {
+    name: "read is built without its image processor",
+    file: "packages/pi/agent.ts",
+    from: "              : { imageProcessor: readImageProcessor(blobs) },",
+    to: "              : {},",
+    command: e2e,
+    expect: "a read image is stored by content",
+  },
+  {
+    name: "a tool row draws its caption, not its image",
+    file: "packages/client/message.tsx",
+    from: '      {size === "closed" ? null : body.kind === "images" ? (',
+    to: '      {size === "closed" ? null : body.kind === "never" ? (',
+    command: browser,
+    expect: "a read image opens its row capped",
+  },
+  {
     name: "the host resolves no card a client creates",
     file: "apps/pineta/host/index.ts",
     from: '        case "text":\n          return Interpret(TextDoc)',

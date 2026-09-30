@@ -284,8 +284,10 @@ branches from the op log. Our mapping is exact. (ADR-0008)
 - **images** — not in the document at all (ADR-0042). Their bytes are rows
   of `pineta_blobs` in the host's SQLite file, keyed by SHA-256; a chat holds
   `ImageRef`s in `details.images`, and the model is given the bytes when its
-  context is built. So compaction never rewrites an image, and a late joiner
-  loads one only when it is drawn.
+  context is built. A tool's image is stored by `read` before pi writes the
+  result, whose entry holds a reference that `KynetaStorage` rejoins with the
+  bytes for pi (ADR-0051). So compaction never rewrites an image, and a late
+  joiner loads one only when it is drawn.
 - **presence** — ephemeral: per-peer selection, scroll, live typing.
   Ephemeral holds **only** scalars/structs/records — no `text`, `list`,
   `counter`, or other ordered/counted container, by design.

@@ -13,6 +13,7 @@ import {
   indexTree,
   type LaneName,
   laneNameForThread,
+  messageImages,
   PENDING_TRACK,
   type Position,
   planStop,
@@ -639,7 +640,56 @@ describe("tool calls: paired with their results on the path", () => {
         id: "c1",
         name: "read",
         label: "read notes.txt",
-        result: { text: "MANGO", isError: false },
+        subject: "notes.txt",
+        result: { text: "MANGO", isError: false, images: [] },
+      },
+    ])
+  })
+  test("a result's stored images are on its call", () => {
+    const image = {
+      type: "image",
+      mimeType: "image/png",
+      sha256: "a".repeat(64),
+      width: 40,
+      height: 30,
+    }
+    const read = indexTree({
+      ...entries,
+      ...Object.fromEntries([
+        e("6-a", "4-a", {
+          role: "assistant",
+          content: [call("c6", "read", { path: "shot.png" })],
+        }),
+        e("7-r", "6-a", {
+          role: "toolResult",
+          toolCallId: "c6",
+          content: [
+            { type: "text", text: "Read image file [image/png]" },
+            image,
+          ],
+          isError: false,
+        }),
+        e("8-a", "7-r", { role: "assistant", content: "A red square." }),
+      ]),
+    })
+    expect(projectSpine(read, "8-a").spine.at(-2)?.toolCalls).toEqual([
+      {
+        id: "c6",
+        name: "read",
+        label: "read shot.png",
+        subject: "shot.png",
+        result: {
+          text: "Read image file [image/png]",
+          isError: false,
+          images: [
+            {
+              sha256: image.sha256,
+              mimeType: "image/png",
+              width: 40,
+              height: 30,
+            },
+          ],
+        },
       },
     ])
   })
@@ -660,6 +710,7 @@ describe("tool calls: paired with their results on the path", () => {
         name: "bash",
         label: "bash pnpm test",
         wholeLabel: `bash ${command}`,
+        subject: command,
       },
     ])
   })
@@ -671,6 +722,7 @@ describe("tool calls: paired with their results on the path", () => {
     expect(projectSpine(i, "5-r").spine[1]?.toolCalls?.[0]?.result).toEqual({
       text: "elsewhere",
       isError: true,
+      images: [],
     })
   })
   test("a branch's message count ignores tool results", () => {
@@ -693,6 +745,37 @@ test("planStop: abort a running lane; an idle one is already stopped; an unknown
   expect(planStop([lane(true)], laneNameForThread("s"))).toBe("abort")
   expect(planStop([lane(false)], laneNameForThread("s"))).toBe("idle")
   expect(planStop([lane(true)], laneNameForThread("other"))).toBe("unknown")
+})
+
+describe("messageImages: only stored references", () => {
+  const ref = {
+    type: "image",
+    mimeType: "image/png",
+    sha256: "b".repeat(64),
+    width: 40,
+    height: 30,
+  }
+  const images = (...parts: Record<string, unknown>[]) =>
+    messageImages({ role: "toolResult", content: parts })
+
+  test("a reference is an image", () => {
+    expect(images({ type: "text", text: "x" }, ref)).toEqual([
+      { sha256: ref.sha256, mimeType: "image/png", width: 40, height: 30 },
+    ])
+  })
+  test.each<[string, Record<string, unknown>]>([
+    ["inline bytes", { type: "image", data: "iVBOR", mimeType: "image/png" }],
+    ["bytes beside a reference", { ...ref, data: "iVBOR" }],
+    ["a malformed hash", { ...ref, sha256: "B".repeat(64) }],
+    ["a type no provider takes", { ...ref, mimeType: "image/svg+xml" }],
+    ["no width", { ...ref, width: 0 }],
+    ["a fractional height", { ...ref, height: 1.5 }],
+  ])("%s is not one", (_, part) => {
+    expect(images(part)).toEqual([])
+  })
+  test("text content has none", () => {
+    expect(messageImages({ role: "user", content: "hi" })).toEqual([])
+  })
 })
 
 describe("toolLabel and tailEdit", () => {

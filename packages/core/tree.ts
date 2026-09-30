@@ -12,7 +12,7 @@
 // A tool's result is its own entry, but it belongs to its call: `projectSpine`
 // pairs it with the call on the same path, and it is never a message itself.
 
-import type { ImageRef } from "./images.ts"
+import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
 import {
   atEntry,
   type ChatMode,
@@ -22,7 +22,7 @@ import {
   type Position,
   type WriterId,
 } from "./index.ts"
-import { toolLabel, wholeToolLabel } from "./tools.ts"
+import { subjectOf, toolLabel, wholeToolLabel } from "./tools.ts"
 
 // ── entries and messages ──────────────────────────────────────────────────
 
@@ -33,6 +33,15 @@ export interface MessagePart {
   readonly id?: string
   readonly name?: string
   readonly arguments?: unknown
+  /**
+   * An `image` part as the session stores it (ADR-0051): the blob its bytes
+   * are in. An image pi wrote inline has `data` instead.
+   */
+  readonly sha256?: string
+  readonly mimeType?: string
+  readonly width?: number
+  readonly height?: number
+  readonly data?: string
 }
 
 export interface AgentMessageLike {
@@ -94,8 +103,18 @@ export interface ToolCallView {
   readonly label: string
   /** `label` uncut, when it is cut (`wholeToolLabel`). */
   readonly wholeLabel?: string
+  /** What it touched, whole: a path or a command (`subjectOf`). */
+  readonly subject?: string
   /** Its result, when the result is on the same path. */
-  readonly result?: { readonly text: string; readonly isError: boolean }
+  readonly result?: ToolResultView
+}
+
+/** A tool's result as a reader sees it. */
+export interface ToolResultView {
+  readonly text: string
+  readonly isError: boolean
+  /** The images it returned, stored as blobs. */
+  readonly images: readonly ImageRef[]
 }
 
 /**
@@ -126,6 +145,40 @@ export function messageText(
     )
     .map(part => part.text)
     .join("")
+}
+
+const isDimension = (n: unknown): n is number =>
+  typeof n === "number" && Number.isInteger(n) && n > 0
+
+/**
+ * The stored images in a message's content, in order. A part with its bytes
+ * inline is not one: no `/blob/` URL serves it. The session keeps one from
+ * before images were blobs, or from a host with no store.
+ */
+export function messageImages(
+  message: AgentMessageLike | null | undefined,
+): ImageRef[] {
+  const content = message?.content
+  if (!Array.isArray(content)) return []
+  return content.flatMap(part =>
+    part?.type === "image" &&
+    part.data === undefined &&
+    typeof part.sha256 === "string" &&
+    isSha256(part.sha256) &&
+    typeof part.mimeType === "string" &&
+    isImageMime(part.mimeType) &&
+    isDimension(part.width) &&
+    isDimension(part.height)
+      ? [
+          {
+            sha256: part.sha256,
+            mimeType: part.mimeType,
+            width: part.width,
+            height: part.height,
+          },
+        ]
+      : [],
+  )
 }
 
 /**
@@ -184,11 +237,13 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
 /** One call as a reader sees it, before its result is paired with it. */
 function callView(id: string, name: string, args: unknown): ToolCallView {
   const wholeLabel = wholeToolLabel(name, args)
+  const subject = subjectOf(name, args)
   return {
     id,
     name,
     label: toolLabel(name, args),
     ...(wholeLabel === undefined ? {} : { wholeLabel }),
+    ...(subject === undefined ? {} : { subject }),
   }
 }
 
@@ -206,11 +261,9 @@ function toolCallsOf(message: AgentMessageLike | undefined): ToolCallView[] {
 }
 
 /** A `toolResult` entry -> the call it answers and what it said, or null. */
-function toolResultOf(entry: EntryLike): {
-  readonly callId: string
-  readonly text: string
-  readonly isError: boolean
-} | null {
+function toolResultOf(
+  entry: EntryLike,
+): ({ readonly callId: string } & ToolResultView) | null {
   const m = entry.message
   if (entry.type !== "message" || m?.role !== "toolResult") return null
   if (typeof m.toolCallId !== "string") return null
@@ -218,6 +271,7 @@ function toolResultOf(entry: EntryLike): {
     callId: m.toolCallId,
     text: messageText(m),
     isError: m.isError === true,
+    images: messageImages(m),
   }
 }
 
@@ -271,12 +325,17 @@ export function promptOf(index: TreeIndex, tip: string | null): EntryId | null {
 function resultsOn(
   index: TreeIndex,
   ids: Iterable<string>,
-): ReadonlyMap<string, { readonly text: string; readonly isError: boolean }> {
-  const results = new Map<string, { text: string; isError: boolean }>()
+): ReadonlyMap<string, ToolResultView> {
+  const results = new Map<string, ToolResultView>()
   for (const id of ids) {
     const entry = index.entries[id]
     const r = entry === undefined ? null : toolResultOf(entry)
-    if (r !== null) results.set(r.callId, { text: r.text, isError: r.isError })
+    if (r !== null)
+      results.set(r.callId, {
+        text: r.text,
+        isError: r.isError,
+        images: r.images,
+      })
   }
   return results
 }

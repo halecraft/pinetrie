@@ -15,7 +15,7 @@ const details = (shas: readonly Sha256[]) => ({
   images: shas.map(image),
 })
 
-test("referencedBlobs: chats, held messages and notes' texts each keep theirs", () => {
+test("referencedBlobs: chats, tool results, held messages and typed texts each keep theirs", () => {
   const held: Held[] = [
     {
       kind: "chat",
@@ -37,11 +37,24 @@ test("referencedBlobs: chats, held messages and notes' texts each keep theirs", 
       encodeChat(details([sha("a")]), 1),
       { role: "user", content: `![](/blob/${sha("f")})` },
       encodeChat(details([]), 2),
+      {
+        role: "toolResult",
+        toolCallId: "c1",
+        content: [
+          { type: "text", text: "Read image file [image/png]" },
+          { type: "image", ...image(sha("e")) },
+        ],
+      },
     ],
     held,
     texts: [`a card ![](/blob/${sha("c")})`, "`![](/blob/dd)` no"],
   })
-  expect([...referenced].sort()).toEqual([sha("a"), sha("b"), sha("c")])
+  expect([...referenced].sort()).toEqual([
+    sha("a"),
+    sha("b"),
+    sha("c"),
+    sha("e"),
+  ])
 })
 
 test("planSweep: only the unreferenced and untouched past the grace go", () => {

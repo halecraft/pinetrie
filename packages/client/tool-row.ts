@@ -1,9 +1,13 @@
-// client/tool-row — how much of a tool call's row is shown, as a pure rule.
+// client/tool-row — how much of a tool call's row is shown, and what it
+// shows, as pure rules.
 //
-// A row opens on its own only for a call whose output streams for REVEAL_MS,
-// so a fast command never flashes open, and then only capped. Nothing but the
-// reader closes it or shows it whole: a following column that grew for a row
-// does not shrink when the call ends (S35).
+// A row opens on its own, capped, for a call whose output streams for
+// REVEAL_MS, so a fast command never flashes open, and for a result with an
+// image (ADR-0051). Nothing but the reader closes it or shows it whole: a
+// following column that grew for a row does not shrink when the call ends
+// (S35).
+
+import type { ImageRef, ToolResultView } from "@pineta/core"
 
 /** How long a call's output streams before its row opens. */
 export const REVEAL_MS = 500
@@ -20,12 +24,32 @@ export type ReaderChoice = "full" | "closed" | null
 export interface RowFacts {
   /** The call's output streamed for REVEAL_MS while this row was drawn. */
   readonly revealed: boolean
+  /** Its result has an image. */
+  readonly shows: boolean
   readonly reader: ReaderChoice
 }
 
 export const rowSize = (f: RowFacts): RowSize =>
-  f.reader ?? (f.revealed ? "capped" : "closed")
+  f.reader ?? (f.revealed || f.shows ? "capped" : "closed")
 
 /** A capped row is partly open already: a click shows the rest. */
 export const click = (size: RowSize): "full" | "closed" =>
   size === "full" ? "closed" : "full"
+
+/**
+ * What an open row draws: a result's images in place of its text, whose
+ * caption only says an image was read, or else its text or live output.
+ * `note` is that text: the caption, and pi's note of a resize.
+ */
+export type ToolBody =
+  | {
+      readonly kind: "images"
+      readonly images: readonly ImageRef[]
+      readonly note: string
+    }
+  | { readonly kind: "text" }
+
+export const toolBody = (result: ToolResultView | undefined): ToolBody =>
+  result !== undefined && result.images.length > 0
+    ? { kind: "images", images: result.images, note: result.text }
+    : { kind: "text" }

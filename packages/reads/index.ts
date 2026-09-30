@@ -13,6 +13,7 @@
 
 import {
   type Above,
+  type AgentMessageLike,
   type AgentRun,
   type ArchiveRecord,
   agentActivity,
@@ -28,6 +29,7 @@ import {
   type LaneRecord,
   type LaneView,
   type MarkRecord,
+  messageImages,
   type NoteRecord,
   nearestRevision,
   type OfferRecord,
@@ -476,11 +478,11 @@ export function workAt(
 // --- blobs (ADR-0042) ---------------------------------------------------------
 
 /**
- * Every blob something still shows: each chat's images, each held message's,
- * and each `/blob/` image in the texts people type: every note's and every
- * card's (ADR-0048). A card holds what a composer has typed, pasted images
- * included, so the caller passes every text, not only those it has loaded.
- * Pure.
+ * Every blob something still shows: each chat's images, each tool result's
+ * (ADR-0051), each held message's, and each `/blob/` image in the texts
+ * people type: every note's and every card's (ADR-0048). A card holds what a
+ * composer has typed, pasted images included, so the caller passes every
+ * text, not only those it has loaded. Pure.
  */
 export function referencedBlobs(facts: {
   readonly messages: Iterable<unknown>
@@ -488,9 +490,12 @@ export function referencedBlobs(facts: {
   readonly texts: Iterable<string>
 }): ReadonlySet<Sha256> {
   const shas = new Set<Sha256>()
-  for (const message of facts.messages)
+  for (const message of facts.messages) {
     for (const image of decodeChat(message)?.images ?? [])
       shas.add(image.sha256)
+    for (const image of messageImages(message as AgentMessageLike))
+      shas.add(image.sha256)
+  }
   for (const held of facts.held)
     if (held.kind === "chat")
       for (const image of held.details.images ?? []) shas.add(image.sha256)

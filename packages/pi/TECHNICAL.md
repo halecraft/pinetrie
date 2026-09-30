@@ -17,11 +17,11 @@ pi hands us an `Entry`. The document stores a typed row. Two pure functions do
 the conversion, and they are the functional core of this module:
 
 ```
-toStoredRow(entry)        Entry minus seq  ->  StoredEntryRow
-fromStoredRow(row, seq)   StoredEntryRow   ->  Entry
+toStoredRow(entry, refOf)          Entry minus seq  ->  StoredEntryRow
+fromStoredRow(row, seq, blobOf)    StoredEntryRow   ->  Entry
 ```
 
-Three rules hold them together:
+Four rules hold them together:
 
 1. **`payload` carries variant data and only that.** `NEVER_IN_PAYLOAD` lists
    the hoisted columns plus `seq`. Duplicating a column into `payload` would
@@ -36,6 +36,18 @@ Three rules hold them together:
 3. **Absent and null are different facts.** `fromId` exists only on
    `branch_summary`, so the column holds `null` for every other type and the
    rejoin restores *absence*. Every message entry hits this path.
+4. **An image's bytes are in the blob store, not `payload`** (ADR-0051).
+   `splitImages` (`stored-images.ts`) stores each image part of a message
+   whose blob the store has as `{type, mimeType, sha256, width, height}`, and
+   `rejoinImages` restores `{type, data, mimeType}`, so pi reads what it
+   wrote. The same pair runs on `pi.pending.entry` values, pi's copy of a
+   message before its entry, since a deleted value stays in the history until
+   compaction (S59). `#applyCommit` gathers the lookups before its batch: the
+   SHA-256 of each part's bytes, and `blobs.ref`. A part the store lacks stays
+   inline, which is every part without `KynetaStorageOptions.blobs`, as
+   conformance runs. A blob gone from the store rejoins as "[image <sha256>
+   is no longer stored]". There is no cache: pi rejoins each entry on a
+   branch about twice a model request, at 0.65 ms for a 2 MB image (S59).
 
 `storage.test.ts` is co-located here on purpose: `toStoredRow` takes pi's
 `Entry`, so a test under `test/` would import a pi type across the boundary
@@ -138,7 +150,17 @@ whose `input` lacks `"image"`, pi-ai replaces each image with a line of text.
 bytes (`detectSupportedImageMimeType`), then `resizeImage`, in a worker
 thread, to 2000×2000 and 4.5 MB of base64. A type no provider takes inline
 (BMP) is "not an image"; a resize that returns null is "unreadable", since
-pi's null means either undecodable or impossible to fit.
+pi's null means either undecodable or impossible to fit. After a resize,
+`resized` is pi's note of the original size (`formatDimensionNote`).
+
+### A tool's images (ADR-0051)
+
+`read` is built with `readImageProcessor`, which runs `prepareImage` on an
+image file, puts it in `CreateAgentOptions.blobs`, and returns its base64 and
+the resize note as pi's `hints`, which pi appends to the caption. It runs
+before pi writes the result (S59), so both of pi's writes find the image in
+the store and keep a reference (rule 4 above). Without a store, `read` gets
+no processor and behaves as pi's own.
 
 The scripted model's `reply` shows an image part as
 `[image <mimeType> <sha256 of its bytes>]`, so a suite can check which image
@@ -383,7 +405,7 @@ into `node_modules`: `createAgentHarness`, `addUsage`/`emptyUsage`,
 `DefaultResourceLoader` and `buildSystemPrompt`. For commands:
 `loadSkillsFromDir`, `loadPromptTemplates`, `substituteArgs`,
 `parseCommandArgs` and `stripFrontmatter`. For images (ADR-0042):
-`detectSupportedImageMimeType` and `resizeImage`. Those paths are depth-sensitive: they broke when this
+`detectSupportedImageMimeType`, `resizeImage` and `formatDimensionNote`. Those paths are depth-sensitive: they broke when this
 package moved under `packages/`. If they break again, the failure is
 `ERR_MODULE_NOT_FOUND` at import time, not a type error.
 
