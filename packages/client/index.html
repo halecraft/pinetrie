@@ -274,10 +274,14 @@
       .msg::before, .msg::after { content: ""; position: absolute; top: 0; bottom: 0; }
       .msg::before { left: 100%; width: 1.75rem; }
       .msg::after { right: 100%; width: .75rem; }
-      /* Live work's mark: a 2px bar in the gutter, drawn by a shadow, so it takes
-         no width and live text wraps as its entry will (S35). Not ::before:
-         .msg's ::before and ::after are its hover gutters. */
-      .msg.streaming, .tool.live { box-shadow: -6px 0 0 -4px #9ecbff; }
+      /* Live work's mark: a 2px bar in the gutter, 4px clear of the text. A
+         border image drawn 6px outside the box (the outset) takes no width, so
+         live text wraps as its entry will (S35). Not ::before: .msg's ::before
+         and ::after are its hover gutters. Not a shadow: an outer shadow meets
+         the box's edge, and masking the gap left a hairline there. */
+      .msg.streaming, .tool.live {
+        border-image: linear-gradient(transparent 4px, #9ecbff 4px, #9ecbff calc(100% - 4px),
+          transparent 0) 0 0 0 1 / 0 0 0 2px / 0 0 0 6px; }
       .msg.streaming { opacity: .75; }
       /* A tool call: what it touched, its status, and its result folded away
          (`rowSize`, tool-row.ts). */
