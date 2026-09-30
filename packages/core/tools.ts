@@ -32,12 +32,15 @@ export function toolLabel(name: string, args: unknown): string {
 }
 
 /**
- * What a call touches, whole, when its label cuts it: a command past its first
- * line or past the label's length. Undefined when the label shows all of it.
+ * A tool call's label uncut, when `toolLabel` cuts it: a command past its
+ * first line or past the label's length. Undefined when the label is whole.
  */
-export function toolDetail(name: string, args: unknown): string | undefined {
+export function wholeToolLabel(
+  name: string,
+  args: unknown,
+): string | undefined {
   const subject = subjectOf(name, args)
-  return subject === undefined || toolLabel(name, args) === `${name} ${subject}`
-    ? undefined
-    : subject
+  if (subject === undefined) return undefined
+  const whole = `${name} ${subject}`
+  return toolLabel(name, args) === whole ? undefined : whole
 }

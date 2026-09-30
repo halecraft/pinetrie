@@ -2122,8 +2122,8 @@ try {
       )
 
       // A label shows a command's first line, and at most 120 characters;
-      // the row, opened, shows all of it. A command its label shows whole
-      // repeats nothing.
+      // the row, opened, shows all of it in the label's place, once. A
+      // command its label shows whole has nothing to swap.
       {
         const WHOLE = `echo ${"long ".repeat(30)}\necho second line`
         script.use([
@@ -2133,24 +2133,28 @@ try {
         await say("echo a long one")
         await toolIdle()
         const cut = `${col(0)} .tool[data-tool="bash"][data-status="ok"]`
-        await appears(`${cut} .tool-command`, 10_000)
+        await appears(`${cut} .tool-label-whole`, 10_000)
         const row = tp.locator(cut).last()
+        /** The summary's text as shown: only what is displayed counts. */
+        const summaryShows = () =>
+          row.locator("summary").evaluate(s => (s as HTMLElement).innerText)
+        const closed = await summaryShows()
         await row.locator("summary").click()
-        const shownWhole = await row
-          .locator(".tool-command")
-          .textContent({ timeout: 5_000 })
-          .catch(() => null)
-        const label = await row.locator(".tool-label").textContent()
-        const repeated = await tp
+        const opened = await summaryShows()
+        const whole = `bash ${WHOLE}`
+        const swaps = await tp
           .locator(cut)
           .filter({ hasText: "echo tick" })
-          .locator(".tool-command")
+          .locator(".tool-label-whole")
           .count()
         ok(
-          shownWhole === WHOLE &&
-            label?.endsWith("…") === true &&
-            repeated === 0,
-          `an opened row shows the whole command its label cuts, and a short one's row repeats nothing (${JSON.stringify(label)}, ${repeated})`,
+          closed.includes("…") &&
+            !closed.includes("second line") &&
+            opened.includes(whole) &&
+            !opened.includes("…") &&
+            opened.split("echo long").length === 2 &&
+            swaps === 0,
+          `an opened row shows the whole command in its label's place, once, and a short one's has nothing to swap (${JSON.stringify(closed.slice(-12))}, ${opened.split("echo long").length - 1} times, ${swaps})`,
         )
       }
 

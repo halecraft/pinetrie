@@ -185,8 +185,9 @@ const SHOWN = 20_000
 
 /**
  * One tool call: what it touched, whether it worked, and, folded, what it
- * returned. A label that cuts what the call touches (a long or multi-line
- * command) is followed, inside the fold, by all of it. The result is its own entry in the tree, paired here by
+ * returned. A cut label (a long or multi-line command) is shown uncut in its
+ * place while the row is open: CSS on `[open]` swaps the two, so the command
+ * is never shown twice. The result is its own entry in the tree, paired here by
  * `projectSpine`; with none yet, the call is still running or was cut off.
  * While it runs, its output streams here, open: the result replaces it in
  * the render that holds the result, in the same element (S35).
@@ -214,12 +215,12 @@ function ToolRow({
       open={live !== undefined}
     >
       <summary>
-        <span className="tool-label">{call.label}</span>{" "}
+        <span className="tool-label">{call.label}</span>
+        {call.wholeLabel !== undefined && (
+          <span className="tool-label-whole">{call.wholeLabel}</span>
+        )}{" "}
         <span className="tool-status">{mark}</span>
       </summary>
-      {call.detail !== undefined && (
-        <pre className="tool-command">{call.detail}</pre>
-      )}
       {live !== undefined && <LiveOutput doc={doc} id={live} />}
       {call.result !== undefined && (
         <pre className="tool-output">

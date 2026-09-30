@@ -22,7 +22,7 @@ import {
   type Position,
   type WriterId,
 } from "./index.ts"
-import { toolDetail, toolLabel } from "./tools.ts"
+import { toolLabel, wholeToolLabel } from "./tools.ts"
 
 // ── entries and messages ──────────────────────────────────────────────────
 
@@ -92,8 +92,8 @@ export interface ToolCallView {
   readonly id: string
   readonly name: string
   readonly label: string
-  /** What it touches, whole, when `label` cuts it (`toolDetail`). */
-  readonly detail?: string
+  /** `label` uncut, when it is cut (`wholeToolLabel`). */
+  readonly wholeLabel?: string
   /** Its result, when the result is on the same path. */
   readonly result?: { readonly text: string; readonly isError: boolean }
 }
@@ -182,13 +182,13 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
 }
 
 /** One call as a reader sees it, before its result is paired with it. */
-function withDetail(id: string, name: string, args: unknown): ToolCallView {
-  const detail = toolDetail(name, args)
+function callView(id: string, name: string, args: unknown): ToolCallView {
+  const wholeLabel = wholeToolLabel(name, args)
   return {
     id,
     name,
     label: toolLabel(name, args),
-    ...(detail === undefined ? {} : { detail }),
+    ...(wholeLabel === undefined ? {} : { wholeLabel }),
   }
 }
 
@@ -200,7 +200,7 @@ function toolCallsOf(message: AgentMessageLike | undefined): ToolCallView[] {
     part?.type === "toolCall" &&
     typeof part.id === "string" &&
     typeof part.name === "string"
-      ? [withDetail(part.id, part.name, part.arguments)]
+      ? [callView(part.id, part.name, part.arguments)]
       : [],
   )
 }

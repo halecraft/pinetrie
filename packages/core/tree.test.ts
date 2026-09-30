@@ -25,8 +25,8 @@ import {
   runSpan,
   tailEdit,
   threadOf,
-  toolDetail,
   toolLabel,
+  wholeToolLabel,
   writerId,
   writersOf,
 } from "./index.ts"
@@ -643,7 +643,7 @@ describe("tool calls: paired with their results on the path", () => {
       },
     ])
   })
-  test("a call whose label cuts its command carries the whole command", () => {
+  test("a call whose label is cut carries it uncut", () => {
     const command = "pnpm test\necho done"
     const long = indexTree({
       ...entries,
@@ -655,7 +655,12 @@ describe("tool calls: paired with their results on the path", () => {
       ]),
     })
     expect(projectSpine(long, "9-a").spine.at(-1)?.toolCalls).toEqual([
-      { id: "c9", name: "bash", label: "bash pnpm test", detail: command },
+      {
+        id: "c9",
+        name: "bash",
+        label: "bash pnpm test",
+        wholeLabel: `bash ${command}`,
+      },
     ])
   })
   test("a result off the path does not pair", () => {
@@ -699,16 +704,16 @@ describe("toolLabel and tailEdit", () => {
     expect(toolLabel("mystery", { x: 1 })).toBe("mystery")
   })
 
-  test("toolDetail gives the whole of what the label cuts, and nothing when it cuts nothing", () => {
-    expect(toolDetail("bash", { command: "pnpm test" })).toBeUndefined()
-    expect(toolDetail("bash", { command: "pnpm test\necho done" })).toBe(
-      "pnpm test\necho done",
+  test("wholeToolLabel is the label uncut, and nothing when it is not cut", () => {
+    expect(wholeToolLabel("bash", { command: "pnpm test" })).toBeUndefined()
+    expect(wholeToolLabel("bash", { command: "pnpm test\necho done" })).toBe(
+      "bash pnpm test\necho done",
     )
     const long = `echo ${"x".repeat(200)}`
     expect(toolLabel("bash", { command: long }).endsWith("…")).toBe(true)
-    expect(toolDetail("bash", { command: long })).toBe(long)
-    expect(toolDetail("read", { path: "a.ts" })).toBeUndefined()
-    expect(toolDetail("mystery", { x: 1 })).toBeUndefined()
+    expect(wholeToolLabel("bash", { command: long })).toBe(`bash ${long}`)
+    expect(wholeToolLabel("read", { path: "a.ts" })).toBeUndefined()
+    expect(wholeToolLabel("mystery", { x: 1 })).toBeUndefined()
   })
 
   // A tail-kept view: lines 1..n, keeping the last `keep` lines.
