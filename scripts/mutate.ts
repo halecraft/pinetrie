@@ -14,9 +14,16 @@
 //     some other check is ELSEWHERE, because the intended check did not fire.
 //   - A run that times out is KILLED (hung): a guard against spinning, removed,
 //     makes the suite hang, and a hang is a failure.
+//   - With `expect`, a suite stops at that check (`PINETA_STOP_AT`,
+//     `apps/pineta/e2e/checks.ts`): nothing after it changes the verdict.
 //
 // Usage: node scripts/mutate.ts <mutations.ts> [name-substring]
 // Exits with the number of mutations that were not KILLED.
+//
+// With `--against <command…>` last, each mutant runs that command instead of
+// its own and reports which checks fail: CAUGHT with their lines, or MISSED.
+// No verdict, and the exit status is 0. It finds where a suite mutation's bug
+// is already caught by a faster command, as a unit test.
 
 import { spawn } from "node:child_process"
 import { readFileSync, writeFileSync } from "node:fs"
@@ -67,12 +74,28 @@ export function judge(
   if (LOAD_FAILURES.some(sign => run.output.includes(sign))) return "BROKEN"
   if (run.status === 0) return "SURVIVED"
   if (expect === undefined) return "KILLED"
-  const failing = run.output
+  return failingChecks(run.output).some(line => line.includes(expect))
+    ? "KILLED"
+    : "ELSEWHERE"
+}
+
+/**
+ * The lines of a run's output that name a failing check: a suite's `FAIL`,
+ * Vitest's `×`, or an assertion's error. Pure.
+ */
+export const failingChecks = (output: string): string[] =>
+  output
     .split("\n")
     .filter(
       line => /^\s*(FAIL|×)/.test(line) || line.includes("AssertionError"),
     )
-  return failing.some(line => line.includes(expect)) ? "KILLED" : "ELSEWHERE"
+
+/** The environment a mutant runs in: the parent's, and the check to stop at. */
+export function mutantEnv(
+  base: NodeJS.ProcessEnv,
+  expect: string | undefined,
+): NodeJS.ProcessEnv {
+  return expect === undefined ? base : { ...base, PINETA_STOP_AT: expect }
 }
 
 /**
@@ -86,9 +109,10 @@ export function run(
   args: readonly string[],
   cwd: string,
   timeoutMs: number,
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<{ status: number | null; timedOut: boolean; output: string }> {
   return new Promise(resolve => {
-    const child = spawn(cmd, args, { cwd, detached: true })
+    const child = spawn(cmd, args, { cwd, detached: true, env })
     let output = ""
     child.stdout.on("data", d => {
       output += d
@@ -116,7 +140,15 @@ export function run(
   })
 }
 
-async function apply(root: string, m: Mutation): Promise<Verdict> {
+/**
+ * Run `body` with the mutant in place, and restore the file however it ends.
+ * An anchor that does not occur exactly once runs nothing.
+ */
+async function withMutant<T>(
+  root: string,
+  m: Mutation,
+  body: () => Promise<T>,
+): Promise<T | "ANCHOR"> {
   const file = path.join(root, m.file)
   const original = readFileSync(file, "utf8")
   if (original.split(m.from).length !== 2) return "ANCHOR"
@@ -124,20 +156,50 @@ async function apply(root: string, m: Mutation): Promise<Verdict> {
   process.once("SIGINT", restore)
   writeFileSync(file, original.replace(m.from, m.to))
   try {
-    const [cmd, ...args] = m.command
-    if (cmd === undefined) return "BROKEN"
-    return judge(await run(cmd, args, root, m.timeoutMs ?? 900_000), m.expect)
+    return await body()
   } finally {
     restore()
     process.removeListener("SIGINT", restore)
   }
 }
 
+const apply = (root: string, m: Mutation): Promise<Verdict> =>
+  withMutant(root, m, async () => {
+    const [cmd, ...args] = m.command
+    if (cmd === undefined) return "BROKEN" as const
+    return judge(
+      await run(
+        cmd,
+        args,
+        root,
+        m.timeoutMs ?? 900_000,
+        mutantEnv(process.env, m.expect),
+      ),
+      m.expect,
+    )
+  })
+
+/** The checks `against` fails with the mutant in place, each once, trimmed. */
+const probe = (
+  root: string,
+  m: Mutation,
+  against: readonly string[],
+): Promise<readonly string[] | "ANCHOR"> =>
+  withMutant(root, m, async () => {
+    const [cmd, ...args] = against
+    if (cmd === undefined) return []
+    const { output } = await run(cmd, args, root, m.timeoutMs ?? 900_000)
+    return [...new Set(failingChecks(output).map(line => line.trim()))]
+  })
+
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  const [list, only] = process.argv.slice(2)
-  if (list === undefined) {
+  const argv = process.argv.slice(2)
+  const at = argv.indexOf("--against")
+  const [list, only] = at < 0 ? argv : argv.slice(0, at)
+  const against = at < 0 ? undefined : argv.slice(at + 1)
+  if (list === undefined || against?.length === 0) {
     console.error(
-      "usage: node scripts/mutate.ts <mutations.ts> [name-substring]",
+      "usage: node scripts/mutate.ts <mutations.ts> [name-substring] [--against <command…>]",
     )
     process.exit(2)
   }
@@ -148,6 +210,18 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const chosen = mod.mutations.filter(
     m => only === undefined || m.name.includes(only),
   )
+  if (against !== undefined) {
+    for (const m of chosen) {
+      const failing = await probe(root, m, against)
+      if (failing === "ANCHOR") console.log(`  ANCHOR    ${m.name}`)
+      else if (failing.length === 0) console.log(`  MISSED    ${m.name}`)
+      else
+        console.log(
+          `  CAUGHT    ${m.name}\n${failing.map(l => `      ${l}`).join("\n")}`,
+        )
+    }
+    process.exit(0)
+  }
   let bad = 0
   for (const m of chosen) {
     const verdict = await apply(root, m)

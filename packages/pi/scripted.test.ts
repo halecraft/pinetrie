@@ -91,3 +91,13 @@ test("a paused request whose run aborts ends, aborted, with no resume", async ()
   abort.abort()
   expect((await held).stopReason).toBe("aborted")
 })
+
+test("a scripted tool step's call carries its arguments", async () => {
+  const script = scriptedModel()
+  const ask = await asker(script)
+  script.use([{ tool: "read", args: { path: "notes.txt" } }])
+  const reply = await ask("read it")
+  expect(
+    reply.content.flatMap(p => (p.type === "toolCall" ? [p] : [])),
+  ).toMatchObject([{ name: "read", arguments: { path: "notes.txt" } }])
+})

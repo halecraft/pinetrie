@@ -12,7 +12,7 @@ import type { Agent, ThreadLaneHandle } from "@pineta/pi"
 import { readOutbox } from "@pineta/reads"
 import { physicalKey } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { basics, methods, record } from "./fakes.ts"
+import { basics, methods, putValue, record } from "./fakes.ts"
 import { type DrainDeps, drain } from "./outbox.ts"
 
 const LANE = laneNameForThread("0123456789abcdef")
@@ -36,7 +36,7 @@ function setUp(items: readonly Held[], append: ThreadLaneHandle["append"]) {
   const b = basics()
   const key = (id: string) => physicalKey(OUTBOX_NAMESPACE, id)
   for (const h of items)
-    b.doc.values.set(key(h.id), {
+    putValue(b.doc, {
       namespace: OUTBOX_NAMESPACE,
       key: h.id,
       value: encodeHeld(h),

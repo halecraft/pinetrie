@@ -1,5 +1,6 @@
 // host/http — the host's one HTTP server: the Exchange's websocket, Vite, the
-// blobs and an offer's reads, each only after admission.
+// blobs and an offer's reads. It carries out `planRequest` and `planUpgrade`
+// (routes.ts), which admit first.
 
 import http, { type IncomingMessage, type ServerResponse } from "node:http"
 import { createRequire } from "node:module"
@@ -14,13 +15,7 @@ import type { OfferAsk } from "@pineta/marginalia"
 import { prepareImage } from "@pineta/pi"
 import { createServer as createViteServer } from "vite"
 import { WebSocketServer } from "ws"
-import {
-  admits,
-  KEY_COOKIE,
-  planInvites,
-  requestFacts,
-  urlHost,
-} from "./admission.ts"
+import { KEY_COOKIE, planInvites, requestFacts, urlHost } from "./admission.ts"
 import { messageOf } from "./basics.ts"
 import { MAX_UPLOAD_BYTES, planUploadHeaders } from "./blobs.ts"
 import type { HotReload } from "./hot-reload.ts"
@@ -31,7 +26,7 @@ import {
   uploaded,
   uploadRefusal,
 } from "./responses.ts"
-import { route } from "./routes.ts"
+import { planRequest, planUpgrade } from "./routes.ts"
 import type { LaneWork } from "./work.ts"
 
 export interface RunningHttp {
@@ -91,25 +86,21 @@ export async function startHttp(input: {
     },
   })
   hotReload.attach(() => vite.ws.send({ type: "full-reload" }))
-  // Admission comes first: nothing reaches Vite, the blobs, an offer's reads or
-  // the Exchange without it.
+  // Each request carries out its plan (`planRequest`), which admits first.
   httpServer.on("request", (req, res) => {
-    const admission = admits(requestFacts(req), key)
-    if (admission.kind === "refuse") {
-      res.writeHead(403).end()
-      return
-    }
-    if (admission.kind === "admitAndForget") {
-      res
-        .writeHead(302, {
-          location: admission.location,
-          "set-cookie": `${KEY_COOKIE}=${encodeURIComponent(key ?? "")}; HttpOnly; SameSite=Strict; Path=/`,
-        })
-        .end()
-      return
-    }
-    const to = route(req.method, new URL(req.url ?? "/", "http://host"))
+    const to = planRequest(requestFacts(req), key, req.method)
     switch (to.kind) {
+      case "refuse":
+        res.writeHead(403).end()
+        return
+      case "redirect":
+        res
+          .writeHead(302, {
+            location: to.location,
+            "set-cookie": `${KEY_COOKIE}=${encodeURIComponent(key ?? "")}; HttpOnly; SameSite=Strict; Path=/`,
+          })
+          .end()
+        return
       case "blob-get":
         return serveBlob(to.sha, res)
       case "blob-post":
@@ -193,15 +184,17 @@ export async function startHttp(input: {
   // Handling every upgrade here — which is what this did before Vite — would
   // swallow HMR silently.
   httpServer.on("upgrade", (req, socket, head) => {
-    const admission = admits(requestFacts(req), key)
-    if (admission.kind === "refuse") {
-      socket.end("HTTP/1.1 403 Forbidden\r\n\r\n")
-      return
-    }
-    if (new URL(req.url ?? "/", "http://host").pathname === "/ws") {
-      wss.handleUpgrade(req, socket, head, ws =>
-        wss.emit("connection", ws, req),
-      )
+    switch (planUpgrade(requestFacts(req), key)) {
+      case "refuse":
+        socket.end("HTTP/1.1 403 Forbidden\r\n\r\n")
+        return
+      case "exchange":
+        wss.handleUpgrade(req, socket, head, ws =>
+          wss.emit("connection", ws, req),
+        )
+        return
+      case "vite":
+        return
     }
   })
 

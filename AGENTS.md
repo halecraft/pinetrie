@@ -44,11 +44,19 @@ later one in its own file in `docs/adrs/`. Each package has a
 | deliberate bugs | `pnpm mutate scripts/mutations/<list>.ts [name]` |
 
 A check without a proof it can fail is not yet a check. A new check comes with a
-deliberate bug (a mutation in `scripts/mutations/`) that it catches.
+deliberate bug (a mutation in `scripts/mutations/`) that it catches. A
+mutation uses a suite only when its check proves what no unit test can: the
+behaviour of a container, jj, git, pi, Kyneta or the browser, or
+`startHost`'s own wiring. Anything else is a unit mutation, a second or two
+against minutes. `pnpm mutate <list> <name> --against <command>` runs a
+mutant against another command and lists the checks that catch it: use it to
+find a unit test that already proves a rule before writing one.
 
-Each mutation runs its whole command, so one checked by `e2e` or `e2e:browser`
-takes minutes. Run unit-test mutations as you write them. Run the suite-level
-ones once, in a batch at the end of the work, after the suite itself passes:
+A mutation runs its command until the check it expects fails
+(`PINETA_STOP_AT`, set by `pnpm mutate`), so one whose check comes late in
+`e2e` or `e2e:browser` still takes minutes. Run unit-test mutations as you
+write them. Run the suite-level ones once, in a batch at the end of the work,
+after the suite itself passes:
 one `pnpm mutate` call per name (it takes one name substring, or none for the
 whole list), one after another. While writing,
 `npx vitest run scripts/mutations.test.ts` checks that every anchor still

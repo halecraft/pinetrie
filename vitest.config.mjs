@@ -12,6 +12,7 @@ export default defineConfig({
       "packages/*/*.test.ts",
       "apps/*/*.test.ts",
       "apps/*/host/**/*.test.ts",
+      "apps/*/e2e/*.test.ts",
       "scripts/*.test.ts",
       "workspace.test.ts",
     ],

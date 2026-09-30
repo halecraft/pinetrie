@@ -1,9 +1,23 @@
-// host/fakes — test support for the shell's unit tests. Production code never
-// imports it.
+// host/fakes — test support for the shell's unit tests: ports that record
+// their calls, a lane whose run a test finishes, and writers that put entries
+// and values in a document as the host would. Production code never imports
+// it.
 
-import type { LaneName } from "@pineta/core"
+import {
+  entryId,
+  type LaneName,
+  type NoteId,
+  type NoteRecord,
+  writerId,
+} from "@pineta/core"
+import { encodeNote, NOTE_NAMESPACE } from "@pineta/marginalia"
 import type { ThreadLaneHandle, WriteOutcome } from "@pineta/pi"
-import { newSessionDoc, type StoredEntryRow } from "@pineta/schema"
+import {
+  newSessionDoc,
+  physicalKey,
+  type SessionDocHandle,
+  type StoredEntryRow,
+} from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 
 export interface Call {
@@ -95,6 +109,44 @@ export const row = (
   fromId: null,
   payload: { message },
 })
+
+/**
+ * One pi value, as pi stores it: `encodeWorkRecord`'s result, or a note, an
+ * archive record or a held item with its namespace and key.
+ */
+export function putValue(
+  doc: SessionDocHandle,
+  stored: {
+    readonly namespace: string
+    readonly key: string
+    readonly value: unknown
+  },
+): void {
+  doc.values.set(physicalKey(stored.namespace, stored.key), stored)
+}
+
+/**
+ * A note's record, stored as the host writes it: open, about `e-1`, opened
+ * by Ada, unless `overrides` says otherwise.
+ */
+export function putNote(
+  doc: SessionDocHandle,
+  id: NoteId,
+  overrides: Partial<NoteRecord> = {},
+): NoteRecord {
+  const note: NoteRecord = {
+    id,
+    state: "open",
+    subject: { kind: "entry", id: entryId("e-1") },
+    openedBy: writerId("ada@example.com"),
+    contributors: [],
+    reopened: false,
+    changedSinceDone: false,
+    ...overrides,
+  }
+  putValue(doc, { namespace: NOTE_NAMESPACE, key: id, value: encodeNote(note) })
+  return note
+}
 
 /** A fresh document, ids from a counter, a fixed clock, and the log's lines. */
 export function basics(doc = newSessionDoc()): Basics & {

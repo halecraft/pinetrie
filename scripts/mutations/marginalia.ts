@@ -469,4 +469,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "an interrupted lane is resumed, and not drained",
   },
+  {
+    name: "a lane-less reply is parented where the sender looked, not at the end",
+    file: "packages/marginalia/chat.ts",
+    from: '    if (!compelled) return { kind: "appendToTree", parent: end, details }',
+    to: '    if (!compelled) return { kind: "appendToTree", parent: input.at, details }',
+    command: unit,
+    expect: "no lane: appended at the thread's end",
+  },
+  {
+    name: "the host writes a plain message to a running lane",
+    file: "packages/marginalia/chat.ts",
+    from: '    return busy\n      ? { kind: "hold", lane: name, details, position: lane.waiting }\n      : { kind: "appendToLane", lane: name, details }',
+    to: '    return { kind: "appendToLane", lane: name, details }',
+    command: unit,
+    expect: "a running lane, or one with messages waiting: held",
+  },
 ]

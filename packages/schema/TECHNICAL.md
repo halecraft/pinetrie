@@ -232,7 +232,8 @@ writes.
 
 `readLaneTip` returns null for both. `hasLaneRecord` separates them: pi writes
 the `pi.branch.tip` key when it creates a lane, even before its first entry.
-See `packages/pi/TECHNICAL.md` for why this matters.
+See `packages/pi/TECHNICAL.md` for why this matters. `writeLaneTip` writes that
+value as pi does, for tests and fixtures; in the host, only pi writes it.
 
 ## Never race a child container (S18)
 

@@ -15,12 +15,17 @@ import {
 } from "@pineta/schema"
 import type { Serial } from "./queue.ts"
 
+/** A held note, as its callers read it. */
+export interface HeldNote {
+  text(): string
+}
+
 export interface NoteTexts {
   /**
    * Hold a note's text, seeded with `seed` if it is new, and attribute every
    * later edit.
    */
-  hold(id: NoteId, seed: string | null): Promise<NoteDocHandle>
+  hold(id: NoteId, seed: string | null): Promise<HeldNote>
   /** A held note's text; undefined for a note not held. */
   text(id: NoteId): string | undefined
   /** Stop attributing edits: the host's shutdown. */

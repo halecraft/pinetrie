@@ -374,7 +374,7 @@ containers, disks and the helper.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
   with a repo in a fork's `/tmp` for the config's scope, an agent's own
   `jj commit` reaching its offer and a branch, and the contract
-  test, in about 85 s. Its `images` section also launches Chromium,
+  test. The `main` section alone takes about 2.5 minutes on the Mac. Its `images` section also launches Chromium,
   through Pineta's Playwright, on the default image. Its `commands` section
   reads skill files at `/mnt/host`, and checks what a real lane's prompt
   tells it about itself and that the note it names is there (ADR-0046). It
@@ -383,7 +383,11 @@ containers, disks and the helper.
   Its hosts pass their own `userConfig`, so the person's own lane config
   never applies. Each
   suite-level mutation in `scripts/mutations/lanes.ts` runs only the section
-  its check is in.
+  its check is in, and stops at that check. Each on `plan.ts` proves a fact
+  about a real lane that a unit test cannot: the journal, `sync`, a
+  read-only mount, a shared mount seen both ways, the git ignore variables,
+  jj's config scope, an agent's own commit, the image's browser.
+  `planContainer`'s rule is a unit mutation.
 - **The contract test takes about 7 s:**
   - its volume is 4 GiB, since `e2fsck -f` walks every block group however
     little a volume holds;

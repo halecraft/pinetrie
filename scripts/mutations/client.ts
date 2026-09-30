@@ -932,4 +932,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "props rebuilt from an unchanged message draw the same",
   },
+  {
+    name: "a new root opens a tab",
+    file: "packages/client/layout.ts",
+    from: "  return changed ? { active, open, roots, newTabs } : state",
+    to: "  return { active, open: [...new Set([...open, ...index.roots])], roots, newTabs }",
+    command: unit,
+    expect: "a root someone else starts opens no tab",
+  },
 ]

@@ -35,13 +35,8 @@ import {
 import { type Browser, chromium, type Page } from "@playwright/test"
 import { sha256Of } from "../host/blobs.ts"
 import { startHost } from "../host/index.ts"
-import {
-  committedProject,
-  createChecks,
-  join,
-  suiteModel,
-  waitFor,
-} from "./harness.ts"
+import { createChecks } from "./checks.ts"
+import { committedProject, join, suiteModel, waitFor } from "./harness.ts"
 import { RED_PNG } from "./images.ts"
 
 /** The ⋯ of the tab you are on: every root tab has one, shown on hover. */

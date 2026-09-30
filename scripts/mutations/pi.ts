@@ -2,7 +2,6 @@
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
-const e2e = ["pnpm", "run", "e2e"]
 
 export const mutations: readonly Mutation[] = [
   {
@@ -12,14 +11,6 @@ export const mutations: readonly Mutation[] = [
     to: '                write.namespace === "never"',
     command: unit,
     expect: "the record keeps only a shell",
-  },
-  {
-    name: "a scripted tool call drops its arguments",
-    file: "packages/pi/scripted.ts",
-    from: "          step.args as Parameters<typeof fauxToolCall>[1],",
-    to: "          {},",
-    command: e2e,
-    expect: "a read is stored as a call paired with its result",
   },
   {
     name: "a field pi does not own re-indexes everything",
@@ -104,14 +95,6 @@ export const mutations: readonly Mutation[] = [
     expect: "SVG, BMP and text are not images",
   },
   {
-    name: "createAgent leaves pi's own conversion",
-    file: "packages/pi/agent.ts",
-    from: "      toProviderMessages: messages =>\n        providerMessages(messages, options.blobs ?? NO_BLOBS),",
-    to: "      toProviderMessages: messages => convertToLlm(messages),",
-    command: e2e,
-    expect: "the model reads the message's text, then its image",
-  },
-  {
     name: "a lane of its own is not told where it is",
     file: "packages/pi/agent.ts",
     from: "        : { promptGuidelines: laneGuidelines(toolContext.lane.facts) }),",
@@ -143,5 +126,21 @@ export const mutations: readonly Mutation[] = [
     to: "<!-- apps/pineta/host/work.ts runEnd -->",
     command: unit,
     expect: "every source lane.md names",
+  },
+  {
+    name: "a scripted tool call drops its arguments",
+    file: "packages/pi/scripted.ts",
+    from: "          step.args as Parameters<typeof fauxToolCall>[1],",
+    to: "          {},",
+    command: unit,
+    expect: "a scripted tool step's call carries its arguments",
+  },
+  {
+    name: "createAgent leaves pi's own conversion",
+    file: "packages/pi/agent.ts",
+    from: "      toProviderMessages: messages =>\n        providerMessages(messages, options.blobs ?? NO_BLOBS),",
+    to: "      toProviderMessages: messages => convertToLlm(messages),",
+    command: unit,
+    expect: "the model reads a chat's text, then its image's bytes",
   },
 ]

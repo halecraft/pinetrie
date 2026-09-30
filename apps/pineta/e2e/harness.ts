@@ -1,9 +1,5 @@
-// e2e/harness — what the end-to-end suites share: assertion bookkeeping,
-// throwaway projects, joining a host, and their model.
-//
-// Extracted because e2e.ts and browser.ts had grown two `ok()` helpers with
-// *different* internal representations (counters vs. arrays) doing the same
-// job, plus two copies of the report-and-exit tail. One of anything is enough.
+// e2e/harness — what the end-to-end suites share besides their checks
+// (checks.ts): waiting, throwaway projects, joining a host, and their model.
 //
 // Deliberately not in core/: core is pure domain logic and imports nothing.
 // A test harness is neither.
@@ -14,35 +10,6 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { type ConnectOptions, connectSession } from "@pineta/client/session"
 import { scriptedModel } from "@pineta/pi"
-
-export interface Checks {
-  /** Record an assertion. Truthy passes. */
-  ok(condition: unknown, label: string): void
-  /** Print the tally and exit non-zero if anything failed. Never returns. */
-  report(title: string): never
-  readonly passed: readonly string[]
-  readonly failed: readonly string[]
-}
-
-export function createChecks(): Checks {
-  const passed: string[] = []
-  const failed: string[] = []
-
-  return {
-    passed,
-    failed,
-    ok(condition, label) {
-      ;(condition ? passed : failed).push(label)
-      console.log(`  ${condition ? "PASS" : "FAIL"}  ${label}`)
-    },
-    report(title) {
-      console.log(
-        `\n=== ${title}: pass=${passed.length} fail=${failed.length} ===`,
-      )
-      process.exit(failed.length > 0 ? 1 : 0)
-    },
-  }
-}
 
 /**
  * Poll until `pred` holds. Resolves with the elapsed milliseconds, or -1 on

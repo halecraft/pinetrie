@@ -115,7 +115,7 @@ export function createCommands(deps: CommandDeps): Commands {
  * `note` `send`, which is checked here, so `sendChat` needs no check of its
  * own. Null when the command may go on.
  */
-export function refuseInArchive(
+function refuseInArchive(
   doc: SessionDocHandle,
   intent: Intent,
 ): Outcome | null {

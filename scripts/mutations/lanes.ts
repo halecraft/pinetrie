@@ -169,15 +169,6 @@ export const mutations: readonly Mutation[] = [
       "a file the agent wrote is whole in a branch taken at the next turn",
   },
   {
-    name: "a person's paths are stored as typed in a thread with its own copy",
-    file: "apps/pineta/host/commands/chat.ts",
-    from: "    hostWorkingCopy: own ? (work.project?.root ?? null) : null,",
-    to: "    hostWorkingCopy: null,",
-    command: lanes("main"),
-    expect:
-      "a person's path to your working copy is stored as the lane sees it",
-  },
-  {
     name: "a lane with no disk and no snapshot is not told it is retired",
     file: "apps/pineta/host/work.ts",
     from: "        if (newest === null) throw new Error(RETIRED)\n",
@@ -210,14 +201,6 @@ export const mutations: readonly Mutation[] = [
     to: "      readonly: true,",
     command: lanes("shared"),
     expect: "a plan a lane writes is in your working copy at once",
-  },
-  {
-    name: "a container made from another spec is only restarted",
-    file: plan,
-    from: '  if (label !== input.want) return "recreate"\n',
-    to: "",
-    command: lanes("shared"),
-    expect: "after a restart, an existing lane has the newly shared directory",
   },
   {
     name: "a path jj tracks is shared",
@@ -486,5 +469,13 @@ export const mutations: readonly Mutation[] = [
     to: "      commits: at.commits,",
     command: lanes("main"),
     expect: "the offer's record names its commit as it is now",
+  },
+  {
+    name: "a container made from another spec is only restarted",
+    file: "packages/lanes/plan.ts",
+    from: '  if (label !== input.want) return "recreate"\n',
+    to: "",
+    command: unit,
+    expect: "planContainer: create, recreate from another spec",
   },
 ]

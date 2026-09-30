@@ -1,9 +1,9 @@
 import { entryId, writerId } from "@pineta/core"
 import { ARCHIVE_NAMESPACE, encodeArchive } from "@pineta/marginalia"
 import type { Reply } from "@pineta/protocol/messages"
-import { physicalKey, writeEntry } from "@pineta/schema"
+import { writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { basics, record, row } from "../fakes.ts"
+import { basics, putValue, record, row } from "../fakes.ts"
 import { type CommandDeps, createCommands } from "./index.ts"
 
 const ALICE = writerId("alice@example.com")
@@ -42,7 +42,7 @@ function setUp() {
 
 test("a chat in an archived root is refused, and the agent is never called", async () => {
   const { b, agent, commands, replies, sender, chat } = setUp()
-  b.doc.values.set(physicalKey(ARCHIVE_NAMESPACE, ROOT_ID), {
+  putValue(b.doc, {
     namespace: ARCHIVE_NAMESPACE,
     key: ROOT_ID,
     value: encodeArchive({

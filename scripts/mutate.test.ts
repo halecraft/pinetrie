@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest"
-import { judge, run as runGroup } from "./mutate.ts"
+import { stopMessage } from "../apps/pineta/e2e/checks.ts"
+import { failingChecks, judge, mutantEnv, run as runGroup } from "./mutate.ts"
 
 const run = (status: number | null, output: string, timedOut = false) => ({
   status,
@@ -30,6 +31,55 @@ describe("judge: what a mutant's run proves", () => {
   })
   test("a hang is a failure: KILLED", () => {
     expect(judge(run(null, "", true), "anything")).toBe("KILLED")
+  })
+  test("a suite stopped at the expected check is KILLED by it", () => {
+    const label = "the colour check (red)"
+    // What a stopped suite prints: its lines, then Node's report of the
+    // uncaught error `ok()` throws.
+    const out = [
+      "  PASS  one",
+      `  FAIL  ${label}`,
+      "  STOP  at the check PINETA_STOP_AT names",
+      "file:///suite/checks.ts:55",
+      "        throw new Error(stopMessage(label))",
+      "        ^",
+      "",
+      `Error: ${stopMessage(label)}`,
+      "    at Object.ok (file:///suite/checks.ts:55:15)",
+    ].join("\n")
+    expect(judge(run(1, out), "colour check")).toBe("KILLED")
+  })
+})
+
+describe("failingChecks: the lines that name a failing check", () => {
+  test("a suite's FAIL, Vitest's ×, and an assertion error; never a pass", () => {
+    const out = [
+      "  PASS  the colour check",
+      "  FAIL  the alignment check",
+      "   × planChat > a busy lane holds 3ms",
+      "AssertionError: expected 1 to be 2",
+      " ✓ something else",
+    ].join("\n")
+    expect(failingChecks(out)).toEqual([
+      "  FAIL  the alignment check",
+      "   × planChat > a busy lane holds 3ms",
+      "AssertionError: expected 1 to be 2",
+    ])
+  })
+})
+
+describe("mutantEnv: a mutant names the check its suite stops at", () => {
+  test("with an expectation, PINETA_STOP_AT is set and the rest kept", () => {
+    const base = { PATH: "/bin", HOME: "/root" }
+    expect(mutantEnv(base, "a check")).toEqual({
+      PATH: "/bin",
+      HOME: "/root",
+      PINETA_STOP_AT: "a check",
+    })
+  })
+  test("without one, the environment is the parent's", () => {
+    const base = { PATH: "/bin" }
+    expect(mutantEnv(base, undefined)).toBe(base)
   })
 })
 

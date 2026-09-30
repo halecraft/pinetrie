@@ -369,4 +369,29 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect: "a mark names its entry",
   },
+  {
+    name: "every message compels the agent",
+    file: "packages/core/index.ts",
+    from: '        ? NOBODY\n        : { kind: "agent", agent: THE_AGENT }',
+    to: '        ? { kind: "agent", agent: THE_AGENT }\n        : { kind: "agent", agent: THE_AGENT }',
+    command: unit,
+    expect: "no mention: the default, either way",
+  },
+  {
+    name: "a lane is told host paths as the host's",
+    file: "packages/core/index.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  `${HOST_MOUNT}${hostPath}`",
+    to: "  hostPath",
+    command: unit,
+    expect: "a granted host path sits under /mnt/host",
+  },
+  {
+    name: "threadOf ignores the lane a send names",
+    file: "packages/core/tree.ts",
+    from: "  if (send.lane !== null) {",
+    to: "  if (send.lane !== null && send.lane === undefined) {",
+    command: unit,
+    expect: "threadOf: a named lane is its thread",
+  },
 ]

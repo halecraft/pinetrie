@@ -80,13 +80,8 @@ import { sha256Of } from "../host/blobs.ts"
 import { startHost } from "../host/index.ts"
 import { lineDocPrefix } from "../host/lines.ts"
 import { openStore } from "../host/store.ts"
-import {
-  committedProject,
-  createChecks,
-  join,
-  suiteModel,
-  waitFor,
-} from "./harness.ts"
+import { createChecks } from "./checks.ts"
+import { committedProject, join, suiteModel, waitFor } from "./harness.ts"
 import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "./images.ts"
 
 const LIVE = process.env.PINETA_LIVE === "1"

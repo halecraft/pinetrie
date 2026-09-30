@@ -19,8 +19,11 @@ export type ControlSender = Parameters<
 
 /** Run each command from each seat in a serial step; a departed seat's Line goes. */
 export function startControl(input: {
-  readonly exchange: Exchange
-  readonly listener: ControlListener
+  /** Only the peers: who each seat is, and when one leaves. */
+  readonly exchange: {
+    readonly peers: Pick<Exchange["peers"], "get" | "current" | "subscribe">
+  }
+  readonly listener: Pick<ControlListener, "onReceive">
   readonly serial: Serial
   readonly handle: (
     sender: ControlSender,

@@ -422,6 +422,23 @@ export function hasLaneRecord(doc: SessionDocHandle, lane: string): boolean {
   return doc.values.get(physicalKey(LANE_TIP, lane)) !== undefined
 }
 
+/**
+ * Record a lane at `tip` as pi does, in its `pi.branch.tip` value: null for a
+ * lane with no entry yet. pi writes it in the host; tests and fixtures write
+ * it here, so they share the reader's address.
+ */
+export function writeLaneTip(
+  doc: SessionDocHandle,
+  lane: string,
+  tip: string | null,
+): void {
+  doc.values.set(physicalKey(LANE_TIP, lane), {
+    namespace: LANE_TIP,
+    key: lane,
+    value: tip,
+  })
+}
+
 /** A lane's tip entry id, or null if the lane has none (or does not exist). */
 export function readLaneTip(
   doc: SessionDocHandle,

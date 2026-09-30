@@ -4,7 +4,8 @@
 //                         silicon)
 //   PINETA_LANES_SECTION=main,images,shared,commands,contract
 //                         runs only the sections named, as a mutation that
-//                         one section catches does
+//                         one section catches does; the mutation also
+//                         stops at its check (PINETA_STOP_AT)
 //
 // Three sections:
 // - main: a host with a scripted model over a throwaway project, whose
@@ -67,7 +68,8 @@ import {
 } from "@pineta/reads"
 import { readEntries, rowMessage } from "@pineta/schema"
 import { startHost } from "../host/index.ts"
-import { committedProject, createChecks, join, waitFor } from "./harness.ts"
+import { createChecks } from "./checks.ts"
+import { committedProject, join, waitFor } from "./harness.ts"
 
 const { ok, report } = createChecks()
 const START_AGENT = { mode: "branch", asksAgent: true } as const

@@ -23,11 +23,11 @@ wires them.
 | `commands/` | one module per command: `chat`, `note`, `archive`, `mark`, `lane` (stop, update, offer); `index.ts` decodes, checks the archive, routes |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
-| `routes.ts` | which requests are the host's, pure |
+| `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
 | `hot-reload.ts` | Vite's hot updates, held while a direct lane in the project runs |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the image store, the SQLite store |
 | `work.ts`, `offers.ts` | lane containers and disks, and each lane's offer in your repo |
-| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `basics` |
+| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue`, `putNote`, `basics` |
 
 ## One serial executor
 
@@ -109,7 +109,26 @@ records written only when changed, and every note's text held.
 - **Otherwise, drive a module with `record<T>()`** for exactly the port it
   takes, and a real `newSessionDoc()`. A method the test did not give throws,
   naming itself, so a module that touches an undeclared port fails at once.
-  `fakeLane` holds a run open until the test finishes it.
+  `fakeLane` holds a run open until the test finishes it. `row` and
+  `writeEntry` put entries in the document, `putValue` a pi value (a work
+  record, an archive record, a held item, a participant's name), `putNote` a
+  note's record, and `writeLaneTip` a lane's tip; a running lane is
+  `beginRun`. Both of those are `@pineta/schema`'s.
+- **Admission is two pure plans**, `planRequest` and `planUpgrade`
+  (`routes.ts`): every admission rule is a unit test there, and `http.ts`
+  only carries them out.
+- **A mutation uses a suite only for what no unit test can show.** The
+  host's that remain, and the fact each proves:
+  - `index.ts`: the host waits for its stored session; startup compacts; a
+    run's end compacts; stale command Lines are deleted at start; it serves
+    only after `recover`;
+  - `http.ts`: the request and upgrade handlers carry out a plan's refusal;
+  - `notes.ts`: a note's edit is credited to its seat's person, from Kyneta's
+    Yjs `clientID`s;
+  - `marginalia/chat.ts`'s `attributed`: the model is told who spoke, which
+    shows that pi's conversion sends `content`;
+  - `work.ts` and `offers.ts`: until they are split, their rules are proven
+    in `e2e:lanes` (and one in `e2e`).
 - **Tests in subdirectories run**: `vitest.config.mjs` includes
   `apps/*/host/**/*.test.ts`.
 - **The integration is the suites'.** `e2e` and `e2e:browser` check the

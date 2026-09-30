@@ -3,14 +3,6 @@ import type { Mutation } from "../mutate.ts"
 
 const vitest = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 const commands = "packages/marginalia/commands.ts"
-/** `e2e:lanes`' commands section; needs `container` running. */
-const lanes = [
-  "env",
-  "PINETA_LANES_SECTION=commands",
-  "pnpm",
-  "run",
-  "e2e:lanes",
-]
 
 export const mutations: readonly Mutation[] = [
   {
@@ -85,15 +77,6 @@ export const mutations: readonly Mutation[] = [
     to: '    return wanted.every(w => (parts[0] ?? "").includes(w))',
     command: vitest("packages/client/commands.test.ts"),
     expect: "a name typed alone finds it in every package",
-  },
-  {
-    name: "a lane is told host paths as the host's",
-    file: "packages/core/index.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  `${HOST_MOUNT}${hostPath}`",
-    to: "  hostPath",
-    command: lanes,
-    expect: "an expanded skill names its files at /mnt/host",
   },
   {
     name: "an unreadable command is sent as text",

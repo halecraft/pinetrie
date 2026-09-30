@@ -1,16 +1,26 @@
 import {
   ERR,
+  entryId,
   laneNameForThread,
   NOBODY,
+  type ProjectRecord,
+  parseMentions,
   ROOT,
   runId,
+  type Sha256,
   writerId,
 } from "@pineta/core"
-import type { ChatDetails } from "@pineta/marginalia"
+import {
+  CHAT_TYPE,
+  type ChatDetails,
+  type ChatMessage,
+  encodeWorkRecord,
+} from "@pineta/marginalia"
 import { readTreeIndex } from "@pineta/reads"
+import { writeEntry } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
-import { basics, methods, record } from "../fakes.ts"
-import { type ChatDeps, executeChat } from "./chat.ts"
+import { basics, methods, putValue, record, row } from "../fakes.ts"
+import { type Chat, type ChatDeps, executeChat, sendChat } from "./chat.ts"
 
 const ALICE = writerId("alice@example.com")
 const LANE = laneNameForThread("0123456789abcdef")
@@ -88,5 +98,93 @@ describe("executeChat", () => {
       details,
       timestamp: 1_000,
     })
+  })
+})
+
+describe("sendChat", () => {
+  const E1 = entryId("e-1")
+  const BEA = writerId("bea@example.com")
+  const SHA = "a".repeat(64) as Sha256
+  const chat = (text: string, asksAgent = false): Chat => ({
+    text,
+    at: { kind: "entry", id: E1 },
+    mode: "reply",
+    lane: null,
+    asksAgent,
+    mentions: parseMentions(text),
+    work: null,
+  })
+  function setUp(project: ProjectRecord | null = null) {
+    const b = basics()
+    writeEntry(b.doc, row(E1, null))
+    if (project !== null)
+      putValue(b.doc, encodeWorkRecord({ kind: "project", record: project }))
+    const agent = record<ChatDeps["agent"]>({
+      commands: () => [],
+      appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
+      createThreadLane: async () => ({ kind: "created", lane: LANE }),
+    })
+    const started: ChatMessage[] = []
+    const deps: ChatDeps = {
+      basics: b,
+      agent: agent.port,
+      work: record<ChatDeps["work"]>({
+        project,
+        checkDirectory: async () => null,
+        prepareLane: async () => {},
+      }).port,
+      blobs: record<ChatDeps["blobs"]>({
+        ref: sha =>
+          sha === SHA
+            ? { sha256: SHA, mimeType: "image/png", width: 2, height: 3 }
+            : undefined,
+      }).port,
+      start: (_lane, s) => {
+        if (s.kind === "prompt" && s.message.customType === CHAT_TYPE)
+          started.push(s.message as ChatMessage)
+        return runId("r-1")
+      },
+    }
+    return { agent, started, deps }
+  }
+
+  test("a Start Agent column's message, naming nobody, starts a run", async () => {
+    const { started, deps } = setUp()
+    const out = await sendChat(deps, ALICE, "s-1", chat("do it", true), [])
+    expect(out).toEqual({ kind: "started", runId: "r-1" })
+    expect(started).toHaveLength(1)
+  })
+
+  test("a sent message keeps the images its text shows, as references", async () => {
+    const { agent, deps } = setUp()
+    await sendChat(deps, ALICE, "s-1", chat(`look ![a](/blob/${SHA})`), [])
+    const appended = agent.calls.find(c => c.method === "appendToTree")
+    expect(appended?.args[0]).toMatchObject({
+      details: {
+        images: [{ sha256: SHA, mimeType: "image/png", width: 2, height: 3 }],
+      },
+    })
+  })
+
+  test("in a thread that works in its own copy, your working copy's paths are stored as the lane sees them", async () => {
+    const { started, deps } = setUp({
+      kind: "lanes",
+      root: "/proj",
+      rootDefault: "own",
+    })
+    await sendChat(deps, ALICE, "s-1", chat("@agent read /proj/a.txt"), [])
+    expect(started[0]?.details.text).toBe(
+      "@agent read /mnt/host-working-copy/a.txt",
+    )
+  })
+
+  test("a conflict names who holds the thread, as a writer", async () => {
+    const { deps } = setUp()
+    const out = await executeChat(
+      deps,
+      { kind: "conflict", by: BEA },
+      { index: readTreeIndex(deps.basics.doc), writer: ALICE, work: null },
+    )
+    expect(out).toEqual({ kind: "conflict", by: BEA })
   })
 })

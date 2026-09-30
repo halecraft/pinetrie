@@ -69,15 +69,7 @@ function cookieValue(
  * Then the key. With none, everything left is admitted. Otherwise it must come
  * as `?key=` (an invite link, or a Node client) or as the cookie a link sets.
  */
-export function admits(
-  request: {
-    readonly url: string
-    readonly cookie?: string | undefined
-    readonly origin?: string | undefined
-    readonly host?: string | undefined
-  },
-  key: string | null,
-): Admission {
+export function admits(request: RequestFacts, key: string | null): Admission {
   if (request.origin !== undefined && !sameHost(request.origin, request.host))
     return REFUSE
   if (key === null) return isLoopbackHost(request.host) ? ADMIT : REFUSE
@@ -93,6 +85,13 @@ export function admits(
 }
 
 /** What `admits` reads of a Node request or upgrade. */
+export interface RequestFacts {
+  readonly url: string
+  readonly cookie?: string | undefined
+  readonly origin?: string | undefined
+  readonly host?: string | undefined
+}
+
 export const requestFacts = (req: {
   readonly url?: string | undefined
   readonly headers: {
@@ -100,7 +99,7 @@ export const requestFacts = (req: {
     readonly origin?: string | undefined
     readonly host?: string | undefined
   }
-}) => ({
+}): RequestFacts => ({
   url: req.url ?? "/",
   cookie: req.headers.cookie,
   origin: req.headers.origin,

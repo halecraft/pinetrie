@@ -1,8 +1,14 @@
 // prepareImage: the type from the bytes, the size from pi's resize.
 
+import { createHash } from "node:crypto"
 import { deflateSync } from "node:zlib"
+import { ROOT, type Sha256, THE_AGENT, writerId } from "@pineta/core"
+import { encodeChat } from "@pineta/marginalia"
+import { newSessionDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
+import { createAgent } from "./agent.ts"
 import { prepareImage } from "./images.ts"
+import { scriptedModel } from "./scripted.ts"
 
 /** A 40×30 red PNG, 98 bytes. */
 const RED = Buffer.from(
@@ -85,4 +91,46 @@ test("SVG, BMP and text are not images; a truncated PNG is unreadable", async ()
     ok: false,
     reason: "unreadable",
   })
+})
+
+test("the model reads a chat's text, then its image's bytes, from the store", async () => {
+  const doc = newSessionDoc()
+  const script = scriptedModel()
+  const sha = createHash("sha256").update(RED).digest("hex") as Sha256
+  const agent = await createAgent({
+    doc,
+    replicaId: "test",
+    model: { kind: "scripted", script },
+    tools: null,
+    blobs: {
+      get: s => (s === sha ? { bytes: RED, mimeType: "image/png" } : undefined),
+    },
+  })
+  let seen: readonly string[] = []
+  script.use([
+    {
+      reply: context => {
+        seen = context
+        return "a red one"
+      },
+    },
+  ])
+  const made = await agent.createThreadLane(ROOT)
+  if (made.kind !== "created") throw new Error("no lane")
+  const text = `what colour? ![red](/blob/${sha})`
+  await agent.lane(made.lane).run(
+    encodeChat(
+      {
+        author: writerId("ada@example.com"),
+        authorName: "Ada",
+        text,
+        compels: { kind: "agent", agent: THE_AGENT },
+        sendId: "s-1",
+        images: [{ sha256: sha, mimeType: "image/png", width: 1, height: 1 }],
+      },
+      1,
+    ),
+  )
+  await agent.close()
+  expect(seen.at(-1)).toBe(`Ada: ${text}[image image/png ${sha}]`)
 })

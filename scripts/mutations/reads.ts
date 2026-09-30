@@ -36,4 +36,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "readTreeIndex keeps the index",
   },
+  {
+    name: "decayed presence is still shown",
+    file: "packages/reads/index.ts",
+    from: "      return value === null || writer === undefined",
+    to: "      return writer === undefined",
+    command: unit,
+    expect: "readPresence leaves out an entry once it decays",
+  },
+  {
+    name: "the queue names the first one waiting",
+    file: "packages/reads/index.ts",
+    from: "    const last = waiting.at(-1)",
+    to: "    const last = waiting[0]",
+    command: unit,
+    expect: "lastWaiting is the writer of the newest item waiting",
+  },
 ]

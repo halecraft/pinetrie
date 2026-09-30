@@ -1,8 +1,9 @@
 import type { Sha256 } from "@pineta/core"
 import { commitId } from "@pineta/core"
 import { diffUrl, reviewUrl } from "@pineta/marginalia"
-import { expect, test } from "vitest"
-import { route } from "./routes.ts"
+import { describe, expect, test } from "vitest"
+import { KEY_COOKIE, type RequestFacts } from "./admission.ts"
+import { planRequest, planUpgrade, route } from "./routes.ts"
 
 const SHA = "a".repeat(64) as Sha256
 const at = (method: string, path: string) =>
@@ -30,4 +31,57 @@ test("an offer's read is a GET the wire accepts; anything else under /offer/ is 
   })
   expect(at("POST", reviewUrl(c))).toEqual({ kind: "bad" })
   expect(at("GET", "/offer/anything")).toEqual({ kind: "bad" })
+})
+
+describe("planRequest and planUpgrade: admission first", () => {
+  const KEY = "k3y"
+  const HOST = "192.168.1.5:7391"
+  const facts = (
+    url: string,
+    extra: Partial<RequestFacts> = {},
+  ): RequestFacts => ({
+    url,
+    host: HOST,
+    ...extra,
+  })
+  const withCookie = (url: string) =>
+    facts(url, { cookie: `${KEY_COOKIE}=${KEY}` })
+
+  test("with a key, a request without it is refused, whatever it asks for: a page, a blob, an upload, an offer's read", () => {
+    const c = commitId("0123abcd")
+    for (const [method, url] of [
+      ["GET", "/"],
+      ["GET", `/blob/${SHA}`],
+      ["POST", "/blob"],
+      ["GET", reviewUrl(c)],
+    ] as const)
+      expect(planRequest(facts(url), KEY, method)).toEqual({ kind: "refuse" })
+    expect(planRequest(withCookie(`/blob/${SHA}`), KEY, "GET")).toEqual({
+      kind: "blob-get",
+      sha: SHA,
+    })
+  })
+
+  test("a request with ?key= is redirected without it; with the cookie, it is routed", () => {
+    expect(planRequest(facts(`/?key=${KEY}&tab=2`), KEY, "GET")).toEqual({
+      kind: "redirect",
+      location: "/?tab=2",
+    })
+    expect(planRequest(withCookie("/"), KEY, "GET")).toEqual({ kind: "other" })
+  })
+
+  test("with a key, an upgrade without it is refused; with it, /ws is the Exchange's and any other path Vite's", () => {
+    expect(planUpgrade(facts("/ws"), KEY)).toBe("refuse")
+    expect(planUpgrade(withCookie("/ws"), KEY)).toBe("exchange")
+    expect(planUpgrade(withCookie("/__vite_hmr"), KEY)).toBe("vite")
+  })
+
+  test("on loopback, an upgrade from another origin is refused, and from the page's own is the Exchange's", () => {
+    const loopback = (origin: string) =>
+      facts("/ws", { host: "127.0.0.1:7391", origin })
+    expect(planUpgrade(loopback("http://evil.example"), null)).toBe("refuse")
+    expect(planUpgrade(loopback("http://127.0.0.1:7391"), null)).toBe(
+      "exchange",
+    )
+  })
 })
