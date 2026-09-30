@@ -141,7 +141,8 @@ give the roots and each tab's signals.
   carries the plan out.
 - **Columns of other tabs are unmounted.** Alignment forgets their keys, so a
   tab shown again aligns its columns as if opened, left to right, the first
-  at its end (Layout, below).
+  at its end (Layout, below). Each keeps what it knew of its end
+  (`SeenEnd`, Following a column's end), and loses its tool rows' sizes.
 - **The Archive tab** is `archive.tsx` over `archiveIndex`
   (`archive-rows.ts`, a client-only read like `projection.ts`). Its filter,
   search, selection and preview anchor are component state, never stored. The
@@ -500,11 +501,20 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   undo it. No wheel, key or touch listeners are needed.
 - **It follows again** on a scroll down to within 24 px of the end, on the
   reader's own send (`onSend`), and on **↓ new below**, which shows while
-  released with content grown since.
+  released with content grown since, or while placed short of its end after
+  mounting behind (below).
 - **`alignOnOpen` settles it:** it dispatches `PLACED` on the body, and the
   column follows only if it was placed at its end. Without it, a column
   aligned short of its end would jump there on its first ResizeObserver
-  callback. `useReveal` dispatches it too (below).
+  callback. `useReveal` dispatches it too (below). A placement at the end
+  clears ↓ new below; one short of it keeps it.
+- **↓ new below survives an unmount** (ADR-0049). A column of a root tab you
+  leave is unmounted, and `useFollow` tells it (`seen.leave`) whether ↓ new
+  below showed; the column saves that with its tip (`SeenEnd`) in `App`.
+  Mounted again, it starts with ↓ new below when `behind` says it moved on
+  since. Nothing clears that before `alignOnOpen` places it: its `holding`
+  step leaves `unseen` alone, and its first resize comes after the
+  placement. A reload keeps no snapshots.
 - **While a lane runs on its path, a following column does not get shorter**
   (`holding`, ADR-0044). A shrink is taken up by `.column-floor`, below the
   content: its height is what the content lost since it was last set
@@ -518,6 +528,12 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   clamp keeps the column there. If a run ends shorter than its floor, the
   column moves once, then. A column that shrinks mid-run for another reason,
   such as a column opened to its left, keeps its floor until the run ends.
+- **The floor is at most a third of the view** (`FLOOR_MAX`, ADR-0049).
+  `capFloor` applies wherever the floor is set, so a view that gets shorter
+  cuts a standing floor too. `held` counts the capped floor, so what the cap
+  gave up is not claimed again. Since tool rows stay open, what the floor
+  still takes up is a row the reader folds mid-run, and columns opened to the
+  left.
 
 ## Threads, lanes and the composer (ADR-0020)
 
@@ -590,12 +606,25 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 
 - **A tool call is a row under the agent's message** (`ToolRow` in
   `message.tsx`): its label (`toolLabel`), ✓, ✗ or …, and its result folded in
-  a `<details>`, capped for display. A label shows a command's first line, at
+  a `<details>`, cut at 20,000 characters for display. A label shows a command's first line, at
   most 120 characters. A cut label is shown uncut in its place while the row
   is open (`.tool-label-whole`, from `wholeToolLabel`): CSS on `[open]`
   swaps the two, so the command is never drawn twice and no state is kept.
-  The live row is the committed row, open, so a running command shows it
-  whole. A result is its own entry in the tree;
+  The live row is the committed row, so a running command, once its row
+  opens, shows it whole.
+- **How much of a row shows is `rowSize`'s** (`tool-row.ts`, ADR-0049):
+  `closed`, `capped` or `full`, from two facts the row holds.
+  `revealed` is set by a timer once the call's output has streamed for
+  `REVEAL_MS` (500ms) while the row is drawn, and never unset; the reader's
+  last choice wins over it. So a fast command never opens, a slow one opens
+  `capped` (command at most 5rem, output at most 10rem, each scrolling) and
+  stays open when its result arrives, and only the reader closes it. A click
+  makes a closed or capped row `full`, uncapped, and a full one closed.
+  `data-size` names the size; a closed row draws no output, so a check reads
+  `.tool-output` only after opening its row.
+- **One `ToolOutput` draws the live output and the result**, and follows its
+  end (`useFollow`). The result keeps the live output's element and scroll:
+  at its end, or where the reader left it. A result is its own entry in the tree;
   `projectSpine` pairs it with its call on the same path, so it adds no column
   row and no rail row. A message that only called tools shows only its rows.
 - **Live work hands over to its entry in one render** (ADR-0044). `App`
@@ -606,8 +635,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     is its lane's current reply (`isCurrentReply`, the host's own rule). Its
     entry moves the lane's tip, so the entry and the stream's end are one
     change.
-  - A tool's output is drawn in its own row (`ToolRow`), open, while the call
-    has a stream and no result. The result replaces it in the same element.
+  - A tool's output is drawn in its own row (`ToolRow`) while the call has a
+    stream and no result, once the row is open. The result replaces it in the
+    same element (`ToolOutput`).
 - **A stream goes when its entry arrives,** which a fast model can do between
   two renders, so a check that must see one uses a slow scripted model. A
   check that must see a run in progress, not its reply, pauses the reply
@@ -913,8 +943,16 @@ shown by their email's part before the `@`. Each rendered chat carries its
 - **`.column-content` must stay unpositioned.** A positioned wrapper becomes
   the messages' offsetParent, and `alignOnOpen` measures `offsetTop` against
   the body's.
-- **A ResizeObserver sees an inline element as 0 × 0.** `LiveOutput`'s
+- **A ResizeObserver sees an inline element as 0 × 0.** `ToolOutput`'s
   `<code>` is `display: block` for it.
+- **A tool row's summary click is its own** (`preventDefault`), and the
+  state alone sets `open`. A native toggle would take a capped row to
+  closed, and `toggle` fires for React's own `open` too, so it cannot tell
+  who opened the row. Enter and Space on a summary are clicks.
+- **`aligned` and the end snapshots in `App` are pruned by different
+  sets.** `aligned` forgets every column off the tab you are on, which is
+  what makes a tab shown again align afresh; the snapshots are pruned by
+  `layoutKeys` (every column in the layout), and must keep exactly those.
 - **Every scroll `useFollow` makes is instant.** A smooth one passes through
   positions short of the end, and the rule reads each as the reader leaving.
 

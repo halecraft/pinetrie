@@ -1919,6 +1919,70 @@ try {
           returned.spacer < returned.height,
         `a branch column is level with its fork point after a return to its tab (off by ${returned?.drift.toFixed(1) ?? "?"}px, in view ${returned?.inView ?? "?"}, spacer ${Math.round(returned?.spacer ?? -1)}px of ${returned?.height ?? "?"}px)`,
       )
+      // ↓ new below, across a tab switch: column 1 is unmounted while the
+      // Archive tab shows, and its thread grows meanwhile. Shown again, it is
+      // placed level with its fork, short of its new end. Which of the two
+      // paths column 1 shows is read from the page: column 0 opened at the
+      // root, and follows its newest leaf.
+      {
+        const jump = `${col(1)} .jump-latest`
+        const before = await lp.locator(jump).count()
+        // Its thread goes on below its own last message.
+        const tip = await lp
+          .locator(`${col(1)} .msg[data-entry]`)
+          .last()
+          .getAttribute("data-entry")
+        await lp.click("#tabs .tab-archive")
+        await lp.waitForSelector('#tabs .tab-archive[aria-selected="true"]', {
+          timeout: 15_000,
+        })
+        let at = tip ?? forkId
+        const kinds: string[] = []
+        for (let n = 0; n < 10; n++) {
+          const r = await writer.chat(
+            `Branch message ${n}.\nIts second line.\nIts third line.`,
+            atEntry(entryId(at)),
+          )
+          kinds.push(r.kind)
+          if (r.kind === "appended") at = r.id
+        }
+        await lp.click(tabSel(longRoot))
+        const arrived = await lp
+          .waitForSelector(`${col(1)} .msg[data-entry="${at}"]`, {
+            timeout: 15_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        const offered = await lp.waitForSelector(jump, { timeout: 5_000 }).then(
+          () => true,
+          () => false,
+        )
+        if (offered) await lp.click(jump)
+        await lp.evaluate(
+          () =>
+            new Promise(r =>
+              requestAnimationFrame(() => requestAnimationFrame(r)),
+            ),
+        )
+        const gap = await lp.$eval(
+          `${col(1)} .column-body`,
+          b => b.scrollHeight - b.scrollTop - b.clientHeight,
+        )
+        const where = await lp.evaluate(
+          id =>
+            [...document.querySelectorAll(".column")].map(
+              c =>
+                `${c.getAttribute("data-position")}:${c.querySelectorAll(".msg").length}:${c.querySelector(`.msg[data-entry="${id}"]`) !== null}`,
+            ),
+          at,
+        )
+        ok(
+          before === 0 && arrived && offered && gap <= 2,
+          `↓ new below shows on a column that moved on while its tab was hidden, and none before (${before} before, arrived ${arrived}, offered ${offered}, gap after ${Math.round(gap)}px; ${kinds.join(",")}; ${where.join(" ")})`,
+        )
+      }
       // The Archive tab reports no thread: Lee leaves no presence behind.
       await lp.click("#tabs .tab-archive")
       await page
@@ -2103,6 +2167,14 @@ try {
           () => true,
           () => false,
         )
+      /**
+       * Open a closed tool row, as a reader does, so its output is drawn. A
+       * row the work opened is left as it is: a click would show it whole.
+       */
+      const openRow = async (sel: string) => {
+        if ((await tp.getAttribute(sel, "open").catch(() => "")) === null)
+          await tp.click(`${sel} summary`)
+      }
 
       // ── where the agent will work, said before sending (ADR-0032) ───────
       // The button says what the send does; the chip beside it, where the new
@@ -2159,7 +2231,7 @@ try {
       const shown = await appears(row)
       await toolIdle()
       const label = await tp.textContent(`${row} .tool-label`).catch(() => "")
-      if (shown) await tp.click(`${row} summary`)
+      if (shown) await openRow(row)
       const output = await tp.textContent(`${row} .tool-output`).catch(() => "")
       ok(
         shown &&
@@ -2169,12 +2241,61 @@ try {
         `a tool call shows as a row with its label, ✓, and its result folded in (${label})`,
       )
 
+      // A command that ends within REVEAL_MS never opens its row: a
+      // MutationObserver records any bash row that is ever open.
+      await tp.evaluate(c => {
+        const w = window as unknown as {
+          __opened: string[]
+          __openedWatch: MutationObserver
+        }
+        w.__opened = []
+        const look = (el: Element) => {
+          for (const row of [el, ...el.querySelectorAll(".tool")])
+            if (row.matches('.tool[data-tool="bash"][open]'))
+              w.__opened.push(row.textContent ?? "")
+        }
+        w.__openedWatch = new MutationObserver(records => {
+          for (const r of records) {
+            if (r.target instanceof Element) look(r.target)
+            for (const n of r.addedNodes) if (n instanceof Element) look(n)
+          }
+        })
+        const column = document.querySelector(c)
+        if (column !== null)
+          w.__openedWatch.observe(column, {
+            subtree: true,
+            childList: true,
+            attributes: true,
+            attributeFilter: ["open"],
+          })
+      }, col(0))
+      script.use([
+        { tool: "bash", args: { command: "echo quick" } },
+        { text: "quick" },
+      ])
+      await say("quick")
+      await toolIdle()
+      const quick = `${col(0)} .tool[data-tool="bash"][data-status="ok"]`
+      const quickShown = await appears(quick, 10_000)
+      const everOpened = await tp.evaluate(() => {
+        const w = window as unknown as {
+          __opened: string[]
+          __openedWatch: MutationObserver
+        }
+        w.__openedWatch.disconnect()
+        return w.__opened
+      })
+      ok(
+        quickShown && everOpened.length === 0,
+        `a command that ends within half a second never opens its row (${everOpened.length} opened)`,
+      )
+
       script.use([
         {
           tool: "bash",
           args: {
             command:
-              "for i in 1 2 3 4 5 6 7 8; do echo tick $i; sleep 0.25; done",
+              "for i in 1 2 3 4 5 6 7 8; do echo tick $i; seq 1 4; sleep 0.25; done",
           },
         },
         { text: "ticked" },
@@ -2194,15 +2315,154 @@ try {
           () => false,
         )
       ok(live, "a running command's output shows live in its column")
+      // The reader scrolls the live output up: the result, drawn in the same
+      // element, keeps that place.
+      await tp
+        .waitForFunction(
+          c =>
+            document
+              .querySelector(`${c} .tool.live .tool-output`)
+              ?.textContent?.includes("tick 6") === true,
+          col(0),
+          { timeout: 20_000 },
+        )
+        .catch(() => null)
+      await tp
+        .$eval(`${col(0)} .tool.live .tool-output`, o => {
+          o.scrollTop = 0
+        })
+        .catch(() => null)
       await toolIdle()
-      const ticked = `${col(0)} .tool[data-tool="bash"]`
+      const ticked = tp.locator(`${col(0)} .tool[data-tool="bash"]`).last()
+      await ticked
+        .locator(".tool-output")
+        .waitFor({ timeout: 10_000 })
+        .catch(() => null)
+      const kept = await ticked.evaluate(d => {
+        const out = d.querySelector(".tool-output")
+        return {
+          live: d.classList.contains("live"),
+          open: d.hasAttribute("open"),
+          size: d.getAttribute("data-size"),
+          status: d.getAttribute("data-status"),
+          top: out?.scrollTop ?? -1,
+          scrolls: out === null ? false : out.scrollHeight > out.clientHeight,
+          result: out?.textContent?.includes("tick 8") === true,
+        }
+      })
       ok(
-        (await tp.locator(`${col(0)} .tool.live`).count()) === 0 &&
-          (await tp.locator(ticked).last().getAttribute("data-status")) ===
-            "ok" &&
-          (await tp.locator(ticked).last().getAttribute("open")) === null,
-        "when the command ends, its row stops being live, folds, and shows ✓",
+        !kept.live &&
+          kept.open &&
+          kept.size === "capped" &&
+          kept.status === "ok" &&
+          kept.result &&
+          kept.scrolls &&
+          kept.top <= 2,
+        `a command still running after half a second opens its row, and it stays open when it ends, where its reader scrolled it (${JSON.stringify(kept)})`,
       )
+
+      // A row the work opened is capped; the reader's click shows it whole,
+      // and a second folds it.
+      {
+        const LONG = "seq 1 300 | sed 's/^/line /'\nsleep 0.6"
+        script.use([
+          { tool: "bash", args: { command: LONG } },
+          { text: "listed" },
+        ])
+        await say("list them")
+        await toolIdle()
+        const row = tp
+          .locator(`${col(0)} .tool[data-tool="bash"][data-status="ok"]`)
+          .last()
+        await row
+          .locator(".tool-output")
+          .waitFor({ timeout: 10_000 })
+          .catch(() => null)
+        const measure = () =>
+          row.evaluate(d => {
+            const rem = Number.parseFloat(
+              getComputedStyle(document.documentElement).fontSize,
+            )
+            const out = d.querySelector(".tool-output")
+            return {
+              size: d.getAttribute("data-size"),
+              rems: d.getBoundingClientRect().height / rem,
+              inner: out === null ? null : out.scrollHeight - out.clientHeight,
+              gap:
+                out === null
+                  ? null
+                  : out.scrollHeight - out.scrollTop - out.clientHeight,
+            }
+          })
+        const capped = await measure()
+        await row.locator("summary").click()
+        const full = await measure()
+        await row.locator("summary").click()
+        const folded = await measure()
+        ok(
+          capped.size === "capped" &&
+            capped.rems <= 17 &&
+            capped.gap !== null &&
+            capped.gap <= 2 &&
+            full.size === "full" &&
+            full.rems > 17 &&
+            full.inner !== null &&
+            full.inner <= 1 &&
+            folded.size === "closed" &&
+            folded.inner === null,
+          `a row the work opens is capped, at its end, and the toggle shows it whole, then folds it (${JSON.stringify({ capped, full, folded })})`,
+        )
+      }
+
+      // A row its reader folds while the agent works: the floor takes up
+      // what it gave back, so a column at its end keeps its height. Its
+      // output is short, so the floor needs less than its cap (FLOOR_MAX).
+      {
+        script.use([
+          {
+            tool: "bash",
+            args: { command: "printf 'step %s\\n' a b c; sleep 3" },
+          },
+          { text: "stepped" },
+        ])
+        await say("step through")
+        const running = `${col(0)} .tool.live[data-size="capped"]`
+        const opened = await appears(running, 10_000)
+        const summary = `${col(0)} .tool.live summary`
+        const column = () =>
+          tp.$eval(`${col(0)} .column-body`, b => ({
+            height: b.scrollHeight,
+            gap: b.scrollHeight - b.scrollTop - b.clientHeight,
+            floor:
+              b.querySelector(".column-floor")?.getBoundingClientRect()
+                .height ?? 0,
+          }))
+        const settle = () =>
+          tp.evaluate(
+            () =>
+              new Promise(r =>
+                requestAnimationFrame(() => requestAnimationFrame(r)),
+              ),
+          )
+        if (opened) await tp.click(summary)
+        await settle()
+        const full = await column()
+        if (opened) await tp.click(summary)
+        await settle()
+        const folded = await column()
+        const size = await tp
+          .getAttribute(`${col(0)} .tool.live`, "data-size", { timeout: 1_000 })
+          .catch(() => null)
+        await toolIdle()
+        ok(
+          opened &&
+            size === "closed" &&
+            folded.floor > 0 &&
+            folded.height >= full.height &&
+            folded.gap <= 2,
+          `a row its reader folds while its agent works leaves the column at its end, no shorter (${JSON.stringify({ size, full, folded })})`,
+        )
+      }
 
       // A label shows a command's first line, and at most 120 characters;
       // the row, opened, shows all of it in the label's place, once. A
@@ -2326,7 +2586,7 @@ try {
       if (stopShown) await tp.click(`${col(0)} .stop`)
       const failed = `${col(0)} .tool[data-tool="bash"][data-status="error"]`
       const ended = await appears(failed, 10_000)
-      if (ended) await tp.click(`${failed} summary`)
+      if (ended) await openRow(failed)
       const why = await tp.textContent(`${failed} .tool-output`).catch(() => "")
       ok(
         stopShown &&

@@ -48,6 +48,7 @@ import {
 } from "./column-view.ts"
 import type { Column as ColumnSpec, Prefill } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
+import { behind, type SeenEnd } from "./follow.ts"
 import { callStreams, type LiveWork } from "./live.ts"
 import { Menu } from "./menu.tsx"
 import { Message } from "./message.tsx"
@@ -135,6 +136,15 @@ export interface ColumnProps {
    * root would give back at once (`columnsOf`), nor in a preview.
    */
   closable: boolean
+  /**
+   * What this column knew of its end when last unmounted, and where it keeps
+   * that when unmounted again (`SeenEnd`, `follow.ts`). None in the
+   * Archive preview.
+   */
+  ends?: {
+    readonly seen: SeenEnd | undefined
+    readonly remember: (key: string, end: SeenEnd) => void
+  }
 }
 
 export function Column(p: ColumnProps) {
@@ -180,11 +190,19 @@ export function Column(p: ColumnProps) {
   const streamingLanes = p.activity
     .filter(r => p.path.has(r.tip))
     .map(r => r.lane)
+  // Mounted again (its tab shown again) past the end its reader saw, it shows
+  // ↓ new below wherever `alignOnOpen` places it short of its end.
+  const [mountedBehind] = useState(() => behind(p.ends?.seen, view.tipId))
+  const leave = useStable((unseen: boolean) =>
+    p.ends?.remember(p.column.key, { tip: view.tipId, unseen }),
+  )
   // While they do, the column does not get shorter at its end (S35).
-  const end = useFollow(body, content, {
-    floor,
-    holding: streamingLanes.length > 0,
-  })
+  const end = useFollow(
+    body,
+    content,
+    { floor, holding: streamingLanes.length > 0 },
+    { unseen: mountedBehind, leave },
+  )
   // This thread's lane, as the host will find it: busy means a compelled
   // message waits.
   const thread = threadOf(p.index, p.lanes, {
@@ -439,8 +457,9 @@ export function Column(p: ColumnProps) {
               </div>
             ))}
           </div>
-          {/* What the content shrank by while the agent works (`useFollow`).
-          Not the spacer above: that one lines the column up on opening. */}
+          {/* What the content shrank by while the agent works, up to a third
+          of the view (`useFollow`). Not the spacer above: that one lines the
+          column up on opening. */}
           <div className="column-floor" ref={floor} />
           {end.unseen && (
             <div className="jump-slot">

@@ -52,6 +52,7 @@ import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { Column, type ColumnProps } from "./column.tsx"
 import { type Column as ColumnSpec, isPinned, type Prefill } from "./columns.ts"
 import type { ReadOnly } from "./composer.tsx"
+import type { SeenEnd } from "./follow.ts"
 import { Header } from "./header.tsx"
 import { peopleHere, readersByRoot } from "./here.ts"
 import {
@@ -74,6 +75,7 @@ import {
   encodeLayout,
   initialLayout,
   type LayoutAction,
+  layoutKeys,
   layoutReducer,
   planOpen,
   resolveLayout,
@@ -92,6 +94,7 @@ import { useColumnDrag } from "./use-column-drag.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { useReveal } from "./use-reveal.ts"
+import { useStable } from "./use-stable.ts"
 
 /**
  * The tab you are on and each root's columns: this browser tab's, or on a new
@@ -480,6 +483,20 @@ function App({ session }: { session: SessionClient }) {
     }
   }, [columns, views])
 
+  // What each column knew of its end when it was unmounted (`SeenEnd`), so a
+  // column of a tab shown again shows ↓ new below for what arrived meanwhile.
+  // Pruned by `layoutKeys`, not by `aligned`'s rule: `aligned` forgets
+  // every column off the tab you are on, which is what this must keep.
+  const ends = useRef(new Map<string, SeenEnd>())
+  useEffect(() => {
+    const keys = layoutKeys(layout)
+    for (const key of ends.current.keys())
+      if (!keys.has(key)) ends.current.delete(key)
+  }, [layout])
+  const rememberEnd = useStable((key: string, end: SeenEnd) => {
+    ends.current.set(key, end)
+  })
+
   // After the alignment above: a picked message the alignment left out of
   // view is scrolled to.
   const reveal = useReveal(strip)
@@ -743,6 +760,10 @@ function App({ session }: { session: SessionClient }) {
                         closable={newTab !== null || columns.length > 1}
                         column={column}
                         count={columns.length}
+                        ends={{
+                          seen: ends.current.get(column.key),
+                          remember: rememberEnd,
+                        }}
                         forks={colors.forks}
                         key={column.key}
                         onBranch={(at, prefill) =>

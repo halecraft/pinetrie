@@ -15,6 +15,7 @@ import {
   encodeLayout,
   initialLayout,
   type Layout,
+  layoutKeys,
   layoutReducer,
   planOpen,
   resolveLayout,
@@ -347,6 +348,19 @@ describe("tabBar", () => {
     expect(tabBar(l)).toEqual([ARCHIVE, R2, R1, { kind: "new", key: "n" }])
     expect(tabBar(initialLayout())).toEqual([ARCHIVE])
   })
+})
+
+test("layoutKeys holds an open root's first column, a closed tab's stored columns and new tabs, whichever tab is shown", () => {
+  const l: Layout = {
+    active: ARCHIVE,
+    open: ["1-r1", "5-r2"],
+    roots: new Map([
+      ["5-r2", [{ key: "b", anchor: "5-r2" }]],
+      ["9-r3", [{ key: "c", anchor: "9-r3" }]],
+    ]),
+    newTabs: [{ key: "n", anchor: null, fresh: {} }],
+  }
+  expect([...layoutKeys(l)].sort()).toEqual(["b", "c", "first-1-r1", "n"])
 })
 
 describe("planOpen", () => {

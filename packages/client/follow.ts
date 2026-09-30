@@ -12,6 +12,12 @@
 // get shorter: a shrink is taken up by a floor below the content, which what
 // grows next fills (S35). A ResizeObserver callback runs after layout and
 // before paint, so the floor is painted in the frame the content shrank in.
+// The floor is at most FLOOR_MAX of the view: past that the scroller shrinks,
+// and two thirds of it still show content.
+//
+// A scroller that is unmounted and mounted again (a column of a root tab
+// shown again) starts from a `SeenEnd`: whether it had moved past what its
+// reader saw. A placement short of the end keeps that, so ↓ new below shows.
 
 /** What a scroller reports: read from the element, nothing else. */
 export interface Metrics {
@@ -30,7 +36,10 @@ export interface Metrics {
 export interface FollowState {
   /** Following: every change of height scrolls to the end. */
   readonly following: boolean
-  /** Released, and the content has grown since. Shows ↓ new below. */
+  /**
+   * Released, and the content has grown since, or it started so (`behind`).
+   * Shows ↓ new below.
+   */
   readonly unseen: boolean
   /** Where the scroll was last left, by the scroller or by a scroll event. */
   readonly lastTop: number
@@ -45,7 +54,10 @@ export type FollowEvent =
   /** A ResizeObserver callback: the content or the viewport changed size. */
   | { readonly kind: "resized"; readonly at: Metrics }
   | { readonly kind: "scrolled"; readonly at: Metrics }
-  /** Something outside placed the scroll on purpose (`alignOnOpen`, `useReveal`). */
+  /**
+   * Something outside placed the scroll on purpose (`alignOnOpen`,
+   * `useReveal`). Short of the end, what was unseen stays unseen.
+   */
   | { readonly kind: "placed"; readonly at: Metrics }
   /** The reader's own send, or ↓ new below. */
   | { readonly kind: "follow"; readonly at: Metrics }
@@ -63,6 +75,9 @@ export interface FollowPlan {
 /** How near the end a scroll down must come to follow again. */
 export const FOLLOW_SLACK = 24
 
+/** The most of the view a floor takes. */
+export const FLOOR_MAX = 1 / 3
+
 /** `scrollTop` can be fractional under zoom: moves within this are none. */
 const JITTER = 1
 
@@ -79,6 +94,13 @@ export const initialFollow: FollowState = {
 const end = (m: Metrics) => Math.max(0, m.scrollHeight - m.clientHeight)
 const gap = (m: Metrics) => m.scrollHeight - m.scrollTop - m.clientHeight
 
+/**
+ * `floor`, cut to FLOOR_MAX of the view. Applied wherever a floor is set, so
+ * a view that got shorter under a standing floor cuts it too.
+ */
+const capFloor = (m: Metrics, floor: number) =>
+  Math.min(floor, FLOOR_MAX * m.clientHeight)
+
 /** `m` with the floor at `floor`: the scroller's height as it will be. */
 const withFloor = (m: Metrics, floor: number): Metrics => ({
   ...m,
@@ -89,7 +111,8 @@ const withFloor = (m: Metrics, floor: number): Metrics => ({
 /** Follow: scroll to the end, and remember leaving the scroll there. */
 const toEnd = (state: FollowState, measured: Metrics): FollowPlan => {
   const floor = state.holding ? Math.max(0, state.held - measured.content) : 0
-  const m = withFloor(measured, floor)
+  const capped = capFloor(measured, floor)
+  const m = withFloor(measured, capped)
   return {
     state: {
       following: true,
@@ -97,10 +120,11 @@ const toEnd = (state: FollowState, measured: Metrics): FollowPlan => {
       lastTop: end(m),
       lastHeight: m.scrollHeight,
       holding: state.holding,
-      held: m.content + floor,
+      // What the cap gave up is not claimed again.
+      held: m.content + capped,
     },
     scrollTo: end(m),
-    floor,
+    floor: capped,
   }
 }
 
@@ -111,7 +135,7 @@ export function follow(state: FollowState, event: FollowEvent): FollowPlan {
       if (state.following) return toEnd(state, m)
       // Released: a floor already there stays, so the reader's place does not
       // move; it grows no more.
-      const floor = state.holding ? m.floor : 0
+      const floor = state.holding ? capFloor(m, m.floor) : 0
       const at = withFloor(m, floor)
       return {
         state: {
@@ -152,7 +176,7 @@ export function follow(state: FollowState, event: FollowEvent): FollowPlan {
         state: {
           ...state,
           following: gap(at) <= FOLLOW_SLACK,
-          unseen: false,
+          unseen: state.unseen && gap(at) > FOLLOW_SLACK,
           lastTop: m.scrollTop,
           lastHeight: at.scrollHeight,
           held: m.content,
@@ -166,7 +190,7 @@ export function follow(state: FollowState, event: FollowEvent): FollowPlan {
     // No scroll: turning off drops the floor, and a scroller at its end stays
     // there as the browser clamps it.
     case "holding": {
-      const floor = event.value ? m.floor : 0
+      const floor = event.value ? capFloor(m, m.floor) : 0
       return {
         state: { ...state, holding: event.value, held: m.content + floor },
         scrollTo: null,
@@ -175,3 +199,21 @@ export function follow(state: FollowState, event: FollowEvent): FollowPlan {
     }
   }
 }
+
+/** What a scroller knew of its end when it was unmounted. */
+export interface SeenEnd {
+  /** The column's tip then. */
+  readonly tip: string | null
+  /** Whether ↓ new below was showing. */
+  readonly unseen: boolean
+}
+
+/**
+ * Whether a scroller mounted again has content below that its reader has not
+ * seen. Following at unmount, it had seen its tip; released, `unseen` says
+ * whether anything grew since.
+ */
+export const behind = (
+  seen: SeenEnd | undefined,
+  tip: string | null,
+): boolean => seen !== undefined && (seen.unseen || seen.tip !== tip)

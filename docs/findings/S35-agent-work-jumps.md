@@ -81,7 +81,9 @@ fast to see without a recording.
   directly above it, so the command shows twice while it runs.
 - Its output box is up to 16 rem tall (`.tool-output`). When the tool ends,
   the box is removed and the committed row is a closed `<details>`, so the
-  column loses up to about 270 px at once.
+  column loses up to about 270 px at once. *Since ADR-0049 the row opens
+  only for a command that runs past 500ms, capped, and stays open when it
+  ends.*
 
 ## Not tested
 

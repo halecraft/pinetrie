@@ -8,13 +8,18 @@ import {
   useRef,
   useState,
 } from "react"
-import { type FollowEvent, follow, initialFollow } from "./follow.ts"
+import {
+  type FollowEvent,
+  type FollowState,
+  follow,
+  initialFollow,
+} from "./follow.ts"
 
 /** The DOM event `alignOnOpen` and `useReveal` dispatch on a column body they have placed. */
 export const PLACED = "pineta:placed"
 
 export interface Follow {
-  /** Released, and content has arrived below since. */
+  /** Released, and content has arrived below since, or it was mounted behind. */
   readonly unseen: boolean
   /** Jump to the end, and follow it again. */
   readonly follow: () => void
@@ -26,6 +31,10 @@ export interface Follow {
  * the scroller's viewport, and follows in the frame the layout changed.
  * With `hold`, while `holding`, a shrink is taken up by `floor`, an element
  * after `content` inside the scroller.
+ * With `seen`, it starts with ↓ new below showing when `seen.unseen` (read
+ * at mount only), and tells `seen.leave` on unmount whether it was showing.
+ * The first placement keeps it only short of the end: nothing clears it
+ * before then, since a scroller's first resize comes after `alignOnOpen`.
  */
 export function useFollow(
   scroller: RefObject<HTMLElement | null>,
@@ -34,11 +43,20 @@ export function useFollow(
     readonly floor: RefObject<HTMLElement | null>
     readonly holding: boolean
   },
+  seen?: {
+    readonly unseen: boolean
+    readonly leave: (unseen: boolean) => void
+  },
 ): Follow {
   // A ref: it changes every frame while a reply streams. Only `unseen` is
   // drawn, so only it is React state.
-  const state = useRef(initialFollow)
-  const [unseen, setUnseen] = useState(false)
+  const state = useRef<FollowState>({
+    ...initialFollow,
+    unseen: seen?.unseen ?? false,
+  })
+  const [unseen, setUnseen] = useState(state.current.unseen)
+  const leave = seen?.leave
+  useLayoutEffect(() => () => leave?.(state.current.unseen), [leave])
 
   const floorRef = hold?.floor
   const step = useCallback(

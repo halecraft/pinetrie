@@ -5,7 +5,7 @@
 import { useSelector } from "@kyneta/react"
 import { entryId, type ToolCallView } from "@pineta/core"
 import { readStreamText, type SessionDocHandle } from "@pineta/schema"
-import { memo, useCallback, useRef } from "react"
+import { memo, useCallback, useEffect, useRef, useState } from "react"
 import { joinWords } from "./column-view.ts"
 import { plural } from "./counts.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
@@ -14,6 +14,7 @@ import type { MessageAct, MessageTools } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
 import { nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
+import { click, REVEAL_MS, type ReaderChoice, rowSize } from "./tool-row.ts"
 import { useFollow } from "./use-follow.ts"
 
 function MessageView(p: MessageProps) {
@@ -184,13 +185,13 @@ function Tools({
 const SHOWN = 20_000
 
 /**
- * One tool call: what it touched, whether it worked, and, folded, what it
- * returned. A cut label (a long or multi-line command) is shown uncut in its
- * place while the row is open: CSS on `[open]` swaps the two, so the command
- * is never shown twice. The result is its own entry in the tree, paired here by
+ * One tool call: what it touched, whether it worked, and what it returned. A
+ * cut label (a long or multi-line command) is shown uncut in its place while
+ * the row is open: CSS on `[open]` swaps the two, so the command is never
+ * shown twice. The result is its own entry in the tree, paired here by
  * `projectSpine`; with none yet, the call is still running or was cut off.
- * While it runs, its output streams here, open: the result replaces it in
- * the render that holds the result, in the same element (S35).
+ * How much is shown is `rowSize`'s: a call whose output streams for
+ * `REVEAL_MS` opens its row, capped, and only the reader closes it.
  */
 function ToolRow({
   call,
@@ -204,41 +205,77 @@ function ToolRow({
   const status =
     call.result === undefined ? "pending" : call.result.isError ? "error" : "ok"
   const mark = status === "pending" ? "…" : status === "error" ? "✗" : "✓"
-  const text = call.result?.text ?? ""
   // A result replaces the stream, whether or not the stream has gone yet.
   const live = call.result === undefined ? stream : undefined
+  const [revealed, setRevealed] = useState(false)
+  const [reader, setReader] = useState<ReaderChoice>(null)
+  const size = rowSize({ revealed, reader })
+  // Set once and never unset, so the row stays open when the result arrives.
+  // A result within REVEAL_MS clears the timer: the row never opened.
+  useEffect(() => {
+    if (live === undefined || revealed) return
+    const t = setTimeout(() => setRevealed(true), REVEAL_MS)
+    return () => clearTimeout(t)
+  }, [live, revealed])
   return (
     <details
       className={live === undefined ? "tool" : "tool live"}
+      data-size={size}
       data-status={status}
       data-tool={call.name}
-      open={live !== undefined}
+      open={size !== "closed"}
     >
-      <summary>
+      {/* The row's size is state, not the element's: a native toggle would
+        close a capped row, where a click shows it whole. Enter and Space on a
+        summary are clicks too. */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: a summary is its details' own toggle, focusable and keyboard-operable */}
+      <summary
+        onClick={e => {
+          e.preventDefault()
+          setReader(click(size))
+        }}
+      >
         <span className="tool-label">{call.label}</span>
         {call.wholeLabel !== undefined && (
           <span className="tool-label-whole">{call.wholeLabel}</span>
         )}{" "}
         <span className="tool-status">{mark}</span>
       </summary>
-      {live !== undefined && <LiveOutput doc={doc} id={live} />}
-      {call.result !== undefined && (
-        <pre className="tool-output">
-          {text.length > SHOWN
-            ? `${text.slice(0, SHOWN)}\n… ${text.length - SHOWN} more characters`
-            : text}
-        </pre>
+      {size !== "closed" && (
+        <ToolOutput doc={doc} result={call.result?.text} stream={live} />
       )}
     </details>
   )
 }
 
-/** A running tool's output, following its end as a column does. */
-function LiveOutput({ doc, id }: { doc: SessionDocHandle; id: string }) {
-  const text = useSelector(
+/**
+ * A call's output: its result, or while it has none, its stream. One element
+ * for both, so the handover keeps its scroll and its follow: a capped row
+ * shows the result's end, where the live output was.
+ */
+function ToolOutput({
+  doc,
+  stream,
+  result,
+}: {
+  doc: SessionDocHandle
+  stream: string | undefined
+  result: string | undefined
+}) {
+  const streamed = useSelector(
     doc,
-    useCallback((d: SessionDocHandle) => readStreamText(d, id), [id]),
+    useCallback(
+      (d: SessionDocHandle) =>
+        stream === undefined ? "" : readStreamText(d, stream),
+      [stream],
+    ),
   )
+  const text =
+    result === undefined
+      ? streamed
+      : result.length > SHOWN
+        ? `${result.slice(0, SHOWN)}\n… ${result.length - SHOWN} more characters`
+        : result
   const pre = useRef<HTMLPreElement>(null)
   const inner = useRef<HTMLElement>(null)
   useFollow(pre, inner)

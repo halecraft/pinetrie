@@ -3642,14 +3642,17 @@ between, and a slow render painted it.
   (S55). `messageEnd` and `toolEnd` are gone from `StreamEvent`.
 - **A tool's live output is drawn in its row.** The row is open while its
   call has a stream and no result, and its result replaces the stream in the
-  same element, in the render that holds the result.
+  same element, in the render that holds the result. *Since ADR-0049, the
+  row opens, capped, only after 500ms and stays open; only the reader closes
+  it, or shows it whole.*
 - **Live work is drawn in its committed form's box.** A streaming reply is a
   `.msg`, and live work's mark takes no width, so nothing rewraps when it
   commits.
 - **A column that follows its end does not get shorter while its agent
   works.** A shrink is taken up by a floor below the content, set before the
   frame is painted, which what the agent writes next fills. The floor goes
-  when the run ends.
+  when the run ends. *Since ADR-0049, the floor is at most a third of the
+  view.*
 
 **Consequences.**
 - The document keeps a finished stream a little longer: a reply until the
@@ -3675,7 +3678,8 @@ between, and a slow render painted it.
   `KynetaStorage`: couples pi's commit path to streams, and orders only the
   host's writes.
 - Keeping a finished tool's output open: changes ADR-0022's folded rows, and
-  covers only that one shrink.
+  covers only that one shrink. *Adopted by ADR-0049: that shrink was the
+  floor's largest, and could leave a column with no text on screen.*
 
 ## ADR-0045 — A mark is a title on an entry; a root's mark titles its tab
 
