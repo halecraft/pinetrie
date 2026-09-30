@@ -136,12 +136,23 @@ export const settleRun = (
 ): "done" | "keep" => (ran.kind === "refused" ? "keep" : "done")
 
 /**
- * The lanes a starting host must drain: each with messages held for it has no
- * run whose end would drain it. Pure. What does not survive a process (runs,
- * streams) is cleared first, by `clearStreams` in `@pineta/schema`.
+ * What a starting host runs, pure. A lane a crash interrupted holds its
+ * operation open, so it is resumed before anything waiting for it (S36 item
+ * 18), and its run's end drains it. Every other lane with messages held for
+ * it is drained, since no run's end will. What does not survive a process
+ * (runs, streams) is cleared first, by `clearStreams` in `@pineta/schema`.
  */
-export function planStartup(input: { readonly held: readonly Held[] }): {
+export function planStartup(input: {
+  readonly held: readonly Held[]
+  /** Lanes a crash interrupted, as pi reports them. */
+  readonly interrupted: readonly LaneName[]
+}): {
+  readonly resume: readonly LaneName[]
   readonly drain: readonly LaneName[]
 } {
-  return { drain: [...new Set(input.held.map(h => h.lane))] }
+  const resume = [...new Set(input.interrupted)]
+  const drain = [...new Set(input.held.map(h => h.lane))].filter(
+    lane => !resume.includes(lane),
+  )
+  return { resume, drain }
 }

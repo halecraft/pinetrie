@@ -88,8 +88,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup drains nothing",
     file: "packages/marginalia/outbox.ts",
-    from: "  return { drain: [...new Set(input.held.map(h => h.lane))] }",
-    to: "  return { drain: [] }",
+    from: "  return { resume, drain }",
+    to: "  return { resume, drain: [] }",
     command: unit,
     expect: "every lane with held messages drains",
   },
@@ -460,5 +460,13 @@ export const mutations: readonly Mutation[] = [
     to: '  if (rest.length > 0) return "bad"',
     command: unit,
     expect: "the wire: every URL parses back",
+  },
+  {
+    name: "startup drains an interrupted lane",
+    file: "packages/marginalia/outbox.ts",
+    from: "    lane => !resume.includes(lane),",
+    to: "    lane => lane !== undefined,",
+    command: unit,
+    expect: "an interrupted lane is resumed, and not drained",
   },
 ]

@@ -5,6 +5,7 @@ import {
   isLoopback,
   isLoopbackHost,
   KEY_COOKIE,
+  planInvites,
   requestFacts,
   urlHost,
 } from "./admission.ts"
@@ -140,5 +141,30 @@ describe("admission: an invite key off loopback", () => {
     expect(urlHost("0.0.0.0")).toBe("127.0.0.1")
     expect(urlHost("::")).toBe("[::1]")
     expect(urlHost("192.168.1.20")).toBe("192.168.1.20")
+  })
+})
+
+describe("invites", () => {
+  const interfaces = [
+    { family: "IPv4", address: "192.168.1.5", internal: false },
+    { family: "IPv4", address: "127.0.0.1", internal: true },
+    { family: "IPv6", address: "fe80::1", internal: false },
+    undefined,
+    { family: "IPv4", address: "10.0.0.2", internal: false },
+  ]
+
+  test("planInvites on 0.0.0.0: one link per external IPv4 address, each with the key", () => {
+    expect(
+      planInvites({ bind: "0.0.0.0", key: "k/y", port: 7391, interfaces }),
+    ).toEqual([
+      "http://192.168.1.5:7391/?key=k%2Fy",
+      "http://10.0.0.2:7391/?key=k%2Fy",
+    ])
+  })
+
+  test("planInvites on loopback: the local link, with no key", () => {
+    expect(
+      planInvites({ bind: "127.0.0.1", key: null, port: 7391, interfaces }),
+    ).toEqual(["http://127.0.0.1:7391/"])
   })
 })

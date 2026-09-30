@@ -1,90 +1,22 @@
-// host — the shell. Owns sockets, the Exchange, the harness lifecycle.
+// host — the composition root. It builds the store, the Exchange, the
+// documents, lane work and the agent, and wires the shell's modules; each
+// module takes what it needs as a parameter, and only this file wires them
+// (TECHNICAL.md).
 //
 // Imports NO pi. Everything pi-shaped arrives through pi/.
-// FC/IS: this file gathers and executes; the deciding is done by core/.
 
 import { readFile } from "node:fs/promises"
-import http, { type IncomingMessage, type ServerResponse } from "node:http"
-import { createRequire } from "node:module"
-import { networkInterfaces } from "node:os"
-import path from "node:path"
 import {
   createInMemoryStore,
   Exchange,
   type Store,
   whenHydrated,
 } from "@kyneta/exchange"
-import { unwrap } from "@kyneta/schema"
-import {
-  WebsocketServerTransport,
-  wrapNodeWebsocket,
-} from "@kyneta/websocket-transport/server"
-import {
-  type BlobStore,
-  type EntryId,
-  ERR,
-  type ImageRef,
-  type Intent,
-  isBusy,
-  type LaneName,
-  type NoteId,
-  noteId,
-  type OfferAction,
-  parseMentions,
-  planStop,
-  promptOf,
-  type RunId,
-  runId,
-  type Sha256,
-  threadOf,
-  type WriterId,
-  writerOfPrincipal,
-} from "@pineta/core"
+import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
+import type { BlobStore, LaneName, NoteId } from "@pineta/core"
 import { userConfigFile } from "@pineta/lanes"
-import {
-  archivedAt,
-  CHAT_TYPE,
-  type ChatDetails,
-  type ChatMessage,
-  decodeCommandRenames,
-  displayName,
-  encodeChat,
-  encodeWorkRecord,
-  LAND_TYPE,
-  type LandMessage,
-  type OfferAsk,
-  parseCommand,
-  pastedImages,
-  planArchive,
-  planChat,
-  planDrain,
-  planImages,
-  planMark,
-  planNote,
-  planNoteEdit,
-  planStartup,
-  planUpdate,
-  recordChanged,
-  resolveCommand,
-  type StackMessage,
-  sentNote,
-  settleRun,
-  type WorkRecord,
-  writesAt,
-} from "@pineta/marginalia"
-import {
-  type Agent,
-  createAgent,
-  type ModelChoice,
-  newId,
-  prepareImage,
-} from "@pineta/pi"
-import {
-  decodeCommand,
-  encodeOutcome,
-  type Outcome,
-  type WireCommand,
-} from "@pineta/protocol/codec"
+import { decodeCommandRenames } from "@pineta/marginalia"
+import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
 import { Control } from "@pineta/protocol/line"
 import {
   CONTROL_TOPIC,
@@ -92,59 +24,31 @@ import {
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
+import { readNotes } from "@pineta/reads"
 import {
-  planSweep,
-  readArchive,
-  readLaneRecords,
-  readLanes,
-  readMarks,
-  readNotes,
-  readOutbox,
-  readParticipantNames,
-  readParticipants,
-  readReferencedBlobs,
-  readThreadName,
-  readTreeIndex,
-  workAt,
-  worksOwn,
-} from "@pineta/reads"
-import {
-  applyStreamOps,
-  beginRun,
-  clearStreams,
-  endRun,
-  NoteDoc,
-  type NoteDocHandle,
-  noteAuthors,
-  noteDocId,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
-  planStream,
   presenceDoc,
-  readActiveRun,
-  readLaneTip,
-  readStreams,
-  readValues,
   SessionDoc,
   type SessionDocHandle,
 } from "@pineta/schema"
-import { createServer as createViteServer } from "vite"
-import { WebSocketServer } from "ws"
-import {
-  admits,
-  DEFAULT_BIND,
-  isLoopback,
-  KEY_COOKIE,
-  newKey,
-  requestFacts,
-  urlHost,
-} from "./admission.ts"
-import { MAX_UPLOAD_BYTES, memoryBlobs, planUploadHeaders } from "./blobs.ts"
-import { departedSeats, lineDocPrefix } from "./lines.ts"
+import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
+import { type Basics, failed } from "./basics.ts"
+import { memoryBlobs } from "./blobs.ts"
+import { createCommands } from "./commands/index.ts"
+import { startControl } from "./control.ts"
+import { hotReload as pauseHotReload } from "./hot-reload.ts"
+import { compactSession, sweepBlobs } from "./housekeeping.ts"
+import { startHttp } from "./http.ts"
+import { lineDocPrefix } from "./lines.ts"
+import { startNoteTexts } from "./notes.ts"
+import { drain as drainOutbox } from "./outbox.ts"
 import { writePolicy } from "./policy.ts"
-import { offerResponse } from "./reviews.ts"
-import { route } from "./routes.ts"
+import { createSerial } from "./queue.ts"
+import { createRuns, streamInto } from "./runs.ts"
+import { createSettle } from "./settle.ts"
+import { recover } from "./startup.ts"
 import { openStore } from "./store.ts"
 import { startLaneWork } from "./work.ts"
 
@@ -292,10 +196,12 @@ export async function startHost({
   // A stored session loads asynchronously; pi must see it before it starts.
   // Only storage is awaited: the host is the authority, with no peer upstream.
   await whenHydrated(doc)
+  const basics: Basics = { doc, log, newId, now: Date.now }
 
   // --- where lanes work (ADR-0032, ADR-0034) --------------------------------
-  // The agent is created with this module's `access` and `hooks`, so it reads
-  // the agent lazily.
+  // Lane work is made before the agent, which is made with lane work's
+  // `access` and `hooks`, so lane work reads the agent lazily. This is the
+  // one lazy read: every module made after the agent is given the agent.
   let created: Agent | undefined
   const theAgent = (): Agent => {
     if (created === undefined) throw new Error("the agent is not created yet")
@@ -333,21 +239,7 @@ export async function startHost({
             access: work.access,
             hooks: work.hooks,
           },
-    // Gather the lane's streams and tip from the document, plan, execute. The
-    // document records what each lane is running and streaming; a second copy
-    // here would be two sources of truth.
-    onStream: event => {
-      applyStreamOps(
-        doc,
-        planStream({
-          event,
-          streams: readStreams(doc),
-          tip: readLaneTip(doc, event.lane),
-          running: readActiveRun(doc, event.lane) !== undefined,
-          newId,
-        }),
-      )
-    },
+    onStream: streamInto(basics),
   })
   created = agent
 
@@ -355,1048 +247,102 @@ export async function startHost({
     `[host] agent ready — model ${agent.modelLabel}; tools ${tools === null ? "off" : `on, in ${work.project?.root ?? tools.project}`}`,
   )
 
-  // --- hot reload -----------------------------------------------------------
-  // Agents edit their own disks, so the page's code changes only by your hand,
-  // and hot reload stays on (ADR-0034). A lane working directly in your
-  // working copy edits the client this host serves, mid-run: while one runs,
-  // updates are held, and its end reloads the page once (ADR-0022's reason).
-  const hotReload = pausedWhile(() => {
-    const project = work.project
-    if (project === null) return false
-    const records = readLaneRecords(doc)
-    return readLanes(doc, readTreeIndex(doc)).some(l => {
-      const w = l.running ? records.get(l.name)?.work : undefined
-      return w?.kind === "direct" && isWithin(w.dir, project.root)
-    })
+  // --- the shell -----------------------------------------------------------
+  const hotReload = pauseHotReload({ doc, project: () => work.project })
+  // Commands are received only from `startControl`, after `recover`.
+  const listener = Control.listen(exchange)
+  const serial = createSerial(failed(basics, "step"))
+  const notes = startNoteTexts({
+    exchange,
+    doc,
+    serial,
+    setNote: note => agent.setNote(note),
+  })
+  const runs = createRuns({ basics, agent, work })
+  const commands = createCommands({
+    basics,
+    agent,
+    work,
+    blobs,
+    notes,
+    start: runs.start,
+  })
+  const drain = (lane: LaneName) =>
+    drainOutbox(
+      { basics, agent, start: runs.start, update: commands.update },
+      lane,
+    )
+  const settle = createSettle({
+    basics,
+    serial,
+    drain,
+    compact: () => compactSession(exchange),
+    sweep: () => sweepBlobs({ basics, blobs, grace: blobGraceMs, notes }),
+  })
+  // A run's end: hot reload may reload the page, then the lane drains and
+  // the session compacts.
+  runs.onEnded(lane => {
+    hotReload.runEnded()
+    void settle([lane])
   })
 
-  // --- command channel (ADR-0007) -----------------------------------------
-  const listener = Control.listen(exchange)
-  type ControlSender = Parameters<Parameters<typeof listener.onReceive>[0]>[0]
-
   /**
-   * One serial executor for every command, and for each drain step. A step
-   * gathers, plans and executes with nothing in between, so its plan is still
-   * true when it is carried out: with one host, this is what makes "a late
-   * message goes after" and "a busy lane holds" hold. Runs are started inside a
-   * step but continue outside it, so one long run never blocks another
-   * thread's commands.
+   * Resolves when no queued step remains (a compaction after a run among
+   * them), no lane's queue has work, and every write has reached the store.
    */
-  let tail: Promise<void> = Promise.resolve()
-  function serially(step: () => Promise<void>): Promise<void> {
-    const run = tail.then(step, step)
-    tail = run.catch(error => {
-      log(
-        `[host] step failed: ${error instanceof Error ? error.message : String(error)}`,
-      )
-    })
-    return run
-  }
-
-  /** Settles when no step is queued or running: each step may queue more. */
   async function quiet(): Promise<void> {
-    for (let seen = tail; ; seen = tail) {
-      await seen
-      if (seen === tail) break
-    }
+    await serial.idle()
     // Lanes' own queues: snapshots, fetches, stops and trims after a run.
     await work.quiet()
     await exchange.flush()
   }
 
-  // A compaction queued and not yet started absorbs the next request: several
-  // runs ending together compact once.
-  let compactionQueued = false
-
-  /**
-   * What happens between runs, as one serial step: drain each lane given, then
-   * compact the session. Draining first means a message waiting for the lane
-   * does not wait for the compaction; a run it starts streams while the
-   * session compacts. Compaction replaces the store's records with the document
-   * as it stands and trims the in-memory op log (ADR-0023); a run's end is when
-   * that log has grown most and its streams have just closed. A failed
-   * compaction is logged; the host carries on.
-   */
-  function settle(lanes: readonly LaneName[]): Promise<void> {
-    const compact = !compactionQueued
-    compactionQueued = true
-    return serially(async () => {
-      for (const lane of lanes) await drain(lane)
-      if (!compact) return
-      compactionQueued = false
-      // The session only. Each client's command Line is also stored, and grows
-      // a little with every command, but half of it is the client's to write,
-      // and Kyneta cannot compact a replica of a document another peer writes.
-      // Its pruning should compact it; that is upstream (S25 addendum). A
-      // note's text is Yjs, which Kyneta cannot compact live (S24).
-      try {
-        await exchange.compact(SESSION_DOC_ID)
-      } catch (error) {
-        log(
-          `[host] compaction failed: ${error instanceof Error ? error.message : String(error)}`,
-        )
-      }
-      try {
-        await sweepBlobs()
-      } catch (error) {
-        log(
-          `[host] deleting unreferenced images failed: ${error instanceof Error ? error.message : String(error)}`,
-        )
-      }
-    })
-  }
-
-  /**
-   * Delete the images nothing shows any more (ADR-0042): gather every note's
-   * text, then the store's list and the session's references with no await
-   * between them, `planSweep`, delete. Runs in `settle`'s serial step.
-   */
-  async function sweepBlobs(): Promise<void> {
-    const noteTexts: string[] = []
-    for (const n of readNotes(doc))
-      noteTexts.push((await holdNote(n.id, null)).text())
-    const doomed = planSweep({
-      stored: blobs.list(),
-      referenced: readReferencedBlobs(doc, noteTexts),
-      now: Date.now(),
-      grace: blobGraceMs,
-    })
-    if (doomed.length === 0) return
-    blobs.delete(doomed)
-    log(`[host] deleted ${doomed.length} unreferenced image(s)`)
-  }
-
-  /**
-   * Start one turn on a thread's lane, streaming into the document: from a
-   * prompt, or resuming what a crash interrupted. The one way a run starts.
-   * Before it, a lane of its own's container is queued to start;
-   * `ask_for_guidance` is on exactly while the prompt is a land message.
-   * After it, a resolution records its outcome, a split's stack is checked,
-   * the lane's offer follows, its container is stopped, and one drain step is
-   * enqueued for the lane: "a run ended" is the only state the outbox's loop
-   * needs.
-   */
-  function startRun(
-    lane: LaneName,
-    start:
-      | {
-          readonly kind: "prompt"
-          readonly message: ChatMessage | LandMessage | StackMessage
-        }
-      | { readonly kind: "resume" },
-  ): RunId {
-    const id = runId(newId())
-    beginRun(doc, lane, id)
-    const handle = agent.lane(lane)
-    void (async () => {
-      try {
-        work.beforeRun(lane)
-        await handle.withGuidance(
-          start.kind === "prompt"
-            ? start.message.customType === LAND_TYPE
-            : latestPrompt(lane)?.role === "land",
-        )
-        const ran =
-          start.kind === "prompt"
-            ? await handle.run(start.message)
-            : await handle.resume()
-        if (
-          start.kind === "prompt" &&
-          start.message.customType === CHAT_TYPE &&
-          settleRun(ran) === "keep"
-        ) {
-          // The reply was already `started`, so the author cannot be told;
-          // at least their message is not lost.
-          log(`[host] run ${id.slice(-8)} REFUSED: kept as a message`)
-          await handle.append(start.message)
-        }
-      } catch (error) {
-        log(
-          `[host] run failed: ${error instanceof Error ? error.message : String(error)}`,
-        )
-      } finally {
-        try {
-          await handle.withGuidance(false)
-          // A resolution ends with its outcome, and a split with its stack
-          // checked, however they started.
-          const prompt = latestPrompt(lane)
-          if (prompt?.role === "land") await work.landingEnded(lane, prompt.id)
-          if (prompt?.role === "stack") await work.splitEnded(lane, prompt.id)
-        } catch (error) {
-          log(
-            `[host] run end failed: ${error instanceof Error ? error.message : String(error)}`,
-          )
-        }
-        endRun(doc, lane, id)
-        work.runEnded(lane)
-        log(`[host] run ${id.slice(-8)} done`)
-        hotReload.runEnded()
-        void settle([lane])
-      }
-    })()
-    return id
-  }
-
-  /** The prompt of the lane's latest run, and its role: `land` and `stack` end specially. */
-  function latestPrompt(
-    lane: LaneName,
-  ): { readonly id: EntryId; readonly role: string | undefined } | null {
-    const index = readTreeIndex(doc)
-    const id = promptOf(index, readLaneTip(doc, lane))
-    return id === null ? null : { id, role: index.entries[id]?.message?.role }
-  }
-
-  /**
-   * An update (ADR-0038): a busy lane holds it, as it would a message;
-   * otherwise a copy of your work is merged into the lane. Clean: a fact in
-   * the thread, and the composer's prefill. Conflicted: the resolution runs
-   * (ADR-0033).
-   */
-  async function startUpdate(lane: LaneName, by: WriterId): Promise<Outcome> {
-    const index = readTreeIndex(doc)
-    const planned = planUpdate({
-      record: readLaneRecords(doc).get(lane),
-      view: readLanes(doc, index).find(l => l.name === lane),
-    })
-    if (planned.kind === "refused")
-      return {
-        kind: "refused",
-        code: planned.code,
-        message: "only a thread with its own copy takes your work",
-      }
-    if (planned.kind === "hold") {
-      await agent.hold({
-        kind: "update",
-        id: newId(),
-        lane,
-        by,
-        timestamp: Date.now(),
-      })
-      return { kind: "queued", position: planned.position }
-    }
-    const updated = await work.prepareUpdate(lane, by)
-    if ("refused" in updated) {
-      log(
-        `[host] ${readThreadName(doc, lane)}: update refused: ${updated.refused}`,
-      )
-      return { kind: "refused", code: ERR.REFUSED, message: updated.refused }
-    }
-    if (updated.kind === "conflicted")
-      return {
-        kind: "started",
-        runId: startRun(lane, { kind: "prompt", message: updated.message }),
-      }
-    return {
-      kind: "updated",
-      text: updated.kind === "clean" ? updated.prefill : "",
-    }
-  }
-
-  /**
-   * An offer action (ADR-0038). A split is a run on the lane, so a busy lane
-   * refuses it; every other action is the offer shell's, on your repo.
-   */
-  async function actOnOffer(
-    lane: LaneName,
-    action: OfferAction,
-    by: WriterId,
-  ): Promise<Outcome> {
-    const offers = work.offers
-    if (offers === null)
-      return {
-        kind: "refused",
-        code: ERR.NOT_OWN_COPY,
-        message: "this host has no lanes of their own",
-      }
-    if (action === "split") {
-      const view = readLanes(doc, readTreeIndex(doc)).find(l => l.name === lane)
-      if (view === undefined || isBusy(view))
-        return {
-          kind: "refused",
-          code: ERR.BUSY,
-          message: "the thread is working: split its offer when it stops",
-        }
-      const message = await work.prepareSplit(lane, by)
-      if ("refused" in message)
-        return { kind: "refused", code: ERR.REFUSED, message: message.refused }
-      return {
-        kind: "started",
-        runId: startRun(lane, { kind: "prompt", message }),
-      }
-    }
-    const refused = await offers.act(lane, action, by)
-    if (refused !== null)
-      return {
-        kind: "refused",
-        code: refused,
-        message: "this thread has no offer in your repo",
-      }
-    return action === "take" ? { kind: "taken" } : { kind: "offered" }
-  }
-
-  /**
-   * Take a now-idle lane's held messages, oldest first: a plain one is appended
-   * and the step goes on; a compelled one is run, and its end brings the next
-   * step. The lane is never written while it runs (S21).
-   */
-  async function drain(lane: LaneName): Promise<void> {
-    for (;;) {
-      const step = planDrain(readOutbox(doc), lane)
-      if (step.kind === "idle") return
-      if (step.kind === "update") {
-        // Released first: the update owns it from here, as a run owns its
-        // message. A resolution run's end brings the next step; a clean one
-        // goes on to the next held item.
-        await agent.release(step.held.id)
-        const outcome = await startUpdate(lane, step.held.by)
-        if (outcome.kind === "started") return
-        continue
-      }
-      const message = encodeChat(step.held.details, step.held.timestamp)
-      if (step.kind === "append") {
-        // Released only once written: a refused append stays held, and is
-        // taken again when the lane's next run ends.
-        const appended = await agent.lane(lane).append(message)
-        if (appended.kind === "refused") {
-          log(`[host] held message kept: append refused (${appended.code})`)
-          return
-        }
-        await agent.release(step.held.id)
-        continue
-      }
-      // The run owns the message from here: if pi refuses it, `settleRun`
-      // keeps it in the tree.
-      await agent.release(step.held.id)
-      startRun(lane, { kind: "prompt", message })
-      return
-    }
-  }
-
-  // No stream survives a process: clear them. Nothing else runs yet, so this
-  // needs no serial step. A run a crash interrupted is resumed (below). Then
-  // settle: drain every other lane with messages held for it, since no run's
-  // end will, and compact.
-  clearStreams(doc)
-  // A lane a crash interrupted holds its operation open: it is resumed, in its
-  // own directory, before anything waiting for it (S36 item 18). Its run's end
-  // drains it, as any run's does.
-  // Every lane has a name before anything runs (ADR-0039).
-  await work.ensureNames()
-  const interrupted = await agent.interrupted()
-  for (const lane of interrupted) {
-    log(
-      `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,
-    )
-    startRun(lane, { kind: "resume" })
-  }
-  void settle(
-    planStartup({ held: readOutbox(doc) }).drain.filter(
-      lane => !interrupted.includes(lane),
-    ),
-  )
-  // What the host found, and the commands its pi loaded, each written after
-  // the startup compaction and only when it changed (`recordChanged`).
-  const writeIfChanged = (record: WorkRecord) => {
-    const { namespace } = encodeWorkRecord(record)
-    if (recordChanged(record, readValues(doc, namespace)[0]?.value))
-      void serially(() => agent.setWorkRecord(record))
-  }
-  if (work.project !== null)
-    writeIfChanged({ kind: "project", record: work.project })
-  writeIfChanged({
-    kind: "commands",
-    record: {
-      commands: agent.commands().map(c => ({
-        name: c.name,
-        kind: c.kind,
-        description: c.description,
-        argumentHint: c.argumentHint,
-      })),
-    },
+  await recover({
+    basics,
+    agent,
+    work,
+    serial,
+    start: runs.start,
+    settle,
+    notes,
   })
-  for (const r of agent.refusedCommands())
-    log(`[host] command ${r.name} is refused: ${r.reason}`)
-
-  /**
-   * A human message, from a `chat` command or a sent draft: gather, `threadOf`
-   * and `planChat`, execute. The one send path, so queueing, conflicts and who
-   * a message is for hold for both.
-   */
-  async function sendChat(
-    writer: WriterId,
-    sendId: string,
-    chat: Omit<Extract<Intent, { kind: "chat" }>, "kind">,
-    contributors: readonly WriterId[],
-  ): Promise<Outcome> {
-    // gather
-    const index = readTreeIndex(doc)
-    const names = readParticipantNames(doc)
-    const nameOf = (w: WriterId) => displayName(w, names.get(w))
-
-    // plan (pure)
-    const thread = threadOf(index, readLanes(doc, index), {
-      at: chat.at,
-      mode: chat.mode,
-      lane: chat.lane,
-      me: writer,
-    })
-    // An entry or lane this document does not hold has nowhere to go: refused
-    // before anything is written, as pi would refuse a lane there.
-    if (thread.kind === "unknown") {
-      return {
-        kind: "refused",
-        code: ERR.UNKNOWN_TARGET,
-        message: "no such entry or lane to write at",
-      }
-    }
-    // Two lanes end here for a moment (a new one, just branched): which thread
-    // the sender meant cannot be told, so they are asked, as for a race.
-    if (thread.kind === "ambiguous") return { kind: "conflict", by: null }
-    // A thread that works, or will work, in its own copy is sent paths as
-    // its lane sees them: your working copy's (ADR-0034), and a command's
-    // files (ADR-0036).
-    const own = worksOwn(doc, index, {
-      lane: thread.lane,
-      end: thread.end,
-      mode: chat.mode,
-      at: chat.at,
-      work: chat.work,
-    })
-    // gather: the command its first word names, from its file as it is now
-    const typed = parseCommand(chat.text)
-    const source =
-      typed === null ? null : resolveCommand(typed.name, agent.commands())
-    const command =
-      typed === null
-        ? null
-        : source === null
-          ? { unknown: typed.name }
-          : ((await agent.expand(source, typed.args, own)) ?? {
-              unreadable: typed.name,
-            })
-    // gather: the store's refs of the images its text shows (ADR-0042)
-    const shas = pastedImages(chat.text)
-    const refs = new Map(
-      shas.flatMap(sha => {
-        const ref = blobs.ref(sha)
-        return ref === undefined ? [] : [[sha, ref] as const]
-      }),
-    )
-
-    // plan: a missing image refuses the send before planChat decides the rest
-    const images = planImages(shas, refs)
-    if (images.kind === "refused") return images
-    const planned = planChat({
-      command,
-      images: images.images,
-      hostWorkingCopy: own ? (work.project?.root ?? null) : null,
-      author: writer,
-      authorName: nameOf(writer),
-      text: chat.text,
-      mode: chat.mode,
-      at: chat.at,
-      thread,
-      mentions: chat.mentions,
-      participants: readParticipants(doc, index),
-      asksAgent: chat.asksAgent,
-      sendId,
-      contributors,
-    })
-
-    // execute
-    const message = (details: ChatDetails) => encodeChat(details, Date.now())
-    switch (planned.kind) {
-      case "refused":
-      case "conflict":
-        return planned
-      case "hold":
-        await agent.hold({
-          kind: "chat",
-          id: newId(),
-          lane: planned.lane,
-          details: planned.details,
-          timestamp: Date.now(),
-        })
-        return { kind: "queued", position: planned.position }
-      case "appendToTree":
-      case "appendToLane": {
-        const appended =
-          planned.kind === "appendToTree"
-            ? await agent.appendToTree(message(planned.details), planned.parent)
-            : await agent.lane(planned.lane).append(message(planned.details))
-        if (appended.kind === "refused") {
-          return {
-            kind: "refused",
-            code: appended.code,
-            message: "pi refused the message",
-          }
-        }
-        return { kind: "appended", id: appended.id }
-      }
-      case "run":
-        return {
-          kind: "started",
-          runId: startRun(planned.lane, {
-            kind: "prompt",
-            message: message(planned.details),
-          }),
-        }
-      case "createAndRun": {
-        // Where the new lane works: the send's choice, else the lane above,
-        // else the project's default (ADR-0032).
-        const { work: setting } = workAt(doc, index, planned.at, chat.work)
-        const bad = await work.checkDirectory(setting)
-        if (bad !== null)
-          return {
-            kind: "refused",
-            code: bad,
-            message: "there is no such directory to work in",
-          }
-        const created = await agent.createThreadLane(planned.at)
-        if (created.kind === "refused") {
-          return {
-            kind: "refused",
-            code: created.code,
-            message: "pi refused to start the thread's lane",
-          }
-        }
-        await work.prepareLane(created.lane, setting, planned.at, writer)
-        log(
-          `[host] ${writer.slice(-8)} starts ${readThreadName(doc, created.lane)}`,
-        )
-        return {
-          kind: "started",
-          runId: startRun(created.lane, {
-            kind: "prompt",
-            message: message(planned.details),
-          }),
-        }
-      }
-    }
-  }
-
-  // --- notes (ADR-0025) ----------------------------------------------------
-
-  /** Each note's text, held for the life of the process, and its listener's release. */
-  const notes = new Map<NoteId, { doc: NoteDocHandle; release: () => void }>()
-
-  /**
-   * Hold a note's text, seeded with `seed` if it is new, and attribute every
-   * later edit: each change's `clientID`s whose clocks moved, and the person
-   * behind each connected seat's `clientID`, are gathered here, `planNoteEdit`
-   * decides, and a changed record is written in a serial step. The operations
-   * themselves say which seat wrote them (S26 addendum, ADR-0037). The authors
-   * are gathered as the edit arrives, while its sender is certainly
-   * connected: by the step, it may have gone.
-   */
-  async function holdNote(
-    id: NoteId,
-    seed: string | null,
-  ): Promise<NoteDocHandle> {
-    const held = notes.get(id)
-    if (held !== undefined) return held.doc
-    const note = exchange.get(noteDocId(id), NoteDoc)
-    // A stored note is loaded first, so its history is not taken for new edits.
-    await whenHydrated(note)
-    if (seed !== null && seed !== "") note.text.insert(0, seed)
-    const ydoc = unwrap(note)
-    const onChange = (tr: {
-      beforeState: Map<number, number>
-      afterState: Map<number, number>
-    }) => {
-      const changed = [...tr.afterState].flatMap(([client, clock]) =>
-        clock > (tr.beforeState.get(client) ?? 0) ? [client] : [],
-      )
-      if (changed.length === 0) return
-      const authors = noteAuthors(exchange.peers.current.values())
-      void serially(async () => {
-        const record = readNotes(doc).find(n => n.id === id)
-        if (record === undefined) return
-        const next = planNoteEdit(record, { changed, authors })
-        if (next !== null) await agent.setNote(next)
-      })
-    }
-    ydoc.on("afterTransaction", onChange)
-    notes.set(id, {
-      doc: note,
-      release: () => ydoc.off("afterTransaction", onChange),
-    })
-    return note
-  }
-
-  /** A note command: gather, `planNote`, execute. */
-  async function handleNote(
-    writer: WriterId,
-    sendId: string,
-    intent: Extract<Intent, { kind: "note" }>,
-  ): Promise<Outcome> {
-    // gather
-    const { action } = intent
-    const index = readTreeIndex(doc)
-
-    // plan (pure)
-    const planned = planNote({
-      action,
-      writer,
-      notes: readNotes(doc),
-      index,
-      lanes: readLanes(doc, index),
-      newId: noteId(newId()),
-    })
-
-    // execute
-    switch (planned.kind) {
-      case "refused":
-        return planned
-      case "existing":
-        return { kind: "noted", id: planned.id }
-      case "create":
-        await holdNote(planned.record.id, planned.text)
-        await agent.setNote(planned.record)
-        return { kind: "noted", id: planned.record.id }
-      case "update":
-        await agent.setNote(planned.record)
-        return { kind: "noted", id: planned.record.id }
-      case "send": {
-        const text = (await holdNote(planned.record.id, null)).text()
-        if (text.trim() === "")
-          return {
-            kind: "refused",
-            code: ERR.EMPTY_MESSAGE,
-            message: "the draft is empty",
-          }
-        const sent = await sendChat(
-          writer,
-          sendId,
-          {
-            text,
-            at: planned.at,
-            mode: "reply",
-            lane: planned.lane,
-            asksAgent: false,
-            mentions: parseMentions(text),
-            work: null,
-          },
-          planned.record.contributors.filter(w => w !== writer),
-        )
-        // Written, running or waiting, the message is the draft's now; on a
-        // conflict or a refusal nothing was sent, and it stays a draft.
-        if (
-          sent.kind === "appended" ||
-          sent.kind === "started" ||
-          sent.kind === "queued"
-        )
-          await agent.setNote(sentNote(planned.record, sendId))
-        return sent
-      }
-    }
-  }
-
-  // Every recorded note's text is held, so edits to it are attributed and
-  // reach the store. Before any command: nothing else runs yet.
-  for (const n of readNotes(doc)) await holdNote(n.id, null)
-
-  /** Archive a root for everyone, or restore it: gather, `planArchive`, write one value. */
-  async function handleArchive(
-    writer: WriterId,
-    intent: Extract<Intent, { kind: "archive" }>,
-  ): Promise<Outcome> {
-    // gather
-    const index = readTreeIndex(doc)
-    // plan (pure)
-    const planned = planArchive({
-      action: intent.action,
-      root: intent.root,
-      by: writer,
-      now: Date.now(),
-      index,
-      lanes: readLanes(doc, index),
-      archive: readArchive(doc),
-    })
-    // execute
-    if (planned.kind === "refused") return planned
-    if (planned.kind === "write") {
-      await agent.setArchive(planned.record)
-      // Its lanes follow: their disks deleted, or their bookmarks back.
-      if (intent.action === "archive") await work.archived(intent.root)
-      else await work.restored(intent.root)
-    }
-    return { kind: intent.action === "archive" ? "archived" : "restored" }
-  }
-
-  /** Title an entry, or clear its title: gather, `planMark`, write or delete one value. */
-  async function handleMark(
-    writer: WriterId,
-    intent: Extract<Intent, { kind: "mark" }>,
-  ): Promise<Outcome> {
-    // gather
-    const index = readTreeIndex(doc)
-    // plan (pure)
-    const planned = planMark({
-      entry: intent.entry,
-      title: intent.title,
-      by: writer,
-      now: Date.now(),
-      index,
-      marks: readMarks(doc),
-    })
-    // execute
-    switch (planned.kind) {
-      case "refused":
-        return planned
-      case "write":
-        await agent.setMark(planned.record)
-        break
-      case "remove":
-        await agent.removeMark(planned.entry)
-        break
-      case "unchanged":
-        break
-    }
-    return { kind: "marked" }
-  }
-
-  /**
-   * A command that would write in an archived root is refused, naming who
-   * archived it (ADR-0029). A sent draft reaches `sendChat` only through a
-   * `note` `send`, which is checked here, so `sendChat` needs no check of its
-   * own. Null when the command may go on.
-   */
-  function refuseInArchive(intent: Intent): Outcome | null {
-    const archive = readArchive(doc)
-    if (archive.size === 0) return null
-    const index = readTreeIndex(doc)
-    const at = writesAt(intent, readNotes(doc), index, readLanes(doc, index))
-    const record = archivedAt(index, archive, at)
-    if (record === null) return null
-    const names = readParticipantNames(doc)
-    return {
-      kind: "refused",
-      code: ERR.ARCHIVED,
-      message: `archived by ${displayName(record.by, names.get(record.by))}`,
-    }
-  }
-
-  /**
-   * One command from one writer. The command is UNTRUSTED text off a socket,
-   * so it is decoded first; the codec owns every shape rule. A sender whose
-   * principal names nobody (`writer` undefined) is refused whatever it sends.
-   */
-  async function handleCommand(
-    sender: ControlSender,
-    writer: WriterId | undefined,
-    wire: WireCommand,
-  ): Promise<void> {
-    const id = typeof wire.id === "string" ? wire.id : ""
-    const respond = (outcome: Outcome) =>
-      sender.send(encodeOutcome(id, outcome))
-    if (writer === undefined)
-      return respond({
-        kind: "refused",
-        code: ERR.INVALID_IDENTITY,
-        message: "connect with your email as your principal",
-      })
-
-    const intent = decodeCommand(wire)
-    if (intent.kind === "refused") return respond(intent)
-    const archived = refuseInArchive(intent)
-    if (archived !== null) return respond(archived)
-    switch (intent.kind) {
-      case "chat":
-        // The command's id is the send's id: its column finds its message by it.
-        return respond(
-          await sendChat(writer, id === "" ? newId() : id, intent, []),
-        )
-      case "note":
-        return respond(
-          await handleNote(writer, id === "" ? newId() : id, intent),
-        )
-      case "name":
-        await agent.setParticipantName(writer, intent.name)
-        return respond({ kind: "named" })
-      case "stop": {
-        const planned = planStop(
-          readLanes(doc, readTreeIndex(doc)),
-          intent.lane,
-        )
-        if (planned === "unknown")
-          return respond({
-            kind: "refused",
-            code: ERR.UNKNOWN_TARGET,
-            message: "no such lane to stop",
-          })
-        // The run's end then drains the lane's outbox, as any run's does.
-        if (planned === "abort") await agent.lane(intent.lane).abort()
-        return respond({ kind: "stopped" })
-      }
-      case "archive":
-        return respond(await handleArchive(writer, intent))
-      case "mark":
-        return respond(await handleMark(writer, intent))
-      case "update":
-        return respond(await startUpdate(intent.lane, writer))
-      case "offer":
-        return respond(await actOnOffer(intent.lane, intent.action, writer))
-    }
-  }
-
-  // Identity comes from the TRANSPORT, never the message: `sender.peer` is the
-  // client's seat, and the principal its connection named is who they are
-  // (ADR-0037), so no command field can claim to be someone else. It is
-  // recorded in every message they write; people own no lanes. A principal
-  // that is not an email names nobody, and every command from it is refused.
-  const lines = new Map<string, { destroy(): void }>()
-  listener.onReceive((sender, receiver, manager) => {
-    lines.set(sender.peer, manager)
-    const writer = writerOfPrincipal(exchange.peers.get(sender.peer)?.principal)
-    void (async () => {
-      for await (const cmd of receiver)
-        await serially(() => handleCommand(sender, writer, cmd))
-    })()
-  })
-  // A seat that has left never returns, so its Line goes (host/lines.ts).
-  const stopLines = exchange.peers.subscribe(() => {
-    for (const seat of departedSeats(lines.keys(), exchange.peers.current)) {
-      lines.get(seat)?.destroy()
-      lines.delete(seat)
-    }
+  const control = startControl({
+    exchange,
+    listener,
+    serial,
+    handle: commands.handle,
   })
 
-  // --- http + ws -----------------------------------------------------------
-  const wss = new WebSocketServer({ noServer: true })
-  wss.on("connection", ws => {
-    const { start } = serverTransport.handleConnection({
-      socket: wrapNodeWebsocket(ws),
-    })
-    start()
+  const server = await startHttp({
+    port,
+    bind,
+    key,
+    tools: tools !== null,
+    serverTransport,
+    hotReload,
+    blobs,
+    offers: work.offers,
+    log,
   })
-
-  const httpServer = http.createServer()
-
-  // Vite serves the client: index.html, module transforms, wasm, HMR. One
-  // node:http server is shared, so there is a single port and a single origin.
-  // Locate the client through module RESOLUTION, not a relative path: it is a
-  // package this app depends on, and where it sits on disk is its business.
-  const clientDir = path.dirname(
-    createRequire(import.meta.url).resolve("@pineta/client/package.json"),
-  )
-  const vite = await createViteServer({
-    root: clientDir,
-    configFile: path.join(clientDir, "vite.config.ts"),
-    plugins: [hotReload.plugin],
-    server: {
-      middlewareMode: true,
-      // Vite attaches its own upgrade listener, ahead of the one below, so its
-      // socket would bypass admission: hot reload runs on loopback only.
-      hmr: key === null ? { server: httpServer } : false,
-    },
-  })
-  hotReload.attach(() => vite.ws.send({ type: "full-reload" }))
-  // Admission comes first: nothing reaches Vite, the blobs, an offer's reads or
-  // the Exchange without it.
-  httpServer.on("request", (req, res) => {
-    const admission = admits(requestFacts(req), key)
-    if (admission.kind === "refuse") {
-      res.writeHead(403).end()
-      return
-    }
-    if (admission.kind === "admitAndForget") {
-      res
-        .writeHead(302, {
-          location: admission.location,
-          "set-cookie": `${KEY_COOKIE}=${encodeURIComponent(key ?? "")}; HttpOnly; SameSite=Strict; Path=/`,
-        })
-        .end()
-      return
-    }
-    const to = route(req.method, new URL(req.url ?? "/", "http://host"))
-    switch (to.kind) {
-      case "blob-get":
-        return serveBlob(to.sha, res)
-      case "blob-post":
-        return void receiveBlob(req, res)
-      case "offer":
-        return void serveOfferRead(to.ask, res)
-      case "bad":
-        res.writeHead(400).end()
-        return
-      case "other":
-        vite.middlewares(req, res)
-    }
-  })
-
-  /**
-   * `GET /offer/…`: a review or a diff of a commit an open offer holds. A
-   * project whose lanes work directly has no offers.
-   */
-  async function serveOfferRead(ask: OfferAsk, res: ServerResponse) {
-    const answer =
-      work.offers === null
-        ? ({ kind: "refused", status: 404, reason: "no offers here" } as const)
-        : await work.offers.read(ask)
-    const out = offerResponse(answer)
-    res.writeHead(out.status, out.headers).end(out.body)
-  }
-
-  /** `GET /blob/<sha256>`: the stored bytes, which never change. */
-  function serveBlob(sha: Sha256 | null, res: ServerResponse): void {
-    const blob = sha === null ? undefined : blobs.get(sha)
-    if (blob === undefined) {
-      res.writeHead(404).end()
-      return
-    }
-    res
-      .writeHead(200, {
-        "content-type": blob.mimeType,
-        "content-length": blob.bytes.byteLength,
-        "cache-control": "private, max-age=31536000, immutable",
-        "x-content-type-options": "nosniff",
-        "content-security-policy": "default-src 'none'",
-      })
-      .end(blob.bytes)
-  }
-
-  /**
-   * `POST /blob`: the headers decide whether to read; the body is read up to
-   * `MAX_UPLOAD_BYTES`; pi judges and fits the bytes; the store keeps them.
-   * Answers the `ImageRef`, or a status with the reason as text.
-   */
-  async function receiveBlob(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
-    const refuse = (status: number, reason: string) => {
-      res.writeHead(status, { "content-type": "text/plain" }).end(reason)
-    }
-    const headers = planUploadHeaders({
-      contentType: req.headers["content-type"],
-      contentLength: req.headers["content-length"],
-    })
-    if (headers.kind === "refuse") {
-      // Not read, so the connection cannot be reused for another request.
-      res.setHeader("connection", "close")
-      refuse(headers.status, headers.reason)
-      req.destroy()
-      return
-    }
-    const chunks: Buffer[] = []
-    let size = 0
-    try {
-      for await (const chunk of req as AsyncIterable<Buffer>) {
-        size += chunk.byteLength
-        if (size > MAX_UPLOAD_BYTES) {
-          res.setHeader("connection", "close")
-          refuse(413, "too large")
-          req.destroy()
-          return
-        }
-        chunks.push(chunk)
-      }
-    } catch {
-      return
-    }
-    const prepared = await prepareImage(Buffer.concat(chunks))
-    if (!prepared.ok) {
-      refuse(415, prepared.reason)
-      return
-    }
-    const { ok: _, ...image } = prepared
-    let ref: ImageRef
-    try {
-      ref = blobs.put(image)
-    } catch (error) {
-      // The store closes with the host: an upload can outlive it.
-      refuse(503, error instanceof Error ? error.message : String(error))
-      return
-    }
-    res
-      .writeHead(201, { "content-type": "application/json" })
-      .end(JSON.stringify(ref))
-  }
-
-  // ROUTE the upgrade. `noServer` + an explicit /ws test is what lets our sync
-  // socket and Vite's HMR socket share a port: anything that is not /ws falls
-  // through to Vite's own upgrade listener (attached via hmr.server above).
-  // Handling every upgrade here — which is what this did before Vite — would
-  // swallow HMR silently.
-  httpServer.on("upgrade", (req, socket, head) => {
-    const admission = admits(requestFacts(req), key)
-    if (admission.kind === "refuse") {
-      socket.end("HTTP/1.1 403 Forbidden\r\n\r\n")
-      return
-    }
-    if (new URL(req.url ?? "/", "http://host").pathname === "/ws") {
-      wss.handleUpgrade(req, socket, head, ws =>
-        wss.emit("connection", ws, req),
-      )
-    }
-  })
-
-  // A stale host holding the port is the most likely startup failure, and the
-  // raw EADDRINUSE stack says nothing about how to recover. Fail with an
-  // instruction instead; `PINETA_PORT=0` asks the OS for any free port.
-  await new Promise<void>((resolve, reject) => {
-    httpServer.once("error", (err: NodeJS.ErrnoException) => {
-      if (err?.code === "EADDRINUSE") {
-        reject(
-          new Error(
-            `port ${port} is already in use — most likely a host left running.\n` +
-              `  find it : lsof -ti :${port}\n` +
-              `  stop it : lsof -ti :${port} | xargs kill\n` +
-              `  or pick another port: PINETA_PORT=7392 npm run host  (PINETA_PORT=0 = any free port)`,
-          ),
-        )
-        return
-      }
-      reject(err)
-    })
-    httpServer.listen(port, bind, resolve)
-  })
-  const address = httpServer.address()
-  if (address === null || typeof address === "string") {
-    throw new Error("http server did not bind to a TCP port")
-  }
-  const actualPort = address.port
-
-  const local = urlHost(bind)
-  // A collaborator opens one of these; on 0.0.0.0, one per network address.
-  const addresses =
-    bind === "0.0.0.0"
-      ? Object.values(networkInterfaces())
-          .flat()
-          .flatMap(a =>
-            a !== undefined && a.family === "IPv4" && !a.internal
-              ? [a.address]
-              : [],
-          )
-      : [local]
-  const invites = addresses.map(
-    a =>
-      `http://${a}:${actualPort}/${key === null ? "" : `?key=${encodeURIComponent(key)}`}`,
-  )
-  if (key !== null && tools !== null)
-    log(
-      "[host] WARNING: anyone with the invite link can run commands on this machine as you.",
-    )
 
   return {
-    port: actualPort,
-    httpUrl: `http://${local}:${actualPort}/`,
-    wsUrl: `ws://${local}:${actualPort}/ws`,
+    port: server.port,
+    httpUrl: server.httpUrl,
+    wsUrl: server.wsUrl,
     doc,
     presence,
-    noteText: id => notes.get(id)?.doc.text(),
+    noteText: (id: NoteId) => notes.text(id),
     agent,
     key,
-    invites,
+    invites: server.invites,
     quiet,
     async shutdown() {
       // Let queued steps, a compaction among them, finish their writes.
       try {
         await quiet()
       } catch {}
-      for (const n of notes.values()) n.release()
-      stopLines()
+      notes.release()
+      control.stop()
       try {
         await agent.close()
       } catch {}
@@ -1407,48 +353,7 @@ export async function startHost({
       try {
         await exchange.shutdown()
       } catch {}
-      try {
-        wss.close()
-      } catch {}
-      await new Promise<void>(resolve => {
-        httpServer.close(() => resolve())
-      })
-    },
-  }
-}
-
-/** Whether two project records say the same. */
-
-/** Whether `dir` is `root` or inside it. */
-const isWithin = (dir: string, root: string): boolean => {
-  const rel = path.relative(root, dir)
-  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel))
-}
-
-/**
- * A Vite plugin that holds hot updates while `paused()` says so, and a hook
- * that reloads the page once when the pause ends: a run's end is the moment.
- */
-function pausedWhile(paused: () => boolean) {
-  let held = false
-  let reload = () => {}
-  return {
-    plugin: {
-      name: "pineta:paused-while-direct",
-      handleHotUpdate() {
-        if (!paused()) return undefined
-        held = true
-        return []
-      },
-    },
-    attach(fullReload: () => void) {
-      reload = fullReload
-    },
-    runEnded() {
-      if (held && !paused()) {
-        held = false
-        reload()
-      }
+      await server.close()
     },
   }
 }

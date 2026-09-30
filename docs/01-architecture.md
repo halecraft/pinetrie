@@ -125,6 +125,11 @@ packages/     libraries; their boundaries are enforced by resolution
 Unit tests sit beside the code they test. `workspace.test.ts` at the root is
 the one exception: it checks the manifests.
 
+The host's shell, `apps/pineta/host/`, is split by responsibility: runs, the
+outbox, settling, startup, each command, HTTP. Each module takes its
+dependencies as a parameter, and `index.ts` alone wires them. Its order rules
+(a run's end, startup) are in `apps/pineta/host/TECHNICAL.md`.
+
 ### The pi rule is correct-by-construction, not checked
 
 `@earendil-works/*` is declared **only** by `packages/pi` and

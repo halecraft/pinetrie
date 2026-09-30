@@ -170,9 +170,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a person's paths are stored as typed in a thread with its own copy",
-    file: "apps/pineta/host/index.ts",
-    from: "      hostWorkingCopy: own ? (work.project?.root ?? null) : null,",
-    to: "      hostWorkingCopy: null,",
+    file: "apps/pineta/host/commands/chat.ts",
+    from: "    hostWorkingCopy: own ? (work.project?.root ?? null) : null,",
+    to: "    hostWorkingCopy: null,",
     command: lanes("main"),
     expect:
       "a person's path to your working copy is stored as the lane sees it",

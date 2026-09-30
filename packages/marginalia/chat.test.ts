@@ -527,7 +527,16 @@ describe("draining, settling and starting up", () => {
   test("planStartup: every lane with held messages drains, once", () => {
     const plan = planStartup({
       held: [held("1-a", NOBODY), held("2-b", AGENT)],
+      interrupted: [],
     })
-    expect(plan).toEqual({ drain: [LANE1] })
+    expect(plan).toEqual({ resume: [], drain: [LANE1] })
+  })
+  test("planStartup: an interrupted lane is resumed, and not drained", () => {
+    const LANE2 = laneNameForThread("2")
+    const plan = planStartup({
+      held: [held("1-a", NOBODY), { ...held("2-b", AGENT), lane: LANE2 }],
+      interrupted: [LANE1],
+    })
+    expect(plan).toEqual({ resume: [LANE1], drain: [LANE2] })
   })
 })

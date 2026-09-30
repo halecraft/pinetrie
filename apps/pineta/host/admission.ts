@@ -141,3 +141,35 @@ export function urlHost(bind: string): string {
   if (bind === "::") return "[::1]"
   return bind.includes(":") ? `[${bind}]` : bind
 }
+
+/** A network interface's address, as `os.networkInterfaces()` lists it. */
+export interface InterfaceAddress {
+  readonly family: string
+  readonly address: string
+  readonly internal: boolean
+}
+
+/**
+ * The links a collaborator opens, the key included off loopback. Bound to
+ * 0.0.0.0, one per external IPv4 address; otherwise the bound address.
+ */
+export function planInvites(input: {
+  readonly bind: string
+  readonly key: string | null
+  readonly port: number
+  readonly interfaces: readonly (InterfaceAddress | undefined)[]
+}): string[] {
+  const { bind, key, port } = input
+  const addresses =
+    bind === "0.0.0.0"
+      ? input.interfaces.flatMap(a =>
+          a !== undefined && a.family === "IPv4" && !a.internal
+            ? [a.address]
+            : [],
+        )
+      : [urlHost(bind)]
+  return addresses.map(
+    a =>
+      `http://${a}:${port}/${key === null ? "" : `?key=${encodeURIComponent(key)}`}`,
+  )
+}

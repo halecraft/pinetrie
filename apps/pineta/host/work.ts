@@ -131,6 +131,7 @@ import {
   openChannel,
 } from "@pineta/pi"
 import {
+  readLane,
   readLaneRecords,
   readLanes,
   readNames,
@@ -871,9 +872,7 @@ export async function startLaneWork(input: {
           root,
           doc,
           agent: input.agent,
-          running: lane =>
-            readLanes(doc, readTreeIndex(doc)).find(l => l.name === lane)
-              ?.running === true,
+          running: lane => readLane(doc, lane)?.running === true,
           taken: () => refreshBaseSoon(),
           log,
         })

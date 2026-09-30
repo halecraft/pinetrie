@@ -107,7 +107,7 @@ include both — though that couples the repos, so I would *not* do it by defaul
 
 **DONE.** Was: esbuild one-shot bundle + a hand-rolled static file server in
 `apps/pineta/host/index.ts` with a manual MIME map, plus a manual wasm copy step. All three
-are deleted; `apps/pineta/host/index.ts` runs Vite in middleware mode on the shared
+are deleted; `apps/pineta/host/http.ts` runs Vite in middleware mode on the shared
 `node:http` server. Bundle fell 771 kB → 305 kB (Vite tree-shakes).
 
 Vite gives us HMR, kills the MIME map, and — importantly — kills the

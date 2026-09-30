@@ -35,4 +35,4 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `reads` | document reads shared by host and client |
 | `lanes` | containers, disks, jj and git |
 | `client` | the browser UI |
-| `apps/pineta` | the host |
+| `apps/pineta` | the host; its shell is split by responsibility (`apps/pineta/host/TECHNICAL.md`) |

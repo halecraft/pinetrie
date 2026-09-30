@@ -191,6 +191,13 @@ export function readLanes(
   })
 }
 
+/** One lane's view, or undefined for a lane the document does not hold. */
+export const readLane = (
+  doc: SessionDocHandle,
+  lane: LaneName,
+): LaneView | undefined =>
+  readLanes(doc, readTreeIndex(doc)).find(l => l.name === lane)
+
 /** Every lane the agent is replying on. */
 export function readAgentActivity(
   doc: SessionDocHandle,

@@ -124,9 +124,11 @@ the queue. The host executes three pure decisions from here:
   message is released only once it is written, so a refused append stays held.
 - **`settleRun`**: a compelled message pi refuses to run is kept, appended with
   no reply, rather than lost; the author already heard `started`.
-- **`planStartup`**: a starting host drains every lane with messages held for
-  it, since no run's end will. What does not survive a process (runs and
-  streams) is cleared first, by `clearStreams` in `@pineta/schema`.
+- **`planStartup`**: a starting host resumes every lane a crash interrupted,
+  whose run's end then drains it, and drains every other lane with messages
+  held for it, since no run's end will. What does not survive a process
+  (runs and streams) is cleared first, by `clearStreams` in
+  `@pineta/schema`.
 
 # Notes (`note.ts`, ADR-0025)
 
@@ -152,8 +154,8 @@ record is a host-written `pineta.note` value keyed by note id, typed here as
   a message the index holds, or the one it has; an `origin` note is not one),
   `draft` (the thread's draft, or a new one;
   what its requester had typed is theirs), `send` (only a draft; the host sends
-  its text through `sendChat`, the one send path, and marks it sent on
-  `appended`, `started` or `queued`), `done` and `reopen`.
+  its text through `sendChat` (`apps/pineta/host/commands/chat.ts`), the one
+  send path, and marks it sent on `appended`, `started` or `queued`), `done` and `reopen`.
 - **`planNoteEdit` decides what one edit changes**, pure: contributors are the
   `clientID`s whose clocks moved, as the people behind the seats connected
   when the edit arrived (`noteAuthors`), in order of first edit; an unknown
@@ -182,7 +184,8 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   every intent (a chat's `at`, a note's entry or place via
   `noteAt`), or null for one that writes in no root (a new root, a name, a
   stop, an archive action). `archivedAt` maps that entry to its root's
-  record. One rule, applied by the host before dispatch; `sendChat` needs no
+  record. One rule, applied by the host before dispatch
+  (`apps/pineta/host/commands/index.ts`); `sendChat` needs no
   copy, because a sent draft reaches it only through a `note` `send`.
 - **Yjs writes are not refused for archiving.** A note's text in an archived
   root stays writable to the host's policy, as ADR-0026 requires (a refused

@@ -1,0 +1,240 @@
+// host/commands/chat — a human message: from a `chat` command, or a sent
+// draft. The one send path, so queueing, conflicts and who a message is for
+// hold for both.
+
+import {
+  type BlobStore,
+  ERR,
+  type Intent,
+  type TreeIndex,
+  threadOf,
+  type WorkSetting,
+  type WriterId,
+} from "@pineta/core"
+import {
+  type ChatDecision,
+  type ChatDetails,
+  displayName,
+  encodeChat,
+  parseCommand,
+  pastedImages,
+  planChat,
+  planImages,
+  resolveCommand,
+} from "@pineta/marginalia"
+import type { Agent } from "@pineta/pi"
+import type { Outcome } from "@pineta/protocol/codec"
+import {
+  readLanes,
+  readParticipantNames,
+  readParticipants,
+  readThreadName,
+  readTreeIndex,
+  workAt,
+  worksOwn,
+} from "@pineta/reads"
+import type { Basics } from "../basics.ts"
+import type { Runs } from "../runs.ts"
+import type { LaneWork } from "../work.ts"
+
+export type Chat = Omit<Extract<Intent, { kind: "chat" }>, "kind">
+
+export interface ChatDeps {
+  readonly basics: Basics
+  readonly agent: Pick<
+    Agent,
+    | "appendToTree"
+    | "commands"
+    | "createThreadLane"
+    | "expand"
+    | "hold"
+    | "lane"
+  >
+  readonly work: Pick<LaneWork, "project" | "checkDirectory" | "prepareLane">
+  readonly blobs: Pick<BlobStore, "ref">
+  readonly start: Runs["start"]
+}
+
+/** What `executeChat` needs besides the decision: the facts the send was planned from. */
+export interface ChatContext {
+  readonly index: TreeIndex
+  readonly writer: WriterId
+  /** Where the send asked a new lane to work, if anywhere. */
+  readonly work: WorkSetting | null
+}
+
+/** Gather, `threadOf` and `planChat`, then `executeChat`. */
+export async function sendChat(
+  deps: ChatDeps,
+  writer: WriterId,
+  sendId: string,
+  chat: Chat,
+  contributors: readonly WriterId[],
+): Promise<Outcome> {
+  const { agent, work, blobs } = deps
+  const { doc } = deps.basics
+
+  // gather
+  const index = readTreeIndex(doc)
+  const names = readParticipantNames(doc)
+  const nameOf = (w: WriterId) => displayName(w, names.get(w))
+
+  // plan (pure)
+  const thread = threadOf(index, readLanes(doc, index), {
+    at: chat.at,
+    mode: chat.mode,
+    lane: chat.lane,
+    me: writer,
+  })
+  // An entry or lane this document does not hold has nowhere to go: refused
+  // before anything is written, as pi would refuse a lane there.
+  if (thread.kind === "unknown") {
+    return {
+      kind: "refused",
+      code: ERR.UNKNOWN_TARGET,
+      message: "no such entry or lane to write at",
+    }
+  }
+  // Two lanes end here for a moment (a new one, just branched): which thread
+  // the sender meant cannot be told, so they are asked, as for a race.
+  if (thread.kind === "ambiguous") return { kind: "conflict", by: null }
+  // A thread that works, or will work, in its own copy is sent paths as
+  // its lane sees them: your working copy's (ADR-0034), and a command's
+  // files (ADR-0036).
+  const own = worksOwn(doc, index, {
+    lane: thread.lane,
+    end: thread.end,
+    mode: chat.mode,
+    at: chat.at,
+    work: chat.work,
+  })
+  // gather: the command its first word names, from its file as it is now
+  const typed = parseCommand(chat.text)
+  const source =
+    typed === null ? null : resolveCommand(typed.name, agent.commands())
+  const command =
+    typed === null
+      ? null
+      : source === null
+        ? { unknown: typed.name }
+        : ((await agent.expand(source, typed.args, own)) ?? {
+            unreadable: typed.name,
+          })
+  // gather: the store's refs of the images its text shows (ADR-0042)
+  const shas = pastedImages(chat.text)
+  const refs = new Map(
+    shas.flatMap(sha => {
+      const ref = blobs.ref(sha)
+      return ref === undefined ? [] : [[sha, ref] as const]
+    }),
+  )
+
+  // plan: a missing image refuses the send before planChat decides the rest
+  const images = planImages(shas, refs)
+  if (images.kind === "refused") return images
+  const planned = planChat({
+    command,
+    images: images.images,
+    hostWorkingCopy: own ? (work.project?.root ?? null) : null,
+    author: writer,
+    authorName: nameOf(writer),
+    text: chat.text,
+    mode: chat.mode,
+    at: chat.at,
+    thread,
+    mentions: chat.mentions,
+    participants: readParticipants(doc, index),
+    asksAgent: chat.asksAgent,
+    sendId,
+    contributors,
+  })
+
+  return executeChat(deps, planned, {
+    index,
+    writer,
+    work: chat.work,
+  })
+}
+
+/**
+ * Carry out a chat's decision. `createAndRun` still checks its directory and
+ * asks pi for the lane here: both are ports that may refuse.
+ */
+export async function executeChat(
+  deps: ChatDeps,
+  planned: ChatDecision,
+  context: ChatContext,
+): Promise<Outcome> {
+  const { agent, work } = deps
+  const { doc, log, now, newId } = deps.basics
+  const { index, writer } = context
+  const message = (details: ChatDetails) => encodeChat(details, now())
+  switch (planned.kind) {
+    case "refused":
+    case "conflict":
+      return planned
+    case "hold":
+      await agent.hold({
+        kind: "chat",
+        id: newId(),
+        lane: planned.lane,
+        details: planned.details,
+        timestamp: now(),
+      })
+      return { kind: "queued", position: planned.position }
+    case "appendToTree":
+    case "appendToLane": {
+      const appended =
+        planned.kind === "appendToTree"
+          ? await agent.appendToTree(message(planned.details), planned.parent)
+          : await agent.lane(planned.lane).append(message(planned.details))
+      if (appended.kind === "refused") {
+        return {
+          kind: "refused",
+          code: appended.code,
+          message: "pi refused the message",
+        }
+      }
+      return { kind: "appended", id: appended.id }
+    }
+    case "run":
+      return {
+        kind: "started",
+        runId: deps.start(planned.lane, {
+          kind: "prompt",
+          message: message(planned.details),
+        }),
+      }
+    case "createAndRun": {
+      // Where the new lane works: the send's choice, else the lane above,
+      // else the project's default (ADR-0032).
+      const { work: setting } = workAt(doc, index, planned.at, context.work)
+      const bad = await work.checkDirectory(setting)
+      if (bad !== null)
+        return {
+          kind: "refused",
+          code: bad,
+          message: "there is no such directory to work in",
+        }
+      const created = await agent.createThreadLane(planned.at)
+      if (created.kind === "refused") {
+        return {
+          kind: "refused",
+          code: created.code,
+          message: "pi refused to start the thread's lane",
+        }
+      }
+      await work.prepareLane(created.lane, setting, planned.at, writer)
+      log(
+        `[host] ${writer.slice(-8)} starts ${readThreadName(doc, created.lane)}`,
+      )
+      return {
+        kind: "started",
+        runId: deps.start(created.lane, {
+          kind: "prompt",
+          message: message(planned.details),
+        }),
+      }
+    }
+  }
+}

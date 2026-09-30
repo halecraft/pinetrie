@@ -14,7 +14,8 @@ functions.
 ## What belongs here
 
 Reads the host decides from, or that more than one reader needs:
-`readRenderableEntries`, `readTreeIndex`, `readLanes`, `readOutbox`,
+`readRenderableEntries`, `readTreeIndex`, `readLanes` (and `readLane`, one
+of them), `readOutbox`,
 `readParticipantNames`, `readParticipants`, `readPresence`,
 `readAgentActivity`, `readNotes`, `readArchive`, `readMarks` (ADR-0045), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
