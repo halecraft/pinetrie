@@ -1,12 +1,14 @@
 # ADR-0048 — Everything unsent is a card, and a card stays where you put it
 
-**Status:** Proposed. Would supersede ADR-0025 (notes), and amend ADR-0023
-(tabs write cards), ADR-0026 (queued notes become queued cards), ADR-0043
-(no notes below messages) and ADR-0046 (a fixed line about pinned cards in
-the prompt). It would also replace the inventory in
-`PLAN-2026-09-27-fold`, and Phases 2–7 of
-`PLAN-2026-09-29-branch-prefill-and-composers`. Those ADRs are marked when
-this one is accepted. Before a plan: the probes and the Kyneta request below.
+**Status:** Accepted. Evidence: S58. Step 1, the drafting card, implemented by
+`PLAN-2026-09-30-drafting-card`: shared drafts and "compose together" are
+withdrawn from ADR-0025, ADR-0023 gains "tabs write cards", and ADR-0037
+gains "the host writes down each seat's person". The later steps would
+supersede the rest of ADR-0025 (notes), and amend ADR-0026 (queued notes
+become queued cards), ADR-0043 (no notes below messages) and ADR-0046 (a
+fixed line about pinned cards in the prompt). They also replace the
+inventory in `PLAN-2026-09-27-fold`, and Phases 2–7 of
+`PLAN-2026-09-29-branch-prefill-and-composers`.
 
 **Context.**
 
@@ -169,7 +171,10 @@ it stays open while you work in them.
 
 *Other people.*
 - **Every card in a shared place is shown to everyone**, in full, and anyone
-  can type in it, attributed by seat (ADR-0025, ADR-0037).
+  can type in it. Who wrote in a card is read from its operations: each
+  carries its seat's `clientID`, and the host writes a record of each seat's
+  person as it connects (`pineta.seat`), so anyone can name a card's writers
+  after they have left (S58). Nobody stores a contributors list.
 - **Anyone can move a card in a shared place.** Only your drawer is yours
   alone, so nobody is locked out because you put something somewhere.
 - **A trace** stays where your card was when someone else moved it: "Bea sent
@@ -199,7 +204,8 @@ it stays open while you work in them.
   sees them. Closing one that holds a card with text asks **keep in drawer**
   (the default) or **discard** (undoable). One with nothing typed closes
   silently, as today. To leave it for a minute, switch tabs: that now keeps
-  everything.
+  everything. Until the drawer exists, closing asks only **discard**, which
+  is final: an undone discard would bring back a card no column shows.
 
 *Marks.* A root tab and a column are marked when they hold your unsent cards.
 Only yours: it answers "where was I?", and is not a busy indicator. A card is
@@ -233,10 +239,25 @@ system prompt: the agent reads every one on every run.
 - **A conversation thread** has no agent, so its pinned cards are the team's
   until someone asks the agent, whose first run reads them.
 
-*Undo.* Two undos, both multiplayer-sound: undo reverses my operations as they
-now stand among everyone else's, which a stack of naive inverses does not.
-- **Text, inside a card:** your keystrokes, never a collaborator's.
-- **Place:** take, put, queue, stop, discard, and moves in the drawer.
+*Undo is Kyneta's* (`createUndoStack`, `@kyneta/exchange`; below). It is
+multiplayer-sound: it reverses my operations as they now stand among everyone
+else's, which a stack of naive inverses does not.
+- **Text, inside a card:** your keystrokes, never a collaborator's. A
+  collaborator's text typed inside yours survives your undo.
+- **Place:** take, put, queue, stop, discard, and moves in the drawer. A
+  place is restored only while it still holds what your step wrote: if Bea
+  moved the card after you, your undo leaves her move alone.
+- **One gesture is one step**, across every document it wrote: a take that
+  changes a card's place and your drawer is undone at once. Typing joins the
+  step before it while you keep typing in one place.
+- **Cmd+Z** in a card undoes through the same stack (`useText`'s `undo`
+  option), and so does Cmd+Z elsewhere on the page, for moves.
+- **The stack is per tab, and in memory.** Kyneta keeps a stack in a
+  document that one runtime writes, and a browser keeps no store
+  (ADR-0037), so a tab's stack lasts until the tab reloads or closes. What
+  undo reverses is kept, since cards themselves are stored; only the list of
+  steps is lost. Storing the stack is one option away (a store under the
+  tab), if a reload that forgets undo proves to hurt.
 
 Discarding is a change of value and undo its inverse, so nothing is destroyed
 and there is no retention period to choose. Undo reaches as far back as the
@@ -253,8 +274,15 @@ where the card becomes a message in the immutable tree.
   are where people type and move things together, so they live in CRDT
   documents: one per session for the shared places (each card's place, owner,
   placer, marks, history); one per person for the drawer; and each card's text
-  in its own Yjs document (today's `NoteDoc`, `packages/schema/note.ts`),
-  unless the probes favour text inside the cards document.
+  in its own Yjs document (`TextDoc`, `packages/schema/text.ts`, shared with
+  notes). Step 1 built the first and the third (`CardsDoc`,
+  `packages/schema/card.ts`). Clients write a card whole once, and only its
+  fields after: a whole-record write concurrent with the host's spend brings
+  the card back, where a field write loses to it (S58).
+- **The host resolves what clients create.** Without a `resolve` for the
+  cards document and `card:` documents, a card the host never opened would be
+  neither stored nor relayed (S58). A tab's undo document is rejected, and
+  neither shared nor accepted: each tab's stack is its own.
 - The host's write policy checks invariants (`canAccept`) instead of carrying
   out commands. ADR-0023 becomes: tabs write cards and presence; the host
   writes pi's tree.
@@ -285,46 +313,58 @@ and a pinned card can quote one.
 - Every card's text is a Yjs document, never compacted while live (S24).
   Storage grows with use until Kyneta compacts live Yjs, as ADR-0026 already
   accepted for queued notes.
-- Undo depends on Kyneta work not yet done. Until it lands, a discard asks
-  before it happens.
+- Undo comes from Kyneta, not from Pineta's code: Pineta chooses each
+  stack's scope and wraps each gesture.
+- Cards' places need a CRDT document, not `json`: Kyneta's undo over a
+  plain document is a strict one-writer stack, and a write by anyone else
+  ends it.
 - The order of work follows what hurts most (switching root tabs, then coming
   back the next day, then an agent finishing elsewhere):
-  1. the drafting card that survives a tab switch, a reload and a host restart;
+  1. the drafting card that survives a tab switch, a reload and a host
+     restart, with undo from the start;
   2. marks for your unsent cards on root tabs and columns;
   3. notes become cards: notes in the tree removed, queued notes become queued
      cards, the take/stop race;
   4. the drawer: grid, take and put, drag, keys;
   5. several cards per place, and pinned cards read by the agent;
   6. traces and card history;
-  7. undo, as Kyneta's lands;
-  8. queue control: staging, reordering, stops;
-  9. later: reminders (drawer cards that light up when due and reach your `@`
+  7. queue control: staging, reordering, stops;
+  8. later: reminders (drawer cards that light up when due and reach your `@`
      inbox, separate from the queue), conditions on queued cards (ADR-0026),
      the agent suggesting next steps as drafting cards, and a summary of what
      happened while you were away.
 
-*What we ask of Kyneta.* Read in `/kyneta/workspace/pineta`, the build Pineta
-links:
-- `packages/schema/src/inverse.ts` gives every change type an inverse (a
-  groupoid: `step(step(pre, c), invert(pre, c)) = pre`), tested for replace,
-  text, sequence, map, set, richtext and tree. Today it serves aborted
-  batches.
-- Ops are safe to keep "for an undo stack" (`packages/schema/README.md`), and
-  `origin: "undo"` labels changesets.
-- The Yjs backend passes `transaction.origin` through so
-  `UndoManager.addTrackedOrigin` works
-  (`packages/schema/backends/yjs/TECHNICAL.md`).
-- `useText` intercepts Cmd+Z by default so that "the CRDT owns undo"
-  (`packages/react/TECHNICAL.md`), and the README lists an undo manager as
-  "Deferred (future work)". So Cmd+Z likely does nothing in a note's editor
-  today; to be confirmed.
+*What Kyneta provides.* Asked for while this ADR was written, and now in the
+build Pineta links (`/kyneta/workspace/pineta`, bookmark `needed-by-pineta`):
+"selective, durable undo across documents".
+- **`createUndoStack({ exchange, docId, key, scope })`**
+  (`packages/exchange/README.md` § Undo, `TECHNICAL.md` § Undo stacks):
+  `gesture(fn)` makes one step of every local commit on a document in
+  `scope`; `typing(fn)` joins the step before by the typing policy;
+  `undo()` and `redo()` return false when nothing stands. A commit outside a
+  gesture is someone else's write, rebased over.
+- **The algorithm** (`packages/schema/TECHNICAL.md` § Undo): a record names
+  content by identity and survives a reload; text and lists are rebased by
+  operational transform; a value is restored only while it holds what the
+  step wrote; a revert is its own inverse, so redo needs no logic of its own.
+  One conformance suite runs it on plain, Loro and Yjs documents, live and
+  after a reload. Ephemeral documents (presence) are not undoable.
+- **Durability**: the stack is a document with a write-ahead note, so a crash
+  mid-undo is finished on the next load without applying anything twice.
+  Without a store it lasts the session.
+- **`useText(ref, { undo: stack })`** (`packages/react/README.md`): Cmd+Z,
+  Cmd+Shift+Z and Ctrl+Y, typing grouped, the caret moved to what was
+  undone. Without a stack, `useText` swallows Cmd+Z, as it does in a note's
+  editor today.
+- Measured from Pineta's lane: one gesture writing two `NoteDoc` documents,
+  then a write outside it at the front of the first. Undo emptied the second
+  and left the first holding only the other write; redo restored both.
+- **Redo of a step of several commits to one text puts them back in reverse
+  order** (S58, addendum): after a run of keystrokes, Cmd+Z then Cmd+Shift+Z
+  scrambles the last word. Asked of Kyneta.
 
-The request is the undo manager: selective (only this peer's operations,
-rebased over everyone's since), one step per gesture even across documents
-(a card's text and its place), wired to `useText`, and durable across a
-reload, or a clear account of why it cannot be.
-
-*Probes before a plan*, each recorded in `docs/findings/`:
+*Probes before a plan*, each recorded in `docs/findings/`. S58 answered 3, and 4
+for the drafting card; 1, 2 and 5 wait for the steps that need them:
 1. **Places as a CRDT:** a movable tree (Loro) or a place field per card. Two
    people move one card at once, and a card moves while being typed in.
    Which converges to something a person would accept?
@@ -333,8 +373,10 @@ reload, or a clear account of why it cannot be.
 3. **A spent card's document:** destroy or keep its text after a send. S28
    found a refused write unrecoverable; measure what a client still holding
    the replica sees.
-4. **Undo today:** what Kyneta's inverses give across two peers, and the
-   precise gap to hand to Kyneta.
+4. **Undo in Pineta's shape:** two browser tabs as two people, over the
+   host's exchange. One takes a card while the other types in it, and one
+   moves a card the other then undoes a move of. A second tab's stack is its
+   own.
 5. **What the agent read:** writing a changed pinned card's text as an entry
    when a run starts, and what pi allows there (a custom entry outside a run,
    S19). Placing the cards near the end of the context through pi, and
@@ -387,3 +429,10 @@ beyond each card's history; whether the drawer crosses sessions.
   It fits "cards belong to a thread", but the branch's path above the fork is
   its parent's as it was, and its pinned cards should be too. Taking a copy
   covers the rare exception.
+- **One undo stack per device, shared by its tabs.** Cmd+Z in one tab could
+  undo a move made in another, and Kyneta's stack is a document that one
+  runtime writes, while each tab is its own runtime.
+- **Storing each tab's stack now** (IndexedDB, under an id kept in
+  `sessionStorage`), so undo survives a reload. It would give the browser a
+  store, reversing part of ADR-0037, for a need not yet felt. It is a
+  store option on the stack if it is wanted later.

@@ -1321,6 +1321,8 @@ tunnels for sharing (a collaborator on the network should need only a link).
 ## ADR-0023 — The session is authoritative JSON, compacted; CRDTs only where people type together
 
 **Status:** Accepted. Evidence: S24, S25. Amends ADR-0008, ADR-0016, ADR-0022.
+Amended by ADR-0048: clients write cards, the cards document and each card's
+text, directly; the host writes pi's tree, and a card only to spend it.
 
 **Context.** The session document was on Loro, a CRDT: every replica could write
 it and merge. None does. The host alone writes the session document (pi's
@@ -1415,7 +1417,9 @@ Initials on the rail's dots (no room). A focused column (Pineta has none).
 ADR-0026 (a queued state; the host refuses no write to a note that
 has a record), and by ADR-0037 (a `clientID` names a seat, and the seat's
 principal the person). Amended by ADR-0043 (a note is drawn below its
-message, and one opened on a message starts empty).
+message, and one opened on a message starts empty). Amended by ADR-0048:
+shared drafts and "compose together" are withdrawn; the next message is
+drafted in a card, which everyone at its thread's end sees and can edit.
 
 **Context.** People could only append messages. There was no shared text to work
 on together (a spec, a plan, the next instruction written jointly), no way to
@@ -2928,7 +2932,9 @@ mounted.
 
 **Status:** Accepted. Implemented by `PLAN-2026-09-28-kyneta-v4`. Evidence:
 S29, S47. Amends ADR-0024 (presence keys per seat), ADR-0025 (authorship by
-seat), ADR-0027 and ADR-0030 (your other tabs are you).
+seat), ADR-0027 and ADR-0030 (your other tabs are you). Amended by ADR-0048:
+the host writes a record of each seat's person (`pineta.seat`) as it
+connects, so a text's writers can be named after they leave.
 
 **Context.** Pineta chose each client's Kyneta peer id and made its writer
 from it: a browser tab took one from Kyneta's `persistentPeerId`, a Node

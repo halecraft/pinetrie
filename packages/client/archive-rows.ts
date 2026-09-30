@@ -5,7 +5,6 @@
 
 import {
   type ArchiveRecord,
-  type LaneView,
   messageText,
   type NoteRecord,
   projectRail,
@@ -14,7 +13,6 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
-import { noteAt } from "@pineta/marginalia"
 
 export type ArchiveFilter = "all" | "archived" | "open" | "mine"
 export const ARCHIVE_FILTERS: readonly ArchiveFilter[] = [
@@ -27,7 +25,7 @@ export const ARCHIVE_FILTERS: readonly ArchiveFilter[] = [
 export interface ArchiveRow {
   readonly summary: RootSummary
   readonly record: ArchiveRecord | null
-  /** Notes whose place (`noteAt`) is in this root. */
+  /** Notes whose message is in this root. */
   readonly notes: number
 }
 
@@ -44,7 +42,6 @@ export function archiveIndex(input: {
   readonly archive: ReadonlyMap<string, ArchiveRecord>
   readonly notes: readonly NoteRecord[]
   readonly index: TreeIndex
-  readonly lanes: readonly LaneView[]
   readonly filter: ArchiveFilter
   readonly query: string
   readonly me: WriterId
@@ -52,8 +49,7 @@ export function archiveIndex(input: {
   const { index, archive } = input
   const noteCount = new Map<string, number>()
   for (const note of input.notes) {
-    const at = noteAt(note, input.lanes, index)
-    const root = at === null ? null : rootOf(index, at)
+    const root = rootOf(index, note.entry)
     if (root !== null) noteCount.set(root, (noteCount.get(root) ?? 0) + 1)
   }
   const needle = input.query.trim().toLowerCase()

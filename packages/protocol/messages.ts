@@ -10,6 +10,8 @@ export const CONTROL_TOPIC = "pineta.control"
 export const SESSION_DOC_ID = "pineta:session"
 /** Who is here, and what each person reads and types: ephemeral, never stored (ADR-0024). */
 export const PRESENCE_DOC_ID = "pineta:presence"
+/** Every card's record (ADR-0048): written by clients, and by the host only to spend one. */
+export const CARDS_DOC_ID = "pineta:cards"
 
 /**
  * The host's principal. Kyneta issues each peer its id (its seat), so a client
@@ -27,15 +29,14 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     or the branch point (`""`: the root, where only a `branch` may start);
  *     `mode` says how it joins the tree (`CHAT_MODES` in @pineta/core); `lane`
  *     names the thread's lane when the sender's column is bound to one;
- *     `asksAgent` marks a Start Agent column. It runs the agent only when the
- *     agent is its addressee (`address`).
+ *     `asksAgent` marks a Start Agent column; `cardId` names the card its text
+ *     was sent from, which the host spends once it is sent (ADR-0048). It
+ *     runs the agent only when the agent is its addressee (`address`).
  *   - `name` sets the sender's display name to `text`.
  *   - `stop` ends the running turn of the thread whose lane is `lane`.
  *   - `note` acts on a note (ADR-0025); `mode` names the action. `open` opens a
- *     note on the entry `parentId`. `draft` starts or joins the draft of
- *     the thread a reply from `parentId` (and `lane`) would continue, with
- *     `text` as what its sender had typed. `send`, `done` and `reopen` act on
- *     the note `targetId`.
+ *     note on the entry `parentId`. `done` and `reopen` act on the note
+ *     `targetId`.
  *   - `archive` hides the root `targetId` for everyone, or restores it
  *     (ADR-0029); `mode` names the action, `archive` or `restore`.
  *   - `mark` titles the entry `targetId` with `text` (ADR-0045); `""`
@@ -78,7 +79,7 @@ export interface Command {
   readonly parentId: string
   /** `chat`: `reply`, `queue` or `branch`; `note`: the action; `""` otherwise. */
   readonly mode: string
-  /** `chat` and a `note` draft: the lane the sender's column is bound to, or `""`. */
+  /** `chat`: the lane the sender's column is bound to, or `""`. */
   readonly lane: string
   /** `chat`: a Start Agent column, where no mention asks the agent. */
   readonly asksAgent: boolean
@@ -90,6 +91,8 @@ export interface Command {
   readonly workDir: string
   /** `note`: the note acted on; `archive`: the root; `mark`: the entry. Separate from `parentId` on purpose. */
   readonly targetId: string
+  /** `chat`: the card its text was sent from, or `""` (ADR-0048). */
+  readonly cardId: string
 }
 
 /**
@@ -151,6 +154,7 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   workKind: "",
   workDir: "",
   targetId: "",
+  cardId: "",
 })
 
 export const EMPTY_REPLY: Reply = Object.freeze({

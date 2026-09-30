@@ -24,6 +24,8 @@ import type { SessionClient } from "@pineta/client/session"
 import {
   ancestry,
   atEntry,
+  type CardId,
+  cardId,
   ERR,
   entryId,
   findSeqKeys,
@@ -39,7 +41,7 @@ import {
   ROOT,
   writerId,
 } from "@pineta/core"
-import { decodeChat, displayName, draftFor, noteAt } from "@pineta/marginalia"
+import { decodeChat, displayName, yourCard } from "@pineta/marginalia"
 import { newId as newHeldId, scriptedModel } from "@pineta/pi"
 import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
@@ -51,6 +53,7 @@ import {
 } from "@pineta/protocol/messages"
 import {
   readArchive,
+  readCards,
   readCommands,
   readLaneRecords,
   readLanes,
@@ -62,6 +65,7 @@ import {
   readPresence,
   readProject,
   readRenderableEntries,
+  readSeats,
   readTreeIndex,
 } from "@pineta/reads"
 import {
@@ -1398,7 +1402,7 @@ invariants("end")
   await dh.shutdown()
 }
 
-// ── notes: a message opened for editing, a draft written together (ADR-0025) ──
+// ── notes: a message opened for editing, together (ADR-0025) ──────────────
 // Its own host, with a store to restart over and a scripted model that can
 // show what it was given.
 {
@@ -1503,111 +1507,6 @@ invariants("end")
     "the model reads the opened message as sent, not the note's edits",
   )
 
-  // 4. A draft at the lane's end, joined by Bea, written by both, sent by Ada.
-  const end = tipOf()
-  const d1 = noteOf(
-    await ada.note({ kind: "draft", at: at(end), lane: null, text: "" }),
-  )
-  const joined = noteOf(
-    await bea.note({ kind: "draft", at: at(end), lane: null, text: "" }),
-  )
-  ok(
-    d1 !== null && joined === d1 && record(d1)?.state === "draft",
-    "compose together makes the thread's draft, and a second person joins it",
-  )
-  const draft1 = noteId(d1 ?? "")
-  ada.noteText(draft1).text.insert(0, "Next: ")
-  await waitFor(() => nh.noteText(draft1) === "Next: ", 5_000)
-  const beaDraft = bea.noteText(draft1)
-  await waitFor(() => beaDraft.text() === "Next: ", 5_000)
-  beaDraft.text.insert(6, "write the tests.")
-  await waitFor(
-    () =>
-      nh.noteText(draft1) === "Next: write the tests." &&
-      record(draft1)?.contributors.length === 2,
-    5_000,
-  )
-  script.use([{ text: "Tests it is." }])
-  const SEND1 = crypto.randomUUID()
-  const sent1 = await ada.note({ kind: "send", note: draft1 }, SEND1)
-  await nIdle()
-  const index1 = readTreeIndex(nh.doc)
-  const sentId = index1.bySend.get(SEND1)
-  const sentMsg = sentId === undefined ? undefined : index1.entries[sentId]
-  const reply1 = projectTranscript(index1, tipOf()).at(-1)
-  ok(
-    sent1.kind === "started" &&
-      sentMsg?.message?.writer === ada.writer &&
-      sentMsg.message.contributors?.join() === bea.writer &&
-      sentMsg.message.content === "Next: write the tests." &&
-      sentMsg.parentId === end &&
-      reply1?.text === "Tests it is.",
-    `a sent draft is Ada's message, with Bea, at the lane's end, and the agent answers (${sent1.kind})`,
-  )
-  const done1 = record(draft1)
-  ok(
-    done1?.state === "done" &&
-      done1.subject.kind === "sent" &&
-      done1.subject.sendId === SEND1,
-    "the sent draft is done, linked to its message",
-  )
-
-  // 9. A draft follows its thread: two messages later it is still this end's.
-  const d2 = noteOf(
-    await bea.note({
-      kind: "draft",
-      at: at(tipOf()),
-      lane: null,
-      text: "Later",
-    }),
-  )
-  const draft2 = noteId(d2 ?? "")
-  await ada.chat("@Bea one", at(tipOf()))
-  await ada.chat("@Bea two", at(tipOf()))
-  await nIdle()
-  const grownEnd = tipOf()
-  const found = draftFor(
-    grownEnd ?? "",
-    readLanes(nh.doc, readTreeIndex(nh.doc)),
-    readTreeIndex(nh.doc),
-    readNotes(nh.doc),
-  )
-  const rejoined = noteOf(
-    await ada.note({ kind: "draft", at: at(grownEnd), lane: null, text: "" }),
-  )
-  ok(
-    found?.id === draft2 && rejoined === draft2,
-    "a draft is still its thread's after the thread grows",
-  )
-  ok(
-    record(draft2)?.contributors.join() === bea.writer,
-    "what a drafter had typed is theirs",
-  )
-
-  // 5. Sent to a busy lane, a plain draft waits, and is done once queued.
-  script.use([{ text: "A long answer." }])
-  const longOne = script.pause("@agent a long one")
-  await ada.chat("@agent a long one", at(grownEnd))
-  await waitFor(() => longOne.reached, 10_000)
-  bea.noteText(draft2).text.insert(5, ", @Bea")
-  await waitFor(() => nh.noteText(draft2) === "Later, @Bea", 5_000)
-  const SEND2 = crypto.randomUUID()
-  const sent2 = await bea.note({ kind: "send", note: draft2 }, SEND2)
-  ok(
-    sent2.kind === "queued" && record(draft2)?.state === "done",
-    `a draft sent to a busy lane waits in its outbox, and is done (${sent2.kind})`,
-  )
-  longOne.resume()
-  await nIdle()
-  const landed = readTreeIndex(nh.doc).bySend.get(SEND2)
-  const sent2Note = record(draft2)
-  ok(
-    landed !== undefined &&
-      sent2Note !== undefined &&
-      noteAt(sent2Note, [], readTreeIndex(nh.doc)) === landed,
-    "once the lane is free, the waiting draft lands, and its note is its message's",
-  )
-
   // 6. Done is read-only, enforced by the host; reopening lets edits in again.
   const doneOutcome = await ada.note({ kind: "done", note: n1 })
   ok(
@@ -1688,6 +1587,201 @@ invariants("end")
   await nh.shutdown()
 }
 
+// ── cards: what you type, kept on its thread (ADR-0048) ──────────────────────
+// Its own host, with a store to restart over.
+{
+  const dbFile = path.join(
+    mkdtempSync(path.join(tmpdir(), "pineta-cards-")),
+    "pineta.db",
+  )
+  const script = scriptedModel()
+  const open = () =>
+    startHost({
+      model: { kind: "scripted", script },
+      store: dbFile,
+      log: () => {},
+    })
+  let ch = await open()
+  const ada = await join(ch, "ada", "cards")
+  const bea = await join(ch, "bea", "cards")
+  await Promise.all([ada.setName("Ada"), bea.setName("Bea")])
+  const tipOf = () => {
+    const l = readLaneNames(ch.doc)[0]
+    return l === undefined ? null : readLaneTip(ch.doc, l)
+  }
+  const cIdle = () =>
+    waitFor(
+      () =>
+        Object.keys(ch.doc.activeRuns()).length === 0 &&
+        readOutbox(ch.doc).length === 0,
+      30_000,
+    )
+  const onHost = (id: CardId) => readCards(ch.cards).find(c => c.id === id)
+  const drafting = (end: string | null) =>
+    ({ kind: "drafting", at: at(end), lane: null }) as const
+  const newCard = (
+    who: SessionClient,
+    end: string | null,
+    text: string,
+  ): CardId => {
+    const id = cardId(crypto.randomUUID())
+    who.createCard({ id, owner: who.writer, place: drafting(end) }, text)
+    return id
+  }
+
+  script.use([{ text: "Ready." }])
+  await ada.chat("@agent start", ROOT, START_AGENT)
+  await cIdle()
+  const end = tipOf()
+
+  // 1. Ada's card at the lane's end reaches Bea, who types in it; after two
+  // more messages it is still Ada's card at the new end.
+  const c1 = newCard(ada, end, "@agent next: ")
+  const beaSees = await waitFor(
+    () =>
+      readCards(bea.cards).some(c => c.id === c1) &&
+      bea.cardText(c1).text() === "@agent next: ",
+    5_000,
+  )
+  bea.cardText(c1).text.insert(13, "write the tests.")
+  const typed = "@agent next: write the tests."
+  await waitFor(
+    () => ada.cardText(c1).text() === typed && ch.cardText(c1) === typed,
+    5_000,
+  )
+  await bea.chat("@Ada one", at(end), { mode: "reply" })
+  await bea.chat("@Ada two", at(tipOf()), { mode: "reply" })
+  await cIdle()
+  const grown = tipOf()
+  const idx = readTreeIndex(ch.doc)
+  const found = yourCard(
+    ada.writer,
+    { kind: "end", end: grown ?? "" },
+    readCards(ada.cards),
+    readLanes(ch.doc, idx),
+    idx,
+  )
+  ok(
+    beaSees >= 0 && grown !== end && found?.id === c1,
+    "a card at a thread's end reaches the others, and is still its owner's there after the thread grows",
+  )
+
+  // 2. Ada sends it: at the new end, with Bea as contributor; the card is spent.
+  script.use([{ text: "Tests it is." }])
+  const SEND1 = crypto.randomUUID()
+  const sent1 = await ada.chat(typed, at(grown), { id: SEND1, card: c1 })
+  await cIdle()
+  await ch.quiet()
+  const index1 = readTreeIndex(ch.doc)
+  const sentId = index1.bySend.get(SEND1)
+  const sentMsg = sentId === undefined ? undefined : index1.entries[sentId]
+  ok(
+    sent1.kind === "started" &&
+      sentMsg?.parentId === grown &&
+      sentMsg.message?.writer === ada.writer &&
+      sentMsg.message.contributors?.join() === bea.writer &&
+      onHost(c1) === undefined,
+    `a card sent is its sender's message, with its other writers, and the card is spent (${sent1.kind})`,
+  )
+
+  // 3. A compelled send to a busy lane is a conflict, and the card stays.
+  script.use([{ text: "A long answer." }, { text: "later" }])
+  const longOne = script.pause("@agent a long one")
+  await bea.chat("@agent a long one", at(tipOf()), { mode: "reply" })
+  await waitFor(() => longOne.reached, 10_000)
+  const busyEnd = tipOf()
+  const c2 = newCard(ada, busyEnd, "@agent me too")
+  await waitFor(() => ch.cardText(c2) === "@agent me too", 5_000)
+  const raced = await ada.chat("@agent me too", at(busyEnd), { card: c2 })
+  ok(
+    raced.kind === "conflict" &&
+      onHost(c2) !== undefined &&
+      ch.cardText(c2) === "@agent me too",
+    `a conflict leaves the card and its text (${raced.kind})`,
+  )
+
+  // 4. A plain message to the busy lane waits, and its card is spent.
+  const c3 = newCard(ada, busyEnd, "@Bea when it is done")
+  await waitFor(() => ch.cardText(c3) === "@Bea when it is done", 5_000)
+  const held = await ada.chat("@Bea when it is done", at(busyEnd), { card: c3 })
+  ok(
+    held.kind === "queued" && onHost(c3) === undefined,
+    `a card sent to a busy lane waits, and is spent (${held.kind})`,
+  )
+  longOne.resume()
+  await cIdle()
+
+  // 5. Bea sends Ada's card after Ada has left: Bea's message, with Ada,
+  // named through her seat's record.
+  const c4 = newCard(ada, tipOf(), "@Bea over to you")
+  await waitFor(() => ch.cardText(c4) === "@Bea over to you", 5_000)
+  await ada.close()
+  await sleep(200)
+  const SEND4 = crypto.randomUUID()
+  const sent4 = await bea.chat("@Bea over to you", at(tipOf()), {
+    id: SEND4,
+    card: c4,
+  })
+  await ch.quiet()
+  const index4 = readTreeIndex(ch.doc)
+  const msg4 = index4.entries[index4.bySend.get(SEND4) ?? ""]
+  ok(
+    sent4.kind === "appended" &&
+      msg4?.message?.writer === bea.writer &&
+      msg4.message.contributors?.join() === ada.writer &&
+      onHost(c4) === undefined,
+    `someone else's card, sent after its owner left, names them as contributor (${sent4.kind})`,
+  )
+
+  // 6. A restart sweeps: an empty card, a stored card text with no record,
+  // and a seat no text names; a card with text is back.
+  const keep = newCard(bea, tipOf(), "kept across a restart")
+  const empty = newCard(bea, tipOf(), "")
+  const orphan = cardId(crypto.randomUUID())
+  bea.cardText(orphan).text.insert(0, "no record")
+  const zed = await join(ch, "zed", "cards")
+  await waitFor(
+    () =>
+      ch.cardText(keep) === "kept across a restart" &&
+      ch.cardText(orphan) === "no record" &&
+      onHost(empty) !== undefined &&
+      readSeats(ch.doc).some(s => s.writer === zed.writer),
+    5_000,
+  )
+  await Promise.all([bea.close(), zed.close()])
+  await ch.shutdown()
+  ch = await open()
+  const eve = await join(ch, "eve", "cards")
+  await ch.quiet()
+  const keepBack = await waitFor(
+    () => eve.cardText(keep).text() === "kept across a restart",
+    5_000,
+  )
+  ok(
+    keepBack >= 0 &&
+      onHost(keep) !== undefined &&
+      onHost(c2) !== undefined &&
+      onHost(empty) === undefined &&
+      !readSeats(ch.doc).some(s => s.writer === zed.writer) &&
+      readSeats(ch.doc).some(s => s.writer === bea.writer),
+    "a restart keeps cards with text, and sweeps empty ones, unrecorded texts and seats no text names",
+  )
+  await eve.close()
+  await ch.shutdown()
+  // Read the store once the host has let it go: it owns its file (S47).
+  const stored: string[] = []
+  const closed = openStore(dbFile)
+  for await (const d of closed.store.listDocIds("card:")) stored.push(d)
+  const texts = [c1, c2, c3, c4, keep, empty, orphan].map(id =>
+    stored.includes(`card:${id}`),
+  )
+  ok(
+    JSON.stringify(texts) ===
+      JSON.stringify([false, true, false, false, true, false, false]),
+    `only the texts of cards still live are stored: spent, empty and unrecorded ones are destroyed (${texts.join()})`,
+  )
+}
+
 // ── the archive: a root put aside for everyone (ADR-0029) ─────────────────
 // Its own host, with a store to restart over.
 {
@@ -1734,11 +1828,10 @@ invariants("end")
   const refusals = [
     await bea.chat("still here?", at(r1b)),
     await bea.note({ kind: "open", entry: entryId(r1b) }),
-    await bea.note({ kind: "draft", at: at(r1b), lane: null, text: "" }),
   ].map(refusal)
   ok(
     refusals.every(r => r === "archived: archived by Ada"),
-    `a chat, a note opened and a draft in it are refused (${refusals.join(" | ")})`,
+    `a chat and a note opened in it are refused (${refusals.join(" | ")})`,
   )
 
   // 3. A new root is accepted.
@@ -2099,16 +2192,25 @@ invariants("end")
       inRecords = true
   ok(!inRecords, "the session's stored records hold no image's bytes")
 
-  // 7. Deleting what nothing shows, after the grace; a draft's image stays,
-  // across a restart.
+  // 7. Deleting what nothing shows, after the grace; a card's image stays,
+  // across a restart (ADR-0048).
   const blue = await upload(BLUE_PNG)
   const yellow = await upload(YELLOW_PNG)
-  const drafted = await iu.note({
-    kind: "draft",
-    at: at(idOfIn(ih.doc, "a green one")),
-    lane: null,
-    text: `next: ![yellow](/blob/${yellow.sha256})`,
-  })
+  const drafted = cardId(crypto.randomUUID())
+  const draftedText = `next: ![yellow](/blob/${yellow.sha256})`
+  iu.createCard(
+    {
+      id: drafted,
+      owner: iu.writer,
+      place: {
+        kind: "drafting",
+        at: at(idOfIn(ih.doc, "a green one")),
+        lane: null,
+      },
+    },
+    draftedText,
+  )
+  await waitFor(() => ih.cardText(drafted) === draftedText, 5_000)
   await iu.close()
   await sleep(100)
   await ih.shutdown()
@@ -2124,12 +2226,11 @@ invariants("end")
   await ih.quiet()
   const kept = new Set(opened.blobs.list().map(b => b.sha256))
   ok(
-    drafted.kind !== "refused" &&
-      !kept.has(blue.sha256) &&
+    !kept.has(blue.sha256) &&
       kept.has(red.sha256) &&
       kept.has(green.sha256) &&
       kept.has(yellow.sha256),
-    `after the grace, an image nothing shows is deleted; a message's, a held one's and a draft's stay, across a restart (${[...kept].map(s => s.slice(0, 6)).join(", ")})`,
+    `after the grace, an image nothing shows is deleted; a message's, a held one's and a card's stay, across a restart (${[...kept].map(s => s.slice(0, 6)).join(", ")})`,
   )
   let seenAfter: readonly string[] = []
   script.use([

@@ -17,6 +17,7 @@ import {
   type ArchiveRecord,
   agentActivity,
   ancestry,
+  type CardRecord,
   type ChatMode,
   type CommandSummary,
   type EntryLike,
@@ -34,6 +35,7 @@ import {
   type ProjectRecord,
   type RevisionRecord,
   rootOf,
+  type SeatRecord,
   type Sha256,
   type ThreadLane,
   type ThreadName,
@@ -47,6 +49,7 @@ import {
   archiveRecords,
   COMMANDS_NAMESPACE,
   commandsRecord,
+  decodeCard,
   decodeChat,
   HAVE_NAMESPACE,
   type Held,
@@ -63,7 +66,6 @@ import {
   NAME_NAMESPACE,
   NOTE_NAMESPACE,
   nameRecords,
-  noteAt,
   noteRecords,
   OFFER_NAMESPACE,
   OUTBOX_NAMESPACE,
@@ -77,8 +79,11 @@ import {
   REVISION_NAMESPACE,
   renderableMessage,
   revisionRecords,
+  SEAT_NAMESPACE,
+  seatRecords,
 } from "@pineta/marginalia"
 import {
+  type CardsDocHandle,
   type PresenceDocHandle,
   readActiveRun,
   readEntries,
@@ -269,11 +274,46 @@ export function readPresence(doc: PresenceDocHandle): PresenceFacts {
 export const readNotes = (doc: SessionDocHandle): readonly NoteRecord[] =>
   noteRecords(readValues(doc, NOTE_NAMESPACE))
 
+/** Every seat the host has seen (`pineta.seat`), first seen first. */
+export const readSeats = (doc: SessionDocHandle): readonly SeatRecord[] =>
+  seatRecords(readValues(doc, SEAT_NAMESPACE))
+
+// Each cards document's records as last decoded, by card id, with the stored
+// value they came from: a Yjs read gives new objects every time, so an
+// unchanged card keeps its record object only through this (S54).
+const decodedCards = new WeakMap<
+  object,
+  Map<string, { readonly stored: string; readonly card: CardRecord }>
+>()
+
+/**
+ * Every card's record (ADR-0048), oldest first (ids are uuidv7). A card that
+ * does not decode is left out. An unchanged card is the same object as last
+ * time, so a change to one card redraws only what shows it.
+ */
+export function readCards(cards: CardsDocHandle): readonly CardRecord[] {
+  const before = decodedCards.get(cards) ?? new Map()
+  const now = new Map<string, { stored: string; card: CardRecord }>()
+  for (const [id, value] of Object.entries(cards.cards())) {
+    const stored = JSON.stringify(value)
+    const was = before.get(id)
+    const card =
+      was !== undefined && was.stored === stored
+        ? was.card
+        : decodeCard(id, value)
+    if (card !== undefined) now.set(id, { stored, card })
+  }
+  decodedCards.set(cards, now)
+  return [...now.keys()].sort().flatMap(id => {
+    const got = now.get(id)
+    return got === undefined ? [] : [got.card]
+  })
+}
+
 /** What the notes index can show: every note, or one kind of note. */
-export type NoteFilter = "all" | "draft" | "open" | "done" | "changed" | "mine"
+export type NoteFilter = "all" | "open" | "done" | "changed" | "mine"
 export const NOTE_FILTERS: readonly NoteFilter[] = [
   "all",
-  "draft",
   "open",
   "done",
   "changed",
@@ -283,19 +323,17 @@ export const NOTE_FILTERS: readonly NoteFilter[] = [
 /** One row of the notes index. */
 export interface NoteRow {
   readonly note: NoteRecord
-  /** Where it sits in the tree now (`noteAt`): a column opens there. */
+  /** The message it is about: a column opens there. */
   readonly at: string
 }
 
 /**
- * The notes index of one root (ADR-0029): the notes `filter` keeps whose place
- * is in `root`, newest first. "mine" is the notes `me` opened or wrote in. A
- * note with no place yet (a sent draft still waiting) is in no root. Pure.
+ * The notes index of one root (ADR-0029): the notes `filter` keeps whose message
+ * is in `root`, newest first. "mine" is the notes `me` opened or wrote in. Pure.
  */
 export function notesIndex(
   notes: readonly NoteRecord[],
   index: TreeIndex,
-  lanes: readonly LaneView[],
   filter: NoteFilter,
   me: WriterId,
   root: string,
@@ -304,7 +342,6 @@ export function notesIndex(
     switch (filter) {
       case "all":
         return true
-      case "draft":
       case "open":
       case "done":
         return n.state === filter
@@ -318,8 +355,8 @@ export function notesIndex(
     .filter(keep)
     .toReversed()
     .flatMap(note => {
-      const at = noteAt(note, lanes, index)
-      return at !== null && rootOf(index, at) === root ? [{ note, at }] : []
+      const at = note.entry
+      return rootOf(index, at) === root ? [{ note, at }] : []
     })
 }
 
@@ -440,14 +477,15 @@ export function workAt(
 
 /**
  * Every blob something still shows: each chat's images, each held message's,
- * and each `/blob/` image in the notes' texts. A draft is a note, and can be
- * seeded from a composer's text, so the caller passes every note's text, not
- * only those it has loaded. Pure.
+ * and each `/blob/` image in the texts people type: every note's and every
+ * card's (ADR-0048). A card holds what a composer has typed, pasted images
+ * included, so the caller passes every text, not only those it has loaded.
+ * Pure.
  */
 export function referencedBlobs(facts: {
   readonly messages: Iterable<unknown>
   readonly held: readonly Held[]
-  readonly noteTexts: Iterable<string>
+  readonly texts: Iterable<string>
 }): ReadonlySet<Sha256> {
   const shas = new Set<Sha256>()
   for (const message of facts.messages)
@@ -456,20 +494,20 @@ export function referencedBlobs(facts: {
   for (const held of facts.held)
     if (held.kind === "chat")
       for (const image of held.details.images ?? []) shas.add(image.sha256)
-  for (const text of facts.noteTexts)
+  for (const text of facts.texts)
     for (const sha of pastedImages(text)) shas.add(sha)
   return shas
 }
 
-/** `referencedBlobs` over the session as it stands, and the notes' texts. */
+/** `referencedBlobs` over the session as it stands, and every note's and card's text. */
 export const readReferencedBlobs = (
   doc: SessionDocHandle,
-  noteTexts: Iterable<string>,
+  texts: Iterable<string>,
 ): ReadonlySet<Sha256> =>
   referencedBlobs({
     messages: Object.values(readEntries(doc)).map(rowMessage),
     held: readOutbox(doc),
-    noteTexts,
+    texts,
   })
 
 /**

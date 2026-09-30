@@ -137,7 +137,7 @@ export function putNote(
   const note: NoteRecord = {
     id,
     state: "open",
-    subject: { kind: "entry", id: entryId("e-1") },
+    entry: entryId("e-1"),
     openedBy: writerId("ada@example.com"),
     contributors: [],
     reopened: false,

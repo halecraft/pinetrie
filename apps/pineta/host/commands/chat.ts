@@ -1,6 +1,6 @@
-// host/commands/chat — a human message: from a `chat` command, or a sent
-// draft. The one send path, so queueing, conflicts and who a message is for
-// hold for both.
+// host/commands/chat — a human message, from a `chat` command: the one send
+// path, so queueing, conflicts and who a message is for are decided once.
+// A message sent from a card spends the card (ADR-0048).
 
 import {
   type BlobStore,
@@ -21,6 +21,7 @@ import {
   planChat,
   planImages,
   resolveCommand,
+  spends,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
@@ -34,6 +35,7 @@ import {
   worksOwn,
 } from "@pineta/reads"
 import type { Basics } from "../basics.ts"
+import type { CardPort } from "../cards.ts"
 import type { Runs } from "../runs.ts"
 import type { LaneWork } from "../work/index.ts"
 
@@ -52,6 +54,8 @@ export interface ChatDeps {
   >
   readonly work: Pick<LaneWork, "project" | "checkDirectory" | "prepareLane">
   readonly blobs: Pick<BlobStore, "ref">
+  /** Who wrote in a card, and spending it once it is sent (ADR-0048). */
+  readonly cards: Pick<CardPort, "writers" | "spend">
   readonly start: Runs["start"]
 }
 
@@ -63,21 +67,29 @@ export interface ChatContext {
   readonly work: WorkSetting | null
 }
 
-/** Gather, `threadOf` and `planChat`, then `executeChat`. */
+/**
+ * Gather, `threadOf` and `planChat`, then `executeChat`. A message sent from
+ * a card carries its other writers as contributors ("Ada, with Bea"), and
+ * spends the card once it is written, running or waiting (`spends`). A
+ * conflict or a refusal leaves the card, so nothing typed is lost.
+ */
 export async function sendChat(
   deps: ChatDeps,
   writer: WriterId,
   sendId: string,
   chat: Chat,
-  contributors: readonly WriterId[],
 ): Promise<Outcome> {
-  const { agent, work, blobs } = deps
+  const { agent, work, blobs, cards } = deps
   const { doc } = deps.basics
 
   // gather
   const index = readTreeIndex(doc)
   const names = readParticipantNames(doc)
   const nameOf = (w: WriterId) => displayName(w, names.get(w))
+  const contributors =
+    chat.card === null
+      ? []
+      : (await cards.writers(chat.card)).filter(w => w !== writer)
 
   // plan (pure)
   const thread = threadOf(index, readLanes(doc, index), {
@@ -149,11 +161,13 @@ export async function sendChat(
     contributors,
   })
 
-  return executeChat(deps, planned, {
+  const sent = await executeChat(deps, planned, {
     index,
     writer,
     work: chat.work,
   })
+  if (chat.card !== null && spends(sent)) await cards.spend(chat.card)
+  return sent
 }
 
 /**

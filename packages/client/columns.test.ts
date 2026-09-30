@@ -1,4 +1,5 @@
 import {
+  cardId,
   type EntryLike,
   indexTree,
   type LaneView,
@@ -126,9 +127,11 @@ describe("columnsReducer", () => {
       key: "b",
       at: "2-t",
       after: 0,
-      text: "@agent separately?",
+      pending: { text: "@agent separately?", card: cardId("c-1") },
     })
-    expect(opened[1]?.fresh).toEqual({ pending: "@agent separately?" })
+    expect(opened[1]?.fresh).toEqual({
+      pending: { text: "@agent separately?", card: "c-1" },
+    })
     const sent = columnsReducer(opened, { kind: "sent", key: "b", sendId: "s" })
     expect(sent[1]?.fresh).toEqual({ sendId: "s" })
   })

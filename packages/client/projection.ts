@@ -16,6 +16,7 @@ import type {
   LaneView,
   MarkRecord,
   NoteRecord,
+  SeatRecord,
   TreeIndex,
 } from "@pineta/core"
 import type { Held } from "@pineta/marginalia"
@@ -34,6 +35,7 @@ import {
   readParticipants,
   readProject,
   readRevisions,
+  readSeats,
   readTreeIndex,
 } from "@pineta/reads"
 import { readStreamRecords, type SessionDocHandle } from "@pineta/schema"
@@ -52,6 +54,8 @@ export interface SessionFacts {
   readonly outbox: readonly Held[]
   readonly participants: readonly string[]
   readonly notes: readonly NoteRecord[]
+  /** Every seat the host has seen: who wrote in a card (ADR-0048). */
+  readonly seats: readonly SeatRecord[]
   readonly archive: ReadonlyMap<string, ArchiveRecord>
   /** Each entry's title (ADR-0045); a root's is its label. */
   readonly marks: ReadonlyMap<string, MarkRecord>
@@ -70,6 +74,7 @@ export function readSessionFacts(doc: SessionDocHandle): SessionFacts {
     outbox: readOutbox(doc),
     participants: readParticipants(doc, index),
     notes: readNotes(doc),
+    seats: readSeats(doc),
     archive: readArchive(doc),
     marks: readMarks(doc),
     workFacts: {

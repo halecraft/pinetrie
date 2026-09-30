@@ -39,7 +39,7 @@ test("referencedBlobs: chats, held messages and notes' texts each keep theirs", 
       encodeChat(details([]), 2),
     ],
     held,
-    noteTexts: [`a draft ![](/blob/${sha("c")})`, "`![](/blob/dd)` no"],
+    texts: [`a card ![](/blob/${sha("c")})`, "`![](/blob/dd)` no"],
   })
   expect([...referenced].sort()).toEqual([sha("a"), sha("b"), sha("c")])
 })

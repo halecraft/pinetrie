@@ -1,4 +1,5 @@
 import {
+  cardId,
   ERR,
   entryId,
   laneNameForThread,
@@ -49,6 +50,7 @@ function setUp(bad: typeof ERR.BAD_DIRECTORY | null) {
     agent: agent.port,
     work: work.port,
     blobs: record<ChatDeps["blobs"]>().port,
+    cards: record<ChatDeps["cards"]>().port,
     start: lane => {
       started.push(lane)
       return runId("r-1")
@@ -113,12 +115,17 @@ describe("sendChat", () => {
     asksAgent,
     mentions: parseMentions(text),
     work: null,
+    card: null,
   })
   function setUp(project: ProjectRecord | null = null) {
     const b = basics()
     writeEntry(b.doc, row(E1, null))
     if (project !== null)
       putValue(b.doc, encodeWorkRecord({ kind: "project", record: project }))
+    const cards = record<ChatDeps["cards"]>({
+      writers: async () => [ALICE, BEA],
+      spend: async () => {},
+    })
     const agent = record<ChatDeps["agent"]>({
       commands: () => [],
       appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
@@ -139,25 +146,26 @@ describe("sendChat", () => {
             ? { sha256: SHA, mimeType: "image/png", width: 2, height: 3 }
             : undefined,
       }).port,
+      cards: cards.port,
       start: (_lane, s) => {
         if (s.kind === "prompt" && s.message.customType === CHAT_TYPE)
           started.push(s.message as ChatMessage)
         return runId("r-1")
       },
     }
-    return { agent, started, deps }
+    return { agent, cards, started, deps }
   }
 
   test("a Start Agent column's message, naming nobody, starts a run", async () => {
     const { started, deps } = setUp()
-    const out = await sendChat(deps, ALICE, "s-1", chat("do it", true), [])
+    const out = await sendChat(deps, ALICE, "s-1", chat("do it", true))
     expect(out).toEqual({ kind: "started", runId: "r-1" })
     expect(started).toHaveLength(1)
   })
 
   test("a sent message keeps the images its text shows, as references", async () => {
     const { agent, deps } = setUp()
-    await sendChat(deps, ALICE, "s-1", chat(`look ![a](/blob/${SHA})`), [])
+    await sendChat(deps, ALICE, "s-1", chat(`look ![a](/blob/${SHA})`))
     const appended = agent.calls.find(c => c.method === "appendToTree")
     expect(appended?.args[0]).toMatchObject({
       details: {
@@ -172,7 +180,7 @@ describe("sendChat", () => {
       root: "/proj",
       rootDefault: "own",
     })
-    await sendChat(deps, ALICE, "s-1", chat("@agent read /proj/a.txt"), [])
+    await sendChat(deps, ALICE, "s-1", chat("@agent read /proj/a.txt"))
     expect(started[0]?.details.text).toBe(
       "@agent read /mnt/host-working-copy/a.txt",
     )
@@ -186,5 +194,57 @@ describe("sendChat", () => {
       { index: readTreeIndex(deps.basics.doc), writer: ALICE, work: null },
     )
     expect(out).toEqual({ kind: "conflict", by: BEA })
+  })
+
+  test("a message sent from a card carries its other writers, and spends the card (ADR-0048)", async () => {
+    const { agent, cards, deps } = setUp()
+    const out = await sendChat(deps, ALICE, "s-1", {
+      ...chat("from the card"),
+      card: cardId("c-1"),
+    })
+    expect(out).toEqual({ kind: "appended", id: "e-2" })
+    const appended = agent.calls.find(c => c.method === "appendToTree")
+    expect(appended?.args[0]).toMatchObject({
+      details: { contributors: [BEA] },
+    })
+    expect(cards.calls.map(c => [c.method, ...c.args])).toEqual([
+      ["writers", "c-1"],
+      ["spend", "c-1"],
+    ])
+  })
+
+  test("a refused send leaves its card", async () => {
+    const { cards, deps } = setUp()
+    const missing = "b".repeat(64)
+    // Refused before it is planned: an image the host does not store.
+    const early = await sendChat(deps, ALICE, "s-1", {
+      ...chat(`look ![a](/blob/${missing})`),
+      card: cardId("c-1"),
+    })
+    // Refused as it is written: pi will not append it.
+    const late = await sendChat(
+      {
+        ...deps,
+        agent: {
+          ...deps.agent,
+          appendToTree: async () => ({ kind: "refused", code: ERR.REFUSED }),
+        },
+      },
+      ALICE,
+      "s-2",
+      { ...chat("from the card"), card: cardId("c-1") },
+    )
+    expect([early.kind, late.kind]).toEqual(["refused", "refused"])
+    expect(cards.calls.map(c => c.method)).not.toContain("spend")
+  })
+
+  test("a message with no card spends nothing and names no one else", async () => {
+    const { agent, cards, deps } = setUp()
+    await sendChat(deps, ALICE, "s-1", chat("plain"))
+    expect(cards.calls).toEqual([])
+    const appended = agent.calls.find(c => c.method === "appendToTree")
+    expect(
+      (appended?.args[0] as { details: ChatDetails }).details.contributors,
+    ).toBeUndefined()
   })
 })

@@ -46,7 +46,7 @@ export interface AgentMessageLike {
   readonly writer?: WriterId
   /** Role `chat` only: the id of the send that wrote it, for its column. */
   readonly sendId?: string
-  /** Role `chat` only: a sent draft's other editors. */
+  /** Role `chat` only: the other people who wrote in the card it was sent from. */
   readonly contributors?: readonly WriterId[]
   /** Role `chat` only: the command it ran, qualified (ADR-0036). */
   readonly command?: string
@@ -77,7 +77,7 @@ export interface TranscriptMessage {
   readonly writer?: WriterId
   /** Role `chat` only: the send that wrote it. */
   readonly sendId?: string
-  /** Role `chat` only: a sent draft's other editors, in order of first edit. */
+  /** Role `chat` only: the other people who wrote in the card it was sent from. */
   readonly contributors?: readonly WriterId[]
   /** Role `chat` only: the command it ran, qualified (ADR-0036). */
   readonly command?: string

@@ -23,7 +23,6 @@ import {
 } from "@pineta/core"
 import { Type } from "typebox"
 import { decodeAll, decodeWith } from "./decode.ts"
-import { noteAt } from "./note.ts"
 
 /** pi value namespace for archive records. The key is the root's entry id. */
 export const ARCHIVE_NAMESPACE = "pineta.archive"
@@ -101,14 +100,13 @@ export function planArchive(input: {
 export function writesAt(
   intent: Intent,
   notes: readonly NoteRecord[],
-  index: TreeIndex,
   lanes: readonly LaneView[],
 ): string | null {
   switch (intent.kind) {
     case "chat":
       return intent.at.kind === "root" ? null : intent.at.id
     case "note":
-      return noteWritesAt(intent.action, notes, index, lanes)
+      return noteWritesAt(intent.action, notes)
     // An update and an offer act at their lane's tip: an archived root's lanes
     // take no work in and offer none out.
     case "update":
@@ -126,20 +124,15 @@ export function writesAt(
 function noteWritesAt(
   action: NoteAction,
   notes: readonly NoteRecord[],
-  index: TreeIndex,
-  lanes: readonly LaneView[],
 ): string | null {
   switch (action.kind) {
     case "open":
       return action.entry
-    case "draft":
-      return action.at.kind === "root" ? null : action.at.id
-    case "send":
     case "done":
     case "reopen": {
       // A note that does not exist writes nowhere: `planNote` refuses it.
       const note = notes.find(n => n.id === action.note)
-      return note === undefined ? null : noteAt(note, lanes, index)
+      return note === undefined ? null : note.entry
     }
   }
 }

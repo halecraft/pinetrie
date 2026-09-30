@@ -39,6 +39,7 @@ import {
   type MarkRecord,
   type NoteRecord,
   type Position,
+  type SeatRecord,
   type StreamEvent,
   type WriterId,
 } from "@pineta/core"
@@ -51,6 +52,7 @@ import {
   encodeHeld,
   encodeMark,
   encodeNote,
+  encodeSeat,
   encodeWorkRecord,
   expandSkill,
   type Held,
@@ -62,6 +64,7 @@ import {
   OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
   resolveCommand,
+  SEAT_NAMESPACE,
   type StackMessage,
   type UpdateMessage,
   type WorkRecord,
@@ -315,6 +318,10 @@ export interface Agent {
   setParticipantName(writer: WriterId, name: string): Promise<void>
   /** Store a note's record in `pineta.note`, keyed by its id (ADR-0025). */
   setNote(note: NoteRecord): Promise<void>
+  /** Store a seat's record in `pineta.seat`, keyed by its `clientID` (ADR-0048). */
+  setSeat(seat: SeatRecord): Promise<void>
+  /** Delete a seat's record: no stored text names it. */
+  removeSeat(clientId: number): Promise<void>
   /** Store a root's archive record in `pineta.archive`, keyed by the root (ADR-0029). */
   setArchive(record: ArchiveRecord): Promise<void>
   /** Store an entry's mark in `pineta.mark`, keyed by the entry (ADR-0045). */
@@ -672,6 +679,14 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
 
     async setNote(note) {
       await put(NOTE_NAMESPACE, note.id, encodeNote(note))
+    },
+
+    async setSeat(seat) {
+      await put(SEAT_NAMESPACE, String(seat.clientId), encodeSeat(seat))
+    },
+
+    async removeSeat(clientId) {
+      await session.deleteValue(value(SEAT_NAMESPACE, String(clientId)), CTX)
     },
 
     async setArchive(record) {

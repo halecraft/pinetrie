@@ -181,7 +181,8 @@ so it is the one behind the menu. What each does is under "Starting" below.
   place, and Home/End move it to either end.
 - **Closing a column** removes it from the view, never from the document. Its
   branch is still in the rail. A root tab's only column has no close, since
-  the tab would show that path again; a new tab's closes the new tab.
+  the tab would show that path again; a new tab's closes the new tab. The
+  cards at a thread's end stay with the thread.
 - Each column's composer sits at its foot. The rail scrolls on its own.
 - **Above the composer, a work strip says what became of the agent's files**
   (ADR-0040): an agent on its own copy shows its offer in plain words ("2
@@ -334,7 +335,27 @@ The rail is E; the column is T. Seeing both at once is the product.
   agent's when the message asked the agent. An agent's reply offers no edit:
   that would be a reply the agent never gave.
 
-### Notes, and drafting together (ADR-0025)
+### Drafting cards (ADR-0048)
+
+- **What you type in a composer is a card on its thread.** The first
+  keystroke worth keeping (anything but a branch's `@agent `) makes it. It
+  belongs to the thread, not the column: switching tabs, reloading, closing
+  and reopening the column, or the host restarting, you find it where you
+  left it, and it follows the thread as the thread grows. A new tab's or a
+  new branch's card belongs to its column until its first message is sent.
+- **Everyone at a thread's end sees everyone's cards there**, above their own
+  composer, headed "Ada's draft · with Bea", and can type in any of them and
+  send it. A card sent by someone other than its owner is the sender's
+  message, "with" the others who wrote in it.
+- **Sending spends the card.** The box stays as it was until the host
+  answers: written, running or waiting, the card is gone and the box empty; a
+  conflict or a refusal leaves the card, so nothing is lost or put back.
+- **Cmd+Z and Cmd+Shift+Z** undo and redo your own typing in a card, never
+  someone else's. Each tab has its own history, which a reload forgets.
+- **Closing a new branch that holds text asks** "discard what you typed?";
+  discarding is final.
+
+### Notes (ADR-0025)
 
 - **Any message can have a note**, the agent's replies included: *note* is
   among its tools. The note is a card below the message's text, which still
@@ -342,22 +363,15 @@ The rail is E; the column is T. Seeing both at once is the product.
   type in it at once. The card's header says its state, who has written in it,
   and who is editing it now. The message stays as sent, which is what the agent
   read.
-- **Compose together**, under a column's composer, starts the thread's shared
-  draft with whatever is typed. There is one draft per thread end: another
-  person's column following that thread shows "Ada is drafting the next
-  message · join". *Send* on the draft sends it as a reply from that column,
-  with the send button's usual effects: it may queue, or be a conflict, which
-  keeps the draft. It then reads "Ada, with Bea", and the draft is not drawn
-  beside it, since its text is the message's, unless it changes after.
 - **Done** makes a note read-only; *reopen* makes it editable again, and a
-  reopened note, once edited, reads "changed since done". A sent draft is done.
+  reopened note, once edited, reads "changed since done".
 - **While the note being edited is scrolled out of view**, a bar at the top of
   its column leads back to it.
 - **On the rail, a note's message is a square.** A closed branch's button
   counts its notes: "⑂ 6 messages · 1 note".
 - **The notes index**, *notes (n)* at the top of the rail, lists the notes in
   the tab's root, newest first, by its first line, state and writers; filters
-  show drafts, open, done, changed since done, and mine. A row opens its
+  show open, done, changed since done, and mine. A row opens its
   note's column.
 
 ## What goes away

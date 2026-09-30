@@ -150,20 +150,29 @@ Measured before building (the plan's Phase 0):
 - documents bound with different decays sync (their schema hashes differ, and
   Kyneta reads across them), which is how e2e uses a 300 ms decay.
 
-## Notes (`note.ts`, ADR-0025)
+## Typed text (`text.ts`, ADR-0025, ADR-0048)
 
-A note's text is a Yjs document, `NoteDoc` (`{ text: Schema.text() }`), with id
-`note:<note id>` (`noteDocId`, and `noteIdOfDoc` back). It is the one place
-people type together, so it is a CRDT (ADR-0023); the record is a session
-value.
+A note's text and a card's are the same Yjs document, `TextDoc`
+(`{ text: Schema.text() }`): a note's with id `note:<note id>` (`noteDocId`,
+`noteIdOfDoc`), a card's `card:<card id>` (`cardDocId`, `cardIdOfDoc`, in
+`card.ts`). People type together there, so it is a CRDT (ADR-0023); a note's
+record is a session value, a card's is in the cards document.
+
+- **`seatOf(peerId, principal)` is the one place a seat becomes a person**:
+  its `clientID` (Kyneta's `yjsClientId`) and its writer, or null for a
+  principal that is not an email, the host's among them. The host's seat
+  records (`pineta.seat`) come from it, and every text's writers from those.
+- **`textClients(doc)`** is every `clientID` that wrote in a text, deletions
+  included, from its Yjs store. Kyneta writes a structural seed under
+  `clientID` 0 before anyone types, which is nobody's and left out (S58).
 
 - **A `clientID` names a seat, and the seat's principal the person**
-  (ADR-0037). `noteAuthors(seats)` maps each seat's `clientID`, Kyneta's own
-  `yjsClientId(peerId)` (53 bits of FNV-1a-64), to `writerOfPrincipal` of its
-  principal; a seat whose principal is no email, the host's included, is
-  nobody. `note.test.ts` pins it to real documents' `clientID`s. The host
-  calls it with the seats connected when an edit arrives, since by its serial
-  step the sender may have gone.
+  (ADR-0037). `seatOf` maps a seat to Kyneta's own `yjsClientId(peerId)` (53
+  bits of FNV-1a-64) and `writerOfPrincipal` of its principal; a seat whose
+  principal is no email, the host's included, is nobody. `text.test.ts` pins
+  it to real documents' `clientID`s. The host writes a record of each seat
+  as it connects, so a note's edits are attributed from the records in the
+  serial step, after the sender may have gone.
 - **A deletion moves its writer's clock.** Kyneta's Yjs substrate ticks a
   `kyneta.clock` text after a transaction that only deleted, and a Kyneta
   delete carries its author's tick, so a deletion is attributed like an
@@ -172,13 +181,30 @@ value.
   document (S24); at note sizes its history is small.
 - **Yjs costs the page about 36 kB gzipped.** It is plain JavaScript: no wasm.
 
+## Cards (`card.ts`, ADR-0048)
+
+`CardsDoc` holds every card's record, keyed by card id: `yjs.bind` of a
+record of flat string structs (`owner`, `kind`, `at`, `lane`, `column`, ""
+for none), decoded in `@pineta/marginalia` (`decodeCard`). Clients write it;
+the host only deletes, to spend or sweep.
+
+- **Written whole once, then field by field** (S58): a host's delete beats a
+  concurrent field write, but a concurrent whole-record set brings the card
+  back. Keys are uuidv7, so no two writers create one (ADR-0016).
+- **A live Yjs document, never compacted** (S24), as a note's text is. A
+  spent card's text document is destroyed instead (`exchange.destroy`),
+  which stores nothing more even while its owner still holds a replica.
+- **`newCardsDoc()`** is one with no Exchange, for tests, as `newSessionDoc`
+  is.
+
 ## Persistence
 
 The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`
 over `node:sqlite`, `.pineta/pineta.db` by default. It holds every document the
 host serves, one append-only record stream per document: the `SessionDoc`,
-which is also pi's storage, each note's text, and each connected client's
-command Line. It is not a pi session file.
+which is also pi's storage, each note's and each live card's text, the
+cards document, and each connected client's command Line. A tab's undo stack
+is never stored here: the host rejects it (`resolveDoc`). It is not a pi session file.
 
 - **The store owns its file** (S47, `apps/pineta/host/store.ts`): exclusive
   locking mode, taken when it opens, so a second process is refused, and so

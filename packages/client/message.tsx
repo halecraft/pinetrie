@@ -87,7 +87,6 @@ function MessageView(p: MessageProps) {
         ))}
         <Tools id={node.id} onAct={p.onAct} tools={p.tools} />
         {p.about}
-        {p.origin}
         {p.closedBranches.length > 0 && (
           <div className="actions">
             {p.closedBranches.map(b => (

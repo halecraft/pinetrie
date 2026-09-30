@@ -3,6 +3,7 @@
 // typed here, by Pineta, which is its single authority.
 
 export * from "./archive.ts"
+export * from "./card.ts"
 export * from "./chat.ts"
 export * from "./commands.ts"
 export * from "./decode.ts"
@@ -14,5 +15,6 @@ export * from "./note.ts"
 export * from "./offer.ts"
 export * from "./outbox.ts"
 export * from "./participant.ts"
+export * from "./seat.ts"
 export * from "./update.ts"
 export * from "./work.ts"

@@ -114,6 +114,10 @@ declare const noteIdBrand: unique symbol
 /** A note's id, uuidv7: the key of its record and the name of its text's document. */
 export type NoteId = string & { readonly [noteIdBrand]: true }
 export const noteId = (id: string): NoteId => id as NoteId
+declare const cardIdBrand: unique symbol
+/** A card's id, uuidv7: the key of its record and the name of its text's document (ADR-0048). */
+export type CardId = string & { readonly [cardIdBrand]: true }
+export const cardId = (id: string): CardId => id as CardId
 
 declare const agentIdBrand: unique symbol
 /** An agent that can be compelled to reply. The host has exactly one for now. */
@@ -150,13 +154,12 @@ export const ERR = {
   REFUSED: "refused",
   /**
    * The root is no entry: a `reply` or `queue` has nothing to continue, and
-   * no note can be opened or drafted there. Only a `branch` starts a thread
-   * at it.
+   * no note can be opened there. Only a `branch` starts a thread at it.
    */
   NO_ANCHOR: "no_anchor",
   /** A display name is empty or too long. */
   INVALID_NAME: "invalid_name",
-  /** A note action its note's state does not allow: sending a note that is no draft. */
+  /** A note action its note's state does not allow: marking a done note done. */
   NOTE_STATE: "note_state",
   /** A write in a root someone archived (ADR-0029). The message names them. */
   ARCHIVED: "archived",
@@ -236,12 +239,14 @@ export type Intent =
        * default (ADR-0032). Read only when the message creates a lane.
        */
       readonly work: WorkSetting | null
+      /** The card the text was sent from, spent once it is sent (ADR-0048). */
+      readonly card: CardId | null
     }
   /** Set the sender's display name: a label, never an identity. */
   | { readonly kind: "name"; readonly name: string }
   /** End a thread's running turn. Idempotent: an idle lane is already stopped. */
   | { readonly kind: "stop"; readonly lane: LaneName }
-  /** Open a message for editing, draft a thread's next one, or move a note on. */
+  /** Open a note on a message, or move a note on. */
   | { readonly kind: "note"; readonly action: NoteAction }
   /** Hide a root for everyone, or bring it back (ADR-0029). */
   | {
@@ -600,47 +605,22 @@ export interface HaveRecord {
 
 // --- notes (ADR-0025) --------------------------------------------------------
 
-/**
- * What a `note` command asks. A draft is started where its sender reads, with
- * their column's lane, exactly as a reply would be sent from there, and may
- * carry what they had already typed.
- */
+/** What a `note` command asks: open a note on a message, or move one on. */
 export type NoteAction =
   | { readonly kind: "open"; readonly entry: EntryId }
-  | {
-      readonly kind: "draft"
-      readonly at: Position
-      readonly lane: LaneName | null
-      readonly text: string
-    }
-  | { readonly kind: "done" | "reopen" | "send"; readonly note: NoteId }
+  | { readonly kind: "done" | "reopen"; readonly note: NoteId }
 
-export const NOTE_ACTIONS = ["open", "draft", "done", "reopen", "send"] as const
+export const NOTE_ACTIONS = ["open", "done", "reopen"] as const
 
-/** Draft: not yet sent. Open: being edited. Done: read-only until reopened. */
-export type NoteState = "draft" | "open" | "done"
-
-/**
- * What a note is the text of. An opened message's entry; a draft's place,
- * kept as a send carries it and resolved by `threadOf` whenever it is needed,
- * so it follows its thread as the thread grows; or, once a draft is sent, the
- * send that wrote its message, which the tree finds by `bySend` even while the
- * message waits in a lane's outbox.
- */
-export type NoteSubject =
-  | { readonly kind: "entry"; readonly id: EntryId }
-  | {
-      readonly kind: "draft"
-      readonly at: Position
-      readonly lane: LaneName | null
-    }
-  | { readonly kind: "sent"; readonly sendId: string }
+/** Open: being edited. Done: read-only until reopened. */
+export type NoteState = "open" | "done"
 
 /** A note's record: a host-written `pineta.note` value. Its text is its own document. */
 export interface NoteRecord {
   readonly id: NoteId
   readonly state: NoteState
-  readonly subject: NoteSubject
+  /** The message it is about. */
+  readonly entry: EntryId
   readonly openedBy: WriterId
   /** Writers whose edits are in its text, in order of first edit. */
   readonly contributors: readonly WriterId[]
@@ -648,6 +628,46 @@ export interface NoteRecord {
   readonly reopened: boolean
   /** Edited since it was reopened. */
   readonly changedSinceDone: boolean
+}
+
+// --- cards (ADR-0048) --------------------------------------------------------
+
+/**
+ * Where a card is. Drafting: below the line at a thread's end, kept as a send
+ * carries it (where it started, and its column's lane) and resolved through
+ * `threadOf` whenever it is needed, so it follows its thread as the thread
+ * grows. Fresh: an unsent branch or new tab, by its column's key.
+ */
+export type CardPlace =
+  | {
+      readonly kind: "drafting"
+      readonly at: Position
+      readonly lane: LaneName | null
+    }
+  | { readonly kind: "fresh"; readonly column: string }
+
+/**
+ * A card's record, in the cards document, which clients write. Its text is
+ * its own document; who wrote in it is read from that document's operations
+ * (`writersOf`), never stored here.
+ */
+export interface CardRecord {
+  readonly id: CardId
+  /** Who created it: whose composer it is. */
+  readonly owner: WriterId
+  readonly place: CardPlace
+}
+
+/**
+ * A seat the host has seen: the Yjs `clientID` its operations carry, and the
+ * person it is (ADR-0037). A host-written `pineta.seat` value, so anyone can
+ * name who wrote in a text after the seat has gone.
+ */
+export interface SeatRecord {
+  readonly clientId: number
+  readonly writer: WriterId
+  /** When the host first saw it, which orders contributors. */
+  readonly at: number
 }
 
 // --- obligation: collaborators and compelled responders ----------------------

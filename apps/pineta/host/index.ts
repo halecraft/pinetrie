@@ -12,13 +12,15 @@ import {
   type Store,
   whenHydrated,
 } from "@kyneta/exchange"
+import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
-import type { BlobStore, LaneName, NoteId } from "@pineta/core"
+import type { BlobStore, CardId, LaneName, NoteId } from "@pineta/core"
 import { userConfigFile } from "@pineta/lanes"
 import { decodeCommandRenames } from "@pineta/marginalia"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
 import { Control } from "@pineta/protocol/line"
 import {
+  CARDS_DOC_ID,
   CONTROL_TOPIC,
   HOST_PRINCIPAL,
   PRESENCE_DOC_ID,
@@ -26,16 +28,21 @@ import {
 } from "@pineta/protocol/messages"
 import { readNotes } from "@pineta/reads"
 import {
+  CardsDoc,
+  type CardsDocHandle,
+  cardDocId,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
   presenceDoc,
   SessionDoc,
   type SessionDocHandle,
+  TextDoc,
 } from "@pineta/schema"
 import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
 import { type Basics, failed } from "./basics.ts"
 import { memoryBlobs } from "./blobs.ts"
+import { startCards } from "./cards.ts"
 import { createCommands } from "./commands/index.ts"
 import { startControl } from "./control.ts"
 import { hotReload as pauseHotReload } from "./hot-reload.ts"
@@ -45,9 +52,10 @@ import { lineDocPrefix } from "./lines.ts"
 import { createNames } from "./names.ts"
 import { startNoteTexts } from "./notes.ts"
 import { drain as drainOutbox } from "./outbox.ts"
-import { writePolicy } from "./policy.ts"
+import { resolveDoc, writePolicy } from "./policy.ts"
 import { createSerial } from "./queue.ts"
 import { createRuns, streamInto } from "./runs.ts"
+import { startSeats } from "./seats.ts"
 import { createSettle } from "./settle.ts"
 import { recover } from "./startup.ts"
 import { openStore } from "./store.ts"
@@ -126,6 +134,10 @@ export interface RunningHost {
   readonly presence: PresenceDocHandle
   /** A note's text as the host holds it; undefined for a note it does not hold. */
   noteText(id: NoteId): string | undefined
+  /** Every card's record, as the host holds them (ADR-0048). */
+  readonly cards: CardsDocHandle
+  /** A card's text as the host holds it: for the suites. */
+  cardText(id: CardId): string
   readonly agent: Agent
   /** The invite key, or null on loopback. */
   readonly key: string | null
@@ -183,20 +195,37 @@ export async function startHost({
     // A client does not reconnect: a closed channel is a seat that has left,
     // so there is nothing to wait for before its Line goes.
     departureTimeout: 0,
+    // Cards are created by clients (ADR-0048): without this, a card the host
+    // never opened itself would be neither stored nor relayed (S58).
+    resolve: docId => {
+      switch (resolveDoc(docId)) {
+        case "cards":
+          return Interpret(CardsDoc)
+        case "text":
+          return Interpret(TextDoc)
+        case "reject":
+          return Reject()
+        case undefined:
+          return undefined
+      }
+    },
   })
 
   // The session document is BOTH pi's storage and the thing we replicate.
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
-  // Clients may write presence and open notes, never the session
+  // Clients may write presence, open notes and cards, never the session
   // (host/policy.ts). A note's state is its record's, read when asked.
   exchange.register(
     writePolicy(id => readNotes(doc).find(n => n.id === id)?.state),
   )
   // Held here so the host relays it between clients (ADR-0024).
   const presence = exchange.get(PRESENCE_DOC_ID, presenceDoc(presenceDecay))
+  // Every card's record, which clients write (ADR-0048).
+  const cards: CardsDocHandle = exchange.get(CARDS_DOC_ID, CardsDoc)
   // A stored session loads asynchronously; pi must see it before it starts.
   // Only storage is awaited: the host is the authority, with no peer upstream.
   await whenHydrated(doc)
+  await whenHydrated(cards)
   const basics: Basics = { doc, log, newId, now: Date.now }
 
   // --- where lanes work (ADR-0032, ADR-0034) --------------------------------
@@ -264,12 +293,14 @@ export async function startHost({
     serial,
     setNote: note => agent.setNote(note),
   })
+  const cardPort = startCards({ exchange, store, doc, cards })
   const runs = createRuns({ basics, agent, work })
   const commands = createCommands({
     basics,
     agent,
     work,
     blobs,
+    cards: cardPort,
     notes,
     start: runs.start,
   })
@@ -283,7 +314,8 @@ export async function startHost({
     serial,
     drain,
     compact: () => compactSession(exchange),
-    sweep: () => sweepBlobs({ basics, blobs, grace: blobGraceMs, notes }),
+    sweep: () =>
+      sweepBlobs({ basics, blobs, grace: blobGraceMs, texts: cardPort.texts }),
   })
   // A run's end: hot reload may reload the page, then the lane drains and
   // the session compacts.
@@ -311,8 +343,11 @@ export async function startHost({
     start: runs.start,
     settle,
     notes,
+    cards: cardPort,
+    cardsDoc: cards,
     ensureNames,
   })
+  const seats = startSeats({ exchange, basics, serial, agent })
   const control = startControl({
     exchange,
     listener,
@@ -339,6 +374,8 @@ export async function startHost({
     doc,
     presence,
     noteText: (id: NoteId) => notes.text(id),
+    cards,
+    cardText: (id: CardId) => exchange.get(cardDocId(id), TextDoc).text(),
     agent,
     key,
     invites: server.invites,
@@ -349,6 +386,7 @@ export async function startHost({
         await quiet()
       } catch {}
       notes.release()
+      seats.stop()
       control.stop()
       try {
         await agent.close()

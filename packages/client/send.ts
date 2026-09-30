@@ -16,13 +16,13 @@ import { addressChat, displayName, parseCommand } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
 import type { Prefill } from "./columns.ts"
 
+/**
+ * What the composer shows after the host answers. Nothing is put back: the
+ * box was never cleared, and a message the host did not write leaves its card
+ * where it was (ADR-0048), a conflict or a refusal such as a root archived a
+ * moment before (ADR-0029).
+ */
 export interface SendSettled {
-  /**
-   * Text to put back in the composer, or null to leave it. A message the host
-   * did not write comes back, so nothing typed is lost: a conflict, or a
-   * refusal such as a root archived a moment before (ADR-0029).
-   */
-  readonly restore: string | null
   readonly status: string
   /**
    * A reply that lost a race: the sender chooses to queue or branch. `line`
@@ -51,7 +51,6 @@ export function settleSend(
   switch (outcome.kind) {
     case "conflict":
       return {
-        restore: message,
         status: "",
         conflict: {
           text: message,
@@ -60,18 +59,16 @@ export function settleSend(
       }
     case "refused":
       return {
-        restore: message,
         status: `not sent: ${outcome.message}`,
         conflict: null,
       }
     case "queued":
       return {
-        restore: null,
         status: `waiting · ${ordinal(outcome.position + 1)} in line`,
         conflict: null,
       }
     default:
-      return { restore: null, status: "", conflict: null }
+      return { status: "", conflict: null }
   }
 }
 

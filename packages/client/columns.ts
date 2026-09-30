@@ -5,6 +5,7 @@
 // (ADR-0027, ADR-0029). Pure: a reducer over values, tested without a DOM.
 
 import {
+  type CardId,
   followTip,
   type LaneName,
   type LaneView,
@@ -19,6 +20,15 @@ import {
 export interface Prefill {
   readonly text: string
   readonly blank: boolean
+}
+
+/**
+ * A first message a fresh column sends as it opens ('branch here' after a
+ * conflict), and the card it came from, which that send spends (ADR-0048).
+ */
+export interface Pending {
+  readonly text: string
+  readonly card?: CardId
 }
 
 export interface Column {
@@ -48,7 +58,7 @@ export interface Column {
    */
   readonly fresh?: {
     readonly sendId?: string
-    readonly pending?: string
+    readonly pending?: Pending
     readonly prefill?: Prefill
   }
 }
@@ -68,7 +78,7 @@ export type ColumnAction =
       readonly at: string
       readonly after: number
       /** A first message the column sends as soon as it opens. */
-      readonly text?: string
+      readonly pending?: Pending
       /** What its composer starts with, unsent. */
       readonly prefill?: Prefill
     }
@@ -118,7 +128,7 @@ export function columnsReducer(
         key: action.key,
         anchor: action.at,
         fresh: {
-          ...(action.text === undefined ? {} : { pending: action.text }),
+          ...(action.pending === undefined ? {} : { pending: action.pending }),
           ...(action.prefill === undefined ? {} : { prefill: action.prefill }),
         },
       })

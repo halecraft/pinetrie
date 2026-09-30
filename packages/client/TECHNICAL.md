@@ -4,7 +4,8 @@ The browser interface: a tab per root, each a rail beside a strip of columns
 (`docs/06-interface.md`, ADR-0029). Everything drawn is a read of the session
 document through `@pineta/reads` and `projection.ts`; the only state kept here
 is the layout (which tab you are on, and each root's columns), kept per
-browser tab, and the text being typed.
+browser tab. What is typed is a card (ADR-0048): a document of its own,
+written by this client, and kept on its thread.
 
 ## Reads go through one index
 
@@ -281,9 +282,8 @@ error.
   is left off; `sync` binds the column again.
 - **`fresh.pending` is never stored**, by either side: restoring it would send
   its message again. A "branch here" column comes back empty. `fresh.prefill`
-  is stored, blank or content: only `pending` is sent on opening. What was typed over it is not kept:
-  the composer's text is its own state, so a reload, or switching root tabs
-  (which unmounts the column), starts it from the prefill again.
+  is stored, blank or content: only `pending` is sent on opening. What was
+  typed over it is a card, kept by the column's key (Drafting cards, below).
 - **Restored anchors the document lacks are pruned once, after
   `whenSettled`.** Until then, missing means not yet arrived: `connectSession`
   returns before the document does (S29: 0 of 50 had it). Neither
@@ -562,7 +562,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `queueWords` says it, with a `title` counting the queue when more than one
   waits ("3 waiting ahead").
 - **Conflict.** A compelled `reply` that lost a race comes back `conflict`, and
-  the composer keeps the text and offers the queue button, in the lane's
+  the card keeps its text and the editor offers the queue button, in the lane's
   current words (`queueWords`), or **branch here**. The line above them is
   `raceWords`, through `settleSend`: the host sends the writer, not a name, so
   the client names it and can tell it is you (the host falls back to the
@@ -649,8 +649,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **Live work is drawn in its committed form's box.** A streaming reply is a
   `.msg.assistant.streaming`, and its mark and a live row's are a 2px shadow
   in the gutter, which takes no width: text wraps as its entry will.
-- **Stop** shows in the composer while the thread's lane runs, and sends
-  `stop`.
+- **Stop** shows above the composer while the thread's lane runs, and sends
+  `stop`. It is the column's, not a card's.
 - **Where a new thread's agent works** (ADR-0032). When a send would create a
   lane (it asks the agent where no lane is, or it is a branch), a chip left of
   the button says where, in `whereWords`'s words: "on a copy ▾", "in your
@@ -708,7 +708,7 @@ The offer's line opens a review, and the column widens to hold it.
 - **A column is `.column` > `.column-thread` + `.review`.** `.column` stays
   `#strip`'s direct child with its key, position and track, so dragging,
   alignment and revealing find it as before; the thread, 28rem, holds the
-  header, body, draft, strip and composer. `reviewing` is `Column`'s state,
+  header, body, others' cards, strip and composer. `reviewing` is `Column`'s state,
   never stored, and is reset during render when the strip's `review` goes
   (a take, a withdrawal), so no frame draws a review that is gone. Hiding
   it instead would let the next offer open it unasked.
@@ -788,6 +788,64 @@ pipeline keeps the tree a pure function, testable without a DOM.
   colour, class `initial`. `Avatar` is an `Initial` with class `avatar`,
   which means a person shown here (Gotchas).
 
+## Drafting cards (ADR-0048)
+
+What you type is a card: a record in the cards document (`session.cards`,
+read with `readCards`) and a `TextDoc` of its own (`session.cardText`). This
+client writes both; the host only spends a card when it is sent, and sweeps
+empty ones when it starts (S58).
+
+- **Where the column's cards are.** `Column` resolves its thread's end with
+  `threadOf`, as a reply would go, and finds your card there with `yourCard`
+  and everyone else's with `draftingAt`. A fresh column's card is found by
+  its key (`CardPlace` `fresh`). So a tab switch, a reload or another device
+  finds the same card: it belongs to the thread, not to the mounted column.
+- **One editor for every card: `card-editor.tsx`.** Your composer is one, and
+  everyone else's cards above it are others, with a heading (`cardHeading`)
+  and no where-menu. `Composer` is the column's foot: typing presence and your
+  card's editor, in the `form.composer` the suites select by.
+- **One uncontrolled textarea for the editor's whole life.** While there is no
+  card, it holds what is typed and nothing else does. The `input` that makes
+  `needsCard` true (anything `sendable` would send) creates the card from
+  `element.value` and binds the same element to the card's text with
+  Kyneta's `attach`, in that one handler: no keystroke falls between them,
+  and focus and the caret stay where they are. A card that already exists is
+  attached on mount. `editorState` (`card-state.ts`, pure) decides every step
+  and names the act (`create`, `attach`, `detach`); the component only
+  carries it out.
+- **Every write the editor makes itself goes through the element**: a command
+  chosen, an update's intent, a pasted image (`insertAt` decides the text).
+  Each is `setRangeText` and a dispatched `input` event, so it is typing:
+  local, it may create the card; bound, the binding writes it.
+- **The editor's own text** (for the button's words, `sendable` and the rows)
+  is set from the `input` event and, while bound, from a subscription to the
+  card's document, which catches others' edits. No hook depends on whether a
+  card exists.
+- **Sending.** The editor sends the text it shows, with the card's id, and is
+  read-only until the host answers. Spent (`appended`, `started`, `queued`),
+  the host has deleted the card, and the editor detaches and empties the box.
+  On a conflict or a refusal the card is still there, so nothing is put back:
+  `settleSend` has no `restore`. "Branch here" hands the text and the card to
+  the new column as `pending`, and that column's send spends it.
+- **A card gone while bound** (someone else sent it) detaches the box. Gone
+  counts only once the card was seen in the records: a card just created is
+  not there until the records redraw.
+- **Undo** is the tab's Kyneta stack (`session.undo`, `createUndoStack`), in
+  memory, over the cards document and every `card:` document; `attach` sends
+  Cmd+Z, Cmd+Shift+Z and Ctrl+Y to it. Creating a card is one step with its
+  first text, so undoing past it removes the record. Typing is grouped by
+  word. Kyneta redoes a step of several commits in reverse order (S58,
+  addendum): the suite checks redo on a one-input step.
+- **The editor's unmount clears its binding's handle** as well as detaching:
+  StrictMode mounts twice, and a stale handle leaves the second mount
+  unbound.
+- **Who wrote in a card** is `writersOf(textClients(cardText), seats)`: its
+  Yjs `clientID`s, through the host's seat records (`readSessionFacts`
+  reads them).
+- **Closing a fresh column that holds text** asks in its header; discard
+  deletes the record outside the undo stack, since no column could show it
+  again.
+
 ## Notes (ADR-0025)
 
 - **A note's card (`note.tsx`) binds its textarea with `useText`** to the note's
@@ -797,23 +855,13 @@ pipeline keeps the tree a pure function, testable without a DOM.
   text where it is shown (a done note, the index's first lines).
 - **A note's card is drawn below its message's text**, which always shows
   (ADR-0043). `messageNotes` (`@pineta/marginalia`) says which: a note
-  about the message, and the note it was sent from (a shared draft or a
-  queued note), the second only while it is not done or once it has changed
-  since. `App` computes it once; its keys are `noteEntries`, so the rail's
-  squares, rail compaction, closed branches' note counts and the Archive
-  preview all count the notes that are drawn. The notes index and the
-  Archive's counts count every record: they list notes, and an origin note
-  is one. A done note's text is markdown, through `MessageText`.
-- **An origin note marked done again hides**, even if its text now differs
-  from its message: `changedSinceDone` resets on done, and the record keeps
-  no other sign of the change.
-- **A thread's draft** sits above its column's composer (`draftFor` over the
-  column's end). Its opener and its writers see the card; anyone else sees
-  "Ada is drafting the next message · join". *Compose together* sends the
-  column's `at` and bound lane, as a reply would.
+  about the message. `App` computes it once; its keys are `noteEntries`, so
+  the rail's squares, rail compaction, closed branches' note counts and the
+  Archive preview all count the notes that are drawn. A done note's text is
+  markdown, through `MessageText`.
 - **Presence `editing`** is set on focus and while typing (at most once a
   second), and set to null on blur, and when the editor goes with no blur (the
-  draft sent, the note done). A done note shows no editors.
+  note done). A done note shows no editors.
 - **The sticky bar** follows the note this window last focused, through an
   `IntersectionObserver` on the column's body.
 - **The notes index** is `notesIndex` (`@pineta/reads`) over the records of

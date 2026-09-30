@@ -141,22 +141,16 @@ describe("planArchive", () => {
 })
 
 describe("writesAt: the entry a command writes at", () => {
-  const draft: NoteRecord = {
-    id: noteId("n-1"),
-    state: "draft",
-    subject: { kind: "draft", at: atEntry(entryId("a")), lane: null },
+  const opened: NoteRecord = {
+    id: noteId("n-2"),
+    state: "open",
+    entry: entryId("c"),
     openedBy: ADA,
     contributors: [],
     reopened: false,
     changedSinceDone: false,
   }
-  const opened: NoteRecord = {
-    ...draft,
-    id: noteId("n-2"),
-    state: "open",
-    subject: { kind: "entry", id: entryId("c") },
-  }
-  const at = (intent: Intent) => writesAt(intent, [draft, opened], index, [])
+  const at = (intent: Intent) => writesAt(intent, [opened], [])
   const chat = (p: Intent & { kind: "chat" }) => p
   test.each([
     [
@@ -170,6 +164,7 @@ describe("writesAt: the entry a command writes at", () => {
         asksAgent: false,
         mentions: [],
         work: null,
+        card: null,
       }),
       "a",
     ],
@@ -184,6 +179,7 @@ describe("writesAt: the entry a command writes at", () => {
         asksAgent: false,
         mentions: [],
         work: null,
+        card: null,
       }),
       null,
     ],
@@ -191,24 +187,6 @@ describe("writesAt: the entry a command writes at", () => {
       "a note opened",
       { kind: "note", action: { kind: "open", entry: entryId("c") } },
       "c",
-    ],
-    [
-      "a draft",
-      {
-        kind: "note",
-        action: {
-          kind: "draft",
-          at: atEntry(entryId("a")),
-          lane: null,
-          text: "",
-        },
-      },
-      "a",
-    ],
-    [
-      "a draft sent: its thread's end",
-      { kind: "note", action: { kind: "send", note: noteId("n-1") } },
-      "b",
     ],
     [
       "a note marked done: its message",

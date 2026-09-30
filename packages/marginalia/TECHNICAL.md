@@ -132,41 +132,73 @@ the queue. The host executes three pure decisions from here:
 
 # Notes (`note.ts`, ADR-0025)
 
-A note is about a message, everyone's to edit, or a draft of a thread's next
-message. Its text is its own Yjs document (`NoteDoc` in `@pineta/schema`); its
-record is a host-written `pineta.note` value keyed by note id, typed here as
-`NoteRecord` (`@pineta/core`) and stored through `encodeNote`/`decodeNote`.
+A note is about a message, everyone's to edit. Its text is its own Yjs
+document (`TextDoc` in `@pineta/schema`); its record is a host-written
+`pineta.note` value keyed by note id, typed here as `NoteRecord`
+(`@pineta/core`) and stored through `encodeNote`/`decodeNote`. The next
+message is drafted in a card (`card.ts`, below), not a note.
 
-- **`subject` says what a note belongs to**, as a union: the message it is
-  about (`entry`); a draft's place, kept as a send carries it (where it was
-  started, and its column's lane); or, once sent, the send's id (`sent`: the
-  message's origin). `noteEntry` (not exported) finds its message (a sent
-  draft through `TreeIndex.bySend`, so a draft still waiting in an outbox has
-  none yet); `noteAt` is where it sits now, a draft at its thread's end.
+- **A note's message is its `entry`.** It is stored as it always was,
+  `subject: { kind: "entry", id }`, so every note written before still
+  decodes: the union had other cases once (a thread's draft, a sent draft), and
+  a record with one of those does not decode now. `orphanNotes` names their
+  text documents for the host's startup sweep.
 - **`messageNotes` is what the screen draws with each message** (ADR-0043):
-  its `about` note, and its `origin` only while that is not done or once it
-  has changed since, because until then its text is the message's.
-- **A draft is resolved, never stored as an end.** `noteAt` runs `threadOf` from
-  its place, as a reply from there would be sent, so the draft follows its
-  thread as the thread grows. `draftFor(end, …)` is the draft whose resolved end
-  is `end`: one per thread end.
+  its note, by entry.
 - **`planNote` decides every action**, pure: `open` (a new, empty note about
-  a message the index holds, or the one it has; an `origin` note is not one),
-  `draft` (the thread's draft, or a new one;
-  what its requester had typed is theirs), `send` (only a draft; the host sends
-  its text through `sendChat` (`apps/pineta/host/commands/chat.ts`), the one
-  send path, and marks it sent on `appended`, `started` or `queued`), `done` and `reopen`.
+  a message the index holds, or the one it has), `done` and `reopen`.
 - **`planNoteEdit` decides what one edit changes**, pure: contributors are the
-  `clientID`s whose clocks moved, as the people behind the seats connected
-  when the edit arrived (`noteAuthors`), in order of first edit; an unknown
+  `clientID`s whose clocks moved, as the people the seat records name
+  (`authorsOf`, `seat.ts`), in order of first edit; an unknown
   `clientID`, the host's own among them, is nobody's. A
   reopened note, once edited, is `changedSinceDone`. It returns null when
   nothing changes, so an edit writes nothing to the session unless it matters.
   `changedSinceDone` is stored, not derived: deriving it would open every note's
   document to filter the index.
-- **A sent draft's message is its sender's**, with the others in
-  `ChatDetails.contributors`, "Ada, with Bea". The model reads only the
-  sender's name.
+
+# Cards (`card.ts`, ADR-0048)
+
+What you type is a card. Its record is in the cards document (`CardsDoc` in
+`@pineta/schema`) and its text in a `TextDoc`, both written by clients; the
+host writes only to spend a card, when it is sent, and to sweep empty ones
+when it starts. This module decodes a record and decides where a card sits.
+
+- **The stored record is flat strings**, "" for none (`encodeCard`,
+  `decodeCard`, total). A drafting card's `at` is never the root; a fresh
+  card's `column` is never "". Clients write a card whole once and only its
+  fields after, since a whole-record write concurrent with a spend brings the
+  card back (S58).
+- **A drafting card is resolved, never stored as an end.** `placeEnd` runs
+  `threadOf` from where it started and its column's lane, as a reply from
+  there would go, so the card follows its thread as the thread grows.
+  `cardEnd` is that for a card; `draftingAt(end, …)` is everyone's cards
+  whose end is `end`; `yourCard` is your own at an end or a fresh column, and
+  never another writer's.
+- **`spends(outcome)`**: written, running or waiting spends the card; a
+  conflict or a refusal leaves it.
+- **`planCardSweep`**: records whose text is empty, and stored `card:`
+  documents with no record, a spent or empty card's among them.
+
+# Seats (`seat.ts`, ADR-0048)
+
+Who wrote in a text is in its operations: each carries its seat's Yjs
+`clientID`. Only the host knows which person a seat is, and only while it is
+connected (ADR-0037), so it writes a `pineta.seat` value per seat, keyed by
+`clientID`, as the seat connects.
+
+- **`planSeats`**: the connected seats with no record yet. The connected seats
+  come mapped by `seatOf` (`@pineta/schema`), which needs Kyneta's
+  `yjsClientId`, which this package does not import.
+- **`authorsOf(seats)`**: each seat's person by `clientID`, which
+  `planNoteEdit` attributes a note's edits with. Notes and cards name people
+  the same way.
+- **`writersOf(clientIds, seats)`**: the people behind a text's `clientID`s,
+  each once, in the order their seats were first seen. A card sent by one
+  person names the others this way, in `ChatDetails.contributors`: "Ada, with
+  Bea". The model reads only the sender's name.
+- **`planSeatSweep`**: seat records no stored text names. A store-less client
+  is a new seat on every load, so without it the records would grow with every
+  visit.
 
 # The archive (`archive.ts`, ADR-0029)
 
@@ -181,12 +213,12 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   waiting. `ROOT_BUSY_REASON` is the one wording, which the tab's menu shows
   too. The state it already has is `unchanged`, and answered the same.
 - **The gate keys on the entry a command writes at.** `writesAt` names it for
-  every intent (a chat's `at`, a note's entry or place via
-  `noteAt`), or null for one that writes in no root (a new root, a name, a
+  every intent (a chat's `at`, a note's entry), or null for one that writes in no root (a new root, a name, a
   stop, an archive action). `archivedAt` maps that entry to its root's
   record. One rule, applied by the host before dispatch
   (`apps/pineta/host/commands/index.ts`); `sendChat` needs no
-  copy, because a sent draft reaches it only through a `note` `send`.
+  copy, since only the `chat` command calls it. A card is written by clients
+  and so passes no gate, but the composer in an archived root is read-only.
 - **Yjs writes are not refused for archiving.** A note's text in an archived
   root stays writable to the host's policy, as ADR-0026 requires (a refused
   write cannot be recovered from, S28); the screen offers no editor there.

@@ -1,11 +1,8 @@
 import {
-  atEntry,
   type EntryLike,
   ERR,
   entryId,
   indexTree,
-  type LaneView,
-  laneNameForThread,
   type NoteAction,
   type NoteRecord,
   noteId,
@@ -15,22 +12,17 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   decodeNote,
-  draftFor,
   encodeNote,
   messageNotes,
-  noteAt,
+  orphanNotes,
   planNote,
   planNoteEdit,
-  sentNote,
 } from "./note.ts"
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
-const E1 = entryId("e1")
 const E2 = entryId("e2")
-const E3 = entryId("e3")
 const E4 = entryId("e4")
-const F1 = entryId("f1")
 
 const entry = (id: string, parentId: string | null): EntryLike => ({
   id,
@@ -48,10 +40,10 @@ const tree = (...more: EntryLike[]): TreeIndex =>
     ),
   )
 
-const draft = (over: Partial<NoteRecord> = {}): NoteRecord => ({
-  id: noteId("n-draft"),
-  state: "draft",
-  subject: { kind: "draft", at: atEntry(E2), lane: null },
+const note = (over: Partial<NoteRecord> = {}): NoteRecord => ({
+  id: noteId("n-1"),
+  state: "open",
+  entry: E2,
   openedBy: ADA,
   contributors: [],
   reopened: false,
@@ -59,31 +51,23 @@ const draft = (over: Partial<NoteRecord> = {}): NoteRecord => ({
   ...over,
 })
 
-const plan = (
-  action: NoteAction,
-  notes: readonly NoteRecord[] = [],
-  index: TreeIndex = tree(),
-  lanes: readonly LaneView[] = [],
-) =>
+const plan = (action: NoteAction, notes: readonly NoteRecord[] = []) =>
   planNote({
     action,
     writer: BEA,
     notes,
-    index,
-    lanes,
+    index: tree(),
     newId: noteId("n-new"),
   })
 
 describe("planNote: the lifecycle", () => {
   test("open: a new, empty note about the message", () => {
-    const d = plan({ kind: "open", entry: E2 })
-    expect(d).toEqual({
+    expect(plan({ kind: "open", entry: E2 })).toEqual({
       kind: "create",
-      text: "",
       record: {
         id: "n-new",
         state: "open",
-        subject: { kind: "entry", id: E2 },
+        entry: E2,
         openedBy: BEA,
         contributors: [],
         reopened: false,
@@ -92,90 +76,20 @@ describe("planNote: the lifecycle", () => {
     })
   })
 
-  test("open twice gives the same note; a sent draft is its message's origin, not a note about it", () => {
-    const opened = draft({
-      id: noteId("n-1"),
-      state: "open",
-      subject: { kind: "entry", id: E2 },
-    })
-    expect(plan({ kind: "open", entry: E2 }, [opened])).toEqual({
+  test("open twice gives the same note", () => {
+    expect(plan({ kind: "open", entry: E2 }, [note()])).toEqual({
       kind: "existing",
       id: "n-1",
-    })
-    const sent = sentNote(draft({ id: noteId("n-2") }), "s-9")
-    const index = tree({
-      ...entry("e3", "e2"),
-      message: { role: "chat", content: "hi", sendId: "s-9" },
-    })
-    expect(plan({ kind: "open", entry: E3 }, [sent], index)).toMatchObject({
-      kind: "create",
-      text: "",
-      record: { subject: { kind: "entry", id: E3 } },
     })
   })
 
   test("open: a message the tree does not hold is refused", () => {
-    const d = planNote({
-      action: { kind: "open", entry: E4 },
-      writer: BEA,
-      notes: [],
-      index: tree(),
-      lanes: [],
-      newId: noteId("n-new"),
-    })
+    const d = plan({ kind: "open", entry: E4 })
     expect(d.kind === "refused" && d.code).toBe(ERR.UNKNOWN_TARGET)
   })
 
-  test("draft joins the thread's draft, wherever along it that was started", () => {
-    const d = plan({ kind: "draft", at: atEntry(E1), lane: null, text: "" }, [
-      draft({ subject: { kind: "draft", at: atEntry(E2), lane: null } }),
-    ])
-    // A reply from e1 continues its newest leaf: f1, not e2's thread.
-    expect(d.kind).toBe("create")
-    const joined = plan(
-      { kind: "draft", at: atEntry(E2), lane: null, text: "" },
-      [draft()],
-    )
-    expect(joined).toEqual({ kind: "existing", id: "n-draft" })
-  })
-
-  test("draft: a new draft keeps its place and what its sender typed", () => {
-    const lane = laneNameForThread("x")
-    const lanes: LaneView[] = [
-      {
-        name: lane,
-        tip: E2,
-        running: false,
-        waiting: 0,
-        askedBy: null,
-        lastWaiting: null,
-      },
-    ]
-    const d = plan(
-      { kind: "draft", at: atEntry(E2), lane, text: "so far" },
-      [],
-      tree(),
-      lanes,
-    )
-    expect(
-      d.kind === "create" && [d.record.subject, d.text, d.record.contributors],
-    ).toEqual([{ kind: "draft", at: atEntry(E2), lane }, "so far", [BEA]])
-  })
-
-  test("send: only a draft, from its place", () => {
-    expect(plan({ kind: "send", note: noteId("n-draft") }, [draft()])).toEqual({
-      kind: "send",
-      record: draft(),
-      at: atEntry(E2),
-      lane: null,
-    })
-    const open = draft({ state: "open", subject: { kind: "entry", id: E2 } })
-    const d = plan({ kind: "send", note: noteId("n-draft") }, [open])
-    expect(d.kind === "refused" && d.code).toBe(ERR.NOTE_STATE)
-  })
-
   test("done, then reopen: a reopened note is back to what it was", () => {
-    const open = draft({ state: "open", subject: { kind: "entry", id: E2 } })
+    const open = note()
     const done = plan({ kind: "done", note: open.id }, [open])
     expect(done.kind === "update" && done.record.state).toBe("done")
     if (done.kind !== "update") return
@@ -198,83 +112,12 @@ describe("planNote: the lifecycle", () => {
   })
 })
 
-describe("draftFor", () => {
-  test("still finds a draft after its thread grows", () => {
-    const grown = tree(entry("e3", "e2"), entry("e4", "e3"))
-    expect(draftFor(E4, [], grown, [draft()])?.id).toBe("n-draft")
-    expect(draftFor(E2, [], grown, [draft()])).toBeUndefined()
-  })
-
-  test("a draft on a sibling thread is not this thread's", () => {
-    expect(draftFor(F1, [], tree(), [draft()])).toBeUndefined()
-  })
-
-  test("a lane-bound draft follows its lane, not the newest leaf", () => {
-    const lane = laneNameForThread("x")
-    const bound = draft({ subject: { kind: "draft", at: atEntry(E1), lane } })
-    const lanes: LaneView[] = [
-      {
-        name: lane,
-        tip: E2,
-        running: false,
-        waiting: 0,
-        askedBy: null,
-        lastWaiting: null,
-      },
-    ]
-    // Unbound, a reply from e1 continues its newest leaf, f1.
-    expect(
-      noteAt(
-        draft({ subject: { kind: "draft", at: atEntry(E1), lane: null } }),
-        lanes,
-        tree(),
-      ),
-    ).toBe(F1)
-    expect(draftFor(E2, lanes, tree(), [bound])?.id).toBe("n-draft")
-  })
-
-  test("a done draft is no one's draft", () => {
-    expect(draftFor(E2, [], tree(), [draft({ state: "done" })])).toBeUndefined()
-  })
-})
-
-describe("messageNotes", () => {
-  // e3 was sent from a draft, as send s-9.
-  const index = tree({
-    ...entry("e3", "e2"),
-    message: { role: "chat", content: "hi", sendId: "s-9" },
-  })
-  const about = (id: string, on = E3) =>
-    draft({ id: noteId(id), state: "open", subject: { kind: "entry", id: on } })
-  const origin = sentNote(draft({ id: noteId("n-sent") }), "s-9")
-
-  test("a note about a message is drawn with it", () => {
-    expect(messageNotes([about("n-1", E2)], index).get(E2)).toEqual({
-      about: about("n-1", E2),
-      origin: undefined,
-    })
-  })
-
-  test("an origin note is drawn only once it has changed since done", () => {
-    expect(messageNotes([origin], index).has(E3)).toBe(false)
-    const changed = { ...origin, changedSinceDone: true }
-    expect(messageNotes([changed], index).get(E3)).toEqual({
-      about: undefined,
-      origin: changed,
-    })
-  })
-
-  test("a message can have both", () => {
-    const changed = { ...origin, changedSinceDone: true }
-    expect(messageNotes([changed, about("n-1")], index).get(E3)).toEqual({
-      about: about("n-1"),
-      origin: changed,
-    })
-  })
-
-  test("a draft is with no message", () => {
-    expect(messageNotes([draft()], index).size).toBe(0)
-  })
+test("messageNotes: each message's note, by its entry", () => {
+  const other = note({ id: noteId("n-2"), entry: entryId("f1") })
+  const drawn = messageNotes([note(), other])
+  expect(drawn.get(E2)).toEqual(note())
+  expect(drawn.get("f1")).toEqual(other)
+  expect(drawn.has("e1")).toBe(false)
 })
 
 describe("planNoteEdit", () => {
@@ -282,7 +125,7 @@ describe("planNoteEdit", () => {
     [11, ADA],
     [22, BEA],
   ])
-  const open = draft({ state: "open", subject: { kind: "entry", id: E2 } })
+  const open = note()
 
   test("contributors in order of first edit; an unknown clientID is nobody", () => {
     const first = planNoteEdit(open, { changed: [22, 99], authors })
@@ -309,17 +152,55 @@ describe("planNoteEdit", () => {
   })
 })
 
-test("a record round-trips through storage; a malformed one is dropped", () => {
-  const lane = laneNameForThread("x")
-  for (const n of [
-    draft({ subject: { kind: "draft", at: atEntry(E2), lane } }),
-    draft({
+describe("storage", () => {
+  test("a record round-trips, in the stored shape notes have always had", () => {
+    const n = note({ state: "done", contributors: [ADA] })
+    const stored = JSON.parse(JSON.stringify(encodeNote(n)))
+    expect(stored.subject).toEqual({ kind: "entry", id: "e2" })
+    expect(stored.entry).toBeUndefined()
+    expect(decodeNote(stored)).toEqual(n)
+  })
+
+  test("a note stored before cards still decodes", () => {
+    const before = {
+      id: "n-old",
       state: "open",
-      subject: { kind: "entry", id: E2 },
-      contributors: [ADA],
-    }),
-    sentNote(draft(), "s-1"),
-  ])
-    expect(decodeNote(JSON.parse(JSON.stringify(encodeNote(n))))).toEqual(n)
-  expect(decodeNote({ id: "n", state: "lost" })).toBeUndefined()
+      subject: { kind: "entry", id: "e2" },
+      openedBy: "p-ada",
+      contributors: ["p-ada"],
+      reopened: false,
+      changedSinceDone: false,
+    }
+    expect(decodeNote(before)?.entry).toBe(E2)
+  })
+
+  test("an old draft, a sent draft and a malformed record do not decode", () => {
+    const base = {
+      id: "n",
+      state: "done",
+      openedBy: "p-ada",
+      contributors: [],
+      reopened: false,
+      changedSinceDone: false,
+    }
+    expect(
+      decodeNote({
+        ...base,
+        state: "draft",
+        subject: { kind: "draft", at: "e2", lane: null },
+      }),
+    ).toBeUndefined()
+    expect(
+      decodeNote({ ...base, subject: { kind: "sent", sendId: "s-1" } }),
+    ).toBeUndefined()
+    expect(decodeNote({ id: "n", state: "lost" })).toBeUndefined()
+  })
+})
+
+test("orphanNotes: stored note documents whose record is gone or no longer decodes", () => {
+  const ofDoc = (docId: string) =>
+    docId.startsWith("note:") ? noteId(docId.slice(5)) : undefined
+  expect(
+    orphanNotes(["note:n-1", "note:old-draft", "card:c-1"], [note()], ofDoc),
+  ).toEqual(["note:old-draft"])
 })

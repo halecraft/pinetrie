@@ -3,12 +3,19 @@
 // Runs unmodified in a browser AND in Node (the e2e check), because the only
 // environment-specific value is the WebSocket constructor. No pi.
 
-import { Exchange, whenPeer } from "@kyneta/exchange"
+import {
+  createUndoStack,
+  Exchange,
+  type UndoStack,
+  whenPeer,
+} from "@kyneta/exchange"
 import { batch, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 
 import {
   type ArchiveAction,
+  type CardId,
+  type CardRecord,
   type ChatMode,
   type EntryId,
   type Intent,
@@ -22,17 +29,21 @@ import {
   type WriterId,
   writerOfPrincipal,
 } from "@pineta/core"
+import { encodeCard } from "@pineta/marginalia"
 import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
 import {
+  CARDS_DOC_ID,
   HOST_PRINCIPAL,
   PRESENCE_DOC_ID,
   type Reply,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
 import {
-  NoteDoc,
-  type NoteDocHandle,
+  CardsDoc,
+  type CardsDocHandle,
+  cardDocId,
+  cardIdOfDoc,
   noteDocId,
   PRESENCE_DECAY,
   type PresenceDecay,
@@ -42,6 +53,8 @@ import {
   SessionDoc,
   type SessionDocHandle,
   seatKey,
+  TextDoc,
+  type TextDocHandle,
 } from "@pineta/schema"
 
 /**
@@ -86,6 +99,18 @@ export interface SessionClient {
   readonly doc: SessionDocHandle
   /** Who is here (ADR-0024). Write only through the methods below. */
   readonly presence: PresenceDocHandle
+  /**
+   * Every card's record (ADR-0048). Read it through `readCards`; write a
+   * card only through `createCard` and `discardCard`, and its text through
+   * its editor.
+   */
+  readonly cards: CardsDocHandle
+  /**
+   * This tab's undo stack over its cards: in memory, so it lasts until the
+   * tab reloads or closes (ADR-0048). The cards document and every card's
+   * text are in its scope; nothing else is.
+   */
+  readonly undo: UndoStack
   /** This window's column `columnKey` follows the thread ending at `end`. */
   setReading(columnKey: string, end: string): void
   /** The column closed: its entry is deleted, not left to decay. */
@@ -103,14 +128,22 @@ export interface SessionClient {
   setName(name: string): Promise<Outcome>
   /** End the running turn of the thread whose lane is `lane`. */
   stop(lane: LaneName): Promise<Outcome>
-  /**
-   * Open a message for editing, draft a thread's next one, or move a note on
-   * (ADR-0025). `id` is the command's: a sent draft's send id, by which its
-   * column finds the message.
-   */
-  note(action: NoteAction, id?: string): Promise<Outcome>
+  /** Open a note on a message, or move a note on (ADR-0025). */
+  note(action: NoteAction): Promise<Outcome>
   /** A note's text: the same document for every caller. */
-  noteText(id: NoteId): NoteDocHandle
+  noteText(id: NoteId): TextDocHandle
+  /** A card's text: the same document for every caller. */
+  cardText(id: CardId): TextDocHandle
+  /**
+   * Create a card holding `text`: its record and its text in one undo step,
+   * so undoing past the first keystroke removes it again.
+   */
+  createCard(card: CardRecord, text: string): void
+  /**
+   * Delete a card's record, outside the undo stack: a fresh column's card
+   * discarded with its column, which nothing could show again.
+   */
+  discardCard(id: CardId): void
   /** Hide the root `root` for everyone, or bring it back (ADR-0029). */
   archive(action: ArchiveAction, root: EntryId): Promise<Outcome>
   /** Title the entry `entry`, or clear its title with null (ADR-0045). */
@@ -138,6 +171,8 @@ export interface ChatHow {
   readonly work?: WorkSetting
   /** The send's id, minted by a fresh column so it can find its message. */
   readonly id?: string
+  /** The card the text is sent from, which the host spends once it is sent. */
+  readonly card?: CardId
 }
 
 export async function connectSession(
@@ -168,6 +203,16 @@ export async function connectSession(
   )
 
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
+  const cards = exchange.get(CARDS_DOC_ID, CardsDoc)
+  const cardText = (id: CardId): TextDocHandle =>
+    exchange.get(cardDocId(id), TextDoc)
+  // Its own document, which the host neither holds nor relays (host/policy.ts).
+  const undo = await createUndoStack({
+    exchange,
+    docId: `undo:${exchange.peerId}`,
+    key: "cards",
+    scope: id => id === CARDS_DOC_ID || cardIdOfDoc(id) !== undefined,
+  })
   const presence = exchange.get(
     PRESENCE_DOC_ID,
     presenceDoc(options.presenceDecay ?? PRESENCE_DECAY),
@@ -188,6 +233,7 @@ export async function connectSession(
   })()
 
   const unsubscribe = subscribe(doc, () => options.onChange?.())
+  const unsubscribeCards = subscribe(cards, () => options.onChange?.())
 
   /**
    * Encode an intent, send it, and resolve with the decoded outcome. The id is
@@ -206,6 +252,8 @@ export async function connectSession(
     principal,
     writer: me,
     presence,
+    cards,
+    undo,
     setReading(columnKey, end) {
       batch(presence, d => d.reading.set(readingKey(mine, columnKey), end))
     },
@@ -233,6 +281,7 @@ export async function connectSession(
           asksAgent: how.asksAgent === true,
           mentions: parseMentions(text),
           work: how.work ?? null,
+          card: how.card ?? null,
         },
         how.id,
       )
@@ -243,11 +292,21 @@ export async function connectSession(
     stop(lane) {
       return send({ kind: "stop", lane })
     },
-    note(action, id) {
-      return send({ kind: "note", action }, id)
+    note(action) {
+      return send({ kind: "note", action })
     },
     noteText(id) {
-      return exchange.get(noteDocId(id), NoteDoc)
+      return exchange.get(noteDocId(id), TextDoc)
+    },
+    cardText,
+    createCard(card, text) {
+      undo.gesture(() => {
+        cards.cards.set(card.id, encodeCard(card))
+        cardText(card.id).text.insert(0, text)
+      })
+    },
+    discardCard(id) {
+      cards.cards.delete(id)
     },
     update(lane) {
       return send({ kind: "update", lane })
@@ -265,6 +324,8 @@ export async function connectSession(
     async close() {
       try {
         unsubscribe?.()
+        unsubscribeCards?.()
+        undo.dispose()
       } catch {}
       // This seat's typing and editing go with it; another seat of the same
       // person keeps its own.

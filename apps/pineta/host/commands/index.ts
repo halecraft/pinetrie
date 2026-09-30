@@ -35,6 +35,7 @@ export interface CommandDeps {
     Pick<Agent, "setParticipantName">
   readonly work: ChatDeps["work"] & ArchiveDeps["work"] & LaneDeps["work"]
   readonly blobs: ChatDeps["blobs"]
+  readonly cards: ChatDeps["cards"]
   readonly notes: NoteDeps["notes"]
   readonly start: ChatDeps["start"]
 }
@@ -57,7 +58,7 @@ export interface Commands {
 export function createCommands(deps: CommandDeps): Commands {
   const { agent } = deps
   const { doc, newId } = deps.basics
-  const note: NoteDeps = { chat: deps, agent, notes: deps.notes }
+  const note: NoteDeps = { basics: deps.basics, agent, notes: deps.notes }
 
   async function handle(
     sender: Pick<ControlSender, "send">,
@@ -82,12 +83,10 @@ export function createCommands(deps: CommandDeps): Commands {
       case "chat":
         // The command's id is the send's id: its column finds its message by it.
         return respond(
-          await sendChat(deps, writer, id === "" ? newId() : id, intent, []),
+          await sendChat(deps, writer, id === "" ? newId() : id, intent),
         )
       case "note":
-        return respond(
-          await handleNote(note, writer, id === "" ? newId() : id, intent),
-        )
+        return respond(await handleNote(note, writer, intent))
       case "name":
         await agent.setParticipantName(writer, intent.name)
         return respond({ kind: "named" })
@@ -111,9 +110,8 @@ export function createCommands(deps: CommandDeps): Commands {
 
 /**
  * A command that would write in an archived root is refused, naming who
- * archived it (ADR-0029). A sent draft reaches `sendChat` only through a
- * `note` `send`, which is checked here, so `sendChat` needs no check of its
- * own. Null when the command may go on.
+ * archived it (ADR-0029). `sendChat` has no other caller, so it needs no
+ * check of its own. Null when the command may go on.
  */
 function refuseInArchive(
   doc: SessionDocHandle,
@@ -122,7 +120,7 @@ function refuseInArchive(
   const archive = readArchive(doc)
   if (archive.size === 0) return null
   const index = readTreeIndex(doc)
-  const at = writesAt(intent, readNotes(doc), index, readLanes(doc, index))
+  const at = writesAt(intent, readNotes(doc), readLanes(doc, index))
   const record = archivedAt(index, archive, at)
   if (record === null) return null
   const names = readParticipantNames(doc)

@@ -6,9 +6,12 @@
 // that person is NOW, with the name they sent it under when it differs, so a
 // message sent before someone named themselves does not read as a stranger's.
 
+import type { WriterId } from "@pineta/core"
+import { displayName } from "@pineta/marginalia"
+
 /**
- * A draft written together names its sender, then the others who wrote it
- * (ADR-0025): "Ada, with Bea". Each by their current name.
+ * A message written together names its sender, then the others who wrote it
+ * (ADR-0025, ADR-0048): "Ada, with Bea". Each by their current name.
  */
 export const withContributors = (speaker: string, others: readonly string[]) =>
   others.length === 0 ? speaker : `${speaker}, with ${others.join(", ")}`
@@ -21,4 +24,27 @@ export function speakerLabel(
 ): string {
   const now = writer === undefined ? undefined : current.get(writer)
   return now === undefined || now === asSent ? asSent : `${now} (${asSent})`
+}
+
+/** "Ada, Bea": each writer by their current name, in the order given. */
+export const namesOf = (
+  nameOf: ReadonlyMap<WriterId, string>,
+  writers: readonly WriterId[],
+): string => writers.map(w => displayName(w, nameOf.get(w))).join(", ")
+
+/**
+ * Whose drafting card this is, and who else wrote in it (ADR-0048): "Ada's
+ * draft · with Bea". `writers` are everyone who wrote in it (`writersOf`),
+ * the owner among them or not.
+ */
+export function cardHeading(
+  nameOf: ReadonlyMap<WriterId, string>,
+  owner: WriterId,
+  writers: readonly WriterId[],
+): string {
+  const others = writers.filter(w => w !== owner)
+  const whose = `${displayName(owner, nameOf.get(owner))}'s draft`
+  return others.length === 0
+    ? whose
+    : `${whose} · with ${namesOf(nameOf, others)}`
 }

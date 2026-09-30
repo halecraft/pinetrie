@@ -28,6 +28,7 @@ const Command = Schema.struct({
   workKind: Schema.string(),
   workDir: Schema.string(),
   targetId: Schema.string(),
+  cardId: Schema.string(),
 })
 
 const Reply = Schema.struct({

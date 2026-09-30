@@ -17,20 +17,22 @@ Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes` (and `readLane`, one
 of them), `readOutbox`,
 `readParticipantNames`, `readParticipants`, `readPresence`,
-`readAgentActivity`, `readNotes`, `readArchive`, `readMarks` (ADR-0045), and
+`readAgentActivity`, `readNotes`, `readSeats` and `readCards` (ADR-0048),
+`readArchive`, `readMarks` (ADR-0045), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
 `readProject` (`lanes`, or `direct` and why). `workAt` is where a lane created
 at an entry would work, and the commit and snapshot it would start from: the
 composer shows it, and the host creates the lane by it, and decides by it
 whether a sent message's paths are stored under `/mnt/host-working-copy`. `notesIndex` is one root's
-notes index: the records a filter keeps whose place is in that root, newest
-first, each with where it sits now (`noteAt`). The Archive tab's rows are a
+notes index: the records a filter keeps whose message is in that root, newest
+first. The Archive tab's rows are a
 client-only read, in `packages/client/archive-rows.ts`. Live streams are read with `readStreams` in
 `@pineta/schema`; an entry count stays in `packages/client/projection.ts`.
 
 `readReferencedBlobs` is every image something still shows (ADR-0042): each
-chat's, each held message's, and each in the notes' texts, which its caller
-must pass for every note, not only those it holds. `planSweep` decides which
+chat's, each held message's, and each in the texts people type, notes' and
+cards', which its caller must pass for every one, not only those it holds
+(the host gathers them all through its card port). `planSweep` decides which
 stored images to delete from it.
 
 It declares core, schema and marginalia only (`workspace.test.ts`), so it runs
@@ -65,3 +67,8 @@ Kyneta has let go.
 - **`readRenderableEntries` decodes chat** (`renderableMessage`), so the index
   carries each chat's writer, whether it compelled the agent, and its send id:
   `threadOf`'s race reads the first two, a fresh column the third.
+- **`readCards` keeps an unchanged card the same object.** A Yjs read gives
+  new objects every time, so it remembers each card's decoded record beside
+  the stored value it came from, per cards document, and reuses the record
+  while that value is unchanged (S54's rule, by value here). A change to one
+  card redraws only what shows it.

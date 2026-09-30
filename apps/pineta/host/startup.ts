@@ -1,16 +1,32 @@
 // host/startup — what a starting host does before it accepts a command.
 
-import type { LaneName } from "@pineta/core"
+import { cardId, type LaneName } from "@pineta/core"
 import {
   encodeWorkRecord,
+  orphanNotes,
+  planCardSweep,
+  planSeatSweep,
   planStartup,
   recordChanged,
   type WorkRecord,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
-import { readNotes, readOutbox, readThreadName } from "@pineta/reads"
-import { clearStreams, readValues } from "@pineta/schema"
+import {
+  readCards,
+  readNotes,
+  readOutbox,
+  readSeats,
+  readThreadName,
+} from "@pineta/reads"
+import {
+  type CardsDocHandle,
+  cardIdOfDoc,
+  clearStreams,
+  noteIdOfDoc,
+  readValues,
+} from "@pineta/schema"
 import type { Basics } from "./basics.ts"
+import type { CardPort } from "./cards.ts"
 import type { NoteTexts } from "./notes.ts"
 import type { Serial } from "./queue.ts"
 import type { Runs } from "./runs.ts"
@@ -20,7 +36,11 @@ export interface StartupDeps {
   readonly basics: Pick<Basics, "doc" | "log">
   readonly agent: Pick<
     Agent,
-    "commands" | "interrupted" | "refusedCommands" | "setWorkRecord"
+    | "commands"
+    | "interrupted"
+    | "refusedCommands"
+    | "setWorkRecord"
+    | "removeSeat"
   >
   readonly work: Pick<LaneWork, "project">
   /** Name every lane that has none (ADR-0039). */
@@ -29,6 +49,8 @@ export interface StartupDeps {
   readonly start: Runs["start"]
   readonly settle: (lanes: readonly LaneName[]) => Promise<void>
   readonly notes: Pick<NoteTexts, "hold">
+  readonly cards: Pick<CardPort, "texts" | "stored" | "remove">
+  readonly cardsDoc: CardsDocHandle
 }
 
 /**
@@ -36,8 +58,9 @@ export interface StartupDeps {
  * that has none (ADR-0039); resume each lane a crash interrupted, in its own
  * directory, and settle the others with messages held for them
  * (`planStartup`); write what the host found and the commands its pi loaded,
- * each only when it changed, after the startup compaction; and hold every
- * recorded note's text, so edits to it are attributed and reach the store.
+ * each only when it changed, after the startup compaction; hold every
+ * recorded note's text, so edits to it are attributed and reach the store;
+ * and sweep what no one will type in again (`sweepTexts`).
  * Nothing else runs yet, so clearing the streams needs no serial step.
  */
 export async function recover(deps: StartupDeps): Promise<void> {
@@ -77,4 +100,51 @@ export async function recover(deps: StartupDeps): Promise<void> {
   for (const r of agent.refusedCommands())
     log(`[host] command ${r.name} is refused: ${r.reason}`)
   for (const n of readNotes(doc)) await notes.hold(n.id, null)
+  await sweepTexts(deps)
+}
+
+/**
+ * Delete what no one will type in again (ADR-0048): card records whose text
+ * is empty and card documents with no record (`planCardSweep`); note
+ * documents whose record is gone or no longer decodes, old drafts among them
+ * (`orphanNotes`); and seat records no stored text names (`planSeatSweep`).
+ * Gather, plan, then execute; the stored lists and the records are read with
+ * no await between them.
+ */
+async function sweepTexts(deps: StartupDeps): Promise<void> {
+  const { agent, cards } = deps
+  const { doc, log } = deps.basics
+  // gather
+  const texts = await cards.texts()
+  const stored = await cards.stored()
+  const records = readCards(deps.cardsDoc)
+  const notes = readNotes(doc)
+  const seats = readSeats(doc)
+  // plan
+  const swept = planCardSweep({
+    cards: records,
+    texts: new Map(
+      texts.flatMap(t =>
+        t.kind === "card" ? [[cardId(t.id), t.text] as const] : [],
+      ),
+    ),
+    stored: stored.cards,
+    cardOfDoc: cardIdOfDoc,
+  })
+  const oldNotes = orphanNotes(stored.notes, notes, noteIdOfDoc)
+  const staleSeats = planSeatSweep(
+    seats,
+    texts.flatMap(t => t.clients),
+  )
+  // execute
+  await cards.remove({
+    records: swept.records,
+    docs: [...swept.docs, ...oldNotes],
+  })
+  for (const clientId of staleSeats) await agent.removeSeat(clientId)
+  const texts_ = swept.docs.length + oldNotes.length
+  if (swept.records.length + texts_ + staleSeats.length > 0)
+    log(
+      `[host] swept ${swept.records.length} empty card(s), ${texts_} unused text(s), ${staleSeats.length} seat(s)`,
+    )
 }

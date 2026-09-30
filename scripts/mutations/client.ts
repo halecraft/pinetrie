@@ -138,7 +138,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column opened to send drops its message",
     file: file,
-    from: "          ...(action.text === undefined ? {} : { pending: action.text }),",
+    from: "          ...(action.pending === undefined ? {} : { pending: action.pending }),",
     to: "          ...{},",
     command: unit,
     expect: "holds it until its send",
@@ -367,14 +367,6 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect: "scrolls to a message a column of its root already shows",
-  },
-  {
-    name: "a refused send drops its text",
-    file: send,
-    from: "        restore: message,\n        status: `not sent",
-    to: "        restore: null,\n        status: `not sent",
-    command: unit,
-    expect: "a conflict and a refusal put the message back",
   },
   {
     name: "a root's first column key holds a colon",
@@ -995,5 +987,29 @@ export const mutations: readonly Mutation[] = [
     to: "seen.unseen",
     command: unit,
     expect: "behind: a column mounted again",
+  },
+  {
+    name: "needsCard keeps a prefill-only box",
+    file: "packages/client/card-state.ts",
+    from: "): boolean => sendable(text, prefill, false) !== null",
+    to: '): boolean => text.trim() !== ""',
+    command: unit,
+    expect: "needsCard: only what could be sent",
+  },
+  {
+    name: "editorState stays bound after a spent reply",
+    file: "packages/client/card-state.ts",
+    from: '      if (event.spent) return { state: { kind: "local" }, act: "detach" }',
+    to: '      if (event.spent && state.card === null)\n        return { state: { kind: "local" }, act: "detach" }',
+    command: unit,
+    expect: "sending: spent empties the box",
+  },
+  {
+    name: "editorState ignores the card vanishing while bound",
+    file: "packages/client/card-state.ts",
+    from: '      return state.kind === "bound"\n        ? { state: { kind: "local" }, act: "detach" }\n        : stay(state)',
+    to: "      return stay(state)",
+    command: unit,
+    expect: "a card found attaches; a card gone detaches",
   },
 ]

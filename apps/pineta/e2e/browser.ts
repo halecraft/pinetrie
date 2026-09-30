@@ -25,6 +25,7 @@ import {
 } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
+  readCards,
   readLaneRecords,
   readMarks,
   readNames,
@@ -3485,57 +3486,145 @@ try {
       `the rail draws the note's message as a square, the size of a dot (${square[0]?.width}×${square[0]?.height})`,
     )
 
-    await page.fill(`${col(0)} .composer .input`, "Together:")
-    await page.click(`${col(0)} .composer .compose-together`)
-    const draftA = page.locator(`${col(0)} .draft-slot textarea`)
-    await draftA.waitFor({ timeout: 15_000 }).catch(() => null)
-    // The other window opens that thread from its rail, at its end.
-    const draftEnd = await page
+    // Cards (ADR-0048): what you type is a card on its thread, shown to
+    // everyone at that end, and kept across tab switches.
+    const box = `${col(0)} .composer .input`
+    const boxValue = (p: typeof page, sel: string) =>
+      p.$eval(sel, el => (el as HTMLTextAreaElement).value).catch(() => "")
+    const hasValue = (p: typeof page, sel: string, want: string) =>
+      p
+        .waitForFunction(
+          ([s, v]) =>
+            (document.querySelector(s ?? "") as HTMLTextAreaElement | null)
+              ?.value === v,
+          [sel, want],
+          { timeout: 15_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+    await page.click(box)
+    // Typed with no pause: the first keystroke creates the card, and the rest
+    // must land in it.
+    await page.keyboard.type("Together:")
+    const cardEnd = await page
       .locator(`${col(0)} .msg[data-entry]`)
       .last()
       .getAttribute("data-entry")
-    await second.click(`.rail-dot[data-entry="${draftEnd}"]`)
-    await second
-      .click(".draft-slot .join-draft", { timeout: 15_000 })
-      .catch(() => null)
-    const draftB = second.locator(".draft-slot textarea")
-    const joinedDraft = await draftB.waitFor({ timeout: 15_000 }).then(
-      () => true,
-      () => false,
-    )
+    await second.click(`.rail-dot[data-entry="${cardEnd}"]`)
+    const theirs = `.cards .card-editor.others .input`
+    const shownThere = await hasValue(second, theirs, "Together:")
     ok(
-      joinedDraft && (await draftA.inputValue()) === "Together:",
-      "compose together makes the thread's draft, and the other window joins it",
+      shownThere,
+      "a card typed in one window shows in the other's column, above its composer",
     )
-    await draftB.focus()
+    await second.focus(theirs)
     await second.keyboard.press("End")
     await second.keyboard.type(" from B")
-    await waitFor(() => false, 1_500)
-    await page.click(`${col(0)} .draft-slot .note-send`)
-    // Sent, the draft is done: its message is its text, with no card, since
-    // the card would repeat it.
-    const sentDraft = msg("Together: from B")
+    const mergedHere = await hasValue(page, box, "Together: from B")
+    const heading = await second
+      .textContent(".cards .card-heading")
+      .catch(() => "")
+    ok(
+      mergedHere && /'s draft · with /.test(heading ?? ""),
+      `the other window's edit reaches the card's owner, and the card names who wrote in it (${heading})`,
+    )
+    const here =
+      (await page.getAttribute(
+        '#tabs .tab[aria-selected="true"]',
+        "data-root",
+      )) ?? ""
+    await page.click(tabSel(downRoot))
+    await page.click(tabSel(here))
+    ok(
+      await hasValue(page, box, "Together: from B"),
+      `what you type is still there after switching tabs (${await boxValue(page, box)})`,
+    )
+    // Undo is the card's (Kyneta's stack): your typing, never the other's.
+    // The last run is one input (`insertText`): Kyneta redoes a step of
+    // several commits to one text in reverse order (S58, addendum).
+    await page.focus(box)
+    await page.keyboard.press("End")
+    await page.keyboard.type(" and")
+    await waitFor(() => false, 1_200)
+    await page.keyboard.insertText(" more")
+    await page.keyboard.press("ControlOrMeta+z")
+    const undone = await hasValue(page, box, "Together: from B and")
+    await page.keyboard.press("ControlOrMeta+Shift+z")
+    const redone = await hasValue(page, box, "Together: from B and more")
+    ok(
+      undone && redone,
+      `Cmd+Z undoes your last run of typing, and Cmd+Shift+Z redoes it (${await boxValue(page, box)})`,
+    )
+    await page.focus(box)
+    await page.keyboard.press("Enter")
+    const sentCard = msg("Together: from B and more")
     const together = await page
-      .waitForSelector(sentDraft, { timeout: 60_000 })
+      .waitForSelector(sentCard, { timeout: 60_000 })
       .then(
         () => true,
         () => false,
       )
-    const cardless = await page
-      .$$eval(`${sentDraft} > .note`, n => n.length)
-      .catch(() => -1)
-    ok(
-      together && cardless === 0,
-      `a sent draft's message draws no card of it (${cardless})`,
-    )
     const byLine = await page
-      .$eval(`${sentDraft} .role`, n => n.textContent ?? "")
+      .$eval(`${sentCard} .role`, n => n.textContent ?? "")
       .catch(() => "")
     ok(
       together && /^Ada.*, with /.test(byLine),
-      `a sent draft is the sender's message, with its other writer (${byLine})`,
+      `a sent card is the sender's message, with its other writer (${byLine})`,
+    )
+    const emptied = await hasValue(page, box, "")
+    await page.click(tabSel(downRoot))
+    await page.click(tabSel(here))
+    ok(
+      emptied && (await hasValue(page, box, "")),
+      "a sent card leaves the box empty, and a tab switch does not bring it back",
     )
     await idle()
+    // A fresh column's card is kept by its key; closing it asks, and discards.
+    // A message's tools show on hover.
+    const branchable = page
+      .locator(`${col(0)} .msg[data-entry]:has(> .tools > .branch)`)
+      .first()
+    await branchable.hover()
+    await branchable.locator(":scope > .tools > .branch").click()
+    const freshBox = `${col(1)} .composer .input`
+    await page.waitForSelector(freshBox, { timeout: 15_000 })
+    await page.focus(freshBox)
+    await page.keyboard.press("End")
+    await page.keyboard.type("a fresh thought")
+    const freshText = await boxValue(page, freshBox)
+    await page.click(tabSel(downRoot))
+    await page.click(tabSel(here))
+    const freshKept = await hasValue(page, freshBox, freshText)
+    ok(
+      freshKept && freshText.endsWith("a fresh thought"),
+      `a new branch's text is kept across a tab switch (${await boxValue(page, freshBox)})`,
+    )
+    const cardsBefore = readCards(host.cards).length
+    await page.click(`${col(1)} .close`)
+    const asks = await page
+      .waitForSelector(`${col(1)} .close-ask`, { timeout: 5_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+    await page.click(`${col(1)} .close-discard`).catch(() => {})
+    const closed = await page
+      .waitForFunction(
+        () => document.querySelectorAll(".column").length === 1,
+        undefined,
+        { timeout: 5_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    await waitFor(() => readCards(host.cards).length < cardsBefore, 5_000)
+    ok(
+      asks && closed && readCards(host.cards).length === cardsBefore - 1,
+      "closing a new branch that holds text asks first, and discarding removes its card",
+    )
     await page.click(".notes-toggle")
     // The whole index shows, over the columns: its middle is its own, not a
     // column's drawn over it, and it is wider than the rail.
@@ -3556,12 +3645,12 @@ try {
       panel.on && panel.width > panel.rail,
       `the notes index opens over the columns, whole (${Math.round(panel.width)}px, rail ${Math.round(panel.rail)}px)`,
     )
-    await page.click('.notes-filters [data-filter="done"]')
-    const doneRows = await page.locator('.notes-row[data-state="done"]').count()
-    const allDone = await page.locator(".notes-row").count()
+    await page.click('.notes-filters [data-filter="open"]')
+    const openRows = await page.locator('.notes-row[data-state="open"]').count()
+    const allOpen = await page.locator(".notes-row").count()
     ok(
-      doneRows === 1 && allDone === 1,
-      `the notes index lists the sent draft under done (${doneRows} of ${allDone})`,
+      openRows === 1 && allOpen === 1,
+      `the notes index lists the open note under open (${openRows} of ${allOpen})`,
     )
     await page.click(".notes-toggle")
   } finally {
@@ -3579,6 +3668,9 @@ try {
   const columnKeys = (p: typeof page) =>
     p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))
   const openKeys = await columnKeys(page)
+  // What you type is kept across a reload too (ADR-0048).
+  await page.fill(`${col(0)} .composer .input`, "survives a reload")
+  await waitFor(() => false, 300)
 
   // A reload is the same person: the device keeps your email, so your name
   // stays and you are not shown to yourself as someone else.
@@ -3621,6 +3713,20 @@ try {
     openKeys.length >= 2 && reopened.join() === openKeys.join(),
     `a reload keeps the tab's open columns, in order (${reopened.length} of ${openKeys.length})`,
   )
+  const typedBack = await page
+    .waitForFunction(
+      s =>
+        (document.querySelector(s) as HTMLTextAreaElement | null)?.value ===
+        "survives a reload",
+      `${col(0)} .composer .input`,
+      { timeout: 10_000 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(typedBack, "what you type is still there after a reload")
+  await page.fill(`${col(0)} .composer .input`, "")
   // A new tab shares the device's storage (same context; every
   // `browser.newPage()` makes a new one) and opens the layout last saved.
   const newTab = await page.context().newPage()

@@ -14,8 +14,10 @@ import {
   ARCHIVE_ACTIONS,
   type ArchiveAction,
   atEntry,
+  type CardId,
   CHAT_MODES,
   type ChatMode,
+  cardId,
   type EntryId,
   ERR,
   type ErrCode,
@@ -138,6 +140,7 @@ export function decodeCommand(
       asksAgent: wire?.asksAgent === true,
       mentions: parseMentions(body),
       work,
+      card: cardFromWire(text(wire?.cardId)),
     }
   }
   if (kind === "update" || kind === "offer") {
@@ -194,25 +197,15 @@ function decodeNote(
       ? refused(ERR.NO_ANCHOR, "the root is no message to open")
       : note({ kind: "open", entry: at.id })
   }
-  if (action === "draft") {
-    if (at.kind === "root")
-      return refused(ERR.NO_ANCHOR, "a draft continues a thread")
-    const lane = text(wire?.lane)
-    if (lane !== "" && !isLaneName(lane))
-      return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
-    return note({
-      kind: "draft",
-      at,
-      lane: isLaneName(lane) ? lane : null,
-      // What its sender had typed, as typed: a draft is not trimmed.
-      text: typeof wire?.text === "string" ? wire.text : "",
-    })
-  }
   const target = text(wire?.targetId)
   return target === ""
     ? refused(ERR.UNKNOWN_TARGET, "a note action must name its note")
     : note({ kind: action, note: noteId(target) })
 }
+
+/** A chat's card on the wire: `""` is none. */
+const cardFromWire = (id: string): CardId | null =>
+  id === "" ? null : cardId(id)
 
 const isNoteAction = (a: string): a is (typeof NOTE_ACTIONS)[number] =>
   (NOTE_ACTIONS as readonly string[]).includes(a)
@@ -257,6 +250,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         lane: intent.lane ?? "",
         asksAgent: intent.asksAgent,
         ...workToWire(intent.work),
+        cardId: intent.card ?? "",
       })
     case "name":
       return command({ id, kind: "name", text: intent.name })
@@ -294,13 +288,6 @@ const noteToWire = (a: NoteAction) => {
   switch (a.kind) {
     case "open":
       return { mode: "open", parentId: a.entry }
-    case "draft":
-      return {
-        mode: "draft",
-        parentId: positionToWire(a.at),
-        lane: a.lane ?? "",
-        text: a.text,
-      }
     default:
       return { mode: a.kind, targetId: a.note }
   }

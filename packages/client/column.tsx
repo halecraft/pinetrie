@@ -4,6 +4,8 @@ import { useSelector } from "@kyneta/react"
 import {
   type AgentRun,
   atEntry,
+  type CardPlace,
+  type CardRecord,
   type ColumnView,
   type EntryId,
   entryId,
@@ -13,6 +15,7 @@ import {
   nearestRevision,
   type Position,
   ROOT,
+  type SeatRecord,
   type ThreadLane,
   type TreeIndex,
   threadOf,
@@ -21,10 +24,10 @@ import {
 } from "@pineta/core"
 import {
   displayName,
-  draftFor,
+  draftingAt,
   type Held,
-  type MessageNotes,
   type OfferButton,
+  yourCard,
 } from "@pineta/marginalia"
 import {
   readStreamText,
@@ -38,6 +41,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { CardEditor } from "./card-editor.tsx"
 import {
   AGENT_MARK,
   columnView,
@@ -46,7 +50,7 @@ import {
   type WorkFacts,
   type WorkStrip,
 } from "./column-view.ts"
-import type { Column as ColumnSpec, Prefill } from "./columns.ts"
+import type { Column as ColumnSpec, Pending, Prefill } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
 import { behind, type SeenEnd } from "./follow.ts"
 import { callStreams, type LiveWork } from "./live.ts"
@@ -92,8 +96,12 @@ export interface ColumnProps {
   onTyping: () => void
   /** Every note's record (ADR-0025). */
   notes: readonly NoteRecord[]
-  /** The notes drawn with each message (`messageNotes`). */
-  notesOf: ReadonlyMap<string, MessageNotes>
+  /** The note drawn with each message (`messageNotes`). */
+  notesOf: ReadonlyMap<string, NoteRecord>
+  /** Every card's record (ADR-0048). */
+  cards: readonly CardRecord[]
+  /** Every seat the host has seen: who wrote in a card. */
+  seats: readonly SeatRecord[]
   /** Others editing a note now (presence), each person once. */
   editorsOf: (note: string) => readonly WriterId[]
   /** Every lane the agent is replying on. Several threads can run at once. */
@@ -114,10 +122,11 @@ export interface ColumnProps {
   /** Open a new tab, its composer starting with `prefill`. */
   onNewTab: (prefill: Prefill, asksAgent: boolean) => void
   /**
-   * After a conflict: a fresh column at `at`, which sends `text` there. A
-   * conflict needs a reply at an entry: a `branch` never conflicts.
+   * After a conflict: a fresh column at `at`, which sends the text there and
+   * spends its card. A conflict needs a reply at an entry: a `branch` never
+   * conflicts.
    */
-  onBranchInstead: (at: EntryId, text: string) => void
+  onBranchInstead: (at: EntryId, pending: Pending) => void
   /** Nothing may be written here (ADR-0029): no composer, no tools that write. */
   readOnly: ReadOnly | null
   /** A fresh column's first send, by id. */
@@ -259,17 +268,58 @@ export function Column(p: ColumnProps) {
     project: p.work.project,
   })
 
-  const draft =
-    fresh || view.tipId === null || !writable
+  // The cards at this column's end (ADR-0048): yours, which the composer
+  // edits, and everyone else's, drawn above it. A thread's cards are found
+  // by where its thread ends now; a fresh column's by its key.
+  const threadEnd =
+    thread.kind === "thread" && thread.end.kind === "entry"
+      ? thread.end.id
+      : null
+  const mine = fresh
+    ? yourCard(
+        p.session.writer,
+        { kind: "fresh", column: p.column.key },
+        p.cards,
+        p.lanes,
+        index,
+      )
+    : threadEnd === null
       ? undefined
-      : draftFor(view.tipId, p.lanes, index, p.notes)
+      : yourCard(
+          p.session.writer,
+          { kind: "end", end: threadEnd },
+          p.cards,
+          p.lanes,
+          index,
+        )
+  const others =
+    fresh || threadEnd === null
+      ? []
+      : draftingAt(threadEnd, p.cards, p.lanes, index).filter(
+          c => c.owner !== p.session.writer,
+        )
+  const place: CardPlace | undefined = fresh
+    ? { kind: "fresh", column: p.column.key }
+    : at.kind === "entry"
+      ? { kind: "drafting", at, lane: p.column.lane ?? null }
+      : undefined
+  // Closing a fresh column that holds your card asks first: its card has no
+  // other place, and discarding it is final (ADR-0048).
+  const [askClose, setAskClose] = useState(false)
+  const close = () => {
+    const typed =
+      fresh && mine !== undefined
+        ? p.session.cardText(mine.id).text().trim() !== ""
+        : false
+    if (typed) setAskClose(true)
+    else p.onClose()
+  }
   // The note this window is editing: while it is scrolled out of view, a bar
   // at the column's top leads back to it.
   const [editingNote, setEditingNote] = useState<NoteId | null>(null)
   const [outOfView, setOutOfView] = useState(false)
   const edited = p.notes.find(n => n.id === editingNote)
   const stillEdited = edited !== undefined && edited.state !== "done"
-  const [joined, setJoined] = useState<NoteId | null>(null)
   // What a message's reader asked for, carried out: the one handler every
   // message shares, so none of them redraws when this column does.
   const onAct = useStable((act: MessageAct) => {
@@ -358,7 +408,7 @@ export function Column(p: ColumnProps) {
               <button
                 aria-label="close column"
                 className="close"
-                onClick={p.onClose}
+                onClick={close}
                 title="close column"
                 type="button"
               >
@@ -367,6 +417,29 @@ export function Column(p: ColumnProps) {
             )}
           </div>
           <Origin onOpen={p.onOpen} origin={shows.origin} />
+          {askClose && (
+            <div className="close-ask">
+              discard what you typed?{" "}
+              <button
+                className="close-discard"
+                onClick={() => {
+                  if (mine !== undefined) p.session.discardCard(mine.id)
+                  setAskClose(false)
+                  p.onClose()
+                }}
+                type="button"
+              >
+                discard
+              </button>{" "}
+              <button
+                className="close-keep"
+                onClick={() => setAskClose(false)}
+                type="button"
+              >
+                keep
+              </button>
+            </div>
+          )}
         </header>
         <div className="column-body" ref={body}>
           {stillEdited && outOfView && (
@@ -379,8 +452,7 @@ export function Column(p: ColumnProps) {
               }
               type="button"
             >
-              editing a {edited.state === "draft" ? "draft" : "note"} · back to
-              it
+              editing a note · back to it
             </button>
           )}
           {/* `useFollow` watches its height. Keep it unpositioned: it would
@@ -404,15 +476,14 @@ export function Column(p: ColumnProps) {
                   key={node.id}
                   nameOf={p.nameOf}
                   node={node}
-                  about={drawn?.about && card(drawn.about)}
+                  about={drawn && card(drawn)}
                   onAct={onAct}
-                  origin={drawn?.origin && card(drawn.origin)}
                   tools={messageTools(node, {
                     parentId: index.parentOf(node.id),
                     isLast: i === view.nodes.length - 1,
                     lane,
                     writable,
-                    hasNoteAbout: drawn?.about !== undefined,
+                    hasNoteAbout: drawn !== undefined,
                   })}
                 />
               )
@@ -472,50 +543,84 @@ export function Column(p: ColumnProps) {
             </div>
           )}
         </div>
-        {/* The thread's draft (ADR-0025): one per thread end, shared by all. */}
-        {draft !== undefined &&
-          (joined === draft.id ||
-          draft.openedBy === p.session.writer ||
-          draft.contributors.includes(p.session.writer) ? (
-            <div className="draft-slot">{card(draft)}</div>
-          ) : (
-            <div className="draft-slot draft-invite">
-              {displayName(draft.openedBy, p.nameOf.get(draft.openedBy))} is
-              drafting the next message ·{" "}
-              <button
-                className="join-draft"
-                onClick={() => setJoined(draft.id)}
-                type="button"
-              >
-                join
-              </button>
-            </div>
-          ))}
+        {/* Everyone else's cards at this end (ADR-0048): shown in full, each
+          editable and sendable by anyone here. */}
+        {others.length > 0 && (
+          <div className="cards">
+            {others.map(c => (
+              <CardEditor
+                asksAgent={p.column.asksAgent === true}
+                at={at}
+                boundLane={p.column.lane}
+                card={c}
+                commands={p.work.commands}
+                fresh={false}
+                insert={null}
+                key={c.id}
+                lane={lane}
+                onBranchInstead={pending => {
+                  if (at.kind === "entry") p.onBranchInstead(at.id, pending)
+                }}
+                onIntent={undefined}
+                onSend={() => {
+                  end.follow()
+                  return undefined
+                }}
+                onTyping={p.onTyping}
+                participants={p.participants}
+                pending={undefined}
+                place={undefined}
+                prefill={undefined}
+                readOnly={p.readOnly}
+                reader={{ me: p.session.writer, nameOf: p.nameOf }}
+                seats={p.seats}
+                session={p.session}
+                takeFocus={undefined}
+                where={undefined}
+              />
+            ))}
+          </div>
+        )}
         <WorkStripView
           act={act}
           review={{ id: reviewId, open: reviewing, toggle: toggleReview }}
           strip={shows.strip}
         />
+        {writable && lane.kind === "lane" && lane.running && (
+          <button
+            className="stop"
+            onClick={() => void p.session.stop(lane.name)}
+            title="end the agent's turn here; messages waiting are then taken"
+            type="button"
+          >
+            Stop
+          </button>
+        )}
         <Composer
           asksAgent={p.column.asksAgent === true}
-          defaultWork={defaultWork}
-          project={p.work.project}
-          commands={p.work.commands}
-          usedDirs={[
-            ...new Set(
-              [...p.work.lanes.values()].flatMap(r =>
-                r.work.kind === "direct" ? [r.work.dir] : [],
+          card={mine}
+          place={place}
+          seats={p.seats}
+          where={{
+            defaultWork,
+            project: p.work.project,
+            usedDirs: [
+              ...new Set(
+                [...p.work.lanes.values()].flatMap(r =>
+                  r.work.kind === "direct" ? [r.work.dir] : [],
+                ),
               ),
-            ),
-          ]}
+            ],
+          }}
+          commands={p.work.commands}
           at={at}
           boundLane={p.column.lane}
           fresh={fresh}
           reader={{ me: p.session.writer, nameOf: p.nameOf }}
           prefill={p.column.fresh?.prefill}
           lane={lane}
-          onBranchInstead={text => {
-            if (at.kind === "entry") p.onBranchInstead(at.id, text)
+          onBranchInstead={pending => {
+            if (at.kind === "entry") p.onBranchInstead(at.id, pending)
           }}
           onSend={() => {
             end.follow()
@@ -525,17 +630,6 @@ export function Column(p: ColumnProps) {
             return id
           }}
           onIntent={setCreatesLane}
-          onComposeTogether={
-            fresh || draft !== undefined || !writable
-              ? undefined
-              : text =>
-                  void p.session.note({
-                    kind: "draft",
-                    at,
-                    lane: p.column.lane ?? null,
-                    text,
-                  })
-          }
           onTyping={p.onTyping}
           takeFocus={() => p.takeFocus(p.column.key)}
           participants={p.participants}

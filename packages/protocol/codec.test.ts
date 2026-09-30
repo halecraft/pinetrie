@@ -7,6 +7,7 @@
 import assert from "node:assert/strict"
 import {
   atEntry,
+  cardId,
   ERR,
   entryId,
   laneNameForThread,
@@ -102,6 +103,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       asksAgent: true,
       mentions: [{ kind: "agent", agent: THE_AGENT }],
       work: null,
+      card: null,
     },
     {
       kind: "chat",
@@ -112,6 +114,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       asksAgent: false,
       mentions: [{ kind: "person", name: "bob" }],
       work: { kind: "own" },
+      card: cardId("c-7"),
     },
     {
       kind: "chat",
@@ -122,29 +125,11 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       asksAgent: false,
       mentions: [],
       work: { kind: "direct", dir: "/tmp/elsewhere" },
+      card: null,
     },
     { kind: "name", name: "Alice" },
     { kind: "stop", lane: laneNameForThread("abc") },
     { kind: "note", action: { kind: "open", entry: entryId("e-2") } },
-    {
-      kind: "note",
-      action: {
-        kind: "draft",
-        at: atEntry(entryId("e-2")),
-        lane: laneNameForThread("abc"),
-        text: "  as typed ",
-      },
-    },
-    {
-      kind: "note",
-      action: {
-        kind: "draft",
-        at: atEntry(entryId("e-2")),
-        lane: null,
-        text: "",
-      },
-    },
-    { kind: "note", action: { kind: "send", note: noteId("n-1") } },
     { kind: "note", action: { kind: "done", note: noteId("n-1") } },
     { kind: "note", action: { kind: "reopen", note: noteId("n-1") } },
     { kind: "archive", action: "archive", root: entryId("e-1") },
@@ -203,27 +188,31 @@ test("decode: a note names a known action, and what it acts on", () => {
     refusalCode(decodeCommand({ kind: "note", mode: "edit", parentId: "e-1" })),
     ERR.UNKNOWN_KIND,
   )
-  for (const mode of ["open", "draft"])
-    assert.equal(
-      refusalCode(decodeCommand({ kind: "note", mode, parentId: "" })),
-      ERR.NO_ANCHOR,
-    )
-  for (const mode of ["send", "done", "reopen"])
+  assert.equal(
+    refusalCode(decodeCommand({ kind: "note", mode: "open", parentId: "" })),
+    ERR.NO_ANCHOR,
+  )
+  for (const mode of ["done", "reopen"])
     assert.equal(
       refusalCode(decodeCommand({ kind: "note", mode, targetId: "" })),
       ERR.UNKNOWN_TARGET,
     )
-  assert.equal(
-    refusalCode(
-      decodeCommand({
-        kind: "note",
-        mode: "draft",
-        parentId: "e-1",
-        lane: "x",
-      }),
-    ),
-    ERR.UNKNOWN_TARGET,
-  )
+  // The next message is drafted in a card (ADR-0048): a note has no such actions.
+  for (const mode of ["draft", "send"])
+    assert.equal(
+      refusalCode(decodeCommand({ kind: "note", mode, targetId: "n-1" })),
+      ERR.UNKNOWN_KIND,
+    )
+})
+
+test("decode: a chat's card is its id, or none", () => {
+  const chat = (cardId: string) =>
+    decodeCommand({ kind: "chat", text: "hi", mode: "branch", cardId })
+  const card = (i: ReturnType<typeof chat>) =>
+    "kind" in i && i.kind === "chat" ? i.card : "refused"
+  assert.equal(card(chat("c-1")), "c-1")
+  assert.equal(card(chat("")), null)
+  assert.equal(card(chat("  ")), null)
 })
 
 test("an archive action must be known, and name its root", () => {

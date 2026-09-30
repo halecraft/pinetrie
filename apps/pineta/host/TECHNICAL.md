@@ -10,7 +10,7 @@ wires them.
 
 | module | owns |
 |---|---|
-| `index.ts` | `startHost`: the store, the Exchange, the documents, lane work and the agent, then the wiring below |
+| `index.ts` | `startHost`: the store, the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents, lane work and the agent, then the wiring below |
 | `basics.ts` | `Basics` (doc, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
 | `queue.ts` | `createSerial`: the one serial executor |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), and the agent's `onStream` (`streamInto`) |
@@ -18,6 +18,8 @@ wires them.
 | `settle.ts` | what happens between runs: drain, then compact and sweep |
 | `housekeeping.ts` | compacting the session, and deleting images nothing shows |
 | `notes.ts` | each note's text, held, and each edit attributed |
+| `cards.ts` | the card port (ADR-0048): who wrote in a card, spending one, and every typed text gathered for the sweeps; where the shell opens card documents |
+| `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`) |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
 | `commands/` | one module per command: `chat`, `note`, `archive`, `mark`, `lane` (stop, update, offer); `index.ts` decodes, checks the archive, routes |
@@ -74,7 +76,10 @@ wires them.
 `ensureNames` (ADR-0039), `planStartup` over the outbox and `interrupted()`,
 each interrupted lane resumed before anything waiting for it (S36 item 18),
 `settle` for the other lanes with held messages, the project and commands
-records written only when changed, and every note's text held.
+records written only when changed, every note's text held, and the sweep of
+what no one will type in again: empty cards, card and note documents with no
+record (old drafts among them), and seat records no stored text names
+(`sweepTexts`).
 
 - **Commands are taken only after `recover`.** `Control.listen` is made
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
@@ -89,9 +94,12 @@ records written only when changed, and every note's text held.
 
 - **A command's id is its send's id.** The column that sent a chat finds its
   message by it (`TreeIndex.bySend`).
-- **The archive gate is in the dispatcher** (`refuseInArchive`). A sent
-  draft is checked there as a `note` command, so `sendChat` has no gate of its
-  own, and `commands/note.ts` calls `sendChat`, never the dispatcher.
+- **The archive gate is in the dispatcher** (`refuseInArchive`). Only the
+  `chat` command calls `sendChat`, so `sendChat` has no gate of its own.
+- **A message sent from a card spends it** (ADR-0048): `sendChat` names the
+  card's other writers as contributors, through the card port, and spends
+  the card after `executeChat` answers `appended`, `started` or `queued`. The
+  command's text is what is sent: the text its sender saw.
 - **`executeChat` still checks a new lane's directory and asks pi for the
   lane.** Both are ports that may refuse, not facts to gather. The directory
   is checked first, so a refused send creates no lane.

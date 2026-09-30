@@ -22,8 +22,6 @@ export interface MessageProps {
   nameOf: ReadonlyMap<WriterId, string>
   /** Its note's card (ADR-0025), drawn below it. */
   about: ReactNode | undefined
-  /** The card of the note it was sent from, drawn below it once changed. */
-  origin: ReactNode | undefined
   /** Which tools it offers (`messageTools`). */
   tools: MessageTools
   /** What the reader asked of it: a note, a branch, a new tab, a closed branch. */
@@ -53,7 +51,6 @@ const MESSAGE_PROPS = {
   closedBranches: "value",
   nameOf: "identity",
   about: "identity",
-  origin: "identity",
   onAct: "identity",
 } as const satisfies { readonly [K in keyof MessageProps]-?: PropRule }
 

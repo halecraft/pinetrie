@@ -49,7 +49,7 @@ const archived: ArchiveRecord = {
 const note = (id: string, on: string): NoteRecord => ({
   id: noteId(id),
   state: "open",
-  subject: { kind: "entry", id: entryId(on) },
+  entry: entryId(on),
   openedBy: ADA,
   contributors: [],
   reopened: false,
@@ -63,7 +63,6 @@ const rows = (filter: ArchiveFilter, query = "", me = ADA) =>
     archive: new Map([["2-r2", archived]]),
     notes: [note("n1", "5-r1"), note("n2", "1-r1"), note("n3", "2-r2")],
     index,
-    lanes: [],
     filter,
     query,
     me,

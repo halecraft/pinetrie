@@ -412,7 +412,16 @@ describe("encodeLayout / decodeLayout", () => {
     const stored = encodeLayout({
       ...initialLayout(),
       roots: new Map([
-        ["1-r1", [{ key: "a", anchor: "1-r1", fresh: { pending: "hello" } }]],
+        [
+          "1-r1",
+          [
+            {
+              key: "a",
+              anchor: "1-r1",
+              fresh: { pending: { text: "hello" } },
+            },
+          ],
+        ],
       ]),
     })
     expect(JSON.stringify(stored)).not.toContain("hello")

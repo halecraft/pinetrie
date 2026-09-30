@@ -20,6 +20,7 @@ function setUp() {
     agent: agent.port,
     work: record<CommandDeps["work"]>().port,
     blobs: record<CommandDeps["blobs"]>().port,
+    cards: record<CommandDeps["cards"]>().port,
     notes: record<CommandDeps["notes"]>().port,
     start: () => {
       throw new Error("no run here")

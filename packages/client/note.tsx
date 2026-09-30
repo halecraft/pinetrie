@@ -1,29 +1,23 @@
 // client/note — a note's card, and the notes index (ADR-0025).
 //
-// A note's text is its own document, bound to a textarea with `useText`, so
-// everyone's edits merge as they type. Its record (state, contributors) is
-// read from the session. The card shows who else is editing it (presence).
+// A note is about a message. Its text is its own document, bound to a
+// textarea with `useText`, so everyone's edits merge as they type. Its record
+// (state, contributors) is read from the session. The card shows who else is
+// editing it (presence). The next message is drafted in a card
+// (`card-editor.tsx`, ADR-0048), not here.
 
 import { useText, useValue } from "@kyneta/react"
 import type { NoteId, NoteRecord, NoteState, WriterId } from "@pineta/core"
 import { NOTE_FILTERS, type NoteFilter, type NoteRow } from "@pineta/reads"
 import { useEffect, useRef, useState } from "react"
 import { MessageText } from "./message-text.tsx"
-import { nameFor } from "./presence.tsx"
-import { raceWords } from "./send.ts"
+import { namesOf } from "./names.ts"
 import type { SessionClient } from "./session-view.ts"
 
 const STATE_LABEL: Record<NoteState, string> = {
-  draft: "draft",
   open: "open for editing",
   done: "done",
 }
-
-/** "Ada, Bea": every name, in order of first edit. */
-const namesOf = (
-  nameOf: ReadonlyMap<WriterId, string>,
-  writers: readonly WriterId[],
-): string => writers.map(w => nameFor(nameOf, w)).join(", ")
 
 /** How long a card grows before it offers to collapse, in characters. */
 const LONG = 600
@@ -50,7 +44,7 @@ export function NoteCard({
   const [collapsed, setCollapsed] = useState(false)
   // Presence says "editing" while the editor has focus: refreshed as they
   // type, at most once a second, and null once they leave it, or once the
-  // editor goes (a draft sent, a note marked done) with no blur to say so.
+  // editor goes (a note marked done) with no blur to say so.
   const said = useRef(0)
   const focused = useRef(false)
   const editable = note.state !== "done"
@@ -71,18 +65,10 @@ export function NoteCard({
     said.current = t
     session.setEditing(note.id)
   }
-  const act = async (kind: "done" | "reopen" | "send") => {
-    setStatus(kind === "send" ? "sending…" : "")
+  const act = async (kind: "done" | "reopen") => {
+    setStatus("")
     const outcome = await session.note({ kind, note: note.id })
-    setStatus(
-      outcome.kind === "refused"
-        ? `not done: ${outcome.message}`
-        : outcome.kind === "conflict"
-          ? `${raceWords(outcome.by, { me: session.writer, nameOf })}; the draft is kept.`
-          : outcome.kind === "queued"
-            ? "sent · waiting for the agent"
-            : "",
-    )
+    setStatus(outcome.kind === "refused" ? `not done: ${outcome.message}` : "")
   }
   return (
     <div
@@ -114,7 +100,7 @@ export function NoteCard({
         <MessageText className="note-text" mode="committed" text={text} />
       ) : (
         <textarea
-          aria-label={note.state === "draft" ? "the draft" : "the note"}
+          aria-label="the note"
           className="note-text"
           onBlur={() => {
             said.current = 0
@@ -132,15 +118,6 @@ export function NoteCard({
         />
       )}
       <div className="note-actions">
-        {note.state === "draft" && (
-          <button
-            className="note-send"
-            onClick={() => void act("send")}
-            type="button"
-          >
-            send
-          </button>
-        )}
         {note.state === "done" ? (
           <button
             className="note-reopen"
@@ -175,7 +152,6 @@ export function NoteCard({
 
 const FILTER_LABEL: Record<NoteFilter, string> = {
   all: "all",
-  draft: "drafts",
   open: "open",
   done: "done",
   changed: "changed since done",

@@ -5,7 +5,7 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/reads"]
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "referencedBlobs skips note texts",
+    name: "referencedBlobs skips the texts people type",
     file: "packages/reads/index.ts",
     from: "    for (const sha of pastedImages(text)) shas.add(sha)",
     to: '    for (const sha of pastedImages("")) shas.add(sha)',
@@ -51,5 +51,13 @@ export const mutations: readonly Mutation[] = [
     to: "    const last = waiting[0]",
     command: unit,
     expect: "lastWaiting is the writer of the newest item waiting",
+  },
+  {
+    name: "readCards gives an unchanged card a new object",
+    file: "packages/reads/index.ts",
+    from: "      was !== undefined && was.stored === stored",
+    to: '      was !== undefined && was.stored === "never"',
+    command: unit,
+    expect: "an unchanged card the same object",
   },
 ]

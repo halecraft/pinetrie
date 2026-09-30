@@ -66,7 +66,7 @@ export const DetailsSchema = Type.Object({
   compels: ResponderSchema,
   /** The send that wrote it (the command's id), so its column can find it. */
   sendId: Type.String(),
-  /** A sent draft's other editors (`WriterId`s), in order of first edit. */
+  /** The other people who wrote in the card it was sent from (`WriterId`s). */
   contributors: Type.Optional(Type.Array(Type.String())),
   /** The command it ran, and what the model read for it (ADR-0036). */
   command: Type.Optional(
@@ -89,9 +89,9 @@ const ChatSchema = Type.Object({
 })
 
 /**
- * A chat's structured fields. `author` is who sent it; a draft written
- * together (ADR-0025) also names its other editors, in `contributors`, so it
- * reads "Ada, with Bea". The model reads only the sender's name.
+ * A chat's structured fields. `author` is who sent it; a card others wrote
+ * in too (ADR-0048) also names them, in `contributors`, so it reads "Ada,
+ * with Bea". The model reads only the sender's name.
  */
 export interface ChatDetails {
   readonly author: WriterId
@@ -354,7 +354,7 @@ export function planChat(input: {
   readonly asksAgent: boolean
   /** The command's id. */
   readonly sendId: string
-  /** A sent draft's other editors; empty for a message written alone. */
+  /** The other people who wrote in its card; empty for a message written alone. */
   readonly contributors: readonly WriterId[]
   /** The images its text shows, as `planImages` found them in the store. */
   readonly images: readonly ImageRef[]

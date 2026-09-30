@@ -4,41 +4,39 @@
 import type { Exchange } from "@kyneta/exchange"
 import type { BlobStore } from "@pineta/core"
 import { SESSION_DOC_ID } from "@pineta/protocol/messages"
-import { planSweep, readNotes, readReferencedBlobs } from "@pineta/reads"
+import { planSweep, readReferencedBlobs } from "@pineta/reads"
 import type { Basics } from "./basics.ts"
-import type { NoteTexts } from "./notes.ts"
+import type { CardPort } from "./cards.ts"
 
 /**
  * Replace the store's records with the session as it stands, which also
  * trims the in-memory op log (ADR-0023). The session only: each client's
  * command Line is stored too, but half of it is the client's to write, and
  * Kyneta cannot compact a replica of a document another peer writes. Its
- * pruning should compact it; that is upstream (S25 addendum). A note's text
- * is Yjs, which Kyneta cannot compact live (S24).
+ * pruning should compact it; that is upstream (S25 addendum). A note's or a
+ * card's text is Yjs, which Kyneta cannot compact live (S24).
  */
 export const compactSession = (exchange: Exchange): Promise<void> =>
   exchange.compact(SESSION_DOC_ID)
 
 /**
- * Delete the images nothing shows any more: gather every note's text, then
- * the store's list and the session's references with no await between them,
- * `planSweep`, delete.
+ * Delete the images nothing shows any more: gather every text people type,
+ * cards' and notes' (`CardPort.texts`), then the store's list and the
+ * session's references with no await between them, `planSweep`, delete.
  */
 export async function sweepBlobs(input: {
   readonly basics: Pick<Basics, "doc" | "log" | "now">
   readonly blobs: BlobStore
   /** How long an image nothing shows is kept, from its upload or last touch. */
   readonly grace: number
-  readonly notes: Pick<NoteTexts, "hold">
+  readonly texts: CardPort["texts"]
 }): Promise<void> {
   const { doc, log } = input.basics
-  const { blobs, notes } = input
-  const noteTexts: string[] = []
-  for (const n of readNotes(doc))
-    noteTexts.push((await notes.hold(n.id, null)).text())
+  const { blobs } = input
+  const texts = (await input.texts()).map(t => t.text)
   const doomed = planSweep({
     stored: blobs.list(),
-    referenced: readReferencedBlobs(doc, noteTexts),
+    referenced: readReferencedBlobs(doc, texts),
     now: input.basics.now(),
     grace: input.grace,
   })

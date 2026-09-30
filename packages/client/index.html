@@ -316,10 +316,9 @@
       .conflict { font-size: .8rem; color: #d0a15f; margin-bottom: .35rem; }
       .conflict button { padding: .1rem .5rem; font-size: .75rem; }
 
-      /* Notes (ADR-0025): a note about a message, or a thread's shared draft. */
+      /* Notes (ADR-0025): a note about a message. */
       .note { margin-top: .3rem; padding: .4rem .5rem; border: 1px solid #3a3f48; border-radius: 4px;
         background: #181b21; }
-      .note[data-state="draft"] { border-style: dashed; }
       /* Below its message's text, and part of it (ADR-0043). */
       .msg > .note { margin-left: .75rem; border: 0; border-left: 2px solid #3a3f48; border-radius: 0; }
       .note[data-state="done"] { opacity: .85; }
@@ -330,10 +329,8 @@
       textarea.note-text { width: 100%; resize: vertical; padding: .4rem; border-radius: 4px;
         border: 1px solid #2c313a; background: #1b1e24; color: inherit; font: inherit; }
       .note-actions { display: flex; gap: .4rem; align-items: center; margin-top: .3rem; }
-      .note-actions button, .join-draft, .compose-together, .notes-toggle, .notes-filters button {
+      .note-actions button, .notes-toggle, .notes-filters button {
         padding: .05rem .45rem; font-size: .72rem; background: none; border: 1px solid #3a3f48; color: #aaa; }
-      .note-actions .note-send { border-color: #2f6feb; color: #9ecbff; }
-      .draft-slot { padding: .4rem .75rem 0; border-top: 1px solid #23272e; font-size: .8rem; color: #aaa; }
       /* The note being edited, scrolled away: a way back to it. */
       .note-bar { position: sticky; top: -.75rem; z-index: 2; display: block; width: 100%;
         margin-bottom: .5rem; padding: .15rem .5rem; font-size: .75rem; background: #2a2140;
@@ -361,8 +358,16 @@
       .notes-empty { font-size: .8rem; color: #6f7784; }
 
       .composer { padding: .5rem .75rem .75rem; border-top: 1px solid #23272e; }
-      /* An archived root, or a preview: what was typed stays, nothing is sent. */
-      .composer .input[readonly] { opacity: .5; }
+      /* An archived root, a preview, or a send on its way: what was typed
+         stays, and nothing more is typed. */
+      .card-editor .input[readonly] { opacity: .5; }
+      /* Everyone else's cards at this end (ADR-0048), above your composer. */
+      .cards { padding: .5rem .75rem 0; border-top: 1px solid #23272e; }
+      .card-editor.others { margin-bottom: .5rem; padding-left: .5rem; border-left: 2px solid #3a3f48; }
+      .card-heading { font-size: .72rem; color: #8b93a1; margin-bottom: .25rem; }
+      /* Closing a new branch that holds text asks first. */
+      .close-ask { font-size: .75rem; color: #d0a15f; margin-top: .25rem; }
+      .close-ask button { padding: .05rem .45rem; font-size: .72rem; }
       .read-only { display: flex; gap: .5rem; align-items: center; justify-content: flex-end;
         margin-top: .4rem; font-size: .8rem; color: #aab4c3; }
 
@@ -386,20 +391,18 @@
       .preview { flex: 1; display: flex; min-height: 0; }
       .preview-strip { display: flex; min-width: 0; }
       .typing { font-size: .75rem; color: #8b93a1; margin-bottom: .3rem; font-style: italic; }
-      .composer .input { display: block; width: 100%; resize: vertical; }
+      .card-editor .input { display: block; width: 100%; resize: vertical; }
       /* Commands matching what is typed (ADR-0036), above the input. */
-      .composer .command-menu { margin: 0 0 .25rem; padding: .25rem 0; max-height: 12rem; overflow-y: auto; background: #1b1f25; border: 1px solid #2d333b; border-radius: 4px; }
-      .composer .command { padding: .15rem .5rem; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .composer .command.highlighted { background: #2d333b; }
-      .composer .command-name { color: #d2a8ff; }
-      .composer .command-hint, .composer .command-kind, .composer .command-description { color: #8b949e; }
+      .card-editor .command-menu { margin: 0 0 .25rem; padding: .25rem 0; max-height: 12rem; overflow-y: auto; background: #1b1f25; border: 1px solid #2d333b; border-radius: 4px; }
+      .card-editor .command { padding: .15rem .5rem; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .card-editor .command.highlighted { background: #2d333b; }
+      .card-editor .command-name { color: #d2a8ff; }
+      .card-editor .command-hint, .card-editor .command-kind, .card-editor .command-description { color: #8b949e; }
       .msg .command-label { margin-left: .4rem; color: #d2a8ff; font-size: .85em; }
-      /* Under the text: compose together at the left; where a new agent works,
-         then send, at the right. A label too wide for the row is cut, and its
-         title names everyone. */
+      /* Under the text: where a new agent works, then send, at the right. A
+         label too wide for the row is cut, and its title names everyone. */
       .compose-row { display: flex; gap: .5rem; align-items: center; justify-content: flex-end;
         margin-top: .4rem; }
-      .compose-row .compose-together { margin: 0 auto 0 0; }
       .compose-row .send { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .where-menu .where-trigger { padding: .2rem .5rem; background: none; border: 1px solid #3a3f48;
         color: #aab4c3; font-size: .75rem; white-space: nowrap; }
@@ -408,7 +411,7 @@
         text-overflow: ellipsis; vertical-align: bottom; }
       .where-menu .where-caret { margin-left: .35rem; }
       .status { font-size: .75rem; color: #d0a15f; }
-      input, .composer textarea {
+      input, .card-editor textarea {
         flex: 1; padding: .5rem .7rem; border-radius: 6px;
         border: 1px solid #2c313a; background: #1b1e24; color: inherit; font: inherit;
       }

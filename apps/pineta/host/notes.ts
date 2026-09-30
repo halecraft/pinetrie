@@ -4,14 +4,13 @@
 import { type Exchange, whenHydrated } from "@kyneta/exchange"
 import { unwrap } from "@kyneta/schema"
 import type { NoteId, NoteRecord } from "@pineta/core"
-import { planNoteEdit } from "@pineta/marginalia"
-import { readNotes } from "@pineta/reads"
+import { authorsOf, planNoteEdit } from "@pineta/marginalia"
+import { readNotes, readSeats } from "@pineta/reads"
 import {
-  NoteDoc,
-  type NoteDocHandle,
-  noteAuthors,
   noteDocId,
   type SessionDocHandle,
+  TextDoc,
+  type TextDocHandle,
 } from "@pineta/schema"
 import type { Serial } from "./queue.ts"
 
@@ -39,20 +38,21 @@ export function startNoteTexts(input: {
   readonly setNote: (note: NoteRecord) => Promise<void>
 }): NoteTexts {
   const { exchange, doc, serial } = input
-  const notes = new Map<NoteId, { doc: NoteDocHandle; release: () => void }>()
+  const notes = new Map<NoteId, { doc: TextDocHandle; release: () => void }>()
 
   /**
-   * Each change's `clientID`s whose clocks moved, and the person behind each
-   * connected seat's `clientID`, are gathered as the edit arrives, while its
-   * sender is certainly connected: by the serial step, it may have gone.
-   * `planNoteEdit` decides, and a changed record is written in that step.
-   * The operations themselves say which seat wrote them (S26 addendum,
-   * ADR-0037).
+   * Each change's `clientID`s whose clocks moved are gathered as the edit
+   * arrives; the person behind each is read in the serial step from the seat
+   * records (`pineta.seat`, `host/seats.ts`), which name a seat after it has
+   * gone. A seat's record is written in the step its connection queued, ahead
+   * of any edit it makes. `planNoteEdit` decides, and a changed record is
+   * written in that step. The operations themselves say which seat wrote them
+   * (S26 addendum, ADR-0037).
    */
-  async function hold(id: NoteId, seed: string | null): Promise<NoteDocHandle> {
+  async function hold(id: NoteId, seed: string | null): Promise<TextDocHandle> {
     const held = notes.get(id)
     if (held !== undefined) return held.doc
-    const note = exchange.get(noteDocId(id), NoteDoc)
+    const note = exchange.get(noteDocId(id), TextDoc)
     // A stored note is loaded first, so its history is not taken for new edits.
     await whenHydrated(note)
     if (seed !== null && seed !== "") note.text.insert(0, seed)
@@ -65,10 +65,10 @@ export function startNoteTexts(input: {
         clock > (tr.beforeState.get(client) ?? 0) ? [client] : [],
       )
       if (changed.length === 0) return
-      const authors = noteAuthors(exchange.peers.current.values())
       void serial.run(async () => {
         const record = readNotes(doc).find(n => n.id === id)
         if (record === undefined) return
+        const authors = authorsOf(readSeats(doc))
         const next = planNoteEdit(record, { changed, authors })
         if (next !== null) await input.setNote(next)
       })

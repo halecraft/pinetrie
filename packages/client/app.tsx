@@ -33,6 +33,7 @@ import { SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
   type NoteFilter,
   notesIndex,
+  readCards,
   readParticipantNames,
   readPresence,
 } from "@pineta/reads"
@@ -212,13 +213,17 @@ function App({ session }: { session: SessionClient }) {
     outbox,
     participants,
     notes,
+    seats,
     archive,
     marks,
     workFacts,
   } = useSelector(doc, readSessionFacts)
-  // The notes drawn with each message (ADR-0043). A message with one is a
+  // Every card's record (ADR-0048): a second document, read on its own. An
+  // unchanged card keeps its record object (`readCards`).
+  const cards = useSelector(session.cards, readCards)
+  // The note drawn with each message (ADR-0043). A message with one is a
   // square on the rail, and counted on a closed branch's button.
-  const notesOf = useMemo(() => messageNotes(notes, index), [notes, index])
+  const notesOf = useMemo(() => messageNotes(notes), [notes])
   const noteEntries = useMemo(() => new Set(notesOf.keys()), [notesOf])
   const [notesOpen, setNotesOpen] = useState(false)
   const [noteFilter, setNoteFilter] = useState<NoteFilter>("all")
@@ -547,6 +552,7 @@ function App({ session }: { session: SessionClient }) {
     activity,
     live,
     colorOf,
+    cards,
     editorsOf: here.editingAt,
     index,
     lanes,
@@ -557,6 +563,7 @@ function App({ session }: { session: SessionClient }) {
       dispatch({ kind: "newTab", key: opening(), asksAgent, prefill }),
     outbox,
     participants,
+    seats,
     session,
     takeFocus,
     work: workFacts,
@@ -686,7 +693,6 @@ function App({ session }: { session: SessionClient }) {
                   archive,
                   notes,
                   index,
-                  lanes,
                   filter: archiveFilter,
                   query: archiveQuery,
                   me: session.writer,
@@ -704,7 +710,6 @@ function App({ session }: { session: SessionClient }) {
                       count: notesIndex(
                         notes,
                         index,
-                        lanes,
                         "all",
                         session.writer,
                         root,
@@ -734,7 +739,6 @@ function App({ session }: { session: SessionClient }) {
                     rows={notesIndex(
                       notes,
                       index,
-                      lanes,
                       noteFilter,
                       session.writer,
                       root,
@@ -770,13 +774,13 @@ function App({ session }: { session: SessionClient }) {
                             ...(prefill === undefined ? {} : { prefill }),
                           })
                         }
-                        onBranchInstead={(at, text) =>
+                        onBranchInstead={(at, pending) =>
                           act({
                             kind: "openFresh",
                             key: opening(),
                             at,
                             after: i,
-                            text,
+                            pending,
                           })
                         }
                         onClose={() =>

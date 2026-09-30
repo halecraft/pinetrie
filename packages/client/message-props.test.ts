@@ -33,7 +33,6 @@ const props = (
     doc: DOC,
     nameOf: NAMES,
     about: undefined,
-    origin: undefined,
     tools: messageTools(node, {
       parentId: "a",
       isLast: true,

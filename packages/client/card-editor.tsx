@@ -1,0 +1,576 @@
+// client/card-editor — one drafting card's editor (ADR-0048): your composer's
+// box, and every other card at a thread's end.
+//
+// One uncontrolled textarea for the editor's whole life. Until there is
+// something worth keeping it is local; the input that makes it worth keeping
+// creates the card and binds this same element to the card's text, in one
+// handler, so no keystroke falls between the card existing and the element
+// being bound, and focus and the caret never move. `editorState` decides each
+// step; this component carries it out. Every write the editor makes itself
+// (a command chosen, an update's intent, a pasted image) goes through the
+// element, so no path asks whether a card exists yet.
+
+import { attach } from "@kyneta/react"
+import { subscribe } from "@kyneta/schema"
+import {
+  type CardId,
+  type CardPlace,
+  type CardRecord,
+  type ChatMode,
+  type CommandSummary,
+  cardId,
+  type LaneName,
+  type Position,
+  type ProjectRecord,
+  type SeatRecord,
+  type ThreadLane,
+  type WorkSetting,
+} from "@pineta/core"
+import { spends, writersOf } from "@pineta/marginalia"
+import { textClients } from "@pineta/schema"
+import { useEffect, useRef, useState } from "react"
+import {
+  type EditorEvent,
+  type EditorState,
+  editorState,
+} from "./card-state.ts"
+import type { Pending, Prefill } from "./columns.ts"
+import { matchCommands } from "./commands.ts"
+import { Menu } from "./menu.tsx"
+import { cardHeading } from "./names.ts"
+import {
+  imageMarkdown,
+  insertAt,
+  pastedFiles,
+  type Selection,
+  uploadImage,
+} from "./paste.ts"
+import {
+  planSend,
+  type Reader,
+  sendable,
+  settleSend,
+  whereChoices,
+  whereWords,
+} from "./send.ts"
+import type { SessionClient } from "./session-view.ts"
+
+/**
+ * A column where nothing may be written: an archived root, in place or
+ * previewed, or an open root's preview (ADR-0029). The editor keeps what was
+ * typed, and shows `label` and `action` in place of its buttons.
+ */
+export interface ReadOnly {
+  readonly label: string
+  readonly action: { readonly title: string; readonly go: () => void }
+}
+
+/** Where a lane this editor's send creates would work, and the choices. */
+export interface Where {
+  /** The lane above's setting, else the project's default (`workFor`). */
+  readonly defaultWork: WorkSetting | null
+  readonly project: ProjectRecord | null
+  /** Directories other lanes work in directly: offered again. */
+  readonly usedDirs: readonly string[]
+}
+
+/**
+ * A new card's id: a uuidv7, so ids sort oldest first and no two writers
+ * mint one key (ADR-0016).
+ */
+const newCardId = (): CardId => {
+  const time = Date.now().toString(16).padStart(12, "0")
+  const rand = [...crypto.getRandomValues(new Uint8Array(10))]
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("")
+  const variant = ((Number.parseInt(rand.slice(3, 4), 16) & 3) | 8).toString(16)
+  return cardId(
+    `${time.slice(0, 8)}-${time.slice(8)}-7${rand.slice(0, 3)}-${variant}${rand.slice(4, 7)}-${rand.slice(7, 19)}`,
+  )
+}
+
+/**
+ * Before sending, the button says what the message will do: who it is for,
+ * and whether it will wait (`planSend`, which decides as the host will, over
+ * the thread `threadOf` gives, ADR-0021). When the send starts an agent, a
+ * chip beside it says where that agent will work, and changes it.
+ *
+ * A reply carries the end its sender saw. If another writer's compelled
+ * message got there first, or the lane became busy, the host writes nothing
+ * and says so (`conflict`), and the sender chooses: queue, or branch here.
+ * Either way, and after a refusal, the card is still there: nothing is put
+ * back, because nothing was taken away.
+ */
+export function CardEditor(p: {
+  session: SessionClient
+  /** The card this edits: yours here once it exists, or someone else's. */
+  card: CardRecord | undefined
+  /**
+   * Where a card made from this box goes: yours, at this column. Undefined
+   * for someone else's card, which always exists.
+   */
+  place: CardPlace | undefined
+  /** Where the message attaches: the column's end, or its branch point. */
+  at: Position
+  /** The thread's lane, from `threadOf`: whether the agent is busy there. */
+  lane: ThreadLane
+  /** The lane this column is bound to, which its sends name. */
+  boundLane: LaneName | undefined
+  /** A Start Agent column. */
+  asksAgent: boolean
+  /** A fresh column: its first message starts the thread (`branch`). */
+  fresh: boolean
+  /** The commands the host's pi loaded, for completion (ADR-0036). */
+  commands: readonly CommandSummary[]
+  /** Everyone who can be mentioned, as shown. */
+  participants: readonly string[]
+  /** Who is sending, and everyone's names. */
+  reader: Reader
+  /** Every seat the host has seen: who wrote in the card (`writersOf`). */
+  seats: readonly SeatRecord[]
+  /** What the box starts with, unsent: a fresh column's (`Prefill`). */
+  prefill: Prefill | undefined
+  /** A first message to send at once: this column was opened to send it. */
+  pending: Pending | undefined
+  /**
+   * Text to put in the box, unsent and editable: an update's intent
+   * (ADR-0038). Each new `key` puts it there once, after what is typed.
+   */
+  insert: { readonly text: string; readonly key: number } | null
+  /** Where a lane the send creates works; absent for someone else's card. */
+  where: Where | undefined
+  readOnly: ReadOnly | null
+  /** A fresh column's send id, recorded before its message is sent. */
+  onSend: () => string | undefined
+  /** After a conflict: open a branch at `at`, which sends the card's text. */
+  onBranchInstead: (pending: Pending) => void
+  /** Called on each keystroke; presence is written at most once a second. */
+  onTyping: () => void
+  /** Told whether the next send would create a lane, each time that changes. */
+  onIntent: ((createsLane: boolean) => void) | undefined
+  /** Whether this column was just opened: then the box takes focus, once. */
+  takeFocus: (() => boolean) | undefined
+}) {
+  const { session, card, prefill, pending } = p
+  const box = useRef<HTMLTextAreaElement>(null)
+  const [state, setState] = useState<EditorState>(() =>
+    card === undefined ? { kind: "local" } : { kind: "bound", card: card.id },
+  )
+  // The state as the handlers last left it, read synchronously between renders.
+  const current = useRef(state)
+  // The box's text, as shown: the element's while local, the card's while bound.
+  const [text, setText] = useState(
+    pending === undefined && card === undefined ? (prefill?.text ?? "") : "",
+  )
+  const detach = useRef<(() => void) | null>(null)
+  const [status, setStatus] = useState("")
+  const [uploading, setUploading] = useState(0)
+  const [conflict, setConflict] = useState<{
+    text: string
+    line: string
+  } | null>(null)
+  const [choice, setChoice] = useState<WorkSetting | null>(null)
+  const plan = planSend({
+    text,
+    fresh: p.fresh,
+    lane: p.lane,
+    asksAgent: p.asksAgent,
+    participants: p.participants,
+    reader: p.reader,
+  })
+  const [hidden, setHidden] = useState<string | null>(null)
+  const [picked, setPicked] = useState(0)
+  const matches = hidden === text ? [] : matchCommands(text, p.commands)
+  const highlighted = matches[Math.min(picked, matches.length - 1)]
+  const work = choice ?? p.where?.defaultWork ?? null
+  const { onIntent } = p
+  useEffect(() => onIntent?.(plan.createsLane), [plan.createsLane, onIntent])
+
+  /** Bind the box to a card's text, keeping the caret where it is. */
+  const bind = (id: CardId) => {
+    const el = box.current
+    if (el === null) return
+    detach.current?.()
+    const doc = session.cardText(id)
+    const { selectionStart, selectionEnd } = el
+    const off = attach(el, doc.text, { undo: session.undo })
+    el.setSelectionRange(selectionStart, selectionEnd)
+    setText(doc.text())
+    const stop = subscribe(doc, () => setText(doc.text()))
+    detach.current = () => {
+      off()
+      stop()
+    }
+  }
+  /** Unbind the box, and empty it. */
+  const unbind = () => {
+    detach.current?.()
+    detach.current = null
+    if (box.current !== null) box.current.value = ""
+    setText("")
+  }
+  /** One step of `editorState`, carried out. */
+  const step = (event: EditorEvent): void => {
+    const next = editorState(current.current, event, prefill)
+    current.current = next.state
+    setState(next.state)
+    switch (next.act) {
+      case "create": {
+        const el = box.current
+        if (el === null || p.place === undefined || next.state.kind !== "bound")
+          return
+        session.createCard(
+          { id: next.state.card, owner: session.writer, place: p.place },
+          el.value,
+        )
+        bind(next.state.card)
+        return
+      }
+      case "attach":
+        if (next.state.kind === "bound") bind(next.state.card)
+        return
+      case "detach":
+        unbind()
+        return
+      case null:
+        return
+    }
+  }
+
+  // The card as the column finds it: found, or gone. Gone only once it was
+  // seen: a card just created is not in the records until they redraw.
+  const seen = useRef<CardId | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on the card's coming and going
+  useEffect(() => {
+    const now = current.current
+    if (card !== undefined) {
+      if (now.kind === "bound" && now.card === card.id) {
+        seen.current = card.id
+        if (detach.current === null) bind(card.id)
+      } else if (now.kind === "local") {
+        seen.current = card.id
+        step({ kind: "found", card: card.id })
+      }
+    } else if (now.kind === "bound" && seen.current === now.card) {
+      step({ kind: "gone" })
+    }
+  }, [card?.id])
+  // Unbound on unmount. StrictMode mounts twice, so the handle is cleared
+  // too: the second mount binds again.
+  useEffect(
+    () => () => {
+      detach.current?.()
+      detach.current = null
+    },
+    [],
+  )
+
+  const send = async (message: string, as: ChatMode, from: CardId | null) => {
+    step({ kind: "send" })
+    setStatus("sending…")
+    const id = p.onSend()
+    const outcome = await session.chat(message, p.at, {
+      mode: as,
+      ...(p.boundLane === undefined ? {} : { lane: p.boundLane }),
+      asksAgent: p.asksAgent,
+      ...(id === undefined ? {} : { id }),
+      ...(plan.createsLane && choice !== null ? { work: choice } : {}),
+      ...(from === null ? {} : { card: from }),
+    })
+    step({ kind: "settled", spent: spends(outcome) })
+    const settled = settleSend(outcome, message, p.reader)
+    setConflict(settled.conflict)
+    setStatus(settled.status)
+  }
+  const cardOf = (s: EditorState): CardId | null =>
+    s.kind === "local" ? null : s.card
+
+  // Sent once, however often React runs effects (StrictMode runs them twice).
+  const sentPending = useRef(false)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, on opening
+  useEffect(() => {
+    if (pending === undefined || sentPending.current) return
+    sentPending.current = true
+    void send(pending.text, "branch", pending.card ?? null)
+  }, [])
+
+  // A column you just opened is for typing in: focus lands after its
+  // prefill (`onFocus`). After the strip's alignment, which is a layout
+  // effect; the focus scrolls a column opened past the strip's edge into view.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, on opening
+  useEffect(() => {
+    if (p.takeFocus?.() === true) box.current?.focus()
+  }, [])
+
+  /**
+   * Write into the box as typing would: the element changes, and its `input`
+   * event does the rest, local or bound.
+   */
+  const write = (start: number, end: number, insert: string) => {
+    const el = box.current
+    if (el === null) return
+    el.setRangeText(insert, start, end, "end")
+    el.dispatchEvent(new Event("input", { bubbles: true }))
+  }
+
+  // An insert is put in the box once per key, after whatever is already typed.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per insert
+  useEffect(() => {
+    const el = box.current
+    if (p.insert === null || p.insert.text === "" || el === null) return
+    if (el.value.trim() === "") write(0, el.value.length, p.insert.text)
+    else write(el.value.length, el.value.length, `\n\n${p.insert.text}`)
+  }, [p.insert?.key])
+
+  const choose = (name: string) => {
+    write(0, box.current?.value.length ?? 0, `/${name} `)
+    setPicked(0)
+  }
+
+  const submit = async () => {
+    const message = sendable(text, prefill, uploading > 0)
+    const now = current.current
+    if (message === null || p.readOnly !== null || now.kind === "sending")
+      return
+    await send(message, plan.mode, cardOf(now))
+  }
+
+  /**
+   * Upload pasted images, then put their markdown where the selection was
+   * when they were pasted, all at once and in order. A refused one is left
+   * out, and the host's reason shown.
+   */
+  const pasteImages = async (files: readonly File[], at: Selection) => {
+    setUploading(n => n + 1)
+    setStatus("uploading image…")
+    const uploads = await Promise.all(files.map(uploadImage))
+    setUploading(n => n - 1)
+    const snippets = uploads.flatMap((u, i) =>
+      u.ok ? [imageMarkdown(files[i]?.name ?? "", u.ref)] : [],
+    )
+    const refused = uploads.flatMap(u => (u.ok ? [] : [u.reason]))
+    setStatus(
+      refused.length === 0 ? "" : `image not added: ${refused.join("; ")}`,
+    )
+    const el = box.current
+    if (snippets.length === 0 || el === null) return
+    // `insertAt` decides the text, a line of its own for each image; the
+    // element is given it as one edit over the selection, as typing would.
+    const before = el.value
+    const start = Math.min(at.start, before.length)
+    const end = Math.min(Math.max(at.end, start), before.length)
+    const after = insertAt(before, at, snippets.join("\n")).text
+    write(start, end, after.slice(start, after.length - (before.length - end)))
+  }
+
+  const writers =
+    card === undefined
+      ? []
+      : writersOf(textClients(session.cardText(card.id)), p.seats)
+  const others = card !== undefined && card.owner !== session.writer
+
+  return (
+    <div className={others ? "card-editor others" : "card-editor"}>
+      {others && card !== undefined && (
+        <div className="card-heading">
+          {cardHeading(p.reader.nameOf, card.owner, writers)}
+        </div>
+      )}
+      {conflict !== null && (
+        <div className="conflict">
+          <span className="conflict-text">{conflict.line}</span>{" "}
+          <button
+            className="queue-after"
+            onClick={() => {
+              setConflict(null)
+              void send(conflict.text, "queue", cardOf(current.current))
+            }}
+            title={plan.queue.title ?? undefined}
+            type="button"
+          >
+            {plan.queue.button}
+          </button>{" "}
+          <button
+            className="branch-instead"
+            onClick={() => {
+              setConflict(null)
+              const from = cardOf(current.current)
+              p.onBranchInstead({
+                text: conflict.text,
+                ...(from === null ? {} : { card: from }),
+              })
+            }}
+            type="button"
+          >
+            branch here
+          </button>
+        </div>
+      )}
+      {matches.length > 0 && p.readOnly === null && (
+        <div className="command-menu" role="listbox">
+          {matches.map(c => (
+            <div
+              aria-selected={c === highlighted}
+              className={c === highlighted ? "command highlighted" : "command"}
+              data-command={c.name}
+              key={c.name}
+              onMouseDown={e => {
+                // Before the input loses focus.
+                e.preventDefault()
+                choose(c.name)
+              }}
+              role="option"
+              // Focus stays in the input; the keys there move the choice.
+              tabIndex={-1}
+            >
+              <span className="command-name">/{c.name}</span>
+              {c.argumentHint !== null && (
+                <span className="command-hint"> {c.argumentHint}</span>
+              )}
+              <span className="command-kind"> · {c.kind}</span>
+              {c.description !== "" && (
+                <span className="command-description"> {c.description}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Enter sends; Shift+Enter is a new line. It grows with what is
+          typed, up to a limit, then scrolls. Uncontrolled: while bound, the
+          card's binding owns its value. */}
+      <textarea
+        autoComplete="off"
+        className="input"
+        data-card={card?.id}
+        defaultValue={text}
+        onFocus={e => {
+          // Focused while it holds only what it started with: type after it.
+          if (prefill === undefined || e.currentTarget.value !== prefill.text)
+            return
+          const end = e.currentTarget.value.length
+          e.currentTarget.setSelectionRange(end, end)
+        }}
+        onInput={e => {
+          const value = e.currentTarget.value
+          setText(value)
+          setPicked(0)
+          p.onTyping()
+          if (current.current.kind === "local" && p.place !== undefined)
+            step({ kind: "input", text: value, card: newCardId() })
+        }}
+        onPaste={e => {
+          const files = pastedFiles(e.clipboardData)
+          if (files.length === 0) return
+          e.preventDefault()
+          const el = e.currentTarget
+          void pasteImages(files, {
+            start: el.selectionStart,
+            end: el.selectionEnd,
+          })
+        }}
+        onKeyDown={e => {
+          if (e.nativeEvent.isComposing) return
+          // While commands are offered, the keys move through them.
+          if (highlighted !== undefined) {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault()
+              const by = e.key === "ArrowDown" ? 1 : -1
+              setPicked((picked + by + matches.length) % matches.length)
+              return
+            }
+            if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+              e.preventDefault()
+              choose(highlighted.name)
+              return
+            }
+            if (e.key === "Escape") {
+              e.preventDefault()
+              setHidden(text)
+              return
+            }
+          }
+          if (e.key !== "Enter" || e.shiftKey) return
+          e.preventDefault()
+          void submit()
+        }}
+        placeholder={plan.placeholder}
+        readOnly={p.readOnly !== null || state.kind === "sending"}
+        ref={box}
+        rows={Math.min(8, Math.max(2, text.split("\n").length))}
+      />
+      {p.readOnly !== null ? (
+        <div className="read-only">
+          <span className="read-only-label">{p.readOnly.label}</span>
+          <button
+            className="read-only-action"
+            onClick={p.readOnly.action.go}
+            type="button"
+          >
+            {p.readOnly.action.title}
+          </button>
+        </div>
+      ) : (
+        <div className="compose-row">
+          {plan.createsLane &&
+            work !== null &&
+            p.where !== undefined &&
+            p.where.project !== null && (
+              <WhereMenu
+                project={p.where.project}
+                usedDirs={p.where.usedDirs}
+                work={work}
+                choose={setChoice}
+              />
+            )}
+          <button
+            className="send"
+            disabled={uploading > 0 || state.kind === "sending"}
+            onClick={() => void submit()}
+            title={plan.title ?? undefined}
+            type="button"
+          >
+            {uploading > 0 ? "uploading image…" : plan.button}
+          </button>
+        </div>
+      )}
+      <span className="status">{status}</span>
+    </div>
+  )
+}
+
+/** The chip that says where a new thread's agent works, and changes it. */
+function WhereMenu(p: {
+  project: ProjectRecord
+  usedDirs: readonly string[]
+  work: WorkSetting
+  choose: (work: WorkSetting) => void
+}) {
+  return (
+    <Menu
+      className="where-menu"
+      heading="where the agent works"
+      items={whereChoices(p.project, p.usedDirs).map(c => ({
+        key: c.key,
+        label: c.row,
+        className: c.className,
+        disabled: c.disabled,
+        ...(c.title === undefined ? {} : { title: c.title }),
+        onChoose: () => {
+          if (c.setting !== null) return p.choose(c.setting)
+          const dir = window.prompt("The directory to work in")?.trim()
+          if (dir !== undefined && dir !== "") p.choose({ kind: "direct", dir })
+        },
+      }))}
+      label="where the agent works"
+      trigger={
+        <>
+          <span className="where-words" data-work={p.work.kind}>
+            {whereWords(p.work, p.project)}
+          </span>
+          <span className="where-caret">▾</span>
+        </>
+      }
+      triggerClassName="where-trigger"
+    />
+  )
+}

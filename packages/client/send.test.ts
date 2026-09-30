@@ -38,9 +38,8 @@ const lane = (
 })
 
 describe("settleSend", () => {
-  test("a conflict and a refusal put the message back", () => {
+  test("a conflict offers queue or branch; a refusal says why", () => {
     expect(settleSend({ kind: "conflict", by: BEA }, "hi", READER)).toEqual({
-      restore: "hi",
       status: "",
       conflict: {
         text: "hi",
@@ -57,20 +56,18 @@ describe("settleSend", () => {
         READER,
       ),
     ).toEqual({
-      restore: "hi",
       status: "not sent: archived by Bea",
       conflict: null,
     })
   })
-  test("a written, started or queued message leaves the composer as it is", () => {
+  test("a written, started or queued message says only where it waits", () => {
     expect(
-      settleSend({ kind: "appended", id: entryId("e") }, "hi", READER).restore,
-    ).toBeNull()
+      settleSend({ kind: "appended", id: entryId("e") }, "hi", READER),
+    ).toEqual({ status: "", conflict: null })
     expect(
-      settleSend({ kind: "started", runId: runId("r") }, "hi", READER).restore,
-    ).toBeNull()
+      settleSend({ kind: "started", runId: runId("r") }, "hi", READER),
+    ).toEqual({ status: "", conflict: null })
     expect(settleSend({ kind: "queued", position: 1 }, "hi", READER)).toEqual({
-      restore: null,
       status: "waiting · 2nd in line",
       conflict: null,
     })

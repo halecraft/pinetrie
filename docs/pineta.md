@@ -93,12 +93,12 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 240/240 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 116 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 826/826 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 502 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 140/140, on the scripted model |
+| end-to-end | `pnpm run e2e` | 152/152, on the scripted model |
 | with a real model | `pnpm run e2e:live` | 121/121 |
-| **real browser** | `pnpm run e2e:browser` | 71/71 |
+| **real browser** | `pnpm run e2e:browser` | 167 checks; in a lane with no containers, the 6 that need one fail |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -164,9 +164,17 @@ yourself. The host refuses client writes to the session.
 
 **ADR-0025 — notes: a message opened for everyone's editing, or a draft of the
 next one.** The text is a Yjs document per note; the record is a host-written
-`pineta.note` value; entries stay as sent, and the model reads them so. One
-draft per thread end, sent through the one send path. Contributors come from
-each edit's Yjs `clientID`. The host refuses writes to a done note.
+`pineta.note` value; entries stay as sent, and the model reads them so.
+Contributors come from each edit's Yjs `clientID`. The host refuses writes to
+a done note. Drafts are withdrawn by ADR-0048: the next message is a card.
+
+**ADR-0048 — everything unsent is a card.** What you type is a card on its
+thread: its record in the cards document and its text in a Yjs document, both
+written by clients; the host only spends a card when it is sent, and sweeps
+empty ones. Everyone at a thread's end sees and can edit its cards. Who wrote
+in one comes from its `clientID`s, through the host's `pineta.seat` records.
+Undo is Kyneta's stack, one per tab, in memory. Built so far: the drafting
+card (step 1).
 
 **ADR-0026 — everything queued is a note; the queue waits at a
 note someone has open.** A message waiting for a busy lane becomes a `queued`
@@ -377,7 +385,9 @@ a reducer in `packages/client/layout.ts`, never written, and the inbox is
 `packages/client/inbox.ts`.
 
 `useText` binds each note's textarea to its Yjs text (ADR-0025): the first
-genuinely collaborative edit. Each person's composer stays local `useState`.
+genuinely collaborative edit. The composer is your drafting card
+(ADR-0048): one uncontrolled textarea, bound with Kyneta's `attach` to the
+card's text from the keystroke that creates it (`packages/client/card-editor.tsx`).
 
 **An image pasted into a composer reaches the agent** (ADR-0042): uploaded
 to `POST /blob`, kept by SHA-256 in `pineta_blobs` beside the session in
@@ -407,7 +417,7 @@ independently shippable:
 2. branch write — create a branch from any entry; Aside first
 3. ~~concurrent lanes~~ — done; since ADR-0020, a lane per thread, not per writer
 4. ~~references~~ — done, then withdrawn (ADR-0043): nothing read them
-5. ~~humans in the tree~~ (ADR-0018) — done: chat and compelled responders, presence (ADR-0024), notes and drafts (ADR-0025)
+5. ~~humans in the tree~~ (ADR-0018) — done: chat and compelled responders, presence (ADR-0024), notes (ADR-0025), and drafting cards (ADR-0048)
 6. Scout — read-only tools
 7. fold — three-way merge producing a `fromId` node
 
@@ -418,6 +428,14 @@ context.**
 
 ### Open, non-blocking
 
+- **Kyneta redoes a step of several commits to one text in reverse order**
+  (S58, addendum): after a run of keystrokes in a card, Cmd+Z then Cmd+Shift+Z
+  scrambles the last word. Undo is right. To ask upstream: `revertStep` for a
+  redo should apply its parts in the order that restores the text.
+- **A spent card's undo steps still take a Cmd+Z** (S58): the stack does not
+  know the host destroyed the document, so one keypress changes nothing
+  visible. To ask upstream: a document its authority dismissed counts as not
+  standing.
 - **A refused write to a note splits that client's replica.** Its later edits
   build on the refused one and never reach the host, even after the note is
   reopened (S26 addendum 2). The host keeps those later edits as pending

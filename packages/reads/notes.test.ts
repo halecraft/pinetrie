@@ -1,5 +1,4 @@
 import {
-  atEntry,
   type EntryLike,
   entryId,
   indexTree,
@@ -28,7 +27,7 @@ const index = indexTree(
 const note = (id: string, over: Partial<NoteRecord>): NoteRecord => ({
   id: noteId(id),
   state: "open",
-  subject: { kind: "entry", id: entryId("e1") },
+  entry: entryId("e1"),
   openedBy: ADA,
   contributors: [],
   reopened: false,
@@ -37,29 +36,24 @@ const note = (id: string, over: Partial<NoteRecord>): NoteRecord => ({
 })
 const notes = [
   note("n1", {}),
-  note("n2", {
-    state: "draft",
-    subject: { kind: "draft", at: atEntry(entryId("e1")), lane: null },
-    openedBy: BEA,
-  }),
+  note("n2", { entry: entryId("e2"), openedBy: BEA }),
   note("n3", { state: "done", openedBy: BEA, contributors: [ADA] }),
   note("n4", { reopened: true, changedSinceDone: true, openedBy: BEA }),
 ]
 
 test("notesIndex: newest first, each filter keeping its kind", () => {
   const ids = (filter: (typeof NOTE_FILTERS)[number], me = ADA) =>
-    notesIndex(notes, index, [], filter, me, "e1").map(r => r.note.id)
+    notesIndex(notes, index, filter, me, "e1").map(r => r.note.id)
   expect(ids("all")).toEqual(["n4", "n3", "n2", "n1"])
-  expect(ids("draft")).toEqual(["n2"])
-  expect(ids("open")).toEqual(["n4", "n1"])
+  expect(ids("open")).toEqual(["n4", "n2", "n1"])
   expect(ids("done")).toEqual(["n3"])
   expect(ids("changed")).toEqual(["n4"])
   expect(ids("mine")).toEqual(["n3", "n1"])
   expect(ids("mine", BEA)).toEqual(["n4", "n3", "n2"])
 })
 
-test("notesIndex: each row sits where its note does; a draft at its thread's end", () => {
-  const at = notesIndex(notes, index, [], "all", ADA, "e1").map(r => r.at)
+test("notesIndex: each row sits at its note's message", () => {
+  const at = notesIndex(notes, index, "all", ADA, "e1").map(r => r.at)
   expect(at).toEqual(["e1", "e1", "e2", "e1"])
 })
 
@@ -74,12 +68,10 @@ test("notesIndex: only the notes whose place is in the root", () => {
     },
   })
   const elsewhere = note("n5", {
-    subject: { kind: "entry", id: entryId("r2") },
+    entry: entryId("r2"),
   })
   const ids = (root: string) =>
-    notesIndex([...notes, elsewhere], two, [], "all", ADA, root).map(
-      r => r.note.id,
-    )
+    notesIndex([...notes, elsewhere], two, "all", ADA, root).map(r => r.note.id)
   expect(ids("r2")).toEqual(["n5"])
   expect(ids("e1")).toEqual(["n4", "n3", "n2", "n1"])
 })
