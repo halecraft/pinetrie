@@ -494,6 +494,10 @@ context.**
   grants it. Your working copy is yours, so hot reload stays on. It needs
   Apple's `container` running (`docs/05-stack.md` D10); without it, threads
   work directly. Restart the host to pick up changes to host code.
+- **A thread's container stops when its run ends**, and starts again at the
+  next message. A dev server or watcher the agent started ends with the run.
+  The agent is told this, and what else holds in every lane, by a short block
+  in its prompt and a note at `/pineta/packages/pi/lane.md` (ADR-0046).
 - **Who you are** (ADR-0037): the page asks for your email and name once per
   browser. The email is who you are, in every tab and on every device; the
   name is how you are shown, renamed in your profile: the avatar at the
@@ -578,7 +582,7 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
 |---|---|
 | `docs/00-vision.md` | product thesis, branch kinds, v1 scope |
 | `docs/01-architecture.md` | evidence base, layer cake, data model, module layout |
-| `docs/02-decisions.md` | **ADR-0001..0025** with rationale |
+| `docs/02-decisions.md` | **ADR-0001..0046** with rationale |
 | `docs/03-spikes.md` | S1–S16, each with question + kill criterion |
 | `docs/04-roadmap.md` | sequencing, invariants, action items |
 | `docs/05-stack.md` | stack decisions, sandbox constraints |

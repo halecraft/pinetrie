@@ -17,7 +17,12 @@ const DEFAULT_CONTAINERFILE = path.join(
   "image",
   "Containerfile",
 )
-const PROJECT_CONTAINERFILE = "pineta.Containerfile"
+/**
+ * A project's own image, when this file exists: its lanes then run it instead
+ * of Pineta's default image, which carries the browser (ADR-0041).
+ */
+export const projectContainerfile = (root: string): string =>
+  path.join(root, "pineta.Containerfile")
 /** The `PATH` of an image that names none. */
 const STANDARD_PATH =
   "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -77,7 +82,7 @@ export async function prepareImages(
   playwrightVersion: string,
   log: (m: string) => void,
 ): Promise<{ readonly lane: string; readonly runtimeFrom: string }> {
-  const own = path.join(root, PROJECT_CONTAINERFILE)
+  const own = projectContainerfile(root)
   const [jjVersion, pineta, project] = await Promise.all([
     hostJjVersion(),
     readFile(DEFAULT_CONTAINERFILE, "utf8"),

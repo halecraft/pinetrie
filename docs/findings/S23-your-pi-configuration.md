@@ -51,7 +51,8 @@ The call went through `createAgentHarness`, `StorageBackedSession` and
    are pi's coding agent's, and Pineta does not emit their events.
 3. **The system prompt comes from `buildSystemPrompt`.** The loader supplies
    its context files and skills. Its section layout is what `pi-anthropic-auth`
-   shapes.
+   shapes: the provider rebuilds the prompt by its section tags (see the
+   addendum).
    - The repo has no `AGENTS.md`, so Pineta's house rules reach the agent only
      once one exists.
    - All 72 of the person's skills are listed in the prompt. Choosing which
@@ -60,6 +61,26 @@ The call went through `createAgentHarness`, `StorageBackedSession` and
    `resource-loader`, `model-runtime`, `system-prompt` in
    `pi-coding-agent/dist/core`). They go in `packages/pi/deep.ts`, beside
    `ModelRuntime`, which already is.
+
+## Addendum (2026-09-30): what the model receives
+
+`buildSystemPrompt` renders every section as `<name>…</name>` text and joins
+them into one string, which the harness passes on unchanged. Read from
+inside a lane of its own, whose agent runs on the person's model through
+`pi-anthropic-auth`, the prompt arrives reshaped:
+
+| pi's section | as received |
+|---|---|
+| preamble | replaced: "You are Claude Code, …", then a short preamble of the provider's |
+| `<tools>` | rewritten to "(none)"; pi's closing sentence is gone |
+| `<rules>` | intact, with Pineta's `promptGuidelines` |
+| `<docs>` | gone |
+| `<project_context>`, `<skills>`, `<cwd>` | intact |
+
+A section Pineta adds through `buildSystemPrompt`'s `sections` was not
+observed; it may be dropped as `<docs>` is. What Pineta must say to every
+model goes in `<rules>` (ADR-0046). Observed only as the prompt a lane's
+agent was given; the extension's source was not read.
 
 ## Method
 

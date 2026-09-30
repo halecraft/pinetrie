@@ -4,13 +4,9 @@ import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
 /** One section of `e2e:lanes`; needs `container` running. */
-const lanes = (section: "main" | "images" | "shared" | "contract") => [
-  "env",
-  `PINETA_LANES_SECTION=${section}`,
-  "pnpm",
-  "run",
-  "e2e:lanes",
-]
+const lanes = (
+  section: "main" | "images" | "shared" | "commands" | "contract",
+) => ["env", `PINETA_LANES_SECTION=${section}`, "pnpm", "run", "e2e:lanes"]
 const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
@@ -404,5 +400,25 @@ export const mutations: readonly Mutation[] = [
     to: '      "PLAYWRIGHT_VERSION=1.55.0",',
     command: lanes("images"),
     expect: "Pineta's Playwright launches Chromium",
+  },
+  {
+    name: "the lane note is not where the prompt says",
+    file: "packages/lanes/lane.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane.md`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane-notes.md`",
+    command: unit,
+    expect: "every Pineta file a lane is pointed at exists",
+  },
+  {
+    name: "the lane note is not where the prompt says, in a real lane",
+    file: "packages/lanes/lane.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane.md`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane-notes.md`",
+    command: lanes("commands"),
+    expect: "the note the prompt names is a file in the lane",
   },
 ]

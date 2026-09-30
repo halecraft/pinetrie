@@ -2,6 +2,7 @@
 // like agent.test.ts: it drives pi's harness, which only this package may
 // import.
 
+import { existsSync, readFileSync } from "node:fs"
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -18,12 +19,109 @@ import { newSessionDoc, readEntries, rowMessage } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { createAgent, withoutFrontmatter } from "./agent.ts"
 import { type LaneChannel, openChannel } from "./lane-env.ts"
-import type { LaneAccess } from "./lanes.ts"
+import { type LaneAccess, type LaneFacts, laneGuidelines } from "./lanes.ts"
 import { scriptedModel } from "./scripted.ts"
 
 test("withoutFrontmatter: a skill's instructions, not its header", () => {
   expect(withoutFrontmatter("---\nname: x\n---\n\n# Do\nit\n")).toBe("# Do\nit")
   expect(withoutFrontmatter("# plain\n")).toBe("# plain")
+})
+
+// ── what a lane of its own is told (ADR-0046) ────────────────────────────
+
+/** A lane's facts with nothing granted, no shared directory and no browser. */
+const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
+  dir: "/workspace",
+  shared: [],
+  offer: "pineta-offer/quiet-otter",
+  grants: { ssh: false, env: [], mounts: [] },
+  browser: false,
+  install: "/pineta",
+  note: "/pineta/packages/pi/lane.md",
+  ...over,
+})
+
+describe("laneGuidelines", () => {
+  const text = (f: LaneFacts) => laneGuidelines(f).join("\n")
+
+  test("names the lane's directory, offer, install and note as given", () => {
+    const told = text(facts())
+    expect(told).toContain("your own jj repo at /workspace")
+    expect(told).toContain("one commit, `pineta-offer/quiet-otter`,")
+    expect(told).toContain("/pineta is Pineta's install, not your project")
+    expect(told).toContain("when you need it: /pineta/packages/pi/lane.md")
+    expect(told).toContain(
+      "/mnt/host-working-copy is the person's working copy",
+    )
+  })
+
+  test("with no name yet, the offer has no bookmark to give", () => {
+    const told = text(facts({ offer: null }))
+    expect(told).toContain("your work as one commit, and never sees")
+    expect(told).not.toContain("pineta-offer")
+  })
+
+  test("one line per shared directory, and none without", () => {
+    expect(text(facts())).not.toContain("shared live")
+    const lines = laneGuidelines(facts({ shared: [".plans", "notes"] }))
+    expect(lines.filter(l => l.includes("shared live"))).toEqual([
+      "/workspace/.plans is shared live with the person and other threads, never committed.",
+      "/workspace/notes is shared live with the person and other threads, never committed.",
+    ])
+  })
+
+  test("says what is granted, and nothing when nothing is", () => {
+    expect(text(facts())).toContain("or credentials. The internet works")
+    expect(
+      text(
+        facts({
+          grants: {
+            ssh: true,
+            env: ["NPM_TOKEN", "CI"],
+            mounts: ["/data", "/ref"],
+          },
+        }),
+      ),
+    ).toContain(
+      "or credentials except your ssh agent, $NPM_TOKEN, $CI, read-only files at /data, /ref. ",
+    )
+    expect(
+      text(facts({ grants: { ssh: false, env: ["CI"], mounts: [] } })),
+    ).toContain("or credentials except $CI. ")
+  })
+
+  test("names the browser only on an image that has one", () => {
+    expect(text(facts())).not.toContain("Chromium")
+    expect(text(facts({ browser: true }))).toContain(
+      "Chromium's headless shell is installed",
+    )
+  })
+
+  test("every source lane.md names is a file that still has its symbol", () => {
+    const repo = path.join(import.meta.dirname, "../..")
+    const note = readFileSync(path.join(import.meta.dirname, "lane.md"), "utf8")
+    const sources = [...note.matchAll(/<!-- (\S+) (\S+) -->/g)]
+    expect(sources.length).toBeGreaterThan(20)
+    const missing = sources.flatMap(([, file = "", symbol = ""]) => {
+      const at = path.join(repo, file)
+      if (!existsSync(at)) return [`${file} (no such file)`]
+      const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      const word = new RegExp(`(^|[^\\w$])${escaped}($|[^\\w$])`, "m")
+      return word.test(readFileSync(at, "utf8")) ? [] : [`${file} ${symbol}`]
+    })
+    expect(missing).toEqual([])
+  })
+
+  test("no two lines are equal, since pi drops a repeated guideline", () => {
+    const lines = laneGuidelines(
+      facts({
+        shared: [".plans", "notes"],
+        browser: true,
+        grants: { ssh: true, env: ["A"], mounts: ["/m"] },
+      }),
+    )
+    expect(new Set(lines).size).toBe(lines.length)
+  })
 })
 
 // ── a harness with a scripted model ───────────────────────────────────────
@@ -151,7 +249,7 @@ describe("lanes in a harness", () => {
     await agent.close()
   })
 
-  test("a lane of its own runs its tools through its helper, and is told where your working copy and its shared directories are", async () => {
+  test("a lane of its own runs its tools through its helper, and its rules tell it about the lane", async () => {
     const dir = path.join(root, "own")
     const { mkdir } = await import("node:fs/promises")
     await mkdir(dir)
@@ -164,8 +262,7 @@ describe("lanes in a harness", () => {
     const { agent, script, newLane, texts } = await setUp(new Map())
     const lane = await newLane({
       kind: "lane",
-      dir,
-      shared: [".plans"],
+      facts: facts({ dir, shared: [".plans"] }),
       hostPaths: [],
       gate: async () => channel,
     })
@@ -184,15 +281,37 @@ describe("lanes in a harness", () => {
     await agent.lane(lane).run(prompt("write, then look"))
     const all = texts().map(t => messageText(t.message as never))
     expect(all.some(t => t.includes(`${dir}\nin the lane`))).toBe(true)
-    expect(told).toContain(`at ${dir}`)
-    expect(told).toContain(
-      "working copy is at /mnt/host-working-copy, read-only",
-    )
-    expect(told).toContain(
-      `${dir}/.plans is shared with the person and every other thread`,
-    )
+    // In <rules>: `pi-anthropic-auth` keeps it when it rebuilds the prompt (S23).
+    const rules = /<rules>\n([\s\S]*?)\n<\/rules>/.exec(told)?.[1] ?? ""
+    for (const line of laneGuidelines(facts({ dir, shared: [".plans"] })))
+      expect(rules).toContain(`- ${line}`)
+    expect(rules).toContain("one commit, `pineta-offer/quiet-otter`,")
+    expect(rules).toContain(`${dir}/.plans is shared live with the person`)
+    expect(rules).toContain("when you need it: /pineta/packages/pi/lane.md")
     channel.close()
     await channel.closed
+    await agent.close()
+  })
+
+  test("a lane that works directly is told nothing of a lane", async () => {
+    const dir = path.join(root, "plain")
+    const { mkdir } = await import("node:fs/promises")
+    await mkdir(dir)
+    const { agent, script, newLane } = await setUp(new Map())
+    const lane = await newLane(where(dir))
+    let told = ""
+    script.use([
+      {
+        reply: context => {
+          told = context[0] ?? ""
+          return "done"
+        },
+      },
+    ])
+    await agent.lane(lane).run(prompt("look"))
+    expect(told).toContain("<rules>")
+    expect(told).not.toContain("Pineta lane")
+    expect(told).not.toContain("Pineta commits your changes")
     await agent.close()
   })
 

@@ -1280,10 +1280,10 @@ async function commandsSection(): Promise<void> {
     ])
     await h.user.chat("/fixture:skill:hello", ROOT, START_AGENT)
     await h.idle()
-    const inLane = `/mnt/host${hello}`
+    const skillDir = `/mnt/host${hello}`
     ok(
       told.includes(
-        `<skill name="hello" location="${inLane}/SKILL.md">\nReferences are relative to ${inLane}.`,
+        `<skill name="hello" location="${skillDir}/SKILL.md">\nReferences are relative to ${skillDir}.`,
       ),
       `in a lane of its own, an expanded skill names its files at /mnt/host (${told.slice(0, 90)})`,
     )
@@ -1293,11 +1293,29 @@ async function commandsSection(): Promise<void> {
       ),
       "the system prompt lists the skills the model may use at /mnt/host",
     )
+    // What the lane is told about itself (ADR-0046), in a real container.
+    const lane = h.laneWith("read it")?.name
+    const name =
+      lane === undefined ? undefined : readNames(h.host.doc).get(lane)
+    ok(
+      name !== undefined &&
+        system.includes("- You work in a Pineta lane") &&
+        system.includes(`\`pineta-offer/${name}\``) &&
+        system.includes("Chromium's headless shell is installed"),
+      "a lane of its own is told it is in a lane, its offer, and its browser",
+    )
+    const note = /when you need it: (\S+)/.exec(system)?.[1] ?? ""
+    ok(
+      note !== "" &&
+        lane !== undefined &&
+        inLane(lane, `test -f ${note} && echo present`).includes("present"),
+      `the note the prompt names is a file in the lane (${note})`,
+    )
     h.script.use([
       {
         tool: "bash",
         args: {
-          command: `cat ${inLane}/references/note.md; sh ${inLane}/scripts/hello.sh; ls /mnt/host${agentDir} 2>&1 | head -1`,
+          command: `cat ${skillDir}/references/note.md; sh ${skillDir}/scripts/hello.sh; ls /mnt/host${agentDir} 2>&1 | head -1`,
         },
       },
       { text: "ran it" },

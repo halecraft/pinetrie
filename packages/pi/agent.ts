@@ -19,6 +19,7 @@ import {
   createEditTool,
   createReadTool,
   createWriteTool,
+  type ExecutionEnv,
   StorageBackedSession,
   uuidv7,
   value,
@@ -32,7 +33,6 @@ import {
   ERR,
   type ErrCode,
   entryId,
-  HOST_WORKING_COPY,
   hostPathInLane,
   type LaneName,
   laneNameForThread,
@@ -87,8 +87,10 @@ import {
   GUIDANCE_TOOL,
   guidanceTool,
   type LaneAccess,
+  type LaneFacts,
   type LaneHooks,
   laneContext,
+  laneGuidelines,
   laneOf,
 } from "./lanes.ts"
 import { KynetaStorage } from "./storage.ts"
@@ -96,6 +98,19 @@ import { KynetaStorage } from "./storage.ts"
 export { KynetaStorage }
 
 const NO_BLOBS: Pick<BlobStore, "get"> = { get: () => undefined }
+
+/**
+ * What pi builds a request's tools and system prompt from. `lane` is null for
+ * a lane that works directly: it gets no block, and every skill at its own path.
+ */
+interface ToolContext {
+  readonly env: ExecutionEnv
+  readonly dir: string
+  readonly lane: {
+    readonly facts: LaneFacts
+    readonly hostPaths: readonly string[]
+  } | null
+}
 
 /** pi's ambient context. Opaque to host/. */
 export const CTX = BACKGROUND_CONTEXT
@@ -402,33 +417,20 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   // pi's own prompt, with the repo's context files and the person's skills, so
   // an extension that shapes pi's prompt sections finds them (S23). It names
   // the lane's directory, and does not wait for its setup. A lane of its own
-  // is told where your working copy is, read-only, and which of its
-  // directories are shared, and sees its skills at the paths it can read
-  // them (`skillsInLane`, ADR-0036).
-  const promptFor = (toolContext: {
-    dir: string
-    own: boolean
-    shared: readonly string[]
-    hostPaths: readonly string[]
-  }) =>
+  // is told about itself (`laneGuidelines`, ADR-0046), and sees its skills at
+  // the paths it can read them (`skillsInLane`, ADR-0036).
+  const promptFor = (toolContext: ToolContext) =>
     buildSystemPrompt({
       cwd: toolContext.dir,
       selectedTools: toolNames,
       contextFiles: setup.contextFiles,
-      skills: toolContext.own
-        ? skillsInLane(setup.skills, toolContext.hostPaths)
-        : setup.skills,
-      ...(toolContext.own
-        ? {
-            promptGuidelines: [
-              `This thread works in its own copy of the project, at ${toolContext.dir}. The person's own working copy is at ${HOST_WORKING_COPY}, read-only: read it when asked about their files, and never try to write there.`,
-              ...toolContext.shared.map(
-                p =>
-                  `${toolContext.dir}/${p} is shared with the person and every other thread: edits there are live, visible to them at once, and never part of a branch.`,
-              ),
-            ],
-          }
-        : {}),
+      skills:
+        toolContext.lane === null
+          ? setup.skills
+          : skillsInLane(setup.skills, toolContext.lane.hostPaths),
+      ...(toolContext.lane === null
+        ? {}
+        : { promptGuidelines: laneGuidelines(toolContext.lane.facts) }),
     })
 
   const { harness } = await createAgentHarness(
@@ -438,30 +440,22 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       model: resolved,
       tools: tools as never[],
       activeToolNames: toolNames,
-      toolContext: (context: typeof CTX) => {
+      toolContext: (context: typeof CTX): ToolContext => {
         const access = accessFor(laneOf(context))
-        return access.kind === "direct"
-          ? {
-              env: directEnv(access.dir, access.ready),
-              dir: access.dir,
-              own: false,
-              shared: [],
-              hostPaths: [],
-            }
-          : {
-              env: laneEnv(access.dir, access.gate),
-              dir: access.dir,
-              own: true,
-              shared: access.shared,
-              hostPaths: access.hostPaths,
-            }
+        if (access.kind === "direct")
+          return {
+            env: directEnv(access.dir, access.ready),
+            dir: access.dir,
+            lane: null,
+          }
+        const { facts, hostPaths } = access
+        return {
+          env: laneEnv(facts.dir, access.gate),
+          dir: facts.dir,
+          lane: { facts, hostPaths },
+        }
       },
-      systemPrompt: (toolContext: {
-        dir: string
-        own: boolean
-        shared: readonly string[]
-        hostPaths: readonly string[]
-      }) => promptFor(toolContext),
+      systemPrompt: promptFor,
       toProviderMessages: messages =>
         providerMessages(messages, options.blobs ?? NO_BLOBS),
       // Pineta's outbox means pi's own queue is never used; should it be, it

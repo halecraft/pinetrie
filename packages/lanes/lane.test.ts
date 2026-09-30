@@ -1,5 +1,23 @@
+import { statSync } from "node:fs"
+import path from "node:path"
 import { describe, expect, test } from "vitest"
-import { createQueue } from "./index.ts"
+import {
+  createQueue,
+  HELPER,
+  LANE_NOTE,
+  PINETA_INSTALL,
+  PINETA_MOUNT,
+} from "./index.ts"
+
+test("every Pineta file a lane is pointed at exists", () => {
+  for (const inLane of [HELPER, LANE_NOTE]) {
+    expect(inLane.startsWith(`${PINETA_MOUNT}/`)).toBe(true)
+    const onHost = path.join(PINETA_INSTALL, inLane.slice(PINETA_MOUNT.length))
+    expect(statSync(onHost, { throwIfNoEntry: false })?.isFile(), onHost).toBe(
+      true,
+    )
+  }
+})
 
 const later = (ms: number) => new Promise(r => setTimeout(r, ms))
 

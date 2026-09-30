@@ -149,6 +149,9 @@ containers, disks and the helper.
   builds the image again. The image's `ENV` reaches an agent's commands, so
   `chromium.launch()` finds the browser with nothing set. A project image
   gets no such argument and no browser.
+- **Whether a lane has the browser is known at startup**, before the images
+  are built: the project has no `projectContainerfile(root)`. The host reads
+  it once, as `prepareImages` does, and tells each lane's agent (ADR-0046).
 
 ## Containers
 
@@ -159,6 +162,10 @@ containers, disks and the helper.
   - its label differs, or it has none: recreate it on the same volume;
   - stopped: start it;
   - running with the same label: nothing to do.
+- **A lane's container is stopped after every run** (`runEnded` in the
+  host's `work.ts`), and its disk trimmed. The next run starts it again.
+  Processes the agent started, dev servers included, end with the run. The
+  agent is told so (ADR-0046).
 - **What reaches existing lanes this way:** a rebuilt image, changed grants,
   links or shared directories. The arguments are fixed when a container is
   created, and before labels existed the host only restarted it. A container
@@ -319,7 +326,8 @@ containers, disks and the helper.
 ## Tests
 
 - **`plan.test.ts`**: the planners.
-- **`lane.test.ts`**: the queue.
+- **`lane.test.ts`**: the queue, and that each file a lane is pointed at
+  inside Pineta's mount (`HELPER`, `LANE_NOTE`) exists in the install.
 - **`lanes.test.ts`**: the executor, and a lane's whole life against jj and
   git, in throwaway repos on the host, with no container. It covers the base,
   a turn, a bundle fetch into your repo as a remote bookmark, an update with a
@@ -333,8 +341,11 @@ containers, disks and the helper.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
   with a repo in a fork's `/tmp` for the config's scope, and the contract
   test, in about 85 s. Its `images` section also launches Chromium,
-  through Pineta's Playwright, on the default image. It has four sections, `main`,
-  `images`, `shared` and `contract`, and `PINETA_LANES_SECTION` picks some.
+  through Pineta's Playwright, on the default image. Its `commands` section
+  reads skill files at `/mnt/host`, and checks what a real lane's prompt
+  tells it about itself and that the note it names is there (ADR-0046). It
+  has five sections, `main`, `images`, `shared`, `commands` and `contract`,
+  and `PINETA_LANES_SECTION` picks some.
   Its hosts pass their own `userConfig`, so the person's own lane config
   never applies. Each
   suite-level mutation in `scripts/mutations/lanes.ts` runs only the section

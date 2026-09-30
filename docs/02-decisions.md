@@ -2469,7 +2469,8 @@ still break each other. How cautious to be varies by person and by repo.
 **Status:** Accepted. Implemented by `PLAN-2026-09-28-lane-containers`.
 Evidence: S38, S39, S40, S41, S42, S43, S44. **Amended by ADR-0038
 (proposed):** work reaches your repo as an offer, and a lane's history as
-remote bookmarks. Amends ADR-0032:
+remote bookmarks. **Amended by ADR-0046:** a lane's agent is told what
+holds in every lane, and no port proxy is built. Amends ADR-0032:
 replaces its jj workspace per lane, the rewrite of the history the model is
 sent, the refusal of other lanes' paths, and dependency setup. Keeps its turn
 revisions, its fork-point rule, landing, working directly, and your working
@@ -2643,7 +2644,9 @@ and lanes exchange commits the way separate clones do.
   a branch's `node_modules` and `.vite` are its parent's at that turn, byte
   for byte, and its writes never reach its parent (S40 item 1, S42).
 - **Each lane has its own ports and processes.** A lane's dev server is at
-  the lane's IP; the host proxies it for browsers that cannot reach it.
+  the lane's IP. *Amended by ADR-0046:* the host does not proxy it, and the
+  host stops a lane's container when its run ends, so a lane's processes,
+  dev servers included, end with the run.
 - **The host sees a lane's work once per turn,** when it fetches, not live.
   People see a lane's files through its revisions (`jj diff`, `jj file show`)
   or through the host, not in their own editor.
@@ -2675,7 +2678,8 @@ and lanes exchange commits the way separate clones do.
   - tens of thousands of snapshots over a long session;
   - the e2e and browser suites in a lane;
   - a project `Containerfile`, or `devcontainer.json`;
-  - the host proxying a lane's ports.
+  - the host proxying a lane's ports (not built, ADR-0046);
+  - whether your machine reaches a server at a lane's IP.
 
 **Alternatives rejected.**
 - Rewriting paths in the history the model is sent (ADR-0032; S38: untrue
@@ -3722,3 +3726,90 @@ only for your own bar would be view state, ADR-0030). The thread names of
 ADR-0039 as titles (those are identifiers minted for a lane, unique and fixed;
 a title is chosen, changes and can repeat). Clearing by storing an empty title
 (it would read as chosen, as ADR-0028 said of a stored default name).
+
+---
+
+## ADR-0046 — A lane's agent is told where it is: a short block in every prompt, and a note it reads when it needs it
+
+**Status:** Accepted. Implementation: `PLAN-2026-09-30-lane-orientation`.
+Amends ADR-0034 (what a lane's prompt says; the port proxy it describes is
+not built).
+
+**Context.** An agent in a lane of its own (ADR-0034) was told two things: its
+copy is at `/workspace`, and your working copy is at `/mnt/host-working-copy`,
+read-only; and each shared directory is shared and never branched
+(ADR-0035). The rest it found by trying. One agent saw `jj st` empty after
+its edits and worked out only later that Pineta commits each turn
+(ADR-0032). Another tried to run `container`, which a lane lacks.
+
+Several facts hold in every lane, whatever the project, and cost an agent
+effort to rediscover:
+- Pineta commits each turn, and the offer and branches follow its commits
+  (ADR-0032, ADR-0038).
+- The container stops when a run ends, so background processes end with it.
+  Only `/workspace` is snapshotted and cloned into branches.
+- `/pineta` is Pineta's install, read-only. It looks like a Pineta checkout,
+  and is not the project.
+- A lane has no container runtime, no model key and no credentials, unless
+  `pineta.json` grants them. It reaches the internet, and not your loopback.
+
+A provider can rebuild the prompt by its section tags. Through
+`pi-anthropic-auth`, a lane's agent receives pi's `<rules>` intact, while pi's
+preamble and `<tools>` are replaced and `<docs>` is dropped (S23, addendum).
+
+**Decision.**
+- **A lane of its own gets a block of guidelines** in pi's `<rules>`, built
+  by `laneGuidelines` (`packages/pi/lanes.ts`) from the lane's facts. It says,
+  in about 200 tokens:
+  - that it is a Pineta lane, as root, in its own jj repo;
+  - that Pineta commits after each message, so the agent commits only when a
+    Pineta message asks it to, and how to list its work;
+  - that the person gets one commit, the offer, named by its bookmark, and
+    never sees the files live;
+  - that only `/workspace` lasts, and background processes end with a run;
+  - where the person's working copy and Pineta's install are;
+  - each shared directory;
+  - that it has no container runtime, model keys or credentials, with the
+    project's grants named; the internet works and your localhost does not;
+  - whether its image has a browser;
+  - where the note is.
+- **The note** is `packages/pi/lane.md`, read in the lane at
+  `/pineta/packages/pi/lane.md` (`LANE_NOTE`). It says the same at length:
+  paths, turn revisions, the offer, what lasts, the image, the network,
+  people and updates, and what to do when the lane cannot do something. It
+  is versioned with the Pineta that runs the lane. Each fact names its
+  source as an HTML comment, a path and a symbol, and a test fails when one
+  no longer exists.
+- **Only what holds in every lane.** A project's own facts, such as which of
+  its checks need `container`, belong in its `AGENTS.md`. Only measured facts:
+  whether your machine reaches a server at a lane's IP is not in either.
+- **The host fills in each lane's values** in `access`: the offer's
+  bookmark, shared directories, grants, whether the image has a browser (the
+  project has no `pineta.Containerfile`), Pineta's mount and the note's
+  path. `packages/pi` builds no name itself: their rules are in
+  `@pineta/lanes`, which it does not declare. Every value is fixed
+  while the host runs, so the prompt is the same on every request of a run.
+- **A thread that works directly is told none of it.**
+
+**Consequences.**
+- Every request of a lane of its own carries about 230 tokens more than
+  before. Directly-working threads and conversations are unchanged.
+- A change to Pineta that makes a line of the block or the note false must
+  change it. The note's source comments point at the code, and a renamed or
+  removed symbol fails `packages/pi/lanes.test.ts`.
+- A change to the block reaches lanes at the host's next start.
+- "Leave commits to Pineta" is a request: an agent that commits anyway can
+  leave work out of the offer. `PLAN-2026-09-30-agent-commits` addresses that.
+
+**Alternatives rejected.**
+- Everything in the prompt: about 1,000 tokens on every request, for facts
+  most turns do not need.
+- Only a pointer to the note: an agent reads a note when it suspects it
+  needs to, and the failures seen came from not suspecting.
+- A section of its own (`buildSystemPrompt`'s `sections`, or
+  `appendSystemPrompt`): a provider that rebuilds the prompt by its tags may
+  drop a section it does not know, as `pi-anthropic-auth` drops `<docs>`.
+- The note as one of Pineta's own skills (`packages/pi/skills/`): it would be
+  listed in every thread, working directly or in a conversation, where it is
+  false; and a listed skill is read only when the agent suspects it needs it.
+- Project facts in the same block: they belong to the project.

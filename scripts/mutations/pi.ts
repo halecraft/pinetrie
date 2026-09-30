@@ -111,4 +111,37 @@ export const mutations: readonly Mutation[] = [
     command: e2e,
     expect: "the model reads the message's text, then its image",
   },
+  {
+    name: "a lane of its own is not told where it is",
+    file: "packages/pi/agent.ts",
+    from: "        : { promptGuidelines: laneGuidelines(toolContext.lane.facts) }),",
+    to: "        : {}),",
+    command: unit,
+    expect: "its rules tell it about the lane",
+  },
+  {
+    name: "a direct lane is told it is in a container",
+    file: "packages/pi/agent.ts",
+    from: "            dir: access.dir,\n            lane: null,",
+    to: '            dir: access.dir,\n            lane: { hostPaths: [], facts: { dir: access.dir, shared: [], offer: null, grants: { ssh: false, env: [], mounts: [] }, browser: false, install: "/pineta", note: "" } },',
+    command: unit,
+    expect: "a lane that works directly is told nothing of a lane",
+  },
+  {
+    name: "the lane is not told its grants",
+    file: "packages/pi/lanes.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '` except ${allowed.join(", ")}`',
+    to: '""',
+    command: unit,
+    expect: "says what is granted",
+  },
+  {
+    name: "the note names a symbol that is gone",
+    file: "packages/pi/lane.md",
+    from: "<!-- apps/pineta/host/work.ts runEnded -->",
+    to: "<!-- apps/pineta/host/work.ts runEnd -->",
+    command: unit,
+    expect: "every source lane.md names",
+  },
 ]

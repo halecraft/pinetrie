@@ -59,6 +59,7 @@ import {
   hostJj,
   hostOps,
   imagePath,
+  LANE_NOTE,
   type LaneHandle,
   type LaneSpec,
   laneContainer,
@@ -73,7 +74,9 @@ import {
   NO_GRANTS,
   normalShared,
   type OpenLink,
+  offerBookmark,
   PINETA_INSTALL,
+  PINETA_MOUNT,
   planContainer,
   planDisk,
   planFetch,
@@ -87,6 +90,7 @@ import {
   prepareHost,
   prepareImages,
   prepareShared,
+  projectContainerfile,
   readLaneConfig,
   refreshBase,
   removeContainer,
@@ -324,6 +328,14 @@ export async function startLaneWork(input: {
   // --- the lane configs and shared directories, at startup ---------------
   // Before the rest, since a run's prompt names the shared directories.
   const lanes = root === null ? null : await prepareLanes(root)
+  // Read at startup, as `prepareImages` reads it, so a lane's prompt says
+  // whether its image has a browser before the images are ready.
+  const browser =
+    root !== null &&
+    (await stat(projectContainerfile(root)).then(
+      () => false,
+      () => true,
+    ))
 
   async function prepareLanes(at: string) {
     const pnpmLock = await stat(path.join(at, "pnpm-lock.yaml")).then(
@@ -921,10 +933,23 @@ export async function startLaneWork(input: {
           ready: Promise.resolve(),
         }
       const handle = handleOf(lane)
+      const name = readNames(doc).get(lane)
+      const grants = lanes?.config.grants ?? NO_GRANTS
       return {
         kind: "lane",
-        dir: WORKSPACE_ROOT,
-        shared: lanes?.shared.map(d => d.path) ?? [],
+        facts: {
+          dir: WORKSPACE_ROOT,
+          shared: lanes?.shared.map(d => d.path) ?? [],
+          offer: name === undefined ? null : offerBookmark(name),
+          grants: {
+            ssh: grants.ssh,
+            env: grants.env,
+            mounts: grants.mounts.map(m => m.target),
+          },
+          browser,
+          install: PINETA_MOUNT,
+          note: LANE_NOTE,
+        },
         hostPaths: hostPaths(),
         gate: async () => {
           await handle.queue.idle()

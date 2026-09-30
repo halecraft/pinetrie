@@ -34,6 +34,9 @@ export const PINETA_INSTALL = path.resolve(import.meta.dirname, "../..")
 /** The helper's own path, inside every lane. */
 export const HELPER = `${PINETA_MOUNT}/packages/pi/lane-helper.ts`
 
+/** The note a lane's agent is pointed at, inside every lane (ADR-0046). */
+export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane.md`
+
 /** The command that opens a lane's channel: the helper on the runtime's Node. */
 export const helperCommand = (container: string): readonly string[] => [
   "container",

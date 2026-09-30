@@ -198,9 +198,16 @@ item 18, and in `lanes.test.ts` against the harness.
 
 - **`LaneAccess`** is Pineta's type, so no pi type crosses the boundary. It
   is either `direct` (a directory on the host, and a promise its tools wait
-  for) or `lane` (a lane of its own: its directory, `/workspace`, its shared
-  directories relative to it (ADR-0035), and a `gate()` that settles with its
-  channel).
+  for) or `lane` (a lane of its own: its `LaneFacts`, the host paths of the
+  skills it can read, and a `gate()` that settles with its channel).
+  `LaneFacts` is everything the lane's prompt says about it: its directory,
+  `/workspace`, its shared directories relative to it (ADR-0035), its offer's
+  bookmark, its grants, whether its image has a browser, Pineta's mount and
+  the note's path. The host builds every name in it: the rules for them are
+  in `@pineta/lanes`, which this package does not declare.
+- **The tool context** is one type, `ToolContext` in `agent.ts`: `env`,
+  `dir`, and `lane`, which is null for a lane that works directly. pi builds
+  both the tools and the system prompt from it.
 - **A lane working directly** gets pi's `NodeExecutionEnv` in its directory
   (`directEnv`). Every method first awaits `ready`, and `shellEnv` sets
   `JJ_EDITOR`, `VISUAL` and `EDITOR` to `false`.
@@ -238,10 +245,21 @@ item 18, and in `lanes.test.ts` against the harness.
   `process.execPath` is the loader: nothing in it may re-execute that
   (S44 item 2).
 - **The system prompt** names the lane's directory. For a lane of its own it
-  adds guidelines: `/mnt/host-working-copy` is your working copy, read-only;
-  and each shared directory is shared with the person and every other
-  thread, live, and never part of a branch. The model is sent the
-  conversation as stored: nothing is rewritten.
+  adds a block of guidelines, `laneGuidelines(facts)` in `lanes.ts`
+  (ADR-0046): what holds in every lane, filled in with the lane's own
+  values, in about 230 tokens. The model is sent the conversation as stored:
+  nothing is rewritten.
+  - **Guidelines, not a section of its own.** pi joins its sections into one
+    string, and a provider may rebuild that string by its tags:
+    `pi-anthropic-auth` keeps `<rules>` and drops `<docs>` (S23, addendum).
+    Guidelines are rendered in `<rules>`.
+  - pi drops a guideline equal to an earlier one, so no two lines of the
+    block may be equal. A unit test checks it.
+  - **The note** the block points at is `lane.md`, in this package, read in
+    the lane through Pineta's own mount (`LANE_NOTE` in `@pineta/lanes`).
+    Each fact in it names its source as `<!-- <path> <symbol> -->`, and
+    `lanes.test.ts` fails when a named file or symbol is gone. A change that
+    makes a line of the block or the note false must change it.
 - **`before_request`** calls `hooks.turnDone(lane, tip)`, and pi awaits it:
   every tool of the turn before has finished, so the commit never races a
   write. The turn's snapshot is queued on the lane: the next tool call waits

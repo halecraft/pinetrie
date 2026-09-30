@@ -1,5 +1,5 @@
 // pi/lanes — where each lane's tools work, as pi sees it (ADR-0032,
-// ADR-0034).
+// ADR-0034), and what a lane of its own is told about itself (ADR-0046).
 //
 // One harness serves every lane, but pi resolves the tools' context from the
 // run's `Context` only: `toolContext` is a function of it. So every call that
@@ -12,7 +12,12 @@ import {
   withContextValue,
 } from "@earendil-works/pi-agent-core/harness/context"
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
-import { type EntryId, type LaneName, NO_EDITOR } from "@pineta/core"
+import {
+  type EntryId,
+  HOST_WORKING_COPY,
+  type LaneName,
+  NO_EDITOR,
+} from "@pineta/core"
 import { Type } from "typebox"
 import type { LaneChannel } from "./lane-env.ts"
 
@@ -31,13 +36,7 @@ export type LaneAccess =
    */
   | {
       readonly kind: "lane"
-      /** `WORKSPACE_ROOT` in a container; the helper's own directory in tests. */
-      readonly dir: string
-      /**
-       * Directories shared read-write with the person and every other lane,
-       * relative to `dir` (ADR-0035).
-       */
-      readonly shared: readonly string[]
+      readonly facts: LaneFacts
       /**
        * Host paths mounted read-only at `/mnt/host` and their path
        * (ADR-0036): the roots of the skills this lane can read.
@@ -45,6 +44,70 @@ export type LaneAccess =
       readonly hostPaths: readonly string[]
       readonly gate: () => Promise<LaneChannel>
     }
+
+/**
+ * What a lane of its own is told about itself (ADR-0046). The host builds
+ * every name in it: `offerBookmark`, `PINETA_MOUNT` and `LANE_NOTE` are in
+ * `@pineta/lanes`, which this package does not declare.
+ */
+export interface LaneFacts {
+  /** `WORKSPACE_ROOT` in a container; the helper's own directory in tests. */
+  readonly dir: string
+  /**
+   * Directories shared read-write with the person and every other lane,
+   * relative to `dir` (ADR-0035).
+   */
+  readonly shared: readonly string[]
+  /** The offer's bookmark in the person's repo; null while the thread has no name. */
+  readonly offer: string | null
+  /** What `pineta.json` lets into the lane (ADR-0034). */
+  readonly grants: {
+    readonly ssh: boolean
+    /** Names of environment variables passed in. */
+    readonly env: readonly string[]
+    /** Where each granted read-only mount is, in the lane. */
+    readonly mounts: readonly string[]
+  }
+  /** The image carries Chromium's headless shell: Pineta's default image does (ADR-0041). */
+  readonly browser: boolean
+  /** Pineta's install, mounted read-only in the lane. */
+  readonly install: string
+  /** The lane note's path in the lane. */
+  readonly note: string
+}
+
+/**
+ * The block a lane of its own is told, one guideline per line (ADR-0046).
+ * Guidelines, not a section of its own: `pi-anthropic-auth` rebuilds the
+ * prompt by its section tags, keeping `<rules>` and dropping `<docs>` (S23).
+ * pi drops a guideline equal to an earlier one, so no two lines may be equal.
+ */
+export function laneGuidelines(facts: LaneFacts): string[] {
+  const { dir, offer, grants } = facts
+  const allowed = [
+    ...(grants.ssh ? ["your ssh agent"] : []),
+    ...grants.env.map(name => `$${name}`),
+    ...(grants.mounts.length === 0
+      ? []
+      : [`read-only files at ${grants.mounts.join(", ")}`]),
+  ]
+  return [
+    `You work in a Pineta lane: a Linux container where you are root, in your own jj repo at ${dir}.`,
+    "Pineta commits your changes after each message. Commit only when a Pineta message asks you to. Your work so far: `jj log -r 'immutable_heads()..'`.",
+    `The person gets your work as one commit${offer === null ? "" : `, \`${offer}\``}, and never sees your files live.`,
+    `Only ${dir} lasts. Background processes end with each run, and nothing outside ${dir} reaches a branch.`,
+    `${HOST_WORKING_COPY} is the person's working copy, read-only. ${facts.install} is Pineta's install, not your project.`,
+    ...facts.shared.map(
+      p =>
+        `${dir}/${p} is shared live with the person and other threads, never committed.`,
+    ),
+    `No container runtime, model keys or credentials${allowed.length === 0 ? "" : ` except ${allowed.join(", ")}`}. The internet works; the person's localhost does not.`,
+    ...(facts.browser
+      ? ["Chromium's headless shell is installed ($PLAYWRIGHT_BROWSERS_PATH)."]
+      : []),
+    `More about the lane, when you need it: ${facts.note}`,
+  ]
+}
 
 export interface LaneHooks {
   /**
