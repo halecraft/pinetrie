@@ -6,8 +6,9 @@
 import {
   type ImageMime,
   type ImageRef,
-  isSha256,
+  type MessagePart,
   type Sha256,
+  storedImage,
 } from "@pineta/core"
 
 /** The namespace of pi's `pendingEntry` values: a message before its entry. */
@@ -36,52 +37,40 @@ export function inlineImages(message: unknown): string[] {
 }
 
 /**
- * `message` with each image part the store has as its reference, without its
- * bytes. A part the store lacks stays inline. The same object when nothing
- * changes.
+ * `message` with each part `f` gives, or the same object when `f` returns
+ * every part as it was: a message without images is stored and read as it is.
  */
-export function splitImages(message: unknown, refOf: RefOf): unknown {
+function mapParts(message: unknown, f: (part: Part) => Part): unknown {
   const content = contentOf(message)
   if (content === undefined) return message
-  let changed = false
-  const parts = content.map(p => {
-    if (p?.type !== "image" || typeof p.data !== "string") return p
-    const ref = refOf(p.data)
-    if (ref === undefined) return p
-    changed = true
-    return {
-      type: "image",
-      mimeType: ref.mimeType,
-      sha256: ref.sha256,
-      width: ref.width,
-      height: ref.height,
-    }
-  })
-  return changed ? { ...(message as object), content: parts } : message
+  const parts = content.map(f)
+  return parts.every((p, i) => p === content[i])
+    ? message
+    : { ...(message as object), content: parts }
 }
 
-/** A stored reference: an image part with a hash and no bytes. */
-const referenceOf = (p: Part): Sha256 | undefined =>
-  p?.type === "image" &&
-  p.data === undefined &&
-  typeof p.sha256 === "string" &&
-  isSha256(p.sha256)
-    ? p.sha256
-    : undefined
+/**
+ * `message` with each image part the store has as its reference, without its
+ * bytes. A part the store lacks stays inline.
+ */
+export const splitImages = (message: unknown, refOf: RefOf): unknown =>
+  mapParts(message, p => {
+    const ref =
+      p?.type === "image" && typeof p.data === "string"
+        ? refOf(p.data)
+        : undefined
+    return ref === undefined ? p : { type: "image", ...ref }
+  })
 
 /**
  * `message` as pi wrote it: each reference with its bytes restored. A blob no
  * longer stored becomes a text part saying so, so pi still reads a message it
- * can send. The same object when nothing changes.
+ * can send.
  */
-export function rejoinImages(message: unknown, blobOf: BlobOf): unknown {
-  const content = contentOf(message)
-  if (content === undefined) return message
-  let changed = false
-  const parts = content.map(p => {
-    const sha = referenceOf(p)
+export const rejoinImages = (message: unknown, blobOf: BlobOf): unknown =>
+  mapParts(message, p => {
+    const sha = storedImage(p as MessagePart)?.sha256
     if (sha === undefined) return p
-    changed = true
     const blob = blobOf(sha)
     return blob === undefined
       ? { type: "text", text: `[image ${sha} is no longer stored]` }
@@ -91,8 +80,6 @@ export function rejoinImages(message: unknown, blobOf: BlobOf): unknown {
           mimeType: blob.mimeType,
         }
   })
-  return changed ? { ...(message as object), content: parts } : message
-}
 
 /** pi's pending entry, `{type, payload}`: its payload is the message. */
 type PendingEntry = { readonly payload?: unknown }

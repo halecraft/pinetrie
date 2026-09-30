@@ -146,8 +146,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a split image keeps its bytes beside its reference",
     file: "packages/pi/stored-images.ts",
-    from: '    return {\n      type: "image",\n      mimeType: ref.mimeType,',
-    to: '    return {\n      ...p,\n      type: "image",\n      mimeType: ref.mimeType,',
+    from: '    return ref === undefined ? p : { type: "image", ...ref }',
+    to: '    return ref === undefined ? p : { ...p, type: "image", ...ref }',
     command: unit,
     expect: "a stored image becomes its reference",
   },

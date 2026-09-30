@@ -251,7 +251,7 @@
          attributes (a pasted image's stored size) keep its box's shape while
          it loads (ADR-0042). */
       .text img { max-width: 100%; height: auto; vertical-align: middle; }
-      .text img.blob-image { cursor: zoom-in; border: 1px solid #23272e; }
+      img.blob-image { cursor: zoom-in; border: 1px solid #23272e; }
       .text img { max-width: 100%; }
       .text .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
       .fork-dot { display: inline-block; width: 10px; height: 10px; padding: 0; margin-left: .4rem;
@@ -298,8 +298,7 @@
       /* A result's images, in place of its text (`toolBody`). A capped row
          caps an image at 10rem tall, as it caps output, through its width. */
       .tool-images { margin: .3rem 0 0; }
-      .tool-images img { display: block; max-width: 100%; height: auto; margin-bottom: .3rem;
-        border: 1px solid #23272e; cursor: zoom-in; }
+      .tool-images img { display: block; max-width: 100%; height: auto; margin-bottom: .3rem; }
       .tool[data-size="capped"] .tool-images img { max-width: min(100%, calc(10rem * var(--ratio))); }
       /* A cut label, uncut, in its place while the row is open. */
       .tool-label-whole { display: none; font-family: ui-monospace, monospace;

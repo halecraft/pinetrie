@@ -139,6 +139,18 @@ const storedRecords = async (
   }
   return { records, bytes }
 }
+/** Whether any of the session's records in `store` holds `text`. */
+const recordsHold = async (store: Store, text: string): Promise<boolean> => {
+  for await (const r of store.loadAll(SESSION_DOC_ID))
+    if (
+      r.kind === "entry" &&
+      Buffer.from(r.payload.data as Uint8Array | string)
+        .toString("latin1")
+        .includes(text)
+    )
+      return true
+  return false
+}
 /** Every command Line document a store holds. */
 const storedLines = async (store: Store): Promise<string[]> => {
   const ids: string[] = []
@@ -2180,15 +2192,7 @@ invariants("end")
   // 6. No image bytes in the session's records, compacted.
   await ih.quiet()
   const base64Slice = RED_PNG.toString("base64").slice(20, 70)
-  let inRecords = false
-  for await (const r of opened.store.loadAll(SESSION_DOC_ID))
-    if (
-      r.kind === "entry" &&
-      Buffer.from(r.payload.data as Uint8Array | string)
-        .toString("latin1")
-        .includes(base64Slice)
-    )
-      inRecords = true
+  const inRecords = await recordsHold(opened.store, base64Slice)
   ok(!inRecords, "the session's stored records hold no image's bytes")
 
   // 7. Deleting what nothing shows, after the grace; a card's image stays,
@@ -2343,15 +2347,7 @@ invariants("end")
       !pendings.some(p => p.includes(base64Slice)),
     `pi's pending entry holds the read image's reference, not its bytes (${pendings.length} seen)`,
   )
-  let inRecords = false
-  for await (const r of opened.store.loadAll(SESSION_DOC_ID))
-    if (
-      r.kind === "entry" &&
-      Buffer.from(r.payload.data as Uint8Array | string)
-        .toString("latin1")
-        .includes(base64Slice)
-    )
-      inRecords = true
+  const inRecords = await recordsHold(opened.store, base64Slice)
   ok(
     !inRecords && !JSON.stringify(readEntries(th.doc)).includes(base64Slice),
     "neither the session's records nor its entries hold a read image's bytes",

@@ -151,17 +151,14 @@ const isDimension = (n: unknown): n is number =>
   typeof n === "number" && Number.isInteger(n) && n > 0
 
 /**
- * The stored images in a message's content, in order. A part with its bytes
- * inline is not one: no `/blob/` URL serves it. The session keeps one from
- * before images were blobs, or from a host with no store.
+ * An image part as the session stores it (ADR-0051), or undefined. A part
+ * with its bytes inline is not one: no `/blob/` URL serves it. The session
+ * keeps one from before images were blobs, or from a host with no store.
  */
-export function messageImages(
-  message: AgentMessageLike | null | undefined,
-): ImageRef[] {
-  const content = message?.content
-  if (!Array.isArray(content)) return []
-  return content.flatMap(part =>
-    part?.type === "image" &&
+export function storedImage(
+  part: MessagePart | null | undefined,
+): ImageRef | undefined {
+  return part?.type === "image" &&
     part.data === undefined &&
     typeof part.sha256 === "string" &&
     isSha256(part.sha256) &&
@@ -169,16 +166,22 @@ export function messageImages(
     isImageMime(part.mimeType) &&
     isDimension(part.width) &&
     isDimension(part.height)
-      ? [
-          {
-            sha256: part.sha256,
-            mimeType: part.mimeType,
-            width: part.width,
-            height: part.height,
-          },
-        ]
-      : [],
-  )
+    ? {
+        sha256: part.sha256,
+        mimeType: part.mimeType,
+        width: part.width,
+        height: part.height,
+      }
+    : undefined
+}
+
+/** The stored images in a message's content, in order (`storedImage`). */
+export function messageImages(
+  message: AgentMessageLike | null | undefined,
+): ImageRef[] {
+  const content = message?.content
+  if (!Array.isArray(content)) return []
+  return content.flatMap(part => storedImage(part) ?? [])
 }
 
 /**
@@ -330,12 +333,9 @@ function resultsOn(
   for (const id of ids) {
     const entry = index.entries[id]
     const r = entry === undefined ? null : toolResultOf(entry)
-    if (r !== null)
-      results.set(r.callId, {
-        text: r.text,
-        isError: r.isError,
-        images: r.images,
-      })
+    if (r === null) continue
+    const { callId, ...result } = r
+    results.set(callId, result)
   }
   return results
 }
