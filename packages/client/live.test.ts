@@ -17,7 +17,6 @@ const tool = (id: string, lane: string, callId: string): StreamRecord => ({
   lane,
   kind: "tool",
   callId,
-  label: "bash x",
 })
 
 describe("liveWork", () => {

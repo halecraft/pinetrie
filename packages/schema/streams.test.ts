@@ -88,21 +88,21 @@ describe("planStream: replies and tools are streams of edits", () => {
     const replaced = drive([
       { kind: "text", lane: L, delta: "Let me run it." },
       { commit: "a1" },
-      { kind: "toolStart", lane: L, callId: "c1", label: "bash x" },
+      { kind: "toolStart", lane: L, callId: "c1" },
     ]).seen[2]
     expect(replaced?.map(s => s.kind)).toEqual(["tool"])
     const current = drive([
       { kind: "text", lane: L, delta: "still going" },
-      { kind: "toolStart", lane: L, callId: "c1", label: "bash x" },
+      { kind: "toolStart", lane: L, callId: "c1" },
     ]).seen[1]
     expect(current?.map(s => s.kind)).toEqual(["reply", "tool"])
   })
 
   test("a reply opening closes its lane's tools, whose results are written, and no other lane's", () => {
     const { seen } = drive([
-      { kind: "toolStart", lane: M, callId: "m1", label: "read m" },
-      { kind: "toolStart", lane: L, callId: "c1", label: "bash a" },
-      { kind: "toolStart", lane: L, callId: "c2", label: "bash b" },
+      { kind: "toolStart", lane: M, callId: "m1" },
+      { kind: "toolStart", lane: L, callId: "c1" },
+      { kind: "toolStart", lane: L, callId: "c2" },
       { commit: "r2" },
       { kind: "text", lane: L, delta: "Both ran." },
     ])
@@ -117,7 +117,7 @@ describe("planStream: replies and tools are streams of edits", () => {
     const { seen } = drive([
       { kind: "text", lane: L, delta: "Now the tests." },
       { commit: "a1" },
-      { kind: "toolStart", lane: L, callId: "c1", label: "bash t" },
+      { kind: "toolStart", lane: L, callId: "c1" },
       { kind: "toolOutput", lane: L, callId: "c1", text: "ok\n" },
       { commit: "r1" },
       { kind: "text", lane: L, delta: "And " },
@@ -135,13 +135,13 @@ describe("planStream: replies and tools are streams of edits", () => {
         (_, k) => `line ${from + k}\n`,
       ).join("")
     const { seen } = drive([
-      { kind: "toolStart", lane: L, callId: "c1", label: "bash pnpm test" },
+      { kind: "toolStart", lane: L, callId: "c1" },
       { kind: "toolOutput", lane: L, callId: "c1", text: view(1, 5) },
       { kind: "toolOutput", lane: L, callId: "c1", text: view(3, 9) },
     ])
     expect(seen[2]?.[0]).toMatchObject({
       kind: "tool",
-      label: "bash pnpm test",
+      callId: "c1",
       text: view(3, 9),
     })
     const tool: Stream = {
@@ -149,7 +149,6 @@ describe("planStream: replies and tools are streams of edits", () => {
       lane: L,
       kind: "tool",
       callId: "c",
-      label: "x",
       text: view(1, 5),
     }
     const ops = planStream({
@@ -186,7 +185,7 @@ describe("the end of a run", () => {
     drive(
       [
         { kind: "text", lane: L, delta: "half" },
-        { kind: "toolStart", lane: M, callId: "m", label: "read m" },
+        { kind: "toolStart", lane: M, callId: "m" },
       ],
       true,
       doc,
@@ -203,7 +202,7 @@ describe("the end of a run", () => {
   test("clearStreams leaves no stream, no text and no running lane", () => {
     const { doc } = drive([
       { kind: "text", lane: L, delta: "half" },
-      { kind: "toolStart", lane: L, callId: "c", label: "read a" },
+      { kind: "toolStart", lane: L, callId: "c" },
     ])
     doc.activeRuns.set(L, "r-1")
     // A text whose record is gone.

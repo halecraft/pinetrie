@@ -294,7 +294,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   as the agent's.
 - **Tool calls are rows under the agent's message** (ADR-0022): what the call
   touched (`read packages/core/tree.ts`, `bash pnpm test`), then ✓, ✗, or …
-  while it has no result, with the result folded away. A result is its own
+  while it has no result, with the result folded away. A long or multi-line
+  command is cut in the label, and shown whole when the row is opened. A result is its own
   entry in the tree, but it belongs to its call, so it adds no message and no
   row on the rail.
 - **While the agent works, its column shows it live**: the reply as it is

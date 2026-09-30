@@ -337,4 +337,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "blobOfUrl refuses a near miss",
   },
+  {
+    name: "toolDetail drops a command's later lines",
+    file: "packages/core/tools.ts",
+    from: "    : subject",
+    to: '    : subject.split("\\n")[0]',
+    command: unit,
+    expect: "toolDetail gives the whole of what the label cuts",
+  },
+  {
+    name: "a call keeps no detail",
+    file: tree,
+    from: "    ...(detail === undefined ? {} : { detail }),",
+    to: "    ...(detail === undefined ? {} : {}),",
+    command: ["pnpm", "exec", "vitest", "run", "packages/core"],
+    expect: "carries the whole command",
+  },
 ]

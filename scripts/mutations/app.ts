@@ -292,6 +292,14 @@ export const mutations: readonly Mutation[] = [
     expect: "without the key: no page",
   },
   {
+    name: "a tool row does not draw the command its label cuts",
+    file: "packages/client/message.tsx",
+    from: "      {call.detail !== undefined && (",
+    to: "      {call.detail === null && (",
+    command: browser,
+    expect: "an opened row shows the whole command its label cuts",
+  },
+  {
     name: "a tool row ignores an error",
     file: "packages/client/message.tsx",
     from: '    call.result === undefined ? "pending" : call.result.isError ? "error" : "ok"',

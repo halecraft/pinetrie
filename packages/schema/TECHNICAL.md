@@ -85,7 +85,7 @@ were no users. Recorded precisely so it does not blur S17's finding that
 
 ## Streams: replies and tools alike (ADR-0022)
 
-`streams` (a record per open stream: lane, `reply` or `tool`, call, label) and
+`streams` (a record per stream: lane, `reply` or `tool`, call, `under`) and
 `streamText` (a `Schema.text()` per stream) replaced `pendingText`, which held
 one text per run. Keys are fresh uuidv7s (ADR-0016), written only by the host.
 

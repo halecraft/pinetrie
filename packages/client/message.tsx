@@ -185,7 +185,8 @@ const SHOWN = 20_000
 
 /**
  * One tool call: what it touched, whether it worked, and, folded, what it
- * returned. The result is its own entry in the tree, paired here by
+ * returned. A label that cuts what the call touches (a long or multi-line
+ * command) is followed, inside the fold, by all of it. The result is its own entry in the tree, paired here by
  * `projectSpine`; with none yet, the call is still running or was cut off.
  * While it runs, its output streams here, open: the result replaces it in
  * the render that holds the result, in the same element (S35).
@@ -216,6 +217,9 @@ function ToolRow({
         <span className="tool-label">{call.label}</span>{" "}
         <span className="tool-status">{mark}</span>
       </summary>
+      {call.detail !== undefined && (
+        <pre className="tool-command">{call.detail}</pre>
+      )}
       {live !== undefined && <LiveOutput doc={doc} id={live} />}
       {call.result !== undefined && (
         <pre className="tool-output">

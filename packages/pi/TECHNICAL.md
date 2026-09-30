@@ -111,7 +111,7 @@ declared in `@pineta/core`, so pi's events never leave this package. Every pi
 | pi's event | `StreamEvent` |
 |---|---|
 | `message_update` (a `text_delta`) | `text` |
-| `tool_start` | `toolStart`, labelled `toolLabel(name, args)` here |
+| `tool_start` | `toolStart`: its lane and call, no label (its row takes the committed call's) |
 | `tool_update` (the first text part of `partialResult`) | `toolOutput`, a whole snapshot |
 
 `message_end` and `tool_end` are not mapped. The entry pi commits after each

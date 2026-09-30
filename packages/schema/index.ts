@@ -68,15 +68,15 @@ export const SessionDoc = json.bind(
     values: Schema.record(Schema.any()),
     lists: Schema.record(Schema.list(Schema.any())),
     // One per stream, keyed by a fresh uuidv7 (ADR-0016): which lane, a
-    // reply or a tool, the tool's call and label, and the lane's tip when a
-    // reply opened ("" for a tool, or a lane with none). `StreamRecord` is
-    // the typed read.
+    // reply or a tool, the tool's call, and the lane's tip when a reply
+    // opened ("" for a tool, or a lane with none). A tool's label is its
+    // call's, in the committed entry its row is drawn from. `StreamRecord`
+    // is the typed read.
     streams: Schema.record(
       Schema.struct.json({
         lane: Schema.string(),
         kind: Schema.string("reply", "tool"),
         callId: Schema.string(),
-        label: Schema.string(),
         under: Schema.string(),
       }),
     ),
@@ -154,7 +154,6 @@ export type StreamRecord =
       readonly lane: string
       readonly kind: "tool"
       readonly callId: string
-      readonly label: string
     }
 
 /** A stream, with what it has written so far. */
@@ -246,7 +245,6 @@ export function planStream(input: {
             lane: event.lane,
             kind: "tool",
             callId: event.callId,
-            label: event.label,
           },
         },
       ]
@@ -285,7 +283,6 @@ function applyOps(d: SessionDocHandle, ops: readonly StreamOp[]): void {
           lane: s.lane,
           kind: s.kind,
           callId: s.kind === "tool" ? s.callId : "",
-          label: s.kind === "tool" ? s.label : "",
           under: s.kind === "reply" ? (s.under ?? "") : "",
         })
         d.streamText.set(s.id, "")
@@ -322,7 +319,7 @@ export function readStreamRecords(
     .map(
       ([id, s]): StreamRecord =>
         s.kind === "tool"
-          ? { id, lane: s.lane, kind: "tool", callId: s.callId, label: s.label }
+          ? { id, lane: s.lane, kind: "tool", callId: s.callId }
           : { id, lane: s.lane, kind: "reply", under: s.under || null },
     )
 }

@@ -25,6 +25,7 @@ import {
   runSpan,
   tailEdit,
   threadOf,
+  toolDetail,
   toolLabel,
   writerId,
   writersOf,
@@ -642,6 +643,21 @@ describe("tool calls: paired with their results on the path", () => {
       },
     ])
   })
+  test("a call whose label cuts its command carries the whole command", () => {
+    const command = "pnpm test\necho done"
+    const long = indexTree({
+      ...entries,
+      ...Object.fromEntries([
+        e("9-a", "4-a", {
+          role: "assistant",
+          content: [call("c9", "bash", { command })],
+        }),
+      ]),
+    })
+    expect(projectSpine(long, "9-a").spine.at(-1)?.toolCalls).toEqual([
+      { id: "c9", name: "bash", label: "bash pnpm test", detail: command },
+    ])
+  })
   test("a result off the path does not pair", () => {
     // Path to 5-r: its result pairs; path to 2-a alone: no result yet.
     expect(
@@ -681,6 +697,18 @@ describe("toolLabel and tailEdit", () => {
       "bash pnpm test",
     )
     expect(toolLabel("mystery", { x: 1 })).toBe("mystery")
+  })
+
+  test("toolDetail gives the whole of what the label cuts, and nothing when it cuts nothing", () => {
+    expect(toolDetail("bash", { command: "pnpm test" })).toBeUndefined()
+    expect(toolDetail("bash", { command: "pnpm test\necho done" })).toBe(
+      "pnpm test\necho done",
+    )
+    const long = `echo ${"x".repeat(200)}`
+    expect(toolLabel("bash", { command: long }).endsWith("…")).toBe(true)
+    expect(toolDetail("bash", { command: long })).toBe(long)
+    expect(toolDetail("read", { path: "a.ts" })).toBeUndefined()
+    expect(toolDetail("mystery", { x: 1 })).toBeUndefined()
   })
 
   // A tail-kept view: lines 1..n, keeping the last `keep` lines.

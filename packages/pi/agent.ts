@@ -39,7 +39,6 @@ import {
   type NoteRecord,
   type Position,
   type StreamEvent,
-  toolLabel,
   type WriterId,
 } from "@pineta/core"
 import {
@@ -501,7 +500,6 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         kind: "toolStart",
         lane: event.lane,
         callId: event.toolCallId,
-        label: toolLabel(event.toolName, event.args),
       }),
     ),
     harness.events.on("tool_update", event =>

@@ -685,8 +685,6 @@ export type StreamEvent =
       readonly kind: "toolStart"
       readonly lane: string
       readonly callId: string
-      /** `toolLabel(name, args)`, so nothing downstream needs the arguments. */
-      readonly label: string
     }
   /** The tool's output so far: a whole snapshot, not a delta. */
   | {

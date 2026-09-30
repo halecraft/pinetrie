@@ -573,7 +573,10 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 
 - **A tool call is a row under the agent's message** (`ToolRow` in
   `message.tsx`): its label (`toolLabel`), ✓, ✗ or …, and its result folded in
-  a `<details>`, capped for display. A result is its own entry in the tree;
+  a `<details>`, capped for display. A label shows a command's first line, at
+  most 120 characters; when it cuts what the call touches, the opened row
+  shows all of it first (`.tool-command`, from `toolDetail`). The live row
+  is the committed row, so a running command shows it too. A result is its own entry in the tree;
   `projectSpine` pairs it with its call on the same path, so it adds no column
   row and no rail row. A message that only called tools shows only its rows.
 - **Live work hands over to its entry in one render** (ADR-0044). `App`

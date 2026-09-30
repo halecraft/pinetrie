@@ -2121,6 +2121,39 @@ try {
         "when the command ends, its row stops being live, folds, and shows ✓",
       )
 
+      // A label shows a command's first line, and at most 120 characters;
+      // the row, opened, shows all of it. A command its label shows whole
+      // repeats nothing.
+      {
+        const WHOLE = `echo ${"long ".repeat(30)}\necho second line`
+        script.use([
+          { tool: "bash", args: { command: WHOLE } },
+          { text: "echoed" },
+        ])
+        await say("echo a long one")
+        await toolIdle()
+        const cut = `${col(0)} .tool[data-tool="bash"][data-status="ok"]`
+        await appears(`${cut} .tool-command`, 10_000)
+        const row = tp.locator(cut).last()
+        await row.locator("summary").click()
+        const shownWhole = await row
+          .locator(".tool-command")
+          .textContent({ timeout: 5_000 })
+          .catch(() => null)
+        const label = await row.locator(".tool-label").textContent()
+        const repeated = await tp
+          .locator(cut)
+          .filter({ hasText: "echo tick" })
+          .locator(".tool-command")
+          .count()
+        ok(
+          shownWhole === WHOLE &&
+            label?.endsWith("…") === true &&
+            repeated === 0,
+          `an opened row shows the whole command its label cuts, and a short one's row repeats nothing (${JSON.stringify(label)}, ${repeated})`,
+        )
+      }
+
       // ── a following column never gets shorter while its agent works (S35) ─
       // At 20× CPU throttle every render is painted, as in a long session, so
       // a render that disagrees with the document would be seen here.
