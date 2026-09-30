@@ -518,13 +518,16 @@ context.**
   branch. A project can share a directory for everyone in `pineta.json`'s
   `lanes.shared`. A changed config reaches existing threads at their next
   run, after a host restart.
-- **Bringing a thread's work back** (ADR-0038, ADR-0039, ADR-0040): each
+- **Bringing a thread's work back** (ADR-0038 to ADR-0040, ADR-0047): each
   thread has a two-word name, shown in its column's header, and keeps an
   offer in your repo, one commit on your `@-` under the bookmark
   `pineta-offer/<name>`. While the thread works, the offer reads
   `WIP (<name>): <its first message>` and grows in place; when a run ends,
-  an agent writes its commit message. See it in jj or jjui before you take
-  it: it shows its conflicts with your committed work. **take**, in the work
+  an agent writes its commit message. Before you take it, press the offer's
+  line in the work strip: the column widens to show its message, its files
+  (flagging those that conflict with your committed work, and those you are
+  editing) and every file's diff. Or find its bookmark, which a press
+  copies, in jj or jjui. **take**, in the work
   strip at its column's foot, puts it under your uncommitted edits. Reword,
   squash or split it like any commit of yours; the host then leaves it
   alone. **split into a stack** has the agent rewrite it as reviewable

@@ -8,7 +8,8 @@
 // `planRefreshOffer`, `planRepair`), then writes the `pineta.offer` record
 // when it changed. Triggers: a lane's fetch, a run's end, an offer action,
 // and your own jj operations, noticed by reading your repo's operation head
-// every 2 s while an offer is open.
+// every 2 s while an offer is open. The queue also carries the reads a page
+// asks for (`read`, ADR-0047): a jj read can write (S57).
 
 import {
   type CommitId,
@@ -26,6 +27,7 @@ import {
   changeOf,
   commitsOf,
   executeOnHost,
+  fileDiff,
   hasBookmark,
   hostCommitIn,
   hostOps,
@@ -44,12 +46,18 @@ import {
   planRefreshOffer,
   planRepair,
   planTakeOffer,
+  revisionRead,
   startOfOffer,
   yourEditsIn,
 } from "@pineta/lanes"
 import {
   acceptStack,
+  answerDiff,
+  answerReview,
   describeRequest,
+  type OfferAnswer,
+  type OfferAsk,
+  planOfferRead,
   planRefresh,
   recordChanged,
   wipDescription,
@@ -98,6 +106,11 @@ export interface Offers {
       readonly top: CommitId | null
     },
   ): Promise<string | null>
+  /**
+   * A review or a diff a page asked for, of a commit an open offer holds now:
+   * gathered, planned (`planOfferRead`) and read on the queue for your repo.
+   */
+  read(ask: OfferAsk): Promise<OfferAnswer>
   /** Settles when no offer work is queued or running. */
   quiet(): Promise<void>
   close(): void
@@ -227,6 +240,7 @@ export function startOffers(input: {
       edited: at.edited,
       bookmark: at.bookmark,
       taken: null,
+      commits: facts.commits,
       at: Date.now(),
       host: {
         changes: [...at.changes],
@@ -622,6 +636,20 @@ export function startOffers(input: {
         const target = await targetNow()
         await build(lane, name, stack.tip, stack.start, target, sources, true)
         return null
+      })
+    },
+
+    read(ask) {
+      return serially(async () => {
+        const read = planOfferRead(readOffers(doc), ask)
+        switch (read.kind) {
+          case "refused":
+            return read
+          case "review":
+            return answerReview(await revisionRead(ops, read.commit))
+          case "diff":
+            return answerDiff(await fileDiff(ops, read.commit, read.path))
+        }
       })
     },
 

@@ -124,6 +124,7 @@ const OfferRecordSchema = Type.Object({
   edited: Type.Boolean(),
   bookmark: Type.String({ minLength: 1 }),
   taken: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  commits: Type.Array(Commit),
   at: Type.Number(),
   host: Type.Object({
     changes: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
@@ -185,6 +186,7 @@ export const decodeOfferRecord = (value: unknown): OfferRecord | undefined =>
   decodeWith(OfferRecordSchema, value, r => ({
     ...r,
     lane: r.lane as LaneName,
+    commits: r.commits.map(commitId),
     host: {
       changes: r.host.changes,
       wrote: r.host.wrote.map(commitId),
@@ -261,6 +263,7 @@ export function encodeWorkRecord(r: WorkRecord): {
           files: [...r.record.files],
           conflicts: [...r.record.conflicts],
           yourEdits: [...r.record.yourEdits],
+          commits: [...r.record.commits],
           host: {
             changes: [...r.record.host.changes],
             wrote: [...r.record.host.wrote],

@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S57 — Reading an offer's revisions and diffs from jj ✅ PASS
+
+`findings/S57-offer-review-reads.md`. A template prints a revision's
+description and per-file stats as JSON, `json()` quoting every path; a
+`root-file:` pattern gives one file's diff, where `root:` would match a
+prefix. Both take milliseconds. A read of a repo with divergent operation
+heads reconciles them, writing an operation, so the host's reads share its
+queue. Produced ADR-0047.
+
 ### S55 — The order a turn's streams and entries are written in ✅ PASS
 
 `findings/S55-live-work-handover.md`. A message's entry is written before its

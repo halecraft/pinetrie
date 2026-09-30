@@ -11,20 +11,29 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   acceptStack,
+  answerDiff,
+  answerReview,
   decodeHaveRecord,
   decodeOfferRecord,
   decodeStack,
   decodeUpdate,
   describeRequest,
+  diffUrl,
   encodeUpdate,
   encodeWorkRecord,
+  MAX_DIFF_BYTES,
+  OFFER_WIRE,
   offerView,
+  parseOfferPath,
+  planOfferRead,
   planRefresh,
   planStack,
   type RefreshFacts,
   renderableMessage,
+  reviewUrl,
   updatePrefill,
   wipDescription,
+  withoutTrailers,
   withTrailers,
 } from "./index.ts"
 
@@ -46,6 +55,7 @@ const offer: OfferRecord = {
   edited: false,
   bookmark: "pineta-offer/t-1",
   taken: null,
+  commits: [commitId("w1")],
   at: 10,
   host: { changes: ["ch1"], wrote: [commitId("w1")], tip: TIP, start: [BASE] },
 }
@@ -261,6 +271,17 @@ describe("the commit message", () => {
     })
     expect(tighter.user).toContain("the rest of the diff left out")
   })
+  test("withoutTrailers undoes withTrailers, and keeps your own", () => {
+    const at = { lane: LANE, name: "amber-fox" as ThreadName, entry: "e9" }
+    const m = "feat: x\n\nwhy it changed\n"
+    expect(withoutTrailers(withTrailers(m, at))).toBe(m.trim())
+    const yours = "feat: x\n\nSigned-off-by: Ada <ada@x.io>"
+    expect(withoutTrailers(withTrailers(yours, at))).toBe(yours)
+    expect(
+      withoutTrailers(`feat: x\n\nSigned-off-by: Ada\nPineta-Entry: e1`),
+    ).toBe("feat: x\n\nSigned-off-by: Ada\nPineta-Entry: e1")
+    expect(withoutTrailers("Pineta-Entry: e1")).toBe("Pineta-Entry: e1")
+  })
   test("withTrailers and the WIP line", () => {
     const name = "amber-fox" as ThreadName
     expect(withTrailers("feat: x\n", { lane: LANE, name, entry: "e9" })).toBe(
@@ -283,6 +304,91 @@ describe("records", () => {
     expect([e.namespace, e.key]).toEqual(["pineta.have", COPY])
     expect(decodeHaveRecord(structuredClone(e.value))).toEqual(h)
     expect(decodeOfferRecord({ ...offer, size: 0 })).toBeUndefined()
+  })
+  test("an offer stored before its commits were kept does not decode", () => {
+    const { commits: _, ...before } = offer
+    expect(decodeOfferRecord(before)).toBeUndefined()
+  })
+})
+
+describe("the review (ADR-0047)", () => {
+  const C1 = commitId("c1")
+  const C2 = commitId("c2")
+  const open: OfferRecord = { ...offer, commits: [C1, C2] }
+  const offers = new Map([[LANE, open]])
+  test("planOfferRead: only a commit an open offer holds now", () => {
+    expect(planOfferRead(offers, { kind: "review", commit: C2 })).toEqual({
+      kind: "review",
+      commit: C2,
+    })
+    expect(
+      planOfferRead(offers, { kind: "diff", commit: C1, path: "a b.txt" }),
+    ).toEqual({ kind: "diff", commit: C1, path: "a b.txt" })
+    const status = (o: ReadonlyMap<string, OfferRecord>, commit: string) => {
+      const read = planOfferRead(o, { kind: "review", commit })
+      return read.kind === "refused" ? read.status : read.kind
+    }
+    // What the host last wrote is not what the offer is now.
+    expect(status(offers, "w1")).toBe(404)
+    expect(status(offers, "ffff")).toBe(404)
+    const taken = new Map([[LANE, { ...open, taken: "t" }]])
+    expect(status(taken, C1)).toBe(404)
+    const path = (p: string) => {
+      const read = planOfferRead(offers, { kind: "diff", commit: C1, path: p })
+      return read.kind === "refused" ? read.status : read.kind
+    }
+    expect([path(""), path("a\nb"), path("a\u007f")]).toEqual([400, 400, 400])
+  })
+  test("answers: a review decoded, a diff within its size, else refused", () => {
+    const review = {
+      description: "feat: x\n",
+      files: [
+        {
+          path: "w2",
+          shown: "{w => w2}",
+          change: "renamed",
+          added: 0,
+          removed: 0,
+        },
+      ],
+    }
+    expect(answerReview(structuredClone(review))).toEqual({
+      kind: "review",
+      review,
+    })
+    const status = (a: ReturnType<typeof answerReview>) =>
+      a.kind === "refused" ? a.status : a.kind
+    expect(status(answerReview(null))).toBe(502)
+    expect(
+      status(
+        answerReview({
+          ...review,
+          files: [{ ...review.files[0], added: "1" }],
+        }),
+      ),
+    ).toBe(502)
+    expect(status(answerDiff(null))).toBe(502)
+    expect(status(answerDiff("x".repeat(MAX_DIFF_BYTES)))).toBe("diff")
+    expect(status(answerDiff("x".repeat(MAX_DIFF_BYTES + 1)))).toBe(413)
+    // Bytes of UTF-8, not characters.
+    expect(status(answerDiff("é".repeat(MAX_DIFF_BYTES / 2 + 1)))).toBe(413)
+  })
+  test("the wire: every URL parses back to what built it", () => {
+    const at = (u: string) => parseOfferPath(new URL(u, "http://host"))
+    const c = commitId("0123abcd")
+    expect(at(reviewUrl(c))).toEqual({ kind: "review", commit: c })
+    for (const path of ["a b.txt", 'we"ird', "q?x&y#z", "dir/é.md"])
+      expect(at(diffUrl(c, path))).toEqual({ kind: "diff", commit: c, path })
+    expect(
+      at(reviewUrl(c).replace(`/${OFFER_WIRE}/`, `/${OFFER_WIRE + 1}/`)),
+    ).toBe("bad")
+    expect(at(`/offer/${OFFER_WIRE}/diff/${c}`)).toBe("bad")
+    expect(at(`/offer/${OFFER_WIRE}/review/not-hex`)).toBe("bad")
+    expect(at(`${reviewUrl(c)}/more`)).toBe("bad")
+    expect(at("/offer/anything")).toBe("bad")
+    expect(at("/offer")).toBe("bad")
+    expect(at("/offers")).toBeNull()
+    expect(at("/other")).toBeNull()
   })
 })
 

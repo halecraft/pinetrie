@@ -44,4 +44,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "ref reads the dimensions without the bytes",
   },
+  {
+    name: "anything under /offer/ reaches Vite",
+    file: "apps/pineta/host/routes.ts",
+    from: '  if (ask === "bad" || method !== "GET") return { kind: "bad" }',
+    to: '  if (ask === "bad" || method !== "GET") return { kind: "other" }',
+    command: unit,
+    expect: "an offer's read is a GET the wire accepts",
+  },
+  {
+    name: "a refusal is cached",
+    file: "apps/pineta/host/reviews.ts",
+    from: '          "cache-control": "no-store",',
+    to: '          "cache-control": "private, max-age=31536000, immutable",',
+    command: unit,
+    expect: "a refusal is never stored",
+  },
 ]

@@ -86,12 +86,16 @@
       @keyframes pulse { 50% { transform: scale(1.8); } }
       #strip { flex: 1; display: flex; overflow-x: auto; min-width: 0; }
 
-      /* A column is one path, on its own scroll, its composer at its foot.
-         min-width: 0 holds it at its basis: a flex item's automatic minimum is
-         its widest unbreakable line, so a long line in a code block or a
-         tool's output would widen the column (S37). */
-      .column { flex: 0 0 28rem; min-width: 0; display: flex; flex-direction: column; min-height: 0;
+      /* A column is its thread, and while you review its offer, the review
+         beside it (ADR-0047). The thread is one path, on its own scroll, its
+         composer at its foot. Its width and min-width: 0 hold it at 28rem: a
+         flex item's automatic minimum is its widest unbreakable line,
+         so a long line in a code block or a tool's output would widen the
+         column (S37). */
+      .column { flex: 0 0 auto; min-width: 0; display: flex; min-height: 0;
         border-right: 1px solid #23272e; }
+      .column-thread { flex: 0 0 28rem; width: 28rem; min-width: 0; display: flex;
+        flex-direction: column; min-height: 0; }
       /* A column's header (ADR-0040): who works in it, then where it forks. Every
          track colour in a column is `var(--track)`, set inline (`trackStyle`). */
       .column-head { display: flex; flex-direction: column; gap: .2rem; padding: .4rem .75rem;
@@ -139,12 +143,71 @@
       .work button { padding: .1rem .5rem; font-size: .75rem; background: none;
         border: 1px solid #444; color: #bbb; }
       .work .offer-line { color: #a8d8a8; }
+      /* An offer that can be reviewed: its line is the review's toggle, and
+         its bookmark copies; both read as text, not as the strip's buttons. */
+      .work button.offer-line, .work button.offer-bookmark { border: none; padding: 0;
+        font-size: inherit; text-align: left; cursor: pointer; }
+      .work button.offer-line { font-size: .75rem; }
+      .work button.offer-line::after { content: " ▸"; }
+      .work button.offer-line[aria-expanded="true"]::after { content: " ◂"; }
+      .work button.offer-line:hover { text-decoration: underline; }
       .work[data-state="nothing"] .offer-line, .work[data-state="taken"] .offer-line,
       .work[data-state="running"] .offer-line, .work[data-state="busy"] .offer-line { color: #8b93a1; }
       .work[data-state="conflicts"] .offer-line,
       .work[data-state="needs_you"] .offer-line { color: #e8c07a; }
       .work .offer-bookmark { font-family: ui-monospace, monospace; font-size: .7rem; color: #6f7784;
         user-select: text; }
+      .work button.offer-bookmark:hover { color: #aab; }
+
+      /* The review of a column's offer (ADR-0047): a file list, and one scroll
+         of every file's diff, each file's head pinned while its diff shows. */
+      .review { flex: 0 0 auto; width: clamp(40rem, 100vw - 36rem, 64rem); min-height: 0;
+        display: flex; flex-direction: column; border-top: 4px solid var(--track, #777);
+        border-left: 1px solid #23272e; font-size: .8rem; --diff-line: 1.35em; }
+      .review-head { display: flex; align-items: center; gap: .6rem; padding: .4rem .75rem;
+        border-bottom: 1px solid #23272e; color: #aaa; outline: none; }
+      .review-head .review-line { color: #a8d8a8; }
+      .review-head .review-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap; color: #ddd; }
+      .review-head .review-close { margin-left: auto; background: none; border: none; color: #8b93a1;
+        font-size: 1rem; padding: 0 .25rem; }
+      .review-body { flex: 1; display: flex; min-height: 0; }
+      .review-list { flex: 0 0 12rem; overflow: auto; padding: .4rem 0; border-right: 1px solid #23272e; }
+      .review-list-title { padding: .4rem .6rem .15rem; color: #8b93a1; font-size: .72rem;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .review-list-file { display: block; width: 100%; text-align: left; background: none; border: none;
+        border-radius: 0; padding: .15rem .6rem; color: #bbb; font-family: ui-monospace, monospace;
+        font-size: .72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .review-list-file:hover { background: #1c2027; }
+      .review-list-file[aria-current] { background: #222833; color: #eee; }
+      .review-list-file[data-conflicts] { color: #e8c07a; }
+      .review-diffs { flex: 1; min-width: 0; overflow: auto; }
+      .review-description { padding: .6rem .75rem; border-bottom: 1px solid #23272e; }
+      .review-revision-title { color: #ddd; font-weight: 600; }
+      .review-revision-body { margin-top: .3rem; white-space: pre-wrap; color: #aab; }
+      .review-file { border-bottom: 1px solid #23272e; }
+      .review-file-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center;
+        gap: .5rem; padding: .3rem .75rem; background: #181b20; border-bottom: 1px solid #23272e;
+        font-family: ui-monospace, monospace; font-size: .75rem; }
+      .review-file-head .review-path { color: #ddd; overflow-wrap: anywhere; }
+      .review-toggle { background: none; border: none; padding: 0; color: #8b93a1; width: 1em; }
+      .review-letter { color: #8b93a1; }
+      .review-file[data-letter="A"] .review-letter { color: #a8d8a8; }
+      .review-file[data-letter="D"] .review-letter { color: #e89a9a; }
+      .review-lines { color: #8b93a1; }
+      .review-flag { padding: 0 .35rem; border-radius: 3px; background: #3a3220; color: #e8c07a;
+        font-family: system-ui, sans-serif; font-size: .7rem; }
+      .review-show { margin: .4rem .75rem; background: none; border: 1px solid #444; color: #bbb;
+        font-size: .75rem; }
+      .review-note { padding: .4rem .75rem; color: #8b93a1; font-style: italic; }
+      .review-placeholder { font-size: .75rem; }
+      .review-diff { margin: 0; padding: .3rem 0; overflow-x: auto; white-space: pre;
+        font-family: ui-monospace, monospace; font-size: .75rem; line-height: var(--diff-line); }
+      .review-diff span { display: block; padding: 0 .75rem; min-width: max-content; }
+      .review-diff [data-kind="add"] { color: #a8d8a8; background: #1b2a1d; }
+      .review-diff [data-kind="del"] { color: #e89a9a; background: #2d1c1e; }
+      .review-diff [data-kind="hunk"] { color: #7fa7d8; }
+      .review-diff [data-kind="meta"] { color: #6f7784; }
       .work .offer-take { border-color: #4f7a4f; color: #a8d8a8; }
       .work .work-warning { color: #e8c07a; }
       .update-waiting { color: #8b93a1; font-style: italic; }

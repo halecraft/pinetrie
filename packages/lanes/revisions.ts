@@ -12,14 +12,12 @@ import {
   commitId,
   type EntryId,
   type LaneName,
+  TRAILERS,
   type YoursNow,
 } from "@pineta/core"
 import { setBookmark } from "./bookmarks.ts"
 import { planTurnCommit } from "./plan.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
-
-const ENTRY_TRAILER = "Pineta-Entry"
-const LANE_TRAILER = "Pineta-Lane"
 
 /** A revision's description: its title, then the trailers. */
 export const revisionMessage = (input: {
@@ -27,11 +25,11 @@ export const revisionMessage = (input: {
   readonly entry: EntryId
   readonly lane: LaneName
 }): string =>
-  `${input.title}\n\n${ENTRY_TRAILER}: ${input.entry}\n${LANE_TRAILER}: ${input.lane}\n`
+  `${input.title}\n\n${TRAILERS.entry}: ${input.entry}\n${TRAILERS.lane}: ${input.lane}\n`
 
 /** The entry a revision's description names, or null. */
 export function entryOfMessage(description: string): string | null {
-  const prefix = `${ENTRY_TRAILER}: `
+  const prefix = `${TRAILERS.entry}: `
   const line = lines(description).find(l => l.startsWith(prefix))
   return line === undefined ? null : line.slice(prefix.length).trim()
 }

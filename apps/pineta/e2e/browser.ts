@@ -28,6 +28,7 @@ import {
   readLaneRecords,
   readMarks,
   readNames,
+  readOffers,
   readParticipantNames,
   readTreeIndex,
 } from "@pineta/reads"
@@ -2374,7 +2375,7 @@ try {
         `${col(0)} .tool[data-tool="read"] .tool-label:has-text("yyy")`,
       )
       await toolIdle()
-      const widths = await tp.$eval(col(0), c => {
+      const widths = await tp.$eval(`${col(0)} .column-thread`, c => {
         const body = c.querySelector(".column-body")
         const rem = Number.parseFloat(
           getComputedStyle(document.documentElement).fontSize,
@@ -2407,11 +2408,16 @@ try {
           nameText === `✦ ${threadName}`,
         `the column's header names the thread (${nameText})`,
       )
+      const longLane = Array.from({ length: 300 }, (_, i) => `line ${i}\n`)
       script.use([
         { tool: "write", args: { path: "from-lane.txt", content: "lane\n" } },
+        {
+          tool: "write",
+          args: { path: "long-lane.txt", content: longLane.join("") },
+        },
         { text: "written" },
       ])
-      await say("write a file")
+      await say("write two files")
       await toolIdle()
       const takeShown = await appears(
         `${col(0)} .work.offer[data-state="ready"] .offer-take`,
@@ -2423,6 +2429,102 @@ try {
         (await tp
           .textContent(`${col(0)} .work .offer-bookmark`)
           .catch(() => "")) ?? ""
+
+      // ── the review, beside the thread (ADR-0047) ─────────────────────────
+      // Once described: describing rewrites the offer's commit, and the review
+      // would read the new one mid-check.
+      await waitFor(
+        () =>
+          [...readOffers(toolHost.doc).values()].some(
+            o => o.taken === null && o.described,
+          ),
+        15_000,
+      )
+      const review = `${col(0)} .review`
+      const section = (file: string) =>
+        `${review} .review-file[data-key$=":${file}"]`
+      await tp.click(`${col(0)} .work .offer-line`).catch(() => {})
+      const opened = await appears(`${review} .review-list-file`)
+      const threadWidth = await tp
+        .$eval(`${col(0)} .column-thread`, t => {
+          const rem = Number.parseFloat(
+            getComputedStyle(document.documentElement).fontSize,
+          )
+          return (
+            Math.round(t.getBoundingClientRect().width) === Math.round(28 * rem)
+          )
+        })
+        .catch(() => false)
+      const rows = await tp.locator(`${review} .review-list-file`).count()
+      const diffShown = await appears(
+        `${section("from-lane.txt")}[data-letter="A"][data-state="shown"] [data-kind="add"]:text-is("+lane")`,
+      )
+      ok(
+        opened && threadWidth && rows === 2 && diffShown,
+        `the offer's line opens its review beside the thread, which keeps its 28rem: a row per file, and a file's diff (opened ${opened}, thread 28rem ${threadWidth}, rows ${rows}, diff ${diffShown})`,
+      )
+      // What only typing changes redraws no part of the review (S54).
+      await appears(`${section("long-lane.txt")}[data-state="shown"]`)
+      await componentRenders(tp)
+      await tp.click(`${col(0)} .composer .input`)
+      await tp.keyboard.type("typed beside a review", { delay: 60 })
+      const typedBeside = (await componentRenders(tp)).filter(
+        r => r.name === "ReviewPaneView" || r.name === "ReviewFileView",
+      )
+      await tp.fill(`${col(0)} .composer .input`, "")
+      ok(
+        opened && typedBeside.length === 0,
+        `typing beside an open review redraws none of it (${typedBeside.map(r => r.name).join(", ")})`,
+      )
+      // A file's head stays at the top while its diff scrolls under it, and
+      // the list brings a file's head to the top.
+      const headAtTop = (file: string) =>
+        tp
+          .$eval(
+            `${section(file)} .review-file-head`,
+            (h, box) => {
+              const top = document
+                .querySelector(box)
+                ?.getBoundingClientRect().top
+              return (
+                top !== undefined &&
+                Math.abs(h.getBoundingClientRect().top - top) <= 1
+              )
+            },
+            `${review} .review-diffs`,
+          )
+          .catch(() => false)
+      await tp
+        .$eval(
+          section("long-lane.txt"),
+          (s, box) => {
+            const scroller = document.querySelector(box)
+            if (scroller === null) return
+            const offset =
+              s.getBoundingClientRect().top -
+              scroller.getBoundingClientRect().top
+            scroller.scrollTop += offset + s.getBoundingClientRect().height / 2
+          },
+          `${review} .review-diffs`,
+        )
+        .catch(() => {})
+      await tp.waitForTimeout(100)
+      const pinned = await headAtTop("long-lane.txt")
+      await tp
+        .click(`${review} .review-list-file[title="from-lane.txt"]`, {
+          timeout: 5_000,
+        })
+        .catch(() => {})
+      await tp.waitForTimeout(100)
+      const listJumped = await headAtTop("from-lane.txt")
+      ok(
+        pinned && listJumped,
+        `a file's head stays pinned while its diff scrolls, and the list brings a file to the top (pinned ${pinned}, jumped ${listJumped})`,
+      )
+      await tp
+        .click(`${review} .review-close`, { timeout: 5_000 })
+        .catch(() => {})
+      const closed = await appears(`${col(0)}:not(:has(.review))`, 5_000)
       if (takeShown) await tp.click(`${col(0)} .work .offer-take`)
       const took =
         (await waitFor(
@@ -2435,6 +2537,24 @@ try {
           !line.includes("`") &&
           took,
         `the column's foot shows the thread's offer in words, its bookmark apart, and Take brings it into your working copy (${line} · ${bookmark})`,
+      )
+      const settled = await tp
+        .waitForFunction(
+          sel => {
+            const l = document.querySelector(sel)
+            return l !== null && l.tagName !== "BUTTON"
+          },
+          `${col(0)} .work .offer-line`,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      const noReview = (await tp.$(review)) === null
+      ok(
+        closed && settled && noReview,
+        `the review closes, and after the take there is none to open (closed ${closed}, line not a button ${settled}, no review ${noReview})`,
       )
 
       // ── markdown: drawn ───────────────────────────────────────────────────

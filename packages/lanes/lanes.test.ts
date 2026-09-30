@@ -33,6 +33,7 @@ import {
   execute,
   executeOnHost,
   executeOrThrow,
+  fileDiff,
   hasBookmark,
   hostBytesRunner,
   hostCommitIn,
@@ -64,6 +65,7 @@ import {
   type Runner,
   retireLaneBookmarks,
   revisionMessage,
+  revisionRead,
   run,
   sideHistory,
   stackBookmark,
@@ -532,6 +534,94 @@ describe("a lane's repo, with jj", () => {
     await laneJj(["bookmark", "set", stackBookmark(LANE), "-r", "@-"])
     expect(await turnOn(laneJj, { ...TURN, entry: entryId("e-3") })).toBeNull()
     expect(await bookmarkOf(laneJj, LANE)).toBe(merge)
+  }, 60_000)
+
+  test("a review reads an offer's commit: its description, files and one file's diff (S57)", async () => {
+    const { laneDir, yoursJj, ops, laneJj, fetch, edit, build, base } =
+      await turnRig("review")
+    // Names the template and the fileset must quote, a file under a
+    // directory, and a rename.
+    await run("mkdir", ["-p", path.join(laneDir, "dir")])
+    await edit(laneDir, "a b.txt", "space\n")
+    await edit(laneDir, 'we"ird', "quote\n")
+    await edit(laneDir, "dir/f.txt", "under\n")
+    await edit(laneDir, "a.txt", "a\nmore\n")
+    await run("mv", [
+      path.join(laneDir, "base.txt"),
+      path.join(laneDir, "moved.txt"),
+    ])
+    await turnOn(laneJj, { ...TURN, entry: entryId("e-2") })
+    await fetch(base)
+    const tip = await laneTipIn(ops, LANE)
+    if (tip === null) throw new Error("no tip")
+    const offer = await build([
+      { commit: tip, description: "feat: lane\n\nwhy\n" },
+    ])
+    const [w] = offer.commits
+    const [change] = offer.changes
+    if (w === undefined || change === undefined) throw new Error("no offer")
+
+    expect(await revisionRead(ops, w)).toEqual({
+      description: "feat: lane\n\nwhy\n",
+      files: expect.arrayContaining([
+        {
+          path: "a b.txt",
+          shown: "a b.txt",
+          change: "added",
+          added: 1,
+          removed: 0,
+        },
+        {
+          path: 'we"ird',
+          shown: 'we"ird',
+          change: "added",
+          added: 1,
+          removed: 0,
+        },
+        {
+          path: "dir/f.txt",
+          shown: "dir/f.txt",
+          change: "added",
+          added: 1,
+          removed: 0,
+        },
+        {
+          path: "a.txt",
+          shown: "a.txt",
+          change: "added",
+          added: 2,
+          removed: 0,
+        },
+        {
+          path: "moved.txt",
+          shown: "{base.txt => moved.txt}",
+          change: "renamed",
+          added: 0,
+          removed: 0,
+        },
+      ]),
+    })
+    expect(await fileDiff(ops, w, 'we"ird')).toContain("+quote")
+    expect(await fileDiff(ops, w, "a b.txt")).toContain("+space")
+    // One file exactly: a directory's name names none of its files.
+    expect(await fileDiff(ops, w, "dir")).toBe("")
+    expect(await fileDiff(ops, w, "dir/f.txt")).toContain("+under")
+
+    // You reword the offer: its commit changes, and the review of the new
+    // one reads your words. `offerFacts` finds it by change id.
+    await yoursJj(["describe", "-r", change, "-m", "feat: as I want it"])
+    const facts = await offerFacts(ops, {
+      changes: offer.changes,
+      wrote: offer.commits,
+      target: "@-",
+    })
+    const [now] = facts.commits
+    if (now === undefined) throw new Error("no commit")
+    expect(now).not.toBe(w)
+    expect(await revisionRead(ops, now)).toMatchObject({
+      description: "feat: as I want it\n",
+    })
+    expect(await revisionRead(ops, commitId("1".repeat(40)))).toBeNull()
   }, 60_000)
 
   /**

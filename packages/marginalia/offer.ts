@@ -4,9 +4,11 @@
 // Every decision an offer needs, pure, over what the host gathers from jj and
 // the document: what a trigger does to it (`planRefresh`), its state and
 // what can be done in it (`offerView`), whether the agent's stack may replace it
-// (`acceptStack`), and the commit-message request (`describeRequest`,
-// `withTrailers`, `wipDescription`). The jj steps that carry them out, and
-// where an offer starts (`startOfOffer`), are in `@pineta/lanes`.
+// (`acceptStack`), the commit-message request (`describeRequest`,
+// `withTrailers`, `wipDescription`), and the review's wire: its URLs, what a
+// request may read and how it is answered (`planOfferRead`, `answerReview`,
+// `answerDiff`). The jj steps that carry them out, and where an offer starts
+// (`startOfOffer`), are in `@pineta/lanes`.
 
 import {
   type CommitId,
@@ -14,8 +16,12 @@ import {
   type LandingRecord,
   type LaneName,
   type OfferRecord,
+  type RevisionReview,
   type ThreadName,
+  TRAILERS,
 } from "@pineta/core"
+import { Type } from "typebox"
+import { decodeWith } from "./decode.ts"
 
 /** What the host found of one revision of an offer, against what it wrote. */
 export interface RevisionFacts {
@@ -209,9 +215,6 @@ export function offerView(input: {
 
 // ── the commit message ────────────────────────────────────────────────────
 
-const THREAD_TRAILER = "Pineta-Thread"
-const LANE_TRAILER = "Pineta-Lane"
-const ENTRY_TRAILER = "Pineta-Entry"
 /** Room for "- (N earlier left out)". */
 const LEFT_OUT_NOTE = 32
 
@@ -232,7 +235,7 @@ export const withTrailers = (
     readonly entry: string
   },
 ): string =>
-  `${message.trim()}\n\n${THREAD_TRAILER}: ${at.name}\n${LANE_TRAILER}: ${at.lane}\n${ENTRY_TRAILER}: ${at.entry}\n`
+  `${message.trim()}\n\n${TRAILERS.thread}: ${at.name}\n${TRAILERS.lane}: ${at.lane}\n${TRAILERS.entry}: ${at.entry}\n`
 
 /**
  * The commit-message request: the skill as the system text, then your repo's
@@ -276,4 +279,154 @@ export function describeRequest(input: {
     system: input.skill.trim(),
     user: `${head}What the thread said:\n${said}\nThe change:\n${diff}`,
   }
+}
+
+// ── the review (ADR-0047) ─────────────────────────────────────────────────
+
+/**
+ * The host's trailers removed: a last paragraph made only of `TRAILERS`
+ * lines, and the blank line before it. A paragraph holding any other line,
+ * your own trailers included, stays whole.
+ */
+export function withoutTrailers(message: string): string {
+  const text = message.trimEnd()
+  const cut = text.lastIndexOf("\n\n")
+  const last = text.slice(cut + 2).split("\n")
+  const ours = Object.values(TRAILERS).map(t => `${t}: `)
+  const onlyOurs =
+    cut >= 0 && last.every(line => ours.some(t => line.startsWith(t)))
+  return onlyOurs ? text.slice(0, cut).trim() : text.trim()
+}
+
+const ReviewFileSchema = Type.Object({
+  path: Type.String({ minLength: 1 }),
+  shown: Type.String({ minLength: 1 }),
+  change: Type.Union([
+    Type.Literal("added"),
+    Type.Literal("modified"),
+    Type.Literal("removed"),
+    Type.Literal("copied"),
+    Type.Literal("renamed"),
+  ]),
+  added: Type.Integer({ minimum: 0 }),
+  removed: Type.Integer({ minimum: 0 }),
+})
+
+const RevisionReviewSchema = Type.Object({
+  description: Type.String(),
+  files: Type.Array(ReviewFileSchema),
+})
+
+/**
+ * A revision's review from the wire: jj's output on the host, the host's
+ * answer in the page. A change to it bumps `OFFER_WIRE`.
+ */
+export const decodeRevisionReview = (
+  value: unknown,
+): RevisionReview | undefined => decodeWith(RevisionReviewSchema, value, r => r)
+
+/**
+ * The version of what `/offer/` answers: `REVISION_READ` (`@pineta/lanes`),
+ * `decodeRevisionReview`, and `fileDiff`'s flags. Every answer is cached as
+ * immutable under a URL holding it, so a change to any of the three bumps it,
+ * or pages keep the old shape.
+ */
+export const OFFER_WIRE = 1
+
+/** What a page asks of an offer: a revision's review, or one file's diff. */
+export type OfferAsk =
+  | { readonly kind: "review"; readonly commit: string }
+  | { readonly kind: "diff"; readonly commit: string; readonly path: string }
+
+const OFFER_PREFIX = "/offer/"
+
+/** A revision's review: `/offer/<OFFER_WIRE>/review/<commit>`. */
+export const reviewUrl = (commit: CommitId): string =>
+  `${OFFER_PREFIX}${OFFER_WIRE}/review/${commit}`
+
+/** One file's diff in a revision: `/offer/<OFFER_WIRE>/diff/<commit>?path=…`. */
+export const diffUrl = (commit: CommitId, path: string): string =>
+  `${OFFER_PREFIX}${OFFER_WIRE}/diff/${commit}?${new URLSearchParams({ path })}`
+
+const HEX = /^[0-9a-f]+$/
+
+/**
+ * An `/offer/` path as an ask: `bad` for anything else under `/offer/`,
+ * another version included, so the host answers only the wire it speaks;
+ * null for a path outside it.
+ */
+export function parseOfferPath(url: URL): OfferAsk | "bad" | null {
+  if (url.pathname !== "/offer" && !url.pathname.startsWith(OFFER_PREFIX))
+    return null
+  const [version, kind, commit, ...rest] = url.pathname
+    .slice(OFFER_PREFIX.length)
+    .split("/")
+  if (version !== String(OFFER_WIRE) || rest.length > 0) return "bad"
+  if (commit === undefined || !HEX.test(commit)) return "bad"
+  if (kind === "review") return { kind: "review", commit }
+  const path = url.searchParams.get("path")
+  if (kind === "diff" && path !== null) return { kind: "diff", commit, path }
+  return "bad"
+}
+
+/** A diff past this many bytes of UTF-8 is refused, not sent. */
+export const MAX_DIFF_BYTES = 1024 * 1024
+
+export type OfferRead =
+  | { readonly kind: "review"; readonly commit: CommitId }
+  | { readonly kind: "diff"; readonly commit: CommitId; readonly path: string }
+  | {
+      readonly kind: "refused"
+      readonly status: 400 | 404
+      readonly reason: string
+    }
+
+// A C0 control or DEL: refused before it reaches a jj fileset.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: the characters refused
+const CONTROL = /[\u0000-\u001f\u007f]/
+
+/**
+ * What a request may read: only a commit an open offer holds now, so a
+ * request reaches nothing of your repo but what a take would bring.
+ */
+export function planOfferRead(
+  offers: ReadonlyMap<string, OfferRecord>,
+  ask: OfferAsk,
+): OfferRead {
+  const held = [...offers.values()].some(
+    o => o.taken === null && o.commits.some(c => c === ask.commit),
+  )
+  if (!held)
+    return { kind: "refused", status: 404, reason: "no open offer holds it" }
+  const commit = ask.commit as CommitId
+  if (ask.kind === "review") return { kind: "review", commit }
+  if (ask.path === "" || CONTROL.test(ask.path))
+    return { kind: "refused", status: 400, reason: "not a path" }
+  return { kind: "diff", commit, path: ask.path }
+}
+
+export type OfferAnswer =
+  | { readonly kind: "review"; readonly review: RevisionReview }
+  | { readonly kind: "diff"; readonly text: string }
+  | {
+      readonly kind: "refused"
+      readonly status: 400 | 404 | 413 | 502
+      readonly reason: string
+    }
+
+/** A review as jj printed it, unchecked: decoded, or 502, the host's read having failed. */
+export function answerReview(got: unknown): OfferAnswer {
+  const review = decodeRevisionReview(got)
+  return review === undefined
+    ? { kind: "refused", status: 502, reason: "the host's read failed" }
+    : { kind: "review", review }
+}
+
+/** A diff as jj printed it: 502 when the read failed, 413 past `MAX_DIFF_BYTES`. */
+export function answerDiff(text: string | null): OfferAnswer {
+  if (text === null)
+    return { kind: "refused", status: 502, reason: "the host's read failed" }
+  if (new TextEncoder().encode(text).length > MAX_DIFF_BYTES)
+    return { kind: "refused", status: 413, reason: "too large to show here" }
+  return { kind: "diff", text }
 }

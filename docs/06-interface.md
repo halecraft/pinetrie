@@ -185,9 +185,14 @@ so it is the one behind the menu. What each does is under "Starting" below.
 - Each column's composer sits at its foot. The rail scrolls on its own.
 - **Above the composer, a work strip says what became of the agent's files**
   (ADR-0040): an agent on its own copy shows its offer in plain words ("2
-  files ready"), with **take** and its bookmark; one working directly says
-  "changes land directly in your working copy", and warns while another
-  agent works in the same directory.
+  files ready"), with **take** and its bookmark, which a press copies; one
+  working directly says "changes land directly in your working copy", and
+  warns while another agent works in the same directory.
+- **A column widens to review its offer** (ADR-0047). The offer's line opens
+  the review to the right of the thread, which keeps its place and width: a
+  file list, and one scroll of every file's diff, each file's head pinned
+  while its diff is in view, with the files that conflict and those you are
+  editing flagged.
 - On a narrow screen, columns stack as a back-navigable sequence (the macOS
   Finder column view on a phone), with a breadcrumb of fork points.
 
@@ -413,6 +418,12 @@ archive record (ADR-0029); a note's text is its own document (ADR-0025).
   of item, such as the agent finishing what you asked; one inbox per person
   across devices, once a person has an identity; browser or system
   notifications, which need permission.
+- **The review, grown** (ADR-0047): side-by-side diffs; a review of one turn,
+  its revision record's commit, through the same URLs; "ask about this" on a
+  hunk, which puts its path, line and quoted lines into the column's
+  composer; on narrow screens, the review as one more step in the stacked
+  sequence; the agent's edit tool rows drawn as diffs, if pi's results carry
+  them.
 
 ## Settled while planning
 

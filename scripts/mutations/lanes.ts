@@ -469,4 +469,22 @@ export const mutations: readonly Mutation[] = [
     command: lanes("commands"),
     expect: "the note the prompt names is a file in the lane",
   },
+  {
+    name: "a diff matches a path prefix",
+    file: "packages/lanes/offer.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    `root-file:${JSON.stringify(path)}`,",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "    `root:${JSON.stringify(path)}`,",
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
+    expect: "a review reads an offer's commit",
+  },
+  {
+    name: "the record keeps the host's commits",
+    file: "apps/pineta/host/offers.ts",
+    from: "      commits: facts.commits,",
+    to: "      commits: at.commits,",
+    command: lanes("main"),
+    expect: "the offer's record names its commit as it is now",
+  },
 ]

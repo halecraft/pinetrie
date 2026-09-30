@@ -247,6 +247,13 @@ containers, disks and the helper.
 - **A path argument is read from the process's directory, not `-R`'s.** Name
   files with the `root:"…"` fileset, as `sideHistory` and `conflictContent`
   do.
+- **A read can write.** With divergent operation heads, any jj command that
+  loads the repo reconciles them, writing an operation and rebasing
+  descendants (S57). So the host's reads of your repo run on its queue for
+  your repo (`host/offers.ts`), with its writes.
+- **The host's trailers** (`Pineta-Thread`, `Pineta-Lane`, `Pineta-Entry`)
+  are core's `TRAILERS`: `revisionMessage` and `entryOfMessage` here, and
+  marginalia's `withTrailers` and `withoutTrailers`, read the one constant.
 - **Decide from exit status, never from printed text.** Output a program
   reads comes from a `-T` template. `execFile` reads all of it: jj exits 3 on
   a broken pipe.
@@ -333,6 +340,16 @@ containers, disks and the helper.
 - **`offerFacts` reads an offer by change id once, then names commits**: its
   three edit tests (description, `jj interdiff`, the bottom's parent an
   ancestor of the target), files, conflicts and divergence.
+- **A review reads by commit id** (ADR-0047): `revisionRead` runs
+  `jj log -r <commit> -T REVISION_READ` and returns the parsed JSON,
+  unchecked (the host decodes it), and `fileDiff` runs `jj diff --git -r
+  <commit> -- root-file:"<path>"`. `REVISION_READ` prints `RevisionReview`'s
+  wire shape, `json()` quoting every string (S57). A rename reads by its
+  new path, with `{old => new}` as its display path; a binary file reads as
+  0 and 0. The diff's path is `root-file:`: a bare path is read from the
+  process's directory, and `root:` matches every file under a directory of
+  that name. A commit id names one commit, so neither resolves a change id
+  or meets a divergent one.
 - **`hostCommitIn`** splits a divergent revision's commits by the user of
   each one's newest evolog operation: the host's is abandoned, yours kept.
 
@@ -351,8 +368,9 @@ containers, disks and the helper.
   on it, while a stack's commits are never adopted; an offer built, refreshed, left, repaired,
   taken under your edits and beside them, the next offer, and a stack; an
   offer following a moved tip, your conflicting commit and a moved start,
-  each checked against a fresh build; and retiring a repo from before
-  offers.
+  each checked against a fresh build; a review of an offer's commit (its
+  description, a rename, names with a space and a quote, and one file's
+  diff, never a directory's); and retiring a repo from before offers.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
   with a repo in a fork's `/tmp` for the config's scope, an agent's own
   `jj commit` reaching its offer and a branch, and the contract

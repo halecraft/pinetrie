@@ -35,7 +35,9 @@ minutes).
   read that takes an id (a stream's text) is a `useCallback` on that id.
 - **`Message` is `memo(MessageView, sameMessageProps)`** (`message-props.ts`,
   pure). `MESSAGE_PROPS` says how each prop is compared, and its type refuses
-  a prop that is not in it. The node, its tools, its join, its fork tracks,
+  a prop that is not in it. `sameProps` (`same-props.ts`) makes the rule
+  from the table, for every memoised component: the review's pane and each
+  of its file sections are the others (below). The node, its tools, its join, its fork tracks,
   its closed branches and its calls' streams (`callStreams`) are compared by
   value, since `projectSpine` builds new nodes on every projection. The rest
   are compared by identity.
@@ -48,6 +50,12 @@ minutes).
   new on every render of the column.
 - **A message with a note card still redraws with its column**: the card is a
   new element each render, compared by identity.
+- **The review redraws with its data, not its column.** `ReviewPane` compares
+  its target and line by value, since `columnView` builds them anew, and its
+  `onClose` is `useStable`'s. A file section (up to 5,000 lines) compares its
+  row by value, so a scroll that moves the list's current file redraws no
+  diff. `useFetched` keys on its URLs' values, not the array's identity. The
+  browser suite checks that typing beside an open review redraws neither.
 - **A layout change is resolved in the same render,** not only a new index:
   `resolveLayout` runs on `stored` too, so a column opened at a lane's tip
   is drawn bound at once. It returns the same state when nothing moves, so
@@ -457,7 +465,7 @@ fast the strip scrolls near an edge (`edgeScroll`).
   widening the strip that the edge scroll is chasing.
 - **A press on a control starts no drag** (`NOT_A_HANDLE`): the name and the
   origin row are buttons. The header is `user-select: none`; the offer's
-  bookmark, which you may copy, is in the work strip, outside it. A press is
+  bookmark, which a press copies, is in the work strip, outside it. A press is
   a drag only once it has moved 5 px, so clicks still reach the header.
 - **Escape or a cancelled pointer moves nothing.** A drop in the gap on either
   side of the column also moves nothing, and marks nothing.
@@ -625,8 +633,10 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `✦ new agent`, or nothing in a conversation), then, in a second row, where
   it forks. It shows no commit and nothing of where the lane works.
 - **The work strip** (`WorkStripView`, above the composer) is the lane's
-  offer for its own copy (ADR-0038): `offerWords`' line, the bookmark apart
-  so you can find it in jj or jjui, its buttons, and a `⋯` menu for the rest
+  offer for its own copy (ADR-0038): `offerWords`' line, which opens the
+  review while the offer is open and holds files (ADR-0047, below), the
+  bookmark apart, which a press copies to find it in jj or jjui, its
+  buttons, and a `⋯` menu for the rest
   ("update from my work", "rewrite description"). What the lane runs now
   (`activityOf`: a turn, a resolution, or a split, from its latest prompt's
   role) comes first: while it runs, the line counts files so far and offers
@@ -642,15 +652,48 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   thread's name and opens its thread.
 - **Selectors in the browser suite:** a column's offer is `.work.offer`, with
   `data-state` (`ready`, `conflicts`, `stack`, and the rest of
-  `offerView`'s states); its line is `.offer-line`, its bookmark
-  `.offer-bookmark`, and each button `.offer-<action>`, Take being
-  `.offer-take`. A direct lane's strip is `.work[data-state="direct"]`, with
+  `offerView`'s states); its line is `.offer-line` (a button when the offer
+  can be reviewed; its caret is CSS, so its text is the words alone), its
+  bookmark `.offer-bookmark`, and each button `.offer-<action>`, Take being
+  `.offer-take`. The review is `.review`, with `.review-list` (rows
+  `.review-list-file`, titled with the display path) and `.review-diffs`;
+  each file is `.review-file[data-key][data-letter][data-state]`, its head
+  `.review-file-head`, its diff `.review-diff` of `[data-kind]` lines. The
+  28rem check measures `.column-thread`. A direct lane's strip is `.work[data-state="direct"]`, with
   `.work-warning`. The header's `.agent-name` holds the thread's name in
   `data-thread` (`.agent-name.pending` before it has one); its origin row
   is `.origin`. A lane's divider is `.lane-join`, with `data-thread`.
 - **The invite key** needs no client code: the host's redirect sets a cookie
   that same-origin requests and upgrades carry. `connectSession({ key })` is
   for Node clients.
+
+## Reviewing an offer (`review.ts`, `review-pane.tsx`, `use-fetched.ts`, ADR-0047)
+
+The offer's line opens a review, and the column widens to hold it.
+
+- **A column is `.column` > `.column-thread` + `.review`.** `.column` stays
+  `#strip`'s direct child with its key, position and track, so dragging,
+  alignment and revealing find it as before; the thread, 28rem, holds the
+  header, body, draft, strip and composer. `reviewing` is `Column`'s state,
+  never stored, and is reset when the strip's `review` goes (a take, a
+  withdrawal): hiding it instead would let the next offer open it unasked.
+- **Every URL names a commit** (`reviewUrl`, `diffUrl`, `@pineta/marginalia`),
+  and the answer is immutable, so the browser's HTTP cache is the only
+  cache and `useFetched` has no refetch rule. The record's `commits` is what
+  changes; the page never keys on its `at`, which every trigger rewrites.
+- **`reviewView` decides the rows**: titles and bodies through
+  `withoutTrailers`, letters, line counts, flags by path from the record,
+  and each file's placeholder height (`estimate`, in diff lines). A file
+  changing more than 400 lines starts collapsed.
+- **`sectionState` decides a section**: collapsed while your toggle says so,
+  waiting until an `IntersectionObserver` (one per pane, 1,000 px ahead)
+  finds it near the view, then its fetch; a 413 is too large. Once near, a
+  section stays wanted.
+- **Each file's head is `position: sticky` in `.review-diffs`.** Chromium's
+  scroll anchoring keeps the view still as sections above it load and
+  replace their placeholders.
+- **A 404 for a commit the offer has just left is brief:** the record arrives
+  with the new commits, and the review asks for their URLs.
 
 ## Message text is markdown (S27)
 
@@ -861,6 +904,11 @@ shown by their email's part before the `@`. Each rendered chat carries its
   that opens a second page opens its thread from there, or from a person in
   the header. The rail is `.rail`, not `#rail`: the
   Archive tab's preview draws a second one.
+- **`.column` must stay `#strip`'s direct child**: `use-column-drag.ts`
+  queries `:scope > .column`. A column's `.column-body` is inside
+  `.column-thread`.
+- **The clipboard needs a secure context.** An invite link over plain http
+  has no `navigator.clipboard`, so the bookmark selects its text instead.
 - **`.column-content` must stay unpositioned.** A positioned wrapper becomes
   the messages' offsetParent, and `alignOnOpen` measures `offsetTop` against
   the body's.

@@ -3,7 +3,8 @@
 // Two stores with one contract (`blobs.test.ts`): a table in the session's
 // SQLite file, on the store's own connection, and a map for a host without a
 // file. Both key a blob by the SHA-256 of its bytes, so storing it twice is
-// touching it. The routes' decisions are here too, pure.
+// touching it. Whether to read an upload is decided here too, pure; which
+// request is a blob's is `routes.ts`'s.
 
 import { createHash } from "node:crypto"
 import type { DatabaseSync } from "node:sqlite"
@@ -152,25 +153,7 @@ export function sqliteBlobs(
   }
 }
 
-// --- the routes -------------------------------------------------------------
-
-export type BlobRoute =
-  | { readonly kind: "blob-get"; readonly sha: Sha256 | null }
-  | { readonly kind: "blob-post" }
-  | { readonly kind: "other" }
-
-/**
- * What a request is for. `GET /blob/<anything>` is a blob's, with a null
- * hash when it names none: a 404, never Vite's. Pure.
- */
-export function route(method: string | undefined, pathname: string): BlobRoute {
-  if (pathname.startsWith("/blob/") && method === "GET") {
-    const sha = pathname.slice("/blob/".length)
-    return { kind: "blob-get", sha: isSha256(sha) ? sha : null }
-  }
-  if (pathname === "/blob" && method === "POST") return { kind: "blob-post" }
-  return { kind: "other" }
-}
+// --- the upload ----------------------------------------------------------
 
 export type UploadHeaders =
   | { readonly kind: "accept" }

@@ -300,9 +300,9 @@ export const mutations: readonly Mutation[] = [
     name: "the trailers leave out the thread's name",
     file: "packages/marginalia/offer.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  `${message.trim()}\\n\\n${THREAD_TRAILER}: ${at.name}\\n${LANE_TRAILER}: ${at.lane}\\n${ENTRY_TRAILER}: ${at.entry}\\n`",
+    from: "  `${message.trim()}\\n\\n${TRAILERS.thread}: ${at.name}\\n${TRAILERS.lane}: ${at.lane}\\n${TRAILERS.entry}: ${at.entry}\\n`",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: "  `${message.trim()}\\n\\n${LANE_TRAILER}: ${at.lane}\\n${ENTRY_TRAILER}: ${at.entry}\\n`",
+    to: "  `${message.trim()}\\n\\n${TRAILERS.lane}: ${at.lane}\\n${TRAILERS.entry}: ${at.entry}\\n`",
     command: unit,
     expect: "withTrailers and the WIP line",
   },
@@ -418,5 +418,47 @@ export const mutations: readonly Mutation[] = [
     to: '    case "mark":\n      return null',
     command: unit,
     expect: "a mark: its entry",
+  },
+  {
+    name: "a taken offer's commit is read",
+    file: "packages/marginalia/offer.ts",
+    from: "    o => o.taken === null && o.commits.some(c => c === ask.commit),",
+    to: "    o => o.commits.some(c => c === ask.commit),",
+    command: unit,
+    expect: "planOfferRead: only a commit an open offer holds now",
+  },
+  {
+    name: "a huge diff is answered",
+    file: "packages/marginalia/offer.ts",
+    from: "  if (new TextEncoder().encode(text).length > MAX_DIFF_BYTES)",
+    to: "  if (text.length < 0)",
+    command: unit,
+    expect: "answers: a review decoded, a diff within its size",
+  },
+  {
+    name: "the host's trailers stay",
+    file: "packages/marginalia/offer.ts",
+    from: "  return onlyOurs ? text.slice(0, cut).trim() : text.trim()",
+    to: "  return text.trim()",
+    command: unit,
+    expect: "withoutTrailers undoes withTrailers",
+  },
+  {
+    name: "a review URL carries no version",
+    file: "packages/marginalia/offer.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  `${OFFER_PREFIX}${OFFER_WIRE}/review/${commit}`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "  `${OFFER_PREFIX}review/${commit}`",
+    command: unit,
+    expect: "the wire: every URL parses back",
+  },
+  {
+    name: "another version is served",
+    file: "packages/marginalia/offer.ts",
+    from: '  if (version !== String(OFFER_WIRE) || rest.length > 0) return "bad"',
+    to: '  if (rest.length > 0) return "bad"',
+    command: unit,
+    expect: "the wire: every URL parses back",
   },
 ]

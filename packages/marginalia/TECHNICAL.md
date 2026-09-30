@@ -295,6 +295,29 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   budget, the thread's oldest messages go first, then the diff is cut; the
   skill never is. `withTrailers` adds the host's own trailers:
   `Pineta-Thread`, `Pineta-Lane` and `Pineta-Entry`.
+- **The review's wire** (ADR-0047) is here, since the host and the page both
+  import it:
+  - `reviewUrl` and `diffUrl` build `/offer/<OFFER_WIRE>/review/<commit>`
+    and `/offer/<OFFER_WIRE>/diff/<commit>?path=…`; `parseOfferPath` reads
+    them back, and calls anything else under `/offer/` `bad`, another
+    version included. An answer is cached as immutable under its URL, so a
+    change to the template (`REVISION_READ`, `@pineta/lanes`), the schema
+    or `fileDiff`'s flags bumps `OFFER_WIRE`.
+  - `decodeRevisionReview` is the one schema: the host decodes jj's JSON
+    with it, and the page the host's answer.
+  - `planOfferRead` serves only a commit in an open offer's `commits`, and
+    refuses an empty path or one with a control character.
+    `answerReview` and `answerDiff` settle what was read: 502 when the
+    read failed, 413 past `MAX_DIFF_BYTES`.
+- **An offer's `commits` are its revisions' commits as the host last read
+  them** (`offerFacts`), on every trigger. `host.wrote` is what the host
+  last wrote, the baseline for spotting your edits; it goes stale when jj
+  rebases the offer under the host (the `none` plan keeps it), and
+  `commits` does not. A revision divergent at that read is left out of
+  `commits`, so a review can briefly show fewer revisions than `size`.
+- **`withoutTrailers`** drops a last paragraph made only of the host's
+  `TRAILERS` (`@pineta/core`), which `withTrailers` writes. A paragraph
+  with any other line, your own trailers included, stays.
 - **`wipDescription`** is the line an offer carries until an agent describes
   it: `WIP (<name>): <first line>`, the first line being the lane's own first
   prompt (`firstPromptOf`, in `@pineta/core`), not its root's, which every

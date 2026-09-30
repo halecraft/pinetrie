@@ -2,7 +2,8 @@
 //
 // Reads only, each a query over `hostOps` returning values: the facts a
 // trigger plans from (`offerFacts`, `startOfOffer`, `laneTipIn`), your edits
-// (`yourEditsIn`), and which of a divergent revision's commits the host made
+// (`yourEditsIn`), what a review shows of a commit (`revisionRead`,
+// `fileDiff`), and which of a divergent revision's commits the host made
 // (`hostCommitIn`). What the host then does is planned in `plan.ts`
 // (`planOffer`, `planTakeOffer`, `planRepair`) and decided in
 // `@pineta/marginalia`'s `offer.ts`.
@@ -186,6 +187,57 @@ export async function yourEditsIn(
     lines(await query(jj, ["diff", "-r", "@", "--name-only"])),
   )
   return files.filter(f => yours.has(f))
+}
+
+/**
+ * A revision's description and per-file stats, printed as the JSON of
+ * `RevisionReview` (`@pineta/core`): `json()` quotes every string (S57). A
+ * change to it bumps `OFFER_WIRE` (`@pineta/marginalia`).
+ */
+export const REVISION_READ =
+  '"{\\"description\\":" ++ json(description) ++ ",\\"files\\":[" ++ ' +
+  'self.diff().stat().files().map(|f| "{\\"path\\":" ++ json(f.path()) ++ ' +
+  '",\\"shown\\":" ++ json(f.display_diff_path()) ++ ",\\"change\\":" ++ json(f.status()) ++ ' +
+  '",\\"added\\":" ++ f.lines_added() ++ ",\\"removed\\":" ++ f.lines_removed() ++ "}").join(",") ++ ' +
+  '"]}"'
+
+/**
+ * A revision's review as jj prints it, parsed but unchecked: the host decodes
+ * it (`answerReview`). Null when jj fails or prints no JSON.
+ */
+export async function revisionRead(
+  jj: Runner,
+  commit: CommitId,
+): Promise<unknown> {
+  const ran = await jj(["log", "--no-graph", "-r", commit, "-T", REVISION_READ])
+  if (!ran.ok) return null
+  try {
+    return JSON.parse(ran.stdout) as unknown
+  } catch {
+    return null
+  }
+}
+
+/**
+ * One file's git diff in a revision; null when jj fails. `root-file:` names
+ * the file from the repo's root, and exactly it: a bare path is read from the
+ * process's directory, and `root:` matches every file under a directory of
+ * that name (S57). A change to the flags bumps `OFFER_WIRE`.
+ */
+export async function fileDiff(
+  jj: Runner,
+  commit: CommitId,
+  path: string,
+): Promise<string | null> {
+  const ran = await jj([
+    "diff",
+    "--git",
+    "-r",
+    commit,
+    "--",
+    `root-file:${JSON.stringify(path)}`,
+  ])
+  return ran.ok ? ran.stdout : null
 }
 
 /**

@@ -58,6 +58,7 @@ import { NoteCard } from "./note.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
+import { ReviewPane } from "./review-pane.tsx"
 import type { SessionClient } from "./session-view.ts"
 import { useFollow } from "./use-follow.ts"
 import { useStable } from "./use-stable.ts"
@@ -209,6 +210,18 @@ export function Column(p: ColumnProps) {
     lanes: p.lanes,
     work: p.work,
   })
+  // The review of the offer beside the thread (ADR-0047): your choice, kept
+  // only while the column is mounted. Reset when the offer goes, so the
+  // thread's next offer does not open it with nobody asking.
+  const review = shows.strip.kind === "offer" ? shows.strip.review : null
+  const [reviewing, setReviewing] = useState(false)
+  const offerGone = review === null
+  useEffect(() => {
+    if (offerGone) setReviewing(false)
+  }, [offerGone])
+  const reviewId = `review-${p.column.key}`
+  const toggleReview = useStable(() => setReviewing(r => !r))
+  const closeReview = useStable(() => setReviewing(false))
   // An update's intent, put in this column's composer (ADR-0038).
   const [insert, setInsert] = useState<{
     readonly text: string
@@ -294,217 +307,237 @@ export function Column(p: ColumnProps) {
       className="column"
       data-key={p.column.key}
       data-position={p.position}
+      data-reviewing={reviewing || undefined}
       data-track={p.track}
     >
-      <header
-        className="column-head"
-        data-color={colorSlot(p.track)}
-        style={trackStyle(p.track)}
-      >
-        <div className="head-row">
-          {p.count > 1 && (
+      <div className="column-thread">
+        <header
+          className="column-head"
+          data-color={colorSlot(p.track)}
+          style={trackStyle(p.track)}
+        >
+          <div className="head-row">
+            {p.count > 1 && (
+              <button
+                aria-keyshortcuts="ArrowLeft ArrowRight Home End"
+                aria-label="move column"
+                className="grip"
+                onKeyDown={e => {
+                  const to = keyMove(p.position, p.count, e.key)
+                  if (to === null) return
+                  e.preventDefault()
+                  movedByKey.current = true
+                  p.onMove(to)
+                }}
+                ref={grip}
+                title="drag to move · ← → Home End"
+                type="button"
+              >
+                ⠿
+              </button>
+            )}
+            <Identity identity={shows.identity} onOpen={p.onOpen} />
+            <span className="head-space" />
+            <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={p.seenBy} />
+            {p.closable && (
+              <button
+                aria-label="close column"
+                className="close"
+                onClick={p.onClose}
+                title="close column"
+                type="button"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <Origin onOpen={p.onOpen} origin={shows.origin} />
+        </header>
+        <div className="column-body" ref={body}>
+          {stillEdited && outOfView && (
             <button
-              aria-keyshortcuts="ArrowLeft ArrowRight Home End"
-              aria-label="move column"
-              className="grip"
-              onKeyDown={e => {
-                const to = keyMove(p.position, p.count, e.key)
-                if (to === null) return
-                e.preventDefault()
-                movedByKey.current = true
-                p.onMove(to)
-              }}
-              ref={grip}
-              title="drag to move · ← → Home End"
+              className="note-bar"
+              onClick={() =>
+                body.current
+                  ?.querySelector(`.note[data-note="${editingNote}"]`)
+                  ?.scrollIntoView({ block: "nearest" })
+              }
               type="button"
             >
-              ⠿
+              editing a {edited.state === "draft" ? "draft" : "note"} · back to
+              it
             </button>
           )}
-          <Identity identity={shows.identity} onOpen={p.onOpen} />
-          <span className="head-space" />
-          <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={p.seenBy} />
-          {p.closable && (
-            <button
-              aria-label="close column"
-              className="close"
-              onClick={p.onClose}
-              title="close column"
-              type="button"
-            >
-              ×
-            </button>
-          )}
-        </div>
-        <Origin onOpen={p.onOpen} origin={shows.origin} />
-      </header>
-      <div className="column-body" ref={body}>
-        {stillEdited && outOfView && (
-          <button
-            className="note-bar"
-            onClick={() =>
-              body.current
-                ?.querySelector(`.note[data-note="${editingNote}"]`)
-                ?.scrollIntoView({ block: "nearest" })
-            }
-            type="button"
-          >
-            editing a {edited.state === "draft" ? "draft" : "note"} · back to it
-          </button>
-        )}
-        {/* `useFollow` watches its height. Keep it unpositioned: it would
+          {/* `useFollow` watches its height. Keep it unpositioned: it would
             become the messages' offsetParent, and `alignOnOpen` measures
             their offsetTop against the body's. */}
-        <div className="column-content" ref={content}>
-          {/* Room above the first message, so opening can bring it level with
+          <div className="column-content" ref={content}>
+            {/* Room above the first message, so opening can bring it level with
             its fork point even when the column is short. */}
-          <div className="spacer" ref={spacer} />
-          {view.nodes.map((node, i) => {
-            const drawn = p.notesOf.get(node.id)
-            return (
-              <Message
-                doc={p.session.doc}
-                streams={callStreams(node.toolCalls, p.live.tools)}
-                closedBranches={node.branches.filter(
-                  b => !p.shown.has(b.rootId),
-                )}
-                forkTracks={p.forks.get(node.id) ?? []}
-                join={shows.joins.get(node.id)}
-                key={node.id}
-                nameOf={p.nameOf}
-                node={node}
-                about={drawn?.about && card(drawn.about)}
-                onAct={onAct}
-                origin={drawn?.origin && card(drawn.origin)}
-                tools={messageTools(node, {
-                  parentId: index.parentOf(node.id),
-                  isLast: i === view.nodes.length - 1,
-                  lane,
-                  writable,
-                  hasNoteAbout: drawn?.about !== undefined,
-                })}
-              />
-            )
-          })}
-          {streamingLanes.map(l => {
-            const reply = p.live.replies.get(l)
-            return (
-              reply !== undefined && (
-                <Reply doc={p.session.doc} key={reply.id} stream={reply} />
-              )
-            )
-          })}
-          {/* Messages waiting for this thread's lane, in the order they will
-            be taken. They are not in the tree yet. */}
-          {waiting.map((h, n) => (
-            <div className="msg waiting" data-held={h.id} key={h.id}>
-              <span className="role">
-                {h.kind === "update"
-                  ? displayName(h.by, p.nameOf.get(h.by))
-                  : withContributors(
-                      speakerLabel(
-                        p.nameOf,
-                        h.details.author,
-                        h.details.authorName,
-                      ),
-                      (h.details.contributors ?? []).map(w =>
-                        displayName(w, p.nameOf.get(w)),
-                      ),
-                    )}{" "}
-                · waiting · {n + 1} of {waiting.length}
-              </span>
-              {h.kind === "update" ? (
-                <div className="update-waiting">merging your work</div>
-              ) : (
-                <MessageText
-                  images={h.details.images}
-                  mode="committed"
-                  text={h.details.text}
+            <div className="spacer" ref={spacer} />
+            {view.nodes.map((node, i) => {
+              const drawn = p.notesOf.get(node.id)
+              return (
+                <Message
+                  doc={p.session.doc}
+                  streams={callStreams(node.toolCalls, p.live.tools)}
+                  closedBranches={node.branches.filter(
+                    b => !p.shown.has(b.rootId),
+                  )}
+                  forkTracks={p.forks.get(node.id) ?? []}
+                  join={shows.joins.get(node.id)}
+                  key={node.id}
+                  nameOf={p.nameOf}
+                  node={node}
+                  about={drawn?.about && card(drawn.about)}
+                  onAct={onAct}
+                  origin={drawn?.origin && card(drawn.origin)}
+                  tools={messageTools(node, {
+                    parentId: index.parentOf(node.id),
+                    isLast: i === view.nodes.length - 1,
+                    lane,
+                    writable,
+                    hasNoteAbout: drawn?.about !== undefined,
+                  })}
                 />
-              )}
+              )
+            })}
+            {streamingLanes.map(l => {
+              const reply = p.live.replies.get(l)
+              return (
+                reply !== undefined && (
+                  <Reply doc={p.session.doc} key={reply.id} stream={reply} />
+                )
+              )
+            })}
+            {/* Messages waiting for this thread's lane, in the order they will
+            be taken. They are not in the tree yet. */}
+            {waiting.map((h, n) => (
+              <div className="msg waiting" data-held={h.id} key={h.id}>
+                <span className="role">
+                  {h.kind === "update"
+                    ? displayName(h.by, p.nameOf.get(h.by))
+                    : withContributors(
+                        speakerLabel(
+                          p.nameOf,
+                          h.details.author,
+                          h.details.authorName,
+                        ),
+                        (h.details.contributors ?? []).map(w =>
+                          displayName(w, p.nameOf.get(w)),
+                        ),
+                      )}{" "}
+                  · waiting · {n + 1} of {waiting.length}
+                </span>
+                {h.kind === "update" ? (
+                  <div className="update-waiting">merging your work</div>
+                ) : (
+                  <MessageText
+                    images={h.details.images}
+                    mode="committed"
+                    text={h.details.text}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          {/* What the content shrank by while the agent works (`useFollow`).
+          Not the spacer above: that one lines the column up on opening. */}
+          <div className="column-floor" ref={floor} />
+          {end.unseen && (
+            <div className="jump-slot">
+              <button
+                className="jump-latest"
+                onClick={end.follow}
+                type="button"
+              >
+                ↓ new below
+              </button>
+            </div>
+          )}
+        </div>
+        {/* The thread's draft (ADR-0025): one per thread end, shared by all. */}
+        {draft !== undefined &&
+          (joined === draft.id ||
+          draft.openedBy === p.session.writer ||
+          draft.contributors.includes(p.session.writer) ? (
+            <div className="draft-slot">{card(draft)}</div>
+          ) : (
+            <div className="draft-slot draft-invite">
+              {displayName(draft.openedBy, p.nameOf.get(draft.openedBy))} is
+              drafting the next message ·{" "}
+              <button
+                className="join-draft"
+                onClick={() => setJoined(draft.id)}
+                type="button"
+              >
+                join
+              </button>
             </div>
           ))}
-        </div>
-        {/* What the content shrank by while the agent works (`useFollow`).
-          Not the spacer above: that one lines the column up on opening. */}
-        <div className="column-floor" ref={floor} />
-        {end.unseen && (
-          <div className="jump-slot">
-            <button className="jump-latest" onClick={end.follow} type="button">
-              ↓ new below
-            </button>
-          </div>
-        )}
-      </div>
-      {/* The thread's draft (ADR-0025): one per thread end, shared by all. */}
-      {draft !== undefined &&
-        (joined === draft.id ||
-        draft.openedBy === p.session.writer ||
-        draft.contributors.includes(p.session.writer) ? (
-          <div className="draft-slot">{card(draft)}</div>
-        ) : (
-          <div className="draft-slot draft-invite">
-            {displayName(draft.openedBy, p.nameOf.get(draft.openedBy))} is
-            drafting the next message ·{" "}
-            <button
-              className="join-draft"
-              onClick={() => setJoined(draft.id)}
-              type="button"
-            >
-              join
-            </button>
-          </div>
-        ))}
-      <WorkStripView act={act} strip={shows.strip} />
-      <Composer
-        asksAgent={p.column.asksAgent === true}
-        defaultWork={defaultWork}
-        project={p.work.project}
-        commands={p.work.commands}
-        usedDirs={[
-          ...new Set(
-            [...p.work.lanes.values()].flatMap(r =>
-              r.work.kind === "direct" ? [r.work.dir] : [],
+        <WorkStripView
+          act={act}
+          review={{ id: reviewId, open: reviewing, toggle: toggleReview }}
+          strip={shows.strip}
+        />
+        <Composer
+          asksAgent={p.column.asksAgent === true}
+          defaultWork={defaultWork}
+          project={p.work.project}
+          commands={p.work.commands}
+          usedDirs={[
+            ...new Set(
+              [...p.work.lanes.values()].flatMap(r =>
+                r.work.kind === "direct" ? [r.work.dir] : [],
+              ),
             ),
-          ),
-        ]}
-        at={at}
-        boundLane={p.column.lane}
-        fresh={fresh}
-        reader={{ me: p.session.writer, nameOf: p.nameOf }}
-        prefill={p.column.fresh?.prefill}
-        lane={lane}
-        onBranchInstead={text => {
-          if (at.kind === "entry") p.onBranchInstead(at.id, text)
-        }}
-        onSend={() => {
-          end.follow()
-          if (!fresh) return undefined
-          const id = crypto.randomUUID()
-          p.onSent(id)
-          return id
-        }}
-        onIntent={setCreatesLane}
-        onComposeTogether={
-          fresh || draft !== undefined || !writable
-            ? undefined
-            : text =>
-                void p.session.note({
-                  kind: "draft",
-                  at,
-                  lane: p.column.lane ?? null,
-                  text,
-                })
-        }
-        onTyping={p.onTyping}
-        takeFocus={() => p.takeFocus(p.column.key)}
-        participants={p.participants}
-        pending={p.column.fresh?.pending}
-        insert={insert}
-        readOnly={p.readOnly}
-        typing={p.typing.map(w => nameFor(p.nameOf, w))}
-        session={p.session}
-      />
+          ]}
+          at={at}
+          boundLane={p.column.lane}
+          fresh={fresh}
+          reader={{ me: p.session.writer, nameOf: p.nameOf }}
+          prefill={p.column.fresh?.prefill}
+          lane={lane}
+          onBranchInstead={text => {
+            if (at.kind === "entry") p.onBranchInstead(at.id, text)
+          }}
+          onSend={() => {
+            end.follow()
+            if (!fresh) return undefined
+            const id = crypto.randomUUID()
+            p.onSent(id)
+            return id
+          }}
+          onIntent={setCreatesLane}
+          onComposeTogether={
+            fresh || draft !== undefined || !writable
+              ? undefined
+              : text =>
+                  void p.session.note({
+                    kind: "draft",
+                    at,
+                    lane: p.column.lane ?? null,
+                    text,
+                  })
+          }
+          onTyping={p.onTyping}
+          takeFocus={() => p.takeFocus(p.column.key)}
+          participants={p.participants}
+          pending={p.column.fresh?.pending}
+          insert={insert}
+          readOnly={p.readOnly}
+          typing={p.typing.map(w => nameFor(p.nameOf, w))}
+          session={p.session}
+        />
+      </div>
+      {reviewing && review !== null && (
+        <ReviewPane
+          id={reviewId}
+          line={shows.strip.kind === "offer" ? shows.strip.words.line : ""}
+          onClose={closeReview}
+          target={review}
+        />
+      )}
     </section>
   )
 }
@@ -589,16 +622,60 @@ function Origin({
 }
 
 /**
+ * An offer's bookmark, which a press copies. The clipboard needs a secure
+ * context, which an invite link over plain http is not: there, a press
+ * selects its text, for you to copy.
+ */
+function Bookmark({ name }: { name: string }) {
+  const self = useRef<HTMLButtonElement>(null)
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const t = setTimeout(() => setCopied(false), 2_000)
+    return () => clearTimeout(t)
+  }, [copied])
+  const select = () => {
+    const range = document.createRange()
+    if (self.current === null) return
+    range.selectNodeContents(self.current)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+  }
+  return (
+    <button
+      className="offer-bookmark"
+      onClick={() => {
+        if (!window.isSecureContext) return select()
+        navigator.clipboard.writeText(name).then(() => setCopied(true), select)
+      }}
+      ref={self}
+      title={copied ? "copied" : "copy the bookmark, to find it in jj"}
+      type="button"
+    >
+      {name}
+    </button>
+  )
+}
+
+/**
  * What became of the column's files, at its foot (ADR-0040): the lane's offer
- * in your repo (ADR-0038), or where a lane that works directly writes. The
- * bookmark it names is the one to look for in jj or jjui.
+ * in your repo (ADR-0038), or where a lane that works directly writes. An
+ * offer's line opens its review (ADR-0047); its bookmark, copied, finds it in
+ * jj or jjui.
  */
 function WorkStripView({
   strip,
   act,
+  review,
 }: {
   strip: WorkStrip
   act: (button: OfferButton) => void
+  review: {
+    readonly id: string
+    readonly open: boolean
+    readonly toggle: () => void
+  }
 }) {
   if (strip.kind === "none") return null
   if (strip.kind === "direct")
@@ -615,10 +692,21 @@ function WorkStripView({
   const { words } = strip
   return (
     <div className="work offer" data-state={strip.state}>
-      <span className="offer-line">{words.line}</span>
-      {strip.bookmark !== null && (
-        <span className="offer-bookmark">{strip.bookmark}</span>
+      {strip.review === null ? (
+        <span className="offer-line">{words.line}</span>
+      ) : (
+        <button
+          aria-controls={review.id}
+          aria-expanded={review.open}
+          className="offer-line"
+          onClick={review.toggle}
+          title={review.open ? "close the review" : "review what a take brings"}
+          type="button"
+        >
+          {words.line}
+        </button>
       )}
+      {strip.bookmark !== null && <Bookmark name={strip.bookmark} />}
       <span className="work-space" />
       {words.buttons.map(({ button, label }) => (
         <button

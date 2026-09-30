@@ -317,6 +317,59 @@ describe("columnView: the work strip", () => {
       bookmark: null,
     })
   })
+  test("an open offer with files can be reviewed, in every state; a taken or empty one cannot", () => {
+    const open: OfferRecord = {
+      lane: B,
+      size: 1,
+      stale: false,
+      files: ["a.txt"],
+      conflicts: [],
+      yourEdits: ["a.txt"],
+      described: true,
+      edited: false,
+      bookmark: "pineta-offer/copper-owl",
+      taken: null,
+      commits: [commitId("c1")],
+      at: 1,
+      host: {
+        changes: ["c"],
+        wrote: [commitId("w")],
+        tip: commitId("t"),
+        start: [commitId("s")],
+      },
+    }
+    const strip = (offer: OfferRecord, running = false) =>
+      columnView(
+        own({
+          lane: onLane(laneView(B, "b2", running)),
+          work: work({
+            lanes: new Map([[B, record(B, { kind: "own" })]]),
+            offers: new Map([[B, offer]]),
+          }),
+        }),
+      ).strip
+    const target = {
+      lane: B,
+      commits: [commitId("c1")],
+      conflicts: [],
+      yourEdits: ["a.txt"],
+    }
+    expect(strip(open)).toMatchObject({ state: "ready", review: target })
+    expect(strip(open, true)).toMatchObject({
+      state: "running",
+      review: target,
+    })
+    expect(strip({ ...open, conflicts: ["a.txt"] })).toMatchObject({
+      state: "conflicts",
+      review: { ...target, conflicts: ["a.txt"] },
+    })
+    expect(strip({ ...open, taken: "t1" })).toMatchObject({ review: null })
+    expect(strip({ ...open, files: [] })).toMatchObject({ review: null })
+    expect(columnView(own()).strip).toMatchObject({
+      state: "nothing",
+      review: null,
+    })
+  })
   test("direct: where changes land, and other running lanes in the same directory", () => {
     const direct = (dir: string) => record(C, { kind: "direct", dir })
     const lanes = new Map([
@@ -378,6 +431,7 @@ describe("offerWords", () => {
     edited: false,
     bookmark: "pineta-offer/amber-fox",
     taken: null,
+    commits: [commitId("w")],
     at: 10,
     host: {
       changes: ["c"],

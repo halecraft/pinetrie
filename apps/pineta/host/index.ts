@@ -52,6 +52,7 @@ import {
   encodeWorkRecord,
   LAND_TYPE,
   type LandMessage,
+  type OfferAsk,
   parseCommand,
   pastedImages,
   planArchive,
@@ -139,14 +140,11 @@ import {
   requestFacts,
   urlHost,
 } from "./admission.ts"
-import {
-  MAX_UPLOAD_BYTES,
-  memoryBlobs,
-  planUploadHeaders,
-  route,
-} from "./blobs.ts"
+import { MAX_UPLOAD_BYTES, memoryBlobs, planUploadHeaders } from "./blobs.ts"
 import { departedSeats, lineDocPrefix } from "./lines.ts"
 import { writePolicy } from "./policy.ts"
+import { offerResponse } from "./reviews.ts"
+import { route } from "./routes.ts"
 import { openStore } from "./store.ts"
 import { startLaneWork } from "./work.ts"
 
@@ -1194,7 +1192,8 @@ export async function startHost({
     },
   })
   hotReload.attach(() => vite.ws.send({ type: "full-reload" }))
-  // Admission comes first: nothing reaches Vite, the blobs or the Exchange without it.
+  // Admission comes first: nothing reaches Vite, the blobs, an offer's reads or
+  // the Exchange without it.
   httpServer.on("request", (req, res) => {
     const admission = admits(requestFacts(req), key)
     if (admission.kind === "refuse") {
@@ -1210,14 +1209,34 @@ export async function startHost({
         .end()
       return
     }
-    const to = route(
-      req.method,
-      new URL(req.url ?? "/", "http://host").pathname,
-    )
-    if (to.kind === "blob-get") return serveBlob(to.sha, res)
-    if (to.kind === "blob-post") return void receiveBlob(req, res)
-    vite.middlewares(req, res)
+    const to = route(req.method, new URL(req.url ?? "/", "http://host"))
+    switch (to.kind) {
+      case "blob-get":
+        return serveBlob(to.sha, res)
+      case "blob-post":
+        return void receiveBlob(req, res)
+      case "offer":
+        return void serveOfferRead(to.ask, res)
+      case "bad":
+        res.writeHead(400).end()
+        return
+      case "other":
+        vite.middlewares(req, res)
+    }
   })
+
+  /**
+   * `GET /offer/…`: a review or a diff of a commit an open offer holds. A
+   * project whose lanes work directly has no offers.
+   */
+  async function serveOfferRead(ask: OfferAsk, res: ServerResponse) {
+    const answer =
+      work.offers === null
+        ? ({ kind: "refused", status: 404, reason: "no offers here" } as const)
+        : await work.offers.read(ask)
+    const out = offerResponse(answer)
+    res.writeHead(out.status, out.headers).end(out.body)
+  }
 
   /** `GET /blob/<sha256>`: the stored bytes, which never change. */
   function serveBlob(sha: Sha256 | null, res: ServerResponse): void {

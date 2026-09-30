@@ -126,13 +126,26 @@ export interface LabelledButton {
   readonly label: string
 }
 
-/** What became of a column's files. */
+/**
+ * What a review of an offer is read from (ADR-0047): the commits it names, and
+ * which of their files to flag.
+ */
+export type ReviewTarget = Pick<
+  OfferRecord,
+  "lane" | "commits" | "conflicts" | "yourEdits"
+>
+
+/**
+ * What became of a column's files: the offer, with what its review reads
+ * while it is open and holds files, or where a direct lane writes.
+ */
 export type WorkStrip =
   | {
       readonly kind: "offer"
       readonly state: OfferView["state"]
       readonly words: OfferWords
       readonly bookmark: string | null
+      readonly review: ReviewTarget | null
     }
   | {
       readonly kind: "direct"
@@ -264,8 +277,9 @@ function workStrip(f: ColumnFacts): WorkStrip {
     }
   }
   if (project.kind !== "lanes") return NO_STRIP
+  const offer = work.offers.get(lane.name)
   const view = offerView({
-    offer: work.offers.get(lane.name),
+    offer,
     activity: activityOf(f.index, lane),
     landing: work.landings.filter(l => l.lane === lane.name).at(-1),
   })
@@ -274,6 +288,15 @@ function workStrip(f: ColumnFacts): WorkStrip {
     state: view.state,
     words: offerWords(view),
     bookmark: view.facts.bookmark,
+    review:
+      offer === undefined || offer.taken !== null || offer.files.length === 0
+        ? null
+        : {
+            lane: offer.lane,
+            commits: offer.commits,
+            conflicts: offer.conflicts,
+            yourEdits: offer.yourEdits,
+          },
   }
 }
 

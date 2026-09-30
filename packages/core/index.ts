@@ -353,6 +353,16 @@ export const NO_EDITOR = {
  */
 export const HOST_OPERATOR = "pineta-host"
 
+/**
+ * The trailers the host writes into commit messages: a turn names its entry
+ * and lane (ADR-0032), an offer its thread too (ADR-0039).
+ */
+export const TRAILERS = {
+  thread: "Pineta-Thread",
+  lane: "Pineta-Lane",
+  entry: "Pineta-Entry",
+} as const
+
 declare const commitIdBrand: unique symbol
 /**
  * A jj commit id, full hex. A revision a lane builds on is immutable, so its
@@ -483,7 +493,9 @@ export interface LandingRecord {
  * A lane's offer: one revision, or a stack, in your repo, holding the lane's
  * work you do not have yet (ADR-0038). A host-written `pineta.offer` value
  * keyed by lane. The page reads the top-level fields; `host` is what the host
- * remembers of what it wrote, and nothing else reads it.
+ * remembers of what it wrote, and nothing else reads it. What a take would
+ * bring, each revision's description, files and diffs, is not stored: the page
+ * reads it by commit when it asks (`RevisionReview`, ADR-0047).
  */
 export interface OfferRecord {
   readonly lane: LaneName
@@ -504,6 +516,12 @@ export interface OfferRecord {
   readonly bookmark: string
   /** The change id its top became when you took it; null while it is open. */
   readonly taken: string | null
+  /**
+   * Each revision's commit as the host last read it, bottom first: what a
+   * review names. Unlike `host.wrote`, it follows a rebase jj made under the
+   * offer, and your edits. A revision divergent at that read is left out.
+   */
+  readonly commits: readonly CommitId[]
   readonly at: number
   readonly host: {
     /** Each revision's change id, bottom first: its identity across rewrites. */
@@ -515,6 +533,30 @@ export interface OfferRecord {
     /** Where it started when built or last followed: what it holds is the tip's change since. */
     readonly start: readonly CommitId[]
   }
+}
+
+/** How jj says a file changed in a revision. */
+export type FileChange = "added" | "modified" | "removed" | "copied" | "renamed"
+
+/** One file of one revision, as jj's diff stats read it (S57). */
+export interface ReviewFile {
+  readonly path: string
+  /** jj's display path: `{old => new}` for a rename or copy, else `path`. */
+  readonly shown: string
+  readonly change: FileChange
+  /** Lines added and removed; 0 and 0 for a binary file or a pure rename. */
+  readonly added: number
+  readonly removed: number
+}
+
+/**
+ * One revision of an offer, as its commit holds it. A commit id names its
+ * content, so this never changes for a commit (ADR-0047).
+ */
+export interface RevisionReview {
+  /** Its description, the host's trailers included. */
+  readonly description: string
+  readonly files: readonly ReviewFile[]
 }
 
 /** Your working copy as the host snapshotted it: `@`, and `@`'s parents. */

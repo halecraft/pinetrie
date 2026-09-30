@@ -7,7 +7,6 @@ import {
   MAX_UPLOAD_BYTES,
   memoryBlobs,
   planUploadHeaders,
-  route,
   sha256Of,
   sqliteBlobs,
 } from "./blobs.ts"
@@ -96,18 +95,6 @@ test("sqlite blobs outlive their connection: a reopened file serves them", () =>
   sqliteBlobs(db).put(RED)
   db.close()
   expect(sqliteBlobs(openDatabase(file)).ref(RED_SHA)?.width).toBe(40)
-})
-
-test("route: a blob's GET, with its hash or null; the upload's POST; else Vite", () => {
-  expect(route("GET", `/blob/${RED_SHA}`)).toEqual({
-    kind: "blob-get",
-    sha: RED_SHA,
-  })
-  expect(route("GET", "/blob/nope")).toEqual({ kind: "blob-get", sha: null })
-  expect(route("POST", "/blob")).toEqual({ kind: "blob-post" })
-  expect(route("GET", "/blob")).toEqual({ kind: "other" })
-  expect(route("POST", `/blob/${RED_SHA}`)).toEqual({ kind: "other" })
-  expect(route("GET", "/src/app.tsx")).toEqual({ kind: "other" })
 })
 
 test("planUploadHeaders reads a body only for an image type within the limit", () => {

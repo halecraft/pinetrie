@@ -656,6 +656,32 @@ async function mainSection(): Promise<void> {
       conflicted >= 0,
       `the offer follows your commit, and says it conflicts with your work (${JSON.stringify(offerOf()?.conflicts)})`,
     )
+    // You reword the commit under the offer: jj rebases the offer, not the
+    // host, whose next trigger plans `none` and keeps `host.wrote`. The
+    // record's `commits` still names the offer as it is now, which is what
+    // a review reads (ADR-0047). The first line stays, for the take below.
+    const wroteBefore = JSON.stringify(offerOf()?.host.wrote)
+    jj(project, "describe", "-r", "@-", "-m", "you edit line two\n\nreworded")
+    const offerNow = () =>
+      jj(
+        project,
+        "log",
+        "--no-graph",
+        "-r",
+        offerBookmarkOf(two?.name),
+        "-T",
+        "commit_id",
+      )
+    const followed = await waitFor(
+      () => JSON.stringify(offerOf()?.commits) === JSON.stringify([offerNow()]),
+      30_000,
+    )
+    ok(
+      followed >= 0 &&
+        JSON.stringify(offerOf()?.host.wrote) === wroteBefore &&
+        wroteBefore !== JSON.stringify(offerOf()?.commits),
+      `the offer's record names its commit as it is now, after jj rebased it under the host (${JSON.stringify({ commits: offerOf()?.commits, wrote: offerOf()?.host.wrote, now: offerNow() })})`,
+    )
     // Resolve in the thread: your work merged into the lane, the agent resolves.
     script.use([
       {
