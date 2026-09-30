@@ -176,6 +176,14 @@ export const mutations: readonly Mutation[] = [
     expect: "with banners off, nothing",
   },
   {
+    name: "a drawn banner skips the upload's check",
+    file: "packages/pi/agent.ts",
+    from: '  return prepared.ok\n    ? { kind: "drawn", image: prepared.image }',
+    to: '  return true\n    ? { kind: "drawn", image: { bytes: new Uint8Array(Buffer.from(data, "base64")), mimeType: "image/png" as const, width: 0, height: 0 } }',
+    command: unit,
+    expect: "bytes that are not one are refused",
+  },
+  {
     name: "set_banner is registered only while banners are on",
     file: "packages/pi/agent.ts",
     from: "          bannerTool(banners?.request),",

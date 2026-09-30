@@ -496,14 +496,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a thread with none gets one",
   },
   {
-    name: "a drawn banner skips the upload's check",
-    file: "apps/pineta/host/banners.ts",
-    from: "        const prepared = await deps.prepare(drawn.bytes)",
-    to: '        const prepared = { ok: true as const, image: { bytes: drawn.bytes, mimeType: "image/png" as const, width: 0, height: 0 } }',
-    command: unit,
-    expect: "the upload's check refuses is not stored",
-  },
-  {
     name: "a run's banner overwrites the person's",
     file: "apps/pineta/host/banners.ts",
     from: "        if (!bannerStillWanted(trigger, readBanners(doc).get(lane))) return\n",

@@ -26,7 +26,7 @@ import {
   ratioFor,
   threadLines,
 } from "@pineta/marginalia"
-import type { Agent, PreparedImage } from "@pineta/pi"
+import type { Agent } from "@pineta/pi"
 import {
   readBanners,
   readNames,
@@ -56,8 +56,6 @@ export function createBanners(deps: {
   readonly config: BannerConfig
   /** Read lazily: the agent is made with `request` as its tool's port. */
   readonly agent: () => BannerAgent
-  /** An upload's check and fit (ADR-0042), which a drawn image passes too. */
-  readonly prepare: (bytes: Uint8Array) => Promise<PreparedImage>
 }): Banners {
   const { basics, serial, blobs, config } = deps
   const { doc, log } = basics
@@ -124,26 +122,29 @@ export function createBanners(deps: {
         }),
       )
       if (brief === null) return failed("the brief was not written")
-      let image: StoredImage | null = null
-      for (let n = 0; n < BANNER_ATTEMPTS && image === null; n += 1) {
-        const drawn = await agent.drawBanner(brief, ratioFor(n, config))
-        if (drawn.kind === "failed") {
-          failed(`attempt ${n + 1}: ${drawn.reason}`)
-          continue
-        }
-        const prepared = await deps.prepare(drawn.bytes)
-        if (prepared.ok) image = prepared.image
-        else failed(`attempt ${n + 1}: ${prepared.reason}`)
-      }
+      const image = await drawWithRetries(agent, brief, failed)
       if (image === null) return
-      const stored = image
       await serial.run(async () => {
         if (!bannerStillWanted(trigger, readBanners(doc).get(lane))) return
-        await write(lane, blobs.put(stored).sha256, plan.focus)
+        await write(lane, blobs.put(image).sha256, plan.focus)
       })
     } catch (error) {
       failed(error instanceof Error ? error.message : String(error))
     }
+  }
+
+  /** Up to `BANNER_ATTEMPTS` draws, each at `ratioFor` its attempt; each failure logged. */
+  async function drawWithRetries(
+    agent: BannerAgent,
+    brief: string,
+    failed: (why: string) => void,
+  ): Promise<StoredImage | null> {
+    for (let n = 0; n < BANNER_ATTEMPTS; n += 1) {
+      const drawn = await agent.drawBanner(brief, ratioFor(n, config))
+      if (drawn.kind === "drawn") return drawn.image
+      failed(`attempt ${n + 1}: ${drawn.reason}`)
+    }
+    return null
   }
 
   return {

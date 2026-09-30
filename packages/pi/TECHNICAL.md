@@ -450,7 +450,9 @@ request returns null, and the offer keeps its placeholder.
   `OPENROUTER_API_KEY`, and the key is passed as `apiKey`.
 - **pi-ai sends no aspect ratio.** `drawBanner` adds OpenRouter's
   `image_config.aspect_ratio` in `onPayload`.
-- **`drawBanner` never rejects**: `drawn` with the bytes, or `failed` and
-  why. The bytes are unchecked; the host stores them through `prepareImage`.
-  `canDrawBanners` is asked first, so a host with no key writes no brief.
+- **`drawBanner` never rejects**: `drawn` with an image, or `failed` and
+  why. The image is fitted in pi, as `read`'s are (`drawnOf` runs
+  `prepareImage`), so the host stores what it is given; bytes that are not an
+  image are a failure, and the host tries again. `canDrawBanners` is asked
+  first, so a host with no key writes no brief.
 

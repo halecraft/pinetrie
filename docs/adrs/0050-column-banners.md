@@ -47,8 +47,10 @@ S60 found:
 - **Retries change the ratio.** Up to three attempts: the configured ratio,
   then 21:9 (`ratioFor`). A model that refuses the configured ratio still
   gets a banner, and no error text is parsed.
-- **A drawn image is stored as an upload is:** through `prepareImage`, which
-  reads its type from its bytes and fits it to 2000 × 2000.
+- **A drawn image is fitted as an upload is,** in pi, by `prepareImage`,
+  which reads its type from its bytes and fits it to 2000 × 2000, as
+  `read`'s images are (ADR-0051). Bytes that are not an image are a failed
+  attempt.
 - **`set_banner` is the person's control, through the agent.** A pasted
   image by its `/blob/` path, the person's words for a new one, or a crop
   (`focus`: top, center, bottom) of the one there is. The agent is offered

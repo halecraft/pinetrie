@@ -25,7 +25,7 @@ import {
   type SessionDocHandle,
 } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
-import { createAgent } from "./agent.ts"
+import { createAgent, drawnOf } from "./agent.ts"
 import { BANNER_TOOL, parseBannerArgs } from "./banner.ts"
 import {
   SCRIPTED_IMAGE_PNG,
@@ -57,6 +57,16 @@ describe("parseBannerArgs", () => {
       direction: "dusk",
     })
   })
+})
+
+test("drawnOf: a model's image is fitted as an upload is; bytes that are not one are refused", async () => {
+  expect(await drawnOf(SCRIPTED_IMAGE_PNG)).toMatchObject({
+    kind: "drawn",
+    image: { mimeType: "image/png", width: 8, height: 1 },
+  })
+  expect(
+    await drawnOf(Buffer.from("not an image at all").toString("base64")),
+  ).toEqual({ kind: "failed", reason: "not an image" })
 })
 
 describe("banners in a harness", () => {
@@ -175,9 +185,9 @@ describe("banners in a harness", () => {
   test("a scripted model draws its fixed image; with banners off, nothing", async () => {
     const on = await agentOver(newSessionDoc(), scriptedModel(), [])
     expect(await on.canDrawBanners()).toBe(true)
-    expect(await on.drawBanner("a marsh", "8:1")).toEqual({
+    expect(await on.drawBanner("a marsh", "8:1")).toMatchObject({
       kind: "drawn",
-      bytes: new Uint8Array(Buffer.from(SCRIPTED_IMAGE_PNG, "base64")),
+      image: { mimeType: "image/png", width: 8, height: 1 },
     })
     await on.close()
     const off = await agentOver(newSessionDoc(), scriptedModel())

@@ -115,7 +115,8 @@ record (old drafts among them), and seat records no stored text names
   its own, only while `bannerStillWanted`.
 - **Only a run's end, for its own lane, starts one.** `recover` does not:
   turning banners on must not draw one for every thread that ever ran.
-- **A drawn image is stored as an upload is,** through `prepareImage`.
+- **A drawn image arrives fitted** (`Agent.drawBanner`), as an upload is,
+  so the host stores it as given. `drawWithRetries` asks up to three times.
 - **A failure is logged, never thrown**: `[host] no banner for <name>: …`,
   one line per failed attempt.
 

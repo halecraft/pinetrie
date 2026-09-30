@@ -40,6 +40,7 @@ import {
   type NoteRecord,
   type Position,
   type SeatRecord,
+  type StoredImage,
   type StreamEvent,
   type WriterId,
 } from "@pineta/core"
@@ -88,7 +89,7 @@ import {
   stripFrontmatter,
   substituteArgs,
 } from "./deep.ts"
-import { readImageProcessor } from "./images.ts"
+import { prepareImage, readImageProcessor } from "./images.ts"
 import { laneEnv } from "./lane-env.ts"
 import {
   directEnv,
@@ -206,13 +207,22 @@ export interface CreateAgentOptions {
 }
 
 /**
- * A banner's image as the model returned it, or why there is none. The
- * bytes are unchecked: the host stores them as an upload, through
- * `prepareImage`.
+ * A banner's image, fitted as an upload is (`prepareImage`), or why there is
+ * none.
  */
 export type Drawn =
-  | { readonly kind: "drawn"; readonly bytes: Uint8Array }
+  | { readonly kind: "drawn"; readonly image: StoredImage }
   | { readonly kind: "failed"; readonly reason: string }
+
+/** A model's image, as base64, fitted as an upload is, or why it is not one. */
+export async function drawnOf(data: string): Promise<Drawn> {
+  const prepared = await prepareImage(
+    new Uint8Array(Buffer.from(data, "base64")),
+  )
+  return prepared.ok
+    ? { kind: "drawn", image: prepared.image }
+    : { kind: "failed", reason: prepared.reason }
+}
 
 /** How long one image request may take: S60 measured about 9 s. */
 const DRAW_TIMEOUT_MS = 120_000
@@ -407,8 +417,9 @@ export interface Agent {
   canDrawBanners(): Promise<boolean>
   /**
    * One banner image from `prompt`, asked at `ratio` (`W:H`, OpenRouter's
-   * `image_config.aspect_ratio`, which pi-ai does not send itself). Never
-   * rejects: a failure, banners being off included, is `failed` and why.
+   * `image_config.aspect_ratio`, which pi-ai does not send itself), fitted
+   * as an upload is. Never rejects: a failure, banners being off or bytes
+   * that are not an image included, is `failed` and why.
    */
   drawBanner(prompt: string, ratio: string): Promise<Drawn>
   close(): Promise<void>
@@ -726,10 +737,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         if (reply.stopReason !== "stop")
           return failed(reply.errorMessage ?? reply.stopReason)
         if (image?.type !== "image") return failed("the reply held no image")
-        return {
-          kind: "drawn",
-          bytes: new Uint8Array(Buffer.from(image.data, "base64")),
-        }
+        return await drawnOf(image.data)
       } catch (error) {
         return failed(error instanceof Error ? error.message : String(error))
       }

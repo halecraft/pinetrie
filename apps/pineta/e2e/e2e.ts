@@ -93,7 +93,13 @@ import { lineDocPrefix } from "../host/lines.ts"
 import { openStore } from "../host/store.ts"
 import { createChecks } from "./checks.ts"
 import { committedProject, join, suiteModel, waitFor } from "./harness.ts"
-import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "./images.ts"
+import {
+  BLUE_PNG,
+  GREEN_PNG,
+  imageSize,
+  RED_PNG,
+  YELLOW_PNG,
+} from "./images.ts"
 
 const LIVE = process.env.PINETA_LIVE === "1"
 const PROMPT = "Say exactly: PINETA-OK"
@@ -120,23 +126,6 @@ const host = await startHost({
 console.log(`[e2e] host at ${host.httpUrl}\n`)
 
 // ── helpers ───────────────────────────────────────────────────────────────
-
-/** A PNG's or a JPEG's width and height, read from its header; null for neither. */
-function imageSize(
-  b: Buffer,
-): { readonly width: number; readonly height: number } | null {
-  if (b[0] === 0x89)
-    return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) }
-  // A JPEG: walk its segments to the frame header (SOF0 to SOF3).
-  let i = 2
-  while (i + 9 < b.length) {
-    const marker = b[i + 1] ?? 0
-    if (marker >= 0xc0 && marker <= 0xc3)
-      return { width: b.readUInt16BE(i + 7), height: b.readUInt16BE(i + 5) }
-    i += 2 + b.readUInt16BE(i + 2)
-  }
-  return null
-}
 
 const codeOf = (o: Outcome) => (o.kind === "refused" ? o.code : "")
 const runOf = (o: Outcome) => (o.kind === "started" ? o.runId : "")

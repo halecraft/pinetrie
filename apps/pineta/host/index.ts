@@ -17,13 +17,7 @@ import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
 import type { BlobStore, CardId, LaneName, NoteId } from "@pineta/core"
 import { userConfigFile } from "@pineta/lanes"
 import { decodeBannerConfig, decodeCommandRenames } from "@pineta/marginalia"
-import {
-  type Agent,
-  createAgent,
-  type ModelChoice,
-  newId,
-  prepareImage,
-} from "@pineta/pi"
+import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
 import { Control } from "@pineta/protocol/line"
 import {
   CARDS_DOC_ID,
@@ -279,7 +273,6 @@ export async function startHost({
           blobs,
           config: bannerConfig,
           agent: theAgent,
-          prepare: prepareImage,
         })
 
   // --- pi stack ------------------------------------------------------------

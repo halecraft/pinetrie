@@ -56,3 +56,20 @@ export function greyPng(w: number, h: number): Buffer {
     chunk("IEND", new Uint8Array()),
   ])
 }
+
+/** A PNG's or a JPEG's width and height, read from its header; null for neither. */
+export function imageSize(
+  b: Buffer,
+): { readonly width: number; readonly height: number } | null {
+  if (b[0] === 0x89)
+    return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) }
+  // A JPEG: walk its segments to the frame header (SOF0 to SOF3).
+  let i = 2
+  while (i + 9 < b.length) {
+    const marker = b[i + 1] ?? 0
+    if (marker >= 0xc0 && marker <= 0xc3)
+      return { width: b.readUInt16BE(i + 7), height: b.readUInt16BE(i + 5) }
+    i += 2 + b.readUInt16BE(i + 2)
+  }
+  return null
+}

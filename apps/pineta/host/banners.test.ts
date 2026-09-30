@@ -6,12 +6,7 @@ import {
   FALLBACK_RATIO,
   type WorkRecord,
 } from "@pineta/marginalia"
-import {
-  type Agent,
-  type Drawn,
-  type PreparedImage,
-  sha256Of,
-} from "@pineta/pi"
+import { type Agent, type Drawn, sha256Of } from "@pineta/pi"
 import { readBanners } from "@pineta/reads"
 import { describe, expect, test } from "vitest"
 import { createBanners } from "./banners.ts"
@@ -22,24 +17,17 @@ import { createSerial } from "./queue.ts"
 const LANE = laneNameForThread("1")
 const BYTES = new Uint8Array([1, 2, 3])
 const SHA = sha256Of(BYTES)
+const DRAWN: Drawn = {
+  kind: "drawn",
+  image: { bytes: BYTES, mimeType: "image/png", width: 8, height: 1 },
+}
 
 type BannerAgent = Pick<
   Agent,
   "canDrawBanners" | "drawBanner" | "describe" | "skill" | "setWorkRecord"
 >
 
-const prepared = async (bytes: Uint8Array): Promise<PreparedImage> => ({
-  ok: true,
-  image: { bytes, mimeType: "image/png", width: 8, height: 1 },
-  resized: undefined,
-})
-
-const setUp = (agent: Partial<BannerAgent> = {}) => createWith(prepared, agent)
-
-function createWith(
-  prepare: (bytes: Uint8Array) => Promise<PreparedImage>,
-  agent: Partial<BannerAgent> = {},
-) {
+function setUp(agent: Partial<BannerAgent> = {}) {
   const b = basics()
   const serial = createSerial()
   const blobs = memoryBlobs(() => 1_000)
@@ -47,7 +35,7 @@ function createWith(
     canDrawBanners: async () => true,
     skill: async () => ({ path: "SKILL.md", content: "Draw it.", hash: "h" }),
     describe: async () => "a dark marsh",
-    drawBanner: async (): Promise<Drawn> => ({ kind: "drawn", bytes: BYTES }),
+    drawBanner: async () => DRAWN,
     setWorkRecord: async (r: WorkRecord) =>
       putValue(b.doc, encodeWorkRecord(r)),
     ...agent,
@@ -58,7 +46,6 @@ function createWith(
     blobs,
     config: DEFAULT_BANNER,
     agent: () => fake.port,
-    prepare,
   })
   return { b, serial, blobs, fake, banners }
 }
@@ -76,7 +63,7 @@ describe("a run's end", () => {
     const { serial, blobs, fake, banners, b } = setUp({
       drawBanner: async (): Promise<Drawn> => {
         await new Promise(r => setTimeout(r, 5))
-        return { kind: "drawn", bytes: BYTES }
+        return DRAWN
       },
     })
     await banners.ran(LANE)
@@ -107,9 +94,7 @@ describe("a run's end", () => {
     let n = 0
     const { serial, fake, banners, b } = setUp({
       drawBanner: async (): Promise<Drawn> =>
-        ++n === 1
-          ? { kind: "failed", reason: "400: ratio refused" }
-          : { kind: "drawn", bytes: BYTES },
+        ++n === 1 ? { kind: "failed", reason: "400: ratio refused" } : DRAWN,
     })
     await banners.ran(LANE)
     await serial.idle()
@@ -130,18 +115,6 @@ describe("a run's end", () => {
     expect(readBanners(b.doc).size).toBe(0)
   })
 
-  test("an image the upload's check refuses is not stored", async () => {
-    const { serial, blobs, banners, b } = createWith(async () => ({
-      ok: false,
-      reason: "not an image",
-    }))
-    await banners.ran(LANE)
-    await serial.idle()
-    expect(blobs.list()).toEqual([])
-    expect(readBanners(b.doc).size).toBe(0)
-    expect(b.lines.join("\n")).toContain("attempt 3: not an image")
-  })
-
   test("with no key, nothing is asked of any model", async () => {
     const { serial, fake, banners } = setUp({
       canDrawBanners: async () => false,
@@ -158,7 +131,7 @@ describe("a run's end", () => {
     })
     await banners.ran(LANE)
     await banners.ran(LANE)
-    drawing.resolve({ kind: "drawn", bytes: BYTES })
+    drawing.resolve(DRAWN)
     await serial.idle()
     await banners.ran(LANE)
     await serial.idle()
@@ -180,7 +153,7 @@ describe("a run's end", () => {
     expect(await banners.request(LANE, ask({ image: pasted }))).toEqual({
       kind: "set",
     })
-    drawing.resolve({ kind: "drawn", bytes: BYTES })
+    drawing.resolve(DRAWN)
     await serial.idle()
     expect(readBanners(b.doc).get(LANE)?.sha).toBe(pasted)
   })
