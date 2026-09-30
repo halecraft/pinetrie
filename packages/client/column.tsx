@@ -45,6 +45,7 @@ import { CardEditor } from "./card-editor.tsx"
 import {
   AGENT_MARK,
   columnView,
+  type HeadBanner,
   type HeadIdentity,
   type HeadOrigin,
   type WorkFacts,
@@ -381,6 +382,9 @@ export function Column(p: ColumnProps) {
           data-color={colorSlot(p.track)}
           style={trackStyle(p.track)}
         >
+          {shows.banner !== null && (
+            <Banner banner={shows.banner} key={shows.banner.url} />
+          )}
           <div className="head-row">
             {p.count > 1 && (
               <button
@@ -676,6 +680,26 @@ function Reply({
       <span className="role">agent</span>
       <MessageText mode="streaming" text={text} />
     </div>
+  )
+}
+
+/**
+ * The image behind the header, cropped to it as `background-size: cover`
+ * would. An image rather than a background, so it can fade in once loaded;
+ * keyed by its URL, so a new banner fades in again.
+ */
+function Banner({ banner }: { banner: HeadBanner }) {
+  const [loaded, setLoaded] = useState(false)
+  return (
+    <img
+      alt=""
+      className="banner"
+      data-loaded={loaded || undefined}
+      draggable={false}
+      onLoad={() => setLoaded(true)}
+      src={banner.url}
+      style={{ objectPosition: `center ${banner.focus}` }}
+    />
   )
 }
 

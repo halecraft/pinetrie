@@ -400,6 +400,12 @@ became of its files (`strip`).
 - **The header's clicks go through `onOpen`** (`openAt`, `planOpen`), which
   reveals the entry in whichever column shows it. A column's lane may have
   started in a column to its left.
+- **The banner (ADR-0050) is the thread's at the column's end**
+  (`banner`): the lane's `pineta.banner`, none for a conversation. It is an
+  `<img>` under the header's content, not a background, so it can fade in
+  once loaded. `isolation: isolate` keeps its negative `z-index` inside
+  the header. The header has no `overflow: hidden`: on a flex item that
+  removes its minimum height, and a tall column squeezed the header.
 - **`onIntent`:** the composer tells the column, in an effect, whether its
   next send would create a lane, so the header can say `✦ new agent`. It is a
   boolean, not the text lifted up: `Column` redraws only when it flips, not

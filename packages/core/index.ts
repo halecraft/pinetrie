@@ -10,6 +10,8 @@
 //
 // Nothing in this file may import pi, Kyneta, or a Node builtin.
 
+import type { Sha256 } from "./images.ts"
+
 // --- branded identifiers ----------------------------------------------------
 //
 // Several ADRs are constraints a type system can hold. Branding them moves the
@@ -586,6 +588,27 @@ export type ThreadName = string & { readonly [threadNameBrand]: true }
 export interface NameRecord {
   readonly lane: LaneName
   readonly name: ThreadName
+  readonly at: number
+}
+
+/** Where a banner's image is cropped to fit its header: CSS `background-position`. */
+export type BannerFocus = "top" | "center" | "bottom"
+
+export const BANNER_FOCUSES: readonly BannerFocus[] = [
+  "top",
+  "center",
+  "bottom",
+]
+
+/**
+ * The image behind a thread's column header: a host-written `pineta.banner`
+ * value keyed by the lane. The image is a blob (ADR-0042); a replaced one is
+ * no longer referenced, and the blob sweep deletes it.
+ */
+export interface BannerRecord {
+  readonly lane: LaneName
+  readonly sha: Sha256
+  readonly focus: BannerFocus
   readonly at: number
 }
 

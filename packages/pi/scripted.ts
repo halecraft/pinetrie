@@ -9,12 +9,16 @@
 import { createHash } from "node:crypto"
 import {
   type AssistantMessage,
+  createImagesProvider,
   type FauxProviderHandle,
   type FauxResponseFactory,
   fauxAssistantMessage,
   fauxProvider,
   fauxText,
   fauxToolCall,
+  type ImagesApi,
+  type ImagesModel,
+  type ImagesProvider,
   type Provider,
   type TranscriptContext,
 } from "@earendil-works/pi-ai"
@@ -247,4 +251,49 @@ export function describeFauxOf(model: ScriptedModel): FauxProviderHandle {
   const faux = handles.get(model)
   if (faux === undefined) throw new Error("not a scripted model")
   return faux.describe
+}
+
+/**
+ * An 8×1 dark PNG: what a scripted model draws for every banner. A suite
+ * checks that a banner is made and shown, not what it shows.
+ */
+export const SCRIPTED_IMAGE_PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAgAAAABCAIAAABsYngUAAAAIUlEQVR4nGOQ1rKS1rOSNrKSNrOStrKStrOSdrKSdrMCADQ9BGmLFOY8AAAAAElFTkSuQmCC"
+
+/**
+ * The image provider behind a scripted model's banners: one model, which
+ * answers every request with `SCRIPTED_IMAGE_PNG` and needs no key.
+ */
+export function scriptedImages(): {
+  readonly provider: ImagesProvider
+  readonly model: ImagesModel<ImagesApi>
+} {
+  const model: ImagesModel<ImagesApi> = {
+    id: "banner",
+    name: "scripted banner",
+    api: "scripted-images",
+    provider: "scripted-images",
+    baseUrl: "",
+    input: ["text"],
+    output: ["image"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  }
+  const provider = createImagesProvider({
+    id: "scripted-images",
+    auth: { apiKey: { name: "Scripted", resolve: async () => ({ auth: {} }) } },
+    models: [model],
+    api: {
+      generateImages: async () => ({
+        api: model.api,
+        provider: model.provider,
+        model: model.id,
+        output: [
+          { type: "image", mimeType: "image/png", data: SCRIPTED_IMAGE_PNG },
+        ],
+        stopReason: "stop",
+        timestamp: Date.now(),
+      }),
+    },
+  })
+  return { provider, model }
 }

@@ -4,6 +4,9 @@
 
 import {
   ancestry,
+  type BannerFocus,
+  type BannerRecord,
+  blobUrl,
   type ColumnView,
   type CommandSummary,
   type EntryId,
@@ -47,6 +50,8 @@ export interface WorkFacts {
   readonly offers: ReadonlyMap<string, OfferRecord>
   /** Each lane's name (ADR-0039). */
   readonly names: ReadonlyMap<LaneName, ThreadName>
+  /** Each thread's column banner. */
+  readonly banners: ReadonlyMap<LaneName, BannerRecord>
 }
 
 // ── which lane worked where ───────────────────────────────────────────────
@@ -96,6 +101,12 @@ export type HeadIdentity =
   | { readonly kind: "pending" }
   /** A conversation. */
   | { readonly kind: "none" }
+
+/** The image behind a column's header, and which part of it shows. */
+export interface HeadBanner {
+  readonly url: string
+  readonly focus: BannerFocus
+}
 
 /** Where a column forks: none for a root column, a new tab, or a column moved first. */
 export type HeadOrigin =
@@ -170,6 +181,8 @@ export interface ColumnFacts {
 
 export interface ColumnShows {
   readonly identity: HeadIdentity
+  /** The banner of the thread at the column's end; none for a conversation. */
+  readonly banner: HeadBanner | null
   readonly origin: HeadOrigin
   /** Dividers, by the entry they sit above. */
   readonly joins: ReadonlyMap<string, LaneJoin>
@@ -186,10 +199,21 @@ export function columnView(f: ColumnFacts): ColumnShows {
   )
   return {
     identity: identityOf(lane, f.createsLane, work.names, stretches),
+    banner: bannerOf(lane, work.banners),
     origin: originOf(f, stretches),
     joins: joinsOf(view, stretches, work.names),
     strip: workStrip(f),
   }
+}
+
+function bannerOf(
+  lane: ThreadLane,
+  banners: ReadonlyMap<LaneName, BannerRecord>,
+): HeadBanner | null {
+  const banner = lane.kind === "lane" ? banners.get(lane.name) : undefined
+  return banner === undefined
+    ? null
+    : { url: blobUrl(banner.sha), focus: banner.focus }
 }
 
 function identityOf(

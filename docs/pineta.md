@@ -410,6 +410,15 @@ a host-written `pineta.mark` value keyed by the entry, set from the tab's
 label everywhere it is named, the Archive search included. ADR-0028's
 descriptions, section headers and boundaries are still to do.
 
+**A thread's column can have a banner** (ADR-0050, S60), when
+`~/.config/pineta/config.json` has `{ "banner": { "enabled": true } }` and
+pi has an OpenRouter key. When a thread's run ends and it has none, the text
+model writes a brief from the `column-banner` skill, which you can replace
+with your own, and Nano Banana 2 draws it at 8:1. It is stored as a pasted
+image is, under a `pineta.banner` value keyed by the lane, and drawn under
+the header's name. The agent's `set_banner` sets a pasted image, a new one
+from your words, or a crop.
+
 **Steps 1–5 are done** (ADR-0018). Now continue thickening (`docs/04-roadmap.md`), each step
 independently shippable:
 

@@ -9,7 +9,14 @@
 
 import { homedir } from "node:os"
 import path from "node:path"
-import { createModels } from "@earendil-works/pi-ai"
+import {
+  createImagesModels,
+  createModels,
+  type ImagesApi,
+  type ImagesModel,
+  type ImagesModels,
+} from "@earendil-works/pi-ai"
+import { openrouterImagesProvider } from "@earendil-works/pi-ai/providers/openrouter-images"
 import type { GatheredCommand } from "@pineta/marginalia"
 import { gatherCommands, pinetaCommands } from "./commands.ts"
 import {
@@ -18,7 +25,12 @@ import {
   ModelRuntime,
   SettingsManager,
 } from "./deep.ts"
-import { describeFauxOf, fauxOf, type ScriptedModel } from "./scripted.ts"
+import {
+  describeFauxOf,
+  fauxOf,
+  type ScriptedModel,
+  scriptedImages,
+} from "./scripted.ts"
 
 export type ModelChoice =
   /** The person's pi setup: settings' default model and the extensions' providers. */
@@ -66,6 +78,34 @@ type Model = NonNullable<ReturnType<Models["getModel"]>>
 
 type PromptInput = Parameters<typeof buildSystemPrompt>[0]
 
+/** Where banners are drawn: pi-ai's image registry, and a key for it. */
+export interface ImagesSetup {
+  readonly models: ImagesModels
+  /** The model a banner is drawn with: the one named, or a scripted model's own. */
+  model(provider: string, id: string): ImagesModel<ImagesApi> | undefined
+  /**
+   * The request's key for `provider`: from pi's `auth.json`, or its
+   * environment variable. Undefined with none; the image registry does not
+   * read `auth.json` itself.
+   */
+  apiKey(provider: string): Promise<string | undefined>
+}
+
+/** OpenRouter's image models, keyed as the person's pi keys OpenRouter. */
+function openRouterImages(models: Runtime): ImagesSetup {
+  const images = createImagesModels()
+  images.setProvider(openrouterImagesProvider())
+  return {
+    models: images,
+    model: (provider, id) => images.getModel(provider, id),
+    apiKey: provider =>
+      models
+        .getAuth(provider)
+        .then(r => r?.auth.apiKey)
+        .catch(() => undefined),
+  }
+}
+
 /** What `createAgent` needs from the choice. */
 export interface ModelSetup {
   readonly models: Models
@@ -81,6 +121,7 @@ export interface ModelSetup {
   readonly skills: PromptInput["skills"]
   /** Every skill and prompt template pi loaded, as commands (ADR-0036). */
   readonly commands: readonly GatheredCommand[]
+  readonly images: ImagesSetup
 }
 
 export async function setUpModel(
@@ -140,10 +181,18 @@ export async function setUpModel(
       models.setProvider(describe.provider)
       const resources =
         where.agentDir === undefined ? none : (await load()).resources
+      const drawn = scriptedImages()
+      const images = createImagesModels()
+      images.setProvider(drawn.provider)
       return {
         models,
         model: faux.getModel(),
         describeModel: describe.getModel(),
+        images: {
+          models: images,
+          model: () => drawn.model,
+          apiKey: async () => "scripted",
+        },
         ...resources,
       }
     }
@@ -152,7 +201,13 @@ export async function setUpModel(
       const resources =
         where.agentDir === undefined ? none : (await load()).resources
       const model = found(models, choice)
-      return { models, model, describeModel: model, ...resources }
+      return {
+        models,
+        model,
+        describeModel: model,
+        images: openRouterImages(models),
+        ...resources,
+      }
     }
     case "configured": {
       const { settingsManager, loader, resources } = await load()
@@ -174,7 +229,13 @@ export async function setUpModel(
           "no model: set defaultProvider and defaultModel in pi's settings, or PINETA_PROVIDER and PINETA_MODEL",
         )
       const model = found(models, picked)
-      return { models, model, describeModel: model, ...resources }
+      return {
+        models,
+        model,
+        describeModel: model,
+        images: openRouterImages(models),
+        ...resources,
+      }
     }
   }
 }

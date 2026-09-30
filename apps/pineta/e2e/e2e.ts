@@ -13,7 +13,13 @@
 // repeatable, cost nothing and need no key (ADR-0041). No section uses the
 // person's pi setup.
 
-import { existsSync, mkdtempSync, readFileSync, realpathSync } from "node:fs"
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs"
 import { request as httpRequest } from "node:http"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -32,6 +38,7 @@ import {
   followTip,
   type ImageRef,
   laneNameForThread,
+  messageText,
   NOBODY,
   noteId,
   type Position,
@@ -53,6 +60,7 @@ import {
 } from "@pineta/protocol/messages"
 import {
   readArchive,
+  readBanners,
   readCards,
   readCommands,
   readLaneRecords,
@@ -89,6 +97,12 @@ import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "./images.ts"
 
 const LIVE = process.env.PINETA_LIVE === "1"
 const PROMPT = "Say exactly: PINETA-OK"
+/** The suites' own real model: never the person's pi setup, which costs them. */
+const LIVE_MODEL = {
+  kind: "named",
+  provider: "cerebras",
+  model: "qwen-3.8-27b",
+} as const
 
 const { ok, report } = createChecks()
 const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms))
@@ -106,6 +120,23 @@ const host = await startHost({
 console.log(`[e2e] host at ${host.httpUrl}\n`)
 
 // ── helpers ───────────────────────────────────────────────────────────────
+
+/** A PNG's or a JPEG's width and height, read from its header; null for neither. */
+function imageSize(
+  b: Buffer,
+): { readonly width: number; readonly height: number } | null {
+  if (b[0] === 0x89)
+    return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) }
+  // A JPEG: walk its segments to the frame header (SOF0 to SOF3).
+  let i = 2
+  while (i + 9 < b.length) {
+    const marker = b[i + 1] ?? 0
+    if (marker >= 0xc0 && marker <= 0xc3)
+      return { width: b.readUInt16BE(i + 7), height: b.readUInt16BE(i + 5) }
+    i += 2 + b.readUInt16BE(i + 2)
+  }
+  return null
+}
 
 const codeOf = (o: Outcome) => (o.kind === "refused" ? o.code : "")
 const runOf = (o: Outcome) => (o.kind === "started" ? o.runId : "")
@@ -885,10 +916,9 @@ invariants("first turn")
 // ── LIVE: what the model says ─────────────────────────────────────────────
 if (LIVE) {
   console.log("\n--- live turn ---")
-  // The suites' own real model: never the person's pi setup, which costs them.
   const live = await startHost({
     port: 0,
-    model: { kind: "named", provider: "cerebras", model: "qwen-3.8-27b" },
+    model: LIVE_MODEL,
     log: () => {},
   })
   const asker = await join(live, "asker", "live")
@@ -933,6 +963,48 @@ if (LIVE) {
   )
   await asker.close()
   await live.shutdown()
+
+  // A banner drawn by the real image model (S60): the configured ratio, wide.
+  const bannerConfig = path.join(
+    mkdtempSync(path.join(tmpdir(), "pineta-live-banner-")),
+    "config.json",
+  )
+  writeFileSync(bannerConfig, JSON.stringify({ banner: { enabled: true } }))
+  const bannerLog: string[] = []
+  const drawing = await startHost({
+    port: 0,
+    model: LIVE_MODEL,
+    userConfig: bannerConfig,
+    log: line => bannerLog.push(line),
+  })
+  const painter = await join(drawing, "painter", "live")
+  await painter.chat(
+    "Name three birds of spring marshes, in one line.",
+    ROOT,
+    START_AGENT,
+  )
+  await waitFor(
+    () => Object.keys(drawing.doc.activeRuns()).length === 0,
+    120_000,
+  )
+  await waitFor(() => readBanners(drawing.doc).size > 0, 120_000)
+  await drawing.quiet()
+  const [banner] = readBanners(drawing.doc).values()
+  const served =
+    banner === undefined
+      ? null
+      : await fetch(`${drawing.httpUrl}blob/${banner.sha}`)
+  const bytes = served === null ? null : Buffer.from(await served.arrayBuffer())
+  const size = bytes === null ? null : imageSize(bytes)
+  console.log(
+    `  banner: ${JSON.stringify(size)} ${served?.headers.get("content-type")} ${bannerLog.filter(l => l.includes("banner")).join(" | ")}`,
+  )
+  ok(
+    served?.status === 200 && size !== null && size.width >= size.height * 4,
+    "a real image model draws a thread's banner, as wide as the configured ratio asks",
+  )
+  await painter.close()
+  await drawing.shutdown()
 }
 
 invariants("end")
@@ -2256,6 +2328,108 @@ invariants("end")
   await iv.close()
   await sleep(100)
   await ih.shutdown()
+}
+
+// ── banners: an image behind each thread's column header ──────────────────
+// Turned on by the user config. A scripted model draws a fixed image; the
+// grace is short, so the sweep's handling of banners shows.
+{
+  const project = committedProject("pineta-banners-", { "a.txt": "a\n" })
+  const userConfig = path.join(
+    mkdtempSync(path.join(tmpdir(), "pineta-banner-config-")),
+    "config.json",
+  )
+  writeFileSync(userConfig, JSON.stringify({ banner: { enabled: true } }))
+  const script = scriptedModel({ answer: { text: "noted" } })
+  const GRACE_MS = 1_000
+  const bh = await startHost({
+    model: { kind: "scripted", script },
+    tools: { project },
+    containers: false,
+    userConfig,
+    blobGraceMs: GRACE_MS,
+    log: () => {},
+  })
+  const bu = await join(bh, "bea", "banners")
+  await bu.setName("Bea")
+  const bidle = async () => {
+    await waitFor(
+      () =>
+        Object.keys(bh.doc.activeRuns()).length === 0 &&
+        readOutbox(bh.doc).length === 0,
+      60_000,
+    )
+    await bh.quiet()
+  }
+  const blobAt = (sha: string) => fetch(`${bh.httpUrl}blob/${sha}`)
+
+  // 1. A thread's first run's end makes its banner.
+  await bu.chat("@agent plan the parser", ROOT, START_AGENT)
+  await bidle()
+  const [lane] = readLanes(bh.doc, readTreeIndex(bh.doc)).map(l => l.name)
+  const made = lane === undefined ? undefined : readBanners(bh.doc).get(lane)
+  ok(
+    made !== undefined &&
+      made.focus === "center" &&
+      (await blobAt(made.sha)).status === 200,
+    "a thread's first run's end makes its banner, stored and served as an image",
+  )
+
+  // 2. The sweep keeps a banner nothing else shows.
+  await sleep(GRACE_MS + 200)
+  const reply = idOfIn(bh.doc, "noted")
+  await bu.chat("@agent and the lexer", at(reply), { mode: "reply" })
+  await bidle()
+  ok(
+    made !== undefined &&
+      (await blobAt(made.sha)).status === 200 &&
+      readBanners(bh.doc).get(made.lane)?.sha === made.sha,
+    "after the grace, a banner's image is kept, and a later run makes no other",
+  )
+
+  // 3. `set_banner` sets a pasted image; the one it replaces is swept.
+  const response = await fetch(`${bh.httpUrl}blob`, {
+    method: "POST",
+    headers: { "content-type": "image/png" },
+    body: new Uint8Array(RED_PNG),
+  })
+  const red = (await response.json()) as ImageRef
+  script.use([
+    {
+      tool: "set_banner",
+      args: { image: `/blob/${red.sha256}`, focus: "top" },
+    },
+    { text: "set it" },
+  ])
+  await bu.chat(
+    `@agent use this as the banner ![red](/blob/${red.sha256})`,
+    at(idOfIn(bh.doc, "noted")),
+    { mode: "reply" },
+  )
+  await bidle()
+  const toolSaid = Object.values(readEntries(bh.doc))
+    .map(rowMessage)
+    .filter(m => (m as { role?: string }).role === "toolResult")
+    .map(m => messageText(m as never))
+  const now = lane === undefined ? undefined : readBanners(bh.doc).get(lane)
+  ok(
+    now?.sha === red.sha256 &&
+      now.focus === "top" &&
+      toolSaid.includes("The banner is set."),
+    "set_banner sets a pasted image as the thread's banner, with its crop, and tells the agent",
+  )
+  await sleep(GRACE_MS + 200)
+  await bu.chat("@agent thanks", at(idOfIn(bh.doc, "set it")), {
+    mode: "reply",
+  })
+  await bidle()
+  ok(
+    made !== undefined && (await blobAt(made.sha)).status === 404,
+    "the banner a new one replaced is swept after the grace",
+  )
+  await bu.close()
+  await sleep(100)
+  await bh.shutdown()
 }
 
 // ── a tool's image: kept by content, a reference in the session (ADR-0051) ──

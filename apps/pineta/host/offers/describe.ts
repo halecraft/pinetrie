@@ -3,7 +3,11 @@
 
 import { type LaneName, projectTranscript } from "@pineta/core"
 import { executeOnHost, lines, planDescribe } from "@pineta/lanes"
-import { describeRequest, withTrailers } from "@pineta/marginalia"
+import {
+  describeRequest,
+  transcriptLines,
+  withTrailers,
+} from "@pineta/marginalia"
 import { readTreeIndex } from "@pineta/reads"
 import { readLaneTip } from "@pineta/schema"
 import type { Refresh } from "./refresh.ts"
@@ -47,14 +51,7 @@ export async function describe(
   )
   const index = readTreeIndex(doc)
   const tip = readLaneTip(doc, lane)
-  const messages = projectTranscript(index, tip)
-    .filter(
-      m => m.role === "chat" || m.role === "user" || m.role === "assistant",
-    )
-    .map(
-      m =>
-        `${m.role === "assistant" ? "agent" : (m.author ?? "someone")}: ${m.text}`,
-    )
+  const messages = transcriptLines(projectTranscript(index, tip))
   const skill = await state.agent().skill("pineta:skill:commit-message")
   const request = describeRequest({
     skill: skill?.content ?? "Write a commit message for this change.",

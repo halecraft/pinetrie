@@ -12,6 +12,7 @@ import {
   type ProjectRecord,
   projectColumns,
   type RevisionRecord,
+  type Sha256,
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
@@ -151,6 +152,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   landings: [],
   offers: new Map(),
   names: new Map(),
+  banners: new Map(),
   ...over,
 })
 const laneView = (name: LaneName, tip: string, running = false): LaneView => ({
@@ -221,6 +223,23 @@ describe("columnView: the header", () => {
       kind: "pending",
     })
     expect(columnView(facts(1)).identity).toEqual({ kind: "none" })
+  })
+  test("the banner is the thread's at the column's end; a conversation has none", () => {
+    const sha = "a".repeat(64) as Sha256
+    const banners = new Map([
+      [B, { lane: B, sha, focus: "top" as const, at: 1 }],
+    ])
+    expect(
+      columnView(
+        facts(1, { lane: onLane(laneView(B, "b2")), work: work({ banners }) }),
+      ).banner,
+    ).toEqual({ url: `/blob/${sha}`, focus: "top" })
+    expect(
+      columnView(
+        facts(1, { lane: onLane(laneView(A, "b2")), work: work({ banners }) }),
+      ).banner,
+    ).toBeNull()
+    expect(columnView(facts(1, { work: work({ banners }) })).banner).toBeNull()
   })
   test("a lane that started above the column's first message still has a start", () => {
     // Column 1 shows only the branch; lane A started at 3, in column 0.

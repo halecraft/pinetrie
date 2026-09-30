@@ -15,7 +15,7 @@ const details = (shas: readonly Sha256[]) => ({
   images: shas.map(image),
 })
 
-test("referencedBlobs: chats, tool results, held messages and typed texts each keep theirs", () => {
+test("referencedBlobs: chats, tool results, held messages, typed texts and banners each keep theirs", () => {
   const held: Held[] = [
     {
       kind: "chat",
@@ -48,12 +48,16 @@ test("referencedBlobs: chats, tool results, held messages and typed texts each k
     ],
     held,
     texts: [`a card ![](/blob/${sha("c")})`, "`![](/blob/dd)` no"],
+    banners: [
+      { lane: laneNameForThread("1"), sha: sha("g"), focus: "center", at: 1 },
+    ],
   })
   expect([...referenced].sort()).toEqual([
     sha("a"),
     sha("b"),
     sha("c"),
     sha("e"),
+    sha("g"),
   ])
 })
 

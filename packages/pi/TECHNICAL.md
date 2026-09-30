@@ -299,16 +299,24 @@ item 18, and in `lanes.test.ts` against the harness.
   directory in `resume`'s `Context`. `lanes.test.ts` reproduces the crash with
   two agents over one document.
 - **`ask_for_guidance`** is registered for every lane but inactive:
-  `ThreadLaneHandle.withGuidance(on)` adds or removes it with pi's
+  `ThreadLaneHandle.withGuidance(on)` sets the lane's whole list with pi's
   `lane.setActiveTools`, which pi stores in the lane's configuration. The host
   turns it on exactly while the run's prompt is a land message, and off at
   every run's end, so a crash cannot leave it on for a later run.
+- **`set_banner`** (`banner.ts`, ADR-0050) is registered whenever the host
+  has tools, and active when `createAgent` is given `banners`. pi keeps a
+  stored list as it is, and fails a run whose list names a tool not
+  registered: a lane stored while banners were on still names it after they
+  are turned off, and its call answers that banners are off. `withGuidance`
+  sets the whole list (`activeTools`), never a toggle, so a lane stored
+  before a change gets the current list at its next run's end. The tool reads its arguments (`parseBannerArgs`: an image that names
+  no pasted image is refused, not ignored) and hands the ask to the host.
 - **Pineta's own skills** are in `skills/`, loaded after yours and the repo's
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `offer-stack`
-  (ADR-0038). So one of yours or the repo's of the same name replaces
-  Pineta's. All three are `disable-model-invocation: true`: only the host
-  asks for them.
+  (ADR-0038), and `column-banner` (ADR-0050). So one of yours or the repo's
+  of the same name replaces Pineta's. All four are
+  `disable-model-invocation: true`: only the host asks for them.
   `Agent.skill(name)` reads the file at call time, without its frontmatter,
   and hashes it. The scripted and named model choices load no resources, so
   it falls back to the file in `skills/`.
@@ -430,4 +438,19 @@ conformance stayed green, which is why they ran first.
 lane's context. The host builds the request (`describeRequest`, in
 marginalia) and adds the trailers; this package only carries it out. A failed
 request returns null, and the offer keeps its placeholder.
+
+### Banners' images (`Agent.drawBanner`, ADR-0050, S60)
+
+- **`setup.images`** is pi-ai's image registry (`createImagesModels`):
+  `openrouterImagesProvider()` for a named or configured model, and
+  `scriptedImages()` for a scripted one, which draws `SCRIPTED_IMAGE_PNG`
+  and needs no key.
+- **The registry does not read `auth.json`.** `images.apiKey(provider)`
+  asks the `ModelRuntime` (`getAuth`), which reads `auth.json` and then
+  `OPENROUTER_API_KEY`, and the key is passed as `apiKey`.
+- **pi-ai sends no aspect ratio.** `drawBanner` adds OpenRouter's
+  `image_config.aspect_ratio` in `onPayload`.
+- **`drawBanner` never rejects**: `drawn` with the bytes, or `failed` and
+  why. The bytes are unchecked; the host stores them through `prepareImage`.
+  `canDrawBanners` is asked first, so a host with no key writes no brief.
 

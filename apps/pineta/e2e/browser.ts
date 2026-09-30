@@ -10,7 +10,8 @@
 //     pnpm run e2e:browser
 
 import { execFileSync } from "node:child_process"
-import { existsSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import path from "node:path"
 import { IDENTITY_KEY, identityCodec } from "@pineta/client/identity"
 import {
@@ -2126,6 +2127,85 @@ try {
       await pp.context().close()
       await qp.context().close()
       await imageHost.shutdown()
+    }
+  }
+
+  // ── a thread's banner behind its column's header ───────────────────────
+  {
+    const config = path.join(
+      mkdtempSync(path.join(tmpdir(), "pineta-browser-banner-")),
+      "config.json",
+    )
+    writeFileSync(config, JSON.stringify({ banner: { enabled: true } }))
+    const bannerHost = await startHost({
+      model: { kind: "scripted", script: suiteModel() },
+      userConfig: config,
+      log: () => {},
+    })
+    const bp = await (await browser.newContext()).newPage()
+    await asPerson(bp, "bea@browser.test", "Bea")
+    try {
+      await bp.goto(bannerHost.httpUrl, { waitUntil: "domcontentloaded" })
+      await bp.click("#tabs .add-agent")
+      await bp.fill(`${col(0)} .composer .input`, "plan the parser")
+      await bp.click(`${col(0)} .composer .send`)
+      const drawn = await bp
+        .waitForSelector(`${col(0)} .column-head .banner[data-loaded]`, {
+          timeout: 30_000,
+        })
+        .then(
+          () => true,
+          () => false,
+        )
+      // Past the fade.
+      await bp.waitForTimeout(800)
+      const header = await bp.evaluate(sel => {
+        const head = document.querySelector(`${sel} .column-head`)
+        const img = head?.querySelector("img.banner")
+        const name = head?.querySelector(".agent-name")
+        if (
+          !(head instanceof HTMLElement) ||
+          !(img instanceof HTMLImageElement)
+        )
+          return null
+        const box = name?.getBoundingClientRect()
+        const onTop =
+          box === undefined
+            ? null
+            : document.elementFromPoint(
+                box.left + box.width / 2,
+                box.top + box.height / 2,
+              )
+        const style = getComputedStyle(img)
+        // The header's padding box: its top border is the colour stripe.
+        return {
+          natural: img.naturalWidth,
+          fit: style.objectFit,
+          opacity: style.opacity,
+          fills:
+            img.offsetWidth === head.clientWidth &&
+            img.offsetHeight === head.clientHeight,
+          nameOnTop:
+            name instanceof Element && onTop instanceof Element
+              ? name.contains(onTop)
+              : false,
+          stripe: getComputedStyle(head).borderTopWidth,
+        }
+      }, col(0))
+      ok(
+        drawn &&
+          header !== null &&
+          header.natural > 0 &&
+          header.fit === "cover" &&
+          header.opacity === "1" &&
+          header.fills &&
+          header.nameOnTop &&
+          header.stripe === "4px",
+        `a thread's first run gives its header a banner: drawn under the name, covering the header, the colour stripe kept (${JSON.stringify(header)})`,
+      )
+    } finally {
+      await bp.context().close()
+      await bannerHost.shutdown()
     }
   }
 

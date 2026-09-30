@@ -45,6 +45,7 @@ test("a scripted model given no agent directory loads nothing of pi's, and still
       .commands.map(c => c.name)
       .sort(),
   ).toEqual([
+    "pineta:skill:column-banner",
     "pineta:skill:commit-message",
     "pineta:skill:offer-stack",
     "pineta:skill:resolve-conflicts",

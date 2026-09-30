@@ -23,6 +23,7 @@ import type { Held } from "@pineta/marginalia"
 import {
   readAgentActivity,
   readArchive,
+  readBanners,
   readCommands,
   readLandings,
   readLaneRecords,
@@ -85,6 +86,7 @@ export function readSessionFacts(doc: SessionDocHandle): SessionFacts {
       landings: readLandings(doc),
       offers: readOffers(doc),
       names: readNames(doc),
+      banners: readBanners(doc),
     },
   }
 }

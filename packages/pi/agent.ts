@@ -45,6 +45,9 @@ import {
 } from "@pineta/core"
 import {
   ARCHIVE_NAMESPACE,
+  type BannerAnswer,
+  type BannerAsk,
+  type BannerConfig,
   type ChatMessage,
   type CommandSource,
   chatImageShas,
@@ -76,6 +79,7 @@ import {
   readLaneTip,
   type SessionDocHandle,
 } from "@pineta/schema"
+import { BANNER_TOOL, bannerTool } from "./banner.ts"
 import { DEFAULT_AGENT_DIR, type ModelChoice, setUpModel } from "./config.ts"
 import {
   buildSystemPrompt,
@@ -124,7 +128,7 @@ export const newId = (): string => uuidv7()
 
 /**
  * Pineta's own skills, loaded after yours and the repo's: `resolve-conflicts`,
- * `commit-message` and `offer-stack`.
+ * `commit-message`, `offer-stack` and `column-banner`.
  */
 const SKILLS_DIR = path.join(import.meta.dirname, "skills")
 
@@ -190,7 +194,28 @@ export interface CreateAgentOptions {
    * as "no longer stored", and a tool's are stored inline.
    */
   readonly blobs?: Pick<BlobStore, "get" | "put" | "ref">
+  /**
+   * Column banners, when the user config enables them: the image model, and
+   * where `set_banner` sends its asks. Without it there is no tool, and
+   * `drawBanner` draws nothing.
+   */
+  readonly banners?: {
+    readonly config: BannerConfig
+    request(lane: LaneName, ask: BannerAsk): Promise<BannerAnswer>
+  }
 }
+
+/**
+ * A banner's image as the model returned it, or why there is none. The
+ * bytes are unchecked: the host stores them as an upload, through
+ * `prepareImage`.
+ */
+export type Drawn =
+  | { readonly kind: "drawn"; readonly bytes: Uint8Array }
+  | { readonly kind: "failed"; readonly reason: string }
+
+/** How long one image request may take: S60 measured about 9 s. */
+const DRAW_TIMEOUT_MS = 120_000
 
 /**
  * What the model reads: pi's own conversion, after each chat's images are
@@ -374,6 +399,18 @@ export interface Agent {
     readonly system: string
     readonly user: string
   }): Promise<string | null>
+  /**
+   * Whether a banner can be drawn: banners are enabled, their model is
+   * known, and there is a key for its provider. Asked before the brief, so a
+   * host with no key spends nothing.
+   */
+  canDrawBanners(): Promise<boolean>
+  /**
+   * One banner image from `prompt`, asked at `ratio` (`W:H`, OpenRouter's
+   * `image_config.aspect_ratio`, which pi-ai does not send itself). Never
+   * rejects: a failure, banners being off included, is `failed` and why.
+   */
+  drawBanner(prompt: string, ratio: string): Promise<Drawn>
   close(): Promise<void>
 }
 
@@ -422,13 +459,33 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
           createBashTool(),
         ]
   const toolNames = fileTools.map(t => t.name)
+  const banners = lanes === null ? undefined : options.banners
   const tools =
     lanes === null
       ? []
       : [
           ...fileTools,
           guidanceTool((lane, q) => lanes.hooks.askedForGuidance(lane, q)),
+          bannerTool(banners?.request),
         ]
+  // What a lane's runs may call: the file tools, `set_banner` when banners
+  // are on, and `ask_for_guidance` during a landing. pi stores the list in a
+  // lane's configuration once it is set, and fails a run whose list names a
+  // tool not registered, so every tool here is registered whatever the
+  // setting, and `withGuidance` sets the whole list: a lane stored before
+  // banners were turned on or off gets the current one at its next run's end.
+  const activeTools = (guidance: boolean): string[] => [
+    ...toolNames,
+    ...(banners === undefined ? [] : [BANNER_TOOL]),
+    ...(guidance ? [GUIDANCE_TOOL] : []),
+  ]
+  const imageModel =
+    options.banners === undefined
+      ? undefined
+      : setup.images.model(
+          options.banners.config.provider,
+          options.banners.config.model,
+        )
   // A call with no lane named (none should run tools) works in the project.
   const accessFor = (lane: LaneName | undefined): LaneAccess =>
     lanes === null || lane === undefined
@@ -459,7 +516,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       models: setup.models,
       model: resolved,
       tools: tools as never[],
-      activeToolNames: toolNames,
+      activeToolNames: activeTools(false),
       toolContext: (context: typeof CTX): ToolContext => {
         const access = accessFor(laneOf(context))
         if (access.kind === "direct")
@@ -605,10 +662,10 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         const lane = await existing(name)
         if (lane === undefined || lanes === null) return
         const active = await lane.getActiveTools(ctx)
-        const next = on
-          ? [...new Set([...active, GUIDANCE_TOOL])]
-          : active.filter(t => t !== GUIDANCE_TOOL)
-        if (next.length !== active.length) await lane.setActiveTools(next, ctx)
+        const next = activeTools(on)
+        const same =
+          next.length === active.length && next.every(t => active.includes(t))
+        if (!same) await lane.setActiveTools(next, ctx)
       },
       async abort() {
         const lane = await existing(name)
@@ -638,6 +695,43 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         return reply.stopReason === "error" || text === "" ? null : text
       } catch {
         return null
+      }
+    },
+
+    async canDrawBanners() {
+      if (imageModel === undefined) return false
+      return (await setup.images.apiKey(imageModel.provider)) !== undefined
+    },
+
+    async drawBanner(prompt, ratio) {
+      const failed = (reason: string): Drawn => ({ kind: "failed", reason })
+      if (imageModel === undefined) return failed("no banner model")
+      try {
+        const apiKey = await setup.images.apiKey(imageModel.provider)
+        if (apiKey === undefined)
+          return failed(`no key for ${imageModel.provider}`)
+        const reply = await setup.images.models.generateImages(
+          imageModel,
+          { input: [{ type: "text", text: prompt }] },
+          {
+            apiKey,
+            timeoutMs: DRAW_TIMEOUT_MS,
+            onPayload: payload => ({
+              ...(payload as object),
+              image_config: { aspect_ratio: ratio },
+            }),
+          },
+        )
+        const image = reply.output.find(o => o.type === "image")
+        if (reply.stopReason !== "stop")
+          return failed(reply.errorMessage ?? reply.stopReason)
+        if (image?.type !== "image") return failed("the reply held no image")
+        return {
+          kind: "drawn",
+          bytes: new Uint8Array(Buffer.from(image.data, "base64")),
+        }
+      } catch (error) {
+        return failed(error instanceof Error ? error.message : String(error))
       }
     },
 

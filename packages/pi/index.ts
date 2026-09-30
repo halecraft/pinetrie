@@ -3,6 +3,7 @@ export {
   type Agent,
   type CreateAgentOptions,
   createAgent,
+  type Drawn,
   KynetaStorage,
   type LaneAccess,
   type LaneHooks,

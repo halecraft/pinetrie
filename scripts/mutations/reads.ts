@@ -53,6 +53,14 @@ export const mutations: readonly Mutation[] = [
     expect: "lastWaiting is the writer of the newest item waiting",
   },
   {
+    name: "referencedBlobs skips banners",
+    file: "packages/reads/index.ts",
+    from: "  for (const banner of facts.banners) shas.add(banner.sha)",
+    to: "  for (const banner of [] as BannerRecord[]) shas.add(banner.sha)",
+    command: unit,
+    expect: "typed texts and banners each keep theirs",
+  },
+  {
     name: "referencedBlobs skips tool results",
     file: "packages/reads/index.ts",
     from: "    for (const image of messageImages(message as AgentMessageLike))",

@@ -18,6 +18,7 @@ import {
   type ArchiveRecord,
   agentActivity,
   ancestry,
+  type BannerRecord,
   type CardRecord,
   type ChatMode,
   type CommandSummary,
@@ -49,6 +50,8 @@ import {
 import {
   ARCHIVE_NAMESPACE,
   archiveRecords,
+  BANNER_NAMESPACE,
+  bannerRecords,
   COMMANDS_NAMESPACE,
   commandsRecord,
   decodeCard,
@@ -408,6 +411,12 @@ export const readNames = (
 ): ReadonlyMap<LaneName, ThreadName> =>
   nameRecords(readValues(doc, NAME_NAMESPACE))
 
+/** Each thread's banner (`pineta.banner`), by lane. */
+export const readBanners = (
+  doc: SessionDocHandle,
+): ReadonlyMap<LaneName, BannerRecord> =>
+  bannerRecords(readValues(doc, BANNER_NAMESPACE))
+
 /**
  * A lane as people read it: its name, or, before the host has named it, the
  * last eight characters of its id.
@@ -479,17 +488,20 @@ export function workAt(
 
 /**
  * Every blob something still shows: each chat's images, each tool result's
- * (ADR-0051), each held message's, and each `/blob/` image in the texts
- * people type: every note's and every card's (ADR-0048). A card holds what a
- * composer has typed, pasted images included, so the caller passes every
- * text, not only those it has loaded. Pure.
+ * (ADR-0051), each held message's, each `/blob/` image in the texts people
+ * type, every note's and every card's (ADR-0048), and each thread's banner
+ * (ADR-0050). A card holds what a composer has typed, pasted images
+ * included, so the caller passes every text, not only those it has loaded.
+ * Pure.
  */
 export function referencedBlobs(facts: {
   readonly messages: Iterable<unknown>
   readonly held: readonly Held[]
   readonly texts: Iterable<string>
+  readonly banners: Iterable<BannerRecord>
 }): ReadonlySet<Sha256> {
   const shas = new Set<Sha256>()
+  for (const banner of facts.banners) shas.add(banner.sha)
   for (const message of facts.messages) {
     for (const image of decodeChat(message)?.images ?? [])
       shas.add(image.sha256)
@@ -513,6 +525,7 @@ export const readReferencedBlobs = (
     messages: Object.values(readEntries(doc)).map(rowMessage),
     held: readOutbox(doc),
     texts,
+    banners: readBanners(doc).values(),
   })
 
 /**

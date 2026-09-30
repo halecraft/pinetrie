@@ -1,6 +1,6 @@
 // work — where lanes work, the disk and files at each entry, resolutions,
 // offers, what you have of lanes, and lanes' names (ADR-0032 to ADR-0034,
-// ADR-0038, ADR-0039).
+// ADR-0038, ADR-0039), and threads' banners.
 //
 // Host-written records, each a pi value under a `pineta.` namespace.
 // `encodeWorkRecord` is the one place their namespaces and keys are chosen;
@@ -11,7 +11,9 @@
 
 import {
   type Above,
+  BANNER_FOCUSES,
   BASE_SNAPSHOT,
+  type BannerRecord,
   type CommandSummary,
   type CommitId,
   commitId,
@@ -23,6 +25,7 @@ import {
   type HaveRecord,
   HOST_WORKING_COPY,
   isBusy,
+  isSha256,
   type LandingRecord,
   type LaneName,
   type LaneRecord,
@@ -46,6 +49,7 @@ export const LANDING_NAMESPACE = "pineta.landing"
 export const OFFER_NAMESPACE = "pineta.offer"
 export const HAVE_NAMESPACE = "pineta.have"
 export const NAME_NAMESPACE = "pineta.name"
+export const BANNER_NAMESPACE = "pineta.banner"
 export const PROJECT_NAMESPACE = "pineta.project"
 /** The one `pineta.project` value's key: a host has one project. */
 export const PROJECT_KEY = "project"
@@ -134,6 +138,13 @@ const OfferRecordSchema = Type.Object({
   }),
 })
 
+const BannerRecordSchema = Type.Object({
+  lane: Type.String({ minLength: 1 }),
+  sha: Type.String({ pattern: "^[0-9a-f]{64}$" }),
+  focus: Type.Union(BANNER_FOCUSES.map(f => Type.Literal(f))),
+  at: Type.Number(),
+})
+
 const NameRecordSchema = Type.Object({
   lane: Type.String({ minLength: 1 }),
   name: Type.String({ pattern: "^[a-z]+-[a-z]+$" }),
@@ -202,6 +213,13 @@ export const decodeNameRecord = (value: unknown): NameRecord | undefined =>
     at: r.at,
   }))
 
+export const decodeBannerRecord = (value: unknown): BannerRecord | undefined =>
+  decodeWith(BannerRecordSchema, value, r =>
+    isSha256(r.sha)
+      ? { lane: r.lane as LaneName, sha: r.sha, focus: r.focus, at: r.at }
+      : undefined,
+  )
+
 export const decodeHaveRecord = (value: unknown): HaveRecord | undefined =>
   decodeWith(HaveRecordSchema, value, r => ({
     ...r,
@@ -226,6 +244,7 @@ export type WorkRecord =
   | { readonly kind: "offer"; readonly record: OfferRecord }
   | { readonly kind: "have"; readonly record: HaveRecord }
   | { readonly kind: "name"; readonly record: NameRecord }
+  | { readonly kind: "banner"; readonly record: BannerRecord }
   | { readonly kind: "project"; readonly record: ProjectRecord }
   | { readonly kind: "commands"; readonly record: CommandsRecord }
 
@@ -284,6 +303,12 @@ export function encodeWorkRecord(r: WorkRecord): {
         key: r.record.lane,
         value: { ...r.record },
       }
+    case "banner":
+      return {
+        namespace: BANNER_NAMESPACE,
+        key: r.record.lane,
+        value: { ...r.record },
+      }
     case "project":
       return {
         namespace: PROJECT_NAMESPACE,
@@ -337,6 +362,12 @@ export const nameRecords = (
   values: Stored,
 ): ReadonlyMap<LaneName, ThreadName> =>
   new Map(decodeAll(values, decodeNameRecord).map(r => [r.lane, r.name]))
+
+/** Stored `pineta.banner` values -> each thread's banner, by lane. */
+export const bannerRecords = (
+  values: Stored,
+): ReadonlyMap<LaneName, BannerRecord> =>
+  new Map(decodeAll(values, decodeBannerRecord).map(r => [r.lane, r]))
 
 /** Stored `pineta.have` values -> every commit you have of lanes. */
 export const haveRecords = (values: Stored): readonly HaveRecord[] =>

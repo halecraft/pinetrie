@@ -31,6 +31,7 @@ wires them.
 | `work/` | lane containers and disks (§ Lane work) |
 | `offers/` | each lane's offer in your repo (§ Offers) |
 | `names.ts` | every lane's thread name (ADR-0039), one plan at a time |
+| `banners.ts` | each thread's column banner (ADR-0050): made at a run's end, set by `set_banner` |
 | `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue`, `putNote`, `basics` |
 
 ## One serial executor
@@ -85,10 +86,11 @@ record (old drafts among them), and seat records no stored text names
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
   a new message could run before an interrupted lane resumed, and jump a
   held one.
-- **The agent and lane work are made in a cycle.** Lane work is made first
-  and reads the agent lazily (`theAgent()`), because the agent is made with
-  lane work's `access` and `hooks`. That is the only lazy read: every module
-  made after the agent is given the agent.
+- **The agent, lane work and banners are made in a cycle.** Lane work and
+  banners are made first and read the agent lazily (`theAgent()`), because
+  the agent is made with lane work's `access` and `hooks` and banners'
+  `request`. Those are the only lazy reads: every module made after the
+  agent is given the agent. The `Serial` is made before them, for banners.
 
 ## Commands
 
@@ -103,6 +105,19 @@ record (old drafts among them), and seat records no stored text names
 - **`executeChat` still checks a new lane's directory and asks pi for the
   lane.** Both are ports that may refuse, not facts to gather. The directory
   is checked first, so a refused send creates no lane.
+
+## Banners (`banners.ts`, ADR-0050)
+
+- **A decision is one `Serial` step**: gather the lane's banner, whether one
+  is being made and whether a blob is stored; `planBanner`; write a pasted
+  image or a crop. A new image is a `serial.track`ed task: the brief and the
+  image take seconds each, outside the queue, then the write is a step of
+  its own, only while `bannerStillWanted`.
+- **Only a run's end, for its own lane, starts one.** `recover` does not:
+  turning banners on must not draw one for every thread that ever ran.
+- **A drawn image is stored as an upload is,** through `prepareImage`.
+- **A failure is logged, never thrown**: `[host] no banner for <name>: …`,
+  one line per failed attempt.
 
 ## HTTP
 

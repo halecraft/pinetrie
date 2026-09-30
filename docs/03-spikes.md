@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S60 — A wide image for a column's header ✅ PASS
+
+`findings/S60-column-banner-aspect.md`. OpenRouter honours
+`image_config.aspect_ratio`, which pi-ai sends only through `onPayload`.
+Nano Banana 2's preview makes 8:1, close to a header's shape; the released
+model refuses anything wider than 21:9. About 9 s and half a cent an image.
+A light image made the header's name unreadable; a dark, low-key brief kept
+it legible without a scrim. Produced ADR-0050.
+
 ### S59 — A tool's image through pi, the session and the store ✅ PASS
 
 `findings/S59-tool-images.md`. An image processor in `read` runs before pi

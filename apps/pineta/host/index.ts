@@ -16,8 +16,14 @@ import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
 import type { BlobStore, CardId, LaneName, NoteId } from "@pineta/core"
 import { userConfigFile } from "@pineta/lanes"
-import { decodeCommandRenames } from "@pineta/marginalia"
-import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
+import { decodeBannerConfig, decodeCommandRenames } from "@pineta/marginalia"
+import {
+  type Agent,
+  createAgent,
+  type ModelChoice,
+  newId,
+  prepareImage,
+} from "@pineta/pi"
 import { Control } from "@pineta/protocol/line"
 import {
   CARDS_DOC_ID,
@@ -40,6 +46,7 @@ import {
   TextDoc,
 } from "@pineta/schema"
 import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
+import { createBanners } from "./banners.ts"
 import { type Basics, failed } from "./basics.ts"
 import { memoryBlobs } from "./blobs.ts"
 import { startCards } from "./cards.ts"
@@ -237,8 +244,9 @@ export async function startHost({
     if (created === undefined) throw new Error("the agent is not created yet")
     return created
   }
-  // The user config, read once: its shared directories (ADR-0035) and its
-  // renames for command packages (ADR-0036). Missing or malformed is empty.
+  // The user config, read once: its shared directories (ADR-0035), its
+  // renames for command packages (ADR-0036) and whether threads get banners.
+  // Missing or malformed is empty.
   const userJson = await readFile(userConfig, "utf8")
     .then(t => JSON.parse(t) as unknown)
     .catch(() => null)
@@ -256,6 +264,23 @@ export async function startHost({
     userConfig: { file: userConfig, json: userJson },
     agent: theAgent,
   })
+
+  const serial = createSerial(failed(basics, "step"))
+  // Each thread's column banner, when the user config turns banners on. Made
+  // before the agent, whose `set_banner` asks it, so it reads the agent
+  // lazily, as lane work does.
+  const bannerConfig = decodeBannerConfig(userJson)
+  const banners =
+    bannerConfig === null
+      ? null
+      : createBanners({
+          basics,
+          serial,
+          blobs,
+          config: bannerConfig,
+          agent: theAgent,
+          prepare: prepareImage,
+        })
 
   // --- pi stack ------------------------------------------------------------
   const commandRenames = decodeCommandRenames(userJson)
@@ -275,8 +300,15 @@ export async function startHost({
             hooks: work.hooks,
           },
     onStream: streamInto(basics),
+    ...(bannerConfig === null || banners === null
+      ? {}
+      : { banners: { config: bannerConfig, request: banners.request } }),
   })
   created = agent
+  if (bannerConfig !== null && !(await agent.canDrawBanners()))
+    log(
+      `[host] banners are on, but ${bannerConfig.provider}/${bannerConfig.model} cannot be drawn: no key, or no such model`,
+    )
 
   log(
     `[host] agent ready — model ${agent.modelLabel}; tools ${tools === null ? "off" : `on, in ${work.project?.root ?? tools.project}`}`,
@@ -286,7 +318,6 @@ export async function startHost({
   const hotReload = pauseHotReload({ doc, project: () => work.project })
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
-  const serial = createSerial(failed(basics, "step"))
   const notes = startNoteTexts({
     exchange,
     doc,
@@ -318,10 +349,11 @@ export async function startHost({
       sweepBlobs({ basics, blobs, grace: blobGraceMs, texts: cardPort.texts }),
   })
   // A run's end: hot reload may reload the page, then the lane drains and
-  // the session compacts.
+  // the session compacts. A thread with no banner gets one.
   runs.onEnded(lane => {
     hotReload.runEnded()
     void settle([lane])
+    banners?.ran(lane).catch(failed(basics, "banner"))
   })
 
   /**

@@ -22,6 +22,7 @@ import {
 } from "@pineta/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
+import { fitNewest, LEFT_OUT_NOTE, leftOut } from "./request.ts"
 
 /** What the host found of one revision of an offer, against what it wrote. */
 export interface RevisionFacts {
@@ -215,9 +216,6 @@ export function offerView(input: {
 
 // ── the commit message ────────────────────────────────────────────────────
 
-/** Room for "- (N earlier left out)". */
-const LEFT_OUT_NOTE = 32
-
 /**
  * The one line an offer carries until an agent describes it: a work in
  * progress, named by its thread and the thread's own first message
@@ -255,21 +253,11 @@ export function describeRequest(input: {
   let room = Math.max(0, input.budget - head.length)
   // The diff is kept whole when it fits; the messages share what is left,
   // less room for the line saying how many were left out.
-  let messageRoom = Math.max(
-    0,
-    room - Math.min(input.diff.length, room) - LEFT_OUT_NOTE,
+  const { text, dropped } = fitNewest(
+    input.messages,
+    Math.max(0, room - Math.min(input.diff.length, room) - LEFT_OUT_NOTE),
   )
-  const kept: string[] = []
-  for (const m of input.messages.toReversed()) {
-    const line = `- ${m.trim()}\n`
-    if (line.length > messageRoom) break
-    kept.unshift(line)
-    messageRoom -= line.length
-  }
-  const dropped = input.messages.length - kept.length
-  const said =
-    (dropped > 0 ? `- (${dropped} earlier left out)\n` : "") +
-    (kept.join("") || "- (no messages)\n")
+  const said = leftOut(dropped) + (text || "- (no messages)\n")
   room -= said.length
   const diff =
     input.diff.length <= room
