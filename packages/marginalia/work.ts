@@ -396,7 +396,7 @@ export function planTurnRecord(input: {
   /** The message made tool calls. */
   readonly toolCalls: boolean
   readonly own: boolean
-  /** What `commitTurn` committed, or null when nothing changed. */
+  /** The turn's revision from `commitTurn`, made or adopted; null when it has none. */
   readonly committed: CommitId | null
   /** The lane's newest revision before this turn. */
   readonly newest: CommitId | null

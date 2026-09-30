@@ -2053,6 +2053,8 @@ point starts from a copy of your `@`, not your `@-`, and lanes' bookmarks
 leave your repo's config. **Amended by ADR-0040:** a direct lane's column no
 longer says where it works and that the directory is shared; its work strip
 says where its changes land, and warns only while another lane runs there.
+Amended in place (`PLAN-2026-09-30-agent-commits`, S56): a commit the
+agent made itself in a turn is that turn's revision.
 
 **Context.** The agent's tools run in the repo the host runs from, so two
 threads running tools at once share one directory and can collide. ADR-0022
@@ -2160,6 +2162,13 @@ fold does (S36 items 11 and 12).
   a record: changes made in the lane's directory between runs are committed
   as their own revision, and otherwise the prompt records the lane's newest
   revision.
+  *Amended (S56):* when the agent committed in the turn itself, with jj or
+  git, `@` is empty and its one parent descends from the lane's bookmark.
+  That commit is the turn's revision: the bookmark moves to it, and it is
+  recorded, so the offer holds it and a branch at the turn starts on it.
+  It keeps the agent's description, with no trailers. A parent on another
+  line, such as a split's stack, or a merge, is not adopted
+  (`planTurnCommit`).
 - **Revisions a lane builds on are immutable.** The host keeps a local
   bookmark per lane, `pineta/<lane>`, at its newest revision (the only place
   that revision is stored), and extends
@@ -3762,8 +3771,8 @@ preamble and `<tools>` are replaced and `<docs>` is dropped (S23, addendum).
   by `laneGuidelines` (`packages/pi/lanes.ts`) from the lane's facts. It says,
   in about 200 tokens:
   - that it is a Pineta lane, as root, in its own jj repo;
-  - that Pineta commits after each message, so the agent commits only when a
-    Pineta message asks it to, and how to list its work;
+  - that Pineta commits after each message, so the agent need not commit,
+    and how to list its work;
   - that the person gets one commit, the offer, named by its bookmark, and
     never sees the files live;
   - that only `/workspace` lasts, and background processes end with a run;
@@ -3798,8 +3807,9 @@ preamble and `<tools>` are replaced and `<docs>` is dropped (S23, addendum).
   change it. The note's source comments point at the code, and a renamed or
   removed symbol fails `packages/pi/lanes.test.ts`.
 - A change to the block reaches lanes at the host's next start.
-- "Leave commits to Pineta" is a request: an agent that commits anyway can
-  leave work out of the offer. `PLAN-2026-09-30-agent-commits` addresses that.
+- An agent that commits anyway loses nothing: its commit is the turn's
+  revision (ADR-0032, amended by S56). Rewriting earlier revisions
+  (`squash`, `rebase`, `abandon`) is still unsafe, and the note says so.
 
 **Alternatives rejected.**
 - Everything in the prompt: about 1,000 tokens on every request, for facts

@@ -458,6 +458,45 @@ async function mainSection(): Promise<void> {
       `a jj repo outside the lane's own works in the lane (${scratch.trim().split("\n").at(-1) ?? ""})`,
     )
 
+    // ── An agent's own commit is the turn's revision (S56) ──────────────────────
+    script.use([
+      {
+        tool: "bash",
+        args: { command: "echo mine > mine.txt && jj commit -m mine 2>&1" },
+      },
+      { text: "committed it" },
+    ])
+    await wu.chat("commit it yourself", ROOT, START_AGENT)
+    await idle()
+    const committer = laneWith("commit it yourself")
+    const committerOffer =
+      committer === undefined
+        ? undefined
+        : readNames(wh.doc).get(committer.name)
+    const hasMine = () =>
+      committerOffer !== undefined &&
+      jj(
+        project,
+        "file",
+        "list",
+        "-r",
+        `present(bookmarks(exact:"pineta-offer/${committerOffer}"))`,
+        'root:"mine.txt"',
+      ).trim() !== ""
+    ok(
+      (await waitFor(hasMine, 30_000)) >= 0,
+      "a commit the agent made itself reaches its thread's offer",
+    )
+    script.use([{ text: "just looking" }])
+    await wu.chat("@agent look at mine", at(idOf("committed it")), BRANCH)
+    await idle()
+    const atMine = laneWith("@agent look at mine")
+    ok(
+      atMine !== undefined &&
+        inLane(atMine.name, "cat mine.txt 2>&1").trim() === "mine",
+      "a branch at the turn the agent committed in has its file",
+    )
+
     // ── 4. A file the agent wrote is whole in a branch at the next turn ─────
     script.use([
       {

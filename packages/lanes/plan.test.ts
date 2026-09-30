@@ -46,6 +46,7 @@ import {
   planShared,
   planSnapshot,
   planTakeOffer,
+  planTurnCommit,
   SPEC_LABEL,
   shellWord,
   specHashOf,
@@ -845,4 +846,41 @@ test("imageRefusal: git 2.41 or later, named when missing or old", () => {
   expect(imageRefusal("git version 3.0.0")).toBeNull()
   expect(imageRefusal("git version 2.40.9")).toContain("git 2.40")
   expect(imageRefusal("")).toContain("has no git")
+})
+
+describe("planTurnCommit: the turn's revision (S56)", () => {
+  const C3 = commitId("c3")
+  const at = {
+    atEmpty: true,
+    parents: [C2],
+    bookmark: C1,
+    parentDescends: true,
+  }
+  test("changes in @ are committed, whatever is below", () => {
+    expect(planTurnCommit({ ...at, atEmpty: false })).toEqual({
+      kind: "commit",
+    })
+    expect(
+      planTurnCommit({ ...at, atEmpty: false, parentDescends: false }),
+    ).toEqual({ kind: "commit" })
+  })
+  test("a commit the agent made on the bookmark is adopted", () => {
+    expect(planTurnCommit(at)).toEqual({ kind: "adopt", commit: C2 })
+  })
+  test("nothing, when @- is the bookmark: the turn changed nothing", () => {
+    expect(planTurnCommit({ ...at, parents: [C1] })).toEqual({ kind: "none" })
+  })
+  test("nothing, when @- is on another line, as a stack's commits are", () => {
+    expect(planTurnCommit({ ...at, parentDescends: false })).toEqual({
+      kind: "none",
+    })
+  })
+  test("nothing, when @- is a merge", () => {
+    expect(planTurnCommit({ ...at, parents: [C2, C3] })).toEqual({
+      kind: "none",
+    })
+  })
+  test("nothing, when the lane has no bookmark", () => {
+    expect(planTurnCommit({ ...at, bookmark: null })).toEqual({ kind: "none" })
+  })
 })

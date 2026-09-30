@@ -12,8 +12,10 @@ import path from "node:path"
 import {
   type CommitId,
   commitId,
+  type EntryId,
   entryId,
   type HaveRecord,
+  type LaneName,
   laneNameForThread,
   NO_EDITOR,
   type ThreadName,
@@ -64,6 +66,7 @@ import {
   revisionMessage,
   run,
   sideHistory,
+  stackBookmark,
   startOfOffer,
   yoursAt,
   yoursNow,
@@ -74,6 +77,16 @@ const NAME = "amber-fox" as ThreadName
 const FORK = laneNameForThread("2")
 const ROOT = laneNameForThread("3")
 const TURN = { lane: LANE, title: "a turn" }
+
+/** `commitTurn` with the lane's bookmark read first, as the host reads it. */
+const turnOn = async (
+  jj: Runner,
+  input: {
+    readonly title: string
+    readonly entry: EntryId
+    readonly lane: LaneName
+  },
+) => commitTurn(jj, { ...input, bookmark: await bookmarkOf(jj, input.lane) })
 
 /** Your default `jj log`, as descriptions. */
 const defaultLog = async (jj: Runner): Promise<string> =>
@@ -250,7 +263,7 @@ describe("a lane's repo, with jj", () => {
 
     // A turn that changed nothing records nothing; one that did, commits.
     const turn = { entry: entryId("e-1"), lane: LANE, title: "edit line two" }
-    expect(await commitTurn(laneJj, turn)).toBeNull()
+    expect(await turnOn(laneJj, turn)).toBeNull()
     await writeFile(
       path.join(laneDir, "shared.txt"),
       "one\ntwo (lane)\nthree\n",
@@ -258,7 +271,7 @@ describe("a lane's repo, with jj", () => {
     // A shared directory, as a lane's mount would put it: never committed.
     await mkdir(path.join(laneDir, ".plans"), { recursive: true })
     await writeFile(path.join(laneDir, ".plans", "a.md"), "a plan\n")
-    const r1 = await commitTurn(laneJj, turn)
+    const r1 = await turnOn(laneJj, turn)
     if (r1 === null) throw new Error("the turn committed nothing")
     expect(await bookmarkOf(laneJj, LANE)).toBe(r1)
     const committed = await laneJj([
@@ -323,7 +336,7 @@ describe("a lane's repo, with jj", () => {
       path.join(laneDir, "shared.txt"),
       "one\ntwo (you, and lane)\nthree\n",
     )
-    const resolved = await commitTurn(laneJj, {
+    const resolved = await turnOn(laneJj, {
       ...turn,
       entry: entryId("e-2"),
     })
@@ -335,7 +348,7 @@ describe("a lane's repo, with jj", () => {
     // A clean update: the merge is committed even with nothing to resolve,
     // so the lane's newest revision holds your work, and its own.
     await writeFile(path.join(laneDir, "lane-only.txt"), "lane\n")
-    await commitTurn(laneJj, { ...turn, entry: entryId("e-3") })
+    await turnOn(laneJj, { ...turn, entry: entryId("e-3") })
     await yoursJj(["new"])
     await writeFile(path.join(yoursDir, "yours-only.txt"), "yours\n")
     await yoursJj(["commit", "-m", "you add a file"])
@@ -359,7 +372,7 @@ describe("a lane's repo, with jj", () => {
     // own change on the fork commit. Both sides then work on.
     await writeFile(path.join(laneDir, "cache.bin"), "ignored state\n")
     await writeFile(path.join(laneDir, ".gitignore"), "cache.bin\n")
-    const point = await commitTurn(laneJj, { ...turn, entry: entryId("e-4") })
+    const point = await turnOn(laneJj, { ...turn, entry: entryId("e-4") })
     if (point === null) throw new Error("the fork point committed nothing")
     await fetchInto(laneDir, LANE, [r1])
     await cp(laneDir, forkDir, { recursive: true, verbatimSymlinks: true })
@@ -373,12 +386,12 @@ describe("a lane's repo, with jj", () => {
     )
 
     await writeFile(path.join(laneDir, "shared.txt"), "parent\n")
-    const parentNext = await commitTurn(laneJj, {
+    const parentNext = await turnOn(laneJj, {
       ...turn,
       entry: entryId("e-5"),
     })
     await writeFile(path.join(forkDir, "shared.txt"), "fork\n")
-    const forkNext = await commitTurn(forkJj, {
+    const forkNext = await turnOn(forkJj, {
       ...turn,
       lane: FORK,
       entry: entryId("e-6"),
@@ -429,9 +442,96 @@ describe("a lane's repo, with jj", () => {
       ).ok,
     ).toBe(true)
     await writeFile(path.join(rootDir, "root.txt"), "root\n")
-    await commitTurn(rootJj, { ...turn, lane: ROOT, entry: entryId("e-7") })
+    await turnOn(rootJj, { ...turn, lane: ROOT, entry: entryId("e-7") })
     await fetchInto(rootDir, ROOT, [])
     expect(await commitsOf(yoursJj, "divergent()")).toEqual([])
+  }, 60_000)
+
+  /**
+   * The names of a revision's files, all at its root here. jj prints each path
+   * from the process's directory, not `-R`'s.
+   */
+  const filesAt = async (jj: Runner, rev: string) =>
+    lines((await jj(["file", "list", "-r", rev])).stdout).map(f =>
+      path.basename(f),
+    )
+
+  // The agent commits in a turn, with jj or with git. The turn's revision is
+  // its commit: the offer holds it, and a branch at that turn starts with it
+  // (S56).
+  for (const how of ["jj", "git"] as const)
+    test(`a commit the agent makes itself is the turn's revision (${how})`, async () => {
+      const { laneDir, laneJj, ops, inLane, fetch, edit, base, first } =
+        await turnRig(`self-${how}`)
+      await edit(laneDir, "b.txt", "b\n")
+      if (how === "jj") await laneJj(["commit", "-m", "mine"])
+      else {
+        const who = {
+          GIT_AUTHOR_NAME: "Agent",
+          GIT_AUTHOR_EMAIL: "agent@example.com",
+          GIT_COMMITTER_NAME: "Agent",
+          GIT_COMMITTER_EMAIL: "agent@example.com",
+        }
+        await run("git", ["-C", laneDir, "add", "b.txt"], { env: who })
+        const made = await run("git", ["-C", laneDir, "commit", "-m", "mine"], {
+          env: who,
+        })
+        expect(made.ok, made.stderr).toBe(true)
+      }
+      const turn = await turnOn(laneJj, { ...TURN, entry: entryId("e-2") })
+      const [mine] = await commitsOf(
+        laneJj,
+        `description(exact:"mine\n") & ::@`,
+      )
+      expect(turn).toBe(mine)
+      expect(await bookmarkOf(laneJj, LANE)).toBe(mine)
+
+      // The offer: your repo fetches the lane's bookmark, which holds b.txt.
+      await fetch(base)
+      const tip = await laneTipIn(ops, LANE)
+      expect(await filesAt(ops, tip ?? "none()")).toContain("b.txt")
+
+      // A branch at that turn: the lane's disk cloned, then `jj new` on the
+      // turn's commit, or the one before it when the turn recorded none.
+      const forkDir = path.join(top, `self-${how}-fork`)
+      await cp(laneDir, forkDir, { recursive: true, verbatimSymlinks: true })
+      await inLane(
+        planForkSetup(FORK, { kind: "commits", commits: [turn ?? first] }),
+        forkDir,
+      )
+      expect(await readFile(path.join(forkDir, "b.txt"), "utf8")).toBe("b\n")
+    }, 60_000)
+
+  test("an update merges on an adopted commit; a stack's commits are never adopted", async () => {
+    const { laneDir, yoursJj, yoursDir, laneJj, inLane, edit, base } =
+      await turnRig("adopt")
+    await edit(laneDir, "b.txt", "b\n")
+    await laneJj(["commit", "-m", "mine"])
+    const mine = await turnOn(laneJj, { ...TURN, entry: entryId("e-2") })
+    if (mine === null) throw new Error("the agent's commit was not adopted")
+
+    // An update merges your work into the lane at its bookmark: on the
+    // agent's commit, so the merge keeps b.txt.
+    await edit(yoursDir, "yours.txt", "yours\n")
+    await yoursJj(["commit", "-m", "you add a file"])
+    await inLane(planYourCopy(await yoursAt(yoursJj)))
+    const [copy] = await commitsOf(laneJj, "@-")
+    if (copy === undefined) throw new Error("no copy")
+    const { ours, merge } = await mergeYours(laneJj, LANE, [copy])
+    expect(ours).toBe(mine)
+    expect(await filesAt(laneJj, merge ?? "none()")).toEqual(
+      expect.arrayContaining(["b.txt", "yours.txt"]),
+    )
+
+    // A stack, as a split builds one: revisions on the offer's start, below
+    // the lane's bookmark, under a bookmark of their own. No turn adopts
+    // them, so the lane's own bookmark stays where it was.
+    await laneJj(["new", base[0] ?? ""])
+    await edit(laneDir, "s.txt", "s\n")
+    await laneJj(["commit", "-m", "s1: s.txt"])
+    await laneJj(["bookmark", "set", stackBookmark(LANE), "-r", "@-"])
+    expect(await turnOn(laneJj, { ...TURN, entry: entryId("e-3") })).toBeNull()
+    expect(await bookmarkOf(laneJj, LANE)).toBe(merge)
   }, 60_000)
 
   /**
@@ -446,18 +546,20 @@ describe("a lane's repo, with jj", () => {
     const yoursJj = hostJj(yoursDir)
     const ops = hostOps(yoursDir)
     const laneJj = laneJjAt(laneDir)
-    const runners = {
+    const runnersAt = (dir: string) => ({
       host: hostRunner(),
-      lane: hostRunner(laneDir),
-      laneBytes: hostBytesRunner(laneDir),
-    }
-    const inLane = (steps: readonly LaneStep[]) =>
+      lane: hostRunner(dir),
+      laneBytes: hostBytesRunner(dir),
+    })
+    const runners = runnersAt(laneDir)
+    /** A lane's steps, in the lane's directory, or in `dir` for a fork. */
+    const inLane = (steps: readonly LaneStep[], dir = laneDir) =>
       executeOrThrow(
         onHost(steps, {
           "/mnt/host-working-copy": yoursDir,
-          "/workspace": laneDir,
+          "/workspace": dir,
         }),
-        runners,
+        runnersAt(dir),
       )
     const fetch = (have: readonly CommitId[]) =>
       executeOrThrow(
@@ -513,6 +615,22 @@ describe("a lane's repo, with jj", () => {
     }
   }
 
+  /** `offerRig`, with your base commit, the lane on it, and a first turn writing `a.txt`. */
+  const turnRig = async (tag: string) => {
+    const rig = await offerRig(tag)
+    await rig.edit(rig.yoursDir, "base.txt", "base\n")
+    await rig.yoursJj(["commit", "-m", "your base"])
+    const base = await yoursNow(rig.yoursJj)
+    await rig.inLane(
+      planBaseRefresh({ base: null, yours: base, lock: null, install: null }),
+    )
+    await rig.inLane(planForkSetup(LANE, { kind: "commits", commits: base }))
+    await rig.edit(rig.laneDir, "a.txt", "a\n")
+    const first = await turnOn(rig.laneJj, { ...TURN, entry: entryId("e-1") })
+    if (first === null) throw new Error("the first turn committed nothing")
+    return { ...rig, base, first }
+  }
+
   test("an offer: built, refreshed, left, repaired, taken, and the next one", async () => {
     const {
       yoursDir,
@@ -565,7 +683,7 @@ describe("a lane's repo, with jj", () => {
     )
     await inLane(planForkSetup(LANE, { kind: "commits", commits: base }))
     await edit(laneDir, "a.txt", "a.txt lane\na.txt 2\na.txt 3\n")
-    const t1 = await commitTurn(laneJj, { ...TURN, entry: entryId("e-1") })
+    const t1 = await turnOn(laneJj, { ...TURN, entry: entryId("e-1") })
     if (t1 === null) throw new Error("no turn")
     await fetch(base)
     // You move on: a commit of your own, and an edit you keep.
@@ -659,7 +777,7 @@ describe("a lane's repo, with jj", () => {
       at: 1,
     }
     await edit(laneDir, "b.txt", "b.txt lane\nb.txt 2\nb.txt 3\n")
-    const t2 = await commitTurn(laneJj, { ...TURN, entry: entryId("e-2") })
+    const t2 = await turnOn(laneJj, { ...TURN, entry: entryId("e-2") })
     if (t2 === null) throw new Error("no turn")
     await fetch([t1])
     const two = await build(
@@ -774,7 +892,7 @@ describe("a lane's repo, with jj", () => {
     ]
     const turn = async (file: string, text: string, n: number) => {
       await edit(laneDir, file, text)
-      const t = await commitTurn(laneJj, {
+      const t = await turnOn(laneJj, {
         ...TURN,
         entry: entryId(`e-f${n}`),
       })
@@ -865,7 +983,7 @@ describe("a lane's repo, with jj", () => {
       haves.push({ lane: LANE, commit, kind, at: haves.length + 1 })
     let entry = 0
     const turn = async () => {
-      const t = await commitTurn(laneJj, {
+      const t = await turnOn(laneJj, {
         ...TURN,
         entry: entryId(`e-s${++entry}`),
       })

@@ -3,8 +3,9 @@
 // After a message's tool calls, and at a run's first request, the host
 // commits whatever changed in the lane's repo: one revision per turn that
 // changed tracked files, described with the message's first line and
-// trailers naming the entry and lane (ADR-0033 reads them back). The lane's
-// bookmark moves to it.
+// trailers naming the entry and lane (ADR-0033 reads them back). A commit the
+// agent made itself in the turn is the turn's revision instead, without
+// trailers (S56). The lane's bookmark moves to it.
 
 import {
   type CommitId,
@@ -14,6 +15,7 @@ import {
   type YoursNow,
 } from "@pineta/core"
 import { setBookmark } from "./bookmarks.ts"
+import { planTurnCommit } from "./plan.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
 
 const ENTRY_TRAILER = "Pineta-Entry"
@@ -52,10 +54,19 @@ export async function commitsOf(
   return lines(ran.stdout).map(commitId)
 }
 
+/** Whether `ancestor` is `commit` or one of its ancestors. */
+const isAncestor = async (
+  jj: Runner,
+  ancestor: CommitId,
+  commit: CommitId,
+): Promise<boolean> =>
+  (await commitsOf(jj, `${ancestor} & ::${commit}`)).length > 0
+
 /**
- * Snapshot the lane's working copy; if anything tracked changed, commit it as
- * a revision, move the lane's bookmark to it, and return it. Null when
- * nothing changed.
+ * Snapshot the lane's working copy and record the turn's revision: what
+ * changed in `@`, committed, or a commit the agent made itself
+ * (`planTurnCommit`). Move the lane's bookmark to it and return it; null when
+ * the turn has none. `bookmark` is the lane's bookmark as the caller read it.
  */
 export async function commitTurn(
   jj: Runner,
@@ -63,21 +74,42 @@ export async function commitTurn(
     readonly title: string
     readonly entry: EntryId
     readonly lane: LaneName
+    readonly bookmark: CommitId | null
   },
 ): Promise<CommitId | null> {
   const snap = await jj(["util", "snapshot"])
   if (!snap.ok) throw new Error(describeFailure("jj util snapshot", snap))
-  const empty = await jj([
+  const at = await jj([
     "log",
     "--ignore-working-copy",
     "--no-graph",
     "-r",
     "@",
     "-T",
-    "empty",
+    'empty ++ "\\n" ++ parents.map(|c| c.commit_id()).join("\\n") ++ "\\n"',
   ])
-  if (!empty.ok) throw new Error(describeFailure("jj log", empty))
-  if (empty.stdout.trim() === "true") return null
+  if (!at.ok) throw new Error(describeFailure("jj log", at))
+  const [empty, ...parentIds] = lines(at.stdout)
+  const atEmpty = empty === "true"
+  const parents = parentIds.map(commitId)
+  const { bookmark } = input
+  // Asked only when the plan could adopt: before most requests the turn
+  // changed nothing, and `@-` is the bookmark.
+  const [parent] = parents
+  const parentDescends =
+    atEmpty &&
+    parents.length === 1 &&
+    parent !== undefined &&
+    bookmark !== null &&
+    parent !== bookmark
+      ? await isAncestor(jj, bookmark, parent)
+      : false
+  const plan = planTurnCommit({ atEmpty, parents, bookmark, parentDescends })
+  if (plan.kind === "none") return null
+  if (plan.kind === "adopt") {
+    await setBookmark(jj, input.lane, plan.commit)
+    return plan.commit
+  }
   const commit = await jj(["commit", "-m", revisionMessage(input)])
   if (!commit.ok) throw new Error(describeFailure("jj commit", commit))
   const [id] = await commitsOf(jj, "@-")

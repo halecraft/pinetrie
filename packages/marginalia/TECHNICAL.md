@@ -232,7 +232,10 @@ through one `setWorkRecord`:
   `planTurnRecord` is the rule:
   - A lane of its own records every turn that made tool calls, with its
     snapshot, because ignored files change without a commit. The commit is
-    there only when one was made.
+    there only when the turn has one: made by the host, or made by the agent
+    itself and adopted (`commitTurn` in `@pineta/lanes`, S56). Otherwise a
+    branch pairs the turn's disk with the commit above, and its `jj new`
+    puts that commit's files back.
   - A prompt with nothing to commit records the lane's newest commit, so a
     branch from it names what its disk was at.
   - A lane working directly records its prompts with neither: it counts as

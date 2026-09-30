@@ -256,9 +256,22 @@ containers, disks and the helper.
 
 ## Revisions and updates (`revisions.ts`, `merge.ts`)
 
-- **`commitTurn`** snapshots. If `@` is `empty`, it commits nothing and
-  returns null; otherwise it runs `jj commit` with the title and two trailers,
-  `Pineta-Entry` and `Pineta-Lane`, then moves the lane's bookmark.
+- **`commitTurn`** snapshots, reads `@`'s `empty` and its parents in one
+  `jj log`, and decides with `planTurnCommit`:
+  - `@` has changes: `jj commit` with the title and two trailers,
+    `Pineta-Entry` and `Pineta-Lane`, then the lane's bookmark moves there;
+  - `@` is empty and its one parent descends from the bookmark: the agent
+    committed in the turn, with jj or git, and that commit is the turn's
+    revision. The bookmark moves to it, untouched, without trailers (S56).
+    Without this, the offer lacked the commit, and a branch at the turn ran
+    `jj new` on the bookmark's commit and lost its files;
+  - otherwise null. A parent on another line (a split's stack, built on the
+    offer's start) or a merge is never adopted.
+
+  The caller passes the bookmark it read (`turnDone` also records it as the
+  prompt's `newest`). The ancestry query (`isAncestor`) runs only when `@`
+  is empty and its one parent is not the bookmark: most turns change
+  nothing, and cost no extra command.
 - **An update merges a copy of your `@`**, made in the lane (`planYourCopy`),
   never your `@-`: the lane takes what you have, committed or not.
 - **The merge is committed at once,** even with nothing to resolve.
@@ -333,13 +346,16 @@ containers, disks and the helper.
   a turn, a bundle fetch into your repo as a remote bookmark, an update with a
   conflict, forks from a turn and from a copy of your `@`, checked for
   divergence and immutability, and a repo beside a fork that the fork's
-  config leaves alone; an offer built, refreshed, left, repaired,
+  config leaves alone; a commit the agent makes itself, with jj and with
+  git, reaching the offer and a branch at its turn, and an update merging
+  on it, while a stack's commits are never adopted; an offer built, refreshed, left, repaired,
   taken under your edits and beside them, the next offer, and a stack; an
   offer following a moved tip, your conflicting commit and a moved start,
   each checked against a fresh build; and retiring a repo from before
   offers.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
-  with a repo in a fork's `/tmp` for the config's scope, and the contract
+  with a repo in a fork's `/tmp` for the config's scope, an agent's own
+  `jj commit` reaching its offer and a branch, and the contract
   test, in about 85 s. Its `images` section also launches Chromium,
   through Pineta's Playwright, on the default image. Its `commands` section
   reads skill files at `/mnt/host`, and checks what a real lane's prompt

@@ -45,11 +45,16 @@ changes Pineta can keep this note true. You can skip them.
   - `jj diff --from 'heads(immutable())'` shows all of it as one diff.
 - Revisions from before this thread began are immutable here: jj refuses to
   rewrite them. <!-- packages/lanes/plan.ts forkConfig -->
-- Leave commits to Pineta. Don't commit, describe, squash, rebase or abandon
-  unless a Pineta message asks you to. The person's copy of your work, and
-  any branch taken from one of your messages, follow the revisions Pineta
-  made; a commit of your own can be left out of both.
-  <!-- packages/lanes/bookmarks.ts setBookmark -->
+- You need not commit. If you do, with jj or git, on top of your work, your
+  commit is the turn's revision: Pineta moves the lane's bookmark to it, and
+  the person's copy of your work and any branch from that message hold it.
+  It keeps your description.
+  <!-- packages/lanes/plan.ts planTurnCommit -->
+- Don't rewrite revisions you or Pineta already made (`squash`, `rebase`,
+  `abandon`, `describe` of an earlier one) unless a Pineta message asks you
+  to. Pineta records each turn by the commit id of its revision, and a
+  rewrite leaves those records naming commits no longer in your history.
+  <!-- packages/marginalia/work.ts planTurnRecord -->
 - `JJ_EDITOR` is `false`, so a jj command that would open an editor fails.
   Always pass `-m`, and don't use interactive commands such as `jj split` or
   `jj diffedit`. <!-- packages/core/index.ts NO_EDITOR -->

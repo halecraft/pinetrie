@@ -756,6 +756,37 @@ export const planBundle = (
   ...have.map(c => `^${c}`),
 ]
 
+/** What a turn's revision is: a commit of `@`, a commit the agent made, or none. */
+export type TurnCommit =
+  | { readonly kind: "commit" }
+  | { readonly kind: "adopt"; readonly commit: CommitId }
+  | { readonly kind: "none" }
+
+/**
+ * A turn whose `@` has changes commits them. With `@` empty, a single parent
+ * that descends from the lane's bookmark is a commit the agent made in the
+ * turn, and is the turn's revision (S56): otherwise the offer would lack it,
+ * and a branch's `jj new` would put the bookmark's files back. A parent on
+ * another line, such as a stack's, or a merge, is left alone.
+ */
+export function planTurnCommit(facts: {
+  readonly atEmpty: boolean
+  /** `@-`: one commit, or several after `jj new a b`. */
+  readonly parents: readonly CommitId[]
+  readonly bookmark: CommitId | null
+  /** The bookmark is an ancestor of `@-`, or `@-` itself. */
+  readonly parentDescends: boolean
+}): TurnCommit {
+  if (!facts.atEmpty) return { kind: "commit" }
+  const [parent, ...others] = facts.parents
+  if (parent === undefined || others.length > 0) return { kind: "none" }
+  if (facts.bookmark === null || parent === facts.bookmark)
+    return { kind: "none" }
+  return facts.parentDescends
+    ? { kind: "adopt", commit: parent }
+    : { kind: "none" }
+}
+
 /**
  * A turn's snapshot: `sync`, so what the tools wrote is on the disk (without
  * it, unflushed files clone empty, S41), then the clone.

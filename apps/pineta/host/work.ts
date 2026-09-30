@@ -705,6 +705,7 @@ export async function startLaneWork(input: {
             title: titleOf(entry),
             entry,
             lane,
+            bookmark: before,
           })
           return { committed: made, newest: before }
         })
@@ -1046,6 +1047,7 @@ export async function startLaneWork(input: {
               title: "edits between runs",
               entry: turnEntry(readTreeIndex(doc), tip),
               lane,
+              bookmark: await bookmarkOf(jj, lane),
             })
           await executeOrThrow(planYourCopy(yours), handle.runners)
           const [copy] = await commitsOf(jj, "@-")

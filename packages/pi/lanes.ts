@@ -93,7 +93,7 @@ export function laneGuidelines(facts: LaneFacts): string[] {
   ]
   return [
     `You work in a Pineta lane: a Linux container where you are root, in your own jj repo at ${dir}.`,
-    "Pineta commits your changes after each message. Commit only when a Pineta message asks you to. Your work so far: `jj log -r 'immutable_heads()..'`.",
+    "Pineta commits your changes after each message, so you need not commit. Don't rewrite earlier revisions. Your work so far: `jj log -r 'immutable_heads()..'`.",
     `The person gets your work as one commit${offer === null ? "" : `, \`${offer}\``}, and never sees your files live.`,
     `Only ${dir} lasts. Background processes end with each run, and nothing outside ${dir} reaches a branch.`,
     `${HOST_WORKING_COPY} is the person's working copy, read-only. ${facts.install} is Pineta's install, not your project.`,
