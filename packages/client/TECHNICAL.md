@@ -514,7 +514,11 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   Mounted again, it starts with ↓ new below when `behind` says it moved on
   since. Nothing clears that before `alignOnOpen` places it: its `holding`
   step leaves `unseen` alone, and its first resize comes after the
-  placement. A reload keeps no snapshots.
+  placement. The snapshots are never pruned, unlike `aligned`, which must
+  forget every column off the tab you are on: a closed column's key is never
+  used again, except `first-<root>`, which comes back as its root's only
+  column, placed at its end, and that clears ↓ new below. A reload keeps no
+  snapshots.
 - **While a lane runs on its path, a following column does not get shorter**
   (`holding`, ADR-0044). A shrink is taken up by `.column-floor`, below the
   content: its height is what the content lost since it was last set
@@ -949,10 +953,7 @@ shown by their email's part before the `@`. Each rendered chat carries its
   state alone sets `open`. A native toggle would take a capped row to
   closed, and `toggle` fires for React's own `open` too, so it cannot tell
   who opened the row. Enter and Space on a summary are clicks.
-- **`aligned` and the end snapshots in `App` are pruned by different
-  sets.** `aligned` forgets every column off the tab you are on, which is
-  what makes a tab shown again align afresh; the snapshots are pruned by
-  `layoutKeys` (every column in the layout), and must keep exactly those.
+
 - **Every scroll `useFollow` makes is instant.** A smooth one passes through
   positions short of the end, and the rule reads each as the reader leaving.
 

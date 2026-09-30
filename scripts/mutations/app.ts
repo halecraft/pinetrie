@@ -727,14 +727,6 @@ export const mutations: readonly Mutation[] = [
     expect: "moved on while its tab was hidden",
   },
   {
-    name: "snapshots are pruned with the alignment",
-    file: "packages/client/app.tsx",
-    from: "    const keys = layoutKeys(layout)",
-    to: "    const keys = new Set(columns.map(c => c.key))",
-    command: browser,
-    expect: "moved on while its tab was hidden",
-  },
-  {
     name: "App re-reads its facts on every render",
     file: "packages/client/app.tsx",
     from: "  } = useSelector(doc, readSessionFacts)",

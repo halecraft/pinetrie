@@ -980,12 +980,4 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "behind: a column mounted again",
   },
-  {
-    name: "a closed tab's columns are forgotten",
-    file: layout,
-    from: "      ...[...layout.roots.values()].flat(),\n",
-    to: "",
-    command: unit,
-    expect: "layoutKeys holds",
-  },
 ]

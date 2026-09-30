@@ -152,6 +152,13 @@ interface ColumnFrame {
  * a slow render's frames are each seen, as a person sees them (S35). The
  * column must be mounted already, so this observer runs after its own.
  */
+/** Wait two frames: a change's layout, its ResizeObserver callbacks and its paint have run. */
+const twoFrames = (p: Page) =>
+  p.evaluate(
+    () =>
+      new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))),
+  )
+
 async function recordFrames(
   p: Page,
   c: string,
@@ -1871,12 +1878,7 @@ try {
       })
       await lp.click(tabSel(longRoot))
       await lp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
-      await lp.evaluate(
-        () =>
-          new Promise(r =>
-            requestAnimationFrame(() => requestAnimationFrame(r)),
-          ),
-      )
+      await twoFrames(lp)
       const returned = await lp.evaluate(
         ([parent, branch, forkSel]) => {
           const pBody = document.querySelector(`${parent} .column-body`)
@@ -1960,12 +1962,7 @@ try {
           () => false,
         )
         if (offered) await lp.click(jump)
-        await lp.evaluate(
-          () =>
-            new Promise(r =>
-              requestAnimationFrame(() => requestAnimationFrame(r)),
-            ),
-        )
+        await twoFrames(lp)
         const gap = await lp.$eval(
           `${col(1)} .column-body`,
           b => b.scrollHeight - b.scrollTop - b.clientHeight,
@@ -2437,18 +2434,11 @@ try {
               b.querySelector(".column-floor")?.getBoundingClientRect()
                 .height ?? 0,
           }))
-        const settle = () =>
-          tp.evaluate(
-            () =>
-              new Promise(r =>
-                requestAnimationFrame(() => requestAnimationFrame(r)),
-              ),
-          )
         if (opened) await tp.click(summary)
-        await settle()
+        await twoFrames(tp)
         const full = await column()
         if (opened) await tp.click(summary)
-        await settle()
+        await twoFrames(tp)
         const folded = await column()
         const size = await tp
           .getAttribute(`${col(0)} .tool.live`, "data-size", { timeout: 1_000 })

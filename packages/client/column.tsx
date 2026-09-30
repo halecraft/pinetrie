@@ -138,11 +138,10 @@ export interface ColumnProps {
   closable: boolean
   /**
    * What this column knew of its end when last unmounted, and where it keeps
-   * that when unmounted again (`SeenEnd`, `follow.ts`). None in the
-   * Archive preview.
+   * that when unmounted again (`follow.ts`). None in the Archive preview.
    */
-  ends?: {
-    readonly seen: SeenEnd | undefined
+  seenEnd?: {
+    readonly last: SeenEnd | undefined
     readonly remember: (key: string, end: SeenEnd) => void
   }
 }
@@ -192,9 +191,9 @@ export function Column(p: ColumnProps) {
     .map(r => r.lane)
   // Mounted again (its tab shown again) past the end its reader saw, it shows
   // ↓ new below wherever `alignOnOpen` places it short of its end.
-  const [mountedBehind] = useState(() => behind(p.ends?.seen, view.tipId))
+  const [mountedBehind] = useState(() => behind(p.seenEnd?.last, view.tipId))
   const leave = useStable((unseen: boolean) =>
-    p.ends?.remember(p.column.key, { tip: view.tipId, unseen }),
+    p.seenEnd?.remember(p.column.key, { tip: view.tipId, unseen }),
   )
   // While they do, the column does not get shorter at its end (S35).
   const end = useFollow(

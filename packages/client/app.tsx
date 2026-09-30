@@ -75,7 +75,6 @@ import {
   encodeLayout,
   initialLayout,
   type LayoutAction,
-  layoutKeys,
   layoutReducer,
   planOpen,
   resolveLayout,
@@ -485,16 +484,12 @@ function App({ session }: { session: SessionClient }) {
 
   // What each column knew of its end when it was unmounted (`SeenEnd`), so a
   // column of a tab shown again shows ↓ new below for what arrived meanwhile.
-  // Pruned by `layoutKeys`, not by `aligned`'s rule: `aligned` forgets
-  // every column off the tab you are on, which is what this must keep.
-  const ends = useRef(new Map<string, SeenEnd>())
-  useEffect(() => {
-    const keys = layoutKeys(layout)
-    for (const key of ends.current.keys())
-      if (!keys.has(key)) ends.current.delete(key)
-  }, [layout])
+  // Never pruned: an entry is small, and a closed column's key is never used
+  // again, except `first-<root>`, which comes back as its root's only
+  // column, placed at its end, and that clears ↓ new below.
+  const seenEnds = useRef(new Map<string, SeenEnd>())
   const rememberEnd = useStable((key: string, end: SeenEnd) => {
-    ends.current.set(key, end)
+    seenEnds.current.set(key, end)
   })
 
   // After the alignment above: a picked message the alignment left out of
@@ -760,8 +755,8 @@ function App({ session }: { session: SessionClient }) {
                         closable={newTab !== null || columns.length > 1}
                         column={column}
                         count={columns.length}
-                        ends={{
-                          seen: ends.current.get(column.key),
+                        seenEnd={{
+                          last: seenEnds.current.get(column.key),
                           remember: rememberEnd,
                         }}
                         forks={colors.forks}

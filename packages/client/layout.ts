@@ -103,21 +103,6 @@ export function columnsOf(layout: Layout, root: string): readonly Column[] {
   return layout.roots.get(root) ?? [{ key: `first-${root}`, anchor: root }]
 }
 
-/**
- * The key of every column the layout can show: each open root's, a stored
- * one or its first; each closed tab's stored ones, which come back when it
- * opens again; and each new tab's. Not only the tab you are on.
- */
-export function layoutKeys(layout: Layout): ReadonlySet<string> {
-  return new Set(
-    [
-      ...layout.open.flatMap(root => columnsOf(layout, root)),
-      ...[...layout.roots.values()].flat(),
-      ...layout.newTabs,
-    ].map(c => c.key),
-  )
-}
-
 export const sameTab = (a: ActiveTab | null, b: ActiveTab): boolean =>
   a !== null &&
   a.kind === b.kind &&

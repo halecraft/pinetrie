@@ -42,8 +42,9 @@ which in a column 600–700px tall could leave no text on screen.
   its tip, and whether ↓ new below showed). Mounted again, it starts with ↓
   new below when it has moved on since (`behind`). A placement short of the
   end keeps `unseen`; only one at the end clears it. `App` keeps the
-  snapshots by column key, pruned against every column in the layout
-  (`layoutKeys`), not only the tab shown.
+  snapshots by column key for the page's life, unpruned: a closed column's
+  key is never used again, except `first-<root>`, which comes back as its
+  root's only column, placed at its end, and that clears ↓ new below.
 
 **Consequences.**
 - A column no longer shrinks when a command ends. What the floor still takes
