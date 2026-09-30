@@ -824,7 +824,9 @@ shown by their email's part before the `@`. Each rendered chat carries its
 - **Playwright clicks what a person cannot see.** It scrolls a clipped element
   into view before clicking, so a check that a popup can be clicked does not
   show it is visible. Check what `elementFromPoint` finds at its centre: the
-  browser suite's `chooseFromMenu` does, for every menu.
+  browser suite's `chooseFromMenu` does, for every menu. It clicks no
+  disabled item: it returns false, so the check expecting the item fails and
+  the suite goes on.
 
 - **Selectors for root tabs:** a root's tab is `#tabs .tab[data-root="…"]`,
   the one you are on has `aria-selected="true"`, its × is the `.tab-close`

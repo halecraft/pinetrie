@@ -70,14 +70,21 @@ async function seeInMenu(p: Page, trigger: string, item: string) {
   return seen ? el : null
 }
 
-/** `seeInMenu`, then choose the item. Whether it was seen; one not seen is not clicked. */
+/**
+ * `seeInMenu`, then choose the item. Whether it was chosen: one not seen, or
+ * disabled, is not clicked, and the menu is closed. Playwright would wait 30 s
+ * for a disabled item and throw, which ended the suite at that check.
+ */
 async function chooseFromMenu(
   p: Page,
   trigger: string,
   item: string,
 ): Promise<boolean> {
   const el = await seeInMenu(p, trigger, item)
-  if (el === null) return false
+  if (el === null || !(await el.isEnabled())) {
+    await p.keyboard.press("Escape")
+    return false
+  }
   await el.click()
   return true
 }
