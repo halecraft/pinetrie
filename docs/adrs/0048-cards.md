@@ -1,8 +1,9 @@
 # ADR-0048 — Everything unsent is a card, and a card stays where you put it
 
 **Status:** Proposed. Would supersede ADR-0025 (notes), and amend ADR-0023
-(tabs write cards), ADR-0026 (queued notes become queued cards) and ADR-0043
-(no notes below messages). It would also replace the inventory in
+(tabs write cards), ADR-0026 (queued notes become queued cards), ADR-0043
+(no notes below messages) and ADR-0046 (a fixed line about pinned cards in
+the prompt). It would also replace the inventory in
 `PLAN-2026-09-27-fold`, and Phases 2–7 of
 `PLAN-2026-09-29-branch-prefill-and-composers`. Those ADRs are marked when
 this one is accepted. Before a plan: the probes and the Kyneta request below.
@@ -51,21 +52,28 @@ Three principles guided the design:
 
 *The concept.* **The tree is what was said; cards are what you're thinking.**
 A message is the past: frozen (ADR-0004), in the tree, read by the model. A
-card is the present and the future: live text, somewhere you put it, not read
-by the model (except a pinned card with its toggle on). Everything unsent is a
+card is the present and the future: live text, somewhere you put it. The model
+reads a card only above the line: a pinned card on every run, a queued one when
+it is taken and becomes a message. Everything unsent is a
 card: the composer's text, a draft, a queued step, a thought. "Note" is renamed
 "card" everywhere, UI, code and docs, with nothing kept for compatibility.
 
 *Places.* A card is always in exactly one place, and its place decides what
-happens to it.
+happens to it and who sees it.
 
 | place | a card there is | who sees it |
 |---|---|---|
-| pinned, at the top of a column | about the whole thread: its direction, what to recall on return | everyone |
-| above the line, at a thread's end | queued: the agent takes these in order | everyone |
+| pinned, at the top of a column | about the whole thread: its direction, what everyone working in it should hold in mind | everyone, and the agent on every run |
+| the tree | sent: it is a message now | everyone, and the agent |
+| above the line, at a thread's end | queued: the agent takes these in order | everyone, and the agent once taken |
 | below the line, at a thread's end | drafting: only people move these | everyone |
 | your drawer | yours, going nowhere | you |
-| the tree | sent: it is a message now | everyone, and the model |
+
+**Visibility comes in three nested rings, and position says which:** your
+drawer is yours; below the line is the team's; above the line, pinned cards,
+messages and queued cards, is the team's and the agent's. Moving a card up
+widens who sees it, and moving it down narrows it. There is no setting for
+who reads a card: a thought only for the team goes below the line.
 
 - **Cards belong to a thread, not a column.** A column is your window; the
   thread is the shared thing. A tab switch, a reload or a second device mounts
@@ -84,7 +92,7 @@ happens to it.
 ┌ column ─────────────────────────┐
 │ Fix the sync bug                │  title (ADR-0039)
 │ ┌ pinned ─────────────────────┐ │  the thread's direction;
-│ │ where I was, what's next    │ │  what to recall on return
+│ │ what we're after, and why   │ │  the agent reads it every run
 │ └─────────────────────────────┘ │
 │ Ada: …                          │  past: messages, frozen
 │ agent: … ◉ running              │  now
@@ -96,8 +104,8 @@ happens to it.
 └─────────────────────────────────┘
 ```
 
-- **The line is the only commitment.** Above it the agent will act; below it
-  only people touch the cards. Queueing moves a card above the line and
+- **The line is the only commitment.** Above it the agent reads and will act;
+  below it only people read and touch the cards. Queueing moves a card above the line and
   stopping moves it back below. Staging several steps is putting several cards
   above it.
 - **The agent takes the top queued card.** It is the only move no person
@@ -198,13 +206,32 @@ Only yours: it answers "where was I?", and is not a busy indicator. A card is
 marked when someone else edited or stopped it, when its thread moved on since
 you wrote it, and when a reminder on it is due.
 
-*Pinned cards and the agent.* A pinned card has a toggle, **the agent reads
-this**, off by default, per card, and the card says so while it is on. Off
-suits the cautious, who want the agent to act only on its messages; on suits
-more autonomous work, where the thread's direction travels with every run.
-What the agent read must be in the tree, or the model's view cannot be
-reproduced (ADR-0004): a run records the text of each pinned card it read,
-whenever it changed since the last run.
+*Pinned cards and the agent.* Pinned cards are, figuratively, the thread's
+system prompt: the agent reads every one on every run.
+- **Where they go in the context.** The system prompt holds one fixed line
+  saying that the thread's pinned cards follow and express the team's intent;
+  the cards' text goes near the end of the context. The system prompt stays
+  the same on every request, as ADR-0046 already requires, so an edited card
+  does not throw away the prompt cache for the whole conversation.
+- **What the agent read is in the tree** (ADR-0004). When a run starts and a
+  pinned card changed since the last run, the host writes an entry holding its
+  text. That entry is also what the model reads, so the tree records the
+  context and supplies it in one place. On screen it is a small marker in the
+  column, not a message.
+- **A run reads the cards as they were when it started.** An edit during a
+  run reaches the next one, and until then the card is marked "changed since
+  the agent last read it".
+- **Anyone can steer.** Anyone can edit a pinned card, and so change what the
+  agent works towards, as anyone can edit a queued card. The card's history
+  records who did.
+- **A card shows its size**, quietly, since a long one costs tokens on every
+  run.
+- **A branch inherits its parent's pinned cards as they were at the fork**,
+  read-only, like the rest of the path above it, and its agent reads them.
+  Cards pinned in the branch are its own. To change an inherited card for the
+  branch, take a copy and pin that; this should be rare.
+- **A conversation thread** has no agent, so its pinned cards are the team's
+  until someone asks the agent, whose first run reads them.
 
 *Undo.* Two undos, both multiplayer-sound: undo reverses my operations as they
 now stand among everyone else's, which a stack of naive inverses does not.
@@ -251,8 +278,10 @@ and a pinned card can quote one.
 - Pineta's host gets smaller where cards are concerned: no commands, codec
   fields or handlers for composing, drafting, cancelling or reordering. The
   host's work is the boundary, and the policy's invariants.
-- The model's view stays reproducible: it reads messages, and pinned cards
-  only when the toggle says so, with what it read recorded.
+- The model's view stays reproducible: it reads messages and pinned cards,
+  and what it read of the cards is an entry in the tree.
+- The prompt gains one fixed line (amending ADR-0046's block), and each
+  run's context gains the pinned cards near its end.
 - Every card's text is a Yjs document, never compacted while live (S24).
   Storage grows with use until Kyneta compacts live Yjs, as ADR-0026 already
   accepted for queued notes.
@@ -265,7 +294,7 @@ and a pinned card can quote one.
   3. notes become cards: notes in the tree removed, queued notes become queued
      cards, the take/stop race;
   4. the drawer: grid, take and put, drag, keys;
-  5. several cards per place, and pinned cards with the agent toggle;
+  5. several cards per place, and pinned cards read by the agent;
   6. traces and card history;
   7. undo, as Kyneta's lands;
   8. queue control: staging, reordering, stops;
@@ -306,8 +335,11 @@ reload, or a clear account of why it cannot be.
    the replica sees.
 4. **Undo today:** what Kyneta's inverses give across two peers, and the
    precise gap to hand to Kyneta.
-5. **What the agent read:** recording a pinned card's text in the tree per
-   run, and what pi allows there (a custom entry outside a run, S19).
+5. **What the agent read:** writing a changed pinned card's text as an entry
+   when a run starts, and what pi allows there (a custom entry outside a run,
+   S19). Placing the cards near the end of the context through pi, and
+   measuring that the prompt cache holds when a card changes between runs.
+   How a branch's context gathers the pinned cards inherited at its fork.
 
 *Still open:* the take and put chords; whether the drawer pushes the columns
 over or covers the rightmost; whether a person-wide activity log is wanted
@@ -344,3 +376,14 @@ beyond each card's history; whether the drawer crosses sessions.
 - **Undo as our own stack of inverse commands.** Unsound with other people
   editing, and a retention rule for discarded cards would be needed. Kyneta's
   operations already carry the algebra.
+- **A toggle per pinned card for whether the agent reads it.** It suits the
+  cautious person, but it is a second rule beside position, and the card
+  would need a label to say which way it is set. With position as the rule,
+  the cautious person puts a card below the line.
+- **Pinned cards in the system prompt.** The natural reading of "the
+  thread's system prompt", but an edited card would change the prompt's
+  prefix and throw away the cache for the whole conversation.
+- **A branch copying its parent's pinned cards**, to change on their own.
+  It fits "cards belong to a thread", but the branch's path above the fork is
+  its parent's as it was, and its pinned cards should be too. Taking a copy
+  covers the rare exception.
