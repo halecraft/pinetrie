@@ -34,10 +34,13 @@ export interface ArchiveRow {
 /**
  * The rows `filter` and `query` keep, newest activity first. "mine" is the
  * roots `me` wrote a chat in. The search is case-insensitive, over each
- * message's text as the columns draw it.
+ * root's label (`rootLabels`, so a title is found) and each message's text as
+ * the columns draw it.
  */
 export function archiveIndex(input: {
   readonly roots: readonly RootSummary[]
+  /** Each root's label, by root (`rootLabels`). */
+  readonly labels: ReadonlyMap<string, string>
   readonly archive: ReadonlyMap<string, ArchiveRecord>
   readonly notes: readonly NoteRecord[]
   readonly index: TreeIndex
@@ -56,6 +59,7 @@ export function archiveIndex(input: {
   const needle = input.query.trim().toLowerCase()
   const matches = (root: string): boolean =>
     needle === "" ||
+    (input.labels.get(root) ?? "").toLowerCase().includes(needle) ||
     projectRail(index, root).some(r =>
       messageText(index.entries[r.id]?.message).toLowerCase().includes(needle),
     )

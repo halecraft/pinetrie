@@ -54,6 +54,7 @@ import {
   readCommands,
   readLaneRecords,
   readLanes,
+  readMarks,
   readNotes,
   readOffers,
   readOutbox,
@@ -1761,7 +1762,44 @@ invariants("end")
     `a restored root takes messages again (${restored.kind}, ${refusal(after)})`,
   )
 
-  // 6. The records survive a restart.
+  // 6. Marks (ADR-0045): the last title wins, the same title writes nothing,
+  // clearing deletes the record, and an archived root takes none.
+  const mark = () => readMarks(ah.doc).get(r2)
+  const titled = await ada.mark(entryId(r2), "Tab names")
+  const byAda = mark()
+  ok(
+    titled.kind === "marked" &&
+      byAda?.title === "Tab names" &&
+      byAda.by === ada.writer &&
+      byAda.at > 0,
+    `a root is titled, by its writer (${refusal(titled)})`,
+  )
+  await bea.mark(entryId(r2), "Tab titles")
+  const byBea = mark()
+  const again = await bea.mark(entryId(r2), "Tab titles")
+  ok(
+    byBea?.title === "Tab titles" &&
+      byBea.by === bea.writer &&
+      again.kind === "marked" &&
+      mark()?.at === byBea.at,
+    "a second title replaces the first, and the same title again writes nothing",
+  )
+  await ada.mark(entryId(r1), "Kept over a restart")
+  const cleared = await ada.mark(entryId(r2), null)
+  ok(
+    cleared.kind === "marked" && mark() === undefined,
+    `clearing a title deletes its record (${cleared.kind})`,
+  )
+  const unknown = await ada.mark(entryId("no-such-entry"), "x")
+  const inArchive = await bea.mark(entryId(r3), "x")
+  ok(
+    refusal(unknown) === "unknown_target: no such entry to title" &&
+      refusal(inArchive) === "archived: archived by Ada" &&
+      readMarks(ah.doc).get(r3) === undefined,
+    `a mark on no entry, and in an archived root, is refused (${refusal(unknown)}; ${refusal(inArchive)})`,
+  )
+
+  // 7. The records survive a restart.
   const before = JSON.stringify([...readArchive(ah.doc)])
   await Promise.all([ada.close(), bea.close()])
   await ah.shutdown()
@@ -1770,6 +1808,10 @@ invariants("end")
     JSON.stringify([...readArchive(ah.doc)]) === before &&
       readArchive(ah.doc).get(r3)?.state === "archived",
     "after a restart, every archive record is back",
+  )
+  ok(
+    readMarks(ah.doc).get(r1)?.title === "Kept over a restart",
+    "after a restart, a mark is back",
   )
   await ah.shutdown()
 }

@@ -16,8 +16,8 @@ functions.
 Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes`, `readOutbox`,
 `readParticipantNames`, `readParticipants`, `readPresence`,
-`readAgentActivity`, `readNotes`, `readArchive`, and where lanes work
-(ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
+`readAgentActivity`, `readNotes`, `readArchive`, `readMarks` (ADR-0045), and
+where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
 `readProject` (`lanes`, or `direct` and why). `workAt` is where a lane created
 at an entry would work, and the commit and snapshot it would start from: the
 composer shows it, and the host creates the lane by it, and decides by it

@@ -227,6 +227,11 @@ describe("writesAt: the entry a command writes at", () => {
       { kind: "archive", action: "archive", root: entryId("r1") },
       null,
     ],
+    [
+      "a mark: its entry",
+      { kind: "mark", entry: entryId("b"), title: "Tab names" },
+      "b",
+    ],
   ] satisfies [string, Intent, string | null][])("%s", (_, intent, want) => {
     expect(at(intent)).toBe(want)
   })

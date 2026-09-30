@@ -149,6 +149,8 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "note", action: { kind: "reopen", note: noteId("n-1") } },
     { kind: "archive", action: "archive", root: entryId("e-1") },
     { kind: "archive", action: "restore", root: entryId("e-1") },
+    { kind: "mark", entry: entryId("e-1"), title: "Tab names" },
+    { kind: "mark", entry: entryId("e-1"), title: null },
     { kind: "update", lane: laneNameForThread("abc") },
     { kind: "offer", lane: laneNameForThread("abc"), action: "take" },
     { kind: "offer", lane: laneNameForThread("abc"), action: "split" },
@@ -170,6 +172,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "noted", id: noteId("n-1") },
     { kind: "archived" },
     { kind: "restored" },
+    { kind: "marked" },
     { kind: "taken" },
     { kind: "updated", text: "I've merged my latest work" },
     { kind: "updated", text: "" },
@@ -234,6 +237,27 @@ test("an archive action must be known, and name its root", () => {
     refusalCode(
       decodeCommand({ kind: "archive", mode: "archive", targetId: " " }),
     ),
+    ERR.UNKNOWN_TARGET,
+  )
+})
+
+test("a mark names its entry; its title is trimmed, blank clears, and a line break or 81 characters is refused", () => {
+  assert.deepEqual(
+    decodeCommand({ kind: "mark", targetId: "e-1", text: "  Tab names " }),
+    { kind: "mark", entry: entryId("e-1"), title: "Tab names" },
+  )
+  assert.deepEqual(decodeCommand({ kind: "mark", targetId: "e-1", text: "" }), {
+    kind: "mark",
+    entry: entryId("e-1"),
+    title: null,
+  })
+  for (const text of ["two\nlines", "x".repeat(81)])
+    assert.equal(
+      refusalCode(decodeCommand({ kind: "mark", targetId: "e-1", text })),
+      ERR.INVALID_TITLE,
+    )
+  assert.equal(
+    refusalCode(decodeCommand({ kind: "mark", targetId: "", text: "x" })),
     ERR.UNKNOWN_TARGET,
   )
 })

@@ -26,6 +26,7 @@ import {
   type LaneName,
   type LaneRecord,
   type LaneView,
+  type MarkRecord,
   type NoteRecord,
   nearestRevision,
   type OfferRecord,
@@ -57,6 +58,8 @@ import {
   LANE_NAMESPACE,
   landingRecords,
   laneRecords,
+  MARK_NAMESPACE,
+  markRecords,
   NAME_NAMESPACE,
   NOTE_NAMESPACE,
   nameRecords,
@@ -318,6 +321,12 @@ export const readArchive = (
   doc: SessionDocHandle,
 ): ReadonlyMap<string, ArchiveRecord> =>
   archiveRecords(readValues(doc, ARCHIVE_NAMESPACE))
+
+/** Every entry's mark (`pineta.mark`, ADR-0045), keyed by entry: a root's titles its tab. */
+export const readMarks = (
+  doc: SessionDocHandle,
+): ReadonlyMap<string, MarkRecord> =>
+  markRecords(readValues(doc, MARK_NAMESPACE))
 
 // ── where lanes work (ADR-0032, ADR-0033) ─────────────────────────────────
 

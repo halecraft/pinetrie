@@ -15,6 +15,7 @@ import {
   normalizeEmail,
   normalizeName,
   parseMentions,
+  parseTitle,
   projectTranscript,
   THE_AGENT,
   writerId,
@@ -235,6 +236,20 @@ describe("address: mentions pick who a message is for (ADR-0021)", () => {
     expect(normalizeName("!!")).toBeUndefined()
     expect(normalizeName("Agent")).toBeUndefined()
     expect(normalizeName("")).toBeUndefined()
+  })
+  test("parseTitle trims a title, clears on blank, and refuses a line break or 81 characters", () => {
+    expect(parseTitle("  Tab names  ")).toEqual({
+      kind: "set",
+      title: "Tab names",
+    })
+    expect(parseTitle("")).toEqual({ kind: "clear" })
+    expect(parseTitle("   ")).toEqual({ kind: "clear" })
+    expect(parseTitle("two\nlines")).toEqual({ kind: "invalid" })
+    expect(parseTitle("x".repeat(80))).toEqual({
+      kind: "set",
+      title: "x".repeat(80),
+    })
+    expect(parseTitle("x".repeat(81))).toEqual({ kind: "invalid" })
   })
   test("a handle is the name in handle characters: @obrien, @guest-x4bu", () => {
     expect(handleOf("O'Brien")).toBe("obrien")

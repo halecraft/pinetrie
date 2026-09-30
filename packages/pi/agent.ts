@@ -36,6 +36,7 @@ import {
   hostPathInLane,
   type LaneName,
   laneNameForThread,
+  type MarkRecord,
   type NoteRecord,
   type Position,
   type StreamEvent,
@@ -48,12 +49,14 @@ import {
   chatImageShas,
   encodeArchive,
   encodeHeld,
+  encodeMark,
   encodeNote,
   encodeWorkRecord,
   expandSkill,
   type Held,
   type LandMessage,
   labelCommands,
+  MARK_NAMESPACE,
   NOTE_NAMESPACE,
   OFFER_NAMESPACE,
   OUTBOX_NAMESPACE,
@@ -299,6 +302,10 @@ export interface Agent {
   setNote(note: NoteRecord): Promise<void>
   /** Store a root's archive record in `pineta.archive`, keyed by the root (ADR-0029). */
   setArchive(record: ArchiveRecord): Promise<void>
+  /** Store an entry's mark in `pineta.mark`, keyed by the entry (ADR-0045). */
+  setMark(record: MarkRecord): Promise<void>
+  /** Delete an entry's mark: its title was cleared. */
+  removeMark(entry: EntryId): Promise<void>
   /** Store one of the host's records (`WorkRecord`), under its namespace and key. */
   setWorkRecord(record: WorkRecord): Promise<void>
   /** Delete a lane's offer record: the offer was withdrawn (ADR-0039). */
@@ -675,6 +682,14 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
 
     async setArchive(record) {
       await put(ARCHIVE_NAMESPACE, record.root, encodeArchive(record))
+    },
+
+    async setMark(record) {
+      await put(MARK_NAMESPACE, record.entry, encodeMark(record))
+    },
+
+    async removeMark(entry) {
+      await session.deleteValue(value(MARK_NAMESPACE, entry), CTX)
     },
 
     async setWorkRecord(record) {

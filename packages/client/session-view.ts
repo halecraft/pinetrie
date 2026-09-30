@@ -113,6 +113,8 @@ export interface SessionClient {
   noteText(id: NoteId): NoteDocHandle
   /** Hide the root `root` for everyone, or bring it back (ADR-0029). */
   archive(action: ArchiveAction, root: EntryId): Promise<Outcome>
+  /** Title the entry `entry`, or clear its title with null (ADR-0045). */
+  mark(entry: EntryId, title: string | null): Promise<Outcome>
   /**
    * Merge your work into a lane (ADR-0038): `updated`, with the composer's
    * prefill, when clean; `started`, the resolution run, when it conflicts.
@@ -255,6 +257,9 @@ export async function connectSession(
     },
     archive(action, root) {
       return send({ kind: "archive", action, root })
+    },
+    mark(entry, title) {
+      return send({ kind: "mark", entry, title })
     },
     replies,
     async close() {

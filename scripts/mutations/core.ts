@@ -353,4 +353,20 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/core"],
     expect: "carries it uncut",
   },
+  {
+    name: "a title keeps its line break",
+    file: core,
+    from: "  return /[\\r\\n]/.test(title) || title.length > MAX_TITLE",
+    to: "  return title.length > MAX_TITLE",
+    command: unit,
+    expect: "parseTitle trims a title",
+  },
+  {
+    name: "the codec lets an invalid title through",
+    file: "packages/protocol/codec.ts",
+    from: '      case "invalid":\n        return refused(',
+    to: '      case "invalid":\n        return { kind: "mark", entry: entryId(entry), title: text(wire?.text) }\n        return refused(',
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "a mark names its entry",
+  },
 ]

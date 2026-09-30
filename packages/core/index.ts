@@ -176,9 +176,27 @@ export const ERR = {
   INVALID_IDENTITY: "invalid_identity",
   /** A message shows a `/blob/` image the host does not store (ADR-0042). */
   IMAGE_MISSING: "image_missing",
+  /** A title with a line break, or longer than `MAX_TITLE` (ADR-0045). */
+  INVALID_TITLE: "invalid_title",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
+
+/**
+ * A command refused, and why. Planners return it, the codec decodes to it, and
+ * the host answers it as its outcome unchanged.
+ */
+export interface Refusal {
+  readonly kind: "refused"
+  readonly code: ErrCode
+  readonly message: string
+}
+
+export const refused = (code: ErrCode, message: string): Refusal => ({
+  kind: "refused",
+  code,
+  message,
+})
 
 /**
  * How a message means to join the tree.
@@ -231,6 +249,12 @@ export type Intent =
       readonly action: ArchiveAction
       readonly root: EntryId
     }
+  /** Title an entry, or clear its title with null (ADR-0045). */
+  | {
+      readonly kind: "mark"
+      readonly entry: EntryId
+      readonly title: string | null
+    }
   /**
    * Merge your work into a lane: a fact in the thread when it merges cleanly,
    * the resolution run when it conflicts (ADR-0038, ADR-0033).
@@ -272,6 +296,42 @@ export interface ArchiveRecord {
   readonly by: WriterId
   /** When it last changed, in ms since the epoch. */
   readonly at: number
+}
+
+// --- marks (ADR-0045) --------------------------------------------------------
+
+/**
+ * A title on an entry: a host-written `pineta.mark` value keyed by the
+ * entry's id, so an entry has at most one. A root's mark titles its tab.
+ */
+export interface MarkRecord {
+  readonly entry: EntryId
+  readonly title: string
+  readonly by: WriterId
+  /** When it was set, in ms since the epoch. */
+  readonly at: number
+}
+
+/** A title's longest form, in UTF-16 code units. */
+export const MAX_TITLE = 80
+
+/** What a typed title asks for. */
+export type TitleInput =
+  | { readonly kind: "set"; readonly title: string }
+  | { readonly kind: "clear" }
+  | { readonly kind: "invalid" }
+
+/**
+ * A title as typed, trimmed: empty clears it; a line break, or more than
+ * `MAX_TITLE`, is invalid. The codec and the page both decide by this, so
+ * they accept the same titles.
+ */
+export function parseTitle(text: string): TitleInput {
+  const title = text.trim()
+  if (title === "") return { kind: "clear" }
+  return /[\r\n]/.test(title) || title.length > MAX_TITLE
+    ? { kind: "invalid" }
+    : { kind: "set", title }
 }
 
 // --- where lanes work (ADR-0032, ADR-0033) -----------------------------------

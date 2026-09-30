@@ -9,12 +9,13 @@ import {
   type ArchiveAction,
   type ArchiveRecord,
   ERR,
-  type ErrCode,
   entryId,
   type Intent,
   type LaneView,
   type NoteAction,
   type NoteRecord,
+  type Refusal,
+  refused,
   rootOf,
   rootWork,
   type TreeIndex,
@@ -52,11 +53,7 @@ export function archiveRecords(
 }
 
 export type ArchivePlan =
-  | {
-      readonly kind: "refused"
-      readonly code: ErrCode
-      readonly message: string
-    }
+  | Refusal
   /** Already in that state: nothing is written, and the outcome is the same. */
   | { readonly kind: "unchanged" }
   | { readonly kind: "write"; readonly record: ArchiveRecord }
@@ -84,19 +81,11 @@ export function planArchive(input: {
   const { action, root, index } = input
   // A root is always a message (S30), so being a root is enough.
   if (rootOf(index, root) !== root)
-    return {
-      kind: "refused",
-      code: ERR.UNKNOWN_TARGET,
-      message: "no such root",
-    }
+    return refused(ERR.UNKNOWN_TARGET, "no such root")
   const state = action === "archive" ? "archived" : "restored"
   const busy = rootWork(index, input.lanes).get(root)
   if (action === "archive" && busy !== undefined)
-    return {
-      kind: "refused",
-      code: ERR.ROOT_BUSY,
-      message: ROOT_BUSY_REASON[busy],
-    }
+    return refused(ERR.ROOT_BUSY, ROOT_BUSY_REASON[busy])
   const current = input.archive.get(root)?.state ?? "restored"
   if (current === state) return { kind: "unchanged" }
   return {
@@ -125,6 +114,8 @@ export function writesAt(
     case "update":
     case "offer":
       return lanes.find(l => l.name === intent.lane)?.tip ?? null
+    case "mark":
+      return intent.entry
     case "name":
     case "stop":
     case "archive":

@@ -8,8 +8,9 @@
 import {
   blobOfUrl,
   ERR,
-  type ErrCode,
   type ImageRef,
+  type Refusal,
+  refused,
   type Sha256,
 } from "@pineta/core"
 import { fromMarkdown } from "mdast-util-from-markdown"
@@ -70,11 +71,7 @@ export const pastedImages = (text: string): Sha256[] => [
 
 export type ImagesDecision =
   | { readonly kind: "images"; readonly images: readonly ImageRef[] }
-  | {
-      readonly kind: "refused"
-      readonly code: ErrCode
-      readonly message: string
-    }
+  | Refusal
 
 /**
  * A message's images, from the blobs its text shows and the refs the store
@@ -89,11 +86,10 @@ export function planImages(
   for (const sha of shas) {
     const ref = refs.get(sha)
     if (ref === undefined)
-      return {
-        kind: "refused",
-        code: ERR.IMAGE_MISSING,
-        message: `an image in this message is no longer stored (${sha.slice(0, 12)}…): paste it again`,
-      }
+      return refused(
+        ERR.IMAGE_MISSING,
+        `an image in this message is no longer stored (${sha.slice(0, 12)}…): paste it again`,
+      )
     images.push(ref)
   }
   return { kind: "images", images }

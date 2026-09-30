@@ -187,6 +187,28 @@ is hidden and made read-only, never removed, and restoring keeps the record.
 - **Yjs writes are not refused for archiving.** A note's text in an archived
   root stays writable to the host's policy, as ADR-0026 requires (a refused
   write cannot be recovered from, S28); the screen offers no editor there.
+- **Every planner refuses with core's `Refusal`** (`refused(code, message)`),
+  the shape the codec decodes to and the host answers as its `Outcome`
+  unchanged, so no package spells it out.
+
+# Marks (`mark.ts`, ADR-0045)
+
+A title on an entry. The record is a host-written `pineta.mark` value keyed
+by the entry's id, so an entry has at most one by construction. A root's mark
+titles its tab; the page offers marks only on roots, while the host accepts
+one on any entry, since the rule is the same everywhere.
+
+- **`planMark` decides**, pure: an entry the index lacks is refused
+  `unknown_target`; the title already stored, or clearing an entry with none,
+  is `unchanged` and writes nothing; otherwise `write`, or `remove` for a
+  cleared title. The last write wins: nobody types a title together.
+- **Clearing deletes the record.** A stored empty title would read as chosen.
+- **A mark in an archived root is refused by the archive's gate:** `writesAt`
+  names a mark's entry, so `planMark` has no check of its own.
+- **The title rule is `parseTitle`'s** (`@pineta/core`): trimmed, empty
+  clears, one line of at most `MAX_TITLE`. The codec and the page both
+  decide by it. The decoder checks only the shape (a non-empty title): the
+  host is the session's one writer, and stores only parsed titles.
 
 # Where lanes work (`work.ts`, ADR-0032 to ADR-0034, ADR-0038, ADR-0039)
 

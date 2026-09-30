@@ -393,6 +393,12 @@ drawn from the render's own facts. A column at its end does not get shorter
 while the agent works: a floor takes up a shrink. The browser suite checks
 this frame by frame at 20× CPU throttle.
 
+**A root's tab can be renamed** (ADR-0045). A title is a mark on the root:
+a host-written `pineta.mark` value keyed by the entry, set from the tab's
+`⋯`, the last write winning, and deleted when cleared. It is the root's
+label everywhere it is named, the Archive search included. ADR-0028's
+descriptions, section headers and boundaries are still to do.
+
 **Steps 1–5 are done** (ADR-0018). Now continue thickening (`docs/04-roadmap.md`), each step
 independently shippable:
 

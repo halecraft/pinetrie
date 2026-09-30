@@ -59,6 +59,7 @@ const note = (id: string, on: string): NoteRecord => ({
 const rows = (filter: ArchiveFilter, query = "", me = ADA) =>
   archiveIndex({
     roots,
+    labels: new Map([["3-r3", "Palette work"]]),
     archive: new Map([["2-r2", archived]]),
     notes: [note("n1", "5-r1"), note("n2", "1-r1"), note("n3", "2-r2")],
     index,
@@ -89,5 +90,8 @@ describe("archiveIndex", () => {
     expect(ids(rows("all", "FRIDAY"))).toEqual(["1-r1"])
     expect(ids(rows("all", " sqlite "))).toEqual(["2-r2"])
     expect(ids(rows("all", "nothing like this"))).toEqual([])
+  })
+  test("search finds a root by its label, which no message holds", () => {
+    expect(ids(rows("all", "palette"))).toEqual(["3-r3"])
   })
 })

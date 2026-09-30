@@ -22,7 +22,6 @@ import {
   type ChatMode,
   type CommandRef,
   ERR,
-  type ErrCode,
   IMAGE_MIMES,
   type ImageMime,
   type ImageRef,
@@ -30,7 +29,9 @@ import {
   type LaneName,
   type Mention,
   type Position,
+  type Refusal,
   type Responder,
+  refused,
   type Sha256,
   THE_AGENT,
   type ThreadLane,
@@ -292,11 +293,7 @@ export type ChatDecision =
   /** Another writer took the slot. Nothing is written; the sender chooses. */
   | { readonly kind: "conflict"; readonly by: WriterId | null }
   /** Nothing is written: a `/package:name` that names no command. */
-  | {
-      readonly kind: "refused"
-      readonly code: ErrCode
-      readonly message: string
-    }
+  | Refusal
 
 /**
  * Who a chat is for, as the host decides it and the composer foresees it
@@ -382,17 +379,12 @@ export function planChat(input: {
   const branch = input.mode === "branch"
   const { command } = input
   if (command !== null && "unknown" in command)
-    return {
-      kind: "refused",
-      code: ERR.UNKNOWN_COMMAND,
-      message: `no command /${command.unknown}`,
-    }
+    return refused(ERR.UNKNOWN_COMMAND, `no command /${command.unknown}`)
   if (command !== null && "unreadable" in command)
-    return {
-      kind: "refused",
-      code: ERR.UNKNOWN_COMMAND,
-      message: `the file of /${command.unreadable} could not be read`,
-    }
+    return refused(
+      ERR.UNKNOWN_COMMAND,
+      `the file of /${command.unreadable} could not be read`,
+    )
   const { compels } = addressChat({
     mentions: input.mentions,
     participants: input.participants,

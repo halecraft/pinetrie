@@ -16,7 +16,7 @@ import {
 
 export interface RootSummary {
   readonly root: string
-  /** Its first message, as the rail finds it: the tab's label. */
+  /** Its first message, as the rail finds it: the tab's label until a title names it (ADR-0045). */
   readonly first: string
   /** Its messages: the rail's rows, some of which it draws inside a run. */
   readonly messages: number

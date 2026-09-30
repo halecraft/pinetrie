@@ -2,15 +2,23 @@
 // tab (ADR-0029, ADR-0030).
 //
 // Your tabs are yours: the roots you have opened, in that order. × closes one
-// for you and writes nothing; Archive, in its ⋯, hides a root for everyone. A
-// root someone else starts opens no tab here.
+// for you and writes nothing. In its ⋯, Rename titles a root for everyone
+// (ADR-0045), and Archive hides it for everyone. A root someone else starts
+// opens no tab here.
 
-import type { WriterId } from "@pineta/core"
+import { MAX_TITLE, type WriterId } from "@pineta/core"
 import { ROOT_BUSY_REASON } from "@pineta/marginalia"
-import type { KeyboardEvent } from "react"
+import {
+  type KeyboardEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
 import { type ActiveTab, sameTab } from "./layout.ts"
 import { Menu } from "./menu.tsx"
 import { Avatars } from "./presence.tsx"
+import { planTitle } from "./root-label.ts"
 
 /** Left and Right move focus between tabs. */
 function moveFocus(e: KeyboardEvent<HTMLElement>) {
@@ -40,11 +48,14 @@ export function TabBar({
   onCloseNew,
   onCloseRoot,
   onArchive,
+  lineOf,
+  titleOf,
+  onRename,
   onAdd,
 }: {
   tabs: readonly ActiveTab[]
   active: ActiveTab
-  /** A root tab's label: its first message's text. */
+  /** A root tab's label: its title, else its first message's first line. */
   labelOf: (root: string) => string
   /** A new tab's label, by its key. */
   newLabel: (key: string) => string
@@ -61,10 +72,28 @@ export function TabBar({
   /** Close a root's tab for you: nothing is written (ADR-0030). */
   onCloseRoot: (root: string) => void
   onArchive: (root: string) => void
+  /** A root's first line: its label with no title, and the rename field's placeholder. */
+  lineOf: (root: string) => string
+  /** A root's stored title, or null when it has none. */
+  titleOf: (root: string) => string | null
+  /** Set a root's title for everyone, or clear it with null (ADR-0045). */
+  onRename: (root: string, title: string | null) => void
   onAdd: (asksAgent: boolean) => void
 }) {
+  // The root whose tab is a title field now. Never stored.
+  const [renaming, setRenaming] = useState<string | null>(null)
+  // The root whose tab takes focus once its field has gone.
+  const [refocus, setRefocus] = useState<string | null>(null)
+  const nav = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (refocus === null) return
+    nav.current
+      ?.querySelector<HTMLElement>(`.tab[data-root="${CSS.escape(refocus)}"]`)
+      ?.focus()
+    setRefocus(null)
+  }, [refocus])
   return (
-    <nav aria-label="threads" id="tabs">
+    <nav aria-label="threads" id="tabs" ref={nav}>
       <div
         aria-label="threads"
         className="tab-list"
@@ -114,6 +143,20 @@ export function TabBar({
             )
           const { root } = tab
           const busy = work.get(root)
+          if (renaming === root)
+            return (
+              <span className="tab-wrap" key={`root:${root}`}>
+                <TitleField
+                  onEnd={focusTab => {
+                    setRenaming(null)
+                    if (focusTab) setRefocus(root)
+                  }}
+                  onSend={title => onRename(root, title)}
+                  placeholder={lineOf(root)}
+                  stored={titleOf(root)}
+                />
+              </span>
+            )
           return (
             <span className="tab-wrap" key={`root:${root}`}>
               <button
@@ -141,11 +184,19 @@ export function TabBar({
                 />
               </button>
               {/* On every root tab: shown on the one you are on, and on
-                  another on hover or focus, so any root can be archived. */}
+                  another on hover or focus, so any root can be renamed or
+                  archived. */}
               {!archived.has(root) && (
                 <Menu
                   className="tab-more"
                   items={[
+                    {
+                      key: "rename",
+                      className: "rename-root",
+                      title: "change this thread's title for everyone",
+                      label: "Rename",
+                      onChoose: () => setRenaming(root),
+                    },
                     {
                       key: "archive",
                       className: "archive-root",
@@ -185,6 +236,72 @@ export function TabBar({
       </div>
       <AddTab onAdd={onAdd} />
     </nav>
+  )
+}
+
+/**
+ * A root tab while it is renamed: a field holding its title. Enter and leaving
+ * the field save, and Escape cancels.
+ */
+function TitleField({
+  stored,
+  placeholder,
+  onSend,
+  onEnd,
+}: {
+  stored: string | null
+  placeholder: string
+  onSend: (title: string | null) => void
+  /** The field is done; `focusTab` when the keyboard ended it. */
+  onEnd: (focusTab: boolean) => void
+}) {
+  const [text, setText] = useState(stored ?? "")
+  const [invalid, setInvalid] = useState(false)
+  const input = useRef<HTMLInputElement>(null)
+  // Every way out comes here once. Removing a focused field can fire a blur
+  // after Enter or Escape, which must not save again, or save a cancel.
+  const done = useRef(false)
+  useLayoutEffect(() => {
+    input.current?.focus()
+    input.current?.select()
+  }, [])
+  const finish = (save: boolean, focusTab: boolean) => {
+    if (done.current) return
+    if (save) {
+      const plan = planTitle(text, stored)
+      if (plan.kind === "refuse") {
+        setInvalid(true)
+        return
+      }
+      if (plan.kind === "send") onSend(plan.title)
+    }
+    done.current = true
+    onEnd(focusTab)
+  }
+  return (
+    <input
+      aria-invalid={invalid}
+      aria-label="title for this thread"
+      className="tab-title-input"
+      maxLength={MAX_TITLE}
+      onBlur={() => finish(true, false)}
+      onChange={e => {
+        setText(e.target.value)
+        setInvalid(false)
+      }}
+      onKeyDown={e => {
+        if (e.key === "Enter") {
+          e.preventDefault()
+          finish(true, true)
+        } else if (e.key === "Escape") {
+          e.preventDefault()
+          finish(false, true)
+        }
+      }}
+      placeholder={placeholder}
+      ref={input}
+      value={text}
+    />
   )
 }
 

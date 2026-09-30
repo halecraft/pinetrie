@@ -38,6 +38,8 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     the note `targetId`.
  *   - `archive` hides the root `targetId` for everyone, or restores it
  *     (ADR-0029); `mode` names the action, `archive` or `restore`.
+ *   - `mark` titles the entry `targetId` with `text` (ADR-0045); `""`
+ *     clears its title.
  *   - `update` merges your work into the thread whose lane is `lane`
  *     (ADR-0038); the agent's resolution runs only when it conflicts
  *     (ADR-0033).
@@ -50,6 +52,7 @@ export const COMMAND_KINDS = [
   "stop",
   "note",
   "archive",
+  "mark",
   "update",
   "offer",
 ] as const
@@ -85,7 +88,7 @@ export interface Command {
    */
   readonly workKind: string
   readonly workDir: string
-  /** `note`: the note acted on; `archive`: the root. Separate from `parentId` on purpose. */
+  /** `note`: the note acted on; `archive`: the root; `mark`: the entry. Separate from `parentId` on purpose. */
   readonly targetId: string
 }
 
@@ -103,6 +106,7 @@ export const OUTCOME_KINDS = [
   "noted",
   "archived",
   "restored",
+  "marked",
   "taken",
   "updated",
   "offered",

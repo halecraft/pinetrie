@@ -14,6 +14,7 @@ import type {
   AgentRun,
   ArchiveRecord,
   LaneView,
+  MarkRecord,
   NoteRecord,
   TreeIndex,
 } from "@pineta/core"
@@ -25,6 +26,7 @@ import {
   readLandings,
   readLaneRecords,
   readLanes,
+  readMarks,
   readNames,
   readNotes,
   readOffers,
@@ -51,6 +53,8 @@ export interface SessionFacts {
   readonly participants: readonly string[]
   readonly notes: readonly NoteRecord[]
   readonly archive: ReadonlyMap<string, ArchiveRecord>
+  /** Each entry's title (ADR-0045); a root's is its label. */
+  readonly marks: ReadonlyMap<string, MarkRecord>
   readonly workFacts: WorkFacts
 }
 
@@ -67,6 +71,7 @@ export function readSessionFacts(doc: SessionDocHandle): SessionFacts {
     participants: readParticipants(doc, index),
     notes: readNotes(doc),
     archive: readArchive(doc),
+    marks: readMarks(doc),
     workFacts: {
       project: readProject(doc),
       commands: readCommands(doc),

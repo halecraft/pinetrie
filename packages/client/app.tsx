@@ -20,8 +20,6 @@ import {
   branchColors,
   compactRail,
   entryId,
-  firstLine,
-  messageText,
   PENDING_TRACK,
   pathIds,
   presenceView,
@@ -86,6 +84,7 @@ import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { readSessionFacts } from "./projection.ts"
 import { EmptyRail, Rail } from "./rail.tsx"
 import { railKeep } from "./rail-view.ts"
+import { firstLines, NO_TEXT, rootLabels } from "./root-label.ts"
 import { connectSession, type SessionClient } from "./session-view.ts"
 import { deviceState, tabState } from "./tab-state.ts"
 import { TabBar } from "./tabs.tsx"
@@ -212,6 +211,7 @@ function App({ session }: { session: SessionClient }) {
     participants,
     notes,
     archive,
+    marks,
     workFacts,
   } = useSelector(doc, readSessionFacts)
   // The notes drawn with each message (ADR-0043). A message with one is a
@@ -225,16 +225,14 @@ function App({ session }: { session: SessionClient }) {
   const nameOf = useSelector(doc, readParticipantNames)
   const presenceFacts = useSelector(session.presence, readPresence)
 
-  // Each root, for labels and the Archive tab. Which have tabs is yours
-  // (`layout.open`, ADR-0030).
+  // Each root, for the Archive tab and its label: its title, else its first
+  // line (ADR-0045). Which roots have tabs is yours (`layout.open`, ADR-0030).
   const summaries = useMemo(() => summarizeRoots(index), [index])
+  const lines = useMemo(() => firstLines(summaries, index), [summaries, index])
+  const labels = useMemo(() => rootLabels(lines, marks), [lines, marks])
   const work = useMemo(() => rootWork(index, lanes), [index, lanes])
-  const labelOf = (root: string): string => {
-    const first = summaries.find(s => s.root === root)?.first ?? root
-    return (
-      firstLine(messageText(index.entries[first]?.message), 40) || "(no text)"
-    )
-  }
+  // A root with no message has no summary, so it has no label in `labels`.
+  const labelOf = (root: string): string => labels.get(root) ?? NO_TEXT
 
   const [stored, dispatch] = useReducer(
     layoutReducer,
@@ -640,6 +638,9 @@ function App({ session }: { session: SessionClient }) {
             colorOf={colorOf}
             labelOf={labelOf}
             nameOf={nameOf}
+            lineOf={r => lines.get(r) ?? NO_TEXT}
+            titleOf={r => marks.get(r)?.title ?? null}
+            onRename={(r, title) => void session.mark(entryId(r), title)}
             newLabel={key =>
               layout.newTabs.find(c => c.key === key)?.asksAgent === true
                 ? "new agent"
@@ -669,6 +670,7 @@ function App({ session }: { session: SessionClient }) {
                 query={archiveQuery}
                 rows={archiveIndex({
                   roots: summaries,
+                  labels,
                   archive,
                   notes,
                   index,

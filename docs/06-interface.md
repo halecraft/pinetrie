@@ -82,7 +82,7 @@ the session, from live data only, as a document editor shows the people in it.
 - **Nothing opens a tab by itself.** A mention is a notification: you choose to
   open it.
 
-### Root tabs: the roots you have open (ADR-0029, ADR-0030)
+### Root tabs: the roots you have open (ADR-0029, ADR-0030, ADR-0045)
 
 A conversation's context is its path to its root, so nothing in one root is
 ever in the context of another. That is where the screen splits.
@@ -94,8 +94,12 @@ ever in the context of another. That is where the screen splits.
   its columns back. A root you start opens as your tab; a root someone else
   starts does not, and reaches you through the header, a mention, or the
   Archive tab.
-- **A tab's label** is its first message's text, cut short, until a mark names
-  it (ADR-0028).
+- **A tab's label** is its title, else its first message's first line, cut
+  short. **Rename** in the tab's `⋯` turns the label into a field: Enter or
+  leaving it saves the title for everyone, Escape cancels, and an empty title
+  brings back the first line. A title is a mark on the root (ADR-0045), and
+  names the root wherever it is shown: the header, the inbox, the Archive
+  tab.
 - **A tab shows what happens in it while you are elsewhere:** a pulse while the
   agent is working there, and small avatars of the others reading there. For
   the roots you have not opened, the header shows the same.
@@ -118,7 +122,7 @@ The leftmost tab. It finds roots, so it is a list, not a rail with columns.
 
 - **A row per root, open or archived:** its label, last activity, who wrote in
   it, its messages and notes, and its state. Filters: archived, open, mine.
-  Search over message text.
+  Search over each root's label, so its title, and its message text.
 - **Selecting a row previews it:** that root's rail, and one read-only column
   that a pick on the rail moves. Its composer is disabled, and none of the tools that
   write are there: note, edit, branch, mark. In place of sending it offers

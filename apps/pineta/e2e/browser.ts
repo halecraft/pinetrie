@@ -26,6 +26,7 @@ import {
 import { scriptedModel } from "@pineta/pi"
 import {
   readLaneRecords,
+  readMarks,
   readNames,
   readParticipantNames,
   readTreeIndex,
@@ -1431,6 +1432,85 @@ try {
     ok(
       onThird && moved,
       "another window shows on the tab it is on, and leaves it when it switches",
+    )
+
+    // 4b. Rename (ADR-0045): a title is the root's label for everyone, the
+    // Archive search finds it, Escape keeps the old one, and clearing it
+    // brings back the first line. The page is on the third root.
+    const tabLabel = (p: Page, r: string) =>
+      p.textContent(`${tabSel(r)} .tab-label`).catch(() => null)
+    const labelIs = (p: Page, r: string, want: string) =>
+      p
+        .waitForFunction(
+          ([sel, text]) => document.querySelector(sel)?.textContent === text,
+          [`${tabSel(r)} .tab-label`, want] as const,
+          { timeout: 15_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+    const rename = async (text: string, key: "Enter" | "Escape") => {
+      const chosen = await chooseFromMenu(page, OWN_MENU, ".rename-root")
+      await page.waitForSelector(".tab-title-input", { timeout: 15_000 })
+      await page.fill(".tab-title-input", text)
+      await page.press(".tab-title-input", key)
+      return chosen
+    }
+    const TITLE = "Palette of tabs"
+    const firstLine = await tabLabel(page, thirdRoot)
+    const renamed = await rename(TITLE, "Enter")
+    const mine = await labelIs(page, thirdRoot, TITLE)
+    const refocused = await page.evaluate(
+      r => document.activeElement?.getAttribute("data-root") === r,
+      thirdRoot,
+    )
+    const theirs = await labelIs(tb, thirdRoot, TITLE)
+    ok(
+      renamed && mine && theirs && refocused,
+      `Rename in a tab's ⋯ titles its root, for everyone, and gives the tab focus back ("${firstLine}" → "${await tabLabel(tb, thirdRoot)}")`,
+    )
+    await tb.click("#tabs .tab-archive")
+    await tb.fill(".archive-search", "palette")
+    const found = await tb
+      .waitForFunction(
+        r => {
+          const rows = [...document.querySelectorAll(".archive-row")]
+          return (
+            rows.length === 1 &&
+            rows[0]?.getAttribute("data-root") === r &&
+            rows[0]?.querySelector(".archive-label")?.textContent ===
+              "Palette of tabs"
+          )
+        },
+        thirdRoot,
+        { timeout: 15_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      found,
+      "the Archive tab shows a root by its title, and its search finds it",
+    )
+    await tb.fill(".archive-search", "")
+    await tb.click(tabSel(firstRoot))
+    const setAt = readMarks(host.doc).get(thirdRoot)?.at
+    await rename("not this", "Escape")
+    // Long enough for a rename sent by mistake to come back.
+    await waitFor(() => false, 1_000)
+    ok(
+      (await labelIs(page, thirdRoot, TITLE)) &&
+        (await page.locator(".tab-title-input").count()) === 0 &&
+        readMarks(host.doc).get(thirdRoot)?.at === setAt,
+      "Escape leaves a tab's title as it was, and sends nothing",
+    )
+    await rename("", "Enter")
+    ok(
+      (await labelIs(page, thirdRoot, firstLine ?? "")) &&
+        (await labelIs(tb, thirdRoot, firstLine ?? "")),
+      `a cleared title gives the tab its first line back ("${await tabLabel(page, thirdRoot)}")`,
     )
 
     // 5. The add menu, by keyboard; an unsent new tab closes without a trace.

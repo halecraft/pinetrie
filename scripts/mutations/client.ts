@@ -884,4 +884,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a change to what a message shows",
   },
+  {
+    name: "a root's label ignores its title",
+    file: "packages/client/root-label.ts",
+    from: "[root, marks.get(root)?.title ?? line]",
+    to: "[root, line]",
+    command: unit,
+    expect: "a titled root is called by its title",
+  },
+  {
+    name: "the Archive search ignores labels",
+    file: "packages/client/archive-rows.ts",
+    from: '    (input.labels.get(root) ?? "").toLowerCase().includes(needle) ||\n',
+    to: "",
+    command: unit,
+    expect: "search finds a root by its label",
+  },
 ]

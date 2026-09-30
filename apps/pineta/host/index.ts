@@ -58,6 +58,7 @@ import {
   planChat,
   planDrain,
   planImages,
+  planMark,
   planNote,
   planNoteEdit,
   planStartup,
@@ -95,6 +96,7 @@ import {
   readArchive,
   readLaneRecords,
   readLanes,
+  readMarks,
   readNotes,
   readOutbox,
   readParticipantNames,
@@ -1024,6 +1026,38 @@ export async function startHost({
     return { kind: intent.action === "archive" ? "archived" : "restored" }
   }
 
+  /** Title an entry, or clear its title: gather, `planMark`, write or delete one value. */
+  async function handleMark(
+    writer: WriterId,
+    intent: Extract<Intent, { kind: "mark" }>,
+  ): Promise<Outcome> {
+    // gather
+    const index = readTreeIndex(doc)
+    // plan (pure)
+    const planned = planMark({
+      entry: intent.entry,
+      title: intent.title,
+      by: writer,
+      now: Date.now(),
+      index,
+      marks: readMarks(doc),
+    })
+    // execute
+    switch (planned.kind) {
+      case "refused":
+        return planned
+      case "write":
+        await agent.setMark(planned.record)
+        break
+      case "remove":
+        await agent.removeMark(planned.entry)
+        break
+      case "unchanged":
+        break
+    }
+    return { kind: "marked" }
+  }
+
   /**
    * A command that would write in an archived root is refused, naming who
    * archived it (ADR-0029). A sent draft reaches `sendChat` only through a
@@ -1099,6 +1133,8 @@ export async function startHost({
       }
       case "archive":
         return respond(await handleArchive(writer, intent))
+      case "mark":
+        return respond(await handleMark(writer, intent))
       case "update":
         return respond(await startUpdate(intent.lane, writer))
       case "offer":

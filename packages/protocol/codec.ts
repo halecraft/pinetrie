@@ -22,6 +22,7 @@ import {
   entryId,
   type Intent,
   isLaneName,
+  MAX_TITLE,
   NOTE_ACTIONS,
   type NoteAction,
   type NoteId,
@@ -31,19 +32,16 @@ import {
   type OfferAction,
   type Position,
   parseMentions,
+  parseTitle,
+  type Refusal,
   ROOT,
   type RunId,
+  refused,
   runId,
   type WorkSetting,
   type WriterId,
 } from "@pineta/core"
 import { type Command, command, type Reply, reply } from "./messages.ts"
-
-export interface Refusal {
-  readonly kind: "refused"
-  readonly code: ErrCode
-  readonly message: string
-}
 
 /** What a reply means. `reply()` flattens it for the wire. */
 export type Outcome =
@@ -64,6 +62,8 @@ export type Outcome =
   /** A root is archived, or restored (ADR-0029); also when it already was. */
   | { readonly kind: "archived" }
   | { readonly kind: "restored" }
+  /** An entry's title is set or cleared (ADR-0045); also when it already was. */
+  | { readonly kind: "marked" }
   /** The lane's offer is in your history now (ADR-0038). */
   | { readonly kind: "taken" }
   /**
@@ -84,12 +84,6 @@ export type WireCommand = { readonly [K in keyof Command]?: unknown }
 
 const text = (v: unknown): string => (typeof v === "string" ? v.trim() : "")
 
-const refuse = (code: ErrCode, message: string): Refusal => ({
-  kind: "refused",
-  code,
-  message,
-})
-
 /**
  * Wire command -> a well-formed intent, or the first shape rule it breaks.
  *
@@ -106,7 +100,7 @@ export function decodeCommand(
   if (kind === "name") {
     const name = normalizeName(text(wire?.text))
     return name === undefined
-      ? refuse(
+      ? refused(
           ERR.INVALID_NAME,
           "a name must be 1 to 40 characters, with a letter or digit, and not 'agent'",
         )
@@ -116,25 +110,25 @@ export function decodeCommand(
     const lane = text(wire?.lane)
     return isLaneName(lane)
       ? { kind: "stop", lane }
-      : refuse(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+      : refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
   }
   if (kind === "chat") {
     const body = text(wire?.text)
-    if (body === "") return refuse(ERR.EMPTY_MESSAGE, "message text is empty")
+    if (body === "") return refused(ERR.EMPTY_MESSAGE, "message text is empty")
     const mode = text(wire?.mode)
     if (!isChatMode(mode)) {
-      return refuse(ERR.UNKNOWN_KIND, `unknown chat mode: ${mode}`)
+      return refused(ERR.UNKNOWN_KIND, `unknown chat mode: ${mode}`)
     }
     if (at.kind === "root" && mode !== "branch") {
-      return refuse(ERR.NO_ANCHOR, "only a branch starts a thread at the root")
+      return refused(ERR.NO_ANCHOR, "only a branch starts a thread at the root")
     }
     const lane = text(wire?.lane)
     if (lane !== "" && !isLaneName(lane)) {
-      return refuse(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+      return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
     }
     const work = workFromWire(text(wire?.workKind), text(wire?.workDir))
     if (work === "invalid")
-      return refuse(ERR.BAD_DIRECTORY, "working directly needs a directory")
+      return refused(ERR.BAD_DIRECTORY, "working directly needs a directory")
     return {
       kind: "chat",
       text: body,
@@ -149,24 +143,41 @@ export function decodeCommand(
   if (kind === "update" || kind === "offer") {
     const lane = text(wire?.lane)
     if (!isLaneName(lane))
-      return refuse(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+      return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
     if (kind === "update") return { kind, lane }
     const action = text(wire?.mode)
     return isOfferAction(action)
       ? { kind, lane, action }
-      : refuse(ERR.UNKNOWN_KIND, `unknown offer action: ${action}`)
+      : refused(ERR.UNKNOWN_KIND, `unknown offer action: ${action}`)
   }
   if (kind === "note") return decodeNote(wire, at)
   if (kind === "archive") {
     const action = text(wire?.mode)
     if (!isArchiveAction(action))
-      return refuse(ERR.UNKNOWN_KIND, `unknown archive action: ${action}`)
+      return refused(ERR.UNKNOWN_KIND, `unknown archive action: ${action}`)
     const root = text(wire?.targetId)
     return root === ""
-      ? refuse(ERR.UNKNOWN_TARGET, "an archive action must name its root")
+      ? refused(ERR.UNKNOWN_TARGET, "an archive action must name its root")
       : { kind: "archive", action, root: entryId(root) }
   }
-  return refuse(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
+  if (kind === "mark") {
+    const entry = text(wire?.targetId)
+    if (entry === "")
+      return refused(ERR.UNKNOWN_TARGET, "a mark must name its entry")
+    const title = parseTitle(text(wire?.text))
+    switch (title.kind) {
+      case "invalid":
+        return refused(
+          ERR.INVALID_TITLE,
+          `a title is one line of at most ${MAX_TITLE} characters`,
+        )
+      case "clear":
+        return { kind: "mark", entry: entryId(entry), title: null }
+      case "set":
+        return { kind: "mark", entry: entryId(entry), title: title.title }
+    }
+  }
+  return refused(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
 }
 
 /** A `note` command: `mode` names the action; only the codec reads it there. */
@@ -176,19 +187,19 @@ function decodeNote(
 ): Intent | Refusal {
   const action = text(wire?.mode)
   if (!isNoteAction(action))
-    return refuse(ERR.UNKNOWN_KIND, `unknown note action: ${action}`)
+    return refused(ERR.UNKNOWN_KIND, `unknown note action: ${action}`)
   const note = (a: NoteAction): Intent => ({ kind: "note", action: a })
   if (action === "open") {
     return at.kind === "root"
-      ? refuse(ERR.NO_ANCHOR, "the root is no message to open")
+      ? refused(ERR.NO_ANCHOR, "the root is no message to open")
       : note({ kind: "open", entry: at.id })
   }
   if (action === "draft") {
     if (at.kind === "root")
-      return refuse(ERR.NO_ANCHOR, "a draft continues a thread")
+      return refused(ERR.NO_ANCHOR, "a draft continues a thread")
     const lane = text(wire?.lane)
     if (lane !== "" && !isLaneName(lane))
-      return refuse(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+      return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
     return note({
       kind: "draft",
       at,
@@ -199,7 +210,7 @@ function decodeNote(
   }
   const target = text(wire?.targetId)
   return target === ""
-    ? refuse(ERR.UNKNOWN_TARGET, "a note action must name its note")
+    ? refused(ERR.UNKNOWN_TARGET, "a note action must name its note")
     : note({ kind: action, note: noteId(target) })
 }
 
@@ -260,6 +271,13 @@ export function encodeIntent(id: string, intent: Intent): Command {
         mode: intent.action,
         targetId: intent.root,
       })
+    case "mark":
+      return command({
+        id,
+        kind: "mark",
+        targetId: intent.entry,
+        text: intent.title ?? "",
+      })
     case "update":
       return command({ id, kind: "update", lane: intent.lane })
     case "offer":
@@ -309,6 +327,8 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "archived" })
     case "restored":
       return reply({ id, outcome: "restored" })
+    case "marked":
+      return reply({ id, outcome: "marked" })
     case "taken":
       return reply({ id, outcome: "taken" })
     case "updated":
@@ -349,6 +369,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "archived" }
     case "restored":
       return { kind: "restored" }
+    case "marked":
+      return { kind: "marked" }
     case "taken":
       return { kind: "taken" }
     case "updated":
@@ -356,7 +378,7 @@ export function decodeReply(wire: Reply): Outcome {
     case "offered":
       return { kind: "offered" }
     case "refused":
-      return refuse(asErrCode(wire.errorCode), wire.errorMessage)
+      return refused(asErrCode(wire.errorCode), wire.errorMessage)
   }
 }
 

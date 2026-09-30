@@ -67,7 +67,16 @@ A root tab's key is its root entry's id: a thread started at the root is
 rooted at its first message (S30). `open` is your tabs: the roots you opened,
 in that order. `tabBar(layout)` is Archive, `open`, then new tabs.
 `summarizeRoots` and `rootWork` (`packages/core/roots.ts`)
-give labels and each tab's signals.
+give the roots and each tab's signals.
+
+- **A root's label is `rootLabels`'s** (`root-label.ts`, ADR-0045): its
+  mark's title, else its first line (`firstLines`). `App` builds both maps
+  once per change, and every place that names a root looks one up: the tabs,
+  the header, the inbox, and the Archive tab, whose search reads labels, so
+  it finds a title without knowing about marks. The first lines are also
+  the rename field's placeholder: what clearing a title brings back.
+- **Renaming is `TabBar`'s state, never the layout's.** `planTitle` is the
+  field's submit, over `parseTitle`, the rule the codec decides by too.
 
 - **Only you put a root in `open`.** `show` of a root opens it, so every way of
   opening goes through `show`: `planOpen`, the Archive tab's Open and Restore,
@@ -805,6 +814,13 @@ shown by their email's part before the `@`. Each rendered chat carries its
   effects.** `useFollow`'s first scroll to its end comes in its
   ResizeObserver callback, a step later. Anything a layout effect measures
   against another column (alignment does) must place that column first.
+- **A renamed root's tab is an `<input class="tab-title-input">`, not a
+  `.tab`**: an input inside a button is invalid HTML, so while the field is
+  open, `.tab[data-root]` is gone. Enter, Escape and blur all go through one
+  `finish` that acts once: removing a focused field can fire a blur after
+  Enter or Escape, which would save again, or save a cancel. Only Enter and
+  Escape give the tab focus back; a blur leaves focus where the person put
+  it.
 - **A root tab's `⋯` is always rendered, hidden with `visibility`** except on
   the tab you are on, while hovered or focused, or while its menu is open
   (`Menu`'s wrapper, `.tab-more`, gains `open`). The menu is its child, so
@@ -830,11 +846,13 @@ shown by their email's part before the `@`. Each rendered chat carries its
 
 - **Selectors for root tabs:** a root's tab is `#tabs .tab[data-root="…"]`,
   the one you are on has `aria-selected="true"`, its × is the `.tab-close`
-  after it, Archive is `.tab-archive`, new tabs are `.tab-new`, and the add
-  tab's buttons are `.add-agent`, `.add-menu` and `.add-conversation`. In the
-  header: `#top .here-person .here-trigger` per person, `.here-agent`, and
-  `.inbox-trigger` with `.inbox-count[data-unseen]`; menu rows are
-  `.here-thread` and `.inbox-row`, each with `data-entry`. You are
+  after it, its `⋯` holds `.rename-root` and `.archive-root`, a root being
+  renamed is `.tab-title-input`, Archive is `.tab-archive`, new tabs are
+  `.tab-new`, and the add tab's buttons are `.add-agent`, `.add-menu` and
+  `.add-conversation`. In the header: `#top .here-person .here-trigger` per
+  person, `.here-agent`, and `.inbox-trigger` with
+  `.inbox-count[data-unseen]`; menu rows are `.here-thread` and `.inbox-row`,
+  each with `data-entry`. You are
   `#top .me-trigger` (its `title` your name), opening `#profile`, with
   `input[name="name"]`, `.name-handle`, `.name-problem[data-problem]`,
   `.profile-email` and `.not-you`. The identification screen's email problem

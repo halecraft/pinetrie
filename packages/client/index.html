@@ -34,6 +34,11 @@
         border: 1px solid #23272e; border-bottom: 0; }
       .tab[aria-selected="true"] { background: #23272e; color: #e6e6e6; }
       .tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      /* A root tab while it is renamed: the tab's box, holding a field. */
+      .tab-title-input { width: 14rem; padding: .3rem .6rem; border-radius: 6px 6px 0 0;
+        background: #23272e; color: #e6e6e6; border: 1px solid #3a3f48; border-bottom: 0;
+        font: inherit; }
+      .tab-title-input[aria-invalid="true"] { border-color: #d66; }
       .tab.running::before { content: ""; width: 6px; height: 6px; border-radius: 50%;
         background: #9ecbff; animation: pulse 1s ease-in-out infinite; }
       .tab.archived .tab-label { text-decoration: line-through; color: #777; }

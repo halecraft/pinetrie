@@ -976,4 +976,20 @@ export const mutations: readonly Mutation[] = [
     command: browser,
     expect: "a message in another thread redraws none of this tab's messages",
   },
+  {
+    name: "a cleared title is never removed",
+    file: "apps/pineta/host/index.ts",
+    from: "        await agent.removeMark(planned.entry)\n",
+    to: "",
+    command: e2e,
+    expect: "clearing a title deletes its record",
+  },
+  {
+    name: "Escape saves the rename",
+    file: "packages/client/tabs.tsx",
+    from: "          finish(false, true)",
+    to: "          finish(true, true)",
+    command: browser,
+    expect: "Escape leaves a tab's title as it was",
+  },
 ]

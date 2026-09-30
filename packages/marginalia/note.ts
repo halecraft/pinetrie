@@ -10,7 +10,6 @@ import {
   atEntry,
   type EntryId,
   ERR,
-  type ErrCode,
   entryId,
   type LaneName,
   type LaneView,
@@ -20,7 +19,9 @@ import {
   type NoteSubject,
   noteId,
   type Position,
+  type Refusal,
   ROOT,
+  refused,
   type TreeIndex,
   threadOf,
   type WriterId,
@@ -208,17 +209,7 @@ export type NoteDecision =
       readonly at: Position
       readonly lane: LaneName | null
     }
-  | {
-      readonly kind: "refused"
-      readonly code: ErrCode
-      readonly message: string
-    }
-
-const refused = (code: ErrCode, message: string): NoteDecision => ({
-  kind: "refused",
-  code,
-  message,
-})
+  | Refusal
 
 /**
  * Decide a note action. Pure; the host gathers every input inside one serial
