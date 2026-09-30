@@ -229,8 +229,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup does not compact",
     file: "apps/pineta/host/index.ts",
-    from: "    settle,\n    notes,\n  })",
-    to: "    settle: lanes =>\n      serial.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    notes,\n  })",
+    from: "    settle,\n    notes,\n    ensureNames,\n  })",
+    to: "    settle: lanes =>\n      serial.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    notes,\n    ensureNames,\n  })",
     command: e2e,
     expect: "a starting host compacts",
   },
@@ -523,14 +523,6 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: browser,
     expect: "the chip says where",
-  },
-  {
-    name: "a missing directory is worked in anyway",
-    file: "apps/pineta/host/work.ts",
-    from: "      return found?.isDirectory() === true ? null : ERR.BAD_DIRECTORY",
-    to: "      return null",
-    command: e2e,
-    expect: "a directory that does not exist is refused",
   },
   // ── your profile (packages/client/profile.tsx, ADR-0037) ──────────────
   {

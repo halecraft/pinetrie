@@ -42,6 +42,7 @@ import { hotReload as pauseHotReload } from "./hot-reload.ts"
 import { compactSession, sweepBlobs } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { lineDocPrefix } from "./lines.ts"
+import { createNames } from "./names.ts"
 import { startNoteTexts } from "./notes.ts"
 import { drain as drainOutbox } from "./outbox.ts"
 import { writePolicy } from "./policy.ts"
@@ -50,7 +51,7 @@ import { createRuns, streamInto } from "./runs.ts"
 import { createSettle } from "./settle.ts"
 import { recover } from "./startup.ts"
 import { openStore } from "./store.ts"
-import { startLaneWork } from "./work.ts"
+import { startLaneWork } from "./work/index.ts"
 
 /** How long an unreferenced image is kept (ADR-0042). */
 const BLOB_GRACE_MS = 24 * 60 * 60 * 1000
@@ -212,14 +213,19 @@ export async function startHost({
   const userJson = await readFile(userConfig, "utf8")
     .then(t => JSON.parse(t) as unknown)
     .catch(() => null)
+  // Every lane's thread name (ADR-0039), one plan at a time.
+  const ensureNames = createNames({
+    basics,
+    agent: { setWorkRecord: record => theAgent().setWorkRecord(record) },
+  })
   const work = await startLaneWork({
-    doc,
+    basics,
+    ensureNames,
     dir: tools?.project ?? null,
     defaultDirect: !lanes,
     containers,
     userConfig: { file: userConfig, json: userJson },
     agent: theAgent,
-    log,
   })
 
   // --- pi stack ------------------------------------------------------------
@@ -305,6 +311,7 @@ export async function startHost({
     start: runs.start,
     settle,
     notes,
+    ensureNames,
   })
   const control = startControl({
     exchange,

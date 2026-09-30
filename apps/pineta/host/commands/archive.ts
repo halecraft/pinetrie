@@ -7,7 +7,7 @@ import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import { readArchive, readLanes, readTreeIndex } from "@pineta/reads"
 import type { Basics } from "../basics.ts"
-import type { LaneWork } from "../work.ts"
+import type { LaneWork } from "../work/index.ts"
 
 export interface ArchiveDeps {
   readonly basics: Pick<Basics, "doc" | "now">

@@ -10,10 +10,16 @@ test("stopsHere: a failing check whose label names stopAt stops; nothing else do
 })
 
 test("ok throws at the named failing check, after recording it; another failure goes on", () => {
-  const checks = createChecks("the x check")
+  const printed: string[] = []
+  const checks = createChecks("the x check", line => printed.push(line))
   checks.ok(false, "another")
   expect(() => checks.ok(false, "the x check (details)")).toThrow(
     stopMessage("the x check (details)"),
   )
   expect(checks.failed).toEqual(["another", "the x check (details)"])
+  expect(printed).toEqual([
+    "  FAIL  another",
+    "  FAIL  the x check (details)",
+    "  STOP  at the check PINETA_STOP_AT names",
+  ])
 })

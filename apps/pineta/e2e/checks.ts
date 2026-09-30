@@ -40,6 +40,7 @@ export const stopMessage = (label: string): string =>
  */
 export function createChecks(
   stopAt: string | undefined = process.env.PINETA_STOP_AT,
+  print: (line: string) => void = console.log,
 ): Checks {
   const passed: string[] = []
   const failed: string[] = []
@@ -50,16 +51,14 @@ export function createChecks(
     ok(condition, label) {
       const pass = Boolean(condition)
       ;(pass ? passed : failed).push(label)
-      console.log(`  ${pass ? "PASS" : "FAIL"}  ${label}`)
+      print(`  ${pass ? "PASS" : "FAIL"}  ${label}`)
       if (stopsHere(pass, label, stopAt)) {
-        console.log("  STOP  at the check PINETA_STOP_AT names")
+        print("  STOP  at the check PINETA_STOP_AT names")
         throw new Error(stopMessage(label))
       }
     },
     report(title) {
-      console.log(
-        `\n=== ${title}: pass=${passed.length} fail=${failed.length} ===`,
-      )
+      print(`\n=== ${title}: pass=${passed.length} fail=${failed.length} ===`)
       process.exit(failed.length > 0 ? 1 : 0)
     },
   }

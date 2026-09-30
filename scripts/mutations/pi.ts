@@ -122,8 +122,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the note names a symbol that is gone",
     file: "packages/pi/lane.md",
-    from: "<!-- apps/pineta/host/work.ts runEnded -->",
-    to: "<!-- apps/pineta/host/work.ts runEnd -->",
+    from: "<!-- apps/pineta/host/work/containers.ts runEnded -->",
+    to: "<!-- apps/pineta/host/work/containers.ts runEnd -->",
     command: unit,
     expect: "every source lane.md names",
   },

@@ -5,7 +5,7 @@ import { readActiveRun, readStreams } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { basics, deferred, fakeLane, methods, record } from "./fakes.ts"
 import { createRuns, planRunEnd, streamInto } from "./runs.ts"
-import type { LaneWork } from "./work.ts"
+import type { LaneWork } from "./work/index.ts"
 
 const LANE = laneNameForThread("0123456789abcdef")
 const chat = encodeChat(

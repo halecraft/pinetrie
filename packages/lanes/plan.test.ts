@@ -45,6 +45,7 @@ import {
   planRun,
   planShared,
   planSnapshot,
+  planStartFrom,
   planTakeOffer,
   planTurnCommit,
   SPEC_LABEL,
@@ -819,6 +820,19 @@ describe("the host: its root, then container, in order", () => {
     expect(decide("running", null)).toBe("recreate")
     expect(decide("stopped", "h1")).toBe("start")
     expect(decide("running", "h1")).toBe("running")
+  })
+  test("planStartFrom: a volume starts from it; none, from the newest snapshot; neither, retired", () => {
+    const newest = snapshotId("e1")
+    expect(planStartFrom({ volume: true, newest: null })).toEqual({
+      kind: "volume",
+    })
+    expect(planStartFrom({ volume: false, newest })).toEqual({
+      kind: "snapshot",
+      from: newest,
+    })
+    expect(planStartFrom({ volume: false, newest: null })).toEqual({
+      kind: "retired",
+    })
   })
 })
 

@@ -14,7 +14,7 @@ import type { Basics } from "./basics.ts"
 import type { NoteTexts } from "./notes.ts"
 import type { Serial } from "./queue.ts"
 import type { Runs } from "./runs.ts"
-import type { LaneWork } from "./work.ts"
+import type { LaneWork } from "./work/index.ts"
 
 export interface StartupDeps {
   readonly basics: Pick<Basics, "doc" | "log">
@@ -22,7 +22,9 @@ export interface StartupDeps {
     Agent,
     "commands" | "interrupted" | "refusedCommands" | "setWorkRecord"
   >
-  readonly work: Pick<LaneWork, "ensureNames" | "project">
+  readonly work: Pick<LaneWork, "project">
+  /** Name every lane that has none (ADR-0039). */
+  readonly ensureNames: () => Promise<void>
   readonly serial: Serial
   readonly start: Runs["start"]
   readonly settle: (lanes: readonly LaneName[]) => Promise<void>
@@ -42,7 +44,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
   const { agent, work, serial, notes, settle } = deps
   const { doc, log } = deps.basics
   clearStreams(doc)
-  await work.ensureNames()
+  await deps.ensureNames()
   const planned = planStartup({
     held: readOutbox(doc),
     interrupted: await agent.interrupted(),

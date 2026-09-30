@@ -35,7 +35,7 @@ import {
 } from "@pineta/reads"
 import type { Basics } from "../basics.ts"
 import type { Runs } from "../runs.ts"
-import type { LaneWork } from "../work.ts"
+import type { LaneWork } from "../work/index.ts"
 
 export type Chat = Omit<Extract<Intent, { kind: "chat" }>, "kind">
 

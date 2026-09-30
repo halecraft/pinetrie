@@ -32,7 +32,7 @@ import {
   readStreams,
 } from "@pineta/schema"
 import { type Basics, failed } from "./basics.ts"
-import type { LaneWork } from "./work.ts"
+import type { LaneWork } from "./work/index.ts"
 
 export type RunStart =
   | {

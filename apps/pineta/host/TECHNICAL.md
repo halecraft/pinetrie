@@ -26,7 +26,9 @@ wires them.
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
 | `hot-reload.ts` | Vite's hot updates, held while a direct lane in the project runs |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the image store, the SQLite store |
-| `work.ts`, `offers.ts` | lane containers and disks, and each lane's offer in your repo |
+| `work/` | lane containers and disks (§ Lane work) |
+| `offers/` | each lane's offer in your repo (§ Offers) |
+| `names.ts` | every lane's thread name (ADR-0039), one plan at a time |
 | `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue`, `putNote`, `basics` |
 
 ## One serial executor
@@ -102,6 +104,57 @@ records written only when changed, and every note's text held.
   by one `send`. A blob, a review and a diff are cached for a year
   (`IMMUTABLE`: each is named by what it holds); a refusal is never stored.
 
+## Lane work (`work/`)
+
+`work/index.ts` builds each piece in order and returns `LaneWork`:
+
+| module | owns |
+|---|---|
+| `setup.ts` | `Setup`: the project, lane configs and shared directories, the browser check, the images and runtime (`ready`), `specOf`, the granted host paths (read once, lazily: the agent exists only after lane work), and the base snapshot's refreshes |
+| `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
+| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`), `beforeRun`, `runEnded` |
+| `fetch.ts` | a lane's history into your repo, each lane's fetches on a `Serial` of its own |
+| `turns.ts` | pi's `turnDone`: the turn's revision, snapshot and fetch; the turn records still being written (`pendingRecords`) |
+| `create.ts` | a new lane: `checkDirectory`, its record and name, its fork (`forkFacts` waits for `pendingRecords`) |
+| `update.ts` | an update (`applyClean` for a clean one), and a resolution's outcome, with the guidance flag pi's hook sets |
+| `split.ts` | a split's prompt, and its end (`finishSplit`) |
+| `archive.ts` | a root archived or restored |
+| `disk.ts` | the snapshot on a lane's queue, and the lockfile's hash |
+
+- **State lives where it changes.** What startup found is `Setup`'s, fixed
+  after it. Each lane's handle is the registry's. Each coordination set is
+  owned by the module that writes it, behind a function: `turns`' pending
+  records, `update`'s guidance flag, `fetch`'s queues.
+- **One `turns` and one `updates`.** `index.ts` makes each once and builds
+  pi's `hooks` from them, so a fork waits on the records this `turnDone`
+  adds, and `landingEnded` reads the flag this `askedForGuidance` sets. A
+  second instance would have its own set, and the fork would wait on the
+  empty one.
+- **The queues a lane's work crosses:** its own `LaneQueue` (the start, a
+  fork, each turn's commit and snapshot, the bundle, the stop and trim); its
+  fetch `Serial` (your repo's fetch, which tools never wait on); the base
+  snapshot's `Serial`; and the offers' queue for your repo.
+- **A lane's `LaneQueue` breaks on a fatal failure and the host's `Serial`s
+  do not.** A failed start or fork must stop the lane's tools, which wait on
+  its queue; a failed host step must not stop the steps behind it.
+
+## Offers (`offers/`)
+
+- **One `Serial` for your repo, in `OfferState`,** carries every offer
+  operation, take and read, so no two interleave. A read waits there too,
+  since a jj read can write (S57).
+- **Each step carries out a pure plan** (`offers/plan.ts`): `planRefresh`
+  (marginalia) picks the branch, `planOfferEffects` says what it runs and
+  writes, `offerRecord` builds the record, and `planTake` a take.
+  `execute.ts` carries them out over ports (`executeOffer`, `executeTake`).
+  So the offers' rules are tested as values, and what a plan makes the host
+  write is tested over `record<T>()`; `packages/lanes/lanes.test.ts` proves
+  the jj steps themselves against real jj.
+- `refresh.ts` builds and records, and carries out a refresh; `describe.ts`
+  asks the model outside the queue and writes inside it; `act.ts`,
+  `stack.ts` and `watch.ts` (`planPoll`) are the actions, a split's stack
+  and your jj operations.
+
 ## Testing the shell
 
 - **Test a decision as a value** where the shell has one: `planRunEnd`,
@@ -127,8 +180,6 @@ records written only when changed, and every note's text held.
     Yjs `clientID`s;
   - `marginalia/chat.ts`'s `attributed`: the model is told who spoke, which
     shows that pi's conversion sends `content`;
-  - `work.ts` and `offers.ts`: until they are split, their rules are proven
-    in `e2e:lanes` (and one in `e2e`).
 - **Tests in subdirectories run**: `vitest.config.mjs` includes
   `apps/*/host/**/*.test.ts`.
 - **The integration is the suites'.** `e2e` and `e2e:browser` check the

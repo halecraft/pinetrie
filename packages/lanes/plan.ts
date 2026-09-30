@@ -1327,6 +1327,24 @@ export function planContainer(input: {
   return state === "running" ? "running" : "start"
 }
 
+/**
+ * Where a lane's container, made anew, starts from: its volume if it has one;
+ * else its newest snapshot (a restored root); else nothing, and the lane
+ * predates lane containers.
+ */
+export function planStartFrom(input: {
+  readonly volume: boolean
+  readonly newest: SnapshotId | null
+}):
+  | { readonly kind: "volume" }
+  | { readonly kind: "snapshot"; readonly from: SnapshotId }
+  | { readonly kind: "retired" } {
+  if (input.volume) return { kind: "volume" }
+  return input.newest === null
+    ? { kind: "retired" }
+    : { kind: "snapshot", from: input.newest }
+}
+
 /** The oldest git a lane's image may have: jj's fetch needs 2.41 (S42 item 7). */
 const MIN_GIT: readonly [number, number] = [2, 41]
 

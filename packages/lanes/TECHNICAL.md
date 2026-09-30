@@ -162,8 +162,12 @@ containers, disks and the helper.
   - its label differs, or it has none: recreate it on the same volume;
   - stopped: start it;
   - running with the same label: nothing to do.
+
+  A container made anew starts from what `planStartFrom` decides: its
+  volume; else its newest snapshot (a restored root); else nothing, and the
+  lane predates lane containers. Both decisions are in `plan.ts`.
 - **A lane's container is stopped after every run** (`runEnded` in the
-  host's `work.ts`), and its disk trimmed. The next run starts it again.
+  host's `work/containers.ts`), and its disk trimmed. The next run starts it again.
   Processes the agent started, dev servers included, end with the run. The
   agent is told so (ADR-0046).
 - **What reaches existing lanes this way:** a rebuilt image, changed grants,
@@ -237,7 +241,7 @@ containers, disks and the helper.
   error, until the lane is started again.
 - **Your repo's fetch is on a second queue per lane,** in the host, which
   tools never wait on. Each fetch then refreshes the lane's offer, on the
-  host's one queue for your repo (`host/offers.ts`).
+  host's one queue for your repo (`host/offers/`).
 
 ## Running jj and git (`run.ts`)
 
@@ -250,7 +254,7 @@ containers, disks and the helper.
 - **A read can write.** With divergent operation heads, any jj command that
   loads the repo reconciles them, writing an operation and rebasing
   descendants (S57). So the host's reads of your repo run on its queue for
-  your repo (`host/offers.ts`), with its writes.
+  your repo (`host/offers/`), with its writes.
 - **The host's trailers** (`Pineta-Thread`, `Pineta-Lane`, `Pineta-Entry`)
   are core's `TRAILERS`: `revisionMessage` and `entryOfMessage` here, and
   marginalia's `withTrailers` and `withoutTrailers`, read the one constant.
@@ -387,7 +391,9 @@ containers, disks and the helper.
   about a real lane that a unit test cannot: the journal, `sync`, a
   read-only mount, a shared mount seen both ways, the git ignore variables,
   jj's config scope, an agent's own commit, the image's browser.
-  `planContainer`'s rule is a unit mutation.
+  `planContainer`'s and `planStartFrom`'s rules are unit mutations. These
+  are all that `e2e:lanes` proves by mutation: the host's lane work and offers
+  are proven by unit tests (`apps/pineta/host/TECHNICAL.md`).
 - **The contract test takes about 7 s:**
   - its volume is 4 GiB, since `e2fsck -f` walks every block group however
     little a volume holds;

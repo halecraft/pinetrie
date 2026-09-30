@@ -18,12 +18,10 @@ test("recover resumes each interrupted lane before it settles the others, and na
       refusedCommands: () => [],
       setWorkRecord: async () => {},
     }).port,
-    work: record<StartupDeps["work"]>({
-      project: null,
-      ensureNames: async () => {
-        events.push("names")
-      },
-    }).port,
+    work: record<StartupDeps["work"]>({ project: null }).port,
+    ensureNames: async () => {
+      events.push("names")
+    },
     serial: createSerial(),
     start: (lane, s) => {
       events.push(`${s.kind} ${lane}`)
@@ -51,10 +49,8 @@ test("recover holds every recorded note's text before it resolves", async () => 
       refusedCommands: () => [],
       setWorkRecord: async () => {},
     }).port,
-    work: record<StartupDeps["work"]>({
-      project: null,
-      ensureNames: async () => {},
-    }).port,
+    work: record<StartupDeps["work"]>({ project: null }).port,
+    ensureNames: async () => {},
     serial: createSerial(),
     start: () => runId("r-1"),
     settle: async () => {},

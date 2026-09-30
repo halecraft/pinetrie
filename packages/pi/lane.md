@@ -79,7 +79,7 @@ changes Pineta can keep this note true. You can skip them.
 
 - The container stops when a run ends, and the next message to this thread
   starts it again. Dev servers, watchers and other background processes end
-  with it. <!-- apps/pineta/host/work.ts runEnded -->
+  with it. <!-- apps/pineta/host/work/containers.ts runEnded -->
 - `/workspace` is snapshotted after each turn. A branch from any of your
   messages starts from the disk as it was at that message.
   <!-- packages/lanes/plan.ts planSnapshot -->
@@ -95,7 +95,7 @@ changes Pineta can keep this note true. You can skip them.
   its own `pineta.Containerfile` runs that image instead, with only what it
   installs. <!-- packages/lanes/image/Containerfile PLAYWRIGHT_BROWSERS_PATH -->
   <!-- packages/lanes/image.ts projectContainerfile -->
-- A lane has 4 GiB of memory. <!-- apps/pineta/host/work.ts LANE_MEMORY -->
+- A lane has 4 GiB of memory. <!-- apps/pineta/host/work/setup.ts LANE_MEMORY -->
 - There is no container runtime (`container`, `docker`) and no `gh`.
 - There is no model key: pi's `auth.json` is not in the lane.
 - There are no credentials: the person's home directory is not mounted. A

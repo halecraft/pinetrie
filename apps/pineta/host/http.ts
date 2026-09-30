@@ -27,7 +27,7 @@ import {
   uploadRefusal,
 } from "./responses.ts"
 import { planRequest, planUpgrade } from "./routes.ts"
-import type { LaneWork } from "./work.ts"
+import type { LaneWork } from "./work/index.ts"
 
 export interface RunningHttp {
   readonly port: number
