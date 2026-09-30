@@ -3,7 +3,7 @@
 Pineta is a coding agent whose conversation is a tree. People branch from any
 message, work in the same tree together, and take the agent's file changes
 when they are ready. The detail is in `docs/01-architecture.md` and the ADRs
-in `docs/02-decisions.md`.
+in `docs/adrs/`.
 
 ```
 browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core

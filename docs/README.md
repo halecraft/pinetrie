@@ -9,8 +9,7 @@ with a conversation **tree** as the primary object rather than a transcript.
 |---|---|
 | `00-vision.md` | What we are building and why. Product thesis. |
 | `01-architecture.md` | Layer cake, thin waist, data model, evidence base. |
-| `02-decisions.md` | ADR-0001..0047. Decisions already made, with rationale. |
-| `adrs/` | ADR-0048 on, one file each, so lanes don't conflict. |
+| `adrs/` | ADRs, one file each: decisions already made, with rationale. |
 | `03-spikes.md` | Open unknowns as falsifiable, time-boxed experiments. |
 | `04-roadmap.md` | Sequencing: spikes → walking skeleton → v1 demo. |
 | `05-stack.md` | Stack decisions and why: TypeScript on Node, pnpm, Vite, React. |
@@ -26,8 +25,7 @@ Nothing stays an open unknown. Every uncertainty is either:
 - **an unknown** → goes in `03-spikes.md` with a kill criterion.
 
 When a spike resolves, it becomes an ADR and is struck from the spike list.
-When an ADR is reversed, it is superseded in place, never deleted — the
-rejected reasoning is the valuable part.
+How an ADR is written, amended and superseded: `adrs/README.md`.
 
 ## Status
 

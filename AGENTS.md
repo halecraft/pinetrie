@@ -3,8 +3,7 @@
 Pineta is a collaborative agentic harness: pi's agent core over a Kyneta CRDT
 document, where the conversation is a tree. Start with `docs/pineta.md` (the
 handoff) and `docs/README.md` (the map of the docs). Decisions and their
-reasons are the ADRs: ADR-0001 to 0047 in `docs/02-decisions.md`, and each
-later one in its own file in `docs/adrs/`. Each package has a
+reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
 `TECHNICAL.md` with its gotchas: read the one nearest the code you change.
 
 ## Tools and environment

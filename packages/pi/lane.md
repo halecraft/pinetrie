@@ -108,7 +108,7 @@ changes Pineta can keep this note true. You can skip them.
 - The internet is reachable.
 - The person's services on their machine's loopback are not.
 - Their services listening on all interfaces are at `192.168.64.1`.
-  <!-- docs/02-decisions.md 192.168.64.1 -->
+  <!-- docs/adrs/0034-lane-containers.md 192.168.64.1 -->
 
 ## People
 
