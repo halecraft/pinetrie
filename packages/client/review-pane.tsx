@@ -1,6 +1,6 @@
 // client/review-pane — a column's review of its offer (ADR-0047): a file
-// list beside one scroll of every file's diff, each file's head pinned while
-// its diff is in view. `review.ts` decides what it shows; `useFetched` reads.
+// list, when there is more than one file, beside one scroll of every file's
+// diff, each file's head pinned while its diff is in view. `review.ts` decides what it shows; `useFetched` reads.
 
 import type { RevisionReview } from "@pineta/core"
 import { decodeRevisionReview, diffUrl, reviewUrl } from "@pineta/marginalia"
@@ -103,9 +103,6 @@ function ReviewPaneView(p: ReviewPaneProps) {
       if (s.dataset.key === key) s.scrollIntoView({ block: "start" })
   }
 
-  const single = view.revisions.length === 1 ? view.revisions[0] : undefined
-  const title =
-    single?.state.kind === "ready" ? single.state.value.title : undefined
   return (
     <section
       aria-label="review of this thread's offer"
@@ -118,7 +115,9 @@ function ReviewPaneView(p: ReviewPaneProps) {
     >
       <div className="review-head" ref={head} tabIndex={-1}>
         <span className="review-line">{p.line}</span>
-        {title !== undefined && <span className="review-title">{title}</span>}
+        {view.title !== undefined && (
+          <span className="review-title">{view.title}</span>
+        )}
         <button
           aria-label="close the review"
           className="review-close"
@@ -129,40 +128,44 @@ function ReviewPaneView(p: ReviewPaneProps) {
         </button>
       </div>
       <div className="review-body">
-        <nav aria-label="files" className="review-list">
-          {view.revisions.map(r => (
-            <div className="review-list-revision" key={r.commit}>
-              {r.state.kind !== "ready" ? (
-                <div className="review-note">
-                  {r.state.kind === "loading" ? "…" : r.state.reason}
-                </div>
-              ) : (
-                <>
-                  {single === undefined && (
-                    <div className="review-list-title">
-                      {r.state.value.title}
-                    </div>
-                  )}
-                  {r.state.value.files.map(f => (
-                    <button
-                      aria-current={current === f.key ? "location" : undefined}
-                      className="review-list-file"
-                      data-conflicts={f.conflicts || undefined}
-                      data-yours={f.yours || undefined}
-                      key={f.key}
-                      onClick={() => jump(f.key)}
-                      title={f.shown}
-                      type="button"
-                    >
-                      <span className="review-letter">{f.letter}</span>{" "}
-                      <span className="review-path">{f.shown}</span>
-                    </button>
-                  ))}
-                </>
-              )}
-            </div>
-          ))}
-        </nav>
+        {view.listed && (
+          <nav aria-label="files" className="review-list">
+            {view.revisions.map(r => (
+              <div className="review-list-revision" key={r.commit}>
+                {r.state.kind !== "ready" ? (
+                  <div className="review-note">
+                    {r.state.kind === "loading" ? "…" : r.state.reason}
+                  </div>
+                ) : (
+                  <>
+                    {view.title === undefined && (
+                      <div className="review-list-title">
+                        {r.state.value.title}
+                      </div>
+                    )}
+                    {r.state.value.files.map(f => (
+                      <button
+                        aria-current={
+                          current === f.key ? "location" : undefined
+                        }
+                        className="review-list-file"
+                        data-conflicts={f.conflicts || undefined}
+                        data-yours={f.yours || undefined}
+                        key={f.key}
+                        onClick={() => jump(f.key)}
+                        title={f.shown}
+                        type="button"
+                      >
+                        <span className="review-letter">{f.letter}</span>{" "}
+                        <span className="review-path">{f.shown}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            ))}
+          </nav>
+        )}
         <div className="review-diffs" onScroll={onScroll} ref={diffs}>
           {view.revisions.map(r => (
             <div className="review-revision" key={r.commit}>

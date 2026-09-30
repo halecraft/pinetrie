@@ -48,6 +48,16 @@ export interface RevisionShown {
 }
 
 export interface ReviewView {
+  /**
+   * Whether the file list shows: not for one revision of at most one file,
+   * nor while that one revision is unread.
+   */
+  readonly listed: boolean
+  /**
+   * The one revision's title, for the review's head; undefined for a stack,
+   * whose list heads each revision's files with its title instead.
+   */
+  readonly title: string | undefined
   /** Bottom first, one per commit of the target. */
   readonly revisions: readonly {
     readonly commit: CommitId
@@ -73,48 +83,54 @@ export function reviewView(
 ): ReviewView {
   const conflicts = new Set(target.conflicts)
   const yours = new Set(target.yourEdits)
-  return {
-    revisions: target.commits.map((commit, i) => {
-      const got = revisions[i] ?? { kind: "loading" }
-      if (got.kind !== "ready") return { commit, state: got }
-      const text = withoutTrailers(got.value.description)
-      const cut = text.indexOf("\n")
-      const files = got.value.files.map(f => {
-        const changed = f.added + f.removed
-        return {
-          key: `${commit}:${f.path}`,
-          commit,
-          path: f.path,
-          shown: f.shown,
-          letter: LETTER[f.change],
-          lines: [
-            f.added > 0 ? `+${f.added}` : "",
-            f.removed > 0 ? `−${f.removed}` : "",
-          ]
-            .filter(s => s !== "")
-            .join(" "),
-          changed,
-          conflicts: conflicts.has(f.path),
-          yours: yours.has(f.path),
-          startsCollapsed: changed > COLLAPSE_OVER,
-          estimate: Math.min(
-            DIFF_LINES_SHOWN,
-            changed + 4 + 6 * Math.ceil(changed / 20),
-          ),
-        }
-      })
+  const shown: ReviewView["revisions"] = target.commits.map((commit, i) => {
+    const got = revisions[i] ?? { kind: "loading" }
+    if (got.kind !== "ready") return { commit, state: got }
+    const text = withoutTrailers(got.value.description)
+    const cut = text.indexOf("\n")
+    const files = got.value.files.map(f => {
+      const changed = f.added + f.removed
       return {
+        key: `${commit}:${f.path}`,
         commit,
-        state: {
-          kind: "ready",
-          value: {
-            title: (cut < 0 ? text : text.slice(0, cut)) || "(no description)",
-            body: cut < 0 ? "" : text.slice(cut + 1).trim(),
-            files,
-          },
-        },
+        path: f.path,
+        shown: f.shown,
+        letter: LETTER[f.change],
+        lines: [
+          f.added > 0 ? `+${f.added}` : "",
+          f.removed > 0 ? `−${f.removed}` : "",
+        ]
+          .filter(s => s !== "")
+          .join(" "),
+        changed,
+        conflicts: conflicts.has(f.path),
+        yours: yours.has(f.path),
+        startsCollapsed: changed > COLLAPSE_OVER,
+        estimate: Math.min(
+          DIFF_LINES_SHOWN,
+          changed + 4 + 6 * Math.ceil(changed / 20),
+        ),
       }
-    }),
+    })
+    return {
+      commit,
+      state: {
+        kind: "ready",
+        value: {
+          title: (cut < 0 ? text : text.slice(0, cut)) || "(no description)",
+          body: cut < 0 ? "" : text.slice(cut + 1).trim(),
+          files,
+        },
+      },
+    }
+  })
+  const only = shown.length === 1 ? shown[0]?.state : undefined
+  return {
+    listed:
+      only === undefined ||
+      (only.kind === "ready" && only.value.files.length > 1),
+    title: only?.kind === "ready" ? only.value.title : undefined,
+    revisions: shown,
   }
 }
 

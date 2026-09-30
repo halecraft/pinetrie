@@ -64,6 +64,28 @@ describe("reviewView", () => {
       [C2, "ready"],
     ])
   })
+  test("the file list shows only when there is more than one file to list", () => {
+    const alone = { ...target, commits: [C1] }
+    const listed = (t: typeof target, got: Loaded<RevisionReview>[]) =>
+      reviewView(t, got).listed
+    expect([
+      listed(alone, [ready(two)]),
+      listed(alone, [{ kind: "loading" }]),
+      listed(alone, [ready({ description: "x", files: [] })]),
+      listed(alone, [ready(one)]),
+      listed(target, [ready(two), ready(two)]),
+      listed(target, [{ kind: "loading" }, { kind: "loading" }]),
+    ]).toEqual([false, false, false, true, true, true])
+  })
+  test("the head carries the one revision's title; a stack's list carries each", () => {
+    const title = (t: typeof target, got: Loaded<RevisionReview>[]) =>
+      reviewView(t, got).title
+    expect([
+      title({ ...target, commits: [C1] }, [ready(two)]),
+      title({ ...target, commits: [C1] }, [{ kind: "loading" }]),
+      title(target, [ready(one), ready(two)]),
+    ]).toEqual(["feat: two", undefined, undefined])
+  })
   test("a file over 400 changed lines starts collapsed; one at 400 does not", () => {
     const rows = (added: number) => {
       const v = reviewView({ ...target, commits: [C1] }, [

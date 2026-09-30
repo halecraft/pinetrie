@@ -903,10 +903,26 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a conflict flags nothing",
     file: "packages/client/review.ts",
-    from: "          conflicts: conflicts.has(f.path),",
-    to: "          conflicts: false,",
+    from: "        conflicts: conflicts.has(f.path),",
+    to: "        conflicts: false,",
     command: unit,
     expect: "flags conflicts and your edits by path",
+  },
+  {
+    name: "one file keeps its file list",
+    file: "packages/client/review.ts",
+    from: '      (only.kind === "ready" && only.value.files.length > 1),',
+    to: '      only.kind === "ready",',
+    command: unit,
+    expect: "the file list shows only when there is more than one file",
+  },
+  {
+    name: "a stack's review heads itself with its first title",
+    file: "packages/client/review.ts",
+    from: '    title: only?.kind === "ready" ? only.value.title : undefined,',
+    to: '    title: shown[0]?.state.kind === "ready" ? shown[0].state.value.title : undefined,',
+    command: unit,
+    expect: "the head carries the one revision's title",
   },
   {
     name: "a file header reads as an added line",

@@ -190,7 +190,7 @@ so it is the one behind the menu. What each does is under "Starting" below.
   warns while another agent works in the same directory.
 - **A column widens to review its offer** (ADR-0047). The offer's line opens
   the review to the right of the thread, which keeps its place and width: a
-  file list, and one scroll of every file's diff, each file's head pinned
+  file list when there is more than one file, and one scroll of every file's diff, each file's head pinned
   while its diff is in view, with the files that conflict and those you are
   editing flagged.
 - On a narrow screen, columns stack as a back-navigable sequence (the macOS
