@@ -9,7 +9,8 @@ with a conversation **tree** as the primary object rather than a transcript.
 |---|---|
 | `00-vision.md` | What we are building and why. Product thesis. |
 | `01-architecture.md` | Layer cake, thin waist, data model, evidence base. |
-| `02-decisions.md` | ADR-0001..0046. Decisions already made, with rationale. |
+| `02-decisions.md` | ADR-0001..0047. Decisions already made, with rationale. |
+| `adrs/` | ADR-0048 on, one file each, so lanes don't conflict. |
 | `03-spikes.md` | Open unknowns as falsifiable, time-boxed experiments. |
 | `04-roadmap.md` | Sequencing: spikes → walking skeleton → v1 demo. |
 | `05-stack.md` | Stack decisions and why: TypeScript on Node, pnpm, Vite, React. |
@@ -21,7 +22,7 @@ with a conversation **tree** as the primary object rather than a transcript.
 
 Nothing stays an open unknown. Every uncertainty is either:
 
-- **a decision** → goes in `02-decisions.md` as an ADR, or
+- **a decision** → goes in `adrs/` as an ADR, one file each, or
 - **an unknown** → goes in `03-spikes.md` with a kill criterion.
 
 When a spike resolves, it becomes an ADR and is struck from the spike list.

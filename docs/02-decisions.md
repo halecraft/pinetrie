@@ -1,6 +1,8 @@
 # Decisions (ADRs)
 
 Format: Context / Decision / Consequences / Alternatives rejected.
+This file holds ADR-0001 to ADR-0047. Later ADRs are one file each in
+`adrs/` (see `adrs/README.md`), so lanes writing them don't conflict here.
 Superseded ADRs are marked in place, never deleted — the rejected reasoning is
 the valuable part.
 
