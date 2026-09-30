@@ -1159,6 +1159,39 @@ describe("a lane's repo, with jj", () => {
     expect([again.conflicted, again.files]).toEqual([false, ["c.txt"]])
   }, 60_000)
 
+  test("a taken branch that holds all its lane's work puts the lane's offer start at its tip (S51)", async () => {
+    const { yoursDir, laneDir, yoursJj, ops, laneJj, inLane, fetch, edit } =
+      await offerRig("holds-tip")
+    await edit(yoursDir, "a.txt", "a\n")
+    await yoursJj(["commit", "-m", "base"])
+    const base = await yoursNow(yoursJj)
+    await inLane(
+      planBaseRefresh({ base: null, yours: base, lock: null, install: null }),
+    )
+    // The lane starts from a copy of your @: a have in its tip's history.
+    await inLane(
+      planForkSetup(LANE, { kind: "copy", ...(await yoursAt(yoursJj)) }),
+    )
+    const [copy] = await commitsOf(laneJj, `bookmarks(exact:"pineta/${LANE}")`)
+    if (copy === undefined) throw new Error("no copy")
+    const turn = async (file: string, n: number) => {
+      await edit(laneDir, file, `${file}\n`)
+      const t = await turnOn(laneJj, { ...TURN, entry: entryId(`e-h${n}`) })
+      if (t === null) throw new Error("no turn")
+      return t
+    }
+    const tip = await turn("parent.txt", 1)
+    // A branch forked at that tip turns once more, and you take its offer:
+    // its delivered have descends from the lane's tip, and holds all of it.
+    const branch = await turn("branch.txt", 2)
+    await fetch(base)
+    const haves: HaveRecord[] = [
+      { lane: LANE, commit: copy, kind: "copy", at: 1 },
+      { lane: LANE, commit: branch, kind: "delivered", at: 2 },
+    ]
+    expect(await startOfOffer(ops, { tip, target: "@-", haves })).toEqual([tip])
+  }, 60_000)
+
   test("retiring a repo from before offers: history kept, out of your log", async () => {
     const dir = path.join(top, "retire")
     await run("mkdir", ["-p", dir])

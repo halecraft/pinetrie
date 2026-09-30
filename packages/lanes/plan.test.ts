@@ -502,6 +502,18 @@ describe("offers (ADR-0038)", () => {
     ] as const)("%s", (_, haves, inTip, expected) => {
       expect(kept(haves, inTip)).toEqual(expected)
     })
+    test("a have that holds the tip is kept alone, whatever copy is newer", () => {
+      // A branch of the lane, taken: its tip descends from this lane's.
+      const branch = have("b5", "delivered", 5)
+      const c6 = have("c6", "copy", 6)
+      expect(
+        startHaves(
+          [c1, d2, branch, c6],
+          new Set(["c1", "d2", "c6"].map(commitId)),
+          new Set([commitId("b5")]),
+        ).map(h => h.commit),
+      ).toEqual(["b5"])
+    })
   })
   test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {
     const n = (i: number) => nonceRevset("N", i)

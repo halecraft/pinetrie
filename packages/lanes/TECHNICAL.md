@@ -328,8 +328,17 @@ containers, disks and the helper.
   conflicts where they differ. "Newest in the tip's history", not the lane's
   newest: a branch forked before its parent's update holds only the older
   copy, and must keep it.
+- **A have that holds the tip wins over every other** (`startHaves`). When
+  you take a branch of a lane, its delivered commit descends from the
+  lane's tip, so it is not in the tip's history, yet you have all the lane
+  holds. Those haves alone are kept, and the start is the tip: the lane's
+  offer is withdrawn. Filtering them out, as the rule above alone did, left
+  the start below the tip, and the offer was followed into an empty one.
+  The start is one commit, never a merge, so the conflict S51 prevents
+  cannot come back.
 - **`startOfOffer` is the one path to a start:** a read of which haves the
-  tip's history holds, `startHaves`, then `offerStart`'s revset. The host's
+  tip's history holds and which hold the tip, `startHaves`, then
+  `offerStart`'s revset. The host's
   refresh, its `squash` and `refresh` actions and `stackSpan` all use it: a
   start from another rule would read as a moved start to `planRefresh`, and
   a split would build on it.

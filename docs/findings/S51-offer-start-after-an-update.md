@@ -57,6 +57,16 @@ at `/mnt/host-working-copy`: `jj log -r 'conflicts() | bookmarks(glob:"pineta-of
    parent's older copy. Dropping that one because the parent has a newer copy
    would make the branch's offer hand your old uncommitted edits back to you.
 
+6. **Addendum: a have that holds the tip must not be dropped.** Item 4's
+   rule kept only haves in the tip's history. A branch of the lane, taken,
+   delivers its own tip, which descends from the lane's tip, so the rule
+   dropped it. The lane's start then stayed below its tip, and `e2e:lanes`'
+   "taking a branch that holds all its parent's work withdraws the parent's
+   offer" failed: the parent's offer was followed into an empty one. Found by
+   running that check at each revision back to this one. Fixed in
+   `startHaves`: a have holding the tip is kept alone, and the start is the
+   tip. `packages/lanes/lanes.test.ts` reproduces it with real jj.
+
 **Not covered here.** Another thread's offer, `pineta-offer/silver-vine`,
 also conflicted. Its only start was the lane's first copy, since it had never
 been updated, and its conflicts were with your later commits in files both

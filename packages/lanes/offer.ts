@@ -34,9 +34,9 @@ export async function laneTipIn(
 }
 
 /**
- * Where an offer starts, as commits: which haves the lane tip's history holds
- * (read), the ones `startHaves` keeps of them (pure), then `offerStart`'s
- * revset (read). The host's every start comes from here, so an offer is
+ * Where an offer starts, as commits: which haves the lane tip's history holds,
+ * and which hold the tip (read), the ones `startHaves` keeps of them (pure),
+ * then `offerStart`'s revset (read). The host's every start comes from here, so an offer is
  * built, followed and split from one start.
  */
 export async function startOfOffer(
@@ -50,7 +50,9 @@ export async function startOfOffer(
   const any = anyHave(input.haves)
   const inTip =
     any === null ? [] : await commitsOf(jj, `::${input.tip} & (${any})`)
-  const haves = startHaves(input.haves, new Set(inTip))
+  const holdTip =
+    any === null ? [] : await commitsOf(jj, `${input.tip}:: & (${any})`)
+  const haves = startHaves(input.haves, new Set(inTip), new Set(holdTip))
   return commitsOf(jj, offerStart({ ...input, haves }))
 }
 

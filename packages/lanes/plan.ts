@@ -927,15 +927,23 @@ export const anyHave = (haves: readonly HaveRecord[]): string | null =>
 
 /**
  * The haves an offer can start from, given which of them the lane tip's
- * history holds (S51). A copy of your `@` holds everything you had when it
- * was made, so the newest copy in the tip's history supersedes every have
- * recorded before it: an older copy's uncommitted edits, or a delivered
- * commit, may since have become commits of yours with other content.
+ * history holds, and which hold the tip (S51).
+ *
+ * A have that holds the tip (a branch of this lane, taken) means you have all
+ * the lane holds: those alone are kept, and the offer starts at the tip.
+ * Otherwise, a copy of your `@` holds everything you had when it was made, so
+ * the newest copy in the tip's history supersedes every have recorded before
+ * it: an older copy's uncommitted edits, or a delivered commit, may since
+ * have become commits of yours with other content. A start at the tip is one
+ * commit, never a merge, so it cannot bring that back.
  */
 export function startHaves(
   haves: readonly HaveRecord[],
   inTip: ReadonlySet<CommitId>,
+  holdTip: ReadonlySet<CommitId> = new Set(),
 ): readonly HaveRecord[] {
+  const holding = haves.filter(h => holdTip.has(h.commit))
+  if (holding.length > 0) return holding
   const held = haves.filter(h => inTip.has(h.commit))
   const newest = held
     .filter(h => h.kind === "copy")

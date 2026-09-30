@@ -295,7 +295,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host starts from every have",
     file: "packages/lanes/offer.ts",
-    from: "  const haves = startHaves(input.haves, new Set(inTip))",
+    from: "  const haves = startHaves(input.haves, new Set(inTip), new Set(holdTip))",
     to: "  const haves = input.haves",
     command: unit,
     expect: "starts at the newest copy (S51)",
@@ -411,5 +411,21 @@ export const mutations: readonly Mutation[] = [
     to: '    ? { kind: "snapshot", from: input.newest }',
     command: unit,
     expect: "planStartFrom: a volume starts from it",
+  },
+  {
+    name: "a have that holds the tip is dropped",
+    file: "packages/lanes/plan.ts",
+    from: "  if (holding.length > 0) return holding\n",
+    to: "",
+    command: unit,
+    expect: "a have that holds the tip is kept alone",
+  },
+  {
+    name: "a start never reads which haves hold the tip",
+    file: "packages/lanes/offer.ts",
+    from: "  const haves = startHaves(input.haves, new Set(inTip), new Set(holdTip))",
+    to: "  const haves = startHaves(input.haves, new Set(inTip), new Set(holdTip.slice(0, 0)))",
+    command: unit,
+    expect: "a taken branch that holds all its lane's work",
   },
 ]
