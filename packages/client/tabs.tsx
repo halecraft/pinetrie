@@ -6,19 +6,23 @@
 // (ADR-0045), and Archive hides it for everyone. A root someone else starts
 // opens no tab here.
 
-import { MAX_TITLE, type WriterId } from "@pineta/core"
+import { MAX_TITLE, type TreeIndex, type WriterId } from "@pineta/core"
 import { ROOT_BUSY_REASON } from "@pineta/marginalia"
 import {
   type KeyboardEvent,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react"
+import { peopleHere, readersByRoot } from "./here.ts"
 import { type ActiveTab, sameTab } from "./layout.ts"
 import { Menu } from "./menu.tsx"
 import { Avatars } from "./presence.tsx"
 import { planTitle } from "./root-label.ts"
+import type { SessionClient } from "./session-view.ts"
+import { useReadingAt } from "./use-presence.ts"
 
 /** Left and Right move focus between tabs. */
 function moveFocus(e: KeyboardEvent<HTMLElement>) {
@@ -41,7 +45,9 @@ export function TabBar({
   newLabel,
   archived,
   work,
-  readers,
+  session,
+  index,
+  order,
   nameOf,
   colorOf,
   onShow,
@@ -63,8 +69,11 @@ export function TabBar({
   archived: ReadonlySet<string>
   /** The agent's work in each root (`rootWork`). */
   work: ReadonlyMap<string, "running" | "waiting">
-  /** Others reading in each root (`readersByRoot`). */
-  readers: ReadonlyMap<string, readonly WriterId[]>
+  /** Whose presence a root tab shows: others reading in it. */
+  session: SessionClient
+  index: TreeIndex
+  /** Everyone, in the order every window agrees on (`writerOrder`). */
+  order: readonly WriterId[]
   nameOf: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
   onShow: (tab: ActiveTab) => void
@@ -177,10 +186,13 @@ export function TabBar({
                 type="button"
               >
                 <span className="tab-label">{labelOf(root)}</span>
-                <Avatars
+                <Readers
                   colorOf={colorOf}
+                  index={index}
                   nameOf={nameOf}
-                  writers={readers.get(root) ?? []}
+                  order={order}
+                  root={root}
+                  session={session}
                 />
               </button>
               {/* On every root tab: shown on the one you are on, and on
@@ -303,6 +315,27 @@ function TitleField({
       value={text}
     />
   )
+}
+
+/**
+ * Others reading in `root`, on its tab. It reads presence itself, so a
+ * presence write redraws this and not the tab bar.
+ */
+function Readers(p: {
+  session: SessionClient
+  index: TreeIndex
+  order: readonly WriterId[]
+  root: string
+  nameOf: ReadonlyMap<WriterId, string>
+  colorOf: (writer: WriterId) => string
+}) {
+  const reading = useReadingAt(p.session.presence, p.session.writer)
+  const { index, order, root } = p
+  const writers = useMemo(
+    () => readersByRoot(peopleHere(reading, index, order)).get(root) ?? [],
+    [reading, index, order, root],
+  )
+  return <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={writers} />
 }
 
 /**

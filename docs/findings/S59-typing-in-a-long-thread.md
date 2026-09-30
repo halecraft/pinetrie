@@ -60,9 +60,96 @@ the ranges shown.
    re-render of `Column` for a reason that leaves its messages alone should
    skip it.
 
+## Where a column's render goes
+
+A second probe, rebuilt from the Method above and also not checked in, asked
+how much of a `Column` render is the message list, and how much is the rest
+of its work: the walks along its thread's path (`columnView`, `threadOf`,
+`nearestRevision`, `yourCard`, `draftingAt`). It used the 1,500-message
+thread among 7,902 entries, and typed 22 keys 1.1 s apart, so each key's
+`typing` write re-rendered `Column` once with its messages unchanged. The
+sampling profiler ran at 100 µs. Each sample is counted under the nearest
+frame that names its part.
+
+| part, per `Column` render | ms |
+|---|---|
+| building the list: the per-message callback in `Column` | 54.2 |
+| of which, `jsxDEV` itself | about 52 |
+| comparing the list: `sameMessageProps`, then React's reconcile and bailout | 2.3 |
+| the walks: `columnView` 0.5, `threadOf` 0.5, `nearestRevision` 0.3, `yourCard` 0.25, `draftingAt` 0.23 | 1.8 |
+| the rest of `Column` | 0.7 |
+| `App` | 3.0 |
+
+React's own measure of each `Column` render took 55–72 ms.
+
+- **The walks are small.** Together they cost 1.8 ms on a 1,500-message
+  path, about 3% of the render. They grow with the thread, but at this size
+  they don't need memoizing.
+- **Most of the list's cost is the development build's element.** For each
+  element, React 19.2's `jsxDEV` captures an `Error("react-stack-top-frame")`
+  and a `console.createTask` for owner stacks
+  (`react-jsx-dev-runtime.development.js`, up to 10,000 per reset). That is
+  about 35 µs per `<Message>`, whether or not the message then redraws. The
+  host always serves Vite's development build (`apps/pineta/host/http.ts`), so
+  this is the cost a person feels. Skipping the list when a column's messages
+  are unchanged removes it.
+
+## React's production build under Vite's dev server
+
+The same probe ran once more with the host started under
+`NODE_ENV=production`. Vite reads that variable when it resolves its config
+(`isProduction`). With it set, esbuild emits `jsx` rather than `jsxDEV`
+(`jsxDev: !isProduction`), `@vitejs/plugin-react` skips Fast Refresh, and
+the dependency optimizer bundles React's production files. The page loaded
+and drew all 1,500 messages. React recorded no component measures.
+
+| React build | keydown events of 16 ms or more (Event Timing) | worst | script over 20 keys |
+|---|---|---|---|
+| development | 21 of 20 keys | 80 ms | 1,741 ms |
+| production | 14 | 16 ms | 399 ms |
+
+The optimizer's cache hash includes `NODE_ENV` (`getConfigHash`), so
+switching builds re-optimizes into the same `cacheDir`. At the time,
+nothing in this repository read `NODE_ENV`.
+
+## How the presence document notifies
+
+A probe in Node: a `@kyneta/reactive` computation over one field of a
+presence document (`newPresenceDoc`), and writes with `batch`.
+
+- A computation over `typing()` fired on a `typing` write, and not on a
+  `reading` or `editing` write. Each field held the same: a read of one
+  field is woken only by writes to it.
+- Writing a value a field already held fired its computations again, and the
+  field's record was a new object, each unchanged row the same. The page's
+  10 s refresh writes exactly that.
+- Notifications arrive after the write, not during it (the probe had to
+  yield before counting).
+
+## After
+
+The same probe, on the code of PLAN-2026-09-30-presence-renders, with the
+1,500-message thread, 20 keys 1.1 s apart.
+
+| React build | keydown events of 16 ms or more | worst | script over 20 keys | renders while typing |
+|---|---|---|---|---|
+| development | 6 | 16 ms | 179 ms | `App` once (the first key makes your card); no `MessageListView` |
+| production | 7 | 16 ms | 223 ms | not recorded |
+
+Against "React's production build" above: development React went from 80 ms
+to 16 ms worst and 1,741 to 179 ms of script.
+
+## What it changed
+
+PLAN-2026-09-30-presence-renders. `App` reads no presence: each field is
+read by the small part that shows it (`packages/client/use-presence.ts`).
+A column's message list is memoised (`MessageList`). `pnpm run host`
+serves production React, and `pnpm run host:react-dev` development React
+(`docs/pineta.md`).
+
 ## What was not measured
 
 - Your session itself: a long lane's messages carry markdown and tool rows,
   which cost more per render than this probe's.
-- A production build: the page is Vite's development build, whose JSX
-  runtime (`jsxDEV`) costs more than production's.
+- `vite build`'s output: production React was measured only under Vite's
+  dev server, which still transforms each module on request.

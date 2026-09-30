@@ -19,13 +19,33 @@ outbox, the participants, the notes, the archive and the work facts, so they
 are always from the same moment. `resolveLayout` takes the index, the lanes
 and the archive together.
 
-## Renders (S54)
+## Renders (S54, S59)
 
-A render of `App` redraws no message whose content did not change. `App`
-renders on every presence change, typing included, so a cascade into every
-message costs CPU in any build, and in the development build memory too:
-React keeps a timeline entry per render whose props changed (S54: 255 MB in
-minutes).
+A render of `App` redraws no message whose content did not change, and a
+presence write renders no `App` at all. A cascade into every message costs
+CPU in any build, and in the development build memory too: React keeps a
+timeline entry per render whose props changed (S54: 255 MB in minutes). In
+the development build each element costs about 35 µs to create whether or
+not it then redraws, so a column that builds a 1,500-message list takes
+about 55 ms (S59).
+
+- **Presence is read by what shows it, never by `App` or a `Column`**
+  (`use-presence.ts`). Each field has its own read (`readReading`,
+  `readTyping`, `readEditing`), and Kyneta wakes a read only for writes to
+  its field (S59). `useSelector` re-renders its reader on every such write,
+  a write of the same value included (the page's 10 s refresh), so the
+  readers are small:
+
+  | field | read by |
+  |---|---|
+  | `typing` | `TypingLine` (`composer.tsx`) |
+  | `editing` | `NoteCard` |
+  | `reading` | `SeenBy` (a column's header), `LiveRail` (rings, and which rail items stay), `People` (`header.tsx`), `Readers` (`tabs.tsx`) |
+
+  Each read keeps its array while the field's entries are the same, so the
+  refresh's render reuses the memos below it. `App` still writes your
+  presence (the reported columns, the refresh, `typing`); writing reads
+  nothing.
 
 - **Every subscription is `useSelector(ref, read)` over a named read**, never
   an inline `useTracked(() => …)`. `useTracked` re-runs a thunk that is a new
@@ -49,7 +69,16 @@ minutes).
   (`message-tools.ts`) through one `onAct`, which `Column` makes once with
   `useStable` and carries out in one `switch`. A handler per message would be
   new on every render of the column.
-- **A message with a note card still redraws with its column**: the card is a
+- **A column's messages are one memoised `MessageList`**
+  (`message-list.tsx`, `message-list-props.ts`), so a column that renders
+  for anything else (a card, its composer's intent, a run elsewhere) builds
+  no list. `view` is compared by identity: `App` keeps it while the index,
+  the columns and the noted entries are the same, and comparing a long
+  thread's nodes would cost part of what skipping saves. So any change to
+  those, a column opened or closed included, builds every column's list
+  once. `lane` and `joins` are rebuilt on every render of the column and
+  compared by value; `sameData` compares a `Map` by its entries.
+- **A message with a note card still redraws with its list**: the card is a
   new element each render, compared by identity.
 - **The review redraws with its data, not its column.** `ReviewPane` compares
   its target and line by value, since `columnView` builds them anew, and its
@@ -62,12 +91,16 @@ minutes).
   is drawn bound at once. It returns the same state when nothing moves, so
   the effect that stores it settles after one pass.
 - **The browser suite counts renders** from React's development build, which
-  the host's Vite serves: it measures every render whose props changed on its
-  "Components ⚛" track, with the changed props' diff
-  (`componentRenders` in `apps/pineta/e2e/browser.ts`). A production build
-  records none, so the check holds only against the dev server. An entry is
-  named by the function that rendered: a message's is `MessageView`, the
-  function `memo` wraps, so a check counting `Message` counts nothing.
+  `startHost` serves with `NODE_ENV` unset, as `pnpm run host:react-dev`
+  does (`pnpm run host` serves production React): React measures every
+  render whose props changed on its "Components ⚛" track, with the changed
+  props' diff (`componentRenders` in `apps/pineta/e2e/browser.ts`). A
+  production build records none, and every count would pass, so the suite
+  stops at its start unless the page has recorded some. A render whose props
+  are the same (a state change, a `useSelector` write) is not recorded. An
+  entry is named by the function that rendered: a message's is
+  `MessageView`, the function `memo` wraps, and a list's
+  `MessageListView`, so a check counting `Message` counts nothing.
 
 ## Root tabs and the layout (`layout.ts`, ADR-0029, ADR-0030)
 
@@ -117,7 +150,7 @@ give the roots and each tab's signals.
   (`first-<root>`, anchored at the root). `columnsReducer` may leave a root
   with none; the layout then deletes the entry.
 - **Column keys hold no `:`.** A presence key is
-  `${writer}:${seat}:${columnKey}`, and `readPresence` takes the writer from
+  `${writer}:${seat}:${columnKey}`, and `readReading` takes the writer from
   before the first colon (ADR-0037). A writer holds none (`normalizeEmail`
   refuses one) and a seat is hex; a colon in a column key would still break
   the rule that a key's parts are its colons.
@@ -213,8 +246,8 @@ rail's scroll-to, the alignment) must search every column.
 The header (`header.tsx`) is the rest of the session, from live data; nothing
 in it opens a tab until you choose.
 
-- **People:** `peopleHere` (`here.ts`) groups `presenceView`'s `readingAt` by
-  person, in `writerOrder`. "Never you" is `presenceView`'s rule, not
+- **People:** `peopleHere` (`here.ts`) groups `readingAt` by
+  person, in `writerOrder`. "Never you" is `readingAt`'s rule, not
   repeated here. Each avatar (`Avatar`, the same circle the tabs and columns
   draw) is a `Menu` of the threads that person is in.
 - **You** are the last thing in the header: your profile (`profile.tsx`,
@@ -794,13 +827,15 @@ pipeline keeps the tree a pure function, testable without a DOM.
   `visibilitychange` listener refreshes on return). Switching tabs therefore
   clears the last tab's keys, through that same deletion. The Archive tab
   reports nothing. Typing is written at most once a second.
-- **A tab's avatars** are `readersByRoot(people)` (`here.ts`): the header's
-  people turned around, so each thread end is resolved to its root once.
-- **`presenceView` (core) decides everything shown**, from `readPresence`
-  (`@pineta/reads`) and the tree: rings (`readingAt`), a header's avatars
-  (`seenBy`, others whose thread end lies on one path with this column's),
-  typing (`typingAt`) and a note's editors (`editingAt`). It always leaves you
-  out, and shows a person once however many seats report them (ADR-0037).
+- **A tab's avatars** are `readersByRoot(peopleHere(…))` (`here.ts`): the
+  header's people turned around, each tab's `Readers` taking its root's.
+- **`core/presence.ts` decides everything shown**, from one field's read
+  (`readReading`, `readTyping`, `readEditing` in `@pineta/reads`) and the
+  tree: rings (`readingAt`), a header's avatars (`seenBy`, others whose
+  thread end lies on one path with this column's), and typing and a note's
+  editors (`whoIsAt`). Each leaves you out, and shows a person once however
+  many seats report them (ADR-0037). Which component reads which field is
+  under Renders.
 - **A person's colour** (`presenceColors`): the first three people, in the
   order they first wrote (`writerOrder`, the same in every window), get
   magenta, white and yellow, far from each other and from the tracks; anyone
@@ -937,7 +972,7 @@ the email is the only thing Pineta chooses.
   clears it or stores another email, so no tab goes on as the old person.
 - **Presence is per seat** (`seatKey(writer, exchange.peerId)`, as `mine` in
   `session-view.ts`), so your tabs never overwrite or clear each other's;
-  `presenceView` shows each person once, and never you.
+  `core/presence.ts` shows each person once, and never you.
 - **The host is found by principal** (`HOST_PRINCIPAL`, `whenPeer`), since
   its seat is Kyneta's to issue: a Line is addressed by seat.
 

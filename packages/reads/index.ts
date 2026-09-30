@@ -241,39 +241,49 @@ export function readParticipants(
 }
 
 /**
- * Who is here, as the presence document says it: decayed (null) values
- * dropped. Each list has one entry per key, so a person here from two seats
- * (ADR-0037) appears twice; `presenceView` shows them once.
+ * One field of the presence document: an entry per key, as its writer and
+ * value. A person here from two seats (ADR-0037) appears twice.
  */
-export interface PresenceFacts {
-  /** One entry per open column: its writer, and the thread end it follows. */
-  readonly reading: readonly (readonly [WriterId, string])[]
-  /** One entry per seat typing: its writer, and the thread end. */
-  readonly typing: readonly (readonly [WriterId, string])[]
-  /** One entry per seat editing: its writer, and the note. */
-  readonly editing: readonly (readonly [WriterId, string])[]
-}
+export type PresenceEntries = readonly (readonly [WriterId, string])[]
+
+const samePairs = (a: PresenceEntries, b: PresenceEntries): boolean =>
+  a.length === b.length &&
+  a.every((pair, i) => pair[0] === b[i]?.[0] && pair[1] === b[i]?.[1])
 
 /**
- * The presence document's live entries. A decayed value is `null` and its key
- * stays, so nulls are skipped here, once. Every key starts with its seat's
- * `seatKey`, and the writer is what comes before the first colon
+ * A read of one presence field's live entries. A decayed value is `null` and
+ * its key stays, so nulls are skipped here, once. Every key starts with its
+ * seat's `seatKey`, and the writer is what comes before the first colon
  * (`writerOfKey`).
+ *
+ * A write of the same value (the page's refresh) gives Kyneta's record a new
+ * identity, so the last result is kept per document and returned while its
+ * entries are the same: memos keyed on it then skip.
  */
-export function readPresence(doc: PresenceDocHandle): PresenceFacts {
-  const live = (record: Record<string, string | null>) =>
-    Object.entries(record).flatMap(([key, value]) => {
+function presenceField(
+  field: (doc: PresenceDocHandle) => Record<string, string | null>,
+): (doc: PresenceDocHandle) => PresenceEntries {
+  const last = new WeakMap<PresenceDocHandle, PresenceEntries>()
+  return doc => {
+    const now = Object.entries(field(doc)).flatMap(([key, value]) => {
       const writer = writerOfKey(key)
       return value === null || writer === undefined
         ? []
         : [[writer as WriterId, value] as const]
     })
-  return {
-    reading: live(doc.reading()),
-    typing: live(doc.typing()),
-    editing: live(doc.editing()),
+    const before = last.get(doc)
+    if (before !== undefined && samePairs(before, now)) return before
+    last.set(doc, now)
+    return now
   }
 }
+
+/** One entry per open column: its writer, and the thread end it follows. */
+export const readReading = presenceField(doc => doc.reading())
+/** One entry per seat typing: its writer, and the thread end. */
+export const readTyping = presenceField(doc => doc.typing())
+/** One entry per seat editing: its writer, and the note. */
+export const readEditing = presenceField(doc => doc.editing())
 
 /** Every note's record (`pineta.note`), oldest first. */
 export const readNotes = (doc: SessionDocHandle): readonly NoteRecord[] =>

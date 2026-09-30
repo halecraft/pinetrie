@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react"
 import { MessageText } from "./message-text.tsx"
 import { namesOf } from "./names.ts"
 import type { SessionClient } from "./session-view.ts"
+import { useWhoIsAt } from "./use-presence.ts"
 
 const STATE_LABEL: Record<NoteState, string> = {
   open: "open for editing",
@@ -26,17 +27,21 @@ export function NoteCard({
   session,
   note,
   nameOf,
-  editors,
   onFocus,
 }: {
   session: SessionClient
   note: NoteRecord
   nameOf: ReadonlyMap<WriterId, string>
-  /** Others editing this note now (presence). */
-  editors: readonly WriterId[]
   /** This window started editing it: the column's sticky bar follows it. */
   onFocus: (id: NoteId) => void
 }) {
+  // Read here, so another person's editing redraws this card alone.
+  const editors = useWhoIsAt(
+    session.presence,
+    "editing",
+    session.writer,
+    note.id,
+  )
   const doc = session.noteText(note.id)
   const text = useValue(doc.text)
   const bind = useText(doc.text)

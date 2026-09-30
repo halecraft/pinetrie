@@ -33,6 +33,7 @@ import {
   readOffers,
   readParticipantNames,
   readTreeIndex,
+  readTyping,
 } from "@pineta/reads"
 import { type Browser, chromium, type Page } from "@playwright/test"
 import { startHost } from "../host/index.ts"
@@ -305,6 +306,31 @@ try {
     { timeout: 20_000 },
   )
   ok(true, "page loaded, wasm instantiated, client connected to the host")
+  // The render checks count React's development-build measures (S54), and
+  // against the production build every count is 0 and passes: refuse it.
+  const devReact = await page
+    .waitForFunction(
+      () =>
+        performance
+          .getEntriesByType("measure")
+          .some(
+            e =>
+              (e as PerformanceMeasure).detail?.devtools?.track ===
+              "Components \u269b",
+          ),
+      undefined,
+      { timeout: 10_000 },
+    )
+    .then(
+      () => true,
+      () => false,
+    )
+  ok(
+    devReact,
+    "the page runs React's development build, whose renders the checks count",
+  )
+  if (!devReact)
+    throw new Error("React's production build: the render checks count nothing")
   ok(
     errors.length === 0,
     `no page errors during load${errors[0] === undefined ? "" : ` — ${errors[0].slice(0, 90)}`}`,
@@ -1306,27 +1332,63 @@ try {
     `another root's tab shows its ⋯ on hover, and not at rest (${hiddenAtRest}, ${shownOnHover})`,
   )
 
-  // Renders (S54). What only presence changes redraws no message, and gives
-  // no column a new index or view: `App`'s reads keep their identity. A
-  // message's render is named `MessageView`, the function `memo` wraps: a
-  // count of `Message` would be 0 whatever renders.
-  await componentRenders(page)
+  // Renders (S54, S59). Your typing writes only presence once your card
+  // exists, and `App` reads none, so it redraws nothing outside the
+  // composer. Typed for over a second: `typing` is written at most once a
+  // second. A render is named by the function that rendered: a message's is
+  // `MessageView`, the function `memo` wraps, and a list's
+  // `MessageListView`, so a count of `Message` would be 0 whatever renders.
   await page.click(`${col(0)} .composer .input`)
-  await page.keyboard.type("typed while only presence changes", {
+  await page.keyboard.type("t")
+  await page.waitForTimeout(500)
+  await componentRenders(page)
+  await page.keyboard.type("yped while only presence changes", {
     delay: 80,
   })
   const typed = await componentRenders(page)
+  // The host has your `typing`: the write the check is about happened.
+  const typedHere = readTyping(host.presence).some(([w]) => w === ME)
   const rendersOf = (name: string) => typed.filter(r => r.name === name)
-  const newFacts = rendersOf("Column").filter(r =>
-    r.props.some(l => /^.\u00a0(index|view)$/.test(l)),
-  )
+  const outside = [
+    "Header",
+    "TabBar",
+    "Column",
+    "MessageListView",
+    "MessageView",
+  ]
+    .map(name => [name, rendersOf(name).length] as const)
+    .filter(([, n]) => n > 0)
   ok(
-    rendersOf("Header").length > 0 &&
-      rendersOf("MessageView").length === 0 &&
-      newFacts.length === 0,
-    `typing redraws no message and gives no column new facts (App ${rendersOf("Header").length}, Message ${rendersOf("MessageView").length}, Column with new facts ${newFacts.length})`,
+    outside.length === 0 && typedHere,
+    `your typing redraws nothing outside your composer (${JSON.stringify(outside)}, typing written ${typedHere})`,
   )
   await page.fill(`${col(0)} .composer .input`, "")
+  // Someone else following this thread changes only `reading`: the column's
+  // header shows them, and no column redraws.
+  const onPath = await page.$$eval(`${col(0)} .msg[data-entry]`, ms =>
+    ms.at(-1)?.getAttribute("data-entry"),
+  )
+  await componentRenders(page)
+  if (onPath != null) api.setReading("presence-check", onPath)
+  const beaHere = `${col(0)} .column-head .avatar[data-writer="${api.writer}"]`
+  const beaShown = await page
+    .waitForSelector(beaHere, { timeout: 15_000 })
+    .then(
+      () => true,
+      () => false,
+    )
+  const readRenders = await componentRenders(page)
+  const readColumns = readRenders.filter(r =>
+    ["Column", "Header", "TabBar"].includes(r.name),
+  )
+  ok(
+    beaShown && readColumns.length === 0,
+    `another person following this thread shows in its header and redraws no column (${readColumns.map(r => r.name).join(", ")})`,
+  )
+  api.clearReading("presence-check")
+  await page
+    .waitForSelector(beaHere, { state: "detached", timeout: 15_000 })
+    .catch(() => null)
   // A message in a thread this tab does not show redraws none of its messages.
   await componentRenders(page)
   const beforeElsewhere = Object.keys(host.doc.entries()).length
@@ -3643,6 +3705,9 @@ try {
       avatar,
       "the column following that thread shows the other window in its header",
     )
+    // Its typing makes a card, new in `cards`, so the column redraws; its
+    // message list does not (S59).
+    await componentRenders(page)
     await second.fill(`${col(0)} .composer .input`, "thinking")
     const typing = await page
       .waitForSelector(".composer .typing", { timeout: 15_000 })
@@ -3651,6 +3716,15 @@ try {
         () => false,
       )
     ok(typing, "the other window's typing shows in that thread's composer")
+    const theirTyping = await componentRenders(page)
+    const columnsDrawn = theirTyping.filter(r => r.name === "Column").length
+    const listsDrawn = theirTyping.filter(
+      r => r.name === "MessageListView" || r.name === "MessageView",
+    ).length
+    ok(
+      columnsDrawn > 0 && listsDrawn === 0,
+      `another window's card redraws the column and none of its messages (Column ${columnsDrawn}, list ${listsDrawn})`,
+    )
     await second.fill(`${col(0)} .composer .input`, "")
     await second.fill(`${col(0)} .composer .input`, "B asks about this")
     await second.click(`${col(0)} .composer .send`)

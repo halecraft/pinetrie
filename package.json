@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "conformance": "pnpm --filter @pineta/conformance run conformance",
     "host": "pnpm --filter @pineta/app run host",
+    "host:react-dev": "pnpm --filter @pineta/app run host:react-dev",
     "e2e": "pnpm --filter @pineta/app run e2e",
     "e2e:live": "pnpm --filter @pineta/app run e2e:live",
     "e2e:browser": "pnpm --filter @pineta/app run e2e:browser",

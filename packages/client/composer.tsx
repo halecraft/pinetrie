@@ -12,8 +12,10 @@ import type {
 } from "@pineta/core"
 import { CardEditor, type ReadOnly, type Where } from "./card-editor.tsx"
 import type { Pending, Prefill } from "./columns.ts"
+import { nameFor } from "./presence.tsx"
 import type { Reader } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
+import { useWhoIsAt } from "./use-presence.ts"
 
 export type { ReadOnly } from "./card-editor.tsx"
 
@@ -42,8 +44,8 @@ export function Composer(p: {
   pending: Pending | undefined
   insert: { readonly text: string; readonly key: number } | null
   where: Where
-  /** Others typing here, by name (presence). */
-  typing: readonly string[]
+  /** The thread end whose typists it names; null names none. */
+  typingAt: string | null
   onTyping: () => void
   onSend: () => string | undefined
   onBranchInstead: (pending: Pending) => void
@@ -51,7 +53,6 @@ export function Composer(p: {
   readOnly: ReadOnly | null
   takeFocus: () => boolean
 }) {
-  const { typing } = p
   return (
     <form
       className="composer"
@@ -60,10 +61,8 @@ export function Composer(p: {
         event.preventDefault()
       }}
     >
-      {typing.length > 0 && (
-        <div className="typing">
-          {typing.join(", ")} {typing.length === 1 ? "is" : "are"} typing…
-        </div>
+      {p.typingAt !== null && (
+        <TypingLine end={p.typingAt} reader={p.reader} session={p.session} />
       )}
       <CardEditor
         asksAgent={p.asksAgent}
@@ -90,5 +89,24 @@ export function Composer(p: {
         where={p.where}
       />
     </form>
+  )
+}
+
+/**
+ * Others typing at `end`. It reads presence itself, so their typing redraws
+ * this line and not the column.
+ */
+function TypingLine(p: {
+  session: SessionClient
+  end: string
+  reader: Reader
+}) {
+  const typing = useWhoIsAt(p.session.presence, "typing", p.reader.me, p.end)
+  if (typing.length === 0) return null
+  const names = typing.map(w => nameFor(p.reader.nameOf, w))
+  return (
+    <div className="typing">
+      {names.join(", ")} {names.length === 1 ? "is" : "are"} typing…
+    </div>
   )
 }

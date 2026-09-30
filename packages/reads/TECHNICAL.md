@@ -16,7 +16,8 @@ functions.
 Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes` (and `readLane`, one
 of them), `readOutbox`,
-`readParticipantNames`, `readParticipants`, `readPresence`,
+`readParticipantNames`, `readParticipants`, `readReading`, `readTyping`,
+`readEditing`,
 `readAgentActivity`, `readNotes`, `readSeats` and `readCards` (ADR-0048),
 `readArchive`, `readMarks` (ADR-0045), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
@@ -62,9 +63,13 @@ Kyneta has let go.
   is who the queue button names. It is null exactly when `waiting` is 0. It
   differs from `askedBy` while a run goes: `askedBy` is who the agent
   answers, `lastWaiting` who is last in line.
-- **`readPresence` gives one entry per key**, as `[writer, value]` pairs for
-  `reading`, `typing` and `editing` alike: a person here from two seats
-  appears twice (ADR-0037), and `presenceView` shows them once.
+- **A presence read gives one entry per key** (`readReading`, `readTyping`,
+  `readEditing`), as `[writer, value]` pairs: a person here from two seats
+  appears twice (ADR-0037), and `core/presence.ts` shows them once. Each
+  read is of one field, so Kyneta wakes it only for writes to that field, and
+  each keeps its last array while the entries are the same: the page's
+  refresh writes the same values again, and Kyneta's record is then a new
+  object (S59).
 - **`readRenderableEntries` decodes chat** (`renderableMessage`), so the index
   carries each chat's writer, whether it compelled the agent, and its send id:
   `threadOf`'s race reads the first two, a fresh column the third.

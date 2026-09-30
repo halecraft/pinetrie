@@ -1,4 +1,7 @@
-// host/server — the entry point. `pnpm run host`
+// host/server — the entry point. `pnpm run host` sets NODE_ENV=production,
+// so Vite serves React's production build; `pnpm run host:react-dev` sets
+// NODE_ENV=development, for React's warnings, render timeline and Fast
+// Refresh (S59).
 //
 //   PINETA_PORT      the port (default 7391; 0 = any free port)
 //   PINETA_BIND      the address (default 127.0.0.1: this machine only)

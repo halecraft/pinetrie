@@ -522,6 +522,12 @@ context.**
   grants it. Your working copy is yours, so hot reload stays on. It needs
   Apple's `container` running (`docs/05-stack.md` D10); without it, threads
   work directly. Restart the host to pick up changes to host code.
+- **`pnpm run host` serves React's production build** through Vite's dev
+  server (`NODE_ENV=production`): hot reload stays, as a full page reload,
+  and a long thread stays quick to type in (S59).
+  `pnpm run host:react-dev` serves React's development build: its warnings,
+  its render timeline and Fast Refresh, for work on the client's renders. The
+  suites start their own host with development React.
 - **A thread's container stops when its run ends**, and starts again at the
   next message. A dev server or watcher the agent started ends with the run.
   The agent is told this, and what else holds in every lane, by a short block

@@ -54,19 +54,19 @@ import {
 import type { Column as ColumnSpec, Pending, Prefill } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
 import { behind, type SeenEnd } from "./follow.ts"
-import { callStreams, type LiveWork } from "./live.ts"
+import type { LiveWork } from "./live.ts"
 import { Menu } from "./menu.tsx"
-import { Message } from "./message.tsx"
+import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
-import { type MessageAct, messageTools } from "./message-tools.ts"
+import type { MessageAct } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
-import { NoteCard } from "./note.tsx"
-import { Avatars, nameFor } from "./presence.tsx"
+import { Avatars } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import { ReviewPane } from "./review-pane.tsx"
 import type { SessionClient } from "./session-view.ts"
 import { useFollow } from "./use-follow.ts"
+import { useSeenBy } from "./use-presence.ts"
 import { useStable } from "./use-stable.ts"
 
 export interface ColumnProps {
@@ -88,9 +88,11 @@ export interface ColumnProps {
   nameOf: ReadonlyMap<WriterId, string>
   /** Everyone who can be mentioned (`readParticipants`). */
   participants: readonly string[]
-  /** Others following this column's thread, and others typing at its end (ADR-0024). */
-  seenBy: readonly WriterId[]
-  typing: readonly WriterId[]
+  /**
+   * Whether its header and composer show who else follows and types here
+   * (ADR-0024): not in the Archive tab's preview.
+   */
+  showsPresence: boolean
   /** Each person's colour (`presenceColors`). */
   colorOf: (writer: WriterId) => string
   /** This window is typing in this column's composer. */
@@ -103,8 +105,6 @@ export interface ColumnProps {
   cards: readonly CardRecord[]
   /** Every seat the host has seen: who wrote in a card. */
   seats: readonly SeatRecord[]
-  /** Others editing a note now (presence), each person once. */
-  editorsOf: (note: string) => readonly WriterId[]
   /** Every lane the agent is replying on. Several threads can run at once. */
   activity: readonly AgentRun[]
   /** The streams to draw, from the same moment as `index` (`liveWork`). */
@@ -338,16 +338,6 @@ export function Column(p: ColumnProps) {
         p.onOpen(act.rootId)
     }
   })
-  const card = (note: NoteRecord) => (
-    <NoteCard
-      editors={p.editorsOf(note.id)}
-      key={note.id}
-      nameOf={p.nameOf}
-      note={note}
-      onFocus={setEditingNote}
-      session={p.session}
-    />
-  )
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-observe as the column grows
   useEffect(() => {
@@ -407,7 +397,15 @@ export function Column(p: ColumnProps) {
             )}
             <Identity identity={shows.identity} onOpen={p.onOpen} />
             <span className="head-space" />
-            <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={p.seenBy} />
+            {p.showsPresence && view.tipId !== null && (
+              <SeenBy
+                colorOf={p.colorOf}
+                end={view.tipId}
+                index={index}
+                nameOf={p.nameOf}
+                session={p.session}
+              />
+            )}
             {p.closable && (
               <button
                 aria-label="close column"
@@ -466,32 +464,21 @@ export function Column(p: ColumnProps) {
             {/* Room above the first message, so opening can bring it level with
             its fork point even when the column is short. */}
             <div className="spacer" ref={spacer} />
-            {view.nodes.map((node, i) => {
-              const drawn = p.notesOf.get(node.id)
-              return (
-                <Message
-                  doc={p.session.doc}
-                  streams={callStreams(node.toolCalls, p.live.tools)}
-                  closedBranches={node.branches.filter(
-                    b => !p.shown.has(b.rootId),
-                  )}
-                  forkTracks={p.forks.get(node.id) ?? []}
-                  join={shows.joins.get(node.id)}
-                  key={node.id}
-                  nameOf={p.nameOf}
-                  node={node}
-                  about={drawn && card(drawn)}
-                  onAct={onAct}
-                  tools={messageTools(node, {
-                    parentId: index.parentOf(node.id),
-                    isLast: i === view.nodes.length - 1,
-                    lane,
-                    writable,
-                    hasNoteAbout: drawn !== undefined,
-                  })}
-                />
-              )
-            })}
+            <MessageList
+              forks={p.forks}
+              index={index}
+              joins={shows.joins}
+              lane={lane}
+              nameOf={p.nameOf}
+              notesOf={p.notesOf}
+              onAct={onAct}
+              onFocusNote={setEditingNote}
+              session={p.session}
+              shown={p.shown}
+              tools={p.live.tools}
+              view={view}
+              writable={writable}
+            />
             {streamingLanes.map(l => {
               const reply = p.live.replies.get(l)
               return (
@@ -640,7 +627,7 @@ export function Column(p: ColumnProps) {
           pending={p.column.fresh?.pending}
           insert={insert}
           readOnly={p.readOnly}
-          typing={p.typing.map(w => nameFor(p.nameOf, w))}
+          typingAt={p.showsPresence ? view.tipId : null}
           session={p.session}
         />
       </div>
@@ -654,6 +641,26 @@ export function Column(p: ColumnProps) {
       )}
     </section>
   )
+}
+
+/**
+ * Others following this column's thread, in its header. It reads presence
+ * itself, so a presence write redraws this and not the column.
+ */
+function SeenBy(p: {
+  session: SessionClient
+  index: TreeIndex
+  end: string
+  nameOf: ReadonlyMap<WriterId, string>
+  colorOf: (writer: WriterId) => string
+}) {
+  const writers = useSeenBy(
+    p.session.presence,
+    p.session.writer,
+    p.index,
+    p.end,
+  )
+  return <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={writers} />
 }
 
 /**

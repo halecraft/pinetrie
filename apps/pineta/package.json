@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "host": "node host/server.ts",
+    "host": "NODE_ENV=production node host/server.ts",
+    "host:react-dev": "NODE_ENV=development node host/server.ts",
     "e2e": "node e2e/e2e.ts",
     "e2e:live": "PINETA_LIVE=1 node e2e/e2e.ts",
     "e2e:browser": "node e2e/browser.ts",

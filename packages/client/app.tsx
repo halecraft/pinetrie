@@ -18,11 +18,9 @@ import { whenSettled } from "@kyneta/exchange"
 import { ExchangeProvider, useDocStatus, useSelector } from "@kyneta/react"
 import {
   branchColors,
-  compactRail,
   entryId,
   PENDING_TRACK,
   pathIds,
-  presenceView,
   projectColumns,
   projectRail,
   rootWork,
@@ -35,7 +33,6 @@ import {
   notesIndex,
   readCards,
   readParticipantNames,
-  readPresence,
 } from "@pineta/reads"
 import {
   StrictMode,
@@ -55,7 +52,6 @@ import { type Column as ColumnSpec, isPinned, type Prefill } from "./columns.ts"
 import type { ReadOnly } from "./composer.tsx"
 import type { SeenEnd } from "./follow.ts"
 import { Header } from "./header.tsx"
-import { peopleHere, readersByRoot } from "./here.ts"
 import {
   IDENTITY_KEY,
   type Identity,
@@ -84,8 +80,7 @@ import {
 import { NotesIndex } from "./note.tsx"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { readSessionFacts } from "./projection.ts"
-import { EmptyRail, Rail } from "./rail.tsx"
-import { railKeep } from "./rail-view.ts"
+import { EmptyRail, LiveRail } from "./rail.tsx"
 import { firstLines, NO_TEXT, rootLabels } from "./root-label.ts"
 import { connectSession, type SessionClient } from "./session-view.ts"
 import { deviceState, tabState } from "./tab-state.ts"
@@ -230,7 +225,6 @@ function App({ session }: { session: SessionClient }) {
   // Its own read, not part of the facts: every message compares `nameOf` by
   // identity, so it may change only when a name does.
   const nameOf = useSelector(doc, readParticipantNames)
-  const presenceFacts = useSelector(session.presence, readPresence)
 
   // Each root, for the Archive tab and its label: its title, else its first
   // line (ADR-0045). Which roots have tabs is yours (`layout.open`, ADR-0030).
@@ -356,35 +350,18 @@ function App({ session }: { session: SessionClient }) {
     () => (root === null ? [] : projectRail(index, root)),
     [index, root],
   )
-  const here = useMemo(
-    () => presenceView(presenceFacts, session.writer, index),
-    [presenceFacts, index, session.writer],
-  )
   const order = useMemo(
     () => writerOrder(index, nameOf.keys()),
     [index, nameOf],
   )
   const colorOf = useMemo(() => presenceColors(order), [order])
-  // Who else is here, by person, for the header.
-  const people = useMemo(
-    () => peopleHere(here.readingAt, index, order),
-    [here, index, order],
-  )
-  const readers = useMemo(() => readersByRoot(people), [people])
-  const rings = useMemo(
-    () =>
-      new Map(
-        [...here.readingAt].map(([end, writers]) => [
-          end,
-          writers.map(w => ({
-            name: nameFor(nameOf, w),
-            color: colorOf(w),
-          })),
-        ]),
-      ),
-    [here, nameOf, colorOf],
-  )
+  // Each column's end, for the rail: one array while the views are the same.
+  const ends = useMemo(() => views.map(v => v.tipId), [views])
 
+  // `App` writes presence and reads none: a read here would render every
+  // column on each write, the refresh and others' typing included (S59).
+  // Each part that shows presence reads it (`use-presence.ts`).
+  //
   // Report the thread end of every column in the tab you are on (ADR-0024,
   // ADR-0029). A key no longer reported is deleted, so switching tabs clears
   // the last tab's columns, as closing a column does. While the page is
@@ -449,20 +426,6 @@ function App({ session }: { session: SessionClient }) {
     shown,
     settled,
   })
-  const railItems = useMemo(
-    () =>
-      compactRail(
-        index,
-        rail,
-        railKeep({
-          notes: noteEntries,
-          rings,
-          activity,
-          ends: views.map(v => v.tipId),
-        }),
-      ),
-    [index, rail, noteEntries, rings, activity, views],
-  )
 
   const strip = useRef<HTMLDivElement>(null)
 
@@ -553,7 +516,6 @@ function App({ session }: { session: SessionClient }) {
     live,
     colorOf,
     cards,
-    editorsOf: here.editingAt,
     index,
     lanes,
     nameOf,
@@ -591,7 +553,6 @@ function App({ session }: { session: SessionClient }) {
               }
         }
         root={r}
-        rings={rings}
         shared={shared}
         noteEntries={noteEntries}
       />
@@ -635,7 +596,8 @@ function App({ session }: { session: SessionClient }) {
             },
           }}
           onOpen={openAt}
-          people={people}
+          order={order}
+          session={session}
           runs={activity}
         />
       </header>
@@ -672,7 +634,9 @@ function App({ session }: { session: SessionClient }) {
             onCloseNew={closeNewTab}
             onCloseRoot={r => dispatch({ kind: "closeRoot", root: r })}
             onShow={tab => dispatch({ kind: "show", tab })}
-            readers={readers}
+            index={index}
+            order={order}
+            session={session}
             tabs={tabBar(layout)}
             work={work}
           />
@@ -702,9 +666,12 @@ function App({ session }: { session: SessionClient }) {
             ) : (
               <>
                 {root !== null && (
-                  <Rail
+                  <LiveRail
                     activity={activity}
-                    here={rings}
+                    colorOf={colorOf}
+                    ends={ends}
+                    index={index}
+                    names={nameOf}
                     notes={noteEntries}
                     notesPanel={{
                       count: notesIndex(
@@ -717,10 +684,10 @@ function App({ session }: { session: SessionClient }) {
                       open: notesOpen,
                       toggle: () => setNotesOpen(!notesOpen),
                     }}
-                    items={railItems}
-                    nameOf={w => nameFor(nameOf, w)}
                     onPick={openAt}
                     open={shown}
+                    rows={rail}
+                    session={session}
                   />
                 )}
                 {newTab !== null && <EmptyRail />}
@@ -797,14 +764,9 @@ function App({ session }: { session: SessionClient }) {
                         path={paths[i] ?? new Set()}
                         position={i}
                         readOnly={readOnly}
-                        seenBy={
-                          view.tipId === null ? [] : here.seenBy(view.tipId)
-                        }
                         shown={shown}
                         track={colors.track[i] ?? PENDING_TRACK}
-                        typing={
-                          view.tipId === null ? [] : here.typingAt(view.tipId)
-                        }
+                        showsPresence
                         view={view}
                       />
                     )
@@ -826,13 +788,11 @@ function App({ session }: { session: SessionClient }) {
 function Preview({
   root,
   readOnly,
-  rings,
   noteEntries,
   shared,
 }: {
   root: string
   readOnly: ReadOnly
-  rings: ReadonlyMap<string, readonly { name: string; color: string }[]>
   noteEntries: ReadonlySet<string>
   shared: Omit<
     ColumnProps,
@@ -850,10 +810,9 @@ function Preview({
     | "path"
     | "position"
     | "readOnly"
-    | "seenBy"
+    | "showsPresence"
     | "shown"
     | "track"
-    | "typing"
     | "view"
   >
 }) {
@@ -868,30 +827,23 @@ function Preview({
   const column: ColumnSpec = { key: `preview-${root}`, anchor }
   const [view] = projectColumns(index, [{ anchor }], noteEntries)
   const rail = projectRail(index, root)
-  const items = compactRail(
-    index,
-    rail,
-    railKeep({
-      notes: noteEntries,
-      rings,
-      activity: shared.activity,
-      ends: [view?.tipId ?? null],
-    }),
-  )
   const path = pathIds(index, view?.tipId ?? null)
   const track = branchColors(rail, view === undefined ? [] : [view]).track[0]
   const none = () => {}
   if (view === undefined) return null
   return (
     <div className="preview">
-      <Rail
+      <LiveRail
         activity={shared.activity}
-        here={rings}
-        items={items}
-        nameOf={w => nameFor(shared.nameOf, w)}
+        colorOf={shared.colorOf}
+        ends={[view.tipId]}
+        index={index}
+        names={shared.nameOf}
         notes={noteEntries}
         onPick={pick}
         open={path}
+        rows={rail}
+        session={shared.session}
       />
       <div className="preview-strip" ref={previewStrip}>
         <Column
@@ -910,10 +862,9 @@ function Preview({
           path={path}
           position={0}
           readOnly={readOnly}
-          seenBy={[]}
+          showsPresence={false}
           shown={path}
           track={track ?? PENDING_TRACK}
-          typing={[]}
           view={view}
         />
       </div>

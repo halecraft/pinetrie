@@ -7,13 +7,25 @@
 
 import {
   type AgentRun,
+  compactRail,
   PENDING_TRACK,
   type RailItem,
+  type RailRow,
   type RailRun,
+  type TreeIndex,
   type WriterId,
 } from "@pineta/core"
-import type { CSSProperties } from "react"
-import { pickAt, type RunFill, runFill, runLabel } from "./rail-view.ts"
+import { type ComponentProps, type CSSProperties, useMemo } from "react"
+import { nameFor } from "./presence.tsx"
+import {
+  pickAt,
+  type RunFill,
+  railKeep,
+  runFill,
+  runLabel,
+} from "./rail-view.ts"
+import type { SessionClient } from "./session-view.ts"
+import { useReadingAt } from "./use-presence.ts"
 
 const PALETTE = [
   "#9ecbff",
@@ -162,6 +174,55 @@ export function Rail({
         )}
       </div>
     </nav>
+  )
+}
+
+/**
+ * A root's rail with others' rings. It reads presence itself, so a presence
+ * write redraws the rail and not the columns. Others' thread ends are kept
+ * out of runs (`railKeep`), so which items are drawn depends on presence too.
+ */
+export function LiveRail({
+  session,
+  index,
+  rows,
+  ends,
+  names,
+  colorOf,
+  ...rail
+}: {
+  session: SessionClient
+  index: TreeIndex
+  /** The root's rows (`projectRail`), before compacting. */
+  rows: readonly RailRow[]
+  /** Each open column's end (`ColumnView.tipId`). */
+  ends: readonly (string | null)[]
+  names: ReadonlyMap<WriterId, string>
+  colorOf: (writer: WriterId) => string
+} & Omit<ComponentProps<typeof Rail>, "items" | "here" | "nameOf">) {
+  const reading = useReadingAt(session.presence, session.writer)
+  const here = useMemo(
+    () =>
+      new Map(
+        [...reading].map(([end, writers]) => [
+          end,
+          writers.map(w => ({ name: nameFor(names, w), color: colorOf(w) })),
+        ]),
+      ),
+    [reading, names, colorOf],
+  )
+  const { notes, activity } = rail
+  const items = useMemo(
+    () =>
+      compactRail(
+        index,
+        rows,
+        railKeep({ notes, rings: here, activity, ends }),
+      ),
+    [index, rows, notes, here, activity, ends],
+  )
+  return (
+    <Rail {...rail} here={here} items={items} nameOf={w => nameFor(names, w)} />
   )
 }
 

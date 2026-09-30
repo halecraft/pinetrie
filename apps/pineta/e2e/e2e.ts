@@ -70,11 +70,12 @@ import {
   readOffers,
   readOutbox,
   readParticipantNames,
-  readPresence,
   readProject,
+  readReading,
   readRenderableEntries,
   readSeats,
   readTreeIndex,
+  readTyping,
 } from "@pineta/reads"
 import {
   noteDocId,
@@ -2020,28 +2021,30 @@ invariants("end")
   ada.setReading("c2", "e-two")
   ada.setTyping("e-two")
   const seen = await waitFor(
-    () => readPresence(bea.presence).reading.length === 2,
+    () => readReading(bea.presence).length === 2,
     5_000,
   )
-  const facts = readPresence(bea.presence)
+  const reading = readReading(bea.presence)
   ok(
     seen >= 0 &&
-      facts.reading.every(([w]) => w === ada.writer) &&
-      facts.reading
+      reading.every(([w]) => w === ada.writer) &&
+      reading
         .map(([, e]) => e)
         .sort()
         .join() === "e-one,e-two" &&
-      facts.typing.some(([w, e]) => w === ada.writer && e === "e-two"),
-    `each open column is reported, and another client sees them (${facts.reading.length} columns)`,
+      readTyping(bea.presence).some(
+        ([w, e]) => w === ada.writer && e === "e-two",
+      ),
+    `each open column is reported, and another client sees them (${reading.length} columns)`,
   )
   // Typing decays with no further keystroke; reading, refreshed, stays.
   const stopped = await waitFor(() => {
     ada.setReading("c1", "e-one")
     ada.setReading("c2", "e-two")
-    return !readPresence(bea.presence).typing.some(([w]) => w === ada.writer)
+    return !readTyping(bea.presence).some(([w]) => w === ada.writer)
   }, 5_000)
   ok(
-    stopped >= 0 && readPresence(bea.presence).reading.length === 2,
+    stopped >= 0 && readReading(bea.presence).length === 2,
     "typing decays when the keystrokes stop; refreshed reading stays",
   )
   // A closed column's key is deleted, not left to decay: decay keeps the key
@@ -2056,14 +2059,14 @@ invariants("end")
     return (
       !Object.keys(bea.presence.reading()).some(
         k => k.startsWith(`${ada.writer}:`) && k.endsWith(":c2"),
-      ) && readPresence(bea.presence).reading.length === 1
+      ) && readReading(bea.presence).length === 1
     )
   }, 5_000)
   ok(closed >= 0, "a closed column's entry is deleted from others' view")
   // Leaving is silence: a client that shuts down decays away.
   await ada.close()
   const left = await waitFor(
-    () => readPresence(bea.presence).reading.length === 0,
+    () => readReading(bea.presence).length === 0,
     5_000,
   )
   ok(

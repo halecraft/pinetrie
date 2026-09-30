@@ -877,6 +877,33 @@ export const mutations: readonly Mutation[] = [
     expect: "a change to what a message shows",
   },
   {
+    name: "a map is equal only to itself",
+    file: "packages/client/same-props.ts",
+    from: "  if (a instanceof Map || b instanceof Map) {",
+    to: "  if (a instanceof Map || b instanceof Map) {\n    return false",
+    command: unit,
+    expect:
+      "a column's list draws the same from a lane and joins rebuilt unchanged",
+  },
+  {
+    name: "a column's list compares joins by identity",
+    file: "packages/client/message-list-props.ts",
+    from: '  joins: "value",',
+    to: '  joins: "identity",',
+    command: unit,
+    expect:
+      "a column's list draws the same from a lane and joins rebuilt unchanged",
+  },
+  {
+    name: "a column's list compares its lane by identity",
+    file: "packages/client/message-list-props.ts",
+    from: '  lane: "value",',
+    to: '  lane: "identity",',
+    command: unit,
+    expect:
+      "a column's list draws the same from a lane and joins rebuilt unchanged",
+  },
+  {
     name: "a root's label ignores its title",
     file: "packages/client/root-label.ts",
     from: "[root, marks.get(root)?.title ?? line]",

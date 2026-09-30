@@ -2,8 +2,10 @@ import { describe, expect, test } from "vitest"
 import {
   type EntryLike,
   indexTree,
-  presenceView,
+  readingAt,
+  seenBy,
   type WriterId,
+  whoIsAt,
   writerId,
 } from "./index.ts"
 
@@ -24,66 +26,62 @@ const tree = (parents: Record<string, string | null>) =>
 // 1 → 2 → 3 is a thread; 4 is a sibling branch off 1.
 const index = tree({ "1": null, "2": "1", "3": "2", "4": "1" })
 const [me, bea, cy] = [writerId("me"), writerId("bea"), writerId("cy")]
-const view = (
-  reading: [WriterId, string][],
-  typing: [WriterId, string][] = [],
-  editing: [WriterId, string][] = [],
-) => presenceView({ reading, typing, editing }, me, index)
+type Entries = [WriterId, string][]
 
-describe("presenceView: others, by thread", () => {
+describe("presence: others, by thread", () => {
   test("excludes me, everywhere", () => {
-    const v = view(
-      [
-        [me, "3"],
-        [bea, "3"],
-      ],
-      [[me, "3"]],
-    )
-    expect([...v.readingAt]).toEqual([["3", [bea]]])
-    expect(v.seenBy("3")).toEqual([bea])
-    expect(v.typingAt("3")).toEqual([])
+    const reading: Entries = [
+      [me, "3"],
+      [bea, "3"],
+    ]
+    expect([...readingAt(reading, me)]).toEqual([["3", [bea]]])
+    expect(seenBy(reading, me, index, "3")).toEqual([bea])
+    expect(whoIsAt([[me, "3"]], "3", me)).toEqual([])
   })
   test("seenBy counts someone behind on the same thread, not on a sibling", () => {
-    const v = view([
+    const reading: Entries = [
       [bea, "2"],
       [cy, "4"],
-    ])
-    expect(v.seenBy("3")).toEqual([bea])
-    expect(v.seenBy("4")).toEqual([cy])
+    ]
+    expect(seenBy(reading, me, index, "3")).toEqual([bea])
+    expect(seenBy(reading, me, index, "4")).toEqual([cy])
   })
   test("readingAt groups several people, and one person's several columns once", () => {
-    const v = view([
-      [bea, "3"],
-      [bea, "3"],
-      [cy, "3"],
-    ])
-    expect(v.readingAt.get("3")).toEqual([bea, cy])
-  })
-  test("typingAt is keyed by thread end", () => {
-    const v = view(
-      [],
+    const at = readingAt(
       [
         [bea, "3"],
-        [cy, "4"],
+        [bea, "3"],
+        [cy, "3"],
       ],
+      me,
     )
-    expect([v.typingAt("3"), v.typingAt("4")]).toEqual([[bea], [cy]])
+    expect(at.get("3")).toEqual([bea, cy])
+  })
+  test("whoIsAt is keyed by value", () => {
+    const typing: Entries = [
+      [bea, "3"],
+      [cy, "4"],
+    ]
+    expect([whoIsAt(typing, "3", me), whoIsAt(typing, "4", me)]).toEqual([
+      [bea],
+      [cy],
+    ])
   })
   test("a person typing or editing from two seats shows once (ADR-0037)", () => {
-    const v = view(
-      [],
-      [
-        [bea, "3"],
-        [bea, "3"],
-        [me, "3"],
-      ],
-      [
-        [bea, "n1"],
-        [bea, "n1"],
-        [cy, "n2"],
-      ],
-    )
-    expect(v.typingAt("3")).toEqual([bea])
-    expect([v.editingAt("n1"), v.editingAt("n2")]).toEqual([[bea], [cy]])
+    const typing: Entries = [
+      [bea, "3"],
+      [bea, "3"],
+      [me, "3"],
+    ]
+    const editing: Entries = [
+      [bea, "n1"],
+      [bea, "n1"],
+      [cy, "n2"],
+    ]
+    expect(whoIsAt(typing, "3", me)).toEqual([bea])
+    expect([whoIsAt(editing, "n1", me), whoIsAt(editing, "n2", me)]).toEqual([
+      [bea],
+      [cy],
+    ])
   })
 })

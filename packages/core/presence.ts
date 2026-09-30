@@ -1,30 +1,27 @@
 // core/presence — what the screen shows of who else is here. Pure.
 //
 // Presence is thread-level (ADR-0024): each column of the tab a person is on
-// reports the end of the thread it follows (ADR-0029). Someone is on your thread when their end and yours lie on
-// one path: one is the other, or an ancestor of it (a column that has not yet
-// caught up). Someone on a sibling branch is not.
+// reports the end of the thread it follows (ADR-0029). Someone is on your
+// thread when their end and yours lie on one path: one is the other, or an
+// ancestor of it (a column that has not yet caught up). Someone on a sibling
+// branch is not.
+//
+// Each function takes one field's entries, so a part of the screen reads only
+// the field it shows, and a write to another field redraws nothing of it.
 
 import type { WriterId } from "./index.ts"
 import { pathIds, type TreeIndex } from "./tree.ts"
 
-export interface PresenceView {
-  /** Others following each thread end, from the columns they report: the rail's rings. */
-  readonly readingAt: ReadonlyMap<string, readonly WriterId[]>
-  /** Others following the thread that ends at `end`: a column's header. */
-  seenBy(end: string): readonly WriterId[]
-  /** Others typing into the composer at `end`. */
-  typingAt(end: string): readonly WriterId[]
-  /** Others editing the note `note`. */
-  editingAt(note: string): readonly WriterId[]
-}
+/** A presence field's entries: one per key, its writer and value. */
+type Entries = readonly (readonly [WriterId, string])[]
 
 /**
  * Everyone but `me` whose value is `value`, each once: a person here from two
- * seats has two entries (ADR-0037).
+ * seats has two entries (ADR-0037). Who types at a thread end, who edits a
+ * note.
  */
-function whoIsAt(
-  entries: readonly (readonly [WriterId, string])[],
+export function whoIsAt(
+  entries: Entries,
   value: string,
   me: WriterId,
 ): WriterId[] {
@@ -34,34 +31,33 @@ function whoIsAt(
   return out
 }
 
-export function presenceView(
-  facts: {
-    readonly reading: readonly (readonly [WriterId, string])[]
-    readonly typing: readonly (readonly [WriterId, string])[]
-    readonly editing: readonly (readonly [WriterId, string])[]
-  },
+/** Others following each thread end, you left out: the rail's rings. */
+export function readingAt(
+  reading: Entries,
+  me: WriterId,
+): ReadonlyMap<string, readonly WriterId[]> {
+  const at = new Map<string, WriterId[]>()
+  for (const [w, end] of reading) {
+    if (w === me) continue
+    const here = at.get(end) ?? []
+    if (!here.includes(w)) here.push(w)
+    at.set(end, here)
+  }
+  return at
+}
+
+/** Others following the thread that ends at `end`: a column's header. */
+export function seenBy(
+  reading: Entries,
   me: WriterId,
   index: TreeIndex,
-): PresenceView {
-  const others = facts.reading.filter(([w]) => w !== me)
-  const readingAt = new Map<string, WriterId[]>()
-  for (const [w, end] of others) {
-    const at = readingAt.get(end) ?? []
-    if (!at.includes(w)) at.push(w)
-    readingAt.set(end, at)
+  end: string,
+): readonly WriterId[] {
+  const mine = pathIds(index, end)
+  const seen: WriterId[] = []
+  for (const [w, theirs] of reading) {
+    if (w === me || seen.includes(w)) continue
+    if (mine.has(theirs) || pathIds(index, theirs).has(end)) seen.push(w)
   }
-  return {
-    readingAt,
-    seenBy(end) {
-      const mine = pathIds(index, end)
-      const seen: WriterId[] = []
-      for (const [w, theirs] of others) {
-        const onPath = mine.has(theirs) || pathIds(index, theirs).has(end)
-        if (onPath && !seen.includes(w)) seen.push(w)
-      }
-      return seen
-    },
-    typingAt: end => whoIsAt(facts.typing, end, me),
-    editingAt: note => whoIsAt(facts.editing, note, me),
-  }
+  return seen
 }

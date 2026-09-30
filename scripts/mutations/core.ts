@@ -203,8 +203,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "presence counts me as someone else",
     file: "packages/core/presence.ts",
-    from: "  const others = facts.reading.filter(([w]) => w !== me)",
-    to: "  const others = facts.reading.filter(([w]) => w !== undefined)",
+    from: "    if (w === me) continue",
+    to: "    if (w === undefined) continue",
     command: unit,
     expect: "excludes me, everywhere",
   },

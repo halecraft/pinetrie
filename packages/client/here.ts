@@ -2,7 +2,7 @@
 //
 // Presence is thread-level (ADR-0024): each column of the tab a person is on
 // reports the end of its thread. The header groups those by person, where
-// `presenceView` groups them by thread end; "never you" is `presenceView`'s.
+// `readingAt` groups them by thread end; "never you" is `readingAt`'s.
 // The tabs' avatars are the same people turned around, by root.
 
 import { rootOf, type TreeIndex, type WriterId } from "@pineta/core"
@@ -14,7 +14,7 @@ export interface PersonHere {
 }
 
 /**
- * `presenceView`'s `readingAt` (thread end -> the others there, you left out)
+ * `readingAt` (thread end -> the others there, you left out)
  * grouped by person, in `order` (`writerOrder`, so every window agrees). A
  * thread end the index lacks, not arrived yet, is left out.
  */

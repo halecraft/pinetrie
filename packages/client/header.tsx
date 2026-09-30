@@ -14,11 +14,11 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { AGENT_MARK } from "./column-view.ts"
 import {
   type OpenMenus,
-  type PersonHere,
+  peopleHere,
   toggleOpenMenu,
   withOpenMenus,
 } from "./here.ts"
@@ -26,10 +26,13 @@ import type { InboxItem } from "./inbox.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, nameFor } from "./presence.tsx"
 import { type Me, Profile } from "./profile.tsx"
+import type { SessionClient } from "./session-view.ts"
 import type { InboxView } from "./use-inbox.ts"
+import { useReadingAt } from "./use-presence.ts"
 
 export function Header({
-  people,
+  session,
+  order,
   runs,
   index,
   labelOf,
@@ -42,7 +45,9 @@ export function Header({
   onOpen,
   me,
 }: {
-  people: readonly PersonHere[]
+  session: SessionClient
+  /** Everyone, in the order every window agrees on (`writerOrder`). */
+  order: readonly WriterId[]
   /** The agent's running lanes (`readAgentActivity`). */
   runs: readonly AgentRun[]
   index: TreeIndex
@@ -59,7 +64,6 @@ export function Header({
   onOpen: (id: string) => void
   me: Me
 }) {
-  const [openMenus, setOpenMenus] = useState<OpenMenus>(new Map())
   const working = runs.length > 0
   const offering = offers.length > 0
   /**
@@ -89,28 +93,14 @@ export function Header({
   return (
     <div className="header-right">
       <div className="here">
-        {withOpenMenus(people, openMenus).map(({ person: p, gone }, at) => (
-          <Menu
-            className="here-person"
-            gone={gone}
-            heading={
-              gone
-                ? `${nameFor(nameOf, p.writer)} has left`
-                : `${nameFor(nameOf, p.writer)} is in`
-            }
-            items={p.threads.map(t => thread(t.end, t.end, t.root))}
-            key={p.writer}
-            label={`${nameFor(nameOf, p.writer)}: where they are`}
-            onToggle={open =>
-              setOpenMenus(m => toggleOpenMenu(m, p.writer, at, open))
-            }
-            title={nameFor(nameOf, p.writer)}
-            trigger={
-              <Avatar colorOf={colorOf} nameOf={nameOf} writer={p.writer} />
-            }
-            triggerClassName="here-trigger"
-          />
-        ))}
+        <People
+          colorOf={colorOf}
+          index={index}
+          nameOf={nameOf}
+          order={order}
+          session={session}
+          thread={thread}
+        />
         <Menu
           className={working ? "here-agent running" : "here-agent"}
           gone={!working}
@@ -180,6 +170,55 @@ export function Header({
       <Profile {...me} colorOf={colorOf} nameOf={nameOf} />
     </div>
   )
+}
+
+/**
+ * Who else is here, a person each, with the threads they follow. It reads
+ * presence itself, so a presence write redraws this and not the header. A
+ * person who leaves while you have their menu open stays, marked gone, until
+ * you close it (`withOpenMenus`).
+ */
+function People({
+  session,
+  index,
+  order,
+  nameOf,
+  colorOf,
+  thread,
+}: {
+  session: SessionClient
+  index: TreeIndex
+  order: readonly WriterId[]
+  nameOf: ReadonlyMap<WriterId, string>
+  colorOf: (writer: WriterId) => string
+  thread: (key: string, end: string, root: string) => MenuItem
+}) {
+  const [openMenus, setOpenMenus] = useState<OpenMenus>(new Map())
+  const reading = useReadingAt(session.presence, session.writer)
+  const people = useMemo(
+    () => peopleHere(reading, index, order),
+    [reading, index, order],
+  )
+  return withOpenMenus(people, openMenus).map(({ person: p, gone }, at) => (
+    <Menu
+      className="here-person"
+      gone={gone}
+      heading={
+        gone
+          ? `${nameFor(nameOf, p.writer)} has left`
+          : `${nameFor(nameOf, p.writer)} is in`
+      }
+      items={p.threads.map(t => thread(t.end, t.end, t.root))}
+      key={p.writer}
+      label={`${nameFor(nameOf, p.writer)}: where they are`}
+      onToggle={open =>
+        setOpenMenus(m => toggleOpenMenu(m, p.writer, at, open))
+      }
+      title={nameFor(nameOf, p.writer)}
+      trigger={<Avatar colorOf={colorOf} nameOf={nameOf} writer={p.writer} />}
+      triggerClassName="here-trigger"
+    />
+  ))
 }
 
 /** `@`: the messages that mention you, and how many you have not seen. */

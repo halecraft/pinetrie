@@ -42,7 +42,15 @@ export const mutations: readonly Mutation[] = [
     from: "      return value === null || writer === undefined",
     to: "      return writer === undefined",
     command: unit,
-    expect: "readPresence leaves out an entry once it decays",
+    expect: "a presence read leaves out an entry once it decays",
+  },
+  {
+    name: "a presence read gives a new array for the same entries",
+    file: "packages/reads/index.ts",
+    from: "    if (before !== undefined && samePairs(before, now)) return before",
+    to: "    if (before !== undefined && false) return before",
+    command: unit,
+    expect: "keeps its array while its entries are the same",
   },
   {
     name: "the queue names the first one waiting",
