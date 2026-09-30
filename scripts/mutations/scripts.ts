@@ -59,4 +59,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a suite's FAIL, Vitest's ×, and an assertion error",
   },
+  {
+    name: "a filter that names nothing runs nothing, and passes",
+    file: "scripts/mutate.ts",
+    from: "  if (chosen.length > 0) return chosen",
+    to: "  if (chosen.length >= 0) return chosen",
+    command: unit,
+    expect: "a filter that names nothing is refused",
+  },
 ]

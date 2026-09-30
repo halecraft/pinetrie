@@ -1,6 +1,13 @@
 import { describe, expect, test } from "vitest"
 import { stopMessage } from "../apps/pineta/e2e/checks.ts"
-import { failingChecks, judge, mutantEnv, run as runGroup } from "./mutate.ts"
+import {
+  choose,
+  failingChecks,
+  judge,
+  type Mutation,
+  mutantEnv,
+  run as runGroup,
+} from "./mutate.ts"
 
 const run = (status: number | null, output: string, timedOut = false) => ({
   status,
@@ -48,6 +55,27 @@ describe("judge: what a mutant's run proves", () => {
       "    at Object.ok (file:///suite/checks.ts:55:15)",
     ].join("\n")
     expect(judge(run(1, out), "colour check")).toBe("KILLED")
+  })
+})
+
+describe("choose: the mutations a filter names", () => {
+  const m = (name: string): Mutation => ({
+    name,
+    file: "f",
+    from: "a",
+    to: "b",
+    command: ["true"],
+  })
+  const list = [m("a taken offer"), m("a huge diff")]
+  test("every one without a filter; those whose name contains it with one", () => {
+    expect(choose(list, undefined)).toEqual(list)
+    expect(choose(list, "huge")).toEqual([list[1]])
+  })
+  test("a filter that names nothing is refused, not run as nothing", () => {
+    expect(choose(list, "the record keeps")).toBe(
+      `no mutation's name contains "the record keeps"`,
+    )
+    expect(choose([], undefined)).toBe("the list has no mutations")
   })
 })
 

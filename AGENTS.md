@@ -58,7 +58,7 @@ A mutation runs its command until the check it expects fails
 write them. Run the suite-level ones once, in a batch at the end of the work,
 after the suite itself passes:
 one `pnpm mutate` call per name (it takes one name substring, or none for the
-whole list), one after another. While writing,
+whole list; a substring that names no mutation exits 2), one after another. While writing,
 `npx vitest run scripts/mutations.test.ts` checks that every anchor still
 matches, in seconds. A run you interrupt leaves its mutant in the file: check
 the file and put the line back.

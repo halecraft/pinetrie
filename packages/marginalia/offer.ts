@@ -393,12 +393,12 @@ export function planOfferRead(
   offers: ReadonlyMap<string, OfferRecord>,
   ask: OfferAsk,
 ): OfferRead {
-  const held = [...offers.values()].some(
-    o => o.taken === null && o.commits.some(c => c === ask.commit),
-  )
-  if (!held)
+  // The commit read is the record's, never the request's string.
+  const commit = [...offers.values()]
+    .flatMap(o => (o.taken === null ? o.commits : []))
+    .find(c => c === ask.commit)
+  if (commit === undefined)
     return { kind: "refused", status: 404, reason: "no open offer holds it" }
-  const commit = ask.commit as CommitId
   if (ask.kind === "review") return { kind: "review", commit }
   if (ask.path === "" || CONTROL.test(ask.path))
     return { kind: "refused", status: 400, reason: "not a path" }

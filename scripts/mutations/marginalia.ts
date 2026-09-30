@@ -422,8 +422,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a taken offer's commit is read",
     file: "packages/marginalia/offer.ts",
-    from: "    o => o.taken === null && o.commits.some(c => c === ask.commit),",
-    to: "    o => o.commits.some(c => c === ask.commit),",
+    from: "    .flatMap(o => (o.taken === null ? o.commits : []))",
+    to: "    .flatMap(o => o.commits)",
     command: unit,
     expect: "planOfferRead: only a commit an open offer holds now",
   },

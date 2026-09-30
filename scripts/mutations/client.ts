@@ -919,7 +919,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a huge file loads at once",
     file: "packages/client/review.ts",
-    from: '  if (row.startsCollapsed !== toggled) return "collapsed"',
+    from: '  if (startsCollapsed !== toggled) return "collapsed"',
     to: '  if (toggled) return "collapsed"',
     command: unit,
     expect: "a big file waits to be opened",

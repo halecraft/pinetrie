@@ -675,8 +675,9 @@ The offer's line opens a review, and the column widens to hold it.
   `#strip`'s direct child with its key, position and track, so dragging,
   alignment and revealing find it as before; the thread, 28rem, holds the
   header, body, draft, strip and composer. `reviewing` is `Column`'s state,
-  never stored, and is reset when the strip's `review` goes (a take, a
-  withdrawal): hiding it instead would let the next offer open it unasked.
+  never stored, and is reset during render when the strip's `review` goes
+  (a take, a withdrawal), so no frame draws a review that is gone. Hiding
+  it instead would let the next offer open it unasked.
 - **Every URL names a commit** (`reviewUrl`, `diffUrl`, `@pineta/marginalia`),
   and the answer is immutable, so the browser's HTTP cache is the only
   cache and `useFetched` has no refetch rule. The record's `commits` is what

@@ -215,10 +215,8 @@ export function Column(p: ColumnProps) {
   // thread's next offer does not open it with nobody asking.
   const review = shows.strip.kind === "offer" ? shows.strip.review : null
   const [reviewing, setReviewing] = useState(false)
-  const offerGone = review === null
-  useEffect(() => {
-    if (offerGone) setReviewing(false)
-  }, [offerGone])
+  // Reset in render, not an effect: no frame draws a review that is gone.
+  if (review === null && reviewing) setReviewing(false)
   const reviewId = `review-${p.column.key}`
   const toggleReview = useStable(() => setReviewing(r => !r))
   const closeReview = useStable(() => setReviewing(false))

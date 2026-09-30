@@ -163,6 +163,23 @@ async function withMutant<T>(
   }
 }
 
+/**
+ * The mutations a filter names, or why there are none: a filter that matches
+ * nothing is a mistake, and a run of nothing would read as a pass.
+ */
+export function choose(
+  mutations: readonly Mutation[],
+  only: string | undefined,
+): readonly Mutation[] | string {
+  const chosen = mutations.filter(
+    m => only === undefined || m.name.includes(only),
+  )
+  if (chosen.length > 0) return chosen
+  return only === undefined
+    ? "the list has no mutations"
+    : `no mutation's name contains "${only}"`
+}
+
 const apply = (root: string, m: Mutation): Promise<Verdict> =>
   withMutant(root, m, async () => {
     const [cmd, ...args] = m.command
@@ -207,9 +224,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const mod = (await import(pathToFileURL(path.resolve(list)).href)) as {
     mutations: readonly Mutation[]
   }
-  const chosen = mod.mutations.filter(
-    m => only === undefined || m.name.includes(only),
-  )
+  const chosen = choose(mod.mutations, only)
+  if (typeof chosen === "string") {
+    console.error(chosen)
+    process.exit(2)
+  }
   if (against !== undefined) {
     for (const m of chosen) {
       const failing = await probe(root, m, against)

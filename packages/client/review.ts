@@ -132,12 +132,12 @@ export type SectionState =
  * near the view, then its diff's fetch.
  */
 export function sectionState(
-  row: FileRow,
+  startsCollapsed: boolean,
   toggled: boolean,
   wanted: boolean,
   diff: Loaded<string> | null,
 ): SectionState {
-  if (row.startsCollapsed !== toggled) return "collapsed"
+  if (startsCollapsed !== toggled) return "collapsed"
   if (!wanted) return "waiting"
   if (diff === null || diff.kind === "loading") return "loading"
   if (diff.kind === "ready") return "shown"

@@ -224,7 +224,7 @@ function ReviewFileView({ row, watch }: ReviewFileProps) {
     open && wanted ? [diffUrl(row.commit, row.path)] : [],
     readText,
   )
-  const state = sectionState(row, toggled, wanted, diff ?? null)
+  const state = sectionState(row.startsCollapsed, toggled, wanted, diff ?? null)
   const lines = diff?.kind === "ready" ? diffLines(diff.value) : []
   return (
     <section

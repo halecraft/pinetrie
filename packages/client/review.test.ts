@@ -7,13 +7,7 @@ import {
 } from "@pineta/core"
 import { withTrailers } from "@pineta/marginalia"
 import { describe, expect, test } from "vitest"
-import {
-  diffLines,
-  type FileRow,
-  type Loaded,
-  reviewView,
-  sectionState,
-} from "./review.ts"
+import { diffLines, type Loaded, reviewView, sectionState } from "./review.ts"
 
 const LANE = laneNameForThread("1")
 const C1 = commitId("c1")
@@ -82,30 +76,17 @@ describe("reviewView", () => {
 })
 
 describe("sectionState", () => {
-  const row = (startsCollapsed: boolean): FileRow => ({
-    key: "c1:a.txt",
-    commit: C1,
-    path: "a.txt",
-    shown: "a.txt",
-    letter: "M",
-    lines: "+1",
-    changed: 1,
-    conflicts: false,
-    yours: false,
-    startsCollapsed,
-    estimate: 10,
-  })
   test("a big file waits to be opened; others wait to be near, then follow their fetch", () => {
-    expect(sectionState(row(true), false, true, null)).toBe("collapsed")
-    expect(sectionState(row(true), true, true, null)).toBe("loading")
-    expect(sectionState(row(false), true, true, null)).toBe("collapsed")
-    expect(sectionState(row(false), false, false, null)).toBe("waiting")
-    expect(sectionState(row(false), false, true, { kind: "loading" })).toBe(
+    expect(sectionState(true, false, true, null)).toBe("collapsed")
+    expect(sectionState(true, true, true, null)).toBe("loading")
+    expect(sectionState(false, true, true, null)).toBe("collapsed")
+    expect(sectionState(false, false, false, null)).toBe("waiting")
+    expect(sectionState(false, false, true, { kind: "loading" })).toBe(
       "loading",
     )
-    expect(sectionState(row(false), false, true, ready("+a"))).toBe("shown")
+    expect(sectionState(false, false, true, ready("+a"))).toBe("shown")
     const failed = (status: number) =>
-      sectionState(row(false), false, true, {
+      sectionState(false, false, true, {
         kind: "failed",
         status,
         reason: "",
