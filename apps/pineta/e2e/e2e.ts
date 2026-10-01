@@ -181,33 +181,34 @@ const storedLines = async (store: Store): Promise<string[]> => {
   return ids
 }
 /**
- * `store`, taking `ms` before it starts to load: a host that does not wait for
- * its store to load then starts from an empty session. A proxy, so everything
- * else, its seat included, is the store's own.
+ * How late `slowToLoad` makes a load: several times a host's start (12 to
+ * 57 ms measured), so a host that does not wait for the load is still seen
+ * with the document empty.
  */
-/** A store whose documents (those `only` accepts, else all) take `ms` to load. */
-const slowToLoad = (
-  store: Store,
-  ms: number,
-  only: (docId: string) => boolean = () => true,
-): Store =>
-  new Proxy(store, {
+const LATE_LOAD_MS = 300
+/**
+ * `store`, with `docId`'s first load taking `ms` longer. Kyneta's hydration
+ * reads `currentMeta` before `loadAll`, so only the first `currentMeta` of
+ * `docId` waits: compaction's `loadAll` and other documents' loads do not. A
+ * proxy, so everything else, its seat included, is the store's own.
+ */
+const slowToLoad = (store: Store, docId: string, ms: number): Store => {
+  let delayed = false
+  return new Proxy(store, {
     get(target, key, receiver) {
-      if (key === "loadAll")
-        return (docId: string) =>
-          (async function* () {
-            if (only(docId)) await sleep(ms)
-            yield* target.loadAll(docId)
-          })()
       if (key === "currentMeta")
-        return async (docId: string) => {
-          if (only(docId)) await sleep(ms)
-          return target.currentMeta(docId)
+        return async (id: string) => {
+          if (id === docId && !delayed) {
+            delayed = true
+            await sleep(ms)
+          }
+          return target.currentMeta(id)
         }
       const value = Reflect.get(target, key, receiver)
       return typeof value === "function" ? value.bind(target) : value
     },
   })
+}
 /** A session's size as it stands: what a compacted store should hold. */
 const sessionBytes = (doc: typeof host.doc): number =>
   JSON.stringify({
@@ -1240,11 +1241,11 @@ invariants("end")
   )
   await th.shutdown()
   await u.close()
-  // The store opens slowly, so a host that did not wait for it would start
+  // The session loads late, so a host that did not wait for it would start
   // from an empty session, and leave the held message undrained.
   opened = openStore(dbFile)
   stored = opened.store
-  th = await open(() => {}, slowToLoad(stored, 3_000))
+  th = await open(() => {}, slowToLoad(stored, SESSION_DOC_ID, LATE_LOAD_MS))
   const linesAfter = await storedLines(stored)
   ok(
     linesAfter.length === 0,
@@ -1625,7 +1626,6 @@ invariants("end")
   await dee.close()
 
   // 7. Restart over the store: records and text are back.
-  await waitFor(() => nh.noteText(n1)?.endsWith(" Reopened.") === true, 5_000)
   const before = {
     notes: JSON.stringify(readNotes(nh.doc)),
     text: nh.noteText(n1),
@@ -1639,7 +1639,7 @@ invariants("end")
   const reopened = openStore(dbFile)
   nh = await startHost({
     model: { kind: "scripted", script },
-    store: slowToLoad(reopened.store, 3_000, id => id === noteDocId(n1)),
+    store: slowToLoad(reopened.store, noteDocId(n1), LATE_LOAD_MS),
     blobs: reopened.blobs,
     log: () => {},
   })

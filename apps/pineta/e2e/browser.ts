@@ -2808,7 +2808,7 @@ try {
         await say("echo a long one")
         await toolIdle()
         const cut = `${col(0)} .tool[data-tool="bash"][data-status="ok"]`
-        await appears(`${cut} .tool-label-whole`, 10_000)
+        await appears(`${cut}:has-text("echo long")`, 10_000)
         const row = tp.locator(cut).last()
         /** The summary's text as shown: only what is displayed counts. */
         const summaryShows = () =>

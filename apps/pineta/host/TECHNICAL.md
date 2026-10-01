@@ -208,4 +208,5 @@ record (old drafts among them), and seat records no stored text names
   `apps/*/host/**/*.test.ts`.
 - **The integration is the suites'.** `e2e` and `e2e:browser` check the
   wiring; their mutations are in `scripts/mutations/app.ts`, and this
-  directory's unit mutations in `scripts/mutations/host.ts`.
+  directory's unit mutations in `scripts/mutations/host.ts`. The suites' own
+  gotchas, and what their waits cost, are in `apps/pineta/e2e/TECHNICAL.md`.

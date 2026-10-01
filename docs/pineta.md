@@ -488,6 +488,13 @@ context.**
   reporting "all boundary rules hold".
 - ~~Multi-writer is proven only at the *storage* layer.~~ Since ADR-0020, two
   threads' lanes run at once in e2e, and one thread's writers queue.
+- **The suites and their mutations spend most of their time waiting** (S65).
+  What remains after the dead waits were removed: the image clean-up delay
+  and presence expiry as host options, short in the suites; `e2e` and
+  `e2e:browser` in sections, as `e2e:lanes` already is
+  (`PINETA_LANES_SECTION`); the browser tools section's container-free
+  checks moved to a host without containers; mutants run in parallel, each
+  in its own copy of the repository.
 - **A run's refusal cannot reach its author.** The host replies `started`
   before pi admits the run, so a refusal is only logged; the message is kept
   in the tree (`settleRun`), with no reply. A second reply, sent once the run

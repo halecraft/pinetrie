@@ -971,6 +971,8 @@ empty ones when it starts (S58).
 - **`:text-is` matches the smallest element holding the text**, which in
   markdown is the paragraph, not `.text`. The suite finds a plain message by
   `.text > p:only-child:text-is(…)`.
+- **Waiting on a selector** is in `apps/pineta/e2e/TECHNICAL.md`: a wait
+  for an element CSS hides never ends early.
 
 ## Who you are (ADR-0037)
 
