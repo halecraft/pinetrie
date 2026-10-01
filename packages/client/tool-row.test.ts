@@ -2,6 +2,7 @@ import { type ImageRef, isSha256, type ToolResultView } from "@pineta/core"
 import { expect, test } from "vitest"
 import {
   click,
+  NO_MEMORY,
   type RowFacts,
   type RowSize,
   rowSize,
@@ -19,6 +20,11 @@ test.each<[RowFacts, RowSize]>([
   [{ revealed: false, shows: true, reader: "full" }, "full"],
 ])("rowSize(%o) is %s", (facts, size) => {
   expect(rowSize(facts)).toBe(size)
+})
+
+test("a row never drawn before starts closed, unless its result shows an image", () => {
+  expect(rowSize({ ...NO_MEMORY, shows: false })).toBe("closed")
+  expect(rowSize({ ...NO_MEMORY, shows: true })).toBe("capped")
 })
 
 test.each<[RowSize, "full" | "closed"]>([

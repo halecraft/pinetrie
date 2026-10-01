@@ -27,6 +27,7 @@ import {
   lanesAlong,
   offerWords,
   type WorkFacts,
+  workingWords,
 } from "./column-view.ts"
 
 const A = laneNameForThread("a")
@@ -433,6 +434,15 @@ describe("columnView: the work strip", () => {
       }),
     )
     expect(quiet.strip).toMatchObject({ alsoHere: [] })
+  })
+})
+
+describe("workingWords", () => {
+  test.each<[boolean, string | undefined]>([
+    [true, "the agent is working"],
+    [false, undefined],
+  ])("a lane running %s says %s", (running, words) => {
+    expect(workingWords(running)).toBe(words)
   })
 })
 

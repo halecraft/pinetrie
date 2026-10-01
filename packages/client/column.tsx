@@ -50,6 +50,7 @@ import {
   type HeadOrigin,
   type WorkFacts,
   type WorkStrip,
+  workingWords,
 } from "./column-view.ts"
 import type { Column as ColumnSpec, Pending, Prefill } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
@@ -64,7 +65,9 @@ import { Avatars } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import { ReviewPane } from "./review-pane.tsx"
+import type { ScreenMemory } from "./screen-memory.ts"
 import type { SessionClient } from "./session-view.ts"
+import type { RowMemory } from "./tool-row.ts"
 import { useFollow } from "./use-follow.ts"
 import { useSeenBy } from "./use-presence.ts"
 import { useStable } from "./use-stable.ts"
@@ -147,13 +150,12 @@ export interface ColumnProps {
    */
   closable: boolean
   /**
-   * What this column knew of its end when last unmounted, and where it keeps
-   * that when unmounted again (`follow.ts`). None in the Archive preview.
+   * What each column knew of its end when last unmounted, by its key
+   * (`follow.ts`). None in the Archive preview.
    */
-  seenEnd?: {
-    readonly last: SeenEnd | undefined
-    readonly remember: (key: string, end: SeenEnd) => void
-  }
+  seenEnd?: ScreenMemory<SeenEnd>
+  /** Each tool row's state, by its call's id, across unmounts. */
+  rows: ScreenMemory<RowMemory>
 }
 
 export function Column(p: ColumnProps) {
@@ -201,7 +203,9 @@ export function Column(p: ColumnProps) {
     .map(r => r.lane)
   // Mounted again (its tab shown again) past the end its reader saw, it shows
   // ↓ new below wherever `alignOnOpen` places it short of its end.
-  const [mountedBehind] = useState(() => behind(p.seenEnd?.last, view.tipId))
+  const [mountedBehind] = useState(() =>
+    behind(p.seenEnd?.get(p.column.key), view.tipId),
+  )
   const leave = useStable((unseen: boolean) =>
     p.seenEnd?.remember(p.column.key, { tip: view.tipId, unseen }),
   )
@@ -222,6 +226,7 @@ export function Column(p: ColumnProps) {
   })
   const lane: ThreadLane =
     thread.kind === "thread" ? thread.lane : { kind: "none" }
+  const running = lane.kind === "lane" && lane.running
   const waiting =
     lane.kind === "lane" ? p.outbox.filter(h => h.lane === lane.name) : []
   // Whether this column's next send would create a lane: the composer's to
@@ -400,6 +405,7 @@ export function Column(p: ColumnProps) {
               fade={shows.banner !== null && shows.banner.url !== mountBanner}
               identity={shows.identity}
               onOpen={p.onOpen}
+              running={running}
             />
             <span className="head-space" />
             {p.showsPresence && view.tipId !== null && (
@@ -478,6 +484,7 @@ export function Column(p: ColumnProps) {
               notesOf={p.notesOf}
               onAct={onAct}
               onFocusNote={setEditingNote}
+              rows={p.rows}
               session={p.session}
               shown={p.shown}
               tools={p.live.tools}
@@ -492,6 +499,9 @@ export function Column(p: ColumnProps) {
                 )
               )
             })}
+            {/* Where the agent's next text will appear. It takes no height:
+            CSS hides it while a row the work opened runs. */}
+            {running && <div aria-hidden className="working-line" />}
             {/* Messages waiting for this thread's lane, in the order they will
             be taken. They are not in the tree yet. */}
             {waiting.map((h, n) => (
@@ -582,7 +592,7 @@ export function Column(p: ColumnProps) {
           review={{ id: reviewId, open: reviewing, toggle: toggleReview }}
           strip={shows.strip}
         />
-        {writable && lane.kind === "lane" && lane.running && (
+        {writable && running && (
           <button
             className="stop"
             onClick={() => void p.session.stop(lane.name)}
@@ -698,17 +708,23 @@ function Reply({
 /**
  * The mark before a thread's name: one fixed square, so the name never
  * moves. It holds the star, and the thread's banner over it when there is
- * one; the star stays in the text either way.
+ * one; the star stays in the text either way. The square pulses while the
+ * lane runs, banner and all: under a banner the star is hidden.
  */
 function ThreadMark({
   banner,
   fade,
+  running,
 }: {
   banner: HeadBanner | null
   fade: boolean
+  running: boolean
 }) {
   return (
-    <span className="thread-mark">
+    <span
+      className={running ? "thread-mark pulse" : "thread-mark"}
+      title={workingWords(running)}
+    >
       {banner === null ? (
         <span className="thread-star">{AGENT_MARK}</span>
       ) : (
@@ -745,24 +761,27 @@ function BannerImage({ url, fade }: { url: string; fade: boolean }) {
 
 /**
  * Who works in the column: its lane's name, which leads to where the lane
- * started; a lane about to start; or nothing, in a conversation.
+ * started; a lane about to start; or nothing, in a conversation. Its mark
+ * pulses while the lane runs.
  */
 function Identity({
   identity,
   banner,
   fade,
   onOpen,
+  running,
 }: {
   identity: HeadIdentity
   banner: HeadBanner | null
   fade: boolean
   onOpen: (id: string) => void
+  running: boolean
 }) {
   if (identity.kind === "none") return null
   if (identity.kind === "pending")
     return (
       <span className="agent-name pending">
-        <ThreadMark banner={null} fade={false} /> new agent
+        <ThreadMark banner={null} fade={false} running={running} /> new agent
       </span>
     )
   const { start } = identity
@@ -777,7 +796,8 @@ function Identity({
       title="where this agent started"
       type="button"
     >
-      <ThreadMark banner={banner} fade={fade} /> {identity.name}
+      <ThreadMark banner={banner} fade={fade} running={running} />{" "}
+      {identity.name}
     </button>
   )
 }

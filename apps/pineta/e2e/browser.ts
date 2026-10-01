@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process"
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { workingWords } from "@pineta/client/column-view"
 import { IDENTITY_KEY, identityCodec } from "@pineta/client/identity"
 import {
   type ButtonWords,
@@ -2852,6 +2853,303 @@ try {
             folded.height >= full.height &&
             folded.gap <= 2,
           `a row its reader folds while its agent works leaves the column at its end, no shorter (${JSON.stringify({ size, full, folded })})`,
+        )
+      }
+
+      // A tab shown again mounts its columns anew: each row starts as it was
+      // left (ADR-0049), so a running one is open from its first frame and a
+      // finished one keeps its size, or its reader's choice.
+      {
+        script.use([
+          {
+            tool: "bash",
+            args: {
+              command:
+                "for i in $(seq 1 25); do echo again $i; sleep 0.2; done",
+            },
+          },
+          { text: "again done" },
+        ])
+        const ticked = tp
+          .locator(`${col(0)} .tool[data-tool="bash"]`)
+          .filter({ hasText: "seq 1 4" })
+        const stepped = tp
+          .locator(`${col(0)} .tool[data-tool="bash"]`)
+          .filter({ hasText: "step %s" })
+        // The reader shows the tick command's row whole. The floor check
+        // above folded the step command's.
+        await ticked.locator("summary").click()
+        await say("again")
+        const opened = await appears(
+          `${col(0)} .tool.live[data-size="capped"]`,
+          10_000,
+        )
+        const root =
+          (await tp.getAttribute(
+            '#tabs .tab-root[aria-selected="true"]',
+            "data-root",
+          )) ?? ""
+        /** Away to the Archive tab and back, recording every bash row's state as it mounts and changes. */
+        const away = async () => {
+          await tp.click("#tabs .tab-archive")
+          await tp.waitForSelector('#tabs .tab-archive[aria-selected="true"]', {
+            timeout: 15_000,
+          })
+          await tp.evaluate(() => {
+            const w = window as unknown as {
+              __rows: string[]
+              __rowsWatch: MutationObserver
+            }
+            w.__rows = []
+            const state = (row: Element, how: string) =>
+              `${how}:${row.textContent?.includes("echo again") ? "again" : "other"}:${row.classList.contains("live") ? "live" : "done"}:${row.getAttribute("data-size")}:${row.hasAttribute("data-revealed") ? "revealed" : "-"}`
+            w.__rowsWatch = new MutationObserver(records => {
+              for (const r of records) {
+                if (
+                  r.type === "attributes" &&
+                  r.target instanceof Element &&
+                  r.target.matches('.tool[data-tool="bash"]')
+                )
+                  w.__rows.push(state(r.target, "changed"))
+                for (const n of r.addedNodes)
+                  if (n instanceof Element)
+                    for (const row of n.querySelectorAll(
+                      '.tool[data-tool="bash"]',
+                    ))
+                      w.__rows.push(state(row, "added"))
+              }
+            })
+            w.__rowsWatch.observe(document.body, {
+              subtree: true,
+              childList: true,
+              attributes: true,
+              attributeFilter: ["open", "data-size", "data-revealed"],
+            })
+          })
+          await tp.click(tabSel(root))
+          await tp.waitForSelector(`${col(0)} .tool[data-tool="bash"]`, {
+            timeout: 15_000,
+          })
+        }
+        const recorded = () =>
+          tp.evaluate(() => {
+            const w = window as unknown as {
+              __rows: string[]
+              __rowsWatch: MutationObserver
+            }
+            w.__rowsWatch.disconnect()
+            return w.__rows
+          })
+        await away()
+        const line = await tp
+          .$eval(`${col(0)} .working-line`, l => getComputedStyle(l).visibility)
+          .catch(() => "none")
+        await tp.waitForTimeout(1_000)
+        const running = await recorded()
+        const sizeOf = async (row: typeof ticked) =>
+          (await row.count()) === 1
+            ? await row.getAttribute("data-size")
+            : "missing"
+        await toolIdle()
+        await away()
+        await twoFrames(tp)
+        const done = await recorded()
+        const again = tp
+          .locator(`${col(0)} .tool[data-tool="bash"]`)
+          .filter({ hasText: "echo again" })
+        const after = {
+          again: await sizeOf(again),
+          ticked: await sizeOf(ticked),
+          stepped: await sizeOf(stepped),
+        }
+        // Fold the whole one again, so the checks below see the column they expect.
+        if (after.ticked === "full") await ticked.locator("summary").click()
+        ok(
+          opened &&
+            running.filter(r => r.includes(":again:")).join() ===
+              "added:again:live:capped:revealed" &&
+            line === "hidden" &&
+            done.every(r => r.startsWith("added:")) &&
+            after.again === "capped" &&
+            after.ticked === "full" &&
+            after.stepped === "closed",
+          `a tab shown again draws each tool row as it was left: a running one open from its first frame, the line hidden, and a finished one's size or its reader's choice kept (${JSON.stringify({ running, line, done, after })})`,
+        )
+      }
+
+      // While the lane runs, its header's mark pulses and a line at the
+      // column's end says more is coming. The line takes no height, whether
+      // it is the content's last child or sits above a waiting message.
+      {
+        const thinking = script.pause("think a while")
+        script.use([{ text: "thought" }, { text: "after the thought" }])
+        await say("think a while")
+        const star = `${col(0)} .column-head .agent-name .thread-mark`
+        const pulsing = await appears(`${star}.pulse`, 10_000)
+        const starShows = await tp
+          .$eval(star, s => ({
+            animation: getComputedStyle(s).animationName,
+            title: s.getAttribute("title"),
+          }))
+          .catch(() => null)
+        /** Where the line is, and what the content's height is with and without it. */
+        const lineShows = () =>
+          tp.$eval(`${col(0)} .column-content`, c => {
+            const line = c.querySelector(".working-line")
+            if (!(c instanceof HTMLElement) || !(line instanceof HTMLElement))
+              return null
+            const prev = line.previousElementSibling
+            const next = line.nextElementSibling
+            if (prev === null) return null
+            const rem = Number.parseFloat(
+              getComputedStyle(document.documentElement).fontSize,
+            )
+            const r = line.getBoundingClientRect()
+            const box = c.getBoundingClientRect()
+            const gapTop = prev.getBoundingClientRect().bottom
+            const gapBottom =
+              next?.getBoundingClientRect().top ??
+              gapTop + Number.parseFloat(getComputedStyle(prev).marginBottom)
+            const withLine = c.offsetHeight
+            line.style.display = "none"
+            const without = c.offsetHeight
+            line.style.display = ""
+            return {
+              visible: getComputedStyle(line).visibility === "visible",
+              next: next?.className ?? null,
+              offCentre: Math.abs(
+                (r.left + r.right) / 2 - (box.left + box.right) / 2,
+              ),
+              inGap: r.top >= gapTop - 1 && r.bottom <= gapBottom + 1,
+              gap: (gapBottom - gapTop) / rem,
+              grows: withLine - without,
+            }
+          })
+        await waitFor(() => thinking.reached)
+        await twoFrames(tp)
+        const last = await lineShows()
+        // A message sent now waits behind the paused run, below the line.
+        await say("wait behind it")
+        await appears(`${col(0)} .msg.waiting`, 10_000)
+        await twoFrames(tp)
+        const above = await lineShows()
+        thinking.resume()
+        await toolIdle()
+        await twoFrames(tp)
+        const ended = {
+          pulsing: await tp.locator(`${star}.pulse`).count(),
+          line: await tp.locator(`${col(0)} .working-line`).count(),
+        }
+        ok(
+          pulsing &&
+            starShows?.animation === "pulse-mark" &&
+            starShows.title === workingWords(true) &&
+            ended.pulsing === 0,
+          `the header's mark pulses while the agent works, and stops when it ends (${JSON.stringify({ starShows, ended })})`,
+        )
+        const placed = (l: Awaited<ReturnType<typeof lineShows>>) =>
+          l?.visible === true &&
+          l.offCentre <= 1 &&
+          l.inGap &&
+          Math.abs(l.grows) <= 0.5
+        ok(
+          placed(last) &&
+            last?.next === null &&
+            placed(above) &&
+            above?.next?.includes("waiting") === true &&
+            ended.line === 0,
+          `while the agent works, a line pulses at the column's end, centred, above what waits, and takes no height (${JSON.stringify({ last, above, ended })})`,
+        )
+      }
+
+      // A command the work opened is outlined while it runs, and the line
+      // hides; one that ends within half a second does neither. The fast one
+      // sleeps, so it is live for frames the sampler sees: an `echo` alone
+      // gets its result between two.
+      {
+        script.use([
+          { tool: "bash", args: { command: "sleep 2" } },
+          { text: "slept" },
+        ])
+        await say("sleep on it")
+        const revealed = `${col(0)} .tool.live[data-revealed]`
+        const outlined = await appears(revealed, 10_000)
+        await tp.waitForTimeout(400)
+        const slow = await tp
+          .$eval(
+            revealed,
+            (row, c) => {
+              const line = document.querySelector(`${c} .working-line`)
+              const s = getComputedStyle(row)
+              return {
+                outline: s.outlineStyle,
+                colour: s.outlineColor,
+                line: line === null ? null : getComputedStyle(line).visibility,
+              }
+            },
+            col(0),
+          )
+          .catch(() => null)
+        await toolIdle()
+        await tp.evaluate(c => {
+          const w = window as unknown as {
+            __frames: {
+              line: number
+              hidden: number
+              live: number
+              outlined: number
+            }
+            __sampling: boolean
+          }
+          w.__frames = { line: 0, hidden: 0, live: 0, outlined: 0 }
+          w.__sampling = true
+          const sample = () => {
+            if (!w.__sampling) return
+            const line = document.querySelector(`${c} .working-line`)
+            if (line !== null) {
+              w.__frames.line++
+              if (getComputedStyle(line).visibility !== "visible")
+                w.__frames.hidden++
+            }
+            for (const row of document.querySelectorAll(`${c} .tool.live`)) {
+              w.__frames.live++
+              if (getComputedStyle(row).outlineStyle !== "none")
+                w.__frames.outlined++
+            }
+            requestAnimationFrame(sample)
+          }
+          requestAnimationFrame(sample)
+        }, col(0))
+        script.use([
+          { tool: "bash", args: { command: "sleep 0.2; echo briefly" } },
+          { text: "brief" },
+        ])
+        await say("briefly")
+        await toolIdle()
+        await twoFrames(tp)
+        const fast = await tp.evaluate(() => {
+          const w = window as unknown as {
+            __frames: {
+              line: number
+              hidden: number
+              live: number
+              outlined: number
+            }
+            __sampling: boolean
+          }
+          w.__sampling = false
+          return w.__frames
+        })
+        ok(
+          outlined &&
+            slow?.outline === "solid" &&
+            slow.colour !== "rgba(0, 0, 0, 0)" &&
+            slow.line === "hidden" &&
+            fast.line > 0 &&
+            fast.live > 0 &&
+            fast.hidden === 0 &&
+            fast.outlined === 0,
+          `a running command the work opened is outlined and hides the line; a fast one does neither (${JSON.stringify({ slow, fast })})`,
         )
       }
 

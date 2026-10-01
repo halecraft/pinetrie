@@ -4,7 +4,9 @@
 and the floor's height), and adopts an alternative it rejected (keeping a
 finished tool's output open). Implementation: `PLAN-2026-09-30-column-end`.
 Amended by ADR-0051: a row whose result has an image opens capped too, and
-draws the image in place of its text.
+draws the image in place of its text. Amended by ADR-0054: a row keeps what
+it decided across an unmount, and `data-revealed` marks a row the work
+opened. Evidence for that amendment: S67.
 
 **Context.** ADR-0044 kept a following column from getting shorter while its
 agent works: a shrink is taken up by a floor below the content. But a tool's
@@ -47,12 +49,22 @@ which in a column 600–700px tall could leave no text on screen.
   snapshots by column key for the page's life, unpruned: a closed column's
   key is never used again, except `first-<root>`, which comes back as its
   root's only column, placed at its end, and that clears ↓ new below.
+- **A row keeps what it decided across an unmount** (amended by ADR-0054).
+  `revealed` and the reader's choice are a `RowMemory`, which `App` keeps
+  by call id for the page's life (`screenMemory`,
+  `packages/client/screen-memory.ts`), as it keeps `SeenEnd`. A row mounted
+  again starts from it. A remembered `revealed` starts no timer, so a
+  running command's row is open from its first frame. Before, it mounted
+  closed and opened `REVEAL_MS` later, and its column grew and followed as
+  if new output had come (S67).
 
 **Consequences.**
 - A column no longer shrinks when a command ends. What the floor still takes
   up is the reader folding a row mid-run, and columns opened to the left.
-- A row's size is screen state. A column mounted again (a tab shown again, a
-  reload, a message moved to another column) draws its rows closed.
+- A row's size is screen state. A column mounted again draws its rows as
+  they were left (amended by ADR-0054). A reload draws them closed. A row
+  first drawn after its call started, such as one that began while its tab
+  was hidden, starts its timer when drawn.
 - A result over 20,000 characters (`SHOWN`) ends in its "… more characters"
   line, not the tail the live output showed.
 - A full row's output has no cap: a long result makes a long column, since the

@@ -15,10 +15,12 @@ import type { MessageAct, MessageTools } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
 import { nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
+import type { ScreenMemory } from "./screen-memory.ts"
 import {
   click,
+  NO_MEMORY,
   REVEAL_MS,
-  type ReaderChoice,
+  type RowMemory,
   rowSize,
   toolBody,
 } from "./tool-row.ts"
@@ -89,6 +91,7 @@ function MessageView(p: MessageProps) {
             call={call}
             doc={p.doc}
             key={call.id}
+            rows={p.rows}
             stream={p.streams[call.id]}
           />
         ))}
@@ -199,36 +202,43 @@ const SHOWN = 20_000
  * How much is shown is `rowSize`'s: a call whose output streams for
  * `REVEAL_MS`, or whose result has an image, opens its row, capped, and only
  * the reader closes it. A result's images are drawn in place of its text
- * (`toolBody`), which keeps to their `title`.
+ * (`toolBody`), which keeps to their `title`. What it decided is kept in
+ * `rows` by the call's id, so a row mounted again starts where it was left.
  */
 function ToolRow({
   call,
   stream,
   doc,
+  rows,
 }: {
   call: ToolCallView
   stream: string | undefined
   doc: SessionDocHandle
+  rows: ScreenMemory<RowMemory>
 }) {
   const status =
     call.result === undefined ? "pending" : call.result.isError ? "error" : "ok"
   const mark = status === "pending" ? "…" : status === "error" ? "✗" : "✓"
   // A result replaces the stream, whether or not the stream has gone yet.
   const live = call.result === undefined ? stream : undefined
-  const [revealed, setRevealed] = useState(false)
-  const [reader, setReader] = useState<ReaderChoice>(null)
+  const [memory, setMemory] = useRemembered(rows, call.id)
+  const { revealed } = memory
   const body = toolBody(call.result)
-  const size = rowSize({ revealed, shows: body.kind === "images", reader })
+  const size = rowSize({ ...memory, shows: body.kind === "images" })
   // Set once and never unset, so the row stays open when the result arrives.
   // A result within REVEAL_MS clears the timer: the row never opened.
   useEffect(() => {
     if (live === undefined || revealed) return
-    const t = setTimeout(() => setRevealed(true), REVEAL_MS)
+    const t = setTimeout(
+      () => setMemory(m => ({ ...m, revealed: true })),
+      REVEAL_MS,
+    )
     return () => clearTimeout(t)
-  }, [live, revealed])
+  }, [live, revealed, setMemory])
   return (
     <details
       className={live === undefined ? "tool" : "tool live"}
+      data-revealed={revealed || undefined}
       data-size={size}
       data-status={status}
       data-tool={call.name}
@@ -241,7 +251,7 @@ function ToolRow({
       <summary
         onClick={e => {
           e.preventDefault()
-          setReader(click(size))
+          setMemory(m => ({ ...m, reader: click(size) }))
         }}
       >
         <span className="tool-label">{call.label}</span>
@@ -266,6 +276,31 @@ function ToolRow({
       )}
     </details>
   )
+}
+
+/**
+ * A row's memory as state, which every change also writes to `rows`, in the
+ * same call: a row unmounted at any moment has left its latest state there.
+ * The setter takes an update of the latest value, read from a ref, so it
+ * keeps its identity: the reveal timer's effect depends on it, and a click
+ * within REVEAL_MS must not restart the timer.
+ */
+function useRemembered(
+  rows: ScreenMemory<RowMemory>,
+  id: string,
+): [RowMemory, (update: (m: RowMemory) => RowMemory) => void] {
+  const [memory, setState] = useState(() => rows.get(id) ?? NO_MEMORY)
+  const current = useRef(memory)
+  const set = useCallback(
+    (update: (m: RowMemory) => RowMemory) => {
+      const next = update(current.current)
+      current.current = next
+      rows.remember(id, next)
+      setState(next)
+    },
+    [rows, id],
+  )
+  return [memory, set]
 }
 
 /**

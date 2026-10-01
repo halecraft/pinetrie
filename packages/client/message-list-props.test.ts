@@ -5,6 +5,8 @@ import {
   type MessageListProps,
   sameMessageListProps,
 } from "./message-list-props.ts"
+import { screenMemory } from "./screen-memory.ts"
+import type { RowMemory } from "./tool-row.ts"
 
 const view: ColumnView = { tipId: "e2", forkFrom: null, nodes: [] }
 const lane = (running = false): MessageListProps["lane"] => ({
@@ -24,6 +26,7 @@ const shared = {
   forks: new Map(),
   shown: new Set<string>(),
   tools: new Map(),
+  rows: screenMemory<RowMemory>(),
   notesOf: new Map(),
   nameOf: new Map(),
   session: {} as MessageListProps["session"],

@@ -3,6 +3,10 @@ import { newSessionDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 import { messageTools } from "./message-tools.ts"
+import { screenMemory } from "./screen-memory.ts"
+import type { RowMemory } from "./tool-row.ts"
+
+const ROWS = screenMemory<RowMemory>()
 
 const entry = (
   id: string,
@@ -31,6 +35,7 @@ const props = (
     node,
     streams: {},
     doc: DOC,
+    rows: ROWS,
     nameOf: NAMES,
     about: undefined,
     tools: messageTools(node, {

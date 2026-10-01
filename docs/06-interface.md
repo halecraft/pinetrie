@@ -326,6 +326,16 @@ The rail is E; the column is T. Seeing both at once is the product.
   place, and a column at its end does not get shorter while the agent works
   (ADR-0044).
   **Stop** ends the turn; messages waiting are then taken.
+- **A column says what its agent is doing** (ADR-0054), and none of it moves
+  the column. While the agent works, the mark before the thread's name in the
+  header (its `✦`, or its banner, ADR-0053) pulses, titled "the agent is
+  working". A short line pulses at the
+  end of the column, centred, where its next text will appear. While a
+  command that has run for half a second is still running, its row is
+  outlined instead, and the line hides: the wait is the machine's, not the
+  model's. A quicker command changes neither.
+- **A tab shown again draws its tool rows as they were left** (ADR-0049):
+  a running command's row open, a row you opened or closed the same way.
 - **Pasting an image into a composer puts it in the message** (ADR-0042).
   It is uploaded as it is pasted, and its markdown, `![name](/blob/…)`, goes
   in where the cursor was; the send button reads "uploading image…" until

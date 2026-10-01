@@ -76,7 +76,8 @@
       .rail-start { position: absolute; width: 8px; height: 8px; box-sizing: border-box;
         border: 1.5px solid #777; border-radius: 50%; }
       .rail-dot { position: absolute; width: 8px; height: 8px; padding: 0; border-radius: 50%; }
-      .rail-dot.pulse { animation: pulse 1s ease-in-out infinite; }
+      /* A running lane: a rail tip, a column's mark. */
+      .pulse { animation: pulse 1s ease-in-out infinite; }
       /* A run of uneventful messages: a capsule, its length and fill inline. */
       .rail-run { position: absolute; width: 8px; padding: 0; border: 1.5px solid; border-radius: 4px;
         box-sizing: border-box; }
@@ -133,6 +134,11 @@
       .column-head button.agent-name:not(:disabled):hover { text-decoration: underline; }
       .column-head button.agent-name:disabled { cursor: inherit; }
       .column-head .agent-name.pending { color: #8b93a1; font-weight: 400; font-style: italic; }
+      /* The mark pulses while its lane runs. Scaled as far as a rail dot, the
+         square would cover the name's first letter; at 1.25 it stays within
+         the .3rem gap. */
+      .column-head .thread-mark.pulse { animation-name: pulse-mark; }
+      @keyframes pulse-mark { 50% { transform: scale(1.25); } }
       .column-head .origin { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; text-align: left; font-size: .75rem; color: #7f8896; }
       .column-head .origin:hover, .column-head .origin:focus-visible { color: #d0d4da; }
@@ -306,12 +312,13 @@
       .msg::before, .msg::after { content: ""; position: absolute; top: 0; bottom: 0; }
       .msg::before { left: 100%; width: 1.75rem; }
       .msg::after { right: 100%; width: .75rem; }
-      /* Live work's mark: a 2px bar in the gutter, 4px clear of the text. A
-         border image drawn 6px outside the box (the outset) takes no width, so
-         live text wraps as its entry will (S35). Not ::before: .msg's ::before
-         and ::after are its hover gutters. Not a shadow: an outer shadow meets
-         the box's edge, and masking the gap left a hairline there. */
-      .msg.streaming, .tool.live {
+      /* A streaming reply's mark: a 2px bar in the gutter, 4px clear of the
+         text. A border image drawn 6px outside the box (the outset) takes no
+         width, so live text wraps as its entry will (S35). Not ::before:
+         .msg's ::before and ::after are its hover gutters. Not a shadow: an
+         outer shadow meets the box's edge, and masking the gap left a
+         hairline there. */
+      .msg.streaming {
         border-image: linear-gradient(transparent 4px, #9ecbff 4px, #9ecbff calc(100% - 4px),
           transparent 0) 0 0 0 1 / 0 0 0 2px / 0 0 0 6px; }
       .msg.streaming { opacity: .75; }
@@ -345,6 +352,24 @@
       .tool[open] > summary:has(.tool-label-whole) .tool-label { display: none; }
       .tool[open] > summary .tool-label-whole { display: inline-block; }
       .tool.live { opacity: .85; }
+      /* A command the work opened, still running: an outline, which takes no
+         layout, so the column does not move when it comes or goes. A call that
+         ends within REVEAL_MS is never revealed, so it never shows one. */
+      .tool.live[data-revealed] { outline: 1px solid transparent; outline-offset: 3px;
+        border-radius: 3px; animation: tool-working 1.2s ease-in-out infinite; }
+      @keyframes tool-working { 0%, 100% { outline-color: rgb(232 192 122 / .3); }
+        50% { outline-color: rgb(232 192 122 / .9); } }
+      /* Where the agent's next text will appear, while its lane runs. Zero
+         height, so its margins collapse through it: as the content's last
+         child or between two messages, it leaves the gap, and the height the
+         follow rule reads (`.column-content`'s own), as they were. The shadow
+         draws it 2px tall, and the transform lifts it to the middle of the
+         gap above; neither takes layout. */
+      .working-line { height: 0; width: 3rem; margin: 0 auto; box-shadow: 0 0 0 1px #9ecbff;
+        transform: translateY(-.5rem); animation: pulse-line 1.2s ease-in-out infinite; }
+      @keyframes pulse-line { 50% { opacity: .35; transform: translateY(-.5rem) scaleX(1.6); } }
+      /* The outline says a command is running; the line would say the model is. */
+      .column-content:has(.tool.live[data-revealed]) .working-line { visibility: hidden; }
       .stop { margin-bottom: .35rem; padding: .1rem .6rem; font-size: .75rem;
         background: none; border: 1px solid #f28b82; color: #f28b82; }
       /* Waiting for the thread's lane: not in the tree yet. */

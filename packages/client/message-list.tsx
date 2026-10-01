@@ -30,6 +30,7 @@ function MessageListView(p: MessageListProps) {
     return (
       <Message
         doc={p.session.doc}
+        rows={p.rows}
         streams={callStreams(node.toolCalls, p.tools)}
         closedBranches={node.branches.filter(b => !p.shown.has(b.rootId))}
         forkTracks={p.forks.get(node.id) ?? []}

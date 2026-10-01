@@ -7,6 +7,8 @@ import type { ReactNode } from "react"
 import type { LaneJoin } from "./column-view.ts"
 import type { MessageAct, MessageTools } from "./message-tools.ts"
 import { type PropRule, sameProps } from "./same-props.ts"
+import type { ScreenMemory } from "./screen-memory.ts"
+import type { RowMemory } from "./tool-row.ts"
 
 export interface MessageProps {
   node: SpineNode
@@ -18,6 +20,8 @@ export interface MessageProps {
   streams: Readonly<Record<string, string>>
   /** Where a running call's output is read. */
   doc: SessionDocHandle
+  /** Each tool row's state, by call id, across unmounts. */
+  rows: ScreenMemory<RowMemory>
   /** Current display names, by writer. */
   nameOf: ReadonlyMap<WriterId, string>
   /** Its note's card (ADR-0025), drawn below it. */
@@ -45,6 +49,7 @@ const MESSAGE_PROPS = {
   node: "value",
   streams: "value",
   doc: "identity",
+  rows: "identity",
   tools: "value",
   join: "value",
   forkTracks: "value",

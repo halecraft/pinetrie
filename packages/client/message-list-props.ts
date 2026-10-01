@@ -14,7 +14,9 @@ import type { LaneJoin } from "./column-view.ts"
 import type { LiveWork } from "./live.ts"
 import type { MessageAct } from "./message-tools.ts"
 import { type PropRule, sameProps } from "./same-props.ts"
+import type { ScreenMemory } from "./screen-memory.ts"
 import type { SessionClient } from "./session-view.ts"
+import type { RowMemory } from "./tool-row.ts"
 
 export interface MessageListProps {
   view: ColumnView
@@ -30,6 +32,8 @@ export interface MessageListProps {
   shown: ReadonlySet<string>
   /** Each running tool call's stream, by call id (`liveWork`). */
   tools: LiveWork["tools"]
+  /** Each tool row's state, by call id, across unmounts. */
+  rows: ScreenMemory<RowMemory>
   /** The note drawn with each message (`messageNotes`). */
   notesOf: ReadonlyMap<string, NoteRecord>
   nameOf: ReadonlyMap<WriterId, string>
@@ -49,7 +53,8 @@ export interface MessageListProps {
  * value would spend part of what skipping saves. `lane` and `joins` are
  * rebuilt on every render of the column, so they are compared by value. The
  * rest keep their identity while unchanged: memos in `App`, the facts,
- * `useSelector`'s names, `useStable`'s handler, a state setter.
+ * `useSelector`'s names, `useStable`'s handler, a state setter, the row
+ * memory made once in `App`.
  */
 const MESSAGE_LIST_PROPS = {
   view: "identity",
@@ -60,6 +65,7 @@ const MESSAGE_LIST_PROPS = {
   forks: "identity",
   shown: "identity",
   tools: "identity",
+  rows: "identity",
   notesOf: "identity",
   nameOf: "identity",
   session: "identity",

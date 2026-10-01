@@ -21,12 +21,22 @@ export type RowSize = "closed" | "capped" | "full"
 /** The reader's last choice, or null before they made one. */
 export type ReaderChoice = "full" | "closed" | null
 
-export interface RowFacts {
+/**
+ * What a row decides for itself. It outlives the row, kept by its call's id,
+ * since a tab shown again mounts its columns anew (ADR-0049).
+ */
+export interface RowMemory {
   /** The call's output streamed for REVEAL_MS while this row was drawn. */
   readonly revealed: boolean
+  readonly reader: ReaderChoice
+}
+
+/** A row never drawn before. */
+export const NO_MEMORY: RowMemory = { revealed: false, reader: null }
+
+export interface RowFacts extends RowMemory {
   /** Its result has an image. */
   readonly shows: boolean
-  readonly reader: ReaderChoice
 }
 
 export const rowSize = (f: RowFacts): RowSize =>

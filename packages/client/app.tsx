@@ -84,15 +84,16 @@ import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { readSessionFacts } from "./projection.ts"
 import { EmptyRail, LiveRail } from "./rail.tsx"
 import { firstLines, NO_TEXT, rootLabels } from "./root-label.ts"
+import { screenMemory } from "./screen-memory.ts"
 import { connectSession, type SessionClient } from "./session-view.ts"
 import { deviceState, tabState } from "./tab-state.ts"
 import { TabBar } from "./tabs.tsx"
+import type { RowMemory } from "./tool-row.ts"
 import { useColumnDrag } from "./use-column-drag.ts"
 import { useFilledCards } from "./use-filled-cards.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { useReveal } from "./use-reveal.ts"
-import { useStable } from "./use-stable.ts"
 
 /**
  * The tab you are on and each root's columns: this browser tab's, or on a new
@@ -490,10 +491,11 @@ function App({ session }: { session: SessionClient }) {
   // Never pruned: an entry is small, and a closed column's key is never used
   // again, except `first-<root>`, which comes back as its root's only
   // column, placed at its end, and that clears ↓ new below.
-  const seenEnds = useRef(new Map<string, SeenEnd>())
-  const rememberEnd = useStable((key: string, end: SeenEnd) => {
-    seenEnds.current.set(key, end)
-  })
+  const [seenEnds] = useState(() => screenMemory<SeenEnd>())
+  // What each tool row decided, by its call's id, so a tab shown again draws
+  // its rows as they were left (ADR-0049). Never pruned: a call id is not
+  // reused.
+  const [rows] = useState(() => screenMemory<RowMemory>())
 
   // After the alignment above: a picked message the alignment left out of
   // view is scrolled to.
@@ -560,6 +562,7 @@ function App({ session }: { session: SessionClient }) {
       dispatch({ kind: "newTab", key: opening(), asksAgent, prefill }),
     outbox,
     participants,
+    rows,
     seats,
     session,
     takeFocus,
@@ -760,10 +763,7 @@ function App({ session }: { session: SessionClient }) {
                         closable={newTab !== null || columns.length > 1}
                         column={column}
                         count={columns.length}
-                        seenEnd={{
-                          last: seenEnds.current.get(column.key),
-                          remember: rememberEnd,
-                        }}
+                        seenEnd={seenEnds}
                         forks={colors.forks}
                         key={column.key}
                         onBranch={(at, prefill) =>

@@ -179,7 +179,8 @@ give the roots and each tab's signals.
 - **Columns of other tabs are unmounted.** Alignment forgets their keys, so a
   tab shown again aligns its columns as if opened, left to right, the first
   at its end (Layout, below). Each keeps what it knew of its end
-  (`SeenEnd`, Following a column's end), and loses its tool rows' sizes.
+  (`SeenEnd`, Following a column's end), and each tool row what it decided
+  (`RowMemory`, Tools and live work).
 - **The Archive tab** is `archive.tsx` over `archiveIndex`
   (`archive-rows.ts`, a client-only read like `projection.ts`). Its filter,
   search, selection and preview anchor are component state, never stored. The
@@ -605,7 +606,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   forget every column off the tab you are on: a closed column's key is never
   used again, except `first-<root>`, which comes back as its root's only
   column, placed at its end, and that clears ↓ new below. A reload keeps no
-  snapshots.
+  snapshots. `App` keeps them in a `screenMemory` (`screen-memory.ts`), a
+  plain object made once, which a component may read during render: a
+  `useStable` handler run during render runs the previous render's function.
 - **While a lane runs on its path, a following column does not get shorter**
   (`holding`, ADR-0044). A shrink is taken up by `.column-floor`, below the
   content: its height is what the content lost since it was last set
@@ -713,6 +716,14 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   makes a closed or capped row `full`, uncapped, and a full one closed.
   `data-size` names the size; a closed row draws no output, so a check reads
   `.tool-output` only after opening its row.
+- **A row keeps what it decided across an unmount** (ADR-0049, amended by
+  ADR-0054). `revealed` and the reader's choice are one `RowMemory`, which
+  `App` keeps by call id in a `screenMemory`, passed down to `ToolRow` as
+  `rows` (an identity prop in both props tables, made once). `useRemembered`
+  (`message.tsx`) starts from it and writes it in the same call that sets
+  the state, so a row unmounted at any moment has left its latest state. A
+  remembered `revealed` starts no timer: a running command's row on a tab
+  shown again is open from its first frame. A reload remembers nothing.
 - **A result with an image opens its row too** (ADR-0051): `rowSize`'s third
   fact, `shows`, is read from the result, so the row opens `capped` when the
   result arrives and on every mount after, and the reader's choice still
@@ -744,10 +755,31 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   check that must see a run in progress, not its reply, pauses the reply
   (`ScriptedModel.pause`).
 - **Live work is drawn in its committed form's box.** A streaming reply is a
-  `.msg.assistant.streaming`, and its mark and a live row's are a 2px shadow
-  in the gutter, which takes no width: text wraps as its entry will.
+  `.msg.assistant.streaming`, and its mark is a 2px bar in the gutter, drawn
+  by a border image outside the box, which takes no width: text wraps as its
+  entry will.
 - **Stop** shows above the composer while the thread's lane runs, and sends
   `stop`. It is the column's, not a card's.
+- **What the agent is doing shows in three places, none taking layout**
+  (ADR-0054). `running` (`lane.running`, Stop's fact) is computed once in
+  `Column`.
+  - The mark before the thread's name (`.thread-mark`: the `✦`, or the
+    banner over it) pulses while it is true, titled by `workingWords`. The
+    square pulses, not the star, which a banner hides.
+  - A live row the work opened carries `data-revealed`, and
+    `.tool.live[data-revealed]` is outlined. A call shorter than `REVEAL_MS`
+    is never revealed, so it shows none.
+  - `.working-line` is drawn at the content's end for the whole run, before
+    the waiting messages. `.column-content:has(.tool.live[data-revealed])`
+    hides it, so no value restates `ToolRow`'s live rule or `REVEAL_MS`.
+  - **The line has zero height**, drawn by a shadow and lifted by a
+    transform. An empty block's margins collapse through it, so the gap is
+    the same with or without it. With a height, as `.column-content`'s last
+    child its bottom margin escapes the content, and the content, whose own
+    height the follow rule reads, would grow and shrink with each run.
+  - Playwright counts a zero-height element as hidden: wait for
+    `.working-line` with `state: "attached"`, or read its computed
+    `visibility` (S67).
 - **Where a new thread's agent works** (ADR-0032). When a send would create a
   lane (it asks the agent where no lane is, or it is a branch), a chip left of
   the button says where, in `whereWords`'s words: "on a copy ▾", "in your
@@ -793,7 +825,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   28rem check measures `.column-thread`. A direct lane's strip is `.work[data-state="direct"]`, with
   `.work-warning`. The header's `.agent-name` holds the thread's name in
   `data-thread` (`.agent-name.pending` before it has one); its origin row
-  is `.origin`. A lane's divider is `.lane-join`, with `data-thread`.
+  is `.origin`. A lane's divider is `.lane-join`, with `data-thread`. The
+  header's mark is `.thread-mark` (`.pulse` while its lane runs), the line
+  `.working-line`, and a row the work opened `.tool[data-revealed]`.
 - **The invite key** needs no client code: the host's redirect sets a cookie
   that same-origin requests and upgrades carry. `connectSession({ key })` is
   for Node clients.

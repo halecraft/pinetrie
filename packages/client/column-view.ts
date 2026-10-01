@@ -37,6 +37,10 @@ import { whereWords } from "./send.ts"
 /** The agent's mark, wherever the agent or a lane of it is named. */
 export const AGENT_MARK = "✦"
 
+/** A column's mark's tooltip: whether its lane is running. */
+export const workingWords = (running: boolean): string | undefined =>
+  running ? "the agent is working" : undefined
+
 /** What the host records about where lanes work, read with everything else. */
 export interface WorkFacts {
   readonly project: ProjectRecord | null

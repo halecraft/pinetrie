@@ -7,6 +7,7 @@
     "./session": "./session-view.ts",
     "./identity": "./identity.ts",
     "./send": "./send.ts",
+    "./column-view": "./column-view.ts",
     "./package.json": "./package.json"
   },
   "scripts": {
