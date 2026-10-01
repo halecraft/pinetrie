@@ -3,12 +3,8 @@
 // Runs unmodified in a browser AND in Node (the e2e check), because the only
 // environment-specific value is the WebSocket constructor. No pi.
 
-import {
-  createUndoStack,
-  Exchange,
-  type UndoStack,
-  whenPeer,
-} from "@kyneta/exchange"
+import { createUndoStack, Exchange, sync, whenPeer } from "@kyneta/exchange"
+import type { UndoTarget } from "@kyneta/react"
 import { batch, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 
@@ -56,6 +52,7 @@ import {
   TextDoc,
   type TextDocHandle,
 } from "@pineta/schema"
+import { hostLetGo, spentCards } from "./card-state.ts"
 
 /**
  * The `WebSocket` constructor to use. The browser supplies the global; Node
@@ -106,11 +103,13 @@ export interface SessionClient {
    */
   readonly cards: CardsDocHandle
   /**
-   * This tab's undo stack over its cards: in memory, so it lasts until the
-   * tab reloads or closes (ADR-0048). The cards document and every card's
-   * text are in its scope; nothing else is.
+   * This tab's undo stack, narrowed to one card: undo and redo take only the
+   * steps that wrote its text, its creation among them (ADR-0052). The stack
+   * itself is not exposed: its own `undo()` takes the tab's last step,
+   * wherever that is. It is in memory, so it lasts until the tab reloads or
+   * closes (ADR-0048).
    */
-  readonly undo: UndoStack
+  undoFor(id: CardId): UndoTarget
   /** This window's column `columnKey` follows the thread ending at `end`. */
   setReading(columnKey: string, end: string): void
   /** The column closed: its entry is deleted, not left to decay. */
@@ -132,7 +131,12 @@ export interface SessionClient {
   note(action: NoteAction): Promise<Outcome>
   /** A note's text: the same document for every caller. */
   noteText(id: NoteId): TextDocHandle
-  /** A card's text: the same document for every caller. */
+  /**
+   * A card's text: the same document for every caller. Call it only for a
+   * card whose record is live: once the host has spent the card, this client
+   * destroys its copy (`hostLetGo`, `spentCards`), and a call then would make
+   * a new, empty one.
+   */
   cardText(id: CardId): TextDocHandle
   /**
    * Create a card holding `text`: its record and its text in one undo step,
@@ -204,8 +208,41 @@ export async function connectSession(
 
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
   const cards = exchange.get(CARDS_DOC_ID, CardsDoc)
-  const cardText = (id: CardId): TextDocHandle =>
-    exchange.get(cardDocId(id), TextDoc)
+  // Each card document this client opens is watched until the host destroys
+  // it, and then this client's copy is destroyed too, so no step on it stands
+  // and a redo in an emptied box cannot write into it (S64). The host's
+  // `dismiss` leaves a receiver's copy in place.
+  const watched = new Map<CardId, () => void>()
+  const letGo = new Set<CardId>()
+  const dropSpent = () => {
+    for (const id of spentCards(letGo, c => cards.cards.has(c))) {
+      letGo.delete(id)
+      void exchange.destroy(cardDocId(id))
+    }
+  }
+  const hostIn = (states: readonly { peer: { peerId: string } }[]) =>
+    states.some(s => s.peer.peerId === host.peerId)
+  const cardText = (id: CardId): TextDocHandle => {
+    const text = exchange.get(cardDocId(id), TextDoc)
+    if (watched.has(id)) return text
+    let hadHost = hostIn(sync(text).peerStates)
+    const stop = sync(text).onPeerSyncChange(states => {
+      const hasHost = hostIn(states)
+      const gone = hostLetGo({
+        hadHost,
+        hasHost,
+        hostConnected: exchange.peers.current.has(host.peerId),
+      })
+      hadHost = hasHost
+      if (!gone) return
+      stop()
+      watched.delete(id)
+      letGo.add(id)
+      dropSpent()
+    })
+    watched.set(id, stop)
+    return text
+  }
   // Its own document, which the host neither holds nor relays (host/policy.ts).
   const undo = await createUndoStack({
     exchange,
@@ -233,7 +270,10 @@ export async function connectSession(
   })()
 
   const unsubscribe = subscribe(doc, () => options.onChange?.())
-  const unsubscribeCards = subscribe(cards, () => options.onChange?.())
+  const unsubscribeCards = subscribe(cards, () => {
+    dropSpent()
+    options.onChange?.()
+  })
 
   /**
    * Encode an intent, send it, and resolve with the decoded outcome. The id is
@@ -253,7 +293,14 @@ export async function connectSession(
     writer: me,
     presence,
     cards,
-    undo,
+    undoFor(id) {
+      const docs = [cardDocId(id)]
+      return {
+        typing: fn => undo.typing(fn),
+        undo: options => undo.undo({ ...options, docs }),
+        redo: options => undo.redo({ ...options, docs }),
+      }
+    },
     setReading(columnKey, end) {
       batch(presence, d => d.reading.set(readingKey(mine, columnKey), end))
     },
@@ -325,6 +372,8 @@ export async function connectSession(
       try {
         unsubscribe?.()
         unsubscribeCards?.()
+        for (const stop of watched.values()) stop()
+        watched.clear()
         undo.dispose()
       } catch {}
       // This seat's typing and editing go with it; another seat of the same

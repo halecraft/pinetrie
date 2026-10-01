@@ -911,11 +911,30 @@ empty ones when it starts (S58).
   counts only once the card was seen in the records: a card just created is
   not there until the records redraw.
 - **Undo** is the tab's Kyneta stack (`session.undo`, `createUndoStack`), in
-  memory, over the cards document and every `card:` document; `attach` sends
-  Cmd+Z, Cmd+Shift+Z and Ctrl+Y to it. Creating a card is one step with its
-  first text, so undoing past it removes the record. Typing is grouped by
-  word. Kyneta redoes a step of several commits in reverse order (S58,
-  addendum): the suite checks redo on a one-input step.
+  memory, over the cards document and every `card:` document. A box undoes
+  only its own card (ADR-0052): `attach` sends Cmd+Z, Cmd+Shift+Z and Ctrl+Y
+  to `session.undoFor(card)`, which passes Kyneta the card's text document
+  (`undo({ docs })`), so it takes that card's newest step even under newer
+  steps in other cards. `SessionClient` exposes only `undoFor`: the stack's
+  own `undo()` takes its top step, which can be anywhere.
+  Creating a card is one step with its first text, so undoing past it removes
+  the record. Typing is grouped by word.
+- **An emptied box can redo its card.** When a bound card goes without a send
+  from this box (your undo past its creation, or someone else's send),
+  `editorState` keeps it as `local.last`; a redo there (`isRedo`: the keys,
+  and a `beforeinput` of `historyRedo`, which takes a native listener)
+  redoes through `undoFor(last)`, and the record coming back binds the box
+  (`found`). Another card's creation leaves that redo alone: Kyneta
+  conflicts steps by the record keys and texts they write, not by document
+  (S64, addendum 3).
+- **A card the host spent is destroyed on every client holding it** (S64),
+  so no step on it stands, and a redo in an emptied box cannot write into it.
+  The host's `dismiss` leaves a receiver's copy, so `connectSession`
+  watches each card document `cardText` opens, the client's one opener of
+  them: `hostLetGo` says the host left it while connected, and `spentCards`
+  destroys the copy once the record is gone too. The two arrive in either
+  order, and a copy whose record is live is never destroyed: a render could
+  still read its text and make a new, empty copy.
 - **The editor's unmount clears its binding's handle** as well as detaching:
   StrictMode mounts twice, and a stale handle leaves the second mount
   unbound.

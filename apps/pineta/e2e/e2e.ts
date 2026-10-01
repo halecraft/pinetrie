@@ -78,6 +78,7 @@ import {
   readTyping,
 } from "@pineta/reads"
 import {
+  cardDocId,
   noteDocId,
   readActiveRun,
   readEntries,
@@ -1755,6 +1756,64 @@ invariants("end")
       sentMsg.message.contributors?.join() === bea.writer &&
       onHost(c1) === undefined,
     `a card sent is its sender's message, with its other writers, and the card is spent (${sent1.kind})`,
+  )
+
+  // 2b. Undo in a card reaches only that card (ADR-0052): A's undo passes
+  // over B's newer creation. A sent card's copy is destroyed once the host
+  // lets go of it (S64), so its steps no longer stand; undoing past a card's
+  // creation keeps the copy, so redo brings it back.
+  const kept = newCard(ada, tipOf(), "kept")
+  ada.undoFor(kept).typing(() => ada.cardText(kept).text.insert(4, " more"))
+  const spentCard = newCard(ada, tipOf(), "@Bea spent")
+  await waitFor(
+    () =>
+      ch.cardText(kept) === "kept more" &&
+      ch.cardText(spentCard) === "@Bea spent",
+    5_000,
+  )
+  await ada.undoFor(kept).undo()
+  const own = await waitFor(() => ch.cardText(kept) === "kept", 5_000)
+  const othersLeft = onHost(spentCard) !== undefined
+  await ada.chat("@Bea spent", at(tipOf()), { card: spentCard })
+  const dropped = await waitFor(
+    () => !ada.exchange.has(cardDocId(spentCard)),
+    5_000,
+  )
+  const sentUndo = await ada.undoFor(spentCard).undo()
+  await ada.undoFor(kept).undo()
+  const uncreated = await waitFor(() => onHost(kept) === undefined, 5_000)
+  await ch.quiet()
+  const stillHeld = ada.exchange.has(cardDocId(kept))
+  await ada.undoFor(kept).redo()
+  const redone = await waitFor(
+    () => onHost(kept) !== undefined && ch.cardText(kept) === "kept",
+    5_000,
+  )
+  ok(
+    own >= 0 &&
+      othersLeft &&
+      dropped >= 0 &&
+      !sentUndo &&
+      uncreated >= 0 &&
+      stillHeld &&
+      redone >= 0,
+    `undo in a card reaches only that card, and a sent card's steps act on nothing; undoing past a card's creation and redoing brings back its record and text (${[own, othersLeft, dropped, sentUndo, uncreated, stillHeld, redone].join()}; ${ch.cardText(kept)})`,
+  )
+  // Creating another card writes another key and another text, so it clears
+  // nothing of the first card's redo: the redo brings it back whole (S64,
+  // addendum 3).
+  await ada.undoFor(kept).undo()
+  await waitFor(() => onHost(kept) === undefined, 5_000)
+  const other = newCard(ada, tipOf(), "another")
+  await waitFor(() => onHost(other) !== undefined, 5_000)
+  const backAfterOther = await ada.undoFor(kept).redo()
+  const whole = await waitFor(
+    () => onHost(kept) !== undefined && ch.cardText(kept) === "kept",
+    5_000,
+  )
+  ok(
+    backAfterOther && whole >= 0,
+    `a card's redo past its creation survives another card's creation, and brings it back whole (${backAfterOther}; ${JSON.stringify(ch.cardText(kept))})`,
   )
 
   // 3. A compelled send to a busy lane is a conflict, and the card stays.

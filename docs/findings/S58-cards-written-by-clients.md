@@ -101,7 +101,9 @@ stored.
    record that outlives the seat.
 5. **A spent card's undo steps are wasted.** Ask Kyneta: a document its
    authority has dismissed should count as not standing, so the stack skips
-   its steps, as it skips a step nothing of which still stands.
+   its steps, as it skips a step nothing of which still stands. Kyneta now
+   skips a step whose document is not held; Pineta destroys each client's
+   copy when the host lets go of it (S64).
 6. **The sender's text and the host's copy agree** at the moment of a send
    from one client, since one client's writes arrive in order. The chat
    command still carries the text the sender saw: a collaborator's concurrent
@@ -136,3 +138,6 @@ scrambles the last word typed. Typing is grouped by word
 Ask Kyneta: `revertStep` for a redo should apply its parts in the order that
 restores the text, as it does for an undo. Until then, the browser suite
 checks redo on a step of one input.
+
+Fixed in Kyneta ("a step of several commits to one text undoes and redoes in
+order"), and the browser suite checks a run of keystrokes again (S64).

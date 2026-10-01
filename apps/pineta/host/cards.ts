@@ -30,7 +30,10 @@ export interface GatheredText {
 export interface CardPort {
   /** The people who wrote in the card: its `clientID`s through the seat records. */
   writers(id: CardId): Promise<readonly WriterId[]>
-  /** Delete its record, then destroy its document: it was sent. */
+  /**
+   * Delete its record, then destroy its document: it was sent. Each client
+   * destroys its own copy once it has seen both (S64).
+   */
   spend(id: CardId): Promise<void>
   /** Every live card's text and every note's, with who wrote in each. */
   texts(): Promise<readonly GatheredText[]>

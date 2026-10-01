@@ -360,6 +360,9 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **Sending spends the card.** The box stays as it was until the host
   answers: written, running or waiting, the card is gone and the box empty; a
   conflict or a refusal leaves the card, so nothing is lost or put back.
+- **Cmd+Z in a box undoes only that box's card**, never anything in another
+  column or tab (ADR-0052). After you undo past a card's first keystroke,
+  the box is empty and Cmd+Shift+Z there brings the card back.
 - **Cmd+Z and Cmd+Shift+Z** undo and redo your own typing in a card, never
   someone else's. Each tab has its own history, which a reload forgets.
 - **Closing a new branch that holds text asks** "discard what you typed?";

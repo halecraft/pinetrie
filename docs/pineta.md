@@ -437,14 +437,9 @@ context.**
 
 ### Open, non-blocking
 
-- **Kyneta redoes a step of several commits to one text in reverse order**
-  (S58, addendum): after a run of keystrokes in a card, Cmd+Z then Cmd+Shift+Z
-  scrambles the last word. Undo is right. To ask upstream: `revertStep` for a
-  redo should apply its parts in the order that restores the text.
-- **A spent card's undo steps still take a Cmd+Z** (S58): the stack does not
-  know the host destroyed the document, so one keypress changes nothing
-  visible. To ask upstream: a document its authority dismissed counts as not
-  standing.
+- **`isRedo` (`packages/client/card-state.ts`) copies Kyneta's redo keys**,
+  for a box holding no card, where `attach` is not bound. Ask Kyneta to
+  export its matcher.
 - **A refused write to a note splits that client's replica.** Its later edits
   build on the refused one and never reach the host, even after the note is
   reopened (S26 addendum 2). The host keeps those later edits as pending

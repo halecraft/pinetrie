@@ -8,7 +8,9 @@ supersede the rest of ADR-0025 (notes), and amend ADR-0026 (queued notes
 become queued cards), ADR-0043 (no notes below messages) and ADR-0046 (a
 fixed line about pinned cards in the prompt). They also replace the
 inventory in `PLAN-2026-09-27-fold`, and Phases 2–7 of
-`PLAN-2026-09-29-branch-prefill-and-composers`.
+`PLAN-2026-09-29-branch-prefill-and-composers`. Amended by ADR-0052: Cmd+Z
+in a card undoes only that card's steps, never the tab's last step
+wherever it is, and undoing a move first shows where it acts.
 
 **Context.**
 
@@ -251,8 +253,11 @@ else's, which a stack of naive inverses does not.
   changes a card's place and your drawer is undone at once. Typing joins the
   step before it while you keep typing in one place.
 - **Cmd+Z** in a card undoes through the same stack (`useText`'s `undo`
-  option), and so does Cmd+Z elsewhere on the page, for moves.
-- **The stack is per tab, and in memory.** Kyneta keeps a stack in a
+  option), and so does Cmd+Z elsewhere on the page, for moves. *Amended by
+  ADR-0052: each card has its own history, and Cmd+Z in its box reaches
+  only that.*
+- **The stack is per tab, and in memory** (*amended by ADR-0052: Cmd+Z in a
+  card undoes only that card's steps*). Kyneta keeps a stack in a
   document that one runtime writes, and a browser keeps no store
   (ADR-0037), so a tab's stack lasts until the tab reloads or closes. What
   undo reverses is kept, since cards themselves are stored; only the list of
@@ -361,7 +366,17 @@ build Pineta links (`/kyneta/workspace/pineta`, bookmark `needed-by-pineta`):
   and left the first holding only the other write; redo restored both.
 - **Redo of a step of several commits to one text puts them back in reverse
   order** (S58, addendum): after a run of keystrokes, Cmd+Z then Cmd+Shift+Z
-  scrambles the last word. Asked of Kyneta.
+  scrambled the last word. Fixed in Kyneta: "a step of several commits to one
+  text undoes and redoes in order" (S64).
+- **An undo never creates a document**: it opens a step's documents with
+  `exchange.open`, and skips a part whose document is not held. A host's
+  destroy leaves each client's copy, so each client destroys its own once
+  the host lets go of the document and the card's record is gone (S64).
+- **Undo and redo by document** (`undo({ docs })`, `redo({ docs })`): the
+  newest step that wrote the given documents, even under steps elsewhere.
+  Steps conflict by what they write, down to record keys, and a new step
+  clears the redo steps it conflicts with and those built on them (S64,
+  addenda 2 and 3). ADR-0052 rests on it.
 
 *Probes before a plan*, each recorded in `docs/findings/`. S58 answered 3, and 4
 for the drafting card; 1, 2 and 5 wait for the steps that need them:

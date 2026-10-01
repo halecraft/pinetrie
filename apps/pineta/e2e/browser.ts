@@ -3894,21 +3894,54 @@ try {
       await hasValue(page, box, "Together: from B"),
       `what you type is still there after switching tabs (${await boxValue(page, box)})`,
     )
+    // A card in another root, typed before this one's last word.
+    await page.click(tabSel(downRoot))
+    await page.click(box)
+    await page.keyboard.press("End")
+    await page.keyboard.type(" elsewhere")
+    const elsewhere = await boxValue(page, box)
+    await page.click(tabSel(here))
     // Undo is the card's (Kyneta's stack): your typing, never the other's.
-    // The last run is one input (`insertText`): Kyneta redoes a step of
-    // several commits to one text in reverse order (S58, addendum).
+    // A word typed after a space starts a step, so Cmd+Z takes back "more",
+    // a run of four keystrokes, which redo puts back in order (S64).
     await page.focus(box)
     await page.keyboard.press("End")
-    await page.keyboard.type(" and")
-    await waitFor(() => false, 1_200)
-    await page.keyboard.insertText(" more")
+    await page.keyboard.type(" and more")
     await page.keyboard.press("ControlOrMeta+z")
-    const undone = await hasValue(page, box, "Together: from B and")
+    const undone = await hasValue(page, box, "Together: from B and ")
     await page.keyboard.press("ControlOrMeta+Shift+z")
     const redone = await hasValue(page, box, "Together: from B and more")
     ok(
       undone && redone,
       `Cmd+Z undoes your last run of typing, and Cmd+Shift+Z redoes it (${await boxValue(page, box)})`,
+    )
+    // Cmd+Z in the other root's box undoes its card, though this root's
+    // typing is newer (ADR-0052).
+    await page.click(tabSel(downRoot))
+    await page.focus(box)
+    await page.keyboard.press("ControlOrMeta+z")
+    const thereUndone = await page
+      .waitForFunction(
+        sel =>
+          !(
+            document.querySelector(sel) as HTMLTextAreaElement | null
+          )?.value.endsWith("elsewhere"),
+        box,
+        { timeout: 5_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    const thereNow = await boxValue(page, box)
+    // And its first keystroke, so its card is gone.
+    await page.keyboard.press("ControlOrMeta+z")
+    await page.click(tabSel(here))
+    ok(
+      elsewhere.endsWith(" elsewhere") &&
+        thereUndone &&
+        (await hasValue(page, box, "Together: from B and more")),
+      `Cmd+Z in a card undoes only that card, never a newer step in another root (${JSON.stringify(thereNow)})`,
     )
     await page.focus(box)
     await page.keyboard.press("Enter")
@@ -3933,6 +3966,42 @@ try {
       emptied && (await hasValue(page, box, "")),
       "a sent card leaves the box empty, and a tab switch does not bring it back",
     )
+    // After a send, Cmd+Z in the emptied box changes nothing, here or in
+    // the other root.
+    const cardsAfterSend = readCards(host.cards).length
+    await page.focus(box)
+    await page.keyboard.press("ControlOrMeta+z")
+    await waitFor(() => false, 300)
+    ok(
+      (await hasValue(page, box, "")) &&
+        readCards(host.cards).length === cardsAfterSend,
+      `Cmd+Z after a send changes nothing (${readCards(host.cards).length} cards, ${cardsAfterSend} before)`,
+    )
+    // Undo past a card's creation empties the box and removes the card;
+    // Cmd+Shift+Z in the same box brings it back.
+    await page.keyboard.type("x")
+    await waitFor(() => readCards(host.cards).length > cardsAfterSend, 5_000)
+    await page.keyboard.press("ControlOrMeta+z")
+    const unmade =
+      (await hasValue(page, box, "")) &&
+      (await waitFor(
+        () => readCards(host.cards).length === cardsAfterSend,
+        5_000,
+      )) >= 0
+    await page.keyboard.press("ControlOrMeta+Shift+z")
+    const remade =
+      (await hasValue(page, box, "x")) &&
+      (await waitFor(
+        () => readCards(host.cards).length > cardsAfterSend,
+        5_000,
+      )) >= 0
+    ok(
+      unmade && remade,
+      `Cmd+Z past a card's creation removes it, and Cmd+Shift+Z in its box brings it back (${unmade}, ${remade})`,
+    )
+    // Gone again, so the rest starts from an empty box.
+    await page.keyboard.press("ControlOrMeta+z")
+    await hasValue(page, box, "")
     await idle()
     // A fresh column's card is kept by its key; closing it asks, and discards.
     // A message's tools show on hover.

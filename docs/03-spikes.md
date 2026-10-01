@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S64 — A spent card's undo, and how a client knows a card was spent ✅ PASS
+
+`findings/S64-spent-card-undo.md`. Kyneta now redoes a run of typing in
+order, and skips an undo step whose document is not held, but a host's
+destroy leaves each client's copy. Only a spend makes the host leave a
+card's document while still connected; its `dismiss` can reach a client
+before the record's delete. Superseded for undo by ADR-0052: a history per
+card.
+
 ### S61 — Menus closed by the session, not by the person ✅ PASS
 
 `findings/S61-menus-closed-by-the-session.md`. A column following its end

@@ -33,6 +33,7 @@ import {
   type EditorEvent,
   type EditorState,
   editorState,
+  isRedo,
 } from "./card-state.ts"
 import type { Pending, Prefill } from "./columns.ts"
 import { matchCommands } from "./commands.ts"
@@ -158,7 +159,9 @@ export function CardEditor(p: {
   const { session, card, prefill, pending } = p
   const box = useRef<HTMLTextAreaElement>(null)
   const [state, setState] = useState<EditorState>(() =>
-    card === undefined ? { kind: "local" } : { kind: "bound", card: card.id },
+    card === undefined
+      ? { kind: "local", last: null }
+      : { kind: "bound", card: card.id },
   )
   // The state as the handlers last left it, read synchronously between renders.
   const current = useRef(state)
@@ -195,14 +198,17 @@ export function CardEditor(p: {
   const { onIntent } = p
   useEffect(() => onIntent?.(plan.createsLane), [plan.createsLane, onIntent])
 
-  /** Bind the box to a card's text, keeping the caret where it is. */
+  /**
+   * Bind the box to a card's text, keeping the caret where it is. Its undo
+   * reaches only this card's steps (ADR-0052).
+   */
   const bind = (id: CardId) => {
     const el = box.current
     if (el === null) return
     detach.current?.()
     const doc = session.cardText(id)
     const { selectionStart, selectionEnd } = el
-    const off = attach(el, doc.text, { undo: session.undo })
+    const off = attach(el, doc.text, { undo: session.undoFor(id) })
     el.setSelectionRange(selectionStart, selectionEnd)
     setText(doc.text())
     const stop = subscribe(doc, () => setText(doc.text()))
@@ -241,6 +247,11 @@ export function CardEditor(p: {
       case "detach":
         unbind()
         return
+      case "redo":
+        // The card comes back as its record does, and `found` binds it.
+        if (next.state.kind === "local" && next.state.last !== null)
+          void session.undoFor(next.state.last).redo()
+        return
       case null:
         return
     }
@@ -264,6 +275,20 @@ export function CardEditor(p: {
       step({ kind: "gone" })
     }
   }, [card?.id])
+  // A redo from the Edit menu or a touch keyboard, in a box holding no card.
+  // A native listener: React's `onBeforeInput` carries no `inputType`.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once; `step` reads refs
+  useEffect(() => {
+    const el = box.current
+    if (el === null) return
+    const onBeforeInput = (e: InputEvent) => {
+      if (current.current.kind !== "local" || !isRedo(e)) return
+      e.preventDefault()
+      step({ kind: "redo" })
+    }
+    el.addEventListener("beforeinput", onBeforeInput)
+    return () => el.removeEventListener("beforeinput", onBeforeInput)
+  }, [])
   // Unbound on unmount. StrictMode mounts twice, so the handle is cleared
   // too: the second mount binds again.
   useEffect(
@@ -479,6 +504,12 @@ export function CardEditor(p: {
         }}
         onKeyDown={e => {
           if (e.nativeEvent.isComposing) return
+          // Bound, `attach` takes the undo keys.
+          if (current.current.kind === "local" && isRedo(e)) {
+            e.preventDefault()
+            step({ kind: "redo" })
+            return
+          }
           // While commands are offered, the keys move through them.
           if (highlighted !== undefined) {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {

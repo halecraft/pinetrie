@@ -4,13 +4,16 @@ import {
   type EditorEvent,
   type EditorState,
   editorState,
+  hostLetGo,
+  isRedo,
   needsCard,
+  spentCards,
 } from "./card-state.ts"
 import { sendable } from "./send.ts"
 
 const AGENT = { text: "@agent ", blank: true }
 const C1: CardId = cardId("c-1")
-const local: EditorState = { kind: "local" }
+const local: EditorState = { kind: "local", last: null }
 const bound: EditorState = { kind: "bound", card: C1 }
 const step = (s: EditorState, e: EditorEvent) => editorState(s, e, AGENT)
 
@@ -56,9 +59,24 @@ describe("editorState", () => {
       bound,
     )
     expect(step(bound, { kind: "gone" })).toEqual({
-      state: local,
+      state: { kind: "local", last: C1 },
       act: "detach",
     })
+  })
+
+  test("a box whose card went can redo it, until it holds a card again", () => {
+    const left: EditorState = { kind: "local", last: C1 }
+    expect(step(left, { kind: "redo" })).toEqual({ state: left, act: "redo" })
+    expect(step(local, { kind: "redo" })).toEqual({ state: local, act: null })
+    expect(step(bound, { kind: "redo" })).toEqual({ state: bound, act: null })
+    // The redo brings the card's record back, which the column finds.
+    expect(step(left, { kind: "found", card: C1 })).toEqual({
+      state: bound,
+      act: "attach",
+    })
+    expect(
+      step(left, { kind: "input", text: "new", card: cardId("c-2") }).state,
+    ).toEqual({ kind: "bound", card: cardId("c-2") })
   })
 
   test("sending: spent empties the box; a conflict or refusal keeps the card", () => {
@@ -83,4 +101,47 @@ describe("editorState", () => {
       step(sending.state, { kind: "settled", spent: false }).state,
     ).toEqual(local)
   })
+})
+
+describe("hostLetGo", () => {
+  const letGo = { hadHost: true, hasHost: false, hostConnected: true }
+  test("the host left the document while connected", () => {
+    expect(hostLetGo(letGo)).toBe(true)
+  })
+  test("an undo past a card's creation, yours or another's: the host stays", () => {
+    expect(hostLetGo({ ...letGo, hasHost: true })).toBe(false)
+  })
+  test("a card the host has not reached yet", () => {
+    expect(hostLetGo({ ...letGo, hadHost: false })).toBe(false)
+  })
+  test("a host that departed", () => {
+    expect(hostLetGo({ ...letGo, hostConnected: false })).toBe(false)
+  })
+})
+
+test("spentCards: only the cards let go of whose records are gone", () => {
+  const C2: CardId = cardId("c-2")
+  expect(spentCards([C1, C2], id => id === C1)).toEqual([C2])
+  expect(spentCards([C1], () => true)).toEqual([])
+})
+
+test("isRedo: the keys and input events attach redoes on", () => {
+  const key = (
+    k: string,
+    mods: Partial<Record<"metaKey" | "ctrlKey" | "shiftKey", boolean>>,
+  ) => ({
+    key: k,
+    metaKey: false,
+    ctrlKey: false,
+    shiftKey: false,
+    ...mods,
+  })
+  expect(isRedo(key("z", { metaKey: true, shiftKey: true }))).toBe(true)
+  expect(isRedo(key("Z", { ctrlKey: true, shiftKey: true }))).toBe(true)
+  expect(isRedo(key("y", { ctrlKey: true }))).toBe(true)
+  expect(isRedo({ inputType: "historyRedo" })).toBe(true)
+  expect(isRedo(key("z", { metaKey: true }))).toBe(false)
+  expect(isRedo(key("y", { metaKey: true }))).toBe(false)
+  expect(isRedo(key("y", {}))).toBe(false)
+  expect(isRedo({ inputType: "historyUndo" })).toBe(false)
 })
