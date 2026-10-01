@@ -2246,8 +2246,8 @@ try {
       )
       await pp.click(sendButton)
       const drawn = `${col(0)} .msg img.blob-image[src="/blob/${sha}"]`
-      /** The image in `p`'s column, once it has loaded: its sizes. */
-      const loaded = (p: Page) =>
+      /** The image at `at`, once it has loaded: its sizes; null if it never does. */
+      const loaded = (p: Page, at = drawn, timeout = 15_000) =>
         p
           .waitForFunction(
             sel => {
@@ -2258,8 +2258,8 @@ try {
                 ? [img.naturalWidth, img.getAttribute("width")]
                 : null
             },
-            drawn,
-            { timeout: 15_000 },
+            at,
+            { timeout },
           )
           .then(
             h => h.jsonValue(),
@@ -2298,19 +2298,8 @@ try {
       pp.context().on("page", p => pages.push(p))
       const url = pp.url()
       await pp.click(drawn)
-      const shown = await pp
-        .waitForFunction(
-          sel => {
-            const img = document.querySelector(sel)
-            return img instanceof HTMLImageElement && img.naturalWidth > 0
-          },
-          `${viewer} img[src="/blob/${sha}"]`,
-          { timeout: 2_000 },
-        )
-        .then(
-          () => true,
-          () => false,
-        )
+      const shown =
+        (await loaded(pp, `${viewer} img[src="/blob/${sha}"]`, 2_000)) !== null
       ok(
         shown && pages.length === 0 && pp.url() === url,
         `a click on an image shows it large in the page, not in a new tab (${shown}, ${pages.length} new pages, ${pp.url() === url})`,

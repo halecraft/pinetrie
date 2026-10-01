@@ -38,10 +38,8 @@ export function BlobImage(props: ComponentProps<"img">) {
       />
       {open &&
         // In `body`: a pasted image is inside a `<p>`, which cannot hold a
-        // `<dialog>`. React events still bubble through the React tree, so
-        // the viewer's clicks and pointerdowns reach the image's ancestors
-        // (`#strip`'s `onPointerDown` in app.tsx, which ignores them: they
-        // are not on a column's head).
+        // `<dialog>`. Its React events still reach the image's ancestors
+        // (TECHNICAL.md, "A clicked blob image is shown over the page").
         createPortal(
           <ImageViewer
             alt={alt ?? ""}
