@@ -37,7 +37,6 @@ import {
   type LaneName,
   laneNameForThread,
   type MarkRecord,
-  type NoteRecord,
   type Position,
   type SeatRecord,
   type StoredImage,
@@ -55,7 +54,6 @@ import {
   encodeArchive,
   encodeHeld,
   encodeMark,
-  encodeNote,
   encodeSeat,
   encodeWorkRecord,
   expandSkill,
@@ -63,8 +61,8 @@ import {
   type LandMessage,
   labelCommands,
   MARK_NAMESPACE,
-  NOTE_NAMESPACE,
   OFFER_NAMESPACE,
+  OLD_NOTE_NAMESPACE,
   OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
   resolveCommand,
@@ -354,8 +352,8 @@ export interface Agent {
   release(id: string): Promise<void>
   /** Store a writer's display name in `pineta.participant`, keyed by writer. */
   setParticipantName(writer: WriterId, name: string): Promise<void>
-  /** Store a note's record in `pineta.note`, keyed by its id (ADR-0025). */
-  setNote(note: NoteRecord): Promise<void>
+  /** Delete a `pineta.note` value: notes on messages are removed (ADR-0048). */
+  removeNote(key: string): Promise<void>
   /** Store a seat's record in `pineta.seat`, keyed by its `clientID` (ADR-0048). */
   setSeat(seat: SeatRecord): Promise<void>
   /** Delete a seat's record: no stored text names it. */
@@ -793,8 +791,8 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       await put(PARTICIPANT_NAMESPACE, writer, displayName)
     },
 
-    async setNote(note) {
-      await put(NOTE_NAMESPACE, note.id, encodeNote(note))
+    async removeNote(key) {
+      await session.deleteValue(value(OLD_NOTE_NAMESPACE, key), CTX)
     },
 
     async setSeat(seat) {

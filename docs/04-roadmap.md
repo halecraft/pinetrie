@@ -113,14 +113,15 @@ Roughly in dependency order, each independently shippable:
      together (which is what "shared composition" became). One Yjs document per
      note; the session holds its record; the entry stays as sent, and the model
      reads it so. Draft, open, done; contributors from each edit's `clientID`.
+     Since removed by ADR-0048 (step 3): what you write is a card, and a
+     branch from `→` carries a conversation about a message.
    - **Fold** (next). **Fold** brings what one line has and another lacks into the other,
      synthesized by the agent, as one merge entry on the target lane's tip whose
      `fromId` is the source's tip. What to fold is a set difference: everything
      reachable from the source's tip, minus everything reachable from the
      target's, over parent and `fromId` edges. So repeated folds take only what
      is new, criss-cross folds need no single common ancestor, and each target
-     is its own destination (ADR-0010). A note's changes since the target last
-     took it come as hunks with their paragraph. A lane folds into a lane the
+     is its own destination (ADR-0010). A lane folds into a lane the
      same way; its files merge only once lanes have workspaces (ADR-0019). S26
      verifies: a `json` session and Yjs notes on one Exchange; rich text on Yjs;
      per-document write permission; pi appending an entry with `fromId`, and

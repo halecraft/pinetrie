@@ -3,14 +3,7 @@
 // and values in a document as the host would. Production code never imports
 // it.
 
-import {
-  entryId,
-  type LaneName,
-  type NoteId,
-  type NoteRecord,
-  writerId,
-} from "@pineta/core"
-import { encodeNote, NOTE_NAMESPACE } from "@pineta/marginalia"
+import type { LaneName } from "@pineta/core"
 import type { ThreadLaneHandle, WriteOutcome } from "@pineta/pi"
 import {
   newSessionDoc,
@@ -111,8 +104,8 @@ export const row = (
 })
 
 /**
- * One pi value, as pi stores it: `encodeWorkRecord`'s result, or a note, an
- * archive record or a held item with its namespace and key.
+ * One pi value, as pi stores it: `encodeWorkRecord`'s result, or an archive
+ * record or a held item with its namespace and key.
  */
 export function putValue(
   doc: SessionDocHandle,
@@ -123,29 +116,6 @@ export function putValue(
   },
 ): void {
   doc.values.set(physicalKey(stored.namespace, stored.key), stored)
-}
-
-/**
- * A note's record, stored as the host writes it: open, about `e-1`, opened
- * by Ada, unless `overrides` says otherwise.
- */
-export function putNote(
-  doc: SessionDocHandle,
-  id: NoteId,
-  overrides: Partial<NoteRecord> = {},
-): NoteRecord {
-  const note: NoteRecord = {
-    id,
-    state: "open",
-    entry: entryId("e-1"),
-    openedBy: writerId("ada@example.com"),
-    contributors: [],
-    reopened: false,
-    changedSinceDone: false,
-    ...overrides,
-  }
-  putValue(doc, { namespace: NOTE_NAMESPACE, key: id, value: encodeNote(note) })
-  return note
 }
 
 /** A fresh document, ids from a counter, a fixed clock, and the log's lines. */

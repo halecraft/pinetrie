@@ -156,13 +156,12 @@ Measured before building (the plan's Phase 0):
 - documents bound with different decays sync (their schema hashes differ, and
   Kyneta reads across them), which is how e2e uses a 300 ms decay.
 
-## Typed text (`text.ts`, ADR-0025, ADR-0048)
+## Typed text (`text.ts`, ADR-0048)
 
-A note's text and a card's are the same Yjs document, `TextDoc`
-(`{ text: Schema.text() }`): a note's with id `note:<note id>` (`noteDocId`,
-`noteIdOfDoc`), a card's `card:<card id>` (`cardDocId`, `cardIdOfDoc`, in
-`card.ts`). People type together there, so it is a CRDT (ADR-0023); a note's
-record is a session value, a card's is in the cards document.
+A card's text is a Yjs document, `TextDoc` (`{ text: Schema.text() }`), with
+id `card:<card id>` (`cardDocId`, `cardIdOfDoc`, in `card.ts`). People type
+together there, so it is a CRDT (ADR-0023); a card's record is in the cards
+document.
 
 - **`seatOf(peerId, principal)` is the one place a seat becomes a person**:
   its `clientID` (Kyneta's `yjsClientId`) and its writer, or null for a
@@ -177,14 +176,14 @@ record is a session value, a card's is in the cards document.
   bits of FNV-1a-64) and `writerOfPrincipal` of its principal; a seat whose
   principal is no email, the host's included, is nobody. `text.test.ts` pins
   it to real documents' `clientID`s. The host writes a record of each seat
-  as it connects, so a note's edits are attributed from the records in the
-  serial step, after the sender may have gone.
+  as it connects, so a card's writers are named from the records after
+  they have gone.
 - **A deletion moves its writer's clock.** Kyneta's Yjs substrate ticks a
   `kyneta.clock` text after a transaction that only deleted, and a Kyneta
   delete carries its author's tick, so a deletion is attributed like an
   insertion.
-- **A note's document is never compacted.** Kyneta cannot compact a live Yjs
-  document (S24); at note sizes its history is small.
+- **A card's document is never compacted.** Kyneta cannot compact a live Yjs
+  document (S24); at a card's size its history is small.
 - **Yjs costs the page about 36 kB gzipped.** It is plain JavaScript: no wasm.
 
 ## Cards (`card.ts`, ADR-0048)
@@ -197,7 +196,7 @@ the host only deletes, to spend or sweep.
 - **Written whole once, then field by field** (S58): a host's delete beats a
   concurrent field write, but a concurrent whole-record set brings the card
   back. Keys are uuidv7, so no two writers create one (ADR-0016).
-- **A live Yjs document, never compacted** (S24), as a note's text is. A
+- **A live Yjs document, never compacted** (S24), as a card's text is. A
   spent card's text document is destroyed instead (`exchange.destroy`),
   which stores nothing more even while its owner still holds a replica.
 - **`newCardsDoc()`** is one with no Exchange, for tests, as `newSessionDoc`
@@ -208,7 +207,7 @@ the host only deletes, to spend or sweep.
 The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`
 over `node:sqlite`, `.pineta/pineta.db` by default. It holds every document the
 host serves, one append-only record stream per document: the `SessionDoc`,
-which is also pi's storage, each note's and each live card's text, the
+which is also pi's storage, each live card's text, the
 cards document, and each connected client's command Line. A tab's undo stack
 is never stored here: the host rejects it (`resolveDoc`). It is not a pi session file.
 

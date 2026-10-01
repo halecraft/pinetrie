@@ -2,15 +2,14 @@ import { laneNameForThread, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
 import { pickAt, railItems, railKeep, runFill, runLabel } from "./rail-view.ts"
 
-test("railKeep: notes, rings, running tips, open columns' ends and your cards' ends", () => {
+test("railKeep: rings, running tips, open columns' ends and your cards' ends", () => {
   const keep = railKeep({
-    notes: new Set(["n"]),
     rings: new Map([["r", []]]),
     activity: [{ lane: laneNameForThread("s"), tip: "t" }],
     ends: ["e", null],
     cards: new Set(["c"]),
   })
-  expect([...keep].sort()).toEqual(["c", "e", "n", "r", "t"])
+  expect([...keep].sort()).toEqual(["c", "e", "r", "t"])
 })
 
 test("runLabel: each part that is not zero, people named", () => {
@@ -61,11 +60,10 @@ test("railItems: a dot at a thread end holding your card carries your colour", (
   const item = (id: string) => ({ ids: [id, `${id}-later`] })
   const marks = railItems([item("c"), item("o")], {
     open: new Set(["o"]),
-    notes: new Set(["c"]),
     yours: { ends: new Set(["c"]), color: "#f0f" },
   }).map(([, m]) => m)
   expect(marks).toEqual([
-    { open: false, noted: true, yours: "#f0f" },
-    { open: true, noted: false, yours: null },
+    { open: false, yours: "#f0f" },
+    { open: true, yours: null },
   ])
 })

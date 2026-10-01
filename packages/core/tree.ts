@@ -476,11 +476,7 @@ export interface BranchSummary {
   readonly rootId: string
   /** Messages in the whole subtree, for its "⑂ n messages" button. */
   readonly messageCount: number
-  /** Of those, the ones that are notes' messages (ADR-0025): "· 1 note". */
-  readonly noteCount: number
 }
-
-const NO_NOTES: ReadonlySet<string> = new Set()
 
 export interface SpineNode extends TranscriptMessage {
   /** Children of this node that are NOT the next node on the spine. */
@@ -506,8 +502,6 @@ export interface SpineProjection {
 export function projectSpine(
   index: TreeIndex,
   tipId: string | null,
-  /** The entries that are notes' messages, which a branch's summary counts. */
-  notes: ReadonlySet<string> = NO_NOTES,
 ): SpineProjection {
   const { path: upward, cycleAt } = ancestry(index, tipId)
   const path = upward.toReversed()
@@ -532,7 +526,7 @@ export function projectSpine(
     const next = path[i + 1]
     const branches = (index.childrenOf.get(id) ?? [])
       .filter(child => child !== next && !onSpine.has(child))
-      .map(rootId => summarizeBranch(index, rootId, notes))
+      .map(rootId => summarizeBranch(index, rootId))
     spine.push({ ...message, branches })
   }
   return {
@@ -542,14 +536,9 @@ export function projectSpine(
   }
 }
 
-/** A branch's size: its messages, and how many of them are notes'. */
-function summarizeBranch(
-  index: TreeIndex,
-  rootId: string,
-  notes: ReadonlySet<string>,
-): BranchSummary {
+/** A branch's size: its messages. */
+function summarizeBranch(index: TreeIndex, rootId: string): BranchSummary {
   let messageCount = 0
-  let noteCount = 0
   const stack = [rootId]
   const visited = new Set<string>()
   for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
@@ -558,13 +547,11 @@ function summarizeBranch(
     // What the rail and columns show as a message, so a tool's result, which
     // belongs to its call, is not counted.
     const entry = index.entries[id]
-    if (entry !== undefined && renderableMessage(entry) !== null) {
+    if (entry !== undefined && renderableMessage(entry) !== null)
       messageCount += 1
-      if (notes.has(id)) noteCount += 1
-    }
     stack.push(...(index.childrenOf.get(id) ?? []))
   }
-  return { rootId, messageCount, noteCount }
+  return { rootId, messageCount }
 }
 
 // ── following a thread ────────────────────────────────────────────────────
@@ -650,8 +637,6 @@ export interface ColumnView {
 export function projectColumns(
   index: TreeIndex,
   columns: readonly ColumnSpec[],
-  /** The entries that are notes' messages (`projectSpine`). */
-  notes: ReadonlySet<string> = NO_NOTES,
 ): ColumnView[] {
   const shown = new Set<string>()
   return columns.map(column => {
@@ -659,7 +644,7 @@ export function projectColumns(
       column.pinned === true || column.anchor === null
         ? column.anchor
         : followTip(index, column.anchor)
-    const { spine } = projectSpine(index, tipId, notes)
+    const { spine } = projectSpine(index, tipId)
     let cut = -1
     for (const [i, node] of spine.entries()) if (shown.has(node.id)) cut = i
     for (const node of spine) shown.add(node.id)
@@ -810,7 +795,7 @@ export const runSpan = (size: number): number => 1 + String(size).length
  * uneventful messages drawn as one run.
  *
  * A row is uneventful when it is none of: in `keep` (what the view needs to
- * see: notes, rings, running tips, open columns' ends, your cards' ends),
+ * see: rings, running tips, open columns' ends, your cards' ends),
  * the root's first message, a branch's first message, a fork, or a thread
  * end. So a run holds no structure, and the compacted rail has every branch
  * the full one has.

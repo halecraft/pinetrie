@@ -64,12 +64,6 @@ describe("projectSpine", () => {
     expect(branch?.messageCount).toBe(2) // d1 and e1
   })
 
-  test("noteCount counts the subtree's messages that are notes'", () => {
-    const { spine } = projectSpine(indexTree(forked), "c1", new Set(["e1"]))
-    const branch = spine.flatMap(n => n.branches)[0]
-    expect([branch?.messageCount, branch?.noteCount]).toEqual([2, 1])
-  })
-
   test("branches sort by ascending rootId, not insertion order", () => {
     const many: Record<string, EntryLike> = {
       a1: msg("a1", null, "root"),

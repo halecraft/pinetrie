@@ -27,7 +27,7 @@ The end-to-end suites: `e2e.ts` (`pnpm run e2e`, and `e2e:live`),
 - **`slowToLoad` delays one document's first `currentMeta`**, by
   `LATE_LOAD_MS`. Kyneta's `#hydrate` reads `currentMeta` before `loadAll`,
   so this delays that document's first load and nothing else (`e2e.ts`, the
-  tools and notes restarts). If Kyneta's hydration stops reading
+  tools and cards restarts). If Kyneta's hydration stops reading
   `currentMeta`, nothing is delayed, and the mutations "the host does not wait for its stored
   session" and "the host serves before it has recovered" survive.
 - **`waitForSelector` waits for a visible element by default**, and so does

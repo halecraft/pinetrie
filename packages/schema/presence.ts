@@ -44,8 +44,6 @@ export const presenceSchema = (d: PresenceDecay) =>
     reading: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
     /** Keyed by writer: the thread end whose composer they are typing in. */
     typing: Schema.record(Schema.string().nullable().decay(d.typingMs)),
-    /** Keyed by writer: the note they are editing. */
-    editing: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
   })
 
 export const presenceDoc = (d: PresenceDecay = PRESENCE_DECAY) =>

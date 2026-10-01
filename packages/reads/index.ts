@@ -31,13 +31,11 @@ import {
   type LaneView,
   type MarkRecord,
   messageImages,
-  type NoteRecord,
   nearestRevision,
   type OfferRecord,
   type Position,
   type ProjectRecord,
   type RevisionRecord,
-  rootOf,
   type SeatRecord,
   type Sha256,
   type ThreadLane,
@@ -69,9 +67,7 @@ import {
   MARK_NAMESPACE,
   markRecords,
   NAME_NAMESPACE,
-  NOTE_NAMESPACE,
   nameRecords,
-  noteRecords,
   OFFER_NAMESPACE,
   OUTBOX_NAMESPACE,
   offerRecords,
@@ -282,12 +278,6 @@ function presenceField(
 export const readReading = presenceField(doc => doc.reading())
 /** One entry per seat typing: its writer, and the thread end. */
 export const readTyping = presenceField(doc => doc.typing())
-/** One entry per seat editing: its writer, and the note. */
-export const readEditing = presenceField(doc => doc.editing())
-
-/** Every note's record (`pineta.note`), oldest first. */
-export const readNotes = (doc: SessionDocHandle): readonly NoteRecord[] =>
-  noteRecords(readValues(doc, NOTE_NAMESPACE))
 
 /** Every seat the host has seen (`pineta.seat`), first seen first. */
 export const readSeats = (doc: SessionDocHandle): readonly SeatRecord[] =>
@@ -323,56 +313,6 @@ export function readCards(cards: CardsDocHandle): readonly CardRecord[] {
     const got = now.get(id)
     return got === undefined ? [] : [got.card]
   })
-}
-
-/** What the notes index can show: every note, or one kind of note. */
-export type NoteFilter = "all" | "open" | "done" | "changed" | "mine"
-export const NOTE_FILTERS: readonly NoteFilter[] = [
-  "all",
-  "open",
-  "done",
-  "changed",
-  "mine",
-]
-
-/** One row of the notes index. */
-export interface NoteRow {
-  readonly note: NoteRecord
-  /** The message it is about: a column opens there. */
-  readonly at: string
-}
-
-/**
- * The notes index of one root (ADR-0029): the notes `filter` keeps whose message
- * is in `root`, newest first. "mine" is the notes `me` opened or wrote in. Pure.
- */
-export function notesIndex(
-  notes: readonly NoteRecord[],
-  index: TreeIndex,
-  filter: NoteFilter,
-  me: WriterId,
-  root: string,
-): readonly NoteRow[] {
-  const keep = (n: NoteRecord): boolean => {
-    switch (filter) {
-      case "all":
-        return true
-      case "open":
-      case "done":
-        return n.state === filter
-      case "changed":
-        return n.changedSinceDone
-      case "mine":
-        return n.openedBy === me || n.contributors.includes(me)
-    }
-  }
-  return notes
-    .filter(keep)
-    .toReversed()
-    .flatMap(note => {
-      const at = note.entry
-      return rootOf(index, at) === root ? [{ note, at }] : []
-    })
 }
 
 /** Every root's archive record (`pineta.archive`, ADR-0029), keyed by root. */
@@ -499,7 +439,7 @@ export function workAt(
 /**
  * Every blob something still shows: each chat's images, each tool result's
  * (ADR-0051), each held message's, each `/blob/` image in the texts people
- * type, every note's and every card's (ADR-0048), and each thread's banner
+ * type, every card's (ADR-0048), and each thread's banner
  * (ADR-0050). A card holds what a composer has typed, pasted images
  * included, so the caller passes every text, not only those it has loaded.
  * Pure.
@@ -526,7 +466,7 @@ export function referencedBlobs(facts: {
   return shas
 }
 
-/** `referencedBlobs` over the session as it stands, and every note's and card's text. */
+/** `referencedBlobs` over the session as it stands, and every card's text. */
 export const readReferencedBlobs = (
   doc: SessionDocHandle,
   texts: Iterable<string>,

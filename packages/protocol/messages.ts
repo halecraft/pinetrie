@@ -34,9 +34,6 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     runs the agent only when the agent is its addressee (`address`).
  *   - `name` sets the sender's display name to `text`.
  *   - `stop` ends the running turn of the thread whose lane is `lane`.
- *   - `note` acts on a note (ADR-0025); `mode` names the action. `open` opens a
- *     note on the entry `parentId`. `done` and `reopen` act on the note
- *     `targetId`.
  *   - `archive` hides the root `targetId` for everyone, or restores it
  *     (ADR-0029); `mode` names the action, `archive` or `restore`.
  *   - `mark` titles the entry `targetId` with `text` (ADR-0045); `""`
@@ -51,7 +48,6 @@ export const COMMAND_KINDS = [
   "chat",
   "name",
   "stop",
-  "note",
   "archive",
   "mark",
   "update",
@@ -77,7 +73,7 @@ export interface Command {
    * root. Only `codec.ts` interprets this; nothing past it sees `""`.
    */
   readonly parentId: string
-  /** `chat`: `reply`, `queue` or `branch`; `note`: the action; `""` otherwise. */
+  /** `chat`: `reply`, `queue` or `branch`; `archive` and `offer`: the action; `""` otherwise. */
   readonly mode: string
   /** `chat`: the lane the sender's column is bound to, or `""`. */
   readonly lane: string
@@ -89,7 +85,7 @@ export interface Command {
    */
   readonly workKind: string
   readonly workDir: string
-  /** `note`: the note acted on; `archive`: the root; `mark`: the entry. Separate from `parentId` on purpose. */
+  /** `archive`: the root; `mark`: the entry. Separate from `parentId` on purpose. */
   readonly targetId: string
   /** `chat`: the card its text was sent from, or `""` (ADR-0048). */
   readonly cardId: string
@@ -106,7 +102,6 @@ export const OUTCOME_KINDS = [
   "conflict",
   "named",
   "stopped",
-  "noted",
   "archived",
   "restored",
   "marked",
@@ -132,8 +127,6 @@ export interface Reply {
    * or for any other outcome. The client names it, and can tell it is itself.
    */
   readonly by: string
-  /** `noted`: the note's id; "" otherwise. */
-  readonly noteId: string
   /** `updated`: the composer's prefill after a clean update; "" otherwise. */
   readonly text: string
 }
@@ -166,7 +159,6 @@ export const EMPTY_REPLY: Reply = Object.freeze({
   entryId: "",
   position: -1,
   by: "",
-  noteId: "",
   text: "",
 })
 

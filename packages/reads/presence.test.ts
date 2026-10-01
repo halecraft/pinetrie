@@ -1,7 +1,7 @@
 import { writerId } from "@pineta/core"
 import { newPresenceDoc, readingKey, seatKey } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { readEditing, readReading, readTyping } from "./index.ts"
+import { readReading, readTyping } from "./index.ts"
 
 test("each presence read names each seat's person, a person with two seats twice (ADR-0037)", () => {
   const ada = writerId("ada@x.io")
@@ -10,13 +10,11 @@ test("each presence read names each seat's person, a person with two seats twice
   doc.reading.set(readingKey(one, "c1"), "e1")
   doc.typing.set(one, "e1")
   doc.typing.set(two, "e2")
-  doc.editing.set(two, "n1")
   expect(readReading(doc)).toEqual([[ada, "e1"]])
   expect(readTyping(doc)).toEqual([
     [ada, "e1"],
     [ada, "e2"],
   ])
-  expect(readEditing(doc)).toEqual([[ada, "n1"]])
 })
 
 test("a presence read leaves out an entry once it decays", () => {
@@ -28,7 +26,6 @@ test("a presence read leaves out an entry once it decays", () => {
   doc.typing.set(seatKey(bea, "s2"), null)
   expect(readReading(doc)).toEqual([[ada, "e1"]])
   expect(readTyping(doc)).toEqual([])
-  expect(readEditing(doc)).toEqual([])
 })
 
 test("a presence read keeps its array while its entries are the same, and not after a change", () => {

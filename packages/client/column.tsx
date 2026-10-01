@@ -9,8 +9,6 @@ import {
   type ColumnView,
   entryId,
   type LaneView,
-  type NoteId,
-  type NoteRecord,
   nearestRevision,
   type Position,
   ROOT,
@@ -33,13 +31,7 @@ import {
   type SessionDocHandle,
   type StreamRecord,
 } from "@pineta/schema"
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react"
+import { useCallback, useLayoutEffect, useRef, useState } from "react"
 import type { ReadOnly } from "./app-view.ts"
 import { CardEditor } from "./card-editor.tsx"
 import {
@@ -103,10 +95,6 @@ export interface ColumnProps {
   colorOf: (writer: WriterId) => string
   /** This window is typing in this column's composer. */
   onTyping: () => void
-  /** Every note's record (ADR-0025). */
-  notes: readonly NoteRecord[]
-  /** The note drawn with each message (`messageNotes`). */
-  notesOf: ReadonlyMap<string, NoteRecord>
   /** Every card's record (ADR-0048). */
   cards: readonly CardRecord[]
   /** Every seat the host has seen: who wrote in a card. */
@@ -319,34 +307,9 @@ export function Column(p: ColumnProps) {
     if (typed) setAskClose(true)
     else act({ kind: "close", discard: null })
   }
-  // The note this window is editing: while it is scrolled out of view, a bar
-  // at the column's top leads back to it.
-  const [editingNote, setEditingNote] = useState<NoteId | null>(null)
-  const [outOfView, setOutOfView] = useState(false)
-  const edited = p.notes.find(n => n.id === editingNote)
-  const stillEdited = edited !== undefined && edited.state !== "done"
   const branchInstead = (pending: Pending) => {
     if (at.kind === "entry") act({ kind: "branchInstead", at: at.id, pending })
   }
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-observe as the column grows
-  useEffect(() => {
-    const root = body.current
-    const el =
-      editingNote === null
-        ? null
-        : root?.querySelector(`.note[data-note="${editingNote}"]`)
-    if (root === null || el === null || el === undefined) {
-      setOutOfView(false)
-      return
-    }
-    const seen = new IntersectionObserver(
-      ([e]) => setOutOfView(e !== undefined && !e.isIntersecting),
-      { root },
-    )
-    seen.observe(el)
-    return () => seen.disconnect()
-  }, [editingNote, view.nodes.length])
 
   return (
     <section
@@ -435,19 +398,6 @@ export function Column(p: ColumnProps) {
           )}
         </header>
         <div className="column-body" ref={body}>
-          {stillEdited && outOfView && (
-            <button
-              className="note-bar"
-              onClick={() =>
-                body.current
-                  ?.querySelector(`.note[data-note="${editingNote}"]`)
-                  ?.scrollIntoView({ block: "nearest" })
-              }
-              type="button"
-            >
-              editing a note · back to it
-            </button>
-          )}
           {/* `useFollow` watches its height. Keep it unpositioned: it would
             become the messages' offsetParent, and `alignOnOpen` measures
             their offsetTop against the body's. */}
@@ -461,9 +411,7 @@ export function Column(p: ColumnProps) {
               joins={shows.joins}
               lane={lane}
               nameOf={p.nameOf}
-              notesOf={p.notesOf}
               onAct={act}
-              onFocusNote={setEditingNote}
               rows={p.rows}
               session={p.session}
               shown={p.shown}

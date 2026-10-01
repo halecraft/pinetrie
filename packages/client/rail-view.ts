@@ -4,15 +4,14 @@ import type { AgentRun, RunStats, WriterId } from "@pineta/core"
 import { listOf, plural } from "./counts.ts"
 
 /**
- * The messages this view draws on their own, never inside a run: notes'
- * messages, thread ends someone else follows, running lanes' tips, each open
+ * The messages this view draws on their own, never inside a run: thread
+ * ends someone else follows, running lanes' tips, each open
  * column's end, and each thread end holding a card of yours, whose dot
  * carries its mark. A column's end is kept because a pinned column can end
  * mid-stretch: inside a run, half of it would be on the column's path and half
  * not, and where the column ends would not show.
  */
 export function railKeep(input: {
-  readonly notes: ReadonlySet<string>
   /** Thread ends others follow: the rings' keys. */
   readonly rings: ReadonlyMap<string, unknown>
   readonly activity: readonly AgentRun[]
@@ -21,7 +20,7 @@ export function railKeep(input: {
   /** Thread ends holding a card of yours (`CardMarks.ends`). */
   readonly cards: ReadonlySet<string>
 }): ReadonlySet<string> {
-  const keep = new Set([...input.notes, ...input.rings.keys(), ...input.cards])
+  const keep = new Set([...input.rings.keys(), ...input.cards])
   for (const run of input.activity) keep.add(run.tip)
   for (const end of input.ends) if (end !== null) keep.add(end)
   return keep
@@ -84,8 +83,6 @@ export function pickAt(
 export interface RailMarks {
   /** On an open column's path: `data-open`. A run's first message speaks for it. */
   readonly open: boolean
-  /** A note's message (ADR-0025): a square. */
-  readonly noted: boolean
   /** Your colour when an unsent card of yours waits here (ADR-0048), else null. */
   readonly yours: string | null
 }
@@ -95,7 +92,6 @@ export function railItems<I extends { readonly ids: readonly string[] }>(
   items: readonly I[],
   facts: {
     readonly open: ReadonlySet<string>
-    readonly notes: ReadonlySet<string>
     readonly yours: {
       readonly ends: ReadonlySet<string>
       readonly color: string
@@ -108,7 +104,6 @@ export function railItems<I extends { readonly ids: readonly string[] }>(
       item,
       {
         open: facts.open.has(id),
-        noted: facts.notes.has(id),
         yours: facts.yours.ends.has(id) ? facts.yours.color : null,
       },
     ] as const

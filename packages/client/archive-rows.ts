@@ -6,10 +6,8 @@
 import {
   type ArchiveRecord,
   messageText,
-  type NoteRecord,
   projectRail,
   type RootSummary,
-  rootOf,
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
@@ -25,8 +23,6 @@ export const ARCHIVE_FILTERS: readonly ArchiveFilter[] = [
 export interface ArchiveRow {
   readonly summary: RootSummary
   readonly record: ArchiveRecord | null
-  /** Notes whose message is in this root. */
-  readonly notes: number
   /** This root holds an unsent card of yours (`CardMarks.roots`). */
   readonly card: boolean
 }
@@ -42,7 +38,6 @@ export function archiveIndex(input: {
   /** Each root's label, by root (`rootLabels`). */
   readonly labels: ReadonlyMap<string, string>
   readonly archive: ReadonlyMap<string, ArchiveRecord>
-  readonly notes: readonly NoteRecord[]
   readonly index: TreeIndex
   readonly filter: ArchiveFilter
   readonly query: string
@@ -51,11 +46,6 @@ export function archiveIndex(input: {
   readonly cardRoots: ReadonlySet<string>
 }): readonly ArchiveRow[] {
   const { index, archive } = input
-  const noteCount = new Map<string, number>()
-  for (const note of input.notes) {
-    const root = rootOf(index, note.entry)
-    if (root !== null) noteCount.set(root, (noteCount.get(root) ?? 0) + 1)
-  }
   const needle = input.query.trim().toLowerCase()
   const matches = (root: string): boolean =>
     needle === "" ||
@@ -84,7 +74,6 @@ export function archiveIndex(input: {
     .map(summary => ({
       summary,
       record: archive.get(summary.root) ?? null,
-      notes: noteCount.get(summary.root) ?? 0,
       card: input.cardRoots.has(summary.root),
     }))
 }

@@ -197,8 +197,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup does not compact",
     file: "apps/pineta/host/index.ts",
-    from: "    settle,\n    notes,\n    cards: cardPort,\n    cardsDoc: cards,\n    ensureNames,\n  })",
-    to: "    settle: lanes =>\n      serial.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    notes,\n    cards: cardPort,\n    cardsDoc: cards,\n    ensureNames,\n  })",
+    from: "    settle,\n    cards: cardPort,\n    cardsDoc: cards,\n    ensureNames,\n  })",
+    to: "    settle: lanes =>\n      serial.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    cardsDoc: cards,\n    ensureNames,\n  })",
     command: e2e,
     expect: "a starting host compacts",
   },
@@ -244,36 +244,12 @@ export const mutations: readonly Mutation[] = [
     expect: "another window's card redraws the column and none of its messages",
   },
   {
-    name: "a note's rail dot takes the note card's class",
-    file: "packages/client/rail.tsx",
-    from: '        p.noted ? "noted" : "",',
-    to: '        p.noted ? "note" : "",',
-    command: browser,
-    expect: "the size of a dot",
-  },
-  {
-    name: "a new tab's rail has no notes toggle, so the columns move",
-    file: "packages/client/rail.tsx",
-    from: '      <button className="notes-toggle" disabled type="button">',
-    to: '      <button className="notes-toggle" hidden type="button">',
-    command: browser,
-    expect: "the columns stay put",
-  },
-  {
     name: "the rail's tree sits against its left edge",
     file: "packages/client/index.html",
     from: "      .rail-tree { position: relative; width: fit-content; margin: 0 auto; }",
     to: "      .rail-tree { position: relative; width: fit-content; }",
     command: browser,
     expect: "centred in the rail",
-  },
-  {
-    name: "the columns are drawn over the notes index",
-    file: "packages/client/index.html",
-    from: "      .notes-index { position: absolute; z-index: 3; left: 3.5rem; top: .5rem; width: 24rem;",
-    to: "      .notes-index { position: absolute; z-index: -1; left: 3.5rem; top: .5rem; width: 24rem;",
-    command: browser,
-    expect: "the notes index opens over the columns, whole",
   },
   {
     name: "a column grows to its widest line",
@@ -316,12 +292,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a starting host keeps no command Line",
   },
   {
-    name: "the host credits note edits to nobody",
-    file: "apps/pineta/host/notes.ts",
-    from: "        const authors = authorsOf(readSeats(doc))",
-    to: "        const authors = authorsOf([])",
+    name: "a starting host leaves the old notes' records",
+    file: "apps/pineta/host/startup.ts",
+    from: "  for (const key of notes.values) await agent.removeNote(key)",
+    to: "  for (const key of notes.values) void key",
     command: e2e,
-    expect: "a deletion in a note makes its writer a contributor",
+    expect: "a starting host has swept before it returns",
   },
   {
     name: "a soft break is not shown",
@@ -330,14 +306,6 @@ export const mutations: readonly Mutation[] = [
     to: "      .text { white-space: normal;",
     command: browser,
     expect: "and its soft break",
-  },
-  {
-    name: "a done note draws plain text",
-    file: "packages/client/note.tsx",
-    from: '        <MessageText className="note-text" mode="committed" text={text} />',
-    to: '        <div className="text note-text">{text}</div>',
-    command: browser,
-    expect: "a done note draws its markdown",
   },
   {
     name: "the columns are not restored",
@@ -534,7 +502,7 @@ export const mutations: readonly Mutation[] = [
     command: browser,
     expect: "outlines its fork dot in the branch's colour",
   },
-  // ── a message's tools, and its notes (ADR-0043) ──
+  // ── a message's tools (ADR-0043) ──
   {
     name: "→ sits a line below the other tools",
     file: "packages/client/index.html",
@@ -578,8 +546,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a row holding only copy is not drawn",
     file: "packages/client/message.tsx",
-    from: "    !tools.copy &&\n",
-    to: "",
+    from: "  if (!tools.copy && edit === undefined && branch === undefined) return null",
+    to: "  if (edit === undefined && branch === undefined) return null",
     command: browser,
     expect: "no tools that write, and copy",
   },
@@ -781,7 +749,7 @@ export const mutations: readonly Mutation[] = [
     from: "  await recover({",
     to: "  void recover({",
     command: e2e,
-    expect: "a starting host holds every note's text before it returns",
+    expect: "a starting host has swept before it returns",
   },
   {
     name: "a new thread's banner waits for its run's end",

@@ -37,13 +37,11 @@ const props = (
     doc: DOC,
     rows: ROWS,
     nameOf: NAMES,
-    about: undefined,
     tools: messageTools(node, {
       parentId: "a",
       isLast: true,
       lane: { kind: "none" },
       writable: true,
-      hasNoteAbout: false,
     }),
     onAct: ACT,
     join: undefined,
@@ -67,7 +65,7 @@ test("a change to what a message shows, or a new handler, draws again", () => {
     sameMessageProps(
       was,
       props("hello", {
-        closedBranches: [{ rootId: "c", messageCount: 1, noteCount: 0 }],
+        closedBranches: [{ rootId: "c", messageCount: 1 }],
       }),
     ),
   ).toBe(false)

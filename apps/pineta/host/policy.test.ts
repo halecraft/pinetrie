@@ -1,36 +1,26 @@
-import { cardId, type NoteState, noteId } from "@pineta/core"
+import { cardId } from "@pineta/core"
 import {
   CARDS_DOC_ID,
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
-import { cardDocId, noteDocId } from "@pineta/schema"
+import { cardDocId } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { acceptsWrite, resolveDoc, writePolicy } from "./policy.ts"
 
-const none = () => undefined
 const CARD = cardDocId(cardId("c-1"))
 const UNDO = "undo:seat-a"
 
 test("acceptsWrite: the session is the host's; presence is each client's", () => {
-  expect(acceptsWrite(SESSION_DOC_ID, none)).toBe(false)
-  expect(acceptsWrite(PRESENCE_DOC_ID, none)).toBe(true)
-  expect(acceptsWrite("line:pineta.control:a→host", none)).toBeUndefined()
-})
-
-test("acceptsWrite: a note's text while it is open; not done, not unrecorded", () => {
-  const id = noteId("n-1")
-  const at = (state: NoteState | undefined) =>
-    acceptsWrite(noteDocId(id), n => (n === id ? state : undefined))
-  expect(at("open")).toBe(true)
-  expect(at("done")).toBe(false)
-  expect(at(undefined)).toBe(false)
+  expect(acceptsWrite(SESSION_DOC_ID)).toBe(false)
+  expect(acceptsWrite(PRESENCE_DOC_ID)).toBe(true)
+  expect(acceptsWrite("line:pineta.control:a→host")).toBeUndefined()
 })
 
 test("acceptsWrite: cards are written by clients; an undo stack is refused (ADR-0048)", () => {
-  expect(acceptsWrite(CARDS_DOC_ID, none)).toBe(true)
-  expect(acceptsWrite(CARD, none)).toBe(true)
-  expect(acceptsWrite(UNDO, none)).toBe(false)
+  expect(acceptsWrite(CARDS_DOC_ID)).toBe(true)
+  expect(acceptsWrite(CARD)).toBe(true)
+  expect(acceptsWrite(UNDO)).toBe(false)
 })
 
 test("resolveDoc: the cards document, a card's text, a tab's undo stack, and nothing else", () => {
@@ -40,7 +30,7 @@ test("resolveDoc: the cards document, a card's text, a tab's undo stack, and not
   for (const other of [
     SESSION_DOC_ID,
     PRESENCE_DOC_ID,
-    noteDocId(noteId("n-1")),
+    "note:n-1",
     "line:pineta.control:a→host",
     "card:",
   ])
@@ -48,7 +38,7 @@ test("resolveDoc: the cards document, a card's text, a tab's undo stack, and not
 })
 
 test("a command Line's documents are shared with, and taken from, its two ends only (ADR-0037)", () => {
-  const policy = writePolicy(none)
+  const policy = writePolicy
   const line = "line:pineta.control:seat-a→seat-host"
   const peer = (peerId: string) =>
     ({ peerId, principal: "x@y.io", type: "user" }) as const
@@ -61,7 +51,7 @@ test("a command Line's documents are shared with, and taken from, its two ends o
 })
 
 test("a tab's undo stack is shared with no one and taken from no one; cards with everyone", () => {
-  const policy = writePolicy(none)
+  const policy = writePolicy
   const peer = { peerId: "seat-a", principal: "x@y.io", type: "user" } as const
   expect([
     policy.canShare?.(UNDO, peer),

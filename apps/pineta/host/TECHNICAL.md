@@ -17,12 +17,11 @@ wires them.
 | `outbox.ts` | `drain`: an idle lane's held messages and updates, oldest first |
 | `settle.ts` | what happens between runs: drain, then compact and sweep |
 | `housekeeping.ts` | compacting the session, and deleting images nothing shows |
-| `notes.ts` | each note's text, held, and each edit attributed |
-| `cards.ts` | the card port (ADR-0048): who wrote in a card, spending one, and every typed text gathered for the sweeps; where the shell opens card documents |
+| `cards.ts` | the card port (ADR-0048): who wrote in a card, spending one, and every card's text gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`) |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
-| `commands/` | one module per command: `chat`, `note`, `archive`, `mark`, `lane` (stop, update, offer); `index.ts` decodes, checks the archive, routes |
+| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, update, offer); `index.ts` decodes, checks the archive, routes |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
@@ -32,11 +31,11 @@ wires them.
 | `offers/` | each lane's offer in your repo (§ Offers) |
 | `names.ts` | every lane's thread name (ADR-0039), one plan at a time |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, set by `set_banner` |
-| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue`, `putNote`, `basics` |
+| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue`, `basics` |
 
 ## One serial executor
 
-- **Every command, drain step and note record is a step on one `Serial`**
+- **Every command and drain step is a step on one `Serial`**
   (`queue.ts`). A step gathers, plans and executes with nothing in between,
   so its plan is still true when it is carried out: with one host, this is
   what makes "a late message goes after" and "a busy lane holds" hold. A run
@@ -77,10 +76,10 @@ wires them.
 `ensureNames` (ADR-0039), `planStartup` over the outbox and `interrupted()`,
 each interrupted lane resumed before anything waiting for it (S36 item 18),
 `settle` for the other lanes with held messages, the project and commands
-records written only when changed, every note's text held, and the sweep of
-what no one will type in again: empty cards, card and note documents with no
-record (old drafts among them), and seat records no stored text names
-(`sweepTexts`).
+records written only when changed, and the sweep of what no one will type in
+again: empty cards, card documents with no record, every `pineta.note`
+record and `note:` document left from notes on messages (ADR-0048), and seat
+records no stored text names (`sweepTexts`).
 
 - **Commands are taken only after `recover`.** `Control.listen` is made
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
@@ -194,8 +193,8 @@ record (old drafts among them), and seat records no stored text names
   naming itself, so a module that touches an undeclared port fails at once.
   `fakeLane` holds a run open until the test finishes it. `row` and
   `writeEntry` put entries in the document, `putValue` a pi value (a work
-  record, an archive record, a held item, a participant's name), `putNote` a
-  note's record, and `writeLaneTip` a lane's tip; a running lane is
+  record, an archive record, a held item, a participant's name, an old note's
+  record), and `writeLaneTip` a lane's tip; a running lane is
   `beginRun`. Both of those are `@pineta/schema`'s.
 - **Admission is two pure plans**, `planRequest` and `planUpgrade`
   (`routes.ts`): every admission rule is a unit test there, and `http.ts`
@@ -206,8 +205,6 @@ record (old drafts among them), and seat records no stored text names
     run's end compacts; stale command Lines are deleted at start; it serves
     only after `recover`;
   - `http.ts`: the request and upgrade handlers carry out a plan's refusal;
-  - `notes.ts`: a note's edit is credited to its seat's person, from Kyneta's
-    Yjs `clientID`s;
   - `marginalia/chat.ts`'s `attributed`: the model is told who spoke, which
     shows that pi's conversion sends `content`;
 - **Tests in subdirectories run**: `vitest.config.mjs` includes

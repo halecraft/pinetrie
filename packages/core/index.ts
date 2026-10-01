@@ -112,10 +112,6 @@ export type EntryId = string & { readonly [entryIdBrand]: true }
 export type RunId = string & { readonly [runIdBrand]: true }
 export const entryId = (id: string): EntryId => id as EntryId
 export const runId = (id: string): RunId => id as RunId
-declare const noteIdBrand: unique symbol
-/** A note's id, uuidv7: the key of its record and the name of its text's document. */
-export type NoteId = string & { readonly [noteIdBrand]: true }
-export const noteId = (id: string): NoteId => id as NoteId
 declare const cardIdBrand: unique symbol
 /** A card's id, uuidv7: the key of its record and the name of its text's document (ADR-0048). */
 export type CardId = string & { readonly [cardIdBrand]: true }
@@ -155,14 +151,12 @@ export const ERR = {
   /** pi refused for a reason with no more specific code here. */
   REFUSED: "refused",
   /**
-   * The root is no entry: a `reply` or `queue` has nothing to continue, and
-   * no note can be opened there. Only a `branch` starts a thread at it.
+   * The root is no entry: a `reply` or `queue` has nothing to continue.
+   * Only a `branch` starts a thread at it.
    */
   NO_ANCHOR: "no_anchor",
   /** A display name is empty or too long. */
   INVALID_NAME: "invalid_name",
-  /** A note action its note's state does not allow: marking a done note done. */
-  NOTE_STATE: "note_state",
   /** A write in a root someone archived (ADR-0029). The message names them. */
   ARCHIVED: "archived",
   /** Archiving a root where the agent is working or messages are waiting. */
@@ -248,8 +242,6 @@ export type Intent =
   | { readonly kind: "name"; readonly name: string }
   /** End a thread's running turn. Idempotent: an idle lane is already stopped. */
   | { readonly kind: "stop"; readonly lane: LaneName }
-  /** Open a note on a message, or move a note on. */
-  | { readonly kind: "note"; readonly action: NoteAction }
   /** Hide a root for everyone, or bring it back (ADR-0029). */
   | {
       readonly kind: "archive"
@@ -614,33 +606,6 @@ export interface HaveRecord {
   readonly commit: CommitId
   readonly kind: "delivered" | "copy"
   readonly at: number
-}
-
-// --- notes (ADR-0025) --------------------------------------------------------
-
-/** What a `note` command asks: open a note on a message, or move one on. */
-export type NoteAction =
-  | { readonly kind: "open"; readonly entry: EntryId }
-  | { readonly kind: "done" | "reopen"; readonly note: NoteId }
-
-export const NOTE_ACTIONS = ["open", "done", "reopen"] as const
-
-/** Open: being edited. Done: read-only until reopened. */
-export type NoteState = "open" | "done"
-
-/** A note's record: a host-written `pineta.note` value. Its text is its own document. */
-export interface NoteRecord {
-  readonly id: NoteId
-  readonly state: NoteState
-  /** The message it is about. */
-  readonly entry: EntryId
-  readonly openedBy: WriterId
-  /** Writers whose edits are in its text, in order of first edit. */
-  readonly contributors: readonly WriterId[]
-  /** Reopened after being done, and not done again since. */
-  readonly reopened: boolean
-  /** Edited since it was reopened. */
-  readonly changedSinceDone: boolean
 }
 
 // --- cards (ADR-0048) --------------------------------------------------------

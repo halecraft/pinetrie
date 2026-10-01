@@ -182,12 +182,6 @@ describe("planIntent", () => {
     expect(plan(move, at(onNewTab))).toEqual([])
   })
 
-  test("a message's note opens a note on it", () => {
-    expect(plan(column({ kind: "note", entry: entryId("3-b") }))).toEqual([
-      { kind: "openNote", entry: "3-b" },
-    ])
-  })
-
   describe("openAt", () => {
     test("an entry a column shows is scrolled to, on its root's tab", () => {
       expect(plan({ kind: "openAt", entry: "4-c" })).toEqual([

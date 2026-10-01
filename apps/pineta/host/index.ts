@@ -14,7 +14,7 @@ import {
 } from "@kyneta/exchange"
 import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
-import type { BlobStore, CardId, LaneName, NoteId } from "@pineta/core"
+import type { BlobStore, CardId, LaneName } from "@pineta/core"
 import { userConfigFile } from "@pineta/lanes"
 import { decodeBannerConfig, decodeCommandRenames } from "@pineta/marginalia"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
@@ -26,7 +26,6 @@ import {
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
-import { readNotes } from "@pineta/reads"
 import {
   CardsDoc,
   type CardsDocHandle,
@@ -51,7 +50,6 @@ import { compactSession, sweepBlobs } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { lineDocPrefix } from "./lines.ts"
 import { createNames } from "./names.ts"
-import { startNoteTexts } from "./notes.ts"
 import { drain as drainOutbox } from "./outbox.ts"
 import { resolveDoc, writePolicy } from "./policy.ts"
 import { createSerial } from "./queue.ts"
@@ -133,8 +131,6 @@ export interface RunningHost {
   readonly wsUrl: string
   readonly doc: SessionDocHandle
   readonly presence: PresenceDocHandle
-  /** A note's text as the host holds it; undefined for a note it does not hold. */
-  noteText(id: NoteId): string | undefined
   /** Every card's record, as the host holds them (ADR-0048). */
   readonly cards: CardsDocHandle
   /** A card's text as the host holds it: for the suites. */
@@ -214,11 +210,8 @@ export async function startHost({
 
   // The session document is BOTH pi's storage and the thing we replicate.
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
-  // Clients may write presence, open notes and cards, never the session
-  // (host/policy.ts). A note's state is its record's, read when asked.
-  exchange.register(
-    writePolicy(id => readNotes(doc).find(n => n.id === id)?.state),
-  )
+  // Clients may write presence and cards, never the session (host/policy.ts).
+  exchange.register(writePolicy)
   // Held here so the host relays it between clients (ADR-0024).
   const presence = exchange.get(PRESENCE_DOC_ID, presenceDoc(presenceDecay))
   // Every card's record, which clients write (ADR-0048).
@@ -308,12 +301,6 @@ export async function startHost({
   const hotReload = pauseHotReload({ doc, project: () => work.project })
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
-  const notes = startNoteTexts({
-    exchange,
-    doc,
-    serial,
-    setNote: note => agent.setNote(note),
-  })
   const cardPort = startCards({ exchange, store, doc, cards })
   const runs = createRuns({ basics, agent, work })
   const commands = createCommands({
@@ -322,7 +309,6 @@ export async function startHost({
     work,
     blobs,
     cards: cardPort,
-    notes,
     start: runs.start,
   })
   const drain = (lane: LaneName) =>
@@ -364,7 +350,6 @@ export async function startHost({
     serial,
     start: runs.start,
     settle,
-    notes,
     cards: cardPort,
     cardsDoc: cards,
     ensureNames,
@@ -395,7 +380,6 @@ export async function startHost({
     wsUrl: server.wsUrl,
     doc,
     presence,
-    noteText: (id: NoteId) => notes.text(id),
     cards,
     cardText: (id: CardId) => exchange.get(cardDocId(id), TextDoc).text(),
     agent,
@@ -407,7 +391,6 @@ export async function startHost({
       try {
         await quiet()
       } catch {}
-      notes.release()
       seats.stop()
       control.stop()
       try {

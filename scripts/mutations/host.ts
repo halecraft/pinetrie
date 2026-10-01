@@ -189,22 +189,6 @@ export const mutations: readonly Mutation[] = [
       "acceptsWrite: the session is the host's; presence is each client's",
   },
   {
-    name: "the host accepts writes to a done note",
-    file: "apps/pineta/host/policy.ts",
-    from: '  return noteState(note) === "open"',
-    to: "  return noteState(note) !== undefined",
-    command: unit,
-    expect: "a note's text while it is open",
-  },
-  {
-    name: "the host refuses every note write",
-    file: "apps/pineta/host/policy.ts",
-    from: '  return noteState(note) === "open"',
-    to: "  return false",
-    command: unit,
-    expect: "a note's text while it is open",
-  },
-  {
     name: "the host shares every command Line with every client",
     file: "apps/pineta/host/policy.ts",
     from: "  canShare: (docId, peer) => (isUndo(docId) ? false : routeLine(docId, peer)),",
@@ -294,21 +278,12 @@ export const mutations: readonly Mutation[] = [
     expect: "clearing a root's title removes its mark",
   },
   {
-    name: "a starting host does not hold its notes",
-    file: "apps/pineta/host/startup.ts",
-    from: "  for (const n of readNotes(doc)) await notes.hold(n.id, null)",
-    to: "  void notes.hold",
-    command: unit,
-    expect: "recover holds every recorded note's text before it resolves",
-  },
-  {
     name: "the sweep reads no typed texts",
     file: "apps/pineta/host/housekeeping.ts",
     from: "  const texts = (await input.texts()).map(t => t.text)",
     to: "  const texts: string[] = []",
     command: unit,
-    expect:
-      "an image only a note's or a card's text shows is kept past its grace",
+    expect: "an image only a card's text shows is kept past its grace",
   },
   {
     name: "the host takes the writer from the seat",

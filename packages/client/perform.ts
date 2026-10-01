@@ -10,7 +10,7 @@ export interface AppPorts {
   readonly dispatch: (action: LayoutAction) => void
   readonly session: Pick<
     SessionClient,
-    "archive" | "mark" | "note" | "discardCard" | "setName"
+    "archive" | "mark" | "discardCard" | "setName"
   >
   /** Scroll to an entry once it is drawn (`useReveal`). */
   readonly reveal: (entry: string) => void
@@ -44,9 +44,6 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "mark":
       void ports.session.mark(effect.root, effect.title)
-      return
-    case "openNote":
-      void ports.session.note({ kind: "open", entry: effect.entry })
       return
     case "discardCard":
       ports.session.discardCard(effect.card)

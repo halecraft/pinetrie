@@ -12,8 +12,6 @@ import {
   entryId,
   type Intent,
   type LaneView,
-  type NoteAction,
-  type NoteRecord,
   type Refusal,
   refused,
   rootOf,
@@ -99,14 +97,11 @@ export function planArchive(input: {
  */
 export function writesAt(
   intent: Intent,
-  notes: readonly NoteRecord[],
   lanes: readonly LaneView[],
 ): string | null {
   switch (intent.kind) {
     case "chat":
       return intent.at.kind === "root" ? null : intent.at.id
-    case "note":
-      return noteWritesAt(intent.action, notes)
     // An update and an offer act at their lane's tip: an archived root's lanes
     // take no work in and offer none out.
     case "update":
@@ -118,22 +113,6 @@ export function writesAt(
     case "stop":
     case "archive":
       return null
-  }
-}
-
-function noteWritesAt(
-  action: NoteAction,
-  notes: readonly NoteRecord[],
-): string | null {
-  switch (action.kind) {
-    case "open":
-      return action.entry
-    case "done":
-    case "reopen": {
-      // A note that does not exist writes nowhere: `planNote` refuses it.
-      const note = notes.find(n => n.id === action.note)
-      return note === undefined ? null : note.entry
-    }
   }
 }
 

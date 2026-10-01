@@ -3,8 +3,6 @@ import {
   type EntryLike,
   entryId,
   indexTree,
-  type NoteRecord,
-  noteId,
   summarizeRoots,
   type WriterId,
   writerId,
@@ -46,22 +44,12 @@ const archived: ArchiveRecord = {
   by: ADA,
   at: 1,
 }
-const note = (id: string, on: string): NoteRecord => ({
-  id: noteId(id),
-  state: "open",
-  entry: entryId(on),
-  openedBy: ADA,
-  contributors: [],
-  reopened: false,
-  changedSinceDone: false,
-})
 
 const rows = (filter: ArchiveFilter, query = "", me = ADA) =>
   archiveIndex({
     roots,
     labels: new Map([["3-r3", "Palette work"]]),
     archive: new Map([["2-r2", archived]]),
-    notes: [note("n1", "5-r1"), note("n2", "1-r1"), note("n3", "2-r2")],
     index,
     filter,
     query,
@@ -79,13 +67,13 @@ describe("archiveIndex", () => {
     ])
   })
 
-  test("every root, newest activity first, with its record and note count", () => {
+  test("every root, newest activity first, with its record", () => {
     const all = rows("all")
     expect(ids(all)).toEqual(["1-r1", "3-r3", "2-r2"])
-    expect(all.map(r => [r.record?.state ?? null, r.notes])).toEqual([
-      [null, 2],
-      [null, 0],
-      ["archived", 1],
+    expect(all.map(r => r.record?.state ?? null)).toEqual([
+      null,
+      null,
+      "archived",
     ])
   })
   test("filters by state, and to roots I wrote in", () => {

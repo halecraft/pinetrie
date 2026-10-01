@@ -67,21 +67,12 @@ describe("presence: others, by thread", () => {
       [cy],
     ])
   })
-  test("a person typing or editing from two seats shows once (ADR-0037)", () => {
+  test("a person typing from two seats shows once (ADR-0037)", () => {
     const typing: Entries = [
       [bea, "3"],
       [bea, "3"],
       [me, "3"],
     ]
-    const editing: Entries = [
-      [bea, "n1"],
-      [bea, "n1"],
-      [cy, "n2"],
-    ]
     expect(whoIsAt(typing, "3", me)).toEqual([bea])
-    expect([whoIsAt(editing, "n1", me), whoIsAt(editing, "n2", me)]).toEqual([
-      [bea],
-      [cy],
-    ])
   })
 })

@@ -10,7 +10,6 @@ const ports = () => {
     session: {
       archive: vi.fn(async () => answer),
       mark: vi.fn(async () => answer),
-      note: vi.fn(async () => answer),
       discardCard: vi.fn(),
       setName: vi.fn(async () => answer),
     },
@@ -48,11 +47,6 @@ test.each<Row>([
     effect: { kind: "mark", root, title: "T" },
     port: p => p.session.mark,
     args: [root, "T"],
-  },
-  {
-    effect: { kind: "openNote", entry: root },
-    port: p => p.session.note,
-    args: [{ kind: "open", entry: root }],
   },
   {
     effect: { kind: "discardCard", card: cardId("c") },

@@ -2,10 +2,10 @@ import { expect, test } from "vitest"
 import { listOf, plural } from "./counts.ts"
 
 test("plural: one is singular, anything else takes an s", () => {
-  expect([0, 1, 2].map(n => plural(n, "note"))).toEqual([
-    "0 notes",
-    "1 note",
-    "2 notes",
+  expect([0, 1, 2].map(n => plural(n, "card"))).toEqual([
+    "0 cards",
+    "1 card",
+    "2 cards",
   ])
 })
 

@@ -356,6 +356,16 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S69 — The take/stop race over the host's exchange ✅ PASS
+
+`findings/S69-the-take-stop-race.md`. A take that reads the top queued card
+and deletes its record in one synchronous step wins against every stop it
+has not yet seen, and respects every stop it has. The stopper's client sees
+the card spent and can say "already sent". A refused send must write the
+card back below the line, or a stop that was lost comes back queued. A
+field on each card orders a queue; a list per thread duplicates cards under
+concurrent moves.
+
 ### S64 — A spent card's undo, and how a client knows a card was spent ✅ PASS
 
 `findings/S64-spent-card-undo.md`. Kyneta now redoes a run of typing in

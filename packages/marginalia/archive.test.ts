@@ -8,8 +8,6 @@ import {
   indexTree,
   type LaneView,
   laneNameForThread,
-  type NoteRecord,
-  noteId,
   ROOT,
   writerId,
 } from "@pineta/core"
@@ -141,16 +139,7 @@ describe("planArchive", () => {
 })
 
 describe("writesAt: the entry a command writes at", () => {
-  const opened: NoteRecord = {
-    id: noteId("n-2"),
-    state: "open",
-    entry: entryId("c"),
-    openedBy: ADA,
-    contributors: [],
-    reopened: false,
-    changedSinceDone: false,
-  }
-  const at = (intent: Intent) => writesAt(intent, [opened], [])
+  const at = (intent: Intent) => writesAt(intent, [])
   const chat = (p: Intent & { kind: "chat" }) => p
   test.each([
     [
@@ -181,21 +170,6 @@ describe("writesAt: the entry a command writes at", () => {
         work: null,
         card: null,
       }),
-      null,
-    ],
-    [
-      "a note opened",
-      { kind: "note", action: { kind: "open", entry: entryId("c") } },
-      "c",
-    ],
-    [
-      "a note marked done: its message",
-      { kind: "note", action: { kind: "done", note: noteId("n-2") } },
-      "c",
-    ],
-    [
-      "a note reopened that does not exist",
-      { kind: "note", action: { kind: "reopen", note: noteId("n-9") } },
       null,
     ],
     ["a name", { kind: "name", name: "Ada" }, null],

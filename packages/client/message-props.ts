@@ -3,7 +3,6 @@
 
 import type { BranchSummary, SpineNode, WriterId } from "@pineta/core"
 import type { SessionDocHandle } from "@pineta/schema"
-import type { ReactNode } from "react"
 import type { LaneJoin } from "./column-view.ts"
 import type { MessageAct, MessageTools } from "./message-tools.ts"
 import { type PropRule, sameProps } from "./same-props.ts"
@@ -24,11 +23,9 @@ export interface MessageProps {
   rows: ScreenMemory<RowMemory>
   /** Current display names, by writer. */
   nameOf: ReadonlyMap<WriterId, string>
-  /** Its note's card (ADR-0025), drawn below it. */
-  about: ReactNode | undefined
   /** Which tools it offers (`messageTools`). */
   tools: MessageTools
-  /** What the reader asked of it: a note, a branch, a new tab, a closed branch. */
+  /** What the reader asked of it: a branch, a new tab, a closed branch. */
   onAct: (act: MessageAct) => void
   /** A lane starts here: a divider above the message names it. */
   join: LaneJoin | undefined
@@ -42,8 +39,7 @@ export interface MessageProps {
  * How each prop is compared. `value` props are plain data rebuilt on every
  * projection (`projectSpine` makes new nodes); the rest keep their identity
  * while unchanged: `onAct` is stable (`useStable`), `nameOf` comes from
- * `useSelector` and changes only with the names, and a note card is a new
- * element each render, so a message with one redraws.
+ * `useSelector` and changes only with the names.
  */
 const MESSAGE_PROPS = {
   node: "value",
@@ -55,7 +51,6 @@ const MESSAGE_PROPS = {
   forkTracks: "value",
   closedBranches: "value",
   nameOf: "identity",
-  about: "identity",
   onAct: "identity",
 } as const satisfies { readonly [K in keyof MessageProps]-?: PropRule }
 

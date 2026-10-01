@@ -40,7 +40,6 @@ const tools = (
     isLast: false,
     lane: agentWork,
     writable: true,
-    hasNoteAbout: false,
     ...over,
   })
 
@@ -105,13 +104,6 @@ describe("edit", () => {
   })
 })
 
-describe("note", () => {
-  test("offered until the message has a note about it", () => {
-    expect(tools(chat("x", false)).note).toEqual({ kind: "note", entry: "5-m" })
-    expect(tools(chat("x", false), { hasNoteAbout: true }).note).toBeUndefined()
-  })
-})
-
 describe("→", () => {
   test("a branch at the message, with @agent typed in agent work", () => {
     expect(tools(chat("x", false)).branch).toEqual({
@@ -148,7 +140,6 @@ describe("copy", () => {
 test("a column that can't be written offers only copy", () => {
   expect(tools(chat("x", true), { writable: false })).toEqual({
     copy: true,
-    note: undefined,
     edit: undefined,
     branch: undefined,
   })

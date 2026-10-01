@@ -13,7 +13,6 @@ import {
 import {
   readArchive,
   readLanes,
-  readNotes,
   readParticipantNames,
   readTreeIndex,
 } from "@pineta/reads"
@@ -23,12 +22,10 @@ import { type ArchiveDeps, handleArchive } from "./archive.ts"
 import { type ChatDeps, sendChat } from "./chat.ts"
 import { actOnOffer, handleStop, type LaneDeps, startUpdate } from "./lane.ts"
 import { handleMark, type MarkDeps } from "./mark.ts"
-import { handleNote, type NoteDeps } from "./note.ts"
 
 export interface CommandDeps {
   readonly basics: ChatDeps["basics"]
   readonly agent: ChatDeps["agent"] &
-    NoteDeps["agent"] &
     ArchiveDeps["agent"] &
     MarkDeps["agent"] &
     LaneDeps["agent"] &
@@ -36,7 +33,6 @@ export interface CommandDeps {
   readonly work: ChatDeps["work"] & ArchiveDeps["work"] & LaneDeps["work"]
   readonly blobs: ChatDeps["blobs"]
   readonly cards: ChatDeps["cards"]
-  readonly notes: NoteDeps["notes"]
   readonly start: ChatDeps["start"]
 }
 
@@ -58,7 +54,6 @@ export interface Commands {
 export function createCommands(deps: CommandDeps): Commands {
   const { agent } = deps
   const { doc, newId } = deps.basics
-  const note: NoteDeps = { basics: deps.basics, agent, notes: deps.notes }
 
   async function handle(
     sender: Pick<ControlSender, "send">,
@@ -85,8 +80,6 @@ export function createCommands(deps: CommandDeps): Commands {
         return respond(
           await sendChat(deps, writer, id === "" ? newId() : id, intent),
         )
-      case "note":
-        return respond(await handleNote(note, writer, intent))
       case "name":
         await agent.setParticipantName(writer, intent.name)
         return respond({ kind: "named" })
@@ -120,7 +113,7 @@ function refuseInArchive(
   const archive = readArchive(doc)
   if (archive.size === 0) return null
   const index = readTreeIndex(doc)
-  const at = writesAt(intent, readNotes(doc), readLanes(doc, index))
+  const at = writesAt(intent, readLanes(doc, index))
   const record = archivedAt(index, archive, at)
   if (record === null) return null
   const names = readParticipantNames(doc)

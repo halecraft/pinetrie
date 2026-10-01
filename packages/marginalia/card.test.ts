@@ -18,6 +18,7 @@ import {
   encodeCard,
   placeEnd,
   planCardSweep,
+  planNoteSweep,
   spends,
   yourCard,
 } from "./card.ts"
@@ -154,6 +155,15 @@ test("planCardSweep: empty cards and documents with no record go; a card with te
       cardOfDoc: ofDoc,
     }),
   ).toEqual({ records: ["c-2"], docs: ["card:c-2", "card:gone"] })
+})
+
+test("planNoteSweep: every old note value and note document goes; cards stay", () => {
+  expect(
+    planNoteSweep({
+      values: ["n-1", "n-2"],
+      stored: ["card:c-1", "note:n-1", "note:gone", "undo:x"],
+    }),
+  ).toEqual({ values: ["n-1", "n-2"], docs: ["note:n-1", "note:gone"] })
 })
 
 describe("storage", () => {

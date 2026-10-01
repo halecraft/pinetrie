@@ -1,6 +1,10 @@
 # ADR-0025 — Notes: a message opened for everyone's editing, or a draft of the next one
 
-**Status:** Accepted. Implemented by `PLAN-2026-09-27-notes`. Amended by
+**Status:** Superseded by ADR-0048 (step 3): notes on messages are removed,
+with their records, done and reopen, the notes index and the rail's
+squares; what you write is a card. Removed by
+`PLAN-2026-10-01-notes-removed`. Was: Accepted. Implemented by
+`PLAN-2026-09-27-notes`. Amended by
 ADR-0026 (a queued state; the host refuses no write to a note that
 has a record), and by ADR-0037 (a `clientID` names a seat, and the seat's
 principal the person). Amended by ADR-0043 (a note is drawn below its

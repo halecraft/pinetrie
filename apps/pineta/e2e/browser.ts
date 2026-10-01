@@ -1222,9 +1222,9 @@ try {
   )
   const tops = row.map(b => b.top)
   ok(
-    row.map(b => b.name).join(" ") === "copy note-open edit branch" &&
+    row.map(b => b.name).join(" ") === "copy edit branch" &&
       Math.max(...tops) - Math.min(...tops) <= 1,
-    `a message's tools are one row: copy, note, edit, → (${JSON.stringify(row)})`,
+    `a message's tools are one row: copy, edit, → (${JSON.stringify(row)})`,
   )
   // Copy puts the message's markdown on the clipboard, not what it draws.
   const still = stillMsg(downCol)
@@ -3621,41 +3621,6 @@ try {
         "raw HTML in a reply shows as text, and a javascript: link goes nowhere",
       )
 
-      // A done note's text is markdown too (ADR-0025). A note starts empty,
-      // so its markdown is typed.
-      await tp.hover(reply)
-      await tp.click(`${reply} .tools .note-open`)
-      await tp
-        .locator(`${reply} .note textarea`)
-        .focus({ timeout: 15_000 })
-        .catch(() => null)
-      await tp.keyboard.type(
-        "Plain **bold** here.\n\nA first line,\nand a second.",
-      )
-      await waitFor(() => false, 1_000)
-      await tp
-        .click(`${reply} .note .note-done`, { timeout: 15_000 })
-        .catch(() => null)
-      const doneLine = await tp
-        .waitForSelector(
-          `${reply} .note[data-state="done"] .note-text strong`,
-          {
-            timeout: 15_000,
-          },
-        )
-        .then(
-          () =>
-            tp.$eval(
-              `${reply} .note .note-text p:nth-of-type(2)`,
-              p => (p as HTMLElement).innerText,
-            ),
-          () => "",
-        )
-      ok(
-        doneLine === "A first line,\nand a second.",
-        `a done note draws its markdown, and keeps its line breaks (${JSON.stringify(doneLine)})`,
-      )
-
       // ── a column follows its end, until the reader scrolls up ──────────────
       const body = (n: number) => `${col(n)} .column-body`
       const gapOf = (n: number) =>
@@ -4180,93 +4145,12 @@ try {
       .catch(() => null)
     await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
     // A's replica has everything the host has, and has drawn it, before the
-    // notes below look for B's message in A's window.
+    // cards below look for the column's last message in A's window.
     const total = String(Object.keys(host.doc.entries()).length)
     await page.waitForFunction(
       n => document.getElementById("count")?.textContent === n,
       total,
       { timeout: 15_000 },
-    )
-
-    // ── notes: a note below its message, and a draft written together ──
-    // A message shown once, in whichever column shows it first.
-    const askedEntry = await page
-      .locator(msg("B asks about this"))
-      .first()
-      .getAttribute("data-entry")
-    const asked = `.msg[data-entry="${askedEntry}"]`
-    await page.hover(asked)
-    await page.click(`${asked} .tools .note-open`)
-    const editorA = page.locator(`${asked} > .note textarea`)
-    const editorB = second.locator(`${asked} > .note textarea`)
-    const cards = await Promise.all([
-      editorA.waitFor({ timeout: 15_000 }).then(
-        () => true,
-        () => false,
-      ),
-      editorB.waitFor({ timeout: 15_000 }).then(
-        () => true,
-        () => false,
-      ),
-    ])
-    // Below the message's text, which still shows, and empty.
-    const placed = await page
-      .$eval(asked, m => {
-        const text = m.querySelector(":scope > .text")
-        const card = m.querySelector(":scope > .note")
-        return {
-          text: text?.textContent ?? "",
-          below:
-            text !== null &&
-            card !== null &&
-            card.getBoundingClientRect().top >=
-              text.getBoundingClientRect().bottom,
-          empty: card?.querySelector("textarea")?.value === "",
-        }
-      })
-      .catch(() => ({ text: "", below: false, empty: false }))
-    ok(
-      cards.every(Boolean) &&
-        placed.text === "B asks about this" &&
-        placed.below &&
-        placed.empty,
-      `a note opened on a message is an empty card below its text, in both windows (${JSON.stringify(placed)})`,
-    )
-    await editorA.focus()
-    await page.keyboard.press("End")
-    await page.keyboard.type(" A1")
-    await editorB.focus()
-    await second.keyboard.press("End")
-    await second.keyboard.type(" B2")
-    const bothIn = (v: string) => v.includes("A1") && v.includes("B2")
-    const merged = await waitFor(() => false, 1_500).then(async () => [
-      await editorA.inputValue(),
-      await editorB.inputValue(),
-    ])
-    ok(
-      merged.every(bothIn),
-      `two windows typing in one note see the merged text (${merged[0]})`,
-    )
-    const editingShown = await page
-      .waitForSelector(`${asked} .note .note-editing`, { timeout: 15_000 })
-      .then(
-        () => true,
-        () => false,
-      )
-    ok(editingShown, "the other window editing the note shows on its card")
-    // Drawn in the same 8 px box as every dot, so it sits on its track.
-    const square = await page
-      .locator(".rail-dot.noted")
-      .evaluateAll(ns => ns.map(n => n.getBoundingClientRect()))
-    const dot = await page
-      .locator(".rail-dot:not(.noted)")
-      .first()
-      .evaluate(n => n.getBoundingClientRect())
-    ok(
-      square.length === 1 &&
-        square[0]?.width === dot.width &&
-        square[0]?.height === dot.height,
-      `the rail draws the note's message as a square, the size of a dot (${square[0]?.width}×${square[0]?.height})`,
     )
 
     // Cards (ADR-0048): what you type is a card on its thread, shown to
@@ -4576,34 +4460,6 @@ try {
     await page.keyboard.press("ControlOrMeta+a")
     await page.keyboard.press("Backspace")
     await pipGone(page, tabSel(here))
-    await page.click(".notes-toggle")
-    // The whole index shows, over the columns: its middle is its own, not a
-    // column's drawn over it, and it is wider than the rail.
-    const panel = await page.$eval(".notes-index", el => {
-      const r = el.getBoundingClientRect()
-      const rail = document.querySelector(".rail")?.getBoundingClientRect()
-      const hit = document.elementFromPoint(
-        r.left + r.width / 2,
-        r.top + r.height / 2,
-      )
-      return {
-        on: hit !== null && el.contains(hit),
-        width: r.width,
-        rail: rail?.width ?? 0,
-      }
-    })
-    ok(
-      panel.on && panel.width > panel.rail,
-      `the notes index opens over the columns, whole (${Math.round(panel.width)}px, rail ${Math.round(panel.rail)}px)`,
-    )
-    await page.click('.notes-filters [data-filter="open"]')
-    const openRows = await page.locator('.notes-row[data-state="open"]').count()
-    const allOpen = await page.locator(".notes-row").count()
-    ok(
-      openRows === 1 && allOpen === 1,
-      `the notes index lists the open note under open (${openRows} of ${allOpen})`,
-    )
-    await page.click(".notes-toggle")
   } finally {
     await second.close().catch(() => {})
   }

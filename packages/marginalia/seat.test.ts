@@ -1,7 +1,6 @@
 import { type SeatRecord, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
 import {
-  authorsOf,
   decodeSeat,
   encodeSeat,
   planSeatSweep,
@@ -53,13 +52,4 @@ test("a seat round-trips; a malformed one is dropped; records sort by first seen
       { value: seat(1, BEA, 10) },
     ]).map(s => s.clientId),
   ).toEqual([1, 2])
-})
-
-test("authorsOf: each seat's person by clientID", () => {
-  const authors = authorsOf([seat(1, ADA), seat(2, BEA)])
-  expect([authors.get(1), authors.get(2), authors.get(3)]).toEqual([
-    ADA,
-    BEA,
-    undefined,
-  ])
 })

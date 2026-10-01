@@ -130,32 +130,6 @@ the queue. The host executes three pure decisions from here:
   (runs and streams) is cleared first, by `clearStreams` in
   `@pineta/schema`.
 
-# Notes (`note.ts`, ADR-0025)
-
-A note is about a message, everyone's to edit. Its text is its own Yjs
-document (`TextDoc` in `@pineta/schema`); its record is a host-written
-`pineta.note` value keyed by note id, typed here as `NoteRecord`
-(`@pineta/core`) and stored through `encodeNote`/`decodeNote`. The next
-message is drafted in a card (`card.ts`, below), not a note.
-
-- **A note's message is its `entry`.** It is stored as it always was,
-  `subject: { kind: "entry", id }`, so every note written before still
-  decodes: the union had other cases once (a thread's draft, a sent draft), and
-  a record with one of those does not decode now. `orphanNotes` names their
-  text documents for the host's startup sweep.
-- **`messageNotes` is what the screen draws with each message** (ADR-0043):
-  its note, by entry.
-- **`planNote` decides every action**, pure: `open` (a new, empty note about
-  a message the index holds, or the one it has), `done` and `reopen`.
-- **`planNoteEdit` decides what one edit changes**, pure: contributors are the
-  `clientID`s whose clocks moved, as the people the seat records name
-  (`authorsOf`, `seat.ts`), in order of first edit; an unknown
-  `clientID`, the host's own among them, is nobody's. A
-  reopened note, once edited, is `changedSinceDone`. It returns null when
-  nothing changes, so an edit writes nothing to the session unless it matters.
-  `changedSinceDone` is stored, not derived: deriving it would open every note's
-  document to filter the index.
-
 # Cards (`card.ts`, ADR-0048)
 
 What you type is a card. Its record is in the cards document (`CardsDoc` in
@@ -178,6 +152,9 @@ when it starts. This module decodes a record and decides where a card sits.
   conflict or a refusal leaves it.
 - **`planCardSweep`**: records whose text is empty, and stored `card:`
   documents with no record, a spent or empty card's among them.
+- **`planNoteSweep`**: every `pineta.note` value and every stored `note:`
+  document, left from notes on messages (ADR-0025), which ADR-0048 removed.
+  `OLD_NOTE_NAMESPACE` is kept only for it.
 
 # Seats (`seat.ts`, ADR-0048)
 
@@ -189,9 +166,6 @@ connected (ADR-0037), so it writes a `pineta.seat` value per seat, keyed by
 - **`planSeats`**: the connected seats with no record yet. The connected seats
   come mapped by `seatOf` (`@pineta/schema`), which needs Kyneta's
   `yjsClientId`, which this package does not import.
-- **`authorsOf(seats)`**: each seat's person by `clientID`, which
-  `planNoteEdit` attributes a note's edits with. Notes and cards name people
-  the same way.
 - **`writersOf(clientIds, seats)`**: the people behind a text's `clientID`s,
   each once, in the order their seats were first seen. A card sent by one
   person names the others this way, in `ChatDetails.contributors`: "Ada, with
@@ -213,15 +187,15 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   waiting. `ROOT_BUSY_REASON` is the one wording, which the tab's menu shows
   too. The state it already has is `unchanged`, and answered the same.
 - **The gate keys on the entry a command writes at.** `writesAt` names it for
-  every intent (a chat's `at`, a note's entry), or null for one that writes in no root (a new root, a name, a
+  every intent (a chat's `at`, a mark's entry), or null for one that writes in no root (a new root, a name, a
   stop, an archive action). `archivedAt` maps that entry to its root's
   record. One rule, applied by the host before dispatch
   (`apps/pineta/host/commands/index.ts`); `sendChat` needs no
   copy, since only the `chat` command calls it. A card is written by clients
   and so passes no gate, but the composer in an archived root is read-only.
-- **Yjs writes are not refused for archiving.** A note's text in an archived
-  root stays writable to the host's policy, as ADR-0026 requires (a refused
-  write cannot be recovered from, S28); the screen offers no editor there.
+- **Yjs writes are not refused for archiving.** A card's text in an archived
+  root stays writable to the host's policy (a refused write cannot be
+  recovered from, S28); the composer there is read-only.
 - **Every planner refuses with core's `Refusal`** (`refused(code, message)`),
   the shape the codec decodes to and the host answers as its `Outcome`
   unchanged, so no package spells it out.

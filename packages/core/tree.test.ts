@@ -727,9 +727,7 @@ describe("tool calls: paired with their results on the path", () => {
   })
   test("a branch's message count ignores tool results", () => {
     const { spine } = projectSpine(i, "1-q")
-    expect(spine[0]?.branches).toEqual([
-      { rootId: "2-a", messageCount: 2, noteCount: 0 },
-    ])
+    expect(spine[0]?.branches).toEqual([{ rootId: "2-a", messageCount: 2 }])
   })
 })
 

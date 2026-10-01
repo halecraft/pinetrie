@@ -2,14 +2,7 @@
 // how each prop is compared: `React.memo`'s rule for `MessageList`
 // (`sameProps`), kept pure (S59).
 
-import type {
-  ColumnView,
-  NoteId,
-  NoteRecord,
-  ThreadLane,
-  TreeIndex,
-  WriterId,
-} from "@pineta/core"
+import type { ColumnView, ThreadLane, TreeIndex, WriterId } from "@pineta/core"
 import type { LaneJoin } from "./column-view.ts"
 import type { LiveWork } from "./live.ts"
 import type { MessageAct } from "./message-tools.ts"
@@ -34,13 +27,9 @@ export interface MessageListProps {
   tools: LiveWork["tools"]
   /** Each tool row's state, by call id, across unmounts. */
   rows: ScreenMemory<RowMemory>
-  /** The note drawn with each message (`messageNotes`). */
-  notesOf: ReadonlyMap<string, NoteRecord>
   nameOf: ReadonlyMap<WriterId, string>
   session: SessionClient
   onAct: (act: MessageAct) => void
-  /** A note card here took focus: the column's bar follows it. */
-  onFocusNote: (id: NoteId) => void
 }
 
 /**
@@ -48,8 +37,8 @@ export interface MessageListProps {
  * in React's development build, memoised or not (S59), so the list is skipped
  * whenever its column renders for a reason that leaves it alone.
  *
- * `view` is compared by identity: `App` keeps it while `index`, the columns
- * and the noted entries are the same, and comparing a long thread's nodes by
+ * `view` is compared by identity: `App` keeps it while `index` and the
+ * columns are the same, and comparing a long thread's nodes by
  * value would spend part of what skipping saves. `lane` and `joins` are
  * rebuilt on every render of the column, so they are compared by value. The
  * rest keep their identity while unchanged: memos in `App`, the facts,
@@ -66,11 +55,9 @@ const MESSAGE_LIST_PROPS = {
   shown: "identity",
   tools: "identity",
   rows: "identity",
-  notesOf: "identity",
   nameOf: "identity",
   session: "identity",
   onAct: "identity",
-  onFocusNote: "identity",
 } as const satisfies { readonly [K in keyof MessageListProps]-?: PropRule }
 
 /** Whether a column's message list would draw the same. */

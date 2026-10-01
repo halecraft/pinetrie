@@ -27,11 +27,9 @@ const shared = {
   shown: new Set<string>(),
   tools: new Map(),
   rows: screenMemory<RowMemory>(),
-  notesOf: new Map(),
   nameOf: new Map(),
   session: {} as MessageListProps["session"],
   onAct: () => {},
-  onFocusNote: () => {},
 }
 const props = (over: Partial<MessageListProps> = {}): MessageListProps => ({
   ...shared,

@@ -1,13 +1,16 @@
 # ADR-0048 — Everything unsent is a card, and a card stays where you put it
 
-**Status:** Accepted. Evidence: S58. Step 2, marks for your unsent cards,
+**Status:** Accepted. Evidence: S58, S69. Step 2, marks for your unsent cards,
 implemented by `PLAN-2026-09-30-card-marks`. Step 1, the drafting card,
 implemented by `PLAN-2026-09-30-drafting-card`: shared drafts and "compose together" are
 withdrawn from ADR-0025, ADR-0023 gains "tabs write cards", and ADR-0037
-gains "the host writes down each seat's person". The later steps would
-supersede the rest of ADR-0025 (notes), and amend ADR-0026 (queued notes
-become queued cards), ADR-0043 (no notes below messages) and ADR-0046 (a
-fixed line about pinned cards in the prompt). They also replace the
+gains "the host writes down each seat's person". Step 3's first part,
+notes removed, implemented by `PLAN-2026-10-01-notes-removed`: it supersedes
+the rest of ADR-0025 and amends ADR-0043 (no notes below messages) and
+ADR-0024 (no `editing` presence); its second part, queued cards, is
+`PLAN-2026-10-01-queued-cards`. The later steps would amend ADR-0026 (queued
+notes become queued cards) and ADR-0046 (a fixed line about pinned cards in
+the prompt). They also replace the
 inventory in `PLAN-2026-09-27-fold`, and Phases 2–7 of
 `PLAN-2026-09-29-branch-prefill-and-composers`. Amended by ADR-0052: Cmd+Z
 in a card undoes only that card's steps, never the tab's last step
@@ -407,7 +410,9 @@ build Pineta links (`/kyneta/workspace/pineta`, bookmark `needed-by-pineta`):
   addenda 2 and 3). ADR-0052 rests on it.
 
 *Probes before a plan*, each recorded in `docs/findings/`. S58 answered 3, and 4
-for the drafting card; 1, 2 and 5 wait for the steps that need them:
+for the drafting card; S69 answered 2, and 1 for a queue's order (a field
+on each card, not a list per thread); 1 and 5 wait for the steps that need
+them:
 1. **Places as a CRDT:** a movable tree (Loro) or a place field per card. Two
    people move one card at once, and a card moves while being typed in.
    Which converges to something a person would accept?

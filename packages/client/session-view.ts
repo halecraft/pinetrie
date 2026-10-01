@@ -16,8 +16,6 @@ import {
   type EntryId,
   type Intent,
   type LaneName,
-  type NoteAction,
-  type NoteId,
   type OfferAction,
   type Position,
   parseMentions,
@@ -40,7 +38,6 @@ import {
   type CardsDocHandle,
   cardDocId,
   cardIdOfDoc,
-  noteDocId,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
@@ -116,8 +113,6 @@ export interface SessionClient {
   clearReading(columnKey: string): void
   /** This window is typing in the composer at `end`. Silence decays it. */
   setTyping(end: string): void
-  /** This window is editing `note`, or, with null, has stopped. */
-  setEditing(note: string | null): void
   /**
    * A human message. `at` is where the sender is reading, or the branch point
    * (only a `branch` starts at the root). It runs the agent only if the agent
@@ -127,10 +122,6 @@ export interface SessionClient {
   setName(name: string): Promise<Outcome>
   /** End the running turn of the thread whose lane is `lane`. */
   stop(lane: LaneName): Promise<Outcome>
-  /** Open a note on a message, or move a note on (ADR-0025). */
-  note(action: NoteAction): Promise<Outcome>
-  /** A note's text: the same document for every caller. */
-  noteText(id: NoteId): TextDocHandle
   /**
    * A card's text: the same document for every caller. Call it only for a
    * card whose record is live: once the host has spent the card, this client
@@ -312,9 +303,6 @@ export async function connectSession(
     setTyping(end) {
       batch(presence, d => d.typing.set(mine, end))
     },
-    setEditing(note) {
-      batch(presence, d => d.editing.set(mine, note))
-    },
     exchange,
     doc,
     chat(text, at, how = {}) {
@@ -338,12 +326,6 @@ export async function connectSession(
     },
     stop(lane) {
       return send({ kind: "stop", lane })
-    },
-    note(action) {
-      return send({ kind: "note", action })
-    },
-    noteText(id) {
-      return exchange.get(noteDocId(id), TextDoc)
     },
     cardText,
     createCard(card, text) {
@@ -376,13 +358,11 @@ export async function connectSession(
         watched.clear()
         undo.dispose()
       } catch {}
-      // This seat's typing and editing go with it; another seat of the same
-      // person keeps its own.
+      // This seat's typing goes with it; another seat of the same person
+      // keeps its own.
       try {
-        batch(presence, d => {
-          if (presence.typing()[mine] !== undefined) d.typing.delete(mine)
-          if (presence.editing()[mine] !== undefined) d.editing.delete(mine)
-        })
+        if (presence.typing()[mine] !== undefined)
+          batch(presence, d => d.typing.delete(mine))
       } catch {}
       try {
         await exchange.shutdown()

@@ -23,7 +23,7 @@ import {
 import { request as httpRequest } from "node:http"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { Exchange, type Store, whenPeer } from "@kyneta/exchange"
+import { Exchange, type Store, whenHydrated, whenPeer } from "@kyneta/exchange"
 import { batch, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 import type { SessionClient } from "@pineta/client/session"
@@ -40,7 +40,6 @@ import {
   laneNameForThread,
   messageText,
   NOBODY,
-  noteId,
   type Position,
   projectRail,
   projectSpine,
@@ -48,7 +47,12 @@ import {
   ROOT,
   writerId,
 } from "@pineta/core"
-import { decodeChat, displayName, yourCard } from "@pineta/marginalia"
+import {
+  decodeChat,
+  displayName,
+  OLD_NOTE_NAMESPACE,
+  yourCard,
+} from "@pineta/marginalia"
 import { newId as newHeldId, scriptedModel, sha256Of } from "@pineta/pi"
 import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
@@ -66,7 +70,6 @@ import {
   readLaneRecords,
   readLanes,
   readMarks,
-  readNotes,
   readOffers,
   readOutbox,
   readParticipantNames,
@@ -79,14 +82,17 @@ import {
 } from "@pineta/reads"
 import {
   cardDocId,
-  noteDocId,
+  physicalKey,
   readActiveRun,
   readEntries,
   readEntryMessage,
   readLaneNames,
   readLaneTip,
   readStreams,
+  readValues,
   rowMessage,
+  SessionDoc,
+  TextDoc,
   writeEntry,
 } from "@pineta/schema"
 import { WebSocket as WsClient } from "ws"
@@ -1477,190 +1483,6 @@ invariants("end")
   await dh.shutdown()
 }
 
-// ── notes: a message opened for editing, together (ADR-0025) ──────────────
-// Its own host, with a store to restart over and a scripted model that can
-// show what it was given.
-{
-  const dbFile = path.join(
-    mkdtempSync(path.join(tmpdir(), "pineta-notes-")),
-    "pineta.db",
-  )
-  const script = scriptedModel()
-  const open = () =>
-    startHost({
-      model: { kind: "scripted", script },
-      store: dbFile,
-      log: () => {},
-    })
-  let nh = await open()
-  const ada = await join(nh, "ada", "notes")
-  const bea = await join(nh, "bea", "notes")
-  await Promise.all([ada.setName("Ada"), bea.setName("Bea")])
-  const noteOf = (o: Outcome) => (o.kind === "noted" ? o.id : null)
-  const record = (id: string | null) => readNotes(nh.doc).find(n => n.id === id)
-  const tipOf = () => {
-    const l = readLaneNames(nh.doc)[0]
-    return l === undefined ? null : readLaneTip(nh.doc, l)
-  }
-  const nIdle = () =>
-    waitFor(
-      () =>
-        Object.keys(nh.doc.activeRuns()).length === 0 &&
-        readOutbox(nh.doc).length === 0,
-      30_000,
-    )
-
-  const ANSWER = "Three steps: plan, build, check."
-  script.use([{ text: ANSWER }])
-  await ada.chat("@agent how do we start?", ROOT, START_AGENT)
-  await nIdle()
-  const answer = tipOf()
-
-  // 1. A note on the agent's reply, opened by Ada; Bea opening it gets the same note.
-  const opened = noteOf(
-    await ada.note({ kind: "open", entry: entryId(answer ?? "") }),
-  )
-  const again = noteOf(
-    await bea.note({ kind: "open", entry: entryId(answer ?? "") }),
-  )
-  ok(
-    opened !== null && again === opened && record(opened)?.state === "open",
-    "a note is opened on a message, and opening it again gives the same note",
-  )
-  const n1 = noteId(opened ?? "")
-  const adaText = ada.noteText(n1)
-  const beaText = bea.noteText(n1)
-  // It starts empty: what Ada types is all the host and Bea hold.
-  adaText.text.insert(0, "Ada: first")
-  const started = await waitFor(
-    () => nh.noteText(n1) === "Ada: first" && beaText.text() === "Ada: first",
-    5_000,
-  )
-  ok(
-    started >= 0,
-    `the note starts empty, for everyone (${JSON.stringify(nh.noteText(n1))})`,
-  )
-  beaText.text.insert(beaText.text().length, " Bea.")
-  const merged = "Ada: first Bea."
-  const both = await waitFor(
-    () =>
-      nh.noteText(n1) === merged &&
-      adaText.text() === merged &&
-      beaText.text() === merged,
-    5_000,
-  )
-  ok(
-    both >= 0,
-    `two people's edits merge, on the host and each client (${nh.noteText(n1)})`,
-  )
-  const asSent = projectTranscript(readTreeIndex(nh.doc), answer ?? "").at(-1)
-  ok(asSent?.text === ANSWER, "the opened message's entry is unchanged")
-  // 2. Contributors, from the edits themselves: no command said who typed.
-  const credited = await waitFor(
-    () => record(n1)?.contributors.join() === [ada.writer, bea.writer].join(),
-    5_000,
-  )
-  ok(
-    credited >= 0,
-    `contributors come from the note's own edits, in order (${record(n1)?.contributors.join()})`,
-  )
-
-  // 8. The model reads the message as sent, never the note's edits.
-  let context: readonly string[] = []
-  script.use([
-    {
-      reply: seen => {
-        context = seen
-        return "noted"
-      },
-    },
-  ])
-  await ada.chat("@agent go on", at(answer))
-  await nIdle()
-  ok(
-    context.includes(ANSWER) && !context.some(t => t.includes("Bea.")),
-    "the model reads the opened message as sent, not the note's edits",
-  )
-
-  // 6. Done is read-only, enforced by the host; reopening lets edits in again.
-  const doneOutcome = await ada.note({ kind: "done", note: n1 })
-  ok(
-    noteOf(doneOutcome) === n1 && record(n1)?.state === "done",
-    "a note is marked done",
-  )
-  const cat = await join(nh, "cat", "notes")
-  const catText = cat.noteText(n1)
-  await waitFor(() => catText.text() === merged, 5_000)
-  catText.text.insert(0, "Cat was here. ")
-  await cat.exchange.flush()
-  await sleep(500)
-  ok(
-    nh.noteText(n1) === merged,
-    "a client's write to a done note is refused by the host",
-  )
-  await cat.close()
-  await ada.note({ kind: "reopen", note: n1 })
-  adaText.text.insert(adaText.text().length, " Reopened.")
-  const changed = await waitFor(
-    () => record(n1)?.changedSinceDone === true,
-    5_000,
-  )
-  ok(
-    changed >= 0 && record(n1)?.state === "open",
-    "a reopened note, edited, is changed since done",
-  )
-  // A deletion says who made it too: Kyneta's Yjs clock ticks for it, under
-  // the deleting seat (ADR-0037).
-  const dee = await join(nh, "dee", "notes")
-  const deeText = dee.noteText(n1)
-  await waitFor(() => deeText.text().endsWith(" Reopened."), 5_000)
-  deeText.text.delete(deeText.text().length - " Reopened.".length, 10)
-  const deleted = await waitFor(
-    () => record(n1)?.contributors.includes(dee.writer) === true,
-    5_000,
-  )
-  ok(
-    deleted >= 0 && nh.noteText(n1)?.endsWith(" Reopened.") === false,
-    "a deletion in a note makes its writer a contributor",
-  )
-  await dee.close()
-
-  // 7. Restart over the store: records and text are back.
-  const before = {
-    notes: JSON.stringify(readNotes(nh.doc)),
-    text: nh.noteText(n1),
-  }
-  await Promise.all([ada.close(), bea.close()])
-  await nh.shutdown()
-  // Only this note's text loads slowly. The startup sweep holds every note
-  // too, but in a step `startHost` does not wait for: a host that held its
-  // notes only there would return with this one not yet held, and a client
-  // could edit it before its edits were attributed.
-  const reopened = openStore(dbFile)
-  nh = await startHost({
-    model: { kind: "scripted", script },
-    store: slowToLoad(reopened.store, noteDocId(n1), LATE_LOAD_MS),
-    blobs: reopened.blobs,
-    log: () => {},
-  })
-  const heldAtStart = nh.noteText(n1)
-  ok(
-    heldAtStart === before.text,
-    `a starting host holds every note's text before it returns (${heldAtStart === undefined ? "not held" : "held"})`,
-  )
-  const eve = await join(nh, "eve", "notes")
-  const eveText = eve.noteText(n1)
-  const back = await waitFor(() => eveText.text() === before.text, 5_000)
-  ok(
-    JSON.stringify(readNotes(nh.doc)) === before.notes &&
-      nh.noteText(n1) === before.text &&
-      back >= 0,
-    "after a restart, every note's record and text are back",
-  )
-  await eve.close()
-  await nh.shutdown()
-}
-
 // ── cards: what you type, kept on its thread (ADR-0048) ──────────────────────
 // Its own host, with a store to restart over.
 {
@@ -1882,7 +1704,49 @@ invariants("end")
   )
   await Promise.all([bea.close(), zed.close()])
   await ch.shutdown()
-  ch = await open()
+  // A note on a message, as a host before ADR-0048 stored one: its record in
+  // the session, and its text in a `note:` document.
+  const OLD_NOTE = "0199-old-note"
+  let notesBefore = 0
+  {
+    const old = openStore(dbFile)
+    const ex = new Exchange({
+      principal: HOST_PRINCIPAL,
+      type: "service",
+      store: old.store,
+    })
+    const session = ex.get(SESSION_DOC_ID, SessionDoc)
+    await whenHydrated(session)
+    batch(session, d =>
+      d.values.set(physicalKey(OLD_NOTE_NAMESPACE, OLD_NOTE), {
+        namespace: OLD_NOTE_NAMESPACE,
+        key: OLD_NOTE,
+        value: { id: OLD_NOTE, state: "open", entry: tipOf() ?? "" },
+      }),
+    )
+    ex.get(`note:${OLD_NOTE}`, TextDoc).text.insert(0, "an old note")
+    await ex.flush()
+    for await (const _ of old.store.listDocIds("note:")) notesBefore += 1
+    // Shutting down closes the store it was given.
+    await ex.shutdown()
+  }
+  // The empty card's text loads late, so a host that served before its
+  // sweep finished would still hold the card.
+  const reopened = openStore(dbFile)
+  ch = await startHost({
+    model: { kind: "scripted", script },
+    store: slowToLoad(reopened.store, cardDocId(empty), LATE_LOAD_MS),
+    blobs: reopened.blobs,
+    log: () => {},
+  })
+  // Read as `startHost` returns, before any client could connect.
+  const sweptAtStart =
+    onHost(empty) === undefined &&
+    readValues(ch.doc, OLD_NOTE_NAMESPACE).length === 0
+  ok(
+    sweptAtStart,
+    "a starting host has swept before it returns: no empty card or old note is left for a client to find",
+  )
   const eve = await join(ch, "eve", "cards")
   await ch.quiet()
   const keepBack = await waitFor(
@@ -1898,12 +1762,15 @@ invariants("end")
       readSeats(ch.doc).some(s => s.writer === bea.writer),
     "a restart keeps cards with text, and sweeps empty ones, unrecorded texts and seats no text names",
   )
+  const notesAfterRestart = readValues(ch.doc, OLD_NOTE_NAMESPACE).length
   await eve.close()
   await ch.shutdown()
   // Read the store once the host has let it go: it owns its file (S47).
   const stored: string[] = []
   const closed = openStore(dbFile)
   for await (const d of closed.store.listDocIds("card:")) stored.push(d)
+  const notesLeft: string[] = []
+  for await (const d of closed.store.listDocIds("note:")) notesLeft.push(d)
   const texts = [c1, c2, c3, c4, keep, empty, orphan].map(id =>
     stored.includes(`card:${id}`),
   )
@@ -1911,6 +1778,10 @@ invariants("end")
     JSON.stringify(texts) ===
       JSON.stringify([false, true, false, false, true, false, false]),
     `only the texts of cards still live are stored: spent, empty and unrecorded ones are destroyed (${texts.join()})`,
+  )
+  ok(
+    notesBefore === 1 && notesLeft.length === 0 && notesAfterRestart === 0,
+    `a restart removes the notes on messages a host before ADR-0048 stored: their records and their texts (${notesBefore} stored, then ${notesAfterRestart} records and ${notesLeft.length} texts)`,
   )
 }
 
@@ -1959,11 +1830,11 @@ invariants("end")
   // 2. Nothing is written in it, and the refusal names who archived it.
   const refusals = [
     await bea.chat("still here?", at(r1b)),
-    await bea.note({ kind: "open", entry: entryId(r1b) }),
+    await bea.mark(entryId(r1b), "a title"),
   ].map(refusal)
   ok(
     refusals.every(r => r === "archived: archived by Ada"),
-    `a chat and a note opened in it are refused (${refusals.join(" | ")})`,
+    `a chat and a title in it are refused (${refusals.join(" | ")})`,
   )
 
   // 3. A new root is accepted.

@@ -13,16 +13,16 @@ import type { CardPort } from "./cards.ts"
  * trims the in-memory op log (ADR-0023). The session only: each client's
  * command Line is stored too, but half of it is the client's to write, and
  * Kyneta cannot compact a replica of a document another peer writes. Its
- * pruning should compact it; that is upstream (S25 addendum). A note's or a
- * card's text is Yjs, which Kyneta cannot compact live (S24).
+ * pruning should compact it; that is upstream (S25 addendum). A card's text
+ * is Yjs, which Kyneta cannot compact live (S24).
  */
 export const compactSession = (exchange: Exchange): Promise<void> =>
   exchange.compact(SESSION_DOC_ID)
 
 /**
- * Delete the images nothing shows any more: gather every text people type,
- * cards' and notes' (`CardPort.texts`), then the store's list and the
- * session's references with no await between them, `planSweep`, delete.
+ * Delete the images nothing shows any more: gather every card's text
+ * (`CardPort.texts`), then the store's list and the session's references
+ * with no await between them, `planSweep`, delete.
  */
 export async function sweepBlobs(input: {
   readonly basics: Pick<Basics, "doc" | "log" | "now">

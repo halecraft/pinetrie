@@ -25,11 +25,7 @@ import {
   type Intent,
   isLaneName,
   MAX_TITLE,
-  NOTE_ACTIONS,
-  type NoteAction,
-  type NoteId,
   normalizeName,
-  noteId,
   OFFER_ACTIONS,
   type OfferAction,
   type Position,
@@ -59,8 +55,6 @@ export type Outcome =
   | { readonly kind: "conflict"; readonly by: WriterId | null }
   | { readonly kind: "named" }
   | { readonly kind: "stopped" }
-  /** A note was made, joined or moved on: its id. */
-  | { readonly kind: "noted"; readonly id: NoteId }
   /** A root is archived, or restored (ADR-0029); also when it already was. */
   | { readonly kind: "archived" }
   | { readonly kind: "restored" }
@@ -153,7 +147,6 @@ export function decodeCommand(
       ? { kind, lane, action }
       : refused(ERR.UNKNOWN_KIND, `unknown offer action: ${action}`)
   }
-  if (kind === "note") return decodeNote(wire, at)
   if (kind === "archive") {
     const action = text(wire?.mode)
     if (!isArchiveAction(action))
@@ -183,32 +176,9 @@ export function decodeCommand(
   return refused(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
 }
 
-/** A `note` command: `mode` names the action; only the codec reads it there. */
-function decodeNote(
-  wire: WireCommand | null | undefined,
-  at: Position,
-): Intent | Refusal {
-  const action = text(wire?.mode)
-  if (!isNoteAction(action))
-    return refused(ERR.UNKNOWN_KIND, `unknown note action: ${action}`)
-  const note = (a: NoteAction): Intent => ({ kind: "note", action: a })
-  if (action === "open") {
-    return at.kind === "root"
-      ? refused(ERR.NO_ANCHOR, "the root is no message to open")
-      : note({ kind: "open", entry: at.id })
-  }
-  const target = text(wire?.targetId)
-  return target === ""
-    ? refused(ERR.UNKNOWN_TARGET, "a note action must name its note")
-    : note({ kind: action, note: noteId(target) })
-}
-
 /** A chat's card on the wire: `""` is none. */
 const cardFromWire = (id: string): CardId | null =>
   id === "" ? null : cardId(id)
-
-const isNoteAction = (a: string): a is (typeof NOTE_ACTIONS)[number] =>
-  (NOTE_ACTIONS as readonly string[]).includes(a)
 
 const isOfferAction = (a: string): a is OfferAction =>
   (OFFER_ACTIONS as readonly string[]).includes(a)
@@ -256,8 +226,6 @@ export function encodeIntent(id: string, intent: Intent): Command {
       return command({ id, kind: "name", text: intent.name })
     case "stop":
       return command({ id, kind: "stop", lane: intent.lane })
-    case "note":
-      return command({ id, kind: "note", ...noteToWire(intent.action) })
     case "archive":
       return command({
         id,
@@ -284,15 +252,6 @@ export function encodeIntent(id: string, intent: Intent): Command {
   }
 }
 
-const noteToWire = (a: NoteAction) => {
-  switch (a.kind) {
-    case "open":
-      return { mode: "open", parentId: a.entry }
-    default:
-      return { mode: a.kind, targetId: a.note }
-  }
-}
-
 /** Outcome -> the flat wire reply. */
 export function encodeOutcome(id: string, outcome: Outcome): Reply {
   switch (outcome.kind) {
@@ -308,8 +267,6 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "named" })
     case "stopped":
       return reply({ id, outcome: "stopped" })
-    case "noted":
-      return reply({ id, outcome: "noted", noteId: outcome.id })
     case "archived":
       return reply({ id, outcome: "archived" })
     case "restored":
@@ -350,8 +307,6 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "named" }
     case "stopped":
       return { kind: "stopped" }
-    case "noted":
-      return { kind: "noted", id: noteId(wire.noteId) }
     case "archived":
       return { kind: "archived" }
     case "restored":

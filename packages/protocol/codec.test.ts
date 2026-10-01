@@ -11,7 +11,6 @@ import {
   ERR,
   entryId,
   laneNameForThread,
-  noteId,
   ROOT,
   runId,
   THE_AGENT,
@@ -129,9 +128,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     { kind: "name", name: "Alice" },
     { kind: "stop", lane: laneNameForThread("abc") },
-    { kind: "note", action: { kind: "open", entry: entryId("e-2") } },
-    { kind: "note", action: { kind: "done", note: noteId("n-1") } },
-    { kind: "note", action: { kind: "reopen", note: noteId("n-1") } },
     { kind: "archive", action: "archive", root: entryId("e-1") },
     { kind: "archive", action: "restore", root: entryId("e-1") },
     { kind: "mark", entry: entryId("e-1"), title: "Tab names" },
@@ -154,7 +150,6 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "appended", id: entryId("e-1") },
     { kind: "named" },
     { kind: "stopped" },
-    { kind: "noted", id: noteId("n-1") },
     { kind: "archived" },
     { kind: "restored" },
     { kind: "marked" },
@@ -183,24 +178,10 @@ test("decode: stop must name a thread's lane", () => {
   )
 })
 
-test("decode: a note names a known action, and what it acts on", () => {
-  assert.equal(
-    refusalCode(decodeCommand({ kind: "note", mode: "edit", parentId: "e-1" })),
-    ERR.UNKNOWN_KIND,
-  )
-  assert.equal(
-    refusalCode(decodeCommand({ kind: "note", mode: "open", parentId: "" })),
-    ERR.NO_ANCHOR,
-  )
-  for (const mode of ["done", "reopen"])
+test("decode: notes on messages are gone (ADR-0048): a note command is an unknown kind", () => {
+  for (const mode of ["open", "done", "reopen"])
     assert.equal(
-      refusalCode(decodeCommand({ kind: "note", mode, targetId: "" })),
-      ERR.UNKNOWN_TARGET,
-    )
-  // The next message is drafted in a card (ADR-0048): a note has no such actions.
-  for (const mode of ["draft", "send"])
-    assert.equal(
-      refusalCode(decodeCommand({ kind: "note", mode, targetId: "n-1" })),
+      refusalCode(decodeCommand({ kind: "note", mode, parentId: "e-1" })),
       ERR.UNKNOWN_KIND,
     )
 })

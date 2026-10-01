@@ -17,7 +17,7 @@ import type { Intent } from "./intent.ts"
 import { nameFor } from "./presence.tsx"
 import type { Reader } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
-import { useWhoIsAt } from "./use-presence.ts"
+import { useTypingAt } from "./use-presence.ts"
 
 /**
  * The column's foot. What you type here is your drafting card at this
@@ -104,7 +104,7 @@ function TypingLine(p: {
   end: string
   reader: Reader
 }) {
-  const typing = useWhoIsAt(p.session.presence, "typing", p.reader.me, p.end)
+  const typing = useTypingAt(p.session.presence, p.reader.me, p.end)
   if (typing.length === 0) return null
   const names = typing.map(w => nameFor(p.reader.nameOf, w))
   return (

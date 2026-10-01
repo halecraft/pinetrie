@@ -781,8 +781,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a read-only column offers no copy",
     file: tools,
-    from: "    return { copy, note: undefined, edit: undefined, branch: undefined }",
-    to: "    return { copy: false, note: undefined, edit: undefined, branch: undefined }",
+    from: "  if (!at.writable) return { copy, edit: undefined, branch: undefined }",
+    to: "  if (!at.writable) return { copy: false, edit: undefined, branch: undefined }",
     command: unit,
     expect: "a column that can't be written offers only copy",
   },
@@ -892,14 +892,6 @@ export const mutations: readonly Mutation[] = [
     to: "    edit: editOf(node, at.parentId),",
     command: unit,
     expect: "only a person's message",
-  },
-  {
-    name: "note is offered on a message that has one",
-    file: tools,
-    from: "    note: at.hasNoteAbout\n      ? undefined\n",
-    to: "    note: false\n      ? undefined\n",
-    command: unit,
-    expect: "offered until the message has a note about it",
   },
   {
     name: "sendable ignores uploading",
@@ -1275,10 +1267,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "railKeep drops your cards' ends",
     file: "packages/client/rail-view.ts",
-    from: "  const keep = new Set([...input.notes, ...input.rings.keys(), ...input.cards])",
-    to: "  const keep = new Set([...input.notes, ...input.rings.keys()])",
+    from: "  const keep = new Set([...input.rings.keys(), ...input.cards])",
+    to: "  const keep = new Set([...input.rings.keys()])",
     command: unit,
-    expect: "railKeep: notes, rings, running tips",
+    expect: "railKeep: rings, running tips",
   },
   {
     name: "archiveIndex marks no row",
@@ -1467,7 +1459,7 @@ export const mutations: readonly Mutation[] = [
       "railItems: a dot at a thread end holding your card carries your colour",
   },
   {
-    name: "a note is drawn in its message's place",
+    name: "a message that only called tools draws an empty text too",
     file: "packages/client/message-tools.ts",
     from: '  node.text !== "" || node.toolCalls === undefined',
     to: '  node.text !== "" && node.toolCalls === undefined',

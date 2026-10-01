@@ -17,22 +17,19 @@ Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes` (and `readLane`, one
 of them), `readOutbox`,
 `readParticipantNames`, `readParticipants`, `readReading`, `readTyping`,
-`readEditing`,
-`readAgentActivity`, `readNotes`, `readSeats` and `readCards` (ADR-0048),
+`readAgentActivity`, `readSeats` and `readCards` (ADR-0048),
 `readArchive`, `readMarks` (ADR-0045), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
 `readProject` (`lanes`, or `direct` and why). `workAt` is where a lane created
 at an entry would work, and the commit and snapshot it would start from: the
 composer shows it, and the host creates the lane by it, and decides by it
-whether a sent message's paths are stored under `/mnt/host-working-copy`. `notesIndex` is one root's
-notes index: the records a filter keeps whose message is in that root, newest
-first. The Archive tab's rows are a
+whether a sent message's paths are stored under `/mnt/host-working-copy`. The Archive tab's rows are a
 client-only read, in `packages/client/archive-rows.ts`. Live streams are read with `readStreams` in
 `@pineta/schema`; an entry count stays in `packages/client/projection.ts`.
 
 `readReferencedBlobs` is every image something still shows (ADR-0042): each
 chat's, each tool result's (`messageImages`, ADR-0051), each held message's,
-and each in the texts people type, notes' and cards', which its caller must
+and each in the texts people type, cards', which its caller must
 pass for every one, not only those it holds (the host gathers them all
 through its card port). `planSweep` decides which
 stored images to delete from it.
@@ -63,8 +60,8 @@ Kyneta has let go.
   is who the queue button names. It is null exactly when `waiting` is 0. It
   differs from `askedBy` while a run goes: `askedBy` is who the agent
   answers, `lastWaiting` who is last in line.
-- **A presence read gives one entry per key** (`readReading`, `readTyping`,
-  `readEditing`), as `[writer, value]` pairs: a person here from two seats
+- **A presence read gives one entry per key** (`readReading`, `readTyping`), as
+  `[writer, value]` pairs: a person here from two seats
   appears twice (ADR-0037), and `core/presence.ts` shows them once. Each
   read is of one field, so Kyneta wakes it only for writes to that field, and
   each keeps its last array while the entries are the same: the page's

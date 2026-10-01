@@ -51,16 +51,6 @@ export function planSeats(
 }
 
 /**
- * Each seat's person, by the `clientID` its operations carry: what
- * `planNoteEdit` attributes a note's edits with. A `clientID` with no record
- * is nobody.
- */
-export const authorsOf = (
-  seats: readonly SeatRecord[],
-): ReadonlyMap<number, WriterId> =>
-  new Map(seats.map(s => [s.clientId, s.writer]))
-
-/**
  * The people behind a text's `clientID`s: each once, in the order their seats
  * were first seen. A `clientID` with no record is nobody.
  */

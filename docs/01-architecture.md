@@ -114,7 +114,7 @@ packages/     libraries; their boundaries are enforced by resolution
   schema/        @pineta/schema       Kyneta only; the document shape (TECHNICAL.md)
   pi/            @pineta/pi           THE pi boundary (TECHNICAL.md)
   protocol/      @pineta/protocol     the wire contract and its codec
-  marginalia/    @pineta/marginalia   Pineta's shapes stored in pi: chat, notes, threads, outbox
+  marginalia/    @pineta/marginalia   Pineta's shapes stored in pi: chat, threads, outbox
   reads/         @pineta/reads        document reads shared by the host and the client
   lanes/         @pineta/lanes        a lane's container and disk: the one place container, jj and git run (TECHNICAL.md)
   client/        @pineta/client       browser UI and session client; owns its Vite build
@@ -194,7 +194,7 @@ a writer, identified by the transport's `LineSender.peer` and recorded in every
 message it sends; writers own no lanes. A lane belongs to a thread: created
 where agent work is first wanted there, never moved, never written while it
 runs (ADR-0020). Threads run concurrently. Decisions are pure (`planChat`,
-`planNote` and the rest in `@pineta/marginalia`, over facts read by `@pineta/reads`);
+`planArchive` and the rest in `@pineta/marginalia`, over facts read by `@pineta/reads`);
 the host gathers, plans and executes each command in one serial step.
 
 Wire sentinels live only in `packages/protocol/codec.ts`. The wire is total, so `""`

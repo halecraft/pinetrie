@@ -70,7 +70,7 @@
       #workspace { position: relative; flex: 1; display: flex; min-height: 0; }
       .rail { position: relative; flex: 0 0 auto; min-width: 3rem; padding: 0 .25rem;
         overflow-y: auto; border-right: 1px solid #23272e; }
-      /* Centred in the rail: the notes toggle above it is usually wider. */
+      /* Centred in the rail, whose min-width is wider than a narrow tree. */
       .rail-tree { position: relative; width: fit-content; margin: 0 auto; }
       /* A new tab's rail: where its first message will be drawn. */
       .rail-start { position: absolute; width: 8px; height: 8px; box-sizing: border-box;
@@ -86,8 +86,7 @@
         color: #ddd; pointer-events: none; }
       @keyframes pulse { 50% { transform: scale(1.8); } }
       /* An unsent card of yours (ADR-0048): a round pip in your colour, with a
-         dark ring so it reads against a tab or a track. Round, unlike a
-         note's square dot. */
+         dark ring so it reads against a tab or a track. */
       .card-pip { display: inline-block; flex: 0 0 auto; width: 6px; height: 6px;
         border-radius: 50%; box-shadow: 0 0 0 1.5px #14161a; }
       /* On a rail dot: centred, with no ring, so the track's colour shows
@@ -388,46 +387,12 @@
       .conflict { font-size: .8rem; color: #d0a15f; margin-bottom: .35rem; }
       .conflict button { padding: .1rem .5rem; font-size: .75rem; }
 
-      /* Notes (ADR-0025): a note about a message. */
-      .note { margin-top: .3rem; padding: .4rem .5rem; border: 1px solid #3a3f48; border-radius: 4px;
-        background: #181b21; }
-      /* Below its message's text, and part of it (ADR-0043). */
-      .msg > .note { margin-left: .75rem; border: 0; border-left: 2px solid #3a3f48; border-radius: 0; }
-      .note[data-state="done"] { opacity: .85; }
-      .note[data-collapsed="yes"] .note-text { max-height: 6rem; overflow: hidden; }
-      .note-head { font-size: .72rem; color: #8b93a1; margin-bottom: .25rem; }
-      .note-state { text-transform: uppercase; letter-spacing: .08em; color: #c792ea; }
-      .note-editing, .note-changed { color: #d0a15f; }
-      textarea.note-text { width: 100%; resize: vertical; padding: .4rem; border-radius: 4px;
-        border: 1px solid #2c313a; background: #1b1e24; color: inherit; font: inherit; }
-      .note-actions { display: flex; gap: .4rem; align-items: center; margin-top: .3rem; }
-      .note-actions button, .notes-toggle, .notes-filters button {
-        padding: .05rem .45rem; font-size: .72rem; background: none; border: 1px solid #3a3f48; color: #aaa; }
-      /* The note being edited, scrolled away: a way back to it. */
-      .note-bar { position: sticky; top: -.75rem; z-index: 2; display: block; width: 100%;
-        margin-bottom: .5rem; padding: .15rem .5rem; font-size: .75rem; background: #2a2140;
-        color: #c792ea; border: 1px solid #c792ea; }
       /* Released, with more below: a way back to the end. The slot is sticky and
          zero-height, so it takes no room and does not move that end. */
       .jump-slot { position: sticky; bottom: 0; height: 0; z-index: 2; }
       .jump-latest { position: absolute; bottom: .5rem; left: 50%; transform: translateX(-50%);
         padding: .15rem .6rem; font-size: .75rem; background: #1d2a3a; color: #9ecbff;
         border: 1px solid #9ecbff; border-radius: 1rem; white-space: nowrap; }
-      /* A note's message on the rail: a square. Not `.note`, the card's class. */
-      .rail-dot.noted { border-radius: 1px; }
-      .notes-toggle { display: block; margin: .3rem auto; white-space: nowrap; }
-      .notes-toggle:disabled { opacity: .5; cursor: default; }
-      /* Drawn over the columns, just right of the rail (`#workspace` is its box). */
-      .notes-index { position: absolute; z-index: 3; left: 3.5rem; top: .5rem; width: 24rem;
-        max-height: 70vh; overflow-y: auto; padding: .5rem; background: #1b1e24;
-        border: 1px solid #3a3f48; border-radius: 6px; }
-      .notes-filters { display: flex; flex-wrap: wrap; gap: .25rem; margin-bottom: .4rem; }
-      .notes-filters button[aria-pressed="true"] { border-color: #c792ea; color: #c792ea; }
-      .notes-row { display: block; width: 100%; text-align: left; margin: 0 0 .25rem; padding: .3rem .4rem;
-        background: none; border: 1px solid #2c313a; color: #ddd; }
-      .notes-first { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .notes-meta { display: block; font-size: .7rem; color: #8b93a1; }
-      .notes-empty { font-size: .8rem; color: #6f7784; }
 
       .composer { padding: .5rem .75rem .75rem; border-top: 1px solid #23272e; }
       /* An archived root, a preview, or a send on its way: what was typed

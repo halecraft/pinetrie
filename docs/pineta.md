@@ -93,12 +93,12 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 928/928 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 579 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 969/969 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 590 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 163/163, on the scripted model |
+| end-to-end | `pnpm run e2e` | 153/153, on the scripted model |
 | with a real model | `pnpm run e2e:live` | 121/121 |
-| **real browser** | `pnpm run e2e:browser` | 184 checks; in a lane with no containers, the 6 that need one fail |
+| **real browser** | `pnpm run e2e:browser` | 181 checks; in a lane with no containers, the 6 that need one fail |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -115,7 +115,7 @@ packages/core/         @pineta/core         declares NOTHING
 packages/schema/       @pineta/schema       Kyneta only; the document shape
 packages/pi/           @pineta/pi           THE pi boundary
 packages/protocol/     @pineta/protocol     the wire contract and its codec
-packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: chat, notes, outbox
+packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: chat, outbox
 packages/reads/        @pineta/reads        document reads shared by host and client
 packages/lanes/        @pineta/lanes        lane containers, disks, and jj/git (ADR-0032–0034, 0038)
 packages/client/       @pineta/client       browser UI; owns its Vite build
@@ -162,11 +162,11 @@ reports its thread (ADR-0029).
 Rings on the rail, avatars in column headers, typing in the composer; never
 yourself. The host refuses client writes to the session.
 
-**ADR-0025 — notes: a message opened for everyone's editing, or a draft of the
-next one.** The text is a Yjs document per note; the record is a host-written
-`pineta.note` value; entries stay as sent, and the model reads them so.
-Contributors come from each edit's Yjs `clientID`. The host refuses writes to
-a done note. Drafts are withdrawn by ADR-0048: the next message is a card.
+**ADR-0025 — notes on messages, superseded by ADR-0048.** A note was a
+shared text below a message, with done and reopen and an index. Step 3 of
+ADR-0048 removed them: a starting host deletes any `pineta.note` record and
+`note:` text left in its store. A branch from `→` carries a conversation
+about a message.
 
 **ADR-0048 — everything unsent is a card.** What you type is a card on its
 thread: its record in the cards document and its text in a Yjs document, both
@@ -174,7 +174,8 @@ written by clients; the host only spends a card when it is sent, and sweeps
 empty ones. Everyone at a thread's end sees and can edit its cards. Who wrote
 in one comes from its `clientID`s, through the host's `pineta.seat` records.
 Undo is Kyneta's stack, one per tab, in memory. Built so far: the drafting
-card (step 1).
+card (step 1), marks for your unsent cards (step 2), and notes removed (step
+3's first part).
 
 **ADR-0026 — everything queued is a note; the queue waits at a
 note someone has open.** A message waiting for a busy lane becomes a `queued`
@@ -384,9 +385,8 @@ Views are pure functions over one `indexTree` (`packages/core/tree.ts`,
 a reducer in `packages/client/layout.ts`, never written, and the inbox is
 `packages/client/inbox.ts`.
 
-`useText` binds each note's textarea to its Yjs text (ADR-0025): the first
-genuinely collaborative edit. The composer is your drafting card
-(ADR-0048): one uncontrolled textarea, bound with Kyneta's `attach` to the
+The composer is your drafting card (ADR-0048), the text people edit
+together: one uncontrolled textarea, bound with Kyneta's `attach` to the
 card's text from the keystroke that creates it (`packages/client/card-editor.tsx`).
 
 **An image pasted into a composer reaches the agent** (ADR-0042): uploaded
@@ -394,8 +394,8 @@ to `POST /blob`, kept by SHA-256 in `pineta_blobs` beside the session in
 the host's SQLite file, referred to by the message's markdown and its
 `details.images`, and handed to the model as image parts by pi's
 `toProviderMessages`. Admission now also refuses another origin, and on
-loopback a rebound name. Images in tool results, workspace paths, remote
-images, and pasting into notes are still to do.
+loopback a rebound name. Images in tool results, workspace paths and remote
+images are still to do.
 
 **Live work hands over to its entry in one render** (ADR-0044). A reply is
 its lane's current reply while the lane's tip is where it opened, and its
@@ -427,7 +427,7 @@ independently shippable:
 2. branch write — create a branch from any entry; Aside first
 3. ~~concurrent lanes~~ — done; since ADR-0020, a lane per thread, not per writer
 4. ~~references~~ — done, then withdrawn (ADR-0043): nothing read them
-5. ~~humans in the tree~~ (ADR-0018) — done: chat and compelled responders, presence (ADR-0024), notes (ADR-0025), and drafting cards (ADR-0048)
+5. ~~humans in the tree~~ (ADR-0018) — done: chat and compelled responders, presence (ADR-0024), notes (ADR-0025, since removed), and cards (ADR-0048)
 6. Scout — read-only tools
 7. fold — three-way merge producing a `fromId` node
 
@@ -441,15 +441,6 @@ context.**
 - **`isRedo` (`packages/client/card-state.ts`) copies Kyneta's redo keys**,
   for a box holding no card, where `attach` is not bound. Ask Kyneta to
   export its matcher.
-- **A refused write to a note splits that client's replica.** Its later edits
-  build on the refused one and never reach the host, even after the note is
-  reopened (S26 addendum 2). The host keeps those later edits as pending
-  structs. Before Kyneta v4, a fresh replica under the same peer id collided
-  with them and corrupted the text (S28); a reload is now a new seat, with a
-  `clientID` of its own (ADR-0037). Someone marking a note done while another
-  person types gets there. ADR-0026 stops refusing writes to notes that have a
-  record.
-
 - **Kyneta ephemeral: a write and a deletion in the same millisecond diverge.**
   A peer that sets a key and deletes it within one millisecond applies both in
   order, so the key is gone there; on other peers the equal timestamps tie and

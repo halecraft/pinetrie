@@ -2,26 +2,24 @@
 // `startHost` reads one more, for the suites (`RunningHost.cardText`).
 //
 // Clients write cards; the host only reads who wrote in one, spends one when
-// it is sent, and sweeps. It also gathers every text people type, cards' and
-// notes', for the sweeps, so no text is read twice.
+// it is sent, and sweeps. It also gathers every card's text for the sweeps,
+// so no text is read twice.
 
 import { type Exchange, type Store, whenHydrated } from "@kyneta/exchange"
 import type { CardId, WriterId } from "@pineta/core"
 import { writersOf } from "@pineta/marginalia"
-import { readCards, readNotes, readSeats } from "@pineta/reads"
+import { readCards, readSeats } from "@pineta/reads"
 import {
   type CardsDocHandle,
   cardDocId,
-  noteDocId,
   type SessionDocHandle,
   TextDoc,
   textClients,
 } from "@pineta/schema"
 
-/** One text people type, as the sweeps need it. */
+/** A card's text, as the sweeps need it. */
 export interface GatheredText {
-  readonly kind: "card" | "note"
-  readonly id: string
+  readonly id: CardId
   readonly text: string
   /** The `clientID`s that wrote in it (`textClients`). */
   readonly clients: readonly number[]
@@ -35,12 +33,15 @@ export interface CardPort {
    * destroys its own copy once it has seen both (S64).
    */
   spend(id: CardId): Promise<void>
-  /** Every live card's text and every note's, with who wrote in each. */
+  /** Every live card's text, with who wrote in it. */
   texts(): Promise<readonly GatheredText[]>
-  /** Every stored card and note text document, by id. */
+  /**
+   * Every stored card text document, and every `note:` document left from
+   * notes on messages (ADR-0025), which the startup sweep deletes.
+   */
   stored(): Promise<{
     readonly cards: readonly string[]
-    readonly notes: readonly string[]
+    readonly oldNotes: readonly string[]
   }>
   /** Delete these card records, then destroy these documents. */
   remove(what: {
@@ -87,26 +88,12 @@ export function startCards(input: {
       const out: GatheredText[] = []
       for (const c of readCards(cards)) {
         const t = await text(cardDocId(c.id))
-        out.push({
-          kind: "card",
-          id: c.id,
-          text: t.text(),
-          clients: textClients(t),
-        })
-      }
-      for (const n of readNotes(doc)) {
-        const t = await text(noteDocId(n.id))
-        out.push({
-          kind: "note",
-          id: n.id,
-          text: t.text(),
-          clients: textClients(t),
-        })
+        out.push({ id: c.id, text: t.text(), clients: textClients(t) })
       }
       return out
     },
     async stored() {
-      return { cards: await listed("card:"), notes: await listed("note:") }
+      return { cards: await listed("card:"), oldNotes: await listed("note:") }
     },
     remove,
   }

@@ -103,7 +103,6 @@ function MessageView(p: MessageProps) {
           />
         ))}
         <Tools node={node} onAct={p.onAct} tools={p.tools} />
-        {p.about}
         {p.closedBranches.length > 0 && (
           <div className="actions">
             {p.closedBranches.map(b => (
@@ -114,7 +113,6 @@ function MessageView(p: MessageProps) {
                 type="button"
               >
                 ⑂ {plural(b.messageCount, "message")}
-                {b.noteCount > 0 && ` · ${plural(b.noteCount, "note")}`}
               </button>
             ))}
           </div>
@@ -141,27 +139,11 @@ function Tools({
   tools: MessageTools
   onAct: (act: MessageAct) => void
 }) {
-  const { note, edit, branch } = tools
-  if (
-    !tools.copy &&
-    note === undefined &&
-    edit === undefined &&
-    branch === undefined
-  )
-    return null
+  const { edit, branch } = tools
+  if (!tools.copy && edit === undefined && branch === undefined) return null
   return (
     <div className="tools">
       {tools.copy && <CopyButton node={node} />}
-      {note !== undefined && (
-        <button
-          className="note-open"
-          onClick={() => onAct(note)}
-          title="open a note on this message, for everyone"
-          type="button"
-        >
-          note
-        </button>
-      )}
       {edit?.kind === "branch" && (
         <button
           className="edit"

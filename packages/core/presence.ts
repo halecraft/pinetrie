@@ -17,8 +17,7 @@ type Entries = readonly (readonly [WriterId, string])[]
 
 /**
  * Everyone but `me` whose value is `value`, each once: a person here from two
- * seats has two entries (ADR-0037). Who types at a thread end, who edits a
- * note.
+ * seats has two entries (ADR-0037): who types at a thread end.
  */
 export function whoIsAt(
   entries: Entries,

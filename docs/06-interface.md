@@ -127,11 +127,11 @@ ever in the context of another. That is where the screen splits.
 The leftmost tab. It finds roots, so it is a list, not a rail with columns.
 
 - **A row per root, open or archived:** its label, last activity, who wrote in
-  it, its messages and notes, and its state. Filters: archived, open, mine.
+  it, its messages, and its state. Filters: archived, open, mine.
   Search over each root's label, so its title, and its message text.
 - **Selecting a row previews it:** that root's rail, and one read-only column
   that a pick on the rail moves. Its composer is disabled, and none of the tools that
-  write are there: note, edit, branch, mark. Copy stays, since it writes nothing. In place of sending it offers
+  write are there: edit, branch, mark. Copy stays, since it writes nothing. In place of sending it offers
   **Restore** for an archived root, and **Open** for an open one. Once the
   inventory exists (planned with fold), picking up will work here, since it
   writes nothing; what is picked up is folded into an open root.
@@ -208,16 +208,16 @@ so it is the one behind the menu. What each does is under "Starting" below.
 - A git-graph strip at the left edge draws every branch in the tab's root as a
   line, and every message as a dot, in tree order, except for uneventful
   stretches (below). The tree is centred in the rail.
-- **A new tab has a rail too**: a hollow dot where its first message will be,
-  and the notes toggle, disabled. It is as wide as the rail it becomes, so the
-  columns do not move when the first message lands.
+- **A new tab has a rail too**: a hollow dot where its first message will be.
+  It is as wide as the rail it becomes, so the columns do not move when the
+  first message lands.
 - **A column wears its rail track's colour**, so you can see which branches are
   on screen and where they sit in the whole.
 - **Clicking a message in the rail brings it into view**: in the column that
   shows it, or in a new column opened beside it.
 - **Uneventful stretches are capsules** (ADR-0031). A message is always its own
   dot if it is the root's first message, a branch's first message, a fork, a
-  thread end, a note's message, a thread end someone else follows, where the
+  thread end, a thread end someone else follows, where the
   agent is replying, or the end of a column you have open. Three or more other
   messages in a row are one capsule on their track: 2 rows long for 3–9
   messages, 3 for 10–99, 4 for 100–999. It is hollow when only the agent
@@ -344,13 +344,13 @@ The rail is E; the column is T. Seeing both at once is the product.
   given the image itself, after the text. An image no longer stored refuses
   the send, and the text comes back to the box.
 - **A message's tools are one row** over its top right, shown on hover or
-  focus (ADR-0043): *copy* first, then *note*, *edit*, and `→` last, in the
+  focus (ADR-0043): *copy* first, then *edit*, and `→` last, in the
   right margin, since what it opens appears to the right. Copy puts the
   message on the clipboard as markdown: its text as it was written, then
   each tool call it made, the command or path and its whole output. It
   shows a check for two seconds; over plain http, which has no clipboard,
-  it selects the message's text and tool rows for you to copy. Beneath a message stay only its notes
-  and the buttons of branches no column shows.
+  it selects the message's text and tool rows for you to copy. Beneath a message stay only the
+  buttons of branches no column shows.
 - **Edit sends a person's message again, changed or not**, as a sibling: a
   branch at its parent whose composer holds its text as sent. The original
   stays. It asks the agent exactly when the original did, so a message its
@@ -390,25 +390,6 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **Closing a new branch that holds text asks** "discard what you typed?";
   discarding is final.
 
-### Notes (ADR-0025)
-
-- **Any message can have a note**, the agent's replies included: *note* is
-  among its tools. The note is a card below the message's text, which still
-  shows, and it starts empty: it is about the message (ADR-0043). Everyone can
-  type in it at once. The card's header says its state, who has written in it,
-  and who is editing it now. The message stays as sent, which is what the agent
-  read.
-- **Done** makes a note read-only; *reopen* makes it editable again, and a
-  reopened note, once edited, reads "changed since done".
-- **While the note being edited is scrolled out of view**, a bar at the top of
-  its column leads back to it.
-- **On the rail, a note's message is a square.** A closed branch's button
-  counts its notes: "⑂ 6 messages · 1 note".
-- **The notes index**, *notes (n)* at the top of the rail, lists the notes in
-  the tab's root, newest first, by its first line, state and writers; filters
-  show open, done, changed since done, and mine. A row opens its
-  note's column.
-
 ## What goes away
 
 | today | replaced by |
@@ -431,7 +412,7 @@ a lane, the `navigate` command had no caller and was deleted with `prompt` and
 ## Data
 
 Every part of this is a read of what the document already holds, except the
-archive record (ADR-0029); a note's text is its own document (ADR-0025).
+archive record (ADR-0029); a card's text is its own document (ADR-0048).
 
 - **A column** is a client-local anchor entry. Its path is `projectTranscript`
   of `followTip(anchor)`, or, once it is bound to a lane, of the lane's tip;

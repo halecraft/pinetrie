@@ -40,7 +40,6 @@ const Reply = Schema.struct({
   entryId: Schema.string(),
   position: Schema.number(),
   by: Schema.string(),
-  noteId: Schema.string(),
   text: Schema.string(),
 })
 

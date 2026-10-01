@@ -107,7 +107,6 @@ export function ArchiveTab({
                       .map(w => nameFor(nameOf, w))
                       .join(", ")}{" "}
                     · {plural(row.summary.messages, "message")}
-                    {row.notes > 0 && ` · ${plural(row.notes, "note")}`}
                   </span>
                   {row.card && <CardPip color={myColor} />}
                 </button>

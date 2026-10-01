@@ -75,10 +75,8 @@ export function Rail({
   activity,
   onPick,
   here,
-  notes,
   yours,
   nameOf,
-  notesPanel,
 }: {
   items: readonly RailItem[]
   /** Ids on any open column's path: marked `data-open`. */
@@ -88,8 +86,6 @@ export function Rail({
   onPick: (id: string) => void
   /** Others following each thread end, with their names and colours: a ring there. */
   here: ReadonlyMap<string, readonly { name: string; color: string }[]>
-  /** Messages that are notes' (ADR-0025): drawn as squares. */
-  notes: ReadonlySet<string>
   /**
    * Thread ends holding an unsent card of yours (`CardMarks.ends`), with your
    * colour: each dot there carries a pip (ADR-0048).
@@ -97,17 +93,6 @@ export function Rail({
   yours: { readonly ends: ReadonlySet<string>; readonly color: string }
   /** A writer's name, for a capsule's label. */
   nameOf: (writer: WriterId) => string
-  /**
-   * The notes index's toggle, at the rail's top, counting this root's notes.
-   * The index itself is drawn by the app, over the columns: the rail scrolls,
-   * so it would clip it. Absent where there is no index: the Archive tab's
-   * preview.
-   */
-  notesPanel?: {
-    readonly count: number
-    readonly open: boolean
-    readonly toggle: () => void
-  }
 }) {
   // Every message, a run's included, to the item that draws it.
   const itemOf = new Map(items.flatMap(it => it.ids.map(id => [id, it])))
@@ -116,17 +101,6 @@ export function Rail({
   const slots = last === undefined ? 0 : last.slot + last.span
   return (
     <nav aria-label="this thread's tree" className="rail">
-      {notesPanel !== undefined && (
-        <button
-          aria-expanded={notesPanel.open}
-          className="notes-toggle"
-          onClick={notesPanel.toggle}
-          title="every note in this thread"
-          type="button"
-        >
-          notes ({notesPanel.count})
-        </button>
-      )}
       <div className="rail-tree">
         <svg height={y(slots)} width={x(tracks - 1) + PAD}>
           <title>
@@ -157,7 +131,7 @@ export function Rail({
         </svg>
         {/* Dots and capsules are buttons over the drawing, so they are
           reachable by keyboard and read as controls. */}
-        {railItems(items, { open, notes, yours }).map(([it, marks]) =>
+        {railItems(items, { open, yours }).map(([it, marks]) =>
           it.kind === "run" ? (
             <Capsule
               key={it.ids[0]}
@@ -171,7 +145,6 @@ export function Rail({
               activity={activity}
               id={it.ids[0]}
               key={it.ids[0]}
-              noted={marks.noted}
               yours={marks.yours}
               onPick={onPick}
               open={marks.open}
@@ -220,15 +193,15 @@ export function LiveRail({
       ),
     [reading, names, colorOf],
   )
-  const { notes, activity, yours } = rail
+  const { activity, yours } = rail
   const items = useMemo(
     () =>
       compactRail(
         index,
         rows,
-        railKeep({ notes, rings: here, activity, ends, cards: yours.ends }),
+        railKeep({ rings: here, activity, ends, cards: yours.ends }),
       ),
-    [index, rows, notes, here, activity, ends, yours.ends],
+    [index, rows, here, activity, ends, yours.ends],
   )
   return (
     <Rail {...rail} here={here} items={items} nameOf={w => nameFor(names, w)} />
@@ -237,15 +210,12 @@ export function LiveRail({
 
 /**
  * A new tab's rail, before its first message: a hollow dot where that message
- * will be drawn, and the notes toggle, disabled. It is as wide as the rail it
+ * will be drawn. It is as wide as the rail it
  * turns into, so the columns do not move when the first message lands.
  */
 export function EmptyRail() {
   return (
     <nav aria-label="this thread's tree" className="rail">
-      <button className="notes-toggle" disabled type="button">
-        notes (0)
-      </button>
       <div
         className="rail-tree"
         style={{ width: x(0) + PAD, height: y(0) + PAD }}
@@ -265,7 +235,6 @@ function Dot(p: {
   slot: number
   track: number
   open: boolean
-  noted: boolean
   /** Your colour when a card of yours waits at this end; null otherwise. */
   yours: string | null
   activity: readonly AgentRun[]
@@ -283,7 +252,6 @@ function Dot(p: {
       className={[
         "rail-dot",
         p.activity.some(run => run.tip === p.id) ? "pulse" : "",
-        p.noted ? "noted" : "",
       ]
         .filter(c => c !== "")
         .join(" ")}

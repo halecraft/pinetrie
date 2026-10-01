@@ -11,7 +11,7 @@ import {
   type WriterId,
   whoIsAt,
 } from "@pineta/core"
-import { readEditing, readReading, readTyping } from "@pineta/reads"
+import { readReading, readTyping } from "@pineta/reads"
 import type { PresenceDocHandle } from "@pineta/schema"
 import { useMemo } from "react"
 
@@ -38,19 +38,12 @@ export function useSeenBy(
   )
 }
 
-// Module-level, so `useSelector`'s memo of its read holds.
-const FIELDS = { typing: readTyping, editing: readEditing } as const
-
-/**
- * Others whose `field` is `value`, each once: who types at a thread end, who
- * edits a note.
- */
-export function useWhoIsAt(
+/** Others typing in the composer at the thread end `end`, each once (`whoIsAt`). */
+export function useTypingAt(
   presence: PresenceDocHandle,
-  field: keyof typeof FIELDS,
   me: WriterId,
-  value: string,
+  end: string,
 ): readonly WriterId[] {
-  const entries = useSelector(presence, FIELDS[field])
-  return useMemo(() => whoIsAt(entries, value, me), [entries, value, me])
+  const entries = useSelector(presence, readTyping)
+  return useMemo(() => whoIsAt(entries, end, me), [entries, end, me])
 }

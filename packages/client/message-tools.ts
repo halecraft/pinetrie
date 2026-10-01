@@ -1,12 +1,10 @@
 // client/message-tools — which tools a message offers, as a pure rule: copy,
-// note, edit (or new tab), and `→` (ADR-0021, ADR-0025, ADR-0043). `Column`
+// edit (or new tab), and `→` (ADR-0021, ADR-0043). `Column`
 // gathers the facts, and `Message` draws the result. Each tool but copy is the
 // `MessageAct` it sends, which reaches `App` as its column's intent
 // (`intent.ts`).
 
 import {
-  type EntryId,
-  entryId,
   parseMentions,
   THE_AGENT,
   type ThreadLane,
@@ -34,8 +32,6 @@ export interface MessageTools {
    * list would join every call's output.
    */
   readonly copy: boolean
-  /** Open a note about it. */
-  readonly note: Extract<MessageAct, { kind: "note" }> | undefined
   /** Send it again: a sibling at its parent, or a root's first message in a new tab. */
   readonly edit: Extract<MessageAct, { kind: "branch" | "newTab" }> | undefined
   /** `→`: a branch at the message. */
@@ -52,7 +48,6 @@ export const branchPrefill = (lane: ThreadLane): Prefill | undefined =>
 
 /** What a reader asked of a message. */
 export type MessageAct =
-  | { readonly kind: "note"; readonly entry: EntryId }
   | { readonly kind: "branch"; readonly branch: OpenBranch }
   | {
       readonly kind: "newTab"
@@ -71,18 +66,13 @@ export function messageTools(
     /** The column's thread. */
     readonly lane: ThreadLane
     readonly writable: boolean
-    readonly hasNoteAbout: boolean
   },
 ): MessageTools {
   // Copying only reads, so a column that can't be written offers it too.
   const copy = node.text !== "" || (node.toolCalls?.length ?? 0) > 0
-  if (!at.writable)
-    return { copy, note: undefined, edit: undefined, branch: undefined }
+  if (!at.writable) return { copy, edit: undefined, branch: undefined }
   return {
     copy,
-    note: at.hasNoteAbout
-      ? undefined
-      : { kind: "note", entry: entryId(node.id) },
     edit: node.role === "chat" ? editOf(node, at.parentId) : undefined,
     // Below a conversation's last message, a branch would be the same as
     // replying. Agent work follows its lane, so there a branch at the end is

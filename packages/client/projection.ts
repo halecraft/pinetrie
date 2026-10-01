@@ -15,7 +15,6 @@ import type {
   ArchiveRecord,
   LaneView,
   MarkRecord,
-  NoteRecord,
   SeatRecord,
   TreeIndex,
 } from "@pineta/core"
@@ -30,7 +29,6 @@ import {
   readLanes,
   readMarks,
   readNames,
-  readNotes,
   readOffers,
   readOutbox,
   readParticipants,
@@ -54,7 +52,6 @@ export interface SessionFacts {
   readonly lanes: readonly LaneView[]
   readonly outbox: readonly Held[]
   readonly participants: readonly string[]
-  readonly notes: readonly NoteRecord[]
   /** Every seat the host has seen: who wrote in a card (ADR-0048). */
   readonly seats: readonly SeatRecord[]
   readonly archive: ReadonlyMap<string, ArchiveRecord>
@@ -74,7 +71,6 @@ export function readSessionFacts(doc: SessionDocHandle): SessionFacts {
     lanes: readLanes(doc, index),
     outbox: readOutbox(doc),
     participants: readParticipants(doc, index),
-    notes: readNotes(doc),
     seats: readSeats(doc),
     archive: readArchive(doc),
     marks: readMarks(doc),

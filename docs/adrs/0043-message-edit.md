@@ -2,7 +2,9 @@
 
 **Status:** Accepted. Implementation: `PLAN-2026-09-29-message-tools`.
 Supersedes ADR-0006 and ADR-0017. Amends ADR-0025 (where a note is drawn, and
-what one opened on a message starts with).
+what one opened on a message starts with). Amended by ADR-0048 (step 3,
+`PLAN-2026-10-01-notes-removed`): no note sits below a message, and the
+row of tools is copy, edit (or new tab), `→`.
 
 **Context.** A message's tools were cite, edit and `→`, and none of them did
 what it seemed to.

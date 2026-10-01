@@ -15,8 +15,8 @@
 //
 // The renderer before React rebuilt the transcript with `innerHTML` on every
 // change, which destroyed focus and selection on every keystroke. React gives
-// stable node identity, which `useText` needs to keep a note's textarea
-// bound while everyone types (ADR-0025).
+// stable node identity, which `useText` needs to keep a card's textarea
+// bound while everyone types (ADR-0048).
 
 import { whenSettled } from "@kyneta/exchange"
 import { useDocStatus, useSelector } from "@kyneta/react"
@@ -30,13 +30,7 @@ import {
   rootWork,
   summarizeRoots,
 } from "@pineta/core"
-import { messageNotes } from "@pineta/marginalia"
-import {
-  type NoteFilter,
-  notesIndex,
-  readCards,
-  readParticipantNames,
-} from "@pineta/reads"
+import { readCards, readParticipantNames } from "@pineta/reads"
 import {
   type ComponentProps,
   useEffect,
@@ -72,7 +66,6 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
-import { NotesIndex } from "./note.tsx"
 import { type AppPorts, perform } from "./perform.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { planReading, typingDue } from "./presence-report.ts"
@@ -184,7 +177,6 @@ export function App({
     lanes,
     outbox,
     participants,
-    notes,
     seats,
     archive,
     marks,
@@ -193,12 +185,6 @@ export function App({
   // Every card's record (ADR-0048): a second document, read on its own. An
   // unchanged card keeps its record object (`readCards`).
   const cards = useSelector(session.cards, readCards)
-  // The note drawn with each message (ADR-0043). A message with one is a
-  // square on the rail, and counted on a closed branch's button.
-  const notesOf = useMemo(() => messageNotes(notes), [notes])
-  const noteEntries = useMemo(() => new Set(notesOf.keys()), [notesOf])
-  const [notesOpen, setNotesOpen] = useState(false)
-  const [noteFilter, setNoteFilter] = useState<NoteFilter>("all")
   // Its own read, not part of the facts: every message compares `nameOf` by
   // identity, so it may change only when a name does.
   const nameOf = useSelector(doc, readParticipantNames)
@@ -283,9 +269,8 @@ export function App({
       projectColumns(
         index,
         columns.map(c => ({ anchor: c.anchor, pinned: isPinned(c) })),
-        noteEntries,
       ),
-    [index, columns, noteEntries],
+    [index, columns],
   )
   const rail = useMemo(() => tabRail(index, active), [index, active])
   const order = useMemo(
@@ -490,8 +475,6 @@ export function App({
     index,
     lanes,
     nameOf,
-    notes,
-    notesOf,
     outbox,
     participants,
     rows,
@@ -505,7 +488,6 @@ export function App({
   const preview = (r: string) => (
     <Preview
       key={r}
-      noteEntries={noteEntries}
       onIntent={onIntent}
       readOnly={readOnlyWords(entryId(r), archive.get(r), nameOf)}
       root={r}
@@ -588,7 +570,6 @@ export function App({
                   roots: summaries,
                   labels,
                   archive,
-                  notes,
                   index,
                   filter: archiveFilter,
                   query: archiveQuery,
@@ -606,18 +587,6 @@ export function App({
                     ends={ends}
                     index={index}
                     names={nameOf}
-                    notes={noteEntries}
-                    notesPanel={{
-                      count: notesIndex(
-                        notes,
-                        index,
-                        "all",
-                        session.writer,
-                        workspace.root,
-                      ).length,
-                      open: notesOpen,
-                      toggle: () => setNotesOpen(!notesOpen),
-                    }}
                     onPick={openAt}
                     open={shown}
                     rows={rail}
@@ -626,28 +595,6 @@ export function App({
                   />
                 ) : (
                   <EmptyRail />
-                )}
-                {/* Over the columns, beside the rail: inside the rail, whose own
-                    scroll clips what overflows it, only a sliver of it showed. */}
-                {notesOpen && workspace.kind === "root" && (
-                  <NotesIndex
-                    filter={noteFilter}
-                    nameOf={nameOf}
-                    onClose={() => setNotesOpen(false)}
-                    onFilter={setNoteFilter}
-                    onPick={at => {
-                      setNotesOpen(false)
-                      openAt(at)
-                    }}
-                    rows={notesIndex(
-                      notes,
-                      index,
-                      noteFilter,
-                      session.writer,
-                      workspace.root,
-                    )}
-                    session={session}
-                  />
                 )}
                 {/* A column's header is its drag handle; its grip is the
                     keyboard's way to move it. */}
@@ -699,14 +646,12 @@ export function App({
 function Preview({
   root,
   readOnly,
-  noteEntries,
   yours,
   shared,
   onIntent,
 }: {
   root: string
   readOnly: ReadOnly
-  noteEntries: ReadonlySet<string>
   /** Thread ends holding a card of yours, for the rail's pips. */
   yours: ComponentProps<typeof LiveRail>["yours"]
   shared: Omit<
@@ -742,7 +687,7 @@ function Preview({
   })
   const { index } = shared
   const column: ColumnSpec = { key: `preview-${root}`, anchor }
-  const [view] = projectColumns(index, [{ anchor }], noteEntries)
+  const [view] = projectColumns(index, [{ anchor }])
   const rail = projectRail(index, root)
   const path = pathIds(index, view?.tipId ?? null)
   const track = branchColors(rail, view === undefined ? [] : [view]).track[0]
@@ -755,7 +700,6 @@ function Preview({
         ends={[view.tipId]}
         index={index}
         names={shared.nameOf}
-        notes={noteEntries}
         onPick={pick}
         open={path}
         rows={rail}

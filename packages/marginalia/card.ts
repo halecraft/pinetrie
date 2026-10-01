@@ -167,3 +167,23 @@ export function planCardSweep(input: {
   })
   return { records, docs }
 }
+
+/** Where notes on messages were kept (ADR-0025), until ADR-0048 removed them. */
+export const OLD_NOTE_NAMESPACE = "pineta.note"
+const OLD_NOTE_PREFIX = "note:"
+
+/**
+ * What a starting host deletes of the removed notes: every `pineta.note`
+ * value, by key, and every stored `note:` document. Pure.
+ */
+export function planNoteSweep(input: {
+  /** The keys of the stored `pineta.note` values. */
+  readonly values: readonly string[]
+  /** Every stored document id. */
+  readonly stored: readonly string[]
+}): { readonly values: readonly string[]; readonly docs: readonly string[] } {
+  return {
+    values: input.values,
+    docs: input.stored.filter(docId => docId.startsWith(OLD_NOTE_PREFIX)),
+  }
+}

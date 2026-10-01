@@ -68,7 +68,6 @@ export type Effect =
       readonly root: EntryId
       readonly title: string | null
     }
-  | { readonly kind: "openNote"; readonly entry: EntryId }
   | { readonly kind: "discardCard"; readonly card: CardId }
   /** Scroll to entry `entry` once it is drawn (`useReveal`). */
   | { readonly kind: "reveal"; readonly entry: string }
@@ -192,8 +191,6 @@ function planColumn(
       ? [layout({ kind: "columns", root: active.root, action })]
       : []
   switch (act.kind) {
-    case "note":
-      return [{ kind: "openNote", entry: act.entry }]
     case "openAt":
       return planOpenAt(act.entry, state, fresh)
     case "newTab":

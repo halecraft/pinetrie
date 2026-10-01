@@ -15,7 +15,7 @@ columns, the rail and the agent's path all read that one index
 (`packages/core/tree.ts`). `App` reads it through `readSessionFacts`
 (`projection.ts`), together with the entry count, the agent's activity, the
 streams to draw (`liveWork`, over the stream records alone), the lanes, the
-outbox, the participants, the notes, the archive and the work facts, so they
+outbox, the participants, the archive and the work facts, so they
 are always from the same moment. `resolveLayout` takes the index, the lanes
 and the archive together.
 
@@ -31,7 +31,7 @@ about 55 ms (S59).
 
 - **Presence is read by what shows it, never by `App` or a `Column`**
   (`use-presence.ts`). Each field has its own read (`readReading`,
-  `readTyping`, `readEditing`), and Kyneta wakes a read only for writes to
+  `readTyping`), and Kyneta wakes a read only for writes to
   its field (S59). `useSelector` re-renders its reader on every such write,
   a write of the same value included (the page's 10 s refresh), so the
   readers are small:
@@ -39,7 +39,6 @@ about 55 ms (S59).
   | field | read by |
   |---|---|
   | `typing` | `TypingLine` (`composer.tsx`) |
-  | `editing` | `NoteCard` |
   | `reading` | `SeenBy` (a column's header), `LiveRail` (rings, and which rail items stay), `People` (`header.tsx`), `Readers` (`tabs.tsx`) |
 
   Each read keeps its array while the field's entries are the same, so the
@@ -78,8 +77,6 @@ about 55 ms (S59).
   those, a column opened or closed included, builds every column's list
   once. `lane` and `joins` are rebuilt on every render of the column and
   compared by value; `sameData` compares a `Map` by its entries.
-- **A message with a note card still redraws with its list**: the card is a
-  new element each render, compared by identity.
 - **The review redraws with its data, not its column.** `ReviewPane` compares
   its target and line by value, since `columnView` builds them anew, and its
   `onClose` is `useStable`'s. A file section (up to 5,000 lines) compares its
@@ -221,7 +218,7 @@ give the roots and each tab's signals.
 - **`planOpen` is the deduplication `App` used to do**, pure: scroll to an
   entry a column of its root already shows, open a column beside the deepest
   sharer (`openBeside`), or preview an archived root in the Archive tab. The
-  rail, fork dots and the notes index all go through it, as an `openAt`
+  rail and fork dots go through it, as an `openAt`
   intent: `planIntent` turns its plan into effects, and `perform` carries
   them out.
 - **Columns of other tabs are unmounted.** Alignment forgets their keys, so a
@@ -424,7 +421,7 @@ landmark, and a capsule per run of three or more uneventful messages.
 those rows (tab summaries, archive search, `branchColors`).
 
 - **`compactRail` (core) is the rule; `railKeep` (`rail-view.ts`) is the
-  view's part of it:** notes, rings, running tips, every open column's end,
+  view's part of it:** rings, running tips, every open column's end,
   and every thread end holding a card of yours, whose dot carries its mark.
   A column's end is kept because a pinned column can end mid-stretch: inside a
   run, half of it would be on the column's path, and where the column ends
@@ -444,9 +441,8 @@ those rows (tab summaries, archive search, `branchColors`).
   counts messages, as dots plus each run's `data-count`; a check counting
   `.rail-dot` alone misses every message inside a run.
 - **A new tab's rail is `EmptyRail`:** a `.rail-start`, not a `.rail-dot`, so
-  `railCount` never counts it, and a disabled `notes (0)` toggle, which sets
-  the rail's width. The first message's rail has the same toggle, so the
-  columns keep their place; the browser suite checks `#strip`'s left edge
+  `railCount` never counts it. The rail's `min-width` is wider than one
+  track, in both, so the columns keep their place; the browser suite checks `#strip`'s left edge
   across that send. `.rail-tree` is `fit-content` and centred, and the SVG is
   `PAD` wide on both sides of its outer tracks.
 - **A capsule's background depends on its fill** (the panel's colour, the
@@ -475,7 +471,7 @@ picks.
 ## A message's tools (`message-tools.ts`, ADR-0043)
 
 `messageTools` decides which tools a message offers, and `Message` draws
-them in one row: *copy*, *note*, *edit* or *new tab*, `→`.
+them in one row: *copy*, *edit* or *new tab*, `→`.
 
 - **Copy is the message as markdown** (`copyText`, `copy-text.ts`): its
   text as stored, not as drawn (mentions, a `/command` and
@@ -643,7 +639,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **It follows height, not data.** A ResizeObserver watches the column's
   viewport and `.column-content`, and scrolls to the end in the frame the
   layout changed. A streaming reply, markdown reflowing, a tool row opening,
-  a note card, an image, the composer growing: each is a change of size.
+  an image, the composer growing: each is a change of size.
   Following new messages alone missed a reply being written (S32: 900 px
   behind by its end).
 - **A scroll up is the reader leaving.** The column only moves down on its
@@ -951,7 +947,7 @@ pipeline keeps the tree a pure function, testable without a DOM.
   The box has its final shape before the image loads, so `alignOnOpen`
   measures stable offsets and following sees one size, not two. The CSS caps
   it at the column's width with `height: auto`, which keeps the ratio the
-  attributes give. A blob image the message does not hold (a note's, a
+  attributes give. A blob image the message does not hold (a
   streaming one's) is drawn unsized. A click on a blob image
   (`.blob-image`) shows it over the page ("A clicked blob image is shown
   over the page", beside `Popover`).
@@ -978,10 +974,10 @@ pipeline keeps the tree a pure function, testable without a DOM.
 - **A tab's avatars** are `readersByRoot(peopleHere(…))` (`here.ts`): the
   header's people turned around, each tab's `Readers` taking its root's.
 - **`core/presence.ts` decides everything shown**, from one field's read
-  (`readReading`, `readTyping`, `readEditing` in `@pineta/reads`) and the
+  (`readReading` and `readTyping` in `@pineta/reads`) and the
   tree: rings (`readingAt`), a header's avatars (`seenBy`, others whose
-  thread end lies on one path with this column's), and typing and a note's
-  editors (`whoIsAt`). Each leaves you out, and shows a person once however
+  thread end lies on one path with this column's), and who is typing
+  (`whoIsAt`). Each leaves you out, and shows a person once however
   many seats report them (ADR-0037). Which component reads which field is
   under Renders.
 - **A person's colour** (`presenceColors`): the first three people, in the
@@ -1113,29 +1109,9 @@ so it never lights the tab (`elsewhere`).
   where who contributed is a projection of the card's history and follows
   undo.
 
-## Notes (ADR-0025)
+## Selectors in the browser suite
 
-- **A note's card (`note.tsx`) binds its textarea with `useText`** to the note's
-  Yjs text, which `session.noteText(id)` gets from the one Exchange. The
-  textarea is uncontrolled: `useText` applies remote edits in place and keeps
-  the cursor, so the card never re-renders per keystroke; `useValue` reads the
-  text where it is shown (a done note, the index's first lines).
-- **A note's card is drawn below its message's text**, which always shows
-  (ADR-0043). `messageNotes` (`@pineta/marginalia`) says which: a note
-  about the message. `App` computes it once; its keys are `noteEntries`, so
-  the rail's squares, rail compaction, closed branches' note counts and the
-  Archive preview all count the notes that are drawn. A done note's text is
-  markdown, through `MessageText`.
-- **Presence `editing`** is set on focus and while typing (at most once a
-  second), and set to null on blur, and when the editor goes with no blur (the
-  note done). A done note shows no editors.
-- **The sticky bar** follows the note this window last focused, through an
-  `IntersectionObserver` on the column's body.
-- **The notes index** is `notesIndex` (`@pineta/reads`) over the records of
-  the tab's root, drawn from the rail's top; each row reads its note's first
-  line on its own.
-- **Selectors in the browser suite:** a message's own text is `.msg > .text`,
-  and its cards are `.msg > .note`, whose text is `.note-text`.
+- **A message's own text is `.msg > .text`.**
 - **`:text-is` matches the smallest element holding the text**, which in
   markdown is the paragraph, not `.text`. The suite finds a plain message by
   `.text > p:only-child:text-is(…)`.
