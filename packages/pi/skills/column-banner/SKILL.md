@@ -8,20 +8,23 @@ disable-model-invocation: true
 
 Each thread in Pineta has a column, and its header has a banner: a very wide, thin image behind the thread's name. It makes the thread easy to tell apart from the others at a glance. You write the prompt an image model draws it from. You are given the thread's name, what the thread said, sometimes what came before it, and sometimes the person's own direction.
 
-## What the image is about
+Every banner is 16-bit pixel art of one memorable sprite. What the sprite is, and its colours, change from thread to thread.
 
-- Draw on what this thread is about: its subject, its mood, the thing it makes or fixes. What came before it is context only; let it colour the image, never decide it, so two threads from one parent look different.
-- The thread's name is two words, such as `vernal-crane`. It may suggest a motif, a season, a creature or a place. Use it when it fits the thread; ignore it when it does not.
-- Prefer a concrete scene or pattern over an abstract one: a landscape, a texture, a row of objects. Code becomes something physical, never a screen of text.
+## What it shows
+
+- One hero sprite, and at most one companion: a creature or object that stands for what this thread is about, the thing it makes, fixes or studies. Code becomes an object, such as a key, a gear or a lantern, never a screen or text.
+- The thread's name is two words, such as `vernal-crane`. When it fits the thread, it names the hero: a crane, perhaps with spring blossom as its companion. When it does not, the thread's subject wins.
+- What came before the thread is context only: let it colour the image, never decide it, so two threads from one parent look different.
 - When the person gave a direction, follow it before anything else here.
 
-## How the image must look
+## How it must look
 
-The banner is shown about 450 pixels wide and 35 to 55 pixels tall, cropped from the middle of a much wider image, on a dark interface, with a light name on its left.
+The image is about 2900 by 350 pixels, shown 448 pixels wide and 34 to 55 tall, on a dark interface, with a light name on its left. Its whole width always shows, but its top and bottom are cut.
 
-- A very wide panorama: a horizontal band, with detail spread evenly along it and no single focal subject, so any crop still reads.
-- Dark and low-key: deep, muted colours, no bright sky or white areas. The left third darkest and quietest, where the name sits.
-- No text, letters, numbers, logos or signatures anywhere in the image.
-- No people's faces.
+- 16-bit console pixel art: big, chunky visible pixels, as if drawn 60 pixels tall and enlarged. Hard edges, a dark outline, no anti-aliasing, gradients, blur or soft lighting.
+- The hero stands in the right half, in side view, about half the image's height, centred vertically, with a bold silhouette that reads at a glance. The companion stands beside it, smaller.
+- Everything else is a flat, very dark background: at most a thin line of ground tiles or a few pixel stars. The left third stays empty for the name.
+- A limited palette that suits the thread's mood, with the hero bright and saturated against the dark.
+- An original sprite, not a character from any existing game. No people, and no text, letters, numbers, score, HUD or logos.
 
 Reply with the image prompt and nothing else: one paragraph, under 80 words, no quotes, no commentary.
