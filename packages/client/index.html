@@ -90,8 +90,10 @@
          note's square dot. */
       .card-pip { display: inline-block; flex: 0 0 auto; width: 6px; height: 6px;
         border-radius: 50%; box-shadow: 0 0 0 1.5px #14161a; }
-      /* On a rail dot: its lower right, clear of .here-count above it. */
-      .rail-dot > .card-pip { position: absolute; left: 6px; top: 5px; width: 5px; height: 5px; }
+      /* On a rail dot: centred, with no ring, so the track's colour shows
+         around it. 4 px in the 8 px dot keeps it on whole pixels. */
+      .rail-dot > .card-pip { position: absolute; left: 2px; top: 2px; width: 4px; height: 4px;
+        box-shadow: none; }
       .archive-row { position: relative; }
       .archive-row > .card-pip { position: absolute; top: .6rem; right: .5rem; }
       #strip { flex: 1; display: flex; overflow-x: auto; min-width: 0; }
