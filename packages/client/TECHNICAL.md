@@ -423,10 +423,18 @@ picks.
 `messageTools` decides which tools a message offers, and `Message` draws
 them in one row: *copy*, *note*, *edit* or *new tab*, `→`.
 
-- **Copy is the message's markdown as stored**, not what it draws: mentions,
-  a `/command` and `![name](/blob/…)` as written. It only reads, so a column
-  that can't be written offers it too, alone. A message that only called
-  tools has no text, and no copy.
+- **Copy is the message as markdown** (`copyText`, `copy-text.ts`): its
+  text as stored, not as drawn (mentions, a `/command` and
+  `![name](/blob/…)` as written), then each tool call, its whole label in
+  code and its whole result fenced, past the 20,000 characters a row shows.
+  A fence or code span is longer than any run of backticks inside it. A
+  result's images, a `write`'s content and an `edit`'s change are not in
+  the view, so they are not copied. It only reads, so a column that can't
+  be written offers it too, alone.
+- **The copied text is built on a press**, not by `messageTools`: every
+  build of a column's list would otherwise join every call's output, and
+  `sameMessageProps` would compare it. `MessageTools.copy` only says
+  whether there is something to copy.
 
 - **Edit is a branch at the message's parent**, holding its text as sent: a
   sibling, since entries are immutable. The parent comes from the index, not
@@ -1195,12 +1203,12 @@ shown by their email's part before the `@`. Each rendered chat carries its
 - **The clipboard needs a secure context.** An invite link over plain http
   has no `navigator.clipboard`. There, or when the clipboard refuses,
   `useCopy` (`copy.ts`) selects an element for the reader to copy: the
-  bookmark its own text, a message its drawn text. It tests for
+  bookmark its own text, a message its drawn text and tool rows. It tests for
   `navigator.clipboard?.writeText`, not `isSecureContext`: the browser
   suite hides the clipboard to check that path (S68), and can't make its
   page insecure. In the suite's Chromium, a context without the clipboard
-  permissions refuses every write, so only its main page, which has them,
-  can check what was copied.
+  permissions refuses every write, so only a page given them (the main page,
+  and the tool images' page) can check what was copied.
 - **`.column-content` must stay unpositioned.** A positioned wrapper becomes
   the messages' offsetParent, and `alignOnOpen` measures `offsetTop` against
   the body's.

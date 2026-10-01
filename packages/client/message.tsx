@@ -3,12 +3,17 @@
 // what the reader asks as a `MessageAct`.
 
 import { useSelector } from "@kyneta/react"
-import { entryId, type ToolCallView } from "@pineta/core"
+import {
+  entryId,
+  type ToolCallView,
+  type TranscriptMessage,
+} from "@pineta/core"
 import { readStreamText, type SessionDocHandle } from "@pineta/schema"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
 import { joinWords } from "./column-view.ts"
 import { COPIED, useCopy } from "./copy.ts"
+import { copyText } from "./copy-text.ts"
 import { plural } from "./counts.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 import { MessageText } from "./message-text.tsx"
@@ -96,7 +101,7 @@ function MessageView(p: MessageProps) {
             stream={p.streams[call.id]}
           />
         ))}
-        <Tools id={node.id} onAct={p.onAct} tools={p.tools} />
+        <Tools node={node} onAct={p.onAct} tools={p.tools} />
         {p.about}
         {p.closedBranches.length > 0 && (
           <div className="actions">
@@ -129,29 +134,24 @@ export const Message = memo(MessageView, sameMessageProps)
  * the right.
  */
 function Tools({
-  id,
+  node,
   tools,
   onAct,
 }: {
-  id: string
+  node: TranscriptMessage
   tools: MessageTools
   onAct: (act: MessageAct) => void
 }) {
-  const { copy, edit, branch } = tools
-  if (
-    copy === undefined &&
-    !tools.note &&
-    edit === undefined &&
-    branch === undefined
-  )
+  const { edit, branch } = tools
+  if (!tools.copy && !tools.note && edit === undefined && branch === undefined)
     return null
   return (
     <div className="tools">
-      {copy !== undefined && <CopyButton text={copy} />}
+      {tools.copy && <CopyButton node={node} />}
       {tools.note && (
         <button
           className="note-open"
-          onClick={() => onAct({ kind: "note", entry: entryId(id) })}
+          onClick={() => onAct({ kind: "note", entry: entryId(node.id) })}
           title="open a note on this message, for everyone"
           type="button"
         >
@@ -200,23 +200,23 @@ function Tools({
 }
 
 /**
- * Copies a message's markdown. Where it can't, a press selects the message's
- * rendered text: a message offering copy has text, so it draws a `.text`.
+ * Copies a message's text and tool calls as markdown. Where it can't, a press
+ * selects what the message draws of them: its text and its tool rows.
  */
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ node }: { node: TranscriptMessage }) {
   const { copied, copy } = useCopy()
   return (
     <button
       aria-label="copy this message"
       className="copy"
       onClick={e =>
-        copy(
-          text,
-          e.currentTarget.closest(".msg")?.querySelector(":scope > .text") ??
-            null,
-        )
+        copy(copyText(node), [
+          ...(e.currentTarget
+            .closest(".msg")
+            ?.querySelectorAll(":scope > .text, :scope > .tool") ?? []),
+        ])
       }
-      title={copied ? COPIED : "copy this message's markdown"}
+      title={copied ? COPIED : "copy this message as markdown"}
       type="button"
     >
       {copied ? "✓" : <CopyIcon />}

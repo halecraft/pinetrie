@@ -682,7 +682,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the row has no copy",
     file: "packages/client/message.tsx",
-    from: "      {copy !== undefined && <CopyButton text={copy} />}",
+    from: "      {tools.copy && <CopyButton node={node} />}",
     to: "",
     command: browser,
     expect: "a message's tools are one row",
@@ -690,10 +690,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "copy puts the drawn text on the clipboard",
     file: "packages/client/message.tsx",
-    from: "          text,",
-    to: '          e.currentTarget.closest(".msg")?.querySelector(":scope > .text")?.textContent ?? "",',
+    from: "        copy(copyText(node), [",
+    to: '        copy(e.currentTarget.closest(".msg")?.querySelector(":scope > .text")?.textContent ?? "", [',
     command: browser,
     expect: "copy puts a message's markdown on the clipboard",
+  },
+  {
+    name: "copy leaves out a message's tool calls",
+    file: "packages/client/message.tsx",
+    from: "        copy(copyText(node), [",
+    to: "        copy(node.text, [",
+    command: browser,
+    expect: "a message that only called a tool copies the call and its output",
   },
   {
     name: "with no clipboard, copy does nothing",
@@ -706,8 +714,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a row holding only copy is not drawn",
     file: "packages/client/message.tsx",
-    from: "    copy === undefined &&\n    !tools.note &&",
-    to: "    !tools.note &&",
+    from: "  if (!tools.copy && !tools.note && edit === undefined && branch === undefined)",
+    to: "  if (!tools.note && edit === undefined && branch === undefined)",
     command: browser,
     expect: "no tools that write, and copy",
   },

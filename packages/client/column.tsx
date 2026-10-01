@@ -833,7 +833,7 @@ function Bookmark({ name }: { name: string }) {
   return (
     <button
       className="offer-bookmark"
-      onClick={e => copy(name, e.currentTarget)}
+      onClick={e => copy(name, [e.currentTarget])}
       title={copied ? COPIED : "copy the bookmark, to find it in jj"}
       type="button"
     >

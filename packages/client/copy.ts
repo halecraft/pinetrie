@@ -9,13 +9,14 @@ export const COPIED = "copied"
  * Copies text to the clipboard. `copied` is true for 2s after a copy. The
  * clipboard exists only in a secure context, which an invite link over plain
  * http is not: there, or when the clipboard refuses, a press selects
- * `fallback`'s contents for the reader to copy. The test is for `writeText`,
+ * `fallback`, from the start of its first element to the end of its last, for
+ * the reader to copy. The test is for `writeText`,
  * not `isSecureContext`, since the browser suite can hide the one (S68) but
  * not the other.
  */
 export function useCopy(): {
   readonly copied: boolean
-  readonly copy: (text: string, fallback: Element | null) => void
+  readonly copy: (text: string, fallback: readonly Element[]) => void
 } {
   const [copied, setCopied] = useState(false)
   useEffect(() => {
@@ -23,7 +24,7 @@ export function useCopy(): {
     const t = setTimeout(() => setCopied(false), 2_000)
     return () => clearTimeout(t)
   }, [copied])
-  const copy = (text: string, fallback: Element | null) => {
+  const copy = (text: string, fallback: readonly Element[]) => {
     const clipboard = navigator.clipboard as Clipboard | undefined
     if (clipboard?.writeText === undefined) return selectContents(fallback)
     clipboard.writeText(text).then(
@@ -34,10 +35,13 @@ export function useCopy(): {
   return { copied, copy }
 }
 
-function selectContents(el: Element | null): void {
-  if (el === null) return
+function selectContents(els: readonly Element[]): void {
+  const first = els[0]
+  const last = els.at(-1)
+  if (first === undefined || last === undefined) return
   const range = document.createRange()
-  range.selectNodeContents(el)
+  range.setStartBefore(first)
+  range.setEndAfter(last)
   const selection = window.getSelection()
   selection?.removeAllRanges()
   selection?.addRange(range)

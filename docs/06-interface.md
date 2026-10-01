@@ -346,9 +346,10 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **A message's tools are one row** over its top right, shown on hover or
   focus (ADR-0043): *copy* first, then *note*, *edit*, and `→` last, in the
   right margin, since what it opens appears to the right. Copy puts the
-  message's markdown on the clipboard, as it was written, and shows a check
-  for two seconds; over plain http, which has no clipboard, it selects the
-  message's text for you to copy. Beneath a message stay only its notes
+  message on the clipboard as markdown: its text as it was written, then
+  each tool call it made, the command or path and its whole output. It
+  shows a check for two seconds; over plain http, which has no clipboard,
+  it selects the message's text and tool rows for you to copy. Beneath a message stay only its notes
   and the buttons of branches no column shows.
 - **Edit sends a person's message again, changed or not**, as a sibling: a
   branch at its parent whose composer holds its text as sent. The original

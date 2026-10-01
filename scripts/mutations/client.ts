@@ -12,6 +12,7 @@ const tabState = "packages/client/tab-state.ts"
 const reorder = "packages/client/reorder.ts"
 const columnView = "packages/client/column-view.ts"
 const tools = "packages/client/message-tools.ts"
+const copyText = "packages/client/copy-text.ts"
 
 export const mutations: readonly Mutation[] = [
   {
@@ -781,17 +782,49 @@ export const mutations: readonly Mutation[] = [
     name: "a read-only column offers no copy",
     file: tools,
     from: "    return { copy, note: false, edit: undefined, branch: undefined }",
-    to: "    return { copy: undefined, note: false, edit: undefined, branch: undefined }",
+    to: "    return { copy: false, note: false, edit: undefined, branch: undefined }",
     command: unit,
     expect: "a column that can't be written offers only copy",
   },
   {
-    name: "a message that only called tools offers copy",
+    name: "a message that only called tools offers no copy",
     file: tools,
-    from: '  const copy = node.text === "" ? undefined : node.text',
-    to: "  const copy = node.text",
+    from: '  const copy = node.text !== "" || (node.toolCalls?.length ?? 0) > 0',
+    to: '  const copy = node.text !== ""',
     command: unit,
-    expect: "copy is the message's markdown",
+    expect: "offered for a message with text or tool calls",
+  },
+  {
+    name: "copy leaves out a call's output",
+    file: copyText,
+    from: '  return result === "" ? head :',
+    to: "  return true ? head :",
+    command: unit,
+    expect: "then each call",
+  },
+  {
+    name: "copy cuts a long label",
+    file: copyText,
+    from: "  const label = call.wholeLabel ?? call.label",
+    to: "  const label = call.label",
+    command: unit,
+    expect: "a cut label is copied whole",
+  },
+  {
+    name: "the longest backtick run, found by spreading every run",
+    file: copyText,
+    from: "  return (text.match(/`+/g) ?? []).reduce(",
+    to: "  return Math.max(0, ...(text.match(/`+/g) ?? []).map(r => r.length)); (text.match(/`+/g) ?? []).reduce(",
+    command: unit,
+    expect: "more backtick runs than a call takes arguments",
+  },
+  {
+    name: "a fence as short as the backticks inside it",
+    file: copyText,
+    from: "Math.max(3, longestTicks(text) + 1)",
+    to: "3",
+    command: unit,
+    expect: "no backticks inside close the code",
   },
   {
     name: "→ in agent work opens a branch with nothing typed",

@@ -2523,7 +2523,12 @@ try {
       userConfig: path.join(work, "no-user-config.json"),
       log: () => {},
     })
-    const ip = await browser.newPage()
+    // It may use the clipboard, for copy's check (S68).
+    const ip = await (
+      await browser.newContext({
+        permissions: ["clipboard-read", "clipboard-write"],
+      })
+    ).newPage()
     await asPerson(ip, "ida@browser.test", "Ida")
     try {
       await ip.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
@@ -2584,6 +2589,26 @@ try {
           !capped.text,
         `a read image opens its row capped, drawn in place of its caption (${JSON.stringify(capped)})`,
       )
+      // The message holds only the call, and copy takes the call and its output.
+      const caller = `${col(0)} .msg:has(> .tool[data-tool="read"])`
+      await ip.hover(caller)
+      await ip.click(`${caller} > .tools > .copy`)
+      const copied = await ip
+        .waitForFunction(
+          async () => (await navigator.clipboard.readText()) !== "",
+          undefined,
+          { timeout: 5_000 },
+        )
+        .then(
+          () => ip.evaluate(() => navigator.clipboard.readText()),
+          () => "",
+        )
+      ok(
+        copied.startsWith(
+          "`read tall.png`\n\n```\nRead image file [image/png]",
+        ),
+        `a message that only called a tool copies the call and its output (${JSON.stringify(copied)})`,
+      )
       await ip.click(`${row} summary`)
       const full = await drawn()
       ok(
@@ -2601,7 +2626,7 @@ try {
         `folded, it stays folded when another message arrives (${after})`,
       )
     } finally {
-      await ip.close()
+      await ip.context().close()
       await imageHost.shutdown()
     }
   }

@@ -34,10 +34,11 @@ export type MessageEdit =
 
 export interface MessageTools {
   /**
-   * What copy puts on the clipboard: the message's markdown, as stored. None
-   * for a message that only called tools.
+   * Copy its text and tool calls: it has one or the other. What is copied is
+   * built on a press (`copyText`), not here, or every build of a column's
+   * list would join every call's output.
    */
-  readonly copy: string | undefined
+  readonly copy: boolean
   /** Open a note about it. */
   readonly note: boolean
   readonly edit: MessageEdit | undefined
@@ -77,7 +78,7 @@ export function messageTools(
   },
 ): MessageTools {
   // Copying only reads, so a column that can't be written offers it too.
-  const copy = node.text === "" ? undefined : node.text
+  const copy = node.text !== "" || (node.toolCalls?.length ?? 0) > 0
   if (!at.writable)
     return { copy, note: false, edit: undefined, branch: undefined }
   return {

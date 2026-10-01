@@ -128,22 +128,21 @@ describe("→", () => {
 })
 
 describe("copy", () => {
-  test("copy is the message's markdown, and none for one that only called tools", () => {
-    expect(tools(chat("@ada **look** at `x`", false)).copy).toBe(
-      "@ada **look** at `x`",
-    )
-    expect(tools({ id: "5-m", role: "assistant", text: "## done" }).copy).toBe(
-      "## done",
-    )
+  test("offered for a message with text or tool calls, and none with neither", () => {
+    const call = { id: "c", name: "bash", label: "bash ls" }
+    expect(tools(chat("x", false)).copy).toBe(true)
+    expect(
+      tools({ id: "5-m", role: "assistant", text: "", toolCalls: [call] }).copy,
+    ).toBe(true)
     expect(
       tools({ id: "5-m", role: "assistant", text: "", toolCalls: [] }).copy,
-    ).toBeUndefined()
+    ).toBe(false)
   })
 })
 
 test("a column that can't be written offers only copy", () => {
   expect(tools(chat("x", true), { writable: false })).toEqual({
-    copy: "x",
+    copy: true,
     note: false,
     edit: undefined,
     branch: undefined,
