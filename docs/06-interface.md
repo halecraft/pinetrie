@@ -107,7 +107,8 @@ ever in the context of another. That is where the screen splits.
   tab.
 - **A tab shows what happens in it while you are elsewhere:** a pulse while the
   agent is working there, and small avatars of the others reading there. For
-  the roots you have not opened, the header shows the same.
+  the roots you have not opened, the header shows the same. A small dot in
+  your colour marks a tab holding something you typed and have not sent.
 - **Archive is in a tab's `⋯` menu**, saying what it does: "hide for
   everyone; restore from Archive". The `⋯` shows on the tab you are on, and on
   any other root tab while it is hovered or focused. Archive is for work that
@@ -357,6 +358,12 @@ The rail is E; the column is T. Seeing both at once is the product.
   composer, headed "Ada's draft · with Bea", and can type in any of them and
   send it. A card sent by someone other than its owner is the sender's
   message, "with" the others who wrote in it.
+- **Marks say where you left something unsent** (ADR-0048): a small dot in
+  your colour on its tab, and on the rail at its thread's end, whether or not
+  that thread's column is open. A root whose tab you closed is marked on the
+  Archive tab and its row. Only your own cards count, and only while they
+  hold text: emptied, sent or discarded, the dot goes. A bare `@agent ` is
+  nothing typed.
 - **Sending spends the card.** The box stays as it was until the host
   answers: written, running or waiting, the card is gone and the box empty; a
   conflict or a refusal leaves the card, so nothing is lost or put back.

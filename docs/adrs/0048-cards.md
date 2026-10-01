@@ -1,7 +1,8 @@
 # ADR-0048 — Everything unsent is a card, and a card stays where you put it
 
-**Status:** Accepted. Evidence: S58. Step 1, the drafting card, implemented by
-`PLAN-2026-09-30-drafting-card`: shared drafts and "compose together" are
+**Status:** Accepted. Evidence: S58. Step 2, marks for your unsent cards,
+implemented by `PLAN-2026-09-30-card-marks`. Step 1, the drafting card,
+implemented by `PLAN-2026-09-30-drafting-card`: shared drafts and "compose together" are
 withdrawn from ADR-0025, ADR-0023 gains "tabs write cards", and ADR-0037
 gains "the host writes down each seat's person". The later steps would
 supersede the rest of ADR-0025 (notes), and amend ADR-0026 (queued notes
@@ -10,7 +11,9 @@ fixed line about pinned cards in the prompt). They also replace the
 inventory in `PLAN-2026-09-27-fold`, and Phases 2–7 of
 `PLAN-2026-09-29-branch-prefill-and-composers`. Amended by ADR-0052: Cmd+Z
 in a card undoes only that card's steps, never the tab's last step
-wherever it is, and undoing a move first shows where it acts.
+wherever it is, and undoing a move first shows where it acts. Who contributed to a card is
+a projection of its history (step 6); step 1's attribution from the text's
+operations is provisional until then.
 
 **Context.**
 
@@ -176,7 +179,11 @@ it stays open while you work in them.
   can type in it. Who wrote in a card is read from its operations: each
   carries its seat's `clientID`, and the host writes a record of each seat's
   person as it connects (`pineta.seat`), so anyone can name a card's writers
-  after they have left (S58). Nobody stores a contributors list.
+  after they have left (S58). Nobody stores a contributors list. *This is
+  provisional:* it reports whoever's operations the text holds, which undo
+  does not change. From step 6, who contributed is a projection of the
+  card's history (below), and it replaces this for the heading, a sent
+  message's "with", and marks.
 - **Anyone can move a card in a shared place.** Only your drawer is yours
   alone, so nobody is locked out because you put something somewhere.
 - **A trace** stays where your card was when someone else moved it: "Bea sent
@@ -197,10 +204,19 @@ it stays open while you work in them.
   stopped, taken, sent. That is its provenance, reached from the card and
   from a trace. Someone taking your card into their drawer is recorded there,
   not notified.
+- **Who contributed to a card is a projection of its history**: each edit,
+  a deletion as much as typing, and each undo and redo, by its author. A
+  person contributed while any edit of theirs still stands, so undoing every
+  edit you made removes you, and redo brings you back. No client can keep
+  this as a cache: each tab undoes on its own (ADR-0052), so only the
+  history knows what still stands across tabs and devices. It lasts as long
+  as the card. Open for step 6: whether someone else editing away all your
+  text, rather than your undoing it, removes you.
 
 *Closing a column.*
 - **A thread's column:** closing it moves nothing. Its cards stay on the
-  thread, others still see them, and your tab's mark shows they are there.
+  thread, others still see them, and your tab's mark and the rail's show
+  they are there.
 - **A fresh column** (an unsent branch, a new tab) has no thread until its
   first message is sent, so its cards have no shared place and nobody else
   sees them. Closing one that holds a card with text asks **keep in drawer**
@@ -209,8 +225,17 @@ it stays open while you work in them.
   everything. Until the drawer exists, closing asks only **discard**, which
   is final: an undone discard would bring back a card no column shows.
 
-*Marks.* A root tab and a column are marked when they hold your unsent cards.
-Only yours: it answers "where was I?", and is not a busy indicator. A card is
+*Marks.* A root tab is marked when it holds an unsent card of yours with
+text, and so is the thread's end on the rail, whether the thread's column is
+open, scrolled away or closed: a drafting card sits after its thread's last
+message, and the rail shows every thread. A column itself is not marked,
+since its composer shows the text when it is on screen. A root with no tab in
+your bar, closed or archived, is marked on the Archive tab and its row.
+Drafting and fresh cards count; a card counts by its text, not its record.
+Only yours: it answers "where was I?", and is not a busy indicator. Yours is
+the cards you own, and from step 6 also every card you contributed to (a
+projection of its history, below), so you can follow a card you helped
+write. A card is
 marked when someone else edited or stopped it, when its thread moved on since
 you wrote it, and when a reminder on it is due.
 
@@ -332,7 +357,8 @@ and a pinned card can quote one.
      cards, the take/stop race;
   4. the drawer: grid, take and put, drag, keys;
   5. several cards per place, and pinned cards read by the agent;
-  6. traces and card history;
+  6. traces and card history, and who contributed, projected from it (for
+     marks, a card's heading and a sent message's "with");
   7. queue control: staging, reordering, stops;
   8. later: reminders (drawer cards that light up when due and reach your `@`
      inbox, separate from the queue), conditions on queued cards (ADR-0026),

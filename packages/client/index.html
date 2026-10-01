@@ -84,6 +84,15 @@
       .here-count { position: absolute; top: -9px; left: 7px; font-size: 9px; line-height: 1;
         color: #ddd; pointer-events: none; }
       @keyframes pulse { 50% { transform: scale(1.8); } }
+      /* An unsent card of yours (ADR-0048): a round pip in your colour, with a
+         dark ring so it reads against a tab or a track. Round, unlike a
+         note's square dot. */
+      .card-pip { display: inline-block; flex: 0 0 auto; width: 6px; height: 6px;
+        border-radius: 50%; box-shadow: 0 0 0 1.5px #14161a; }
+      /* On a rail dot: its lower right, clear of .here-count above it. */
+      .rail-dot > .card-pip { position: absolute; left: 6px; top: 5px; width: 5px; height: 5px; }
+      .archive-row { position: relative; }
+      .archive-row > .card-pip { position: absolute; top: .6rem; right: .5rem; }
       #strip { flex: 1; display: flex; overflow-x: auto; min-width: 0; }
 
       /* A column is its thread, and while you review its offer, the review

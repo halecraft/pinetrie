@@ -5,8 +5,9 @@ import { listOf, plural } from "./counts.ts"
 
 /**
  * The messages this view draws on their own, never inside a run: notes'
- * messages, thread ends someone else follows, running lanes' tips, and each
- * open column's end. A column's end is kept because a pinned column can end
+ * messages, thread ends someone else follows, running lanes' tips, each open
+ * column's end, and each thread end holding a card of yours, whose dot
+ * carries its mark. A column's end is kept because a pinned column can end
  * mid-stretch: inside a run, half of it would be on the column's path and half
  * not, and where the column ends would not show.
  */
@@ -17,8 +18,10 @@ export function railKeep(input: {
   readonly activity: readonly AgentRun[]
   /** Each open column's end (`ColumnView.tipId`). */
   readonly ends: Iterable<string | null>
+  /** Thread ends holding a card of yours (`CardMarks.ends`). */
+  readonly cards: ReadonlySet<string>
 }): ReadonlySet<string> {
-  const keep = new Set([...input.notes, ...input.rings.keys()])
+  const keep = new Set([...input.notes, ...input.rings.keys(), ...input.cards])
   for (const run of input.activity) keep.add(run.tip)
   for (const end of input.ends) if (end !== null) keep.add(end)
   return keep

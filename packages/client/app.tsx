@@ -35,6 +35,7 @@ import {
   readParticipantNames,
 } from "@pineta/reads"
 import {
+  type ComponentProps,
   StrictMode,
   useEffect,
   useLayoutEffect,
@@ -47,6 +48,7 @@ import { createRoot } from "react-dom/client"
 import { placement } from "./align.ts"
 import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
+import { cardMarks } from "./card-marks.ts"
 import { Column, type ColumnProps } from "./column.tsx"
 import { type Column as ColumnSpec, isPinned, type Prefill } from "./columns.ts"
 import type { ReadOnly } from "./composer.tsx"
@@ -86,6 +88,7 @@ import { connectSession, type SessionClient } from "./session-view.ts"
 import { deviceState, tabState } from "./tab-state.ts"
 import { TabBar } from "./tabs.tsx"
 import { useColumnDrag } from "./use-column-drag.ts"
+import { useFilledCards } from "./use-filled-cards.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { useReveal } from "./use-reveal.ts"
@@ -355,6 +358,22 @@ function App({ session }: { session: SessionClient }) {
     [index, nameOf],
   )
   const colorOf = useMemo(() => presenceColors(order), [order])
+  // Where your unsent cards are (ADR-0048, step 2): your cards that hold
+  // text, read from their texts, since a record outlives its text.
+  const mine = useMemo(
+    () => cards.filter(c => c.owner === session.writer),
+    [cards, session.writer],
+  )
+  const filled = useFilledCards(session, mine)
+  const unsent = useMemo(
+    () =>
+      cardMarks({ me: session.writer, cards, filled, layout, lanes, index }),
+    [session.writer, cards, filled, layout, lanes, index],
+  )
+  const yours = useMemo(
+    () => ({ ends: unsent.ends, color: colorOf(session.writer) }),
+    [unsent.ends, colorOf, session.writer],
+  )
   // Each column's end, for the rail: one array while the views are the same.
   const ends = useMemo(() => views.map(v => v.tipId), [views])
 
@@ -555,6 +574,7 @@ function App({ session }: { session: SessionClient }) {
         root={r}
         shared={shared}
         noteEntries={noteEntries}
+        yours={yours}
       />
     )
   }
@@ -638,6 +658,7 @@ function App({ session }: { session: SessionClient }) {
             order={order}
             session={session}
             tabs={tabBar(layout)}
+            unsent={unsent}
             work={work}
           />
           <main id="workspace">
@@ -645,6 +666,7 @@ function App({ session }: { session: SessionClient }) {
               <ArchiveTab
                 filter={archiveFilter}
                 labelOf={labelOf}
+                myColor={yours.color}
                 nameOf={nameOf}
                 onFilter={setArchiveFilter}
                 onQuery={setArchiveQuery}
@@ -660,6 +682,7 @@ function App({ session }: { session: SessionClient }) {
                   filter: archiveFilter,
                   query: archiveQuery,
                   me: session.writer,
+                  cardRoots: unsent.roots,
                 })}
                 selected={archivePick}
               />
@@ -688,6 +711,7 @@ function App({ session }: { session: SessionClient }) {
                     open={shown}
                     rows={rail}
                     session={session}
+                    yours={yours}
                   />
                 )}
                 {newTab !== null && <EmptyRail />}
@@ -789,11 +813,14 @@ function Preview({
   root,
   readOnly,
   noteEntries,
+  yours,
   shared,
 }: {
   root: string
   readOnly: ReadOnly
   noteEntries: ReadonlySet<string>
+  /** Thread ends holding a card of yours, for the rail's pips. */
+  yours: ComponentProps<typeof LiveRail>["yours"]
   shared: Omit<
     ColumnProps,
     | "closable"
@@ -844,6 +871,7 @@ function Preview({
         open={path}
         rows={rail}
         session={shared.session}
+        yours={yours}
       />
       <div className="preview-strip" ref={previewStrip}>
         <Column

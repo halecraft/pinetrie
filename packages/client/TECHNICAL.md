@@ -146,6 +146,9 @@ give the roots and each tab's signals.
   keeps its place in the bar (`resolveLayout` keeps it). Its columns are drawn with `readOnly`: the
   composer stays mounted, disabled, so what was typed survives; Restore brings
   it back in place.
+- **`tabOfColumn` is the one lookup from a column's key to its tab**: a new
+  tab's, or a root's whether or not that root is open. The card marks place a
+  fresh card with it.
 - **`columnsOf` is the one place a root gets its first column**
   (`first-<root>`, anchored at the root). `columnsReducer` may leave a root
   with none; the layout then deletes the entry.
@@ -355,7 +358,8 @@ landmark, and a capsule per run of three or more uneventful messages.
 those rows (tab summaries, archive search, `branchColors`).
 
 - **`compactRail` (core) is the rule; `railKeep` (`rail-view.ts`) is the
-  view's part of it:** notes, rings, running tips and every open column's end.
+  view's part of it:** notes, rings, running tips, every open column's end,
+  and every thread end holding a card of yours, whose dot carries its mark.
   A column's end is kept because a pinned column can end mid-stretch: inside a
   run, half of it would be on the column's path, and where the column ends
   would not show. So a run is all on an open path or all off it, and
@@ -940,10 +944,43 @@ empty ones when it starts (S58).
   unbound.
 - **Who wrote in a card** is `writersOf(textClients(cardText), seats)`: its
   Yjs `clientID`s, through the host's seat records (`readSessionFacts`
-  reads them).
+  reads them). Provisional (ADR-0048): undo does not remove a `clientID`, so
+  someone who undid everything they wrote is still named. Step 6 replaces it
+  with a projection of the card's history; marks do not use it.
 - **Closing a fresh column that holds text** asks in its header; discard
   deletes the record outside the undo stack, since no column could show it
   again.
+
+## Marks for your cards (ADR-0048, step 2)
+
+A pip in your colour (`CardPip`, `.card-pip`, the one selector the suites
+use) marks where an unsent card of yours holds text: its root's tab or its
+new tab, the rail dot at a drafting card's thread end, and, for a root with no
+tab in your bar, the Archive tab and the root's row.
+
+- **`cardMarks` (`card-marks.ts`) decides, purely,** from your cards, the
+  ones holding text, the layout, the lanes and the index. A drafting card is
+  placed by `cardEnd` and `rootOf`; a fresh card by `tabOfColumn`, so one
+  typed in another browser tab or device, whose layout this one lacks, marks
+  nothing until the drawer (step 4) collects it.
+- **The marks read text, not records:** a record outlives its text (an
+  emptied card stays until sent or swept). `holdsText` is `needsCard` with
+  the one blank prefill, `AGENT_PREFILL`, so a bare `@agent ` is nothing,
+  in any card.
+- **`useFilledCards` reads the texts**, through `cardText` (`get`, never
+  Kyneta's `open`: the browser keeps no store, so a card typed elsewhere
+  would never open). It is a subscription of its own, an exception to
+  "every subscription is `useSelector`": `useTracked` compares no values,
+  and would render `App` on every keystroke. Each change goes through
+  `withFilled`, which returns the same set unless a card flips between empty
+  and not, and React skips a render for the same state.
+- **A thread's mark is on the rail, never on its column.** On screen, the
+  column's composer shows the text; scrolled away or closed, the column
+  cannot show a mark, and the rail shows every thread. `railKeep` keeps the
+  marked ends out of runs, so a mark is always on a dot.
+- **Only your own cards count.** Cards you contributed to wait for step 6,
+  where who contributed is a projection of the card's history and follows
+  undo.
 
 ## Notes (ADR-0025)
 

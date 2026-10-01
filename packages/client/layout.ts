@@ -103,6 +103,20 @@ export function columnsOf(layout: Layout, root: string): readonly Column[] {
   return layout.roots.get(root) ?? [{ key: `first-${root}`, anchor: root }]
 }
 
+/**
+ * The tab a column is in, by its key: a new tab's, or a root's, whether or not
+ * that root's tab is open. Undefined for a key this layout does not hold.
+ */
+export function tabOfColumn(
+  layout: Layout,
+  key: string,
+): ActiveTab | undefined {
+  if (layout.newTabs.some(c => c.key === key)) return { kind: "new", key }
+  for (const [root, columns] of layout.roots)
+    if (columns.some(c => c.key === key)) return { kind: "root", root }
+  return undefined
+}
+
 export const sameTab = (a: ActiveTab | null, b: ActiveTab): boolean =>
   a !== null &&
   a.kind === b.kind &&

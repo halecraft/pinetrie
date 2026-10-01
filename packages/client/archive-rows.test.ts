@@ -66,10 +66,19 @@ const rows = (filter: ArchiveFilter, query = "", me = ADA) =>
     filter,
     query,
     me,
+    cardRoots: new Set(["3-r3"]),
   })
 const ids = (r: ReturnType<typeof rows>) => r.map(x => x.summary.root)
 
 describe("archiveIndex", () => {
+  test("a row holds your card exactly when its root does", () => {
+    expect(rows("all").map(r => [r.summary.root, r.card])).toEqual([
+      ["1-r1", false],
+      ["3-r3", true],
+      ["2-r2", false],
+    ])
+  })
+
   test("every root, newest activity first, with its record and note count", () => {
     const all = rows("all")
     expect(ids(all)).toEqual(["1-r1", "3-r3", "2-r2"])

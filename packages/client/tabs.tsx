@@ -4,7 +4,8 @@
 // Your tabs are yours: the roots you have opened, in that order. × closes one
 // for you and writes nothing. In its ⋯, Rename titles a root for everyone
 // (ADR-0045), and Archive hides it for everyone. A root someone else starts
-// opens no tab here.
+// opens no tab here. A tab holding an unsent card of yours carries a pip, and so
+// does Archive when such a root has no tab here (ADR-0048, `cardMarks`).
 
 import { MAX_TITLE, type TreeIndex, type WriterId } from "@pineta/core"
 import { ROOT_BUSY_REASON } from "@pineta/marginalia"
@@ -16,6 +17,8 @@ import {
   useRef,
   useState,
 } from "react"
+import type { CardMarks } from "./card-marks.ts"
+import { CardPip } from "./card-pip.tsx"
 import { peopleHere, readersByRoot } from "./here.ts"
 import { type ActiveTab, sameTab } from "./layout.ts"
 import { Menu } from "./menu.tsx"
@@ -45,6 +48,7 @@ export function TabBar({
   newLabel,
   archived,
   work,
+  unsent,
   session,
   index,
   order,
@@ -69,6 +73,8 @@ export function TabBar({
   archived: ReadonlySet<string>
   /** The agent's work in each root (`rootWork`). */
   work: ReadonlyMap<string, "running" | "waiting">
+  /** Where your unsent cards are: a pip on each tab holding one (`cardMarks`). */
+  unsent: CardMarks
   /** Whose presence a root tab shows: others reading in it. */
   session: SessionClient
   index: TreeIndex
@@ -89,6 +95,7 @@ export function TabBar({
   onRename: (root: string, title: string | null) => void
   onAdd: (asksAgent: boolean) => void
 }) {
+  const pip = <CardPip color={colorOf(session.writer)} />
   // The root whose tab is a title field now. Never stored.
   const [renaming, setRenaming] = useState<string | null>(null)
   // The root whose tab takes focus once its field has gone.
@@ -124,6 +131,8 @@ export function TabBar({
                 type="button"
               >
                 Archive
+                {/* A root holding your card has no tab of its own. */}
+                {unsent.elsewhere && pip}
               </button>
             )
           if (tab.kind === "new")
@@ -139,6 +148,7 @@ export function TabBar({
                   type="button"
                 >
                   {newLabel(tab.key)}
+                  {unsent.newTabs.has(tab.key) && pip}
                 </button>
                 <button
                   aria-label="close this new thread; nothing has been written"
@@ -186,6 +196,7 @@ export function TabBar({
                 type="button"
               >
                 <span className="tab-label">{labelOf(root)}</span>
+                {unsent.roots.has(root) && pip}
                 <Readers
                   colorOf={colorOf}
                   index={index}

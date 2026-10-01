@@ -9,6 +9,7 @@ import {
   type ArchiveFilter,
   type ArchiveRow,
 } from "./archive-rows.ts"
+import { CardPip } from "./card-pip.tsx"
 import { plural } from "./counts.ts"
 import { nameFor } from "./presence.tsx"
 
@@ -31,6 +32,7 @@ export function ArchiveTab({
   onSelect,
   labelOf,
   nameOf,
+  myColor,
   preview,
 }: {
   /** `archiveIndex` over the filter and query below. */
@@ -43,6 +45,8 @@ export function ArchiveTab({
   onSelect: (root: string) => void
   labelOf: (root: string) => string
   nameOf: ReadonlyMap<WriterId, string>
+  /** Your colour, for the pip on a row holding a card of yours. */
+  myColor: string
   /** The selected root, read-only: its rail and one column. */
   preview: (root: string) => ReactNode
 }) {
@@ -105,6 +109,7 @@ export function ArchiveTab({
                     · {plural(row.summary.messages, "message")}
                     {row.notes > 0 && ` · ${plural(row.notes, "note")}`}
                   </span>
+                  {row.card && <CardPip color={myColor} />}
                 </button>
               </li>
             )

@@ -4063,6 +4063,86 @@ try {
       asks && closed && readCards(host.cards).length === cardsBefore - 1,
       "closing a new branch that holds text asks first, and discarding removes its card",
     )
+    // Marks (ADR-0048, step 2): a pip where a card of yours holds text.
+    const pipIn = (p: typeof page, sel: string) =>
+      p.waitForSelector(`${sel} .card-pip`, { timeout: 5_000 }).then(
+        () => true,
+        () => false,
+      )
+    const pipGone = (p: typeof page, sel: string) =>
+      p
+        .waitForFunction(
+          s => document.querySelector(`${s} .card-pip`) === null,
+          sel,
+          { timeout: 5_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+    await page.click(box)
+    await page.keyboard.type("where was I")
+    await page.click(tabSel(downRoot))
+    const tabMarked = await pipIn(page, tabSel(here))
+    const otherBare =
+      (await page.locator(`${tabSel(downRoot)} .card-pip`).count()) === 0
+    await page.click(tabSel(here))
+    const markedEnd = await page
+      .locator(`${col(0)} .msg[data-entry]`)
+      .last()
+      .getAttribute("data-entry")
+    const railDot = `.rail-dot[data-entry="${markedEnd}"]`
+    const railMarked = await pipIn(page, railDot)
+    ok(
+      tabMarked && otherBare && railMarked,
+      `a card of yours with text marks its root's tab and its thread's end on the rail (tab ${tabMarked}, other tab bare ${otherBare}, rail ${railMarked})`,
+    )
+    // Sam sees Ada's card above his composer, and no mark: it is not his.
+    const samSees = await hasValue(second, theirs, "where was I")
+    ok(
+      samSees &&
+        (await second.locator(`${tabSel(here)} .card-pip`).count()) === 0,
+      "someone else's card marks nothing for you",
+    )
+    // Emptied, the card's record stays, and the marks go: they read its text.
+    const records = readCards(host.cards).length
+    await page.focus(box)
+    await page.keyboard.press("ControlOrMeta+a")
+    await page.keyboard.press("Backspace")
+    const unmarked =
+      (await pipGone(page, tabSel(here))) && (await pipGone(page, railDot))
+    ok(
+      unmarked && readCards(host.cards).length === records,
+      `a card emptied marks nothing, though its record stays (${unmarked}; ${readCards(host.cards).length} records, ${records} before)`,
+    )
+    // A root whose tab you closed is marked in the Archive tab and its row.
+    await page.keyboard.type("back tomorrow")
+    await pipIn(page, tabSel(here))
+    const columnsHere = await page.locator(".column").count()
+    await page.click(`${tabSel(here)} ~ .tab-close`)
+    const archiveMarked = await pipIn(page, "#tabs .tab-archive")
+    await page.click("#tabs .tab-archive")
+    const rowMarked = await pipIn(page, `.archive-row[data-root="${here}"]`)
+    await openFromArchive(page, here)
+    const columnsBack = await page
+      .waitForFunction(
+        n => document.querySelectorAll(".column").length === n,
+        columnsHere,
+        { timeout: 15_000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      )
+    ok(
+      archiveMarked && rowMarked && columnsBack,
+      `a closed root holding your card marks the Archive tab and its row, and comes back as it was (tab ${archiveMarked}, row ${rowMarked}, columns ${columnsBack})`,
+    )
+    // Empty again, so what follows starts from an empty box.
+    await page.focus(box)
+    await page.keyboard.press("ControlOrMeta+a")
+    await page.keyboard.press("Backspace")
+    await pipGone(page, tabSel(here))
     await page.click(".notes-toggle")
     // The whole index shows, over the columns: its middle is its own, not a
     // column's drawn over it, and it is wider than the rail.

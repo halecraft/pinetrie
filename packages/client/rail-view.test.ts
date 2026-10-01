@@ -2,14 +2,15 @@ import { laneNameForThread, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
 import { pickAt, railKeep, runFill, runLabel } from "./rail-view.ts"
 
-test("railKeep: notes, rings, running tips and open columns' ends", () => {
+test("railKeep: notes, rings, running tips, open columns' ends and your cards' ends", () => {
   const keep = railKeep({
     notes: new Set(["n"]),
     rings: new Map([["r", []]]),
     activity: [{ lane: laneNameForThread("s"), tip: "t" }],
     ends: ["e", null],
+    cards: new Set(["c"]),
   })
-  expect([...keep].sort()).toEqual(["e", "n", "r", "t"])
+  expect([...keep].sort()).toEqual(["c", "e", "n", "r", "t"])
 })
 
 test("runLabel: each part that is not zero, people named", () => {

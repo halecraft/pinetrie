@@ -15,6 +15,9 @@ import type { Prefill } from "./columns.ts"
 /** The mention that asks the agent, as a composer starts with it. */
 const AGENT_PREFIX = `@${THE_AGENT} `
 
+/** `@agent ` as a box starts with it: the one blank prefill, nothing typed. */
+export const AGENT_PREFILL: Prefill = { text: AGENT_PREFIX, blank: true }
+
 /** A fresh column to open: a branch at `at`. */
 export interface OpenBranch {
   readonly at: string
@@ -43,7 +46,7 @@ export interface MessageTools {
  * conversation (ADR-0021). Nothing in a conversation.
  */
 export const branchPrefill = (lane: ThreadLane): Prefill | undefined =>
-  lane.kind === "lane" ? { text: AGENT_PREFIX, blank: true } : undefined
+  lane.kind === "lane" ? AGENT_PREFILL : undefined
 
 /** What a reader asked of a message. `Column` carries it out. */
 export type MessageAct =

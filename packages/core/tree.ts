@@ -810,9 +810,10 @@ export const runSpan = (size: number): number => 1 + String(size).length
  * uneventful messages drawn as one run.
  *
  * A row is uneventful when it is none of: in `keep` (what the view needs to
- * see: notes, rings, running tips, open columns' ends), the root's first
- * message, a branch's first message, a fork, or a thread end. So a run holds
- * no structure, and the compacted rail has every branch the full one has.
+ * see: notes, rings, running tips, open columns' ends, your cards' ends),
+ * the root's first message, a branch's first message, a fork, or a thread
+ * end. So a run holds no structure, and the compacted rail has every branch
+ * the full one has.
  * An uneventful row's only child is the next row in depth-first order, so a
  * run is a stretch of consecutive rows.
  */

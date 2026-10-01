@@ -27,6 +27,8 @@ export interface ArchiveRow {
   readonly record: ArchiveRecord | null
   /** Notes whose message is in this root. */
   readonly notes: number
+  /** This root holds an unsent card of yours (`CardMarks.roots`). */
+  readonly card: boolean
 }
 
 /**
@@ -45,6 +47,8 @@ export function archiveIndex(input: {
   readonly filter: ArchiveFilter
   readonly query: string
   readonly me: WriterId
+  /** Roots holding an unsent card of yours (`CardMarks.roots`). */
+  readonly cardRoots: ReadonlySet<string>
 }): readonly ArchiveRow[] {
   const { index, archive } = input
   const noteCount = new Map<string, number>()
@@ -81,5 +85,6 @@ export function archiveIndex(input: {
       summary,
       record: archive.get(summary.root) ?? null,
       notes: noteCount.get(summary.root) ?? 0,
+      card: input.cardRoots.has(summary.root),
     }))
 }

@@ -16,6 +16,7 @@ import {
   type WriterId,
 } from "@pineta/core"
 import { type ComponentProps, type CSSProperties, useMemo } from "react"
+import { CardPip } from "./card-pip.tsx"
 import { nameFor } from "./presence.tsx"
 import {
   pickAt,
@@ -74,6 +75,7 @@ export function Rail({
   onPick,
   here,
   notes,
+  yours,
   nameOf,
   notesPanel,
 }: {
@@ -87,6 +89,11 @@ export function Rail({
   here: ReadonlyMap<string, readonly { name: string; color: string }[]>
   /** Messages that are notes' (ADR-0025): drawn as squares. */
   notes: ReadonlySet<string>
+  /**
+   * Thread ends holding an unsent card of yours (`CardMarks.ends`), with your
+   * colour: each dot there carries a pip (ADR-0048).
+   */
+  yours: { readonly ends: ReadonlySet<string>; readonly color: string }
   /** A writer's name, for a capsule's label. */
   nameOf: (writer: WriterId) => string
   /**
@@ -164,6 +171,7 @@ export function Rail({
               id={it.ids[0]}
               key={it.ids[0]}
               noted={notes.has(it.ids[0])}
+              yours={yours.ends.has(it.ids[0]) ? yours.color : null}
               onPick={onPick}
               open={open.has(it.ids[0])}
               people={here.get(it.ids[0]) ?? []}
@@ -211,15 +219,15 @@ export function LiveRail({
       ),
     [reading, names, colorOf],
   )
-  const { notes, activity } = rail
+  const { notes, activity, yours } = rail
   const items = useMemo(
     () =>
       compactRail(
         index,
         rows,
-        railKeep({ notes, rings: here, activity, ends }),
+        railKeep({ notes, rings: here, activity, ends, cards: yours.ends }),
       ),
-    [index, rows, notes, here, activity, ends],
+    [index, rows, notes, here, activity, ends, yours.ends],
   )
   return (
     <Rail {...rail} here={here} items={items} nameOf={w => nameFor(names, w)} />
@@ -257,11 +265,17 @@ function Dot(p: {
   track: number
   open: boolean
   noted: boolean
+  /** Your colour when a card of yours waits at this end; null otherwise. */
+  yours: string | null
   activity: readonly AgentRun[]
   people: readonly { name: string; color: string }[]
   onPick: (id: string) => void
 }) {
   const [first] = p.people
+  const here =
+    p.people.length === 0
+      ? undefined
+      : `here: ${p.people.map(person => person.name).join(", ")}`
   return (
     <button
       aria-label="open this message's thread"
@@ -290,15 +304,18 @@ function Dot(p: {
             : `0 0 0 1.5px ${PANEL}, 0 0 0 3.5px ${first.color}`,
       }}
       title={
-        p.people.length === 0
-          ? undefined
-          : `here: ${p.people.map(person => person.name).join(", ")}`
+        p.yours === null
+          ? here
+          : [here, "your unsent card is here"]
+              .filter(t => t !== undefined)
+              .join(" · ")
       }
       type="button"
     >
       {p.people.length > 1 && (
         <span className="here-count">{p.people.length}</span>
       )}
+      {p.yours !== null && <CardPip color={p.yours} />}
     </button>
   )
 }
