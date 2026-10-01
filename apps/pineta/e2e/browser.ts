@@ -4133,6 +4133,25 @@ try {
       archiveMarked && rowMarked && columnsBack,
       `a closed root holding your card marks the Archive tab and its row, and comes back as it was (tab ${archiveMarked}, row ${rowMarked}, columns ${columnsBack})`,
     )
+    // An archived root's work is done: its card lights its own row, never
+    // the Archive tab. Restored after, for what follows.
+    await chooseFromMenu(page, OWN_MENU, ".archive-root")
+    await page.click(tabSel(downRoot))
+    await page.waitForFunction(
+      r => document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+      here,
+      { timeout: 15_000 },
+    )
+    // The tab leaving and the Archive tab's pip are one render's facts.
+    const archiveBare =
+      (await page.locator("#tabs .tab-archive .card-pip").count()) === 0
+    await page.click("#tabs .tab-archive")
+    const archivedRow = await pipIn(page, `.archive-row[data-root="${here}"]`)
+    await openFromArchive(page, here)
+    ok(
+      archiveBare && archivedRow,
+      `an archived root holding your card marks its row, not the Archive tab (tab bare ${archiveBare}, row ${archivedRow})`,
+    )
     // Empty again, so what follows starts from an empty box.
     await page.focus(box)
     await page.keyboard.press("ControlOrMeta+a")

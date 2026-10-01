@@ -48,7 +48,7 @@ import { createRoot } from "react-dom/client"
 import { placement } from "./align.ts"
 import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
-import { cardMarks } from "./card-marks.ts"
+import { cardMarks, ownCards } from "./card-marks.ts"
 import { Column, type ColumnProps } from "./column.tsx"
 import { type Column as ColumnSpec, isPinned, type Prefill } from "./columns.ts"
 import type { ReadOnly } from "./composer.tsx"
@@ -361,14 +361,30 @@ function App({ session }: { session: SessionClient }) {
   // Where your unsent cards are (ADR-0048, step 2): your cards that hold
   // text, read from their texts, since a record outlives its text.
   const mine = useMemo(
-    () => cards.filter(c => c.owner === session.writer),
+    () => ownCards(session.writer, cards),
     [cards, session.writer],
   )
   const filled = useFilledCards(session, mine)
+  const archivedRoots = useMemo(
+    () =>
+      new Set(
+        [...archive.values()].flatMap(r =>
+          r.state === "archived" ? [r.root as string] : [],
+        ),
+      ),
+    [archive],
+  )
   const unsent = useMemo(
     () =>
-      cardMarks({ me: session.writer, cards, filled, layout, lanes, index }),
-    [session.writer, cards, filled, layout, lanes, index],
+      cardMarks({
+        mine,
+        filled,
+        layout,
+        archived: archivedRoots,
+        lanes,
+        index,
+      }),
+    [mine, filled, layout, archivedRoots, lanes, index],
   )
   const yours = useMemo(
     () => ({ ends: unsent.ends, color: colorOf(session.writer) }),
@@ -629,13 +645,7 @@ function App({ session }: { session: SessionClient }) {
         <>
           <TabBar
             active={active}
-            archived={
-              new Set(
-                [...archive.values()].flatMap(r =>
-                  r.state === "archived" ? [r.root as string] : [],
-                ),
-              )
-            }
+            archived={archivedRoots}
             colorOf={colorOf}
             labelOf={labelOf}
             nameOf={nameOf}

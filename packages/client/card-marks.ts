@@ -1,6 +1,7 @@
 // client/card-marks — where your unsent cards are, as marks (ADR-0048, step
 // 2): on root tabs and new tabs, on the rail at a thread's end, and on the
-// Archive tab for a root with no tab in your bar. They answer "where was I?",
+// Archive tab for a root whose tab you closed. An archived root's work is
+// done, so it lights only its own row, never the Archive tab. They answer "where was I?",
 // so they count only the cards you own (contributors wait for step 6's
 // history). A card counts while it holds text, not while its record exists:
 // a record outlives its text. Pure.
@@ -17,6 +18,15 @@ import { cardEnd } from "@pineta/marginalia"
 import { needsCard } from "./card-state.ts"
 import { type Layout, tabBar, tabOfColumn } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
+
+/**
+ * The cards that are yours, as the marks count them: those you own. Cards you
+ * contributed to wait for step 6's history.
+ */
+export const ownCards = (
+  me: WriterId,
+  cards: readonly CardRecord[],
+): readonly CardRecord[] => cards.filter(c => c.owner === me)
 
 /**
  * Whether a card has something typed in it: what `needsCard` would make a
@@ -50,24 +60,29 @@ export interface CardMarks {
   readonly newTabs: ReadonlySet<string>
   /** Thread ends holding a drafting card of yours: dots on the rail. */
   readonly ends: ReadonlySet<string>
-  /** A root in `roots` has no tab in your bar: the Archive tab is marked. */
+  /**
+   * A root in `roots` has no tab in your bar and is not archived: the
+   * Archive tab is marked.
+   */
   readonly elsewhere: boolean
 }
 
 export function cardMarks(input: {
-  readonly me: WriterId
-  readonly cards: readonly CardRecord[]
+  /** Your cards (`ownCards`). */
+  readonly mine: readonly CardRecord[]
   /** Cards that hold text (`holdsText`), by id. */
   readonly filled: ReadonlySet<CardId>
   readonly layout: Layout
+  /** Roots in state `archived` (ADR-0029). */
+  readonly archived: ReadonlySet<string>
   readonly lanes: readonly LaneView[]
   readonly index: TreeIndex
 }): CardMarks {
   const roots = new Set<string>()
   const newTabs = new Set<string>()
   const ends = new Set<string>()
-  for (const card of input.cards) {
-    if (card.owner !== input.me || !input.filled.has(card.id)) continue
+  for (const card of input.mine) {
+    if (!input.filled.has(card.id)) continue
     switch (card.place.kind) {
       case "drafting": {
         const end = cardEnd(card, input.lanes, input.index)
@@ -94,6 +109,6 @@ export function cardMarks(input: {
     roots,
     newTabs,
     ends,
-    elsewhere: [...roots].some(r => !tabbed.has(r)),
+    elsewhere: [...roots].some(r => !tabbed.has(r) && !input.archived.has(r)),
   }
 }

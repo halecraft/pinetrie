@@ -361,7 +361,8 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **Marks say where you left something unsent** (ADR-0048): a small dot in
   your colour on its tab, and on the rail at its thread's end, whether or not
   that thread's column is open. A root whose tab you closed is marked on the
-  Archive tab and its row. Only your own cards count, and only while they
+  Archive tab and its row; an archived root only on its row, since its work
+  is done. Only your own cards count, and only while they
   hold text: emptied, sent or discarded, the dot goes. A bare `@agent ` is
   nothing typed.
 - **Sending spends the card.** The box stays as it was until the host

@@ -1007,4 +1007,12 @@ export const mutations: readonly Mutation[] = [
     command: browser,
     expect: "a card emptied marks nothing",
   },
+  {
+    name: "the marks are given no archived roots",
+    file: "packages/client/app.tsx",
+    from: "        archived: archivedRoots,",
+    to: "        archived: new Set(),",
+    command: browser,
+    expect: "an archived root holding your card",
+  },
 ]

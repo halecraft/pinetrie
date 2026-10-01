@@ -229,8 +229,10 @@ it stays open while you work in them.
 text, and so is the thread's end on the rail, whether the thread's column is
 open, scrolled away or closed: a drafting card sits after its thread's last
 message, and the rail shows every thread. A column itself is not marked,
-since its composer shows the text when it is on screen. A root with no tab in
-your bar, closed or archived, is marked on the Archive tab and its row.
+since its composer shows the text when it is on screen. A root whose tab you
+closed is marked on the Archive tab and its row. An archived root marks only
+its row: archiving says its work is done, so what is left in it is not
+somewhere you were going back to.
 Drafting and fresh cards count; a card counts by its text, not its record.
 Only yours: it answers "where was I?", and is not a busy indicator. Yours is
 the cards you own, and from step 6 also every card you contributed to (a

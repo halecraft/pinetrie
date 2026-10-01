@@ -10,7 +10,7 @@ import {
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { cardMarks, holdsText, withFilled } from "./card-marks.ts"
+import { cardMarks, holdsText, ownCards, withFilled } from "./card-marks.ts"
 import { initialLayout, type Layout, tabOfColumn } from "./layout.ts"
 
 const ADA = writerId("p-ada")
@@ -60,13 +60,13 @@ const layout: Layout = {
 const marks = (
   cards: readonly CardRecord[],
   filled: readonly string[] = cards.map(c => c.id),
-  over: { layout?: Layout; index?: TreeIndex } = {},
+  over: { layout?: Layout; index?: TreeIndex; archived?: Set<string> } = {},
 ) =>
   cardMarks({
-    me: ADA,
-    cards,
+    mine: ownCards(ADA, cards),
     filled: new Set(filled.map(cardId)),
     layout: over.layout ?? layout,
+    archived: over.archived ?? new Set(),
     lanes: [],
     index: over.index ?? tree(),
   })
@@ -141,13 +141,20 @@ describe("cardMarks", () => {
     expect(sets(marks([drafting("c", "gone")]))).toEqual(none)
   })
 
-  test("elsewhere: a marked root with no tab in your bar", () => {
+  test("elsewhere: a marked root whose tab you closed", () => {
     expect(marks([drafting("c", "g1")]).elsewhere).toBe(true)
     expect(marks([fresh("c", "first-g1")]).elsewhere).toBe(true)
-    // Closed, or archived: either way it left `open`.
     const closed = { ...layout, open: [] }
     expect(
       marks([drafting("c", "e2")], ["c"], { layout: closed }).elsewhere,
     ).toBe(true)
+  })
+
+  test("an archived root marks its row, never the Archive tab", () => {
+    const m = marks([drafting("c", "g1")], ["c"], {
+      archived: new Set(["g1"]),
+    })
+    expect([...m.roots]).toEqual(["g1"])
+    expect(m.elsewhere).toBe(false)
   })
 })

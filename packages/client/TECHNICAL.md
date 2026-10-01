@@ -960,7 +960,9 @@ empty ones when it starts (S58).
 A pip in your colour (`CardPip`, `.card-pip`, the one selector the suites
 use) marks where an unsent card of yours holds text: its root's tab or its
 new tab, the rail dot at a drafting card's thread end, and, for a root with no
-tab in your bar, the Archive tab and the root's row.
+tab in your bar, the root's row in the Archive tab. The Archive tab itself is
+marked only for a root whose tab you closed: an archived root's work is done,
+so it never lights the tab (`elsewhere`).
 
 - **`cardMarks` (`card-marks.ts`) decides, purely,** from your cards, the
   ones holding text, the layout, the lanes and the index. A drafting card is
