@@ -46,9 +46,12 @@ import {
   uploadImage,
 } from "./paste.ts"
 import {
+  placeholderWords,
   planSend,
+  queueWords,
   type Reader,
   sendable,
+  sendButton,
   settleSend,
   whereChoices,
   whereWords,
@@ -91,9 +94,10 @@ const newCardId = (): CardId => {
 
 /**
  * Before sending, the button says what the message will do: who it is for,
- * and whether it will wait (`planSend`, which decides as the host will, over
- * the thread `threadOf` gives, ADR-0021). When the send starts an agent, a
- * chip beside it says where that agent will work, and changes it.
+ * and whether it will wait. `planSend` decides as the host will, over the
+ * thread `threadOf` gives (ADR-0021), and `sendButton` words it. When the send
+ * starts an agent, a chip beside it says where that agent will work, and
+ * changes it.
  *
  * A reply carries the end its sender saw. If another writer's compelled
  * message got there first, or the lane became busy, the host writes nothing
@@ -178,6 +182,11 @@ export function CardEditor(p: {
     participants: p.participants,
     reader: p.reader,
   })
+  const button = sendButton(plan, {
+    uploading: uploading > 0,
+    sending: state.kind === "sending",
+  })
+  const queue = queueWords(plan.queue)
   const [hidden, setHidden] = useState<string | null>(null)
   const [picked, setPicked] = useState(0)
   const matches = hidden === text ? [] : matchCommands(text, p.commands)
@@ -385,10 +394,10 @@ export function CardEditor(p: {
               setConflict(null)
               void send(conflict.text, "queue", cardOf(current.current))
             }}
-            title={plan.queue.title ?? undefined}
+            title={queue.title ?? undefined}
             type="button"
           >
-            {plan.queue.button}
+            {queue.label}
           </button>{" "}
           <button
             className="branch-instead"
@@ -493,7 +502,7 @@ export function CardEditor(p: {
           e.preventDefault()
           void submit()
         }}
-        placeholder={plan.placeholder}
+        placeholder={placeholderWords(plan)}
         readOnly={p.readOnly !== null || state.kind === "sending"}
         ref={box}
         rows={Math.min(8, Math.max(2, text.split("\n").length))}
@@ -524,12 +533,12 @@ export function CardEditor(p: {
             )}
           <button
             className="send"
-            disabled={uploading > 0 || state.kind === "sending"}
+            disabled={button.disabled}
             onClick={() => void submit()}
-            title={plan.title ?? undefined}
+            title={button.title ?? undefined}
             type="button"
           >
-            {uploading > 0 ? "uploading image…" : plan.button}
+            {button.label}
           </button>
         </div>
       )}

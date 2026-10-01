@@ -1,19 +1,26 @@
 import {
+  type Address,
+  type ChatMode,
   ERR,
   entryId,
   laneNameForThread,
+  NOBODY,
   type ProjectRecord,
   runId,
+  THE_AGENT,
   type ThreadLane,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
+  placeholderWords,
   planSend,
   queuePlace,
   queueWords,
   raceWords,
+  type SendPlan,
   sendable,
+  sendButton,
   settleSend,
   whereChoices,
   whereWords,
@@ -23,6 +30,10 @@ const ME = writerId("duane@example.com")
 const BEA = writerId("bea@example.com")
 const CY = writerId("cy@example.com")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
+const AGENT: Address = {
+  compels: { kind: "agent", agent: THE_AGENT },
+  people: [],
+}
 
 const lane = (
   over: Partial<Extract<ThreadLane, { kind: "lane" }>> = {},
@@ -95,7 +106,7 @@ describe("sendable", () => {
   })
 })
 
-describe("planSend: the button, as the host will decide (ADR-0021)", () => {
+describe("planSend: what the send does, as the host will decide (ADR-0021)", () => {
   const plan = (
     text: string,
     over: Partial<Parameters<typeof planSend>[0]> = {},
@@ -113,58 +124,47 @@ describe("planSend: the button, as the host will decide (ADR-0021)", () => {
     expect(plan("hi")).toEqual({
       mode: "reply",
       createsLane: false,
-      button: "send",
-      title: null,
-      placeholder: "say something · @agent to ask",
-      queue: { button: "queue up next", title: null },
+      to: { compels: NOBODY, people: [] },
+      queue: { kind: "next" },
+      agentByDefault: false,
     })
-    expect([plan("@ada hi").button, plan("@ada hi").title]).toEqual([
-      "send to Ada",
-      null,
-    ])
-    expect([plan("@ada @bea @cy").button, plan("@ada @bea @cy").title]).toEqual(
-      ["send to Ada +2", "to Ada, Bea, Cy"],
-    )
+    expect(plan("@ada hi").to).toEqual({ compels: NOBODY, people: ["Ada"] })
+    expect(plan("@ada @bea @cy").to.people).toEqual(["Ada", "Bea", "Cy"])
   })
   test("asking the agent where there is no lane creates one", () => {
-    expect(plan("@agent hi")).toMatchObject({
-      button: "ask the agent",
-      createsLane: true,
-    })
+    expect(plan("@agent hi")).toMatchObject({ to: AGENT, createsLane: true })
     expect(plan("hi", { asksAgent: true })).toMatchObject({
-      button: "ask the agent",
+      to: AGENT,
       createsLane: true,
-      placeholder: "ask the agent…",
+      agentByDefault: true,
     })
     expect(plan("/fixture:skill:hello")).toMatchObject({
-      button: "ask the agent",
+      to: AGENT,
       createsLane: true,
     })
   })
   test("in agent work, a message naming no one asks the agent", () => {
     expect(plan("hi", { lane: lane() })).toMatchObject({
       mode: "reply",
-      button: "ask the agent",
+      to: AGENT,
       createsLane: false,
-      placeholder: "ask the agent…",
+      agentByDefault: true,
     })
   })
   test("a busy lane queues the agent's next question, never a person's message", () => {
     expect(plan("hi", { lane: lane({ running: true }) })).toMatchObject({
       mode: "queue",
-      button: "queue up next",
-      title: null,
+      queue: { kind: "next" },
     })
     expect(
       plan("hi", { lane: lane({ waiting: 3, lastWaiting: BEA }) }),
     ).toMatchObject({
       mode: "queue",
-      button: "queue after Bea",
-      title: "3 waiting ahead",
+      queue: { kind: "after", name: "Bea", ahead: 3 },
     })
     expect(plan("@ada hi", { lane: lane({ running: true }) })).toMatchObject({
       mode: "reply",
-      button: "send to Ada",
+      to: { compels: NOBODY, people: ["Ada"] },
     })
   })
   test("a fresh column branches, and creates a lane when it asks the agent", () => {
@@ -176,6 +176,75 @@ describe("planSend: the button, as the host will decide (ADR-0021)", () => {
       mode: "branch",
       createsLane: true,
     })
+  })
+})
+
+describe("sendButton: the plan in words, and whether it can be pressed", () => {
+  const sent = (to: Address, mode: ChatMode = "reply"): SendPlan => ({
+    mode,
+    createsLane: false,
+    to,
+    queue: { kind: "after", name: "Bea", ahead: 3 },
+    agentByDefault: false,
+  })
+  const IDLE = { uploading: false, sending: false }
+  const people = (...names: string[]): Address => ({
+    compels: NOBODY,
+    people: names,
+  })
+  test.each([
+    ["to nobody", sent(people()), IDLE, "send", null, false],
+    ["to one person", sent(people("Ada")), IDLE, "send to Ada", null, false],
+    [
+      "to several, naming them all in the title",
+      sent(people("Ada", "Bea", "Cy")),
+      IDLE,
+      "send to Ada +2",
+      "to Ada, Bea, Cy",
+      false,
+    ],
+    ["to the agent", sent(AGENT), IDLE, "send to agent", null, false],
+    [
+      "to the agent, naming people too",
+      sent({ ...AGENT, people: ["Ada"] }),
+      IDLE,
+      "send to agent",
+      null,
+      false,
+    ],
+    [
+      "queued, in the queue's words",
+      sent(AGENT, "queue"),
+      IDLE,
+      "queue after Bea",
+      "3 waiting ahead",
+      false,
+    ],
+    [
+      "uploading, whatever it would do",
+      sent(AGENT, "queue"),
+      { uploading: true, sending: false },
+      "uploading image…",
+      null,
+      true,
+    ],
+    [
+      "sending, in the words it was sent with",
+      sent(people("Ada")),
+      { uploading: false, sending: true },
+      "send to Ada",
+      null,
+      true,
+    ],
+  ] as const)("%s", (_, plan, busy, label, title, disabled) => {
+    expect(sendButton(plan, busy)).toEqual({ label, title, disabled })
+  })
+  test("placeholderWords says whether a message naming no one asks the agent", () => {
+    const plan = sent(people())
+    expect(placeholderWords({ ...plan, agentByDefault: true })).toBe(
+      "send to agent…",
+    )
+    expect(placeholderWords(plan)).toBe("say something · @agent to ask")
   })
 })
 
@@ -209,14 +278,14 @@ describe("queuePlace: behind the newest message waiting", () => {
 describe("queueWords", () => {
   test("says where it waits", () => {
     expect(queueWords({ kind: "next" })).toEqual({
-      button: "queue up next",
+      label: "queue up next",
       title: null,
     })
     expect(queueWords({ kind: "after", name: "Bea", ahead: 1 })).toEqual({
-      button: "queue after Bea",
+      label: "queue after Bea",
       title: null,
     })
-    expect(queueWords({ kind: "afterYours", ahead: 1 }).button).toBe(
+    expect(queueWords({ kind: "afterYours", ahead: 1 }).label).toBe(
       "queue after yours",
     )
   })

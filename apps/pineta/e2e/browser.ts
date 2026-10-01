@@ -15,11 +15,19 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { IDENTITY_KEY, identityCodec } from "@pineta/client/identity"
 import {
+  type ButtonWords,
+  queueWords,
+  recipientWords,
+  UPLOADING,
+} from "@pineta/client/send"
+import {
   atEntry,
   entryId,
   handleOf,
+  NOBODY,
   projectRail,
   ROOT,
+  THE_AGENT,
   type ThreadName,
   toolLabel,
   writerId,
@@ -40,6 +48,14 @@ import { startHost } from "../host/index.ts"
 import { createChecks } from "./checks.ts"
 import { committedProject, join, suiteModel, waitFor } from "./harness.ts"
 import { greyPng, RED_PNG } from "./images.ts"
+
+// The send button's labels, from the words the composer draws them with.
+const TO_AGENT = recipientWords({
+  compels: { kind: "agent", agent: THE_AGENT },
+  people: [],
+}).label
+const TO_NOBODY = recipientWords({ compels: NOBODY, people: [] }).label
+const TO_ADA = recipientWords({ compels: NOBODY, people: ["Ada"] }).label
 
 /** The ⋯ of the tab you are on: every root tab has one, shown on hover. */
 const OWN_MENU = '#tabs .tab[aria-selected="true"] ~ .tab-more .tab-menu'
@@ -414,7 +430,7 @@ try {
   await page.click("#tabs .add-agent")
   await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
   ok(
-    (await label(0)) === "ask the agent",
+    (await label(0)) === TO_AGENT,
     `＋ agent promises a reply with no mention: "${await label(0)}"`,
   )
   ok(
@@ -490,7 +506,7 @@ try {
   await shows(NOTE)
   await new Promise(r => setTimeout(r, 1500))
   ok(
-    plain === "send to Ada" &&
+    plain === TO_ADA &&
       (await page.$$eval(".msg.assistant", n => n.length)) ===
         assistantsBefore &&
       Object.keys(host.doc.activeRuns()).length === 0,
@@ -504,7 +520,7 @@ try {
   const repliesBefore = await page.$$eval(".msg.assistant", n => n.length)
   await page.click(`${col(0)} .composer .send`)
   ok(
-    ask === "ask the agent" &&
+    ask === TO_AGENT &&
       (await page
         .waitForFunction(
           n => document.querySelectorAll(".msg.assistant").length > n,
@@ -710,7 +726,7 @@ try {
   const prefilled = await page.inputValue(`${col(1)} .composer .input`)
   const prefilledLabel = await label(1)
   ok(
-    prefilled === "@agent " && prefilledLabel === "ask the agent",
+    prefilled === "@agent " && prefilledLabel === TO_AGENT,
     `→ in agent work opens a branch with @agent typed ("${prefilled}", "${prefilledLabel}")`,
   )
   const caret = await caretIn(1)
@@ -910,15 +926,15 @@ try {
     bea.kind === "started",
     `Bea's question starts the thread's run (${bea.kind})`,
   )
-  // The send button's words and title, once they are `text` and `title`.
-  const queueButton = (text: string, title: string | null) =>
+  // The send button once it says `words`: its label and its title.
+  const queueButton = (words: ButtonWords) =>
     page
       .waitForFunction(
-        ([c, text, title]) => {
+        ([c, label, title]) => {
           const b = document.querySelector(`${c} .composer .send`)
-          return b?.textContent === text && b.getAttribute("title") === title
+          return b?.textContent === label && b.getAttribute("title") === title
         },
-        [col(0), text, title] as const,
+        [col(0), words.label, words.title] as const,
         { timeout: 15_000 },
       )
       .then(
@@ -926,7 +942,7 @@ try {
         () => false,
       )
   ok(
-    idleLabel === "ask the agent" && (await queueButton("queue up next", null)),
+    idleLabel === TO_AGENT && (await queueButton(queueWords({ kind: "next" }))),
     `once Bea's run shows, with nothing waiting, the composer says it will queue up next ("${await label(0)}")`,
   )
   const beaAgain = await other.chat(
@@ -935,7 +951,8 @@ try {
     { mode: "queue" },
   )
   ok(
-    beaAgain.kind === "queued" && (await queueButton("queue after Bea", null)),
+    beaAgain.kind === "queued" &&
+      (await queueButton(queueWords({ kind: "after", name: "Bea", ahead: 1 }))),
     `with Bea's second question waiting, it says it will queue after her (${beaAgain.kind}, "${await label(0)}")`,
   )
   await page.click(`${col(0)} .composer .send`)
@@ -949,7 +966,7 @@ try {
     )
   ok(waiting, "the queued message shows in its column, waiting")
   ok(
-    await queueButton("queue after yours", "2 waiting ahead"),
+    await queueButton(queueWords({ kind: "afterYours", ahead: 2 })),
     `with your own message last in line, it says it will queue after yours ("${await label(0)}")`,
   )
   beasTurn.resume()
@@ -1127,7 +1144,7 @@ try {
   const agentCol = col(before)
   await page.waitForSelector(`${agentCol} .composer`, { timeout: 15_000 })
   ok(
-    (await label(before)) === "ask the agent" &&
+    (await label(before)) === TO_AGENT &&
       (await page.$$eval(".column", n => n.length)) === 1 &&
       (await page.$$eval(`${agentCol} .msg`, n => n.length)) === 0 &&
       (await page.textContent('#tabs .tab-new[aria-selected="true"]')) ===
@@ -1147,7 +1164,7 @@ try {
   const downStart = await page.inputValue(`${downCol} .composer .input`)
   await page.fill(`${downCol} .composer .input`, "")
   ok(
-    downStart === "@agent " && (await label(before + 1)) === "send",
+    downStart === "@agent " && (await label(before + 1)) === TO_NOBODY,
     `with @agent deleted, the branch at the end is a conversation ("${downStart}", "${await label(before + 1)}")`,
   )
   await send(before + 1, "off the record")
@@ -1185,7 +1202,7 @@ try {
   await page.waitForSelector(`${asideCol} .composer`, { timeout: 15_000 })
   const asideStart = await page.inputValue(`${asideCol} .composer .input`)
   ok(
-    asideStart === "" && (await label(before + 2)) === "send",
+    asideStart === "" && (await label(before + 2)) === TO_NOBODY,
     `→ in a conversation opens a branch with nothing typed ("${asideStart}", "${await label(before + 2)}")`,
   )
   await page.click(`${asideCol} .close`)
@@ -1645,7 +1662,7 @@ try {
     const convo = await label(0)
     ok(
       focused &&
-        convo === "send" &&
+        convo === TO_NOBODY &&
         (await page.textContent('#tabs .tab-new[aria-selected="true"]')) ===
           "new conversation",
       `the add menu's conversation, chosen by keyboard, opens a new tab that only sends ("${convo}")`,
@@ -2193,15 +2210,15 @@ try {
       const prevented = await paste(RED_PNG.toString("base64"), "red.png")
       const waiting = await pp
         .waitForFunction(
-          sel => {
+          ([sel, uploading]) => {
             const b = document.querySelector(sel)
             return (
               b instanceof HTMLButtonElement &&
               b.disabled &&
-              b.textContent?.trim() === "uploading image…"
+              b.textContent?.trim() === uploading
             )
           },
-          sendButton,
+          [sendButton, UPLOADING] as const,
           { timeout: 5_000 },
         )
         .then(
@@ -2523,9 +2540,9 @@ try {
       await chooseFromMenu(tp, chip, ".where-own")
       const again = await said()
       ok(
-        onCopy === "on a copy | own | ask the agent" &&
+        onCopy === `on a copy | own | ${TO_AGENT}` &&
           chose &&
-          direct === "in your working copy | direct | ask the agent" &&
+          direct === `in your working copy | direct | ${TO_AGENT}` &&
           again === onCopy,
         `the chip says where the new thread's agent works, and the menu changes it (${onCopy}; ${direct}; ${again})`,
       )

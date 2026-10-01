@@ -680,11 +680,27 @@ export const mutations: readonly Mutation[] = [
     name: "the others are left off",
     file: send,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "            : `send to ${first} +${others.length}`",
+    from: "        label: `send to ${first} +${others.length}`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: "            : `send to ${first}`",
+    to: "        label: `send to ${first}`,",
     command: unit,
-    expect: "in a conversation, a message is sent, to whoever it names",
+    expect: "to several, naming them all in the title",
+  },
+  {
+    name: "the button forgets an upload",
+    file: send,
+    from: "  const words = busy.uploading\n",
+    to: "  const words = false\n",
+    command: unit,
+    expect: "uploading, whatever it would do",
+  },
+  {
+    name: "a send in flight can be sent again",
+    file: send,
+    from: "  return { ...words, disabled: busy.uploading || busy.sending }",
+    to: "  return { ...words, disabled: busy.uploading }",
+    command: unit,
+    expect: "sending, in the words it was sent with",
   },
   {
     name: "your own message is someone else's",

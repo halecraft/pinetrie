@@ -453,6 +453,25 @@ became of its files (`strip`).
   boolean, not the text lifted up: `Column` redraws only when it flips, not
   on every keystroke.
 
+## Words come from values
+
+A label is decided as a value and worded in one function: `offerView` and
+`offerWords`, `queuePlace` and `queueWords`, `planSend` and `sendButton`. A
+change of wording then touches the words function, its one test, and
+`docs/06-interface.md`.
+
+- **Tests check the value.** A test about who a message is for checks
+  `SendPlan.to`, not the label. One table per words function (`test.each`, as
+  `describe("offerWords")` and `describe("sendButton")` are) pins the words.
+- **Suites compare with the words function**, never a literal: the browser
+  suite builds its labels from `recipientWords`, `queueWords` and `UPLOADING`
+  (`@pineta/client/send`), as it does tool labels from `toolLabel`. A check
+  that is about the words themselves (a run's tooltip, a refusal's reason)
+  keeps its literal.
+- **Docs quote labels in `docs/06-interface.md` only.** An ADR states the rule
+  ("the button says what the send does, and to whom"), and this file names the
+  function.
+
 ## Colour carries the link, not geometry
 
 Each column takes the rail track of its last message (`branchColors`); its
@@ -597,12 +616,12 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `readParticipants`, the reads the host decides from. `planSend` (`send.ts`)
   decides the rest: who the message is for is `addressChat`
   (`@pineta/marginalia`), the function `planChat` runs on the host, so the
-  button cannot promise a reply the host will not start. The button says the
-  result: "send", "send to Ada" ("send to Ada +2", naming everyone in its
-  `title`), "ask the agent", or, when the lane is busy (`isBusy`), a queue:
-  "queue up next", "queue after Bea" or "queue after yours". A fresh column
-  sends `branch`. The placeholder is `planSend`'s too: the composer holds only
-  its state and draws.
+  button cannot promise a reply the host will not start. `SendPlan.to` is
+  `addressChat`'s `Address`, unchanged. A fresh column sends `branch`; a
+  send that asks the agent while its lane is busy (`isBusy`) queues.
+  `sendButton` words the plan (labels: `docs/06-interface.md`), and
+  `placeholderWords` gives the box's placeholder: the composer holds only its
+  state and draws.
 - **The queue names the last message waiting,** not who the agent is
   answering: the host takes held items in the order sent, whatever their kind,
   so a new one waits behind the newest (`LaneView.lastWaiting`). `queuePlace`
@@ -633,9 +652,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `![name](/blob/<sha256>)` (`imageMarkdown`) in place of that selection, on
   lines of their own, at once. A refused one is left out, and the host's
   reason shown in the status line.
-- **Sending waits for uploads.** `sendable` is null while one is out, and the
-  send button is disabled and reads "uploading image…": a message sent then
-  would lack the image's markdown.
+- **Sending waits for uploads.** `sendable` is null while one is out, and
+  `sendButton` disables the button and labels it `UPLOADING`: a message sent
+  then would lack the image's markdown.
 - **The host decides what a message shows.** The composer shows markdown,
   not thumbnails. On send, the host reads the `/blob/` images from the text,
   and refuses the send if one is no longer stored (`image_missing`), which
@@ -882,7 +901,8 @@ empty ones when it starts (S58).
   card's document, which catches others' edits. No hook depends on whether a
   card exists.
 - **Sending.** The editor sends the text it shows, with the card's id, and is
-  read-only until the host answers. Spent (`appended`, `started`, `queued`),
+  read-only until the host answers; `sendButton` disables the button while it
+  waits. Spent (`appended`, `started`, `queued`),
   the host has deleted the card, and the editor detaches and empties the box.
   On a conflict or a refusal the card is still there, so nothing is put back:
   `settleSend` has no `restore`. "Branch here" hands the text and the card to
