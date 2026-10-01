@@ -53,7 +53,9 @@ S60 found:
   attempt.
 - **`set_banner` is the person's control, through the agent.** A pasted
   image by its `/blob/` path, the person's words for a new one, or a crop
-  (`focus`: top, center, bottom) of the one there is. The agent is offered
+  (`focus`: top, upper, center, bottom) of the one there is. Unasked, the
+  crop is `upper`, a quarter of the way down: centred, a one-row header cut
+  the top off the brief's sprite. The agent is offered
   it only when banners are on and the host has tools. It answers once the
   ask is planned:
   a pasted image or crop is written before it returns, and a new image

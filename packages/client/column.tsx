@@ -237,6 +237,9 @@ export function Column(p: ColumnProps) {
     lanes: p.lanes,
     work: p.work,
   })
+  // The banner drawn as the column mounts shows at once; one arriving later,
+  // a new one, fades in.
+  const [mountBanner] = useState(() => shows.banner?.url ?? null)
   // The review of the offer beside the thread (ADR-0047): your choice, kept
   // only while the column is mounted. Reset when the offer goes, so the
   // thread's next offer does not open it with nobody asking.
@@ -373,7 +376,11 @@ export function Column(p: ColumnProps) {
           style={trackStyle(p.track)}
         >
           {shows.banner !== null && (
-            <Banner banner={shows.banner} key={shows.banner.url} />
+            <Banner
+              banner={shows.banner}
+              fade={shows.banner.url !== mountBanner}
+              key={shows.banner.url}
+            />
           )}
           <div className="head-row">
             {p.count > 1 && (
@@ -692,20 +699,21 @@ function Reply({
 
 /**
  * The image behind the header, cropped to it as `background-size: cover`
- * would. An image rather than a background, so it can fade in once loaded;
- * keyed by its URL, so a new banner fades in again.
+ * would. An image rather than a background, so a new one can fade in once
+ * loaded; keyed by its URL, so each new banner does.
  */
-function Banner({ banner }: { banner: HeadBanner }) {
+function Banner({ banner, fade }: { banner: HeadBanner; fade: boolean }) {
   const [loaded, setLoaded] = useState(false)
   return (
     <img
       alt=""
       className="banner"
+      data-fade={fade || undefined}
       data-loaded={loaded || undefined}
       draggable={false}
       onLoad={() => setLoaded(true)}
       src={banner.url}
-      style={{ objectPosition: `center ${banner.focus}` }}
+      style={{ objectPosition: banner.position }}
     />
   )
 }

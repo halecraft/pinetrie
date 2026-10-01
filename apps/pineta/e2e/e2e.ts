@@ -2421,7 +2421,7 @@ invariants("end")
   const made = lane === undefined ? undefined : readBanners(bh.doc).get(lane)
   ok(
     made !== undefined &&
-      made.focus === "center" &&
+      made.focus === "upper" &&
       (await blobAt(made.sha)).status === 200,
     "a thread's first run's end makes its banner, stored and served as an image",
   )

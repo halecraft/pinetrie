@@ -104,12 +104,13 @@
       .column-head .head-row { display: flex; gap: .5rem; align-items: center; min-height: 1.3rem; }
       .column-head .head-space { flex: 1; }
       /* The thread's banner, under the header's own content: `isolation` keeps
-         its negative z-index inside the header. It fades in once loaded. */
+         its negative z-index inside the header. A new one fades in once loaded;
+         the one there as the column mounts does not. */
       .column-head { position: relative; isolation: isolate; }
       .column-head .banner { position: absolute; inset: 0; z-index: -1; width: 100%;
-        height: 100%; object-fit: cover; pointer-events: none; opacity: 0;
-        transition: opacity .6s ease-in; }
-      .column-head .banner[data-loaded] { opacity: 1; }
+        height: 100%; object-fit: cover; pointer-events: none; }
+      .column-head .banner[data-fade] { opacity: 0; transition: opacity .6s ease-in; }
+      .column-head .banner[data-fade][data-loaded] { opacity: 1; }
       .column-head .agent-name { flex: 0 0 auto; white-space: nowrap; font-size: .85rem;
         font-weight: 600; color: var(--track, #9ecbff); }
       .column-head button.agent-name:not(:disabled):hover { text-decoration: underline; }

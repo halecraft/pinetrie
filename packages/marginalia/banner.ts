@@ -6,6 +6,7 @@ import {
   BANNER_FOCUSES,
   type BannerFocus,
   type BannerRecord,
+  DEFAULT_BANNER_FOCUS,
   type EntryId,
   type Sha256,
   type ThreadName,
@@ -133,17 +134,17 @@ export function planBanner(facts: {
   if (trigger.kind === "ran")
     return banner !== undefined || facts.generating
       ? { kind: "none" }
-      : { kind: "generate", direction: null, focus: "center" }
+      : { kind: "generate", direction: null, focus: DEFAULT_BANNER_FOCUS }
   const { image, direction, focus } = trigger.ask
   if (image !== null)
     return facts.stored(image)
-      ? { kind: "write", sha: image, focus: focus ?? "center" }
+      ? { kind: "write", sha: image, focus: focus ?? DEFAULT_BANNER_FOCUS }
       : { kind: "refused", reason: "not_stored" }
   if (direction === null && focus !== null && banner !== undefined)
     return banner.focus === focus
       ? { kind: "none" }
       : { kind: "write", sha: banner.sha, focus }
-  return { kind: "generate", direction, focus: focus ?? "center" }
+  return { kind: "generate", direction, focus: focus ?? DEFAULT_BANNER_FOCUS }
 }
 
 /** What `set_banner` tells the agent: the host's answer to its ask. */

@@ -99,7 +99,7 @@ describe("planBanner", () => {
     expect(plan({ kind: "ran" })).toEqual({
       kind: "generate",
       direction: null,
-      focus: "center",
+      focus: "upper",
     })
     expect(plan({ kind: "ran" }, { banner })).toEqual({ kind: "none" })
     expect(plan({ kind: "ran" }, { generating: true })).toEqual({
@@ -115,7 +115,7 @@ describe("planBanner", () => {
     expect(plan(ask({ image: A }))).toEqual({
       kind: "write",
       sha: A,
-      focus: "center",
+      focus: "upper",
     })
     expect(plan(ask({ image: B }))).toEqual({
       kind: "refused",
@@ -140,11 +140,11 @@ describe("planBanner", () => {
   test("words, or nothing, make a new one, even while one is being made", () => {
     expect(
       plan(ask({ direction: "at dusk" }), { banner, generating: true }),
-    ).toEqual({ kind: "generate", direction: "at dusk", focus: "center" })
+    ).toEqual({ kind: "generate", direction: "at dusk", focus: "upper" })
     expect(plan(ask({}), { banner })).toEqual({
       kind: "generate",
       direction: null,
-      focus: "center",
+      focus: "upper",
     })
   })
 })

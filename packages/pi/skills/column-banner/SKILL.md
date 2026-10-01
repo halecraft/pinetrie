@@ -19,10 +19,10 @@ Every banner is 16-bit pixel art of one memorable sprite. What the sprite is, an
 
 ## How it must look
 
-The image is about 2900 by 350 pixels, shown 448 pixels wide and 34 to 55 tall, on a dark interface, with a light name on its left. Its whole width always shows, but its top and bottom are cut.
+The image is about 2900 by 350 pixels, shown 448 pixels wide and 34 to 55 tall, on a dark interface, with a light name on its left. Its whole width always shows, but a short header shows only from about a tenth of the way down to nearly three quarters.
 
 - 16-bit console pixel art: big, chunky visible pixels, as if drawn 60 pixels tall and enlarged. Hard edges, a dark outline, no anti-aliasing, gradients, blur or soft lighting.
-- The hero stands in the right half, in side view, about half the image's height, centred vertically, with a bold silhouette that reads at a glance. The companion stands beside it, smaller.
+- The hero stands in the right half, in side view, with a bold silhouette that reads at a glance: its top a fifth of the way down the image, its feet about two thirds of the way down, and nothing of it above or below. The companion stands beside it, smaller.
 - Everything else is a flat, very dark background: at most a thin line of ground tiles or a few pixel stars. The left third stays empty for the name.
 - A limited palette that suits the thread's mood, with the hero bright and saturated against the dark.
 - An original sprite, not a character from any existing game. No people, and no text, letters, numbers, score, HUD or logos.

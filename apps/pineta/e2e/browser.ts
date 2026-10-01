@@ -2366,6 +2366,22 @@ try {
           header.stripe === "4px",
         `a thread's first run gives its header a banner: drawn under the name, covering the header, the colour stripe kept (${JSON.stringify(header)})`,
       )
+
+      // Back to the tab, the column mounts again with its banner already there.
+      await bp.click("#tabs .tab-archive")
+      await bp.click("#tabs .tab-root")
+      const again = await bp
+        .waitForSelector(`${col(0)} .column-head .banner`, { timeout: 15_000 })
+        .then(img =>
+          img.evaluate(n => ({
+            fade: n.hasAttribute("data-fade"),
+            opacity: getComputedStyle(n).opacity,
+          })),
+        )
+      ok(
+        !again.fade && again.opacity === "1",
+        `a banner already there shows at once when its column mounts again, without fading in (${JSON.stringify(again)})`,
+      )
     } finally {
       await bp.context().close()
       await bannerHost.shutdown()

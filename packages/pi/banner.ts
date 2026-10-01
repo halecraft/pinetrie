@@ -2,7 +2,13 @@
 // the person asks, and the arguments it takes. The host decides and writes
 // (`planBanner`); this only reads the call.
 
-import { blobOfUrl, isSha256, type LaneName, type Sha256 } from "@pineta/core"
+import {
+  BANNER_FOCUSES,
+  blobOfUrl,
+  isSha256,
+  type LaneName,
+  type Sha256,
+} from "@pineta/core"
 import {
   type BannerAnswer,
   type BannerAsk,
@@ -89,8 +95,11 @@ export function bannerTool(
       ),
       focus: Type.Optional(
         Type.Union(
-          [Type.Literal("top"), Type.Literal("center"), Type.Literal("bottom")],
-          { description: "Which part of the image the thin header shows" },
+          BANNER_FOCUSES.map(f => Type.Literal(f)),
+          {
+            description:
+              "Which band of the image the thin header shows: upper, a quarter of the way down, unless asked",
+          },
         ),
       ),
     }),

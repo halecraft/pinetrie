@@ -85,7 +85,7 @@ describe("a run's end", () => {
     expect(readBanners(b.doc).get(LANE)).toEqual({
       lane: LANE,
       sha: SHA,
-      focus: "center",
+      focus: "upper",
       at: 1_000,
     })
   })

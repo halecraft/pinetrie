@@ -872,6 +872,14 @@ export const mutations: readonly Mutation[] = [
     expect: "gives its header a banner",
   },
   {
+    name: "a banner fades in each time its column mounts",
+    file: "packages/client/column.tsx",
+    from: "              fade={shows.banner.url !== mountBanner}",
+    to: "              fade={true}",
+    command: browser,
+    expect: "shows at once when its column mounts again",
+  },
+  {
     name: "a banner covers the header's name",
     file: "packages/client/index.html",
     from: "      .column-head .banner { position: absolute; inset: 0; z-index: -1;",

@@ -105,7 +105,16 @@ export type HeadIdentity =
 /** The image behind a column's header, and which part of it shows. */
 export interface HeadBanner {
   readonly url: string
-  readonly focus: BannerFocus
+  /** CSS `object-position`. */
+  readonly position: string
+}
+
+/** How far down the image each focus is: `object-position`'s y. */
+const FOCUS_Y: Readonly<Record<BannerFocus, string>> = {
+  top: "0%",
+  upper: "25%",
+  center: "50%",
+  bottom: "100%",
 }
 
 /** Where a column forks: none for a root column, a new tab, or a column moved first. */
@@ -213,7 +222,10 @@ function bannerOf(
   const banner = lane.kind === "lane" ? banners.get(lane.name) : undefined
   return banner === undefined
     ? null
-    : { url: blobUrl(banner.sha), focus: banner.focus }
+    : {
+        url: blobUrl(banner.sha),
+        position: `center ${FOCUS_Y[banner.focus]}`,
+      }
 }
 
 function identityOf(
