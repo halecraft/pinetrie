@@ -194,8 +194,8 @@ function planColumn(
   switch (act.kind) {
     case "note":
       return [{ kind: "openNote", entry: act.entry }]
-    case "openBranch":
-      return planOpenAt(act.rootId, state, fresh)
+    case "openAt":
+      return planOpenAt(act.entry, state, fresh)
     case "newTab":
       return planIntent(
         { kind: "newTab", asksAgent: act.asksAgent, prefill: act.prefill },
@@ -245,6 +245,17 @@ function planColumn(
 /** A column opened with `key` takes focus; nothing opened, nothing armed. */
 const opened = (key: string, effects: readonly Effect[]): readonly Effect[] =>
   effects.length === 0 ? [] : [{ kind: "armFocus", key }, ...effects]
+
+/**
+ * The entry `intent` asks to see, from the page or from a column (a closed
+ * branch's button), or null.
+ */
+export const entryShown = (intent: Intent): string | null =>
+  intent.kind === "openAt"
+    ? intent.entry
+    : intent.kind === "column" && intent.act.kind === "openAt"
+      ? intent.act.entry
+      : null
 
 /** After a restore is answered: the root is shown only if it was restored. */
 export const afterRestore = (

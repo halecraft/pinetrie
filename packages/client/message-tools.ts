@@ -59,7 +59,8 @@ export type MessageAct =
       readonly prefill: Prefill
       readonly asksAgent: boolean
     }
-  | { readonly kind: "openBranch"; readonly rootId: string }
+  /** Show an entry: a closed branch's first message. */
+  | { readonly kind: "openAt"; readonly entry: string }
 
 export function messageTools(
   node: TranscriptMessage,

@@ -5,6 +5,7 @@ import {
   afterRestore,
   claimFocus,
   type Effect,
+  entryShown,
   type Intent,
   type IntentState,
   nameEffects,
@@ -233,9 +234,11 @@ describe("planIntent", () => {
     })
 
     test("a message's closed branch opens as openAt does; no entry, nothing", () => {
-      expect(plan(column({ kind: "openBranch", rootId: "3-b" }))).toEqual(
-        plan({ kind: "openAt", entry: "3-b" }),
-      )
+      const fromColumn = column({ kind: "openAt", entry: "3-b" })
+      expect(plan(fromColumn)).toEqual(plan({ kind: "openAt", entry: "3-b" }))
+      expect(entryShown(fromColumn)).toBe("3-b")
+      expect(entryShown({ kind: "openAt", entry: "3-b" })).toBe("3-b")
+      expect(entryShown({ kind: "signOut" })).toBe(null)
       expect(plan({ kind: "openAt", entry: "nowhere" })).toEqual([])
     })
   })

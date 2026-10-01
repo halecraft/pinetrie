@@ -1531,4 +1531,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a mention drawn in the tab you are on is seen",
   },
+  {
+    name: "a closed branch in the Archive preview shows nothing",
+    file: "packages/client/intent.ts",
+    from: '    : intent.kind === "column" && intent.act.kind === "openAt"',
+    to: "    : false",
+    command: unit,
+    expect: "a message's closed branch opens as openAt does",
+  },
 ]

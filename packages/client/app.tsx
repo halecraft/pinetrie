@@ -60,6 +60,7 @@ import { type Inbox, mentionsOf } from "./inbox.ts"
 import {
   claimFocus,
   type Effect,
+  entryShown,
   type Intent,
   nameEffects,
   planIntent,
@@ -734,9 +735,8 @@ function Preview({
     reveal(id)
   }
   const onPreviewIntent = useStable((intent: Intent) => {
-    if (intent.kind === "openAt") pick(intent.entry)
-    else if (intent.kind === "column" && intent.act.kind === "openBranch")
-      pick(intent.act.rootId)
+    const entry = entryShown(intent)
+    if (entry !== null) pick(entry)
     else if (intent.kind === "restore" || intent.kind === "show")
       onIntent(intent)
   })
