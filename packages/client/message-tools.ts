@@ -1,5 +1,5 @@
-// client/message-tools — which tools a message offers, as a pure rule: note,
-// edit (or new tab), and `→` (ADR-0021, ADR-0025, ADR-0043). `Column` gathers
+// client/message-tools — which tools a message offers, as a pure rule: copy,
+// note, edit (or new tab), and `→` (ADR-0021, ADR-0025, ADR-0043). `Column` gathers
 // the facts, and `Message` draws the result. What a reader then asks of the
 // message is a `MessageAct`, which `Column` carries out.
 
@@ -33,6 +33,11 @@ export type MessageEdit =
     }
 
 export interface MessageTools {
+  /**
+   * What copy puts on the clipboard: the message's markdown, as stored. None
+   * for a message that only called tools.
+   */
+  readonly copy: string | undefined
   /** Open a note about it. */
   readonly note: boolean
   readonly edit: MessageEdit | undefined
@@ -59,8 +64,6 @@ export type MessageAct =
     }
   | { readonly kind: "openBranch"; readonly rootId: string }
 
-const NONE: MessageTools = { note: false, edit: undefined, branch: undefined }
-
 export function messageTools(
   node: TranscriptMessage,
   at: {
@@ -73,8 +76,12 @@ export function messageTools(
     readonly hasNoteAbout: boolean
   },
 ): MessageTools {
-  if (!at.writable) return NONE
+  // Copying only reads, so a column that can't be written offers it too.
+  const copy = node.text === "" ? undefined : node.text
+  if (!at.writable)
+    return { copy, note: false, edit: undefined, branch: undefined }
   return {
+    copy,
     note: !at.hasNoteAbout,
     edit: node.role === "chat" ? editOf(node, at.parentId) : undefined,
     // Below a conversation's last message, a branch would be the same as

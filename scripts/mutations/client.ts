@@ -778,6 +778,22 @@ export const mutations: readonly Mutation[] = [
   },
   // ── a message's tools (message-tools.ts) ──
   {
+    name: "a read-only column offers no copy",
+    file: tools,
+    from: "    return { copy, note: false, edit: undefined, branch: undefined }",
+    to: "    return { copy: undefined, note: false, edit: undefined, branch: undefined }",
+    command: unit,
+    expect: "a column that can't be written offers only copy",
+  },
+  {
+    name: "a message that only called tools offers copy",
+    file: tools,
+    from: '  const copy = node.text === "" ? undefined : node.text',
+    to: "  const copy = node.text",
+    command: unit,
+    expect: "copy is the message's markdown",
+  },
+  {
     name: "→ in agent work opens a branch with nothing typed",
     file: tools,
     from: "        : { at: node.id, prefill: branchPrefill(at.lane) },",

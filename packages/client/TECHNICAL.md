@@ -421,7 +421,12 @@ picks.
 ## A message's tools (`message-tools.ts`, ADR-0043)
 
 `messageTools` decides which tools a message offers, and `Message` draws
-them in one row: *note*, *edit* or *new tab*, `→`.
+them in one row: *copy*, *note*, *edit* or *new tab*, `→`.
+
+- **Copy is the message's markdown as stored**, not what it draws: mentions,
+  a `/command` and `![name](/blob/…)` as written. It only reads, so a column
+  that can't be written offers it too, alone. A message that only called
+  tools has no text, and no copy.
 
 - **Edit is a branch at the message's parent**, holding its text as sent: a
   sibling, since entries are immutable. The parent comes from the index, not
@@ -1184,7 +1189,14 @@ shown by their email's part before the `@`. Each rendered chat carries its
   queries `:scope > .column`. A column's `.column-body` is inside
   `.column-thread`.
 - **The clipboard needs a secure context.** An invite link over plain http
-  has no `navigator.clipboard`, so the bookmark selects its text instead.
+  has no `navigator.clipboard`. There, or when the clipboard refuses,
+  `useCopy` (`copy.ts`) selects an element for the reader to copy: the
+  bookmark its own text, a message its drawn text. It tests for
+  `navigator.clipboard?.writeText`, not `isSecureContext`: the browser
+  suite hides the clipboard to check that path (S68), and can't make its
+  page insecure. In the suite's Chromium, a context without the clipboard
+  permissions refuses every write, so only its main page, which has them,
+  can check what was copied.
 - **`.column-content` must stay unpositioned.** A positioned wrapper becomes
   the messages' offsetParent, and `alignOnOpen` measures `offsetTop` against
   the body's.
@@ -1199,8 +1211,9 @@ shown by their email's part before the `@`. Each rendered chat carries its
   positions short of the end, and the rule reads each as the reader leaving.
 
 - **Message tools are hidden until hover or focus**, with `visibility`, so
-  their boxes can be measured before a hover. `→` is `.tools > .branch`. A
-  browser test must hover a message before clicking any of them.
+  their boxes can be measured before a hover. `→` is `.tools > .branch`,
+  copy `.tools > .copy`. A browser test must hover a message before
+  clicking any of them, and again after moving the mouse elsewhere.
 - **Stop aborts a running command only once the command has started.** With a
   slow model, the tool call itself streams first; a check waits for the live
   tool row before clicking Stop, as a person would.

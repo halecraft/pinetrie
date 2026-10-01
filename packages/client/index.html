@@ -305,6 +305,8 @@
         visibility: hidden; }
       .msg:hover .tools, .msg:focus-within .tools { visibility: visible; }
       .tools .branch { color: #9ecbff; }
+      /* The row stretches it to the word buttons' height; flex centres its icon. */
+      .tools .copy { display: flex; align-items: center; }
       /* The column's side padding hovers its message too: the → sits in the right
          gutter, and a hidden → takes no hover to bring itself back. ::before for
          the right, so .tools (later in the tree) paints over it and takes the

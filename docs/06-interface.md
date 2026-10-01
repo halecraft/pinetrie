@@ -131,7 +131,7 @@ The leftmost tab. It finds roots, so it is a list, not a rail with columns.
   Search over each root's label, so its title, and its message text.
 - **Selecting a row previews it:** that root's rail, and one read-only column
   that a pick on the rail moves. Its composer is disabled, and none of the tools that
-  write are there: note, edit, branch, mark. In place of sending it offers
+  write are there: note, edit, branch, mark. Copy stays, since it writes nothing. In place of sending it offers
   **Restore** for an archived root, and **Open** for an open one. Once the
   inventory exists (planned with fold), picking up will work here, since it
   writes nothing; what is picked up is folded into an open root.
@@ -344,8 +344,11 @@ The rail is E; the column is T. Seeing both at once is the product.
   given the image itself, after the text. An image no longer stored refuses
   the send, and the text comes back to the box.
 - **A message's tools are one row** over its top right, shown on hover or
-  focus (ADR-0043): *note*, *edit*, and `→` last, in the right margin, since
-  what it opens appears to the right. Beneath a message stay only its notes
+  focus (ADR-0043): *copy* first, then *note*, *edit*, and `→` last, in the
+  right margin, since what it opens appears to the right. Copy puts the
+  message's markdown on the clipboard, as it was written, and shows a check
+  for two seconds; over plain http, which has no clipboard, it selects the
+  message's text for you to copy. Beneath a message stay only its notes
   and the buttons of branches no column shows.
 - **Edit sends a person's message again, changed or not**, as a sibling: a
   branch at its parent whose composer holds its text as sent. The original

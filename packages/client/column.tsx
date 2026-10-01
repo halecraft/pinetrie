@@ -54,6 +54,7 @@ import {
 } from "./column-view.ts"
 import type { Column as ColumnSpec, Pending, Prefill } from "./columns.ts"
 import { Composer, type ReadOnly } from "./composer.tsx"
+import { COPIED, useCopy } from "./copy.ts"
 import { behind, type SeenEnd } from "./follow.ts"
 import type { LiveWork } from "./live.ts"
 import { Menu } from "./menu.tsx"
@@ -824,35 +825,16 @@ function Origin({
 }
 
 /**
- * An offer's bookmark, which a press copies. The clipboard needs a secure
- * context, which an invite link over plain http is not: there, a press
- * selects its text, for you to copy.
+ * An offer's bookmark, which a press copies. Where it can't be copied, a
+ * press selects the bookmark's own text (`useCopy`).
  */
 function Bookmark({ name }: { name: string }) {
-  const self = useRef<HTMLButtonElement>(null)
-  const [copied, setCopied] = useState(false)
-  useEffect(() => {
-    if (!copied) return
-    const t = setTimeout(() => setCopied(false), 2_000)
-    return () => clearTimeout(t)
-  }, [copied])
-  const select = () => {
-    const range = document.createRange()
-    if (self.current === null) return
-    range.selectNodeContents(self.current)
-    const selection = window.getSelection()
-    selection?.removeAllRanges()
-    selection?.addRange(range)
-  }
+  const { copied, copy } = useCopy()
   return (
     <button
       className="offer-bookmark"
-      onClick={() => {
-        if (!window.isSecureContext) return select()
-        navigator.clipboard.writeText(name).then(() => setCopied(true), select)
-      }}
-      ref={self}
-      title={copied ? "copied" : "copy the bookmark, to find it in jj"}
+      onClick={e => copy(name, e.currentTarget)}
+      title={copied ? COPIED : "copy the bookmark, to find it in jj"}
       type="button"
     >
       {name}

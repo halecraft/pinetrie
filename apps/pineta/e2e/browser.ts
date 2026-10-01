@@ -14,6 +14,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { workingWords } from "@pineta/client/column-view"
+import { COPIED } from "@pineta/client/copy"
 import { IDENTITY_KEY, identityCodec } from "@pineta/client/identity"
 import {
   type ButtonWords,
@@ -270,8 +271,13 @@ const host = await startHost({
 console.log(`  host              : ${host.httpUrl}\n`)
 
 // An explicit context: a page from `browser.newPage()` owns its context, and
-// Playwright refuses a second tab in it, which the column checks open.
-const page = await (await browser.newContext()).newPage()
+// Playwright refuses a second tab in it, which the column checks open. It may
+// use the clipboard, so a check can read what copy wrote (S68).
+const page = await (
+  await browser.newContext({
+    permissions: ["clipboard-read", "clipboard-write"],
+  })
+).newPage()
 /** The main page's person: the email it gives the form below (ADR-0037). */
 const ME = writerId("ada@browser.test")
 /**
@@ -374,6 +380,15 @@ try {
   // ── helpers ──────────────────────────────────────────────────────────────
   /** A message for Ada only: it names her, so in agent work it asks no one. */
   const NOTE = "@Ada just a note"
+  /** A message whose markdown draws as other text: what copy copies is not what it shows. */
+  const STILL_SOURCE = "still **off** it"
+  const STILL = "still off it"
+  /**
+   * `STILL`'s message. `msg` finds none: `:text-is` does not match a
+   * paragraph whose text is split by a <strong>.
+   */
+  const stillMsg = (scope: string) =>
+    `${scope} .msg:has(> .text > p:only-child:has-text(${JSON.stringify(STILL)}))`
   const col = (n: number) => `.column[data-position="${n}"]`
   // Plain text is drawn as markdown: one paragraph. `:text-is` matches the
   // smallest element holding the text, which is that paragraph.
@@ -1194,9 +1209,10 @@ try {
       !downTexts.includes("say exactly: DOWN-TWO"),
     "the conversation's column keeps only its own thread",
   )
-  // A branch from a conversation opens with nothing typed.
-  await send(before + 1, "still off it")
-  await shows("still off it", downCol)
+  // A branch from a conversation opens with nothing typed. The message's
+  // markdown draws as other text, for copy below.
+  await send(before + 1, STILL_SOURCE)
+  await page.waitForSelector(stillMsg(downCol), { timeout: 60_000 })
   await page.hover(`${downCol} ${msg("off the record")}`)
   await page.click(`${downCol} ${msg("off the record")} > .tools > .branch`)
   const asideCol = col(before + 2)
@@ -1225,15 +1241,61 @@ try {
   )
   const tops = row.map(b => b.top)
   ok(
-    row.map(b => b.name).join(" ") === "note-open edit branch" &&
+    row.map(b => b.name).join(" ") === "copy note-open edit branch" &&
       Math.max(...tops) - Math.min(...tops) <= 1,
-    `a message's tools are one row: note, edit, → (${JSON.stringify(row)})`,
+    `a message's tools are one row: copy, note, edit, → (${JSON.stringify(row)})`,
+  )
+  // Copy puts the message's markdown on the clipboard, not what it draws.
+  const still = stillMsg(downCol)
+  await page.hover(still)
+  await page.click(`${still} > .tools > .copy`)
+  const copied = await page
+    .waitForFunction(
+      async () => (await navigator.clipboard.readText()) !== "",
+      undefined,
+      { timeout: 5_000 },
+    )
+    .then(
+      () => page.evaluate(() => navigator.clipboard.readText()),
+      () => "",
+    )
+  const copiedTitle = await page.getAttribute(
+    `${still} > .tools > .copy`,
+    "title",
+  )
+  ok(
+    copied === STILL_SOURCE && copiedTitle === COPIED,
+    `copy puts a message's markdown on the clipboard ("${copied}", "${copiedTitle}")`,
+  )
+  // Without a clipboard, as over plain http, copy selects the drawn text for
+  // you to copy (S68: hiding it stands in for an insecure context).
+  await page.evaluate(() => {
+    getSelection()?.removeAllRanges()
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined,
+      configurable: true,
+    })
+  })
+  let selected = ""
+  try {
+    await page.click(`${still} > .tools > .copy`)
+    selected = await page.evaluate(() => getSelection()?.toString() ?? "")
+  } finally {
+    await page.evaluate(() => {
+      Reflect.deleteProperty(navigator, "clipboard")
+      getSelection()?.removeAllRanges()
+    })
+  }
+  ok(
+    selected.trim() === STILL,
+    `with no clipboard, copy selects the message's text ("${selected}")`,
   )
   // Edit opens a branch at the message's parent, holding its text as sent,
   // with @agent in front: its thread's default person the agent, and a branch
   // asks only through a mention.
   const askedId = (await page.getAttribute(person, "data-entry")) ?? ""
   const parentId = readTreeIndex(host.doc).parentOf(askedId) ?? ""
+  await page.hover(person)
   await page.click(`${person} > .tools > .edit`)
   const editCol = col(before + 1)
   await page.waitForSelector(`${editCol} .composer`, { timeout: 15_000 })
@@ -1861,8 +1923,14 @@ try {
       .$eval(input, n => (n as HTMLTextAreaElement).readOnly)
       .catch(() => false)
     await page.hover(`${col(0)} .msg`)
+    // Copy only reads, so it stays.
     const tools = await page
-      .locator(`${col(0)} .msg .tools button, ${col(0)} .msg .branch`)
+      .locator(`${col(0)} .msg .tools button:not(.copy)`)
+      .count()
+    const copyStays = await page
+      .locator(`${col(0)} .msg`)
+      .first()
+      .locator(":scope > .tools > .copy")
       .count()
     const leftTb = await tb
       .waitForFunction(
@@ -1879,8 +1947,9 @@ try {
         kept === "typed, not sent" &&
         frozen &&
         tools === 0 &&
+        copyStays === 1 &&
         leftTb,
-      `an archived root leaves the other window's bar, and the page on it reads it: "${banner}", its typed text kept, no tools (${tools})`,
+      `an archived root leaves the other window's bar, and the page on it reads it: "${banner}", its typed text kept, no tools that write, and copy (${tools}, ${copyStays})`,
     )
     await page.click(`${col(0)} .read-only-action`)
     await page
@@ -1931,13 +2000,19 @@ try {
     await page.hover(".archive-preview .column .msg")
     const previewWrites = await page
       .locator(
-        ".archive-preview .composer .send, .archive-preview .msg .tools button, .archive-preview .msg .branch",
+        ".archive-preview .composer .send, .archive-preview .msg .tools button:not(.copy)",
       )
+      .count()
+    const previewCopy = await page
+      .locator(".archive-preview .column .msg")
+      .first()
+      .locator(":scope > .tools > .copy")
       .count()
     ok(
       previewWrites === 0 &&
+        previewCopy === 1 &&
         (await page.locator(".archive-preview .rail-dot").count()) >= 1,
-      `the archived root's preview draws its rail and column, with nothing that writes (${previewWrites})`,
+      `the archived root's preview draws its rail and column, with nothing that writes, and copy (${previewWrites}, ${previewCopy})`,
     )
     await page.click(".archive-preview .read-only-action")
     const restored = await page

@@ -8,6 +8,7 @@ import { readStreamText, type SessionDocHandle } from "@pineta/schema"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
 import { joinWords } from "./column-view.ts"
+import { COPIED, useCopy } from "./copy.ts"
 import { plural } from "./counts.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 import { MessageText } from "./message-text.tsx"
@@ -119,13 +120,14 @@ function MessageView(p: MessageProps) {
   )
 }
 
-/**
- * A message's tools, in one row that floats over its top right on hover or
- * focus: buttons under every message would drown the conversation. `→` comes
- * last, in the right margin, since what it opens appears to the right.
- */
 export const Message = memo(MessageView, sameMessageProps)
 
+/**
+ * A message's tools, in one row that floats over its top right on hover or
+ * focus: buttons under every message would drown the conversation. Copy comes
+ * first; `→` comes last, in the right margin, since what it opens appears to
+ * the right.
+ */
 function Tools({
   id,
   tools,
@@ -135,10 +137,17 @@ function Tools({
   tools: MessageTools
   onAct: (act: MessageAct) => void
 }) {
-  const { edit, branch } = tools
-  if (!tools.note && edit === undefined && branch === undefined) return null
+  const { copy, edit, branch } = tools
+  if (
+    copy === undefined &&
+    !tools.note &&
+    edit === undefined &&
+    branch === undefined
+  )
+    return null
   return (
     <div className="tools">
+      {copy !== undefined && <CopyButton text={copy} />}
       {tools.note && (
         <button
           className="note-open"
@@ -187,6 +196,50 @@ function Tools({
         </button>
       )}
     </div>
+  )
+}
+
+/**
+ * Copies a message's markdown. Where it can't, a press selects the message's
+ * rendered text: a message offering copy has text, so it draws a `.text`.
+ */
+function CopyButton({ text }: { text: string }) {
+  const { copied, copy } = useCopy()
+  return (
+    <button
+      aria-label="copy this message"
+      className="copy"
+      onClick={e =>
+        copy(
+          text,
+          e.currentTarget.closest(".msg")?.querySelector(":scope > .text") ??
+            null,
+        )
+      }
+      title={copied ? COPIED : "copy this message's markdown"}
+      type="button"
+    >
+      {copied ? "✓" : <CopyIcon />}
+    </button>
+  )
+}
+
+/** Two overlapping sheets, 1em square, drawn in the text's colour. */
+function CopyIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height="1em"
+      stroke="currentColor"
+      strokeLinejoin="round"
+      strokeWidth="1.5"
+      viewBox="0 0 16 16"
+      width="1em"
+    >
+      <rect height="9" rx="1.5" width="9" x="5.5" y="5.5" />
+      <path d="M10.5 3V2.5A1.5 1.5 0 0 0 9 1H2.5A1.5 1.5 0 0 0 1 2.5V9a1.5 1.5 0 0 0 1.5 1.5H3" />
+    </svg>
   )
 }
 

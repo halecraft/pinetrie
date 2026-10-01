@@ -127,8 +127,23 @@ describe("→", () => {
   })
 })
 
-test("a column that can't be written offers nothing", () => {
+describe("copy", () => {
+  test("copy is the message's markdown, and none for one that only called tools", () => {
+    expect(tools(chat("@ada **look** at `x`", false)).copy).toBe(
+      "@ada **look** at `x`",
+    )
+    expect(tools({ id: "5-m", role: "assistant", text: "## done" }).copy).toBe(
+      "## done",
+    )
+    expect(
+      tools({ id: "5-m", role: "assistant", text: "", toolCalls: [] }).copy,
+    ).toBeUndefined()
+  })
+})
+
+test("a column that can't be written offers only copy", () => {
   expect(tools(chat("x", true), { writable: false })).toEqual({
+    copy: "x",
     note: false,
     edit: undefined,
     branch: undefined,

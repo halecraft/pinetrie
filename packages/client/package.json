@@ -8,6 +8,7 @@
     "./identity": "./identity.ts",
     "./send": "./send.ts",
     "./column-view": "./column-view.ts",
+    "./copy": "./copy.ts",
     "./package.json": "./package.json"
   },
   "scripts": {
