@@ -1,6 +1,6 @@
 // client/copy — copying text to the clipboard from a button.
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 
 /** A copy button's title just after a press. */
 export const COPIED = "copied"
@@ -23,14 +23,14 @@ export function useCopy(): {
     const t = setTimeout(() => setCopied(false), 2_000)
     return () => clearTimeout(t)
   }, [copied])
-  const copy = useCallback((text: string, fallback: Element | null) => {
+  const copy = (text: string, fallback: Element | null) => {
     const clipboard = navigator.clipboard as Clipboard | undefined
     if (clipboard?.writeText === undefined) return selectContents(fallback)
     clipboard.writeText(text).then(
       () => setCopied(true),
       () => selectContents(fallback),
     )
-  }, [])
+  }
   return { copied, copy }
 }
 
