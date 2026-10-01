@@ -1,12 +1,16 @@
+import { existsSync } from "node:fs"
+import path from "node:path"
 import { describe, expect, test } from "vitest"
 import { stopMessage } from "../apps/pineta/e2e/checks.ts"
 import {
   choose,
+  commandOf,
   failingChecks,
   judge,
   type Mutation,
   mutantEnv,
   run as runGroup,
+  SUITES,
 } from "./mutate.ts"
 
 const run = (status: number | null, output: string, timedOut = false) => ({
@@ -99,16 +103,45 @@ describe("failingChecks: the lines that name a failing check", () => {
 describe("mutantEnv: a mutant names the check its suite stops at", () => {
   test("with an expectation, PINETA_STOP_AT is set and the rest kept", () => {
     const base = { PATH: "/bin", HOME: "/root" }
-    expect(mutantEnv(base, "a check")).toEqual({
+    expect(mutantEnv(base, { expect: "a check" })).toEqual({
       PATH: "/bin",
       HOME: "/root",
       PINETA_STOP_AT: "a check",
     })
   })
-  test("without one, the environment is the parent's", () => {
-    const base = { PATH: "/bin" }
-    expect(mutantEnv(base, undefined)).toBe(base)
+  test("a suite mutation runs only its scenario: PINETA_SCENARIO is set", () => {
+    expect(
+      mutantEnv({ PATH: "/bin" }, { expect: "a check", scenario: "boot" }),
+    ).toEqual({
+      PATH: "/bin",
+      PINETA_STOP_AT: "a check",
+      PINETA_SCENARIO: "boot",
+    })
   })
+  test("without either, the environment is the parent's", () => {
+    const base = { PATH: "/bin" }
+    expect(mutantEnv(base, {})).toBe(base)
+  })
+})
+
+test("SUITES: each suite's scenario directory exists, and its command runs it", () => {
+  for (const suite of Object.values(SUITES)) {
+    expect(existsSync(path.join(import.meta.dirname, "..", suite.dir))).toBe(
+      true,
+    )
+    expect(suite.command.slice(0, 2)).toEqual(["pnpm", "run"])
+  }
+  expect(
+    commandOf({
+      name: "x",
+      file: "f",
+      from: "a",
+      to: "b",
+      suite: "browser",
+      scenario: "boot",
+      expect: "c",
+    }),
+  ).toEqual(SUITES.browser.command)
 })
 
 describe("run: nothing a command starts outlives it", () => {

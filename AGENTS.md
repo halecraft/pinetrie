@@ -39,9 +39,9 @@ reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
 | gate | command |
 |---|---|
 | unit, conformance, e2e | `pnpm run verify` |
-| with a real model | `pnpm run e2e:live` |
-| in a real browser | `pnpm run e2e:browser` (its tools section needs `container` running; on the Mac, `pnpm --filter @pineta/app exec playwright install chromium-headless-shell` once) |
-| lanes of their own, in containers | `pnpm run e2e:lanes` (needs Apple's `container` running, outside the sandbox; `PINETA_LANES_SECTION=main,images,contract` runs some) |
+| with a real model | `pnpm run e2e:live` (the `live` scenario alone; needs a model key) |
+| in a real browser | `pnpm run e2e:browser` (without `container`, its offer and review checks report SKIP; on the Mac, `pnpm --filter @pineta/app exec playwright install chromium-headless-shell` once) |
+| lanes of their own, in containers | `pnpm run e2e:lanes` (needs Apple's `container` running, outside the sandbox; without it every scenario reports SKIP) |
 | deliberate bugs | `pnpm mutate scripts/mutations/<list>.ts [name]` |
 
 A check without a proof it can fail is not yet a check. A new check comes with a
@@ -53,9 +53,15 @@ against minutes. `pnpm mutate <list> <name> --against <command>` runs a
 mutant against another command and lists the checks that catch it: use it to
 find a unit test that already proves a rule before writing one.
 
-A mutation runs its command until the check it expects fails
-(`PINETA_STOP_AT`, set by `pnpm mutate`), so one whose check comes late in
-`e2e` or `e2e:browser` still takes minutes. Run unit-test mutations as you
+Each suite is a set of scenarios, one per file (`apps/pineta/e2e/TECHNICAL.md`),
+and `PINETA_SCENARIO=a,b` runs some. A suite mutation names its `suite`,
+`scenario` and check, and runs only that scenario until the check it expects
+fails (`PINETA_STOP_AT`, set by `pnpm mutate`), so one whose check comes late
+in a long scenario still takes a minute or two. Every suite check is a
+mutation's `expect` (`scripts/proofs.ts`); one no mutation proves yet is in
+`scripts/unproven.ts`, which only shrinks. The suites keep to a budget: the
+host and lanes scenarios at most √ of the unit tests, the browser's at most √
+of those (`scripts/budget.test.ts`). Run unit-test mutations as you
 write them. Run the suite-level ones once, in a batch at the end of the work,
 after the suite itself passes:
 one `pnpm mutate` call per name (it takes one name substring, or none for the

@@ -9,6 +9,21 @@ const checks = [
   "run",
   "apps/pineta/e2e/checks.test.ts",
 ]
+const proofs = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "scripts/proofs.test.ts",
+  "scripts/budget.test.ts",
+]
+const scenarios = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "apps/pineta/e2e/scenario.test.ts",
+]
 
 export const mutations: readonly Mutation[] = [
   {
@@ -22,10 +37,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every failing check stops the suite",
     file: "apps/pineta/e2e/checks.ts",
-    from: '  !passed && stopAt !== undefined && stopAt !== "" && label.includes(stopAt)',
-    to: '  !passed && stopAt !== undefined && stopAt !== ""',
+    from: "): boolean => !passed && stopAt !== undefined && label === stopAt",
+    to: "): boolean => !passed && stopAt !== undefined",
     command: checks,
-    expect: "a failing check whose label names stopAt stops",
+    expect: "stopsHere: a failing check whose label is stopAt stops",
   },
   {
     name: "a stop is not recorded as a failure",
@@ -33,13 +48,13 @@ export const mutations: readonly Mutation[] = [
     from: "      ;(pass ? passed : failed).push(label)",
     to: "      if (!stopsHere(pass, label, stopAt)) (pass ? passed : failed).push(label)",
     command: checks,
-    expect: "ok throws at the named failing check, after recording it",
+    expect: "check prints its label and what it found",
   },
   {
     name: "mutate names no check",
     file: "scripts/mutate.ts",
-    from: "  return expect === undefined ? base : { ...base, PINETA_STOP_AT: expect }",
-    to: "  return base",
+    from: "    ...(m.expect === undefined ? {} : { PINETA_STOP_AT: m.expect }),\n",
+    to: "",
     command: unit,
     expect: "with an expectation, PINETA_STOP_AT is set",
   },
@@ -66,5 +81,70 @@ export const mutations: readonly Mutation[] = [
     to: "  if (chosen.length >= 0) return chosen",
     command: unit,
     expect: "a filter that names nothing is refused",
+  },
+  {
+    name: "mutantEnv drops PINETA_SCENARIO",
+    file: "scripts/mutate.ts",
+    from: "    ...(m.scenario === undefined ? {} : { PINETA_SCENARIO: m.scenario }),\n",
+    to: "",
+    command: unit,
+    expect: "a suite mutation runs only its scenario",
+  },
+  {
+    name: "chooseScenarios ignores PINETA_SCENARIO",
+    file: "apps/pineta/e2e/scenario.ts",
+    from: "  if (asked.length === 0) return [...all].sort()",
+    to: "  if (true) return [...all].sort()",
+    command: scenarios,
+    expect: "the named ones, in name order",
+  },
+  {
+    name: "planSuite runs a scenario whose needs gave a reason",
+    file: "apps/pineta/e2e/scenario.ts",
+    from: "      return why === null ? { name, run: true } : { name, run: false, why }",
+    to: "      return { name, run: true }",
+    command: scenarios,
+    expect: "planSuite runs a scenario with no problem",
+  },
+  {
+    name: "budgetBreaches lets a layer reach one past its square root",
+    file: "scripts/budget.ts",
+    from: "    ...(c.integration > allowed(c.unit)",
+    to: "    ...(c.integration > allowed(c.unit) + 1",
+    command: proofs,
+    expect: "budgetBreaches",
+  },
+  {
+    name: "budgetBreaches breaches a layer at its square root",
+    file: "scripts/budget.ts",
+    from: "    ...(c.browser > allowed(c.integration)",
+    to: "    ...(c.browser >= allowed(c.integration)",
+    command: proofs,
+    expect: "budgetBreaches",
+  },
+  {
+    name: "proofGaps reports no unproven label",
+    file: "scripts/proofs.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "      .filter(label => !expected.has(`${scenario}\\n${label}`))",
+    to: "      .filter(() => false)",
+    command: proofs,
+    expect: "a label no suite mutation expects is unproven",
+  },
+  {
+    name: "proofGaps accepts an expect that is no label in its scenario",
+    file: "scripts/proofs.ts",
+    from: "    return labels.includes(m.expect)",
+    to: "    return true",
+    command: proofs,
+    expect: "a mutation naming no scenario, or no label in it, is unknown",
+  },
+  {
+    name: "labelsIn reads only double-quoted labels",
+    file: "scripts/proofs.ts",
+    from: "const LABEL = /(?<![\\w.])check\\(\\s*([\"'])((?:\\\\.|(?!\\1).)*)\\1/g",
+    to: 'const LABEL = /(?<![\\w.])check\\(\\s*(["])((?:\\\\.|(?!\\1).)*)\\1/g',
+    command: proofs,
+    expect: "reads labels in either quote style",
   },
 ]

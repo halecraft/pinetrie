@@ -93,12 +93,13 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 968/968 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 590 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 992/992 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 620 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 152/152, on the scripted model |
-| with a real model | `pnpm run e2e:live` | 121/121 |
-| **real browser** | `pnpm run e2e:browser` | 181 checks; in a lane with no containers, the 6 that need one fail |
+| end-to-end | `pnpm run e2e` | 12 scenarios, 30 checks, on the scripted model (S67) |
+| with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
+| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 141 checks; in a lane with no containers, the 6 that need one report SKIP |
+| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 17 host and lanes scenarios ≤ ⌊√902⌋; 4 browser ≤ ⌊√17⌋ |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -478,14 +479,14 @@ context.**
   It has now failed the same way twice (`.mjs`-blind, then `.tsx`-blind) while
   reporting "all boundary rules hold".
 - ~~Multi-writer is proven only at the *storage* layer.~~ Since ADR-0020, two
-  threads' lanes run at once in e2e, and one thread's writers queue.
+  threads' lanes run at once, and one thread's writers queue.
 - **The suites and their mutations spend most of their time waiting** (S65).
-  What remains after the dead waits were removed: the image clean-up delay
-  and presence expiry as host options, short in the suites; `e2e` and
-  `e2e:browser` in sections, as `e2e:lanes` already is
-  (`PINETA_LANES_SECTION`); the browser tools section's container-free
-  checks moved to a host without containers; mutants run in parallel, each
-  in its own copy of the repository.
+  What remains after the dead waits were removed, and the suites became
+  scenarios (S67): the image clean-up delay and presence expiry as host
+  options, short in the suites; mutants run in parallel, each in its own
+  copy of the repository; and the suite checks listed in
+  `scripts/unproven.ts` proved by a mutation, or deleted (the `lanes/*`
+  ones on the Mac).
 - **A run's refusal cannot reach its author.** The host replies `started`
   before pi admits the run, so a refusal is only logged; the message is kept
   in the tree (`settleRun`), with no reply. A second reply, sent once the run

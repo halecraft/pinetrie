@@ -1,12 +1,9 @@
 // Mutations for @pineta/lanes. Run: pnpm mutate scripts/mutations/lanes.ts
-// The planners' checks are unit tests, in seconds.
+// The planners' checks are unit tests, in seconds. The suite mutations run one
+// `e2e:lanes` scenario, which needs `container`: on the Mac.
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
-/** One section of `e2e:lanes`; needs `container` running. */
-const lanes = (
-  section: "main" | "images" | "shared" | "commands" | "contract",
-) => ["env", `PINETA_LANES_SECTION=${section}`, "pnpm", "run", "e2e:lanes"]
 const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
@@ -113,7 +110,8 @@ export const mutations: readonly Mutation[] = [
     from: '  `[[--scope]]\\n--when.repositories = ["${repo}"]\\n[--scope.revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: '  `[revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
-    command: lanes("main"),
+    suite: "lanes",
+    scenario: "main",
     expect: "a jj repo outside the lane's own works in the lane",
   },
   {
@@ -129,15 +127,18 @@ export const mutations: readonly Mutation[] = [
     file: plan,
     from: '    "--opt",\n    "journal=ordered",\n',
     to: "",
-    command: lanes("contract"),
-    expect: "every clone of a journaled volume taken mid-write checks clean",
+    suite: "lanes",
+    scenario: "contract",
+    expect:
+      "every clone of a journaled volume taken mid-write checks clean and holds every fsynced record",
   },
   {
     name: "a turn's snapshot skips sync",
     file: plan,
     from: '  inLane("sync"),\n',
     to: "",
-    command: lanes("main"),
+    suite: "lanes",
+    scenario: "main",
     expect:
       "a file the agent wrote is whole in a branch taken at the next turn",
   },
@@ -146,7 +147,8 @@ export const mutations: readonly Mutation[] = [
     file: plan,
     from: "    at(parts.hostWorkingCopy, HOST_WORKING_COPY),",
     to: "    { source: parts.hostWorkingCopy, target: HOST_WORKING_COPY, readonly: false },",
-    command: lanes("main"),
+    suite: "lanes",
+    scenario: "main",
     expect:
       "a write to /mnt/host-working-copy fails, through bash and through write",
   },
@@ -156,7 +158,8 @@ export const mutations: readonly Mutation[] = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  `${RUNTIME_MOUNT}/node/${LOADER}`,\n  "--library-path",\n  `${RUNTIME_MOUNT}/node/lib`,\n  `${RUNTIME_MOUNT}/node/node`,',
     to: '  "node",',
-    command: lanes("images"),
+    suite: "lanes",
+    scenario: "images",
     expect: "a lane on Alpine, with musl and no Node, runs pi's four tools",
   },
   {
@@ -173,16 +176,19 @@ export const mutations: readonly Mutation[] = [
     file: plan,
     from: '    ...setEnv("GIT_CONFIG_COUNT", "1"),\n',
     to: "",
-    command: lanes("shared"),
-    expect: "a shared directory is never in a lane's commit",
+    suite: "lanes",
+    scenario: "shared",
+    expect:
+      "a shared directory is never in a lane's commit, your @ or a snapshot, and a branch sees it live",
   },
   {
     name: "shared directories are mounted read-only",
     file: plan,
     from: "      readonly: false,",
     to: "      readonly: true,",
-    command: lanes("shared"),
-    expect: "a plan a lane writes is in your working copy at once",
+    suite: "lanes",
+    scenario: "shared",
+    expect: "a plan a lane writes is in your working copy at once, and yours",
   },
   {
     name: "a path jj tracks is shared",
@@ -315,8 +321,9 @@ export const mutations: readonly Mutation[] = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,",
     to: '      "PLAYWRIGHT_VERSION=1.55.0",',
-    command: lanes("images"),
-    expect: "Pineta's Playwright launches Chromium",
+    suite: "lanes",
+    scenario: "images",
+    expect: "on the default image, Pineta's Playwright launches Chromium",
   },
   {
     name: "an agent's own commit is not adopted",
@@ -339,7 +346,8 @@ export const mutations: readonly Mutation[] = [
     file: plan,
     from: '  return facts.parentDescends\n    ? { kind: "adopt", commit: parent }\n    : { kind: "none" }',
     to: '  return { kind: "none" }',
-    command: lanes("main"),
+    suite: "lanes",
+    scenario: "main",
     expect: "a commit the agent made itself reaches its thread's offer",
   },
   {
@@ -383,7 +391,8 @@ export const mutations: readonly Mutation[] = [
     from: "export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane.md`",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane-notes.md`",
-    command: lanes("commands"),
+    suite: "lanes",
+    scenario: "commands",
     expect: "the note the prompt names is a file in the lane",
   },
   {

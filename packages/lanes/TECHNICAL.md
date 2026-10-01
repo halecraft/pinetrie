@@ -391,11 +391,12 @@ containers, disks and the helper.
   through Pineta's Playwright, on the default image. Its `commands` section
   reads skill files at `/mnt/host`, and checks what a real lane's prompt
   tells it about itself and that the note it names is there (ADR-0046). It
-  has five sections, `main`, `images`, `shared`, `commands` and `contract`,
-  and `PINETA_LANES_SECTION` picks some.
+  has five scenarios (`apps/pineta/e2e/lanes/`), `main`, `images`,
+  `shared`, `commands` and `contract`, and `PINETA_SCENARIO` picks some.
+  Without `container`, each reports SKIP with the host's own reason.
   Its hosts pass their own `userConfig`, so the person's own lane config
   never applies. Each
-  suite-level mutation in `scripts/mutations/lanes.ts` runs only the section
+  suite-level mutation in `scripts/mutations/lanes.ts` runs only the scenario
   its check is in, and stops at that check. Each on `plan.ts` proves a fact
   about a real lane that a unit test cannot: the journal, `sync`, a
   read-only mount, a shared mount seen both ways, the git ignore variables,

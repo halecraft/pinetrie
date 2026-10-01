@@ -16,6 +16,8 @@
 //     makes the suite hang, and a hang is a failure.
 //   - With `expect`, a suite stops at that check (`PINETA_STOP_AT`,
 //     `apps/pineta/e2e/checks.ts`): nothing after it changes the verdict.
+//   - A suite mutation runs only its scenario (`PINETA_SCENARIO`,
+//     `apps/pineta/e2e/scenario.ts`), with its suite's command (`SUITES`).
 //
 // Usage: node scripts/mutate.ts <mutations.ts> [name-substring]
 // Exits with the number of mutations that were not KILLED.
@@ -31,7 +33,7 @@ import path from "node:path"
 import process from "node:process"
 import { pathToFileURL } from "node:url"
 
-export interface Mutation {
+interface MutationBase {
   /** What the mutant breaks, in words. */
   readonly name: string
   /** Repository-relative file to mutate. */
@@ -39,13 +41,51 @@ export interface Mutation {
   /** Exact text to replace; must occur once. */
   readonly from: string
   readonly to: string
+  /** Default 900 s. A run that exceeds it counts as KILLED (hung). */
+  readonly timeoutMs?: number
+}
+
+/** A mutation a command catches: a unit test's, usually. */
+export interface CommandMutation extends MutationBase {
   /** The command whose failure kills the mutant, e.g. ["pnpm", "exec", "vitest", "run", "packages/core"]. */
   readonly command: readonly string[]
   /** A fragment of the failing check's line that must appear in the output. */
   readonly expect?: string
-  /** Default 900 s. A run that exceeds it counts as KILLED (hung). */
-  readonly timeoutMs?: number
 }
+
+/** The end-to-end suites, each a directory of scenarios. */
+export type Suite = "host" | "live" | "browser" | "lanes"
+
+/** A mutation one scenario of a suite catches, at one check. */
+export interface SuiteMutation extends MutationBase {
+  readonly suite: Suite
+  /** A scenario's file stem in the suite's directory (`SUITES`). */
+  readonly scenario: string
+  /** A check label in that scenario, exactly (`scripts/proofs.ts`). */
+  readonly expect: string
+}
+
+export type Mutation = CommandMutation | SuiteMutation
+
+/** Each suite's command, and the directory of its scenarios. */
+export const SUITES: Readonly<
+  Record<Suite, { readonly command: readonly string[]; readonly dir: string }>
+> = {
+  host: { command: ["pnpm", "run", "e2e"], dir: "apps/pineta/e2e/host" },
+  live: { command: ["pnpm", "run", "e2e:live"], dir: "apps/pineta/e2e/host" },
+  browser: {
+    command: ["pnpm", "run", "e2e:browser"],
+    dir: "apps/pineta/e2e/browser",
+  },
+  lanes: {
+    command: ["pnpm", "run", "e2e:lanes"],
+    dir: "apps/pineta/e2e/lanes",
+  },
+}
+
+/** The command a mutation runs. */
+export const commandOf = (m: Mutation): readonly string[] =>
+  "suite" in m ? SUITES[m.suite].command : m.command
 
 export type Verdict = "KILLED" | "SURVIVED" | "BROKEN" | "ELSEWHERE" | "ANCHOR"
 
@@ -90,12 +130,20 @@ export const failingChecks = (output: string): string[] =>
       line => /^\s*(FAIL|×)/.test(line) || line.includes("AssertionError"),
     )
 
-/** The environment a mutant runs in: the parent's, and the check to stop at. */
+/**
+ * The environment a mutant runs in: the parent's, the check to stop at, and,
+ * for a suite mutation, the one scenario to run.
+ */
 export function mutantEnv(
   base: NodeJS.ProcessEnv,
-  expect: string | undefined,
+  m: Pick<Mutation, "expect"> & { readonly scenario?: string },
 ): NodeJS.ProcessEnv {
-  return expect === undefined ? base : { ...base, PINETA_STOP_AT: expect }
+  if (m.expect === undefined && m.scenario === undefined) return base
+  return {
+    ...base,
+    ...(m.expect === undefined ? {} : { PINETA_STOP_AT: m.expect }),
+    ...(m.scenario === undefined ? {} : { PINETA_SCENARIO: m.scenario }),
+  }
 }
 
 /**
@@ -182,7 +230,7 @@ export function choose(
 
 const apply = (root: string, m: Mutation): Promise<Verdict> =>
   withMutant(root, m, async () => {
-    const [cmd, ...args] = m.command
+    const [cmd, ...args] = commandOf(m)
     if (cmd === undefined) return "BROKEN" as const
     return judge(
       await run(
@@ -190,7 +238,7 @@ const apply = (root: string, m: Mutation): Promise<Verdict> =>
         args,
         root,
         m.timeoutMs ?? 900_000,
-        mutantEnv(process.env, m.expect),
+        mutantEnv(process.env, m),
       ),
       m.expect,
     )

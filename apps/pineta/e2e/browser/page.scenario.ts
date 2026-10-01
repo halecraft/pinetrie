@@ -1,0 +1,2505 @@
+// e2e/browser/page — one window on a real host: who you are, the first turn,
+// branches and their columns, moving them, tabs, the header and the inbox,
+// the composer and cards, a second window, and a reload.
+
+import { COPIED } from "@pineta/client/copy"
+import { IDENTITY_KEY, identityCodec } from "@pineta/client/identity"
+import { type ButtonWords, queueWords } from "@pineta/client/send"
+import {
+  atEntry,
+  entryId,
+  handleOf,
+  projectRail,
+  ROOT,
+  writerId,
+} from "@pineta/core"
+import {
+  readCards,
+  readMarks,
+  readParticipantNames,
+  readTreeIndex,
+  readTyping,
+} from "@pineta/reads"
+import type { Page } from "@playwright/test"
+import { startHost } from "../../host/index.ts"
+import type { Checks } from "../checks.ts"
+import { join, suiteModel, waitFor } from "../harness.ts"
+import type { Scenario } from "../scenario.ts"
+
+import {
+  chooseFromMenu,
+  componentRenders,
+  launchBrowser,
+  OWN_MENU,
+  openProfile,
+  RAIL_MESSAGES,
+  shownName,
+  storedName,
+  TO_NOBODY,
+  twoFrames,
+} from "./page.ts"
+
+export const scenario: Scenario = {
+  run: ({ check }) => run(check),
+}
+
+async function run(check: Checks["check"]): Promise<void> {
+  const browser = await launchBrowser()
+  try {
+    const script = suiteModel()
+    const host = await startHost({
+      model: { kind: "scripted", script },
+      log: (m: string) => console.log("    [host]", m),
+    })
+    console.log(`  host              : ${host.httpUrl}\n`)
+
+    // An explicit context: a page from `browser.newPage()` owns its context, and
+    // Playwright refuses a second tab in it, which the column checks open. It may
+    // use the clipboard, so a check can read what copy wrote (S68).
+    const page = await (
+      await browser.newContext({
+        permissions: ["clipboard-read", "clipboard-write"],
+      })
+    ).newPage()
+    /** The main page's person: the email it gives the form below (ADR-0037). */
+    const ME = writerId("ada@browser.test")
+    /**
+     * Make `p` a person before it loads: what the identity form would have
+     * stored. A page from `browser.newPage()` has a context, and so a device, of
+     * its own, which would otherwise ask.
+     */
+    const asPerson = (p: Page, email: string, name: string) =>
+      p.addInitScript(([key, value]) => localStorage.setItem(key, value), [
+        IDENTITY_KEY,
+        JSON.stringify(identityCodec.encode({ email, name })),
+      ] as const)
+    const errors: string[] = []
+    page.on("pageerror", e => errors.push(String(e.message)))
+    page.on("console", m => m.type() === "error" && errors.push(m.text()))
+
+    try {
+      await page.goto(host.httpUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: 20_000,
+      })
+
+      // A first visit asks who you are, and connects nothing until it knows: your
+      // email is the principal, your name the session's label for you (ADR-0037).
+      await page.waitForSelector("#identity", { timeout: 20_000 })
+      await page.fill('#identity input[name="email"]', "ada")
+      await page.fill('#identity input[name="name"]', "Ada")
+      await page.click('#identity button[type="submit"]')
+      const refusedEmail = await page
+        .waitForSelector('.identity-problem[data-problem="email"]', {
+          timeout: 5_000,
+        })
+        .then(
+          () => true,
+          () => false,
+        )
+      await page.fill('#identity input[name="email"]', " Ada@Browser.Test ")
+      await page.click('#identity button[type="submit"]')
+      check(
+        "a first visit asks for your email and name, and refuses what is not an email",
+        refusedEmail,
+      )
+
+      // The bundle must load and connect before anything renders: a module the
+      // browser cannot run fails exactly here, which a browser-free check cannot
+      // see.
+      await page.waitForFunction(
+        () => document.getElementById("status")?.textContent === "connected",
+        { timeout: 20_000 },
+      )
+      check(
+        "page loaded, wasm instantiated, client connected to the host",
+        true,
+      )
+      // The render checks count React's development-build measures (S54), and
+      // against the production build every count is 0 and passes: refuse it.
+      const devReact = await page
+        .waitForFunction(
+          () =>
+            performance
+              .getEntriesByType("measure")
+              .some(
+                e =>
+                  (e as PerformanceMeasure).detail?.devtools?.track ===
+                  "Components \u269b",
+              ),
+          undefined,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "the page runs React's development build, whose renders the checks count",
+        devReact,
+      )
+      if (!devReact)
+        throw new Error(
+          "React's production build: the render checks count nothing",
+        )
+      check(
+        "no page errors during load",
+        errors.length === 0,
+        `${errors[0] === undefined ? "" : ` — ${errors[0].slice(0, 90)}`}`,
+      )
+      // The session is plain JSON (ADR-0023): the page loads no Loro and no wasm.
+      // In development Vite pre-bundles loro-crdt with its wasm inside a JS module,
+      // so a check for `.wasm` files alone would pass with Loro loaded.
+      const heavy = await page.evaluate(() =>
+        performance
+          .getEntriesByType("resource")
+          .map(e => e.name)
+          .filter(n => /loro|\.wasm/i.test(n)),
+      )
+      check(
+        "the page loads no Loro and no wasm",
+        heavy.length === 0,
+        `${heavy[0] === undefined ? "" : ` — ${heavy[0].split("/").at(-1)}`}`,
+      )
+
+      // ── helpers ──────────────────────────────────────────────────────────────
+      /** A message for Ada only: it names her, so in agent work it asks no one. */
+      const NOTE = "@Ada just a note"
+      /** A message whose markdown draws as other text: what copy copies is not what it shows. */
+      const STILL_SOURCE = "still **off** it"
+      const STILL = "still off it"
+      /**
+       * `STILL`'s message. `msg` finds none: `:text-is` does not match a
+       * paragraph whose text is split by a <strong>.
+       */
+      const stillMsg = (scope: string) =>
+        `${scope} .msg:has(> .text > p:only-child:has-text(${JSON.stringify(STILL)}))`
+      const col = (n: number) => `.column[data-position="${n}"]`
+      // Plain text is drawn as markdown: one paragraph. `:text-is` matches the
+      // smallest element holding the text, which is that paragraph.
+      const msg = (text: string) =>
+        `.msg:has(> .text > p:only-child:text-is(${JSON.stringify(text)}))`
+      const label = async (n: number) =>
+        (await page.textContent(`${col(n)} .composer .send`))?.trim() ?? ""
+      const send = async (n: number, text: string) => {
+        await page.fill(`${col(n)} .composer .input`, text)
+        await page.click(`${col(n)} .composer .send`)
+      }
+      const idle = () =>
+        waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+      /** Where the caret is in column `n`'s box, or null if it is not focused. */
+      const caretIn = (n: number) =>
+        page.$eval(`${col(n)} .composer .input`, box =>
+          document.activeElement === box
+            ? (box as HTMLTextAreaElement).selectionStart
+            : null,
+        )
+      const shows = (text: string, scope = "") =>
+        page
+          .waitForSelector(`${scope} ${msg(text)}`.trim(), { timeout: 60_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+      const texts = (n: number) =>
+        page.$$eval(`${col(n)} .msg > .text`, ns =>
+          ns.map(t => t.textContent ?? ""),
+        )
+      const top = (sel: string) =>
+        page
+          .$eval(sel, n => n.getBoundingClientRect().top)
+          .catch(() => Number.NaN)
+
+      // ── names, and the promise before the first message ─────────────────────
+      await waitFor(
+        () => readParticipantNames(host.doc).get(ME) === "Ada",
+        15_000,
+      )
+      await page.waitForSelector("#tabs .add-agent", { timeout: 15_000 })
+      await page.click("#tabs .add-agent")
+      await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
+      check(
+        "＋ agent's new tab is ready to type in: its box has focus",
+        (await caretIn(0)) === 0,
+      )
+      /** Where the columns start: the rail's width, plus its border. */
+      const stripLeft = () =>
+        page.$eval("#strip", n => Math.round(n.getBoundingClientRect().left))
+      const emptyLeft = await stripLeft()
+
+      // ── the first turn: the reply, the agent joining ────────────────────────
+      // Whether a reply streams live is checked on the scripted host below, where
+      // its pace is set: a live model's one-line reply can open and close its
+      // stream between two of the page's renders.
+      await send(0, "Say exactly: BROWSER-OK")
+      // Structure, not the model's words: a reply appeared, in this column. What
+      // the model says is `e2e:live`'s to check.
+      await idle()
+      const roles = await page.$$eval(`${col(0)} .msg`, ns =>
+        ns.map(
+          n =>
+            `${n.className.replace("msg ", "")}:${n.querySelector(".role")?.textContent}`,
+        ),
+      )
+      check(
+        "the column reads Ada's asked message, then the agent",
+        roles.join(",") === "chat asked:Ada,assistant:agent",
+        `${roles.join(", ")}`,
+      )
+      const filledLeft = await stripLeft()
+      // One track: its dots are centred in the rail, not against its left edge.
+      const offCentre = await page.$eval(".rail", rail => {
+        const dot = rail.querySelector(".rail-dot")?.getBoundingClientRect()
+        const box = rail.getBoundingClientRect()
+        return dot === undefined
+          ? Number.POSITIVE_INFINITY
+          : Math.abs(
+              dot.left + dot.width / 2 - (box.left + rail.clientWidth / 2),
+            )
+      })
+      check(
+        "the first message takes the new tab's hollow dot, and the columns stay put",
+        filledLeft === emptyLeft &&
+          (await page.locator(".rail-start").count()) === 0,
+        `${emptyLeft}px → ${filledLeft}px`,
+      )
+      check(
+        "one track's dots are centred in the rail",
+        offCentre <= 1,
+        `${offCentre.toFixed(1)}px off`,
+      )
+
+      // ── mentions pick the addressee, and the button says so ────────────────
+      // The thread has a lane now, so a message naming no one asks the agent; one
+      // naming only a person is for them (ADR-0021).
+      await page.fill(`${col(0)} .composer .input`, NOTE)
+      await label(0)
+      await page.$$eval(".msg.assistant", n => n.length)
+      await page.click(`${col(0)} .composer .send`)
+      await shows(NOTE)
+      await new Promise(r => setTimeout(r, 1500))
+      await page.fill(
+        `${col(0)} .composer .input`,
+        "@agent say exactly: BROWSER-TWO",
+      )
+      await label(0)
+      await page.$$eval(".msg.assistant", n => n.length)
+      await page.click(`${col(0)} .composer .send`)
+      await idle()
+      /** Messages the rail draws: one per dot, and each capsule's count. */
+      const railCount = (p: Page = page) => p.evaluate(RAIL_MESSAGES)
+
+      // ── a branch opens beside its parent, in its colour ─────────────────────
+      // It forks at the agent's reply, the second message, so opening has to
+      // bring its first message down to meet the fork point.
+      const replyId =
+        (await page.$eval(`${col(0)} .msg.assistant`, n =>
+          n.getAttribute("data-entry"),
+        )) ?? ""
+      const atReply = `${col(0)} .msg[data-entry="${replyId}"]`
+      const other = await join(host, "other", "browser")
+      await other.setName("Bea")
+      // A fork on purpose, at the agent's reply: `branch`. A branch starts as a
+      // conversation, so it is appended with no run.
+      await other.chat("an aside", atEntry(entryId(replyId)), {
+        mode: "branch",
+      })
+      await page.waitForSelector(`${atReply} .open-branch`, { timeout: 15_000 })
+      await texts(0)
+      await page.evaluate(() => document.fonts.ready)
+      await page.click(`${atReply} .open-branch`)
+      const opened = await shows("an aside", col(1))
+      check(
+        "the branch opened as a second column, to the right of its parent",
+        opened && (await page.$$eval(".column", n => n.length)) === 2,
+      )
+      const drift = Math.abs(
+        (await top(`${col(1)} .msg`)) - (await top(atReply)),
+      )
+      const needed = (await top(atReply)) - (await top(`${col(0)} .msg`))
+      check(
+        "it opened with its first message level with the fork point",
+        drift <= 4 && needed > 20,
+        `${needed.toFixed(0)}px down (off by ${drift.toFixed(1)}px)`,
+      )
+      const colours = await page.evaluate(
+        ({ first, branch }) => {
+          const column = document.querySelector(branch)
+          const track = column?.getAttribute("data-track") ?? ""
+          const dot = document.querySelector(
+            `${first} .fork-dot[data-track="${track}"]`,
+          )
+          const railDot = document.querySelector(
+            `.rail-dot[data-track="${track}"][data-open="yes"]`,
+          )
+          const head = column?.querySelector(".column-head") ?? null
+          return {
+            head:
+              head === null ? "none" : getComputedStyle(head).borderTopColor,
+            dot: dot === null ? "none" : getComputedStyle(dot).backgroundColor,
+            rail:
+              railDot === null
+                ? "none"
+                : getComputedStyle(railDot).backgroundColor,
+          }
+        },
+        { first: col(0), branch: col(1) },
+      )
+      check(
+        "the branch's header, its fork dot and its rail track share a colour",
+        colours.head !== "none" &&
+          colours.head === colours.dot &&
+          colours.dot === colours.rail,
+        `${colours.head} · ${colours.dot} · ${colours.rail}`,
+      )
+      // Hovering the header outlines its fork dot in the branch's colour. The
+      // aside is the reply's younger child, so its track is 1 (`projectRail`),
+      // the slot the mutation names.
+      await page.hover(`${col(1)} .column-head .head-row`)
+      const outline = await page.evaluate(
+        ({ first, branch }) => {
+          const track = document
+            .querySelector(branch)
+            ?.getAttribute("data-track")
+          const dot = document.querySelector(
+            `${first} .fork-dot[data-track="${track}"]`,
+          )
+          return dot === null ? "none" : getComputedStyle(dot).outlineColor
+        },
+        { first: col(0), branch: col(1) },
+      )
+      await page.mouse.move(0, 0)
+      check(
+        "hovering a branch's header outlines its fork dot in the branch's colour",
+        outline === colours.head,
+        `${outline} · ${colours.head}`,
+      )
+      const beforeScroll = await page.$eval(
+        `${col(1)} .column-body`,
+        n => n.scrollTop,
+      )
+      await page.$eval(`${col(0)} .column-body`, n => {
+        n.scrollTop += 40
+      })
+      check(
+        "scrolling one column does not scroll another",
+        (await page.$eval(`${col(1)} .column-body`, n => n.scrollTop)) ===
+          beforeScroll,
+      )
+      // The header's origin row leads back to the fork point. A short window puts
+      // it out of view first, so the row has somewhere to go.
+      {
+        const size = page.viewportSize()
+        if (size !== null) await page.setViewportSize({ ...size, height: 260 })
+        await page.$eval(`${col(0)} .column-body`, n => {
+          n.scrollTop = n.scrollHeight
+        })
+        const inView = () =>
+          page.$eval(atReply, m => {
+            const r = m.getBoundingClientRect()
+            const body = m.closest(".column-body")?.getBoundingClientRect()
+            return (
+              body !== undefined && r.bottom > body.top && r.top < body.bottom
+            )
+          })
+        const hidden = !(await inView())
+        await page.click(`${col(1)} .column-head .origin`)
+        const back = await waitFor(() => inView(), 5_000)
+        if (size !== null) await page.setViewportSize(size)
+        check(
+          "the origin row leads back to the fork point",
+          hidden && back >= 0,
+          `hidden first: ${hidden}`,
+        )
+      }
+
+      // ── → opens a branch beside its parent, and it follows its branch ──────
+      // The → sits in the column's right padding, all but a pixel outside its
+      // message, and a hidden → takes no hover. A pointer that overshoots into
+      // that padding, past the →, must still show it and reach it.
+      await page.locator(`${col(0)} ${msg(NOTE)}`).scrollIntoViewIfNeeded()
+      const gutter = await page.$eval(`${col(0)} ${msg(NOTE)}`, m => {
+        const body = m.closest(".column-body")
+        const arrow = m
+          .querySelector(":scope > .tools > .branch")
+          ?.getBoundingClientRect()
+        if (body === null || arrow === undefined) return null
+        // Its client area's right edge: a scrollbar, if drawn, lies beyond it.
+        const inner =
+          body.getBoundingClientRect().left + body.clientLeft + body.clientWidth
+        return {
+          past: { x: inner - 1, y: arrow.top + arrow.height / 2 },
+          on: {
+            x: arrow.left + arrow.width / 2,
+            y: arrow.top + arrow.height / 2,
+          },
+        }
+      })
+      await page.mouse.move(0, 0)
+      if (gutter !== null) {
+        await page.mouse.move(gutter.past.x, gutter.past.y)
+        await page.mouse.move(gutter.on.x, gutter.on.y, { steps: 4 })
+      }
+      const reached =
+        gutter !== null &&
+        (await page.evaluate(({ x, y }) => {
+          const hit = document.elementFromPoint(x, y)
+          return (
+            hit?.classList.contains("branch") === true &&
+            getComputedStyle(hit).visibility === "visible"
+          )
+        }, gutter.on))
+      check(
+        "→ shows from the padding beside its message, and takes the click",
+        reached,
+      )
+
+      // From the first column while two are open, so "beside its parent"
+      // (position 1) and "the far right" (position 2) differ.
+      await page.hover(`${col(0)} ${msg(NOTE)}`)
+      await page.click(`${col(0)} ${msg(NOTE)} > .tools > .branch`)
+      // Where it opens and what it starts with are `planIntent`'s and
+      // `startText`'s, proven by their unit tests.
+      await page
+        .waitForFunction(
+          ([c, note]) =>
+            document
+              .querySelector(`${c} .origin`)
+              ?.textContent?.includes(note) === true &&
+            document.querySelector(`${c} .msg`) === null,
+          [col(1), NOTE] as const,
+          { timeout: 15_000 },
+        )
+        .catch(() => null)
+      const caret = await caretIn(1)
+      check(
+        "→ opens a branch ready to type in: its box has focus, the caret after @agent",
+        caret === "@agent ".length,
+        `${caret}`,
+      )
+      // Its header says a new agent starts, for as long as its composer asks one.
+      {
+        const pending = `${col(1)} .column-head .agent-name.pending`
+        const appears = (present: boolean) =>
+          page
+            .waitForFunction(
+              ([sel, want]) => (document.querySelector(sel) !== null) === want,
+              [pending, present] as const,
+              { timeout: 5_000 },
+            )
+            .then(
+              () => true,
+              () => false,
+            )
+        const first = await appears(true)
+        await page.fill(`${col(1)} .composer .input`, "")
+        const gone = await appears(false)
+        await page.fill(`${col(1)} .composer .input`, "@agent ")
+        const again = await appears(true)
+        check(
+          "a new column's header says a new agent starts only while its composer asks one",
+          first && gone && again,
+          `${first}, ${gone}, ${again}`,
+        )
+      }
+      await railCount()
+      await send(1, "deeper")
+      await idle()
+      // Each column's LAST message, found by class: `:last-of-type` would match
+      // the last div, and pass on finding nothing.
+      await page.$$eval(".column", cs =>
+        cs.map(c => {
+          const all = c.querySelectorAll(".column-body .msg")
+          const last = all[all.length - 1]
+          return (
+            last
+              ?.querySelector(":scope > .tools > .branch")
+              ?.getAttribute("title") ?? (last === undefined ? "none" : "no")
+          )
+        }),
+      )
+
+      // ── moving a column: drag its header, or its grip's keys ───────────────
+      const keys = () =>
+        page.$$eval(".column", ns => ns.map(n => n.getAttribute("data-key")))
+      /** Press column `n`'s header, and move to `dx` px into column `into`. */
+      const dragHeader = async (n: number, into: number, dx: number) => {
+        const head = await page.locator(`${col(n)} .column-head`).boundingBox()
+        const target = await page.locator(col(into)).boundingBox()
+        if (head === null || target === null) return false
+        const y = head.y + head.height / 2
+        await page.mouse.move(head.x + 40, y)
+        await page.mouse.down()
+        await page.mouse.move(target.x + dx, y, { steps: 12 })
+        return true
+      }
+      const marked = () =>
+        page.evaluate(() => ({
+          dragging:
+            document
+              .querySelector(".column[data-dragging]")
+              ?.getAttribute("data-position") ?? null,
+          drop: [...document.querySelectorAll(".column[data-drop]")]
+            .map(
+              n =>
+                `${n.getAttribute("data-position")}:${n.getAttribute("data-drop")}`,
+            )
+            .join(),
+        }))
+      const unmoved = await keys()
+      const pressed = await dragHeader(2, 0, 60)
+      const mid = await marked()
+      check(
+        "a dragged header's column is lifted and a bar marks where it will land; nothing moves before the drop",
+        pressed &&
+          mid.dragging === "2" &&
+          mid.drop === "0:before" &&
+          (await keys()).join() === unmoved.join(),
+        `${JSON.stringify(mid)}`,
+      )
+      await page.keyboard.press("Escape")
+      await page.mouse.up()
+      const after = await marked()
+      check(
+        "Escape cancels a drag: nothing moves, and nothing stays marked",
+        (await keys()).join() === unmoved.join() &&
+          after.dragging === null &&
+          after.drop === "",
+        `${JSON.stringify(after)}`,
+      )
+      await dragHeader(2, 0, 60)
+      await page.mouse.up()
+      const dropped = await keys()
+      check(
+        "a dropped column moves there, and the others keep their order",
+        dropped.join() ===
+          [unmoved[2], unmoved[0], unmoved[1], ...unmoved.slice(3)].join(),
+        `${unmoved.length} columns`,
+      )
+      await page.waitForFunction(
+        c =>
+          document
+            .querySelector(`${c} .msg`)
+            ?.textContent?.includes("BROWSER-OK"),
+        col(0),
+        { timeout: 15_000 },
+      )
+      const main = await texts(0)
+      const former = await texts(1)
+      check(
+        "moved first, a branch shows its whole path, and the old first column now starts after its fork point",
+        main.includes("an aside") &&
+          former.some(t => t.includes("BROWSER-TWO")) &&
+          !former.includes("Say exactly: BROWSER-OK"),
+      )
+      const leftover = await page.$eval(
+        `${col(0)} .spacer`,
+        n => n.getBoundingClientRect().height,
+      )
+      check(
+        "the new first column keeps no alignment spacer: it has no fork point",
+        leftover === 0,
+        `${leftover}px`,
+      )
+      await page.focus(`${col(0)} .grip`)
+      await page.keyboard.press("ArrowRight")
+      const stepped = await keys()
+      const focused = await page.evaluate(() => {
+        const a = document.activeElement
+        return a?.classList.contains("grip") === true
+          ? (a.closest(".column")?.getAttribute("data-key") ?? null)
+          : null
+      })
+      check(
+        "→ on a column's grip moves it one place right, and its grip keeps focus",
+        stepped.join() ===
+          [dropped[1], dropped[0], ...dropped.slice(2)].join() &&
+          focused === dropped[0],
+        `${focused}`,
+      )
+      // The strip is wider than the page, so the last column starts cut off.
+      await page.keyboard.press("End")
+      const shown = await page.evaluate(() => {
+        const strip = document.querySelector("#strip")
+        const moved = document.activeElement?.closest(".column")
+        if (strip === null || moved === null || moved === undefined) return null
+        const s = strip.getBoundingClientRect()
+        const c = moved.getBoundingClientRect()
+        return {
+          overflows: strip.scrollWidth > strip.clientWidth,
+          last: moved.getAttribute("data-position"),
+          inView: c.left >= s.left - 1 && c.right <= s.right + 1,
+        }
+      })
+      check(
+        "End on its grip moves it last, and scrolls the strip to show it",
+        shown?.overflows === true &&
+          shown.last === String(dropped.length - 1) &&
+          shown.inView,
+        `${JSON.stringify(shown)}`,
+      )
+      await page.keyboard.press("Home")
+
+      // ── a busy thread: the composer says it will queue, and it does ────────
+      // On one host the page sees another writer's run start almost at once, so
+      // the composer chooses `queue` itself: that is what a person meets. A true
+      // conflict needs two sends to cross in flight; its outcome is checked in
+      // e2e, where the commands can be ordered.
+      const tipOf0 = () =>
+        page.$$eval(
+          `${col(0)} .column-body .msg[data-entry]`,
+          ns => ns.at(-1)?.getAttribute("data-entry") ?? "",
+        )
+      await page.fill(`${col(0)} .composer .input`, "@agent after Bea")
+      await label(0)
+      // Her reply is paused, so her run shows for as long as the checks look.
+      const beasTurn = script.pause("Bea's turn")
+      await other.chat("@agent Bea's turn", atEntry(entryId(await tipOf0())))
+      // The send button once it says `words`: its label and its title.
+      const queueButton = (words: ButtonWords) =>
+        page
+          .waitForFunction(
+            ([c, label, title]) => {
+              const b = document.querySelector(`${c} .composer .send`)
+              return (
+                b?.textContent === label && b.getAttribute("title") === title
+              )
+            },
+            [col(0), words.label, words.title] as const,
+            { timeout: 15_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+      await other.chat("@agent Bea again", atEntry(entryId(await tipOf0())), {
+        mode: "queue",
+      })
+      await page.click(`${col(0)} .composer .send`)
+      const waiting = await page
+        .waitForSelector(`${col(0)} ${msg("@agent after Bea")}.waiting`, {
+          timeout: 15_000,
+        })
+        .then(
+          () => true,
+          () => false,
+        )
+      check("the queued message shows in its column, waiting", waiting)
+      check(
+        "with your own message last in line, it says it will queue after yours",
+        await queueButton(queueWords({ kind: "afterYours", ahead: 2 })),
+        `"${await label(0)}"`,
+      )
+      beasTurn.resume()
+      await idle()
+      const asked = [
+        "@agent Bea's turn",
+        "@agent Bea again",
+        "@agent after Bea",
+      ]
+      await page.$$eval(
+        `${col(0)} .msg`,
+        (ns, asked) =>
+          ns
+            .map(n => n.querySelector(":scope > .text")?.textContent ?? "")
+            .filter(t => asked.includes(t)),
+        asked,
+      )
+      await page.$$eval(`${col(0)} .msg`, ns =>
+        ns.slice(-4).map(n => n.className.replace("msg ", "").split(" ")[0]),
+      )
+
+      // ── the agent in a thread no column shows: the rail pulses ──────────────
+      await page.click(`${col(1)} .close`)
+      await page.click(`${col(1)} .close`)
+      await page.waitForFunction(
+        () => document.querySelectorAll(".column").length === 1,
+        undefined,
+        { timeout: 15_000 },
+      )
+      const noteId =
+        Object.values(host.doc.entries()).find(e =>
+          JSON.stringify(e).includes("just a note"),
+        )?.id ?? ""
+      const pulse = script.pause("say exactly: PULSE")
+      await other.chat("@agent say exactly: PULSE", atEntry(entryId(noteId)), {
+        mode: "branch",
+      })
+      const pulsing = await page
+        .waitForSelector(".rail-dot.pulse", { timeout: 30_000 })
+        .then(el => el.getAttribute("data-entry"))
+        .catch(() => null)
+      check(
+        "the rail pulses where the agent replies, with no column open there",
+        pulsing !== null,
+      )
+      // A pulsing dot scales forever, and Playwright clicks only a still element.
+      pulse.resume()
+      if (pulsing !== null)
+        await page.click(`.rail-dot[data-entry="${pulsing}"]`)
+      check(
+        "clicking the pulse opens that thread",
+        await shows("@agent say exactly: PULSE"),
+      )
+      await idle()
+      // A menu open on the agent stays when its work ends: only you close it,
+      // and then the agent, idle, leaves the header.
+      const held = script.pause("say exactly: HELD")
+      await other.chat("@agent say exactly: HELD", atEntry(entryId(noteId)), {
+        mode: "branch",
+      })
+      const heldOpen = await page
+        .waitForSelector("#top .here-agent.running", { timeout: 30_000 })
+        .then(() => page.click("#top .here-agent .here-trigger"))
+        .then(() =>
+          page.waitForSelector("#top .here-agent .menu .here-thread", {
+            timeout: 15_000,
+          }),
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      held.resume()
+      await idle()
+      const finished = await page
+        .waitForFunction(
+          () =>
+            document.querySelector("#top .here-agent .menu-heading")
+              ?.textContent === "The agent has finished",
+          undefined,
+          { timeout: 15_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      await page.keyboard.press("Escape")
+      const left = await page
+        .waitForFunction(
+          () => document.querySelector("#top .here-agent") === null,
+          undefined,
+          { timeout: 15_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "a menu open on the agent stays open when its work ends, and the agent leaves the header once you close it",
+        heldOpen && finished && left,
+        `opened ${heldOpen}, stayed ${finished}, left ${left}`,
+      )
+      await other.close()
+
+      // ── your profile: a rename shows, and the name each message was sent ──
+      // under stays; this device keeps the name you go by (ADR-0037).
+      const profileSeen = await openProfile(page)
+      const nameField = '#profile input[name="name"]'
+      await page.fill(nameField, "agent")
+      await page.press(nameField, "Enter")
+      const refusedName = await page
+        .waitForSelector('#profile .name-problem[data-problem="name"]', {
+          timeout: 5_000,
+        })
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "your profile refuses a name no mention could reach, before sending it",
+        profileSeen && refusedName,
+      )
+      await page.fill(nameField, "Ada Lovelace")
+      const hint = await page
+        .textContent("#profile .name-handle", { timeout: 5_000 })
+        .catch(() => null)
+      check(
+        "your profile shows the handle the name you type gives you",
+        hint === "others mention you as @adalovelace",
+        `${hint}`,
+      )
+      await page.press(nameField, "Enter")
+      const renamed = await page
+        .waitForFunction(
+          () =>
+            [...document.querySelectorAll(".msg.chat .role")].some(
+              n => n.textContent === "Ada Lovelace (Ada)",
+            ),
+          undefined,
+          { timeout: 15_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "after a rename, Ada's earlier messages show her current name, then the one she sent under",
+        renamed,
+      )
+      check(
+        "a rename is kept on this device",
+        (await waitFor(
+          async () => (await storedName(page)) === "Ada Lovelace",
+          10_000,
+        )) >= 0,
+      )
+      // The page's person, from another device: its rename reaches this one's
+      // storage too. Set back, so the checks below see "Ada Lovelace".
+      const adaElsewhere = await join(host, "ada", "browser")
+      await adaElsewhere.setName("Ada L")
+      const followed = await waitFor(
+        async () =>
+          (await shownName(page)) === "Ada L" &&
+          (await storedName(page)) === "Ada L",
+        15_000,
+      )
+      await adaElsewhere.setName("Ada Lovelace")
+      await waitFor(
+        async () => (await shownName(page)) === "Ada Lovelace",
+        15_000,
+      )
+      await adaElsewhere.close()
+      check("a rename on another device is kept on this one", followed >= 0)
+
+      // ── ＋ agent: a new tab, an agent thread at the root, and stepping down ──
+      const firstRoot = readTreeIndex(host.doc).roots[0] ?? ""
+      // A new tab holds one column, so the thread's columns count from 0.
+      const before = 0
+      await page.click("#tabs .add-agent")
+      const agentCol = col(before)
+      await page.waitForSelector(`${agentCol} .composer`, { timeout: 15_000 })
+      await send(before, "say exactly: DOWN-ONE")
+      await page.waitForSelector(`${agentCol} .msg.assistant`, {
+        timeout: 60_000,
+      })
+      await idle()
+      // → at the agent thread's end opens a branch with @agent typed; deleting
+      // it steps down to a conversation continuing from there.
+      const end = `${agentCol} .msg.assistant`
+      await page.hover(end)
+      await page.click(`${end} > .tools > .branch`)
+      const downCol = col(before + 1)
+      await page.waitForSelector(`${downCol} .composer`, { timeout: 15_000 })
+      await page.inputValue(`${downCol} .composer .input`)
+      await page.fill(`${downCol} .composer .input`, "")
+      await send(before + 1, "off the record")
+      await shows("off the record", downCol)
+      // The agent thread goes on through its lane; the newer conversation at its
+      // old end must not take its column, nor its reply.
+      await send(before, "say exactly: DOWN-TWO")
+      await page
+        .waitForFunction(
+          c => document.querySelectorAll(`${c} .msg.assistant`).length === 2,
+          agentCol,
+          { timeout: 60_000 },
+        )
+        .catch(() => null)
+      await idle()
+      await texts(before)
+      await texts(before + 1)
+      // A branch from a conversation opens with nothing typed. The message's
+      // markdown draws as other text, for copy below.
+      await send(before + 1, STILL_SOURCE)
+      await page.waitForSelector(stillMsg(downCol), { timeout: 60_000 })
+      await page.hover(`${downCol} ${msg("off the record")}`)
+      await page.click(`${downCol} ${msg("off the record")} > .tools > .branch`)
+      const asideCol = col(before + 2)
+      await page.waitForSelector(`${asideCol} .composer`, { timeout: 15_000 })
+      await page.inputValue(`${asideCol} .composer .input`)
+      await page.click(`${asideCol} .close`)
+      await page.waitForFunction(
+        () => document.querySelectorAll(".column").length === 2,
+        undefined,
+        { timeout: 15_000 },
+      )
+
+      // ── a message's tools: one row; edit is a sibling; a first message's new tab
+      // (ADR-0043). A person's message in agent work has all three tools.
+      const person = `${agentCol} ${msg("say exactly: DOWN-TWO")}`
+      await page.hover(person)
+      const row = await page.$$eval(`${person} > .tools > button`, bs =>
+        bs.map(b => ({
+          name: b.className,
+          top: Math.round(b.getBoundingClientRect().top * 10) / 10,
+        })),
+      )
+      const tops = row.map(b => b.top)
+      check(
+        "a message's tools are one row: copy, edit, →",
+        row.map(b => b.name).join(" ") === "copy edit branch" &&
+          Math.max(...tops) - Math.min(...tops) <= 1,
+        `${JSON.stringify(row)}`,
+      )
+      // Copy puts the message's markdown on the clipboard, not what it draws.
+      const still = stillMsg(downCol)
+      await page.hover(still)
+      await page.click(`${still} > .tools > .copy`)
+      const copied = await page
+        .waitForFunction(
+          async () => (await navigator.clipboard.readText()) !== "",
+          undefined,
+          { timeout: 5_000 },
+        )
+        .then(
+          () => page.evaluate(() => navigator.clipboard.readText()),
+          () => "",
+        )
+      const copiedTitle = await page.getAttribute(
+        `${still} > .tools > .copy`,
+        "title",
+      )
+      check(
+        "copy puts a message's markdown on the clipboard",
+        copied === STILL_SOURCE && copiedTitle === COPIED,
+        `"${copied}", "${copiedTitle}"`,
+      )
+      // Without a clipboard, as over plain http, copy selects the drawn text for
+      // you to copy (S68: hiding it stands in for an insecure context).
+      await page.evaluate(() => {
+        getSelection()?.removeAllRanges()
+        Object.defineProperty(navigator, "clipboard", {
+          value: undefined,
+          configurable: true,
+        })
+      })
+      let selected = ""
+      try {
+        await page.click(`${still} > .tools > .copy`)
+        selected = await page.evaluate(() => getSelection()?.toString() ?? "")
+      } finally {
+        await page.evaluate(() => {
+          Reflect.deleteProperty(navigator, "clipboard")
+          getSelection()?.removeAllRanges()
+        })
+      }
+      check(
+        "with no clipboard, copy selects the message's text",
+        selected.trim() === STILL,
+        `"${selected}"`,
+      )
+      // Edit opens a branch at the message's parent, holding its text as sent,
+      // with @agent in front: its thread's default person the agent, and a branch
+      // asks only through a mention.
+      const askedId = (await page.getAttribute(person, "data-entry")) ?? ""
+      const parentId = readTreeIndex(host.doc).parentOf(askedId) ?? ""
+      await page.hover(person)
+      await page.click(`${person} > .tools > .edit`)
+      const editCol = col(before + 1)
+      await page.waitForSelector(`${editCol} .composer`, { timeout: 15_000 })
+      const editStart = await page.inputValue(`${editCol} .composer .input`)
+      const editTrack = await page.getAttribute(editCol, "data-track")
+      const forkOnParent = await page
+        .locator(
+          `${agentCol} .msg[data-entry="${parentId}"] .fork-dot[data-track="${editTrack}"]`,
+        )
+        .count()
+      // Sent without @agent, it is a plain message: no run.
+      await page.fill(`${editCol} .composer .input`, "say exactly: DOWN-2B")
+      await page.click(`${editCol} .composer .send`)
+      await shows("say exactly: DOWN-2B", editCol)
+      const edited = [...readTreeIndex(host.doc).bySend.values()]
+        .map(id => readTreeIndex(host.doc).entries[id])
+        .find(e => e?.message?.content === "say exactly: DOWN-2B")
+      check(
+        "edit sends again beside the original: a branch at its parent, starting with its text",
+        editStart === "@agent say exactly: DOWN-TWO" &&
+          forkOnParent === 1 &&
+          edited?.parentId === parentId &&
+          (await texts(before)).includes("say exactly: DOWN-TWO"),
+        `"${editStart}", its fork dot on the parent: ${forkOnParent}`,
+      )
+      await page.click(`${editCol} .close`)
+      await page.waitForFunction(
+        () => document.querySelectorAll(".column").length === 2,
+        undefined,
+        { timeout: 15_000 },
+      )
+      // A root's first message has no parent: its edit is a new tab, an agent's
+      // since the message asked the agent.
+      const first = `${agentCol} ${msg("say exactly: DOWN-ONE")}`
+      await page.hover(first)
+      await page.click(`${first} > .tools > .edit-new-tab`)
+      await page.waitForSelector('#tabs .tab-new[aria-selected="true"]', {
+        timeout: 15_000,
+      })
+      await page.click(`${col(0)} .close`)
+      const agentRoot = readTreeIndex(host.doc).roots.at(-1) ?? ""
+      await page.click(`#tabs .tab[data-root="${agentRoot}"]`)
+      await page.waitForFunction(
+        () => document.querySelectorAll(".column").length === 2,
+        undefined,
+        { timeout: 15_000 },
+      )
+
+      // ── your tabs, the header and the inbox (ADR-0029, ADR-0030) ───────────
+      const downRoot = readTreeIndex(host.doc).roots.at(-1) ?? ""
+      const tabSel = (root: string) => `#tabs .tab[data-root="${root}"]`
+      const selectedRoot = (p: Page) =>
+        p
+          .$eval('#tabs .tab[aria-selected="true"]', n =>
+            n.getAttribute("data-root"),
+          )
+          .catch(() => null)
+      const messagesIn = (root: string) =>
+        projectRail(readTreeIndex(host.doc), root).length
+      // 1. Which tree a tab's rail draws is `tabRail`'s, proven by its unit test.
+      await page.click(tabSel(firstRoot))
+      await page
+        .waitForFunction(
+          `(${RAIL_MESSAGES})() === ${messagesIn(firstRoot)}`,
+          null,
+          {
+            timeout: 15_000,
+          },
+        )
+        .catch(() => null)
+
+      // 2. A root someone else starts opens no tab here (ADR-0030).
+      const api = await join(host, "tabs", "browser")
+      await api.setName("Bea")
+      const third = await api.chat("a third thread", ROOT, { mode: "branch" })
+      const thirdRoot = third.kind === "appended" ? third.id : ""
+      await page.waitForFunction(
+        n => document.getElementById("count")?.textContent === n,
+        String(Object.keys(host.doc.entries()).length),
+        { timeout: 15_000 },
+      )
+      check(
+        "a root another writer starts opens no tab, and the page stays where it is",
+        thirdRoot !== "" &&
+          (await page.locator(tabSel(thirdRoot)).count()) === 0 &&
+          (await selectedRoot(page)) === firstRoot,
+      )
+      // Any root can be archived: another tab's ⋯ shows while it is hovered.
+      const otherMenu = page.locator(
+        `${tabSel(downRoot)} ~ .tab-more .tab-menu`,
+      )
+      const hiddenAtRest = !(await otherMenu.isVisible())
+      await page.hover(tabSel(downRoot))
+      const shownOnHover = await otherMenu.isVisible()
+      await page.mouse.move(0, 0)
+      check(
+        "another root's tab shows its ⋯ on hover, and not at rest",
+        hiddenAtRest && shownOnHover,
+        `${hiddenAtRest}, ${shownOnHover}`,
+      )
+
+      // Renders (S54, S59). Your typing writes only presence once your card
+      // exists, and `App` reads none, so it redraws nothing outside the
+      // composer. Typed for over a second: `typing` is written at most once a
+      // second. A render is named by the function that rendered: a message's is
+      // `MessageView`, the function `memo` wraps, and a list's
+      // `MessageListView`, so a count of `Message` would be 0 whatever renders.
+      await page.click(`${col(0)} .composer .input`)
+      await page.keyboard.type("t")
+      await page.waitForTimeout(500)
+      await componentRenders(page)
+      await page.keyboard.type("yped while only presence changes", {
+        delay: 80,
+      })
+      const typed = await componentRenders(page)
+      // The host has your `typing`: the write the check is about happened.
+      const typedHere = readTyping(host.presence).some(([w]) => w === ME)
+      const rendersOf = (name: string) => typed.filter(r => r.name === name)
+      const outside = [
+        "Header",
+        "TabBar",
+        "Column",
+        "MessageListView",
+        "MessageView",
+      ]
+        .map(name => [name, rendersOf(name).length] as const)
+        .filter(([, n]) => n > 0)
+      check(
+        "your typing redraws nothing outside your composer",
+        outside.length === 0 && typedHere,
+        `${JSON.stringify(outside)}, typing written ${typedHere}`,
+      )
+      await page.fill(`${col(0)} .composer .input`, "")
+      // Someone else following this thread changes only `reading`: the column's
+      // header shows them, and no column redraws.
+      const onPath = await page.$$eval(`${col(0)} .msg[data-entry]`, ms =>
+        ms.at(-1)?.getAttribute("data-entry"),
+      )
+      await componentRenders(page)
+      if (onPath != null) api.setReading("presence-check", onPath)
+      const beaHere = `${col(0)} .column-head .avatar[data-writer="${api.writer}"]`
+      const beaShown = await page
+        .waitForSelector(beaHere, { timeout: 15_000 })
+        .then(
+          () => true,
+          () => false,
+        )
+      const readRenders = await componentRenders(page)
+      const readColumns = readRenders.filter(r =>
+        ["Column", "Header", "TabBar"].includes(r.name),
+      )
+      check(
+        "another person following this thread shows in its header and redraws no column",
+        beaShown && readColumns.length === 0,
+        `${readColumns.map(r => r.name).join(", ")}`,
+      )
+      api.clearReading("presence-check")
+      await page
+        .waitForSelector(beaHere, { state: "detached", timeout: 15_000 })
+        .catch(() => null)
+      // A message in a thread this tab does not show redraws none of its messages.
+      await componentRenders(page)
+      const beforeElsewhere = Object.keys(host.doc.entries()).length
+      await api.chat("meanwhile, elsewhere", atEntry(entryId(thirdRoot)))
+      await page.waitForFunction(
+        n => document.getElementById("count")?.textContent === n,
+        String(beforeElsewhere + 1),
+        { timeout: 15_000 },
+      )
+      const elsewhere = (await componentRenders(page)).filter(
+        r => r.name === "MessageView",
+      )
+      check(
+        "a message in another thread redraws none of this tab's messages",
+        elsewhere.length === 0,
+        `${elsewhere.length}`,
+      )
+
+      // 3. Closing a tab is yours: × writes nothing, and reopening brings its columns back.
+      await page.click(tabSel(downRoot))
+      await page.waitForFunction(
+        () => document.querySelectorAll(".column").length >= 2,
+        undefined,
+        { timeout: 15_000 },
+      )
+      const downKeys = await page.$$eval(".column", cs =>
+        cs.map(c => c.getAttribute("data-key") ?? ""),
+      )
+      // × closes the tab for you and writes nothing (`planIntent`'s unit test).
+      await page.click(`${tabSel(downRoot)} ~ .tab-close`)
+      await page
+        .waitForFunction(
+          r => document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+          downRoot,
+          { timeout: 15_000 },
+        )
+        .catch(() => null)
+      const openFromArchive = async (p: Page, r: string) => {
+        await p.click("#tabs .tab-archive")
+        await p.click(`.archive-row[data-root="${r}"]`)
+        await p.click(".archive-preview .read-only-action")
+        await p.waitForSelector(`${tabSel(r)}[aria-selected="true"]`, {
+          timeout: 15_000,
+        })
+      }
+      await openFromArchive(page, downRoot)
+      await page
+        .waitForFunction(
+          n => document.querySelectorAll(".column").length === n,
+          downKeys.length,
+          { timeout: 15_000 },
+        )
+        .catch(() => null)
+      await page.$$eval(".column", cs =>
+        cs.map(c => c.getAttribute("data-key") ?? ""),
+      )
+      await page.click(tabSel(firstRoot))
+
+      // 4. Another window, another person: the header shows them, never
+      // yourself, and takes you to them.
+      const myWriter = ME
+      const tb = await browser.newPage()
+      await asPerson(tb, "tabs-b@browser.test", "Tabby")
+      try {
+        await tb.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+        const knownHere = await tb
+          .waitForFunction(
+            () =>
+              document.getElementById("status")?.textContent === "connected",
+            undefined,
+            { timeout: 20_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "a browser that knows who you are connects without asking",
+          knownHere && (await tb.locator("#identity").count()) === 0,
+        )
+        await tb
+          .waitForSelector('#tabs .tab-archive[aria-selected="true"]', {
+            timeout: 20_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        await openFromArchive(tb, thirdRoot)
+        const avatar = await page
+          .waitForSelector("#top .here-person .here-trigger", {
+            timeout: 15_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "another window shows in the header, and you never do",
+          avatar &&
+            (await page
+              .locator(`#top .avatar[data-writer="${myWriter}"]`)
+              .count()) === 0,
+        )
+        const toThem = await chooseFromMenu(
+          page,
+          "#top .here-person .here-trigger",
+          ".here-thread",
+        )
+        const followed = await page
+          .waitForSelector(`${tabSel(thirdRoot)}[aria-selected="true"]`, {
+            timeout: 15_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "choosing a person's thread in the header opens it as your tab",
+          toThem && followed && (await shows("a third thread")),
+        )
+        const onThird = await page
+          .waitForSelector(`${tabSel(thirdRoot)} .avatar`, { timeout: 15_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        await openFromArchive(tb, firstRoot)
+        const moved = await page
+          .waitForFunction(
+            ([from, to]) =>
+              document.querySelector(
+                `#tabs .tab[data-root="${from}"] .avatar`,
+              ) === null &&
+              document.querySelector(
+                `#tabs .tab[data-root="${to}"] .avatar`,
+              ) !== null,
+            [thirdRoot, firstRoot] as const,
+            { timeout: 15_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "another window shows on the tab it is on, and leaves it when it switches",
+          onThird && moved,
+        )
+
+        // 4b. Rename (ADR-0045): a title is the root's label for everyone, the
+        // Archive search finds it, Escape keeps the old one, and clearing it
+        // brings back the first line. The page is on the third root.
+        const tabLabel = (p: Page, r: string) =>
+          p.textContent(`${tabSel(r)} .tab-label`).catch(() => null)
+        const labelIs = (p: Page, r: string, want: string) =>
+          p
+            .waitForFunction(
+              ([sel, text]) =>
+                document.querySelector(sel)?.textContent === text,
+              [`${tabSel(r)} .tab-label`, want] as const,
+              { timeout: 15_000 },
+            )
+            .then(
+              () => true,
+              () => false,
+            )
+        const rename = async (text: string, key: "Enter" | "Escape") => {
+          const chosen = await chooseFromMenu(page, OWN_MENU, ".rename-root")
+          if (!chosen) return false
+          await page.waitForSelector(".tab-title-input", { timeout: 15_000 })
+          await page.fill(".tab-title-input", text)
+          await page.press(".tab-title-input", key)
+          return chosen
+        }
+        const TITLE = "Palette of tabs"
+        const firstLine = await tabLabel(page, thirdRoot)
+        const renamed = await rename(TITLE, "Enter")
+        const mine = await labelIs(page, thirdRoot, TITLE)
+        const refocused = await page.evaluate(
+          r => document.activeElement?.getAttribute("data-root") === r,
+          thirdRoot,
+        )
+        const theirs = await labelIs(tb, thirdRoot, TITLE)
+        check(
+          "Rename in a tab's ⋯ titles its root, for everyone, and gives the tab focus back",
+          renamed && mine && theirs && refocused,
+          `"${firstLine}" → "${await tabLabel(tb, thirdRoot)}"`,
+        )
+        await tb.click("#tabs .tab-archive")
+        await tb.fill(".archive-search", "palette")
+        await tb
+          .waitForFunction(
+            r => {
+              const rows = [...document.querySelectorAll(".archive-row")]
+              return (
+                rows.length === 1 &&
+                rows[0]?.getAttribute("data-root") === r &&
+                rows[0]?.querySelector(".archive-label")?.textContent ===
+                  "Palette of tabs"
+              )
+            },
+            thirdRoot,
+            { timeout: 15_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        await tb.fill(".archive-search", "")
+        await tb.click(tabSel(firstRoot))
+        const setAt = readMarks(host.doc).get(thirdRoot)?.at
+        await rename("not this", "Escape")
+        // Long enough for a rename sent by mistake to come back.
+        await waitFor(() => false, 1_000)
+        check(
+          "Escape leaves a tab's title as it was, and sends nothing",
+          (await labelIs(page, thirdRoot, TITLE)) &&
+            (await page.locator(".tab-title-input").count()) === 0 &&
+            readMarks(host.doc).get(thirdRoot)?.at === setAt,
+        )
+        await rename("", "Enter")
+
+        // 5. The add menu, by keyboard; an unsent new tab closes without a trace.
+
+        await page.focus("#tabs .add-menu")
+        await page.keyboard.press("ArrowDown")
+        const focused = await page
+          .waitForFunction(
+            () =>
+              document.activeElement?.classList.contains("add-conversation"),
+            undefined,
+            { timeout: 5_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        await page.keyboard.press("Enter")
+        await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
+        const convo = await label(0)
+        check(
+          "the add menu's conversation, chosen by keyboard, opens a new tab that only sends",
+          focused &&
+            convo === TO_NOBODY &&
+            (await page.textContent('#tabs .tab-new[aria-selected="true"]')) ===
+              "new conversation",
+          `"${convo}"`,
+        )
+        await page.fill(`${col(0)} .composer .input`, "never sent")
+        await page.click("#tabs .tab-new ~ .tab-close")
+        await page
+          .waitForFunction(
+            () => document.querySelector("#tabs .tab-new") === null,
+          )
+          .catch(() => null)
+
+        // 6. Mentions: @ counts what you have not seen, and takes you there.
+        const unseen = () =>
+          page
+            .$eval("#top .inbox-count", n =>
+              Number(n.getAttribute("data-unseen")),
+            )
+            .catch(() => 0)
+        // The page's handle, from its name as it is now (it was renamed above).
+        const handle = `@${handleOf(await shownName(page))}`
+        const before = await unseen()
+        const mention = await api.chat(
+          `${handle} a look at this?`,
+          atEntry(entryId(downRoot)),
+        )
+        const mentionId = mention.kind === "appended" ? mention.id : ""
+        const counted = await page
+          .waitForFunction(
+            n =>
+              Number(
+                document
+                  .querySelector("#top .inbox-count")
+                  ?.getAttribute("data-unseen") ?? 0,
+              ) === n,
+            before + 1,
+            { timeout: 15_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        const picked = await chooseFromMenu(
+          page,
+          "#top .inbox-trigger",
+          `.inbox-row[data-entry="${mentionId}"]`,
+        )
+        const drawn = await page
+          .waitForSelector(`.column .msg[data-entry="${mentionId}"]`, {
+            timeout: 15_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        await page
+          .waitForFunction(
+            () => document.querySelector("#top .inbox-count") === null,
+            undefined,
+            { timeout: 15_000 },
+          )
+          .catch(() => null)
+        check(
+          "a mention counts on @, and choosing it opens its thread with the message drawn",
+          counted && picked && drawn && (await unseen()) === 0,
+          `${before} → ${before + 1} → ${await unseen()}`,
+        )
+        // A mention on screen is seen at once (`seenNow`, proven by its unit
+        // test). The menu check below starts from this message.
+        await api.chat(`${handle} and here`, atEntry(entryId(mentionId)))
+        await shows(`${handle} and here`)
+        // A menu stays open while an entry arrives: the column following its end
+        // scrolls, and only a scroll that moves the trigger closes a popover.
+        const hereId =
+          (await page.$eval(msg(`${handle} and here`), n =>
+            n.getAttribute("data-entry"),
+          )) ?? ""
+        await page.click("#top .inbox-trigger")
+        await page.waitForSelector("#top .inbox .menu", { timeout: 15_000 })
+        await page.evaluate(() => {
+          const w = window as { columnScrolls?: number }
+          w.columnScrolls = 0
+          window.addEventListener(
+            "scroll",
+            e => {
+              if (
+                e.target instanceof Element &&
+                e.target.matches(".column-body")
+              )
+                w.columnScrolls = (w.columnScrolls ?? 0) + 1
+            },
+            true,
+          )
+        })
+        const arriving = "arriving while a menu is open"
+        await api.chat(
+          `${arriving}\n\n${"a paragraph to fill the column\n\n".repeat(12)}`,
+          atEntry(entryId(hereId)),
+        )
+        await page.waitForSelector(
+          `.msg:has-text(${JSON.stringify(arriving)})`,
+          {
+            timeout: 15_000,
+          },
+        )
+        await waitFor(() => false, 500)
+        const columnScrolls = await page.evaluate(
+          () => (window as { columnScrolls?: number }).columnScrolls ?? 0,
+        )
+        check(
+          "an open menu stays open while an entry arrives and its column scrolls to follow it",
+          columnScrolls > 0 && (await page.$("#top .inbox .menu")) !== null,
+          `${columnScrolls} scrolls`,
+        )
+        await page.keyboard.press("Escape")
+        // Seen is kept per device: across a reload, and a mention made meanwhile counts.
+        await page.click(tabSel(firstRoot))
+        const rootTabs = (p: Page) =>
+          p.$$eval("#tabs .tab-root", ts =>
+            ts.map(t => t.getAttribute("data-root") ?? ""),
+          )
+        const tabsBefore = await rootTabs(page)
+        const reloading = page.reload({ waitUntil: "domcontentloaded" })
+        await api.chat(
+          `${handle} while you were away`,
+          atEntry(entryId(mentionId)),
+        )
+        await reloading
+        const afterReload = await page
+          .waitForFunction(
+            () =>
+              document
+                .querySelector("#top .inbox-count")
+                ?.getAttribute("data-unseen") === "1",
+            undefined,
+            { timeout: 20_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "after a reload, what was seen stays seen, and a mention made meanwhile counts",
+          afterReload,
+        )
+        const tabsAfter = await rootTabs(page)
+        check(
+          "a reload keeps your tabs, in order",
+          tabsBefore.length >= 3 && tabsAfter.join() === tabsBefore.join(),
+          `${tabsAfter.length} of ${tabsBefore.length}`,
+        )
+        // Two tabs of one device share it: mark all seen in one clears the other.
+        const sibling = await page.context().newPage()
+        try {
+          await sibling.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+          // A second tab of the device is the same person (ADR-0037), so its
+          // mentions are the page's.
+          await sibling.waitForSelector("#top .inbox-count", {
+            timeout: 20_000,
+          })
+          await chooseFromMenu(
+            sibling,
+            "#top .inbox-trigger",
+            ".inbox-all-seen",
+          )
+          const cleared = await page
+            .waitForFunction(
+              () => document.querySelector("#top .inbox-count") === null,
+              undefined,
+              { timeout: 15_000 },
+            )
+            .then(
+              () => true,
+              () => false,
+            )
+          check(
+            "two tabs of one device share the inbox: mark all seen in one clears the other",
+            cleared,
+          )
+        } finally {
+          await sibling.close().catch(() => {})
+        }
+
+        // 7. Archived, a root leaves every tab bar; the page on it reads it.
+        await page.click(tabSel(thirdRoot))
+        await page.waitForSelector(`${col(0)} .composer .send`, {
+          timeout: 15_000,
+        })
+        // tb opens the third root again, so it has a tab there to lose, and then
+        // is on another: the tab someone is on stays until they leave it.
+        await openFromArchive(tb, thirdRoot)
+        await tb.click(tabSel(firstRoot))
+        await page.fill(`${col(0)} .composer .input`, "typed, not sent")
+        const menuSeen = await chooseFromMenu(page, OWN_MENU, ".archive-root")
+        check(
+          "a tab's ⋯ opens a menu drawn in full below the tab bar",
+          menuSeen,
+        )
+        await page
+          .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })
+          .catch(() => null)
+        const banner =
+          (await page
+            .textContent(`${col(0)} .read-only-label`)
+            .catch(() => "")) ?? ""
+        const input = `${col(0)} .composer .input`
+        const kept = await page.inputValue(input).catch(() => "")
+        const frozen = await page
+          .$eval(input, n => (n as HTMLTextAreaElement).readOnly)
+          .catch(() => false)
+        await page.hover(`${col(0)} .msg`)
+        // Copy only reads, so it stays.
+        const tools = await page
+          .locator(`${col(0)} .msg .tools button:not(.copy)`)
+          .count()
+        const copyStays = await page
+          .locator(`${col(0)} .msg`)
+          .first()
+          .locator(":scope > .tools > .copy")
+          .count()
+        const leftTb = await tb
+          .waitForFunction(
+            r =>
+              document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+            thirdRoot,
+            { timeout: 15_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "an archived root leaves the other window's bar, and the page on it reads it",
+          banner.startsWith("archived by Ada") &&
+            kept === "typed, not sent" &&
+            frozen &&
+            tools === 0 &&
+            copyStays === 1 &&
+            leftTb,
+          `"${banner}", its typed text kept, no tools that write, and copy (${tools}, ${copyStays})`,
+        )
+        await page.click(`${col(0)} .read-only-action`)
+        await page
+          .waitForSelector(`${col(0)} .composer .send`, { timeout: 15_000 })
+          .catch(() => null)
+        await waitFor(() => false, 1_000)
+        check(
+          "restoring it in place brings back the composer with its text, and opens no tab for the other window",
+          (await page.inputValue(input)) === "typed, not sent" &&
+            (await tb.locator(tabSel(thirdRoot)).count()) === 0,
+        )
+
+        // Archived again and left, its tab goes; the Archive tab brings it back.
+        await page.fill(input, "")
+        await chooseFromMenu(page, OWN_MENU, ".archive-root")
+        await page
+          .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })
+          .catch(() => null)
+        await page.click(tabSel(firstRoot))
+        await page
+          .waitForFunction(
+            r =>
+              document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+            thirdRoot,
+            { timeout: 15_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        await page.click("#tabs .tab-archive")
+        const rowOf = (r: string) => `.archive-row[data-root="${r}"]`
+        await page.waitForSelector(rowOf(thirdRoot), { timeout: 15_000 })
+        await page.$$eval(".archive-row", rs =>
+          rs.map(r => r.getAttribute("data-state")),
+        )
+        await page.click(rowOf(thirdRoot))
+        await page.waitForSelector(".archive-preview .column .msg", {
+          timeout: 15_000,
+        })
+        await page.hover(".archive-preview .column .msg")
+        const previewWrites = await page
+          .locator(
+            ".archive-preview .composer .send, .archive-preview .msg .tools button:not(.copy)",
+          )
+          .count()
+        const previewCopy = await page
+          .locator(".archive-preview .column .msg")
+          .first()
+          .locator(":scope > .tools > .copy")
+          .count()
+        check(
+          "the archived root's preview draws its rail and column, with nothing that writes, and copy",
+          previewWrites === 0 &&
+            previewCopy === 1 &&
+            (await page.locator(".archive-preview .rail-dot").count()) >= 1,
+          `${previewWrites}, ${previewCopy}`,
+        )
+        await page.click(".archive-preview .read-only-action")
+        const restored = await page
+          .waitForFunction(
+            r =>
+              document
+                .querySelector(`#tabs .tab[data-root="${r}"]`)
+                ?.getAttribute("aria-selected") === "true",
+            thirdRoot,
+            { timeout: 15_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        await waitFor(() => false, 1_000)
+        check(
+          "Restore in the Archive tab opens it as a tab for the page that restored it, and not for the other window",
+          restored && (await tb.locator(tabSel(thirdRoot)).count()) === 0,
+        )
+        // The Archive tab reports no thread: the other window leaves nothing
+        // behind, once its deletions have reached this page.
+        await tb.click("#tabs .tab-archive")
+        await page
+          .waitForFunction(
+            () =>
+              document.querySelector(".avatar") === null &&
+              document.querySelector(".rail-dot[data-here]") === null,
+            undefined,
+            { timeout: 15_000 },
+          )
+          .catch(() => null)
+      } finally {
+        await tb.close().catch(() => {})
+      }
+
+      // Not you: the profile shows the email this device gave, and signing in as
+      // someone else forgets it and asks again. A device of its own, filling the
+      // form itself: `asPerson` would store the identity again on the reload.
+      const nv = await browser.newPage()
+      try {
+        await nv.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+        await nv.waitForSelector("#identity", { timeout: 20_000 })
+        await nv.fill('#identity input[name="email"]', "nobody@browser.test")
+        await nv.fill('#identity input[name="name"]', "Nobody")
+        await nv.click('#identity button[type="submit"]')
+        const nvSeen = await openProfile(nv)
+        const nvEmail = await nv.textContent("#profile .profile-email")
+        await nv.click("#profile .not-you")
+        const askedAgain = await nv
+          .waitForSelector("#identity", { timeout: 20_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "Not you? asks who you are again",
+          nvSeen && nvEmail === "nobody@browser.test" && askedAgain,
+          `${nvEmail}`,
+        )
+      } finally {
+        await nv.close().catch(() => {})
+      }
+
+      // ── a branch shown again after a return to its tab ──────────────────────
+      // Every column of a tab shown again mounts at the top. A branch from far
+      // down a long column must be aligned against where its parent ends up, not
+      // where it mounted. A person of their own, so `page`'s tabs are untouched.
+      {
+        const writer = await join(host, "long", "browser")
+        const lp = await browser.newPage()
+        await asPerson(lp, "lee@browser.test", "Lee")
+        try {
+          const ids: string[] = []
+          for (let n = 0; n < 30; n++) {
+            const at = ids.at(-1)
+            const r = await writer.chat(
+              `Message ${n} of a long thread.\nIts second line.\nIts third line.`,
+              at === undefined ? ROOT : atEntry(entryId(at)),
+              at === undefined ? { mode: "branch" } : {},
+            )
+            if (r.kind === "appended") ids.push(r.id)
+          }
+          const longRoot = ids[0] ?? ""
+          const forkId = ids.at(-2) ?? ""
+          await lp.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+          await openFromArchive(lp, longRoot)
+          await lp.waitForSelector(
+            `${col(0)} .msg[data-entry="${ids.at(-1)}"]`,
+            {
+              timeout: 15_000,
+            },
+          )
+          // Below its last message, so the branch does not move column 0 on.
+          const fork = `${col(0)} .msg[data-entry="${forkId}"]`
+          const aside = await writer.chat(
+            "a late aside",
+            atEntry(entryId(forkId)),
+            { mode: "branch" },
+          )
+          await lp.waitForSelector(`${fork} .open-branch`, { timeout: 15_000 })
+          await lp.click(`${fork} .open-branch`)
+          await lp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
+          await lp.click("#tabs .tab-archive")
+          await lp.waitForSelector('#tabs .tab-archive[aria-selected="true"]', {
+            timeout: 15_000,
+          })
+          await lp.click(tabSel(longRoot))
+          await lp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
+          await twoFrames(lp)
+          const returned = await lp.evaluate(
+            ([parent, branch, forkSel]) => {
+              const pBody = document.querySelector(`${parent} .column-body`)
+              const bBody = document.querySelector(`${branch} .column-body`)
+              const forkMsg = document.querySelector(forkSel)
+              const first = document.querySelector(`${branch} .msg`)
+              const spacer = document.querySelector(`${branch} .spacer`)
+              if (
+                !(pBody instanceof HTMLElement) ||
+                !(bBody instanceof HTMLElement) ||
+                !(forkMsg instanceof HTMLElement) ||
+                first === null ||
+                spacer === null
+              )
+                return null
+              const shown = bBody.getBoundingClientRect()
+              const at = first.getBoundingClientRect().top
+              return {
+                depth: forkMsg.offsetTop - pBody.offsetTop,
+                screen: pBody.clientHeight,
+                drift: Math.abs(at - forkMsg.getBoundingClientRect().top),
+                inView: at >= shown.top && at < shown.bottom,
+                spacer: spacer.getBoundingClientRect().height,
+                height: bBody.clientHeight,
+              }
+            },
+            [col(0), col(1), fork] as const,
+          )
+          check(
+            "a fork far down a long column lies below its first screenful",
+            ids.length === 30 &&
+              aside.kind === "appended" &&
+              returned !== null &&
+              returned.depth > returned.screen,
+            `${returned?.depth ?? "?"}px down, ${returned?.screen ?? "?"}px shown`,
+          )
+          check(
+            "a branch column is level with its fork point after a return to its tab",
+            returned !== null &&
+              returned.drift <= 4 &&
+              returned.inView &&
+              returned.spacer < returned.height,
+            `off by ${returned?.drift.toFixed(1) ?? "?"}px, in view ${returned?.inView ?? "?"}, spacer ${Math.round(returned?.spacer ?? -1)}px of ${returned?.height ?? "?"}px`,
+          )
+          // ↓ new below, across a tab switch: column 1 is unmounted while the
+          // Archive tab shows, and its thread grows meanwhile. Shown again, it is
+          // placed level with its fork, short of its new end. Which of the two
+          // paths column 1 shows is read from the page: column 0 opened at the
+          // root, and follows its newest leaf.
+          {
+            const jump = `${col(1)} .jump-latest`
+            const before = await lp.locator(jump).count()
+            // Its thread goes on below its own last message.
+            const tip = await lp
+              .locator(`${col(1)} .msg[data-entry]`)
+              .last()
+              .getAttribute("data-entry")
+            await lp.click("#tabs .tab-archive")
+            await lp.waitForSelector(
+              '#tabs .tab-archive[aria-selected="true"]',
+              {
+                timeout: 15_000,
+              },
+            )
+            let at = tip ?? forkId
+            const kinds: string[] = []
+            for (let n = 0; n < 10; n++) {
+              const r = await writer.chat(
+                `Branch message ${n}.\nIts second line.\nIts third line.`,
+                atEntry(entryId(at)),
+              )
+              kinds.push(r.kind)
+              if (r.kind === "appended") at = r.id
+            }
+            await lp.click(tabSel(longRoot))
+            const arrived = await lp
+              .waitForSelector(`${col(1)} .msg[data-entry="${at}"]`, {
+                timeout: 15_000,
+              })
+              .then(
+                () => true,
+                () => false,
+              )
+            const offered = await lp
+              .waitForSelector(jump, { timeout: 5_000 })
+              .then(
+                () => true,
+                () => false,
+              )
+            if (offered) await lp.click(jump)
+            await twoFrames(lp)
+            const gap = await lp.$eval(
+              `${col(1)} .column-body`,
+              b => b.scrollHeight - b.scrollTop - b.clientHeight,
+            )
+            const where = await lp.evaluate(
+              id =>
+                [...document.querySelectorAll(".column")].map(
+                  c =>
+                    `${c.getAttribute("data-position")}:${c.querySelectorAll(".msg").length}:${c.querySelector(`.msg[data-entry="${id}"]`) !== null}`,
+                ),
+              at,
+            )
+            check(
+              "↓ new below shows on a column that moved on while its tab was hidden, and none before",
+              before === 0 && arrived && offered && gap <= 2,
+              `${before} before, arrived ${arrived}, offered ${offered}, gap after ${Math.round(gap)}px; ${kinds.join(",")}; ${where.join(" ")}`,
+            )
+          }
+          // The Archive tab reports no thread: Lee leaves no presence behind.
+          await lp.click("#tabs .tab-archive")
+          await page
+            .waitForFunction(
+              () => document.querySelector(".avatar") === null,
+              undefined,
+              {
+                timeout: 15_000,
+              },
+            )
+            .catch(() => null)
+        } finally {
+          await lp.close().catch(() => {})
+          await writer.close()
+        }
+      }
+      // ── nothing left of the old controls ────────────────────────────────────
+      await page.$$eval(
+        "#reading, #thread, #threadMode, #followLatest, #switchLane, #offLane, .fork, #streaming, .rule, .rule-marker, .branch-here, .new-thread, .start, .start-agent, .start-chat",
+        n => n.length,
+      )
+
+      // ── a second window joins and asks ──────────────────────────────────────
+      // Alone, nobody else is shown anywhere (ADR-0024).
+      await page.evaluate(() => ({
+        avatars: [...document.querySelectorAll(".avatar")].map(
+          a =>
+            `${a.closest("[data-root], .column-head")?.className}:${a.getAttribute("data-writer")}`,
+        ),
+        rings: [...document.querySelectorAll(".rail-dot[data-here]")].map(d =>
+          d.getAttribute("title"),
+        ),
+      }))
+      // Ada's other tabs, closed above, read until their presence decays: her
+      // avatar's menu would offer their threads too. Wait for this page alone.
+      await waitFor(
+        () =>
+          new Set(
+            Object.keys(host.presence.reading())
+              .filter(k => k.startsWith(`${ME}:`))
+              .map(k => k.split(":")[1]),
+          ).size === 1,
+        45_000,
+      )
+      const second = await browser.newPage()
+      await asPerson(second, "second@browser.test", "Sam")
+      try {
+        await second.goto(host.httpUrl, {
+          waitUntil: "domcontentloaded",
+          timeout: 20_000,
+        })
+        // It opens on the Archive tab, and follows Ada from her avatar. Others
+        // who joined earlier may still be shown until their presence decays,
+        // so the avatar is found by her writer id.
+        const adaTrigger = `#top .here-person .here-trigger:has(.avatar[data-writer="${ME}"])`
+        await second
+          .waitForSelector(adaTrigger, {
+            timeout: 20_000,
+          })
+          .catch(() => null)
+        const followedAda = await chooseFromMenu(
+          second,
+          adaTrigger,
+          ".here-thread",
+        )
+        const rendered = await second
+          .waitForSelector(".column .msg", { timeout: 20_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "a joining window follows Ada's thread from her avatar in the header",
+          followedAda && rendered,
+        )
+        // Presence: the second window's open column rings its thread's end on the
+        // first window's rail; opening that thread shows it in the header.
+        const ring = await page
+          .waitForSelector(".rail-dot[data-here]", { timeout: 15_000 })
+          .then(
+            el => el,
+            () => null,
+          )
+        const ringTitle = (await ring?.getAttribute("title")) ?? ""
+        check(
+          "another window following a thread rings its end on the rail",
+          ring !== null && ringTitle.startsWith("here: "),
+          `${ringTitle}`,
+        )
+        if (ring !== null) await ring.click()
+        const avatar = await page
+          .waitForSelector(".column-head .avatar", { timeout: 15_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "the column following that thread shows the other window in its header",
+          avatar,
+        )
+        // Its typing makes a card, new in `cards`, so the column redraws; its
+        // message list does not (S59).
+        await componentRenders(page)
+        await second.fill(`${col(0)} .composer .input`, "thinking")
+        const typing = await page
+          .waitForSelector(".composer .typing", { timeout: 15_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "the other window's typing shows in that thread's composer",
+          typing,
+        )
+        const theirTyping = await componentRenders(page)
+        const columnsDrawn = theirTyping.filter(r => r.name === "Column").length
+        const listsDrawn = theirTyping.filter(
+          r => r.name === "MessageListView" || r.name === "MessageView",
+        ).length
+        check(
+          "another window's card redraws the column and none of its messages",
+          columnsDrawn > 0 && listsDrawn === 0,
+          `Column ${columnsDrawn}, list ${listsDrawn}`,
+        )
+        await second.fill(`${col(0)} .composer .input`, "")
+        await second.fill(`${col(0)} .composer .input`, "B asks about this")
+        await second.click(`${col(0)} .composer .send`)
+        await second
+          .waitForSelector(msg("B asks about this"), { timeout: 60_000 })
+          .catch(() => null)
+        await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+        // A's replica has everything the host has, and has drawn it, before the
+        // cards below look for the column's last message in A's window.
+        const total = String(Object.keys(host.doc.entries()).length)
+        await page.waitForFunction(
+          n => document.getElementById("count")?.textContent === n,
+          total,
+          { timeout: 15_000 },
+        )
+
+        // Cards (ADR-0048): what you type is a card on its thread, shown to
+        // everyone at that end, and kept across tab switches.
+        const box = `${col(0)} .composer .input`
+        const boxValue = (p: typeof page, sel: string) =>
+          p.$eval(sel, el => (el as HTMLTextAreaElement).value).catch(() => "")
+        const hasValue = (p: typeof page, sel: string, want: string) =>
+          p
+            .waitForFunction(
+              ([s, v]) =>
+                (document.querySelector(s ?? "") as HTMLTextAreaElement | null)
+                  ?.value === v,
+              [sel, want],
+              { timeout: 15_000 },
+            )
+            .then(
+              () => true,
+              () => false,
+            )
+        await page.click(box)
+        // Typed with no pause: the first keystroke creates the card, and the rest
+        // must land in it.
+        await page.keyboard.type("Together:")
+        const cardEnd = await page
+          .locator(`${col(0)} .msg[data-entry]`)
+          .last()
+          .getAttribute("data-entry")
+        await second.click(`.rail-dot[data-entry="${cardEnd}"]`)
+        const theirs = `.cards .card-editor.others .input`
+        const shownThere = await hasValue(second, theirs, "Together:")
+        check(
+          "a card typed in one window shows in the other's column, above its composer",
+          shownThere,
+        )
+        await second.focus(theirs)
+        await second.keyboard.press("End")
+        await second.keyboard.type(" from B")
+        const mergedHere = await hasValue(page, box, "Together: from B")
+        const heading = await second
+          .textContent(".cards .card-heading")
+          .catch(() => "")
+        check(
+          "the other window's edit reaches the card's owner, and the card names who wrote in it",
+          mergedHere && /'s draft · with /.test(heading ?? ""),
+          `${heading}`,
+        )
+        const here =
+          (await page.getAttribute(
+            '#tabs .tab[aria-selected="true"]',
+            "data-root",
+          )) ?? ""
+        await page.click(tabSel(downRoot))
+        await page.click(tabSel(here))
+        check(
+          "what you type is still there after switching tabs",
+          await hasValue(page, box, "Together: from B"),
+          `${await boxValue(page, box)}`,
+        )
+        // A card in another root, typed before this one's last word.
+        await page.click(tabSel(downRoot))
+        await page.click(box)
+        await page.keyboard.press("End")
+        await page.keyboard.type(" elsewhere")
+        const elsewhere = await boxValue(page, box)
+        await page.click(tabSel(here))
+        // Undo is the card's (Kyneta's stack): your typing, never the other's.
+        // A word typed after a space starts a step, so Cmd+Z takes back "more",
+        // a run of four keystrokes, which redo puts back in order (S64).
+        await page.focus(box)
+        await page.keyboard.press("End")
+        await page.keyboard.type(" and more")
+        await page.keyboard.press("ControlOrMeta+z")
+        const undone = await hasValue(page, box, "Together: from B and ")
+        await page.keyboard.press("ControlOrMeta+Shift+z")
+        const redone = await hasValue(page, box, "Together: from B and more")
+        check(
+          "Cmd+Z undoes your last run of typing, and Cmd+Shift+Z redoes it",
+          undone && redone,
+          `${await boxValue(page, box)}`,
+        )
+        // Cmd+Z in the other root's box undoes its card, though this root's
+        // typing is newer (ADR-0052).
+        await page.click(tabSel(downRoot))
+        await page.focus(box)
+        await page.keyboard.press("ControlOrMeta+z")
+        const thereUndone = await page
+          .waitForFunction(
+            sel =>
+              !(
+                document.querySelector(sel) as HTMLTextAreaElement | null
+              )?.value.endsWith("elsewhere"),
+            box,
+            { timeout: 5_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        const thereNow = await boxValue(page, box)
+        // And its first keystroke, so its card is gone.
+        await page.keyboard.press("ControlOrMeta+z")
+        await page.click(tabSel(here))
+        check(
+          "Cmd+Z in a card undoes only that card, never a newer step in another root",
+          elsewhere.endsWith(" elsewhere") &&
+            thereUndone &&
+            (await hasValue(page, box, "Together: from B and more")),
+          `${JSON.stringify(thereNow)}`,
+        )
+        await page.focus(box)
+        await page.keyboard.press("Enter")
+        const sentCard = msg("Together: from B and more")
+        await page.waitForSelector(sentCard, { timeout: 60_000 }).then(
+          () => true,
+          () => false,
+        )
+        await page
+          .$eval(`${sentCard} .role`, n => n.textContent ?? "")
+          .catch(() => "")
+        const emptied = await hasValue(page, box, "")
+        await page.click(tabSel(downRoot))
+        await page.click(tabSel(here))
+        check(
+          "a sent card leaves the box empty, and a tab switch does not bring it back",
+          emptied && (await hasValue(page, box, "")),
+        )
+        // After a send, Cmd+Z in the emptied box changes nothing, here or in
+        // the other root.
+        const cardsAfterSend = readCards(host.cards).length
+        await page.focus(box)
+        await page.keyboard.press("ControlOrMeta+z")
+        await waitFor(() => false, 300)
+        check(
+          "Cmd+Z after a send changes nothing",
+          (await hasValue(page, box, "")) &&
+            readCards(host.cards).length === cardsAfterSend,
+          `${readCards(host.cards).length} cards, ${cardsAfterSend} before`,
+        )
+        // Undo past a card's creation empties the box and removes the card;
+        // Cmd+Shift+Z in the same box brings it back.
+        await page.keyboard.type("x")
+        await waitFor(
+          () => readCards(host.cards).length > cardsAfterSend,
+          5_000,
+        )
+        await page.keyboard.press("ControlOrMeta+z")
+        const unmade =
+          (await hasValue(page, box, "")) &&
+          (await waitFor(
+            () => readCards(host.cards).length === cardsAfterSend,
+            5_000,
+          )) >= 0
+        await page.keyboard.press("ControlOrMeta+Shift+z")
+        const remade =
+          (await hasValue(page, box, "x")) &&
+          (await waitFor(
+            () => readCards(host.cards).length > cardsAfterSend,
+            5_000,
+          )) >= 0
+        check(
+          "Cmd+Z past a card's creation removes it, and Cmd+Shift+Z in its box brings it back",
+          unmade && remade,
+          `${unmade}, ${remade}`,
+        )
+        // Gone again, so the rest starts from an empty box.
+        await page.keyboard.press("ControlOrMeta+z")
+        await hasValue(page, box, "")
+        await idle()
+        // A fresh column's card is kept by its key; closing it asks, and discards.
+        // A message's tools show on hover.
+        const branchable = page
+          .locator(`${col(0)} .msg[data-entry]:has(> .tools > .branch)`)
+          .first()
+        await branchable.hover()
+        await branchable.locator(":scope > .tools > .branch").click()
+        const freshBox = `${col(1)} .composer .input`
+        await page.waitForSelector(freshBox, { timeout: 15_000 })
+        await page.focus(freshBox)
+        await page.keyboard.press("End")
+        await page.keyboard.type("a fresh thought")
+        const freshText = await boxValue(page, freshBox)
+        await page.click(tabSel(downRoot))
+        await page.click(tabSel(here))
+        const freshKept = await hasValue(page, freshBox, freshText)
+        check(
+          "a new branch's text is kept across a tab switch",
+          freshKept && freshText.endsWith("a fresh thought"),
+          `${await boxValue(page, freshBox)}`,
+        )
+        const cardsBefore = readCards(host.cards).length
+        await page.click(`${col(1)} .close`)
+        const asks = await page
+          .waitForSelector(`${col(1)} .close-ask`, { timeout: 5_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        await page.click(`${col(1)} .close-discard`).catch(() => {})
+        const closed = await page
+          .waitForFunction(
+            () => document.querySelectorAll(".column").length === 1,
+            undefined,
+            { timeout: 5_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        await waitFor(() => readCards(host.cards).length < cardsBefore, 5_000)
+        check(
+          "closing a new branch that holds text asks first, and discarding removes its card",
+          asks && closed && readCards(host.cards).length === cardsBefore - 1,
+        )
+        // Marks (ADR-0048, step 2): a pip where a card of yours holds text.
+        const pipIn = (p: typeof page, sel: string) =>
+          p.waitForSelector(`${sel} .card-pip`, { timeout: 5_000 }).then(
+            () => true,
+            () => false,
+          )
+        const pipGone = (p: typeof page, sel: string) =>
+          p
+            .waitForFunction(
+              s => document.querySelector(`${s} .card-pip`) === null,
+              sel,
+              { timeout: 5_000 },
+            )
+            .then(
+              () => true,
+              () => false,
+            )
+        await page.click(box)
+        await page.keyboard.type("where was I")
+        await page.click(tabSel(downRoot))
+        const tabMarked = await pipIn(page, tabSel(here))
+        const otherBare =
+          (await page.locator(`${tabSel(downRoot)} .card-pip`).count()) === 0
+        await page.click(tabSel(here))
+        const markedEnd = await page
+          .locator(`${col(0)} .msg[data-entry]`)
+          .last()
+          .getAttribute("data-entry")
+        const railDot = `.rail-dot[data-entry="${markedEnd}"]`
+        const railMarked = await pipIn(page, railDot)
+        check(
+          "a card of yours with text marks its root's tab and its thread's end on the rail",
+          tabMarked && otherBare && railMarked,
+          `tab ${tabMarked}, other tab bare ${otherBare}, rail ${railMarked}`,
+        )
+        // Sam sees Ada's card above his composer, and no mark: it is not his.
+        await hasValue(second, theirs, "where was I")
+        // Emptied, the card's record stays, and the marks go: they read its text.
+        const records = readCards(host.cards).length
+        await page.focus(box)
+        await page.keyboard.press("ControlOrMeta+a")
+        await page.keyboard.press("Backspace")
+        const unmarked =
+          (await pipGone(page, tabSel(here))) && (await pipGone(page, railDot))
+        check(
+          "a card emptied marks nothing, though its record stays",
+          unmarked && readCards(host.cards).length === records,
+          `${unmarked}; ${readCards(host.cards).length} records, ${records} before`,
+        )
+        // A root whose tab you closed is marked in the Archive tab and its row.
+        await page.keyboard.type("back tomorrow")
+        await pipIn(page, tabSel(here))
+        const columnsHere = await page.locator(".column").count()
+        await page.click(`${tabSel(here)} ~ .tab-close`)
+        const archiveMarked = await pipIn(page, "#tabs .tab-archive")
+        await page.click("#tabs .tab-archive")
+        const rowMarked = await pipIn(page, `.archive-row[data-root="${here}"]`)
+        await openFromArchive(page, here)
+        const columnsBack = await page
+          .waitForFunction(
+            n => document.querySelectorAll(".column").length === n,
+            columnsHere,
+            { timeout: 15_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "a closed root holding your card marks the Archive tab and its row, and comes back as it was",
+          archiveMarked && rowMarked && columnsBack,
+          `tab ${archiveMarked}, row ${rowMarked}, columns ${columnsBack}`,
+        )
+        // An archived root's work is done: its card lights its own row, never
+        // the Archive tab. Restored after, for what follows.
+        await chooseFromMenu(page, OWN_MENU, ".archive-root")
+        await page.click(tabSel(downRoot))
+        await page.waitForFunction(
+          r => document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+          here,
+          { timeout: 15_000 },
+        )
+        // The tab leaving and the Archive tab's pip are one render's facts.
+        const archiveBare =
+          (await page.locator("#tabs .tab-archive .card-pip").count()) === 0
+        await page.click("#tabs .tab-archive")
+        const archivedRow = await pipIn(
+          page,
+          `.archive-row[data-root="${here}"]`,
+        )
+        await openFromArchive(page, here)
+        check(
+          "an archived root holding your card marks its row, not the Archive tab",
+          archiveBare && archivedRow,
+          `tab bare ${archiveBare}, row ${archivedRow}`,
+        )
+        // Empty again, so what follows starts from an empty box.
+        await page.focus(box)
+        await page.keyboard.press("ControlOrMeta+a")
+        await page.keyboard.press("Backspace")
+        await pipGone(page, tabSel(here))
+      } finally {
+        await second.close().catch(() => {})
+      }
+
+      // A reload keeps the tab you are on, and its open columns (ADR-0027). The
+      // DOWN thread's tab has two: the agent thread and the conversation below it.
+      await page.click(tabSel(downRoot))
+      await page.waitForFunction(
+        () => document.querySelectorAll(".column").length >= 2,
+        undefined,
+        { timeout: 15_000 },
+      )
+      const columnKeys = (p: typeof page) =>
+        p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))
+      const openKeys = await columnKeys(page)
+      // What you type is kept across a reload too (ADR-0048).
+      await page.fill(`${col(0)} .composer .input`, "survives a reload")
+      await waitFor(() => false, 300)
+
+      // A reload is the same person: the device keeps your email, so your name
+      // stays and you are not shown to yourself as someone else.
+      const myName = await shownName(page)
+      const me = ME
+      await page.reload({ waitUntil: "domcontentloaded" })
+      // Not asked again: a page that asks never connects, which the check says.
+      await page
+        .waitForFunction(
+          () => document.getElementById("status")?.textContent === "connected",
+          { timeout: 20_000 },
+        )
+        .catch(() => null)
+      const kept = await page
+        .waitForFunction(
+          n =>
+            document
+              .querySelector("#top .me-trigger")
+              ?.getAttribute("title") === n,
+          myName,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      // Another window's entries may not have expired yet; none may be mine.
+      const ghosts = await page.locator(`.avatar[data-writer="${me}"]`).count()
+      check(
+        "a reload keeps who you are: your name",
+        myName === "Ada Lovelace" && kept && ghosts === 0,
+        `${myName}), and no ghost of yourself`,
+      )
+      // The document has arrived (the name shows); give the prune after settling
+      // time to run before comparing.
+      await waitFor(() => false, 1_000)
+      const reopened = await columnKeys(page)
+      const focusedBox = await page.evaluate(
+        () => document.activeElement?.closest(".composer") != null,
+      )
+      check(
+        "a reload focuses no box: only a column you open takes focus",
+        !focusedBox,
+      )
+      check(
+        "a reload keeps the tab's open columns, in order",
+        openKeys.length >= 2 && reopened.join() === openKeys.join(),
+        `${reopened.length} of ${openKeys.length}`,
+      )
+      const typedBack = await page
+        .waitForFunction(
+          s =>
+            (document.querySelector(s) as HTMLTextAreaElement | null)?.value ===
+            "survives a reload",
+          `${col(0)} .composer .input`,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check("what you type is still there after a reload", typedBack)
+      await page.fill(`${col(0)} .composer .input`, "")
+      // A new tab shares the device's storage (same context; every
+      // `browser.newPage()` makes a new one) and opens the layout last saved.
+      const newTab = await page.context().newPage()
+      try {
+        await newTab.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+        await newTab.waitForFunction(
+          () => document.getElementById("status")?.textContent === "connected",
+          { timeout: 20_000 },
+        )
+        await waitFor(() => false, 1_000)
+        const inNewTab = await columnKeys(newTab)
+        check(
+          "a new tab opens the device's last layout",
+          inNewTab.join() === openKeys.join(),
+          `${inNewTab.length} of ${openKeys.length}`,
+        )
+        // It is you, from another seat: your name, and no avatar of yourself.
+        const asYou =
+          (await shownName(newTab)) === myName &&
+          (await page.locator(`.avatar[data-writer="${me}"]`).count()) === 0 &&
+          (await newTab.locator(`.avatar[data-writer="${me}"]`).count()) === 0
+        check(
+          "a second tab is the same person: your name, and never an avatar of you",
+          asYou,
+        )
+      } finally {
+        await newTab.close().catch(() => {})
+      }
+
+      // Archived by someone else before a reload, the tab you were on gives way
+      // to the newest open root.
+      check(
+        "a reload keeps the tab you were on",
+        (await selectedRoot(page)) === downRoot,
+      )
+      await api.archive("archive", entryId(downRoot))
+      await page.reload({ waitUntil: "domcontentloaded" })
+      await page
+        .waitForFunction(
+          r =>
+            document
+              .querySelector('#tabs .tab[aria-selected="true"]')
+              ?.getAttribute("data-root") === r,
+          thirdRoot,
+          { timeout: 20_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      await api.close()
+
+      check(
+        "no page errors overall",
+        errors.length === 0,
+        `${errors[0] === undefined ? "" : ` — ${errors[0].slice(0, 90)}`}`,
+      )
+    } finally {
+      await page.close().catch(() => {})
+      await host.shutdown().catch(() => {})
+    }
+  } finally {
+    await browser.close().catch(() => {})
+  }
+}

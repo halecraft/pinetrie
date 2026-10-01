@@ -1,19 +1,27 @@
 // e2e/harness — what the end-to-end suites share besides their checks
-// (checks.ts): waiting, throwaway projects, joining a host, and their model.
+// (checks.ts) and scenarios (scenario.ts): waiting, throwaway projects,
+// joining a host, a host for a body (`withHost`), why `container` is unusable
+// here (`containerProblem`), and their model.
 //
 // Deliberately not in core/: core is pure domain logic and imports nothing.
 // A test harness is neither.
 
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, realpathSync, writeFileSync } from "node:fs"
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { type ConnectOptions, connectSession } from "@pineta/client/session"
+import { prepareHost } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
+import {
+  type RunningHost,
+  type StartHostOptions,
+  startHost,
+} from "../host/index.ts"
 
 /**
  * Poll until `pred` holds. Resolves with the elapsed milliseconds, or -1 on
- * timeout. Shared by both suites so each does not grow its own copy.
+ * timeout. Shared by every suite, so none grows its own copy.
  */
 export async function waitFor(
   pred: () => boolean | Promise<boolean>,
@@ -51,13 +59,13 @@ export function committedProject(
 }
 
 /**
- * A person joining `host` over its WebSocket, as `<name>@<section>.test`: one
- * domain per section, so no two sections share a person (ADR-0037).
+ * A person joining `host` over its WebSocket, as `<name>@<scenario>.test`:
+ * one domain per scenario, so no two scenarios share a person (ADR-0037).
  */
 export const join = (
   host: { readonly wsUrl: string },
   name: string,
-  section: string,
+  scenario: string,
   options: Partial<
     Omit<ConnectOptions, "url" | "WebSocket" | "principal">
   > = {},
@@ -65,7 +73,7 @@ export const join = (
   connectSession({
     url: host.wsUrl,
     WebSocket,
-    principal: `${name}@${section}.test`,
+    principal: `${name}@${scenario}.test`,
     ...options,
   })
 
@@ -81,3 +89,32 @@ export const SUITE_REPLY =
  */
 export const suiteModel = () =>
   scriptedModel({ tokensPerSecond: 400, answer: { text: SUITE_REPLY } })
+
+/** Start a host, give it to `body`, and shut it down however `body` ends. */
+export async function withHost<T>(
+  options: StartHostOptions,
+  body: (host: RunningHost) => Promise<T>,
+): Promise<T> {
+  const host = await startHost(options)
+  try {
+    return await body(host)
+  } finally {
+    await host.shutdown().catch(() => {})
+  }
+}
+
+/**
+ * Why lanes cannot have containers of their own here, or null: the reason the
+ * host itself would give (`prepareHost`, `planHost` in `@pineta/lanes`), on a
+ * throwaway project. A scenario that needs `container` gives this as its
+ * `needs`.
+ */
+export async function containerProblem(): Promise<string | null> {
+  const dir = committedProject("pineta-container-", { "README.md": "probe\n" })
+  try {
+    const { project } = await prepareHost(dir)
+    return project.kind === "direct" ? project.reason : null
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
