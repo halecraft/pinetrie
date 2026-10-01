@@ -36,11 +36,10 @@ import {
 const SHA = "c".repeat(64) as Sha256
 
 describe("parseBannerArgs", () => {
-  test("a pasted image by its path or its hash, with its crop", () => {
-    expect(parseBannerArgs({ image: `/blob/${SHA}`, focus: "top" })).toEqual({
+  test("a pasted image by its path or its hash", () => {
+    expect(parseBannerArgs({ image: `/blob/${SHA}` })).toEqual({
       image: SHA,
       direction: null,
-      focus: "top",
     })
     expect(parseBannerArgs({ image: SHA })).toMatchObject({ image: SHA })
   })
@@ -49,10 +48,11 @@ describe("parseBannerArgs", () => {
       "refused",
     )
   })
-  test("blank words and an unknown crop are none", () => {
-    expect(
-      parseBannerArgs({ image: " ", direction: "  ", focus: "left" }),
-    ).toEqual({ image: null, direction: null, focus: null })
+  test("blank words are none", () => {
+    expect(parseBannerArgs({ image: " ", direction: "  " })).toEqual({
+      image: null,
+      direction: null,
+    })
     expect(parseBannerArgs({ direction: " dusk " })).toMatchObject({
       direction: "dusk",
     })
@@ -62,7 +62,7 @@ describe("parseBannerArgs", () => {
 test("drawnOf: a model's image is fitted as an upload is; bytes that are not one are refused", async () => {
   expect(await drawnOf(SCRIPTED_IMAGE_PNG)).toMatchObject({
     kind: "drawn",
-    image: { mimeType: "image/png", width: 8, height: 1 },
+    image: { mimeType: "image/png", width: 4, height: 4 },
   })
   expect(
     await drawnOf(Buffer.from("not an image at all").toString("base64")),
@@ -132,14 +132,14 @@ describe("banners in a harness", () => {
     const made = await agent.createThreadLane(ROOT)
     if (made.kind !== "created") throw new Error("no lane")
     script.use([
-      { tool: BANNER_TOOL, args: { direction: "at dusk", focus: "bottom" } },
+      { tool: BANNER_TOOL, args: { direction: "at dusk" } },
       { text: "done" },
     ])
     await agent.lane(made.lane).run(prompt("a dusk banner, please"))
     expect(asks).toEqual([
       {
         lane: made.lane,
-        ask: { image: null, direction: "at dusk", focus: "bottom" },
+        ask: { image: null, direction: "at dusk" },
       },
     ])
     expect(toolResults(doc).join("\n")).toContain("A new banner is being made")
@@ -185,14 +185,14 @@ describe("banners in a harness", () => {
   test("a scripted model draws its fixed image; with banners off, nothing", async () => {
     const on = await agentOver(newSessionDoc(), scriptedModel(), [])
     expect(await on.canDrawBanners()).toBe(true)
-    expect(await on.drawBanner("a marsh", "8:1")).toMatchObject({
+    expect(await on.drawBanner("a zebra")).toMatchObject({
       kind: "drawn",
-      image: { mimeType: "image/png", width: 8, height: 1 },
+      image: { mimeType: "image/png", width: 4, height: 4 },
     })
     await on.close()
     const off = await agentOver(newSessionDoc(), scriptedModel())
     expect(await off.canDrawBanners()).toBe(false)
-    expect(await off.drawBanner("a marsh", "8:1")).toMatchObject({
+    expect(await off.drawBanner("a zebra")).toMatchObject({
       kind: "failed",
     })
     await off.close()

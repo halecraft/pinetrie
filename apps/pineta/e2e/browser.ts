@@ -2332,26 +2332,18 @@ try {
         )
           return null
         const box = name?.getBoundingClientRect()
-        const onTop =
-          box === undefined
-            ? null
-            : document.elementFromPoint(
-                box.left + box.width / 2,
-                box.top + box.height / 2,
-              )
+        const icon = img.getBoundingClientRect()
         const style = getComputedStyle(img)
         // The header's padding box: its top border is the colour stripe.
         return {
           natural: img.naturalWidth,
           fit: style.objectFit,
+          blend: style.mixBlendMode,
           opacity: style.opacity,
-          fills:
-            img.offsetWidth === head.clientWidth &&
-            img.offsetHeight === head.clientHeight,
-          nameOnTop:
-            name instanceof Element && onTop instanceof Element
-              ? name.contains(onTop)
-              : false,
+          square: img.offsetWidth === img.offsetHeight,
+          tall: img.offsetHeight === head.clientHeight,
+          rightOfName: box !== undefined && icon.left >= box.right,
+          inside: icon.right <= head.getBoundingClientRect().right,
           stripe: getComputedStyle(head).borderTopWidth,
         }
       }, col(0))
@@ -2359,12 +2351,15 @@ try {
         drawn &&
           header !== null &&
           header.natural > 0 &&
-          header.fit === "cover" &&
+          header.fit === "contain" &&
+          header.blend === "lighten" &&
           header.opacity === "1" &&
-          header.fills &&
-          header.nameOnTop &&
+          header.square &&
+          header.tall &&
+          header.rightOfName &&
+          header.inside &&
           header.stripe === "4px",
-        `a thread's first run gives its header a banner: drawn under the name, covering the header, the colour stripe kept (${JSON.stringify(header)})`,
+        `a new thread gives its header a banner: a square icon the header's height, right of the name, its black blended away, the colour stripe kept (${JSON.stringify(header)})`,
       )
 
       // Back to the tab, the column mounts again with its banner already there.

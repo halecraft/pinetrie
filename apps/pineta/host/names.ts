@@ -11,11 +11,13 @@ import { createSerial } from "./queue.ts"
 
 /**
  * Name every lane that has none. One at a time, so two never plan the same
- * name: each reads the names the one before wrote.
+ * name: each reads the names the one before wrote. `onNamed` hears of each
+ * lane once its name is written: what makes a new thread's banner.
  */
 export function createNames(deps: {
   readonly basics: Pick<Basics, "doc" | "now">
   readonly agent: Pick<Agent, "setWorkRecord">
+  readonly onNamed: (lane: LaneName) => void
 }): () => Promise<void> {
   const { doc, now } = deps.basics
   const serial = createSerial()
@@ -30,7 +32,9 @@ export function createNames(deps: {
         readNames(doc),
         now(),
       )
-      for (const record of planned)
+      for (const record of planned) {
         await deps.agent.setWorkRecord({ kind: "name", record })
+        deps.onNamed(record.lane)
+      }
     })
 }

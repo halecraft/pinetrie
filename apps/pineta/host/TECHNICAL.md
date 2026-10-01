@@ -31,7 +31,7 @@ wires them.
 | `work/` | lane containers and disks (§ Lane work) |
 | `offers/` | each lane's offer in your repo (§ Offers) |
 | `names.ts` | every lane's thread name (ADR-0039), one plan at a time |
-| `banners.ts` | each thread's column banner (ADR-0050): made at a run's end, set by `set_banner` |
+| `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, set by `set_banner` |
 | `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue`, `putNote`, `basics` |
 
 ## One serial executor
@@ -106,15 +106,21 @@ record (old drafts among them), and seat records no stored text names
   lane.** Both are ports that may refuse, not facts to gather. The directory
   is checked first, so a refused send creates no lane.
 
-## Banners (`banners.ts`, ADR-0050)
+## Banners (`banners.ts`, ADR-0050, ADR-0053)
 
 - **A decision is one `Serial` step**: gather the lane's banner, whether one
-  is being made and whether a blob is stored; `planBanner`; write a pasted
-  image or a crop. A new image is a `serial.track`ed task: the brief and the
-  image take seconds each, outside the queue, then the write is a step of
-  its own, only while `bannerStillWanted`.
-- **Only a run's end, for its own lane, starts one.** `recover` does not:
-  turning banners on must not draw one for every thread that ever ran.
+  is being made and whether a blob is stored; `bannerDue` or `planAsk`;
+  write a pasted image. A new image is a `serial.track`ed task: the image takes seconds,
+  outside the queue, then the write is a step of its own, only while
+  `bannerStillWanted`. A missing `column-banner` skill is logged.
+- **A thread is due one as it is named** (`createNames`' `onNamed`), and
+  again at each run's end, which draws only when it still has none: the
+  retry for a failed one. `recover` does not: turning banners on must not
+  draw one for every thread that ever ran. Banners are made before
+  `createNames`, which is made before lane work.
+- **Only the name goes out**: the prompt is the `column-banner` skill's
+  body, filled from the thread's name (`bannerPrompt`). No text model is
+  asked, and no message leaves for the image model.
 - **A drawn image arrives fitted** (`Agent.drawBanner`), as an upload is,
   so the host stores it as given. `drawWithRetries` asks up to three times.
 - **A failure is logged, never thrown**: `[host] no banner for <name>: …`,

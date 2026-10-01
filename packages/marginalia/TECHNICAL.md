@@ -259,7 +259,7 @@ through one `setWorkRecord`:
 | a lane's offer in your repo | `pineta.offer` | the lane | when a trigger changed it, or it was taken |
 | a commit you have of a lane: delivered by a take, or a copy of your `@`; a start until a newer copy in the lane's history supersedes it (S51) | `pineta.have` | the commit | at a take, a fork from your `@`, and an update |
 | a lane's name, `word-word` | `pineta.name` | the lane | once, at the host's start or before the lane's first run |
-| a thread's column banner: the image's hash and its crop (ADR-0050) | `pineta.banner` | the lane | when a banner is made or set |
+| a thread's column banner: the image's hash (ADR-0050, ADR-0053) | `pineta.banner` | the lane | when a banner is made or set |
 | what the host found where it runs: `lanes`, or `direct` and why | `pineta.project` | `project` | at every start |
 
 - **Every run's prompt has a revision record**, so the nearest record above
@@ -377,28 +377,20 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   it. The decoder accepts only `word-word`; `ThreadName` is branded in
   `@pineta/core`, and minted only here.
 
-# Banners (`banner.ts`, ADR-0050)
+# Banners (`banner.ts`, ADR-0050, ADR-0053)
 
 - **`decodeBannerConfig`** reads the user config's `banner`: null unless
   `enabled` is `true`. `model` is `provider/id`, split at its first `/`,
-  since OpenRouter's ids hold one. A malformed model or ratio takes
-  `DEFAULT_BANNER`'s.
-- **`planBanner` decides**, from a trigger (`ran`, or `asked` with the
-  tool's ask), the lane's banner, whether one is being made, and whether a
-  blob is stored. A run's end makes one only for a thread with none and none
-  being made. Asked: an image is used when stored, a crop alone moves the
-  banner there is, and anything else makes a new one.
-- **`bannerStillWanted`**: one a run's end started gives way to any banner
-  written meanwhile. One the person asked for is always written.
-- **`ratioFor(n)`**: the configured ratio first, then `FALLBACK_RATIO`
-  (21:9), which every model S60 probed has. The retry is the fallback; no
-  refusal is read.
-- **`bannerRequest`** gives the thread's own lines the room first, newest
-  first, and the lines before its first prompt what is left
-  (`threadLines`). A section with no line that fits is left out.
-- **`fitNewest`, `leftOut` and `transcriptLines`** (`request.ts`) are
-  shared with `describeRequest`: the newest lines that fit, the line saying
-  how many were left out, and a path's messages as `speaker: text`.
+  since OpenRouter's ids hold one. A malformed model takes `DEFAULT_BANNER`.
+- **Two decisions, with no outcome in common.** `bannerDue`: a thread just
+  named, or at its run's end, gets one only when it has none and none is
+  being made. `planAsk`, for `set_banner`: a pasted image is used when
+  stored, and anything else makes a new one.
+- **`bannerStillWanted`**: a due one gives way to any banner written
+  meanwhile. One the person asked for is always written.
+- **`bannerPrompt`** fills the template's `{adjective}` and `{noun}` from
+  the thread's name and puts the person's direction after it. A record written when banners had a crop still decodes: its `focus`
+  is ignored.
 
 # Updates and stacks (`update.ts`, ADR-0038)
 

@@ -619,14 +619,6 @@ export const mutations: readonly Mutation[] = [
     expect: "an asked message with no record",
   },
   {
-    name: "a banner's upper crop is its centre",
-    file: columnView,
-    from: '  upper: "25%",',
-    to: '  upper: "50%",',
-    command: unit,
-    expect: "how far down its image",
-  },
-  {
     name: "a new column's next send never shows",
     file: columnView,
     from: '    return createsLane ? { kind: "pending" } : { kind: "none" }',

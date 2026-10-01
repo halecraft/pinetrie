@@ -1,7 +1,8 @@
 # ADR-0050 — A thread's column has a banner: drawn from the thread after its first run, or set by the person through the agent
 
 **Status:** Accepted. Implementation: `PLAN-2026-09-30-column-banners`.
-Measured in S60.
+Measured in S60. Amended by ADR-0053: the banner is a square icon drawn
+from the thread's name alone, as the thread is named, with no crop.
 
 **Context.** A tab can hold many columns, and each header shows the same
 things: a colour stripe, a two-word name (ADR-0039), avatars. Threads are
@@ -53,9 +54,7 @@ S60 found:
   attempt.
 - **`set_banner` is the person's control, through the agent.** A pasted
   image by its `/blob/` path, the person's words for a new one, or a crop
-  (`focus`: top, upper, center, bottom) of the one there is. Unasked, the
-  crop is `upper`, a quarter of the way down: centred, a one-row header cut
-  the top off the brief's sprite. The agent is offered
+  (`focus`: top, center, bottom) of the one there is. The agent is offered
   it only when banners are on and the host has tools. It answers once the
   ask is planned:
   a pasted image or crop is written before it returns, and a new image

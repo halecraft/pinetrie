@@ -254,11 +254,11 @@ export function describeFauxOf(model: ScriptedModel): FauxProviderHandle {
 }
 
 /**
- * An 8×1 dark PNG: what a scripted model draws for every banner. A suite
+ * A 4×4 dark PNG: what a scripted model draws for every banner. A suite
  * checks that a banner is made and shown, not what it shows.
  */
 export const SCRIPTED_IMAGE_PNG =
-  "iVBORw0KGgoAAAANSUhEUgAAAAgAAAABCAIAAABsYngUAAAAIUlEQVR4nGOQ1rKS1rOSNrKSNrOStrKStrOSdrKSdrMCADQ9BGmLFOY8AAAAAElFTkSuQmCC"
+  "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGOQllOBIwbiOACWxAXR5dcEAQAAAABJRU5ErkJggg=="
 
 /**
  * The image provider behind a scripted model's banners: one model, which

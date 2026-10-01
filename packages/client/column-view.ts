@@ -4,7 +4,6 @@
 
 import {
   ancestry,
-  type BannerFocus,
   type BannerRecord,
   blobUrl,
   type ColumnView,
@@ -102,19 +101,9 @@ export type HeadIdentity =
   /** A conversation. */
   | { readonly kind: "none" }
 
-/** The image behind a column's header, and which part of it shows. */
+/** The thread's icon in a column's header. */
 export interface HeadBanner {
   readonly url: string
-  /** CSS `object-position`. */
-  readonly position: string
-}
-
-/** How far down the image each focus is: `object-position`'s y. */
-const FOCUS_Y: Readonly<Record<BannerFocus, string>> = {
-  top: "0%",
-  upper: "25%",
-  center: "50%",
-  bottom: "100%",
 }
 
 /** Where a column forks: none for a root column, a new tab, or a column moved first. */
@@ -220,12 +209,7 @@ function bannerOf(
   banners: ReadonlyMap<LaneName, BannerRecord>,
 ): HeadBanner | null {
   const banner = lane.kind === "lane" ? banners.get(lane.name) : undefined
-  return banner === undefined
-    ? null
-    : {
-        url: blobUrl(banner.sha),
-        position: `center ${FOCUS_Y[banner.focus]}`,
-      }
+  return banner === undefined ? null : { url: blobUrl(banner.sha) }
 }
 
 function identityOf(

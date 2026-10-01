@@ -112,12 +112,17 @@
       .column-head button { background: none; border: none; border-radius: 0; padding: 0; color: inherit; }
       .column-head .head-row { display: flex; gap: .5rem; align-items: center; min-height: 1.3rem; }
       .column-head .head-space { flex: 1; }
-      /* The thread's banner, under the header's own content: `isolation` keeps
-         its negative z-index inside the header. A new one fades in once loaded;
-         the one there as the column mounts does not. */
-      .column-head { position: relative; isolation: isolate; }
-      .column-head .banner { position: absolute; inset: 0; z-index: -1; width: 100%;
-        height: 100%; object-fit: cover; pointer-events: none; }
+      /* The thread's banner: a square sprite on black, at the header's full
+         height on its right, under its content. `isolation` keeps the negative
+         z-index inside the header, and makes the header's own background what
+         `lighten` blends with, so the black goes; the mask fades what is left
+         of the square's edges. A new one fades in once loaded; the one there
+         as the column mounts does not. */
+      .column-head { position: relative; isolation: isolate; background: #14161a; }
+      .column-head .banner { position: absolute; top: 0; right: 2.5rem; z-index: -1;
+        height: 100%; aspect-ratio: 1; object-fit: contain; pointer-events: none;
+        mix-blend-mode: lighten;
+        mask-image: radial-gradient(closest-side, #000 70%, transparent); }
       .column-head .banner[data-fade] { opacity: 0; transition: opacity .6s ease-in; }
       .column-head .banner[data-fade][data-loaded] { opacity: 1; }
       .column-head .agent-name { flex: 0 0 auto; white-space: nowrap; font-size: .85rem;

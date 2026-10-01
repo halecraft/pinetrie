@@ -1,19 +1,9 @@
 // pi/banner — `set_banner`, the tool that sets a thread's column banner when
 // the person asks, and the arguments it takes. The host decides and writes
-// (`planBanner`); this only reads the call.
+// (`planAsk`); this only reads the call.
 
-import {
-  BANNER_FOCUSES,
-  blobOfUrl,
-  isSha256,
-  type LaneName,
-  type Sha256,
-} from "@pineta/core"
-import {
-  type BannerAnswer,
-  type BannerAsk,
-  parseFocus,
-} from "@pineta/marginalia"
+import { blobOfUrl, isSha256, type LaneName, type Sha256 } from "@pineta/core"
+import type { BannerAnswer, BannerAsk } from "@pineta/marginalia"
 import { Type } from "typebox"
 import { laneOf } from "./lanes.ts"
 
@@ -33,7 +23,6 @@ const imageOf = (s: string): Sha256 | null =>
 export function parseBannerArgs(args: {
   readonly image?: string
   readonly direction?: string
-  readonly focus?: string
 }): BannerAsk | { readonly refused: string } {
   const image =
     args.image === undefined || args.image.trim() === ""
@@ -44,7 +33,7 @@ export function parseBannerArgs(args: {
       refused: `"${args.image}" is not a pasted image: pass its /blob/<sha256> path from the message.`,
     }
   const direction = args.direction?.trim() || null
-  return { image, direction, focus: parseFocus(args.focus) }
+  return { image, direction }
 }
 
 /** The host's answer, as the agent reads it. */
@@ -54,8 +43,6 @@ export function bannerAnswerText(answer: BannerAnswer): string {
       return "A new banner is being made. It appears in this thread's column header in about ten seconds."
     case "set":
       return "The banner is set."
-    case "unchanged":
-      return "The banner is already so."
     case "refused":
       return answer.reason === "not_stored"
         ? "That image is not stored: ask the person to paste it again."
@@ -80,7 +67,7 @@ export function bannerTool(
     name: BANNER_TOOL,
     label: "set banner",
     description:
-      "Set the image behind this thread's column header. Use it only when the person asks. With `image`, use an image the person pasted; with `direction`, or nothing, make a new one; with `focus` alone, move the crop of the banner there is.",
+      "Set the image in this thread's column header. Use it only when the person asks. With `image`, use an image the person pasted; with `direction`, or nothing, make a new one from the thread's name.",
     parameters: Type.Object({
       image: Type.Optional(
         Type.String({
@@ -93,19 +80,10 @@ export function bannerTool(
           description: "The person's words for a new banner",
         }),
       ),
-      focus: Type.Optional(
-        Type.Union(
-          BANNER_FOCUSES.map(f => Type.Literal(f)),
-          {
-            description:
-              "Which band of the image the thin header shows: upper, a quarter of the way down, unless asked",
-          },
-        ),
-      ),
     }),
     async execute(
       _id: string,
-      params: { image?: string; direction?: string; focus?: string },
+      params: { image?: string; direction?: string },
       _onUpdate: unknown,
       _toolContext: unknown,
       _invocation: unknown,

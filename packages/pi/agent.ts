@@ -411,17 +411,16 @@ export interface Agent {
   }): Promise<string | null>
   /**
    * Whether a banner can be drawn: banners are enabled, their model is
-   * known, and there is a key for its provider. Asked before the brief, so a
-   * host with no key spends nothing.
+   * known, and there is a key for its provider. Asked first, so a host with
+   * no key spends nothing.
    */
   canDrawBanners(): Promise<boolean>
   /**
-   * One banner image from `prompt`, asked at `ratio` (`W:H`, OpenRouter's
-   * `image_config.aspect_ratio`, which pi-ai does not send itself), fitted
-   * as an upload is. Never rejects: a failure, banners being off or bytes
-   * that are not an image included, is `failed` and why.
+   * One square banner image from `prompt`, fitted as an upload is. Never
+   * rejects: a failure, banners being off or bytes that are not an image
+   * included, is `failed` and why.
    */
-  drawBanner(prompt: string, ratio: string): Promise<Drawn>
+  drawBanner(prompt: string): Promise<Drawn>
   close(): Promise<void>
 }
 
@@ -714,7 +713,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       return (await setup.images.apiKey(imageModel.provider)) !== undefined
     },
 
-    async drawBanner(prompt, ratio) {
+    async drawBanner(prompt) {
       const failed = (reason: string): Drawn => ({ kind: "failed", reason })
       if (imageModel === undefined) return failed("no banner model")
       try {
@@ -727,9 +726,11 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
           {
             apiKey,
             timeoutMs: DRAW_TIMEOUT_MS,
+            // pi-ai sends no ratio; OpenRouter clamps it to what the
+            // model has, and every model has 1:1.
             onPayload: payload => ({
               ...(payload as object),
-              image_config: { aspect_ratio: ratio },
+              image_config: { aspect_ratio: "1:1" },
             }),
           },
         )

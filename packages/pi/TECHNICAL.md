@@ -314,7 +314,8 @@ item 18, and in `lanes.test.ts` against the harness.
 - **Pineta's own skills** are in `skills/`, loaded after yours and the repo's
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `offer-stack`
-  (ADR-0038), and `column-banner` (ADR-0050). So one of yours or the repo's
+  (ADR-0038), and `column-banner` (ADR-0053), whose whole body is the image
+  model's prompt. So one of yours or the repo's
   of the same name replaces Pineta's. All four are
   `disable-model-invocation: true`: only the host asks for them.
   `Agent.skill(name)` reads the file at call time, without its frontmatter,
@@ -439,7 +440,7 @@ lane's context. The host builds the request (`describeRequest`, in
 marginalia) and adds the trailers; this package only carries it out. A failed
 request returns null, and the offer keeps its placeholder.
 
-### Banners' images (`Agent.drawBanner`, ADR-0050, S60)
+### Banners' images (`Agent.drawBanner`, ADR-0050, ADR-0053)
 
 - **`setup.images`** is pi-ai's image registry (`createImagesModels`):
   `openrouterImagesProvider()` for a named or configured model, and
@@ -449,10 +450,11 @@ request returns null, and the offer keeps its placeholder.
   asks the `ModelRuntime` (`getAuth`), which reads `auth.json` and then
   `OPENROUTER_API_KEY`, and the key is passed as `apiKey`.
 - **pi-ai sends no aspect ratio.** `drawBanner` adds OpenRouter's
-  `image_config.aspect_ratio` in `onPayload`.
+  `image_config.aspect_ratio`, always 1:1, in `onPayload`. OpenRouter
+  clamps a ratio to what the model has, and every model has 1:1.
 - **`drawBanner` never rejects**: `drawn` with an image, or `failed` and
   why. The image is fitted in pi, as `read`'s are (`drawnOf` runs
   `prepareImage`), so the host stores what it is given; bytes that are not an
   image are a failure, and the host tries again. `canDrawBanners` is asked
-  first, so a host with no key writes no brief.
+  first, so a host with no key reads no skill and asks no model.
 

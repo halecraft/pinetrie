@@ -244,10 +244,23 @@ export async function startHost({
   const userJson = await readFile(userConfig, "utf8")
     .then(t => JSON.parse(t) as unknown)
     .catch(() => null)
-  // Every lane's thread name (ADR-0039), one plan at a time.
+  const serial = createSerial(failed(basics, "step"))
+  // Each thread's column banner, when the user config turns banners on. Made
+  // before the agent, whose `set_banner` asks it, so it reads the agent
+  // lazily, as lane work does.
+  const bannerConfig = decodeBannerConfig(userJson)
+  const banners =
+    bannerConfig === null
+      ? null
+      : createBanners({ basics, serial, blobs, agent: theAgent })
+  // Every lane's thread name (ADR-0039), one plan at a time. A thread's
+  // banner is drawn from its name, so it starts as the name is written.
   const ensureNames = createNames({
     basics,
     agent: { setWorkRecord: record => theAgent().setWorkRecord(record) },
+    onNamed: lane => {
+      banners?.due(lane).catch(failed(basics, "banner"))
+    },
   })
   const work = await startLaneWork({
     basics,
@@ -258,22 +271,6 @@ export async function startHost({
     userConfig: { file: userConfig, json: userJson },
     agent: theAgent,
   })
-
-  const serial = createSerial(failed(basics, "step"))
-  // Each thread's column banner, when the user config turns banners on. Made
-  // before the agent, whose `set_banner` asks it, so it reads the agent
-  // lazily, as lane work does.
-  const bannerConfig = decodeBannerConfig(userJson)
-  const banners =
-    bannerConfig === null
-      ? null
-      : createBanners({
-          basics,
-          serial,
-          blobs,
-          config: bannerConfig,
-          agent: theAgent,
-        })
 
   // --- pi stack ------------------------------------------------------------
   const commandRenames = decodeCommandRenames(userJson)
@@ -342,11 +339,11 @@ export async function startHost({
       sweepBlobs({ basics, blobs, grace: blobGraceMs, texts: cardPort.texts }),
   })
   // A run's end: hot reload may reload the page, then the lane drains and
-  // the session compacts. A thread with no banner gets one.
+  // the session compacts. A thread whose banner failed tries again.
   runs.onEnded(lane => {
     hotReload.runEnded()
     void settle([lane])
-    banners?.ran(lane).catch(failed(basics, "banner"))
+    banners?.due(lane).catch(failed(basics, "banner"))
   })
 
   /**

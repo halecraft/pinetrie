@@ -1,7 +1,6 @@
 // What a one-shot model request outside a thread is made from: a thread's
-// messages as lines, and the newest of them that fit a budget. The commit
-// message (`describeRequest`) and a column's banner (`bannerRequest`) share
-// them.
+// messages as lines, and the newest of them that fit a budget, as the commit
+// message's request (`describeRequest`) uses them.
 
 import type { TranscriptMessage } from "@pineta/core"
 

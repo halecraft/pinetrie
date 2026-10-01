@@ -48,9 +48,7 @@ test("referencedBlobs: chats, tool results, held messages, typed texts and banne
     ],
     held,
     texts: [`a card ![](/blob/${sha("c")})`, "`![](/blob/dd)` no"],
-    banners: [
-      { lane: laneNameForThread("1"), sha: sha("g"), focus: "center", at: 1 },
-    ],
+    banners: [{ lane: laneNameForThread("1"), sha: sha("g"), at: 1 }],
   })
   expect([...referenced].sort()).toEqual([
     sha("a"),

@@ -698,9 +698,9 @@ function Reply({
 }
 
 /**
- * The image behind the header, cropped to it as `background-size: cover`
- * would. An image rather than a background, so a new one can fade in once
- * loaded; keyed by its URL, so each new banner does.
+ * The thread's icon, a square at the header's right, under its content. An
+ * image rather than a background, so a new one can fade in once loaded;
+ * keyed by its URL, so each new banner does.
  */
 function Banner({ banner, fade }: { banner: HeadBanner; fade: boolean }) {
   const [loaded, setLoaded] = useState(false)
@@ -713,7 +713,6 @@ function Banner({ banner, fade }: { banner: HeadBanner; fade: boolean }) {
       draggable={false}
       onLoad={() => setLoaded(true)}
       src={banner.url}
-      style={{ objectPosition: banner.position }}
     />
   )
 }

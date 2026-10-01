@@ -1,9 +1,7 @@
-import { laneNameForThread, type Sha256 } from "@pineta/core"
+import { laneNameForThread, type Sha256, type ThreadName } from "@pineta/core"
 import {
   type BannerAsk,
-  DEFAULT_BANNER,
   encodeWorkRecord,
-  FALLBACK_RATIO,
   type WorkRecord,
 } from "@pineta/marginalia"
 import { type Agent, type Drawn, sha256Of } from "@pineta/pi"
@@ -15,26 +13,38 @@ import { basics, deferred, methods, putValue, record } from "./fakes.ts"
 import { createSerial } from "./queue.ts"
 
 const LANE = laneNameForThread("1")
+const NAME = "clear-zebra" as ThreadName
 const BYTES = new Uint8Array([1, 2, 3])
 const SHA = sha256Of(BYTES)
 const DRAWN: Drawn = {
   kind: "drawn",
-  image: { bytes: BYTES, mimeType: "image/png", width: 8, height: 1 },
+  image: { bytes: BYTES, mimeType: "image/png", width: 1, height: 1 },
 }
 
 type BannerAgent = Pick<
   Agent,
-  "canDrawBanners" | "drawBanner" | "describe" | "skill" | "setWorkRecord"
+  "canDrawBanners" | "drawBanner" | "skill" | "setWorkRecord"
 >
 
-function setUp(agent: Partial<BannerAgent> = {}) {
+function setUp(agent: Partial<BannerAgent> = {}, named = true) {
   const b = basics()
+  if (named)
+    putValue(
+      b.doc,
+      encodeWorkRecord({
+        kind: "name",
+        record: { lane: LANE, name: NAME, at: 1 },
+      }),
+    )
   const serial = createSerial()
   const blobs = memoryBlobs(() => 1_000)
   const fake = record<BannerAgent>({
     canDrawBanners: async () => true,
-    skill: async () => ({ path: "SKILL.md", content: "Draw it.", hash: "h" }),
-    describe: async () => "a dark marsh",
+    skill: async () => ({
+      path: "SKILL.md",
+      content: "A {adjective} {noun}.",
+      hash: "h",
+    }),
     drawBanner: async () => DRAWN,
     setWorkRecord: async (r: WorkRecord) =>
       putValue(b.doc, encodeWorkRecord(r)),
@@ -44,7 +54,6 @@ function setUp(agent: Partial<BannerAgent> = {}) {
     basics: b,
     serial,
     blobs,
-    config: DEFAULT_BANNER,
     agent: () => fake.port,
   })
   return { b, serial, blobs, fake, banners }
@@ -53,12 +62,15 @@ function setUp(agent: Partial<BannerAgent> = {}) {
 const ask = (a: Partial<BannerAsk>): BannerAsk => ({
   image: null,
   direction: null,
-  focus: null,
   ...a,
 })
 
-describe("a run's end", () => {
-  test("a thread with none gets one: the skill's brief, drawn at the configured ratio, stored", async () => {
+const draws = (
+  calls: readonly { method: string; args: readonly unknown[] }[],
+) => calls.filter(c => c.method === "drawBanner").map(c => c.args)
+
+describe("a thread due one", () => {
+  test("a thread with none gets one: the skill filled from its name, drawn, stored", async () => {
     // Drawn a timer tick later, as a real model is: `idle` must wait for it.
     const { serial, blobs, fake, banners, b } = setUp({
       drawBanner: async (): Promise<Drawn> => {
@@ -66,42 +78,33 @@ describe("a run's end", () => {
         return DRAWN
       },
     })
-    await banners.ran(LANE)
+    await banners.due(LANE)
     await serial.idle()
     expect(methods(fake.calls)).toEqual([
       "canDrawBanners",
       "skill",
-      "describe",
       "drawBanner",
       "setWorkRecord",
     ])
-    const describeCall = fake.calls.find(c => c.method === "describe")
-    expect(describeCall?.args[0]).toMatchObject({ system: "Draw it." })
-    expect(fake.calls.find(c => c.method === "drawBanner")?.args).toEqual([
-      "a dark marsh",
-      DEFAULT_BANNER.aspectRatio,
-    ])
+    expect(draws(fake.calls)).toEqual([["A clear zebra."]])
     expect(blobs.ref(SHA)).toBeDefined()
     expect(readBanners(b.doc).get(LANE)).toEqual({
       lane: LANE,
       sha: SHA,
-      focus: "upper",
       at: 1_000,
     })
   })
 
-  test("a failed attempt is logged, and the next asks for the fallback ratio", async () => {
+  test("a failed attempt is logged, and the next tries again", async () => {
     let n = 0
     const { serial, fake, banners, b } = setUp({
       drawBanner: async (): Promise<Drawn> =>
-        ++n === 1 ? { kind: "failed", reason: "400: ratio refused" } : DRAWN,
+        ++n === 1 ? { kind: "failed", reason: "502: busy" } : DRAWN,
     })
-    await banners.ran(LANE)
+    await banners.due(LANE)
     await serial.idle()
-    expect(
-      fake.calls.filter(c => c.method === "drawBanner").map(c => c.args[1]),
-    ).toEqual([DEFAULT_BANNER.aspectRatio, FALLBACK_RATIO])
-    expect(b.lines.join("\n")).toContain("attempt 1: 400: ratio refused")
+    expect(draws(fake.calls)).toHaveLength(2)
+    expect(b.lines.join("\n")).toContain("attempt 1: 502: busy")
     expect(readBanners(b.doc).get(LANE)?.sha).toBe(SHA)
   })
 
@@ -109,9 +112,9 @@ describe("a run's end", () => {
     const { serial, fake, banners, b } = setUp({
       drawBanner: async (): Promise<Drawn> => ({ kind: "failed", reason: "x" }),
     })
-    await banners.ran(LANE)
+    await banners.due(LANE)
     await serial.idle()
-    expect(fake.calls.filter(c => c.method === "drawBanner")).toHaveLength(3)
+    expect(draws(fake.calls)).toHaveLength(3)
     expect(readBanners(b.doc).size).toBe(0)
   })
 
@@ -119,9 +122,22 @@ describe("a run's end", () => {
     const { serial, fake, banners } = setUp({
       canDrawBanners: async () => false,
     })
-    await banners.ran(LANE)
+    await banners.due(LANE)
     await serial.idle()
     expect(methods(fake.calls)).toEqual(["canDrawBanners"])
+  })
+
+  test("with no name yet, or no skill, it is logged, and nothing is drawn", async () => {
+    const { serial, fake, banners, b } = setUp({}, false)
+    await banners.due(LANE)
+    await serial.idle()
+    expect(methods(fake.calls)).toEqual([])
+    expect(b.lines.join("\n")).toContain("the thread has no name yet")
+    const unskilled = setUp({ skill: async () => null })
+    await unskilled.banners.due(LANE)
+    await unskilled.serial.idle()
+    expect(draws(unskilled.fake.calls)).toEqual([])
+    expect(unskilled.b.lines.join("\n")).toContain("no column-banner skill")
   })
 
   test("a thread with a banner, or one being made, gets no other", async () => {
@@ -129,13 +145,13 @@ describe("a run's end", () => {
     const { serial, fake, banners } = setUp({
       drawBanner: () => drawing.promise,
     })
-    await banners.ran(LANE)
-    await banners.ran(LANE)
+    await banners.due(LANE)
+    await banners.due(LANE)
     drawing.resolve(DRAWN)
     await serial.idle()
-    await banners.ran(LANE)
+    await banners.due(LANE)
     await serial.idle()
-    expect(fake.calls.filter(c => c.method === "describe")).toHaveLength(1)
+    expect(draws(fake.calls)).toHaveLength(1)
   })
 
   test("a banner the person set meanwhile is kept", async () => {
@@ -149,7 +165,7 @@ describe("a run's end", () => {
       width: 1,
       height: 1,
     }).sha256
-    await banners.ran(LANE)
+    await banners.due(LANE)
     expect(await banners.request(LANE, ask({ image: pasted }))).toEqual({
       kind: "set",
     })
@@ -160,7 +176,7 @@ describe("a run's end", () => {
 })
 
 describe("set_banner", () => {
-  test("a pasted image is set with its crop; one not stored is refused", async () => {
+  test("a pasted image is set; one not stored is refused", async () => {
     const { blobs, banners, b } = setUp()
     const pasted = blobs.put({
       bytes: new Uint8Array([9]),
@@ -168,13 +184,10 @@ describe("set_banner", () => {
       width: 1,
       height: 1,
     }).sha256
-    expect(
-      await banners.request(LANE, ask({ image: pasted, focus: "top" })),
-    ).toEqual({ kind: "set" })
-    expect(readBanners(b.doc).get(LANE)).toMatchObject({
-      sha: pasted,
-      focus: "top",
+    expect(await banners.request(LANE, ask({ image: pasted }))).toEqual({
+      kind: "set",
     })
+    expect(readBanners(b.doc).get(LANE)?.sha).toBe(pasted)
     expect(
       await banners.request(LANE, ask({ image: "f".repeat(64) as Sha256 })),
     ).toEqual({ kind: "refused", reason: "not_stored" })
@@ -186,13 +199,9 @@ describe("set_banner", () => {
       kind: "requested",
     })
     await serial.idle()
-    expect(
-      (
-        fake.calls.find(c => c.method === "describe")?.args[0] as {
-          user: string
-        }
-      ).user,
-    ).toContain("The person asked for: at dusk")
+    expect(draws(fake.calls)[0]?.[0]).toBe(
+      "A clear zebra.\n\nAbove all, the person asks for: at dusk",
+    )
     expect(readBanners(b.doc).get(LANE)?.sha).toBe(SHA)
   })
 })

@@ -8,14 +8,6 @@ const core = "packages/core/index.ts"
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "an unasked banner is cropped at its centre",
-    file: core,
-    from: 'export const DEFAULT_BANNER_FOCUS: BannerFocus = "upper"',
-    to: 'export const DEFAULT_BANNER_FOCUS: BannerFocus = "center"',
-    command: ["pnpm", "exec", "vitest", "run", "packages/marginalia"],
-    expect: "a run's end makes one only for a thread with none",
-  },
-  {
     name: "the youngest child continues the parent's track",
     file: tree,
     from: "    const tracks = children.map((_, i) => (i === 0 ? track : claim()))",

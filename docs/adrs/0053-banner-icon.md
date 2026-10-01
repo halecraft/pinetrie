@@ -1,0 +1,54 @@
+# ADR-0053 — A thread's banner is its name's icon: a square sprite drawn from the name alone, as the thread is named
+
+**Status:** Accepted. Amends ADR-0050.
+
+**Context.** ADR-0050's banners were wide images behind the header, briefed
+by the text model from the thread's messages and drawn at 8:1 after the
+first run. In use they were hard to tell apart: the brief asked for a dark,
+low-key panorama with no focal subject, and got murky scenery. Asked instead
+for one pixel-art sprite, the image model drew recognisable ones, but at
+8:1 a 34px header cut their tops off, and anatomy suffered (a five-legged
+zebra). Only Nano Banana 2's preview draws 8:1 (S60), so the shape tied
+banners to one model. And a banner came only after a run had ended.
+
+**Decision.**
+
+- **The banner is a square icon.** The client draws it at the header's full
+  height on its right, `object-fit: contain`, under the header's content.
+  The prompt asks for a sprite on plain black; `mix-blend-mode: lighten`
+  against the header's own background removes the black, and a radial mask
+  fades the square's edges. With no crop, the record has no `focus`, and
+  `set_banner` takes only an image or words.
+- **Any model draws it.** Every image model draws 1:1, and OpenRouter clamps
+  a ratio to what the model has. The default is FLUX.2 Klein 4B
+  (`black-forest-labs/flux.2-klein-4b`), the fastest and cheapest of FLUX.2;
+  `banner.model` in the user config names another.
+- **Only the name is sent.** The `column-banner` skill's body is the image
+  model's prompt, with `{adjective}` and `{noun}` filled from the
+  thread's two-word name (`bannerPrompt`). No text model writes a brief, and
+  no message leaves for the image model. The person's direction to
+  `set_banner` is added after the template.
+- **It starts as the thread is named.** `createNames` reports each lane it
+  names, and that lane is due a banner (`bannerDue`). A run's end
+  makes it due again, which draws only for a thread still without one: the
+  retry for a failed draw. Enabling banners still draws none for old threads.
+
+**Consequences.**
+
+- A banner says nothing about what its thread did. It is the name's mascot,
+  and two threads sharing a noun get similar ones.
+- One model request per banner, not two, and none to the text model.
+- A pasted image is shown the same way, contained in the square: a wide
+  photograph shows small.
+- Records written with a `focus` still decode; it is ignored.
+- Klein's results are not yet measured here; the default may change once
+  they are.
+
+**Alternatives rejected.**
+
+- **Keep the wide image, crop higher.** Tried (`upper`, a quarter of the way
+  down): the sprite still had to land in a band the model does not place
+  reliably, and only one model draws the shape.
+- **A brief from the name by the text model.** Two requests and seconds more
+  for little: a two-word name needs no summarising, and a template is the
+  same for every thread.

@@ -18,10 +18,16 @@ test("two ensureNames called together write each lane's name once, and no two la
       putValue(b.doc, encodeWorkRecord(r))
     },
   })
-  const ensureNames = createNames({ basics: b, agent: agent.port })
+  const named: string[] = []
+  const ensureNames = createNames({
+    basics: b,
+    agent: agent.port,
+    onNamed: lane => named.push(lane),
+  })
   await Promise.all([ensureNames(), ensureNames()])
   const written = agent.calls.map(c => c.args[0] as WorkRecord)
   expect(written).toHaveLength(2)
   const names = written.map(r => (r.kind === "name" ? r.record.name : ""))
   expect(new Set(names).size).toBe(2)
+  expect(named.sort()).toEqual([...lanes].sort())
 })

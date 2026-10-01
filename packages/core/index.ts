@@ -592,26 +592,6 @@ export interface NameRecord {
 }
 
 /**
- * Which band of a banner's image its thin header shows: `upper` is a quarter
- * of the way down.
- */
-export type BannerFocus = "top" | "upper" | "center" | "bottom"
-
-export const BANNER_FOCUSES: readonly BannerFocus[] = [
-  "top",
-  "upper",
-  "center",
-  "bottom",
-]
-
-/**
- * A banner's crop when none was asked for. The brief keeps the left third
- * empty and stands its hero in the upper middle; centred, a one-row header
- * cut off its top.
- */
-export const DEFAULT_BANNER_FOCUS: BannerFocus = "upper"
-
-/**
  * The image behind a thread's column header: a host-written `pineta.banner`
  * value keyed by the lane. The image is a blob (ADR-0042); a replaced one is
  * no longer referenced, and the blob sweep deletes it.
@@ -619,7 +599,6 @@ export const DEFAULT_BANNER_FOCUS: BannerFocus = "upper"
 export interface BannerRecord {
   readonly lane: LaneName
   readonly sha: Sha256
-  readonly focus: BannerFocus
   readonly at: number
 }
 

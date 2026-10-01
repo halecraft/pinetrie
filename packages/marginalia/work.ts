@@ -11,7 +11,6 @@
 
 import {
   type Above,
-  BANNER_FOCUSES,
   BASE_SNAPSHOT,
   type BannerRecord,
   type CommandSummary,
@@ -141,7 +140,6 @@ const OfferRecordSchema = Type.Object({
 const BannerRecordSchema = Type.Object({
   lane: Type.String({ minLength: 1 }),
   sha: Type.String({ pattern: "^[0-9a-f]{64}$" }),
-  focus: Type.Union(BANNER_FOCUSES.map(f => Type.Literal(f))),
   at: Type.Number(),
 })
 
@@ -216,7 +214,7 @@ export const decodeNameRecord = (value: unknown): NameRecord | undefined =>
 export const decodeBannerRecord = (value: unknown): BannerRecord | undefined =>
   decodeWith(BannerRecordSchema, value, r =>
     isSha256(r.sha)
-      ? { lane: r.lane as LaneName, sha: r.sha, focus: r.focus, at: r.at }
+      ? { lane: r.lane as LaneName, sha: r.sha, at: r.at }
       : undefined,
   )
 

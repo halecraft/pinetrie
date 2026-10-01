@@ -1,7 +1,5 @@
 import {
   type AgentMessageLike,
-  BANNER_FOCUSES,
-  type BannerFocus,
   commitId,
   type EntryLike,
   entryId,
@@ -228,38 +226,18 @@ describe("columnView: the header", () => {
   })
   test("the banner is the thread's at the column's end; a conversation has none", () => {
     const sha = "a".repeat(64) as Sha256
-    const banners = new Map([
-      [B, { lane: B, sha, focus: "top" as const, at: 1 }],
-    ])
+    const banners = new Map([[B, { lane: B, sha, at: 1 }]])
     expect(
       columnView(
         facts(1, { lane: onLane(laneView(B, "b2")), work: work({ banners }) }),
       ).banner,
-    ).toEqual({ url: `/blob/${sha}`, position: "center 0%" })
+    ).toEqual({ url: `/blob/${sha}` })
     expect(
       columnView(
         facts(1, { lane: onLane(laneView(A, "b2")), work: work({ banners }) }),
       ).banner,
     ).toBeNull()
     expect(columnView(facts(1, { work: work({ banners }) })).banner).toBeNull()
-  })
-  test("a banner's focus is how far down its image the header shows", () => {
-    const sha = "a".repeat(64) as Sha256
-    const at = (focus: BannerFocus) =>
-      columnView(
-        facts(1, {
-          lane: onLane(laneView(B, "b2")),
-          work: work({
-            banners: new Map([[B, { lane: B, sha, focus, at: 1 }]]),
-          }),
-        }),
-      ).banner?.position
-    expect(BANNER_FOCUSES.map(at)).toEqual([
-      "center 0%",
-      "center 25%",
-      "center 50%",
-      "center 100%",
-    ])
   })
   test("a lane that started above the column's first message still has a start", () => {
     // Column 1 shows only the branch; lane A started at 3, in column 0.

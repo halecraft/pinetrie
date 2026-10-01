@@ -2414,16 +2414,24 @@ invariants("end")
   }
   const blobAt = (sha: string) => fetch(`${bh.httpUrl}blob/${sha}`)
 
-  // 1. A thread's first run's end makes its banner.
+  // 1. A new thread's banner is made as it is named, while its first run is
+  //    still going.
+  const planning = script.pause("plan the parser")
   await bu.chat("@agent plan the parser", ROOT, START_AGENT)
+  await waitFor(() => planning.reached, 10_000)
+  const bannerOfFirst = () => {
+    const [first] = readLanes(bh.doc, readTreeIndex(bh.doc))
+    return first === undefined ? undefined : readBanners(bh.doc).get(first.name)
+  }
+  const madeEarly =
+    (await waitFor(() => bannerOfFirst() !== undefined, 10_000)) >= 0
+  planning.resume()
   await bidle()
   const [lane] = readLanes(bh.doc, readTreeIndex(bh.doc)).map(l => l.name)
   const made = lane === undefined ? undefined : readBanners(bh.doc).get(lane)
   ok(
-    made !== undefined &&
-      made.focus === "upper" &&
-      (await blobAt(made.sha)).status === 200,
-    "a thread's first run's end makes its banner, stored and served as an image",
+    madeEarly && made !== undefined && (await blobAt(made.sha)).status === 200,
+    "a new thread's banner is made as it is named, before its first run ends, stored and served as an image",
   )
 
   // 2. The sweep keeps a banner nothing else shows.
@@ -2448,7 +2456,7 @@ invariants("end")
   script.use([
     {
       tool: "set_banner",
-      args: { image: `/blob/${red.sha256}`, focus: "top" },
+      args: { image: `/blob/${red.sha256}` },
     },
     { text: "set it" },
   ])
@@ -2464,10 +2472,8 @@ invariants("end")
     .map(m => messageText(m as never))
   const now = lane === undefined ? undefined : readBanners(bh.doc).get(lane)
   ok(
-    now?.sha === red.sha256 &&
-      now.focus === "top" &&
-      toolSaid.includes("The banner is set."),
-    "set_banner sets a pasted image as the thread's banner, with its crop, and tells the agent",
+    now?.sha === red.sha256 && toolSaid.includes("The banner is set."),
+    "set_banner sets a pasted image as the thread's banner, and tells the agent",
   )
   await sleep(GRACE_MS + 200)
   await bu.chat("@agent thanks", at(idOfIn(bh.doc, "set it")), {
