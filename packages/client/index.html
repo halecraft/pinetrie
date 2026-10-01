@@ -110,23 +110,26 @@
       .column-head { display: flex; flex-direction: column; gap: .2rem; padding: .4rem .75rem;
         border-top: 4px solid var(--track, #777); font-size: .8rem; color: #aaa; }
       .column-head button { background: none; border: none; border-radius: 0; padding: 0; color: inherit; }
-      .column-head .head-row { display: flex; gap: .5rem; align-items: center; min-height: 1.3rem; }
+      .column-head .head-row { display: flex; gap: .5rem; align-items: center; min-height: 1.5rem; }
       .column-head .head-space { flex: 1; }
-      /* The thread's banner: a square sprite on black, at the header's full
-         height on its right, under its content. `isolation` keeps the negative
-         z-index inside the header, and makes the header's own background what
-         `lighten` blends with, so the black goes; the mask fades what is left
-         of the square's edges. A new one fades in once loaded; the one there
-         as the column mounts does not. */
-      .column-head { position: relative; isolation: isolate; background: #14161a; }
-      .column-head .banner { position: absolute; top: 0; right: 2.5rem; z-index: -1;
-        height: 100%; aspect-ratio: 1; object-fit: contain; pointer-events: none;
-        mix-blend-mode: lighten;
-        mask-image: radial-gradient(closest-side, #000 70%, transparent); }
+      /* The mark before a thread's name: a fixed square holding the star, and
+         the banner, a sprite on black, laid over it, so the name never moves
+         when one arrives. `isolation` makes the header's own background what
+         `lighten` blends with, so the sprite's black goes. A new banner fades
+         in once loaded, and the star out; the one there as the column mounts
+         does not. The head row is the square's height, with or without one. */
+      .column-head { isolation: isolate; background: #14161a; }
+      .column-head .agent-name { flex: 0 0 auto; display: inline-flex; align-items: center;
+        gap: .3rem; white-space: nowrap; font-size: .85rem;
+        font-weight: 600; color: var(--track, #9ecbff); }
+      .column-head .thread-mark { position: relative; flex: 0 0 auto; width: 1.5rem; height: 1.5rem;
+        display: inline-flex; align-items: center; justify-content: center; }
+      .column-head .thread-star { transition: opacity .6s ease-in; }
+      .column-head .thread-star[data-gone] { opacity: 0; }
+      .column-head .banner { position: absolute; inset: 0; width: 100%; height: 100%;
+        object-fit: contain; pointer-events: none; mix-blend-mode: lighten; }
       .column-head .banner[data-fade] { opacity: 0; transition: opacity .6s ease-in; }
       .column-head .banner[data-fade][data-loaded] { opacity: 1; }
-      .column-head .agent-name { flex: 0 0 auto; white-space: nowrap; font-size: .85rem;
-        font-weight: 600; color: var(--track, #9ecbff); }
       .column-head button.agent-name:not(:disabled):hover { text-decoration: underline; }
       .column-head button.agent-name:disabled { cursor: inherit; }
       .column-head .agent-name.pending { color: #8b93a1; font-weight: 400; font-style: italic; }

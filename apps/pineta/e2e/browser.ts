@@ -2324,26 +2324,40 @@ try {
       await bp.waitForTimeout(800)
       const header = await bp.evaluate(sel => {
         const head = document.querySelector(`${sel} .column-head`)
-        const img = head?.querySelector("img.banner")
-        const name = head?.querySelector(".agent-name")
+        const mark = head?.querySelector(".agent-name .thread-mark")
+        const img = mark?.querySelector("img.banner")
+        const star = mark?.querySelector(".thread-star")
         if (
           !(head instanceof HTMLElement) ||
-          !(img instanceof HTMLImageElement)
+          !(mark instanceof HTMLElement) ||
+          !(img instanceof HTMLImageElement) ||
+          !(star instanceof HTMLElement)
         )
           return null
-        const box = name?.getBoundingClientRect()
-        const icon = img.getBoundingClientRect()
+        // Where the name's text starts, and how tall the header is: the same
+        // with the image as without it, so its arrival moves nothing.
+        const layout = () => {
+          const text = document.createRange()
+          const name = mark.nextSibling
+          if (name !== null) text.selectNode(name)
+          return `${text.getBoundingClientRect().left},${head.offsetHeight}`
+        }
+        const withImage = layout()
+        img.style.display = "none"
+        const without = layout()
+        img.style.display = ""
         const style = getComputedStyle(img)
-        // The header's padding box: its top border is the colour stripe.
         return {
           natural: img.naturalWidth,
           fit: style.objectFit,
           blend: style.mixBlendMode,
           opacity: style.opacity,
-          square: img.offsetWidth === img.offsetHeight,
-          tall: img.offsetHeight === head.clientHeight,
-          rightOfName: box !== undefined && icon.left >= box.right,
-          inside: icon.right <= head.getBoundingClientRect().right,
+          starOpacity: getComputedStyle(star).opacity,
+          fills:
+            img.offsetWidth === mark.offsetWidth &&
+            img.offsetHeight === mark.offsetHeight &&
+            mark.offsetWidth === mark.offsetHeight,
+          still: withImage === without,
           stripe: getComputedStyle(head).borderTopWidth,
         }
       }, col(0))
@@ -2354,12 +2368,11 @@ try {
           header.fit === "contain" &&
           header.blend === "lighten" &&
           header.opacity === "1" &&
-          header.square &&
-          header.tall &&
-          header.rightOfName &&
-          header.inside &&
+          header.starOpacity === "0" &&
+          header.fills &&
+          header.still &&
           header.stripe === "4px",
-        `a new thread gives its header a banner: a square icon the header's height, right of the name, its black blended away, the colour stripe kept (${JSON.stringify(header)})`,
+        `a new thread's banner takes the star's square before its name, its black blended away, and moves nothing as it arrives (${JSON.stringify(header)})`,
       )
 
       // Back to the tab, the column mounts again with its banner already there.
@@ -2998,13 +3011,17 @@ try {
         `${col(0)} .column-head .agent-name`,
         "data-thread",
       )
+      const starShown = await tp
+        .locator(`${col(0)} .column-head .agent-name .thread-mark .thread-star`)
+        .evaluate(n => getComputedStyle(n).opacity === "1")
       ok(
         threadName !== null &&
           [...readNames(toolHost.doc).values()].includes(
             threadName as ThreadName,
           ) &&
-          nameText === `✦ ${threadName}`,
-        `the column's header names the thread (${nameText})`,
+          nameText === `✦ ${threadName}` &&
+          starShown,
+        `the column's header names the thread, its star shown with no banner (${nameText})`,
       )
       const longLane = Array.from({ length: 300 }, (_, i) => `line ${i}\n`)
       script.use([

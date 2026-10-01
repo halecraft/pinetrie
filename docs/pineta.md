@@ -416,7 +416,7 @@ pi has an OpenRouter key. As a thread is named, its name fills the
 `column-banner` skill, a prompt you can replace with your own, and FLUX.2
 Klein draws a square pixel-art sprite of it. Only the name is sent. It is
 stored as a pasted image is, under a `pineta.banner` value keyed by the
-lane, and drawn as an icon at the header's right. A failed one is tried
+lane, and drawn in place of the ✦ before the thread's name. A failed one is tried
 again at the thread's next run's end. The agent's `set_banner` sets a
 pasted image, or a new one from your words.
 

@@ -447,14 +447,15 @@ became of its files (`strip`).
   reveals the entry in whichever column shows it. A column's lane may have
   started in a column to its left.
 - **The banner (ADR-0050, ADR-0053) is the thread's at the column's end**
-  (`banner`): the lane's `pineta.banner`, none for a conversation. It is a
-  square `<img>` at the header's right, its full height, under its content.
-  A new one fades in once loaded; the one there as the column mounts shows at
-  once, or every tab switch would fade it in again. `isolation: isolate`
-  keeps its negative `z-index` inside the header and makes the header's own
-  background what `mix-blend-mode: lighten` blends with: the sprite's black
-  ground becomes the header's colour, and a radial mask fades the square's
-  edges. The header has no `overflow: hidden`: on a flex item that
+  (`banner`): the lane's `pineta.banner`, none for a conversation. It takes
+  the star's place before the name (`ThreadMark`): a fixed 1.5rem square,
+  the head row's height, holding the star, with the image laid over it
+  absolutely, so its arrival moves nothing. The star stays in the text
+  (`✦ name`), hidden under an image. A new one fades in once loaded, the
+  star fading out; the one there as the column mounts shows at once, or
+  every tab switch would fade it in again. `isolation: isolate` makes the
+  header's own background what `mix-blend-mode: lighten` blends with: the
+  sprite's black ground becomes the header's colour. The header has no `overflow: hidden`: on a flex item that
   removes its minimum height, and a tall column squeezed the header.
 - **`onIntent`:** the composer tells the column, in an effect, whether its
   next send would create a lane, so the header can say `✦ new agent`. It is a

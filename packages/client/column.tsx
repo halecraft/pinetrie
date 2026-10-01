@@ -375,13 +375,6 @@ export function Column(p: ColumnProps) {
           data-color={colorSlot(p.track)}
           style={trackStyle(p.track)}
         >
-          {shows.banner !== null && (
-            <Banner
-              banner={shows.banner}
-              fade={shows.banner.url !== mountBanner}
-              key={shows.banner.url}
-            />
-          )}
           <div className="head-row">
             {p.count > 1 && (
               <button
@@ -402,7 +395,12 @@ export function Column(p: ColumnProps) {
                 ⠿
               </button>
             )}
-            <Identity identity={shows.identity} onOpen={p.onOpen} />
+            <Identity
+              banner={shows.banner}
+              fade={shows.banner !== null && shows.banner.url !== mountBanner}
+              identity={shows.identity}
+              onOpen={p.onOpen}
+            />
             <span className="head-space" />
             {p.showsPresence && view.tipId !== null && (
               <SeenBy
@@ -698,22 +696,50 @@ function Reply({
 }
 
 /**
- * The thread's icon, a square at the header's right, under its content. An
- * image rather than a background, so a new one can fade in once loaded;
- * keyed by its URL, so each new banner does.
+ * The mark before a thread's name: one fixed square, so the name never
+ * moves. It holds the star, and the thread's banner over it when there is
+ * one; the star stays in the text either way.
  */
-function Banner({ banner, fade }: { banner: HeadBanner; fade: boolean }) {
+function ThreadMark({
+  banner,
+  fade,
+}: {
+  banner: HeadBanner | null
+  fade: boolean
+}) {
+  return (
+    <span className="thread-mark">
+      {banner === null ? (
+        <span className="thread-star">{AGENT_MARK}</span>
+      ) : (
+        <BannerImage fade={fade} key={banner.url} url={banner.url} />
+      )}
+    </span>
+  )
+}
+
+/**
+ * A banner over the star. A new one fades in once loaded, the star fading
+ * out under it; one there as the column mounts shows at once, with no star.
+ * Keyed by its URL, so each new banner fades in.
+ */
+function BannerImage({ url, fade }: { url: string; fade: boolean }) {
   const [loaded, setLoaded] = useState(false)
   return (
-    <img
-      alt=""
-      className="banner"
-      data-fade={fade || undefined}
-      data-loaded={loaded || undefined}
-      draggable={false}
-      onLoad={() => setLoaded(true)}
-      src={banner.url}
-    />
+    <>
+      <span className="thread-star" data-gone={loaded || !fade || undefined}>
+        {AGENT_MARK}
+      </span>
+      <img
+        alt=""
+        className="banner"
+        data-fade={fade || undefined}
+        data-loaded={loaded || undefined}
+        draggable={false}
+        onLoad={() => setLoaded(true)}
+        src={url}
+      />
+    </>
   )
 }
 
@@ -723,14 +749,22 @@ function Banner({ banner, fade }: { banner: HeadBanner; fade: boolean }) {
  */
 function Identity({
   identity,
+  banner,
+  fade,
   onOpen,
 }: {
   identity: HeadIdentity
+  banner: HeadBanner | null
+  fade: boolean
   onOpen: (id: string) => void
 }) {
   if (identity.kind === "none") return null
   if (identity.kind === "pending")
-    return <span className="agent-name pending">{AGENT_MARK} new agent</span>
+    return (
+      <span className="agent-name pending">
+        <ThreadMark banner={null} fade={false} /> new agent
+      </span>
+    )
   const { start } = identity
   return (
     <button
@@ -743,7 +777,7 @@ function Identity({
       title="where this agent started"
       type="button"
     >
-      {AGENT_MARK} {identity.name}
+      <ThreadMark banner={banner} fade={fade} /> {identity.name}
     </button>
   )
 }

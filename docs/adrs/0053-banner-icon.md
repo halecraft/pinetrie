@@ -13,11 +13,11 @@ banners to one model. And a banner came only after a run had ended.
 
 **Decision.**
 
-- **The banner is a square icon.** The client draws it at the header's full
-  height on its right, `object-fit: contain`, under the header's content.
-  The prompt asks for a sprite on plain black; `mix-blend-mode: lighten`
-  against the header's own background removes the black, and a radial mask
-  fades the square's edges. With no crop, the record has no `focus`, and
+- **The banner is a square icon in the star's place.** The client draws it
+  before the thread's name, in the fixed square that holds the star (✦)
+  when there is no banner, so its arrival moves nothing. The prompt asks for
+  a sprite on plain black; `mix-blend-mode: lighten` against the header's
+  own background removes the black. With no crop, the record has no `focus`, and
   `set_banner` takes only an image or words.
 - **Any model draws it.** Every image model draws 1:1, and OpenRouter clamps
   a ratio to what the model has. The default is FLUX.2 Klein 4B
