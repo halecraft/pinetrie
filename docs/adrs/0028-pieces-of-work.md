@@ -7,6 +7,8 @@ ADR-0029: marks stay inside a root, and focus, its breadcrumb and
 the whole-session rail sections are withdrawn, along with this ADR's change
 to ADR-0027. Amended by ADR-0045: a mark's record is keyed by its entry and
 holds a title only; a root's mark titles its tab; the rest is deferred.
+ADR-0056 makes an ask's message the first section header that sticks while
+its section scrolls; a mark's, when built, sticks above it.
 
 **Context.** People use one session for several separate pieces of work, and
 start each one where it belongs: a new thread at the root, or a branch off any

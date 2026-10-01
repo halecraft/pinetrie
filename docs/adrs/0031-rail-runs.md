@@ -2,6 +2,12 @@
 
 **Status:** Accepted. Implemented by `PLAN-2026-09-27-rail-runs`. Evidence:
 S33. Amends `docs/06-interface.md` (the rail is no longer a dot per message).
+Amended by ADR-0056: a capsule's messages are a *stretch*, since a run is
+the agent's work for one ask. An ask whose run holds three or more agent
+messages is a landmark, and its run is a stretch of its own, so a stretch
+never crosses such an ask. Short exchanges still merge as below. A
+capsule's tooltip leads with its ask, and the column folds the same
+stretches.
 
 **Context.** The rail drew a dot per message on a 16 px row. Tool results get
 no row, but each step of an agent's work does, so a loop of 200 steps was

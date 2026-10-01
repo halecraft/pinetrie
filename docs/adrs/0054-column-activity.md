@@ -2,7 +2,9 @@
 
 **Status:** Accepted. Evidence: S67. Implementation:
 `PLAN-2026-10-01-column-activity`. Amends ADR-0049 (a column mounted again
-draws its tool rows as they were left).
+draws its tool rows as they were left). Amended by ADR-0056: the mark's
+title names the ask the agent is working on, and in outline density the
+running ask's own line pulses where the working line would be.
 
 **Context.** Inside a column, the only sign that its agent was working was the
 **Stop** button above the composer. Nothing said whether the agent was
