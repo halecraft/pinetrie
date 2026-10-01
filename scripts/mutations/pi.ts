@@ -168,6 +168,14 @@ export const mutations: readonly Mutation[] = [
     expect: "is refused, not ignored",
   },
   {
+    name: "an OpenRouter model pi-ai does not list cannot be drawn",
+    file: "packages/pi/config.ts",
+    from: '  if (listed !== undefined || provider !== "openrouter") return listed',
+    to: "  return listed",
+    command: unit,
+    expect: "imageModelFor",
+  },
+  {
     name: "banners can be drawn with banners off",
     file: "packages/pi/agent.ts",
     from: "      if (imageModel === undefined) return false",

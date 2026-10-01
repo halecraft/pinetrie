@@ -22,9 +22,14 @@ banners to one model. And a banner came only after a run had ended.
   pure black in the sprite. With no crop, the record has no `focus`, and
   `set_banner` takes only an image or words.
 - **Any model draws it.** Every image model draws 1:1, and OpenRouter clamps
-  a ratio to what the model has. The default is FLUX.2 Klein 4B
-  (`black-forest-labs/flux.2-klein-4b`), the fastest and cheapest of FLUX.2;
-  `banner.model` in the user config names another.
+  a ratio to what the model has. The default is Recraft V4.1 Flash
+  (`recraft/recraft-v4.1-flash`): OpenRouter lists it at 0.7¢ an image and
+  about 1.5 seconds. FLUX.2 Klein 4B, tried first, is listed at 1.4¢ a
+  megapixel, with no way to ask a smaller image, and took about ten seconds
+  in use.
+  `banner.model` in the user config names another. pi-ai 0.87.1 does not
+  list Recraft's Flash, so Pineta describes an OpenRouter model pi-ai does
+  not list itself (`imageModelFor`).
 - **Only the name is sent.** The `column-banner` skill's body is the image
   model's prompt, with `{adjective}` and `{noun}` filled from the
   thread's two-word name (`bannerPrompt`). No text model writes a brief, and
@@ -43,8 +48,8 @@ banners to one model. And a banner came only after a run had ended.
 - A pasted image is shown the same way, contained in the square: a wide
   photograph shows small.
 - Records written with a `focus` still decode; it is ignored.
-- Klein's results are not yet measured here; the default may change once
-  they are.
+- An OpenRouter id that does not exist is no longer caught at start: it
+  fails at each draw, logged.
 
 **Alternatives rejected.**
 

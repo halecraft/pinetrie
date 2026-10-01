@@ -12,10 +12,13 @@ export interface BannerConfig {
   readonly model: string
 }
 
-/** FLUX.2's fastest and cheapest: one square sprite needs no more. */
+/**
+ * Recraft V4.1 Flash: 0.7¢ an image and about 1.5 seconds, as OpenRouter
+ * lists it. pi-ai 0.87.1 does not list it; `imageModelFor` describes it.
+ */
 export const DEFAULT_BANNER: BannerConfig = {
   provider: "openrouter",
-  model: "black-forest-labs/flux.2-klein-4b",
+  model: "recraft/recraft-v4.1-flash",
 }
 
 const recordOf = (v: unknown): Record<string, unknown> | undefined =>

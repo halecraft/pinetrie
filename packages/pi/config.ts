@@ -91,13 +91,40 @@ export interface ImagesSetup {
   apiKey(provider: string): Promise<string | undefined>
 }
 
+/**
+ * The image model `provider/id` names: pi-ai's entry when it lists one, or,
+ * for an OpenRouter id it does not, one described here. OpenRouter adds
+ * models faster than pi-ai's list follows (`recraft/recraft-v4.1-flash` is
+ * not in 0.87.1's), and pi-ai's `generateImages` takes the model as given,
+ * without looking it up. An unlisted model is taken to draw from text alone;
+ * an id OpenRouter does not have fails at the draw.
+ */
+export function imageModelFor(
+  listed: ImagesModel<ImagesApi> | undefined,
+  provider: string,
+  id: string,
+): ImagesModel<ImagesApi> | undefined {
+  if (listed !== undefined || provider !== "openrouter") return listed
+  return {
+    id,
+    name: id,
+    api: "openrouter-images",
+    provider,
+    baseUrl: "https://openrouter.ai/api/v1",
+    input: ["text"],
+    output: ["image"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  }
+}
+
 /** OpenRouter's image models, keyed as the person's pi keys OpenRouter. */
 function openRouterImages(models: Runtime): ImagesSetup {
   const images = createImagesModels()
   images.setProvider(openrouterImagesProvider())
   return {
     models: images,
-    model: (provider, id) => images.getModel(provider, id),
+    model: (provider, id) =>
+      imageModelFor(images.getModel(provider, id), provider, id),
     apiKey: provider =>
       models
         .getAuth(provider)

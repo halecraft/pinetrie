@@ -413,8 +413,8 @@ descriptions, section headers and boundaries are still to do.
 **A thread's column can have a banner** (ADR-0050, ADR-0053), when
 `~/.config/pineta/config.json` has `{ "banner": { "enabled": true } }` and
 pi has an OpenRouter key. As a thread is named, its name fills the
-`column-banner` skill, a prompt you can replace with your own, and FLUX.2
-Klein draws a square pixel-art sprite of it. Only the name is sent. It is
+`column-banner` skill, a prompt you can replace with your own, and Recraft
+V4.1 Flash draws a square pixel-art sprite of it. Only the name is sent. It is
 stored as a pasted image is, under a `pineta.banner` value keyed by the
 lane, and drawn in place of the ✦ before the thread's name. A failed one is tried
 again at the thread's next run's end. The agent's `set_banner` sets a

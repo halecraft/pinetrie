@@ -445,7 +445,10 @@ request returns null, and the offer keeps its placeholder.
 - **`setup.images`** is pi-ai's image registry (`createImagesModels`):
   `openrouterImagesProvider()` for a named or configured model, and
   `scriptedImages()` for a scripted one, which draws `SCRIPTED_IMAGE_PNG`
-  and needs no key.
+  and needs no key. An OpenRouter id pi-ai does not list is described by
+  `imageModelFor` (text in, image out), since `generateImages` takes the
+  model as given: so a model newer than pi-ai, such as
+  `recraft/recraft-v4.1-flash`, can be named.
 - **The registry does not read `auth.json`.** `images.apiKey(provider)`
   asks the `ModelRuntime` (`getAuth`), which reads `auth.json` and then
   `OPENROUTER_API_KEY`, and the key is passed as `apiKey`.

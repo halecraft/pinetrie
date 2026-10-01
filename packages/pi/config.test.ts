@@ -4,7 +4,7 @@
 import path from "node:path"
 import { labelCommands } from "@pineta/marginalia"
 import { expect, test } from "vitest"
-import { setUpModel } from "./config.ts"
+import { imageModelFor, setUpModel } from "./config.ts"
 import { scriptedModel } from "./scripted.ts"
 
 const agentDir = path.join(import.meta.dirname, "fixtures", "pi-agent")
@@ -75,4 +75,21 @@ test("a scripted model answers commit messages from a provider of its own: the r
     messages: [{ role: "user", content: "go", timestamp: 0 }],
   })
   expect(text(run)).toBe("the run's reply")
+})
+
+test("imageModelFor: pi-ai's entry, else one for an unlisted OpenRouter id, else none", () => {
+  const listed = imageModelFor(
+    undefined,
+    "openrouter",
+    "recraft/recraft-v4.1-flash",
+  )
+  expect(listed).toMatchObject({
+    id: "recraft/recraft-v4.1-flash",
+    api: "openrouter-images",
+    provider: "openrouter",
+    output: ["image"],
+  })
+  if (listed === undefined) throw new Error("no model")
+  expect(imageModelFor(listed, "openrouter", "other")).toBe(listed)
+  expect(imageModelFor(undefined, "elsewhere", "x")).toBeUndefined()
 })
