@@ -279,6 +279,17 @@ in it opens a tab until you choose.
   the trigger or the box, or on nothing: live data can remove the item that
   held focus. `role` is `menu` or `dialog`: a dialog's box takes the role,
   and a menu's list does.
+- **A clicked blob image is shown over the page** (`BlobImage` in
+  `blob-image.tsx`, for markdown and tool rows alike). It is a modal
+  `<dialog>`, which the browser draws in the top layer, so no column clips
+  it; Escape closes it and gives focus back (S66). A click does not close a
+  modal dialog, so any click in it, on the backdrop or the image, does. It is
+  portalled to `body`: a pasted image sits in a `<p>`, which cannot hold a
+  `<dialog>`. React events still bubble through the React tree, so the
+  viewer's clicks and pointerdowns reach the image's ancestors, among them
+  `#strip`'s `onPointerDown`, which ignores anything off a column's head. A
+  handler added above an image sees them too. A Cmd- or Ctrl-click opens
+  the image in a new tab instead (`imageClick`, `image-click.ts`).
 - **A trigger from live data is `gone`, not unmounted.** Unmounting a
   `Popover` takes its open box with it, so a change in the session would
   close a menu you opened. The header keeps its agent and offers menus
@@ -834,8 +845,9 @@ pipeline keeps the tree a pure function, testable without a DOM.
   measures stable offsets and following sees one size, not two. The CSS caps
   it at the column's width with `height: auto`, which keeps the ratio the
   attributes give. A blob image the message does not hold (a note's, a
-  streaming one's) is drawn unsized. `BlobImage` (`blob-image.tsx`) opens a
-  blob image in a new tab on a click (`.blob-image`).
+  streaming one's) is drawn unsized. A click on a blob image
+  (`.blob-image`) shows it over the page ("A clicked blob image is shown
+  over the page", beside `Popover`).
 - **Streaming text goes through remend**, which closes an unfinished `**`,
   fence or link, with `singleTilde` and `comparisonOperators` off: those
   escape mid-text, and the message would change when it commits. Committed

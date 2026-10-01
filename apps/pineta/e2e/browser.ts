@@ -2286,6 +2286,52 @@ try {
         JSON.stringify(theirs) === JSON.stringify([40, "40"]),
         `another window draws it too (${JSON.stringify(theirs)})`,
       )
+      // A click shows it over the page; Escape or a click closes it (S66).
+      const viewer = "dialog.image-viewer[open]"
+      /** Whether the viewer reaches `state` within 2 s. */
+      const viewing = (state: "visible" | "hidden") =>
+        pp.waitForSelector(viewer, { state, timeout: 2_000 }).then(
+          () => true,
+          () => false,
+        )
+      const pages: Page[] = []
+      pp.context().on("page", p => pages.push(p))
+      const url = pp.url()
+      await pp.click(drawn)
+      const shown = await pp
+        .waitForFunction(
+          sel => {
+            const img = document.querySelector(sel)
+            return img instanceof HTMLImageElement && img.naturalWidth > 0
+          },
+          `${viewer} img[src="/blob/${sha}"]`,
+          { timeout: 2_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      ok(
+        shown && pages.length === 0 && pp.url() === url,
+        `a click on an image shows it large in the page, not in a new tab (${shown}, ${pages.length} new pages, ${pp.url() === url})`,
+      )
+      await pp.keyboard.press("Escape")
+      ok(await viewing("hidden"), "Escape closes the image's view")
+      await pp.click(drawn)
+      ok(
+        await viewing("visible"),
+        "a closed image's view opens again on a click",
+      )
+      // The backdrop: the image is centred, and no image fills the window.
+      await pp.mouse.click(5, 5)
+      ok(await viewing("hidden"), "a click beside the image closes its view")
+      await pp.click(drawn)
+      const reopened = await viewing("visible")
+      await pp.click(`${viewer} img`)
+      ok(
+        reopened && (await viewing("hidden")),
+        `a click on the shown image closes its view (${reopened})`,
+      )
     } finally {
       await pp.context().close()
       await qp.context().close()

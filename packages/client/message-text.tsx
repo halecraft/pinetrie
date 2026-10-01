@@ -11,8 +11,8 @@ import { messageTree, NO_IMAGES, type TextMode } from "./markdown.ts"
 /**
  * Model output and people's text are never HTML: raw HTML is drawn as text,
  * and a link or image keeps only an http, https, mailto, relative or `#` URL.
- * A `/blob/` image in `images` is drawn at its stored size, and opens in a
- * new tab when clicked.
+ * A `/blob/` image in `images` is drawn at its stored size, and a click shows
+ * it over the page (`BlobImage`).
  */
 export function MessageText({
   text,

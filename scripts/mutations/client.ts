@@ -1216,6 +1216,14 @@ export const mutations: readonly Mutation[] = [
     expect: "a row holds your card exactly when its root does",
   },
   {
+    name: "a modified click views the image too",
+    file: "packages/client/image-click.ts",
+    from: '  return e.metaKey || e.ctrlKey ? "tab" : "view"',
+    to: '  return "view"',
+    command: unit,
+    expect: "a Cmd- or Ctrl-click opens the image in a new tab",
+  },
+  {
     name: "an archived root lights the Archive tab",
     file: "packages/client/card-marks.ts",
     from: "    elsewhere: [...roots].some(r => !tabbed.has(r) && !input.archived.has(r)),",
