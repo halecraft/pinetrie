@@ -1,4 +1,4 @@
-// client/app — browser entry. Vite transforms and serves this directly.
+// client/app — the page: `App`, which `main.tsx` mounts.
 //
 // The screen is your tabs, one per root you opened, each a rail beside a strip
 // of columns, under a header showing who is here, your inbox of mentions and
@@ -9,13 +9,17 @@
 // reducer (`layout.ts`), kept in this browser tab's storage and never in the
 // document (ADR-0027). Which mentions you have seen is kept per device.
 //
+// `App` gathers, `appView` (`app-view.ts`) decides what is shown, and a click
+// comes back as an `Intent`, which `planIntent` (`intent.ts`) plans and
+// `perform` carries out.
+//
 // The renderer before React rebuilt the transcript with `innerHTML` on every
 // change, which destroyed focus and selection on every keystroke. React gives
 // stable node identity, which `useText` needs to keep a note's textarea
 // bound while everyone types (ADR-0025).
 
 import { whenSettled } from "@kyneta/exchange"
-import { ExchangeProvider, useDocStatus, useSelector } from "@kyneta/react"
+import { useDocStatus, useSelector } from "@kyneta/react"
 import {
   branchColors,
   entryId,
@@ -27,7 +31,6 @@ import {
   summarizeRoots,
 } from "@pineta/core"
 import { messageNotes } from "@pineta/marginalia"
-import { SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
   type NoteFilter,
   notesIndex,
@@ -36,7 +39,6 @@ import {
 } from "@pineta/reads"
 import {
   type ComponentProps,
-  StrictMode,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -44,93 +46,57 @@ import {
   useRef,
   useState,
 } from "react"
-import { createRoot } from "react-dom/client"
 import { placement } from "./align.ts"
+import { appView, type ReadOnly, readOnlyWords, tabRail } from "./app-view.ts"
 import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { cardMarks, ownCards } from "./card-marks.ts"
 import { Column, type ColumnProps } from "./column.tsx"
-import { type Column as ColumnSpec, isPinned, type Prefill } from "./columns.ts"
-import type { ReadOnly } from "./composer.tsx"
+import { type Column as ColumnSpec, isPinned } from "./columns.ts"
 import type { SeenEnd } from "./follow.ts"
 import { Header } from "./header.tsx"
+import { type Identity, reconcileName } from "./identity.ts"
+import { type Inbox, mentionsOf } from "./inbox.ts"
 import {
-  IDENTITY_KEY,
-  type Identity,
-  identityCodec,
-  reconcileName,
-} from "./identity.ts"
-import { askIdentity } from "./identity-form.tsx"
-import {
-  decodeInbox,
-  encodeInbox,
-  type Inbox,
-  mentionsOf,
-  mergeInbox,
-} from "./inbox.ts"
+  claimFocus,
+  type Effect,
+  type Intent,
+  nameEffects,
+  planIntent,
+} from "./intent.ts"
 import {
   columnsOf,
-  decodeLayout,
-  encodeLayout,
   initialLayout,
-  type LayoutAction,
+  type Layout,
   layoutReducer,
-  planOpen,
   resolveLayout,
-  tabBar,
 } from "./layout.ts"
 import { NotesIndex } from "./note.tsx"
+import { type AppPorts, perform } from "./perform.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
+import { planReading, typingDue } from "./presence-report.ts"
 import { readSessionFacts } from "./projection.ts"
 import { EmptyRail, LiveRail } from "./rail.tsx"
 import { firstLines, NO_TEXT, rootLabels } from "./root-label.ts"
 import { screenMemory } from "./screen-memory.ts"
-import { connectSession, type SessionClient } from "./session-view.ts"
-import { deviceState, tabState } from "./tab-state.ts"
+import type { SessionClient } from "./session-view.ts"
+import type { DeviceState, TabState } from "./tab-state.ts"
 import { TabBar } from "./tabs.tsx"
+import { tabsView } from "./tabs-view.ts"
 import type { RowMemory } from "./tool-row.ts"
 import { useColumnDrag } from "./use-column-drag.ts"
 import { useFilledCards } from "./use-filled-cards.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { useReveal } from "./use-reveal.ts"
+import { useStable } from "./use-stable.ts"
 
-/**
- * The tab you are on and each root's columns: this browser tab's, or on a new
- * one the device's latest (ADR-0027). The key predates tabs; the layout's
- * version tells an older one apart.
- */
-const layoutStore = tabState({
-  key: `pineta-columns:${SESSION_DOC_ID}`,
-  codec: { encode: encodeLayout, decode: decodeLayout },
-  tab: sessionStorage,
-  device: localStorage,
-})
-
-/**
- * Which mentions of you this device has seen (ADR-0030): shared by its tabs,
- * kept across reloads, never in the document.
- */
-const inboxStore = deviceState<Inbox>({
-  key: `pineta-inbox:${SESSION_DOC_ID}`,
-  codec: { encode: encodeInbox, decode: decodeInbox },
-  device: localStorage,
-  merge: mergeInbox,
-  events: window,
-})
-
-/**
- * Who this device says it is (ADR-0037), shared by its tabs. Another tab
- * clearing it, or storing another email, reloads this one too (at mount); a
- * new name for the same email reloads nothing.
- */
-const identityStore = deviceState<Identity>({
-  key: IDENTITY_KEY,
-  codec: identityCodec,
-  device: localStorage,
-  merge: (_, next) => next,
-  events: window,
-})
+/** What `App` keeps on this device and tab, built by `main.tsx`. */
+export interface AppStores {
+  readonly layout: TabState<Layout>
+  readonly inbox: DeviceState<Inbox>
+  readonly identity: DeviceState<Identity>
+}
 
 /**
  * Bring a newly opened column's first message level with its fork point in
@@ -196,7 +162,13 @@ function place(
 /** How often a visible page refreshes its presence: well inside its 30 s decay. */
 const PRESENCE_REFRESH_MS = 10_000
 
-function App({ session }: { session: SessionClient }) {
+export function App({
+  session,
+  stores,
+}: {
+  session: SessionClient
+  stores: AppStores
+}) {
   const doc = session.doc
   const status = useDocStatus(doc)
   // Every read is `useSelector` over a named read, never an inline
@@ -242,7 +214,7 @@ function App({ session }: { session: SessionClient }) {
   const [stored, dispatch] = useReducer(
     layoutReducer,
     undefined,
-    () => layoutStore.load() ?? initialLayout(),
+    () => stores.layout.load() ?? initialLayout(),
   )
   // Drawn from this render's facts, never `stored`: an effect runs a render
   // after the facts it reads, and a slow render painted new entries under an
@@ -259,7 +231,7 @@ function App({ session }: { session: SessionClient }) {
   }, [layout, stored, index, lanes, archive])
   // Every change is saved, the document's too: restored from an older
   // anchor, `followTip` could land on a newer branch below it.
-  useEffect(() => layoutStore.save(layout), [layout])
+  useEffect(() => stores.layout.save(layout), [stores, layout])
   // Restored anchors the document lacks are dropped once, when it has
   // settled, and the tab to show is chosen then: before, missing means not
   // yet arrived. `"populated"` comes with the first data, so it cannot tell
@@ -278,26 +250,8 @@ function App({ session }: { session: SessionClient }) {
   useEffect(() => {
     if (settled) dispatch({ kind: "prune", index, archive })
   }, [settled])
-  // This device's name for you and the session's, made to agree once the
-  // document has settled: before, a missing name means not yet arrived.
-  const myName = nameOf.get(session.writer)
-  useEffect(() => {
-    if (!settled) return
-    const step = reconcileName(identityStore.load(), session.principal, myName)
-    if (step?.kind === "send") void session.setName(step.name)
-    if (step?.kind === "store") identityStore.save(step.identity)
-  }, [settled, myName, session])
 
   const active = layout.active
-  const root = active?.kind === "root" ? active.root : null
-  const archivedHere = root === null ? undefined : archive.get(root)
-  const readOnly: ReadOnly | null =
-    root !== null && archivedHere?.state === "archived"
-      ? {
-          label: `archived by ${nameFor(nameOf, archivedHere.by)}`,
-          action: { title: "Restore", go: () => restore(root) },
-        }
-      : null
   // The tab's columns: a root's, or a new tab's one fresh column.
   // Memoised: `columnsOf` gives a root with no stored columns a new list on
   // each call, and every projection below is keyed on this one.
@@ -312,33 +266,15 @@ function App({ session }: { session: SessionClient }) {
             : [],
     [layout, active],
   )
-  /** A column action on the tab you are on. */
-  const act = (
-    action: Extract<LayoutAction, { kind: "columns" }>["action"],
-  ) => {
-    if (active?.kind === "root")
-      dispatch({ kind: "columns", root: active.root, action })
-    else if (active?.kind === "new" && action.kind === "sent")
-      dispatch({ kind: "sent", key: active.key, sendId: action.sendId })
-    else if (active?.kind === "new" && action.kind === "close")
-      closeNewTab(active.key)
-  }
-  const closeNewTab = (key: string) => dispatch({ kind: "closeNewTab", key })
 
   // The column you just opened, whose composer takes focus once when it
-  // mounts. Never stored: a column restored, or shown again with its tab,
-  // leaves focus where it is.
-  const focusNext = useRef<string | null>(null)
-  /** A key for a column you open, whose composer then takes focus. */
-  const opening = () => {
-    const key = crypto.randomUUID()
-    focusNext.current = key
-    return key
-  }
+  // mounts (`claimFocus`). Never stored: a column restored, or shown again
+  // with its tab, leaves focus where it is.
+  const armed = useRef<string | null>(null)
   const takeFocus = (key: string) => {
-    if (focusNext.current !== key) return false
-    focusNext.current = null
-    return true
+    const claim = claimFocus(armed.current, key)
+    armed.current = claim.armed
+    return claim.focus
   }
 
   const views = useMemo(
@@ -350,10 +286,7 @@ function App({ session }: { session: SessionClient }) {
       ),
     [index, columns, noteEntries],
   )
-  const rail = useMemo(
-    () => (root === null ? [] : projectRail(index, root)),
-    [index, root],
-  )
+  const rail = useMemo(() => tabRail(index, active), [index, active])
   const order = useMemo(
     () => writerOrder(index, nameOf.keys()),
     [index, nameOf],
@@ -398,21 +331,17 @@ function App({ session }: { session: SessionClient }) {
   // column on each write, the refresh and others' typing included (S59).
   // Each part that shows presence reads it (`use-presence.ts`).
   //
-  // Report the thread end of every column in the tab you are on (ADR-0024,
-  // ADR-0029). A key no longer reported is deleted, so switching tabs clears
-  // the last tab's columns, as closing a column does. While the page is
-  // visible the entries are refreshed, so they outlive their decay. A column
-  // with no message yet (a new tab) follows no thread, and reports nothing.
+  // Each column of the tab you are on reports its thread end (ADR-0024,
+  // ADR-0029; `planReading`). While the page is visible the entries are
+  // refreshed, so they outlive their decay.
   const reported = useRef(new Map<string, string | null>())
   useEffect(() => {
     const now = new Map(
       columns.map((c, i) => [c.key, views[i]?.tipId ?? null] as const),
     )
-    for (const [key, end] of now)
-      if (end !== null && reported.current.get(key) !== end)
-        session.setReading(key, end)
-    for (const key of reported.current.keys())
-      if (!now.has(key)) session.clearReading(key)
+    const writes = planReading(reported.current, now)
+    for (const [key, end] of writes.set) session.setReading(key, end)
+    for (const key of writes.clear) session.clearReading(key)
     reported.current = now
   }, [columns, views, session])
   useEffect(() => {
@@ -428,13 +357,11 @@ function App({ session }: { session: SessionClient }) {
       document.removeEventListener("visibilitychange", refresh)
     }
   }, [session])
-  // Typing is written at most once a second.
   const lastTyped = useRef(0)
   const typing = (end: string | null) => {
-    const t = Date.now()
-    if (end === null) return
-    if (t - lastTyped.current < 1_000) return
-    lastTyped.current = t
+    const now = Date.now()
+    if (end === null || !typingDue(lastTyped.current, now)) return
+    lastTyped.current = now
     session.setTyping(end)
   }
   const colors = useMemo(() => branchColors(rail, views), [rail, views])
@@ -443,6 +370,19 @@ function App({ session }: { session: SessionClient }) {
     [index, views],
   )
   const shown = useMemo(() => new Set(paths.flatMap(p => [...p])), [paths])
+  const view = useMemo(
+    () =>
+      appView({
+        active,
+        columns,
+        tracks: colors.track,
+        archive,
+        nameOf,
+        offers: workFacts.offers,
+        lanes,
+      }),
+    [active, columns, colors.track, archive, nameOf, workFacts.offers, lanes],
+  )
 
   // Your inbox: the messages that mention you, and which you have seen.
   const mentions = useMemo(
@@ -456,7 +396,7 @@ function App({ session }: { session: SessionClient }) {
     [index, session.writer, nameOf, participants],
   )
   const inbox = useInbox({
-    store: inboxStore,
+    store: stores.inbox,
     index,
     items: mentions,
     shown,
@@ -500,52 +440,45 @@ function App({ session }: { session: SessionClient }) {
   // After the alignment above: a picked message the alignment left out of
   // view is scrolled to.
   const reveal = useReveal(strip)
-  const dragColumn = useColumnDrag(strip, (from, to) =>
-    act({ kind: "move", from, to }),
-  )
 
   // The Archive tab's own state: never stored.
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("all")
   const [archiveQuery, setArchiveQuery] = useState("")
   const [archivePick, setArchivePick] = useState<string | null>(null)
 
-  /**
-   * Show entry `id`, wherever it is (`planOpen`): in view in the column that
-   * shows it, or in a new one.
-   */
-  const openAt = (id: string) => {
-    const plan = planOpen(layout, index, archive, id)
-    if (plan === null) return
-    switch (plan.kind) {
-      case "scroll":
-        reveal(id)
-        dispatch({ kind: "show", tab: { kind: "root", root: plan.root } })
-        return
-      case "open":
-        reveal(id)
-        dispatch({ kind: "show", tab: { kind: "root", root: plan.root } })
-        dispatch({
-          kind: "columns",
-          root: plan.root,
-          action: {
-            kind: "open",
-            key: crypto.randomUUID(),
-            after: plan.after,
-            anchor: id,
-          },
-        })
-        return
-      case "preview":
-        setArchivePick(plan.root)
-        dispatch({ kind: "show", tab: { kind: "archive" } })
-    }
+  const ports: AppPorts = {
+    dispatch,
+    session,
+    reveal,
+    pickArchived: setArchivePick,
+    arm: key => {
+      armed.current = key
+    },
+    identity: stores.identity,
+    reload: () => location.reload(),
   }
+  /** Carry out `effects`: the one way anything below acts. */
+  const run = useStable((effects: readonly Effect[]) => perform(effects, ports))
+  /** What a reader asked for, planned from this render's layout and facts. */
+  const onIntent = useStable((intent: Intent) =>
+    run(planIntent(intent, { layout, index, archive }, crypto.randomUUID())),
+  )
+  const openAt = (entry: string) => onIntent({ kind: "openAt", entry })
+  const dragColumn = useColumnDrag(strip, (from, to) =>
+    onIntent({ kind: "column", position: from, act: { kind: "move", to } }),
+  )
 
-  const restore = (r: string) =>
-    void session.archive("restore", entryId(r)).then(outcome => {
-      if (outcome.kind === "restored")
-        dispatch({ kind: "show", tab: { kind: "root", root: r } })
-    })
+  // This device's name for you and the session's, made to agree once the
+  // document has settled: before, a missing name means not yet arrived.
+  const myName = nameOf.get(session.writer)
+  useEffect(() => {
+    if (!settled) return
+    run(
+      nameEffects(
+        reconcileName(stores.identity.load(), session.principal, myName),
+      ),
+    )
+  }, [settled, myName, session, stores, run])
 
   /** The props every column shares, whichever tab draws it. */
   const shared = {
@@ -558,8 +491,6 @@ function App({ session }: { session: SessionClient }) {
     nameOf,
     notes,
     notesOf,
-    onNewTab: (prefill: Prefill, asksAgent: boolean) =>
-      dispatch({ kind: "newTab", key: opening(), asksAgent, prefill }),
     outbox,
     participants,
     rows,
@@ -570,35 +501,19 @@ function App({ session }: { session: SessionClient }) {
   }
 
   /** A root, read-only, for the Archive tab: its rail and one column. */
-  const preview = (r: string) => {
-    const record = archive.get(r)
-    return (
-      <Preview
-        key={r}
-        readOnly={
-          record?.state === "archived"
-            ? {
-                label: `archived by ${nameFor(nameOf, record.by)}`,
-                action: { title: "Restore", go: () => restore(r) },
-              }
-            : {
-                label: "open",
-                action: {
-                  title: "Open",
-                  go: () =>
-                    dispatch({ kind: "show", tab: { kind: "root", root: r } }),
-                },
-              }
-        }
-        root={r}
-        shared={shared}
-        noteEntries={noteEntries}
-        yours={yours}
-      />
-    )
-  }
+  const preview = (r: string) => (
+    <Preview
+      key={r}
+      noteEntries={noteEntries}
+      onIntent={onIntent}
+      readOnly={readOnlyWords(entryId(r), archive.get(r), nameOf)}
+      root={r}
+      shared={shared}
+      yours={yours}
+    />
+  )
 
-  const newTab = active?.kind === "new" ? active : null
+  const { workspace } = view
   return (
     <>
       <header id="top">
@@ -619,20 +534,12 @@ function App({ session }: { session: SessionClient }) {
           mentions={mentions}
           nameOf={nameOf}
           names={workFacts.names}
-          offers={[...workFacts.offers.values()].flatMap(o => {
-            const tip = lanes.find(l => l.name === o.lane)?.tip
-            return o.taken === null && tip != null
-              ? [{ lane: o.lane, tip }]
-              : []
-          })}
+          offers={view.offers}
           me={{
             writer: session.writer,
             email: session.principal,
             rename: session.setName,
-            signOut: () => {
-              identityStore.clear()
-              location.reload()
-            },
+            signOut: () => onIntent({ kind: "signOut" }),
           }}
           onOpen={openAt}
           order={order}
@@ -640,42 +547,32 @@ function App({ session }: { session: SessionClient }) {
           runs={activity}
         />
       </header>
-      {active === null ? (
+      {active === null || workspace.kind === "connecting" ? (
         <main id="workspace">
           <p className="connecting">connecting…</p>
         </main>
       ) : (
         <>
           <TabBar
-            active={active}
-            archived={archivedRoots}
             colorOf={colorOf}
-            labelOf={labelOf}
-            nameOf={nameOf}
-            lineOf={r => lines.get(r) ?? NO_TEXT}
-            titleOf={r => marks.get(r)?.title ?? null}
-            onRename={(r, title) => void session.mark(entryId(r), title)}
-            newLabel={key =>
-              layout.newTabs.find(c => c.key === key)?.asksAgent === true
-                ? "new agent"
-                : "new conversation"
-            }
-            onAdd={asksAgent =>
-              dispatch({ kind: "newTab", key: opening(), asksAgent })
-            }
-            onArchive={r => void session.archive("archive", entryId(r))}
-            onCloseNew={closeNewTab}
-            onCloseRoot={r => dispatch({ kind: "closeRoot", root: r })}
-            onShow={tab => dispatch({ kind: "show", tab })}
             index={index}
+            nameOf={nameOf}
+            onIntent={onIntent}
             order={order}
             session={session}
-            tabs={tabBar(layout)}
-            unsent={unsent}
-            work={work}
+            view={tabsView({
+              layout,
+              active,
+              labels,
+              lines,
+              marks,
+              archived: archivedRoots,
+              work,
+              unsent,
+            })}
           />
           <main id="workspace">
-            {active.kind === "archive" ? (
+            {workspace.kind === "archive" ? (
               <ArchiveTab
                 filter={archiveFilter}
                 labelOf={labelOf}
@@ -701,7 +598,7 @@ function App({ session }: { session: SessionClient }) {
               />
             ) : (
               <>
-                {root !== null && (
+                {workspace.kind === "root" ? (
                   <LiveRail
                     activity={activity}
                     colorOf={colorOf}
@@ -715,7 +612,7 @@ function App({ session }: { session: SessionClient }) {
                         index,
                         "all",
                         session.writer,
-                        root,
+                        workspace.root,
                       ).length,
                       open: notesOpen,
                       toggle: () => setNotesOpen(!notesOpen),
@@ -726,11 +623,12 @@ function App({ session }: { session: SessionClient }) {
                     session={session}
                     yours={yours}
                   />
+                ) : (
+                  <EmptyRail />
                 )}
-                {newTab !== null && <EmptyRail />}
                 {/* Over the columns, beside the rail: inside the rail, whose own
                     scroll clips what overflows it, only a sliver of it showed. */}
-                {notesOpen && root !== null && (
+                {notesOpen && workspace.kind === "root" && (
                   <NotesIndex
                     filter={noteFilter}
                     nameOf={nameOf}
@@ -745,7 +643,7 @@ function App({ session }: { session: SessionClient }) {
                       index,
                       noteFilter,
                       session.writer,
-                      root,
+                      workspace.root,
                     )}
                     session={session}
                   />
@@ -753,55 +651,31 @@ function App({ session }: { session: SessionClient }) {
                 {/* A column's header is its drag handle; its grip is the
                     keyboard's way to move it. */}
                 <div id="strip" onPointerDown={dragColumn} ref={strip}>
-                  {views.map((view, i) => {
-                    const column = columns[i]
-                    if (column === undefined) return null
+                  {workspace.slots.map(slot => {
+                    const column = columns[slot.position]
+                    const columnView = views[slot.position]
+                    if (column === undefined || columnView === undefined)
+                      return null
                     return (
                       <Column
                         {...shared}
-                        // A new tab's column closes the new tab.
-                        closable={newTab !== null || columns.length > 1}
+                        closable={slot.closable}
                         column={column}
-                        count={columns.length}
+                        count={workspace.slots.length}
                         seenEnd={seenEnds}
                         forks={colors.forks}
-                        key={column.key}
-                        onBranch={(at, prefill) =>
-                          act({
-                            kind: "openFresh",
-                            key: opening(),
-                            at,
-                            after: i,
-                            ...(prefill === undefined ? {} : { prefill }),
-                          })
+                        key={slot.key}
+                        onIntent={onIntent}
+                        onTyping={() => typing(columnView.tipId)}
+                        path={paths[slot.position] ?? new Set()}
+                        position={slot.position}
+                        readOnly={
+                          workspace.kind === "root" ? workspace.readOnly : null
                         }
-                        onBranchInstead={(at, pending) =>
-                          act({
-                            kind: "openFresh",
-                            key: opening(),
-                            at,
-                            after: i,
-                            pending,
-                          })
-                        }
-                        onClose={() =>
-                          newTab !== null
-                            ? closeNewTab(newTab.key)
-                            : act({ kind: "close", index: i })
-                        }
-                        onMove={to => act({ kind: "move", from: i, to })}
-                        onOpen={openAt}
-                        onSent={sendId =>
-                          act({ kind: "sent", key: column.key, sendId })
-                        }
-                        onTyping={() => typing(views[i]?.tipId ?? null)}
-                        path={paths[i] ?? new Set()}
-                        position={i}
-                        readOnly={readOnly}
                         shown={shown}
-                        track={colors.track[i] ?? PENDING_TRACK}
+                        track={slot.track}
                         showsPresence
-                        view={view}
+                        view={columnView}
                       />
                     )
                   })}
@@ -817,7 +691,9 @@ function App({ session }: { session: SessionClient }) {
 
 /**
  * A root, read-only, in the Archive tab: its rail, and one column that a pick
- * on the rail moves. Its anchor is its own state, never stored.
+ * on the rail moves. Its anchor is its own state, never stored. A click that
+ * shows an entry picks it here; a read-only action (Restore, Open) goes on to
+ * `App`; the column offers nothing else.
  */
 function Preview({
   root,
@@ -825,6 +701,7 @@ function Preview({
   noteEntries,
   yours,
   shared,
+  onIntent,
 }: {
   root: string
   readOnly: ReadOnly
@@ -835,14 +712,9 @@ function Preview({
     ColumnProps,
     | "closable"
     | "column"
-    | "forks"
-    | "onBranch"
-    | "onBranchInstead"
-    | "onClose"
-    | "onMove"
     | "count"
-    | "onOpen"
-    | "onSent"
+    | "forks"
+    | "onIntent"
     | "onTyping"
     | "path"
     | "position"
@@ -852,6 +724,7 @@ function Preview({
     | "track"
     | "view"
   >
+  onIntent: (intent: Intent) => void
 }) {
   const [anchor, setAnchor] = useState(root)
   const previewStrip = useRef<HTMLDivElement>(null)
@@ -860,13 +733,19 @@ function Preview({
     setAnchor(id)
     reveal(id)
   }
+  const onPreviewIntent = useStable((intent: Intent) => {
+    if (intent.kind === "openAt") pick(intent.entry)
+    else if (intent.kind === "column" && intent.act.kind === "openBranch")
+      pick(intent.act.rootId)
+    else if (intent.kind === "restore" || intent.kind === "show")
+      onIntent(intent)
+  })
   const { index } = shared
   const column: ColumnSpec = { key: `preview-${root}`, anchor }
   const [view] = projectColumns(index, [{ anchor }], noteEntries)
   const rail = projectRail(index, root)
   const path = pathIds(index, view?.tipId ?? null)
   const track = branchColors(rail, view === undefined ? [] : [view]).track[0]
-  const none = () => {}
   if (view === undefined) return null
   return (
     <div className="preview">
@@ -890,13 +769,8 @@ function Preview({
           column={column}
           count={1}
           forks={new Map()}
-          onBranch={none}
-          onBranchInstead={none}
-          onClose={none}
-          onMove={none}
-          onOpen={pick}
-          onSent={none}
-          onTyping={none}
+          onIntent={onPreviewIntent}
+          onTyping={() => {}}
           path={path}
           position={0}
           readOnly={readOnly}
@@ -909,34 +783,3 @@ function Preview({
     </div>
   )
 }
-
-// ── mount ─────────────────────────────────────────────────────────────────
-//
-// connectSession owns the Exchange, so ExchangeProvider is handed that same
-// connection rather than opening a second one. The e2e check drives the exact
-// same function in Node.
-
-const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`
-const root = document.getElementById("root")
-if (root === null) throw new Error("client/app: missing #root in the page")
-
-// Who you are: your email, asked once per device and shared by its tabs, so a
-// reload, another tab and another device with the same email are one person
-// (ADR-0037). Kyneta gives each tab its own seat.
-const identity =
-  identityStore.load() ?? identityStore.save(await askIdentity(root))
-identityStore.subscribe(next => {
-  if (next?.email !== identity.email) location.reload()
-})
-const session = await connectSession({
-  url: wsUrl,
-  WebSocket,
-  principal: identity.email,
-})
-createRoot(root).render(
-  <StrictMode>
-    <ExchangeProvider exchange={session.exchange}>
-      <App session={session} />
-    </ExchangeProvider>
-  </StrictMode>,
-)

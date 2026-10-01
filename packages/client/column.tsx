@@ -7,7 +7,6 @@ import {
   type CardPlace,
   type CardRecord,
   type ColumnView,
-  type EntryId,
   entryId,
   type LaneView,
   type NoteId,
@@ -41,26 +40,29 @@ import {
   useRef,
   useState,
 } from "react"
+import type { ReadOnly } from "./app-view.ts"
 import { CardEditor } from "./card-editor.tsx"
 import {
   AGENT_MARK,
+  bannerUrl,
   columnView,
   type HeadBanner,
   type HeadIdentity,
   type HeadOrigin,
+  identityWords,
   type WorkFacts,
   type WorkStrip,
   workingWords,
 } from "./column-view.ts"
-import type { Column as ColumnSpec, Pending, Prefill } from "./columns.ts"
-import { Composer, type ReadOnly } from "./composer.tsx"
+import type { Column as ColumnSpec, Pending } from "./columns.ts"
+import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { behind, type SeenEnd } from "./follow.ts"
+import type { ColumnAct, Intent } from "./intent.ts"
 import type { LiveWork } from "./live.ts"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
-import type { MessageAct } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
 import { Avatars } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
@@ -120,35 +122,18 @@ export interface ColumnProps {
   /** The ids on this column's path, which the app has already computed. */
   path: ReadonlySet<string>
   /**
-   * Open a fresh column to the right, forked at `at`, its composer starting
-   * with `prefill`.
+   * What a reader asks of the page. The column's own acts go as
+   * `{ kind: "column", position, act }`, a message's among them.
    */
-  onBranch: (at: string, prefill: Prefill | undefined) => void
-  /** Open a new tab, its composer starting with `prefill`. */
-  onNewTab: (prefill: Prefill, asksAgent: boolean) => void
-  /**
-   * After a conflict: a fresh column at `at`, which sends the text there and
-   * spends its card. A conflict needs a reply at an entry: a `branch` never
-   * conflicts.
-   */
-  onBranchInstead: (at: EntryId, pending: Pending) => void
+  onIntent: (intent: Intent) => void
   /** Nothing may be written here (ADR-0029): no composer, no tools that write. */
   readOnly: ReadOnly | null
-  /** A fresh column's first send, by id. */
-  onSent: (sendId: string) => void
   /**
    * Whether the column keyed `key` was just opened, so its composer takes
    * focus. True once per opening.
    */
   takeFocus: (key: string) => boolean
-  onOpen: (anchor: string) => void
-  /** Move this column to index `to`, from its grip's keys (`keyMove`). */
-  onMove: (to: number) => void
-  onClose: () => void
-  /**
-   * Whether "close" does anything: not on a root tab's only column, which the
-   * root would give back at once (`columnsOf`), nor in a preview.
-   */
+  /** Whether × shows (`ColumnSlot.closable`); never in a preview. */
   closable: boolean
   /**
    * What each column knew of its end when last unmounted, by its key
@@ -197,6 +182,15 @@ export function Column(p: ColumnProps) {
       ? ROOT
       : atEntry(entryId(view.tipId))
   const writable = p.readOnly === null
+  // What this column's reader asks, a message's acts among it: the one
+  // handler every message shares, so none of them redraws when this column
+  // does.
+  const act = useStable((act: ColumnAct) =>
+    p.onIntent({ kind: "column", position: p.position, act }),
+  )
+  const openAt = useStable((entry: string) =>
+    p.onIntent({ kind: "openAt", entry }),
+  )
 
   // The lanes running on this column's path stream here.
   const streamingLanes = p.activity
@@ -233,7 +227,11 @@ export function Column(p: ColumnProps) {
   // Whether this column's next send would create a lane: the composer's to
   // decide, as it is typed.
   const [createsLane, setCreatesLane] = useState(false)
+  // The banner drawn as the column mounts shows at once; one arriving later,
+  // a new one, fades in.
+  const [mountedBanner] = useState(() => bannerUrl(lane, p.work.banners))
   const shows = columnView({
+    mountedBanner,
     index,
     view,
     lane,
@@ -243,9 +241,6 @@ export function Column(p: ColumnProps) {
     lanes: p.lanes,
     work: p.work,
   })
-  // The banner drawn as the column mounts shows at once; one arriving later,
-  // a new one, fades in.
-  const [mountBanner] = useState(() => shows.banner?.url ?? null)
   // The review of the offer beside the thread (ADR-0047): your choice, kept
   // only while the column is mounted. Reset when the offer goes, so the
   // thread's next offer does not open it with nobody asking.
@@ -261,7 +256,7 @@ export function Column(p: ColumnProps) {
     readonly text: string
     readonly key: number
   } | null>(null)
-  const act = (button: OfferButton) => {
+  const actOnOffer = (button: OfferButton) => {
     if (lane.kind !== "lane") return
     if (button === "update" || button === "resolve")
       void p.session.update(lane.name).then(outcome => {
@@ -322,7 +317,7 @@ export function Column(p: ColumnProps) {
         ? p.session.cardText(mine.id).text().trim() !== ""
         : false
     if (typed) setAskClose(true)
-    else p.onClose()
+    else act({ kind: "close", discard: null })
   }
   // The note this window is editing: while it is scrolled out of view, a bar
   // at the column's top leads back to it.
@@ -330,23 +325,9 @@ export function Column(p: ColumnProps) {
   const [outOfView, setOutOfView] = useState(false)
   const edited = p.notes.find(n => n.id === editingNote)
   const stillEdited = edited !== undefined && edited.state !== "done"
-  // What a message's reader asked for, carried out: the one handler every
-  // message shares, so none of them redraws when this column does.
-  const onAct = useStable((act: MessageAct) => {
-    switch (act.kind) {
-      case "note":
-        void p.session.note({ kind: "open", entry: act.entry })
-        return
-      case "branch":
-        p.onBranch(act.branch.at, act.branch.prefill)
-        return
-      case "newTab":
-        p.onNewTab(act.prefill, act.asksAgent)
-        return
-      case "openBranch":
-        p.onOpen(act.rootId)
-    }
-  })
+  const branchInstead = (pending: Pending) => {
+    if (at.kind === "entry") act({ kind: "branchInstead", at: at.id, pending })
+  }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-observe as the column grows
   useEffect(() => {
@@ -392,7 +373,7 @@ export function Column(p: ColumnProps) {
                   if (to === null) return
                   e.preventDefault()
                   movedByKey.current = true
-                  p.onMove(to)
+                  act({ kind: "move", to })
                 }}
                 ref={grip}
                 title="drag to move · ← → Home End"
@@ -403,9 +384,8 @@ export function Column(p: ColumnProps) {
             )}
             <Identity
               banner={shows.banner}
-              fade={shows.banner !== null && shows.banner.url !== mountBanner}
               identity={shows.identity}
-              onOpen={p.onOpen}
+              onOpen={openAt}
               running={running}
             />
             <span className="head-space" />
@@ -430,16 +410,15 @@ export function Column(p: ColumnProps) {
               </button>
             )}
           </div>
-          <Origin onOpen={p.onOpen} origin={shows.origin} />
+          <Origin onOpen={openAt} origin={shows.origin} />
           {askClose && (
             <div className="close-ask">
               discard what you typed?{" "}
               <button
                 className="close-discard"
                 onClick={() => {
-                  if (mine !== undefined) p.session.discardCard(mine.id)
                   setAskClose(false)
-                  p.onClose()
+                  act({ kind: "close", discard: mine?.id ?? null })
                 }}
                 type="button"
               >
@@ -483,7 +462,7 @@ export function Column(p: ColumnProps) {
               lane={lane}
               nameOf={p.nameOf}
               notesOf={p.notesOf}
-              onAct={onAct}
+              onAct={act}
               onFocusNote={setEditingNote}
               rows={p.rows}
               session={p.session}
@@ -565,10 +544,9 @@ export function Column(p: ColumnProps) {
                 insert={null}
                 key={c.id}
                 lane={lane}
-                onBranchInstead={pending => {
-                  if (at.kind === "entry") p.onBranchInstead(at.id, pending)
-                }}
-                onIntent={undefined}
+                onBranchInstead={branchInstead}
+                onCreatesLane={undefined}
+                onIntent={p.onIntent}
                 onSend={() => {
                   end.follow()
                   return undefined
@@ -589,7 +567,7 @@ export function Column(p: ColumnProps) {
           </div>
         )}
         <WorkStripView
-          act={act}
+          act={actOnOffer}
           review={{ id: reviewId, open: reviewing, toggle: toggleReview }}
           strip={shows.strip}
         />
@@ -626,17 +604,16 @@ export function Column(p: ColumnProps) {
           reader={{ me: p.session.writer, nameOf: p.nameOf }}
           prefill={p.column.fresh?.prefill}
           lane={lane}
-          onBranchInstead={pending => {
-            if (at.kind === "entry") p.onBranchInstead(at.id, pending)
-          }}
+          onBranchInstead={branchInstead}
           onSend={() => {
             end.follow()
             if (!fresh) return undefined
-            const id = crypto.randomUUID()
-            p.onSent(id)
-            return id
+            const sendId = crypto.randomUUID()
+            act({ kind: "sent", key: p.column.key, sendId })
+            return sendId
           }}
-          onIntent={setCreatesLane}
+          onCreatesLane={setCreatesLane}
+          onIntent={p.onIntent}
           onTyping={p.onTyping}
           takeFocus={() => p.takeFocus(p.column.key)}
           participants={p.participants}
@@ -714,11 +691,9 @@ function Reply({
  */
 function ThreadMark({
   banner,
-  fade,
   running,
 }: {
   banner: HeadBanner | null
-  fade: boolean
   running: boolean
 }) {
   return (
@@ -729,7 +704,7 @@ function ThreadMark({
       {banner === null ? (
         <span className="thread-star">{AGENT_MARK}</span>
       ) : (
-        <BannerImage fade={fade} key={banner.url} url={banner.url} />
+        <BannerImage fade={banner.fade} key={banner.url} url={banner.url} />
       )}
     </span>
   )
@@ -768,13 +743,11 @@ function BannerImage({ url, fade }: { url: string; fade: boolean }) {
 function Identity({
   identity,
   banner,
-  fade,
   onOpen,
   running,
 }: {
   identity: HeadIdentity
   banner: HeadBanner | null
-  fade: boolean
   onOpen: (id: string) => void
   running: boolean
 }) {
@@ -782,7 +755,7 @@ function Identity({
   if (identity.kind === "pending")
     return (
       <span className="agent-name pending">
-        <ThreadMark banner={null} fade={false} running={running} /> new agent
+        <ThreadMark banner={null} running={running} /> {identityWords(identity)}
       </span>
     )
   const { start } = identity
@@ -797,8 +770,7 @@ function Identity({
       title="where this agent started"
       type="button"
     >
-      <ThreadMark banner={banner} fade={fade} running={running} />{" "}
-      {identity.name}
+      <ThreadMark banner={banner} running={running} /> {identityWords(identity)}
     </button>
   )
 }

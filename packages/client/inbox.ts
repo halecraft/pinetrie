@@ -133,6 +133,19 @@ export function seenOnScreen(
   )
 }
 
+/**
+ * The inbox once the mentions drawn in the tab you are on are seen, or null
+ * when none of them is new: then nothing is written.
+ */
+export function seenNow(
+  inbox: Inbox,
+  items: readonly InboxItem[],
+  shown: ReadonlySet<string>,
+): Inbox | null {
+  const drawn = seenOnScreen(inbox, items, shown)
+  return drawn.length === 0 ? null : markSeen(inbox, drawn, items)
+}
+
 // ── stored form ───────────────────────────────────────────────────────────
 
 /** `v` changes when the shape does; an unknown one starts afresh. */

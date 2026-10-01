@@ -1,10 +1,12 @@
 // client/message-tools — which tools a message offers, as a pure rule: copy,
-// note, edit (or new tab), and `→` (ADR-0021, ADR-0025, ADR-0043). `Column` gathers
-// the facts, and `Message` draws the result. What a reader then asks of the
-// message is a `MessageAct`, which `Column` carries out.
+// note, edit (or new tab), and `→` (ADR-0021, ADR-0025, ADR-0043). `Column`
+// gathers the facts, and `Message` draws the result. Each tool but copy is the
+// `MessageAct` it sends, which reaches `App` as its column's intent
+// (`intent.ts`).
 
 import {
   type EntryId,
+  entryId,
   parseMentions,
   THE_AGENT,
   type ThreadLane,
@@ -24,14 +26,7 @@ export interface OpenBranch {
   readonly prefill: Prefill | undefined
 }
 
-export type MessageEdit =
-  | ({ readonly kind: "branch" } & OpenBranch)
-  | {
-      readonly kind: "newTab"
-      readonly asksAgent: boolean
-      readonly prefill: Prefill
-    }
-
+/** Each tool a message offers, as the act it sends; undefined when not offered. */
 export interface MessageTools {
   /**
    * Copy its text and tool calls: it has one or the other. What is copied is
@@ -40,10 +35,11 @@ export interface MessageTools {
    */
   readonly copy: boolean
   /** Open a note about it. */
-  readonly note: boolean
-  readonly edit: MessageEdit | undefined
+  readonly note: Extract<MessageAct, { kind: "note" }> | undefined
+  /** Send it again: a sibling at its parent, or a root's first message in a new tab. */
+  readonly edit: Extract<MessageAct, { kind: "branch" | "newTab" }> | undefined
   /** `→`: a branch at the message. */
-  readonly branch: OpenBranch | undefined
+  readonly branch: Extract<MessageAct, { kind: "branch" }> | undefined
 }
 
 /**
@@ -54,7 +50,7 @@ export interface MessageTools {
 export const branchPrefill = (lane: ThreadLane): Prefill | undefined =>
   lane.kind === "lane" ? AGENT_PREFILL : undefined
 
-/** What a reader asked of a message. `Column` carries it out. */
+/** What a reader asked of a message. */
 export type MessageAct =
   | { readonly kind: "note"; readonly entry: EntryId }
   | { readonly kind: "branch"; readonly branch: OpenBranch }
@@ -80,10 +76,12 @@ export function messageTools(
   // Copying only reads, so a column that can't be written offers it too.
   const copy = node.text !== "" || (node.toolCalls?.length ?? 0) > 0
   if (!at.writable)
-    return { copy, note: false, edit: undefined, branch: undefined }
+    return { copy, note: undefined, edit: undefined, branch: undefined }
   return {
     copy,
-    note: !at.hasNoteAbout,
+    note: at.hasNoteAbout
+      ? undefined
+      : { kind: "note", entry: entryId(node.id) },
     edit: node.role === "chat" ? editOf(node, at.parentId) : undefined,
     // Below a conversation's last message, a branch would be the same as
     // replying. Agent work follows its lane, so there a branch at the end is
@@ -91,7 +89,10 @@ export function messageTools(
     branch:
       at.isLast && at.lane.kind !== "lane"
         ? undefined
-        : { at: node.id, prefill: branchPrefill(at.lane) },
+        : {
+            kind: "branch",
+            branch: { at: node.id, prefill: branchPrefill(at.lane) },
+          },
   }
 }
 
@@ -101,7 +102,10 @@ export function messageTools(
  * original did. A branch asks only through a mention (`agentByDefault`), so a
  * message its thread's default compelled gets `@agent ` in front.
  */
-function editOf(node: TranscriptMessage, parentId: string | null): MessageEdit {
+function editOf(
+  node: TranscriptMessage,
+  parentId: string | null,
+): MessageTools["edit"] {
   const compelled = node.compelled === true
   if (parentId === null)
     return {
@@ -112,10 +116,19 @@ function editOf(node: TranscriptMessage, parentId: string | null): MessageEdit {
   const named = parseMentions(node.text).some(m => m.kind === "agent")
   return {
     kind: "branch",
-    at: parentId,
-    prefill: {
-      text: compelled && !named ? `${AGENT_PREFIX}${node.text}` : node.text,
-      blank: false,
+    branch: {
+      at: parentId,
+      prefill: {
+        text: compelled && !named ? `${AGENT_PREFIX}${node.text}` : node.text,
+        blank: false,
+      },
     },
   }
 }
+
+/**
+ * Whether a message draws its own text: a message that only called tools
+ * shows only its tool rows.
+ */
+export const showsText = (node: TranscriptMessage): boolean =>
+  node.text !== "" || node.toolCalls === undefined

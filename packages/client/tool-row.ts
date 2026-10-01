@@ -63,3 +63,16 @@ export const toolBody = (result: ToolResultView | undefined): ToolBody =>
   result !== undefined && result.images.length > 0
     ? { kind: "images", images: result.images, note: result.text }
     : { kind: "text" }
+
+/** Whether a call is still running (or was cut off), failed, or worked. */
+export type CallStatus = "pending" | "error" | "ok"
+
+export const callStatus = (result: ToolResultView | undefined): CallStatus =>
+  result === undefined ? "pending" : result.isError ? "error" : "ok"
+
+/** A status as its row's mark. */
+export const CALL_MARK: Readonly<Record<CallStatus, string>> = {
+  pending: "…",
+  error: "✗",
+  ok: "✓",
+}

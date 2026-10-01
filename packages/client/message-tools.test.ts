@@ -6,7 +6,12 @@ import {
   type TranscriptMessage,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { branchPrefill, messageTools } from "./message-tools.ts"
+import {
+  branchPrefill,
+  type MessageTools,
+  messageTools,
+  showsText,
+} from "./message-tools.ts"
 
 const agentWork: ThreadLane = {
   kind: "lane",
@@ -39,6 +44,10 @@ const tools = (
     ...over,
   })
 
+/** The text an edit's composer starts with, whichever it opens. */
+const editText = (edit: MessageTools["edit"]): string | undefined =>
+  edit?.kind === "branch" ? edit.branch.prefill?.text : edit?.prefill.text
+
 describe("edit", () => {
   // Messages as their threads' defaults and mentions made them (ADR-0021).
   const cases: readonly TranscriptMessage[] = [
@@ -52,8 +61,7 @@ describe("edit", () => {
 
   test("an edit asks the agent exactly when the original did", () => {
     for (const node of cases) {
-      const edit = tools(node).edit
-      const text = edit?.prefill?.text ?? ""
+      const text = editText(tools(node).edit) ?? ""
       const asks = address({
         mentions: parseMentions(text),
         participants: ["Ada"],
@@ -66,21 +74,18 @@ describe("edit", () => {
   test("is a branch at the parent, its text as sent, content that sends unchanged", () => {
     expect(tools(chat("just us", false)).edit).toEqual({
       kind: "branch",
-      at: "4-p",
-      prefill: { text: "just us", blank: false },
+      branch: { at: "4-p", prefill: { text: "just us", blank: false } },
     })
-    expect(tools(chat("fix the test", true)).edit?.prefill?.text).toBe(
+    expect(editText(tools(chat("fix the test", true)).edit)).toBe(
       "@agent fix the test",
     )
   })
 
   test("never doubles @agent, and leaves a command as typed", () => {
-    expect(tools(chat("@agent fix it", true)).edit?.prefill?.text).toBe(
+    expect(editText(tools(chat("@agent fix it", true)).edit)).toBe(
       "@agent fix it",
     )
-    expect(tools(chat("/pkg:review", false)).edit?.prefill?.text).toBe(
-      "/pkg:review",
-    )
+    expect(editText(tools(chat("/pkg:review", false)).edit)).toBe("/pkg:review")
   })
 
   test("a root's first message opens a new tab, asking the agent when it did", () => {
@@ -102,20 +107,20 @@ describe("edit", () => {
 
 describe("note", () => {
   test("offered until the message has a note about it", () => {
-    expect(tools(chat("x", false)).note).toBe(true)
-    expect(tools(chat("x", false), { hasNoteAbout: true }).note).toBe(false)
+    expect(tools(chat("x", false)).note).toEqual({ kind: "note", entry: "5-m" })
+    expect(tools(chat("x", false), { hasNoteAbout: true }).note).toBeUndefined()
   })
 })
 
 describe("→", () => {
   test("a branch at the message, with @agent typed in agent work", () => {
     expect(tools(chat("x", false)).branch).toEqual({
-      at: "5-m",
-      prefill: { text: "@agent ", blank: true },
+      kind: "branch",
+      branch: { at: "5-m", prefill: { text: "@agent ", blank: true } },
     })
     expect(tools(chat("x", false), { lane: conversation }).branch).toEqual({
-      at: "5-m",
-      prefill: undefined,
+      kind: "branch",
+      branch: { at: "5-m", prefill: undefined },
     })
   })
 
@@ -143,7 +148,7 @@ describe("copy", () => {
 test("a column that can't be written offers only copy", () => {
   expect(tools(chat("x", true), { writable: false })).toEqual({
     copy: true,
-    note: false,
+    note: undefined,
     edit: undefined,
     branch: undefined,
   })
@@ -152,4 +157,15 @@ test("a column that can't be written offers only copy", () => {
 test("branchPrefill: @agent, blank, in agent work; nothing in a conversation", () => {
   expect(branchPrefill(agentWork)).toEqual({ text: "@agent ", blank: true })
   expect(branchPrefill(conversation)).toBeUndefined()
+})
+
+test("showsText: a message that only called tools shows only its rows", () => {
+  const call = { id: "c", name: "bash", label: "ls" } as never
+  expect(showsText({ id: "m", role: "assistant", text: "" })).toBe(true)
+  expect(
+    showsText({ id: "m", role: "assistant", text: "", toolCalls: [call] }),
+  ).toBe(false)
+  expect(
+    showsText({ id: "m", role: "assistant", text: "so", toolCalls: [call] }),
+  ).toBe(true)
 })

@@ -17,14 +17,14 @@ import {
   useRef,
   useState,
 } from "react"
-import type { CardMarks } from "./card-marks.ts"
 import { CardPip } from "./card-pip.tsx"
 import { peopleHere, readersByRoot } from "./here.ts"
-import { type ActiveTab, sameTab } from "./layout.ts"
+import type { Intent } from "./intent.ts"
 import { Menu } from "./menu.tsx"
 import { Avatars } from "./presence.tsx"
-import { planTitle } from "./root-label.ts"
+import { planTitle, renameKey } from "./root-label.ts"
 import type { SessionClient } from "./session-view.ts"
+import { renameIntent, type TabsView } from "./tabs-view.ts"
 import { useReadingAt } from "./use-presence.ts"
 
 /** Left and Right move focus between tabs. */
@@ -42,39 +42,17 @@ function moveFocus(e: KeyboardEvent<HTMLElement>) {
 }
 
 export function TabBar({
-  tabs,
-  active,
-  labelOf,
-  newLabel,
-  archived,
-  work,
-  unsent,
+  view,
+  onIntent,
   session,
   index,
   order,
   nameOf,
   colorOf,
-  onShow,
-  onCloseNew,
-  onCloseRoot,
-  onArchive,
-  lineOf,
-  titleOf,
-  onRename,
-  onAdd,
 }: {
-  tabs: readonly ActiveTab[]
-  active: ActiveTab
-  /** A root tab's label: its title, else its first message's first line. */
-  labelOf: (root: string) => string
-  /** A new tab's label, by its key. */
-  newLabel: (key: string) => string
-  /** Roots in state `archived`. In the bar, only the tab you are on can be one. */
-  archived: ReadonlySet<string>
-  /** The agent's work in each root (`rootWork`). */
-  work: ReadonlyMap<string, "running" | "waiting">
-  /** Where your unsent cards are: a pip on each tab holding one (`cardMarks`). */
-  unsent: CardMarks
+  /** What the bar shows and offers (`tabsView`). */
+  view: TabsView
+  onIntent: (intent: Intent) => void
   /** Whose presence a root tab shows: others reading in it. */
   session: SessionClient
   index: TreeIndex
@@ -82,18 +60,6 @@ export function TabBar({
   order: readonly WriterId[]
   nameOf: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
-  onShow: (tab: ActiveTab) => void
-  onCloseNew: (key: string) => void
-  /** Close a root's tab for you: nothing is written (ADR-0030). */
-  onCloseRoot: (root: string) => void
-  onArchive: (root: string) => void
-  /** A root's first line: its label with no title, and the rename field's placeholder. */
-  lineOf: (root: string) => string
-  /** A root's stored title, or null when it has none. */
-  titleOf: (root: string) => string | null
-  /** Set a root's title for everyone, or clear it with null (ADR-0045). */
-  onRename: (root: string, title: string | null) => void
-  onAdd: (asksAgent: boolean) => void
 }) {
   const pip = <CardPip color={colorOf(session.writer)} />
   // The root whose tab is a title field now. Never stored.
@@ -116,44 +82,42 @@ export function TabBar({
         onKeyDown={moveFocus}
         role="tablist"
       >
-        {tabs.map(tab => {
-          const selected = sameTab(tab, active)
+        {view.tabs.map(tab => {
           if (tab.kind === "archive")
             return (
               <button
-                aria-selected={selected}
+                aria-selected={tab.selected}
                 className="tab tab-archive"
                 data-tab="archive"
                 key="archive"
-                onClick={() => onShow(tab)}
+                onClick={() => onIntent(tab.show)}
                 role="tab"
-                tabIndex={selected ? 0 : -1}
+                tabIndex={tab.selected ? 0 : -1}
                 type="button"
               >
                 Archive
-                {/* A root holding your card has no tab of its own. */}
-                {unsent.elsewhere && pip}
+                {tab.pip && pip}
               </button>
             )
           if (tab.kind === "new")
             return (
               <span className="tab-wrap" key={`new:${tab.key}`}>
                 <button
-                  aria-selected={selected}
+                  aria-selected={tab.selected}
                   className="tab tab-new"
                   data-new={tab.key}
-                  onClick={() => onShow(tab)}
+                  onClick={() => onIntent(tab.show)}
                   role="tab"
-                  tabIndex={selected ? 0 : -1}
+                  tabIndex={tab.selected ? 0 : -1}
                   type="button"
                 >
-                  {newLabel(tab.key)}
-                  {unsent.newTabs.has(tab.key) && pip}
+                  {tab.label}
+                  {tab.pip && pip}
                 </button>
                 <button
                   aria-label="close this new thread; nothing has been written"
                   className="tab-close"
-                  onClick={() => onCloseNew(tab.key)}
+                  onClick={() => onIntent(tab.close)}
                   type="button"
                 >
                   ×
@@ -161,7 +125,6 @@ export function TabBar({
               </span>
             )
           const { root } = tab
-          const busy = work.get(root)
           if (renaming === root)
             return (
               <span className="tab-wrap" key={`root:${root}`}>
@@ -170,33 +133,33 @@ export function TabBar({
                     setRenaming(null)
                     if (focusTab) setRefocus(root)
                   }}
-                  onSend={title => onRename(root, title)}
-                  placeholder={lineOf(root)}
-                  stored={titleOf(root)}
+                  onSend={title => onIntent(renameIntent(root, title))}
+                  placeholder={tab.line}
+                  stored={tab.title}
                 />
               </span>
             )
           return (
             <span className="tab-wrap" key={`root:${root}`}>
               <button
-                aria-selected={selected}
+                aria-selected={tab.selected}
                 className={[
                   "tab",
                   "tab-root",
-                  busy === "running" ? "running" : "",
-                  archived.has(root) ? "archived" : "",
+                  tab.running ? "running" : "",
+                  tab.archived ? "archived" : "",
                 ]
                   .filter(c => c !== "")
                   .join(" ")}
                 data-root={root}
-                onClick={() => onShow(tab)}
+                onClick={() => onIntent(tab.show)}
                 role="tab"
-                tabIndex={selected ? 0 : -1}
-                title={labelOf(root)}
+                tabIndex={tab.selected ? 0 : -1}
+                title={tab.label}
                 type="button"
               >
-                <span className="tab-label">{labelOf(root)}</span>
-                {unsent.roots.has(root) && pip}
+                <span className="tab-label">{tab.label}</span>
+                {tab.pip && pip}
                 <Readers
                   colorOf={colorOf}
                   index={index}
@@ -206,39 +169,39 @@ export function TabBar({
                   session={session}
                 />
               </button>
-              {/* On every root tab: shown on the one you are on, and on
-                  another on hover or focus, so any root can be renamed or
-                  archived. */}
-              {!archived.has(root) && (
+              {/* Shown on the tab you are on, and on another on hover or
+                  focus, so any root can be renamed or archived. */}
+              {tab.menu.length > 0 && (
                 <Menu
                   className="tab-more"
-                  items={[
-                    {
-                      key: "rename",
-                      className: "rename-root",
-                      title: "change this thread's title for everyone",
-                      label: "Rename",
-                      onChoose: () => setRenaming(root),
-                    },
-                    {
-                      key: "archive",
-                      className: "archive-root",
-                      disabled: busy !== undefined,
-                      title: "hide for everyone; restore from Archive",
-                      label: (
-                        <>
-                          Archive
-                          {busy !== undefined && (
-                            <span className="why">
-                              {" "}
-                              · {ROOT_BUSY_REASON[busy]}
-                            </span>
-                          )}
-                        </>
-                      ),
-                      onChoose: () => onArchive(root),
-                    },
-                  ]}
+                  items={tab.menu.map(item =>
+                    item.kind === "rename"
+                      ? {
+                          key: "rename",
+                          className: "rename-root",
+                          title: "change this thread's title for everyone",
+                          label: "Rename",
+                          onChoose: () => setRenaming(root),
+                        }
+                      : {
+                          key: "archive",
+                          className: "archive-root",
+                          disabled: item.busy !== null,
+                          title: "hide for everyone; restore from Archive",
+                          label: (
+                            <>
+                              Archive
+                              {item.busy !== null && (
+                                <span className="why">
+                                  {" "}
+                                  · {ROOT_BUSY_REASON[item.busy]}
+                                </span>
+                              )}
+                            </>
+                          ),
+                          onChoose: () => onIntent(item.intent),
+                        },
+                  )}
                   label="more for this thread"
                   trigger="⋯"
                   triggerClassName="tab-menu"
@@ -247,7 +210,7 @@ export function TabBar({
               <button
                 aria-label="close this thread for you; nothing is written"
                 className="tab-close"
-                onClick={() => onCloseRoot(root)}
+                onClick={() => onIntent(tab.close)}
                 title="close for you; reopen from Archive"
                 type="button"
               >
@@ -257,7 +220,7 @@ export function TabBar({
           )
         })}
       </div>
-      <AddTab onAdd={onAdd} />
+      <AddTab add={view.add} onIntent={onIntent} />
     </nav>
   )
 }
@@ -313,13 +276,10 @@ function TitleField({
         setInvalid(false)
       }}
       onKeyDown={e => {
-        if (e.key === "Enter") {
-          e.preventDefault()
-          finish(true, true)
-        } else if (e.key === "Escape") {
-          e.preventDefault()
-          finish(false, true)
-        }
+        const step = renameKey(e.key)
+        if (step === null) return
+        e.preventDefault()
+        finish(step.save, step.refocus)
       }}
       placeholder={placeholder}
       ref={input}
@@ -353,12 +313,18 @@ function Readers(p: {
  * The add tab: a split button. Agent work is the usual start at the root, so
  * it is the main action; a conversation is in its menu.
  */
-function AddTab({ onAdd }: { onAdd: (asksAgent: boolean) => void }) {
+function AddTab({
+  add,
+  onIntent,
+}: {
+  add: TabsView["add"]
+  onIntent: (intent: Intent) => void
+}) {
   return (
     <span className="add-tab">
       <button
         className="add-agent"
-        onClick={() => onAdd(true)}
+        onClick={() => onIntent(add.agent)}
         title="a new thread where the agent answers every message that names no one"
         type="button"
       >
@@ -373,7 +339,7 @@ function AddTab({ onAdd }: { onAdd: (asksAgent: boolean) => void }) {
             title:
               "a new conversation: the agent answers only when @agent is mentioned",
             label: "conversation",
-            onChoose: () => onAdd(false),
+            onChoose: () => onIntent(add.conversation),
           },
         ]}
         label="other ways to start"

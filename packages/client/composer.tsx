@@ -10,14 +10,14 @@ import type {
   SeatRecord,
   ThreadLane,
 } from "@pineta/core"
-import { CardEditor, type ReadOnly, type Where } from "./card-editor.tsx"
+import type { ReadOnly } from "./app-view.ts"
+import { CardEditor, type Where } from "./card-editor.tsx"
 import type { Pending, Prefill } from "./columns.ts"
+import type { Intent } from "./intent.ts"
 import { nameFor } from "./presence.tsx"
 import type { Reader } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
 import { useWhoIsAt } from "./use-presence.ts"
-
-export type { ReadOnly } from "./card-editor.tsx"
 
 /**
  * The column's foot. What you type here is your drafting card at this
@@ -49,7 +49,9 @@ export function Composer(p: {
   onTyping: () => void
   onSend: () => string | undefined
   onBranchInstead: (pending: Pending) => void
-  onIntent: (createsLane: boolean) => void
+  onCreatesLane: (createsLane: boolean) => void
+  /** Where a read-only action goes (`ReadOnly.action.intent`). */
+  onIntent: (intent: Intent) => void
   readOnly: ReadOnly | null
   takeFocus: () => boolean
 }) {
@@ -74,6 +76,7 @@ export function Composer(p: {
         insert={p.insert}
         lane={p.lane}
         onBranchInstead={p.onBranchInstead}
+        onCreatesLane={p.onCreatesLane}
         onIntent={p.onIntent}
         onSend={p.onSend}
         onTyping={p.onTyping}

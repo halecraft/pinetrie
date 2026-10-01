@@ -67,8 +67,8 @@ about 55 ms (S59).
   every message.
 - **A message reports what its reader asks as a `MessageAct`**
   (`message-tools.ts`) through one `onAct`, which `Column` makes once with
-  `useStable` and carries out in one `switch`. A handler per message would be
-  new on every render of the column.
+  `useStable` and passes on as its column's intent (below). A handler per
+  message would be new on every render of the column.
 - **A column's messages are one memoised `MessageList`**
   (`message-list.tsx`, `message-list-props.ts`), so a column that renders
   for anything else (a card, its composer's intent, a run elsewhere) builds
@@ -102,6 +102,48 @@ about 55 ms (S59).
   `MessageView`, the function `memo` wraps, and a list's
   `MessageListView`, so a check counting `Message` counts nothing.
 
+## Views decide, intents act
+
+The page works as the host's shell does: gather, plan purely, then carry
+the plan out (`apps/pineta/host/TECHNICAL.md`). A rule kept in a component
+can only be proven in a browser, minutes per check; a rule in a pure
+function is proven by a unit test in a second.
+
+- **A component draws a view.** It branches only on a view's `kind` or its
+  flags, and draws the view's strings. It compares no document fact, builds
+  no label, and chooses nothing that is offered. The views are `appView`
+  (`app-view.ts`), `tabsView`, `columnView`, `messageTools`, `railItems`,
+  `toolBody` and `callStatus`, `editorState` and `startText`. What stays in
+  components and `use-*.ts` is what needs a browser: measuring, focus and
+  the caret, scrolling, observers, subscriptions.
+- **A click is an `Intent`** (`intent.ts`). A column's acts are nested
+  under its position (`{ kind: "column", position, act }`), as
+  `LayoutAction` nests `ColumnAction` under a root, and a message's
+  `MessageAct`s are among them. `Column` takes one `onIntent`, which `App`
+  makes once with `useStable`, so it never redraws a list.
+- **`planIntent` turns an intent into `Effect`s**, from the layout, the
+  index and the archive of the render it was made in. It owns what a click
+  does: which root a column act belongs to, that × closes a tab and writes
+  nothing, that a column you open takes focus (`armFocus`). Fresh column
+  keys come from the shell as an argument, as `columnsReducer` takes them.
+  `afterRestore` plans a restore's answer, and `nameEffects` the settle's
+  name step (`reconcileName`).
+- **`perform` carries the effects out** (`perform.ts`), one port call each,
+  through `AppPorts`: the reducer's `dispatch`, the session's writes,
+  `reveal`, the Archive tab's pick, focus, the identity store and
+  `reload`.
+- **`appView` decides; it does not project.** The projections
+  (`projectColumns`, `pathIds`, `branchColors`, `cardMarks`) stay in `App`'s
+  own `useMemo`s, and their results come in. One tree rebuilt each render
+  would give every memoised child new props (S54, S59). `appView` gives the
+  workspace (`connecting`, `archive`, a root's or a new tab's columns as
+  `ColumnSlot`s), the read-only words, and the header's open offers. A slot
+  is new each render; `Column` is not memoised, so this costs nothing, and
+  a slot must never reach a memoised component by identity.
+- **`main.tsx` boots the page:** it builds the device's stores, asks who you
+  are, connects, and mounts `App({ session, stores })`. `app.tsx` touches no
+  browser global as it loads.
+
 ## Root tabs and the layout (`layout.ts`, ADR-0029, ADR-0030)
 
 The layout is `{ active, open, roots, newTabs }`, and `layoutReducer` is pure.
@@ -118,7 +160,12 @@ give the roots and each tab's signals.
   it finds a title without knowing about marks. The first lines are also
   the rename field's placeholder: what clearing a title brings back.
 - **Renaming is `TabBar`'s state, never the layout's.** `planTitle` is the
-  field's submit, over `parseTitle`, the rule the codec decides by too.
+  field's submit, over `parseTitle`, the rule the codec decides by too, and
+  `renameKey` what Enter and Escape do.
+- **What the bar shows and offers is `tabsView`'s** (`tabs-view.ts`), over
+  `tabBar`'s order: each tab's label, pip, ⋯ items and the intents it
+  sends. `TabBar` draws it; the `Readers` on each tab read presence
+  themselves (S59).
 
 - **Only you put a root in `open`.** `show` of a root opens it, so every way of
   opening goes through `show`: `planOpen`, the Archive tab's Open and Restore,
@@ -174,8 +221,9 @@ give the roots and each tab's signals.
 - **`planOpen` is the deduplication `App` used to do**, pure: scroll to an
   entry a column of its root already shows, open a column beside the deepest
   sharer (`openBeside`), or preview an archived root in the Archive tab. The
-  rail, fork dots and the notes index all go through it; `App`
-  carries the plan out.
+  rail, fork dots and the notes index all go through it, as an `openAt`
+  intent: `planIntent` turns its plan into effects, and `perform` carries
+  them out.
 - **Columns of other tabs are unmounted.** Alignment forgets their keys, so a
   tab shown again aligns its columns as if opened, left to right, the first
   at its end (Layout, below). Each keeps what it knew of its end
@@ -217,9 +265,11 @@ counter.
   A new tab can carry one too (an edit of a root's first message). Both are
   stored with the layout (v4), since only `pending` is sent on opening.
 - **A column you open takes focus, once.** `→`, "Branch here" and ＋ open
-  their column with `App`'s `opening()` key, and its composer focuses its box
-  when it mounts (`takeFocus`); `onFocus` puts the caret after the prefill.
-  The key lives in a ref, never in the layout: a column restored on reload,
+  their column with a fresh key that `planIntent` arms (`armFocus`), and its
+  composer focuses its box when it mounts (`takeFocus`, which `claimFocus`
+  decides: the armed key focuses once, and nothing else does); `onFocus`
+  puts the caret after the prefill. The key lives in a ref, never in the
+  layout: a column restored on reload,
   or mounted again when its tab is shown, leaves focus where it is. The focus
   runs in an effect, after the strip's alignment, and scrolls a column opened
   past the strip's edge into view.
@@ -234,7 +284,7 @@ counter.
 - **`asksAgent`** is a new tab from **＋ agent** (ADR-0021's Start Agent): a
   message with no mention asks the agent, as if `@agent` were written, until
   the thread has a lane of its own. Only the composer reads it; the header
-  shows what the composer will do (`onIntent`, below).
+  shows what the composer will do (`onCreatesLane`, below).
 - **Deduplication is `planOpen`'s** (`layout.ts`, above). Two anchors can
   resolve to one path, which `columnsReducer` cannot see.
 - **Open columns are never written to the document.** Which paths a person
@@ -315,6 +365,10 @@ in it opens a tab until you choose.
 (`localStorage`), which a new tab starts from. It knows nothing of Pineta; a
 value's stored form is its codec's. The layout is its one use, under the key
 `pineta-columns:<session>`, which predates root tabs.
+
+The stores are built in `main.tsx`, the one module that touches
+`sessionStorage`, `localStorage` and `window` as it loads, and `App` is
+given them (`AppStores`).
 
 `deviceState` keeps a value in the device's slot only, shared by the device's
 tabs: the inbox's seen state (`pineta-inbox:<session>`), and who you are
@@ -468,8 +522,8 @@ became of its files (`strip`).
 - **`offerView` (`@pineta/marginalia`) decides an offer; `offerWords`
   words it**: its line and each button's label, by state. The bookmark is a
   fact of its own, drawn apart (`.offer-bookmark`), never in the line.
-- **The header's clicks go through `onOpen`** (`openAt`, `planOpen`), which
-  reveals the entry in whichever column shows it. A column's lane may have
+- **The header's clicks are `openAt` intents** (`planOpen`), which reveal
+  the entry in whichever column shows it. A column's lane may have
   started in a column to its left.
 - **The banner (ADR-0050, ADR-0053) is the thread's at the column's end**
   (`banner`): the lane's `pineta.banner`, none for a conversation. It takes
@@ -478,11 +532,13 @@ became of its files (`strip`).
   absolutely, so its arrival moves nothing. The star stays in the text
   (`✦ name`), hidden under an image. A new one fades in once loaded, the
   star fading out; the one there as the column mounts shows at once, or
-  every tab switch would fade it in again. `isolation: isolate` makes the
+  every tab switch would fade it in again: `Column` keeps the banner's URL
+  as it mounted (`bannerUrl`), and `columnView` decides `fade` from it.
+  `isolation: isolate` makes the
   header's own background what `mix-blend-mode: lighten` blends with: the
   sprite's black ground becomes the header's colour. The header has no `overflow: hidden`: on a flex item that
   removes its minimum height, and a tall column squeezed the header.
-- **`onIntent`:** the composer tells the column, in an effect, whether its
+- **`onCreatesLane`:** the composer tells the column, in an effect, whether its
   next send would create a lane, so the header can say `✦ new agent`. It is a
   boolean, not the text lifted up: `Column` redraws only when it flips, not
   on every keystroke.
@@ -913,11 +969,12 @@ pipeline keeps the tree a pure function, testable without a DOM.
 
 - **Every column of the tab you are on is reported** (ADR-0029), since there
   is no focused column: `App` writes each column's thread end when it changes,
-  deletes the key of a column no longer reported, and refreshes all of them
+  deletes the key of a column no longer reported (`planReading`,
+  `presence-report.ts`, decides both), and refreshes all of them
   every 10 s while `document.visibilityState` is `visible` (a
   `visibilitychange` listener refreshes on return). Switching tabs therefore
   clears the last tab's keys, through that same deletion. The Archive tab
-  reports nothing. Typing is written at most once a second.
+  reports nothing. Typing is written at most once a second (`typingDue`).
 - **A tab's avatars** are `readersByRoot(peopleHere(…))` (`here.ts`): the
   header's people turned around, each tab's `Readers` taking its root's.
 - **`core/presence.ts` decides everything shown**, from one field's read
@@ -962,8 +1019,10 @@ empty ones when it starts (S58).
   Kyneta's `attach`, in that one handler: no keystroke falls between them,
   and focus and the caret stay where they are. A card that already exists is
   attached on mount. `editorState` (`card-state.ts`, pure) decides every step
-  and names the act (`create`, `attach`, `detach`); the component only
-  carries it out.
+  and names its acts in order (`create`, `attach`, `detach`, `redo`); the
+  component carries them out in turn. A new card is `create` then
+  `attach`: bound first, the binding would write into a card that does not
+  exist yet, and the first run of typing would be lost.
 - **Every write the editor makes itself goes through the element**: a command
   chosen, an update's intent, a pasted image (`insertAt` decides the text).
   Each is `setRangeText` and a dispatched `input` event, so it is typing:
@@ -996,7 +1055,9 @@ empty ones when it starts (S58).
   `editorState` keeps it as `local.last`; a redo there (`isRedo`: the keys,
   and a `beforeinput` of `historyRedo`, which takes a native listener)
   redoes through `undoFor(last)`, and the record coming back binds the box
-  (`found`). Another card's creation leaves that redo alone: Kyneta
+  (`found`). Whether the key is the editor's is the step's `claims`: every
+  emptied box claims it, with a card to redo or not, and a bound box never
+  does, since Kyneta's binding takes the undo keys. Another card's creation leaves that redo alone: Kyneta
   conflicts steps by the record keys and texts they write, not by document
   (S64, addendum 3).
 - **A card the host spent is destroyed on every client holding it** (S64),
@@ -1087,7 +1148,7 @@ A person is their email: the principal every Exchange of theirs names, and so
 their writer, `w-<email>`. Kyneta issues each tab its own peer id, a seat, so
 the email is the only thing Pineta chooses.
 
-- **Asked once per browser, before anything connects.** `app.tsx` reads
+- **Asked once per browser, before anything connects.** `main.tsx` reads
   `pineta-identity` (a `deviceState`, `identity.ts`), or draws the form
   (`identity-form.tsx`: **email:** and **name:**) and waits for it. The form's
   rule is `parseIdentity`, over the host's own `normalizeEmail` and
@@ -1098,7 +1159,8 @@ the email is the only thing Pineta chooses.
   that has none for you, or `store` the session's name when it differs from
   the stored one, whichever device set it. So a session that has no name for
   you learns the one you go by now, not the one typed on a first visit. One
-  effect in `App` runs it, keyed on `settled` and your session name: before
+  effect in `App` performs it (`nameEffects`), keyed on `settled` and your
+  session name: before
   the document settles, a missing name means not yet arrived, as for
   `prune`. It does nothing when nothing is stored for your email, which is a
   tab about to reload. Under `StrictMode` a `send` can run twice on a first
@@ -1159,8 +1221,9 @@ shown by their email's part before the `@`. Each rendered chat carries its
   the tab you are on, while hovered or focused, or while its menu is open
   (`Menu`'s wrapper, `.tab-more`, gains `open`). The menu is its child, so
   hiding the `⋯` would hide an open menu too.
-- **A column's × (`.close`) is `closable`:** hidden on a root tab's only
-  column (`columnsOf` would give it back) and in the Archive tab's preview.
+- **A column's × (`.close`) is `closable`** (`ColumnSlot`, `appView`):
+  hidden on a root tab's only column (`columnsOf` would give it back) and in
+  the Archive tab's preview.
 - **A popover opens above its trigger in the window's lower half.** A
   composer's `▾` is at the window's foot, so a list below it would be out of
   sight; and since `.popover` sets a `top` in the stylesheet, the upward box

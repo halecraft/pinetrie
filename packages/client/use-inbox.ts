@@ -9,7 +9,7 @@ import {
   isUnseen,
   markAllSeen,
   markSeen,
-  seenOnScreen,
+  seenNow,
   startInbox,
 } from "./inbox.ts"
 import type { DeviceState } from "./tab-state.ts"
@@ -65,8 +65,8 @@ export function useInbox({
   // A mention drawn in a column of the tab you are on is seen.
   useEffect(() => {
     if (inbox === null) return
-    const drawn = seenOnScreen(inbox, items, shown)
-    if (drawn.length > 0) save(markSeen(inbox, drawn, items), inbox)
+    const next = seenNow(inbox, items, shown)
+    if (next !== null) save(next, inbox)
   }, [inbox, items, shown, save])
 
   if (inbox === null)

@@ -21,6 +21,7 @@ import { nameFor } from "./presence.tsx"
 import {
   pickAt,
   type RunFill,
+  railItems,
   railKeep,
   runFill,
   runLabel,
@@ -156,13 +157,13 @@ export function Rail({
         </svg>
         {/* Dots and capsules are buttons over the drawing, so they are
           reachable by keyboard and read as controls. */}
-        {items.map(it =>
+        {railItems(items, { open, notes, yours }).map(([it, marks]) =>
           it.kind === "run" ? (
             <Capsule
               key={it.ids[0]}
               label={runLabel(it.ids.length, it.stats, nameOf)}
               onPick={onPick}
-              open={open.has(it.ids[0])}
+              open={marks.open}
               run={it}
             />
           ) : (
@@ -170,10 +171,10 @@ export function Rail({
               activity={activity}
               id={it.ids[0]}
               key={it.ids[0]}
-              noted={notes.has(it.ids[0])}
-              yours={yours.ends.has(it.ids[0]) ? yours.color : null}
+              noted={marks.noted}
+              yours={marks.yours}
               onPick={onPick}
-              open={open.has(it.ids[0])}
+              open={marks.open}
               people={here.get(it.ids[0]) ?? []}
               slot={it.slot}
               track={it.track}

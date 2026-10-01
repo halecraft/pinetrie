@@ -1,6 +1,6 @@
 import { laneNameForThread, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
-import { pickAt, railKeep, runFill, runLabel } from "./rail-view.ts"
+import { pickAt, railItems, railKeep, runFill, runLabel } from "./rail-view.ts"
 
 test("railKeep: notes, rings, running tips, open columns' ends and your cards' ends", () => {
   const keep = railKeep({
@@ -55,4 +55,17 @@ test("runFill: the agent alone, people alone, or both", () => {
   expect(runFill(12, stats(1))).toBe("mixed")
   expect(runFill(12, stats(11))).toBe("mixed")
   expect(runFill(12, stats(12))).toBe("people")
+})
+
+test("railItems: a dot at a thread end holding your card carries your colour", () => {
+  const item = (id: string) => ({ ids: [id, `${id}-later`] })
+  const marks = railItems([item("c"), item("o")], {
+    open: new Set(["o"]),
+    notes: new Set(["c"]),
+    yours: { ends: new Set(["c"]), color: "#f0f" },
+  }).map(([, m]) => m)
+  expect(marks).toEqual([
+    { open: false, noted: true, yours: "#f0f" },
+    { open: true, noted: false, yours: null },
+  ])
 })

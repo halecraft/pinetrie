@@ -108,6 +108,11 @@ export type HeadIdentity =
 /** The thread's icon in a column's header. */
 export interface HeadBanner {
   readonly url: string
+  /**
+   * A banner that arrives while the column is mounted fades in; the one there
+   * as it mounts shows at once, or every tab switch would fade it in again.
+   */
+  readonly fade: boolean
 }
 
 /** Where a column forks: none for a root column, a new tab, or a column moved first. */
@@ -175,6 +180,8 @@ export interface ColumnFacts {
   readonly lane: ThreadLane
   /** The composer's next send would create a lane. */
   readonly createsLane: boolean
+  /** The banner's URL as the column mounted (`bannerUrl`), or null. */
+  readonly mountedBanner: string | null
   readonly writable: boolean
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly lanes: readonly LaneView[]
@@ -201,20 +208,31 @@ export function columnView(f: ColumnFacts): ColumnShows {
   )
   return {
     identity: identityOf(lane, f.createsLane, work.names, stretches),
-    banner: bannerOf(lane, work.banners),
+    banner: bannerOf(bannerUrl(lane, work.banners), f.mountedBanner),
     origin: originOf(f, stretches),
     joins: joinsOf(view, stretches, work.names),
     strip: workStrip(f),
   }
 }
 
-function bannerOf(
+/** The banner of `lane`'s thread, as a URL; none for a conversation. */
+export function bannerUrl(
   lane: ThreadLane,
   banners: ReadonlyMap<LaneName, BannerRecord>,
-): HeadBanner | null {
+): string | null {
   const banner = lane.kind === "lane" ? banners.get(lane.name) : undefined
-  return banner === undefined ? null : { url: blobUrl(banner.sha) }
+  return banner === undefined ? null : blobUrl(banner.sha)
 }
+
+const bannerOf = (
+  url: string | null,
+  mounted: string | null,
+): HeadBanner | null => (url === null ? null : { url, fade: url !== mounted })
+
+/** A column's identity, after its mark: the thread's name, or a new agent. */
+export const identityWords = (
+  identity: Exclude<HeadIdentity, { kind: "none" }>,
+): string => (identity.kind === "agent" ? identity.name : "new agent")
 
 function identityOf(
   lane: ThreadLane,

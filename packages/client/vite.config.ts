@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
 // `target: esnext` because the client connects with a top-level `await`
-// (`app.tsx`), which a modern browser supports natively.
+// (`main.tsx`), which a modern browser supports natively.
 export default defineConfig({
   // This file lives in the client package, so that directory is Vite's root.
   root: fileURLToPath(new URL(".", import.meta.url)),

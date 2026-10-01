@@ -23,6 +23,7 @@ import { describe, expect, test } from "vitest"
 import {
   type ColumnFacts,
   columnView,
+  identityWords,
   joinWords,
   lanesAlong,
   offerWords,
@@ -192,6 +193,7 @@ const facts = (
     view,
     lane: { kind: "none" },
     createsLane: false,
+    mountedBanner: null,
     writable: true,
     nameOf: new Map([[ADA, "Ada"]]),
     lanes: [],
@@ -232,13 +234,28 @@ describe("columnView: the header", () => {
       columnView(
         facts(1, { lane: onLane(laneView(B, "b2")), work: work({ banners }) }),
       ).banner,
-    ).toEqual({ url: `/blob/${sha}` })
+    ).toEqual({ url: `/blob/${sha}`, fade: true })
     expect(
       columnView(
         facts(1, { lane: onLane(laneView(A, "b2")), work: work({ banners }) }),
       ).banner,
     ).toBeNull()
     expect(columnView(facts(1, { work: work({ banners }) })).banner).toBeNull()
+  })
+  test("a banner there as the column mounted shows at once; a new one fades in", () => {
+    const sha = "a".repeat(64) as Sha256
+    const banners = new Map([[B, { lane: B, sha, at: 1 }]])
+    const shown = (mountedBanner: string | null) =>
+      columnView(
+        facts(1, {
+          lane: onLane(laneView(B, "b2")),
+          work: work({ banners }),
+          mountedBanner,
+        }),
+      ).banner?.fade
+    expect(shown(`/blob/${sha}`)).toBe(false)
+    expect(shown(null)).toBe(true)
+    expect(shown("/blob/other")).toBe(true)
   })
   test("a lane that started above the column's first message still has a start", () => {
     // Column 1 shows only the branch; lane A started at 3, in column 0.
@@ -522,5 +539,17 @@ describe("offerWords", () => {
       "rewrite description",
       "update from my work",
     ])
+  })
+})
+
+describe("identityWords", () => {
+  test.each<[Parameters<typeof identityWords>[0], string]>([
+    [
+      { kind: "agent", name: "amber-fox" as ThreadName, start: null },
+      "amber-fox",
+    ],
+    [{ kind: "pending" }, "new agent"],
+  ])("%o", (identity, words) => {
+    expect(identityWords(identity)).toBe(words)
   })
 })

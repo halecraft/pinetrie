@@ -1,6 +1,8 @@
 import { type ImageRef, isSha256, type ToolResultView } from "@pineta/core"
 import { expect, test } from "vitest"
 import {
+  CALL_MARK,
+  callStatus,
   click,
   NO_MEMORY,
   type RowFacts,
@@ -60,4 +62,16 @@ test("a result with an image shows the image, its caption as the note", () => {
 test("a result without an image, or no result yet, shows text", () => {
   expect(toolBody(result([]))).toEqual({ kind: "text" })
   expect(toolBody(undefined)).toEqual({ kind: "text" })
+})
+
+test("a call's status: running without a result, failed by its result's error", () => {
+  const result = (isError: boolean): ToolResultView => ({
+    text: "",
+    isError,
+    images: [],
+  })
+  expect(callStatus(undefined)).toBe("pending")
+  expect(callStatus(result(true))).toBe("error")
+  expect(callStatus(result(false))).toBe("ok")
+  expect(CALL_MARK).toEqual({ pending: "…", error: "✗", ok: "✓" })
 })

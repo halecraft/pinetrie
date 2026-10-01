@@ -61,3 +61,16 @@ export function planTitle(typed: string, stored: string | null): TitlePlan {
         : { kind: "send", title: input.title }
   }
 }
+
+/**
+ * What a key does in the rename field: Enter saves, Escape cancels, and both
+ * give the tab focus back. Null for any other key. Leaving the field saves
+ * too, and leaves focus where it went.
+ */
+export function renameKey(
+  key: string,
+): { readonly save: boolean; readonly refocus: true } | null {
+  if (key === "Enter") return { save: true, refocus: true }
+  if (key === "Escape") return { save: false, refocus: true }
+  return null
+}

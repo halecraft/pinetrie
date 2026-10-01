@@ -7,8 +7,8 @@
 // `editorState` decides each step and names what the component must do;
 // `card-editor.tsx` does it. Pure.
 
-import type { CardId } from "@pineta/core"
-import type { Prefill } from "./columns.ts"
+import type { CardId, CardRecord } from "@pineta/core"
+import type { Pending, Prefill } from "./columns.ts"
 import { sendable } from "./send.ts"
 
 /**
@@ -49,20 +49,33 @@ export type EditorEvent =
 
 /**
  * What the component does on the way to the next state:
- * - `create`: write the card from the element's text, then bind the element;
- * - `attach`: bind the element to a card that exists;
+ * - `create`: write the card from the element's text;
+ * - `attach`: bind the element to the card, which exists;
  * - `detach`: unbind it, and empty it;
- * - `redo`: redo the last card's history (`local.last`);
- * - null: nothing.
+ * - `redo`: redo the last card's history (`local.last`).
  */
-export type EditorAct = "create" | "attach" | "detach" | "redo" | null
+export type EditorAct = "create" | "attach" | "detach" | "redo"
 
 export interface EditorStep {
   readonly state: EditorState
-  readonly act: EditorAct
+  /**
+   * In order. A new card is created, then attached: bound first, the binding
+   * would write the element's text into a card that does not exist yet, and
+   * the first run of typing would be lost.
+   */
+  readonly acts: readonly EditorAct[]
+  /**
+   * The key that made a `redo` step is the editor's: its default is
+   * prevented. Bound, Kyneta's binding takes the undo keys itself.
+   */
+  readonly claims: boolean
 }
 
-const stay = (state: EditorState): EditorStep => ({ state, act: null })
+const step = (
+  state: EditorState,
+  acts: readonly EditorAct[] = [],
+): EditorStep => ({ state, acts, claims: false })
+const stay = (state: EditorState): EditorStep => step(state)
 
 export function editorState(
   state: EditorState,
@@ -72,36 +85,35 @@ export function editorState(
   switch (event.kind) {
     case "input":
       return state.kind === "local" && needsCard(event.text, prefill)
-        ? { state: { kind: "bound", card: event.card }, act: "create" }
+        ? step({ kind: "bound", card: event.card }, ["create", "attach"])
         : stay(state)
     case "found":
       return state.kind === "local"
-        ? { state: { kind: "bound", card: event.card }, act: "attach" }
+        ? step({ kind: "bound", card: event.card }, ["attach"])
         : stay(state)
     case "gone":
       // While sending, the host spends the card as part of this send: the
       // reply says how it went.
       return state.kind === "bound"
-        ? { state: { kind: "local", last: state.card }, act: "detach" }
+        ? step({ kind: "local", last: state.card }, ["detach"])
         : stay(state)
     case "redo":
-      return state.kind === "local" && state.last !== null
-        ? { state, act: "redo" }
-        : stay(state)
+      // An emptied box takes the redo key, with a card to bring back or not.
+      if (state.kind !== "local") return stay(state)
+      return {
+        ...step(state, state.last === null ? [] : ["redo"]),
+        claims: true,
+      }
     case "send":
       return state.kind === "sending"
         ? stay(state)
-        : {
-            state: {
-              kind: "sending",
-              card: state.kind === "bound" ? state.card : null,
-            },
-            act: null,
-          }
+        : step({
+            kind: "sending",
+            card: state.kind === "bound" ? state.card : null,
+          })
     case "settled":
       if (state.kind !== "sending") return stay(state)
-      if (event.spent)
-        return { state: { kind: "local", last: null }, act: "detach" }
+      if (event.spent) return step({ kind: "local", last: null }, ["detach"])
       // A conflict or a refusal: nothing was sent, and the card is still
       // there, so nothing is restored.
       return state.card === null
@@ -159,3 +171,16 @@ export const spentCards = (
   letGo: Iterable<CardId>,
   live: (id: CardId) => boolean,
 ): CardId[] => [...letGo].filter(id => !live(id))
+
+/**
+ * What the box starts with: a fresh column's prefill, unless it opens with a
+ * message to send (`pending`) or a card that holds its own text.
+ */
+export const startText = (input: {
+  readonly pending: Pending | undefined
+  readonly card: CardRecord | undefined
+  readonly prefill: Prefill | undefined
+}): string =>
+  input.pending === undefined && input.card === undefined
+    ? (input.prefill?.text ?? "")
+    : ""

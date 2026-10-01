@@ -14,6 +14,7 @@ import {
   markSeen,
   mentionsOf,
   mergeInbox,
+  seenNow,
   seenOnScreen,
   startInbox,
 } from "./inbox.ts"
@@ -111,6 +112,14 @@ describe("the inbox", () => {
     const shown = new Set(["1-r1", "7-d", "2-a"])
     expect(seenOnScreen(start, mine, shown)).toEqual(["7-d"])
     expect(seenOnScreen({ since: "7-d", seen: [] }, mine, shown)).toEqual([])
+  })
+  test("a mention drawn in the tab you are on is seen; with none new, nothing is written", () => {
+    const shown = new Set(["1-r1", "7-d", "2-a"])
+    const next = seenNow(start, mine, shown)
+    expect(next === null ? "nothing written" : isUnseen(next, "7-d")).toBe(
+      false,
+    )
+    expect(seenNow({ since: "7-d", seen: [] }, mine, shown)).toBe(null)
   })
   test("the stored form round-trips, and a malformed one restores nothing", () => {
     const i: Inbox = { since: "1-r1", seen: ["7-d"] }

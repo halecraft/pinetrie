@@ -29,14 +29,18 @@ import {
 import { spends, writersOf } from "@pineta/marginalia"
 import { textClients } from "@pineta/schema"
 import { useEffect, useRef, useState } from "react"
+import type { ReadOnly } from "./app-view.ts"
 import {
   type EditorEvent,
   type EditorState,
+  type EditorStep,
   editorState,
   isRedo,
+  startText,
 } from "./card-state.ts"
 import type { Pending, Prefill } from "./columns.ts"
 import { matchCommands } from "./commands.ts"
+import type { Intent } from "./intent.ts"
 import { Menu } from "./menu.tsx"
 import { cardHeading } from "./names.ts"
 import {
@@ -58,16 +62,6 @@ import {
   whereWords,
 } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
-
-/**
- * A column where nothing may be written: an archived root, in place or
- * previewed, or an open root's preview (ADR-0029). The editor keeps what was
- * typed, and shows `label` and `action` in place of its buttons.
- */
-export interface ReadOnly {
-  readonly label: string
-  readonly action: { readonly title: string; readonly go: () => void }
-}
 
 /** Where a lane this editor's send creates would work, and the choices. */
 export interface Where {
@@ -152,7 +146,9 @@ export function CardEditor(p: {
   /** Called on each keystroke; presence is written at most once a second. */
   onTyping: () => void
   /** Told whether the next send would create a lane, each time that changes. */
-  onIntent: ((createsLane: boolean) => void) | undefined
+  onCreatesLane: ((createsLane: boolean) => void) | undefined
+  /** Where a read-only action goes (`ReadOnly.action.intent`). */
+  onIntent: (intent: Intent) => void
   /** Whether this column was just opened: then the box takes focus, once. */
   takeFocus: (() => boolean) | undefined
 }) {
@@ -166,9 +162,7 @@ export function CardEditor(p: {
   // The state as the handlers last left it, read synchronously between renders.
   const current = useRef(state)
   // The box's text, as shown: the element's while local, the card's while bound.
-  const [text, setText] = useState(
-    pending === undefined && card === undefined ? (prefill?.text ?? "") : "",
-  )
+  const [text, setText] = useState(() => startText({ pending, card, prefill }))
   const detach = useRef<(() => void) | null>(null)
   const [status, setStatus] = useState("")
   const [uploading, setUploading] = useState(0)
@@ -195,8 +189,11 @@ export function CardEditor(p: {
   const matches = hidden === text ? [] : matchCommands(text, p.commands)
   const highlighted = matches[Math.min(picked, matches.length - 1)]
   const work = choice ?? p.where?.defaultWork ?? null
-  const { onIntent } = p
-  useEffect(() => onIntent?.(plan.createsLane), [plan.createsLane, onIntent])
+  const { onCreatesLane } = p
+  useEffect(
+    () => onCreatesLane?.(plan.createsLane),
+    [plan.createsLane, onCreatesLane],
+  )
 
   /**
    * Bind the box to a card's text, keeping the caret where it is. Its undo
@@ -224,37 +221,43 @@ export function CardEditor(p: {
     if (box.current !== null) box.current.value = ""
     setText("")
   }
-  /** One step of `editorState`, carried out. */
-  const step = (event: EditorEvent): void => {
+  /**
+   * One step of `editorState`, its acts carried out in its order. A card
+   * that cannot be created ends the step: nothing is bound to it.
+   */
+  const step = (event: EditorEvent): EditorStep => {
     const next = editorState(current.current, event, prefill)
     current.current = next.state
     setState(next.state)
-    switch (next.act) {
-      case "create": {
-        const el = box.current
-        if (el === null || p.place === undefined || next.state.kind !== "bound")
-          return
-        session.createCard(
-          { id: next.state.card, owner: session.writer, place: p.place },
-          el.value,
-        )
-        bind(next.state.card)
-        return
+    for (const act of next.acts)
+      switch (act) {
+        case "create": {
+          const el = box.current
+          if (
+            el === null ||
+            p.place === undefined ||
+            next.state.kind !== "bound"
+          )
+            return next
+          session.createCard(
+            { id: next.state.card, owner: session.writer, place: p.place },
+            el.value,
+          )
+          break
+        }
+        case "attach":
+          if (next.state.kind === "bound") bind(next.state.card)
+          break
+        case "detach":
+          unbind()
+          break
+        case "redo":
+          // The card comes back as its record does, and `found` binds it.
+          if (next.state.kind === "local" && next.state.last !== null)
+            void session.undoFor(next.state.last).redo()
+          break
       }
-      case "attach":
-        if (next.state.kind === "bound") bind(next.state.card)
-        return
-      case "detach":
-        unbind()
-        return
-      case "redo":
-        // The card comes back as its record does, and `found` binds it.
-        if (next.state.kind === "local" && next.state.last !== null)
-          void session.undoFor(next.state.last).redo()
-        return
-      case null:
-        return
-    }
+    return next
   }
 
   // The card as the column finds it: found, or gone. Gone only once it was
@@ -282,9 +285,7 @@ export function CardEditor(p: {
     const el = box.current
     if (el === null) return
     const onBeforeInput = (e: InputEvent) => {
-      if (current.current.kind !== "local" || !isRedo(e)) return
-      e.preventDefault()
-      step({ kind: "redo" })
+      if (isRedo(e) && step({ kind: "redo" }).claims) e.preventDefault()
     }
     el.addEventListener("beforeinput", onBeforeInput)
     return () => el.removeEventListener("beforeinput", onBeforeInput)
@@ -402,6 +403,7 @@ export function CardEditor(p: {
       ? []
       : writersOf(textClients(session.cardText(card.id)), p.seats)
   const others = card !== undefined && card.owner !== session.writer
+  const { readOnly } = p
 
   return (
     <div className={others ? "card-editor others" : "card-editor"}>
@@ -504,10 +506,9 @@ export function CardEditor(p: {
         }}
         onKeyDown={e => {
           if (e.nativeEvent.isComposing) return
-          // Bound, `attach` takes the undo keys.
-          if (current.current.kind === "local" && isRedo(e)) {
+          // Bound, `attach` takes the undo keys, and the step claims none.
+          if (isRedo(e) && step({ kind: "redo" }).claims) {
             e.preventDefault()
-            step({ kind: "redo" })
             return
           }
           // While commands are offered, the keys move through them.
@@ -538,15 +539,15 @@ export function CardEditor(p: {
         ref={box}
         rows={Math.min(8, Math.max(2, text.split("\n").length))}
       />
-      {p.readOnly !== null ? (
+      {readOnly !== null ? (
         <div className="read-only">
-          <span className="read-only-label">{p.readOnly.label}</span>
+          <span className="read-only-label">{readOnly.label}</span>
           <button
             className="read-only-action"
-            onClick={p.readOnly.action.go}
+            onClick={() => p.onIntent(readOnly.action.intent)}
             type="button"
           >
-            {p.readOnly.action.title}
+            {readOnly.action.title}
           </button>
         </div>
       ) : (

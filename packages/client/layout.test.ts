@@ -1,13 +1,12 @@
 import {
   type ArchiveRecord,
-  type EntryLike,
   entryId,
-  indexTree,
   type LaneView,
   laneNameForThread,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
+import { tree } from "./fixtures.ts"
 import {
   type ActiveTab,
   columnsOf,
@@ -20,29 +19,6 @@ import {
   resolveLayout,
   tabBar,
 } from "./layout.ts"
-
-/** A tree from `child: parent` pairs; `sends` gives some entries a send id. */
-const tree = (
-  parents: Record<string, string | null>,
-  sends: Record<string, string> = {},
-) =>
-  indexTree(
-    Object.fromEntries(
-      Object.entries(parents).map(([id, parentId]): [string, EntryLike] => [
-        id,
-        {
-          id,
-          parentId,
-          type: "message",
-          message: {
-            role: "chat",
-            content: id,
-            ...(sends[id] === undefined ? {} : { sendId: sends[id] }),
-          },
-        },
-      ]),
-    ),
-  )
 
 // Two roots: r1 -> a -> b, with a branch a -> c; and r2 -> d.
 const parents = {

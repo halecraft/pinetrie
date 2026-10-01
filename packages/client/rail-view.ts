@@ -79,3 +79,38 @@ export function pickAt(
   const i = Math.floor(fraction * ids.length)
   return ids[Math.min(ids.length - 1, Math.max(0, i))] ?? ids[0]
 }
+
+/** What a rail item marks besides its place: decided here, drawn by `Rail`. */
+export interface RailMarks {
+  /** On an open column's path: `data-open`. A run's first message speaks for it. */
+  readonly open: boolean
+  /** A note's message (ADR-0025): a square. */
+  readonly noted: boolean
+  /** Your colour when an unsent card of yours waits here (ADR-0048), else null. */
+  readonly yours: string | null
+}
+
+/** Each item's marks, read from its first message. */
+export function railItems<I extends { readonly ids: readonly string[] }>(
+  items: readonly I[],
+  facts: {
+    readonly open: ReadonlySet<string>
+    readonly notes: ReadonlySet<string>
+    readonly yours: {
+      readonly ends: ReadonlySet<string>
+      readonly color: string
+    }
+  },
+): readonly (readonly [item: I, marks: RailMarks])[] {
+  return items.map(item => {
+    const id = item.ids[0] ?? ""
+    return [
+      item,
+      {
+        open: facts.open.has(id),
+        noted: facts.notes.has(id),
+        yours: facts.yours.ends.has(id) ? facts.yours.color : null,
+      },
+    ] as const
+  })
+}

@@ -15,6 +15,12 @@ The end-to-end suites: `e2e.ts` (`pnpm run e2e`, and `e2e:live`),
   whose condition cannot hold, costs its whole length every run. A negative
   check, which shows that nothing arrives, has to wait: wait as briefly as
   the rule it checks allows.
+- **A browser check stays only while it proves what only a browser shows:**
+  focus and the caret, geometry, CSS, scrolling, render counts, a real
+  Kyneta round trip, the device's storage. A rule decided in a pure
+  function is proven by its unit test (`packages/client/TECHNICAL.md`,
+  "Views decide, intents act"), and the browser check for it is deleted. Keep
+  the actions a later step depends on, and the waits that let it start.
 
 ## Gotchas
 

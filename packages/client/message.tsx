@@ -3,11 +3,7 @@
 // what the reader asks as a `MessageAct`.
 
 import { useSelector } from "@kyneta/react"
-import {
-  entryId,
-  type ToolCallView,
-  type TranscriptMessage,
-} from "@pineta/core"
+import type { ToolCallView, TranscriptMessage } from "@pineta/core"
 import { readStreamText, type SessionDocHandle } from "@pineta/schema"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
@@ -17,12 +13,18 @@ import { copyText } from "./copy-text.ts"
 import { plural } from "./counts.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 import { MessageText } from "./message-text.tsx"
-import type { MessageAct, MessageTools } from "./message-tools.ts"
+import {
+  type MessageAct,
+  type MessageTools,
+  showsText,
+} from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
 import { nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import type { ScreenMemory } from "./screen-memory.ts"
 import {
+  CALL_MARK,
+  callStatus,
   click,
   NO_MEMORY,
   REVEAL_MS,
@@ -88,8 +90,7 @@ function MessageView(p: MessageProps) {
             type="button"
           />
         ))}
-        {/* A message that only called tools shows only its tool rows. */}
-        {(node.text !== "" || node.toolCalls === undefined) && (
+        {showsText(node) && (
           <MessageText images={node.images} mode="committed" text={node.text} />
         )}
         {node.toolCalls?.map(call => (
@@ -142,16 +143,21 @@ function Tools({
   tools: MessageTools
   onAct: (act: MessageAct) => void
 }) {
-  const { edit, branch } = tools
-  if (!tools.copy && !tools.note && edit === undefined && branch === undefined)
+  const { note, edit, branch } = tools
+  if (
+    !tools.copy &&
+    note === undefined &&
+    edit === undefined &&
+    branch === undefined
+  )
     return null
   return (
     <div className="tools">
       {tools.copy && <CopyButton node={node} />}
-      {tools.note && (
+      {note !== undefined && (
         <button
           className="note-open"
-          onClick={() => onAct({ kind: "note", entry: entryId(node.id) })}
+          onClick={() => onAct(note)}
           title="open a note on this message, for everyone"
           type="button"
         >
@@ -161,7 +167,7 @@ function Tools({
       {edit?.kind === "branch" && (
         <button
           className="edit"
-          onClick={() => onAct({ kind: "branch", branch: edit })}
+          onClick={() => onAct(edit)}
           title="edit and send again, in a branch beside this one"
           type="button"
         >
@@ -171,13 +177,7 @@ function Tools({
       {edit?.kind === "newTab" && (
         <button
           className="edit-new-tab"
-          onClick={() =>
-            onAct({
-              kind: "newTab",
-              prefill: edit.prefill,
-              asksAgent: edit.asksAgent,
-            })
-          }
+          onClick={() => onAct(edit)}
           title="a new tab starting with this message's text"
           type="button"
         >
@@ -188,7 +188,7 @@ function Tools({
         <button
           aria-label="open a branch here"
           className="branch"
-          onClick={() => onAct({ kind: "branch", branch })}
+          onClick={() => onAct(branch)}
           title="open a branch here"
           type="button"
         >
@@ -269,9 +269,8 @@ function ToolRow({
   doc: SessionDocHandle
   rows: ScreenMemory<RowMemory>
 }) {
-  const status =
-    call.result === undefined ? "pending" : call.result.isError ? "error" : "ok"
-  const mark = status === "pending" ? "…" : status === "error" ? "✗" : "✓"
+  const status = callStatus(call.result)
+  const mark = CALL_MARK[status]
   // A result replaces the stream, whether or not the stream has gone yet.
   const live = call.result === undefined ? stream : undefined
   const [memory, setMemory] = useRemembered(rows, call.id)

@@ -75,7 +75,10 @@ test("a change to what a message shows, or a new handler, draws again", () => {
     sameMessageProps(
       was,
       props("hello", {
-        tools: { ...was.tools, branch: { at: "b", prefill: undefined } },
+        tools: {
+          ...was.tools,
+          branch: { kind: "branch", branch: { at: "b", prefill: undefined } },
+        },
       }),
     ),
   ).toBe(false)

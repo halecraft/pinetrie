@@ -7,7 +7,7 @@ import {
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { firstLines, planTitle, rootLabels } from "./root-label.ts"
+import { firstLines, planTitle, renameKey, rootLabels } from "./root-label.ts"
 
 const chat = (id: string, text: string): EntryLike => ({
   id,
@@ -62,4 +62,10 @@ describe("planTitle", () => {
     })
     expect(planTitle("", "Tab names")).toEqual({ kind: "send", title: null })
   })
+})
+
+test("renameKey: Enter saves, Escape leaves the title as it was; both refocus", () => {
+  expect(renameKey("Enter")).toEqual({ save: true, refocus: true })
+  expect(renameKey("Escape")).toEqual({ save: false, refocus: true })
+  expect(renameKey("a")).toBe(null)
 })
