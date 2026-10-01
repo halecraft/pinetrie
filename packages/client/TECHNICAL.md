@@ -772,8 +772,12 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     banner over it) pulses while it is true, titled by `workingWords`. The
     square pulses, not the star, which a banner hides.
   - A live row the work opened carries `data-revealed`, and
-    `.tool.live[data-revealed]` is outlined. A call shorter than `REVEAL_MS`
-    is never revealed, so it shows none.
+    `.tool.live[data-revealed]::after` draws a ring around it. A call
+    shorter than `REVEAL_MS` is never revealed, so it shows none. The ring
+    is a positioned pseudo-element, not an `outline`, so it can reach 1rem
+    into the column's right gutter (1.75rem, against .75rem on the left)
+    and sit centred in the column. The browser suite measures it from the
+    row's box and the pseudo-element's resolved insets.
   - `.working-line` is drawn at the content's end for the whole run, before
     the waiting messages. `.column-content:has(.tool.live[data-revealed])`
     hides it, so no value restates `ToolRow`'s live rule or `REVEAL_MS`.

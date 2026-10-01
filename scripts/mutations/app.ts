@@ -848,6 +848,14 @@ export const mutations: readonly Mutation[] = [
     expect: "a running command the work opened is outlined",
   },
   {
+    name: "a running row's ring hugs the row, off-centre in its column",
+    file: "packages/client/index.html",
+    from: "        inset: -4px calc(-1rem - 4px) -4px -4px; border: 1px solid transparent;",
+    to: "        inset: -4px; border: 1px solid transparent;",
+    command: browser,
+    expect: "centred in its column",
+  },
+  {
     name: "the result is a new element",
     file: "packages/client/message.tsx",
     from: "        <ToolOutput doc={doc} result={call.result?.text} stream={live} />",

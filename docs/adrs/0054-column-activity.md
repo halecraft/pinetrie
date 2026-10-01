@@ -28,11 +28,14 @@ with each command, would scroll the column or leave floor behind.
   is hidden.
 - **A command the work opened is outlined while it runs.** A row that is live
   (a stream and no result) and revealed (it streamed for `REVEAL_MS`, ADR-0049)
-  carries `data-revealed`, and `.tool.live[data-revealed]` has a pulsing
-  outline. An outline takes no layout. A call whose result comes sooner is
-  never revealed, so it never shows one, as its row never opens. This applies
-  to every tool, not only `bash`. The live row's gutter bar goes;
-  a streaming reply keeps its own.
+  carries `data-revealed`, and `.tool.live[data-revealed]::after` draws a
+  pulsing ring around it. The ring is absolutely placed, so it takes no
+  layout. It reaches 1rem past the row's right edge, into the gutter the
+  column keeps for `→`, so it sits as far from the column's right edge as
+  from its left: around the row alone it sat off-centre. A call whose result
+  comes sooner is never revealed, so it never shows one, as its row never
+  opens. This applies to every tool, not only `bash`. The live row's gutter
+  bar goes; a streaming reply keeps its own.
 - **While the lane runs, a short line pulses at the end of the column's
   content**, centred, after the streaming reply and before the messages
   waiting for the lane: where the next text will appear (`.working-line`).

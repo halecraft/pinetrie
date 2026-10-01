@@ -354,13 +354,19 @@
       .tool[open] > summary:has(.tool-label-whole) .tool-label { display: none; }
       .tool[open] > summary .tool-label-whole { display: inline-block; }
       .tool.live { opacity: .85; }
-      /* A command the work opened, still running: an outline, which takes no
-         layout, so the column does not move when it comes or goes. A call that
-         ends within REVEAL_MS is never revealed, so it never shows one. */
-      .tool.live[data-revealed] { outline: 1px solid transparent; outline-offset: 3px;
-        border-radius: 3px; animation: tool-working 1.2s ease-in-out infinite; }
-      @keyframes tool-working { 0%, 100% { outline-color: rgb(232 192 122 / .3); }
-        50% { outline-color: rgb(232 192 122 / .9); } }
+      /* A command the work opened, still running: a ring, absolutely placed, so
+         it takes no layout and the column does not move when it comes or goes.
+         A call that ends within REVEAL_MS is never revealed, so it never shows
+         one. The ring reaches 1rem past the row's right edge, into the gutter
+         .column-body keeps for → (1.75rem, against .75rem on the left), so it
+         sits as far from the column's right edge as from its left. */
+      .tool.live[data-revealed] { position: relative; }
+      .tool.live[data-revealed]::after { content: ""; position: absolute;
+        inset: -4px calc(-1rem - 4px) -4px -4px; border: 1px solid transparent;
+        border-radius: 3px; pointer-events: none;
+        animation: tool-working 1.2s ease-in-out infinite; }
+      @keyframes tool-working { 0%, 100% { border-color: rgb(232 192 122 / .3); }
+        50% { border-color: rgb(232 192 122 / .9); } }
       /* Where the agent's next text will appear, while its lane runs. Zero
          height, so its margins collapse through it: as the content's last
          child or between two messages, it leaves the gap, and the height the

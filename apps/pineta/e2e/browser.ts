@@ -3155,11 +3155,32 @@ try {
             revealed,
             (row, c) => {
               const line = document.querySelector(`${c} .working-line`)
-              const s = getComputedStyle(row)
+              const s = getComputedStyle(row, "::after")
+              // The ring's box, from the row's and its resolved insets, against
+              // the column's: as far from its right edge as from its left.
+              const r = row.getBoundingClientRect()
+              // Its inner box: a classic scrollbar is not the column's edge,
+              // and the Mac's overlay one takes no width.
+              const scroller = row.closest(".column-body")
+              const box = scroller?.getBoundingClientRect()
+              const body =
+                scroller === null || scroller === undefined || box === undefined
+                  ? undefined
+                  : {
+                      left: box.left + scroller.clientLeft,
+                      right:
+                        box.left + scroller.clientLeft + scroller.clientWidth,
+                    }
+              const left = r.left + Number.parseFloat(s.left)
+              const right = r.right - Number.parseFloat(s.right)
               return {
-                outline: s.outlineStyle,
-                colour: s.outlineColor,
+                outline: s.borderTopStyle,
+                colour: s.borderTopColor,
                 line: line === null ? null : getComputedStyle(line).visibility,
+                margins:
+                  body === undefined
+                    ? null
+                    : { left: left - body.left, right: body.right - right },
               }
             },
             col(0),
@@ -3188,7 +3209,7 @@ try {
             }
             for (const row of document.querySelectorAll(`${c} .tool.live`)) {
               w.__frames.live++
-              if (getComputedStyle(row).outlineStyle !== "none")
+              if (getComputedStyle(row, "::after").content !== "none")
                 w.__frames.outlined++
             }
             requestAnimationFrame(sample)
@@ -3220,11 +3241,13 @@ try {
             slow?.outline === "solid" &&
             slow.colour !== "rgba(0, 0, 0, 0)" &&
             slow.line === "hidden" &&
+            slow.margins !== null &&
+            Math.abs(slow.margins.left - slow.margins.right) <= 1 &&
             fast.line > 0 &&
             fast.live > 0 &&
             fast.hidden === 0 &&
             fast.outlined === 0,
-          `a running command the work opened is outlined and hides the line; a fast one does neither (${JSON.stringify({ slow, fast })})`,
+          `a running command the work opened is outlined, centred in its column, and hides the line; a fast one does neither (${JSON.stringify({ slow, fast })})`,
         )
       }
 
