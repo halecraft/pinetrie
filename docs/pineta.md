@@ -243,6 +243,17 @@ extensions' providers are applied). Replies and tool output are one kind of
 stream, written as text edits; pi's checkpoints are stored the same way. Stop
 ends a thread's turn. The session persists in `.pineta/pineta.db`.
 
+**ADR-0060 — takes stack on an integration line; the repo is the ledger**
+(accepted; not built). A take moves one bookmark forward to the offer,
+never your `@`: the line (`pineta-onto`, immutable) or a `wip/` bookmark a
+thread forked from, each named on the take button; only a clean offer
+lands on the line. A thread's base is the line, or a WIP chosen at its
+first message (a copy of it, so the WIP stays mutable); "bring up to date"
+is always with that base. Pineta keeps what it needs as trailers on the
+commits it makes, and finds yours by ancestry and change id; the session
+document becomes a cache. It answers S73 and S74, and replaces
+ADR-0038's take, offer start and `pineta.have`.
+
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold
