@@ -121,15 +121,15 @@ export function railItems<I extends { readonly ids: readonly string[] }>(
   })
 }
 
-/** What `railBands` reads of a rail item: where it is drawn, and its messages. */
-export interface BandItem {
+/** What `railView` reads of a rail item: where it is drawn, and its messages. */
+export interface ViewItem {
   readonly slot: number
   readonly span: number
   readonly track: number
   readonly ids: readonly string[]
 }
 
-/** A part of a column's view on the rail, in slots: a dot's centre is its slot. */
+/** Whole rail items a column's view touches, in slots: a dot's centre is its slot. */
 export interface Band {
   readonly track: number
   readonly top: number
@@ -137,41 +137,92 @@ export interface Band {
 }
 
 /**
+ * Where in a capsule a column's view is, when it shows only part of it: the
+ * capsule, and how far down it the view's top and bottom are (0 to 1).
+ */
+export interface Tick {
+  readonly track: number
+  readonly slot: number
+  readonly span: number
+  readonly from: number
+  readonly to: number
+}
+
+export interface RailView {
+  readonly bands: readonly Band[]
+  readonly ticks: readonly Tick[]
+  /**
+   * Where the view's edges are, in slots, a capsule's messages each an equal
+   * slice of it: what the rail keeps in view. Null when the rail draws none
+   * of its messages.
+   */
+  readonly extent: { readonly top: number; readonly bottom: number } | null
+}
+
+/**
  * Where a column's view lies on the rail (ADR-0058): `ids`, the messages from
  * the view's top edge to its bottom edge, `first` and `last` how far into the
- * first and the last the edges are. A dot is drawn whole; a capsule gives
- * each of its messages an equal slice of its length, as `pickAt` reads it, so
- * the edges cut it where they are. Messages in a row on one track make one
- * band, whatever other tracks draw beside them. Messages the rail does not
- * draw are left out.
+ * first and the last the edges are.
+ *
+ * The bands are whole items, so an outline only ever wraps a dot or a capsule
+ * entire, and keeps their shape: messages in a row on one track make one
+ * band, whatever other tracks draw beside them. A capsule the view shows only
+ * part of gets a tick at that part, each of its messages an equal slice of
+ * it, as `pickAt` reads it: a fraction of a capsule can be less than a pixel,
+ * and stretched into an outline it would match no shape on the rail.
+ * Messages the rail does not draw are left out.
  */
-export function railBands(
-  itemOf: ReadonlyMap<string, BandItem>,
+export function railView(
+  itemOf: ReadonlyMap<string, ViewItem>,
   ids: readonly string[],
   first: number,
   last: number,
-): readonly Band[] {
+): RailView {
   const bands: Band[] = []
+  const parts = new Map<ViewItem, { from: number; to: number }>()
+  const tops: number[] = []
+  const bottoms: number[] = []
   for (const [n, id] of ids.entries()) {
     const item = itemOf.get(id)
     if (item === undefined) continue
     const top = item.slot - 0.5
-    let from = top
-    let to = top + item.span
-    if (item.ids.length > 1) {
-      const k = item.ids.indexOf(id)
-      const slice = item.span / item.ids.length
-      from = top + slice * (k + (n === 0 ? first : 0))
-      to = top + slice * (k + (n === ids.length - 1 ? last : 1))
-    }
+    const bottom = top + item.span
     const at = bands.at(-1)
     if (at !== undefined && at.track === item.track)
       bands[bands.length - 1] = {
         track: at.track,
-        top: Math.min(at.top, from),
-        bottom: Math.max(at.bottom, to),
+        top: Math.min(at.top, top),
+        bottom: Math.max(at.bottom, bottom),
       }
-    else bands.push({ track: item.track, top: from, bottom: to })
+    else bands.push({ track: item.track, top, bottom })
+    const k = item.ids.indexOf(id)
+    const from = (k + (n === 0 ? first : 0)) / item.ids.length
+    const to = (k + (n === ids.length - 1 ? last : 1)) / item.ids.length
+    // A dot is whole; a capsule is cut where the edges are.
+    const exact =
+      item.ids.length > 1
+        ? { top: top + from * item.span, bottom: top + to * item.span }
+        : { top, bottom }
+    tops.push(exact.top)
+    bottoms.push(exact.bottom)
+    const was = parts.get(item)
+    parts.set(item, {
+      from: Math.min(was?.from ?? from, from),
+      to: Math.max(was?.to ?? to, to),
+    })
   }
-  return bands
+  const ticks: Tick[] = []
+  for (const [item, part] of parts)
+    if (item.ids.length > 1 && (part.from > 0 || part.to < 1))
+      ticks.push({
+        track: item.track,
+        slot: item.slot,
+        span: item.span,
+        ...part,
+      })
+  const extent =
+    tops.length === 0
+      ? null
+      : { top: Math.min(...tops), bottom: Math.max(...bottoms) }
+  return { bands, ticks, extent }
 }

@@ -226,12 +226,27 @@ export interface ViewportStore {
   subscribe(listener: () => void): () => void
 }
 
+/** Whether a column's view is unchanged: the same messages, edges and colour. */
+export const sameViewport = (
+  a: ColumnViewport | undefined,
+  b: ColumnViewport,
+): boolean =>
+  a !== undefined &&
+  a.track === b.track &&
+  a.ids.length === b.ids.length &&
+  a.ids[0] === b.ids[0] &&
+  a.ids.at(-1) === b.ids.at(-1) &&
+  Math.abs(a.first - b.first) < 0.01 &&
+  Math.abs(a.last - b.last) < 0.01
+
 export function viewportStore(): ViewportStore {
   let now: Viewports = { columns: new Map(), moved: null }
   const listeners = new Set<() => void>()
   return {
     get: () => now,
     set: (key, view) => {
+      // A column measured again, unmoved, is not the one moved last.
+      if (view !== null && sameViewport(now.columns.get(key), view)) return
       const columns = new Map(now.columns)
       if (view === null) {
         if (!columns.delete(key)) return

@@ -293,10 +293,10 @@ the tree.
 - **Activity shows in the rail**: a pulsing dot where the agent is replying, a
   mark where a branch has messages you have not read.
 - **The rail outlines what each column shows** (ADR-0058): a rounded outline
-  in the column's colour around the dots in its view, cut where its view's
-  edges fall in a capsule. It moves as the column scrolls, and the rail
-  scrolls to keep the outline of the column you move in view, except while
-  your pointer is over the rail.
+  in the column's colour around the whole dots and capsules in its view, and
+  a tick across a capsule it shows only part of, at that part. Both move as
+  the column scrolls, and the rail scrolls to keep the view of the column you
+  move in view, except while your pointer is over the rail.
 
 The rail is E; the column is T. Seeing both at once is the product.
 

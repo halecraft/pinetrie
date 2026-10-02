@@ -8,6 +8,7 @@ import {
   sameSpan,
   spotFor,
   spotOf,
+  viewportStore,
   visibleSpan,
 } from "./viewport.ts"
 
@@ -134,4 +135,21 @@ test("railScroll: brings a band into view, unless the reader just scrolled the r
   )
   // The reader scrolled the rail a moment ago.
   expect(railScroll({ top: 400, bottom: 500 }, view, still - 1)).toBeNull()
+})
+
+test("viewportStore: the rail follows the column that moved, not one measured again unmoved", () => {
+  const store = viewportStore()
+  let heard = 0
+  store.subscribe(() => heard++)
+  const at = (first: number) => ({ track: 0, ids: ["a", "b"], first, last: 1 })
+  store.set("left", at(0))
+  store.set("right", at(0))
+  store.set("left", at(0.5))
+  // The right column's measuring runs again, and nothing changed.
+  store.set("right", at(0))
+  expect(store.get().moved).toBe("left")
+  expect(heard).toBe(3)
+  store.set("left", null)
+  expect(store.get().moved).toBeNull()
+  expect([...store.get().columns.keys()]).toEqual(["right"])
 })

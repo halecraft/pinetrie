@@ -297,8 +297,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the rail's tree sits against its left edge",
     file: "packages/client/index.html",
-    from: "      .rail-tree { position: relative; width: fit-content; margin: 0 auto; }",
-    to: "      .rail-tree { position: relative; width: fit-content; }",
+    from: "      .rail-tree { position: relative; width: fit-content; margin: 0 auto; isolation: isolate; }",
+    to: "      .rail-tree { position: relative; width: fit-content; isolation: isolate; }",
     suite: "browser",
     scenario: "page",
     expect: "one track's dots are centred in the rail",
@@ -1346,6 +1346,16 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect: "the rail holds still while the pointer is over it",
+  },
+  {
+    name: "the rail draws no tick",
+    file: "packages/client/rail.tsx",
+    from: "      {ticks.map(t => (",
+    to: "      {ticks.slice(0, 0).map(t => (",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a view in part of a capsule outlines the capsule whole, with a tick across it",
   },
   {
     name: "a column leaving keeps no spot",

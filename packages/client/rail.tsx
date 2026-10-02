@@ -32,14 +32,14 @@ import { askWords, workWords } from "./ask-words.ts"
 import { CardPip } from "./card-pip.tsx"
 import { nameFor } from "./presence.tsx"
 import {
-  type Band,
   pickAt,
-  railBands,
   railItems,
   railKeep,
+  railView,
   type StretchFill,
   stretchFill,
   stretchWords,
+  type Tick,
 } from "./rail-view.ts"
 import type { SessionClient } from "./session-view.ts"
 import { useReadingAt } from "./use-presence.ts"
@@ -154,9 +154,6 @@ export function Rail({
             )
           })}
         </svg>
-        {viewports !== undefined && (
-          <RailViewport itemOf={itemOf} store={viewports} />
-        )}
         {/* Dots and capsules are buttons over the drawing, so they are
           reachable by keyboard and read as controls. */}
         {railItems(items, { open, yours }).map(([it, marks]) =>
@@ -186,6 +183,11 @@ export function Rail({
             />
           ),
         )}
+        {/* After the dots: its ticks lie over the capsules, its outlines
+          under everything (`.rail-view`'s z-index). */}
+        {viewports !== undefined && (
+          <RailViewport itemOf={itemOf} store={viewports} />
+        )}
       </div>
     </nav>
   )
@@ -193,19 +195,27 @@ export function Rail({
 
 /** An outline's width: a dot's, and a little room either side. */
 const OUTLINE = 14
-/** An outline's least height, in slots: a few messages of a capsule still show. */
-const OUTLINE_MIN = 0.75
+/** A tick's width: wider than a capsule, so its ends show on any fill. */
+const TICK = 12
 
-/** A band at least `OUTLINE_MIN` tall, grown about its middle. */
-const atLeast = (b: Band): Band => {
-  const grow = Math.max(0, OUTLINE_MIN - (b.bottom - b.top)) / 2
-  return { ...b, top: b.top - grow, bottom: b.bottom + grow }
+/** Where a tick is drawn, in px: on its capsule's box, at least 2 px tall. */
+const tickBox = (t: Tick): { top: number; height: number } => {
+  const top = y(t.slot) - ROW / 2 + 2
+  const length = t.span * ROW - 4
+  const height = Math.max(2, (t.to - t.from) * length)
+  return {
+    top: Math.min(top + t.from * length, top + length - height),
+    height,
+  }
 }
 
 /**
- * What each column shows, outlined on the rail in its colour (`railBands`,
- * ADR-0058), under the dots. It reads the columns' views itself, so a scroll
- * redraws the outlines alone. The rail follows the column moved last: it
+ * What each column shows, on the rail in its colour (`railView`, ADR-0058):
+ * an outline around the whole dots and capsules in its view, under them, and
+ * a tick across a capsule it shows only part of, over it. It reads the
+ * columns' views itself, so a scroll redraws these alone. The rail follows
+ * the view's own extent, not its outline: a capsule outlined whole can be
+ * far taller than what is in view. The rail follows the column moved last: it
  * scrolls when that column's outline leaves its view (`railScroll`), unless
  * the reader has just scrolled the rail.
  */
@@ -217,11 +227,19 @@ function RailViewport({
   store: ViewportStore
 }) {
   const views = useSyncExternalStore(store.subscribe, store.get)
-  const outlines = [...views.columns].flatMap(([key, v]) =>
-    railBands(itemOf, v.ids, v.first, v.last).map(
-      (b, n) =>
-        ({ key, n, color: trackColor(v.track), ...atLeast(b) }) as const,
-    ),
+  const drawn = [...views.columns].map(
+    ([key, v]) =>
+      ({
+        key,
+        color: trackColor(v.track),
+        ...railView(itemOf, v.ids, v.first, v.last),
+      }) as const,
+  )
+  const outlines = drawn.flatMap(({ key, color, bands }) =>
+    bands.map((b, n) => ({ key, n, color, ...b }) as const),
+  )
+  const ticks = drawn.flatMap(({ key, color, ticks }) =>
+    ticks.map((t, n) => ({ key, n, color, ...t }) as const),
   )
   const anchor = useRef<HTMLSpanElement>(null)
   // The rail's own scroll: where it last put it, and when the reader last
@@ -252,7 +270,7 @@ function RailViewport({
       rail.removeEventListener("pointerleave", leave)
     }
   }, [])
-  const followed = outlines.filter(o => o.key === views.moved)
+  const followed = drawn.find(d => d.key === views.moved)?.extent ?? null
   // Only when a column's view moves: a redraw of the rail for anything else
   // leaves its scroll where the reader put it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the views change
@@ -261,11 +279,10 @@ function RailViewport({
     const rail = tree?.closest<HTMLElement>(".rail")
     if (tree === null || tree === undefined) return
     if (rail === null || rail === undefined) return
-    const [first] = followed
-    if (first === undefined) return
+    if (followed === null) return
     const band = {
-      top: tree.offsetTop + y(first.top),
-      bottom: tree.offsetTop + Math.max(...followed.map(o => y(o.bottom))),
+      top: tree.offsetTop + y(followed.top),
+      bottom: tree.offsetTop + y(followed.bottom),
     }
     const since = over.current ? 0 : performance.now() - reader.current
     const to = railScroll(band, rail, since)
@@ -289,6 +306,23 @@ function RailViewport({
             height: (o.bottom - o.top) * ROW,
             borderColor: o.color,
             background: `color-mix(in srgb, ${o.color} 10%, transparent)`,
+          }}
+        />
+      ))}
+      {ticks.map(t => (
+        <span
+          aria-hidden
+          className="rail-tick"
+          data-key={t.key}
+          data-track={t.track}
+          key={`${t.key}-${t.n}`}
+          style={{
+            left: x(t.track) - TICK / 2,
+            width: TICK,
+            ...tickBox(t),
+            background: t.color,
+            // A dark edge, so it shows on a capsule filled in its colour.
+            boxShadow: `0 0 0 1px ${PANEL}`,
           }}
         />
       ))}

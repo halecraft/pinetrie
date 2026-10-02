@@ -28,17 +28,27 @@ first (and how far into it the view's top is) to the last.
   message: the view's top in it is past the message above it, and the span
   covers the folded messages between.
 - **The rail outlines each column's span** in that column's colour: a
-  rounded outline around the dots in view, with a faint fill, under them
-  (`railBands`, `packages/client/rail-view.ts`). A dot is outlined whole; a
-  capsule is cut where the view's edges fall in it, each of its messages an
-  equal slice, as a click on it reads it (`pickAt`). A column whose path
-  changes track at a fork has one outline per track.
+  rounded outline around the whole dots and capsules in view, with a faint
+  fill, under them (`railView`, `packages/client/rail-view.ts`). A column
+  whose path changes track at a fork has one outline per track.
+- **A capsule the view shows only part of gets a tick** across it, over it,
+  in the column's colour with a dark edge, wider than the capsule: from where
+  the view's top falls in it to where its bottom does, each of its messages an
+  equal slice, as a click on it reads it (`pickAt`), and at least 2 px tall.
+  The outline says which items; the tick says where in one. *Amended in
+  review:* the outline first cut the capsule itself, and stretched to a
+  least height. A capsule holds up to 999 messages in four rows, so a view of
+  one message was a sliver, stretched into a 12 px box: neither a dot's
+  shape nor a capsule's, and hanging past the capsule's end.
 - **Only the outlines read the views.** Columns write a `ViewportStore`
   made once in `App`, and `RailViewport` reads it with
   `useSyncExternalStore`, so a scroll redraws neither a column nor the
   rail's dots.
 - **The rail follows the column moved last**, scrolling only when that
-  column's outline leaves its view (`railScroll`). It holds still while the
+  column's view leaves the rail's: its `extent`, where its edges fall, cut
+  in capsules as the tick is, not its outline, which can be a whole capsule
+  far taller (`railScroll`). A column measured again, unmoved, is not one
+  moved (`sameViewport`). It holds still while the
   pointer is over it, and for `RAIL_HOLD_MS` after the reader scrolls it or
   the pointer leaves it. It moves only when a column's view does: a redraw of
   the rail for anything else leaves its scroll alone.
@@ -77,6 +87,12 @@ first (and how far into it the view's top is) to the last.
   drawn in that colour, so the dots and the line inside it would not show.
 - One horizontal line across the rail at the view's top: it says how far
   down but not on which track, and has to choose a column.
+- An outline cut at the view's edges inside a capsule (the first version):
+  a few messages of a long capsule are under a pixel.
+- A bracket beside the track: it needs room between tracks, widening the
+  rail.
+- Opening the capsule into dots where the view is: the rail's shape would
+  change under the eye as a column scrolls, and every frame would redraw it.
 - Dimming every dot not in view: the rail's other signals (rings, pips,
   pulses) would dim with them, and it cannot say which column shows what.
 - Keeping a column's `scrollTop` by its key: wrong once content above it

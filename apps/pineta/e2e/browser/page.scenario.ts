@@ -2068,25 +2068,39 @@ async function run(check: Checks["check"]): Promise<void> {
               `at the top: first ${atTop[0]}, end ${atTop[1]}; at the end: first ${atEnd[0]}, end ${atEnd[1]}`,
             )
 
-            // The rail, shorter than its tree, keeps the outline in view.
+            // The rail, shorter than its tree, keeps the column's view in
+            // view. Column 0's view at its end runs from the trunk's capsule
+            // past the branch's to its tip on the next track, about 100 px:
+            // the rail is taller than that and its margins.
             const short = await lp.addStyleTag({
-              content: ".rail { max-height: 72px }",
+              content: ".rail { max-height: 140px }",
             })
+            // Where the rail is, and whether the dots at the column's start
+            // and its end are in the rail's view: the outline wraps whole
+            // capsules, taller than the view, so the dots say where it is.
             const railAt = () =>
-              lp.evaluate(key => {
-                const rail = document.querySelector(".rail")
-                const o = document.querySelector(
-                  `.rail-view[data-key="${key}"]`,
-                )
-                if (rail === null || o === null) return null
-                const r = rail.getBoundingClientRect()
-                const b = o.getBoundingClientRect()
-                return {
-                  scrollTop: rail.scrollTop,
-                  scrolls: rail.scrollHeight > rail.clientHeight,
-                  inView: b.bottom > r.top && b.top < r.bottom,
-                }
-              }, key0)
+              lp.evaluate(
+                ([start, end]) => {
+                  const rail = document.querySelector(".rail")
+                  if (rail === null) return null
+                  const r = rail.getBoundingClientRect()
+                  const seen = (id: string) => {
+                    const d = document.querySelector(
+                      `.rail-dot[data-entry="${id}"]`,
+                    )
+                    if (d === null) return false
+                    const b = d.getBoundingClientRect()
+                    return b.top >= r.top && b.bottom <= r.bottom
+                  }
+                  return {
+                    scrollTop: rail.scrollTop,
+                    scrolls: rail.scrollHeight > rail.clientHeight,
+                    start: seen(start),
+                    end: seen(end),
+                  }
+                },
+                [ids[0] ?? "", tip0] as const,
+              )
             await scrollTo("top")
             await twoFrames(lp)
             await scrollTo("end")
@@ -2096,7 +2110,8 @@ async function run(check: Checks["check"]): Promise<void> {
               "the rail scrolls to keep a column's outline in view",
               followed?.scrolls === true &&
                 followed.scrollTop > 0 &&
-                followed.inView,
+                followed.end &&
+                !followed.start,
               JSON.stringify(followed),
             )
             // Under the pointer, the rail is the reader's: it holds still.
@@ -2112,7 +2127,7 @@ async function run(check: Checks["check"]): Promise<void> {
               followed !== null &&
                 held !== null &&
                 held.scrollTop === followed.scrollTop &&
-                !held.inView,
+                !held.start,
               `${JSON.stringify(held)} after ${JSON.stringify(followed)}`,
             )
             await lp.mouse.move(600, 10)
@@ -2122,6 +2137,47 @@ async function run(check: Checks["check"]): Promise<void> {
             // height.
             await scrollTo("middle")
             await twoFrames(lp)
+            // Halfway up 30 messages, the view is in a capsule: the outline
+            // wraps it whole, and a tick across it marks the view.
+            const cut = await lp.evaluate(key => {
+              const tick = document.querySelector(
+                `.rail-tick[data-key="${key}"]`,
+              )
+              if (tick === null) return null
+              const t = tick.getBoundingClientRect()
+              const y = t.top + t.height / 2
+              const x = t.left + t.width / 2
+              const capsule = [
+                ...document.querySelectorAll(".rail-stretch"),
+              ].find(c => {
+                const r = c.getBoundingClientRect()
+                return (
+                  r.top <= y && y <= r.bottom && r.left <= x && x <= r.right
+                )
+              })
+              if (capsule === undefined) return { capsule: false }
+              const c = capsule.getBoundingClientRect()
+              const wraps = [
+                ...document.querySelectorAll(`.rail-view[data-key="${key}"]`),
+              ].some(o => {
+                const r = o.getBoundingClientRect()
+                return r.top <= c.top && c.bottom <= r.bottom
+              })
+              return {
+                capsule: true,
+                wraps,
+                inside: t.top >= c.top - 1 && t.bottom <= c.bottom + 1,
+                wider: t.width > c.width,
+              }
+            }, key0)
+            check(
+              "a view in part of a capsule outlines the capsule whole, with a tick across it",
+              cut?.capsule === true &&
+                cut.wraps === true &&
+                cut.inside === true &&
+                cut.wider === true,
+              JSON.stringify(cut),
+            )
             const where = () =>
               lp.$eval(
                 body0,

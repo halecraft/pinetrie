@@ -701,13 +701,21 @@ serves the rail's outline and the column's spot.
   `ViewportStore` only when `sameSpan` says the span moved.
 - **Only `RailViewport` reads the store** (`rail.tsx`, with
   `useSyncExternalStore`), so a scroll redraws the outlines alone, not a
-  column and not the rail's dots. `railBands` turns a column's ids and
-  edges into one band per track; a capsule is sliced as `pickAt` reads it.
-  An outline is at least `OUTLINE_MIN` slots tall, or a few messages of a
-  long capsule would be a sliver.
+  column and not the rail's dots. `railView` turns a column's ids and
+  edges into bands, one per track, of whole items, so an outline keeps the
+  shape of what it wraps; ticks, for each capsule shown in part, sliced as
+  `pickAt` reads it; and the `extent` the rail keeps in view.
+- **Outlines are under the dots and ticks over them**: `RailViewport` is
+  drawn after the dots, `.rail-view` has `z-index: -1` and `.rail-tick`
+  `1`, and `.rail-tree` is `isolation: isolate`, so the outline's -1
+  stays inside the tree. A tick is wider than a capsule, with a dark edge:
+  on a capsule filled in the column's colour, those are what show.
 - **The rail follows `moved`**, the column whose view changed last, in a
   layout effect that runs only when the views change: a redraw for
-  presence or a new message leaves the rail's scroll alone. `railScroll`
+  presence or a new message leaves the rail's scroll alone. The store
+  ignores a write that changes nothing (`sameViewport`): a column's
+  measuring runs again whenever its effect does, and would take `moved`
+  from the column the reader scrolls. `railScroll`
   holds while the pointer is over the rail and for `RAIL_HOLD_MS` after
   the reader scrolls it or the pointer leaves. The rail's own scroll is told
   from the reader's by the `scrollTop` it last set.
@@ -725,8 +733,8 @@ serves the rail's outline and the column's spot.
   root's newest path, and its spot, saved as you go back to the tab, would
   replace the tab's columns' own. Its column still measures, and its rail
   draws its outline.
-- **Selectors:** `.rail-view[data-key][data-track]`, one per band, keyed by
-  its column. The browser suite tests "around a dot" over every outline of
+- **Selectors:** `.rail-view[data-key][data-track]`, one per band, and
+  `.rail-tick[data-key][data-track]`, keyed by their column. The browser suite tests "around a dot" over every outline of
   a column: a column's view can lie on two tracks.
 
 ## Moving columns (`reorder.ts`, `use-column-drag.ts`)
