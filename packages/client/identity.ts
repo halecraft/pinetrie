@@ -11,8 +11,10 @@
 // difference goes.
 
 import { handleOf, normalizeEmail, normalizeName } from "@pineta/core"
+import type { Outcome } from "@pineta/protocol/codec"
 import { Type } from "typebox"
 import { Value } from "typebox/value"
+import { failedWords } from "./send.ts"
 import type { Codec } from "./tab-state.ts"
 
 export interface Identity {
@@ -78,6 +80,23 @@ export function planRename(
   const name = normalizeName(draft)
   if (name === undefined) return { kind: "refuse" }
   return name === current ? { kind: "unchanged" } : { kind: "send", name }
+}
+
+/**
+ * What the profile form shows for the host's answer to a rename: a refusal's
+ * code and reason, a failure in `failedWords`, or null when the rename took.
+ */
+export function renameProblem(
+  outcome: Outcome,
+): { readonly code: string; readonly message: string } | null {
+  switch (outcome.kind) {
+    case "refused":
+      return { code: outcome.code, message: outcome.message }
+    case "failed":
+      return { code: "failed", message: failedWords(outcome.message) }
+    default:
+      return null
+  }
 }
 
 /** The handle a typed name gives you, or null when the name is refused. */

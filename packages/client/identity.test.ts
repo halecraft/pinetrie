@@ -1,3 +1,4 @@
+import { ERR } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   identityCodec,
@@ -5,7 +6,9 @@ import {
   parseIdentity,
   planRename,
   reconcileName,
+  renameProblem,
 } from "./identity.ts"
+import { failedWords } from "./send.ts"
 
 describe("identity (ADR-0037)", () => {
   test("the form's input is normalized, or names the field that is not usable", () => {
@@ -67,6 +70,21 @@ describe("identity (ADR-0037)", () => {
     ]
     for (const [draft, current, plan] of rows)
       expect(planRename(draft, current)).toEqual(plan)
+  })
+
+  test("a rename the host refused or failed shows why; one that took shows nothing", () => {
+    expect(
+      renameProblem({
+        kind: "refused",
+        code: ERR.INVALID_NAME,
+        message: "too long",
+      }),
+    ).toEqual({ code: ERR.INVALID_NAME, message: "too long" })
+    expect(renameProblem({ kind: "failed", message: "store closed" })).toEqual({
+      code: "failed",
+      message: failedWords("store closed"),
+    })
+    expect(renameProblem({ kind: "named" })).toBeNull()
   })
 
   test("the hint is the handle a typed name gives, or none for a refused name", () => {

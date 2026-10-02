@@ -542,8 +542,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the profile's save closes without renaming",
     file: "packages/client/profile.tsx",
-    from: "                const outcome = await rename(plan.name)",
-    to: '                const outcome: Outcome = { kind: "named" }',
+    from: "                const problem = renameProblem(await rename(plan.name))",
+    to: '                const problem = renameProblem({ kind: "named" })',
     suite: "browser",
     scenario: "page",
     expect:

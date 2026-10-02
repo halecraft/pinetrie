@@ -9,11 +9,10 @@
 import type { WriterId } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
 import { useState } from "react"
-import { planRename } from "./identity.ts"
+import { planRename, renameProblem } from "./identity.ts"
 import { NAME_PROBLEM, NameInput, type NameProblem } from "./name-input.tsx"
 import { Popover } from "./popover.tsx"
 import { Initial, nameFor } from "./presence.tsx"
-import { failedWords } from "./send.ts"
 
 export interface Me {
   readonly writer: WriterId
@@ -75,16 +74,9 @@ export function Profile({
                 return
               }
               if (plan.kind === "send") {
-                const outcome = await rename(plan.name)
-                if (outcome.kind === "refused") {
-                  setProblem({ code: outcome.code, message: outcome.message })
-                  return
-                }
-                if (outcome.kind === "failed") {
-                  setProblem({
-                    code: "failed",
-                    message: failedWords(outcome.message),
-                  })
+                const problem = renameProblem(await rename(plan.name))
+                if (problem !== null) {
+                  setProblem(problem)
                   return
                 }
               }

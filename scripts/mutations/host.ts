@@ -304,8 +304,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a throwing command gets no reply",
     file: "apps/pineta/host/commands/index.ts",
-    from: '      outcome = { kind: "failed", message: messageOf(error) }',
-    to: "      throw error",
+    from: '        return { kind: "failed", message: messageOf(error) }',
+    to: "        throw error",
     command: unit,
     expect: "a command that throws is answered failed",
   },

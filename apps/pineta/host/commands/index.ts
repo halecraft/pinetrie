@@ -66,15 +66,14 @@ export function createCommands(deps: CommandDeps): Commands {
     wire: WireCommand,
   ): Promise<void> {
     const id = typeof wire.id === "string" ? wire.id : ""
-    let outcome: Outcome
-    try {
-      outcome = await outcomeOf(writer, wire, id)
-    } catch (error) {
-      const kind = typeof wire.kind === "string" ? wire.kind : "malformed"
-      failed(deps.basics, `a ${kind} command`)(error)
-      outcome = { kind: "failed", message: messageOf(error) }
-    }
-    // Sent here alone, outside the try: a send that throws gets no second reply.
+    const outcome = await outcomeOf(writer, wire, id).catch(
+      (error: unknown): Outcome => {
+        const kind = typeof wire.kind === "string" ? wire.kind : "malformed"
+        failed(deps.basics, `a ${kind} command`)(error)
+        return { kind: "failed", message: messageOf(error) }
+      },
+    )
+    // Sent here alone, after the catch: a send that throws gets no second reply.
     sender.send(encodeOutcome(id, outcome))
   }
 

@@ -1628,4 +1628,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "every lane id this client mints is one the host accepts",
   },
+  {
+    name: "a failed rename closes the profile form",
+    file: "packages/client/identity.ts",
+    from: '      return { code: "failed", message: failedWords(outcome.message) }',
+    to: "      return null",
+    command: unit,
+    expect: "a rename the host refused or failed shows why",
+  },
 ]

@@ -828,7 +828,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   error's message. The card keeps its text (`spends` is false), as for a
   refusal, but `failedWords` never says "not sent": the host may have written
   the message before it failed. The profile form words a failed rename with
-  the same function.
+  the same function, through `renameProblem` (`identity.ts`).
 - **Waiting messages** from `pineta.outbox` show dimmed in their column, in the
   order they will be taken. They are not in the tree yet.
 
