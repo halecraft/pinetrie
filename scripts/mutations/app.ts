@@ -1091,13 +1091,14 @@ export const mutations: readonly Mutation[] = [
     expect: "a closed column's entry is deleted from others' view",
   },
   {
-    name: "the host registers no write policy",
-    file: "apps/pineta/host/index.ts",
-    from: "  exchange.register(writePolicy)",
-    to: "  void writePolicy",
+    name: "a client declares no writers",
+    file: "packages/client/session-view.ts",
+    from: "  exchange.register(writersPolicy)",
+    to: "  void writersPolicy",
     suite: "host",
     scenario: "presence",
-    expect: "a client's direct write to the session is refused by the host",
+    expect:
+      "a client cannot write the session: its write is refused before it is made, and the host's copy is unchanged",
   },
   {
     name: "the agent writes into another document",
@@ -1408,14 +1409,14 @@ export const mutations: readonly Mutation[] = [
       "an unqueue the take got to first is refused as gone, and its client says it was sent",
   },
   {
-    name: "the host accepts a client's write to the places",
-    file: "apps/pineta/host/policy.ts",
-    from: "  if (docId === SESSION_DOC_ID || docId === PLACES_DOC_ID) return false",
-    to: "  if (docId === SESSION_DOC_ID) return false",
+    name: "anyone may write the places",
+    file: "packages/protocol/writers.ts",
+    from: "    return principal === HOST_PRINCIPAL\n",
+    to: "    return undefined\n",
     suite: "host",
     scenario: "cards",
     expect:
-      "a client's write to the places is refused: the host's copy is unchanged",
+      "a client cannot write the places: its write is refused before it is made, and the host's copy is unchanged",
   },
   // ── your inventory (ADR-0048 step 4) ──
   {

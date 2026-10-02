@@ -6,7 +6,8 @@
   "exports": {
     "./messages": "./messages.ts",
     "./codec": "./codec.ts",
-    "./line": "./line.ts"
+    "./line": "./line.ts",
+    "./writers": "./writers.ts"
   },
   "dependencies": {
     "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",

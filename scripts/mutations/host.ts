@@ -385,14 +385,6 @@ export const mutations: readonly Mutation[] = [
       "acceptsWrite: the session and the places are the host's; presence is each client's",
   },
   {
-    name: "the host accepts session writes",
-    file: "apps/pineta/host/policy.ts",
-    from: "  if (docId === SESSION_DOC_ID || docId === PLACES_DOC_ID) return false",
-    to: "  if (docId === PLACES_DOC_ID) return false",
-    command: unit,
-    expect: "acceptsWrite: the session and the places are the host's",
-  },
-  {
     name: "the host shares every command Line with every client",
     file: "apps/pineta/host/policy.ts",
     from: "      : (routeLine(docId, peer) ?? holdsInventory(docId, peer.principal)),",
@@ -732,11 +724,11 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the policy shares every inventory with everyone",
-    file: "apps/pineta/host/policy.ts",
+    file: "packages/protocol/writers.ts",
     from: "    : writerOfPrincipal(principal) === holder",
     to: "    : true",
     command: unit,
-    expect: "an inventory is shared with, and taken from, its person only",
+    expect: "an inventory is shared with its person only",
   },
   {
     name: "resolveDoc leaves an inventory to Kyneta's default",
@@ -906,14 +898,6 @@ export const mutations: readonly Mutation[] = [
     // tsc names no failing check (`failingChecks`): with typecheck clean,
     // any error is the mutant's.
     command: ["pnpm", "exec", "tsc", "--noEmit"],
-  },
-  {
-    name: "the host accepts a client's write to the places (unit)",
-    file: "apps/pineta/host/policy.ts",
-    from: "  if (docId === SESSION_DOC_ID || docId === PLACES_DOC_ID) return false",
-    to: "  if (docId === SESSION_DOC_ID) return false",
-    command: unit,
-    expect: "acceptsWrite: the session and the places are the host's",
   },
   {
     name: "a removal leaves the places document's rev behind",

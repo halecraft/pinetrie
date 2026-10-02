@@ -171,12 +171,22 @@ it out, each step in its own `try`: `intake` (seats, control), `close` (the host
   `serial.run` behind the move's own step.
 - **Your inventory is a client's document the host only keeps**
   (ADR-0059). `resolveDoc` interprets `inventory:<writer>` as
-  `InventoryDoc`; the policy shares it with, and accepts it from, only the
-  peers whose principal is that writer (`holdsInventory`). Kyneta fires
+  `InventoryDoc`; the policy shares it only with the peers whose principal
+  is that writer (`holdsInventory`), and who may write it is the
+  protocol's (`writersPolicy`, below). Kyneta fires
   `resolve` only for a peer `canShare` grants (S76), so nobody else can
   create someone's inventory. The host never writes one: it decides only
   whose inventory a card is in, and refuses a nineteenth card without
   knowing the slots.
+- **Who may write a document is declared once, on every peer**
+  (`writersPolicy`, `@pineta/protocol/writers`, Kyneta's `canWrite`): the
+  session and the places only the host; an inventory its person, and the
+  host, which relays it between that person's tabs (Kyneta judges the
+  sender, not the author). The host registers it beside `hostPolicy`, and
+  `connectSession` on every client, so a client's write to a document it
+  may not write throws before it is made, rather than forking its copy
+  (S28, S76). `hostPolicy` keeps what is the host's alone: which peers may
+  hold a document, and which writes it takes from presence and cards.
 
 ## The queue (`take.ts`, ADR-0048, ADR-0055)
 

@@ -356,6 +356,17 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S82 — Kyneta undo stacks on the host, one per seat ✅ PASS
+
+`findings/S82-host-undo-stacks.md`. One stack per seat over a places
+document only the host writes, on Yjs: `undo({ whole: true })` refuses a
+move when someone moved the card since, the row's placer catching a move
+away and back, and undoes a gesture over three cards whole or not at all.
+Without `whole` a dead step is skipped and an older one undone, out of
+sight. `rev` must be raised outside the gesture, `top` names the card but
+not its target, and Yjs places grew about 25 bytes a move, against `json`'s
+none.
+
 ### S81 — An offer conflicted where its lane had resolved a catch-up ✅ PASS
 
 `findings/S81-offer-start-after-a-catch-up.md`. A source taken, then

@@ -30,6 +30,7 @@ import {
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
+import { writersPolicy } from "@pineta/protocol/writers"
 import { readRunning } from "@pineta/reads"
 import {
   cardDocId,
@@ -57,7 +58,7 @@ import { compactSession, sweepBlobs } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { lineDocPrefix } from "./lines.ts"
 import { createNames } from "./names.ts"
-import { resolveDoc, writePolicy } from "./policy.ts"
+import { hostPolicy, resolveDoc } from "./policy.ts"
 import { createSerial } from "./queue.ts"
 import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
@@ -222,9 +223,11 @@ export async function startHost({
 
   // The session document is BOTH pi's storage and the thing we replicate.
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
-  // Clients may write presence and cards' texts, never the session or the
-  // places (host/policy.ts).
-  exchange.register(writePolicy)
+  // Clients may write presence and cards' texts (host/policy.ts); only the
+  // host the session and the places, and only its person an inventory
+  // (`writersPolicy`, registered on every client too).
+  exchange.register(hostPolicy)
+  exchange.register(writersPolicy)
   // Held here so the host relays it between clients (ADR-0024).
   const presence = exchange.get(PRESENCE_DOC_ID, presenceDoc(presenceDecay))
   // Where every card is, which only the host writes (ADR-0059).

@@ -9,7 +9,7 @@ import { readReading, readTyping } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { join, waitFor } from "../harness.ts"
+import { join, refusedWrite, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { sleep } from "./support.ts"
@@ -75,12 +75,16 @@ async function run(check: Checks["check"]): Promise<void> {
     }, 5_000)
     check("a closed column's entry is deleted from others' view", closed >= 0)
     await ada.close()
-    // Clients may not write the session: the host's policy refuses it.
-    batch(bea.doc, d => d.values.set("forged", { value: "bea is the host" }))
+    // Clients may not write the session (`writersPolicy`, on every peer): the
+    // write throws before it is made.
+    const refused = refusedWrite(() =>
+      batch(bea.doc, d => d.values.set("forged", { value: "bea is the host" })),
+    )
     await sleep(500)
     check(
-      "a client's direct write to the session is refused by the host",
-      ph.doc.values.get("forged") === undefined,
+      "a client cannot write the session: its write is refused before it is made, and the host's copy is unchanged",
+      refused && ph.doc.values.get("forged") === undefined,
+      `refused ${refused}`,
     )
     await bea.close()
     await sleep(100)

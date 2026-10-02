@@ -1254,7 +1254,9 @@ pipeline keeps the tree a pure function, testable without a DOM.
 What you type is a card: a record in the places document, which only the
 host writes (ADR-0059), and a `TextDoc` of its own (`session.cardText`),
 which this client writes. The page reads the records as `session.cards`, a
-snapshot store; it never holds the places document itself.
+snapshot store; it never holds the places document itself. `connectSession`
+registers `writersPolicy` (`@pineta/protocol/writers`), so a write to the
+places, the session or someone else's inventory throws before it is made.
 
 - **Every move is a request to the host** (`session-view.ts`): creating a
   card (its text in one undo step, then a `move` from nowhere, then its

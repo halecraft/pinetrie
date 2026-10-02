@@ -4,8 +4,9 @@
 // record, here, says where it is and whose it is. A place does not merge
 // (S75), so the host writes this document alone, in arrival order, through
 // handoffs it applies or refuses. It is `json`, like the session: one
-// writer, compacted. A client never writes it: the host refuses the write,
-// and the writer's copy then keeps its own value for good (S28, S76).
+// writer, compacted. A client cannot write it: every peer declares the host
+// its only writer (`writersPolicy`), so a client's write throws before it is
+// made, where it would otherwise fork that client's copy for good (S28, S76).
 
 import {
   type BoundSchema,

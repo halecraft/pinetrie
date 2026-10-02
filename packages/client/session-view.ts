@@ -3,9 +3,15 @@
 // Runs unmodified in a browser AND in Node (the e2e check), because the only
 // environment-specific value is the WebSocket constructor. No pi.
 
-import { createUndoStack, Exchange, sync, whenPeer } from "@kyneta/exchange"
+import {
+  createUndoStack,
+  Exchange,
+  sync,
+  type Undone,
+  whenPeer,
+} from "@kyneta/exchange"
 import type { UndoTarget } from "@kyneta/react"
-import { batch, subscribe } from "@kyneta/schema"
+import { batch, type CommitOptions, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 
 import {
@@ -41,12 +47,12 @@ import {
   type Reply,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
+import { inventoryDocId, writersPolicy } from "@pineta/protocol/writers"
 import { readPlaces, readPlacesRev } from "@pineta/reads"
 import {
   cardDocId,
   cardIdOfDoc,
   InventoryDoc,
-  inventoryDocId,
   PlacesDoc,
   PRESENCE_DECAY,
   type PresenceDecay,
@@ -137,8 +143,8 @@ export interface SessionClient {
   /**
    * Every card's record (ADR-0059): the host's, with this tab's moves the
    * copy does not yet hold drawn over them (`withPending`). The places
-   * document itself is never exposed: a client's write to it is refused, and
-   * the writer's copy then keeps its own value for good (S76). Move a card
+   * document itself is never exposed, and a write to it throws
+   * (`writersPolicy`). Move a card
    * only through the methods below, and write its text through its editor.
    */
   readonly cards: Readable<readonly CardRecord[]>
@@ -147,9 +153,9 @@ export interface SessionClient {
    * steps that wrote its text, its creation among them (ADR-0052). The stack
    * itself is not exposed: its own `undo()` takes the tab's last step,
    * wherever that is. It is in memory, so it lasts until the tab reloads or
-   * closes (ADR-0048).
+   * closes (ADR-0048). Each undo and redo says what it did (`Undone`).
    */
-  undoFor(id: CardId): UndoTarget
+  undoFor(id: CardId): CardUndo
   /** This window's column `columnKey` follows the thread ending at `end`. */
   setReading(columnKey: string, end: string): void
   /** The column closed: its entry is deleted, not left to decay. */
@@ -276,6 +282,12 @@ export interface ChatHow {
   readonly base?: string
 }
 
+/** One card's undo, as its box binds it, saying what each undo and redo did. */
+export type CardUndo = Omit<UndoTarget, "undo" | "redo"> & {
+  undo(options?: CommitOptions): Promise<Undone>
+  redo(options?: CommitOptions): Promise<Undone>
+}
+
 /** What every send from one column carries, whichever card it is sent from. */
 export type ColumnHow = Pick<ChatHow, "lane" | "reserved" | "base"> & {
   readonly asksAgent: boolean
@@ -301,6 +313,9 @@ export async function connectSession(
     reconnect: { enabled: false },
   })
   const exchange = new Exchange({ principal, transports: [transport] })
+  // Who may write what is declared on every peer: this client's own write to
+  // the places, or to someone else's inventory, throws before it is made.
+  exchange.register(writersPolicy)
   await transport.waitForStatus("ready", { timeoutMs: 10_000 })
   // Kyneta issues the host's seat, so it is found by its principal.
   const host = await within(

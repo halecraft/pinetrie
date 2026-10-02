@@ -8,11 +8,11 @@ import { type CardId, cardId, entryId, type LaneName, ROOT } from "@pineta/core"
 import { yourCard } from "@pineta/marginalia"
 import { scriptedModel } from "@pineta/pi"
 import { PLACES_DOC_ID } from "@pineta/protocol/messages"
+import { inventoryDocId } from "@pineta/protocol/writers"
 import { readLanes, readPlaces, readSeats, readTreeIndex } from "@pineta/reads"
 import {
   cardDocId,
   InventoryDoc,
-  inventoryDocId,
   PlacesDoc,
   readLaneNames,
   readLaneTip,
@@ -20,7 +20,7 @@ import {
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { idleNow, join, waitFor } from "../harness.ts"
+import { idleNow, join, refusedWrite, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { at, LATE_LOAD_MS, START_AGENT, sleep, slowToLoad } from "./support.ts"
@@ -157,12 +157,12 @@ async function run(check: Checks["check"]): Promise<void> {
       own >= 0 &&
         othersLeft &&
         dropped >= 0 &&
-        !sentUndo &&
+        sentUndo.kind === "none" &&
         emptied >= 0 &&
         recordKept &&
         stillHeld &&
         redone >= 0,
-      `${[own, othersLeft, dropped, sentUndo, emptied, recordKept, stillHeld, redone].join()}; ${ch.cardText(kept)}`,
+      `${[own, othersLeft, dropped, sentUndo.kind, emptied, recordKept, stillHeld, redone].join()}; ${ch.cardText(kept)}`,
     )
 
     // 3. A compelled send to a busy lane is a conflict, and the card stays.
@@ -275,30 +275,34 @@ async function run(check: Checks["check"]): Promise<void> {
       `${told}; sent ${sent7}`,
     )
 
-    // 4d. A client's write to the places document is refused: only the host
-    // writes it (ADR-0059). A throwaway session writes it, since the writer's
-    // copy keeps its own value for good (S76).
+    // 4d. A client cannot write the places document: only the host writes it
+    // (ADR-0059), and every peer declares so (`writersPolicy`), so the write
+    // throws before it is made. A throwaway session tries it: had it been
+    // made, the writer's copy would keep its own value for good (S76).
     const mallory = await join(ch, "mallory", "cards")
     const forged = cardId(crypto.randomUUID())
-    mallory.exchange.get(PLACES_DOC_ID, PlacesDoc).cards.set(forged, {
-      owner: mallory.writer,
-      kind: "fresh",
-      at: "",
-      lane: "",
-      column: "forged",
-      order: "",
-      by: "",
-      seen: "",
-      command: "",
-      unsent: "",
-      placer: mallory.writer,
-      holder: "",
-    })
+    const placesRefused = refusedWrite(() =>
+      mallory.exchange.get(PLACES_DOC_ID, PlacesDoc).cards.set(forged, {
+        owner: mallory.writer,
+        kind: "fresh",
+        at: "",
+        lane: "",
+        column: "forged",
+        order: "",
+        by: "",
+        seen: "",
+        command: "",
+        unsent: "",
+        placer: mallory.writer,
+        holder: "",
+      }),
+    )
     await sleep(500)
     await ch.quiet()
     check(
-      "a client's write to the places is refused: the host's copy is unchanged",
-      onHost(forged) === undefined,
+      "a client cannot write the places: its write is refused before it is made, and the host's copy is unchanged",
+      placesRefused && onHost(forged) === undefined,
+      `refused ${placesRefused}`,
     )
     await mallory.close()
 
@@ -324,17 +328,18 @@ async function run(check: Checks["check"]): Promise<void> {
       5_000,
     )
     const beaView = bea.exchange.get(inventoryDocId(ada.writer), InventoryDoc)
-    beaView.slots.set("7", "planted")
+    const beaRefused = refusedWrite(() => beaView.slots.set("7", "planted"))
     await sleep(500)
     await ch.quiet()
     const hidden =
-      Object.keys(beaView.slots()).every(s => s === "7") &&
+      beaRefused &&
+      Object.keys(beaView.slots()).length === 0 &&
       ada.slots.current()["7"] === undefined &&
       ada2.slots.current()["7"] === undefined
     check(
       "a take reaches your other session's inventory and nobody else's, and nobody else writes it",
       took.kind === "accepted" && otherSession >= 0 && hidden,
-      `${took.kind}; other session ${otherSession}; Bea sees ${JSON.stringify(beaView.slots())}`,
+      `${took.kind}; other session ${otherSession}; Bea refused ${beaRefused}, sees ${JSON.stringify(beaView.slots())}`,
     )
     const stolen = await bea.moveCard(
       {

@@ -71,7 +71,10 @@ a person's inventory.
 - **A client never writes `places`.** The host refuses such a write, but
   the writer keeps its own value for good (S28, S76), and two tabs then undo
   each other's repairs forever. The client's code holds no writable
-  reference to it.
+  reference to it. (*Since Kyneta's `canWrite`, every peer declares who may
+  write `places`, the session and each inventory (`writersPolicy`,
+  `@pineta/protocol/writers`), so a client's write throws before it is
+  made, and a writer whose offer is refused is told and stops writing.*)
 
 *Handoffs.* A move from one place to another, within the host's places or
 between the host and an inventory, is a request to the host naming the
@@ -210,10 +213,11 @@ message is a creation into your inventory, and undoing it removes it.
 - Kyneta's undo covers texts and inventories. A handoff's undo is Pineta's
   own, which is sound because a place is one value and the reverse is
   refused when that value changed.
-- Kyneta's `destroy` keeps every destroyed document in memory, and nothing
-  unloads a document while keeping it stored (S76). Both are asked of
-  Kyneta; until then a tab's and the host's memory grow with the cards they
-  have opened.
+- Kyneta's `destroy` kept every destroyed document in memory, and nothing
+  unloaded a document while keeping it stored (S76). Kyneta now does both:
+  a destroyed document's replica is disposed, and `unload` takes a stored
+  document out of memory. Pineta does not unload yet, so a tab's and the
+  host's memory still grow with the cards they have opened.
 - Stored cards are not carried over: no code reads the old cards document,
   and the startup sweep removes the texts no record names. The only stored
   session held two drafts, kept by hand.

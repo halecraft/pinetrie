@@ -84,8 +84,10 @@ They share `checks.ts` (recording a check, and stopping at one),
   the card.
 - **The places are the host's alone** (ADR-0059): read them through
   `RunningHost.places` (`readPlaces`), and move cards through a session's
-  port. A session that writes the places document keeps its own value for
-  good (S76), so the one check that does joins a throwaway session for it.
+  port. A session's write to the places, or to the session, throws
+  `NotAWriterError` (`writersPolicy`): the checks that try it catch that.
+  The places one joins a throwaway session, so a mutant that lets the write
+  through forks no session the scenario goes on to use (S76).
 - **An inventory is checked from a second session of the same person**
   (`host/cards`): `join(ch, "ada", …)` again is Ada from another seat, and
   her inventory reaches it through the host. Another person's view is the

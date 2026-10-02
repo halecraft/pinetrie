@@ -4,17 +4,18 @@ import {
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
-import { cardDocId, inventoryDocId } from "@pineta/schema"
+import { inventoryDocId } from "@pineta/protocol/writers"
+import { cardDocId } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { acceptsWrite, resolveDoc, writePolicy } from "./policy.ts"
+import { acceptsWrite, hostPolicy, resolveDoc } from "./policy.ts"
 
 const CARD = cardDocId(cardId("c-1"))
 const UNDO = "undo:seat-a"
 const INVENTORY = inventoryDocId(writerId("ada@x.io"))
 
-test("acceptsWrite: the session and the places are the host's; presence is each client's", () => {
-  expect(acceptsWrite(SESSION_DOC_ID)).toBe(false)
-  expect(acceptsWrite(PLACES_DOC_ID)).toBe(false)
+test("acceptsWrite: presence is each client's; the session and the places are left to who may write them (`writersPolicy`)", () => {
+  expect(acceptsWrite(SESSION_DOC_ID)).toBeUndefined()
+  expect(acceptsWrite(PLACES_DOC_ID)).toBeUndefined()
   expect(acceptsWrite(PRESENCE_DOC_ID)).toBe(true)
   expect(acceptsWrite("line:pineta.control:a→host")).toBeUndefined()
 })
@@ -42,7 +43,7 @@ test("resolveDoc: a card's text, an inventory, a tab's undo stack, and nothing e
 })
 
 test("a command Line's documents are shared with, and taken from, its two ends only (ADR-0037)", () => {
-  const policy = writePolicy
+  const policy = hostPolicy
   const line = "line:pineta.control:seat-a→seat-host"
   const peer = (peerId: string) =>
     ({ peerId, principal: "x@y.io", type: "user" }) as const
@@ -54,28 +55,25 @@ test("a command Line's documents are shared with, and taken from, its two ends o
   ]).toEqual([true, false, false, undefined])
 })
 
-test("a tab's undo stack is shared with no one and taken from no one; places and texts with everyone", () => {
-  const policy = writePolicy
+test("a tab's undo stack is shared with no one and taken from no one; places and texts shared with everyone", () => {
+  const policy = hostPolicy
   const peer = { peerId: "seat-a", principal: "x@y.io", type: "user" } as const
   expect([
     policy.canShare?.(UNDO, peer),
     policy.canAccept?.(UNDO, peer),
     policy.canShare?.(PLACES_DOC_ID, peer),
     policy.canShare?.(CARD, peer),
-    policy.canAccept?.(PLACES_DOC_ID, peer),
     policy.canAccept?.(CARD, peer),
-  ]).toEqual([false, false, undefined, undefined, false, true])
+  ]).toEqual([false, false, undefined, undefined, true])
 })
 
-test("an inventory is shared with, and taken from, its person only (ADR-0059)", () => {
-  const policy = writePolicy
+test("an inventory is shared with its person only (ADR-0059)", () => {
+  const policy = hostPolicy
   const peer = (principal: string) =>
     ({ peerId: `seat-${principal}`, principal, type: "user" }) as const
   expect([
     policy.canShare?.(INVENTORY, peer("Ada@X.io")),
-    policy.canAccept?.(INVENTORY, peer("ada@x.io")),
     policy.canShare?.(INVENTORY, peer("bea@x.io")),
-    policy.canAccept?.(INVENTORY, peer("bea@x.io")),
     policy.canShare?.(INVENTORY, peer("pineta-host")),
-  ]).toEqual([true, true, false, false, false])
+  ]).toEqual([true, false, false])
 })

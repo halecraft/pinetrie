@@ -197,10 +197,12 @@ through `applyPlaceStep` (`apps/pineta/host/places.ts`).
 
 - **A place does not merge** (S75), so it is not a CRDT: one writer, in
   arrival order, through handoffs the host applies or refuses (ADR-0059).
-- **A client must never write it.** The host's policy refuses the write,
-  and the writer's copy then keeps its own value for good, even after the
-  host writes that card again (S28, S76). The client keeps the document
-  private: the page reads `SessionClient.cards`.
+- **A client cannot write it.** Every peer registers `writersPolicy`
+  (`@pineta/protocol/writers`), Kyneta's `canWrite`, so a client's write
+  throws before it is made, and the host refuses the same operations from
+  any sender. Made anyway, a write would leave the writer's copy forked for
+  good (S28, S76). The client keeps the document private: the page reads
+  `SessionClient.cards`.
 - **`rev` is raised with every write, in the same batch.** A reply to a
   move carries it, and a client draws its move until its copy's `rev`
   reaches it (`packages/client/card-moves.ts`). A write that skipped `rev`
@@ -227,14 +229,17 @@ whose inventory a card is in; this says which slot holds it, and each tab
 repairs it from the host's record (`planSlots`, `packages/client`).
 
 - **The host stores and relays it, and never writes it.** Its policy
-  shares and accepts it only with peers whose principal is its writer
+  shares it only with peers whose principal is its writer
   (`apps/pineta/host/policy.ts`).
 - **A slot naming a card that is gone stays until written over**: the
   repair clears only a slot whose card it has seen not held for a while,
   and the panel draws a slot whose card is not held as empty.
-- **`writerOfInventoryDoc` names a writer only for an id
-  `inventoryDocId` makes**, so a hand-written `inventory:ada@x` names
-  nobody.
+- **Its id, and who may write it, are the protocol's**
+  (`inventoryDocId`, `writerOfInventoryDoc`, `mayWrite` in
+  `@pineta/protocol/writers`): its person, and the host, which relays it
+  between that person's tabs. `writerOfInventoryDoc` names a writer only
+  for an id `inventoryDocId` makes, so a hand-written `inventory:ada@x`
+  names nobody.
 
 ## Persistence
 

@@ -186,6 +186,39 @@ export const mutations: readonly Mutation[] = [
   },
 
   {
+    name: "any inventory id names a writer",
+    file: "packages/protocol/writers.ts",
+    from: "  return writer !== undefined && inventoryDocId(writer) === docId",
+    to: "  return writer !== undefined",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect:
+      "an inventory's document names its writer, and nothing else names one",
+  },
+  {
+    name: "a client may write the session",
+    file: "packages/protocol/writers.ts",
+    from: "  if (docId === SESSION_DOC_ID || docId === PLACES_DOC_ID)",
+    to: "  if (docId === PLACES_DOC_ID)",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "mayWrite: the session and the places are the host's",
+  },
+  {
+    name: "anyone writes anyone's inventory",
+    file: "packages/protocol/writers.ts",
+    from: "  return principal === HOST_PRINCIPAL || holds",
+    to: "  return true",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "mayWrite: the session and the places are the host's",
+  },
+  {
+    name: "the host may not relay an inventory",
+    file: "packages/protocol/writers.ts",
+    from: "  return principal === HOST_PRINCIPAL || holds",
+    to: "  return holds",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "mayWrite: the session and the places are the host's",
+  },
+  {
     name: "the wire drops an inventory's holder",
     file: "packages/protocol/codec.ts",
     from: "  return JSON.stringify({ kind, at, lane, column, seen, holder })",

@@ -10,6 +10,7 @@ import { execFileSync } from "node:child_process"
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { NotAWriterError } from "@kyneta/exchange"
 import {
   type ConnectOptions,
   connectSession,
@@ -28,6 +29,19 @@ import {
  * Poll until `pred` holds. Resolves with the elapsed milliseconds, or -1 on
  * timeout. Shared by every suite, so none grows its own copy.
  */
+/**
+ * Whether `write` threw because this peer may not write the document
+ * (`writersPolicy`): refused before anything was made.
+ */
+export function refusedWrite(write: () => void): boolean {
+  try {
+    write()
+    return false
+  } catch (e) {
+    return e instanceof NotAWriterError
+  }
+}
+
 export async function waitFor(
   pred: () => boolean | Promise<boolean>,
   timeoutMs = 60_000,
