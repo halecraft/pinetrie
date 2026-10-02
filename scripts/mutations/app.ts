@@ -292,14 +292,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a starting host keeps no command Line",
   },
   {
-    name: "a starting host leaves the old notes' records",
-    file: "apps/pineta/host/startup.ts",
-    from: "  for (const key of notes.values) await agent.removeNote(key)",
-    to: "  for (const key of notes.values) void key",
-    command: e2e,
-    expect: "a starting host has swept before it returns",
-  },
-  {
     name: "a soft break is not shown",
     file: "packages/client/index.html",
     from: "      .text { white-space: pre-line;",

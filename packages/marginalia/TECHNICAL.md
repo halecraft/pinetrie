@@ -152,9 +152,6 @@ when it starts. This module decodes a record and decides where a card sits.
   conflict or a refusal leaves it.
 - **`planCardSweep`**: records whose text is empty, and stored `card:`
   documents with no record, a spent or empty card's among them.
-- **`planNoteSweep`**: every `pineta.note` value and every stored `note:`
-  document, left from notes on messages (ADR-0025), which ADR-0048 removed.
-  `OLD_NOTE_NAMESPACE` is kept only for it.
 
 # Seats (`seat.ts`, ADR-0048)
 

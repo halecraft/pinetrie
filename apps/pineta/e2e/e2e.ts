@@ -23,7 +23,7 @@ import {
 import { request as httpRequest } from "node:http"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { Exchange, type Store, whenHydrated, whenPeer } from "@kyneta/exchange"
+import { Exchange, type Store, whenPeer } from "@kyneta/exchange"
 import { batch, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 import type { SessionClient } from "@pineta/client/session"
@@ -47,12 +47,7 @@ import {
   ROOT,
   writerId,
 } from "@pineta/core"
-import {
-  decodeChat,
-  displayName,
-  OLD_NOTE_NAMESPACE,
-  yourCard,
-} from "@pineta/marginalia"
+import { decodeChat, displayName, yourCard } from "@pineta/marginalia"
 import { newId as newHeldId, scriptedModel, sha256Of } from "@pineta/pi"
 import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
@@ -82,17 +77,13 @@ import {
 } from "@pineta/reads"
 import {
   cardDocId,
-  physicalKey,
   readActiveRun,
   readEntries,
   readEntryMessage,
   readLaneNames,
   readLaneTip,
   readStreams,
-  readValues,
   rowMessage,
-  SessionDoc,
-  TextDoc,
   writeEntry,
 } from "@pineta/schema"
 import { WebSocket as WsClient } from "ws"
@@ -1704,32 +1695,6 @@ invariants("end")
   )
   await Promise.all([bea.close(), zed.close()])
   await ch.shutdown()
-  // A note on a message, as a host before ADR-0048 stored one: its record in
-  // the session, and its text in a `note:` document.
-  const OLD_NOTE = "0199-old-note"
-  let notesBefore = 0
-  {
-    const old = openStore(dbFile)
-    const ex = new Exchange({
-      principal: HOST_PRINCIPAL,
-      type: "service",
-      store: old.store,
-    })
-    const session = ex.get(SESSION_DOC_ID, SessionDoc)
-    await whenHydrated(session)
-    batch(session, d =>
-      d.values.set(physicalKey(OLD_NOTE_NAMESPACE, OLD_NOTE), {
-        namespace: OLD_NOTE_NAMESPACE,
-        key: OLD_NOTE,
-        value: { id: OLD_NOTE, state: "open", entry: tipOf() ?? "" },
-      }),
-    )
-    ex.get(`note:${OLD_NOTE}`, TextDoc).text.insert(0, "an old note")
-    await ex.flush()
-    for await (const _ of old.store.listDocIds("note:")) notesBefore += 1
-    // Shutting down closes the store it was given.
-    await ex.shutdown()
-  }
   // The empty card's text loads late, so a host that served before its
   // sweep finished would still hold the card.
   const reopened = openStore(dbFile)
@@ -1740,12 +1705,9 @@ invariants("end")
     log: () => {},
   })
   // Read as `startHost` returns, before any client could connect.
-  const sweptAtStart =
-    onHost(empty) === undefined &&
-    readValues(ch.doc, OLD_NOTE_NAMESPACE).length === 0
   ok(
-    sweptAtStart,
-    "a starting host has swept before it returns: no empty card or old note is left for a client to find",
+    onHost(empty) === undefined,
+    "a starting host has swept before it returns: no empty card is left for a client to find",
   )
   const eve = await join(ch, "eve", "cards")
   await ch.quiet()
@@ -1762,15 +1724,12 @@ invariants("end")
       readSeats(ch.doc).some(s => s.writer === bea.writer),
     "a restart keeps cards with text, and sweeps empty ones, unrecorded texts and seats no text names",
   )
-  const notesAfterRestart = readValues(ch.doc, OLD_NOTE_NAMESPACE).length
   await eve.close()
   await ch.shutdown()
   // Read the store once the host has let it go: it owns its file (S47).
   const stored: string[] = []
   const closed = openStore(dbFile)
   for await (const d of closed.store.listDocIds("card:")) stored.push(d)
-  const notesLeft: string[] = []
-  for await (const d of closed.store.listDocIds("note:")) notesLeft.push(d)
   const texts = [c1, c2, c3, c4, keep, empty, orphan].map(id =>
     stored.includes(`card:${id}`),
   )
@@ -1778,10 +1737,6 @@ invariants("end")
     JSON.stringify(texts) ===
       JSON.stringify([false, true, false, false, true, false, false]),
     `only the texts of cards still live are stored: spent, empty and unrecorded ones are destroyed (${texts.join()})`,
-  )
-  ok(
-    notesBefore === 1 && notesLeft.length === 0 && notesAfterRestart === 0,
-    `a restart removes the notes on messages a host before ADR-0048 stored: their records and their texts (${notesBefore} stored, then ${notesAfterRestart} records and ${notesLeft.length} texts)`,
   )
 }
 

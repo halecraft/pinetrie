@@ -62,7 +62,6 @@ import {
   labelCommands,
   MARK_NAMESPACE,
   OFFER_NAMESPACE,
-  OLD_NOTE_NAMESPACE,
   OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
   resolveCommand,
@@ -352,8 +351,6 @@ export interface Agent {
   release(id: string): Promise<void>
   /** Store a writer's display name in `pineta.participant`, keyed by writer. */
   setParticipantName(writer: WriterId, name: string): Promise<void>
-  /** Delete a `pineta.note` value: notes on messages are removed (ADR-0048). */
-  removeNote(key: string): Promise<void>
   /** Store a seat's record in `pineta.seat`, keyed by its `clientID` (ADR-0048). */
   setSeat(seat: SeatRecord): Promise<void>
   /** Delete a seat's record: no stored text names it. */
@@ -789,10 +786,6 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
 
     async setParticipantName(writer, displayName) {
       await put(PARTICIPANT_NAMESPACE, writer, displayName)
-    },
-
-    async removeNote(key) {
-      await session.deleteValue(value(OLD_NOTE_NAMESPACE, key), CTX)
     },
 
     async setSeat(seat) {

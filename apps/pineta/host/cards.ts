@@ -35,14 +35,8 @@ export interface CardPort {
   spend(id: CardId): Promise<void>
   /** Every live card's text, with who wrote in it. */
   texts(): Promise<readonly GatheredText[]>
-  /**
-   * Every stored card text document, and every `note:` document left from
-   * notes on messages (ADR-0025), which the startup sweep deletes.
-   */
-  stored(): Promise<{
-    readonly cards: readonly string[]
-    readonly oldNotes: readonly string[]
-  }>
+  /** Every stored card text document, by id. */
+  stored(): Promise<readonly string[]>
   /** Delete these card records, then destroy these documents. */
   remove(what: {
     readonly records: readonly CardId[]
@@ -93,7 +87,7 @@ export function startCards(input: {
       return out
     },
     async stored() {
-      return { cards: await listed("card:"), oldNotes: await listed("note:") }
+      return listed("card:")
     },
     remove,
   }

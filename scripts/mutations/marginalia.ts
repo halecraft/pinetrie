@@ -509,14 +509,6 @@ export const mutations: readonly Mutation[] = [
     expect: "planCardSweep: empty cards and documents with no record go",
   },
   {
-    name: "planNoteSweep keeps the old notes' documents",
-    file: "packages/marginalia/card.ts",
-    from: "    docs: input.stored.filter(docId => docId.startsWith(OLD_NOTE_PREFIX)),",
-    to: "    docs: [],",
-    command: unit,
-    expect: "planNoteSweep: every old note value and note document goes",
-  },
-  {
     name: "writersOf keeps an unknown clientID",
     file: "packages/marginalia/seat.ts",
     from: "    if (wrote.has(s.clientId) && !out.includes(s.writer)) out.push(s.writer)",

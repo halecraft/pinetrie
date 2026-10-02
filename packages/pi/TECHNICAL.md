@@ -382,9 +382,7 @@ only work, never correctness, and never touched the host's own stream writes.
 `setArchive`, `setMark` and `setWorkRecord` write `pineta.archive`,
 `pineta.mark` and the four work records through `Session.setValue`
 (ADR-0029, ADR-0045, ADR-0032): every setter's body is one `put`.
-`removeMark`, `removeOffer` and `removeNote` delete theirs with
-`Session.deleteValue`; `removeNote` is the startup sweep's, for the
-`pineta.note` values notes on messages left (ADR-0048). They use the
+`removeMark` and `removeOffer` delete theirs with `Session.deleteValue`. They use the
 generic value path, so conformance covers the storage shape. `setWorkRecord` takes its namespace and key from
 `encodeWorkRecord`, in marginalia.
 

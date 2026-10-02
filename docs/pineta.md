@@ -93,10 +93,10 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 969/969 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 590 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 968/968 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 589 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 153/153, on the scripted model |
+| end-to-end | `pnpm run e2e` | 152/152, on the scripted model |
 | with a real model | `pnpm run e2e:live` | 121/121 |
 | **real browser** | `pnpm run e2e:browser` | 181 checks; in a lane with no containers, the 6 that need one fail |
 | types | `pnpm run typecheck` | clean (strict) |
@@ -164,9 +164,8 @@ yourself. The host refuses client writes to the session.
 
 **ADR-0025 — notes on messages, superseded by ADR-0048.** A note was a
 shared text below a message, with done and reopen and an index. Step 3 of
-ADR-0048 removed them: a starting host deletes any `pineta.note` record and
-`note:` text left in its store. A branch from `→` carries a conversation
-about a message.
+ADR-0048 removed them. A branch from `→` carries a conversation about a
+message.
 
 **ADR-0048 — everything unsent is a card.** What you type is a card on its
 thread: its record in the cards document and its text in a Yjs document, both

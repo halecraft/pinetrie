@@ -77,9 +77,8 @@ wires them.
 each interrupted lane resumed before anything waiting for it (S36 item 18),
 `settle` for the other lanes with held messages, the project and commands
 records written only when changed, and the sweep of what no one will type in
-again: empty cards, card documents with no record, every `pineta.note`
-record and `note:` document left from notes on messages (ADR-0048), and seat
-records no stored text names (`sweepTexts`).
+again: empty cards, card documents with no record, and seat records no stored
+text names (`sweepTexts`).
 
 - **Commands are taken only after `recover`.** `Control.listen` is made
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
@@ -193,8 +192,7 @@ records no stored text names (`sweepTexts`).
   naming itself, so a module that touches an undeclared port fails at once.
   `fakeLane` holds a run open until the test finishes it. `row` and
   `writeEntry` put entries in the document, `putValue` a pi value (a work
-  record, an archive record, a held item, a participant's name, an old note's
-  record), and `writeLaneTip` a lane's tip; a running lane is
+  record, an archive record, a held item, a participant's name), and `writeLaneTip` a lane's tip; a running lane is
   `beginRun`. Both of those are `@pineta/schema`'s.
 - **Admission is two pure plans**, `planRequest` and `planUpgrade`
   (`routes.ts`): every admission rule is a unit test there, and `http.ts`

@@ -3,9 +3,7 @@
 import type { LaneName } from "@pineta/core"
 import {
   encodeWorkRecord,
-  OLD_NOTE_NAMESPACE,
   planCardSweep,
-  planNoteSweep,
   planSeatSweep,
   planStartup,
   recordChanged,
@@ -34,7 +32,6 @@ export interface StartupDeps {
     | "refusedCommands"
     | "setWorkRecord"
     | "removeSeat"
-    | "removeNote"
   >
   readonly work: Pick<LaneWork, "project">
   /** Name every lane that has none (ADR-0039). */
@@ -96,10 +93,8 @@ export async function recover(deps: StartupDeps): Promise<void> {
 
 /**
  * Delete what no one will type in again (ADR-0048): card records whose text
- * is empty and card documents with no record (`planCardSweep`); the records
- * and documents of notes on messages, which ADR-0048 removed
- * (`planNoteSweep`); and seat records no card's text names
- * (`planSeatSweep`). Gather, plan, then execute; the stored lists and the
+ * is empty and card documents with no record (`planCardSweep`); and seat
+ * records no card's text names (`planSeatSweep`). Gather, plan, then execute; the stored lists and the
  * records are read with no await between them.
  */
 async function sweepTexts(deps: StartupDeps): Promise<void> {
@@ -109,33 +104,23 @@ async function sweepTexts(deps: StartupDeps): Promise<void> {
   const texts = await cards.texts()
   const stored = await cards.stored()
   const records = readCards(deps.cardsDoc)
-  const noteKeys = readValues(doc, OLD_NOTE_NAMESPACE).map(v => v.key)
   const seats = readSeats(doc)
   // plan
   const swept = planCardSweep({
     cards: records,
     texts: new Map(texts.map(t => [t.id, t.text] as const)),
-    stored: stored.cards,
+    stored,
     cardOfDoc: cardIdOfDoc,
   })
-  const notes = planNoteSweep({ values: noteKeys, stored: stored.oldNotes })
   const staleSeats = planSeatSweep(
     seats,
     texts.flatMap(t => t.clients),
   )
   // execute
-  await cards.remove({
-    records: swept.records,
-    docs: [...swept.docs, ...notes.docs],
-  })
-  for (const key of notes.values) await agent.removeNote(key)
+  await cards.remove(swept)
   for (const clientId of staleSeats) await agent.removeSeat(clientId)
   if (swept.records.length + swept.docs.length + staleSeats.length > 0)
     log(
       `[host] swept ${swept.records.length} empty card(s), ${swept.docs.length} unused text(s), ${staleSeats.length} seat(s)`,
-    )
-  if (notes.values.length + notes.docs.length > 0)
-    log(
-      `[host] removed ${notes.values.length} note(s) and ${notes.docs.length} note text(s): notes on messages are gone (ADR-0048)`,
     )
 }
