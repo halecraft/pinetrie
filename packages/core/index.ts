@@ -85,8 +85,9 @@ declare const laneNameBrand: unique symbol
 /**
  * A thread's lane: a line of work (ADR-0019), never moved (ADR-0020). Its id
  * can exist before the lane does: a column reserves it, and the thread is
- * named under it (ADR-0057). Only `laneNameForThread()` and the decoders
- * mint one, so no writer's id or `"main"` is assignable.
+ * named under it (ADR-0057). `laneNameForThread()` and `parseNewLane()` mint
+ * one, and every reader of a stored or sent name checks it with `isLaneName()`,
+ * so no writer's id or `"main"` is one.
  */
 export type LaneName = string & { readonly [laneNameBrand]: true }
 
@@ -96,7 +97,10 @@ const LANE_PREFIX = "t-"
 export const laneNameForThread = (id: string): LaneName =>
   `${LANE_PREFIX}${id}` as LaneName
 
-/** Whether untrusted text names a thread's lane: the codec's check. */
+/**
+ * Whether text names a thread's lane: the check wherever a lane name is read,
+ * in the codec, the schema's readers, marginalia's decoders and the pi adapter.
+ */
 export const isLaneName = (s: string): s is LaneName =>
   s.startsWith(LANE_PREFIX) && s.length > LANE_PREFIX.length
 
@@ -116,9 +120,12 @@ declare const runIdBrand: unique symbol
 /**
  * Entry ids and run ids are both uuidv7 strings and cannot be told apart at
  * runtime. Positions take an entry id; `activeRuns` holds run ids. Passing
- * one where the other belongs would otherwise
- * compile, run, and fail silently. Mint them only at the edges: the protocol
- * codec, the document readers, and the host's id generator.
+ * one where the other belongs would otherwise compile, run, and fail
+ * silently. Mint them only where they enter: the protocol codec, the reads,
+ * the schema's readers, marginalia's decoders, the pi adapter, the client's
+ * stored forms, and the host's id generator. `biome.json` refuses an
+ * `entryId` import in core, the client and the host, and a `runId` import in
+ * core and the client (S71).
  */
 export type EntryId = string & { readonly [entryIdBrand]: true }
 export type RunId = string & { readonly [runIdBrand]: true }
@@ -860,16 +867,16 @@ export function normalizeName(name: string): string | undefined {
  */
 export type StreamEvent =
   /** Text the model is writing, as a delta. */
-  | { readonly kind: "text"; readonly lane: string; readonly delta: string }
+  | { readonly kind: "text"; readonly lane: LaneName; readonly delta: string }
   | {
       readonly kind: "toolStart"
-      readonly lane: string
+      readonly lane: LaneName
       readonly callId: string
     }
   /** The tool's output so far: a whole snapshot, not a delta. */
   | {
       readonly kind: "toolOutput"
-      readonly lane: string
+      readonly lane: LaneName
       readonly callId: string
       readonly text: string
     }

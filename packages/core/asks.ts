@@ -13,7 +13,6 @@ import {
   atEntry,
   type DiffSpan,
   type EntryId,
-  entryId,
   type RevisionRecord,
   type StopRecord,
   type WriterId,
@@ -78,11 +77,11 @@ const known = new WeakMap<TreeIndex, AskIndex>()
 export function indexAsks(index: TreeIndex): AskIndex {
   const cached = known.get(index)
   if (cached !== undefined) return cached
-  const promptAt = new Map<string, EntryId | null>()
-  const resolve = (from: string): EntryId | null => {
-    const walked: string[] = []
+  const promptAt = new Map<EntryId, EntryId | null>()
+  const resolve = (from: EntryId): EntryId | null => {
+    const walked: EntryId[] = []
     let found: EntryId | null = null
-    for (let id: string | null = from; id !== null; id = index.parentOf(id)) {
+    for (let id: EntryId | null = from; id !== null; id = index.parentOf(id)) {
       const seen = promptAt.get(id)
       if (seen !== undefined) {
         found = seen
@@ -90,7 +89,7 @@ export function indexAsks(index: TreeIndex): AskIndex {
       }
       walked.push(id)
       if (startsRun(index.entries[id])) {
-        found = entryId(id)
+        found = id
         break
       }
       // A cycle has no prompt; `ancestry` reports it elsewhere.
@@ -103,17 +102,19 @@ export function indexAsks(index: TreeIndex): AskIndex {
   const work = new Map<EntryId, EntryId[]>()
   const last = new Map<EntryId, EntryId>()
   // Ids are uuidv7, so sorted ids are creation order (S9).
-  for (const id of Object.keys(index.entries).sort()) {
-    const entry = index.entries[id]
+  const entries = Object.values(index.entries).sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  )
+  for (const entry of entries) {
     if (!isWork(entry)) continue
+    const { id } = entry
     const parent = index.parentOf(id)
     const prompt = parent === null ? null : resolve(parent)
     if (prompt === null) continue
-    const eid = entryId(id)
-    askOf.set(eid, prompt)
-    last.set(prompt, eid)
-    if (entry?.message?.role === "assistant")
-      work.set(prompt, [...(work.get(prompt) ?? []), eid])
+    askOf.set(id, prompt)
+    last.set(prompt, id)
+    if (entry.message?.role === "assistant")
+      work.set(prompt, [...(work.get(prompt) ?? []), id])
   }
   const asks: AskIndex = { askOf, work, last }
   known.set(index, asks)
@@ -185,8 +186,8 @@ export function lastWord(
 export function segmentPath(
   index: TreeIndex,
   asks: AskIndex,
-  ids: readonly string[],
-  landmarks: ReadonlySet<string>,
+  ids: readonly EntryId[],
+  landmarks: ReadonlySet<EntryId>,
 ): readonly Segment[] {
   const out: Segment[] = []
   const words = new Map<EntryId, EntryId | null>()
@@ -195,8 +196,7 @@ export function segmentPath(
     return words.get(prompt)
   }
   const folded = new Set<EntryId>()
-  for (const raw of ids) {
-    const id = entryId(raw)
+  for (const id of ids) {
     const ask = asks.askOf.get(id)
     if (ask === undefined || landmarks.has(id) || wordOf(ask) === id) {
       out.push({ kind: "entry", id })
@@ -222,10 +222,10 @@ export function askStats(
   index: TreeIndex,
   asks: AskIndex,
   prompt: EntryId,
-  revisions: ReadonlyMap<string, RevisionRecord>,
+  revisions: ReadonlyMap<EntryId, RevisionRecord>,
 ): WorkStats {
   const work = asks.work.get(prompt) ?? []
-  const mine = new Set<string>(work)
+  const mine = new Set<EntryId>(work)
   const results = [...asks.askOf]
     .filter(([id, ask]) => ask === prompt && !mine.has(id))
     .map(([id]) => id)
@@ -242,7 +242,7 @@ export function askSpan(
   index: TreeIndex,
   asks: AskIndex,
   prompt: EntryId,
-  revisions: ReadonlyMap<string, RevisionRecord>,
+  revisions: ReadonlyMap<EntryId, RevisionRecord>,
 ): DiffSpan | null {
   const from = revisions.get(prompt)?.commit ?? null
   const last = asks.last.get(prompt)

@@ -22,7 +22,7 @@ import { whenSettled } from "@kyneta/exchange"
 import { useDocStatus, useSelector } from "@kyneta/react"
 import {
   branchColors,
-  entryId,
+  type EntryId,
   PENDING_TRACK,
   pathIds,
   projectColumns,
@@ -264,7 +264,7 @@ export function App({
   const labels = useMemo(() => rootLabels(lines, marks), [lines, marks])
   const work = useMemo(() => rootWork(index, lanes), [index, lanes])
   // A root with no message has no summary, so it has no label in `labels`.
-  const labelOf = (root: string): string => labels.get(root) ?? NO_TEXT
+  const labelOf = (root: EntryId): string => labels.get(root) ?? NO_TEXT
 
   const [stored, dispatch] = useReducer(
     layoutReducer,
@@ -357,7 +357,7 @@ export function App({
     () =>
       new Set(
         [...archive.values()].flatMap(r =>
-          r.state === "archived" ? [r.root as string] : [],
+          r.state === "archived" ? [r.root] : [],
         ),
       ),
     [archive],
@@ -522,7 +522,7 @@ export function App({
   // The Archive tab's own state: never stored.
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("all")
   const [archiveQuery, setArchiveQuery] = useState("")
-  const [archivePick, setArchivePick] = useState<string | null>(null)
+  const [archivePick, setArchivePick] = useState<EntryId | null>(null)
 
   // An opened fold draws in its own ask (`AskWork`): a render of `App`
   // runs `useReveal`'s wait once it has.
@@ -550,7 +550,7 @@ export function App({
       planIntent(intent, { layout, index, archive, asks }, crypto.randomUUID()),
     ),
   )
-  const openAt = (entry: string) => onIntent({ kind: "openAt", entry })
+  const openAt = (entry: EntryId) => onIntent({ kind: "openAt", entry })
   const dragColumn = useColumnDrag(strip, (from, to) =>
     onIntent({ kind: "column", position: from, act: { kind: "move", to } }),
   )
@@ -592,11 +592,11 @@ export function App({
   }
 
   /** A root, read-only, for the Archive tab: its rail and one column. */
-  const preview = (r: string) => (
+  const preview = (r: EntryId) => (
     <Preview
       key={r}
       onIntent={onIntent}
-      readOnly={readOnlyWords(entryId(r), archive.get(r), nameOf)}
+      readOnly={readOnlyWords(r, archive.get(r), nameOf)}
       root={r}
       shared={shared}
       yours={yours}
@@ -762,7 +762,7 @@ function Preview({
   shared,
   onIntent,
 }: {
-  root: string
+  root: EntryId
   readOnly: ReadOnly
   /** Thread ends holding a card of yours, for the rail's pips. */
   yours: ComponentProps<typeof LiveRail>["yours"]
@@ -788,7 +788,7 @@ function Preview({
   const [anchor, setAnchor] = useState(root)
   const previewStrip = useRef<HTMLDivElement>(null)
   const reveal = useReveal(previewStrip)
-  const pick = (id: string) => {
+  const pick = (id: EntryId) => {
     setAnchor(id)
     reveal(id)
   }

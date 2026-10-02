@@ -1,4 +1,11 @@
-import type { StreamEvent } from "@pineta/core"
+import {
+  type EntryId,
+  entryId,
+  type LaneName,
+  laneNameForThread,
+  runId,
+  type StreamEvent,
+} from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   applyStreamOps,
@@ -11,8 +18,8 @@ import {
   type Stream,
 } from "./index.ts"
 
-const L = "t-lane"
-const M = "t-other"
+const L = laneNameForThread("lane")
+const M = laneNameForThread("other")
 let n = 0
 const newId = () => {
   n += 1
@@ -22,7 +29,7 @@ const newId = () => {
 /** An entry written on `lane`: its tip moves, as pi's commit moves it. */
 interface Commit {
   readonly commit: string
-  readonly lane?: string
+  readonly lane?: LaneName
 }
 
 /**
@@ -34,13 +41,13 @@ function drive(
   running = true,
   doc = newSessionDoc(),
 ) {
-  const tips = new Map<string, string | null>([
-    [L, "p"],
-    [M, "q"],
+  const tips = new Map<LaneName, EntryId | null>([
+    [L, entryId("p")],
+    [M, entryId("q")],
   ])
   const seen: (readonly Stream[])[] = []
   for (const step of steps) {
-    if ("commit" in step) tips.set(step.lane ?? L, step.commit)
+    if ("commit" in step) tips.set(step.lane ?? L, entryId(step.commit))
     else
       applyStreamOps(
         doc,
@@ -154,7 +161,7 @@ describe("planStream: replies and tools are streams of edits", () => {
     const ops = planStream({
       event: { kind: "toolOutput", lane: L, callId: "c", text: view(3, 9) },
       streams: [tool],
-      tip: "p",
+      tip: entryId("p"),
       running: true,
       newId,
     })
@@ -180,8 +187,8 @@ describe("planStream: replies and tools are streams of edits", () => {
 describe("the end of a run", () => {
   test("endRun deletes the lane's streams with its key, and leaves other lanes' alone", () => {
     const doc = newSessionDoc()
-    beginRun(doc, L, "r-1")
-    beginRun(doc, M, "r-2")
+    beginRun(doc, L, runId("r-1"))
+    beginRun(doc, M, runId("r-2"))
     drive(
       [
         { kind: "text", lane: L, delta: "half" },
@@ -190,9 +197,9 @@ describe("the end of a run", () => {
       true,
       doc,
     )
-    endRun(doc, L, "r-other")
+    endRun(doc, L, runId("r-other"))
     expect(readStreams(doc).length).toBe(2)
-    endRun(doc, L, "r-1")
+    endRun(doc, L, runId("r-1"))
     expect([
       readStreams(doc).map(s => s.lane),
       Object.keys(doc.activeRuns()),
@@ -204,7 +211,7 @@ describe("the end of a run", () => {
       { kind: "text", lane: L, delta: "half" },
       { kind: "toolStart", lane: L, callId: "c" },
     ])
-    doc.activeRuns.set(L, "r-1")
+    doc.activeRuns.set(L, runId("r-1"))
     // A text whose record is gone.
     doc.streamText.set("orphan", "left over")
     clearStreams(doc)

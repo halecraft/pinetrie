@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest"
+import { entriesOf, entry, fromParents } from "./fixtures.ts"
 import {
   agentActivity,
   ancestry,
@@ -7,6 +8,7 @@ import {
   branchColors,
   type ChatMode,
   compactRail,
+  type EntryId,
   type EntryLike,
   entryId,
   followTip,
@@ -38,20 +40,8 @@ import {
  * A tree from `child: parent` pairs. Ids are uuidv7-like: the digit prefix
  * sorts by age, so "2-…" is older than "3-…". Every entry is a chat message.
  */
-const tree = (
-  parents: Record<string, string | null>,
-): Record<string, EntryLike> =>
-  Object.fromEntries(
-    Object.entries(parents).map(([id, parentId]) => [
-      id,
-      {
-        id,
-        parentId,
-        type: "message",
-        message: { role: "chat", content: id, author: "A" },
-      },
-    ]),
-  )
+const tree = (parents: Record<string, string | null>) =>
+  fromParents(parents, id => ({ role: "chat", content: id, author: "A" }))
 
 // The plan's example: a trunk T1 -> T2 -> T3, a branch A off T1, a branch B off
 // T2. The trunk's continuation is older than each branch.
@@ -68,8 +58,11 @@ const ids = (nodes: readonly { id: string }[]) => nodes.map(n => n.id)
 
 describe("indexTree and ancestry", () => {
   test("children are sorted by id, whatever the insertion order", () => {
-    const shuffled = Object.fromEntries(Object.entries(forks).toReversed())
-    expect(indexTree(shuffled).childrenOf.get("1-t1")).toEqual(["2-t2", "4-a1"])
+    const shuffled = entriesOf(Object.values(forks).toReversed())
+    expect(indexTree(shuffled).childrenOf.get(entryId("1-t1"))).toEqual([
+      "2-t2",
+      "4-a1",
+    ])
   })
   test("roots and orphans are reported", () => {
     const i = indexTree({
@@ -83,14 +76,14 @@ describe("indexTree and ancestry", () => {
       ...forks,
       ...tree({ "9-x": "missing", "a-y": "9-x" }),
     })
-    expect(rootOf(i, "7-b2")).toBe("1-t1")
-    expect(rootOf(i, "1-t1")).toBe("1-t1")
-    expect(rootOf(i, "a-y")).toBe("9-x")
-    expect(rootOf(i, "nope")).toBeNull()
+    expect(rootOf(i, entryId("7-b2"))).toBe("1-t1")
+    expect(rootOf(i, entryId("1-t1"))).toBe("1-t1")
+    expect(rootOf(i, entryId("a-y"))).toBe("9-x")
+    expect(rootOf(i, entryId("nope"))).toBeNull()
   })
   test("a cycle stops ancestry and is reported", () => {
     const cyclic = tree({ x: "y", y: "x" })
-    expect(ancestry(indexTree(cyclic), "x")).toEqual({
+    expect(ancestry(indexTree(cyclic), entryId("x"))).toEqual({
       path: ["x", "y"],
       cycleAt: "x",
     })
@@ -105,29 +98,31 @@ describe("followTip: the view follows the thread you are reading", () => {
     "4-a3": "2-a2",
   })
   test("follows a newer reply below what you read, whichever lane wrote it", () => {
-    expect(followTip(indexTree(entries), "2-a2")).toBe("4-a3")
+    expect(followTip(indexTree(entries), entryId("2-a2"))).toBe("4-a3")
   })
   test("never jumps to a branch that is not below you", () => {
     const newer = { ...entries, ...tree({ "5-b3": "3-b2" }) }
-    expect(followTip(indexTree(newer), "2-a2")).toBe("4-a3")
+    expect(followTip(indexTree(newer), entryId("2-a2"))).toBe("4-a3")
   })
   test("a cycle stops the walk rather than spinning", () => {
-    expect(followTip(indexTree(tree({ w: "x", x: "y", y: "x" })), "z")).toBe(
-      "z",
-    )
+    expect(
+      followTip(indexTree(tree({ w: "x", x: "y", y: "x" })), entryId("z")),
+    ).toBe("z")
   })
   test("walking down from an entry on a cycle ends", () => {
     // Going down, a cycle is reachable only from inside it: each entry has one
     // parent, so no chain leaves a cycle to reach it from outside.
     // Every entry on a cycle has a child, so there is no leaf below: `at` stands.
-    expect(followTip(indexTree(tree({ x: "y", y: "x" })), "x")).toBe("x")
+    expect(followTip(indexTree(tree({ x: "y", y: "x" })), entryId("x"))).toBe(
+      "x",
+    )
   })
 })
 
 describe("projectColumns", () => {
   const i = indexTree(forks)
   test("a first column is its whole path", () => {
-    const [c] = projectColumns(i, [{ anchor: "3-t3" }])
+    const [c] = projectColumns(i, [{ anchor: entryId("3-t3") }])
     expect([c?.forkFrom, ids(c?.nodes ?? [])]).toEqual([
       null,
       ["1-t1", "2-t2", "3-t3"],
@@ -135,9 +130,9 @@ describe("projectColumns", () => {
   })
   test("a branch starts after the deepest message it shares with ANY column to its left", () => {
     const [, a, b] = projectColumns(i, [
-      { anchor: "3-t3" },
-      { anchor: "4-a1" },
-      { anchor: "6-b1" },
+      { anchor: entryId("3-t3") },
+      { anchor: entryId("4-a1") },
+      { anchor: entryId("6-b1") },
     ])
     expect([a?.forkFrom, ids(a?.nodes ?? [])]).toEqual([
       "1-t1",
@@ -151,8 +146,8 @@ describe("projectColumns", () => {
   })
   test("making a branch main recomputes every fork point", () => {
     const [a, trunk] = projectColumns(i, [
-      { anchor: "4-a1" },
-      { anchor: "3-t3" },
+      { anchor: entryId("4-a1") },
+      { anchor: entryId("3-t3") },
     ])
     expect(ids(a?.nodes ?? [])).toEqual(["1-t1", "4-a1", "5-a2"])
     expect([trunk?.forkFrom, ids(trunk?.nodes ?? [])]).toEqual([
@@ -166,15 +161,15 @@ describe("projectColumns", () => {
       ...tree({ "8-r1": null, "9-r2": "8-r1" }),
     })
     const [, c] = projectColumns(other, [
-      { anchor: "3-t3" },
-      { anchor: "8-r1" },
+      { anchor: entryId("3-t3") },
+      { anchor: entryId("8-r1") },
     ])
     expect([c?.forkFrom, ids(c?.nodes ?? [])]).toEqual([null, ["8-r1", "9-r2"]])
   })
   test("a pinned column (fresh, or bound to a lane) ends at its anchor and follows nothing", () => {
     const [, c] = projectColumns(i, [
-      { anchor: "3-t3" },
-      { anchor: "2-t2", pinned: true },
+      { anchor: entryId("3-t3") },
+      { anchor: entryId("2-t2"), pinned: true },
     ])
     expect([c?.tipId, c?.forkFrom, ids(c?.nodes ?? [])]).toEqual([
       "2-t2",
@@ -183,7 +178,7 @@ describe("projectColumns", () => {
     ])
     // A fresh column at the root: nothing at all, and no fork.
     const [, root] = projectColumns(i, [
-      { anchor: "3-t3" },
+      { anchor: entryId("3-t3") },
       { anchor: null, pinned: true },
     ])
     expect([root?.tipId, root?.forkFrom, root?.nodes]).toEqual([null, null, []])
@@ -195,19 +190,28 @@ describe("writersOf", () => {
     const ada = writerId("w-ada")
     const bea = writerId("w-bea")
     const by = (writer: typeof ada) => ({ role: "chat", author: "", writer })
-    const i = indexTree({
-      "1-a": { id: "1-a", parentId: null, type: "message", message: by(bea) },
-      "2-b": { id: "2-b", parentId: "1-a", type: "message", message: by(ada) },
-      "3-c": { id: "3-c", parentId: "2-b", type: "message", message: by(bea) },
-      "4-d": { id: "4-d", parentId: "3-c", type: "message" },
-    })
-    expect(writersOf(i, ["4-d", "3-c", "2-b", "1-a"])).toEqual([bea, ada])
-    expect(writersOf(i, ["3-c", "2-b"])).toEqual([ada, bea])
+    const i = indexTree(
+      entriesOf([
+        entry("1-a", null, by(bea)),
+        entry("2-b", "1-a", by(ada)),
+        entry("3-c", "2-b", by(bea)),
+        entry("4-d", "3-c"),
+      ]),
+    )
+    expect(
+      writersOf(i, [
+        entryId("4-d"),
+        entryId("3-c"),
+        entryId("2-b"),
+        entryId("1-a"),
+      ]),
+    ).toEqual([bea, ada])
+    expect(writersOf(i, [entryId("3-c"), entryId("2-b")])).toEqual([ada, bea])
   })
 })
 
 describe("projectRail", () => {
-  const rows = projectRail(indexTree(forks), "1-t1")
+  const rows = projectRail(indexTree(forks), entryId("1-t1"))
   const trackOf = (id: string) => rows.find(r => r.id === id)?.track
   test("the oldest child continues its parent's track; a younger one takes a new track", () => {
     expect([trackOf("1-t1"), trackOf("2-t2"), trackOf("3-t3")]).toEqual([
@@ -232,17 +236,17 @@ describe("projectRail", () => {
     })
   })
   test("the same entries in another insertion order give the same rows", () => {
-    const shuffled = Object.fromEntries(Object.entries(forks).toReversed())
-    expect(projectRail(indexTree(shuffled), "1-t1")).toEqual(rows)
+    const shuffled = entriesOf(Object.values(forks).toReversed())
+    expect(projectRail(indexTree(shuffled), entryId("1-t1"))).toEqual(rows)
   })
   test("draws only its root's tree, from track 0", () => {
     const i = indexTree({ ...forks, ...tree({ "8-r1": null, "9-r2": "8-r1" }) })
-    expect(ids(projectRail(i, "8-r1"))).toEqual(["8-r1", "9-r2"])
-    expect(projectRail(i, "8-r1")[0]).toMatchObject({
+    expect(ids(projectRail(i, entryId("8-r1")))).toEqual(["8-r1", "9-r2"])
+    expect(projectRail(i, entryId("8-r1"))[0]).toMatchObject({
       track: 0,
       parentId: null,
     })
-    expect(ids(projectRail(i, "1-t1"))).toEqual(ids(rows))
+    expect(ids(projectRail(i, entryId("1-t1")))).toEqual(ids(rows))
   })
   test("a non-message entry has no row; its child attaches to the message above", () => {
     const withCompaction = {
@@ -250,7 +254,7 @@ describe("projectRail", () => {
       "8-c": { id: "8-c", parentId: "3-t3", type: "compaction" },
       ...tree({ "9-after": "8-c" }),
     }
-    const r = projectRail(indexTree(withCompaction), "1-t1")
+    const r = projectRail(indexTree(withCompaction), entryId("1-t1"))
     expect(r.some(x => x.id === "8-c")).toBe(false)
     expect(r.find(x => x.id === "9-after")).toMatchObject({
       parentId: "3-t3",
@@ -261,30 +265,25 @@ describe("projectRail", () => {
 
 describe("compactRail", () => {
   const pad = (n: number) => String(n).padStart(3, "0")
-  const e = (
-    id: string,
-    parentId: string | null,
-    message: Record<string, unknown>,
-  ): [string, EntryLike] => [id, { id, parentId, type: "message", message }]
   /**
    * A person's question, `steps` agent messages that each call `read` and get
    * a result, and a reply. Ids sort in the order written. Step k is
    * `${pad(2k)}-s`, its result `${pad(2k + 1)}-r`.
    */
-  const loop = (steps: number, failAt?: number): Record<string, EntryLike> => {
-    const out: [string, EntryLike][] = [e("000-q", null, { role: "user" })]
+  const loop = (steps: number, failAt?: number) => {
+    const out: EntryLike[] = [entry("000-q", null, { role: "user" })]
     let parent = "000-q"
     for (let k = 1; k <= steps; k += 1) {
       const step = `${pad(2 * k)}-s`
       const result = `${pad(2 * k + 1)}-r`
       out.push(
-        e(step, parent, {
+        entry(step, parent, {
           role: "assistant",
           content: [
             { type: "toolCall", id: `c${k}`, name: "read", arguments: {} },
           ],
         }),
-        e(result, step, {
+        entry(result, step, {
           role: "toolResult",
           toolCallId: `c${k}`,
           content: "",
@@ -293,21 +292,26 @@ describe("compactRail", () => {
       )
       parent = result
     }
-    out.push(e("999-a", parent, { role: "assistant", content: "done" }))
-    return Object.fromEntries(out)
+    out.push(entry("999-a", parent, { role: "assistant", content: "done" }))
+    return entriesOf(out)
   }
   const steps = (n: number) =>
     Array.from({ length: n }, (_, k) => `${pad(2 * (k + 1))}-s`)
   const compact = (
-    entries: Record<string, EntryLike>,
+    entries: Record<EntryId, EntryLike>,
     root: string,
     keep: readonly string[] = [],
   ) => {
     const i = indexTree(entries)
-    return compactRail(i, projectRail(i, root), new Set(keep), {
-      asks: indexAsks(i),
-      revisions: new Map(),
-    })
+    return compactRail(
+      i,
+      projectRail(i, entryId(root)),
+      new Set(keep.map(entryId)),
+      {
+        asks: indexAsks(i),
+        revisions: new Map(),
+      },
+    )
   }
   const shape = (items: readonly RailItem[]) =>
     items.map(it => (it.kind === "dot" ? it.ids[0] : [...it.ids]))
@@ -380,7 +384,7 @@ describe("compactRail", () => {
   })
   test("every row is in exactly one item, in order, and slots add up", () => {
     const i = indexTree({ ...loop(12), ...tree({ "005-x": "004-s" }) })
-    const rows = projectRail(i, "000-q")
+    const rows = projectRail(i, entryId("000-q"))
     const items = compactRail(i, rows, new Set(), {
       asks: indexAsks(i),
       revisions: new Map(),
@@ -397,13 +401,13 @@ describe("compactRail", () => {
     const chat = (writer: typeof ada) => ({ role: "chat", author: "", writer })
     const agent = { role: "assistant", content: "ok" }
     const items = compact(
-      Object.fromEntries([
-        e("01", null, chat(ada)),
-        e("02", "01", chat(bea)),
-        e("03", "02", agent),
-        e("04", "03", chat(ada)),
-        e("05", "04", agent),
-        e("06", "05", chat(bea)),
+      entriesOf([
+        entry("01", null, chat(ada)),
+        entry("02", "01", chat(bea)),
+        entry("03", "02", agent),
+        entry("04", "03", chat(ada)),
+        entry("05", "04", agent),
+        entry("06", "05", chat(bea)),
       ]),
       "01",
     )
@@ -416,12 +420,12 @@ describe("compactRail", () => {
 
 describe("colour and the agent", () => {
   const i = indexTree(forks)
-  const rail = projectRail(i, "1-t1")
+  const rail = projectRail(i, entryId("1-t1"))
   test("a column's colour is its last message's track; its fork dot matches", () => {
     const cols = projectColumns(i, [
-      { anchor: "3-t3" },
-      { anchor: "4-a1" },
-      { anchor: "6-b1" },
+      { anchor: entryId("3-t3") },
+      { anchor: entryId("4-a1") },
+      { anchor: entryId("6-b1") },
     ])
     const c = branchColors(rail, cols)
     expect(c.track).toEqual([0, 1, 2])
@@ -432,16 +436,16 @@ describe("colour and the agent", () => {
   })
   test("a fresh branch is pending until it has a message", () => {
     const cols = projectColumns(i, [
-      { anchor: "3-t3" },
-      { anchor: "2-t2", pinned: true },
+      { anchor: entryId("3-t3") },
+      { anchor: entryId("2-t2"), pinned: true },
     ])
     expect(branchColors(rail, cols).track).toEqual([0, PENDING_TRACK])
   })
   test("the agent is idle with no running lane; a lane runs once it has a tip", () => {
     expect(agentActivity([])).toEqual([])
     const runs = agentActivity([
-      { lane: laneNameForThread("a"), tip: "5-a2" },
-      { lane: laneNameForThread("b"), tip: "7-b2" },
+      { lane: laneNameForThread("a"), tip: entryId("5-a2") },
+      { lane: laneNameForThread("b"), tip: entryId("7-b2") },
       { lane: laneNameForThread("new"), tip: null },
     ])
     expect(runs.map(r => [r.lane, r.tip])).toEqual([
@@ -456,36 +460,26 @@ describe("threads: where a message lands, and whether it raced", () => {
   const say = (
     id: string,
     parentId: string | null,
-    extra: Record<string, unknown>,
-  ): [string, EntryLike] => [
-    id,
-    {
-      id,
-      parentId,
-      type: "message",
-      message: { role: "chat", content: id, ...extra },
-    },
-  ]
-  const entries = Object.fromEntries([
-    say("1-q", null, { writer: "w-wu", compelled: true }),
-    [
-      "2-r",
-      {
-        id: "2-r",
-        parentId: "1-q",
-        type: "message",
-        message: { role: "assistant", content: "r" },
-      },
-    ],
-    say("3-plain", "2-r", { writer: "w-bo", compelled: false }),
-    say("4-mine", "3-plain", { writer: "w-wu", compelled: true }),
-  ]) as Record<string, EntryLike>
+    extra: { readonly writer: string; readonly compelled: boolean },
+  ) =>
+    entry(id, parentId, {
+      role: "chat",
+      content: id,
+      writer: writerId(extra.writer),
+      compelled: extra.compelled,
+    })
+  const entries = entriesOf([
+    say("1-q", null, { writer: "wu", compelled: true }),
+    entry("2-r", "1-q", { role: "assistant", content: "r" }),
+    say("3-plain", "2-r", { writer: "bo", compelled: false }),
+    say("4-mine", "3-plain", { writer: "wu", compelled: true }),
+  ])
   const at = (id: string) => atEntry(entryId(id))
 
   const me = writerId("wu")
   const lane = (tip: string | null, name = "x") => ({
     name: laneNameForThread(name),
-    tip,
+    tip: tip === null ? null : entryId(tip),
     running: false,
     waiting: 0,
     askedBy: null,
@@ -520,9 +514,9 @@ describe("threads: where a message lands, and whether it raced", () => {
     // 5-conv steps down at the lane's old tip; the lane then moved on to 6-next.
     const i = indexTree({
       ...entries,
-      ...Object.fromEntries([
-        say("6-next", "4-mine", { writer: "w-wu", compelled: false }),
-        say("7-conv", "4-mine", { writer: "w-bo", compelled: false }),
+      ...entriesOf([
+        say("6-next", "4-mine", { writer: "wu", compelled: false }),
+        say("7-conv", "4-mine", { writer: "bo", compelled: false }),
       ]),
     })
     const lanes = [lane("6-next")]
@@ -579,8 +573,8 @@ describe("threads: where a message lands, and whether it raced", () => {
   test("threadOf race: another writer's compelled message on the thread is; in a sibling fork, not", () => {
     const raced = indexTree({
       ...entries,
-      ...Object.fromEntries([
-        say("5-theirs", "4-mine", { writer: "w-bo", compelled: true }),
+      ...entriesOf([
+        say("5-theirs", "4-mine", { writer: "bo", compelled: true }),
       ]),
     })
     expect(threadOf(raced, [], send(at("1-q")))).toMatchObject({
@@ -593,9 +587,9 @@ describe("threads: where a message lands, and whether it raced", () => {
     // Bob asks in a fork at 2-r; my thread continues through 6-mine, newer.
     const forked = indexTree({
       ...entries,
-      ...Object.fromEntries([
-        say("5-fork", "2-r", { writer: "w-bo", compelled: true }),
-        say("6-mine", "4-mine", { writer: "w-wu", compelled: false }),
+      ...entriesOf([
+        say("5-fork", "2-r", { writer: "bo", compelled: true }),
+        say("6-mine", "4-mine", { writer: "wu", compelled: false }),
       ]),
     })
     expect(threadOf(forked, [], send(at("1-q")))).toMatchObject({
@@ -606,32 +600,27 @@ describe("threads: where a message lands, and whether it raced", () => {
 })
 
 describe("tool calls: paired with their results on the path", () => {
-  const e = (
-    id: string,
-    parentId: string | null,
-    message: Record<string, unknown>,
-  ): [string, EntryLike] => [id, { id, parentId, type: "message", message }]
   const call = (id: string, name: string, args: unknown) => ({
     type: "toolCall",
     id,
     name,
     arguments: args,
   })
-  const entries = Object.fromEntries([
-    e("1-q", null, { role: "user", content: "what is in notes?" }),
-    e("2-a", "1-q", {
+  const entries = entriesOf([
+    entry("1-q", null, { role: "user", content: "what is in notes?" }),
+    entry("2-a", "1-q", {
       role: "assistant",
       content: [call("c1", "read", { path: "notes.txt" })],
     }),
-    e("3-r", "2-a", {
+    entry("3-r", "2-a", {
       role: "toolResult",
       toolCallId: "c1",
       content: [{ type: "text", text: "MANGO" }],
       isError: false,
     }),
-    e("4-a", "3-r", { role: "assistant", content: "It says MANGO." }),
+    entry("4-a", "3-r", { role: "assistant", content: "It says MANGO." }),
     // A sibling branch answering the same call id: not on the main path.
-    e("5-r", "2-a", {
+    entry("5-r", "2-a", {
       role: "toolResult",
       toolCallId: "c1",
       content: [{ type: "text", text: "elsewhere" }],
@@ -641,7 +630,7 @@ describe("tool calls: paired with their results on the path", () => {
   const i = indexTree(entries)
 
   test("a call and its result on one path pair; a message with only calls keeps them", () => {
-    const { spine } = projectSpine(i, "4-a")
+    const { spine } = projectSpine(i, entryId("4-a"))
     expect(spine.map(n => n.id)).toEqual(["1-q", "2-a", "4-a"])
     expect(spine[1]?.toolCalls).toEqual([
       {
@@ -663,12 +652,12 @@ describe("tool calls: paired with their results on the path", () => {
     }
     const read = indexTree({
       ...entries,
-      ...Object.fromEntries([
-        e("6-a", "4-a", {
+      ...entriesOf([
+        entry("6-a", "4-a", {
           role: "assistant",
           content: [call("c6", "read", { path: "shot.png" })],
         }),
-        e("7-r", "6-a", {
+        entry("7-r", "6-a", {
           role: "toolResult",
           toolCallId: "c6",
           content: [
@@ -677,10 +666,10 @@ describe("tool calls: paired with their results on the path", () => {
           ],
           isError: false,
         }),
-        e("8-a", "7-r", { role: "assistant", content: "A red square." }),
+        entry("8-a", "7-r", { role: "assistant", content: "A red square." }),
       ]),
     })
-    expect(projectSpine(read, "8-a").spine.at(-2)?.toolCalls).toEqual([
+    expect(projectSpine(read, entryId("8-a")).spine.at(-2)?.toolCalls).toEqual([
       {
         id: "c6",
         name: "read",
@@ -705,14 +694,14 @@ describe("tool calls: paired with their results on the path", () => {
     const command = "pnpm test\necho done"
     const long = indexTree({
       ...entries,
-      ...Object.fromEntries([
-        e("9-a", "4-a", {
+      ...entriesOf([
+        entry("9-a", "4-a", {
           role: "assistant",
           content: [call("c9", "bash", { command })],
         }),
       ]),
     })
-    expect(projectSpine(long, "9-a").spine.at(-1)?.toolCalls).toEqual([
+    expect(projectSpine(long, entryId("9-a")).spine.at(-1)?.toolCalls).toEqual([
       {
         id: "c9",
         name: "bash",
@@ -725,16 +714,18 @@ describe("tool calls: paired with their results on the path", () => {
   test("a result off the path does not pair", () => {
     // Path to 5-r: its result pairs; path to 2-a alone: no result yet.
     expect(
-      projectSpine(i, "2-a").spine[1]?.toolCalls?.[0]?.result,
+      projectSpine(i, entryId("2-a")).spine[1]?.toolCalls?.[0]?.result,
     ).toBeUndefined()
-    expect(projectSpine(i, "5-r").spine[1]?.toolCalls?.[0]?.result).toEqual({
+    expect(
+      projectSpine(i, entryId("5-r")).spine[1]?.toolCalls?.[0]?.result,
+    ).toEqual({
       text: "elsewhere",
       isError: true,
       images: [],
     })
   })
   test("a branch's message count ignores tool results", () => {
-    const { spine } = projectSpine(i, "1-q")
+    const { spine } = projectSpine(i, entryId("1-q"))
     expect(spine[0]?.branches).toEqual([{ rootId: "2-a", messageCount: 2 }])
   })
 })
@@ -742,23 +733,20 @@ describe("tool calls: paired with their results on the path", () => {
 describe("planStop", () => {
   const i = indexTree({
     ...tree({ "1-p": null }),
-    "2-a": {
-      id: "2-a",
-      parentId: "1-p",
-      type: "message",
-      message: { role: "assistant", content: "working" },
-    },
+    ...entriesOf([
+      entry("2-a", "1-p", { role: "assistant", content: "working" }),
+    ]),
   })
   const ada = writerId("ada")
   const lane = (running: boolean) => ({
     name: laneNameForThread("s"),
-    tip: "2-a",
+    tip: entryId("2-a"),
     running,
     waiting: 0,
     askedBy: null,
     lastWaiting: null,
   })
-  const facts = (stops: ReadonlyMap<string, StopRecord> = new Map()) => ({
+  const facts = (stops: ReadonlyMap<EntryId, StopRecord> = new Map()) => ({
     index: i,
     stops,
     by: ada,
@@ -772,7 +760,7 @@ describe("planStop", () => {
     })
   })
   test("the first stop recorded is kept: a second press records nothing", () => {
-    const first = new Map([["1-p", { by: writerId("bea"), at: 1 }]])
+    const first = new Map([[entryId("1-p"), { by: writerId("bea"), at: 1 }]])
     expect(planStop([lane(true)], s, facts(first))).toEqual({
       kind: "abort",
       record: null,

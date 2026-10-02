@@ -31,8 +31,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a turn is not awaited before the next request",
     file: "packages/pi/agent.ts",
-    from: "      if (tip !== null)\n        await lanes.hooks.turnDone(event.lane as LaneName, entryId(tip))",
-    to: "      if (tip !== null)\n        void lanes.hooks.turnDone(event.lane as LaneName, entryId(tip))",
+    from: "      if (tip !== null) await lanes.hooks.turnDone(lane, tip)\n      return undefined",
+    to: "      if (tip !== null) void lanes.hooks.turnDone(lane, tip)\n      return undefined",
     command: unit,
     expect: "each turn is recorded before the next request",
   },

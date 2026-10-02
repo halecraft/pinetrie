@@ -1,7 +1,35 @@
-// client/fixtures — test support for the client's unit tests. Production code
-// never imports it.
+// client/fixtures — test support for the client's unit tests: entries and
+// trees, their ids minted with `entryId`. Production code never imports it.
 
-import { type EntryLike, indexTree, type TreeIndex } from "@pineta/core"
+import {
+  type AgentMessageLike,
+  type EntryId,
+  type EntryLike,
+  entryId,
+  indexTree,
+  type TreeIndex,
+} from "@pineta/core"
+
+/** One entry: a message when `message` is given, else of `more.type`. */
+export const entry = (
+  id: string,
+  parentId: string | null,
+  message?: AgentMessageLike,
+  more: { readonly type?: string; readonly timestamp?: number } = {},
+): EntryLike => ({
+  id: entryId(id),
+  parentId: parentId === null ? null : entryId(parentId),
+  type: more.type ?? "message",
+  ...(message === undefined ? {} : { message }),
+  ...(more.timestamp === undefined ? {} : { timestamp: more.timestamp }),
+})
+
+/** The index of `list`, keyed by each entry's own id as the reads key them. */
+export const indexOf = (list: Iterable<EntryLike>): TreeIndex => {
+  const entries: Record<EntryId, EntryLike> = {}
+  for (const e of list) entries[e.id] = e
+  return indexTree(entries)
+}
 
 /**
  * A tree of chat messages from `child: parent` pairs, each message's text its
@@ -11,20 +39,12 @@ export const tree = (
   parents: Record<string, string | null>,
   sends: Record<string, string> = {},
 ): TreeIndex =>
-  indexTree(
-    Object.fromEntries(
-      Object.entries(parents).map(([id, parentId]): [string, EntryLike] => [
-        id,
-        {
-          id,
-          parentId,
-          type: "message",
-          message: {
-            role: "chat",
-            content: id,
-            ...(sends[id] === undefined ? {} : { sendId: sends[id] }),
-          },
-        },
-      ]),
+  indexOf(
+    Object.entries(parents).map(([id, parentId]) =>
+      entry(id, parentId, {
+        role: "chat",
+        content: id,
+        ...(sends[id] === undefined ? {} : { sendId: sends[id] }),
+      }),
     ),
   )

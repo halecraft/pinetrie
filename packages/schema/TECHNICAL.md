@@ -266,6 +266,21 @@ the `pi.branch.tip` key when it creates a lane, even before its first entry.
 See `packages/pi/TECHNICAL.md` for why this matters. `writeLaneTip` writes that
 value as pi does, for tests and fixtures; in the host, only pi writes it.
 
+## Lane names, tips and runs are branded here
+
+The lane and run functions take and give `LaneName`, `EntryId` and `RunId`
+(`@pineta/core`), so `endRun(doc, lane, run)` cannot take its two ids
+swapped. The readers mint them: `readLaneTip` an `EntryId`, `readActiveRun` a
+`RunId`, and `readStoredLanes` the lane names.
+
+- **`readStoredLanes` sets aside a stored name that fails `isLaneName`**, in
+  `malformed`, and `readLaneNames` gives only `lanes`, so no reader is
+  handed a name like `"main"`, which would become a container's or a
+  bookmark's name. The host logs the malformed ones at startup (`recover`).
+  Every lane name in a measured store passed (S71).
+- **`readStreamRecords` drops a stream whose lane fails `isLaneName`.** Only
+  the host writes streams, and `clearStreams` deletes them all at startup.
+
 ## Never race a child container (S18)
 
 Moot for the session since ADR-0023: it has one writer, so two replicas never

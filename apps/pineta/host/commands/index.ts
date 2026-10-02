@@ -1,7 +1,7 @@
 // host/commands — one command from one writer: decoded, checked against the
 // archive, and routed to its module.
 
-import { ERR, type LaneView, type WriterId } from "@pineta/core"
+import { type EntryId, ERR, type LaneView, type WriterId } from "@pineta/core"
 import { archivedAt, displayName, writesAt } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import {
@@ -158,7 +158,7 @@ export function createCommands(deps: CommandDeps): Commands {
 function refuseInArchive(
   doc: SessionDocHandle,
   cards: CardsDocHandle,
-  writes: (lanes: readonly LaneView[]) => string | null,
+  writes: (lanes: readonly LaneView[]) => EntryId | null,
 ): Outcome | null {
   const archive = readArchive(doc)
   if (archive.size === 0) return null

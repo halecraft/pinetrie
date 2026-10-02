@@ -1,8 +1,10 @@
 import {
   commitId,
+  type EntryId,
   entryId,
   type HaveRecord,
   type LandingRecord,
+  type LaneName,
   laneNameForThread,
   type OfferRecord,
   type RevisionRecord,
@@ -317,8 +319,8 @@ describe("the review (ADR-0047)", () => {
   const open: OfferRecord = { ...offer, commits: [C1, C2] }
   const offers = new Map([[LANE, open]])
   const facts = (
-    o: ReadonlyMap<string, OfferRecord>,
-    revisions: ReadonlyMap<string, RevisionRecord> = new Map(),
+    o: ReadonlyMap<LaneName, OfferRecord>,
+    revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(),
   ) => ({ offers: o, revisions })
   const rev = (c: string) => ({ kind: "revision", commit: c }) as const
   test("planOfferRead: only a commit an open offer holds now", () => {
@@ -335,7 +337,7 @@ describe("the review (ADR-0047)", () => {
         path: "a b.txt",
       }),
     ).toEqual({ kind: "diff", span: rev(C1), path: "a b.txt" })
-    const status = (o: ReadonlyMap<string, OfferRecord>, commit: string) => {
+    const status = (o: ReadonlyMap<LaneName, OfferRecord>, commit: string) => {
       const read = planOfferRead(facts(o), {
         kind: "review",
         span: rev(commit),
@@ -361,7 +363,7 @@ describe("the review (ADR-0047)", () => {
     const OTHER = laneNameForThread("other")
     const record = (entry: string, lane: typeof LANE, commit: string) =>
       [
-        entry,
+        entryId(entry),
         {
           entry: entryId(entry),
           lane,

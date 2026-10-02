@@ -92,4 +92,12 @@ export const mutations: readonly Mutation[] = [
     ],
     expect: "before its first colon",
   },
+  {
+    name: "stored lane names are not checked",
+    file: file,
+    from: "    if (isLaneName(key)) lanes.push(key)\n    else malformed.push(key)",
+    to: "    lanes.push(key as LaneName)",
+    command: unit,
+    expect: "readStoredLanes gives a thread's lanes",
+  },
 ]

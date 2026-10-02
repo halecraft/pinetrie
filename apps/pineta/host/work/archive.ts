@@ -1,12 +1,7 @@
 // host/work/archive — a root archived or restored (ADR-0029): its lanes'
 // disks deleted, their history out of your repo, or back.
 
-import {
-  type EntryId,
-  type LaneName,
-  nearestRevision,
-  rootOf,
-} from "@pineta/core"
+import { nearestRevision, rootOf } from "@pineta/core"
 import {
   type DiskPaths,
   executeOnHost,
@@ -30,16 +25,14 @@ import type { LaneRegistry } from "./registry.ts"
 function lanesIn(doc: SessionDocHandle, treeRoot: string) {
   const index = readTreeIndex(doc)
   const records = readLaneRecords(doc)
-  return readLaneNames(doc)
-    .map(name => name as LaneName)
-    .filter(lane => {
-      const tip = readLaneTip(doc, lane)
-      return (
-        tip !== null &&
-        rootOf(index, tip) === treeRoot &&
-        records.get(lane)?.work.kind === "own"
-      )
-    })
+  return readLaneNames(doc).filter(lane => {
+    const tip = readLaneTip(doc, lane)
+    return (
+      tip !== null &&
+      rootOf(index, tip) === treeRoot &&
+      records.get(lane)?.work.kind === "own"
+    )
+  })
 }
 
 export interface Archive {
@@ -98,7 +91,7 @@ export function createArchive(deps: {
         if (tip === null) return []
         const { commit } = nearestRevision(index, revisions, {
           kind: "entry",
-          id: tip as EntryId,
+          id: tip,
         })
         return commit === null ? [] : [{ lane, commit }]
       })

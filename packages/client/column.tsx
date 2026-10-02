@@ -10,7 +10,6 @@ import {
   type CardRecord,
   type ColumnView,
   type EntryId,
-  entryId,
   type LaneView,
   messageAt,
   nearestRevision,
@@ -109,7 +108,7 @@ export interface ColumnProps {
   /** This column's colour track; its header carries it. */
   track: number
   /** Fork dots, by the message they sit on. */
-  forks: ReadonlyMap<string, readonly number[]>
+  forks: ReadonlyMap<EntryId, readonly number[]>
   /** Ids any column of this tab shows: a branch leaving here that is shown needs no button. */
   shown: ReadonlySet<string>
   /** Display names by writer. */
@@ -137,7 +136,7 @@ export interface ColumnProps {
   /** Where lanes work, the files at each entry, and landings (ADR-0032). */
   work: WorkFacts
   /** The ids on this column's path, which the app has already computed. */
-  path: ReadonlySet<string>
+  path: ReadonlySet<EntryId>
   /**
    * What a reader asks of the page. The column's own acts go as
    * `{ kind: "column", position, act }`, a message's among them.
@@ -162,13 +161,13 @@ export interface ColumnProps {
   /** Every ask (`indexAsks`), from the same moment as `index`. */
   asks: AskIndex
   /** What the rail draws apart in this column's root, sorted: no fold hides it. */
-  landmarks: readonly string[]
+  landmarks: readonly EntryId[]
   /** Who stopped each ask, by its prompt (ADR-0056). */
-  stops: ReadonlyMap<string, StopRecord>
+  stops: ReadonlyMap<EntryId, StopRecord>
   /** Each ask's fold, as the reader chose it, across unmounts. */
   folds: FoldMemory
   /** Each ask's model-written digest, by its prompt (ADR-0056). */
-  digests: ReadonlyMap<string, DigestRecord>
+  digests: ReadonlyMap<EntryId, DigestRecord>
   /** Where this device last left each thread (ADR-0056); none in a preview. */
   left?: DeviceState<Left>
   /** Every mounted column's view, which the rail outlines (ADR-0058). */
@@ -210,10 +209,10 @@ export function Column(p: ColumnProps) {
   const at: Position = fresh
     ? p.column.anchor === null
       ? ROOT
-      : atEntry(entryId(p.column.anchor))
+      : atEntry(p.column.anchor)
     : view.tipId === null
       ? ROOT
-      : atEntry(entryId(view.tipId))
+      : atEntry(view.tipId)
   const writable = p.readOnly === null
   // What this column's reader asks, a message's acts among it: the one
   // handler every message shares, so none of them redraws when this column
@@ -221,7 +220,7 @@ export function Column(p: ColumnProps) {
   const act = useStable((act: ColumnAct) =>
     p.onIntent({ kind: "column", position: p.position, act }),
   )
-  const openAt = useStable((entry: string) =>
+  const openAt = useStable((entry: EntryId) =>
     p.onIntent({ kind: "openAt", entry }),
   )
 
@@ -266,7 +265,7 @@ export function Column(p: ColumnProps) {
   const leave = useStable(
     (left: {
       readonly unseen: boolean
-      readonly released: string | null
+      readonly released: EntryId | null
       readonly following: boolean
     }) => {
       p.seenEnd?.remember(p.column.key, {
@@ -309,7 +308,7 @@ export function Column(p: ColumnProps) {
     lane.kind === "lane" && lane.running ? promptOf(index, lane.tip) : null
   const density = p.column.density ?? "story"
   const nameFn = (w: WriterId) => nameFor(p.nameOf, w)
-  const askLine = (ask: string | null): string | null => {
+  const askLine = (ask: EntryId | null): string | null => {
     const prompt = ask === null ? null : messageAt(index, ask)
     return prompt === null ? null : askWords(prompt, nameFn)
   }
@@ -813,7 +812,7 @@ export function Column(p: ColumnProps) {
 function SeenBy(p: {
   session: SessionClient
   index: TreeIndex
-  end: string
+  end: EntryId
   nameOf: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
 }) {
@@ -922,7 +921,7 @@ function Identity({
 }: {
   identity: HeadIdentity
   banner: HeadBanner | null
-  onOpen: (id: string) => void
+  onOpen: (id: EntryId) => void
   running: boolean
   working: string | undefined
 }) {
@@ -958,7 +957,7 @@ function Origin({
   onOpen,
 }: {
   origin: HeadOrigin
-  onOpen: (id: string) => void
+  onOpen: (id: EntryId) => void
 }) {
   if (origin.kind === "none") return null
   return (

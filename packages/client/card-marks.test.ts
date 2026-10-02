@@ -3,34 +3,25 @@ import {
   type CardId,
   type CardRecord,
   cardId,
+  type EntryId,
   type EntryLike,
   entryId,
-  indexTree,
   type TreeIndex,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import { cardMarks, holdsText, ownCards, withFilled } from "./card-marks.ts"
+import { entry, indexOf } from "./fixtures.ts"
 import { initialLayout, type Layout, tabOfColumn } from "./layout.ts"
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
 
-const entry = (id: string, parentId: string | null): EntryLike => ({
-  id,
-  parentId,
-  type: "message",
-  message: { role: "user", content: `text of ${id}` },
-})
+const said = (id: string, parentId: string | null): EntryLike =>
+  entry(id, parentId, { role: "user", content: `text of ${id}` })
 /** Two roots: e1 -> e2, and g1. */
 const tree = (...more: EntryLike[]): TreeIndex =>
-  indexTree(
-    Object.fromEntries(
-      [entry("e1", null), entry("e2", "e1"), entry("g1", null), ...more].map(
-        e => [e.id, e],
-      ),
-    ),
-  )
+  indexOf([said("e1", null), said("e2", "e1"), said("g1", null), ...more])
 const drafting = (id: string, at: string, owner = ADA): CardRecord => ({
   id: cardId(id),
   owner,
@@ -48,23 +39,23 @@ const fresh = (id: string, column: string): CardRecord => ({
 /** e1's tab open, holding a branch column; a new tab; g1's tab closed. */
 const layout: Layout = {
   ...initialLayout(),
-  open: ["e1"],
+  open: [entryId("e1")],
   roots: new Map([
     [
-      "e1",
+      entryId("e1"),
       [
-        { key: "first-e1", anchor: "e1" },
-        { key: "branch", anchor: "e1", fresh: {} },
+        { key: "first-e1", anchor: entryId("e1") },
+        { key: "branch", anchor: entryId("e1"), fresh: {} },
       ],
     ],
-    ["g1", [{ key: "first-g1", anchor: "g1" }]],
+    [entryId("g1"), [{ key: "first-g1", anchor: entryId("g1") }]],
   ]),
   newTabs: [{ key: "new-1", anchor: null, fresh: {} }],
 }
 const marks = (
   cards: readonly CardRecord[],
   filled: readonly string[] = cards.map(c => c.id),
-  over: { layout?: Layout; index?: TreeIndex; archived?: Set<string> } = {},
+  over: { layout?: Layout; index?: TreeIndex; archived?: Set<EntryId> } = {},
 ) =>
   cardMarks({
     mine: ownCards(ADA, cards),
@@ -119,7 +110,7 @@ describe("cardMarks", () => {
   })
 
   test("it follows its thread as the thread grows", () => {
-    const grown = tree(entry("e3", "e2"))
+    const grown = tree(said("e3", "e2"))
     expect([
       ...marks([drafting("c", "e2")], ["c"], { index: grown }).ends,
     ]).toEqual(["e3"])
@@ -156,7 +147,7 @@ describe("cardMarks", () => {
 
   test("an archived root marks its row, never the Archive tab", () => {
     const m = marks([drafting("c", "g1")], ["c"], {
-      archived: new Set(["g1"]),
+      archived: new Set([entryId("g1")]),
     })
     expect([...m.roots]).toEqual(["g1"])
     expect(m.elsewhere).toBe(false)

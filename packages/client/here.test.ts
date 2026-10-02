@@ -1,5 +1,6 @@
-import { type EntryLike, indexTree, writerId } from "@pineta/core"
+import { entryId, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
+import { tree } from "./fixtures.ts"
 import {
   peopleHere,
   readersByRoot,
@@ -10,26 +11,13 @@ import {
 const ADA = writerId("ada")
 const BEA = writerId("bea")
 const CY = writerId("cy")
-const msg = (id: string, parentId: string | null): EntryLike => ({
-  id,
-  parentId,
-  type: "message",
-  message: { role: "user", content: id },
-})
-const index = indexTree(
-  Object.fromEntries(
-    [msg("1-r1", null), msg("2-a", "1-r1"), msg("3-r2", null)].map(e => [
-      e.id,
-      e,
-    ]),
-  ),
-)
+const index = tree({ "1-r1": null, "2-a": "1-r1", "3-r2": null })
 
 test("peopleHere groups each person's columns, in order, and drops an end not arrived", () => {
   const readingAt = new Map([
-    ["2-a", [BEA, CY]],
-    ["3-r2", [BEA]],
-    ["9-missing", [ADA]],
+    [entryId("2-a"), [BEA, CY]],
+    [entryId("3-r2"), [BEA]],
+    [entryId("9-missing"), [ADA]],
   ])
   expect(peopleHere(readingAt, index, [CY, BEA])).toEqual([
     { writer: CY, threads: [{ end: "2-a", root: "1-r1" }] },
@@ -46,9 +34,9 @@ test("peopleHere groups each person's columns, in order, and drops an end not ar
 test("readersByRoot turns people around: each root with its readers, each once", () => {
   const people = peopleHere(
     new Map([
-      ["2-a", [BEA, CY]],
-      ["1-r1", [BEA]],
-      ["3-r2", [BEA]],
+      [entryId("2-a"), [BEA, CY]],
+      [entryId("1-r1"), [BEA]],
+      [entryId("3-r2"), [BEA]],
     ]),
     index,
     [BEA, CY],
@@ -60,8 +48,12 @@ test("readersByRoot turns people around: each root with its readers, each once",
 })
 
 test("withOpenMenus keeps a person who left while their menu is open, where they were", () => {
-  const bea = { writer: BEA, threads: [{ end: "2-a", root: "1-r1" }] }
-  const cy = { writer: CY, threads: [{ end: "3-r2", root: "3-r2" }] }
+  const thread = (end: string, root: string) => ({
+    end: entryId(end),
+    root: entryId(root),
+  })
+  const bea = { writer: BEA, threads: [thread("2-a", "1-r1")] }
+  const cy = { writer: CY, threads: [thread("3-r2", "3-r2")] }
   expect(withOpenMenus([bea, cy], new Map())).toEqual([
     { person: bea, gone: false },
     { person: cy, gone: false },

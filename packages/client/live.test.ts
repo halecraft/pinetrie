@@ -1,18 +1,26 @@
-import { type AgentRun, laneNameForThread } from "@pineta/core"
+import {
+  type AgentRun,
+  entryId,
+  type LaneName,
+  laneNameForThread,
+} from "@pineta/core"
 import type { StreamRecord } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { callStreams, liveWork } from "./live.ts"
 
 const L = laneNameForThread("l")
 const M = laneNameForThread("m")
-const run = (lane: typeof L, tip: string): AgentRun => ({ lane, tip })
-const reply = (id: string, lane: string, under: string): StreamRecord => ({
+const run = (lane: typeof L, tip: string): AgentRun => ({
+  lane,
+  tip: entryId(tip),
+})
+const reply = (id: string, lane: LaneName, under: string): StreamRecord => ({
   id,
   lane,
   kind: "reply",
-  under,
+  under: entryId(under),
 })
-const tool = (id: string, lane: string, callId: string): StreamRecord => ({
+const tool = (id: string, lane: LaneName, callId: string): StreamRecord => ({
   id,
   lane,
   kind: "tool",

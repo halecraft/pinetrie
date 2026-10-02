@@ -5,12 +5,20 @@
 // `readingAt` groups them by thread end; "never you" is `readingAt`'s.
 // The tabs' avatars are the same people turned around, by root.
 
-import { rootOf, type TreeIndex, type WriterId } from "@pineta/core"
+import {
+  type EntryId,
+  rootOf,
+  type TreeIndex,
+  type WriterId,
+} from "@pineta/core"
 
 export interface PersonHere {
   readonly writer: WriterId
   /** Each thread end they read, with its root. */
-  readonly threads: readonly { readonly end: string; readonly root: string }[]
+  readonly threads: readonly {
+    readonly end: EntryId
+    readonly root: EntryId
+  }[]
 }
 
 /**
@@ -19,11 +27,11 @@ export interface PersonHere {
  * thread end the index lacks, not arrived yet, is left out.
  */
 export function peopleHere(
-  readingAt: ReadonlyMap<string, readonly WriterId[]>,
+  readingAt: ReadonlyMap<EntryId, readonly WriterId[]>,
   index: TreeIndex,
   order: readonly WriterId[],
 ): readonly PersonHere[] {
-  const threads = new Map<WriterId, { end: string; root: string }[]>()
+  const threads = new Map<WriterId, { end: EntryId; root: EntryId }[]>()
   for (const [end, writers] of readingAt) {
     const root = rootOf(index, end)
     if (root === null) continue

@@ -1,40 +1,13 @@
-import {
-  cardId,
-  type EntryLike,
-  indexTree,
-  type LaneView,
-  laneNameForThread,
-} from "@pineta/core"
+import { cardId, entryId, type LaneView, laneNameForThread } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import { type Column, columnsReducer } from "./columns.ts"
+import { tree } from "./fixtures.ts"
 
-/** A tree from `child: parent` pairs; `sends` gives some entries a send id. */
-const tree = (
-  parents: Record<string, string | null>,
-  sends: Record<string, string> = {},
-) =>
-  indexTree(
-    Object.fromEntries(
-      Object.entries(parents).map(([id, parentId]): [string, EntryLike] => [
-        id,
-        {
-          id,
-          parentId,
-          type: "message",
-          message: {
-            role: "chat",
-            content: id,
-            ...(sends[id] === undefined ? {} : { sendId: sends[id] }),
-          },
-        },
-      ]),
-    ),
-  )
 const anchors = (s: readonly Column[]) => s.map(c => c.anchor)
 const L = laneNameForThread("l")
 const lane = (tip: string | null, name = L): LaneView => ({
   name,
-  tip,
+  tip: tip === null ? null : entryId(tip),
   running: false,
   waiting: 0,
   askedBy: null,
@@ -48,7 +21,7 @@ const sync = (
 
 describe("columnsReducer", () => {
   test("sync follows a column's own tip, never a newer branch above it", () => {
-    const col: readonly Column[] = [{ key: "k", anchor: "2-b" }]
+    const col: readonly Column[] = [{ key: "k", anchor: entryId("2-b") }]
     // A reply below the tip moves the column on.
     const replied = sync(col, tree({ "1-a": null, "2-b": "1-a", "3-c": "2-b" }))
     expect(anchors(replied)).toEqual(["3-c"])
@@ -62,7 +35,7 @@ describe("columnsReducer", () => {
 
   test("a column binds to the one lane ending at its tip, then follows the lane past a newer fork", () => {
     const bound = sync(
-      [{ key: "k", anchor: "1-a" }],
+      [{ key: "k", anchor: entryId("1-a") }],
       tree({ "1-a": null, "2-t": "1-a" }),
       [lane("2-t")],
     )
@@ -84,7 +57,9 @@ describe("columnsReducer", () => {
   test("no binding while two lanes end at the tip: which thread it is cannot be told", () => {
     const i = tree({ "1-a": null, "2-t": "1-a" })
     const two = [lane("2-t"), lane("2-t", laneNameForThread("m"))]
-    expect(sync([{ key: "k", anchor: "2-t" }], i, two)[0]?.lane).toBeUndefined()
+    expect(
+      sync([{ key: "k", anchor: entryId("2-t") }], i, two)[0]?.lane,
+    ).toBeUndefined()
   })
 
   describe("a reserved lane (ADR-0057)", () => {
@@ -93,9 +68,11 @@ describe("columnsReducer", () => {
       columnsReducer(s, { kind: "reserve", key, lane: R })
 
     test("reserve keeps the id on the column keyed, and not on a bound one", () => {
-      const s = reserve([{ key: "k", anchor: "1-a" }], "k")
+      const s = reserve([{ key: "k", anchor: entryId("1-a") }], "k")
       expect(s[0]?.reserved).toBe(R)
-      const bound: readonly Column[] = [{ key: "k", anchor: "1-a", lane: L }]
+      const bound: readonly Column[] = [
+        { key: "k", anchor: entryId("1-a"), lane: L },
+      ]
       expect(reserve(bound, "k")).toBe(bound)
       // No column takes it: the same list, so a root stores none of its own.
       expect(reserve(s, "other")).toBe(s)
@@ -103,7 +80,7 @@ describe("columnsReducer", () => {
 
     test("a fresh column binds to its reserved lane once the lane has a tip, before its message is indexed", () => {
       const fresh = reserve(
-        [{ key: "k", anchor: "2-t", fresh: { sendId: "s-1" } }],
+        [{ key: "k", anchor: entryId("2-t"), fresh: { sendId: "s-1" } }],
         "k",
       )
       const i = tree({ "1-a": null, "2-t": "1-a" })
@@ -115,13 +92,13 @@ describe("columnsReducer", () => {
     })
 
     test("binds by id even while a second lane ends at the same tip", () => {
-      const s = reserve([{ key: "k", anchor: "2-t" }], "k")
+      const s = reserve([{ key: "k", anchor: entryId("2-t") }], "k")
       const i = tree({ "1-a": null, "2-t": "1-a" })
       expect(sync(s, i, [lane("2-t"), lane("2-t", R)])[0]?.lane).toBe(R)
     })
 
     test("a reservation that is no lane yet is kept as the column follows, and dropped as it binds to another", () => {
-      const s = reserve([{ key: "k", anchor: "1-a" }], "k")
+      const s = reserve([{ key: "k", anchor: entryId("1-a") }], "k")
       const i = tree({ "1-a": null, "2-b": "1-a" })
       expect(sync(s, i)).toEqual([{ key: "k", anchor: "2-b", reserved: R }])
       expect(sync(s, i, [lane("2-b")])).toEqual([
@@ -131,7 +108,7 @@ describe("columnsReducer", () => {
 
     test("a fresh column keeps it as it anchors at a message sent to people", () => {
       const s = reserve(
-        [{ key: "k", anchor: "1-a", fresh: { sendId: "s-1" } }],
+        [{ key: "k", anchor: entryId("1-a"), fresh: { sendId: "s-1" } }],
         "k",
       )
       const i = tree({ "1-a": null, "2-m": "1-a" }, { "2-m": "s-1" })
@@ -140,10 +117,10 @@ describe("columnsReducer", () => {
   })
 
   test("a fresh column anchors at the message its send wrote, whatever came first", () => {
-    const start = columnsReducer([{ key: "k", anchor: "2-t" }], {
+    const start = columnsReducer([{ key: "k", anchor: entryId("2-t") }], {
       kind: "openFresh",
       key: "fresh",
-      at: "2-t",
+      at: entryId("2-t"),
       after: 0,
     })
     expect(start[1]).toEqual({ key: "fresh", anchor: "2-t", fresh: {} })
@@ -165,19 +142,19 @@ describe("columnsReducer", () => {
   test("openFresh goes after the column it branches from", () => {
     const after = columnsReducer(
       [
-        { key: "a", anchor: "x" },
-        { key: "b", anchor: "y" },
+        { key: "a", anchor: entryId("x") },
+        { key: "b", anchor: entryId("y") },
       ],
-      { kind: "openFresh", key: "f", at: "x", after: 0 },
+      { kind: "openFresh", key: "f", at: entryId("x"), after: 0 },
     )
     expect(after.map(c => c.key)).toEqual(["a", "f", "b"])
   })
 
   test("a column opened to send a message holds it until its send is recorded", () => {
-    const opened = columnsReducer([{ key: "k", anchor: "2-t" }], {
+    const opened = columnsReducer([{ key: "k", anchor: entryId("2-t") }], {
       kind: "openFresh",
       key: "b",
-      at: "2-t",
+      at: entryId("2-t"),
       after: 0,
       pending: { text: "@agent separately?", card: cardId("c-1") },
     })
@@ -189,10 +166,10 @@ describe("columnsReducer", () => {
   })
 
   test("a branch's column holds its prefill until its first send", () => {
-    const opened = columnsReducer([{ key: "k", anchor: "2-t" }], {
+    const opened = columnsReducer([{ key: "k", anchor: entryId("2-t") }], {
       kind: "openFresh",
       key: "b",
-      at: "2-t",
+      at: entryId("2-t"),
       after: 0,
       prefill: { text: "@agent ", blank: true },
     })
@@ -205,20 +182,20 @@ describe("columnsReducer", () => {
 
   test("open inserts next to the column it forks from", () => {
     const three: Column[] = [
-      { key: "a", anchor: "x" },
-      { key: "b", anchor: "y" },
+      { key: "a", anchor: entryId("x") },
+      { key: "b", anchor: entryId("y") },
     ]
     const s = columnsReducer(three, {
       kind: "open",
       key: "new",
       after: 0,
-      anchor: "z",
+      anchor: entryId("z"),
     })
     expect(anchors(s)).toEqual(["x", "z", "y"])
   })
 
   test("close of the last column leaves none: the layout gives the root its first", () => {
-    const s = columnsReducer([{ key: "a", anchor: "x" }], {
+    const s = columnsReducer([{ key: "a", anchor: entryId("x") }], {
       kind: "close",
       index: 0,
     })
@@ -227,10 +204,10 @@ describe("columnsReducer", () => {
 
   describe("move", () => {
     const abcd: readonly Column[] = [
-      { key: "a", anchor: "w" },
-      { key: "b", anchor: "x" },
-      { key: "c", anchor: "y" },
-      { key: "d", anchor: "z" },
+      { key: "a", anchor: entryId("w") },
+      { key: "b", anchor: entryId("x") },
+      { key: "c", anchor: entryId("y") },
+      { key: "d", anchor: entryId("z") },
     ]
     const keys = (from: number, to: number) =>
       columnsReducer(abcd, { kind: "move", from, to }).map(c => c.key)
@@ -253,7 +230,7 @@ describe("columnsReducer", () => {
   })
 
   test("sync leaves a column whose anchor has not arrived, and settles it once it has", () => {
-    const waiting: readonly Column[] = [{ key: "k", anchor: "2-b" }]
+    const waiting: readonly Column[] = [{ key: "k", anchor: entryId("2-b") }]
     expect(sync(waiting, tree({ "1-a": null }))).toBe(waiting)
     const arrived = tree({ "1-a": null, "2-b": "1-a", "3-c": "2-b" })
     expect(anchors(sync(waiting, arrived))).toEqual(["3-c"])
@@ -261,8 +238,8 @@ describe("columnsReducer", () => {
 
   test("prune drops the columns whose anchor the settled document lacks", () => {
     const s: readonly Column[] = [
-      { key: "a", anchor: "1-a" },
-      { key: "b", anchor: "gone" },
+      { key: "a", anchor: entryId("1-a") },
+      { key: "b", anchor: entryId("gone") },
       { key: "c", anchor: null },
     ]
     const pruned = columnsReducer(s, {

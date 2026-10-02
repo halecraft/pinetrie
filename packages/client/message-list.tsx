@@ -53,11 +53,11 @@ function MessageListView(p: MessageListProps) {
   const releasedPath =
     p.releasedTip === null ? null : new Set(ancestry(index, p.releasedTip).path)
   const nameOf = (w: Parameters<typeof nameFor>[1]) => nameFor(p.nameOf, w)
-  const holds = (row: ColumnRow, id: string): boolean =>
+  const holds = (row: ColumnRow, id: EntryId): boolean =>
     row.kind === "message"
       ? row.id === id
       : row.parts.some(s =>
-          s.kind === "entry" ? s.id === id : s.ids.includes(id as EntryId),
+          s.kind === "entry" ? s.id === id : s.ids.includes(id),
         )
   return columnRows(segments, asks).flatMap(row => [
     p.leftBefore !== null && holds(row, p.leftBefore) && (

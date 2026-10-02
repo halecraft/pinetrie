@@ -11,6 +11,7 @@ import {
   type CommitId,
   commitId,
   firstLine,
+  isLaneName,
   type LaneName,
   type WriterId,
 } from "@pineta/core"
@@ -56,13 +57,16 @@ export interface UpdateMessage {
 
 const fromStoredUpdate = (
   d: Static<typeof UpdateDetailsSchema>,
-): UpdateDetails => ({
-  lane: d.lane as LaneName,
-  copy: commitId(d.copy),
-  commits: d.commits,
-  files: d.files,
-  by: d.by as WriterId,
-})
+): UpdateDetails | undefined =>
+  isLaneName(d.lane)
+    ? {
+        lane: d.lane,
+        copy: commitId(d.copy),
+        commits: d.commits,
+        files: d.files,
+        by: d.by as WriterId,
+      }
+    : undefined
 
 /** A stored message -> its update details, or undefined if it is not one. */
 export const decodeUpdate = (message: unknown): UpdateDetails | undefined =>
@@ -138,13 +142,17 @@ export interface StackMessage {
 
 /** A stored message -> its stack details, or undefined if it is not one. */
 export const decodeStack = (message: unknown): StackDetails | undefined =>
-  decodeWith(StackSchema, message, ({ details }) => ({
-    lane: details.lane as LaneName,
-    start: details.start.map(commitId),
-    tip: commitId(details.tip),
-    skill: details.skill,
-    by: details.by as WriterId,
-  }))
+  decodeWith(StackSchema, message, ({ details }) =>
+    isLaneName(details.lane)
+      ? {
+          lane: details.lane,
+          start: details.start.map(commitId),
+          tip: commitId(details.tip),
+          skill: details.skill,
+          by: details.by as WriterId,
+        }
+      : undefined,
+  )
 
 /** The one line a column shows for a stack message. */
 export const stackLine = (_d: StackDetails): string =>

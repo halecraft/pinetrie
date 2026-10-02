@@ -42,7 +42,7 @@ export const decodeMark = (value: unknown): MarkRecord | undefined =>
 /** Stored `pineta.mark` values -> each entry's mark. */
 export function markRecords(
   values: Iterable<{ readonly value: unknown }>,
-): ReadonlyMap<string, MarkRecord> {
+): ReadonlyMap<EntryId, MarkRecord> {
   return new Map(decodeAll(values, decodeMark).map(r => [r.entry, r]))
 }
 
@@ -60,7 +60,7 @@ export function planMark(input: {
   readonly by: WriterId
   readonly now: number
   readonly index: TreeIndex
-  readonly marks: ReadonlyMap<string, MarkRecord>
+  readonly marks: ReadonlyMap<EntryId, MarkRecord>
 }): MarkPlan {
   const { entry, title } = input
   if (input.index.entries[entry] === undefined)

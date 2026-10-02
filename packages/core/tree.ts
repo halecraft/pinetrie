@@ -17,7 +17,6 @@ import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
 import {
   atEntry,
   type EntryId,
-  entryId,
   type LaneName,
   type PlanMode,
   type Position,
@@ -76,8 +75,8 @@ export interface AgentMessageLike {
 }
 
 export interface EntryLike {
-  readonly id: string
-  readonly parentId: string | null
+  readonly id: EntryId
+  readonly parentId: EntryId | null
   readonly type: string
   /** Absent on entries that carry no message, e.g. a compaction. */
   readonly message?: AgentMessageLike
@@ -86,7 +85,7 @@ export interface EntryLike {
 }
 
 export interface TranscriptMessage {
-  readonly id: string
+  readonly id: EntryId
   readonly role: string
   readonly text: string
   /** Role `chat` only: the speaker's display name as sent. */
@@ -251,7 +250,7 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
 /** The message a reader sees at `id`, or null (`renderableMessage`). */
 export function messageAt(
   index: TreeIndex,
-  id: string,
+  id: EntryId,
 ): TranscriptMessage | null {
   const entry = index.entries[id]
   return entry === undefined ? null : renderableMessage(entry)
@@ -305,13 +304,13 @@ function toolResultOf(
  * up past results. Anything else is its own turn: a prompt, or a message that
  * called no tools.
  */
-export function turnEntry(index: TreeIndex, tip: string): EntryId {
+export function turnEntry(index: TreeIndex, tip: EntryId): EntryId {
   let at = tip
   for (;;) {
     const entry = index.entries[at]
     const parent = index.parentOf(at)
     if (entry === undefined || toolResultOf(entry) === null || parent === null)
-      return entryId(at)
+      return at
     at = parent
   }
 }
@@ -339,9 +338,12 @@ export const startsRun = (entry: EntryLike | undefined): boolean => {
  * message sits between a run's prompt and its tip. `indexAsks` finds every
  * run's prompt at once.
  */
-export function promptOf(index: TreeIndex, tip: string | null): EntryId | null {
+export function promptOf(
+  index: TreeIndex,
+  tip: EntryId | null,
+): EntryId | null {
   for (const id of ancestry(index, tip).path)
-    if (startsRun(index.entries[id])) return entryId(id)
+    if (startsRun(index.entries[id])) return id
   return null
 }
 
@@ -352,7 +354,7 @@ export function promptOf(index: TreeIndex, tip: string | null): EntryId | null {
  */
 function resultsOn(
   index: TreeIndex,
-  ids: Iterable<string>,
+  ids: Iterable<EntryId>,
 ): ReadonlyMap<string, ToolResultView> {
   const results = new Map<string, ToolResultView>()
   for (const id of ids) {
@@ -368,20 +370,20 @@ function resultsOn(
 // ── the index ─────────────────────────────────────────────────────────────
 
 export interface TreeIndex {
-  readonly entries: Readonly<Record<string, EntryLike>>
+  readonly entries: Readonly<Record<EntryId, EntryLike>>
   /** Children of each entry, ascending by id (creation order, S9). */
-  readonly childrenOf: ReadonlyMap<string, readonly string[]>
+  readonly childrenOf: ReadonlyMap<EntryId, readonly EntryId[]>
   /** An entry's parent id as stored; null for a root. */
-  readonly parentOf: (id: string) => string | null
+  readonly parentOf: (id: EntryId) => EntryId | null
   /** Entries with no parent: one per thread started at the root. Ascending by id. */
-  readonly roots: readonly string[]
+  readonly roots: readonly EntryId[]
   /** Entries whose parent is absent from the set. Never dropped. Ascending. */
-  readonly orphans: readonly string[]
+  readonly orphans: readonly EntryId[]
   /**
    * Chat entries by the send that wrote them. A fresh column knows its send's
    * id before the entry exists, so it finds its first message here, exactly.
    */
-  readonly bySend: ReadonlyMap<string, string>
+  readonly bySend: ReadonlyMap<string, EntryId>
 }
 
 const ascending = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
@@ -391,13 +393,14 @@ const ascending = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
  * order, so two replicas holding the same entries build the same index.
  */
 export function indexTree(
-  entries: Readonly<Record<string, EntryLike>>,
+  entries: Readonly<Record<EntryId, EntryLike>>,
 ): TreeIndex {
-  const childrenOf = new Map<string, string[]>()
-  const roots: string[] = []
-  const orphans: string[] = []
-  const bySend = new Map<string, string>()
-  for (const [id, entry] of Object.entries(entries)) {
+  const childrenOf = new Map<EntryId, EntryId[]>()
+  const roots: EntryId[] = []
+  const orphans: EntryId[] = []
+  const bySend = new Map<string, EntryId>()
+  for (const entry of Object.values(entries)) {
+    const id = entry.id
     const send = entry.message?.sendId
     if (send !== undefined) bySend.set(send, id)
     const parent = entry.parentId
@@ -422,15 +425,15 @@ export function indexTree(
 
 export interface Ancestry {
   /** `id`, then each ancestor present in the index, up to a root. */
-  readonly path: readonly string[]
+  readonly path: readonly EntryId[]
   /** The id where the walk met itself, or null. Callers decide what a cycle means. */
-  readonly cycleAt: string | null
+  readonly cycleAt: EntryId | null
 }
 
 /** Walk up from `id`. Stops, rather than spinning, on a cycle. */
-export function ancestry(index: TreeIndex, id: string | null): Ancestry {
-  const path: string[] = []
-  const seen = new Set<string>()
+export function ancestry(index: TreeIndex, id: EntryId | null): Ancestry {
+  const path: EntryId[] = []
+  const seen = new Set<EntryId>()
   for (let cursor = id; cursor !== null; cursor = index.parentOf(cursor)) {
     if (index.entries[cursor] === undefined) break
     if (seen.has(cursor)) return { path, cycleAt: cursor }
@@ -445,15 +448,15 @@ export function ancestry(index: TreeIndex, id: string | null): Ancestry {
  * own root, since `ancestry` stops where a parent is missing. Null for an id
  * the index lacks.
  */
-export function rootOf(index: TreeIndex, id: string): string | null {
+export function rootOf(index: TreeIndex, id: EntryId): EntryId | null {
   return ancestry(index, id).path.at(-1) ?? null
 }
 
 /** The ids on the path to `tip`. */
 export const pathIds = (
   index: TreeIndex,
-  tip: string | null,
-): ReadonlySet<string> => new Set(ancestry(index, tip).path)
+  tip: EntryId | null,
+): ReadonlySet<EntryId> => new Set(ancestry(index, tip).path)
 
 /**
  * Who wrote `ids`' messages, in order of first message: ids are uuidv7, so
@@ -461,7 +464,7 @@ export const pathIds = (
  */
 export function writersOf(
   index: TreeIndex,
-  ids: Iterable<string>,
+  ids: Iterable<EntryId>,
 ): readonly WriterId[] {
   const out: WriterId[] = []
   for (const id of [...ids].sort()) {
@@ -482,7 +485,7 @@ export function writersOf(
  */
 export function projectTranscript(
   index: TreeIndex,
-  tipId: string | null,
+  tipId: EntryId | null,
 ): TranscriptMessage[] {
   const { path, cycleAt } = ancestry(index, tipId)
   if (cycleAt !== null) throw new Error(`cycle in parentId chain at ${cycleAt}`)
@@ -498,7 +501,7 @@ export function projectTranscript(
 /** A branch departing the spine at some node. */
 export interface BranchSummary {
   /** The child entry that leaves the spine: a column opens here. */
-  readonly rootId: string
+  readonly rootId: EntryId
   /** Messages in the whole subtree, for its "⑂ n messages" button. */
   readonly messageCount: number
 }
@@ -511,9 +514,9 @@ export interface SpineNode extends TranscriptMessage {
 export interface SpineProjection {
   readonly spine: readonly SpineNode[]
   /** Ids whose parentId names an entry absent from the set. Never dropped. */
-  readonly orphans: readonly string[]
+  readonly orphans: readonly EntryId[]
   /** Ids on a parentId cycle. Reported rather than spun on. */
-  readonly cycles: readonly string[]
+  readonly cycles: readonly EntryId[]
 }
 
 /**
@@ -526,7 +529,7 @@ export interface SpineProjection {
  */
 export function projectSpine(
   index: TreeIndex,
-  tipId: string | null,
+  tipId: EntryId | null,
 ): SpineProjection {
   const { path: upward, cycleAt } = ancestry(index, tipId)
   const path = upward.toReversed()
@@ -562,10 +565,10 @@ export function projectSpine(
 }
 
 /** A branch's size: its messages. */
-function summarizeBranch(index: TreeIndex, rootId: string): BranchSummary {
+function summarizeBranch(index: TreeIndex, rootId: EntryId): BranchSummary {
   let messageCount = 0
   const stack = [rootId]
-  const visited = new Set<string>()
+  const visited = new Set<EntryId>()
   for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
     if (visited.has(id)) continue
     visited.add(id)
@@ -588,8 +591,8 @@ function summarizeBranch(index: TreeIndex, rootId: string): BranchSummary {
  * comparing ids, never by position in `tips`: two clients reading the same
  * document in a different order must pick the same one.
  */
-export function latestTip(tips: Iterable<string | null>): string | null {
-  let latest: string | null = null
+export function latestTip(tips: Iterable<EntryId | null>): EntryId | null {
+  let latest: EntryId | null = null
   for (const tip of tips) {
     if (tip !== null && (latest === null || tip > latest)) latest = tip
   }
@@ -608,12 +611,12 @@ export function latestTip(tips: Iterable<string | null>): string | null {
  * followed through the lane instead (`threadOf`, and a bound column), because
  * a conversation forked at the lane's tip is newer and is not its thread.
  */
-export function followTip(index: TreeIndex, at: string): string {
+export function followTip(index: TreeIndex, at: EntryId): EntryId {
   if (index.entries[at] === undefined) return at
   // Walk DOWN from `at`: the leaves below it are the only candidates, so there
   // is no need to walk up from every leaf in the tree to find them.
-  const leaves: string[] = []
-  const seen = new Set<string>([at])
+  const leaves: EntryId[] = []
+  const seen = new Set<EntryId>([at])
   const stack = [...(index.childrenOf.get(at) ?? [])]
   for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
     if (seen.has(id)) continue
@@ -629,7 +632,7 @@ export function followTip(index: TreeIndex, at: string): string {
 
 export interface ColumnSpec {
   /** The entry the column follows from; null only for a fresh column at the root. */
-  readonly anchor: string | null
+  readonly anchor: EntryId | null
   /**
    * The path ends at `anchor` (nothing, when null) and follows nothing below
    * it: a fresh column, which has nothing of its own yet, or a column bound to
@@ -641,7 +644,7 @@ export interface ColumnSpec {
 
 export interface ColumnView {
   /** Where this column's path ends: its anchor if pinned or null, else `followTip`. */
-  readonly tipId: string | null
+  readonly tipId: EntryId | null
   /**
    * The deepest message this path shares with ANY column to its left, or null
    * when it shares none: the first column.
@@ -649,7 +652,7 @@ export interface ColumnView {
    * branch off T1, then a branch off T2, the third column shares only T1 with
    * its neighbour but T2 with the trunk, and must start after T2.
    */
-  readonly forkFrom: string | null
+  readonly forkFrom: EntryId | null
   /** The path after `forkFrom` (all of it when `forkFrom` is null). */
   readonly nodes: readonly SpineNode[]
 }
@@ -663,7 +666,7 @@ export function projectColumns(
   index: TreeIndex,
   columns: readonly ColumnSpec[],
 ): ColumnView[] {
-  const shown = new Set<string>()
+  const shown = new Set<EntryId>()
   return columns.map(column => {
     const tipId =
       column.pinned === true || column.anchor === null
@@ -684,11 +687,11 @@ export function projectColumns(
 // ── the rail: one root's tree ─────────────────────────────────────────────
 
 export interface RailRow {
-  readonly id: string
+  readonly id: EntryId
   /** Which vertical track the row sits on. */
   readonly track: number
   /** The nearest ancestor with a row, or null at a root: the edge's other end. */
-  readonly parentId: string | null
+  readonly parentId: EntryId | null
   /** That ancestor's track, or null at a root. */
   readonly parentTrack: number | null
 }
@@ -705,15 +708,15 @@ export interface RailRow {
  */
 export function projectRail(
   index: TreeIndex,
-  root: string,
+  root: EntryId,
 ): readonly RailRow[] {
-  const visible = (id: string): boolean => {
+  const visible = (id: EntryId): boolean => {
     const entry = index.entries[id]
     return entry !== undefined && renderableMessage(entry) !== null
   }
   // Children as the rail sees them: through any non-message entry.
-  const visibleChildren = (ids: readonly string[]): string[] => {
-    const out: string[] = []
+  const visibleChildren = (ids: readonly EntryId[]): EntryId[] => {
+    const out: EntryId[] = []
     const stack = ids.toReversed()
     for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
       if (visible(id)) out.push(id)
@@ -734,15 +737,15 @@ export function projectRail(
   // A root that is no message starts its visible children side by side.
   const starts = visibleChildren([root])
   type Visit = {
-    id: string
+    id: EntryId
     track: number
-    parentId: string | null
+    parentId: EntryId | null
     parentTrack: number | null
   }
   const stack: Visit[] = starts
     .toReversed()
     .map(id => ({ id, track: -1, parentId: null, parentTrack: null }))
-  const seen = new Set<string>()
+  const seen = new Set<EntryId>()
   for (let v = stack.pop(); v !== undefined; v = stack.pop()) {
     if (seen.has(v.id)) continue
     seen.add(v.id)
@@ -776,10 +779,10 @@ interface RailItemBase {
   /** Rows it takes. */
   readonly span: number
   /** Its messages, top to bottom: each the only child of the one above. */
-  readonly ids: readonly [string, ...string[]]
+  readonly ids: readonly [EntryId, ...EntryId[]]
   readonly track: number
   /** The first message's parent and that parent's track: the edge into it. */
-  readonly parentId: string | null
+  readonly parentId: EntryId | null
   readonly parentTrack: number | null
 }
 
@@ -787,7 +790,7 @@ interface RailItemBase {
 export interface RailDot extends RailItemBase {
   readonly kind: "dot"
   readonly span: 1
-  readonly ids: readonly [string]
+  readonly ids: readonly [EntryId]
 }
 
 /** A straight stretch of uneventful messages on one track, drawn as one capsule. */
@@ -840,9 +843,9 @@ export const stretchSpan = (size: number): number => 1 + String(size).length
  */
 export function railLandmarks(
   rows: readonly RailRow[],
-  keep: ReadonlySet<string>,
-): ReadonlySet<string> {
-  const childRows = new Map<string, number>()
+  keep: ReadonlySet<EntryId>,
+): ReadonlySet<EntryId> {
+  const childRows = new Map<EntryId, number>()
   for (const r of rows)
     if (r.parentId !== null)
       childRows.set(r.parentId, (childRows.get(r.parentId) ?? 0) + 1)
@@ -865,7 +868,7 @@ export function railLandmarks(
 /** What the rail reads besides the rows: the asks, and the turns' revisions. */
 export interface RailAsks {
   readonly asks: AskIndex
-  readonly revisions: ReadonlyMap<string, RevisionRecord>
+  readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
 }
 
 /**
@@ -884,11 +887,11 @@ export interface RailAsks {
 export function compactRail(
   index: TreeIndex,
   rows: readonly RailRow[],
-  keep: ReadonlySet<string>,
+  keep: ReadonlySet<EntryId>,
   { asks, revisions }: RailAsks,
 ): readonly RailItem[] {
   const landmarks = railLandmarks(rows, keep)
-  const long = new Set<string>(
+  const long = new Set<EntryId>(
     [...asks.work].flatMap(([prompt, work]) =>
       work.length >= MIN_STRETCH ? [prompt] : [],
     ),
@@ -896,8 +899,8 @@ export function compactRail(
   const uneventful = (r: RailRow): boolean =>
     !landmarks.has(r.id) && !long.has(r.id)
   /** The long ask a row works for, or null: a stretch keeps to one. */
-  const longAsk = (id: string | undefined): EntryId | null => {
-    const prompt = id === undefined ? undefined : asks.askOf.get(entryId(id))
+  const longAsk = (id: EntryId | undefined): EntryId | null => {
+    const prompt = id === undefined ? undefined : asks.askOf.get(id)
     return prompt !== undefined && long.has(prompt) ? prompt : null
   }
 
@@ -934,7 +937,7 @@ export function compactRail(
       stretch.forEach(dot)
     else {
       const span = stretchSpan(stretch.length)
-      const ids: readonly [string, ...string[]] = [
+      const ids: readonly [EntryId, ...EntryId[]] = [
         first.id,
         ...more.map(r => r.id),
       ]
@@ -966,11 +969,11 @@ const edge = (r: RailRow) => ({
  */
 export function workStats(
   index: TreeIndex,
-  ids: readonly string[],
-  after: string | undefined,
-  revisions: ReadonlyMap<string, RevisionRecord>,
+  ids: readonly EntryId[],
+  after: EntryId | undefined,
+  revisions: ReadonlyMap<EntryId, RevisionRecord>,
 ): WorkStats {
-  const between: string[] = []
+  const between: EntryId[] = []
   for (const [k, id] of ids.entries()) {
     const next = ids[k + 1] ?? after
     if (next === undefined) continue
@@ -991,9 +994,9 @@ export function workStats(
  */
 export function statsOf(
   index: TreeIndex,
-  messages: readonly string[],
-  others: readonly string[],
-  revisions: ReadonlyMap<string, RevisionRecord>,
+  messages: readonly EntryId[],
+  others: readonly EntryId[],
+  revisions: ReadonlyMap<EntryId, RevisionRecord>,
 ): WorkStats {
   let people = 0
   const calls: ToolCallView[] = []
@@ -1027,7 +1030,7 @@ export function statsOf(
 /** A lane as the reads see it. */
 export interface LaneView {
   readonly name: LaneName
-  readonly tip: string | null
+  readonly tip: EntryId | null
   readonly running: boolean
   /** Cards queued for it (ADR-0048). */
   readonly waiting: number
@@ -1097,7 +1100,7 @@ export function threadOf(
     return { kind: "thread", end: at, lane: { kind: "none" }, race: null }
   if (at.kind === "root") return { kind: "unknown" }
 
-  let end: string
+  let end: EntryId
   let lane: LaneView | undefined
   if (send.lane !== null) {
     // Named, the lane is the thread: never looked up again by its tip, which
@@ -1118,7 +1121,7 @@ export function threadOf(
   }
   return {
     kind: "thread",
-    end: atEntry(entryId(end)),
+    end: atEntry(end),
     lane: lane === undefined ? { kind: "none" } : { kind: "lane", ...lane },
     race: raceAlong(index, at.id, end, send.me),
   }
@@ -1148,7 +1151,7 @@ export function planStop(
   lane: LaneName,
   facts: {
     readonly index: TreeIndex
-    readonly stops: ReadonlyMap<string, StopRecord>
+    readonly stops: ReadonlyMap<EntryId, StopRecord>
     readonly by: WriterId
     readonly now: number
   },
@@ -1187,10 +1190,10 @@ export const agentByDefault = (send: {
 function raceAlong(
   index: TreeIndex,
   at: EntryId,
-  end: string,
+  end: EntryId,
   me: WriterId,
 ): { readonly by: WriterId } | null {
-  let newest: { id: string; by: WriterId } | null = null
+  let newest: { id: EntryId; by: WriterId } | null = null
   for (const id of ancestry(index, end).path) {
     if (id === at) break
     const m = index.entries[id]?.message
@@ -1210,7 +1213,7 @@ function raceAlong(
 export interface AgentRun {
   readonly lane: LaneName
   /** The lane's tip: the message it is answering, then its reply. */
-  readonly tip: string
+  readonly tip: EntryId
 }
 
 /**
@@ -1218,7 +1221,7 @@ export interface AgentRun {
  * several can run at once; an empty list is an idle agent.
  */
 export function agentActivity(
-  running: readonly { readonly lane: LaneName; readonly tip: string | null }[],
+  running: readonly { readonly lane: LaneName; readonly tip: EntryId | null }[],
 ): readonly AgentRun[] {
   return running.flatMap(r =>
     r.tip === null ? [] : [{ lane: r.lane, tip: r.tip }],
@@ -1232,7 +1235,7 @@ export interface BranchColors {
   /** Per column: the rail track of its last message, or PENDING_TRACK. */
   readonly track: readonly number[]
   /** Fork dots: at each `forkFrom` message, the tracks of the columns forking there. */
-  readonly forks: ReadonlyMap<string, readonly number[]>
+  readonly forks: ReadonlyMap<EntryId, readonly number[]>
 }
 
 /**
@@ -1253,7 +1256,7 @@ export function branchColors(
       ? PENDING_TRACK
       : (trackOf.get(last) ?? PENDING_TRACK)
   })
-  const forks = new Map<string, number[]>()
+  const forks = new Map<EntryId, number[]>()
   for (const [i, c] of columns.entries()) {
     if (c.forkFrom === null) continue
     const t = track[i] ?? PENDING_TRACK

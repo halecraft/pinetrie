@@ -17,7 +17,7 @@ export const scenario: Scenario = {
   run: ({ check }) => run(check),
 }
 
-const appended = (o: Outcome) => (o.kind === "appended" ? o.id : "")
+const appended = (o: Outcome) => (o.kind === "appended" ? o.id : entryId(""))
 
 async function run(check: Checks["check"]): Promise<void> {
   await withHost(

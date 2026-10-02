@@ -27,9 +27,9 @@ const archived = (root: string): ArchiveRecord => ({
   at: 1,
 })
 const columns = (...keys: string[]): Column[] =>
-  keys.map(key => ({ key, anchor: "r" }))
+  keys.map(key => ({ key, anchor: entryId("r") }))
 const input = (over: Partial<AppViewInput>): AppViewInput => ({
-  active: { kind: "root", root: "r" },
+  active: { kind: "root", root: entryId("r") },
   columns: columns("a"),
   tracks: [3],
   archive: new Map(),
@@ -68,13 +68,17 @@ describe("appView's workspace", () => {
   })
 
   test("an archived root is read-only, with Restore; a restored one is not", () => {
-    const here = workspace({ archive: new Map([["r", archived("r")]]) })
+    const here = workspace({
+      archive: new Map([[entryId("r"), archived("r")]]),
+    })
     expect(here.kind === "root" && here.readOnly).toEqual({
       label: "archived by Ada",
       action: { title: "Restore", intent: { kind: "restore", root: "r" } },
     })
     const back = workspace({
-      archive: new Map([["r", { ...archived("r"), state: "restored" }]]),
+      archive: new Map([
+        [entryId("r"), { ...archived("r"), state: "restored" }],
+      ]),
     })
     expect(back.kind === "root" && back.readOnly).toBe(null)
   })
@@ -117,7 +121,10 @@ test("the header's offers are the open ones whose lane has a tip", () => {
 test("a tab's rail draws its own root's tree only", () => {
   const index = tree({ r1: null, a: "r1", r2: null, b: "r2" })
   const ids = (rows: readonly { readonly id: string }[]) => rows.map(r => r.id)
-  expect(ids(tabRail(index, { kind: "root", root: "r1" }))).toEqual(["r1", "a"])
+  expect(ids(tabRail(index, { kind: "root", root: entryId("r1") }))).toEqual([
+    "r1",
+    "a",
+  ])
   expect(tabRail(index, { kind: "new", key: "t" })).toEqual([])
   expect(tabRail(index, null)).toEqual([])
 })

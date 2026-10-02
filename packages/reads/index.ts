@@ -20,7 +20,9 @@ import {
   type BannerRecord,
   type CardRecord,
   type CommandSummary,
+  type EntryId,
   type EntryLike,
+  entryId,
   type HaveRecord,
   indexTree,
   type LandingRecord,
@@ -116,8 +118,8 @@ function renderableEntry(row: StoredEntryRow): EntryLike {
   const known = entryOfRow.get(row)
   if (known !== undefined) return known
   const entry: EntryLike = Object.freeze({
-    id: row.id,
-    parentId: row.parentId,
+    id: entryId(row.id),
+    parentId: row.parentId === null ? null : entryId(row.parentId),
     type: row.type,
     message: renderableMessage(rowMessage(row)),
   })
@@ -125,11 +127,15 @@ function renderableEntry(row: StoredEntryRow): EntryLike {
   return entry
 }
 
+/** Keyed by each entry's own id: `Object.entries` would give plain strings. */
 function renderableEntries(
   rows: Readonly<Record<string, StoredEntryRow>>,
-): Record<string, EntryLike> {
-  const out: Record<string, EntryLike> = {}
-  for (const [id, row] of Object.entries(rows)) out[id] = renderableEntry(row)
+): Record<EntryId, EntryLike> {
+  const out: Record<EntryId, EntryLike> = {}
+  for (const row of Object.values(rows)) {
+    const entry = renderableEntry(row)
+    out[entry.id] = entry
+  }
   return out
 }
 
@@ -141,7 +147,7 @@ function renderableEntries(
  */
 export const readRenderableEntries = (
   doc: SessionDocHandle,
-): Record<string, EntryLike> => renderableEntries(readEntries(doc))
+): Record<EntryId, EntryLike> => renderableEntries(readEntries(doc))
 
 /**
  * The tree, indexed once per change of its entries (`indexTree`): a document
@@ -165,7 +171,7 @@ export const readRunning = (doc: SessionDocHandle, lane: LaneName): boolean =>
  * Who asked the run that wrote `tip`: the writer of its prompt
  * (`promptOf`, ADR-0056), when a person's message started it.
  */
-function askerOf(index: TreeIndex, tip: string | null): WriterId | undefined {
+function askerOf(index: TreeIndex, tip: EntryId | null): WriterId | undefined {
   const prompt = promptOf(index, tip)
   const message = prompt === null ? undefined : index.entries[prompt]?.message
   return message?.role === "chat" ? message.writer : undefined
@@ -183,9 +189,7 @@ export function readLanes(
   index: TreeIndex,
   cards: readonly CardRecord[],
 ): readonly LaneView[] {
-  // Lane names are read from storage: branded here, the one edge they cross.
-  return readLaneNames(doc).map(stored => {
-    const name = stored as LaneName
+  return readLaneNames(doc).map(name => {
     const tip = readLaneTip(doc, name)
     const running = readRunning(doc, name)
     const queue = queuedOn(cards, name)
@@ -213,7 +217,6 @@ export const readLane = (
 export function readAgentActivity(doc: SessionDocHandle): readonly AgentRun[] {
   return agentActivity(
     readLaneNames(doc)
-      .map(stored => stored as LaneName)
       .filter(lane => readRunning(doc, lane))
       .map(lane => ({ lane, tip: readLaneTip(doc, lane) })),
   )
@@ -243,7 +246,7 @@ export function readParticipants(
  * One field of the presence document: an entry per key, as its writer and
  * value. A person here from two seats (ADR-0037) appears twice.
  */
-export type PresenceEntries = readonly (readonly [WriterId, string])[]
+export type PresenceEntries = readonly (readonly [WriterId, EntryId])[]
 
 const samePairs = (a: PresenceEntries, b: PresenceEntries): boolean =>
   a.length === b.length &&
@@ -268,7 +271,7 @@ function presenceField(
       const writer = writerOfKey(key)
       return value === null || writer === undefined
         ? []
-        : [[writer as WriterId, value] as const]
+        : [[writer as WriterId, entryId(value)] as const]
     })
     const before = last.get(doc)
     if (before !== undefined && samePairs(before, now)) return before
@@ -321,25 +324,25 @@ export function readCards(cards: CardsDocHandle): readonly CardRecord[] {
 /** Every root's archive record (`pineta.archive`, ADR-0029), keyed by root. */
 export const readArchive = (
   doc: SessionDocHandle,
-): ReadonlyMap<string, ArchiveRecord> =>
+): ReadonlyMap<EntryId, ArchiveRecord> =>
   archiveRecords(readValues(doc, ARCHIVE_NAMESPACE))
 
 /** Every entry's mark (`pineta.mark`, ADR-0045), keyed by entry: a root's titles its tab. */
 export const readMarks = (
   doc: SessionDocHandle,
-): ReadonlyMap<string, MarkRecord> =>
+): ReadonlyMap<EntryId, MarkRecord> =>
   markRecords(readValues(doc, MARK_NAMESPACE))
 
 /** Each ask's digest (`pineta.digest`, ADR-0056), by its prompt. */
 export const readDigests = (
   doc: SessionDocHandle,
-): ReadonlyMap<string, DigestRecord> =>
+): ReadonlyMap<EntryId, DigestRecord> =>
   digestRecords(readValues(doc, DIGEST_NAMESPACE))
 
 /** Who stopped each ask (`pineta.stop`, ADR-0056), by its prompt. */
 export const readStops = (
   doc: SessionDocHandle,
-): ReadonlyMap<string, StopRecord> =>
+): ReadonlyMap<EntryId, StopRecord> =>
   stopRecords(readValues(doc, STOP_NAMESPACE))
 
 // ── where lanes work (ADR-0032, ADR-0033) ─────────────────────────────────
@@ -347,13 +350,13 @@ export const readStops = (
 /** Every lane's record (`pineta.lane`): where it works, by lane. */
 export const readLaneRecords = (
   doc: SessionDocHandle,
-): ReadonlyMap<string, LaneRecord> =>
+): ReadonlyMap<LaneName, LaneRecord> =>
   laneRecords(readValues(doc, LANE_NAMESPACE))
 
 /** Every revision record (`pineta.revision`), by the entry it is at. */
 export const readRevisions = (
   doc: SessionDocHandle,
-): ReadonlyMap<string, RevisionRecord> =>
+): ReadonlyMap<EntryId, RevisionRecord> =>
   revisionRecords(readValues(doc, REVISION_NAMESPACE))
 
 /** Every resolution's record (`pineta.landing`), oldest first. */
@@ -363,7 +366,7 @@ export const readLandings = (doc: SessionDocHandle): readonly LandingRecord[] =>
 /** Each lane's offer in your repo (ADR-0038), by lane. */
 export const readOffers = (
   doc: SessionDocHandle,
-): ReadonlyMap<string, OfferRecord> =>
+): ReadonlyMap<LaneName, OfferRecord> =>
   offerRecords(readValues(doc, OFFER_NAMESPACE))
 
 /** The commits you have of lanes: delivered by a take, or copies of your `@`. */

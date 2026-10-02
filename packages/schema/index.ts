@@ -5,7 +5,17 @@
 // keeping. Nothing here knows what pi is.
 
 import { batch, createDoc, json, Schema } from "@kyneta/schema"
-import { type StreamEvent, type TextEdit, tailEdit } from "@pineta/core"
+import {
+  type EntryId,
+  entryId,
+  isLaneName,
+  type LaneName,
+  type RunId,
+  runId,
+  type StreamEvent,
+  type TextEdit,
+  tailEdit,
+} from "@pineta/core"
 
 /**
  * One entry as it sits in the document (ADR-0015).
@@ -105,21 +115,22 @@ export type SessionDocHandle = ReturnType<typeof newSessionDoc>
 
 // --- runs and streams (ADR-0014, S22, S55) --------------------------------
 
-/** Mark a lane as running `runId`. Its streams open as it writes. */
+/** Mark a lane as running `run`. Its streams open as it writes. */
 export function beginRun(
   doc: SessionDocHandle,
-  lane: string,
-  runId: string,
+  lane: LaneName,
+  run: RunId,
 ): void {
-  batch(doc, d => d.activeRuns.set(lane, runId))
+  batch(doc, d => d.activeRuns.set(lane, run))
 }
 
 /** The run a lane is running, or undefined when the lane is idle. */
 export function readActiveRun(
   doc: SessionDocHandle,
-  lane: string,
-): string | undefined {
-  return doc.activeRuns.get(lane) ?? undefined
+  lane: LaneName,
+): RunId | undefined {
+  const run = doc.activeRuns.get(lane)
+  return typeof run === "string" ? runId(run) : undefined
 }
 
 /**
@@ -129,14 +140,14 @@ export function readActiveRun(
  */
 export function endRun(
   doc: SessionDocHandle,
-  lane: string,
-  runId: string,
+  lane: LaneName,
+  run: RunId,
 ): void {
   const closing = closeStreams(
     readStreamRecords(doc).filter(s => s.lane === lane),
   )
   batch(doc, d => {
-    if (d.activeRuns.get(lane) !== runId) return
+    if (d.activeRuns.get(lane) !== run) return
     d.activeRuns.delete(lane)
     applyOps(d, closing)
   })
@@ -146,14 +157,14 @@ export function endRun(
 export type StreamRecord =
   | {
       readonly id: string
-      readonly lane: string
+      readonly lane: LaneName
       readonly kind: "reply"
       /** The lane's tip when the reply opened. */
-      readonly under: string | null
+      readonly under: EntryId | null
     }
   | {
       readonly id: string
-      readonly lane: string
+      readonly lane: LaneName
       readonly kind: "tool"
       readonly callId: string
     }
@@ -167,7 +178,7 @@ export type Stream = StreamRecord & { readonly text: string }
  * that writes it (S35), so the entry and the end of this are one change. The
  * host appends to this reply, and the reader draws it.
  */
-export const isCurrentReply = (s: StreamRecord, tip: string | null): boolean =>
+export const isCurrentReply = (s: StreamRecord, tip: EntryId | null): boolean =>
   s.kind === "reply" && s.under === tip
 
 export type StreamOp =
@@ -202,7 +213,7 @@ export function planStream(input: {
   /** Every stream, with its text. */
   readonly streams: readonly Stream[]
   /** The event's lane's tip. */
-  readonly tip: string | null
+  readonly tip: EntryId | null
   readonly running: boolean
   readonly newId: () => string
 }): readonly StreamOp[] {
@@ -312,18 +323,30 @@ export function applyStreamOps(
   batch(doc, d => applyOps(d, ops))
 }
 
-/** Every stream's record, in id order, without reading any text. */
+/**
+ * Every stream's record, in id order, without reading any text. A record
+ * whose lane is not a thread's is left out: only the host writes streams,
+ * and it clears them all at startup (`clearStreams`).
+ */
 export function readStreamRecords(
   doc: SessionDocHandle,
 ): readonly StreamRecord[] {
   return Object.entries(doc.streams())
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(
-      ([id, s]): StreamRecord =>
-        s.kind === "tool"
-          ? { id, lane: s.lane, kind: "tool", callId: s.callId }
-          : { id, lane: s.lane, kind: "reply", under: s.under || null },
-    )
+    .flatMap(([id, s]): StreamRecord[] => {
+      const lane = s.lane
+      if (!isLaneName(lane)) return []
+      return s.kind === "tool"
+        ? [{ id, lane, kind: "tool", callId: s.callId }]
+        : [
+            {
+              id,
+              lane,
+              kind: "reply",
+              under: s.under === "" ? null : entryId(s.under),
+            },
+          ]
+    })
 }
 
 /** What a stream has written so far; "" once it is gone. */
@@ -420,7 +443,7 @@ const asStored = (v: unknown): StoredAddress | undefined =>
  * entry, so `readLaneTip` returns null for both. Measured, not assumed: see
  * `packages/pi/TECHNICAL.md`.
  */
-export function hasLaneRecord(doc: SessionDocHandle, lane: string): boolean {
+export function hasLaneRecord(doc: SessionDocHandle, lane: LaneName): boolean {
   return doc.values.get(physicalKey(LANE_TIP, lane)) !== undefined
 }
 
@@ -431,8 +454,8 @@ export function hasLaneRecord(doc: SessionDocHandle, lane: string): boolean {
  */
 export function writeLaneTip(
   doc: SessionDocHandle,
-  lane: string,
-  tip: string | null,
+  lane: LaneName,
+  tip: EntryId | null,
 ): void {
   doc.values.set(physicalKey(LANE_TIP, lane), {
     namespace: LANE_TIP,
@@ -444,19 +467,34 @@ export function writeLaneTip(
 /** A lane's tip entry id, or null if the lane has none (or does not exist). */
 export function readLaneTip(
   doc: SessionDocHandle,
-  laneName: string,
-): string | null {
-  const value = asStored(doc.values.get(physicalKey(LANE_TIP, laneName)))?.value
-  return typeof value === "string" ? value : null
+  lane: LaneName,
+): EntryId | null {
+  const value = asStored(doc.values.get(physicalKey(LANE_TIP, lane)))?.value
+  return typeof value === "string" ? entryId(value) : null
 }
 
 /**
- * Every lane the document records. Read from each value's own `namespace` and
- * `key` properties, never by splitting the record key.
+ * Every lane the document records, split by `isLaneName`: a thread's lanes,
+ * and the stored names that are not one, which no reader is given. Read from
+ * each value's own `namespace` and `key` properties, never by splitting the
+ * record key.
  */
-export function readLaneNames(doc: SessionDocHandle): string[] {
-  return readValues(doc, LANE_TIP).map(v => v.key)
+export function readStoredLanes(doc: SessionDocHandle): {
+  readonly lanes: readonly LaneName[]
+  /** Stored lane keys that fail `isLaneName`: never a thread's lane. */
+  readonly malformed: readonly string[]
+} {
+  const lanes: LaneName[] = []
+  const malformed: string[] = []
+  for (const { key } of readValues(doc, LANE_TIP))
+    if (isLaneName(key)) lanes.push(key)
+    else malformed.push(key)
+  return { lanes, malformed }
 }
+
+/** Every thread's lane the document records (`readStoredLanes`). */
+export const readLaneNames = (doc: SessionDocHandle): readonly LaneName[] =>
+  readStoredLanes(doc).lanes
 
 /**
  * Every value in `namespace`, read from each value's own `namespace` and `key`

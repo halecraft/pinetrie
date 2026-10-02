@@ -8,6 +8,7 @@ import path from "node:path"
 import {
   ancestry,
   commitId,
+  type EntryId,
   entryId,
   type LaneName,
   messageText,
@@ -88,12 +89,12 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     await waitFor(() => idleNow(wh), 180_000)
     await wh.quiet()
   }
-  const idOf = (text: string): string | null => {
+  const idOf = (text: string): EntryId | null => {
     const index = tree()
     return (
-      Object.keys(index.entries).find(
-        id => projectTranscript(index, id).at(-1)?.text === text,
-      ) ?? null
+      Object.values(index.entries).find(
+        e => projectTranscript(index, e.id).at(-1)?.text === text,
+      )?.id ?? null
     )
   }
   /** The lane whose thread holds the message with `text`. */
@@ -117,7 +118,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         ?.tip ?? null
     const onPath = new Set(ancestry(index, tip).path)
     return Object.values(readEntries(wh.doc))
-      .filter(r => onPath.has(r.id))
+      .filter(r => onPath.has(entryId(r.id)))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
       .map(r => rowMessage(r) as { role?: string })
       .filter(m => m.role === "toolResult")

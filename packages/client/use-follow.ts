@@ -1,6 +1,7 @@
 // client/use-follow — the shell of `follow.ts`: read the scroller, decide,
 // scroll.
 
+import type { EntryId } from "@pineta/core"
 import {
   type RefObject,
   useCallback,
@@ -22,7 +23,7 @@ export interface Follow {
   /** Released, and content has arrived below since, or it was mounted behind. */
   readonly unseen: boolean
   /** The column's tip when its reader left its end; null while following. */
-  readonly releasedTip: string | null
+  readonly releasedTip: EntryId | null
   /** Jump to the end, and follow it again. */
   readonly follow: () => void
 }
@@ -51,14 +52,14 @@ export function useFollow(
   seen?: {
     readonly unseen: boolean
     /** The tip it was released from when it was last unmounted. */
-    readonly released: string | null
+    readonly released: EntryId | null
     readonly leave: (left: {
       readonly unseen: boolean
-      readonly released: string | null
+      readonly released: EntryId | null
       readonly following: boolean
     }) => void
   },
-  tip: string | null = null,
+  tip: EntryId | null = null,
 ): Follow {
   // A ref: it changes every frame while a reply streams. Only `unseen` and
   // `releasedTip` are drawn, so only they are React state.

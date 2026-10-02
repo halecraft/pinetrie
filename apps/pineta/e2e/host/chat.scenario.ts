@@ -7,7 +7,7 @@
 // `queue.test.ts`).
 
 import { subscribe } from "@kyneta/schema"
-import { projectTranscript, ROOT } from "@pineta/core"
+import { type EntryId, projectTranscript, ROOT } from "@pineta/core"
 import { readCards, readLanes, readTreeIndex } from "@pineta/reads"
 import { readStreams } from "@pineta/schema"
 import type { Checks } from "../checks.ts"
@@ -27,7 +27,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const tree = () => readTreeIndex(host.doc)
       const idle = () => waitFor(() => idleNow(host), 60_000)
       /** The path to `tip`, as "role:text" (chat as "Name:text"). */
-      const shape = (tip: string | null) =>
+      const shape = (tip: EntryId | null) =>
         projectTranscript(tree(), tip).map(m =>
           m.role === "chat" ? `${m.author}:${m.text}` : m.role,
         )

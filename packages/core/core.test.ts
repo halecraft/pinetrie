@@ -5,6 +5,7 @@ import assert from "node:assert/strict"
 import {
   address,
   emailLocalPart,
+  entryId,
   findSeqKeys,
   handleOf,
   indexTree,
@@ -60,8 +61,14 @@ describe("who a principal is (ADR-0037)", () => {
 test("latestTip: the newest tip by id, independent of input order", () => {
   // Out of id order on purpose: a helper that returned the first or last tip
   // would pass an in-order input.
-  assert.equal(latestTip(["b-2", null, "c-3", "a-1"]), "c-3")
-  assert.equal(latestTip(["c-3", "a-1", "b-2"]), "c-3")
+  assert.equal(
+    latestTip([entryId("b-2"), null, entryId("c-3"), entryId("a-1")]),
+    "c-3",
+  )
+  assert.equal(
+    latestTip([entryId("c-3"), entryId("a-1"), entryId("b-2")]),
+    "c-3",
+  )
   assert.equal(latestTip([null, null]), null, "lanes with no tip are ignored")
   assert.equal(latestTip([]), null, "an empty session has no view")
 })
@@ -121,7 +128,7 @@ test("projectTranscript: order comes from the parentId walk, not insertion or se
       message: { role: "user", content: "two" },
     },
   }
-  const out = projectTranscript(indexTree(entries), "c")
+  const out = projectTranscript(indexTree(entries), entryId("c"))
   assert.deepEqual(
     out.map(m => m.text),
     ["one", "two", "three"],
@@ -150,7 +157,7 @@ test("projectTranscript: an abandoned branch is not on the tip's path", () => {
     },
   }
   assert.deepEqual(
-    projectTranscript(indexTree(entries), "b").map(m => m.text),
+    projectTranscript(indexTree(entries), entryId("b")).map(m => m.text),
     ["root", "kept"],
   )
 })
@@ -172,7 +179,7 @@ test("projectTranscript: non-message entries and unknown roles are dropped", () 
     },
   }
   assert.deepEqual(
-    projectTranscript(indexTree(entries), "s").map(m => m.role),
+    projectTranscript(indexTree(entries), entryId("s")).map(m => m.role),
     ["user"],
   )
 })
@@ -192,7 +199,10 @@ test("projectTranscript: a cycle is reported, not spun on", () => {
       message: { role: "user", content: "b" },
     },
   }
-  assert.throws(() => projectTranscript(indexTree(entries), "a"), /cycle/)
+  assert.throws(
+    () => projectTranscript(indexTree(entries), entryId("a")),
+    /cycle/,
+  )
 })
 
 test("messageText: flattens pi's content parts", () => {

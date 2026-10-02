@@ -1,4 +1,4 @@
-import { laneNameForThread } from "@pineta/core"
+import { entryId, laneNameForThread } from "@pineta/core"
 import { expect, test } from "vitest"
 import {
   pickAt,
@@ -12,10 +12,10 @@ import {
 
 test("railKeep: rings, running tips, open columns' ends and your cards' ends", () => {
   const keep = railKeep({
-    rings: new Map([["r", []]]),
-    activity: [{ lane: laneNameForThread("s"), tip: "t" }],
-    ends: ["e", null],
-    cards: new Set(["c"]),
+    rings: new Map([[entryId("r"), []]]),
+    activity: [{ lane: laneNameForThread("s"), tip: entryId("t") }],
+    ends: [entryId("e"), null],
+    cards: new Set([entryId("c")]),
   })
   expect([...keep].sort()).toEqual(["c", "e", "r", "t"])
 })
@@ -28,13 +28,16 @@ test("stretchWords: a long ask's capsule leads with its ask", () => {
 })
 
 test("pickAt: the message as far through the run as the click is down it", () => {
-  const ids = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"] as const
-  expect(pickAt(ids, 0)).toBe("a")
-  expect(pickAt(ids, 0.55)).toBe("f")
-  expect(pickAt(ids, 0.999)).toBe("j")
+  const ids = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"].map(entryId)
+  const [first] = ids
+  if (first === undefined) throw new Error("no ids")
+  const run = [first, ...ids.slice(1)] as const
+  expect(pickAt(run, 0)).toBe("a")
+  expect(pickAt(run, 0.55)).toBe("f")
+  expect(pickAt(run, 0.999)).toBe("j")
   // The edges of the border can measure just outside.
-  expect([pickAt(ids, -0.01), pickAt(ids, 1)]).toEqual(["a", "j"])
-  expect(pickAt(ids, null)).toBe("a")
+  expect([pickAt(run, -0.01), pickAt(run, 1)]).toEqual(["a", "j"])
+  expect(pickAt(run, null)).toBe("a")
 })
 
 test("stretchFill: the agent alone, people alone, or both", () => {
@@ -55,10 +58,12 @@ test("stretchFill: the agent alone, people alone, or both", () => {
 })
 
 test("railItems: a dot at a thread end holding your card carries your colour", () => {
-  const item = (id: string) => ({ ids: [id, `${id}-later`] })
+  const item = (id: string) => ({
+    ids: [entryId(id), entryId(`${id}-later`)] as const,
+  })
   const marks = railItems([item("c"), item("o")], {
-    open: new Set(["o"]),
-    yours: { ends: new Set(["c"]), color: "#f0f" },
+    open: new Set([entryId("o")]),
+    yours: { ends: new Set([entryId("c")]), color: "#f0f" },
   }).map(([, m]) => m)
   expect(marks).toEqual([
     { open: false, yours: "#f0f" },

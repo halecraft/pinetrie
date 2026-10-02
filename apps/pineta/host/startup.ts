@@ -12,7 +12,12 @@ import {
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readCards, readSeats, readThreadName } from "@pineta/reads"
-import { cardIdOfDoc, clearStreams, readValues } from "@pineta/schema"
+import {
+  cardIdOfDoc,
+  clearStreams,
+  readStoredLanes,
+  readValues,
+} from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { Serial } from "./queue.ts"
@@ -40,7 +45,8 @@ export interface StartupDeps {
 }
 
 /**
- * In order: no stream survives a process, so clear them; name every lane
+ * In order: no stream survives a process, so clear them; log the stored lane
+ * names that are not a thread's, which no reader is given; name every lane
  * that has none (ADR-0039); resume each lane a crash interrupted, in its own
  * directory, and settle the others with cards queued for them
  * (`planStartup`); delete what an older host left in its outbox, logging
@@ -53,6 +59,11 @@ export async function recover(deps: StartupDeps): Promise<void> {
   const { agent, work, serial, settle } = deps
   const { doc, cards, log } = deps.basics
   clearStreams(doc)
+  const { malformed } = readStoredLanes(doc)
+  if (malformed.length > 0)
+    log(
+      `[host] ignoring lanes whose names are not a thread's: ${malformed.join(", ")}`,
+    )
   await deps.ensureNames()
   const planned = planStartup({
     cards: readCards(cards),

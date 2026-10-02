@@ -8,17 +8,16 @@
 // that works directly records its prompts with neither: it still counts as
 // the lane above, but the walk passes it for commit and disk.
 
-import {
-  type CommitId,
-  type EntryId,
-  entryId,
-  type LaneName,
-  type LaneRecord,
-  type Position,
-  type ProjectRecord,
-  type RevisionRecord,
-  type SnapshotId,
-  type WorkSetting,
+import type {
+  CommitId,
+  EntryId,
+  LaneName,
+  LaneRecord,
+  Position,
+  ProjectRecord,
+  RevisionRecord,
+  SnapshotId,
+  WorkSetting,
 } from "./index.ts"
 import { ancestry, type TreeIndex } from "./tree.ts"
 
@@ -40,7 +39,7 @@ export interface Above {
  */
 export function nearestRevision(
   index: TreeIndex,
-  revisions: ReadonlyMap<string, RevisionRecord>,
+  revisions: ReadonlyMap<EntryId, RevisionRecord>,
   at: Position,
 ): Above {
   let lane: LaneName | null = null
@@ -66,15 +65,15 @@ export function nearestRevision(
  */
 export function firstPromptOf(
   index: TreeIndex,
-  revisions: ReadonlyMap<string, RevisionRecord>,
+  revisions: ReadonlyMap<EntryId, RevisionRecord>,
   lane: LaneName,
-  tip: string | null,
+  tip: EntryId | null,
 ): EntryId | null {
   if (tip === null) return null
   const path = ancestry(index, tip).path
   for (let i = path.length - 1; i >= 0; i -= 1) {
     const id = path[i]
-    if (id !== undefined && revisions.get(id)?.lane === lane) return entryId(id)
+    if (id !== undefined && revisions.get(id)?.lane === lane) return id
   }
   return null
 }
@@ -89,7 +88,7 @@ export function firstPromptOf(
 export function workFor(input: {
   readonly choice: WorkSetting | null
   readonly above: LaneName | null
-  readonly lanes: ReadonlyMap<string, LaneRecord>
+  readonly lanes: ReadonlyMap<LaneName, LaneRecord>
   readonly project: ProjectRecord | null
 }): WorkSetting | null {
   const { project } = input

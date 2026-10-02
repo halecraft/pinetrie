@@ -86,7 +86,7 @@ export function createTurns(deps: {
     pendingRecords: async () => {
       await Promise.all([...recording])
     },
-    async turnDone(lane: LaneName, tip: string) {
+    async turnDone(lane: LaneName, tip: EntryId) {
       try {
         const record = registry.recordOf(lane)
         if (record === undefined) return

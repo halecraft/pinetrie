@@ -21,6 +21,14 @@ cards (`readLanes(doc, index, cards)`), by a `useSelector` over the session
 whose selector changes with the cards. `resolveLayout` takes the index, the
 lanes and the archive together.
 
+**Ids arrive branded.** Every entry id the client holds came from the reads
+as an `EntryId`, and every lane as a `LaneName` (`packages/reads/TECHNICAL.md`),
+so the client never mints one but where an id comes back in from elsewhere:
+its stored forms (`layout.ts`'s `decodeLayout`, `left.ts`'s `decodeLeft`)
+and ids read back from the page (`use-ask-bar.ts`, from `data-ask-of`).
+`biome.json` refuses an `entryId` or `runId` import anywhere else in the
+client; tests build entries and trees through `fixtures.ts`, which mints.
+
 ## Renders (S54, S59)
 
 A render of `App` redraws no message whose content did not change, and a

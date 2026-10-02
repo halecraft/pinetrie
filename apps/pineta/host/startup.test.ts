@@ -12,18 +12,43 @@ import {
   LEGACY_OUTBOX_NAMESPACE,
   SEAT_NAMESPACE,
 } from "@pineta/marginalia"
-import { newCardsDoc, physicalKey, readValues } from "@pineta/schema"
+import {
+  newCardsDoc,
+  physicalKey,
+  readValues,
+  writeLaneTip,
+} from "@pineta/schema"
 import { expect, test } from "vitest"
 import { basics, putValue, record } from "./fakes.ts"
 import { createSerial } from "./queue.ts"
 import { recover, type StartupDeps } from "./startup.ts"
 
-const emptyCards = () =>
-  record<StartupDeps["cards"]>({
+const agentPort = (impl: Partial<StartupDeps["agent"]> = {}) =>
+  record<StartupDeps["agent"]>({
+    interrupted: async () => [],
+    commands: () => [],
+    refusedCommands: () => [],
+    setWorkRecord: async () => {},
+    removeSeat: async () => {},
+    ...impl,
+  })
+
+/** What `recover` needs, doing nothing, with `over` in place. */
+const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
+  basics: basics(),
+  agent: agentPort().port,
+  work: record<StartupDeps["work"]>({ project: null }).port,
+  ensureNames: async () => {},
+  serial: createSerial(),
+  start: () => runId("r-1"),
+  settle: async () => {},
+  cards: record<StartupDeps["cards"]>({
     texts: async () => [],
     stored: async () => [],
     remove: async () => {},
-  }).port
+  }).port,
+  ...over,
+})
 
 test("recover resumes each interrupted lane before it settles the others, and names lanes first", async () => {
   const LANE = laneNameForThread("0123456789abcdef")
@@ -46,38 +71,45 @@ test("recover resumes each interrupted lane before it settles the others, and na
     }),
   )
   const events: string[] = []
-  const deps: StartupDeps = {
-    basics: basics(undefined, cardsDoc),
-    agent: record<StartupDeps["agent"]>({
-      interrupted: async () => {
-        events.push("interrupted")
-        return [LANE]
+  await recover(
+    deps({
+      basics: basics(undefined, cardsDoc),
+      agent: agentPort({
+        interrupted: async () => {
+          events.push("interrupted")
+          return [LANE]
+        },
+      }).port,
+      ensureNames: async () => {
+        events.push("names")
       },
-      commands: () => [],
-      refusedCommands: () => [],
-      setWorkRecord: async () => {},
-      removeSeat: async () => {},
-    }).port,
-    work: record<StartupDeps["work"]>({ project: null }).port,
-    ensureNames: async () => {
-      events.push("names")
-    },
-    serial: createSerial(),
-    start: (lane, s) => {
-      events.push(`${s.kind} ${lane}`)
-      return runId("r-1")
-    },
-    settle: async lanes => {
-      events.push(`settle ${lanes.join(",")}`)
-    },
-    cards: emptyCards(),
-  }
-  await recover(deps)
+      start: (lane, s) => {
+        events.push(`${s.kind} ${lane}`)
+        return runId("r-1")
+      },
+      settle: async lanes => {
+        events.push(`settle ${lanes.join(",")}`)
+      },
+    }),
+  )
   expect(events).toEqual([
     "names",
     "interrupted",
     `resume ${LANE}`,
     `settle ${OTHER}`,
+  ])
+})
+
+test("recover logs a stored lane whose name is not a thread's, and only such a lane", async () => {
+  const b = basics()
+  writeLaneTip(b.doc, laneNameForThread("0123456789abcdef"), null)
+  await recover(deps({ basics: b }))
+  expect(b.lines.filter(l => l.includes("ignoring"))).toEqual([])
+
+  putValue(b.doc, { namespace: "pi.branch.tip", key: "main", value: null })
+  await recover(deps({ basics: b }))
+  expect(b.lines.filter(l => l.includes("ignoring"))).toEqual([
+    "[host] ignoring lanes whose names are not a thread's: main",
   ])
 })
 
@@ -88,26 +120,12 @@ test("recover deletes what an older host held in its outbox, logging each one's 
     key: "h-1",
     value: { id: "h-1", details: { text: "run the tests" } },
   })
-  const agent = record<StartupDeps["agent"]>({
-    interrupted: async () => [],
-    commands: () => [],
-    refusedCommands: () => [],
-    setWorkRecord: async () => {},
-    removeSeat: async () => {},
+  const agent = agentPort({
     removeHeld: async key => {
       b.doc.values.delete(physicalKey(LEGACY_OUTBOX_NAMESPACE, key))
     },
   })
-  await recover({
-    basics: b,
-    agent: agent.port,
-    work: record<StartupDeps["work"]>({ project: null }).port,
-    ensureNames: async () => {},
-    serial: createSerial(),
-    start: () => runId("r-1"),
-    settle: async () => {},
-    cards: emptyCards(),
-  })
+  await recover(deps({ basics: b, agent: agent.port }))
   expect(readValues(b.doc, LEGACY_OUTBOX_NAMESPACE)).toEqual([])
   expect(b.lines.some(l => l.includes("run the tests"))).toBe(true)
 })
@@ -135,13 +153,7 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
         at: clientId,
       }),
     })
-  const agent = record<StartupDeps["agent"]>({
-    interrupted: async () => [],
-    commands: () => [],
-    refusedCommands: () => [],
-    setWorkRecord: async () => {},
-    removeSeat: async () => {},
-  })
+  const agent = agentPort()
   const cards = record<StartupDeps["cards"]>({
     texts: async () => [
       { id: cardId("c-full"), text: "keep me", clients: [11] },
@@ -150,16 +162,7 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
     stored: async () => ["card:c-full", "card:c-empty", "card:c-gone"],
     remove: async () => {},
   })
-  await recover({
-    basics: b,
-    agent: agent.port,
-    work: record<StartupDeps["work"]>({ project: null }).port,
-    ensureNames: async () => {},
-    serial: createSerial(),
-    start: () => runId("r-1"),
-    settle: async () => {},
-    cards: cards.port,
-  })
+  await recover(deps({ basics: b, agent: agent.port, cards: cards.port }))
   expect(cards.calls.find(c => c.method === "remove")?.args[0]).toEqual({
     records: ["c-empty"],
     docs: ["card:c-empty", "card:c-gone"],

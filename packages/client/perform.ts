@@ -1,6 +1,7 @@
 // client/perform — carry out the effects `planIntent` decided (`intent.ts`).
 // The shell: one port call per effect, and nothing decided here.
 
+import type { EntryId } from "@pineta/core"
 import type { Identity } from "./identity.ts"
 import { afterRestore, type Effect } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
@@ -25,7 +26,7 @@ export interface AppPorts {
   /** Open an ask's fold (`FoldMemory`). */
   readonly openFold: (ask: string) => void
   /** Select a root in the Archive tab. */
-  readonly pickArchived: (root: string) => void
+  readonly pickArchived: (root: EntryId) => void
   /** The column keyed `key` takes focus when it mounts. */
   readonly arm: (key: string) => void
   readonly identity: {

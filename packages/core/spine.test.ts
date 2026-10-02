@@ -4,36 +4,35 @@
 // straight line and every assertion passes vacuously, so the fork cases carry
 // the weight.
 
-import {
-  type EntryLike,
-  indexTree,
-  projectSpine,
-  projectTranscript,
-} from "@pineta/core"
 import { describe, expect, test } from "vitest"
+import { entriesOf, entry } from "./fixtures.ts"
+import { entryId, indexTree, projectSpine, projectTranscript } from "./index.ts"
 
-const msg = (id: string, parentId: string | null, text: string): EntryLike => ({
-  id,
-  parentId,
-  type: "message",
-  message: { role: id.startsWith("a") ? "assistant" : "user", content: text },
-})
+const msg = (id: string, parentId: string | null, text: string) =>
+  entry(id, parentId, {
+    role: id.startsWith("a") ? "assistant" : "user",
+    content: text,
+  })
 
 /** A chain a -> b -> c, with d and e forking off b. */
-const forked: Record<string, EntryLike> = {
-  a1: msg("a1", null, "root"),
-  b1: msg("b1", "a1", "trunk one"),
-  c1: msg("c1", "b1", "trunk two"),
-  d1: msg("d1", "b1", "aside one"),
-  e1: msg("e1", "d1", "aside two"),
-}
+const forked = entriesOf([
+  msg("a1", null, "root"),
+  msg("b1", "a1", "trunk one"),
+  msg("c1", "b1", "trunk two"),
+  msg("d1", "b1", "aside one"),
+  msg("e1", "d1", "aside two"),
+])
 
 describe("projectSpine", () => {
   test("a linear chain has a spine and no branches", () => {
-    const linear = { a1: forked.a1, b1: forked.b1, c1: forked.c1 }
+    const linear = entriesOf([
+      msg("a1", null, "root"),
+      msg("b1", "a1", "trunk one"),
+      msg("c1", "b1", "trunk two"),
+    ])
     const { spine, orphans, cycles } = projectSpine(
-      indexTree(linear as Record<string, EntryLike>),
-      "c1",
+      indexTree(linear),
+      entryId("c1"),
     )
     expect(spine.map(n => n.id)).toEqual(["a1", "b1", "c1"])
     expect(spine.every(n => n.branches.length === 0)).toBe(true)
@@ -42,14 +41,14 @@ describe("projectSpine", () => {
 
   test("the spine equals projectTranscript; branches are the extra", () => {
     // The two projections must never disagree about what is on the path.
-    const { spine } = projectSpine(indexTree(forked), "c1")
+    const { spine } = projectSpine(indexTree(forked), entryId("c1"))
     expect(spine.map(n => ({ id: n.id, role: n.role, text: n.text }))).toEqual(
-      projectTranscript(indexTree(forked), "c1"),
+      projectTranscript(indexTree(forked), entryId("c1")),
     )
   })
 
   test("a fork appears as a branch on its parent, not on the spine", () => {
-    const { spine } = projectSpine(indexTree(forked), "c1")
+    const { spine } = projectSpine(indexTree(forked), entryId("c1"))
     expect(spine.map(n => n.id)).toEqual(["a1", "b1", "c1"])
     const b1 = spine.find(n => n.id === "b1")
     expect(b1?.branches.map(b => b.rootId)).toEqual(["d1"])
@@ -59,50 +58,47 @@ describe("projectSpine", () => {
   })
 
   test("messageCount covers the whole subtree, not just its root", () => {
-    const { spine } = projectSpine(indexTree(forked), "c1")
+    const { spine } = projectSpine(indexTree(forked), entryId("c1"))
     const branch = spine.find(n => n.id === "b1")?.branches[0]
     expect(branch?.messageCount).toBe(2) // d1 and e1
   })
 
   test("branches sort by ascending rootId, not insertion order", () => {
-    const many: Record<string, EntryLike> = {
-      a1: msg("a1", null, "root"),
-      b1: msg("b1", "a1", "trunk"),
-      z9: msg("z9", "a1", "z"),
-      m5: msg("m5", "a1", "m"),
-      c3: msg("c3", "a1", "c"),
-    }
-    const { spine } = projectSpine(indexTree(many), "b1")
+    const many = entriesOf([
+      msg("a1", null, "root"),
+      msg("b1", "a1", "trunk"),
+      msg("z9", "a1", "z"),
+      msg("m5", "a1", "m"),
+      msg("c3", "a1", "c"),
+    ])
+    const { spine } = projectSpine(indexTree(many), entryId("b1"))
     expect(spine.find(n => n.id === "a1")?.branches.map(b => b.rootId)).toEqual(
       ["c3", "m5", "z9"],
     )
   })
 
   test("an orphan parent is reported, not silently dropped", () => {
-    const orphaned: Record<string, EntryLike> = {
-      a1: msg("a1", null, "root"),
-      x1: msg("x1", "missing", "lost"),
-    }
-    const { orphans } = projectSpine(indexTree(orphaned), "a1")
+    const orphaned = entriesOf([
+      msg("a1", null, "root"),
+      msg("x1", "missing", "lost"),
+    ])
+    const { orphans } = projectSpine(indexTree(orphaned), entryId("a1"))
     expect(orphans).toEqual(["x1"])
   })
 
   test("a cycle is reported and the walk terminates", () => {
-    const cyclic: Record<string, EntryLike> = {
-      p: { ...msg("p", "q", "p"), parentId: "q" },
-      q: { ...msg("q", "p", "q"), parentId: "p" },
-    }
-    const { cycles } = projectSpine(indexTree(cyclic), "p")
+    const cyclic = entriesOf([msg("p", "q", "p"), msg("q", "p", "q")])
+    const { cycles } = projectSpine(indexTree(cyclic), entryId("p"))
     expect(cycles.length).toBeGreaterThan(0)
   })
 
   test("non-message entries are dropped from the spine", () => {
-    const mixed: Record<string, EntryLike> = {
-      a1: msg("a1", null, "root"),
-      s1: { id: "s1", parentId: "a1", type: "compaction" },
-      c1: msg("c1", "s1", "after"),
-    }
-    const { spine } = projectSpine(indexTree(mixed), "c1")
+    const mixed = entriesOf([
+      msg("a1", null, "root"),
+      entry("s1", "a1", undefined, { type: "compaction" }),
+      msg("c1", "s1", "after"),
+    ])
+    const { spine } = projectSpine(indexTree(mixed), entryId("c1"))
     expect(spine.map(n => n.id)).toEqual(["a1", "c1"])
   })
 

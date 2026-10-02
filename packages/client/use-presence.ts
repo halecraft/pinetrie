@@ -5,6 +5,7 @@
 
 import { useSelector } from "@kyneta/react"
 import {
+  type EntryId,
   readingAt,
   seenBy,
   type TreeIndex,
@@ -19,7 +20,7 @@ import { useMemo } from "react"
 export function useReadingAt(
   presence: PresenceDocHandle,
   me: WriterId,
-): ReadonlyMap<string, readonly WriterId[]> {
+): ReadonlyMap<EntryId, readonly WriterId[]> {
   const reading = useSelector(presence, readReading)
   return useMemo(() => readingAt(reading, me), [reading, me])
 }
@@ -29,7 +30,7 @@ export function useSeenBy(
   presence: PresenceDocHandle,
   me: WriterId,
   index: TreeIndex,
-  end: string,
+  end: EntryId,
 ): readonly WriterId[] {
   const reading = useSelector(presence, readReading)
   return useMemo(
@@ -42,7 +43,7 @@ export function useSeenBy(
 export function useTypingAt(
   presence: PresenceDocHandle,
   me: WriterId,
-  end: string,
+  end: EntryId,
 ): readonly WriterId[] {
   const entries = useSelector(presence, readTyping)
   return useMemo(() => whoIsAt(entries, end, me), [entries, end, me])

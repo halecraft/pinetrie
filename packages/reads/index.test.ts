@@ -4,6 +4,7 @@ import {
   cardId,
   entryId,
   laneNameForThread,
+  runId,
   writerId,
 } from "@pineta/core"
 import {
@@ -37,16 +38,17 @@ test("readTreeIndex keeps the index, and each unchanged entry, until entries cha
   writeEntry(doc, row("e3", "e2"))
   const after = readTreeIndex(doc)
   expect(after).not.toBe(before)
-  expect(after.entries.e1).toBe(before.entries.e1)
-  expect(after.entries.e2).toBe(before.entries.e2)
-  expect(after.childrenOf.get("e2")).toEqual(["e3"])
+  const [e1, e2] = [entryId("e1"), entryId("e2")]
+  expect(after.entries[e1]).toBe(before.entries[e1])
+  expect(after.entries[e2]).toBe(before.entries[e2])
+  expect(after.childrenOf.get(entryId("e2"))).toEqual(["e3"])
 })
 
 test("readLanes: a lane's queued cards are what waits; askedBy is who queued the first, lastWaiting the last", () => {
   const doc = newSessionDoc()
   const lane = laneNameForThread("0123456789abcdef")
   writeEntry(doc, row("e1", null))
-  writeLaneTip(doc, lane, "e1")
+  writeLaneTip(doc, lane, entryId("e1"))
   const queued = (id: string, order: string, email: string): CardRecord => ({
     id: cardId(id),
     owner: writerId("ada@x.io"),
@@ -86,6 +88,6 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     askedBy: null,
     lastWaiting: null,
   })
-  beginRun(doc, lane, "r-1")
+  beginRun(doc, lane, runId("r-1"))
   expect(readLanes(doc, readTreeIndex(doc), cards)[0]?.running).toBe(true)
 })

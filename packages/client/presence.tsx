@@ -33,7 +33,10 @@ export function writerOrder(
   index: TreeIndex,
   named: Iterable<WriterId>,
 ): readonly WriterId[] {
-  const wrote = writersOf(index, Object.keys(index.entries))
+  const wrote = writersOf(
+    index,
+    Object.values(index.entries).map(e => e.id),
+  )
   const rest = [...named].filter(w => !wrote.includes(w)).sort()
   return [...wrote, ...rest]
 }

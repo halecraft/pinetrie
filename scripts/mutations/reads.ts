@@ -92,4 +92,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "an unchanged card the same object",
   },
+  {
+    name: "the tree is read unbranded",
+    file: "packages/reads/index.ts",
+    from: "    id: entryId(row.id),",
+    to: "    id: row.id,",
+    // tsc names no failing check (`failingChecks`): with typecheck clean,
+    // any error is the mutant's.
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
 ]

@@ -29,7 +29,7 @@ function running(answer: string | null = "Fixing the rail.") {
     b.doc,
     row(entryId("e-2"), "e-1", { role: "assistant", content: "looking" }),
   )
-  writeLaneTip(b.doc, lane, "e-2")
+  writeLaneTip(b.doc, lane, entryId("e-2"))
   beginRun(b.doc, lane, runId("r-1"))
   const presence = newPresenceDoc()
   const agent = record<Pick<Agent, "complete" | "skill" | "setDigest">>({
@@ -113,7 +113,7 @@ test.each([
   {
     left: "a plain message appended",
     rows: [row(entryId("e-3"), "e-2", { role: "chat", content: "fyi" })],
-    tip: "e-3",
+    tip: entryId("e-3"),
     next: false,
   },
   {
@@ -122,7 +122,7 @@ test.each([
       row(entryId("e-3"), "e-2", { role: "chat", content: "next" }),
       row(entryId("e-4"), "e-3", { role: "assistant", content: "starting" }),
     ],
-    tip: "e-4",
+    tip: entryId("e-4"),
     next: true,
   },
 ])("a run's end digests the ask it answered, after the drain left $left", async ({

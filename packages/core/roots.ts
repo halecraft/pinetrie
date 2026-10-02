@@ -4,7 +4,7 @@
 // A root is found by walking up (`rootOf`), and a thread started at the root
 // is rooted at its first message (S30), so a root's id is its tab's key.
 
-import type { WriterId } from "./index.ts"
+import type { EntryId, WriterId } from "./index.ts"
 import {
   isBusy,
   type LaneView,
@@ -15,13 +15,13 @@ import {
 } from "./tree.ts"
 
 export interface RootSummary {
-  readonly root: string
+  readonly root: EntryId
   /** Its first message, as the rail finds it: the tab's label until a title names it (ADR-0045). */
-  readonly first: string
+  readonly first: EntryId
   /** Its messages: the rail's rows, some of which it draws inside a run. */
   readonly messages: number
   /** Its newest message: last activity, since ids are uuidv7. */
-  readonly newest: string
+  readonly newest: EntryId
   /** Everyone who wrote a chat in it, in order of first message. */
   readonly writers: readonly WriterId[]
 }
@@ -60,8 +60,8 @@ export function summarizeRoots(index: TreeIndex): readonly RootSummary[] {
 export function rootWork(
   index: TreeIndex,
   lanes: readonly LaneView[],
-): ReadonlyMap<string, "running" | "waiting"> {
-  const work = new Map<string, "running" | "waiting">()
+): ReadonlyMap<EntryId, "running" | "waiting"> {
+  const work = new Map<EntryId, "running" | "waiting">()
   for (const lane of lanes) {
     if (lane.tip === null || !isBusy(lane)) continue
     const root = rootOf(index, lane.tip)

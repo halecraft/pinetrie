@@ -1,4 +1,5 @@
-import type { ColumnView, LaneName } from "@pineta/core"
+import type { ColumnView, EntryId, LaneName } from "@pineta/core"
+import { entryId } from "@pineta/core"
 import { expect, test } from "vitest"
 import { foldMemory } from "./ask-fold.ts"
 import type { LaneJoin } from "./column-view.ts"
@@ -9,18 +10,18 @@ import {
 import { screenMemory } from "./screen-memory.ts"
 import type { RowMemory } from "./tool-row.ts"
 
-const view: ColumnView = { tipId: "e2", forkFrom: null, nodes: [] }
+const view: ColumnView = { tipId: entryId("e2"), forkFrom: null, nodes: [] }
 const lane = (running = false): MessageListProps["lane"] => ({
   kind: "lane",
   name: "lane-1" as LaneName,
-  tip: "e2",
+  tip: entryId("e2"),
   running,
   waiting: 0,
   askedBy: null,
   lastWaiting: null,
 })
-const joins = (): ReadonlyMap<string, LaneJoin> =>
-  new Map([["e1", { name: undefined, from: null }]])
+const joins = (): ReadonlyMap<EntryId, LaneJoin> =>
+  new Map([[entryId("e1"), { name: undefined, from: null }]])
 const shared = {
   index: {} as MessageListProps["index"],
   writable: true,
@@ -43,7 +44,7 @@ const props = (over: Partial<MessageListProps> = {}): MessageListProps => ({
   view,
   lane: lane(),
   joins: joins(),
-  landmarks: ["e1"],
+  landmarks: [entryId("e1")],
   density: "story",
   releasedTip: null,
   runningAsk: null,
@@ -56,13 +57,15 @@ test("a column's list draws the same from a lane and joins rebuilt unchanged", (
 })
 
 test("a column's list redraws when its density, its reader's release or its landmarks change, and not when they are rebuilt unchanged", () => {
-  expect(sameMessageListProps(props(), props({ landmarks: ["e1"] }))).toBe(true)
+  expect(
+    sameMessageListProps(props(), props({ landmarks: [entryId("e1")] })),
+  ).toBe(true)
   expect(sameMessageListProps(props(), props({ density: "outline" }))).toBe(
     false,
   )
-  expect(sameMessageListProps(props(), props({ releasedTip: "e1" }))).toBe(
-    false,
-  )
+  expect(
+    sameMessageListProps(props(), props({ releasedTip: entryId("e1") })),
+  ).toBe(false)
   expect(sameMessageListProps(props(), props({ landmarks: [] }))).toBe(false)
 })
 
@@ -71,7 +74,9 @@ test("a column's list redraws when its lane, joins or view change", () => {
   expect(
     sameMessageListProps(
       props(),
-      props({ joins: new Map([["e2", { name: undefined, from: null }]]) }),
+      props({
+        joins: new Map([[entryId("e2"), { name: undefined, from: null }]]),
+      }),
     ),
   ).toBe(false)
   // By identity: comparing a long thread's nodes would spend what skipping saves.

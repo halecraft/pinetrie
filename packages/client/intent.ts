@@ -110,7 +110,7 @@ export type Intent =
       readonly title: string | null
     }
   /** Show entry `entry`, wherever it is (`planOpen`). */
-  | { readonly kind: "openAt"; readonly entry: string }
+  | { readonly kind: "openAt"; readonly entry: EntryId }
   | { readonly kind: "signOut" }
 
 export type Effect =
@@ -147,11 +147,11 @@ export type Effect =
       readonly action: OfferAction
     }
   /** Scroll to entry `entry` once it is drawn (`useReveal`). */
-  | { readonly kind: "reveal"; readonly entry: string }
+  | { readonly kind: "reveal"; readonly entry: EntryId }
   /** Open ask `ask`'s fold, so what is revealed in it is drawn (ADR-0056). */
   | { readonly kind: "openFold"; readonly ask: EntryId }
   /** Select `root` in the Archive tab, which previews it. */
-  | { readonly kind: "pickArchived"; readonly root: string }
+  | { readonly kind: "pickArchived"; readonly root: EntryId }
   /** The column keyed `key` takes focus when it mounts (`claimFocus`). */
   | { readonly kind: "armFocus"; readonly key: string }
   | { readonly kind: "setName"; readonly name: string }
@@ -165,13 +165,13 @@ type RootColumnAction = Extract<LayoutAction, { kind: "columns" }>["action"]
 export interface IntentState {
   readonly layout: Layout
   readonly index: TreeIndex
-  readonly archive: ReadonlyMap<string, ArchiveRecord>
+  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
   /** Every ask (`indexAsks`): a pick into one's work opens its fold. */
   readonly asks: AskIndex
 }
 
 const layout = (action: LayoutAction): Effect => ({ kind: "layout", action })
-const showRoot = (root: string): Effect =>
+const showRoot = (root: EntryId): Effect =>
   layout({ kind: "show", tab: { kind: "root", root } })
 
 /**
@@ -230,13 +230,13 @@ export function planIntent(
  * (ADR-0056): forks, branch starts and people's messages are never in one.
  */
 function planOpenAt(
-  id: string,
+  id: EntryId,
   state: IntentState,
   fresh: string,
 ): readonly Effect[] {
   const plan = planOpen(state.layout, state.index, state.archive, id)
   if (plan === null) return []
-  const ask = state.asks.askOf.get(id as EntryId)
+  const ask = state.asks.askOf.get(id)
   const fold: readonly Effect[] =
     ask === undefined ? [] : [{ kind: "openFold", ask }]
   switch (plan.kind) {
@@ -362,7 +362,7 @@ const opened = (key: string, effects: readonly Effect[]): readonly Effect[] =>
  * The entry `intent` asks to see, from the page or from a column (a closed
  * branch's button), or null.
  */
-export const entryShown = (intent: Intent): string | null =>
+export const entryShown = (intent: Intent): EntryId | null =>
   intent.kind === "openAt"
     ? intent.entry
     : intent.kind === "column" && intent.act.kind === "openAt"

@@ -1,10 +1,6 @@
-import {
-  type EntryLike,
-  indexTree,
-  type WriterId,
-  writerId,
-} from "@pineta/core"
+import { type WriterId, writerId } from "@pineta/core"
 import { describe, expect, test } from "vitest"
+import { entry, indexOf } from "./fixtures.ts"
 import {
   decodeInbox,
   encodeInbox,
@@ -28,28 +24,21 @@ const chat = (
   parentId: string | null,
   writer: WriterId,
   text: string,
-): EntryLike => ({
-  id,
-  parentId,
-  type: "message",
-  message: { role: "chat", content: text, author: "x", writer },
-})
+) => entry(id, parentId, { role: "chat", content: text, author: "x", writer })
 // Two roots. Ids sort by age.
 const entries = [
   chat("1-r1", null, BEA, "hello @ada"),
   chat("2-a", "1-r1", ADA, "@ada talking to myself"),
   chat("3-b", "1-r1", BEA, "@cy not you"),
   chat("4-r2", null, BEA, "@guest-7f1d over here"),
-  {
-    id: "5-agent",
-    parentId: "4-r2",
-    type: "message",
-    message: { role: "assistant", content: "@ada from the agent" },
-  },
+  entry("5-agent", "4-r2", {
+    role: "assistant",
+    content: "@ada from the agent",
+  }),
   chat("6-c", "4-r2", BEA, "again @Ada, and @types/node"),
   chat("7-d", "1-r1", BEA, "later @ada"),
 ]
-const index = indexTree(Object.fromEntries(entries.map(e => [e.id, e])))
+const index = indexOf(entries)
 const participants = ["Ada", "Bea", "Cy", "guest-7f1d"]
 const mine = mentionsOf({ index, me: ADA, myName: "Ada", participants })
 const ids = mine.map(m => m.id)

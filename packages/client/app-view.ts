@@ -8,7 +8,6 @@
 import {
   type ArchiveRecord,
   type EntryId,
-  entryId,
   type LaneName,
   type LaneView,
   type OfferRecord,
@@ -51,7 +50,7 @@ export type Workspace =
   | { readonly kind: "archive" }
   | {
       readonly kind: "root"
-      readonly root: string
+      readonly root: EntryId
       readonly readOnly: ReadOnly | null
       readonly slots: readonly ColumnSlot[]
     }
@@ -69,16 +68,16 @@ export interface AppViewInput {
   readonly columns: readonly Column[]
   /** `branchColors(rail, views).track`, memoised by `App`. */
   readonly tracks: readonly number[]
-  readonly archive: ReadonlyMap<string, ArchiveRecord>
+  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
   readonly nameOf: ReadonlyMap<WriterId, string>
-  readonly offers: ReadonlyMap<string, OfferRecord>
+  readonly offers: ReadonlyMap<LaneName, OfferRecord>
   readonly lanes: readonly LaneView[]
 }
 
 /** An open offer, for the header: its lane, and the tip it leads to. */
 export interface OpenOffer {
   readonly lane: LaneName
-  readonly tip: string
+  readonly tip: EntryId
 }
 
 export function appView(input: AppViewInput): {
@@ -111,7 +110,7 @@ function workspaceOf(input: AppViewInput): Workspace {
         root: active.root,
         readOnly:
           record?.state === "archived"
-            ? readOnlyWords(entryId(active.root), record, input.nameOf)
+            ? readOnlyWords(active.root, record, input.nameOf)
             : null,
         slots: slots(columns.length > 1),
       }

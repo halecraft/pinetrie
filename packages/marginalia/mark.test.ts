@@ -13,8 +13,8 @@ const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
 
 const entry = (id: string, parentId: string | null): EntryLike => ({
-  id,
-  parentId,
+  id: entryId(id),
+  parentId: parentId === null ? null : entryId(parentId),
   type: "message",
   message: { role: "user", content: id },
 })
@@ -49,7 +49,7 @@ describe("the record", () => {
     expect(decodeMark({ ...r, title: "" })).toBeUndefined()
     expect(decodeMark({ ...r, entry: "" })).toBeUndefined()
     expect(
-      markRecords([{ value: r }, { value: { nope: 1 } }]).get("r1"),
+      markRecords([{ value: r }, { value: { nope: 1 } }]).get(entryId("r1")),
     ).toEqual(r)
   })
 })
@@ -62,21 +62,24 @@ describe("planMark", () => {
     })
   })
   test("replaces another title: the last write wins", () => {
-    expect(plan({ marks: new Map([["r1", mark("r1", "Old")]]) })).toMatchObject(
-      { kind: "write", record: { title: "Tab names", by: ADA } },
-    )
+    expect(
+      plan({ marks: new Map([[entryId("r1"), mark("r1", "Old")]]) }),
+    ).toMatchObject({ kind: "write", record: { title: "Tab names", by: ADA } })
   })
   test("any entry in the tree takes a mark, not only a root", () => {
     expect(plan({ entry: entryId("a") })).toMatchObject({ kind: "write" })
   })
   test("the title already stored writes nothing", () => {
-    expect(plan({ marks: new Map([["r1", mark("r1", "Tab names")]]) })).toEqual(
-      { kind: "unchanged" },
-    )
+    expect(
+      plan({ marks: new Map([[entryId("r1"), mark("r1", "Tab names")]]) }),
+    ).toEqual({ kind: "unchanged" })
   })
   test("clearing a title removes its record", () => {
     expect(
-      plan({ title: null, marks: new Map([["r1", mark("r1", "Old")]]) }),
+      plan({
+        title: null,
+        marks: new Map([[entryId("r1"), mark("r1", "Old")]]),
+      }),
     ).toEqual({ kind: "remove", entry: "r1" })
   })
   test("clearing an entry with no title writes nothing", () => {

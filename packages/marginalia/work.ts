@@ -21,6 +21,7 @@ import {
   type ForkStart,
   type HaveRecord,
   HOST_WORKING_COPY,
+  isLaneName,
   isSha256,
   type LandingRecord,
   type LaneName,
@@ -155,26 +156,34 @@ const HaveRecordSchema = Type.Object({
 })
 
 export const decodeLaneRecord = (value: unknown): LaneRecord | undefined =>
-  decodeWith(LaneRecordSchema, value, r => ({
-    lane: r.lane as LaneName,
-    work: r.work,
-    by: r.by as WriterId,
-    createdAt: r.createdAt,
-  }))
+  decodeWith(LaneRecordSchema, value, r =>
+    isLaneName(r.lane)
+      ? {
+          lane: r.lane,
+          work: r.work,
+          by: r.by as WriterId,
+          createdAt: r.createdAt,
+        }
+      : undefined,
+  )
 
 export const decodeRevisionRecord = (
   value: unknown,
 ): RevisionRecord | undefined =>
-  decodeWith(RevisionRecordSchema, value, r => ({
-    entry: entryId(r.entry),
-    lane: r.lane as LaneName,
-    commit: r.commit === null ? null : commitId(r.commit),
-    snapshot:
-      r.snapshot === undefined || r.snapshot === null
-        ? null
-        : snapshotId(r.snapshot),
-    paths: r.paths ?? [],
-  }))
+  decodeWith(RevisionRecordSchema, value, r =>
+    isLaneName(r.lane)
+      ? {
+          entry: entryId(r.entry),
+          lane: r.lane,
+          commit: r.commit === null ? null : commitId(r.commit),
+          snapshot:
+            r.snapshot === undefined || r.snapshot === null
+              ? null
+              : snapshotId(r.snapshot),
+          paths: r.paths ?? [],
+        }
+      : undefined,
+  )
 
 export const decodeProjectRecord = (
   value: unknown,
@@ -183,46 +192,54 @@ export const decodeProjectRecord = (
 export const decodeLandingRecord = (
   value: unknown,
 ): LandingRecord | undefined =>
-  decodeWith(LandingRecordSchema, value, r => ({
-    ...r,
-    lane: r.lane as LaneName,
-    prompt: entryId(r.prompt),
-    by: r.by as WriterId,
-  }))
+  decodeWith(LandingRecordSchema, value, r =>
+    isLaneName(r.lane)
+      ? {
+          ...r,
+          lane: r.lane,
+          prompt: entryId(r.prompt),
+          by: r.by as WriterId,
+        }
+      : undefined,
+  )
 
 export const decodeOfferRecord = (value: unknown): OfferRecord | undefined =>
-  decodeWith(OfferRecordSchema, value, r => ({
-    ...r,
-    lane: r.lane as LaneName,
-    commits: r.commits.map(commitId),
-    host: {
-      changes: r.host.changes,
-      wrote: r.host.wrote.map(commitId),
-      tip: commitId(r.host.tip),
-      start: r.host.start.map(commitId),
-    },
-  }))
+  decodeWith(OfferRecordSchema, value, r =>
+    isLaneName(r.lane)
+      ? {
+          ...r,
+          lane: r.lane,
+          commits: r.commits.map(commitId),
+          host: {
+            changes: r.host.changes,
+            wrote: r.host.wrote.map(commitId),
+            tip: commitId(r.host.tip),
+            start: r.host.start.map(commitId),
+          },
+        }
+      : undefined,
+  )
 
 export const decodeNameRecord = (value: unknown): NameRecord | undefined =>
-  decodeWith(NameRecordSchema, value, r => ({
-    lane: r.lane as LaneName,
-    name: r.name as ThreadName,
-    at: r.at,
-  }))
+  decodeWith(NameRecordSchema, value, r =>
+    isLaneName(r.lane)
+      ? { lane: r.lane, name: r.name as ThreadName, at: r.at }
+      : undefined,
+  )
 
 export const decodeBannerRecord = (value: unknown): BannerRecord | undefined =>
   decodeWith(BannerRecordSchema, value, r =>
-    isSha256(r.sha)
-      ? { lane: r.lane as LaneName, sha: r.sha, at: r.at }
+    isSha256(r.sha) && isLaneName(r.lane)
+      ? { lane: r.lane, sha: r.sha, at: r.at }
       : undefined,
   )
 
 export const decodeHaveRecord = (value: unknown): HaveRecord | undefined =>
-  decodeWith(HaveRecordSchema, value, r => ({
-    ...r,
-    lane: r.lane as LaneName,
-    commit: commitId(r.commit),
-  }))
+  decodeWith(HaveRecordSchema, value, r =>
+    isLaneName(r.lane)
+      ? { ...r, lane: r.lane, commit: commitId(r.commit) }
+      : undefined,
+  )
 
 /** The commands the host's pi loaded, as people see them (ADR-0036). */
 export interface CommandsRecord {
@@ -333,13 +350,15 @@ export const recordChanged = (record: WorkRecord, stored: unknown): boolean =>
 type Stored = Iterable<{ readonly value: unknown }>
 
 /** Stored `pineta.lane` values -> each lane's record, by lane. */
-export const laneRecords = (values: Stored): ReadonlyMap<string, LaneRecord> =>
+export const laneRecords = (
+  values: Stored,
+): ReadonlyMap<LaneName, LaneRecord> =>
   new Map(decodeAll(values, decodeLaneRecord).map(r => [r.lane, r]))
 
 /** Stored `pineta.revision` values -> each record, by the entry it is at. */
 export const revisionRecords = (
   values: Stored,
-): ReadonlyMap<string, RevisionRecord> =>
+): ReadonlyMap<EntryId, RevisionRecord> =>
   new Map(decodeAll(values, decodeRevisionRecord).map(r => [r.entry, r]))
 
 /** Stored `pineta.landing` values -> every landing, oldest first (ids are uuidv7). */
@@ -351,7 +370,7 @@ export const landingRecords = (values: Stored): readonly LandingRecord[] =>
 /** Stored `pineta.offer` values -> each lane's offer, by lane. */
 export const offerRecords = (
   values: Stored,
-): ReadonlyMap<string, OfferRecord> =>
+): ReadonlyMap<LaneName, OfferRecord> =>
   new Map(decodeAll(values, decodeOfferRecord).map(r => [r.lane, r]))
 
 /** Stored `pineta.name` values -> each lane's name, by lane (ADR-0039). */

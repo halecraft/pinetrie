@@ -4,7 +4,7 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import type { SessionClient } from "@pineta/client/session"
-import { type CardId, cardId, type LaneName, ROOT } from "@pineta/core"
+import { type CardId, cardId, entryId, type LaneName, ROOT } from "@pineta/core"
 import { yourCard } from "@pineta/marginalia"
 import { scriptedModel } from "@pineta/pi"
 import { readCards, readLanes, readSeats, readTreeIndex } from "@pineta/reads"
@@ -93,7 +93,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const idx = readTreeIndex(ch.doc)
     const found = yourCard(
       ada.writer,
-      { kind: "end", end: grown ?? "" },
+      { kind: "end", end: grown ?? entryId("") },
       readCards(ada.cards),
       readLanes(ch.doc, idx, readCards(ch.cards)),
       idx,
@@ -259,7 +259,8 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     await ch.quiet()
     const index4 = readTreeIndex(ch.doc)
-    const msg4 = index4.entries[index4.bySend.get(SEND4) ?? ""]
+    const wrote4 = index4.bySend.get(SEND4)
+    const msg4 = wrote4 === undefined ? undefined : index4.entries[wrote4]
     check(
       "someone else's card, sent after its owner left, names them as contributor",
       sent4.kind === "appended" &&

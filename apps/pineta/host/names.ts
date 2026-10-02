@@ -38,10 +38,10 @@ export function createNames(deps: {
       serial.run(async () => {
         const records = readLaneRecords(doc)
         const planned = planNames(
-          readLaneNames(doc).map(stored => {
-            const lane = stored as LaneName
-            return { lane, createdAt: records.get(lane)?.createdAt ?? 0 }
-          }),
+          readLaneNames(doc).map(lane => ({
+            lane,
+            createdAt: records.get(lane)?.createdAt ?? 0,
+          })),
           readNames(doc),
           now(),
         )

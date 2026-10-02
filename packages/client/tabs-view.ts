@@ -2,7 +2,7 @@
 // decided. PURE: `TabBar` (`tabs.tsx`) draws it, and each click sends the
 // intent it names.
 
-import { entryId, type MarkRecord } from "@pineta/core"
+import type { EntryId, MarkRecord } from "@pineta/core"
 import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
 import { type ActiveTab, type Layout, sameTab, tabBar } from "./layout.ts"
@@ -35,7 +35,7 @@ export type TabView =
     })
   | (TabCommon & {
       readonly kind: "root"
-      readonly root: string
+      readonly root: EntryId
       /** Its title, else its first message's first line (`rootLabels`). */
       readonly label: string
       /** Its first line: the rename field's placeholder. */
@@ -61,12 +61,12 @@ export interface TabsViewInput {
   readonly layout: Layout
   readonly active: ActiveTab
   /** Each root's label (`rootLabels`). */
-  readonly labels: ReadonlyMap<string, string>
+  readonly labels: ReadonlyMap<EntryId, string>
   /** Each root's first line (`firstLines`). */
-  readonly lines: ReadonlyMap<string, string>
-  readonly marks: ReadonlyMap<string, MarkRecord>
+  readonly lines: ReadonlyMap<EntryId, string>
+  readonly marks: ReadonlyMap<EntryId, MarkRecord>
   /** Roots in state `archived`. */
-  readonly archived: ReadonlySet<string>
+  readonly archived: ReadonlySet<EntryId>
   /** The agent's work in each root (`rootWork`). */
   readonly work: ReadonlyMap<string, "running" | "waiting">
   readonly unsent: CardMarks
@@ -122,7 +122,7 @@ function tabView(tab: ActiveTab, input: TabsViewInput): TabView {
               {
                 kind: "archive",
                 busy: input.work.get(root) ?? null,
-                intent: { kind: "archive", root: entryId(root) },
+                intent: { kind: "archive", root },
               },
             ],
         pip: input.unsent.roots.has(root),
@@ -133,8 +133,8 @@ function tabView(tab: ActiveTab, input: TabsViewInput): TabView {
 }
 
 /** What a root tab's rename field sends, once planned (`planTitle`). */
-export const renameIntent = (root: string, title: string | null): Intent => ({
+export const renameIntent = (root: EntryId, title: string | null): Intent => ({
   kind: "rename",
-  root: entryId(root),
+  root,
   title,
 })

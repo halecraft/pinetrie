@@ -1,4 +1,4 @@
-import type { TranscriptMessage } from "@pineta/core"
+import { entryId, type TranscriptMessage } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import { fitNewest, leftOut, transcriptLines } from "./request.ts"
 
@@ -7,7 +7,7 @@ const message = (
   text: string,
   author?: string,
 ): TranscriptMessage => ({
-  id: text,
+  id: entryId(text),
   role,
   text,
   ...(author === undefined ? {} : { author }),

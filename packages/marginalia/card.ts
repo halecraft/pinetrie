@@ -16,7 +16,9 @@ import {
   type CardPlace,
   type CardRecord,
   cardId,
+  type EntryId,
   entryId,
+  isLaneName,
   type LaneName,
   type LaneView,
   type Position,
@@ -111,7 +113,10 @@ const isCommand = (s: string): s is CardCommand =>
 
 /**
  * A stored card -> its record; undefined for one that is malformed, a
- * command this build does not know among them. Total.
+ * command this build does not know among them. Total. A drafting card's
+ * lane that is not a thread's is dropped and the card kept: the startup
+ * sweep deletes the text of a card that does not decode (`planCardSweep`).
+ * A queued card needs its lane, so one with such a lane does not decode.
  */
 export const decodeCard = (
   id: string,
@@ -132,14 +137,14 @@ export const decodeCard = (
             ? {
                 kind: "drafting",
                 at: atEntry(entryId(c.at)),
-                lane: c.lane === "" ? null : (c.lane as LaneName),
+                lane: isLaneName(c.lane) ? c.lane : null,
               }
-            : c.lane === "" || order === "" || by === ""
+            : !isLaneName(c.lane) || order === "" || by === ""
               ? undefined
               : {
                   kind: "queued",
                   at: atEntry(entryId(c.at)),
-                  lane: c.lane as LaneName,
+                  lane: c.lane,
                   order,
                   by: by as WriterId,
                 }
@@ -165,7 +170,7 @@ export function placeEnd(
   me: WriterId,
   lanes: readonly LaneView[],
   index: TreeIndex,
-): string | null {
+): EntryId | null {
   const thread = threadOf(index, lanes, {
     at: place.at,
     mode: "reply",
@@ -185,14 +190,14 @@ export const cardEnd = (
   card: CardRecord,
   lanes: readonly LaneView[],
   index: TreeIndex,
-): string | null =>
+): EntryId | null =>
   card.place.kind === "drafting"
     ? placeEnd(card.place, card.owner, lanes, index)
     : null
 
 /** Every drafting card whose thread ends at `end`, everyone's, oldest first. */
 export const draftingAt = (
-  end: string,
+  end: EntryId,
   cards: readonly CardRecord[],
   lanes: readonly LaneView[],
   index: TreeIndex,
@@ -200,7 +205,7 @@ export const draftingAt = (
 
 /** Where a column's composer is: a thread's end, or a fresh column by its key. */
 export type CardWhere =
-  | { readonly kind: "end"; readonly end: string }
+  | { readonly kind: "end"; readonly end: EntryId }
   | { readonly kind: "fresh"; readonly column: string }
 
 /**

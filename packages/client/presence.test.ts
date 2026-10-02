@@ -1,24 +1,17 @@
-import { type EntryLike, indexTree, writerId } from "@pineta/core"
+import { writerId } from "@pineta/core"
 import { expect, test } from "vitest"
+import { entry, indexOf } from "./fixtures.ts"
 import { presenceColors, writerOrder } from "./presence.tsx"
 
 const ADA = writerId("ada")
 const BEA = writerId("bea")
 const CAT = writerId("cat")
 const DAN = writerId("dan")
-const chat = (id: string, writer: ReturnType<typeof writerId>): EntryLike => ({
-  id,
-  parentId: null,
-  type: "message",
-  message: { role: "chat", content: "hi", writer },
-})
+const chat = (id: string, writer: ReturnType<typeof writerId>) =>
+  entry(id, null, { role: "chat", content: "hi", writer })
 
 test("writerOrder: by first message, then those only named", () => {
-  const index = indexTree({
-    "2": chat("2", ADA),
-    "1": chat("1", BEA),
-    "3": chat("3", BEA),
-  })
+  const index = indexOf([chat("2", ADA), chat("1", BEA), chat("3", BEA)])
   expect(writerOrder(index, [DAN, CAT, ADA])).toEqual([BEA, ADA, CAT, DAN])
 })
 

@@ -53,5 +53,73 @@
       "arrowParentheses": "asNeeded",
       "indentStyle": "space"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "packages/core/**",
+        "packages/client/**",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!packages/core/fixtures.ts",
+        "!packages/client/fixtures.ts",
+        "!apps/pineta/host/fakes.ts",
+        "!packages/client/layout.ts",
+        "!packages/client/left.ts",
+        "!packages/client/use-ask-bar.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@pineta/core": {
+                    "importNames": ["entryId", "runId"],
+                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts)."
+                  },
+                  "./index.ts": {
+                    "importNames": ["entryId", "runId"],
+                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts)."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/pineta/host/**",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!packages/core/fixtures.ts",
+        "!packages/client/fixtures.ts",
+        "!apps/pineta/host/fakes.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@pineta/core": {
+                    "importNames": ["entryId"],
+                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts)."
+                  },
+                  "./index.ts": {
+                    "importNames": ["entryId"],
+                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts)."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

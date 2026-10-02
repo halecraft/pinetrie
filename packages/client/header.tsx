@@ -8,7 +8,9 @@
 
 import {
   type AgentRun,
+  type EntryId,
   firstLine,
+  type LaneName,
   messageText,
   rootOf,
   type TreeIndex,
@@ -51,17 +53,17 @@ export function Header({
   /** The agent's running lanes (`readAgentActivity`). */
   runs: readonly AgentRun[]
   index: TreeIndex
-  labelOf: (root: string) => string
+  labelOf: (root: EntryId) => string
   nameOf: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
   mentions: readonly InboxItem[]
   inbox: InboxView
   /** Threads with an offer open in your repo, at their lane's tip (ADR-0038). */
-  offers: readonly { readonly lane: string; readonly tip: string }[]
+  offers: readonly { readonly lane: LaneName; readonly tip: EntryId }[]
   /** Each lane's name: a thread's row leads with it (ADR-0039). */
   names: ReadonlyMap<string, string>
   /** Open an entry as your tab (`planOpen`). */
-  onOpen: (id: string) => void
+  onOpen: (id: EntryId) => void
   me: Me
 }) {
   const working = runs.length > 0
@@ -72,8 +74,8 @@ export function Header({
    */
   const thread = (
     key: string,
-    end: string,
-    root: string,
+    end: EntryId,
+    root: EntryId,
     name?: string,
   ): MenuItem => ({
     key,
@@ -191,7 +193,7 @@ function People({
   order: readonly WriterId[]
   nameOf: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
-  thread: (key: string, end: string, root: string) => MenuItem
+  thread: (key: string, end: EntryId, root: EntryId) => MenuItem
 }) {
   const [openMenus, setOpenMenus] = useState<OpenMenus>(new Map())
   const reading = useReadingAt(session.presence, session.writer)
@@ -231,9 +233,9 @@ function InboxMenu({
 }: {
   mentions: readonly InboxItem[]
   inbox: InboxView
-  labelOf: (root: string) => string
+  labelOf: (root: EntryId) => string
   nameOf: ReadonlyMap<WriterId, string>
-  onOpen: (id: string) => void
+  onOpen: (id: EntryId) => void
 }) {
   const [onlyUnseen, setOnlyUnseen] = useState(false)
   const listed = onlyUnseen

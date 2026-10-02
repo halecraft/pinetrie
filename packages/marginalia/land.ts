@@ -11,6 +11,7 @@
 import {
   type CommitId,
   commitId,
+  isLaneName,
   type LaneName,
   type WriterId,
 } from "@pineta/core"
@@ -60,14 +61,19 @@ export interface LandMessage {
   readonly timestamp: number
 }
 
-const fromStored = (d: Static<typeof LandDetailsSchema>): LandDetails => ({
-  landing: d.landing,
-  lane: d.lane as LaneName,
-  yours: d.yours.map(commitId),
-  files: d.files,
-  skill: d.skill,
-  by: d.by as WriterId,
-})
+const fromStored = (
+  d: Static<typeof LandDetailsSchema>,
+): LandDetails | undefined =>
+  isLaneName(d.lane)
+    ? {
+        landing: d.landing,
+        lane: d.lane,
+        yours: d.yours.map(commitId),
+        files: d.files,
+        skill: d.skill,
+        by: d.by as WriterId,
+      }
+    : undefined
 
 /** A stored message -> its land details, or undefined if it is not one. */
 export const decodeLand = (message: unknown): LandDetails | undefined =>

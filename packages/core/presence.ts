@@ -9,11 +9,11 @@
 // Each function takes one field's entries, so a part of the screen reads only
 // the field it shows, and a write to another field redraws nothing of it.
 
-import type { WriterId } from "./index.ts"
+import type { EntryId, WriterId } from "./index.ts"
 import { pathIds, type TreeIndex } from "./tree.ts"
 
-/** A presence field's entries: one per key, its writer and value. */
-type Entries = readonly (readonly [WriterId, string])[]
+/** A presence field's entries: one per key, its writer and the thread end. */
+type Entries = readonly (readonly [WriterId, EntryId])[]
 
 /**
  * Everyone but `me` whose value is `value`, each once: a person here from two
@@ -21,7 +21,7 @@ type Entries = readonly (readonly [WriterId, string])[]
  */
 export function whoIsAt(
   entries: Entries,
-  value: string,
+  value: EntryId,
   me: WriterId,
 ): WriterId[] {
   const out: WriterId[] = []
@@ -34,8 +34,8 @@ export function whoIsAt(
 export function readingAt(
   reading: Entries,
   me: WriterId,
-): ReadonlyMap<string, readonly WriterId[]> {
-  const at = new Map<string, WriterId[]>()
+): ReadonlyMap<EntryId, readonly WriterId[]> {
+  const at = new Map<EntryId, WriterId[]>()
   for (const [w, end] of reading) {
     if (w === me) continue
     const here = at.get(end) ?? []
@@ -50,7 +50,7 @@ export function seenBy(
   reading: Entries,
   me: WriterId,
   index: TreeIndex,
-  end: string,
+  end: EntryId,
 ): readonly WriterId[] {
   const mine = pathIds(index, end)
   const seen: WriterId[] = []

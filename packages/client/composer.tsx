@@ -5,6 +5,7 @@ import type {
   CardPlace,
   CardRecord,
   CommandSummary,
+  EntryId,
   Position,
   SeatRecord,
   ThreadLane,
@@ -43,7 +44,7 @@ export function Composer(p: {
   pending: Pending | undefined
   where: Where
   /** The thread end whose typists it names; null names none. */
-  typingAt: string | null
+  typingAt: EntryId | null
   onTyping: () => void
   onSend: () => string | undefined
   onBranchInstead: (pending: Pending) => void
@@ -100,7 +101,7 @@ export function Composer(p: {
  */
 function TypingLine(p: {
   session: SessionClient
-  end: string
+  end: EntryId
   reader: Reader
 }) {
   const typing = useTypingAt(p.session.presence, p.reader.me, p.end)

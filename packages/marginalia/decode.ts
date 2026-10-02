@@ -7,7 +7,11 @@
 import type { Static, TSchema } from "typebox"
 import { Value } from "typebox/value"
 
-/** Check `value` against `schema`, then brand it with `build`; undefined if it does not match. */
+/**
+ * Check `value` against `schema`, then brand it with `build`; undefined if it
+ * does not match. `build` may refuse it too, by returning undefined: each
+ * lane is checked there with `isLaneName`.
+ */
 export function decodeWith<S extends TSchema, T>(
   schema: S,
   value: unknown,

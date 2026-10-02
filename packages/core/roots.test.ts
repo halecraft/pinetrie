@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest"
+import { entriesOf, entry } from "./fixtures.ts"
 import {
-  type EntryLike,
+  entryId,
   idTime,
   indexTree,
   type LaneView,
@@ -16,35 +17,25 @@ const ADA = writerId("ada")
 const BEA = writerId("bea")
 
 /** A chat by `writer` at `parent`; "c" entries are not messages. */
-const chat = (
-  id: string,
-  parentId: string | null,
-  writer: WriterId,
-): EntryLike => ({
-  id,
-  parentId,
-  type: "message",
-  message: { role: "chat", content: id, author: "A", writer },
-})
+const chat = (id: string, parentId: string | null, writer: WriterId) =>
+  entry(id, parentId, { role: "chat", content: id, author: "A", writer })
 
 // Two roots: r1 (Bea replies, then Ada branches) and r2 (a compaction only
 // between two messages); and a root with no message at all.
-const entries: Record<string, EntryLike> = Object.fromEntries(
-  [
-    chat("1-r1", null, ADA),
-    chat("2-a", "1-r1", BEA),
-    chat("4-b", "1-r1", ADA),
-    chat("3-r2", null, BEA),
-    { id: "5-c", parentId: "3-r2", type: "compaction" },
-    chat("6-d", "5-c", BEA),
-    { id: "0-empty", parentId: null, type: "compaction" },
-  ].map(e => [e.id, e]),
-)
+const entries = entriesOf([
+  chat("1-r1", null, ADA),
+  chat("2-a", "1-r1", BEA),
+  chat("4-b", "1-r1", ADA),
+  chat("3-r2", null, BEA),
+  entry("5-c", "3-r2", undefined, { type: "compaction" }),
+  chat("6-d", "5-c", BEA),
+  entry("0-empty", null, undefined, { type: "compaction" }),
+])
 const index = indexTree(entries)
 
 const lane = (tip: string | null, over: Partial<LaneView> = {}): LaneView => ({
   name: laneNameForThread(tip ?? "none"),
-  tip,
+  tip: tip === null ? null : entryId(tip),
   running: false,
   waiting: 0,
   askedBy: null,

@@ -1,9 +1,8 @@
 import {
   type AgentMessageLike,
   commitId,
-  type EntryLike,
+  type EntryId,
   entryId,
-  indexTree,
   type LaneName,
   type LaneRecord,
   type LaneView,
@@ -30,6 +29,7 @@ import {
   type WorkFacts,
   workingWords,
 } from "./column-view.ts"
+import { entry, indexOf } from "./fixtures.ts"
 
 const A = laneNameForThread("a")
 const B = laneNameForThread("b")
@@ -55,20 +55,13 @@ const reply = (text: string): AgentMessageLike => ({
   content: [{ type: "text", text }],
 })
 const tree = (lines: readonly Line[]): TreeIndex =>
-  indexTree(
-    Object.fromEntries(
-      lines.map(([id, parentId, message]): [string, EntryLike] => [
-        id,
-        { id, parentId, type: "message", message },
-      ]),
-    ),
-  )
+  indexOf(lines.map(([id, parentId, message]) => entry(id, parentId, message)))
 const revisions = (
   owners: Record<string, LaneName>,
-): ReadonlyMap<string, RevisionRecord> =>
+): ReadonlyMap<EntryId, RevisionRecord> =>
   new Map(
     Object.entries(owners).map(([id, lane]) => [
-      id,
+      entryId(id),
       { entry: entryId(id), lane, commit: null, snapshot: null, paths: [] },
     ]),
   )
@@ -78,8 +71,8 @@ const stretches = (
   owners: Record<string, LaneName>,
   lane: LaneName | null = null,
 ) =>
-  lanesAlong(index, tip, revisions(owners), lane).map(s => [
-    s.start as string,
+  lanesAlong(index, entryId(tip), revisions(owners), lane).map(s => [
+    s.start,
     s.lane,
   ])
 
@@ -159,7 +152,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
 })
 const laneView = (name: LaneName, tip: string, running = false): LaneView => ({
   name,
-  tip,
+  tip: entryId(tip),
   running,
   waiting: 0,
   askedBy: null,
@@ -183,8 +176,8 @@ const facts = (
 ): ColumnFacts => {
   const index = tree(BRANCH)
   const views = projectColumns(index, [
-    { anchor: "6", pinned: true },
-    { anchor: "b2", pinned: true },
+    { anchor: entryId("6"), pinned: true },
+    { anchor: entryId("b2"), pinned: true },
   ])
   const view = views[n]
   if (view === undefined) throw new Error("no view")
@@ -303,8 +296,8 @@ describe("columnView: the header", () => {
     // Column 1 shows only the branch; lane A started at 3, in column 0.
     const index = tree([...BRANCH, ["b3", "b2", chat("more", true)]])
     const view = projectColumns(index, [
-      { anchor: "6", pinned: true },
-      { anchor: "b3", pinned: true },
+      { anchor: entryId("6"), pinned: true },
+      { anchor: entryId("b3"), pinned: true },
     ])[1]
     if (view === undefined) throw new Error("no view")
     const shows = columnView({
@@ -334,8 +327,8 @@ describe("columnView: the header", () => {
     expect(columnView(facts(0)).origin).toEqual({ kind: "none" })
     const index = tree(TRUNK)
     const [, fromChat] = projectColumns(index, [
-      { anchor: "6", pinned: true },
-      { anchor: "2", pinned: true },
+      { anchor: entryId("6"), pinned: true },
+      { anchor: entryId("2"), pinned: true },
     ])
     if (fromChat === undefined) throw new Error("no view")
     expect(

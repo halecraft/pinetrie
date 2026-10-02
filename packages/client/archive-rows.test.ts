@@ -1,14 +1,13 @@
 import {
   type ArchiveRecord,
-  type EntryLike,
   entryId,
-  indexTree,
   summarizeRoots,
   type WriterId,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
+import { entry, indexOf } from "./fixtures.ts"
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
@@ -18,25 +17,16 @@ const chat = (
   parentId: string | null,
   writer: WriterId,
   text: string,
-): EntryLike => ({
-  id,
-  parentId,
-  type: "message",
-  message: { role: "chat", content: text, author: "x", writer },
-})
+) => entry(id, parentId, { role: "chat", content: text, author: "x", writer })
 // Three roots, oldest first: r1 (Ada), r2 (Bea, archived), r3 (Bea; its newest
 // message is older than r1's reply, so r1 has the newest activity).
-const index = indexTree(
-  Object.fromEntries(
-    [
-      chat("1-r1", null, ADA, "Plan the release"),
-      chat("2-r2", null, BEA, "Old spike about SQLite"),
-      chat("3-r3", null, BEA, "Notes on colour"),
-      chat("4-r3", "3-r3", BEA, "more"),
-      chat("5-r1", "1-r1", BEA, "release date is Friday"),
-    ].map(e => [e.id, e]),
-  ),
-)
+const index = indexOf([
+  chat("1-r1", null, ADA, "Plan the release"),
+  chat("2-r2", null, BEA, "Old spike about SQLite"),
+  chat("3-r3", null, BEA, "Notes on colour"),
+  chat("4-r3", "3-r3", BEA, "more"),
+  chat("5-r1", "1-r1", BEA, "release date is Friday"),
+])
 const roots = summarizeRoots(index)
 const archived: ArchiveRecord = {
   root: entryId("2-r2"),
@@ -48,13 +38,13 @@ const archived: ArchiveRecord = {
 const rows = (filter: ArchiveFilter, query = "", me = ADA) =>
   archiveIndex({
     roots,
-    labels: new Map([["3-r3", "Palette work"]]),
-    archive: new Map([["2-r2", archived]]),
+    labels: new Map([[entryId("3-r3"), "Palette work"]]),
+    archive: new Map([[entryId("2-r2"), archived]]),
     index,
     filter,
     query,
     me,
-    cardRoots: new Set(["3-r3"]),
+    cardRoots: new Set([entryId("3-r3")]),
   })
 const ids = (r: ReturnType<typeof rows>) => r.map(x => x.summary.root)
 

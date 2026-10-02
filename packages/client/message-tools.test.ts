@@ -1,5 +1,6 @@
 import {
   address,
+  entryId,
   laneNameForThread,
   parseMentions,
   type ThreadLane,
@@ -16,7 +17,7 @@ import {
 const agentWork: ThreadLane = {
   kind: "lane",
   name: laneNameForThread("t"),
-  tip: "9-t",
+  tip: entryId("9-t"),
   running: false,
   waiting: 0,
   askedBy: null,
@@ -25,7 +26,7 @@ const agentWork: ThreadLane = {
 const conversation: ThreadLane = { kind: "none" }
 
 const chat = (text: string, compelled: boolean): TranscriptMessage => ({
-  id: "5-m",
+  id: entryId("5-m"),
   role: "chat",
   text,
   compelled,
@@ -36,7 +37,7 @@ const tools = (
   over: Partial<Parameters<typeof messageTools>[1]> = {},
 ) =>
   messageTools(node, {
-    parentId: "4-p",
+    parentId: entryId("4-p"),
     isLast: false,
     lane: agentWork,
     writable: true,
@@ -100,7 +101,10 @@ describe("edit", () => {
 
   test("only a person's message", () => {
     for (const role of ["assistant", "land", "update", "stack"])
-      expect(tools({ id: "5-m", role, text: "x" }).edit, role).toBeUndefined()
+      expect(
+        tools({ id: entryId("5-m"), role, text: "x" }).edit,
+        role,
+      ).toBeUndefined()
   })
 })
 
@@ -129,10 +133,16 @@ describe("copy", () => {
     const call = { id: "c", name: "bash", label: "bash ls" }
     expect(tools(chat("x", false)).copy).toBe(true)
     expect(
-      tools({ id: "5-m", role: "assistant", text: "", toolCalls: [call] }).copy,
+      tools({
+        id: entryId("5-m"),
+        role: "assistant",
+        text: "",
+        toolCalls: [call],
+      }).copy,
     ).toBe(true)
     expect(
-      tools({ id: "5-m", role: "assistant", text: "", toolCalls: [] }).copy,
+      tools({ id: entryId("5-m"), role: "assistant", text: "", toolCalls: [] })
+        .copy,
     ).toBe(false)
   })
 })
@@ -152,11 +162,23 @@ test("branchPrefill: @agent, blank, in agent work; nothing in a conversation", (
 
 test("showsText: a message that only called tools shows only its rows", () => {
   const call = { id: "c", name: "bash", label: "ls" } as never
-  expect(showsText({ id: "m", role: "assistant", text: "" })).toBe(true)
+  expect(showsText({ id: entryId("m"), role: "assistant", text: "" })).toBe(
+    true,
+  )
   expect(
-    showsText({ id: "m", role: "assistant", text: "", toolCalls: [call] }),
+    showsText({
+      id: entryId("m"),
+      role: "assistant",
+      text: "",
+      toolCalls: [call],
+    }),
   ).toBe(false)
   expect(
-    showsText({ id: "m", role: "assistant", text: "so", toolCalls: [call] }),
+    showsText({
+      id: entryId("m"),
+      role: "assistant",
+      text: "so",
+      toolCalls: [call],
+    }),
   ).toBe(true)
 })

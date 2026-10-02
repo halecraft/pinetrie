@@ -5,6 +5,7 @@
 import type { Store } from "@kyneta/exchange"
 import {
   atEntry,
+  type EntryId,
   entryId,
   type Position,
   projectTranscript,
@@ -99,12 +100,12 @@ export const sessionBytes = (doc: SessionDocHandle): number =>
     lists: doc.lists(),
   }).length
 /** In `doc`, the id of the message whose text is exactly `text`. */
-export const idOfIn = (doc: SessionDocHandle, text: string): string | null => {
+export const idOfIn = (doc: SessionDocHandle, text: string): EntryId | null => {
   const index = readTreeIndex(doc)
   return (
-    Object.keys(index.entries).find(
-      id => projectTranscript(index, id).at(-1)?.text === text,
-    ) ?? null
+    Object.values(index.entries).find(
+      e => projectTranscript(index, e.id).at(-1)?.text === text,
+    )?.id ?? null
   )
 }
 /** How the two starts send at the root (ADR-0021). */

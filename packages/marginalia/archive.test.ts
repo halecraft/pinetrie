@@ -25,8 +25,8 @@ const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
 
 const entry = (id: string, parentId: string | null): EntryLike => ({
-  id,
-  parentId,
+  id: entryId(id),
+  parentId: parentId === null ? null : entryId(parentId),
   type: "message",
   message: { role: "user", content: id },
 })
@@ -52,7 +52,7 @@ const record = (
 
 const lane = (tip: string, over: Partial<LaneView> = {}): LaneView => ({
   name: laneNameForThread(tip),
-  tip,
+  tip: entryId(tip),
   running: false,
   waiting: 0,
   askedBy: null,
@@ -65,7 +65,7 @@ const plan = (
 ): ReturnType<typeof planArchive> =>
   planArchive({
     action: "archive",
-    root: "r1",
+    root: entryId("r1"),
     by: ADA,
     now: 5,
     index,
@@ -102,11 +102,11 @@ describe("planArchive", () => {
     })
   })
   test("refuses an entry that is not a root", () => {
-    expect(plan({ root: "a" })).toMatchObject({
+    expect(plan({ root: entryId("a") })).toMatchObject({
       kind: "refused",
       code: ERR.UNKNOWN_TARGET,
     })
-    expect(plan({ root: "nope" })).toMatchObject({ kind: "refused" })
+    expect(plan({ root: entryId("nope") })).toMatchObject({ kind: "refused" })
   })
   test("refuses while the agent works in the root, or messages wait there", () => {
     expect(plan({ lanes: [lane("b", { running: true })] })).toEqual({
@@ -126,14 +126,16 @@ describe("planArchive", () => {
       plan({
         action: "restore",
         lanes: [lane("b", { running: true })],
-        archive: new Map([["r1", record("r1")]]),
+        archive: new Map([[entryId("r1"), record("r1")]]),
       }),
     ).toMatchObject({ kind: "write", record: { state: "restored" } })
   })
   test("the state it already has is unchanged", () => {
-    expect(plan({ archive: new Map([["r1", record("r1")]]) })).toEqual({
-      kind: "unchanged",
-    })
+    expect(plan({ archive: new Map([[entryId("r1"), record("r1")]]) })).toEqual(
+      {
+        kind: "unchanged",
+      },
+    )
     expect(plan({ action: "restore" })).toEqual({ kind: "unchanged" })
   })
 })
@@ -194,19 +196,19 @@ describe("writesAt: the entry a command writes at", () => {
 
 describe("archivedAt", () => {
   const archive = new Map([
-    ["r1", record("r1")],
-    ["r2", record("r2", "restored")],
-    ["o", record("o")],
+    [entryId("r1"), record("r1")],
+    [entryId("r2"), record("r2", "restored")],
+    [entryId("o"), record("o")],
   ])
   test("an entry in an archived root is refused, by its record", () => {
-    expect(archivedAt(index, archive, "b")).toEqual(record("r1"))
+    expect(archivedAt(index, archive, entryId("b"))).toEqual(record("r1"))
   })
   test("a restored root, a root with no record, and no entry are allowed", () => {
-    expect(archivedAt(index, archive, "c")).toBeNull()
-    expect(archivedAt(index, new Map(), "b")).toBeNull()
+    expect(archivedAt(index, archive, entryId("c"))).toBeNull()
+    expect(archivedAt(index, new Map(), entryId("b"))).toBeNull()
     expect(archivedAt(index, archive, null)).toBeNull()
   })
   test("an orphan's tree is judged by the orphan's record", () => {
-    expect(archivedAt(index, archive, "d")).toEqual(record("o"))
+    expect(archivedAt(index, archive, entryId("d"))).toEqual(record("o"))
   })
 })

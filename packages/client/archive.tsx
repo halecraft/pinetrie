@@ -2,7 +2,7 @@
 // preview and restore (ADR-0029). Its body is a list, since it is for finding
 // a root; the selected root is previewed read-only beside it.
 
-import { idTime, type WriterId } from "@pineta/core"
+import { type EntryId, idTime, type WriterId } from "@pineta/core"
 import { type ReactNode, useState } from "react"
 import {
   ARCHIVE_FILTERS,
@@ -41,14 +41,14 @@ export function ArchiveTab({
   onFilter: (filter: ArchiveFilter) => void
   query: string
   onQuery: (query: string) => void
-  selected: string | null
-  onSelect: (root: string) => void
-  labelOf: (root: string) => string
+  selected: EntryId | null
+  onSelect: (root: EntryId) => void
+  labelOf: (root: EntryId) => string
   nameOf: ReadonlyMap<WriterId, string>
   /** Your colour, for the pip on a row holding a card of yours. */
   myColor: string
   /** The selected root, read-only: its rail and one column. */
-  preview: (root: string) => ReactNode
+  preview: (root: EntryId) => ReactNode
 }) {
   const [now] = useState(() => Date.now())
   return (

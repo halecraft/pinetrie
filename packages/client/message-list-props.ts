@@ -30,9 +30,9 @@ export interface MessageListProps {
   lane: ThreadLane
   writable: boolean
   /** Where a lane starts on this path (`columnView`). */
-  joins: ReadonlyMap<string, LaneJoin>
+  joins: ReadonlyMap<EntryId, LaneJoin>
   /** Fork dots, by the message they sit on. */
-  forks: ReadonlyMap<string, readonly number[]>
+  forks: ReadonlyMap<EntryId, readonly number[]>
   /** Ids any column of this tab shows. */
   shown: ReadonlySet<string>
   /** Each running tool call's stream, by call id (`liveWork`). */
@@ -49,25 +49,25 @@ export interface MessageListProps {
    * What the rail draws apart (`railLandmarks`), sorted: no fold hides them.
    * A list, compared by value, since the running tips it holds change.
    */
-  landmarks: readonly string[]
+  landmarks: readonly EntryId[]
   /** How much of each ask is drawn. */
   density: Density
   /** The column's tip when its reader left its end (`useFollow`). */
-  releasedTip: string | null
+  releasedTip: EntryId | null
   /** The prompt of the ask this column's lane runs, if it runs. */
-  runningAsk: string | null
+  runningAsk: EntryId | null
   /** Who stopped each ask, by its prompt. */
-  stops: ReadonlyMap<string, StopRecord>
+  stops: ReadonlyMap<EntryId, StopRecord>
   /** The turns' revisions, whose paths an ask's digest counts. */
-  revisions: ReadonlyMap<string, RevisionRecord>
+  revisions: ReadonlyMap<EntryId, RevisionRecord>
   /** Each ask's fold, as the reader chose it. */
   folds: FoldMemory
   /** The message a "since you were here" line goes before (`leftLine`). */
-  leftBefore: string | null
+  leftBefore: EntryId | null
   /** Open the review of an ask's files (ADR-0056). */
   onReviewAsk: (ask: EntryId) => void
   /** Each ask's model-written digest, by its prompt. */
-  digests: ReadonlyMap<string, DigestRecord>
+  digests: ReadonlyMap<EntryId, DigestRecord>
 }
 
 /**

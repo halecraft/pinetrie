@@ -15,6 +15,7 @@ import {
   type AgentRun,
   type ArchiveRecord,
   type AskIndex,
+  type EntryId,
   indexAsks,
   type MarkRecord,
   type SeatRecord,
@@ -50,9 +51,9 @@ export interface SessionFacts {
   /** Every ask (ADR-0056), from `index`: the rail and the columns read one. */
   readonly asks: AskIndex
   /** Who stopped each ask, by its prompt. */
-  readonly stops: ReadonlyMap<string, StopRecord>
+  readonly stops: ReadonlyMap<EntryId, StopRecord>
   /** Each ask's model-written digest, when digests are on, by its prompt. */
-  readonly digests: ReadonlyMap<string, DigestRecord>
+  readonly digests: ReadonlyMap<EntryId, DigestRecord>
   /** How many entries the document holds, messages or not. */
   readonly count: number
   readonly activity: readonly AgentRun[]
@@ -61,9 +62,9 @@ export interface SessionFacts {
   readonly participants: readonly string[]
   /** Every seat the host has seen: who wrote in a card (ADR-0048). */
   readonly seats: readonly SeatRecord[]
-  readonly archive: ReadonlyMap<string, ArchiveRecord>
+  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
   /** Each entry's title (ADR-0045); a root's is its label. */
-  readonly marks: ReadonlyMap<string, MarkRecord>
+  readonly marks: ReadonlyMap<EntryId, MarkRecord>
   readonly workFacts: WorkFacts
 }
 

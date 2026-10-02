@@ -10,6 +10,7 @@ import {
   type AgentRun,
   type AskIndex,
   compactRail,
+  type EntryId,
   messageAt,
   PENDING_TRACK,
   type RailItem,
@@ -100,20 +101,20 @@ export function Rail({
   /** The tree the items were compacted from: a long ask's capsule names its ask. */
   index: TreeIndex
   /** Each ask's model-written digest, which a long ask's capsule shows. */
-  digests: ReadonlyMap<string, { readonly text: string }>
+  digests: ReadonlyMap<EntryId, { readonly text: string }>
   items: readonly RailItem[]
   /** Ids on any open column's path: marked `data-open`. */
-  open: ReadonlySet<string>
+  open: ReadonlySet<EntryId>
   /** Every running lane: each tip pulses, whether or not a column shows it. */
   activity: readonly AgentRun[]
-  onPick: (id: string) => void
+  onPick: (id: EntryId) => void
   /** Others following each thread end, with their names and colours: a ring there. */
-  here: ReadonlyMap<string, readonly { name: string; color: string }[]>
+  here: ReadonlyMap<EntryId, readonly { name: string; color: string }[]>
   /**
    * Thread ends holding an unsent card of yours (`CardMarks.ends`), with your
    * colour: each dot there carries a pip (ADR-0048).
    */
-  yours: { readonly ends: ReadonlySet<string>; readonly color: string }
+  yours: { readonly ends: ReadonlySet<EntryId>; readonly color: string }
   /** A writer's name, for a capsule's label. */
   nameOf: (writer: WriterId) => string
   /** Each mounted column's view, outlined (ADR-0058); none, no outlines. */
@@ -333,7 +334,7 @@ function RailViewport({
 /** A long ask's first line, for its capsule's tooltip; null for any other stretch. */
 function askLine(
   index: TreeIndex,
-  ask: string | null,
+  ask: EntryId | null,
   nameOf: (writer: WriterId) => string,
 ): string | null {
   const prompt = ask === null ? null : messageAt(index, ask)
@@ -362,9 +363,9 @@ export function LiveRail({
   /** Every ask, which a long one's stretch keeps to (`indexAsks`). */
   asks: AskIndex
   /** The turns' revisions, whose paths a capsule counts. */
-  revisions: ReadonlyMap<string, RevisionRecord>
+  revisions: ReadonlyMap<EntryId, RevisionRecord>
   /** Each open column's end (`ColumnView.tipId`). */
-  ends: readonly (string | null)[]
+  ends: readonly (EntryId | null)[]
   names: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
 } & Omit<ComponentProps<typeof Rail>, "items" | "here" | "nameOf">) {
@@ -418,7 +419,7 @@ export function EmptyRail() {
 }
 
 function Dot(p: {
-  id: string
+  id: EntryId
   slot: number
   track: number
   open: boolean
@@ -426,7 +427,7 @@ function Dot(p: {
   yours: string | null
   activity: readonly AgentRun[]
   people: readonly { name: string; color: string }[]
-  onPick: (id: string) => void
+  onPick: (id: EntryId) => void
 }) {
   const [first] = p.people
   const here =
@@ -495,7 +496,7 @@ function Capsule(p: {
   stretch: RailStretch
   label: string
   open: boolean
-  onPick: (id: string) => void
+  onPick: (id: EntryId) => void
 }) {
   const { stretch } = p
   const color = trackColor(stretch.track)

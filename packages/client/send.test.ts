@@ -44,7 +44,7 @@ const lane = (
 ): ThreadLane => ({
   kind: "lane",
   name: laneNameForThread("1"),
-  tip: "e-1",
+  tip: entryId("e-1"),
   running: false,
   waiting: 0,
   askedBy: null,

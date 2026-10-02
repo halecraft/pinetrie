@@ -6,6 +6,7 @@
 import {
   type AskIndex,
   type EntryId,
+  entryId,
   projectTranscript,
   type TreeIndex,
 } from "@pineta/core"
@@ -46,11 +47,11 @@ export const decodeDigest = (value: unknown): DigestRecord | undefined =>
 /** Stored `pineta.digest` values -> each ask's digest, by its prompt. */
 export function digestRecords(
   values: Iterable<{ readonly key: string; readonly value: unknown }>,
-): ReadonlyMap<string, DigestRecord> {
-  const out = new Map<string, DigestRecord>()
+): ReadonlyMap<EntryId, DigestRecord> {
+  const out = new Map<EntryId, DigestRecord>()
   for (const { key, value } of values) {
     const r = decodeDigest(value)
-    if (r !== undefined) out.set(key, r)
+    if (r !== undefined) out.set(entryId(key), r)
   }
   return out
 }
@@ -131,9 +132,7 @@ export function planDigest(input: {
   return {
     final: input.ended,
     said: prompt === undefined ? "" : transcriptLine(prompt),
-    work: transcriptLines(
-      path.filter(m => asks.askOf.get(m.id as EntryId) === ask),
-    ),
+    work: transcriptLines(path.filter(m => asks.askOf.get(m.id) === ask)),
     previous: stored?.text ?? null,
   }
 }
@@ -179,13 +178,12 @@ export function digestRequest(input: {
  * an entry of its work, so it follows the run.
  */
 export function readsAsk(
-  ends: Iterable<string>,
+  ends: Iterable<EntryId>,
   asks: AskIndex,
   ask: EntryId,
-  tip: string | null,
+  tip: EntryId | null,
 ): boolean {
   for (const end of ends)
-    if (end === tip || end === ask || asks.askOf.get(end as EntryId) === ask)
-      return true
+    if (end === tip || end === ask || asks.askOf.get(end) === ask) return true
   return false
 }

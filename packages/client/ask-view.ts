@@ -11,7 +11,6 @@ import {
   askStats,
   type DiffSpan,
   type EntryId,
-  entryId,
   firstLine,
   lastWord,
   messageAt,
@@ -110,12 +109,12 @@ export function askView(input: {
   readonly asks: AskIndex
   readonly ask: EntryId
   /** The prompt of the ask this column's lane is running, if any. */
-  readonly runningAsk: string | null
-  readonly stops: ReadonlyMap<string, StopRecord>
-  readonly revisions: ReadonlyMap<string, RevisionRecord>
-  readonly digests: ReadonlyMap<string, { readonly text: string }>
+  readonly runningAsk: EntryId | null
+  readonly stops: ReadonlyMap<EntryId, StopRecord>
+  readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
+  readonly digests: ReadonlyMap<EntryId, { readonly text: string }>
   /** The column's path up to `releasedTip`; null while it follows its end. */
-  readonly releasedPath: ReadonlySet<string> | null
+  readonly releasedPath: ReadonlySet<EntryId> | null
   readonly nameOf: (writer: WriterId) => string
 }): AskView {
   const { index, asks, ask } = input
@@ -137,7 +136,7 @@ export function askView(input: {
     digest: workWords(stats, input.nameOf),
     outcome: outcomeWords(outcome, input.nameOf),
     live: running ? liveLine(index, asks, ask) : null,
-    lastWord: lastWord(index, asks, entryId(ask)),
+    lastWord: lastWord(index, asks, ask),
     summary: input.digests.get(ask)?.text ?? null,
     files: stats.files.length,
     span: askSpan(index, asks, ask, input.revisions),

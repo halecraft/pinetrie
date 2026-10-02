@@ -8,6 +8,7 @@
 import {
   type ArchiveAction,
   type ArchiveRecord,
+  type EntryId,
   ERR,
   entryId,
   type Intent,
@@ -45,7 +46,7 @@ export const decodeArchive = (value: unknown): ArchiveRecord | undefined =>
 /** Stored `pineta.archive` values -> each root's record. */
 export function archiveRecords(
   values: Iterable<{ readonly value: unknown }>,
-): ReadonlyMap<string, ArchiveRecord> {
+): ReadonlyMap<EntryId, ArchiveRecord> {
   return new Map(decodeAll(values, decodeArchive).map(r => [r.root, r]))
 }
 
@@ -68,12 +69,12 @@ export const ROOT_BUSY_REASON = {
  */
 export function planArchive(input: {
   readonly action: ArchiveAction
-  readonly root: string
+  readonly root: EntryId
   readonly by: WriterId
   readonly now: number
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
-  readonly archive: ReadonlyMap<string, ArchiveRecord>
+  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
 }): ArchivePlan {
   const { action, root, index } = input
   // A root is always a message (S30), so being a root is enough.
@@ -87,7 +88,7 @@ export function planArchive(input: {
   if (current === state) return { kind: "unchanged" }
   return {
     kind: "write",
-    record: { root: entryId(root), state, by: input.by, at: input.now },
+    record: { root, state, by: input.by, at: input.now },
   }
 }
 
@@ -98,7 +99,7 @@ export function planArchive(input: {
 export function writesAt(
   intent: Intent,
   lanes: readonly LaneView[],
-): string | null {
+): EntryId | null {
   switch (intent.kind) {
     case "chat":
       return intent.at.kind === "root" ? null : intent.at.id
@@ -119,8 +120,8 @@ export function writesAt(
 /** The record that makes `at` read-only, or null. */
 export function archivedAt(
   index: TreeIndex,
-  archive: ReadonlyMap<string, ArchiveRecord>,
-  at: string | null,
+  archive: ReadonlyMap<EntryId, ArchiveRecord>,
+  at: EntryId | null,
 ): ArchiveRecord | null {
   if (at === null) return null
   const root = rootOf(index, at)

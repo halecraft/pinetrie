@@ -745,4 +745,21 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a taken card in an archived root is refused",
   },
+  {
+    name: "a malformed lane is silent at startup",
+    file: "apps/pineta/host/startup.ts",
+    from: "  if (malformed.length > 0)\n    log(",
+    to: "  if (malformed.length < 0)\n    log(",
+    command: unit,
+    expect: "recover logs a stored lane whose name is not a thread's",
+  },
+  {
+    name: "a run's lane and id are swapped",
+    file: "apps/pineta/host/runs.ts",
+    from: "          return endRun(doc, lane, id)",
+    to: "          return endRun(doc, id, lane)",
+    // tsc names no failing check (`failingChecks`): with typecheck clean,
+    // any error is the mutant's.
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
 ]

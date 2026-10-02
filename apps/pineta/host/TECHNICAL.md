@@ -89,8 +89,10 @@ wires them.
 
 ## Startup
 
-`recover` runs, in order: `clearStreams` (no stream survives a process),
-`ensureNames` (ADR-0039), `planStartup` over the queued cards and `interrupted()`,
+`recover` runs, in order: `clearStreams` (no stream survives a process), a
+log of the stored lane names that fail `isLaneName` (`readStoredLanes`: no
+reader is given them, so the log is where one shows; it never throws, and
+nothing is deleted), `ensureNames` (ADR-0039), `planStartup` over the queued cards and `interrupted()`,
 each interrupted lane resumed before anything waiting for it (S36 item 18),
 `settle` for the other lanes with cards queued, the values an older host
 left in `pineta.outbox` deleted and each one's text logged, the project and commands

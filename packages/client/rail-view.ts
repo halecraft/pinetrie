@@ -3,6 +3,7 @@
 
 import {
   type AgentRun,
+  type EntryId,
   type RailRow,
   railLandmarks,
   type WorkStats,
@@ -20,20 +21,20 @@ import {
  */
 export function railKeep(input: {
   /** Thread ends others follow: the rings' keys. */
-  readonly rings: ReadonlyMap<string, unknown>
+  readonly rings: ReadonlyMap<EntryId, unknown>
   readonly activity: readonly AgentRun[]
   /** Each open column's end (`ColumnView.tipId`). */
-  readonly ends: Iterable<string | null>
+  readonly ends: Iterable<EntryId | null>
   /** Thread ends holding a card of yours (`CardMarks.ends`). */
-  readonly cards: ReadonlySet<string>
-}): ReadonlySet<string> {
+  readonly cards: ReadonlySet<EntryId>
+}): ReadonlySet<EntryId> {
   const keep = new Set([...input.rings.keys(), ...input.cards])
   for (const run of input.activity) keep.add(run.tip)
   for (const end of input.ends) if (end !== null) keep.add(end)
   return keep
 }
 
-const NO_RINGS: ReadonlyMap<string, unknown> = new Map()
+const NO_RINGS: ReadonlyMap<EntryId, unknown> = new Map()
 
 /**
  * What a root's columns draw apart from any fold (ADR-0056): the rail's
@@ -45,7 +46,7 @@ const NO_RINGS: ReadonlyMap<string, unknown> = new Map()
 export function columnLandmarks(
   rows: readonly RailRow[],
   keep: Omit<Parameters<typeof railKeep>[0], "rings">,
-): readonly string[] {
+): readonly EntryId[] {
   return [...railLandmarks(rows, railKeep({ ...keep, rings: NO_RINGS }))].sort()
 }
 
@@ -82,9 +83,9 @@ export function stretchFill(stats: WorkStats): StretchFill {
  * height. Null, a click with no point, picks the first.
  */
 export function pickAt(
-  ids: readonly [string, ...string[]],
+  ids: readonly [EntryId, ...EntryId[]],
   fraction: number | null,
-): string {
+): EntryId {
   if (fraction === null) return ids[0]
   const i = Math.floor(fraction * ids.length)
   return ids[Math.min(ids.length - 1, Math.max(0, i))] ?? ids[0]
@@ -99,18 +100,20 @@ export interface RailMarks {
 }
 
 /** Each item's marks, read from its first message. */
-export function railItems<I extends { readonly ids: readonly string[] }>(
+export function railItems<
+  I extends { readonly ids: readonly [EntryId, ...EntryId[]] },
+>(
   items: readonly I[],
   facts: {
-    readonly open: ReadonlySet<string>
+    readonly open: ReadonlySet<EntryId>
     readonly yours: {
-      readonly ends: ReadonlySet<string>
+      readonly ends: ReadonlySet<EntryId>
       readonly color: string
     }
   },
 ): readonly (readonly [item: I, marks: RailMarks])[] {
   return items.map(item => {
-    const id = item.ids[0] ?? ""
+    const id = item.ids[0]
     return [
       item,
       {

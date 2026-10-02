@@ -11,6 +11,7 @@ import {
   type CommitId,
   commitId,
   type EntryId,
+  entryId,
   type LaneName,
   TRAILERS,
   WORKSPACE_ROOT,
@@ -29,10 +30,10 @@ export const revisionMessage = (input: {
   `${input.title}\n\n${TRAILERS.entry}: ${input.entry}\n${TRAILERS.lane}: ${input.lane}\n`
 
 /** The entry a revision's description names, or null. */
-export function entryOfMessage(description: string): string | null {
+export function entryOfMessage(description: string): EntryId | null {
   const prefix = `${TRAILERS.entry}: `
   const line = lines(description).find(l => l.startsWith(prefix))
-  return line === undefined ? null : line.slice(prefix.length).trim()
+  return line === undefined ? null : entryId(line.slice(prefix.length).trim())
 }
 
 /** The commit ids a revset names, in jj's order. */

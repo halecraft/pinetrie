@@ -14,6 +14,7 @@ import {
   HOST_OPERATOR,
   HOST_WORKING_COPY,
   hostPathInLane,
+  isLaneName,
   type LaneName,
   NO_EDITOR,
   type ProjectRecord,
@@ -1198,9 +1199,7 @@ export function planRetire(input: {
   const { root } = input
   const lanes = input.bookmarks.flatMap(b => {
     const lane = b.name.startsWith("pineta/") ? b.name.slice(7) : ""
-    return lane.startsWith("t-")
-      ? [{ lane: lane as LaneName, commit: b.commit }]
-      : []
+    return isLaneName(lane) ? [{ lane, commit: b.commit }] : []
   })
   const next = withoutPinetaHeads(input.heads)
   const key = 'revset-aliases."immutable_heads()"'

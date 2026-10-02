@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest"
+import { entriesOf, entry } from "./fixtures.ts"
 import {
   atEntry,
   commitId,
-  type EntryLike,
+  type EntryId,
   entryId,
   firstLine,
   firstPromptOf,
@@ -28,12 +29,7 @@ const at = (
   parentId: string | null,
   role: string,
   extra: object = {},
-): EntryLike => ({
-  id,
-  parentId,
-  type: "message",
-  message: { role, content: id, ...extra },
-})
+) => entry(id, parentId, { role, content: id, ...extra })
 
 const A = laneNameForThread("a")
 const B = laneNameForThread("b")
@@ -52,24 +48,22 @@ const SB = snapshotId("6-pb")
 // commit and a snapshot) and m2 (a snapshot only).
 // Below m1: a conversation (x1), and lane B's prompt pb with its answer mb.
 // Below mb: lane D, working directly, with its prompt pd and answer md.
-const entries: Record<string, EntryLike> = Object.fromEntries(
-  [
-    at("1-p1", null, "chat"),
-    at("2-m1", "1-p1", "assistant", {
-      content: [{ type: "toolCall", id: "call-1", name: "write" }],
-    }),
-    at("3-r1", "2-m1", "toolResult", { toolCallId: "call-1" }),
-    at("4-m2", "3-r1", "assistant"),
-    at("5-x1", "3-r1", "chat"),
-    at("6-pb", "3-r1", "chat"),
-    at("7-mb", "6-pb", "assistant"),
-    at("8-pd", "7-mb", "chat"),
-    at("9-md", "8-pd", "assistant"),
-    at("a-ld", "9-md", "land"),
-  ].map(e => [e.id, e]),
-)
+const entries = entriesOf([
+  at("1-p1", null, "chat"),
+  at("2-m1", "1-p1", "assistant", {
+    content: [{ type: "toolCall", id: "call-1", name: "write" }],
+  }),
+  at("3-r1", "2-m1", "toolResult", { toolCallId: "call-1" }),
+  at("4-m2", "3-r1", "assistant"),
+  at("5-x1", "3-r1", "chat"),
+  at("6-pb", "3-r1", "chat"),
+  at("7-mb", "6-pb", "assistant"),
+  at("8-pd", "7-mb", "chat"),
+  at("9-md", "8-pd", "assistant"),
+  at("a-ld", "9-md", "land"),
+])
 const index = indexTree(entries)
-const revisions: ReadonlyMap<string, RevisionRecord> = new Map(
+const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
   [
     { entry: entryId("1-p1"), lane: A, commit: C1, snapshot: S1, paths: [] },
     { entry: entryId("2-m1"), lane: A, commit: C2, snapshot: S2, paths: [] },
@@ -89,14 +83,14 @@ const near = (id: string) =>
 
 describe("firstPromptOf: a lane's own first prompt (ADR-0039)", () => {
   test("a branch's first prompt is its own, below its parent's", () => {
-    expect(firstPromptOf(index, revisions, B, "7-mb")).toBe("6-pb")
-    expect(firstPromptOf(index, revisions, D, "a-ld")).toBe("8-pd")
+    expect(firstPromptOf(index, revisions, B, entryId("7-mb"))).toBe("6-pb")
+    expect(firstPromptOf(index, revisions, D, entryId("a-ld"))).toBe("8-pd")
   })
   test("the root lane's first prompt is the root's", () => {
-    expect(firstPromptOf(index, revisions, A, "4-m2")).toBe("1-p1")
+    expect(firstPromptOf(index, revisions, A, entryId("4-m2"))).toBe("1-p1")
   })
   test("no run of the lane on the path, or no tip: none", () => {
-    expect(firstPromptOf(index, revisions, B, "4-m2")).toBeNull()
+    expect(firstPromptOf(index, revisions, B, entryId("4-m2"))).toBeNull()
     expect(firstPromptOf(index, revisions, B, null)).toBeNull()
   })
 })
@@ -127,7 +121,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
   test("a record from before lane containers has a commit and no disk", () => {
     const old = new Map([
       [
-        "1-p1",
+        entryId("1-p1"),
         {
           entry: entryId("1-p1"),
           lane: A,
@@ -228,14 +222,14 @@ describe("workFor: the choice, then the lane above, then the project's default",
 
 describe("a turn's entry, and a run's prompt", () => {
   test("turnEntry: from a tool result, the message that made the call; else the entry", () => {
-    expect(turnEntry(index, "3-r1")).toBe("2-m1")
-    expect(turnEntry(index, "1-p1")).toBe("1-p1")
-    expect(turnEntry(index, "4-m2")).toBe("4-m2")
+    expect(turnEntry(index, entryId("3-r1"))).toBe("2-m1")
+    expect(turnEntry(index, entryId("1-p1"))).toBe("1-p1")
+    expect(turnEntry(index, entryId("4-m2"))).toBe("4-m2")
   })
   test("promptOf: the nearest person's, user or land message at or above", () => {
-    expect(promptOf(index, "4-m2")).toBe("1-p1")
-    expect(promptOf(index, "9-md")).toBe("8-pd")
-    expect(promptOf(index, "a-ld")).toBe("a-ld")
+    expect(promptOf(index, entryId("4-m2"))).toBe("1-p1")
+    expect(promptOf(index, entryId("9-md"))).toBe("8-pd")
+    expect(promptOf(index, entryId("a-ld"))).toBe("a-ld")
     expect(promptOf(index, null)).toBeNull()
   })
 })

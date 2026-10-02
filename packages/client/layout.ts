@@ -12,6 +12,8 @@
 import {
   type ArchiveRecord,
   ancestry,
+  type EntryId,
+  entryId,
   isLaneName,
   type LaneView,
   parseNewLane,
@@ -32,7 +34,7 @@ import {
 
 export type ActiveTab =
   | { readonly kind: "archive" }
-  | { readonly kind: "root"; readonly root: string }
+  | { readonly kind: "root"; readonly root: EntryId }
   | { readonly kind: "new"; readonly key: string }
 
 export interface Layout {
@@ -42,12 +44,12 @@ export interface Layout {
    */
   readonly active: ActiveTab | null
   /** Your open roots, in the order you opened them: the bar's root tabs. */
-  readonly open: readonly string[]
+  readonly open: readonly EntryId[]
   /**
    * Each opened root's columns, in order, kept when its tab is closed so
    * opening it again brings them back. A root with none is absent.
    */
-  readonly roots: ReadonlyMap<string, readonly Column[]>
+  readonly roots: ReadonlyMap<EntryId, readonly Column[]>
   /** New tabs: each one fresh column at the root, local until its first send. */
   readonly newTabs: readonly Column[]
 }
@@ -64,11 +66,11 @@ export type LayoutAction =
   /** Close an unsent new tab; nothing was written. */
   | { readonly kind: "closeNewTab"; readonly key: string }
   /** Close a root's tab for you: nothing is written, and its columns are kept. */
-  | { readonly kind: "closeRoot"; readonly root: string }
+  | { readonly kind: "closeRoot"; readonly root: EntryId }
   /** A column action on one root's columns; `sync` and `prune` are the layout's. */
   | {
       readonly kind: "columns"
-      readonly root: string
+      readonly root: EntryId
       readonly action: Exclude<ColumnAction, { kind: "sync" | "prune" }>
     }
   /**
@@ -86,14 +88,14 @@ export type LayoutAction =
   | {
       readonly kind: "prune"
       readonly index: TreeIndex
-      readonly archive: ReadonlyMap<string, ArchiveRecord>
+      readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
     }
 
 /** The document facts a layout follows: one moment's, read together. */
 export interface LayoutFacts {
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
-  readonly archive: ReadonlyMap<string, ArchiveRecord>
+  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
 }
 
 export const initialLayout = (): Layout => ({
@@ -107,7 +109,7 @@ export const initialLayout = (): Layout => ({
  * A root's columns as stored, or its first column, anchored at the root. Its
  * key holds no `:`, as no column key may (`readingKey`).
  */
-export function columnsOf(layout: Layout, root: string): readonly Column[] {
+export function columnsOf(layout: Layout, root: EntryId): readonly Column[] {
   return layout.roots.get(root) ?? [{ key: `first-${root}`, anchor: root }]
 }
 
@@ -133,10 +135,10 @@ export const sameTab = (a: ActiveTab | null, b: ActiveTab): boolean =>
 
 /** Store a root's columns; an empty list gives the root its first column again. */
 const withRoot = (
-  roots: ReadonlyMap<string, readonly Column[]>,
-  root: string,
+  roots: ReadonlyMap<EntryId, readonly Column[]>,
+  root: EntryId,
   columns: readonly Column[],
-): ReadonlyMap<string, readonly Column[]> => {
+): ReadonlyMap<EntryId, readonly Column[]> => {
   const next = new Map(roots)
   if (columns.length === 0) next.delete(root)
   else next.set(root, columns)
@@ -144,15 +146,15 @@ const withRoot = (
 }
 
 /** `open` with `root` at its end, unless it is there already. */
-const opened = (open: readonly string[], root: string): readonly string[] =>
+const opened = (open: readonly EntryId[], root: EntryId): readonly EntryId[] =>
   open.includes(root) ? open : [...open, root]
 
 /** Your open roots, less the archived ones other than the root you are on. */
 function withoutArchived(
-  open: readonly string[],
-  archive: ReadonlyMap<string, ArchiveRecord>,
+  open: readonly EntryId[],
+  archive: ReadonlyMap<EntryId, ArchiveRecord>,
   active: ActiveTab | null,
-): readonly string[] {
+): readonly EntryId[] {
   const kept = open.filter(
     root =>
       archive.get(root)?.state !== "archived" ||
@@ -267,7 +269,7 @@ function syncLayout(
   lanes: readonly LaneView[],
 ): Layout {
   let changed = false
-  const roots = new Map<string, readonly Column[]>()
+  const roots = new Map<EntryId, readonly Column[]>()
   for (const [root, columns] of state.roots) {
     const next = columnsReducer(columns, { kind: "sync", index, lanes })
     if (next !== columns) changed = true
@@ -305,7 +307,7 @@ function syncLayout(
 function pruneLayout(
   state: Layout,
   index: TreeIndex,
-  archive: ReadonlyMap<string, ArchiveRecord>,
+  archive: ReadonlyMap<EntryId, ArchiveRecord>,
 ): Layout {
   let roots = state.roots
   for (const [root, columns] of state.roots) {
@@ -351,8 +353,8 @@ export function tabBar(layout: Layout): readonly ActiveTab[] {
  */
 export function openBeside(
   index: TreeIndex,
-  paths: readonly ReadonlySet<string>[],
-  id: string,
+  paths: readonly ReadonlySet<EntryId>[],
+  id: EntryId,
 ): number {
   const up = ancestry(index, id).path
   let best = paths.length - 1
@@ -370,11 +372,11 @@ export function openBeside(
 /** What showing an entry means, for the shell to carry out. */
 export type OpenPlan =
   /** A column of `root` already shows it: show the root and scroll there. */
-  | { readonly kind: "scroll"; readonly root: string }
+  | { readonly kind: "scroll"; readonly root: EntryId }
   /** Show `root` and open a column anchored at the entry, after column `after`. */
-  | { readonly kind: "open"; readonly root: string; readonly after: number }
+  | { readonly kind: "open"; readonly root: EntryId; readonly after: number }
   /** Its root is archived and not the tab you are on: preview it in the Archive tab. */
-  | { readonly kind: "preview"; readonly root: string }
+  | { readonly kind: "preview"; readonly root: EntryId }
 
 /**
  * Show entry `id`, wherever it is. A message on a shared stretch of paths is
@@ -384,8 +386,8 @@ export type OpenPlan =
 export function planOpen(
   layout: Layout,
   index: TreeIndex,
-  archive: ReadonlyMap<string, ArchiveRecord>,
-  id: string,
+  archive: ReadonlyMap<EntryId, ArchiveRecord>,
+  id: EntryId,
 ): OpenPlan | null {
   const root = rootOf(index, id)
   if (root === null) return null
@@ -400,7 +402,7 @@ export function planOpen(
     })),
   )
   const paths = views.map(v =>
-    v.tipId === null ? new Set<string>() : pathIds(index, v.tipId),
+    v.tipId === null ? new Set<EntryId>() : pathIds(index, v.tipId),
   )
   if (paths.some(p => p.has(id))) return { kind: "scroll", root }
   return { kind: "open", root, after: openBeside(index, paths, id) }
@@ -483,7 +485,7 @@ const toStored = (c: Column): Stored => ({
 
 const fromStored = (s: Stored): Column => ({
   key: s.key,
-  anchor: s.anchor,
+  anchor: s.anchor === null ? null : entryId(s.anchor),
   // Unrecognised, it is left off: `sync` binds the column again once its tip
   // is exactly one lane's.
   ...(s.lane !== undefined && isLaneName(s.lane) ? { lane: s.lane } : {}),
@@ -530,11 +532,14 @@ export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
 export const decodeLayout = (raw: unknown): Layout | undefined =>
   Value.Check(StoredLayout, raw)
     ? {
-        active: raw.active,
-        open: raw.open,
+        active:
+          raw.active?.kind === "root"
+            ? { kind: "root", root: entryId(raw.active.root) }
+            : raw.active,
+        open: raw.open.map(entryId),
         roots: new Map(
           Object.entries(raw.roots).map(([root, columns]) => [
-            root,
+            entryId(root),
             columns.map(fromStored),
           ]),
         ),

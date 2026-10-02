@@ -1,6 +1,7 @@
-import { type EntryLike, indexTree, projectColumns } from "@pineta/core"
+import { entryId, projectColumns } from "@pineta/core"
 import { newSessionDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
+import { entry, indexOf } from "./fixtures.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 import { messageTools } from "./message-tools.ts"
 import { screenMemory } from "./screen-memory.ts"
@@ -8,27 +9,16 @@ import type { RowMemory } from "./tool-row.ts"
 
 const ROWS = screenMemory<RowMemory>()
 
-const entry = (
-  id: string,
-  parentId: string | null,
-  content: string,
-): EntryLike => ({
-  id,
-  parentId,
-  type: "message",
-  message: { role: "user", content },
-})
-
 /** A message's props as `Column` builds them, from entries built afresh. */
 const props = (
   text: string,
   over: Partial<MessageProps> = {},
 ): MessageProps => {
-  const index = indexTree({
-    a: entry("a", null, "first"),
-    b: entry("b", "a", text),
-  })
-  const [view] = projectColumns(index, [{ anchor: "b" }])
+  const index = indexOf([
+    entry("a", null, { role: "user", content: "first" }),
+    entry("b", "a", { role: "user", content: text }),
+  ])
+  const [view] = projectColumns(index, [{ anchor: entryId("b") }])
   const node = view?.nodes[1]
   if (node === undefined) throw new Error("no node")
   return {
@@ -38,7 +28,7 @@ const props = (
     rows: ROWS,
     nameOf: NAMES,
     tools: messageTools(node, {
-      parentId: "a",
+      parentId: entryId("a"),
       isLast: true,
       lane: { kind: "none" },
       writable: true,
@@ -65,7 +55,7 @@ test("a change to what a message shows, or a new handler, draws again", () => {
     sameMessageProps(
       was,
       props("hello", {
-        closedBranches: [{ rootId: "c", messageCount: 1 }],
+        closedBranches: [{ rootId: entryId("c"), messageCount: 1 }],
       }),
     ),
   ).toBe(false)
@@ -75,7 +65,10 @@ test("a change to what a message shows, or a new handler, draws again", () => {
       props("hello", {
         tools: {
           ...was.tools,
-          branch: { kind: "branch", branch: { at: "b", prefill: undefined } },
+          branch: {
+            kind: "branch",
+            branch: { at: entryId("b"), prefill: undefined },
+          },
         },
       }),
     ),

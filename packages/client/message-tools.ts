@@ -5,6 +5,7 @@
 // (`intent.ts`).
 
 import {
+  type EntryId,
   parseMentions,
   THE_AGENT,
   type ThreadLane,
@@ -20,7 +21,7 @@ export const AGENT_PREFILL: Prefill = { text: AGENT_PREFIX, blank: true }
 
 /** A fresh column to open: a branch at `at`. */
 export interface OpenBranch {
-  readonly at: string
+  readonly at: EntryId
   readonly prefill: Prefill | undefined
 }
 
@@ -55,12 +56,12 @@ export type MessageAct =
       readonly asksAgent: boolean
     }
   /** Show an entry: a closed branch's first message. */
-  | { readonly kind: "openAt"; readonly entry: string }
+  | { readonly kind: "openAt"; readonly entry: EntryId }
 
 export function messageTools(
   node: TranscriptMessage,
   at: {
-    readonly parentId: string | null
+    readonly parentId: EntryId | null
     /** The column's last message. */
     readonly isLast: boolean
     /** The column's thread. */
@@ -95,7 +96,7 @@ export function messageTools(
  */
 function editOf(
   node: TranscriptMessage,
-  parentId: string | null,
+  parentId: EntryId | null,
 ): MessageTools["edit"] {
   const compelled = node.compelled === true
   if (parentId === null)

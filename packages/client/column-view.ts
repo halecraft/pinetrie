@@ -10,7 +10,6 @@ import {
   type CommandSummary,
   type DiffSpan,
   type EntryId,
-  entryId,
   firstLine,
   type LandingRecord,
   type LaneName,
@@ -58,11 +57,11 @@ export interface WorkFacts {
   readonly project: ProjectRecord | null
   /** The commands the host's pi loaded (ADR-0036). */
   readonly commands: readonly CommandSummary[]
-  readonly lanes: ReadonlyMap<string, LaneRecord>
-  readonly revisions: ReadonlyMap<string, RevisionRecord>
+  readonly lanes: ReadonlyMap<LaneName, LaneRecord>
+  readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   readonly landings: readonly LandingRecord[]
   /** Each lane's offer in your repo (ADR-0038). */
-  readonly offers: ReadonlyMap<string, OfferRecord>
+  readonly offers: ReadonlyMap<LaneName, OfferRecord>
   /** Each lane's name (ADR-0039). */
   readonly names: ReadonlyMap<LaneName, ThreadName>
   /** Each thread's column banner. */
@@ -86,8 +85,8 @@ export interface LaneStretch {
  */
 export function lanesAlong(
   index: TreeIndex,
-  tip: string | null,
-  revisions: ReadonlyMap<string, RevisionRecord>,
+  tip: EntryId | null,
+  revisions: ReadonlyMap<EntryId, RevisionRecord>,
   lane: LaneName | null,
 ): readonly LaneStretch[] {
   const path = ancestry(index, tip).path
@@ -99,7 +98,7 @@ export function lanesAlong(
     if (message?.role !== "chat" || message.compelled !== true) continue
     const owner = revisions.get(id)?.lane ?? lane
     if (owner === null || owner === stretches.at(-1)?.lane) continue
-    stretches.push({ start: entryId(id), lane: owner })
+    stretches.push({ start: id, lane: owner })
   }
   return stretches
 }
@@ -214,7 +213,7 @@ export interface ColumnShows {
   readonly banner: HeadBanner | null
   readonly origin: HeadOrigin
   /** Dividers, by the entry they sit above. */
-  readonly joins: ReadonlyMap<string, LaneJoin>
+  readonly joins: ReadonlyMap<EntryId, LaneJoin>
   readonly strip: WorkStrip
   /** What `Column` does to have its thread named before it starts. */
   readonly reserve: ReserveStep
@@ -331,7 +330,7 @@ function originOf(
         "agent")
   return {
     kind: "fork",
-    at: entryId(at),
+    at,
     speaker,
     text: firstLine(messageText(message), 48),
   }
@@ -341,9 +340,9 @@ function joinsOf(
   view: ColumnView,
   stretches: readonly LaneStretch[],
   names: ReadonlyMap<LaneName, ThreadName>,
-): ReadonlyMap<string, LaneJoin> {
+): ReadonlyMap<EntryId, LaneJoin> {
   const shown = new Set(view.nodes.map(n => n.id))
-  const joins = new Map<string, LaneJoin>()
+  const joins = new Map<EntryId, LaneJoin>()
   stretches.forEach((s, i) => {
     if (!shown.has(s.start)) return
     const before = stretches[i - 1]

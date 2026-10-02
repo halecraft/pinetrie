@@ -325,8 +325,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the WIP line names the root's first prompt",
     file: "packages/core/work.ts",
-    from: "    if (id !== undefined && revisions.get(id)?.lane === lane) return entryId(id)",
-    to: "    if (id !== undefined && revisions.get(id) !== undefined) return entryId(id)",
+    from: "    if (id !== undefined && revisions.get(id)?.lane === lane) return id",
+    to: "    if (id !== undefined && revisions.get(id) !== undefined) return id",
     command: unit,
     expect: "a branch's first prompt is its own",
   },

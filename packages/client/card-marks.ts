@@ -10,6 +10,7 @@
 import {
   type CardId,
   type CardRecord,
+  type EntryId,
   type LaneView,
   rootOf,
   type TreeIndex,
@@ -56,11 +57,11 @@ export function withFilled(
 /** Where your unsent cards are: the marks that answer "where was I?". */
 export interface CardMarks {
   /** Roots holding a card of yours: their tabs, and their Archive rows. */
-  readonly roots: ReadonlySet<string>
+  readonly roots: ReadonlySet<EntryId>
   /** New tabs, by key, whose column holds a card of yours. */
   readonly newTabs: ReadonlySet<string>
   /** Thread ends holding a drafting card of yours: dots on the rail. */
-  readonly ends: ReadonlySet<string>
+  readonly ends: ReadonlySet<EntryId>
   /**
    * A root in `roots` has no tab in your bar and is not archived: the
    * Archive tab is marked.
@@ -75,13 +76,13 @@ export function cardMarks(input: {
   readonly filled: ReadonlySet<CardId>
   readonly layout: Layout
   /** Roots in state `archived` (ADR-0029). */
-  readonly archived: ReadonlySet<string>
+  readonly archived: ReadonlySet<EntryId>
   readonly lanes: readonly LaneView[]
   readonly index: TreeIndex
 }): CardMarks {
-  const roots = new Set<string>()
+  const roots = new Set<EntryId>()
   const newTabs = new Set<string>()
-  const ends = new Set<string>()
+  const ends = new Set<EntryId>()
   for (const card of input.mine) {
     if (!input.filled.has(card.id)) continue
     switch (card.place.kind) {

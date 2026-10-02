@@ -3,12 +3,12 @@
 // Kept on the device (`pineta-left:<session>`), shared by its tabs, never in
 // the document. Pure.
 
-import { ancestry, type TreeIndex } from "@pineta/core"
+import { ancestry, type EntryId, entryId, type TreeIndex } from "@pineta/core"
 import { type Static, Type } from "typebox"
 import { Value } from "typebox/value"
 
 /** Per lane, the entry its column's end was at when this device left it. */
-export type Left = ReadonlyMap<string, string>
+export type Left = ReadonlyMap<string, EntryId>
 
 /** Saves from two tabs merge: the one written last wins for its own lanes. */
 export const mergeLeft = (stored: Left, value: Left): Left =>
@@ -23,9 +23,9 @@ export const mergeLeft = (stored: Left, value: Left): Left =>
  */
 export function leftLine(
   index: TreeIndex,
-  at: string | undefined,
-  ids: readonly string[],
-): string | null {
+  at: EntryId | undefined,
+  ids: readonly EntryId[],
+): EntryId | null {
   const end = ids.at(-1)
   if (at === undefined || end === undefined) return null
   const above = new Set(ancestry(index, at).path)
@@ -48,4 +48,8 @@ export const encodeLeft = (left: Left): Static<typeof StoredLeft> => ({
 
 /** A stored record, whole or not at all. Total. */
 export const decodeLeft = (raw: unknown): Left | undefined =>
-  Value.Check(StoredLeft, raw) ? new Map(Object.entries(raw.lanes)) : undefined
+  Value.Check(StoredLeft, raw)
+    ? new Map(
+        Object.entries(raw.lanes).map(([lane, at]) => [lane, entryId(at)]),
+      )
+    : undefined

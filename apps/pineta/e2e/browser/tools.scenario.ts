@@ -88,9 +88,9 @@ async function run(
         const askId = (text: string) => {
           const index = readTreeIndex(askHost.doc)
           return (
-            Object.keys(index.entries).find(
-              id => messageText(index.entries[id]?.message) === text,
-            ) ?? ""
+            Object.values(index.entries).find(
+              e => messageText(e.message) === text,
+            )?.id ?? ""
           )
         }
         /** Eight reads, a command that waits, then a reply: a run long enough to watch. */
@@ -1659,7 +1659,10 @@ async function run(
         await say("read notes, again and again")
         await toolIdle()
         const loopIndex = readTreeIndex(toolHost.doc)
-        const loopRows = projectRail(loopIndex, loopIndex.roots.at(-1) ?? "")
+        const loopRows = projectRail(
+          loopIndex,
+          loopIndex.roots.at(-1) ?? entryId(""),
+        )
         await tp.waitForSelector(
           `${col(0)} .msg[data-entry="${loopRows.at(-1)?.id ?? "none"}"]`,
           { timeout: 15_000 },
@@ -1724,7 +1727,8 @@ async function run(
           // aside after it, so it is the newest leaf, which the tab opens.
           const later = trunk === null ? null : await chain(trunk, "Later", 30)
           const aside = trunk === null ? null : await chain(trunk, "Aside", 1)
-          const railRoot = start.kind === "appended" ? start.id : "none"
+          const railRoot =
+            start.kind === "appended" ? start.id : entryId("none")
           // Another writer's root opens no tab (ADR-0030): open it from Archive.
           await openFromArchive(tp, railRoot)
           await tp.waitForSelector(

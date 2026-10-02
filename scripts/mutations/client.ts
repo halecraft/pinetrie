@@ -1772,4 +1772,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "whole items outlined, one band per track",
   },
+  {
+    name: "a client view mints an entry id",
+    file: "packages/client/tabs-view.ts",
+    from: 'import type { EntryId, MarkRecord } from "@pineta/core"',
+    to: 'import { type EntryId, entryId, type MarkRecord } from "@pineta/core"\nexport const minted = entryId',
+    command: ["pnpm", "exec", "biome", "lint", "packages/client/tabs-view.ts"],
+    expect: "Mint an id only where it enters",
+  },
 ]

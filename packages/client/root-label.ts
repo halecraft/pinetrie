@@ -2,6 +2,7 @@
 // tab's rename field's submit. Pure.
 
 import {
+  type EntryId,
   firstLine,
   type MarkRecord,
   messageText,
@@ -17,7 +18,7 @@ export const NO_TEXT = "(no text)"
 export function firstLines(
   summaries: readonly RootSummary[],
   index: TreeIndex,
-): ReadonlyMap<string, string> {
+): ReadonlyMap<EntryId, string> {
   return new Map(
     summaries.map(s => [
       s.root,
@@ -32,9 +33,9 @@ export function firstLines(
  * look labels up in it.
  */
 export function rootLabels(
-  lines: ReadonlyMap<string, string>,
-  marks: ReadonlyMap<string, MarkRecord>,
-): ReadonlyMap<string, string> {
+  lines: ReadonlyMap<EntryId, string>,
+  marks: ReadonlyMap<EntryId, MarkRecord>,
+): ReadonlyMap<EntryId, string> {
   return new Map(
     [...lines].map(([root, line]) => [root, marks.get(root)?.title ?? line]),
   )

@@ -13,6 +13,7 @@
 import {
   type CommitId,
   type DiffSpan,
+  type EntryId,
   firstLine,
   type LandingRecord,
   type LaneName,
@@ -409,8 +410,8 @@ const CONTROL = /[\u0000-\u001f\u007f]/
  */
 export function planOfferRead(
   facts: {
-    readonly offers: ReadonlyMap<string, OfferRecord>
-    readonly revisions: ReadonlyMap<string, RevisionRecord>
+    readonly offers: ReadonlyMap<LaneName, OfferRecord>
+    readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   },
   ask: OfferAsk,
 ): OfferRead {

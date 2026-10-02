@@ -1083,7 +1083,9 @@ async function run(check: Checks["check"]): Promise<void> {
       // Edit opens a branch at the message's parent, holding its text as sent,
       // with @agent in front: its thread's default person the agent, and a branch
       // asks only through a mention.
-      const askedId = (await page.getAttribute(person, "data-entry")) ?? ""
+      const askedId = entryId(
+        (await page.getAttribute(person, "data-entry")) ?? "",
+      )
       const parentId = readTreeIndex(host.doc).parentOf(askedId) ?? ""
       await page.hover(person)
       await page.click(`${person} > .tools > .edit`)
@@ -1144,7 +1146,7 @@ async function run(check: Checks["check"]): Promise<void> {
           )
           .catch(() => null)
       const messagesIn = (root: string) =>
-        projectRail(readTreeIndex(host.doc), root).length
+        projectRail(readTreeIndex(host.doc), entryId(root)).length
       // 1. Which tree a tab's rail draws is `tabRail`'s, proven by its unit test.
       await page.click(tabSel(firstRoot))
       await page
@@ -1161,7 +1163,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const api = await join(host, "tabs", "browser")
       await api.setName("Bea")
       const third = await api.chat("a third thread", ROOT, { mode: "branch" })
-      const thirdRoot = third.kind === "appended" ? third.id : ""
+      const thirdRoot = third.kind === "appended" ? third.id : entryId("")
       await page.waitForFunction(
         n => document.getElementById("count")?.textContent === n,
         String(Object.keys(host.doc.entries()).length),

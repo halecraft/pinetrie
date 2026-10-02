@@ -23,6 +23,8 @@
 // (`releasedTip`): an ask whose run ended after it stays open under the
 // reader until they come back down (ADR-0056).
 
+import type { EntryId } from "@pineta/core"
+
 /** What a scroller reports: read from the element, nothing else. */
 export interface Metrics {
   readonly scrollTop: number
@@ -36,7 +38,7 @@ export interface Metrics {
   /** The floor's height now. */
   readonly floor: number
   /** The column's tip now: not the element's, but what a release keeps. */
-  readonly tip: string | null
+  readonly tip: EntryId | null
 }
 
 export interface FollowState {
@@ -55,7 +57,7 @@ export interface FollowState {
   /** The content's height and the floor's together, when last set. */
   readonly held: number
   /** The column's tip when the reader left its end; null while following. */
-  readonly releasedTip: string | null
+  readonly releasedTip: EntryId | null
 }
 
 export type FollowEvent =
@@ -143,7 +145,7 @@ const toEnd = (state: FollowState, measured: Metrics): FollowPlan => {
  * Following, there is none; a scroller mounted again may start with one
  * (`SeenEnd.released`) before its placement.
  */
-const released = (state: FollowState, m: Metrics): string | null =>
+const released = (state: FollowState, m: Metrics): EntryId | null =>
   state.releasedTip ?? m.tip
 
 export function follow(state: FollowState, event: FollowEvent): FollowPlan {
@@ -234,11 +236,11 @@ export function follow(state: FollowState, event: FollowEvent): FollowPlan {
 /** What a scroller knew of its end when it was unmounted. */
 export interface SeenEnd {
   /** The column's tip then. */
-  readonly tip: string | null
+  readonly tip: EntryId | null
   /** Whether ↓ new below was showing. */
   readonly unseen: boolean
   /** Its tip when its reader left its end, if they had (`releasedTip`). */
-  readonly released: string | null
+  readonly released: EntryId | null
 }
 
 /**
@@ -248,5 +250,5 @@ export interface SeenEnd {
  */
 export const behind = (
   seen: SeenEnd | undefined,
-  tip: string | null,
+  tip: EntryId | null,
 ): boolean => seen !== undefined && (seen.unseen || seen.tip !== tip)

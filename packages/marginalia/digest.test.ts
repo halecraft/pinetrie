@@ -92,7 +92,12 @@ describe("planDigest", () => {
     id: string,
     parentId: string | null,
     message: Record<string, unknown>,
-  ): EntryLike => ({ id, parentId, type: "message", message })
+  ): EntryLike => ({
+    id: entryId(id),
+    parentId: parentId === null ? null : entryId(parentId),
+    type: "message",
+    message,
+  })
   // Two chat asks, a land ask, and a message no run answered, in a line.
   const index = indexTree(
     Object.fromEntries(

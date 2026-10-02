@@ -1,11 +1,17 @@
 import type { ToolCallView, TranscriptMessage } from "@pineta/core"
+import { entryId } from "@pineta/core"
 import { expect, test } from "vitest"
 import { copyText } from "./copy-text.ts"
 
 const reply = (
   text: string,
   toolCalls: readonly ToolCallView[] = [],
-): TranscriptMessage => ({ id: "5-m", role: "assistant", text, toolCalls })
+): TranscriptMessage => ({
+  id: entryId("5-m"),
+  role: "assistant",
+  text,
+  toolCalls,
+})
 
 const done = (text: string, isError = false) => ({
   text,

@@ -8,6 +8,7 @@
 
 import {
   address,
+  type EntryId,
   messageText,
   parseMentions,
   rootOf,
@@ -19,8 +20,8 @@ import { Value } from "typebox/value"
 
 /** A message that mentions you. */
 export interface InboxItem {
-  readonly id: string
-  readonly root: string
+  readonly id: EntryId
+  readonly root: EntryId
   readonly by: WriterId
   readonly text: string
 }
@@ -38,7 +39,8 @@ export function mentionsOf(input: {
   readonly participants: readonly string[]
 }): readonly InboxItem[] {
   const out: InboxItem[] = []
-  for (const [id, entry] of Object.entries(input.index.entries)) {
+  for (const entry of Object.values(input.index.entries)) {
+    const { id } = entry
     const m = entry.message
     if (m?.role !== "chat" || m.writer === undefined || m.writer === input.me)
       continue

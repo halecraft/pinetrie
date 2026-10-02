@@ -3,7 +3,12 @@
 // prompt as it asks pi to abort (`planStop`, in core). The first press is the
 // one recorded: `planStop` writes no second.
 
-import type { StopRecord, WriterId } from "@pineta/core"
+import {
+  type EntryId,
+  entryId,
+  type StopRecord,
+  type WriterId,
+} from "@pineta/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 
@@ -24,11 +29,11 @@ export const decodeStop = (value: unknown): StopRecord | undefined =>
 /** Stored `pineta.stop` values -> each ask's stop, by its prompt. */
 export function stopRecords(
   values: Iterable<{ readonly key: string; readonly value: unknown }>,
-): ReadonlyMap<string, StopRecord> {
-  const out = new Map<string, StopRecord>()
+): ReadonlyMap<EntryId, StopRecord> {
+  const out = new Map<EntryId, StopRecord>()
   for (const { key, value } of values) {
     const r = decodeStop(value)
-    if (r !== undefined) out.set(key, r)
+    if (r !== undefined) out.set(entryId(key), r)
   }
   return out
 }

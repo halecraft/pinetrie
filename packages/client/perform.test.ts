@@ -76,14 +76,18 @@ test.each<Row>([
     port: p => p.session.discardCard,
     args: ["c"],
   },
-  { effect: { kind: "reveal", entry: "e" }, port: p => p.reveal, args: ["e"] },
+  {
+    effect: { kind: "reveal", entry: entryId("e") },
+    port: p => p.reveal,
+    args: ["e"],
+  },
   {
     effect: { kind: "openFold", ask: entryId("a") },
     port: p => p.openFold,
     args: ["a"],
   },
   {
-    effect: { kind: "pickArchived", root: "r" },
+    effect: { kind: "pickArchived", root: entryId("r") },
     port: p => p.pickArchived,
     args: ["r"],
   },

@@ -9,8 +9,8 @@ import {
 } from "./layout.ts"
 import { type TabsViewInput, tabsView } from "./tabs-view.ts"
 
-const R1: ActiveTab = { kind: "root", root: "r1" }
-const R2: ActiveTab = { kind: "root", root: "r2" }
+const R1: ActiveTab = { kind: "root", root: entryId("r1") }
+const R2: ActiveTab = { kind: "root", root: entryId("r2") }
 const reduce = (l: Layout, ...actions: Parameters<typeof layoutReducer>[1][]) =>
   actions.reduce(layoutReducer, l)
 // Your tabs: r1, r2, and a new agent tab "t"; you are on r1.
@@ -37,14 +37,14 @@ const input = (over: Partial<TabsViewInput> = {}): TabsViewInput => ({
   layout,
   active: R1,
   labels: new Map([
-    ["r1", "Tab names"],
-    ["r2", "second"],
+    [entryId("r1"), "Tab names"],
+    [entryId("r2"), "second"],
   ]),
   lines: new Map([
-    ["r1", "first"],
-    ["r2", "second"],
+    [entryId("r1"), "first"],
+    [entryId("r2"), "second"],
   ]),
-  marks: new Map([["r1", mark]]),
+  marks: new Map([[entryId("r1"), mark]]),
   archived: new Set(),
   work: new Map(),
   unsent: none,
@@ -69,7 +69,7 @@ describe("tabsView", () => {
   })
 
   test("every root tab not archived offers ⋯, not only the one you are on", () => {
-    const menus = tabs({ archived: new Set(["r1"]) }).map(t =>
+    const menus = tabs({ archived: new Set([entryId("r1")]) }).map(t =>
       t.kind === "root" ? t.menu.map(i => i.kind) : null,
     )
     expect(menus).toEqual([null, [], ["rename", "archive"], null])
@@ -87,7 +87,7 @@ describe("tabsView", () => {
   test("a pip on each tab holding a card of yours, and on Archive for one elsewhere", () => {
     const unsent = {
       ...none,
-      roots: new Set(["r2"]),
+      roots: new Set([entryId("r2")]),
       newTabs: new Set(["t"]),
       elsewhere: true,
     }

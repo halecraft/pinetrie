@@ -1,6 +1,7 @@
 // client/use-ask-bar — the shell of `ask-bar.ts`: measure each ask's work
 // and message against the top of a column's view, on scroll and resize.
 
+import { type EntryId, entryId } from "@pineta/core"
 import { type RefObject, useEffect, useRef, useState } from "react"
 import { type AtTop, askAtTop, sameAtTop, type WorkBox } from "./ask-bar.ts"
 
@@ -27,12 +28,14 @@ export function useAskBar(
       frame = 0
       const top = el.getBoundingClientRect().top
       const works: WorkBox[] = []
-      const prompts = new Map<string, number>()
+      const prompts = new Map<EntryId, number>()
       for (const w of el.querySelectorAll<HTMLElement>(
         ".ask-work[data-ask-of]",
       )) {
-        const ask = w.dataset.askOf
-        if (ask === undefined) continue
+        // The ask id `ask-work.tsx` drew into `data-ask-of`, read back.
+        const drawn = w.dataset.askOf
+        if (drawn === undefined) continue
+        const ask = entryId(drawn)
         const box = w.getBoundingClientRect()
         works.push({ ask, top: box.top - top, bottom: box.bottom - top })
         const prompt = el.querySelector(`.msg[data-entry="${ask}"]`)

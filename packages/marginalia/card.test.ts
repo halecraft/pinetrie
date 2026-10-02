@@ -35,8 +35,8 @@ const E2 = entryId("e2")
 const F1 = entryId("f1")
 
 const entry = (id: string, parentId: string | null): EntryLike => ({
-  id,
-  parentId,
+  id: entryId(id),
+  parentId: parentId === null ? null : entryId(parentId),
   type: "message",
   message: { role: "user", content: `text of ${id}` },
 })
@@ -65,7 +65,7 @@ const queued = (id: string, order: string, lane = LANE): QueuedCard => ({
 const laneAt = (tip: string): LaneView[] => [
   {
     name: laneNameForThread("x"),
-    tip,
+    tip: entryId(tip),
     running: false,
     waiting: 0,
     askedBy: null,
@@ -121,10 +121,9 @@ describe("where a card sits", () => {
       id: cardId("c-3"),
       place: { kind: "drafting", at: atEntry(F1), lane: null },
     })
-    expect(draftingAt("e2", [card(), beas, sibling], [], tree())).toEqual([
-      card(),
-      beas,
-    ])
+    expect(
+      draftingAt(entryId("e2"), [card(), beas, sibling], [], tree()),
+    ).toEqual([card(), beas])
   })
 
   test("yourCard: by thread end or fresh column, never another writer's", () => {
@@ -136,21 +135,33 @@ describe("where a card sits", () => {
     const cards = [beas, card(), fresh]
     const at = (where: Parameters<typeof yourCard>[1], me = ADA) =>
       yourCard(me, where, cards, [], tree())?.id
-    expect(at({ kind: "end", end: "e2" })).toBe("c-1")
-    expect(at({ kind: "end", end: "e2" }, BEA)).toBe("c-2")
+    expect(at({ kind: "end", end: entryId("e2") })).toBe("c-1")
+    expect(at({ kind: "end", end: entryId("e2") }, BEA)).toBe("c-2")
     expect(at({ kind: "fresh", column: "k-1" })).toBe("c-3")
     expect(at({ kind: "fresh", column: "k-1" }, BEA)).toBeUndefined()
-    expect(at({ kind: "end", end: "f1" })).toBeUndefined()
+    expect(at({ kind: "end", end: entryId("f1") })).toBeUndefined()
   })
 
   test("yourCard: of two of yours at one end, the newest, so an unqueued one does not take the composer", () => {
     const older = card({ id: cardId("c-1") })
     const newer = card({ id: cardId("c-9") })
     expect(
-      yourCard(ADA, { kind: "end", end: "e2" }, [newer, older], [], tree())?.id,
+      yourCard(
+        ADA,
+        { kind: "end", end: entryId("e2") },
+        [newer, older],
+        [],
+        tree(),
+      )?.id,
     ).toBe("c-9")
     expect(
-      yourCard(ADA, { kind: "end", end: "e2" }, [older, newer], [], tree())?.id,
+      yourCard(
+        ADA,
+        { kind: "end", end: entryId("e2") },
+        [older, newer],
+        [],
+        tree(),
+      )?.id,
     ).toBe("c-9")
   })
 
@@ -158,9 +169,9 @@ describe("where a card sits", () => {
     const q = queued("c-2", "a")
     // Its lane ends at e2, where it was queued: it is still not drafting there.
     expect(cardEnd(q, laneAt("e2"), tree())).toBeNull()
-    expect(draftingAt("e2", [card(), q], laneAt("e2"), tree())).toEqual([
-      card(),
-    ])
+    expect(
+      draftingAt(entryId("e2"), [card(), q], laneAt("e2"), tree()),
+    ).toEqual([card()])
   })
 })
 
@@ -306,5 +317,14 @@ describe("storage", () => {
         column: "",
       }),
     ).toMatchObject({ command: null, unsent: null })
+  })
+
+  test("a card whose lane is not a thread's keeps its text, and loses the lane", () => {
+    const stored = { ...encodeCard(card()), at: "e2", lane: "main" }
+    expect(decodeCard("c", stored)?.place).toEqual({
+      kind: "drafting",
+      at: atEntry(E2),
+      lane: null,
+    })
   })
 })

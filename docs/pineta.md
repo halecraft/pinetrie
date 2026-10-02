@@ -148,7 +148,9 @@ registers by lane name (`pi.branch.tip`, `pi.lane.state`, `pi.lane.config`).
 Two writers on one lane silently orphan a whole turn, drop queued steering
 messages, and lose an in-flight operation record. That danger still holds; the
 answer changed: lanes now belong to threads, the host is their only writer, and
-`LaneName` is mintable only by `laneNameForThread()`.
+a `LaneName` is always a thread's (`t-`): `laneNameForThread()` and
+`parseNewLane()` mint one, and every reader of a stored lane name checks it
+with `isLaneName()`, dropping one that fails.
 
 **ADR-0020 — lanes belong to threads and never move; people own none.** A lane
 is created where agent work is first wanted in a thread, and its tip is always
@@ -361,8 +363,15 @@ that **all three evaded**. Every other package boundary now works the same way:
 the root declares only tooling, so a package can import only what it declares.
 `workspace.test.ts` checks the manifests. See `docs/01-architecture.md`.
 
-**ADRs are encoded as types where possible.** `LaneName` and `LocalSeq` are
-branded; `projectTranscript(entries, tipId)` cannot even accept a seq.
+**ADRs are encoded as types where possible.** Entry ids, run ids and lane
+names are branded (`EntryId`, `RunId`, `LaneName`), so a swapped argument is
+a compile error. They are minted where they enter: the protocol codec, the
+reads (`renderableEntry`), the schema's readers, marginalia's decoders, a
+commit's trailer (`packages/lanes`), the pi adapter, the client's stored forms,
+and the host's id generator. Biome's `noRestrictedImports` (`biome.json`)
+refuses `entryId` in core, the client and the host, and `runId` in core and
+the client (S71). A `LocalSeq` brand was deleted (ADR-0013
+above); `projectTranscript(entries, tipId)` cannot even accept a seq.
 
 **FC/IS — gather → plan → execute. Decisions are values.** `packages/core` is
 pure and imports nothing; the shell in `host/` performs the decision. This

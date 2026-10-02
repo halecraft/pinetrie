@@ -5,6 +5,7 @@
 
 import {
   type ArchiveRecord,
+  type EntryId,
   messageText,
   projectRail,
   type RootSummary,
@@ -36,18 +37,18 @@ export interface ArchiveRow {
 export function archiveIndex(input: {
   readonly roots: readonly RootSummary[]
   /** Each root's label, by root (`rootLabels`). */
-  readonly labels: ReadonlyMap<string, string>
-  readonly archive: ReadonlyMap<string, ArchiveRecord>
+  readonly labels: ReadonlyMap<EntryId, string>
+  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
   readonly index: TreeIndex
   readonly filter: ArchiveFilter
   readonly query: string
   readonly me: WriterId
   /** Roots holding an unsent card of yours (`CardMarks.roots`). */
-  readonly cardRoots: ReadonlySet<string>
+  readonly cardRoots: ReadonlySet<EntryId>
 }): readonly ArchiveRow[] {
   const { index, archive } = input
   const needle = input.query.trim().toLowerCase()
-  const matches = (root: string): boolean =>
+  const matches = (root: EntryId): boolean =>
     needle === "" ||
     (input.labels.get(root) ?? "").toLowerCase().includes(needle) ||
     projectRail(index, root).some(r =>

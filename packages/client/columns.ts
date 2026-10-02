@@ -6,6 +6,7 @@
 
 import {
   type CardId,
+  type EntryId,
   followTip,
   type LaneName,
   type LaneView,
@@ -39,7 +40,7 @@ export interface Column {
    * The entry the column follows from (`followTip`); a bound column's is its
    * lane's tip. Null only for a fresh column at the root: a new tab's.
    */
-  readonly anchor: string | null
+  readonly anchor: EntryId | null
   /**
    * The lane this column's thread is (ADR-0021). Set once its reserved lane
    * has a tip, or else once the column's end is exactly one lane's tip; from
@@ -82,13 +83,13 @@ export type ColumnAction =
       readonly kind: "open"
       readonly key: string
       readonly after: number
-      readonly anchor: string
+      readonly anchor: EntryId
     }
   /** Open a fresh column after column `after`: a branch at `at`. */
   | {
       readonly kind: "openFresh"
       readonly key: string
-      readonly at: string
+      readonly at: EntryId
       readonly after: number
       /** A first message the column sends as soon as it opens. */
       readonly pending?: Pending

@@ -18,7 +18,7 @@ function running() {
     b.doc,
     row(entryId("e-2"), "e-1", { role: "assistant", content: "working" }),
   )
-  writeLaneTip(b.doc, lane, "e-2")
+  writeLaneTip(b.doc, lane, entryId("e-2"))
   beginRun(b.doc, lane, runId("r-1"))
   const handle = fakeLane(lane, { abort: async () => {} })
   const agent = record<Pick<Agent, "lane" | "setStop">>({

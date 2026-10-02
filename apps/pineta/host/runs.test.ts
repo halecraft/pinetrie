@@ -107,7 +107,7 @@ describe("a run's end", () => {
       b.doc,
       row(entryId("a-1"), "p-1", { role: "assistant", content: "hello" }),
     )
-    writeLaneTip(b.doc, LANE, "a-1")
+    writeLaneTip(b.doc, LANE, entryId("a-1"))
     lane.finish({ kind: "ok" })
     expect((await ended).prompt).toBe("p-1")
   })

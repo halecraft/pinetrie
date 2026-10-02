@@ -28,6 +28,19 @@ whether a sent message's paths are stored under `/mnt/host-working-copy`. The Ar
 client-only read, in `packages/client/archive-rows.ts`. Live streams are read with `readStreams` in
 `@pineta/schema`; an entry count stays in `packages/client/projection.ts`.
 
+## Where entry ids are branded
+
+A stored row's id is a plain `string` (Kyneta's `Schema.string()` carries no
+brand), and `renderableEntry` is the first Pineta code to see one: it mints
+the entry's `id` and `parentId` as `EntryId`s, and everything read from the
+index after that carries the brand (S71). Presence's `reading` and `typing`
+values are thread ends, written by clients: `presenceField` mints them too.
+Lane names, lane tips and run ids are branded one layer down, by
+`@pineta/schema`'s readers (`readLaneNames`, `readLaneTip`, `readActiveRun`),
+and each record's ids by its decoder in `@pineta/marginalia`. `entryId` is
+the identity at run time, so the frozen entries and the index's cache are
+unchanged by it.
+
 `readReferencedBlobs` is every image something still shows (ADR-0042): each
 chat's, each tool result's (`messageImages`, ADR-0051), and each in the
 texts people type, cards' (queued ones among them), which its caller must
@@ -74,6 +87,13 @@ Kyneta has let go.
   each keeps its last array while the entries are the same: the page's
   refresh writes the same values again, and Kyneta's record is then a new
   object (S59).
+- **Build a `Record<EntryId, …>` from each entry's own `id`.** `Object.entries`
+  and `Object.keys` give back `string`, which cannot index it (TS7053), so
+  `renderableEntries` walks `Object.values` and keys by `entry.id`.
+- **A map keyed by an entry or a lane says so in its type** (`readArchive`,
+  `readRevisions`, `readOffers`…). A `string`-keyed map still accepts an
+  `EntryId`, so a key type left `string` compiles and leaves its lookups
+  unchecked (S71).
 - **`readRenderableEntries` decodes chat** (`renderableMessage`), so the index
   carries each chat's writer, whether it compelled the agent, and its send id:
   `threadOf`'s race reads the first two, a fresh column the third.

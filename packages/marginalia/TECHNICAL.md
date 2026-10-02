@@ -6,6 +6,13 @@ authority. Every module decodes through `decodeWith` (`decode.ts`), which is
 total: a malformed value is dropped, never thrown. `decodeAll` does it for a
 namespace's stored values.
 
+A decoder brands the ids it reads, and its `build` may refuse a value too.
+**Every lane is checked with `isLaneName`** in `build` (as
+`decodeBannerRecord` checks `isSha256`), and a value whose lane fails is
+dropped. That is what keeps a malformed lane out of the host's writes: the
+outbox drains each held item's lane through `agent.lane`, which finds any
+lane pi holds (S71). A card is the exception (`card.ts`, below).
+
 Namespaces are stored data and name the owner, `pineta.`, following pi's own
 `pi.` convention. They deliberately do not follow the package name: renaming a
 package must never require changing stored data.
@@ -141,7 +148,11 @@ queued card is taken next.
   card malformed. Clients write a card whole once and only its fields after,
   since a whole-record write concurrent with a spend brings the card back
   (S58); `queueFields` and `unqueueFields` are those writes, as values. An
-  unqueue writes only `kind`: the card goes back to where it was queued.
+  unqueue writes only `kind`: the card goes back to where it was queued. A
+  drafting card whose lane fails `isLaneName` keeps its place with no lane:
+  dropped, it would be swept with its text at the next start
+  (`planCardSweep`), and the lane only says which thread it follows. A
+  queued card with such a lane does not decode: its lane is where it runs.
 - **A drafting card is resolved, never stored as an end.** `placeEnd` runs
   `threadOf` from where it started and its column's lane, as a reply from
   there would go, so the card follows its thread as the thread grows.

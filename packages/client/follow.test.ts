@@ -1,3 +1,4 @@
+import { entryId } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   behind,
@@ -23,7 +24,7 @@ const at = (
     clientHeight,
     content,
     floor,
-    tip,
+    tip: tip === null ? null : entryId(tip),
   }) satisfies Metrics
 
 /** Following, left at the end of 1000 px of content in a 300 px viewport. */
@@ -130,11 +131,11 @@ test("a column mounted behind keeps ↓ new below through its holding step and a
 describe("behind: a column mounted again", () => {
   test.each<[SeenEnd | undefined, boolean]>([
     [undefined, false],
-    [{ tip: "b", unseen: false, released: null }, false],
-    [{ tip: "a", unseen: false, released: null }, true],
-    [{ tip: "b", unseen: true, released: "a" }, true],
+    [{ tip: entryId("b"), unseen: false, released: null }, false],
+    [{ tip: entryId("a"), unseen: false, released: null }, true],
+    [{ tip: entryId("b"), unseen: true, released: entryId("a") }, true],
   ])("seen %o at tip b is behind: %s", (seen, expected) => {
-    expect(behind(seen, "b")).toBe(expected)
+    expect(behind(seen, entryId("b"))).toBe(expected)
   })
 })
 
@@ -290,7 +291,10 @@ describe("releasedTip: the tip a reader left the end at (ADR-0056)", () => {
     expect(again.releasedTip).toBe("t9")
   })
   test("a column mounted again released keeps its tip through a placement short of the end", () => {
-    const mounted: FollowState = { ...initialFollow, releasedTip: "t1" }
+    const mounted: FollowState = {
+      ...initialFollow,
+      releasedTip: entryId("t1"),
+    }
     const placed = follow(mounted, {
       kind: "placed",
       at: at(0, 1000, 300, { tip: "t9" }),

@@ -175,9 +175,9 @@ export async function sectionHost(input: {
   const laneWith = (text: string) => {
     const index = readTreeIndex(host.doc)
     const id =
-      Object.keys(index.entries).find(
-        e => projectTranscript(index, e).at(-1)?.text === text,
-      ) ?? null
+      Object.values(index.entries).find(
+        e => projectTranscript(index, e.id).at(-1)?.text === text,
+      )?.id ?? null
     return readLanes(host.doc, index, readCards(host.cards)).find(
       l => id !== null && ancestry(index, l.tip).path.includes(id),
     )
@@ -188,7 +188,7 @@ export async function sectionHost(input: {
     const index = readTreeIndex(host.doc)
     const onPath = new Set(ancestry(index, laneWith(text)?.tip ?? null).path)
     return Object.values(readEntries(host.doc))
-      .filter(r => onPath.has(r.id))
+      .filter(r => onPath.has(entryId(r.id)))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
       .map(r => rowMessage(r) as { role?: string })
       .filter(m => m.role === "toolResult")

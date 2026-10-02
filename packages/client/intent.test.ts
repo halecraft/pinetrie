@@ -4,6 +4,7 @@ import {
   atEntry,
   type CardRecord,
   cardId,
+  type EntryId,
   entryId,
   indexAsks,
   laneNameForThread,
@@ -42,7 +43,7 @@ const onRoot = (root: string): Layout =>
   resolveLayout(
     layoutReducer(initialLayout(), {
       kind: "show",
-      tab: { kind: "root", root },
+      tab: { kind: "root", root: entryId(root) },
     }),
     { index, lanes: [], archive: new Map() },
   )
@@ -53,7 +54,7 @@ const onNewTab: Layout = layoutReducer(initialLayout(), {
 })
 const at = (
   layout: Layout,
-  archive = new Map<string, ArchiveRecord>(),
+  archive = new Map<EntryId, ArchiveRecord>(),
   asks: AskIndex = indexAsks(index),
 ) => ({
   layout,
@@ -72,7 +73,7 @@ const column = (
 describe("planIntent", () => {
   test("× on a root's tab closes it for you, and writes nothing", () => {
     expect(
-      plan({ kind: "closeTab", tab: { kind: "root", root: "1-r1" } }),
+      plan({ kind: "closeTab", tab: { kind: "root", root: entryId("1-r1") } }),
     ).toEqual([{ kind: "layout", action: { kind: "closeRoot", root: "1-r1" } }])
   })
 
@@ -87,7 +88,10 @@ describe("planIntent", () => {
     expect(
       plan(
         column(
-          { kind: "branch", branch: { at: "2-a", prefill: undefined } },
+          {
+            kind: "branch",
+            branch: { at: entryId("2-a"), prefill: undefined },
+          },
           1,
         ),
       ),
@@ -200,7 +204,7 @@ describe("planIntent", () => {
 
   describe("openAt", () => {
     test("an entry a column shows is scrolled to, on its root's tab", () => {
-      expect(plan({ kind: "openAt", entry: "4-c" })).toEqual([
+      expect(plan({ kind: "openAt", entry: entryId("4-c") })).toEqual([
         { kind: "reveal", entry: "4-c" },
         {
           kind: "layout",
@@ -210,7 +214,7 @@ describe("planIntent", () => {
     })
 
     test("an entry no column shows opens one, revealed, which takes no focus", () => {
-      const effects = plan({ kind: "openAt", entry: "3-b" })
+      const effects = plan({ kind: "openAt", entry: entryId("3-b") })
       expect(effects[0]).toEqual({ kind: "reveal", entry: "3-b" })
       expect(effects.at(-1)).toEqual({
         kind: "layout",
@@ -224,9 +228,9 @@ describe("planIntent", () => {
     })
 
     test("an entry in an archived root is previewed in the Archive tab", () => {
-      const archive = new Map<string, ArchiveRecord>([
+      const archive = new Map<EntryId, ArchiveRecord>([
         [
-          "5-r2",
+          entryId("5-r2"),
           {
             root: entryId("5-r2"),
             state: "archived",
@@ -236,7 +240,10 @@ describe("planIntent", () => {
         ],
       ])
       expect(
-        plan({ kind: "openAt", entry: "6-d" }, at(onRoot("1-r1"), archive)),
+        plan(
+          { kind: "openAt", entry: entryId("6-d") },
+          at(onRoot("1-r1"), archive),
+        ),
       ).toEqual([
         { kind: "pickArchived", root: "5-r2" },
         { kind: "layout", action: { kind: "show", tab: { kind: "archive" } } },
@@ -250,7 +257,7 @@ describe("planIntent", () => {
         last: new Map([[entryId("2-a"), entryId("4-c")]]),
       }
       const effects = plan(
-        { kind: "openAt", entry: "4-c" },
+        { kind: "openAt", entry: entryId("4-c") },
         at(onRoot("1-r1"), new Map(), asks),
       )
       expect(effects.slice(0, 2)).toEqual([
@@ -260,19 +267,21 @@ describe("planIntent", () => {
       // A message no run wrote opens nothing.
       expect(
         plan(
-          { kind: "openAt", entry: "3-b" },
+          { kind: "openAt", entry: entryId("3-b") },
           at(onRoot("1-r1"), new Map(), asks),
         ).some(e => e.kind === "openFold"),
       ).toBe(false)
     })
 
     test("a message's closed branch opens as openAt does; no entry, nothing", () => {
-      const fromColumn = column({ kind: "openAt", entry: "3-b" })
-      expect(plan(fromColumn)).toEqual(plan({ kind: "openAt", entry: "3-b" }))
+      const fromColumn = column({ kind: "openAt", entry: entryId("3-b") })
+      expect(plan(fromColumn)).toEqual(
+        plan({ kind: "openAt", entry: entryId("3-b") }),
+      )
       expect(entryShown(fromColumn)).toBe("3-b")
-      expect(entryShown({ kind: "openAt", entry: "3-b" })).toBe("3-b")
+      expect(entryShown({ kind: "openAt", entry: entryId("3-b") })).toBe("3-b")
       expect(entryShown({ kind: "signOut" })).toBe(null)
-      expect(plan({ kind: "openAt", entry: "nowhere" })).toEqual([])
+      expect(plan({ kind: "openAt", entry: entryId("nowhere") })).toEqual([])
     })
   })
 

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest"
+import { entriesOf, entry } from "./fixtures.ts"
 import {
   ancestry,
   askOutcome,
@@ -6,10 +7,12 @@ import {
   askStats,
   commitId,
   compactRail,
+  type EntryId,
   type EntryLike,
   entryId,
   indexAsks,
   indexTree,
+  laneNameForThread,
   lastWord,
   projectRail,
   type RevisionRecord,
@@ -23,21 +26,6 @@ import {
 } from "./index.ts"
 
 type Message = NonNullable<EntryLike["message"]>
-const e = (
-  id: string,
-  parentId: string | null,
-  message: Message,
-  timestamp?: number,
-): [string, EntryLike] => [
-  id,
-  {
-    id,
-    parentId,
-    type: "message",
-    message,
-    ...(timestamp === undefined ? {} : { timestamp }),
-  },
-]
 const chat = (text = "hi"): Message => ({ role: "chat", content: text })
 const said = (text: string, extra: Partial<Message> = {}): Message => ({
   role: "assistant",
@@ -55,18 +43,18 @@ const result = (call: string, text = "ok", isError = false): Message => ({
   content: text,
   isError,
 })
-const build = (rows: readonly [string, EntryLike][]): TreeIndex =>
-  indexTree(Object.fromEntries(rows))
+const build = (rows: readonly EntryLike[]): TreeIndex =>
+  indexTree(entriesOf(rows))
 
 describe("indexAsks", () => {
   const index = build([
-    e("1-p", null, chat()),
-    e("2-a", "1-p", calls("c1")),
-    e("3-r", "2-a", result("c1")),
-    e("4-a", "3-r", said("done")),
-    e("5-q", "4-a", chat("for people only")),
-    e("6-l", "5-q", { role: "land", content: "resolving" }),
-    e("7-a", "6-l", said("resolved")),
+    entry("1-p", null, chat()),
+    entry("2-a", "1-p", calls("c1")),
+    entry("3-r", "2-a", result("c1")),
+    entry("4-a", "3-r", said("done")),
+    entry("5-q", "4-a", chat("for people only")),
+    entry("6-l", "5-q", { role: "land", content: "resolving" }),
+    entry("7-a", "6-l", said("resolved")),
   ])
   const asks = indexAsks(index)
   test("a run's agent messages and results belong to its prompt", () => {
@@ -84,8 +72,8 @@ describe("indexAsks", () => {
 })
 
 describe("askOutcome and lastWord, over S70's endings", () => {
-  const ask = (rows: readonly [string, EntryLike][]) => {
-    const index = build([e("1-p", null, chat()), ...rows])
+  const ask = (rows: readonly EntryLike[]) => {
+    const index = build([entry("1-p", null, chat()), ...rows])
     const asks = indexAsks(index)
     const p = entryId("1-p")
     return {
@@ -96,27 +84,29 @@ describe("askOutcome and lastWord, over S70's endings", () => {
   }
   const bea = writerId("bea")
   test("answered: its last message", () => {
-    const a = ask([e("2-a", "1-p", said("done", { stopReason: "stop" }))])
+    const a = ask([entry("2-a", "1-p", said("done", { stopReason: "stop" }))])
     expect(a.outcome()).toEqual({ kind: "answered" })
     expect(a.word).toBe("2-a")
   })
   test("stopped while text streamed: the partial text, aborted", () => {
-    const a = ask([e("2-a", "1-p", said("word wo", { stopReason: "aborted" }))])
+    const a = ask([
+      entry("2-a", "1-p", said("word wo", { stopReason: "aborted" })),
+    ])
     expect(a.outcome({ by: bea, at: 1 })).toEqual({ kind: "stopped", by: bea })
     expect(a.outcome()).toEqual({ kind: "stopped", by: null })
     expect(a.word).toBe("2-a")
   })
   test("stopped during a command: the run ends on its aborted result, and the call is the last word", () => {
     const a = ask([
-      e("2-a", "1-p", calls("c1")),
-      e("3-r", "2-a", result("c1", "Command aborted", true)),
+      entry("2-a", "1-p", calls("c1")),
+      entry("3-r", "2-a", result("c1", "Command aborted", true)),
     ])
     expect(a.outcome({ by: bea, at: 1 })).toEqual({ kind: "stopped", by: bea })
     expect(a.word).toBe("2-a")
   })
   test("stopped before the first response: an empty message, never a last word", () => {
     const a = ask([
-      e("2-a", "1-p", {
+      entry("2-a", "1-p", {
         role: "assistant",
         content: [],
         stopReason: "aborted",
@@ -127,8 +117,8 @@ describe("askOutcome and lastWord, over S70's endings", () => {
   })
   test("a model error fails with its message; its empty text is no last word", () => {
     const a = ask([
-      e("2-a", "1-p", said("done")),
-      e(
+      entry("2-a", "1-p", said("done")),
+      entry(
         "3-a",
         "2-a",
         said("", { stopReason: "error", errorMessage: "no reply" }),
@@ -139,17 +129,17 @@ describe("askOutcome and lastWord, over S70's endings", () => {
   })
   test("a restart's interrupted partial is not last: the resumed run answered", () => {
     const a = ask([
-      e("2-a", "1-p", said("par", { stopReason: "error" })),
-      e("3-a", "2-a", said("after resume", { stopReason: "stop" })),
+      entry("2-a", "1-p", said("par", { stopReason: "error" })),
+      entry("3-a", "2-a", said("after resume", { stopReason: "stop" })),
     ])
     expect(a.outcome()).toEqual({ kind: "answered" })
   })
   test("a stop that lost the race to the answer is ignored", () => {
-    const a = ask([e("2-a", "1-p", said("done", { stopReason: "stop" }))])
+    const a = ask([entry("2-a", "1-p", said("done", { stopReason: "stop" }))])
     expect(a.outcome({ by: bea, at: 1 })).toEqual({ kind: "answered" })
   })
   test("running is running", () => {
-    const index = build([e("1-p", null, chat())])
+    const index = build([entry("1-p", null, chat())])
     expect(
       askOutcome(index, indexAsks(index), entryId("1-p"), {
         running: true,
@@ -161,19 +151,19 @@ describe("askOutcome and lastWord, over S70's endings", () => {
 
 describe("workStats", () => {
   const index = build([
-    e("1-p", null, chat(), 100),
-    e("2-a", "1-p", calls("c1"), 110),
-    e("3-r", "2-a", result("c1", "x", true), 150),
-    e("4-a", "3-r", calls("c2"), 160),
-    e("5-r", "4-a", result("c2"), 170),
-    e("6-a", "5-r", said("done"), 200),
-    e("7-q", "6-a", chat("thanks"), 300),
+    entry("1-p", null, chat(), { timestamp: 100 }),
+    entry("2-a", "1-p", calls("c1"), { timestamp: 110 }),
+    entry("3-r", "2-a", result("c1", "x", true), { timestamp: 150 }),
+    entry("4-a", "3-r", calls("c2"), { timestamp: 160 }),
+    entry("5-r", "4-a", result("c2"), { timestamp: 170 }),
+    entry("6-a", "5-r", said("done"), { timestamp: 200 }),
+    entry("7-q", "6-a", chat("thanks"), { timestamp: 300 }),
   ])
-  const rev = (entry: string, paths: string[]): [string, RevisionRecord] => [
-    entry,
+  const rev = (entry: string, paths: string[]): [EntryId, RevisionRecord] => [
+    entryId(entry),
     {
       entry: entryId(entry),
-      lane: "t-x" as RevisionRecord["lane"],
+      lane: laneNameForThread("x"),
       commit: null,
       snapshot: null,
       paths,
@@ -185,7 +175,12 @@ describe("workStats", () => {
   ])
   test("counts the work, the union of its turns' paths, and its time", () => {
     expect(
-      workStats(index, ["2-a", "4-a", "6-a"], undefined, revisions),
+      workStats(
+        index,
+        [entryId("2-a"), entryId("4-a"), entryId("6-a")],
+        undefined,
+        revisions,
+      ),
     ).toEqual({
       people: 0,
       writers: [],
@@ -199,7 +194,7 @@ describe("workStats", () => {
   })
   test("a long ask's stretch and its fold hold the same messages", () => {
     const asks = indexAsks(index)
-    const rows = projectRail(index, "1-p")
+    const rows = projectRail(index, entryId("1-p"))
     const [, stretch] = compactRail(index, rows, new Set(), {
       asks,
       revisions,
@@ -217,7 +212,7 @@ describe("workStats", () => {
     ])
     expect(
       stretch?.kind === "stretch"
-        ? workStats(index, stretch.ids, "7-q", revisions)
+        ? workStats(index, stretch.ids, entryId("7-q"), revisions)
         : null,
     ).toEqual(askStats(index, asks, entryId("1-p"), revisions))
   })
@@ -225,20 +220,20 @@ describe("workStats", () => {
 
 describe("askSpan", () => {
   const index = build([
-    e("1-p", null, chat()),
-    e("2-a", "1-p", calls("c1")),
-    e("3-r", "2-a", result("c1")),
-    e("4-a", "3-r", said("done")),
+    entry("1-p", null, chat()),
+    entry("2-a", "1-p", calls("c1")),
+    entry("3-r", "2-a", result("c1")),
+    entry("4-a", "3-r", said("done")),
   ])
   const asks = indexAsks(index)
   const rev = (
     entry: string,
     commit: string | null,
-  ): [string, RevisionRecord] => [
-    entry,
+  ): [EntryId, RevisionRecord] => [
+    entryId(entry),
     {
       entry: entryId(entry),
-      lane: "t-x" as RevisionRecord["lane"],
+      lane: laneNameForThread("x"),
       commit: commit === null ? null : commitId(commit),
       snapshot: null,
       paths: [],
@@ -271,26 +266,31 @@ describe("askSpan", () => {
 
 describe("compactRail and asks", () => {
   test("a long ask is a dot and a capsule; its next prompt starts again", () => {
-    const rows: [string, EntryLike][] = [
-      e("01", null, chat()),
-      e("02", "01", said("ok")),
-      e("03", "02", chat()),
-      e("04", "03", said("ok")),
-      e("05", "04", chat("the long one")),
+    const rows: EntryLike[] = [
+      entry("01", null, chat()),
+      entry("02", "01", said("ok")),
+      entry("03", "02", chat()),
+      entry("04", "03", said("ok")),
+      entry("05", "04", chat("the long one")),
     ]
     let parent = "05"
     for (const id of ["06", "07", "08", "09"]) {
-      rows.push(e(id, parent, said(id)))
+      rows.push(entry(id, parent, said(id)))
       parent = id
     }
-    rows.push(e("10", parent, chat("next")), e("11", "10", said("ok")))
-    rows.push(e("12", "11", chat("more")), e("13", "12", said("ok")))
-    rows.push(e("14", "13", chat("end")))
+    rows.push(entry("10", parent, chat("next")), entry("11", "10", said("ok")))
+    rows.push(entry("12", "11", chat("more")), entry("13", "12", said("ok")))
+    rows.push(entry("14", "13", chat("end")))
     const index = build(rows)
-    const items = compactRail(index, projectRail(index, "01"), new Set(), {
-      asks: indexAsks(index),
-      revisions: new Map(),
-    })
+    const items = compactRail(
+      index,
+      projectRail(index, entryId("01")),
+      new Set(),
+      {
+        asks: indexAsks(index),
+        revisions: new Map(),
+      },
+    )
     expect(
       items.map(it => (it.kind === "dot" ? it.ids[0] : [...it.ids])),
     ).toEqual([
@@ -304,20 +304,25 @@ describe("compactRail and asks", () => {
     expect(items[3]).toMatchObject({ kind: "stretch", ask: "05" })
   })
   test("short exchanges still merge across their asks", () => {
-    const rows: [string, EntryLike][] = [e("00", null, chat())]
+    const rows: EntryLike[] = [entry("00", null, chat())]
     let parent = "00"
     for (let k = 1; k <= 10; k += 1) {
       const q = `${String(2 * k).padStart(2, "0")}`
       const a = `${String(2 * k + 1).padStart(2, "0")}`
-      rows.push(e(q, parent, chat()), e(a, q, said("ok")))
+      rows.push(entry(q, parent, chat()), entry(a, q, said("ok")))
       parent = a
     }
-    rows.push(e("99", parent, chat()))
+    rows.push(entry("99", parent, chat()))
     const index = build(rows)
-    const items = compactRail(index, projectRail(index, "00"), new Set(), {
-      asks: indexAsks(index),
-      revisions: new Map(),
-    })
+    const items = compactRail(
+      index,
+      projectRail(index, entryId("00")),
+      new Set(),
+      {
+        asks: indexAsks(index),
+        revisions: new Map(),
+      },
+    )
     expect(items).toHaveLength(3)
     expect(items[1]).toMatchObject({ kind: "stretch", ask: null })
   })
@@ -357,16 +362,17 @@ function* roles(n: number): Generator<("chat" | "agent" | "update")[]> {
   }
 }
 
-const id = (i: number) => `${String(i).padStart(2, "0")}`
+const id = (i: number) => entryId(String(i).padStart(2, "0"))
 
 /** Segment edges on a path: each segment's first and last position. */
-function edges(segments: readonly Segment[], path: readonly string[]) {
+function edges(segments: readonly Segment[], path: readonly EntryId[]) {
   const starts = new Set<number>()
   const ends = new Set<number>()
   for (const s of segments) {
     const ids = s.kind === "entry" ? [s.id] : s.ids
-    starts.add(path.indexOf(ids[0] ?? ""))
-    ends.add(path.indexOf(ids.at(-1) ?? ""))
+    starts.add(ids[0] === undefined ? -1 : path.indexOf(ids[0]))
+    const last = ids.at(-1)
+    ends.add(last === undefined ? -1 : path.indexOf(last))
   }
   return { starts, ends }
 }
@@ -377,7 +383,7 @@ test("over every tree of 6 entries: no fold crosses a prompt, landmarks are draw
     for (const role of roles(6)) {
       const index = build(
         shape.map((p, i) =>
-          e(
+          entry(
             id(i),
             p === null ? null : id(p),
             role[i] === "agent"
@@ -396,7 +402,7 @@ test("over every tree of 6 entries: no fold crosses a prompt, landmarks are draw
         const path = ancestry(index, leaf).path.toReversed()
         // A column's end is kept, as `railKeep` keeps every open column's.
         const keep = new Set([leaf])
-        const rows = projectRail(index, "00")
+        const rows = projectRail(index, entryId("00"))
         const landmarks = railLandmarks(rows, keep)
         const segments = segmentPath(index, asks, path, landmarks)
         for (const s of segments) {
@@ -415,7 +421,7 @@ test("over every tree of 6 entries: no fold crosses a prompt, landmarks are draw
         })) {
           if (it.kind !== "stretch" || !path.includes(it.ids[0])) continue
           expect(starts.has(path.indexOf(it.ids[0]))).toBe(true)
-          expect(ends.has(path.indexOf(it.ids.at(-1) ?? ""))).toBe(true)
+          expect(ends.has(path.indexOf(it.ids.at(-1) ?? it.ids[0]))).toBe(true)
         }
         checked += 1
       }

@@ -5,7 +5,13 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import type { Store } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
-import { cardId, laneNameForThread, projectSpine, ROOT } from "@pineta/core"
+import {
+  cardId,
+  laneNameForThread,
+  projectSpine,
+  ROOT,
+  runId,
+} from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import { SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
@@ -229,7 +235,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const l6 = tlane()
     const heldText = "@Bob queued across a restart"
     if (l6 !== undefined && l6.tip !== null) {
-      beginRun(th.doc, l6.name, "r-held")
+      beginRun(th.doc, l6.name, runId("r-held"))
       const held = cardId(crypto.randomUUID())
       const where = at(l6.tip)
       u.createCard(

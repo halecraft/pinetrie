@@ -34,6 +34,7 @@ import {
   type ErrCode,
   entryId,
   hostPathInLane,
+  isLaneName,
   type LaneName,
   type MarkRecord,
   type Position,
@@ -566,42 +567,46 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     // the document: asking the lane here, inside its own drive, could wait on
     // itself.
     harness.hooks.on("before_request", async event => {
-      if (event.step !== "assistant") return undefined
-      const tip = readLaneTip(doc, event.lane)
-      if (tip !== null)
-        await lanes.hooks.turnDone(event.lane as LaneName, entryId(tip))
+      const lane = event.lane
+      if (event.step !== "assistant" || !isLaneName(lane)) return undefined
+      const tip = readLaneTip(doc, lane)
+      if (tip !== null) await lanes.hooks.turnDone(lane, tip)
       return undefined
     })
   }
 
   // Streaming: every harness event carries the lane it happened on, so
   // concurrent threads' streams stay apart. pi's events become `StreamEvent`s
-  // here; nothing else of them leaves this module. The harness's tool events
+  // here; nothing else of them leaves this module. `emit` brands the lane,
+  // and skips an event on a lane that is not a thread's. The harness's tool events
   // are `tool_*`: the `tool_execution_*` in pi's types are its older loop's.
   // `message_end` and `tool_end` are not mapped: the entry pi commits after
   // each is what ends its stream on screen (`planStream`).
-  const emit = (event: StreamEvent) => options.onStream?.(event)
+  const emit = (lane: string, make: (lane: LaneName) => StreamEvent) => {
+    if (isLaneName(lane)) options.onStream?.(make(lane))
+  }
   const offs = [
     harness.events.on("message_update", event => {
       const inner = event.event
       if (inner.type !== "text_delta") return
       const delta = typeof inner.delta === "string" ? inner.delta : ""
-      if (delta.length > 0) emit({ kind: "text", lane: event.lane, delta })
+      if (delta.length > 0)
+        emit(event.lane, lane => ({ kind: "text", lane, delta }))
     }),
     harness.events.on("tool_start", event =>
-      emit({
+      emit(event.lane, lane => ({
         kind: "toolStart",
-        lane: event.lane,
+        lane,
         callId: event.toolCallId,
-      }),
+      })),
     ),
     harness.events.on("tool_update", event =>
-      emit({
+      emit(event.lane, lane => ({
         kind: "toolOutput",
-        lane: event.lane,
+        lane,
         callId: event.toolCallId,
         text: firstText(event.partialResult),
-      }),
+      })),
     ),
   ]
 
@@ -627,7 +632,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   async function afterRun(name: LaneName): Promise<void> {
     if (lanes === null) return
     const tip = readLaneTip(doc, name)
-    if (tip !== null) await lanes.hooks.turnDone(name, entryId(tip))
+    if (tip !== null) await lanes.hooks.turnDone(name, tip)
   }
 
   function threadLane(name: LaneName): ThreadLaneHandle {
@@ -832,8 +837,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
 
     async interrupted() {
       const out: LaneName[] = []
-      for (const stored of readLaneNames(doc)) {
-        const name = stored as LaneName
+      for (const name of readLaneNames(doc)) {
         const lane = await existing(name)
         if (lane === undefined) continue
         const info = await lane.inspectExecution(CTX)
