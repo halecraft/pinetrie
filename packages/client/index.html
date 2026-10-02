@@ -398,7 +398,13 @@
       /* The files an ask changed: opens their review beside the column. */
       .ask-files { position: absolute; top: .05rem; right: 0; padding: 0 .4rem; font-size: .72rem;
         background: none; color: #9ecbff; border: 1px solid #2f4a66; border-radius: 3px; }
-      .ask-line.running { animation: pulse 1.2s ease-in-out infinite; color: #9ecbff; }
+      /* Outline's line is one line: a running command can be long. */
+      .ask-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      /* The running ask's line stands in for the working line (ADR-0054): it
+         pulses by its brightness, never its size, which would spill a line
+         as wide as the column past it. */
+      .ask-line.running { animation: pulse-ask 1.2s ease-in-out infinite; color: #9ecbff; }
+      @keyframes pulse-ask { 50% { opacity: .45; } }
       /* A model's summary of an ask's work: set apart from the agent's words. */
       .ask-digest { margin: -.6rem 0 1rem; padding: .2rem .5rem; font-size: .8rem; font-style: italic;
         color: #b2ccd6; border-left: 2px dotted #4a6577; }
