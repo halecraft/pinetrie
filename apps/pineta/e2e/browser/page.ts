@@ -13,7 +13,6 @@ export const TO_AGENT = recipientWords({
   people: [],
 }).label
 export const TO_NOBODY = recipientWords({ compels: NOBODY, people: [] }).label
-export const TO_ADA = recipientWords({ compels: NOBODY, people: ["Ada"] }).label
 
 /** The ⋯ of the tab you are on: every root tab has one, shown on hover. */
 export const OWN_MENU = '#tabs .tab[aria-selected="true"] ~ .tab-more .tab-menu'

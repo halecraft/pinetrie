@@ -78,7 +78,7 @@ export const join = (
   })
 
 /** What the suites' agent says when nothing is scripted. */
-export const SUITE_REPLY =
+const SUITE_REPLY =
   "A scripted reply, streamed in pieces, so a suite sees it grow and then end."
 
 /**

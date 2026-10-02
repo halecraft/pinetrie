@@ -1,8 +1,7 @@
-// e2e/host/support — what the host scenarios share: outcome readers,
+// e2e/host/support — what the host scenarios share: a run's id,
 // positions, the store's records, a store that loads one document late, and
 // the two ways to start a thread at the root.
 
-import { request as httpRequest } from "node:http"
 import type { Store } from "@kyneta/exchange"
 import {
   atEntry,
@@ -11,7 +10,6 @@ import {
   projectTranscript,
   ROOT,
 } from "@pineta/core"
-import { displayName } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
 import { CONTROL_TOPIC, SESSION_DOC_ID } from "@pineta/protocol/messages"
 import { readTreeIndex } from "@pineta/reads"
@@ -20,7 +18,6 @@ import { lineDocPrefix } from "../../host/lines.ts"
 
 export const sleep = (ms: number): Promise<void> =>
   new Promise(r => setTimeout(r, ms))
-export const codeOf = (o: Outcome) => (o.kind === "refused" ? o.code : "")
 export const runOf = (o: Outcome) => (o.kind === "started" ? o.runId : "")
 export const at = (id: string | null): Position =>
   id === null ? ROOT : atEntry(entryId(id))
@@ -110,37 +107,7 @@ export const idOfIn = (doc: SessionDocHandle, text: string): string | null => {
     ) ?? null
   )
 }
-/** An unnamed person's mention handle: their screen label, from their email. */
-export const handleOfUnnamed = (w: Parameters<typeof displayName>[0]) =>
-  displayName(w, undefined)
 /** How the two starts send at the root (ADR-0021). */
 export const START_AGENT = { mode: "branch", asksAgent: true } as const
 export const START_CHAT = { mode: "branch" } as const
 export const BRANCH = { mode: "branch" } as const
-
-/**
- * The status a raw POST to `url` gets. With "headers", only the headers are
- * sent, and the body never: a host that waits to read one never answers. A
- * reset connection is -1; no answer in 10 s, 0.
- */
-export function rawPost(
-  url: string,
-  headers: Record<string, string | number>,
-  body: Buffer | "headers",
-): Promise<number> {
-  return new Promise(resolve => {
-    const done = (status: number) => {
-      clearTimeout(timer)
-      resolve(status)
-      req.destroy()
-    }
-    const req = httpRequest(url, { method: "POST", headers }, res => {
-      res.resume()
-      done(res.statusCode ?? 0)
-    })
-    req.on("error", () => done(-1))
-    const timer = setTimeout(() => done(0), 10_000)
-    if (body === "headers") req.flushHeaders()
-    else req.end(body)
-  })
-}

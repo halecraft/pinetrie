@@ -164,7 +164,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
       // ── helpers ──────────────────────────────────────────────────────────────
       /** A message for Ada only: it names her, so in agent work it asks no one. */
-      const NOTE = "@Ada just a note"
+      const FOR_ADA = "@Ada just a note"
       /** A message whose markdown draws as other text: what copy copies is not what it shows. */
       const STILL_SOURCE = "still **off** it"
       const STILL = "still off it"
@@ -272,11 +272,11 @@ async function run(check: Checks["check"]): Promise<void> {
       // ── mentions pick the addressee, and the button says so ────────────────
       // The thread has a lane now, so a message naming no one asks the agent; one
       // naming only a person is for them (ADR-0021).
-      await page.fill(`${col(0)} .composer .input`, NOTE)
+      await page.fill(`${col(0)} .composer .input`, FOR_ADA)
       await label(0)
       await page.$$eval(".msg.assistant", n => n.length)
       await page.click(`${col(0)} .composer .send`)
-      await shows(NOTE)
+      await shows(FOR_ADA)
       await new Promise(r => setTimeout(r, 1500))
       await page.fill(
         `${col(0)} .composer .input`,
@@ -417,8 +417,8 @@ async function run(check: Checks["check"]): Promise<void> {
       // The → sits in the column's right padding, all but a pixel outside its
       // message, and a hidden → takes no hover. A pointer that overshoots into
       // that padding, past the →, must still show it and reach it.
-      await page.locator(`${col(0)} ${msg(NOTE)}`).scrollIntoViewIfNeeded()
-      const gutter = await page.$eval(`${col(0)} ${msg(NOTE)}`, m => {
+      await page.locator(`${col(0)} ${msg(FOR_ADA)}`).scrollIntoViewIfNeeded()
+      const gutter = await page.$eval(`${col(0)} ${msg(FOR_ADA)}`, m => {
         const body = m.closest(".column-body")
         const arrow = m
           .querySelector(":scope > .tools > .branch")
@@ -456,18 +456,18 @@ async function run(check: Checks["check"]): Promise<void> {
 
       // From the first column while two are open, so "beside its parent"
       // (position 1) and "the far right" (position 2) differ.
-      await page.hover(`${col(0)} ${msg(NOTE)}`)
-      await page.click(`${col(0)} ${msg(NOTE)} > .tools > .branch`)
+      await page.hover(`${col(0)} ${msg(FOR_ADA)}`)
+      await page.click(`${col(0)} ${msg(FOR_ADA)} > .tools > .branch`)
       // Where it opens and what it starts with are `planIntent`'s and
       // `startText`'s, proven by their unit tests.
       await page
         .waitForFunction(
-          ([c, note]) =>
+          ([c, text]) =>
             document
               .querySelector(`${c} .origin`)
-              ?.textContent?.includes(note) === true &&
+              ?.textContent?.includes(text) === true &&
             document.querySelector(`${c} .msg`) === null,
-          [col(1), NOTE] as const,
+          [col(1), FOR_ADA] as const,
           { timeout: 15_000 },
         )
         .catch(() => null)
@@ -717,14 +717,18 @@ async function run(check: Checks["check"]): Promise<void> {
         undefined,
         { timeout: 15_000 },
       )
-      const noteId =
+      const forAdaId =
         Object.values(host.doc.entries()).find(e =>
           JSON.stringify(e).includes("just a note"),
         )?.id ?? ""
       const pulse = script.pause("say exactly: PULSE")
-      await other.chat("@agent say exactly: PULSE", atEntry(entryId(noteId)), {
-        mode: "branch",
-      })
+      await other.chat(
+        "@agent say exactly: PULSE",
+        atEntry(entryId(forAdaId)),
+        {
+          mode: "branch",
+        },
+      )
       const pulsing = await page
         .waitForSelector(".rail-dot.pulse", { timeout: 30_000 })
         .then(el => el.getAttribute("data-entry"))
@@ -745,7 +749,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // A menu open on the agent stays when its work ends: only you close it,
       // and then the agent, idle, leaves the header.
       const held = script.pause("say exactly: HELD")
-      await other.chat("@agent say exactly: HELD", atEntry(entryId(noteId)), {
+      await other.chat("@agent say exactly: HELD", atEntry(entryId(forAdaId)), {
         mode: "branch",
       })
       const heldOpen = await page

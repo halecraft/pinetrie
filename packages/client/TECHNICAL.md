@@ -71,8 +71,8 @@ about 55 ms (S59).
 - **A column's messages are one memoised `MessageList`**
   (`message-list.tsx`, `message-list-props.ts`), so a column that renders
   for anything else (a card, its composer's intent, a run elsewhere) builds
-  no list. `view` is compared by identity: `App` keeps it while the index,
-  the columns and the noted entries are the same, and comparing a long
+  no list. `view` is compared by identity: `App` keeps it while the index
+  and the columns are the same, and comparing a long
   thread's nodes would cost part of what skipping saves. So any change to
   those, a column opened or closed included, builds every column's list
   once. `lane` and `joins` are rebuilt on every render of the column and
@@ -457,7 +457,7 @@ else reads those rows (tab summaries, archive search, `branchColors`).
   across that send. `.rail-tree` is `fit-content` and centred, and the SVG is
   `PAD` wide on both sides of its outer tracks.
 - **A capsule's background depends on its fill** (the panel's colour, the
-  track's, or the two blended half and half), so a colour check reads a `.rail-dot`. Signals (`.pulse`, `[data-here]`, `.noted`) are always on dots.
+  track's, or the two blended half and half), so a colour check reads a `.rail-dot`. Signals (`.pulse`, `[data-here]`, a `.card-pip`) are always on dots.
 
 ## Asks, densities and folds (ADR-0056)
 
