@@ -79,6 +79,8 @@ export interface RefreshContext {
   readonly open: OfferRecord | null
   /** The open offer's revisions are still in your repo, or divergent there. */
   readonly live: boolean
+  /** The open offer's commits as the facts found them; null with no facts. */
+  readonly read: readonly CommitId[] | null
 }
 
 export interface OfferEffects {
@@ -132,12 +134,23 @@ export function planOfferEffects(
     }
   const { open } = c
   if (open === null) return NOTHING
+  // The baseline your edits are seen against: what the host wrote, or, for
+  // an offer that is not yours, what was read now. A host write whose record
+  // was lost is then the baseline from the first trigger on (S73).
+  const read =
+    c.read !== null && c.read.length === open.host.changes.length
+      ? c.read
+      : null
+  const baseline =
+    plan === "leave" || plan === "repair"
+      ? open.host.wrote
+      : (read ?? open.host.wrote)
   // What the record keeps unless the plan changes it.
   const kept: OfferAt = {
     bookmark: open.bookmark,
     tip: open.host.tip,
     start: open.host.start,
-    commits: open.host.wrote,
+    commits: baseline,
     changes: open.host.changes,
     target: c.target,
     stale: open.stale,

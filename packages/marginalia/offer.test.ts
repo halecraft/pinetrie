@@ -149,7 +149,7 @@ describe("offerView: ADR-0038's table", () => {
 })
 
 describe("planRefresh", () => {
-  const clean = { sameDescription: true, sameChange: true }
+  const clean = { sameDescription: true, sameChange: true, since: null }
   const facts = (
     o: Partial<NonNullable<RefreshFacts["offer"]>> | undefined,
     tip = TIP,
@@ -200,7 +200,11 @@ describe("planRefresh", () => {
     expect(
       planRefresh(
         facts(
-          { revisions: [{ sameDescription: false, sameChange: true }] },
+          {
+            revisions: [
+              { sameDescription: false, sameChange: true, since: null },
+            ],
+          },
           TIP,
           [T2],
         ),
@@ -211,17 +215,36 @@ describe("planRefresh", () => {
     expect(planRefresh(facts({ placed: false, onTarget: false }))).toBe("leave")
     expect(
       planRefresh(
-        facts({ revisions: [{ sameDescription: false, sameChange: true }] }),
+        facts({
+          revisions: [
+            { sameDescription: false, sameChange: true, since: null },
+          ],
+        }),
       ),
     ).toBe("leave")
     expect(
       planRefresh(
         facts({
           size: 2,
-          revisions: [{ sameDescription: true, sameChange: false }, clean],
+          revisions: [
+            { sameDescription: true, sameChange: false, since: null },
+            clean,
+          ],
         }),
       ),
     ).toBe("leave")
+  })
+  test("a change the evolog shows only the host made is not yours: the offer follows (S73)", () => {
+    const changed = (since: { reached: boolean; yoursChanged: boolean }) =>
+      planRefresh(
+        facts({
+          builtFrom: T2,
+          revisions: [{ sameDescription: true, sameChange: false, since }],
+        }),
+      )
+    expect(changed({ reached: true, yoursChanged: false })).toBe("follow")
+    expect(changed({ reached: true, yoursChanged: true })).toBe("leave")
+    expect(changed({ reached: false, yoursChanged: false })).toBe("leave")
   })
   test("divergent: repair, before anything else", () => {
     expect(planRefresh(facts({ divergent: true, placed: false }))).toBe(

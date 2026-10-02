@@ -371,9 +371,19 @@ containers, disks and the helper.
   `planRefreshOffer`'s rebase.
 - **Take is `jj rebase -r <bottom>::<top> -A <target> -B @`** when the target
   is an ancestor of `@`; otherwise only bookmarks move (`planTakeOffer`).
-- **`offerFacts` reads an offer by change id once, then names commits**: its
-  three edit tests (description, `jj interdiff`, the bottom's parent an
-  ancestor of the target), files, conflicts and divergence.
+- **`offerFacts` reads an offer by change id once, then names commits**
+  (`offerCommits`, which a read needing only the commits uses alone): its
+  edit tests (`sameAs`: the description and `jj interdiff`; and the bottom's
+  parent an ancestor of the target), files, conflicts and divergence.
+- **Only when a revision fails `sameAs` is its evolog read** (`evologOf`,
+  one `jj evolog -T EVOLOG_ENTRY`), and `walkSince` (pure) walks it back to
+  what the host wrote, through each version's predecessor of the same
+  change. Each version an operation not the host's made is checked with
+  `sameAs` against the one before it. A record write can be lost after its
+  jj steps landed (a restart between the two, S73), so the host's own commit
+  is recognised from the evolog, never from the record alone. A rebase jj
+  made because you reworded a commit below is your operation (S48 item 7),
+  and changes nothing, so it is not an edit.
 - **A review reads by commit id** (ADR-0047): `revisionRead` runs
   `jj log -r <commit> -T REVISION_READ` and returns the parsed JSON,
   unchecked (the host decodes it), and `fileDiff` runs `jj diff --git -r
@@ -393,11 +403,12 @@ containers, disks and the helper.
   `--from --to`. A commit stays readable by id after it is abandoned, so a
   lane's revisions can be read after a take or a split.
 - **`hostCommitIn`** splits a divergent revision's commits by the user of
-  each one's newest evolog operation: the host's is abandoned, yours kept.
+  each one's newest evolog operation (`evologOf` with a limit of 1,
+  `isHostUser`): the host's is abandoned, yours kept.
 
 ## Tests
 
-- **`plan.test.ts`**: the planners.
+- **`plan.test.ts`**: the planners, and `walkSince` over parsed evologs.
 - **`lane.test.ts`**: the queue, and that each file a lane is pointed at
   inside Pineta's mount (`HELPER`, `LANE_NOTE`) exists in the install.
 - **`lanes.test.ts`**: the executor, and a lane's whole life against jj and
@@ -407,8 +418,8 @@ containers, disks and the helper.
   divergence and immutability, and a repo beside a fork that the fork's
   config leaves alone; a commit the agent makes itself, with jj and with
   git, reaching the offer and a branch at its turn, and an update merging
-  on it, while a stack's commits are never adopted; an offer built, refreshed, left, repaired,
-  taken under your edits and beside them, the next offer, and a stack; an
+  on it, while a stack's commits are never adopted; an offer built, refreshed, left, rewritten by the host with its record
+  lost (S73), repaired, taken under your edits and beside them, the next offer, and a stack; an
   offer following a moved tip, your conflicting commit and a moved start,
   each checked against a fresh build; an offer after you committed your
   edits differently, after a taken branch that holds the lane's tip, from a

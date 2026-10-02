@@ -188,7 +188,6 @@ export function createContainers(deps: {
     startContainer,
 
     async close() {
-      offers?.close()
       await registry.stopAll()
     },
   }

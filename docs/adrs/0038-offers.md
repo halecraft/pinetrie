@@ -15,6 +15,9 @@ your `@` in a lane's history supersedes the haves recorded before it.
 Amended in place (S72, `PLAN-2026-10-02-offer-start-beside`): a commit
 delivered beside a lane's tip counts for the history the two share at or
 above the tip's newest copy.
+Amended in place (S73, `PLAN-2026-10-01-offer-lost-write`): an offer is
+edited only by a change an operation not the host's made; an edited offer
+that conflicts says so.
 
 **Context.** Taking a thread's work today rebases your `@` onto the lane's
 merge (ADR-0034). Every turn commit the lane made becomes an ancestor of your
@@ -80,7 +83,12 @@ pull request.
     matches the commit the host last wrote for it: the same description, no
     `jj interdiff`, and a parent that is an ancestor of the target (S48
     item 7). Otherwise the offer is yours: the host leaves it, and the
-    thread's later turns become a new offer on top.
+    thread's later turns become a new offer on top. *Amended (S73):* a
+    difference counts as yours only if a version an operation not the
+    host's made, walking the evolog back to the host's commit, changed it.
+    The host's record of its own write can be lost after its jj steps
+    landed (a restart between the two), and its own commit must not then
+    read as your edit.
   - **A race is repaired in your favour.** A refresh racing your edit makes
     the offer divergent; the host abandons the commit its own operation made
     (`operation.user()`) and keeps yours (S48 item 8).
@@ -155,7 +163,7 @@ pull request.
   | needs you | the agent's question | a reply; Take anyway |
   | stack ready | "offer: a stack of K" | **Take stack**, Squash to one |
   | stack stale | "a stack of K, and changes since" | Split again, Take stack and the rest |
-  | edited by you | "you edited this offer" | **Take**, Refresh (discards your edits) |
+  | edited by you | "you edited this offer", and "· conflicts with your edits in N files" when it conflicts (S73) | **Take** ("Take anyway" when it conflicts), Refresh (discards your edits) |
   | taken | "taken as `<change id>`" | none, until the next turn |
 
   "Land your work" and "take into my working copy" are gone. The page header

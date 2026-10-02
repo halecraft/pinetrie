@@ -395,6 +395,29 @@ export const NO_EDITOR = {
 export const HOST_OPERATOR = "pineta-host"
 
 /**
+ * What the host found of one revision of an offer, against the commit it
+ * last wrote for it (`offerFacts` in `@pineta/lanes` reads it,
+ * `revisionEdited` in `@pineta/marginalia` decides from it).
+ */
+export interface RevisionFacts {
+  /** The description is the one the host last wrote. */
+  readonly sameDescription: boolean
+  /** `jj interdiff` against the commit the host last wrote is empty. */
+  readonly sameChange: boolean
+  /**
+   * What the evolog says since the host's write, read only when one of the
+   * two differs (null otherwise): whether the walk back from the revision
+   * reached the host's commit, and whether a version of yours on the way
+   * changed it. The host's own versions never count: its record of one can
+   * be lost after its jj steps landed (S73).
+   */
+  readonly since: {
+    readonly reached: boolean
+    readonly yoursChanged: boolean
+  } | null
+}
+
+/**
  * The trailers the host writes into commit messages: a turn names its entry
  * and lane (ADR-0032), an offer its thread too (ADR-0039).
  */

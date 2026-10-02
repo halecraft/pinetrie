@@ -4,6 +4,7 @@
 import type { LaneName } from "@pineta/core"
 import { readThreadName } from "@pineta/reads"
 import type { CardsDocHandle, SessionDocHandle } from "@pineta/schema"
+import { SerialClosed } from "./queue.ts"
 
 export interface Basics {
   readonly doc: SessionDocHandle
@@ -19,17 +20,20 @@ export const messageOf = (error: unknown): string =>
 
 /**
  * A `.catch` handler that logs `[host] <thread>: <what> failed: <message>`,
- * or `[host] <what> failed: <message>` with no lane.
+ * or `[host] <what> failed: <message>` with no lane. A step a closed
+ * `Serial` refused is not logged: shutdown refuses them on purpose.
  */
 export function failed(
   basics: Pick<Basics, "doc" | "log">,
   what: string,
   lane?: LaneName,
 ): (error: unknown) => void {
-  return error =>
+  return error => {
+    if (error instanceof SerialClosed) return
     basics.log(
       lane === undefined
         ? `[host] ${what} failed: ${messageOf(error)}`
         : `[host] ${readThreadName(basics.doc, lane)}: ${what} failed: ${messageOf(error)}`,
     )
+  }
 }

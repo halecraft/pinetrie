@@ -9,6 +9,7 @@ import { createHash } from "node:crypto"
 import path from "node:path"
 import {
   type CommitId,
+  commitId,
   type ForkStart,
   type HaveRecord,
   HOST_OPERATOR,
@@ -921,6 +922,85 @@ export function offerStart(input: {
     return `heads(::${input.tip} & ::(${all}))`
   const shared = `(::(${besides}) & (${above})::)`
   return `heads(::${input.tip} & (::(${all}) | ${shared}))`
+}
+
+/** One version of a commit in `jj evolog`: who made it, and from what. */
+export interface EvologEntry {
+  readonly commit: CommitId
+  readonly change: string
+  /** The operation that made it was the host's (`HOST_OPERATOR`). */
+  readonly byHost: boolean
+  readonly predecessors: readonly {
+    readonly commit: CommitId
+    readonly change: string
+  }[]
+}
+
+/**
+ * The template `parseEvolog` reads: one entry a line, its fields split by
+ * tabs, each predecessor as `<commit>:<change>`. An entry whose operation
+ * jj no longer holds prints an empty user, which is not the host's.
+ */
+export const EVOLOG_ENTRY =
+  'commit.commit_id() ++ "\t" ++ commit.change_id() ++ "\t" ++ if(operation, operation.user(), "") ++ "\t" ++ predecessors.map(|p| p.commit_id() ++ ":" ++ p.change_id()).join(",") ++ "\n"'
+
+/** Whether an operation's user (`<user>@<hostname>`) is the host's. */
+export const isHostUser = (user: string): boolean =>
+  user.startsWith(`${HOST_OPERATOR}@`)
+
+/** `jj evolog -T EVOLOG_ENTRY`'s output -> its entries, newest first. */
+export function parseEvolog(stdout: string): EvologEntry[] {
+  return stdout
+    .split("\n")
+    .filter(line => line !== "")
+    .map(line => {
+      const [commit = "", change = "", user = "", preds = ""] = line.split("\t")
+      return {
+        commit: commitId(commit),
+        change,
+        byHost: isHostUser(user),
+        predecessors: preds
+          .split(",")
+          .filter(p => p !== "")
+          .map(p => {
+            const [c = "", ch = ""] = p.split(":")
+            return { commit: commitId(c), change: ch }
+          }),
+      }
+    })
+}
+
+/**
+ * The versions of a revision since the host last wrote it: walking back from
+ * `from` to `wrote` through each entry's predecessor of the same change. It
+ * stops, not `reached`, at an entry with no such predecessor, one the read
+ * did not return, or a cycle. `yours` are the versions an operation not the
+ * host's made, each with the version before it: only those can be your edit.
+ * The host's record of its own version can be lost after its jj steps
+ * landed (S73), so the evolog, not the record, says who made it.
+ */
+export function walkSince(
+  entries: readonly EvologEntry[],
+  from: CommitId,
+  wrote: CommitId,
+): {
+  readonly reached: boolean
+  readonly yours: readonly { readonly from: CommitId; readonly to: CommitId }[]
+} {
+  const byCommit = new Map(entries.map(e => [e.commit, e]))
+  const yours: { from: CommitId; to: CommitId }[] = []
+  const seen = new Set<CommitId>()
+  let at = from
+  for (;;) {
+    if (at === wrote) return { reached: true, yours }
+    const entry = byCommit.get(at)
+    if (entry === undefined || seen.has(at)) return { reached: false, yours }
+    seen.add(at)
+    const before = entry.predecessors.find(p => p.change === entry.change)
+    if (before === undefined) return { reached: false, yours }
+    if (!entry.byHost) yours.push({ from: before.commit, to: at })
+    at = before.commit
+  }
 }
 
 /**

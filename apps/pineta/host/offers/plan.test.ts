@@ -41,6 +41,7 @@ const context = (open: OfferRecord | null): RefreshContext => ({
   wip: "WIP (amber fox): fix it",
   open,
   live: true,
+  read: [NOW_COMMIT],
 })
 
 describe("offerRecord", () => {
@@ -120,6 +121,16 @@ describe("planOfferEffects", () => {
     const e = planOfferEffects("withdraw", context(offer()))
     expect(e.steps).toEqual(planAbandonOffer("/repo", ["kxyz"]))
     expect(e.after).toEqual({ kind: "remove" })
+  })
+
+  test("an offer not yours takes what was read as its baseline; one you edited keeps what the host wrote", () => {
+    const wroteOf = (plan: "none" | "stale" | "leave") => {
+      const e = planOfferEffects(plan, context(offer()))
+      return e.after.kind === "record" ? e.after.at.commits : null
+    }
+    expect(wroteOf("none")).toEqual([NOW_COMMIT])
+    expect(wroteOf("stale")).toEqual([NOW_COMMIT])
+    expect(wroteOf("leave")).toEqual([WROTE])
   })
 
   test("build names the lane's tip as its one source, with the WIP line", () => {

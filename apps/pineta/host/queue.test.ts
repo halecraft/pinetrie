@@ -1,6 +1,6 @@
 import { expect, test } from "vitest"
 import { deferred } from "./fakes.ts"
-import { createSerial } from "./queue.ts"
+import { createSerial, SerialClosed } from "./queue.ts"
 
 test("a step runs after a failed one, and the failure is heard once", async () => {
   const heard: unknown[] = []
@@ -47,4 +47,23 @@ test("idle waits for a step queued while it waits, and for tracked work", async 
   work.resolve()
   await idle
   expect(done).toEqual(["first", "queued meanwhile", "tracked", "idle"])
+})
+
+test("a closed serial refuses a new step, and idle still waits for the one it holds", async () => {
+  const serial = createSerial()
+  const done: string[] = []
+  const gate = deferred<void>()
+  void serial.run(async () => {
+    await gate.promise
+    done.push("held")
+  })
+  serial.close()
+  const refused = serial.run(async () => {
+    done.push("refused")
+  })
+  await expect(refused).rejects.toBeInstanceOf(SerialClosed)
+  const idle = serial.idle()
+  gate.resolve()
+  await idle
+  expect(done).toEqual(["held"])
 })

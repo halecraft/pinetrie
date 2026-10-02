@@ -2,9 +2,10 @@
 // (ADR-0038): a one-shot model request outside the thread.
 
 import { type LaneName, projectTranscript } from "@pineta/core"
-import { executeOnHost, lines, planDescribe } from "@pineta/lanes"
+import { executeOnHost, lines, offerCommits, planDescribe } from "@pineta/lanes"
 import {
   describeRequest,
+  revisionEdited,
   transcriptLines,
   withTrailers,
 } from "@pineta/marginalia"
@@ -88,7 +89,7 @@ export function describe(
         return
       const target = await state.targetNow()
       const facts = await state.factsOf(now, target)
-      if (facts.revisions.some(r => !r.sameDescription || !r.sameChange)) return
+      if (facts.revisions.some(revisionEdited)) return
       await executeOnHost(
         planDescribe(
           root,
@@ -96,7 +97,7 @@ export function describe(
           withTrailers(text, { lane, name, entry: tip ?? "" }),
         ),
       )
-      const after = await state.factsOf(now, target)
+      const after = await offerCommits(ops, now.host.changes)
       await refresh.record(lane, {
         bookmark: now.bookmark,
         tip: now.host.tip,

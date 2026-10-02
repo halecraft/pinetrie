@@ -30,6 +30,7 @@ const context: RefreshContext = {
   wip: "WIP (amber fox): fix it",
   open: offer,
   live: true,
+  read: null,
 }
 
 const ports = () =>

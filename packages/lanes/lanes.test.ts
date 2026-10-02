@@ -897,7 +897,7 @@ describe("a lane's repo, with jj", () => {
       onTarget: true,
       placed: true,
       divergent: false,
-      revisions: [{ sameDescription: true, sameChange: true }],
+      revisions: [{ sameDescription: true, sameChange: true, since: null }],
     })
     expect(await commitsOf(yoursJj, "divergent()")).toEqual([])
 
@@ -909,15 +909,34 @@ describe("a lane's repo, with jj", () => {
     const refreshed = await facts([w1])
     expect(refreshed).toMatchObject({
       onTarget: true,
-      revisions: [{ sameDescription: true, sameChange: true }],
+      revisions: [{ sameDescription: true, sameChange: true, since: null }],
     })
 
-    // You reword it: edited; the host leaves it.
+    // You reword it: edited; the host leaves it. The evolog walks back
+    // through the host's rebase to what it wrote, and finds your change.
     await yoursJj(["describe", "-r", c1, "-m", "offer: as I want it"])
     expect((await facts([w1])).revisions).toEqual([
-      { sameDescription: false, sameChange: true },
+      {
+        sameDescription: false,
+        sameChange: true,
+        since: { reached: true, yoursChanged: true },
+      },
     ])
     await yoursJj(["describe", "-r", c1, "-m", "offer: lane"])
+
+    // The host rewrites it and its record is lost (S73): against the stale
+    // commit it differs, but only the host changed it since.
+    const [beforeHost] = await commitsOf(ops, `change_id(${c1})`)
+    if (beforeHost === undefined) throw new Error("no offer")
+    await ops(["describe", "-r", c1, "-m", "offer: the host's line"])
+    expect((await facts([beforeHost])).revisions).toEqual([
+      {
+        sameDescription: false,
+        sameChange: true,
+        since: { reached: true, yoursChanged: false },
+      },
+    ])
+    await ops(["describe", "-r", c1, "-m", "offer: lane"])
 
     // A race: your edit and a host refresh from the same operation. The
     // host keeps yours (S48 item 8).

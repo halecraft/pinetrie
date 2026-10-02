@@ -25,6 +25,7 @@ import {
   ONTO_BOOKMARK,
   offerStart,
   PINETA_HEADS,
+  parseEvolog,
   planBaseRefresh,
   planBundle,
   planContainer,
@@ -52,6 +53,7 @@ import {
   shellWord,
   specHashOf,
   startHaves,
+  walkSince,
   withoutPinetaHeads,
 } from "./index.ts"
 
@@ -951,5 +953,59 @@ describe("planTurnCommit: the turn's revision (S56)", () => {
   })
   test("nothing, when the lane has no bookmark", () => {
     expect(planTurnCommit({ ...at, bookmark: null })).toEqual({ kind: "none" })
+  })
+})
+
+describe("walkSince", () => {
+  // One line per version, newest first, as `jj evolog -T EVOLOG_ENTRY` prints them.
+  const evolog = (...rows: readonly (readonly [string, string, string])[]) =>
+    parseEvolog(
+      rows
+        .map(([commit, user, pred]) =>
+          [commit, "kchange", user, pred === "" ? "" : `${pred}:kchange`].join(
+            "\t",
+          ),
+        )
+        .join("\n"),
+    )
+  const HOST = "pineta-host@mac"
+  const id = commitId
+  test("the host's own versions back to what it wrote: reached, none of yours", () => {
+    const entries = evolog(
+      ["c3", HOST, "c2"],
+      ["c2", HOST, "c1"],
+      ["c1", HOST, ""],
+    )
+    expect(walkSince(entries, id("c3"), id("c1"))).toEqual({
+      reached: true,
+      yours: [],
+    })
+  })
+  test("a version of yours on the way is listed with the one before it", () => {
+    const entries = evolog(
+      ["c3", HOST, "c2"],
+      ["c2", "you@mac", "c1"],
+      ["c1", HOST, ""],
+    )
+    expect(walkSince(entries, id("c3"), id("c1"))).toEqual({
+      reached: true,
+      yours: [{ from: id("c1"), to: id("c2") }],
+    })
+  })
+  test("a walk that never meets what the host wrote is not reached", () => {
+    const entries = evolog(["c3", HOST, "c2"], ["c2", HOST, ""])
+    expect(walkSince(entries, id("c3"), id("c9")).reached).toBe(false)
+  })
+  test("of a squash's predecessors, only its own change's is followed", () => {
+    const entries = parseEvolog(
+      [
+        "c2\tkchange\tyou@mac\tcx:kother,c1:kchange",
+        "c1\tkchange\tpineta-host@mac\t",
+      ].join("\n"),
+    )
+    expect(walkSince(entries, id("c2"), id("c1"))).toEqual({
+      reached: true,
+      yours: [{ from: id("c1"), to: id("c2") }],
+    })
   })
 })

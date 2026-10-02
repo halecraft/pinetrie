@@ -555,6 +555,12 @@ describe("offerWords", () => {
       "conflicts with your edits in 1 file",
     ],
     ["edited", { ...offer, edited: true }, "idle", "you edited this offer"],
+    [
+      "edited, and conflicting",
+      { ...offer, edited: true, conflicts: ["a.txt", "b.txt"] },
+      "idle",
+      "you edited this offer \u00b7 conflicts with your edits in 2 files",
+    ],
     ["taken", { ...offer, taken: "zz12345678ab" }, "idle", "taken as zz123456"],
   ] as const)("%s", (_, o, activity, line) => {
     const w = words(o, activity)
@@ -575,6 +581,14 @@ describe("offerWords", () => {
     expect(labels({ ...offer, conflicts: ["a.txt"] })).toEqual([
       "resolve in the thread",
       "take anyway",
+    ])
+    expect(labels({ ...offer, edited: true })).toEqual([
+      "take",
+      "refresh (discards your edits)",
+    ])
+    expect(labels({ ...offer, edited: true, conflicts: ["a.txt"] })).toEqual([
+      "take anyway",
+      "refresh (discards your edits)",
     ])
     expect(words(offer).menu.map(b => b.label)).toEqual([
       "rewrite description",

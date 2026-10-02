@@ -604,7 +604,10 @@ became of its files (`strip`).
   With no revisions at all (a host without a project), every asked message
   falls back, and the whole path reads as the column's lane.
 - **`offerView` (`@pineta/marginalia`) decides an offer; `offerWords`
-  words it**: its line and each button's label, by state. The bookmark is a
+  words it**: its line and each button's label, by state. An offer that
+  conflicts says so even when it is `edited` (S73), and its take reads
+  "take anyway" whatever the state, as it does when a resolution asked for
+  you. The bookmark is a
   fact of its own, drawn apart (`.offer-bookmark`), never in the line.
 - **The header's clicks are `openAt` intents** (`planOpen`), which reveal
   the entry in whichever column shows it. A column's lane may have

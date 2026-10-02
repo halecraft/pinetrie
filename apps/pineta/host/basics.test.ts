@@ -2,6 +2,7 @@ import { laneNameForThread } from "@pineta/core"
 import { expect, test } from "vitest"
 import { failed, messageOf } from "./basics.ts"
 import { basics } from "./fakes.ts"
+import { SerialClosed } from "./queue.ts"
 
 test("failed logs the host's line, with the thread when it names a lane", () => {
   const b = basics()
@@ -12,6 +13,12 @@ test("failed logs the host's line, with the thread when it names a lane", () => 
     "[host] compaction failed: disk full",
     "[host] 89abcdef: forking failed: no volume",
   ])
+})
+
+test("failed logs nothing for a step a closed serial refused", () => {
+  const b = basics()
+  failed(b, "refreshing its offer")(new SerialClosed())
+  expect(b.lines).toEqual([])
 })
 
 test("messageOf reads an Error's message, and anything else as a string", () => {

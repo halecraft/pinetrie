@@ -17,6 +17,7 @@ import {
   type OfferFacts,
   type OfferSource,
   offerBookmark,
+  offerCommits,
   offerFacts,
   offerRevisions,
   planOffer,
@@ -197,13 +198,15 @@ export function createRefresh(state: OfferState): Refresh {
       wip: wipLine(doc, lane, name),
       open: facts === null ? null : open,
       live,
+      read: facts === null ? null : facts.commits,
     })
     // execute
     return executeOffer(
       {
         run: executeOnHost,
         build: sources => build(lane, name, tip, start, target, sources, false),
-        reread: async offer => (await state.factsOf(offer, target)).commits,
+        reread: async offer =>
+          (await offerCommits(ops, offer.host.changes)).commits,
         record: (at, known) =>
           record(lane, at, known && facts !== null ? facts : undefined),
         repair: (offer, at) => repair(lane, offer, at),

@@ -18,6 +18,7 @@ import {
   type LandingRecord,
   type LaneName,
   type OfferRecord,
+  type RevisionFacts,
   type RevisionRecord,
   type RevisionReview,
   spanKey,
@@ -28,13 +29,15 @@ import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { fitNewest, LEFT_OUT_NOTE, leftOut } from "./request.ts"
 
-/** What the host found of one revision of an offer, against what it wrote. */
-export interface RevisionFacts {
-  /** The description is the one the host last wrote. */
-  readonly sameDescription: boolean
-  /** `jj interdiff` against the commit the host last wrote is empty. */
-  readonly sameChange: boolean
-}
+/**
+ * Whether you edited a revision since the host last wrote it: it differs in
+ * description or change, and the evolog does not show only the host's own
+ * versions between (S73). A walk that never reached the host's commit
+ * proves nothing, so that revision counts as yours.
+ */
+export const revisionEdited = (r: RevisionFacts): boolean =>
+  !(r.sameDescription && r.sameChange) &&
+  (r.since === null || !r.since.reached || r.since.yoursChanged)
 
 /** What a trigger found: the lane, your repo, and the offer if there is one. */
 export interface RefreshFacts {
@@ -89,9 +92,7 @@ export function planRefresh(facts: RefreshFacts): RefreshPlan {
   if (offer === undefined || offer.taken !== null)
     return nothingNew ? "none" : "build"
   if (offer.divergent) return "repair"
-  const edited =
-    !offer.placed ||
-    offer.revisions.some(r => !r.sameDescription || !r.sameChange)
+  const edited = !offer.placed || offer.revisions.some(revisionEdited)
   if (edited) return "leave"
   const moved =
     offer.builtFrom !== tip || !sameCommits(offer.builtOn, facts.start)

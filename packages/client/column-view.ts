@@ -439,6 +439,10 @@ export function offerWords(view: OfferView): OfferWords {
   const { state, facts } = view
   const files = count(facts.files, "file", "files")
   const yours = facts.touchesYourEdits ? " · touches files you're editing" : ""
+  const conflicts =
+    facts.conflicts === 0
+      ? ""
+      : `conflicts with your edits in ${count(facts.conflicts, "file", "files")}`
   const line =
     state === "nothing"
       ? "nothing to take yet"
@@ -455,9 +459,9 @@ export function offerWords(view: OfferView): OfferWords {
             : state === "needs_you"
               ? "the agent has a question about your edits · see the thread"
               : state === "edited"
-                ? "you edited this offer"
+                ? `you edited this offer${conflicts === "" ? "" : ` · ${conflicts}`}`
                 : state === "conflicts"
-                  ? `conflicts with your edits in ${count(facts.conflicts, "file", "files")}`
+                  ? conflicts
                   : state === "stale"
                     ? `a stack of ${facts.size}, and changes since`
                     : state === "stack"
@@ -468,7 +472,7 @@ export function offerWords(view: OfferView): OfferWords {
       ? "take stack"
       : button === "take" && state === "stale"
         ? "take stack and the rest"
-        : button === "take" && (state === "conflicts" || state === "needs_you")
+        : button === "take" && (facts.conflicts > 0 || state === "needs_you")
           ? "take anyway"
           : button === "split" && state === "stale"
             ? "split again"

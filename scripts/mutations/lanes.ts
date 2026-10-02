@@ -8,6 +8,23 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a version of yours since the host's write goes unlisted",
+    file: plan,
+    from: "    if (!entry.byHost) yours.push({ from: before.commit, to: at })",
+    to: "    if (false) yours.push({ from: before.commit, to: at })",
+    command: unit,
+    expect: "a version of yours on the way is listed",
+  },
+  {
+    name: "no operation reads as the host's",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  user.startsWith(`${HOST_OPERATOR}@`)",
+    to: "  false",
+    command: unit,
+    expect: "an offer: built, refreshed, left",
+  },
+  {
     name: "retiring removes nothing of Pineta's line",
     file: plan,
     from: '    .filter(p => p !== PINETA_HEADS && p !== "")',

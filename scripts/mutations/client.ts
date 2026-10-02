@@ -16,6 +16,15 @@ const copyText = "packages/client/copy-text.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "an edited offer hides its conflicts",
+    file: "packages/client/column-view.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '                ? `you edited this offer${conflicts === "" ? "" : ` · ${conflicts}`}`',
+    to: '                ? "you edited this offer"',
+    command: unit,
+    expect: "edited, and conflicting",
+  },
+  {
     name: "a fresh column takes the newest child of its anchor",
     file: file,
     from: "      fresh.sendId === undefined ? undefined : index.bySend.get(fresh.sendId)",

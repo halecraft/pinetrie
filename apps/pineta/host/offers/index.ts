@@ -63,7 +63,11 @@ export interface Offers {
   read(ask: OfferAsk): Promise<OfferAnswer>
   /** Settles when no offer work is queued or running. */
   quiet(): Promise<void>
-  close(): void
+  /**
+   * Shutdown: stop polling your repo, and refuse every offer step from now
+   * on. `quiet` still waits for the steps already queued.
+   */
+  stop(): void
 }
 
 export function startOffers(input: {
@@ -126,6 +130,9 @@ export function startOffers(input: {
       })
     },
     quiet: () => serial.idle(),
-    close: () => watch.close(),
+    stop() {
+      watch.close()
+      serial.close()
+    },
   }
 }

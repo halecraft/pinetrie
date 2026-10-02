@@ -62,6 +62,7 @@ import { createSerial } from "./queue.ts"
 import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
 import { createSettle } from "./settle.ts"
+import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { recover } from "./startup.ts"
 import { openStore } from "./store.ts"
 import { drain as drainQueue, takenChat } from "./take.ts"
@@ -440,24 +441,38 @@ export async function startHost({
     invites: server.invites,
     quiet,
     async shutdown() {
-      // Let queued steps, a compaction among them, finish their writes.
-      try {
-        await quiet()
-      } catch {}
-      unwatchQueues()
-      seats.stop()
-      control.stop()
-      try {
-        await agent.close()
-      } catch {}
-      // A container runs only while its lane runs (ADR-0034).
-      try {
-        await work.close()
-      } catch {}
-      try {
-        await exchange.shutdown()
-      } catch {}
-      await server.close()
+      const carry = async (step: ShutdownStep): Promise<void> => {
+        switch (step) {
+          case "intake":
+            unwatchQueues()
+            seats.stop()
+            control.stop()
+            return
+          case "close":
+            serial.close()
+            work.offers?.stop()
+            return
+          case "quiet":
+            // Queued steps, a compaction among them, finish their writes.
+            return quiet()
+          case "agent":
+            return agent.close()
+          case "work":
+            // A container runs only while its lane runs (ADR-0034).
+            return work.close()
+          case "exchange":
+            return exchange.shutdown()
+          case "server":
+            return server.close()
+        }
+      }
+      for (const step of planShutdown()) {
+        if (step === "server") await carry(step)
+        else
+          try {
+            await carry(step)
+          } catch {}
+      }
     },
   }
 }

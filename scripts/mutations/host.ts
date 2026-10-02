@@ -5,6 +5,46 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pineta/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a closed serial still runs new steps",
+    file: "apps/pineta/host/queue.ts",
+    from: "      if (closed) {",
+    to: "      if (false) {",
+    command: unit,
+    expect: "a closed serial refuses a new step",
+  },
+  {
+    name: "a step refused in shutdown is logged as a failure",
+    file: "apps/pineta/host/basics.ts",
+    from: "    if (error instanceof SerialClosed) return\n",
+    to: "",
+    command: unit,
+    expect: "failed logs nothing for a step a closed serial refused",
+  },
+  {
+    name: "shutdown closes the queues after it waits",
+    file: "apps/pineta/host/shutdown.ts",
+    from: '  "close",\n  "quiet",',
+    to: '  "quiet",\n  "close",',
+    command: unit,
+    expect: "planShutdown closes intake and the queues before it waits",
+  },
+  {
+    name: "an offer not yours keeps a stale baseline",
+    file: "apps/pineta/host/offers/plan.ts",
+    from: "      : (read ?? open.host.wrote)",
+    to: "      : open.host.wrote",
+    command: unit,
+    expect: "an offer not yours takes what was read as its baseline",
+  },
+  {
+    name: "a starting host checks no offer until you run jj",
+    file: "apps/pineta/host/offers/watch.ts",
+    from: "    touch: op === last ? [] : input.open,",
+    to: "    touch: last === null || op === last ? [] : input.open,",
+    command: unit,
+    expect: "planPoll: the first read and a new op touch every open offer",
+  },
+  {
     name: "a store does not own its file",
     file: "apps/pineta/host/store.ts",
     from: '    db.exec("PRAGMA locking_mode = EXCLUSIVE")',
@@ -519,14 +559,6 @@ export const mutations: readonly Mutation[] = [
     to: "  const entry: string | null = null",
     command: unit,
     expect: "a revision's reason is its message",
-  },
-  {
-    name: "the first read touches every offer",
-    file: "apps/pineta/host/offers/watch.ts",
-    from: "    touch: last === null || op === last ? [] : input.open,",
-    to: "    touch: op === last ? [] : input.open,",
-    command: unit,
-    expect: "planPoll: the first read touches none",
   },
   {
     name: "names are planned concurrently",

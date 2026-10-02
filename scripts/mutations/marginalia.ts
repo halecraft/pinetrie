@@ -6,6 +6,14 @@ const archive = "packages/marginalia/archive.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the host's own rewrite reads as your edit",
+    file: "packages/marginalia/offer.ts",
+    from: "  (r.since === null || !r.since.reached || r.since.yoursChanged)",
+    to: "  true",
+    command: unit,
+    expect: "a change the evolog shows only the host made is not yours",
+  },
+  {
     name: "decoding skips the schema check",
     file: "packages/marginalia/decode.ts",
     from: "  return Value.Check(schema, value) ? build(value as Static<S>) : undefined",
@@ -204,16 +212,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an offer moved by you is refreshed anyway",
     file: "packages/marginalia/offer.ts",
-    from: "    !offer.placed ||",
-    to: "    false ||",
+    from: "  const edited = !offer.placed ||",
+    to: "  const edited = false ||",
     command: unit,
     expect: "any failed edit test",
   },
   {
     name: "an edit to a stack's lower revision goes unnoticed",
     file: "packages/marginalia/offer.ts",
-    from: "    offer.revisions.some(r => !r.sameDescription || !r.sameChange)",
-    to: "    offer.revisions.slice(-1).some(r => !r.sameDescription || !r.sameChange)",
+    from: "offer.revisions.some(revisionEdited)",
+    to: "offer.revisions.slice(-1).some(revisionEdited)",
     command: unit,
     expect: "any failed edit test",
   },

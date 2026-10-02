@@ -344,10 +344,13 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   the target moved), `leave` (you edited it), `repair` (a race left it
   divergent), or `none`. Where it starts is compared as a set: a merge's
   parents come in any order. `follow` is not `update`, which is "update from
-  my work" (`planUpdate`). An offer is edited when any of its
-  revisions fails any of three tests against what the host last wrote: the
-  description, `jj interdiff`, and the bottom's parent an ancestor of the
-  target (S48 item 7). A revision you edit is never touched again.
+  my work" (`planUpdate`). An offer is edited when its bottom's parent is
+  not an ancestor of the target (S48 item 7), or when any revision is
+  edited (`revisionEdited`): it differs from what the host last wrote in
+  description or `jj interdiff`, and the evolog does not show that only the
+  host changed it since (`RevisionFacts.since`, S73). A walk that did not
+  reach the host's commit counts as yours. A revision you edit is never
+  touched again.
 - **`offerView`** is ADR-0038's state table as a decision: the offer's
   state, its buttons, its menu, and the facts its words are made from
   (`OfferFacts`: files, size, conflicts, bookmark, …). It writes no words:
@@ -382,9 +385,10 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
     read failed, 413 past `MAX_DIFF_BYTES`.
 - **An offer's `commits` are its revisions' commits as the host last read
   them** (`offerFacts`), on every trigger. `host.wrote` is what the host
-  last wrote, the baseline for spotting your edits; it goes stale when jj
-  rebases the offer under the host (the `none` plan keeps it), and
-  `commits` does not. A revision divergent at that read is left out of
+  last wrote, the baseline for spotting your edits. Whenever the offer is
+  not yours (any plan but `leave` and `repair`), the record takes the
+  commits it read as the new baseline, so a rebase jj made under the host,
+  or a host write whose record was lost (S73), is the baseline from then on. A revision divergent at that read is left out of
   `commits`, so a review can briefly show fewer revisions than `size`.
 - **`withoutTrailers`** drops a last paragraph made only of the host's
   `TRAILERS` (`@pineta/core`), which `withTrailers` writes. A paragraph

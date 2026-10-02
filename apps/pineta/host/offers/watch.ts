@@ -1,6 +1,7 @@
 // host/offers/watch — your own jj operations: while an offer is open, your
 // repo's operation head is read every 2 s, and a new one refreshes each open
-// offer.
+// offer. So does the first read, so a host that just started checks each
+// offer once: its last record may have been lost with the host before (S73).
 
 import type { LaneName } from "@pineta/core"
 import { readOffers } from "@pineta/reads"
@@ -10,9 +11,8 @@ import type { OfferState } from "./state.ts"
 const POLL_MS = 2_000
 
 /**
- * What one read of your repo's operation head means. The first read only
- * learns it; the same head touches nothing; a new one touches every open
- * offer.
+ * What one read of your repo's operation head means. The same head touches
+ * nothing; the first read, and a new head, touch every open offer.
  */
 export function planPoll(input: {
   readonly last: string | null
@@ -22,7 +22,7 @@ export function planPoll(input: {
   const { last, op } = input
   return {
     last: op,
-    touch: last === null || op === last ? [] : input.open,
+    touch: op === last ? [] : input.open,
   }
 }
 

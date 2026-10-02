@@ -12,7 +12,8 @@ wires them.
 |---|---|
 | `index.ts` | `startHost`: the store, the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents, lane work and the agent, then the wiring below |
 | `basics.ts` | `Basics` (doc, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
-| `queue.ts` | `createSerial`: the one serial executor |
+| `queue.ts` | `createSerial`: the one serial executor, which a shutdown closes |
+| `shutdown.ts` | the order a host stops in (`planShutdown`) |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), and the agent's `onStream` (`streamInto`) |
 | `take.ts` | taking a lane's queued cards (ADR-0048): `takeTop`, and `drain`, which sends each through its command (ADR-0055) |
 | `settle.ts` | what happens between runs: drain, then compact and sweep |
@@ -58,6 +59,12 @@ wires them.
 - **A failed drain is logged against its lane** (`settle.ts`), and the
   settle still drains the other lanes, compacts and sweeps. A throw there
   would also leave `compactionQueued` set, and no later settle would compact.
+- **A closed `Serial` refuses new steps and finishes the ones it holds.**
+  `run` then rejects with `SerialClosed`, already handled, so voiding it is
+  still safe, and `failed()` logs nothing for it: a refusal during shutdown
+  is expected. A step refused then is lost without harm: a queued card stays
+  queued for the next host, and a refresh or a description runs again at the
+  next trigger.
 - **`RunningHost.quiet()`** is `serial.idle()`, then lane work's `quiet()`,
   then `exchange.flush()`. The suites await it before they check, so any
   background promise must be a `serial.run` or `serial.track`, or `quiet`
@@ -109,6 +116,21 @@ text names (`sweepTexts`).
   the agent is made with lane work's `access` and `hooks` and banners'
   `request`. Those are the only lazy reads: every module made after the
   agent is given the agent. The `Serial` is made before them, for banners.
+
+## Shutdown
+
+`planShutdown` (`shutdown.ts`) returns the order, and `shutdown()` carries
+it out, each step in its own `try`: `intake` (the cards' watch, seats,
+control), `close` (the host's `Serial` and the offers'), `quiet`, `agent`,
+`work` (the containers), `exchange`, `server`.
+
+- **The queues close before `quiet`.** `quiet` waits only for what is queued
+  when it looks. A step started after it (an offer refresh from the 2 s poll
+  or a lane's fetch, a drain from a command) writes to a closing agent and
+  document: its jj steps land and its record is lost (S73).
+- **Closing the agent ends running runs.** pi's harness seals every lane, so
+  a run's `run` rejects and `runs.ts`' `end` runs its steps: a refresh and a
+  `settle`. The closed queues refuse them.
 
 ## Commands
 
@@ -283,6 +305,16 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   asks the model outside the queue and writes inside it; `act.ts`,
   `stack.ts` and `watch.ts` (`planPoll`) are the actions, a split's stack
   and your jj operations.
+- **The first poll touches every open offer.** A host that just started
+  checks each one, so a record its predecessor lost (S73) is corrected before
+  you can take the offer.
+- **`Offers.stop()`** closes the poll and the offers' `Serial`; it is the
+  `close` step of a shutdown. `touch`, `runEnded`, `act` and `stackEnded`
+  need no check of their own: each goes through the closed queue.
+- **A record's baseline (`host.wrote`) is what was read** whenever the plan
+  is not `leave` or `repair` (`planOfferEffects`): an offer that is not
+  yours is safe to compare against as it is now. `leave` and `repair` keep
+  what the host wrote, against which your edit is seen.
 
 ## Testing the shell
 
