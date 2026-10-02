@@ -339,8 +339,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host shares every command Line with every client",
     file: "apps/pineta/host/policy.ts",
-    from: "  canShare: (docId, peer) => (isUndo(docId) ? false : routeLine(docId, peer)),",
-    to: "  canShare: docId => (isUndo(docId) ? false : undefined),",
+    from: "      : (routeLine(docId, peer) ?? holdsInventory(docId, peer.principal)),",
+    to: "      : holdsInventory(docId, peer.principal),",
     command: unit,
     expect:
       "a command Line's documents are shared with, and taken from, its two ends only",
@@ -660,10 +660,35 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the policy shares a tab's undo stack",
     file: "apps/pineta/host/policy.ts",
-    from: "  canShare: (docId, peer) => (isUndo(docId) ? false : routeLine(docId, peer)),",
-    to: "  canShare: (docId, peer) => routeLine(docId, peer),",
+    from: "    isUndo(docId)\n      ? false\n      : (routeLine",
+    to: "    false\n      ? false\n      : (routeLine",
     command: unit,
     expect: "a tab's undo stack is shared with no one",
+  },
+  {
+    name: "a fresh column's first send strands its other cards",
+    file: "apps/pineta/host/commands/cards.ts",
+    from: "      for (const step of followers(cards, card, sent))\n        applyPlaceStep(places, step)\n",
+    to: "",
+    command: unit,
+    expect:
+      "spend: a fresh column's first send leaves its other cards drafting",
+  },
+  {
+    name: "the policy shares every inventory with everyone",
+    file: "apps/pineta/host/policy.ts",
+    from: "    : writerOfPrincipal(principal) === holder",
+    to: "    : true",
+    command: unit,
+    expect: "an inventory is shared with, and taken from, its person only",
+  },
+  {
+    name: "resolveDoc leaves an inventory to Kyneta's default",
+    file: "apps/pineta/host/policy.ts",
+    from: '  if (writerOfInventoryDoc(docId) !== undefined) return "inventory"',
+    to: "",
+    command: unit,
+    expect: "resolveDoc: a card's text, an inventory",
   },
   {
     name: "acceptsWrite refuses card documents",
@@ -679,7 +704,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (cardIdOfDoc(docId) !== undefined) return "text"',
     to: '  if (cardIdOfDoc(docId) === "never") return "text"',
     command: unit,
-    expect: "resolveDoc: a card's text, a tab's undo stack",
+    expect: "resolveDoc: a card's text, an inventory, a tab's undo stack",
   },
   {
     name: "the startup sweeps nothing",
@@ -772,8 +797,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher never spends a chat's card",
     file: "apps/pineta/host/commands/index.ts",
-    from: "          return settled(sent, await cardCommands.spend(card.id))",
-    to: "          return settled(sent)",
+    from: "            await cardCommands.spend(card.id, { sendId, chat: intent }),",
+    to: "            null,",
     command: unit,
     expect: "a chat command spends its card once written",
   },

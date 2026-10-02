@@ -93,13 +93,13 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 1226/1226 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 757 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 1346/1346 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 839 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 12 scenarios, 37 checks, on the scripted model (S67) |
+| end-to-end | `pnpm run e2e` | 12 scenarios, 40 checks, on the scripted model (S67) |
 | with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
-| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 154 checks; in a lane with no containers, the 6 that need one report SKIP |
-| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 17 host and lanes scenarios ≤ ⌊√1074⌋; 4 browser ≤ ⌊√17⌋ |
+| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 160 checks; in a lane with no containers, the 6 that need one report SKIP |
+| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 17 host and lanes scenarios ≤ ⌊√1184⌋; 4 browser ≤ ⌊√17⌋ |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -178,23 +178,27 @@ and moves cards on request, spends one when it is sent, takes queued ones,
 and sweeps empty ones. Everyone at a thread's end sees and can edit its
 cards. Who wrote in one comes from its `clientID`s, through the host's
 `pineta.seat` records. Undo is Kyneta's stack, one per tab, in memory. Built
-so far: the drafting card (step 1), marks for your unsent cards (step 2), and
-step 3: notes removed, and queued cards. A send to a busy thread queues your
+so far: the drafting card (step 1), marks for your unsent cards (step 2),
+step 3: notes removed, and queued cards, and step 4: your inventory, a
+floating 3 × 6 grid you take cards into and put them out of, by key, button
+or drag, with moves you can undo, a closed branch reopened for it. A send
+to a busy thread queues your
 card above the line, in the host's step that found the lane busy, where
 anyone can edit it or unqueue it until the host takes it; the take and an
 unqueue are steps on the host's one serial executor, so an unqueue after
 the take is refused and its client says "already sent" (S69).
 `pineta.outbox` is gone.
 
-**ADR-0059 — a card's place has one owner at a time.** Built for the places
-there are now (drafting, queued, fresh); the inventory is step 4's. A place
+**ADR-0059 — a card's place has one owner at a time.** Built for every
+place there is now (drafting, queued, fresh, and your inventory). A place
 does not merge (S75), so the host writes every
 place in its session (`places`, `json`) and settles moves as handoffs, in
 arrival order, telling the loser where the card went. A tab draws its move
 at once, until its copy of `places` reaches the `rev` the host's reply
 carries (a revision watermark), whichever arrives first. Your inventory is a
 Yjs document of slots that only your tabs hold and write; the host records
-only that a card is in it, and each tab repairs its slots from that (S76).
+only that a card is in it, and each tab repairs its slots from that, once
+a card has been held, or not, for 2 s (S76, S79).
 Texts stay CRDTs. Queue and unqueue are handoffs too, a card's command is in
 its place record, and the cards document is gone.
 

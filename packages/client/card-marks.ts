@@ -95,14 +95,17 @@ export function cardMarks(input: {
         break
       }
       case "fresh": {
-        // A column this browser tab's layout lacks was typed elsewhere: the
-        // inventory (step 4) will collect it.
+        // A column this browser tab's layout lacks was typed in another
+        // browser tab, and is marked nowhere here.
         const tab = tabOfColumn(input.layout, card.place.column)
         if (tab?.kind === "new") newTabs.add(tab.key)
         if (tab?.kind === "root") roots.add(tab.root)
         break
       }
+      // Only drafting and fresh cards are marked (ADR-0048): the inventory
+      // is no tab.
       case "queued":
+      case "inventory":
         break
     }
   }

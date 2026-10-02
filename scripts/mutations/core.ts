@@ -9,6 +9,22 @@ const core = "packages/core/index.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "every inventory is one place",
+    file: core,
+    from: '      return b.kind === "inventory" && a.holder === b.holder',
+    to: '      return b.kind === "inventory"',
+    command: unit,
+    expect: "sameKey tells two holders apart",
+  },
+  {
+    name: "an inventory without a holder is read",
+    file: core,
+    from: '      return f.holder === ""\n        ? undefined',
+    to: "      return false\n        ? undefined",
+    command: unit,
+    expect: "an inventory needs its holder",
+  },
+  {
     name: "an offer's ledger is read from its oldest paragraph",
     file: "packages/core/index.ts",
     from: "    .filter(p => trailerValues(p, TRAILERS.source).length > 0)\n    .at(-1)",
@@ -169,6 +185,14 @@ export const mutations: readonly Mutation[] = [
     expect: "two are ambiguous",
   },
 
+  {
+    name: "the wire drops an inventory's holder",
+    file: "packages/protocol/codec.ts",
+    from: "  return JSON.stringify({ kind, at, lane, column, seen, holder })",
+    to: "  return JSON.stringify({ kind, at, lane, column, seen })",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "encodeIntent -> decodeCommand round-trips every intent",
+  },
   {
     name: "a reply may start at the root",
     file: "packages/protocol/codec.ts",

@@ -147,7 +147,10 @@ it out, each step in its own `try`: `intake` (seats, control), `close` (the host
   card's other writers as contributors, through the card port, and spends
   nothing. The dispatcher's `chat` case spends the card when the answer
   takes its text (`spendsCard`: `appended` or `started`): the record goes,
-  then the text, and the reply carries the places' `rev`. The take destroys
+  then the text, and the reply carries the places' `rev`. Sent from a fresh
+  column, the spend first moves the column's other cards to drafting at the
+  message it wrote (`planFreshFollow`, found by the send's id), in the same
+  step, so no move gets between. The take destroys
   a taken card's text itself, since it removed the record. The command's
   text is what is sent: the text its sender saw.
 - **A busy lane answers a chat from a card `queued`** (ADR-0059): the
@@ -166,6 +169,14 @@ it out, each step in its own `try`: `intake` (seats, control), `close` (the host
   who put it there, and the current `rev`. A move that leaves a card queued
   on a lane that is not running queues the lane's drain, a voided
   `serial.run` behind the move's own step.
+- **Your inventory is a client's document the host only keeps**
+  (ADR-0059). `resolveDoc` interprets `inventory:<writer>` as
+  `InventoryDoc`; the policy shares it with, and accepts it from, only the
+  peers whose principal is that writer (`holdsInventory`). Kyneta fires
+  `resolve` only for a peer `canShare` grants (S76), so nobody else can
+  create someone's inventory. The host never writes one: it decides only
+  whose inventory a card is in, and refuses a nineteenth card without
+  knowing the slots.
 
 ## The queue (`take.ts`, ADR-0048, ADR-0055)
 

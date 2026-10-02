@@ -1,15 +1,16 @@
-import { cardId } from "@pineta/core"
+import { cardId, writerId } from "@pineta/core"
 import {
   PLACES_DOC_ID,
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
-import { cardDocId } from "@pineta/schema"
+import { cardDocId, inventoryDocId } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { acceptsWrite, resolveDoc, writePolicy } from "./policy.ts"
 
 const CARD = cardDocId(cardId("c-1"))
 const UNDO = "undo:seat-a"
+const INVENTORY = inventoryDocId(writerId("ada@x.io"))
 
 test("acceptsWrite: the session and the places are the host's; presence is each client's", () => {
   expect(acceptsWrite(SESSION_DOC_ID)).toBe(false)
@@ -23,8 +24,9 @@ test("acceptsWrite: cards' texts are written by clients; an undo stack is refuse
   expect(acceptsWrite(UNDO)).toBe(false)
 })
 
-test("resolveDoc: a card's text, a tab's undo stack, and nothing else", () => {
+test("resolveDoc: a card's text, an inventory, a tab's undo stack, and nothing else", () => {
   expect(resolveDoc(CARD)).toBe("text")
+  expect(resolveDoc(INVENTORY)).toBe("inventory")
   expect(resolveDoc(UNDO)).toBe("reject")
   for (const other of [
     SESSION_DOC_ID,
@@ -34,6 +36,7 @@ test("resolveDoc: a card's text, a tab's undo stack, and nothing else", () => {
     "note:n-1",
     "line:pineta.control:a→host",
     "card:",
+    "inventory:ada@x.io",
   ])
     expect(resolveDoc(other)).toBeUndefined()
 })
@@ -62,4 +65,17 @@ test("a tab's undo stack is shared with no one and taken from no one; places and
     policy.canAccept?.(PLACES_DOC_ID, peer),
     policy.canAccept?.(CARD, peer),
   ]).toEqual([false, false, undefined, undefined, false, true])
+})
+
+test("an inventory is shared with, and taken from, its person only (ADR-0059)", () => {
+  const policy = writePolicy
+  const peer = (principal: string) =>
+    ({ peerId: `seat-${principal}`, principal, type: "user" }) as const
+  expect([
+    policy.canShare?.(INVENTORY, peer("Ada@X.io")),
+    policy.canAccept?.(INVENTORY, peer("ada@x.io")),
+    policy.canShare?.(INVENTORY, peer("bea@x.io")),
+    policy.canAccept?.(INVENTORY, peer("bea@x.io")),
+    policy.canShare?.(INVENTORY, peer("pineta-host")),
+  ]).toEqual([true, true, false, false, false])
 })

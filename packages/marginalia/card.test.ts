@@ -4,6 +4,7 @@ import {
   cardId,
   type EntryLike,
   entryId,
+  INVENTORY_SLOTS,
   indexTree,
   type LaneView,
   laneNameForThread,
@@ -17,8 +18,10 @@ import {
   draftingAt,
   encodeCard,
   orderAfter,
+  ownsPlace,
   placeEnd,
   planCardSweep,
+  planFreshFollow,
   planMove,
   planMoveCommand,
   planSetCommand,
@@ -310,7 +313,7 @@ describe("handoffs (ADR-0059)", () => {
     })
   })
 
-  test("a removal: only a fresh column's card", () => {
+  test("a removal: a fresh column's card, not a drafting one", () => {
     const fresh = card({ place: { kind: "fresh", column: "k" } })
     expect(
       planMove(
@@ -325,6 +328,124 @@ describe("handoffs (ADR-0059)", () => {
       code: "not-fresh",
       now: c,
     })
+  })
+
+  describe("inventories", () => {
+    const mine = { kind: "inventory", holder: ADA } as const
+    const beas = { kind: "inventory", holder: BEA } as const
+    const full = (holder: typeof ADA) =>
+      Array.from({ length: INVENTORY_SLOTS }, (_, n) =>
+        card({
+          id: cardId(`held-${n}`),
+          place: { kind: "inventory", holder },
+        }),
+      )
+
+    test("a take into your own inventory keeps the card's owner, command and why it was not sent", () => {
+      const c = card({
+        owner: BEA,
+        place: drafting,
+        command: "bring-up-to-date",
+        unsent: "x",
+      })
+      expect(
+        planMove([c], { card: C1, from: drafting, to: mine }, ADA),
+      ).toEqual({
+        kind: "write",
+        record: { ...c, place: mine, placer: ADA },
+      })
+    })
+
+    test("into or out of someone else's inventory is refused not-yours", () => {
+      const c = card({ place: drafting })
+      expect(
+        planMove([c], { card: C1, from: drafting, to: beas }, ADA),
+      ).toEqual({ kind: "refused", code: "not-yours", now: c })
+      const held = card({ place: beas })
+      expect(
+        planMove([held], { card: C1, from: beas, to: drafting }, ADA),
+      ).toEqual({ kind: "refused", code: "not-yours", now: held })
+      expect(planMove([], { card: C1, from: null, to: beas }, ADA)).toEqual({
+        kind: "refused",
+        code: "not-yours",
+        now: null,
+      })
+    })
+
+    test("the nineteenth card is refused full, a creation too; another person's full inventory is not yours", () => {
+      const c = card({ place: drafting })
+      expect(
+        planMove(
+          [...full(ADA), c],
+          { card: C1, from: drafting, to: mine },
+          ADA,
+        ),
+      ).toEqual({ kind: "refused", code: "full", now: c })
+      expect(
+        planMove(full(ADA), { card: C1, from: null, to: mine }, ADA),
+      ).toEqual({ kind: "refused", code: "full", now: null })
+      expect(
+        planMove([...full(BEA), c], { card: C1, from: drafting, to: mine }, ADA)
+          .kind,
+      ).toBe("write")
+      expect(
+        planMove(full(ADA).slice(1), { card: C1, from: null, to: mine }, ADA)
+          .kind,
+      ).toBe("write")
+    })
+
+    test("removal from your own inventory is allowed, from someone else's refused", () => {
+      const held = card({ place: mine })
+      expect(planMove([held], { card: C1, from: mine, to: null }, ADA)).toEqual(
+        { kind: "remove", id: C1 },
+      )
+      expect(planMove([held], { card: C1, from: mine, to: null }, BEA)).toEqual(
+        { kind: "refused", code: "not-yours", now: held },
+      )
+    })
+
+    test("a key names its holder: Bea's inventory is not Ada's", () => {
+      const held = card({ place: beas })
+      expect(
+        planMove([held], { card: C1, from: mine, to: drafting }, ADA),
+      ).toEqual({ kind: "refused", code: "moved", now: held })
+    })
+
+    test("ownsPlace: false only for someone else's inventory", () => {
+      expect(ownsPlace(mine, ADA)).toBe(true)
+      expect(ownsPlace(beas, ADA)).toBe(false)
+      expect(ownsPlace(drafting, ADA)).toBe(true)
+      expect(ownsPlace(queuedKey, ADA)).toBe(true)
+      expect(ownsPlace({ kind: "fresh", column: "k" }, ADA)).toBe(true)
+    })
+  })
+
+  test("planFreshFollow: the sent card's column's other cards go drafting at the new entry, placer kept; nothing else moves", () => {
+    const fresh = { kind: "fresh", column: "k" } as const
+    const sent = card({ place: fresh })
+    const other = card({
+      id: cardId("c-2"),
+      owner: BEA,
+      placer: BEA,
+      place: fresh,
+    })
+    const elsewhere = card({
+      id: cardId("c-3"),
+      place: { kind: "fresh", column: "j" },
+    })
+    expect(
+      planFreshFollow([sent, other, elsewhere], sent.id, E2, LANE),
+    ).toEqual([
+      {
+        kind: "write",
+        record: {
+          ...other,
+          place: { kind: "drafting", at: atEntry(E2), lane: LANE },
+        },
+      },
+    ])
+    const draft = card({ place: drafting })
+    expect(planFreshFollow([draft, other], draft.id, E2, LANE)).toEqual([])
   })
 
   test("planMoveCommand: the lane to drain when the card ends queued on a lane not running", () => {
@@ -388,6 +509,7 @@ describe("storage", () => {
       card(),
       card({ place: { kind: "drafting", at: atEntry(E2), lane } }),
       card({ place: { kind: "fresh", column: "k-1" } }),
+      card({ place: { kind: "inventory", holder: BEA } }),
       queued("c-2", "k"),
       card({ command: "bring-up-to-date", unsent: "refused" }),
       card({ placer: BEA }),
@@ -402,6 +524,7 @@ describe("storage", () => {
     expect(decodeCard("c", { ...ok, kind: "pinned" })).toBeUndefined()
     expect(decodeCard("c", { ...ok, at: "" })).toBeUndefined()
     expect(decodeCard("c", { ...ok, kind: "fresh" })).toBeUndefined()
+    expect(decodeCard("c", { ...ok, kind: "inventory" })).toBeUndefined()
     expect(decodeCard("c", { ...ok, owner: "" })).toBeUndefined()
     expect(decodeCard("c", { ...ok, placer: "" })).toBeUndefined()
     const { placer: _, ...noPlacer } = ok

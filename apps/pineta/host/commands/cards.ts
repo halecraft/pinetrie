@@ -10,6 +10,7 @@
 import {
   type CardCommand,
   type CardId,
+  type CardRecord,
   keyOf,
   type LaneName,
   type Move,
@@ -19,6 +20,7 @@ import {
 } from "@pineta/core"
 import {
   type MoveStep,
+  planFreshFollow,
   planMoveCommand,
   planSetCommand,
 } from "@pineta/marginalia"
@@ -84,6 +86,26 @@ export function createCardCommands(deps: CardCommandDeps) {
     return settled({ kind: "moved" }, rev)
   }
 
+  /**
+   * Where a fresh column's other cards go once its first message is written:
+   * that message, by the send's id, on the column's lane, or the lane its send
+   * reserved once pi holds it, else none.
+   */
+  function followers(
+    cards: readonly CardRecord[],
+    card: CardId,
+    sent: { readonly sendId: string; readonly chat: Chat },
+  ) {
+    const index = readTreeIndex(doc)
+    const at = index.bySend.get(sent.sendId)
+    if (at === undefined) return []
+    const { lane, reserved } = sent.chat
+    const held =
+      reserved !== null &&
+      readLanes(doc, index, cards).some(l => l.name === reserved)
+    return planFreshFollow(cards, card, at, lane ?? (held ? reserved : null))
+  }
+
   return {
     /** A handoff: applied when the card is where its sender saw it, else refused. */
     move(writer: WriterId, move: Move): Promise<Settled> {
@@ -101,10 +123,19 @@ export function createCardCommands(deps: CardCommandDeps) {
       return carry(planSetCommand(readPlaces(places), card, command), null)
     },
 
-    /** A sent card's record goes, then its text (S64). Its `rev` after. */
-    async spend(card: CardId): Promise<number> {
-      const held = readPlaces(places).some(c => c.id === card)
-      const rev = held
+    /**
+     * A sent card's record goes, then its text (S64). Sent from a fresh
+     * column, the column's other cards follow it to the message it became
+     * (`planFreshFollow`), in this step. Its `rev` after.
+     */
+    async spend(
+      card: CardId,
+      sent: { readonly sendId: string; readonly chat: Chat },
+    ): Promise<number> {
+      const cards = readPlaces(places)
+      for (const step of followers(cards, card, sent))
+        applyPlaceStep(places, step)
+      const rev = cards.some(c => c.id === card)
         ? applyPlaceStep(places, { kind: "remove", id: card })
         : places.rev()
       await deps.cards.destroy(card)

@@ -45,11 +45,16 @@ export const queuedWords = (by: WriterId, n: number, reader: Reader): string =>
 export const unsentWords = (reason: string): string => `not sent: ${reason}`
 
 /**
- * A move of yours the host refused (ADR-0059). Gone from the queue, the host
- * had taken the card first (S69), so it was sent as its queuer's message;
- * moved, someone else moved it first.
+ * Something of yours refused (ADR-0059): a move the host refused, an undone
+ * swap whose slots changed, a keep without room. Gone from the queue, the
+ * host had taken the card first (S69), so it was sent as its queuer's
+ * message; moved, someone else moved it first.
  */
 export function refusalWords(refusal: Refusal, reader: Reader): string {
+  if (refusal.code === "slots-changed")
+    return "not undone: those slots have changed since"
+  if (refusal.code === "no-room")
+    return `not kept: needs ${slotWords(refusal.need)}, ${refusal.free} free`
   const { by } = refusal
   switch (refusal.code) {
     case "gone":
@@ -63,6 +68,10 @@ export function refusalWords(refusal: Refusal, reader: Reader): string {
       return by === null
         ? "not moved: someone moved it first"
         : `not moved: ${who(by, reader)} moved it first`
+    case "full":
+      return "inventory full"
+    case "not-yours":
+      return "not moved: that inventory is someone else's"
     case "exists":
     case "not-fresh":
       return "not moved"
@@ -75,3 +84,39 @@ export function refusalWords(refusal: Refusal, reader: Reader): string {
  */
 export const cardStatus = (status: string, unsent: string | null): string =>
   status !== "" || unsent === null ? status : unsentWords(unsent)
+
+const slotWords = (n: number): string => (n === 1 ? "1 slot" : `${n} slots`)
+
+/** The inventory panel's name, and its button in the header. */
+export const INVENTORY = "inventory"
+/** A card's button that takes it into your inventory; its drag handle too. */
+export const TAKE = "take"
+export const TAKE_TITLE =
+  "take into your inventory (Ctrl+Shift+I) · drag to move"
+/** A message's button that takes a copy of it, or of your selection in it. */
+export const TAKE_COPY = "take a copy into your inventory"
+/** The panel's button that puts the selected card in the column last focused. */
+export const PUT = "put"
+export const PUT_TITLE =
+  "put below the line in the column you were in (Ctrl+Shift+O)"
+/** The panel's button that removes the selected card: final. */
+export const REMOVE = "remove"
+/** Closing a fresh column that holds text: the default, and the final choice. */
+export const KEEP_IN_INVENTORY = "keep in inventory"
+export const DISCARD = "discard"
+/** The archived-root dialog's choice. */
+export const RESTORE_AND_UNDO = "restore and undo"
+
+/** The archived-root dialog's question. */
+export const restoreAsk = (label: string): string =>
+  `${label} is archived. Restore it to undo there?`
+
+/** The close ask's question, by how many cards hold text. */
+export const closeAskWords = (n: number): string =>
+  n === 1
+    ? "keep what you typed in your inventory?"
+    : `keep the ${n} cards here in your inventory?`
+
+/** A refusal's React key: what it is about, and why. */
+export const refusalKey = (refusal: Refusal): string =>
+  `${refusal.code}:${refusal.card ?? ""}`

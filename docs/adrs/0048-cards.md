@@ -27,7 +27,13 @@ has one owner at a time, the session's host or a person's inventory; the
 host writes places, and moves between owners are handoffs it applies or
 refuses; the inventory is a document of slots that only its person's tabs
 write; the cards document goes. Places written by the host, for the
-places there are now, implemented by `PLAN-2026-10-02-card-places`.
+places there are now, implemented by `PLAN-2026-10-02-card-places`. Step 4,
+the inventory, implemented by `PLAN-2026-10-03-inventory`, with these
+amended in place (2026-10-03, with Duane): closing a fresh column keeps its
+cards in your inventory by default, and discard stays final (*Closing a
+column*); a fresh column's first send carries its other cards to the new
+message, the host's write (*Physics*, 1); clipboard copy and cut of cards
+wait for the key system's redesign (*Input*).
 
 **Context.**
 
@@ -140,7 +146,10 @@ who reads a card: a thought only for the team goes below the line.
 *Physics.*
 
 1. A card is always somewhere, and only a person moves it, except the agent
-   taking the top queued card.
+   taking the top queued card. *Amended (step 4):* a fresh column's first
+   send also moves the column's other cards, to drafting at the message it
+   wrote; the column has become that thread's, and the cards stay in it on
+   screen. That is the host's write, so it keeps each card's placer.
 2. Its place decides what happens to it.
 3. **Two verbs move cards: take and put.** Take moves the focused card into
    your inventory; put moves the inventory's selected card to where you are focused.
@@ -167,6 +176,8 @@ fidelity by construction.
   dragging out of it puts. Holding a card over a root tab opens that tab, so a
   card can cross tabs.
 - **Clipboard:** copy makes a new card where it is pasted; cut moves it.
+  *Deferred (step 4) to the key system's redesign:* Cmd+C and Cmd+X belong
+  to text.
 - A test holds the fidelity: every place a drag can drop on is reachable by
   put, and every place put reaches accepts a drop.
 
@@ -253,11 +264,13 @@ centred by default, and open while you work in them, since nothing pauses.
   they are there.
 - **A fresh column** (an unsent branch, a new tab) has no thread until its
   first message is sent, so its cards have no shared place and nobody else
-  sees them. Closing one that holds a card with text asks **keep in inventory**
-  (the default) or **discard** (undoable). One with nothing typed closes
-  silently, as today. To leave it for a minute, switch tabs: that now keeps
-  everything. Until the inventory exists, closing asks only **discard**, which
-  is final: an undone discard would bring back a card no column shows.
+  sees them. Closing one whose cards hold text asks **keep in inventory**
+  (the default) or **discard**. Keep moves each of them into your
+  inventory, and can be undone: the undo reopens the column. Discard is
+  final: an undone discard would bring back a card no column shows. Keep is
+  refused, and the column stays open, when your inventory has too few empty
+  slots. One with nothing typed closes silently. To leave it for a minute,
+  switch tabs: that keeps everything. (*Amended in place, step 4.*)
 
 *Marks.* A root tab is marked when it holds an unsent card of yours with
 text, and so is the thread's end on the rail, whether the thread's column is

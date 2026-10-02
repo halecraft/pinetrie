@@ -6,6 +6,15 @@ const file = "packages/schema/index.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "any inventory id names a writer",
+    file: "packages/schema/inventory.ts",
+    from: "  return writer !== undefined && inventoryDocId(writer) === docId",
+    to: "  return writer !== undefined",
+    command: unit,
+    expect:
+      "an inventory's document names its writer, and nothing else names one",
+  },
+  {
     name: "every reply is current: a second message appends to the first",
     file: file,
     from: '  s.kind === "reply" && s.under === tip',

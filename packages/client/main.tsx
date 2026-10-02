@@ -10,6 +10,7 @@ import { App, type AppStores } from "./app.tsx"
 import { IDENTITY_KEY, type Identity, identityCodec } from "./identity.ts"
 import { askIdentity } from "./identity-form.tsx"
 import { decodeInbox, encodeInbox, type Inbox, mergeInbox } from "./inbox.ts"
+import { DOCK_KEY, type Dock, dockCodec } from "./inventory-dock.ts"
 import { decodeLayout, encodeLayout } from "./layout.ts"
 import { decodeLeft, encodeLeft, type Left, mergeLeft } from "./left.ts"
 import { connectSession } from "./session-view.ts"
@@ -57,6 +58,14 @@ const stores: AppStores = {
   identity: deviceState<Identity>({
     key: IDENTITY_KEY,
     codec: identityCodec,
+    device: localStorage,
+    merge: (_, next) => next,
+    events: window,
+  }),
+  /** Where the inventory panel is docked (ADR-0048): the device's, not the session's. */
+  dock: deviceState<Dock>({
+    key: DOCK_KEY,
+    codec: dockCodec,
     device: localStorage,
     merge: (_, next) => next,
     events: window,

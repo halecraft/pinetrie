@@ -394,6 +394,7 @@ describe("planOpen", () => {
     expect(planOpen(l, index, new Map(), entryId("2-a"))).toEqual({
       kind: "scroll",
       root: "1-r1",
+      key: expect.any(String),
     })
   })
   test("opens beside the column sharing most of its path, in its own root", () => {
@@ -405,6 +406,7 @@ describe("planOpen", () => {
     expect(planOpen(l, index, new Map(), entryId("6-d"))).toEqual({
       kind: "scroll",
       root: "5-r2",
+      key: expect.any(String),
     })
   })
   test("previews an archived root, unless it is the tab you are on", () => {

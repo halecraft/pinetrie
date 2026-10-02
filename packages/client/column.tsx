@@ -6,7 +6,7 @@ import {
   type AskIndex,
   askSpan,
   atEntry,
-  type CardPlace,
+  type CardId,
   type CardRecord,
   type ColumnView,
   type EntryId,
@@ -49,11 +49,18 @@ import type { ReadOnly } from "./app-view.ts"
 import type { FoldMemory } from "./ask-fold.ts"
 import { askWords, DENSITIES, type Density, densityWords } from "./ask-words.ts"
 import { CardEditor, QueuedCardEditor } from "./card-editor.tsx"
-import { refusalWords } from "./card-words.ts"
+import {
+  closeAskWords,
+  DISCARD,
+  KEEP_IN_INVENTORY,
+  refusalKey,
+  refusalWords,
+} from "./card-words.ts"
 import {
   AGENT_MARK,
   bannerUrl,
   columnView,
+  composerPlace,
   type HeadBanner,
   type HeadIdentity,
   type HeadOrigin,
@@ -77,6 +84,7 @@ import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
+import type { ComposerPlacesStore } from "./put-target.ts"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import { ReviewPane } from "./review-pane.tsx"
@@ -174,6 +182,8 @@ export interface ColumnProps {
   viewports?: ViewportStore
   /** Where columns were left, by message (ADR-0058). */
   spots?: SpotStore
+  /** Each column's composer place, which a put lands in (`put-target.ts`). */
+  composers: ComposerPlacesStore
 }
 
 export function Column(p: ColumnProps) {
@@ -218,7 +228,12 @@ export function Column(p: ColumnProps) {
   // handler every message shares, so none of them redraws when this column
   // does.
   const act = useStable((act: ColumnAct) =>
-    p.onIntent({ kind: "column", position: p.position, act }),
+    p.onIntent({
+      kind: "column",
+      position: p.position,
+      key: p.column.key,
+      act,
+    }),
   )
   const openAt = useStable((entry: EntryId) =>
     p.onIntent({ kind: "openAt", entry }),
@@ -318,12 +333,13 @@ export function Column(p: ColumnProps) {
   // The cards queued for this thread's lane, above the line, in the order the
   // host takes them (ADR-0048).
   const queued = lane.kind === "lane" ? queuedOn(p.cards, lane.name) : []
-  // Your moves here the host refused: an unqueue it had taken the card
-  // before (S69), or a move someone else made first (ADR-0059).
+  // What you did here that was refused: an unqueue the host had taken the
+  // card before (S69), a move someone else made first (ADR-0059), a put the
+  // host would not take, or a keep without room.
   const refused = useSyncExternalStore(
     p.session.refusals.subscribe,
     p.session.refusals.current,
-  ).filter(r => lane.kind === "lane" && r.lane === lane.name)
+  ).filter(r => r.actedAt.kind === "column" && r.actedAt.key === p.column.key)
   const reader = { me: p.session.writer, nameOf: p.nameOf }
   // Whether this column's next send would create a lane: the composer's to
   // decide, as it is typed.
@@ -361,6 +377,7 @@ export function Column(p: ColumnProps) {
   useEffect(() => carryOut(reserve), [reserving])
   // What every send from this column carries, from any card at its end.
   const how: ColumnHow = {
+    column: p.column.key,
     asksAgent: p.column.asksAgent === true,
     ...(p.column.lane === undefined ? {} : { lane: p.column.lane }),
     ...(reserved === null ? {} : { reserved }),
@@ -477,29 +494,53 @@ export function Column(p: ColumnProps) {
           p.lanes,
           index,
         )
-  // Every drafting card here but the composer's: everyone else's, and any
-  // other of yours, such as one someone unqueued while you typed this one.
-  const others =
-    fresh || threadEnd === null
-      ? []
-      : draftingAt(threadEnd, p.cards, p.lanes, index).filter(
-          c => c.id !== mine?.id,
+  // Every card here but the one the composer shows: everyone else's, and
+  // any other of yours, such as one someone unqueued while you typed this
+  // one, or one put here while you had one. A fresh column's are those under
+  // its key. The composer shows your newest once it is free (`yourCard`).
+  const [composerShows, setComposerShows] = useState<CardId | null>(null)
+  const shownBelow = composerShows ?? mine?.id
+  const others = (
+    fresh
+      ? p.cards.filter(
+          c => c.place.kind === "fresh" && c.place.column === p.column.key,
         )
-  const place: CardPlace | undefined = fresh
-    ? { kind: "fresh", column: p.column.key }
-    : at.kind === "entry"
-      ? { kind: "drafting", at, lane: p.column.lane ?? null }
-      : undefined
-  // Closing a fresh column that holds your card asks first: its card has no
-  // other place, and discarding it is final (ADR-0048).
-  const [askClose, setAskClose] = useState(false)
+      : threadEnd === null
+        ? []
+        : draftingAt(threadEnd, p.cards, p.lanes, index)
+  ).filter(c => c.id !== shownBelow)
+  const place = composerPlace(p.column, at) ?? undefined
+  // A put lands where this composer would create a card. A column that can
+  // be written publishes it; one leaving takes it back.
+  const { composers } = p
+  const key = p.column.key
+  useEffect(() => {
+    composers.set(key, writable ? (place ?? null) : null)
+  })
+  useEffect(() => () => composers.set(key, null), [composers, key])
+  // A send from any card here: a fresh column's first one names the message
+  // the column then follows.
+  const onSend = () => {
+    end.follow()
+    if (!fresh) return undefined
+    const sendId = crypto.randomUUID()
+    act({ kind: "sent", key: p.column.key, sendId })
+    return sendId
+  }
+  // Where a drop lands: exactly where a put can.
+  const putColumn = writable && place !== undefined ? key : null
+  // Closing a fresh column whose cards hold text asks first: they have no
+  // thread to stay on. Keeping them in your inventory is the default, and can
+  // be undone; discarding them is final (ADR-0048).
+  const [askClose, setAskClose] = useState<readonly CardId[] | null>(null)
   const close = () => {
-    const typed =
-      fresh && mine !== undefined
-        ? p.session.cardText(mine.id).text().trim() !== ""
-        : false
-    if (typed) setAskClose(true)
-    else act({ kind: "close", discard: null })
+    const typed = fresh
+      ? [...(mine === undefined ? [] : [mine]), ...others]
+          .filter(c => p.session.cardText(c.id).text().trim() !== "")
+          .map(c => c.id)
+      : []
+    if (typed.length > 0) setAskClose(typed)
+    else act({ kind: "close", discard: [] })
   }
   const branchInstead = (pending: Pending) => {
     if (at.kind === "entry") act({ kind: "branchInstead", at: at.id, pending })
@@ -584,25 +625,37 @@ export function Column(p: ColumnProps) {
             )}
           </div>
           <Origin onOpen={openAt} origin={shows.origin} />
-          {askClose && (
+          {askClose !== null && (
             <div className="close-ask">
-              discard what you typed?{" "}
+              {closeAskWords(askClose.length)}{" "}
               <button
-                className="close-discard"
+                // biome-ignore lint/a11y/noAutofocus: the default answer to the ask just shown
+                autoFocus
+                className="close-keep"
                 onClick={() => {
-                  setAskClose(false)
-                  act({ kind: "close", discard: mine?.id ?? null })
+                  setAskClose(null)
+                  act({ kind: "keep", cards: askClose })
                 }}
                 type="button"
               >
-                discard
+                {KEEP_IN_INVENTORY}
               </button>{" "}
               <button
-                className="close-keep"
-                onClick={() => setAskClose(false)}
+                className="close-discard"
+                onClick={() => {
+                  setAskClose(null)
+                  act({ kind: "close", discard: askClose })
+                }}
                 type="button"
               >
-                keep
+                {DISCARD}
+              </button>{" "}
+              <button
+                className="close-cancel"
+                onClick={() => setAskClose(null)}
+                type="button"
+              >
+                cancel
               </button>
             </div>
           )}
@@ -691,7 +744,7 @@ export function Column(p: ColumnProps) {
               />
             ))}
             {refused.map(r => (
-              <div className="refused-move" key={r.card}>
+              <div className="refused-move" key={refusalKey(r)}>
                 {refusalWords(r, reader)}
               </div>
             ))}
@@ -715,24 +768,22 @@ export function Column(p: ColumnProps) {
         {/* Everyone else's cards at this end (ADR-0048): shown in full, each
           editable and sendable by anyone here. */}
         {others.length > 0 && (
-          <div className="cards">
+          <div className="cards" data-put-column={putColumn ?? undefined}>
             {others.map(c => (
               <CardEditor
                 at={at}
                 card={c}
                 commands={p.work.commands}
-                fresh={false}
+                fresh={fresh}
                 how={how}
                 key={c.id}
                 lane={lane}
                 onAct={act}
                 onBranchInstead={branchInstead}
                 onCreatesLane={undefined}
+                onShows={undefined}
                 onIntent={p.onIntent}
-                onSend={() => {
-                  end.follow()
-                  return undefined
-                }}
+                onSend={onSend}
                 onTyping={p.onTyping}
                 participants={p.participants}
                 pending={undefined}
@@ -787,18 +838,14 @@ export function Column(p: ColumnProps) {
           prefill={p.column.fresh?.prefill}
           lane={lane}
           onBranchInstead={branchInstead}
-          onSend={() => {
-            end.follow()
-            if (!fresh) return undefined
-            const sendId = crypto.randomUUID()
-            act({ kind: "sent", key: p.column.key, sendId })
-            return sendId
-          }}
+          onSend={onSend}
           onAct={act}
           onCreatesLane={setCreatesLane}
+          onShows={setComposerShows}
           onIntent={p.onIntent}
           onTyping={p.onTyping}
           takeFocus={() => p.takeFocus(p.column.key)}
+          putColumn={putColumn}
           participants={p.participants}
           pending={p.column.fresh?.pending}
           readOnly={p.readOnly}

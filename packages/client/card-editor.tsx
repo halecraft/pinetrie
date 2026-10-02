@@ -1,6 +1,7 @@
 // client/card-editor — one card's editor (ADR-0048): your composer's box,
 // every other drafting card at a thread's end, and each queued card above
-// the line (`QueuedCardEditor`).
+// the line (`QueuedCardEditor`), and the card selected in your inventory, both
+// a `BoundCardEditor`.
 //
 // One uncontrolled textarea for the editor's whole life. Until there is
 // something worth keeping it is local; the input that makes it worth keeping
@@ -27,7 +28,7 @@ import type {
 } from "@pineta/core"
 import { type QueuedCard, writersOf } from "@pineta/marginalia"
 import { textClients } from "@pineta/schema"
-import { useEffect, useRef, useState } from "react"
+import { type ReactNode, useEffect, useRef, useState } from "react"
 import type { ReadOnly } from "./app-view.ts"
 import {
   type EditorEvent,
@@ -41,6 +42,8 @@ import {
   cardStatus,
   commandTag,
   queuedWords,
+  TAKE,
+  TAKE_TITLE,
   UNQUEUE,
 } from "./card-words.ts"
 import type { Pending, Prefill } from "./columns.ts"
@@ -56,6 +59,7 @@ import {
   type Selection,
   uploadImage,
 } from "./paste.ts"
+import { CARD_MIME } from "./put-target.ts"
 import {
   baseChoices,
   type ComposerMode,
@@ -70,7 +74,11 @@ import {
   whereChoices,
   whereWords,
 } from "./send.ts"
-import type { ColumnHow, SessionClient } from "./session-view.ts"
+import {
+  type ColumnHow,
+  NOT_RECORDED,
+  type SessionClient,
+} from "./session-view.ts"
 
 /**
  * Bind a box to a card's text, its undo reaching only that card's steps
@@ -162,6 +170,11 @@ export function CardEditor(p: {
   onTyping: () => void
   /** Told whether the next send would create a lane, each time that changes. */
   onCreatesLane: ((createsLane: boolean) => void) | undefined
+  /**
+   * Told which card the box shows, each time that changes: the column draws
+   * every other card at its end above it, a card put there among them.
+   */
+  onShows: ((card: CardId | null) => void) | undefined
   /** Where a read-only action goes (`ReadOnly.action.intent`). */
   onIntent: (intent: Intent) => void
   /** The column's acts: queueing a card, clearing its command. */
@@ -211,11 +224,13 @@ export function CardEditor(p: {
   const matches = hidden === text ? [] : matchCommands(text, p.commands)
   const highlighted = matches[Math.min(picked, matches.length - 1)]
   const work = choice ?? p.where?.defaultWork ?? null
-  const { onCreatesLane } = p
+  const { onCreatesLane, onShows } = p
   useEffect(
     () => onCreatesLane?.(plan.createsLane),
     [plan.createsLane, onCreatesLane],
   )
+  const shows = state.kind === "local" ? null : state.card
+  useEffect(() => onShows?.(shows), [shows, onShows])
 
   /** Bind the box to a card's text, keeping the caret where it is. */
   const bind = (id: CardId) => {
@@ -261,6 +276,7 @@ export function CardEditor(p: {
               unsent: null,
             },
             el.value,
+            NOT_RECORDED(p.how.column),
           )
           break
         }
@@ -275,9 +291,11 @@ export function CardEditor(p: {
   }
 
   // The card as the column finds it: found, or gone. Gone only once it was
-  // seen: a card just created is not in the records until they redraw.
+  // seen: a card just created is not in the records until they redraw. A box
+  // left empty by a send finds the card the column gives it then: one put
+  // here while this one was being written.
   const seen = useRef<CardId | null>(null)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on the card's coming and going
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on the card's coming and going, and the box coming free
   useEffect(() => {
     const now = current.current
     if (card !== undefined) {
@@ -291,7 +309,7 @@ export function CardEditor(p: {
     } else if (now.kind === "bound" && seen.current === now.card) {
       step({ kind: "gone" })
     }
-  }, [card?.id])
+  }, [card?.id, state.kind === "local"])
   // Unbound on unmount. StrictMode mounts twice, so the handle is cleared
   // too: the second mount binds again.
   useEffect(
@@ -593,6 +611,12 @@ export function CardEditor(p: {
                 chooseBase={setBase}
               />
             )}
+          {card !== undefined && (
+            <TakeButton
+              card={card.id}
+              onTake={id => p.onAct({ kind: "take", card: id })}
+            />
+          )}
           <button
             className="send"
             disabled={button.disabled}
@@ -609,11 +633,84 @@ export function CardEditor(p: {
   )
 }
 
+/** Start a card's drag: its id, under Pineta's own type (`put-target.ts`). */
+export const dragCard = (
+  e: { readonly dataTransfer: DataTransfer | null },
+  card: CardId,
+) => {
+  e.dataTransfer?.setData(CARD_MIME, card)
+  if (e.dataTransfer !== null) e.dataTransfer.effectAllowed = "move"
+}
+
+/**
+ * A card's take button: a press takes it into your inventory, and a drag
+ * moves it wherever it is dropped (ADR-0048).
+ */
+export function TakeButton(p: {
+  card: CardId
+  onTake: (card: CardId) => void
+}) {
+  return (
+    <button
+      className="take"
+      data-card={p.card}
+      draggable
+      onClick={() => p.onTake(p.card)}
+      onDragStart={e => dragCard(e, p.card)}
+      title={TAKE_TITLE}
+      type="button"
+    >
+      {TAKE}
+    </button>
+  )
+}
+
+/**
+ * A card that exists, bound whole: a heading, its text, and its buttons. A
+ * queued card is one, and so is your inventory's selected card.
+ */
+export function BoundCardEditor(p: {
+  session: SessionClient
+  card: CardRecord
+  className: string
+  heading: ReactNode
+  readOnly: boolean
+  /** The box's least height, in lines. */
+  rows: number
+  onTyping: () => void
+  /** Its buttons. */
+  children: ReactNode
+  /** `data-queued`: a queued card's, which the browser suite reads. */
+  queued: CardId | null
+}) {
+  const { session, card } = p
+  const box = useRef<HTMLTextAreaElement>(null)
+  const [text, setText] = useState("")
+  useEffect(() => {
+    const el = box.current
+    return el === null ? undefined : bindText(session, card.id, el, setText)
+  }, [session, card.id])
+  return (
+    <div className={p.className} data-queued={p.queued ?? undefined}>
+      <div className="card-heading">{p.heading}</div>
+      <textarea
+        autoComplete="off"
+        className="input"
+        data-card={card.id}
+        onInput={p.onTyping}
+        readOnly={p.readOnly}
+        ref={box}
+        rows={Math.min(8, Math.max(p.rows, text.split("\n").length))}
+      />
+      <div className="compose-row">{p.children}</div>
+    </div>
+  )
+}
+
 /**
  * A queued card above the line (ADR-0048): its text, which anyone here may
  * edit until the host takes it, who queued it and its place in line, its
- * command, and a button that unqueues it. It is always bound: a queued card
- * exists.
+ * command, a button that unqueues it, and one that takes it.
  */
 export function QueuedCardEditor(p: {
   session: SessionClient
@@ -625,32 +722,23 @@ export function QueuedCardEditor(p: {
   onAct: (act: ColumnAct) => void
   onTyping: () => void
 }) {
-  const { session, card } = p
-  const box = useRef<HTMLTextAreaElement>(null)
-  const [text, setText] = useState("")
-  useEffect(() => {
-    const el = box.current
-    return el === null ? undefined : bindText(session, card.id, el, setText)
-  }, [session, card.id])
+  const { card } = p
   return (
-    <div className="card-editor queued" data-queued={card.id}>
-      <div className="card-heading">
-        {queuedWords(card.place.by, p.n, p.reader)}
-      </div>
-      <textarea
-        autoComplete="off"
-        className="input"
-        data-card={card.id}
-        onInput={p.onTyping}
-        readOnly={p.readOnly !== null}
-        ref={box}
-        rows={Math.min(8, Math.max(1, text.split("\n").length))}
-      />
-      <div className="compose-row">
-        {card.command !== null && (
-          <span className="card-command">{commandTag(card.command)}</span>
-        )}
-        {p.readOnly === null && (
+    <BoundCardEditor
+      card={card}
+      className="card-editor queued"
+      heading={queuedWords(card.place.by, p.n, p.reader)}
+      onTyping={p.onTyping}
+      queued={card.id}
+      readOnly={p.readOnly !== null}
+      rows={1}
+      session={p.session}
+    >
+      {card.command !== null && (
+        <span className="card-command">{commandTag(card.command)}</span>
+      )}
+      {p.readOnly === null && (
+        <>
           <button
             className="unqueue"
             onClick={() =>
@@ -665,9 +753,13 @@ export function QueuedCardEditor(p: {
           >
             {UNQUEUE}
           </button>
-        )}
-      </div>
-    </div>
+          <TakeButton
+            card={card.id}
+            onTake={id => p.onAct({ kind: "take", card: id })}
+          />
+        </>
+      )}
+    </BoundCardEditor>
   )
 }
 

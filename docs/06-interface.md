@@ -142,9 +142,9 @@ The leftmost tab. It finds roots, so it is a list, not a rail with columns.
 - **Selecting a row previews it:** that root's rail, and one read-only column
   that a pick on the rail moves. Its composer is disabled, and none of the tools that
   write are there: edit, branch, mark. Copy stays, since it writes nothing. In place of sending it offers
-  **Restore** for an archived root, and **Open** for an open one. Once the
-  inventory exists (planned with fold), picking up will work here, since it
-  writes nothing; what is picked up is folded into an open root.
+  **Restore** for an archived root, and **Open** for an open one. Taking a
+  copy of a message into your inventory is not offered here yet, though it
+  writes nothing in the root; it is offered wherever you can write.
 - **Restore** opens the root as your tab and switches to it; for everyone
   else it is simply no longer archived. **Open** opens an open root as your
   tab. Restoring is the only way to write in an archived root; the host
@@ -493,8 +493,49 @@ The rail is E; the column is T. Seeing both at once is the product.
   back.
 - **Cmd+Z and Cmd+Shift+Z** undo and redo your own typing in a card, never
   someone else's. Each tab has its own history, which a reload forgets.
-- **Closing a new branch that holds text asks** "discard what you typed?";
-  discarding is final.
+- **Closing a new branch that holds text asks** "keep what you typed in your
+  inventory?": **keep in inventory** (focused, the default), **discard**,
+  which is final, or **cancel**. Keep moves every card in the branch with
+  text into your inventory, and closes the branch once each is there; with
+  too few empty slots it says so ("not kept: needs 2 slots, 1 free") and the
+  branch stays open.
+- **A new branch shows every card in it**, a card put there among them, and
+  its first message leaves the others drafting below it.
+
+### Your inventory (ADR-0048 step 4)
+
+- **A panel of your own, floating over the columns**, opened and closed by
+  **inventory** in the header (which counts your cards). It sits in the
+  middle of the screen by default; drag its top bar and it settles left,
+  centre or right, and this device remembers where. Only you see it, on
+  every tab and device; nobody else can move a card into or out of it.
+- **A fixed 3 × 6 grid.** Each slot shows its card's first line in its
+  author's colour; the first nine are numbered 1–9. Click a slot, or move
+  with the arrow keys or `hjkl` while the panel has focus, to select it; the
+  selected card is shown whole beside the grid, and editable. Cards keep
+  their slots, gaps included, on every device. Dropping a card on a slot
+  that holds one swaps the two.
+- **Take** moves a card into your inventory: Ctrl+Shift+I in its box, its
+  **take** button, or a drag onto the panel. It lands in the selected slot
+  if that is empty, else the first empty one, and flies there; a take while
+  the panel is closed shows it briefly. A message's **take** copies its
+  text, or your selection in it, as a new card: the message keeps it. Full
+  means full: the nineteenth card is refused with "inventory full".
+- **Put** moves the selected card below the line at the end of the column
+  you were last in: Ctrl+Shift+O, the panel's **put** button, or a drag out
+  of the panel onto a column's composer or the cards above it. Held over a
+  root's tab, a drag opens it. Put where you have no card, it becomes your
+  composer; where you have one, it is shown above it. **Remove** deletes the
+  selected card for good.
+- **Undo a move** with Cmd+Z (Ctrl+Z elsewhere) while no box has focus;
+  Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it. It first shows where the
+  card goes back to, the panel, the thread's column, or a branch you closed
+  since, reopened, then moves it there. In an archived root it asks first
+  whether to restore it. If the card has moved since, it says so where it
+  showed, and that move is dropped from the list. Sends and discards are
+  final. Each tab keeps its own list, which a reload forgets.
+- **A refusal is said where you acted**: in the panel for a take, in the
+  column you aimed at for a put, and where an undo showed.
 
 ## What goes away
 

@@ -132,6 +132,7 @@ describe("copy", () => {
   test("offered for a message with text or tool calls, and none with neither", () => {
     const call = { id: "c", name: "bash", label: "bash ls" }
     expect(tools(chat("x", false)).copy).toBe(true)
+    expect(tools(chat("x", false)).take).toBe(true)
     expect(
       tools({
         id: entryId("5-m"),
@@ -150,6 +151,7 @@ describe("copy", () => {
 test("a column that can't be written offers only copy", () => {
   expect(tools(chat("x", true), { writable: false })).toEqual({
     copy: true,
+    take: false,
     edit: undefined,
     branch: undefined,
   })

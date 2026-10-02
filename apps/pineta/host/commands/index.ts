@@ -111,16 +111,15 @@ export function createCommands(deps: CommandDeps): Commands {
     switch (intent.kind) {
       case "chat": {
         // The command's id is the send's id: its column finds its message by it.
-        const sent = await sendChat(
-          deps,
-          writer,
-          id === "" ? newId() : id,
-          intent,
-        )
+        const sendId = id === "" ? newId() : id
+        const sent = await sendChat(deps, writer, sendId, intent)
         const card = intent.card
         if (card === null) return settled(sent)
         if (spendsCard(sent))
-          return settled(sent, await cardCommands.spend(card.id))
+          return settled(
+            sent,
+            await cardCommands.spend(card.id, { sendId, chat: intent }),
+          )
         if (sent.kind === "busy")
           return (
             (await cardCommands.queueBusy(writer, { ...intent, card })) ??

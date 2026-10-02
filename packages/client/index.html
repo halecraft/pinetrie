@@ -499,8 +499,37 @@
       .card-editor.queued { margin: 0 0 1rem; padding-left: .5rem; border-left: 2px dashed #777; }
       .card-editor.queued .compose-row { justify-content: flex-start; }
       .unqueue { padding: .05rem .45rem; font-size: .72rem; }
-      /* An unqueue that lost: the card was taken first (S69). */
+      /* Something of yours refused, said where you acted (ADR-0059). */
       .refused-move { font-size: .75rem; color: #d0a15f; margin: 0 0 1rem; }
+      .take { padding: .05rem .45rem; font-size: .72rem; cursor: grab; }
+      .card-heading[draggable="true"] { cursor: grab; }
+      /* Your inventory (ADR-0048): floating over the columns' middle, docked
+         left, centre or right, a 3 × 6 grid beside the selected card. */
+      .inventory { position: fixed; z-index: 5; top: 30vh; width: min(52rem, 94vw);
+        background: #171a1f; border: 1px solid #3a3f48; border-radius: 8px;
+        box-shadow: 0 8px 32px rgb(0 0 0 / .5); }
+      .inventory[data-dock="left"] { left: 1rem; }
+      .inventory[data-dock="centre"] { left: 50%; transform: translateX(-50%); }
+      .inventory[data-dock="right"] { right: 1rem; }
+      .inventory-frame { padding: .3rem .75rem; font-size: .75rem; color: #8b93a1;
+        cursor: grab; user-select: none; border-bottom: 1px solid #23272e; touch-action: none; }
+      .inventory-body { display: flex; gap: .75rem; padding: .75rem; }
+      .inventory-grid { display: grid; grid-template-columns: repeat(6, 5.5rem);
+        grid-auto-rows: 3.5rem; gap: .35rem; flex: none; }
+      .slot { position: relative; padding: .3rem; text-align: left; overflow: hidden;
+        background: #1b1e24; border: 1px solid #2c313a; border-radius: 4px; font-size: .72rem; }
+      .slot.empty { border-style: dashed; }
+      .slot[aria-pressed="true"] { outline: 2px solid #9ecbff; }
+      .slot-label { position: absolute; top: .1rem; right: .25rem; color: #6f7784; font-size: .65rem; }
+      .slot-line { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      .inventory-card { flex: 1; min-width: 0; }
+      .inventory-card .compose-row { justify-content: flex-start; }
+      .inventory-empty { color: #6f7784; font-size: .8rem; }
+      .inventory-toggle { margin-left: .75rem; padding: .15rem .6rem; font-size: .75rem; }
+      .inventory-toggle[aria-pressed="true"] { border-color: #9ecbff; color: #e6e6e6; }
+      dialog.restore-ask { background: #171a1f; color: inherit; border: 1px solid #3a3f48;
+        border-radius: 8px; }
+      dialog.restore-ask::backdrop { background: rgb(0 0 0 / .5); }
       /* A command, named last: what the card is sent through (ADR-0055). */
       .card-command { font-size: .75rem; color: #9ecbff; white-space: nowrap; }
       .card-command-clear { padding: 0 .3rem; font-size: .72rem; background: none; border: none; color: #8b93a1; }

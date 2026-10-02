@@ -45,12 +45,15 @@ import { readPlaces, readPlacesRev } from "@pineta/reads"
 import {
   cardDocId,
   cardIdOfDoc,
+  InventoryDoc,
+  inventoryDocId,
   PlacesDoc,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
   presenceDoc,
   readingKey,
+  readSlots,
   SessionDoc,
   type SessionDocHandle,
   seatKey,
@@ -59,15 +62,30 @@ import {
   textVersion,
 } from "@pineta/schema"
 import {
+  type ActedAt,
   answerOf,
+  type HistoryEntry,
+  type HistoryStep,
+  intentsOf,
+  type MoveAnswer,
   type MovesEvent,
+  type MovesState,
   movesStep,
   NO_MOVES,
+  NO_STEP,
   type Pending,
   type Refusal,
   withPending,
 } from "./card-moves.ts"
 import { hostLetGo, spentCards } from "./card-state.ts"
+import {
+  type HeldSince,
+  heldBy,
+  planSlots,
+  type Slots,
+  steadiness,
+  takeWrites,
+} from "./inventory.ts"
 import { type SnapshotStore, snapshotStore } from "./store.ts"
 
 /**
@@ -158,22 +176,25 @@ export interface SessionClient {
   /**
    * Create a card holding `text`: its text in one undo step, so undoing past
    * the first keystroke empties it, and a request that the host place it
-   * (ADR-0059), then one for its command when it has one.
+   * (ADR-0059), then one for its command when it has one. Into your
+   * inventory, `how.slot` is the slot it takes.
    */
-  createCard(card: CardRecord, text: string): void
+  createCard(card: CardRecord, text: string, how?: MoveHow): Promise<MoveAnswer>
   /**
    * Ask the host to remove a card, outside the undo stack: a fresh column's
-   * card discarded with its column, which nothing could show again.
+   * card discarded with its column, which nothing could show again, or one
+   * in your inventory.
    */
-  discardCard(id: CardId): void
+  discardCard(id: CardId, how?: MoveHow): void
   /**
    * Ask the host to queue a card on `lane`, from `at`: after the lane's
-   * last queued card, queued by you. Not undoable: a card's box undoes only
-   * its text (ADR-0052).
+   * last queued card, queued by you. A card's box undoes only its text
+   * (ADR-0052); the move is undone from the page, by `how.history`.
    */
   queueCard(
     id: CardId,
     where: { readonly lane: LaneName; readonly at: Position },
+    how?: MoveHow,
   ): void
   /**
    * Ask the host to take a queued card back below the line, where it was
@@ -182,14 +203,39 @@ export interface SessionClient {
   unqueueCard(
     id: CardId,
     queued: { readonly lane: LaneName; readonly by: WriterId },
+    how?: MoveHow,
   ): void
+  /**
+   * Hand a card from one place to another (ADR-0059): a take, a put, or an
+   * undo's reverse. Into your inventory with `how.slot`, the slot is written
+   * once the host accepts, before the answer is recorded, so the repair never
+   * sees the card held without its slot. Resolves with the host's answer.
+   */
+  moveCard(move: Move, how: MoveHow): Promise<MoveAnswer>
+  /**
+   * Swap two slots of your inventory, in one write; no host is asked. `step`
+   * records it, or moves its entry, in the history.
+   */
+  swapSlots(a: number, b: number, step: HistoryStep): void
+  /** Drop `entry` from the history, keeping why: undo could not act on it. */
+  dropEntry(entry: HistoryEntry, refusal: Refusal): void
+  /** Keep a refusal made before anything was sent: a keep without room. */
+  refuse(refusal: Refusal): void
   /** Ask the host to set a card's command, or clear it with null (ADR-0055). */
   setCommand(id: CardId, command: CardCommand | null): void
   /**
-   * Your moves the host refused (ADR-0059), until your next send, queue or
-   * unqueue in their lane.
+   * What you did that was refused (ADR-0059), each until your next move
+   * where you acted.
    */
   readonly refusals: Readable<readonly Refusal[]>
+  /** This tab's moves: in flight, refused, and its history (`card-moves.ts`). */
+  readonly moves: Readable<MovesState>
+  /**
+   * Your inventory's slots as your document holds them, repaired from the
+   * host's record on every change (`planSlots`). Written only by this
+   * client's methods.
+   */
+  readonly slots: Readable<Slots>
   /** Hide the root `root` for everyone, or bring it back (ADR-0029). */
   archive(action: ArchiveAction, root: EntryId): Promise<Outcome>
   /** Title the entry `entry`, or clear its title with null (ADR-0045). */
@@ -221,6 +267,8 @@ export interface ChatHow {
   readonly id?: string
   /** The card the text is sent from, which the host spends once it is sent. */
   readonly card?: CardId
+  /** The column it is sent from, where a refusal of its card's move is said. */
+  readonly column?: string
   /** The lane id the column reserved: what a lane this send creates is called (ADR-0057). */
   readonly reserved?: LaneName
   /** The WIP bookmark a lane this send creates starts from; absent, the line (ADR-0060). */
@@ -230,7 +278,29 @@ export interface ChatHow {
 /** What every send from one column carries, whichever card it is sent from. */
 export type ColumnHow = Pick<ChatHow, "lane" | "reserved" | "base"> & {
   readonly asksAgent: boolean
+  readonly column: string
 }
+
+/** What a move carries besides its target: where it was made, its history, a take's slot. */
+export interface MoveHow {
+  readonly actedAt: ActedAt
+  readonly history: HistoryStep
+  /** The slot a move into your inventory takes; null for any other move. */
+  readonly slot: number | null
+}
+
+/** A move made in column `key` that enters no history: a send, a composer's new card, a discard. */
+export const NOT_RECORDED = (key: string): MoveHow => ({
+  actedAt: { kind: "column", key },
+  history: NO_STEP,
+  slot: null,
+})
+
+/**
+ * A move made with no page: a suite's client. Its refusals are kept where no
+ * column is, and it enters no history.
+ */
+export const OFF_PAGE: MoveHow = NOT_RECORDED("")
 
 export async function connectSession(
   options: ConnectOptions,
@@ -281,9 +351,50 @@ export async function connectSession(
   const moves = snapshotStore(NO_MOVES)
   const cards = snapshotStore(withPending(records, NO_MOVES, me))
   const redraw = () => cards.set(withPending(records, moves.current(), me))
+  // Your inventory's slots (ADR-0059): written by this person's tabs only,
+  // repaired from the host's record on every change, and only once the
+  // host's copy has reached this one. Repaired before then, an empty copy
+  // would fill slots that the stored layout already names, and the merge
+  // would move cards.
+  const inventory = exchange.get(inventoryDocId(me), InventoryDoc)
+  const slots = snapshotStore<Slots>(readSlots(inventory))
+  const inventoryReady = () =>
+    sync(inventory).readyFor(p => p.peerId === host.peerId)
+  /** Write `writes` to the slots in one batch; nothing for none. */
+  const writeSlots = (writes: {
+    readonly set: Readonly<Record<string, CardId>>
+    readonly clear: readonly string[]
+  }) => {
+    if (Object.keys(writes.set).length === 0 && writes.clear.length === 0)
+      return
+    batch(inventory, d => {
+      for (const slot of writes.clear) d.slots.delete(slot)
+      for (const [slot, card] of Object.entries(writes.set))
+        d.slots.set(slot, card)
+    })
+  }
+  // The host's records, not the drawn ones: a put in flight keeps its slot
+  // until the host accepts it, so a refused put finds it there. A card is
+  // acted on only once steady (`steadiness`): this tab looks again then.
+  let heldSince: HeldSince = new Map()
+  let wake: ReturnType<typeof setTimeout> | null = null
+  const repair = () => {
+    if (!inventoryReady()) return
+    const held = heldBy(records, me).map(c => c.id)
+    const stored = readSlots(inventory)
+    const now = steadiness(heldSince, held, stored, Date.now())
+    heldSince = now.memory
+    if (wake !== null) clearTimeout(wake)
+    wake =
+      now.wake === null
+        ? null
+        : setTimeout(repair, Math.max(0, now.wake - Date.now()))
+    writeSlots(planSlots(held, stored, intentsOf(moves.current()), now.steady))
+  }
   const dispatch = (event: MovesEvent) => {
     moves.set(movesStep(moves.current(), event))
     redraw()
+    repair()
   }
   /** A card as the page reads it now. */
   const cardNow = (id: CardId): CardRecord | undefined =>
@@ -344,6 +455,12 @@ export async function connectSession(
     dropSpent()
     options.onChange?.()
   })
+  const unsubscribeInventory = subscribe(inventory, () => {
+    slots.set(readSlots(inventory))
+    repair()
+  })
+  const unsubscribeInventorySync = sync(inventory).onPeerSyncChange(repair)
+  repair()
   // A client does not reconnect: once the host has gone, no move of this
   // tab's will be answered.
   const unsubscribePeers = exchange.peers.subscribe(() => {
@@ -372,48 +489,65 @@ export async function connectSession(
   /**
    * Send a request that moves a card: drawn at once as `pending`, until this
    * tab's copy holds what the host did, and answered as the host answers it.
-   * `lane`: the lane it is queued on or for, whose refusals it clears;
-   * `queuedBy`: who queued the card, when it was queued.
+   * `queuedBy`: who queued the card, when it was queued. An accepted move
+   * into your inventory with a slot writes that slot first.
    */
   function tracked(
     intent: Intent,
     pending: Pending,
-    how: {
-      readonly card: CardId
-      readonly lane: LaneName | null
-      readonly queuedBy: WriterId | null
-    },
-  ): Promise<{ readonly outcome: Outcome; readonly rev: number | null }> {
-    dispatch({ kind: "sent", pending, lane: how.lane })
-    const reply = request(intent, pending.id)
-    void reply.then(({ outcome, rev }) =>
-      dispatch({
-        kind: "answered",
-        id: pending.id,
-        answer: answerOf(outcome, rev, how),
-      }),
-    )
-    return reply
+    how: { readonly card: CardId; readonly queuedBy: WriterId | null },
+  ): Promise<{
+    readonly outcome: Outcome
+    readonly rev: number | null
+    readonly answer: MoveAnswer
+  }> {
+    dispatch({ kind: "sent", pending })
+    return request(intent, pending.id).then(({ outcome, rev }) => {
+      const answer = answerOf(outcome, rev, {
+        ...how,
+        actedAt: pending.actedAt,
+      })
+      const into =
+        pending.kind === "create" ? pending.draft.place : pending.move.to
+      if (
+        answer.kind === "accepted" &&
+        into?.kind === "inventory" &&
+        pending.slot !== null
+      )
+        writeSlots(takeWrites(readSlots(inventory), how.card, pending.slot))
+      dispatch({ kind: "answered", id: pending.id, answer })
+      return { outcome, rev, answer }
+    })
   }
 
   /** A move, tracked; with `draft`, a creation, drawn as that record. */
   function sendMove(
     move: Move,
-    how: {
-      readonly lane: LaneName | null
+    how: MoveHow & {
       readonly queuedBy: WriterId | null
-      readonly draft?: CardRecord
+      readonly draft: CardRecord | null
     },
-  ): void {
-    const id = crypto.randomUUID()
-    const answer = { state: "sent" } as const
-    void tracked(
+  ): Promise<MoveAnswer> {
+    // A recorded handoff keeps the move as sent: a queue's text version is
+    // read here (S72), after the page planned it.
+    const { history } = how
+    const sent = {
+      id: crypto.randomUUID(),
+      answer: { state: "sent" },
+      slot: how.slot,
+      actedAt: how.actedAt,
+      history:
+        history.kind === "record" && history.entry.kind === "handoff"
+          ? { ...history, entry: { ...history.entry, move } }
+          : history,
+    } as const
+    return tracked(
       { kind: "move", move },
-      how.draft === undefined
-        ? { id, kind: "move", move, answer }
-        : { id, kind: "create", draft: how.draft, answer },
-      { card: move.card, lane: how.lane, queuedBy: how.queuedBy },
-    )
+      how.draft === null
+        ? { ...sent, kind: "move", move }
+        : { ...sent, kind: "create", draft: how.draft },
+      { card: move.card, queuedBy: how.queuedBy },
+    ).then(r => r.answer)
   }
 
   return {
@@ -474,8 +608,11 @@ export async function connectSession(
                 kind: "move",
                 move: { card: card.id, from: keyOf(card.place), to: null },
                 answer: { state: "sent" },
+                slot: null,
+                actedAt: { kind: "column", key: how.column ?? "" },
+                history: NO_STEP,
               },
-              { card: card.id, lane: how.lane ?? null, queuedBy: null },
+              { card: card.id, queuedBy: null },
             )
       return sent.then(r => r.outcome)
     },
@@ -489,50 +626,72 @@ export async function connectSession(
       return send({ kind: "reserve", lane })
     },
     cardText,
-    createCard(card, text) {
+    createCard(card, text, how = OFF_PAGE) {
       const draft: CardRecord = { ...card, owner: me, placer: me }
       undo.gesture(() => {
         cardText(card.id).text.insert(0, text)
       })
-      sendMove(
+      const answer = sendMove(
         { card: card.id, from: null, to: keyOf(card.place) },
-        { lane: null, queuedBy: null, draft: { ...draft, command: null } },
+        { ...how, queuedBy: null, draft: { ...draft, command: null } },
       )
       if (card.command !== null)
         void send({ kind: "set-command", card: card.id, command: card.command })
+      return answer
     },
-    discardCard(id) {
+    discardCard(id, how = OFF_PAGE) {
       const card = cardNow(id)
       if (card === undefined) return
-      sendMove(
+      void sendMove(
         { card: id, from: keyOf(card.place), to: null },
-        { lane: null, queuedBy: null },
+        { ...how, queuedBy: null, draft: null },
       )
     },
-    queueCard(id, { lane, at }) {
+    moveCard(move, how) {
+      return sendMove(move, { ...how, queuedBy: null, draft: null })
+    },
+    swapSlots(a, b, step) {
+      const now = readSlots(inventory)
+      const [atA, atB] = [now[String(a)], now[String(b)]]
+      const set: Record<string, CardId> = {}
+      const clear: string[] = []
+      if (atB === undefined) clear.push(String(a))
+      else set[String(a)] = atB
+      if (atA === undefined) clear.push(String(b))
+      else set[String(b)] = atA
+      writeSlots({ set, clear })
+      dispatch({ kind: "swapped", step })
+    },
+    dropEntry(entry, refusal) {
+      dispatch({ kind: "dropped", entry, refusal })
+    },
+    refuse(refusal) {
+      dispatch({ kind: "refused", refusal })
+    },
+    queueCard(id, { lane, at }, how = OFF_PAGE) {
       const card = cardNow(id)
       if (card === undefined) return
       // The text as this client has it: the host waits for that much (S72).
       const seen = textVersion(cardText(id))
-      sendMove(
+      void sendMove(
         {
           card: id,
           from: keyOf(card.place),
           to: { kind: "queued", at, lane, seen },
         },
-        { lane, queuedBy: null },
+        { ...how, queuedBy: null, draft: null },
       )
     },
-    unqueueCard(id, queued) {
+    unqueueCard(id, queued, how = OFF_PAGE) {
       const card = cardNow(id)
       if (card === undefined || card.place.kind !== "queued") return
-      sendMove(
+      void sendMove(
         {
           card: id,
           from: keyOf(card.place),
           to: { kind: "drafting", at: card.place.at, lane: card.place.lane },
         },
-        { lane: queued.lane, queuedBy: queued.by },
+        { ...how, queuedBy: queued.by, draft: null },
       )
     },
     setCommand(id, command) {
@@ -542,6 +701,8 @@ export async function connectSession(
       current: () => moves.current().refusals,
       subscribe: moves.subscribe,
     },
+    moves: { current: moves.current, subscribe: moves.subscribe },
+    slots: { current: slots.current, subscribe: slots.subscribe },
     offer(lane, action, to = null) {
       return send({ kind: "offer", lane, action, to })
     },
@@ -559,6 +720,9 @@ export async function connectSession(
       try {
         unsubscribe?.()
         unsubscribePlaces?.()
+        unsubscribeInventory()
+        unsubscribeInventorySync()
+        if (wake !== null) clearTimeout(wake)
         unsubscribePeers()
         for (const stop of watched.values()) stop()
         watched.clear()

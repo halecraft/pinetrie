@@ -1029,8 +1029,8 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       const tops = row.map(b => b.top)
       check(
-        "a message's tools are one row: copy, edit, →",
-        row.map(b => b.name).join(" ") === "copy edit branch" &&
+        "a message's tools are one row: copy, take, edit, →",
+        row.map(b => b.name).join(" ") === "copy take-copy edit branch" &&
           Math.max(...tops) - Math.min(...tops) <= 1,
         `${JSON.stringify(row)}`,
       )
@@ -2702,14 +2702,165 @@ async function run(check: Checks["check"]): Promise<void> {
         await second.close().catch(() => {})
       }
 
-      // A reload keeps the tab you are on, and its open columns (ADR-0027). The
-      // DOWN thread's tab has two: the agent thread and the conversation below it.
+      // Your inventory (ADR-0048 step 4), in the DOWN thread's tab: its agent
+      // thread and the conversation below it.
       await page.click(tabSel(downRoot))
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length >= 2,
         undefined,
         { timeout: 15_000 },
       )
+      const placeOf = (id: string) =>
+        readPlaces(host.places).find(c => c.id === id)?.place
+      const slotOf = (id: string) => `.inventory .slot[data-card="${id}"]`
+      const valueIs = (sel: string, want: string) =>
+        page
+          .waitForFunction(
+            ([s, v]) =>
+              (document.querySelector(s ?? "") as HTMLTextAreaElement | null)
+                ?.value === v,
+            [sel, want],
+            { timeout: 10_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+      const boxText = (sel: string) =>
+        page.$eval(sel, el => (el as HTMLTextAreaElement).value).catch(() => "")
+      const appears = (sel: string) =>
+        page.waitForSelector(sel, { timeout: 10_000 }).then(
+          () => true,
+          () => false,
+        )
+      await page.click("#top .inventory-toggle")
+      await page.waitForSelector(".inventory", { timeout: 5_000 })
+      // Take: Ctrl+Shift+I in a composer's box takes its card.
+      const downBox = `${col(1)} .composer .input`
+      await page.click(downBox)
+      await page.keyboard.type("for later: a plan")
+      await page.waitForFunction(
+        s => document.querySelector(s)?.getAttribute("data-card") != null,
+        downBox,
+        { timeout: 10_000 },
+      )
+      const taken = (await page.getAttribute(downBox, "data-card")) ?? ""
+      await page.keyboard.press("Control+Shift+I")
+      const inSlot = await appears(slotOf(taken))
+      const lineShown = await page
+        .waitForFunction(
+          s => document.querySelector(s)?.textContent === "for later: a plan",
+          `${slotOf(taken)} .slot-line`,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      const firstLine = await page
+        .textContent(`${slotOf(taken)} .slot-line`)
+        .catch(() => "")
+      const boxEmptied = await valueIs(downBox, "")
+      await waitFor(() => placeOf(taken)?.kind === "inventory", 5_000)
+      check(
+        "Ctrl+Shift+I takes the composer's card into your inventory, which shows its first line, and the composer empties",
+        inSlot &&
+          lineShown &&
+          boxEmptied &&
+          placeOf(taken)?.kind === "inventory",
+        `slot ${inSlot}, line ${firstLine}, emptied ${boxEmptied}, ${placeOf(taken)?.kind}`,
+      )
+      // Put: Ctrl+Shift+O puts the selected card in the column last focused.
+      const slotIndex = await page.getAttribute(slotOf(taken), "data-slot")
+      await page.click(downBox)
+      await page.click(slotOf(taken))
+      await page.keyboard.press("Control+Shift+O")
+      const putBack = await valueIs(downBox, "for later: a plan")
+      await waitFor(() => placeOf(taken)?.kind === "drafting", 5_000)
+      check(
+        "Ctrl+Shift+O puts the selected card below the line in the column you were in, and its composer holds it again",
+        putBack && placeOf(taken)?.kind === "drafting",
+        `${await boxText(downBox)}; ${placeOf(taken)?.kind}`,
+      )
+      // Undo, outside a box: the put is undone, and the card is back in its slot.
+      // The page records a move once its answer arrives, just after the host's
+      // write that the check above reads.
+      await waitFor(() => false, 500)
+      await page.evaluate(() =>
+        (document.activeElement as HTMLElement | null)?.blur(),
+      )
+      await page.keyboard.press("ControlOrMeta+z")
+      const undone = await appears(
+        `.inventory .slot[data-slot="${slotIndex}"][data-card="${taken}"]`,
+      )
+      await waitFor(() => placeOf(taken)?.kind === "inventory", 5_000)
+      check(
+        "the undo key outside a box undoes the put: the card is back in its slot",
+        undone && placeOf(taken)?.kind === "inventory",
+        `slot ${slotIndex}: ${undone}; ${placeOf(taken)?.kind}`,
+      )
+      // Drag: a slot droppedThere on another column's foot puts its card there.
+      const agentBox = `${col(0)} textarea[data-card="${taken}"]`
+      await page.dragAndDrop(slotOf(taken), `${col(0)} .composer`)
+      const droppedThere = await valueIs(agentBox, "for later: a plan")
+      await waitFor(() => placeOf(taken)?.kind === "drafting", 5_000)
+      check(
+        "dragging a slot onto another column's foot puts its card there",
+        droppedThere && placeOf(taken)?.kind === "drafting",
+        `${await boxText(agentBox)}; ${placeOf(taken)?.kind}`,
+      )
+      // Undone, and removed: what follows starts from no card of this one.
+      await waitFor(() => false, 500)
+      await page.evaluate(() =>
+        (document.activeElement as HTMLElement | null)?.blur(),
+      )
+      await page.keyboard.press("ControlOrMeta+z")
+      await page.click(slotOf(taken))
+      await page.click(".inventory .remove")
+      await waitFor(() => placeOf(taken) === undefined, 5_000)
+      const columnsBefore = await page.locator(".column").count()
+      // Closing a fresh column with text keeps its card, in the slot selected.
+      const branchable = page
+        .locator(
+          `${col(columnsBefore - 1)} .msg[data-entry]:has(> .tools > .branch)`,
+        )
+        .first()
+      await branchable.hover()
+      await branchable.locator(":scope > .tools > .branch").click()
+      const fresh = col(columnsBefore)
+      const freshBox = `${fresh} .composer .input`
+      await page.waitForSelector(freshBox, { timeout: 15_000 })
+      await page.click(freshBox)
+      await page.keyboard.type("half a thought")
+      await page.waitForFunction(
+        s => document.querySelector(s)?.getAttribute("data-card") != null,
+        freshBox,
+        { timeout: 10_000 },
+      )
+      const thought = (await page.getAttribute(freshBox, "data-card")) ?? ""
+      await page.click('.inventory .slot[data-slot="5"]')
+      await page.click(`${fresh} .close`)
+      await page.click(`${fresh} .close-keep`)
+      const keptOnClose = await appears(
+        `.inventory .slot[data-slot="5"][data-card="${thought}"]`,
+      )
+      const closedFresh = await page
+        .waitForFunction(
+          n => document.querySelectorAll(".column").length === n,
+          columnsBefore,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "closing a fresh column with text keeps its card in your inventory",
+        keptOnClose && closedFresh && placeOf(thought)?.kind === "inventory",
+        `slot ${keptOnClose}, closed ${closedFresh}, ${placeOf(thought)?.kind}`,
+      )
+
+      // A reload keeps the tab you are on, and its open columns (ADR-0027).
       const columnKeys = (p: typeof page) =>
         p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))
       const openKeys = await columnKeys(page)
@@ -2778,6 +2929,15 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       check("what you type is still there after a reload", typedBack)
+      // Your inventory is kept as you left it: the kept card in slot 5.
+      await page.click("#top .inventory-toggle")
+      const stillInSlot = await appears(
+        `.inventory .slot[data-slot="5"][data-card="${thought}"]`,
+      )
+      check("a reload keeps your inventory's cards in their slots", stillInSlot)
+      await page.click(`.inventory .slot[data-card="${thought}"]`)
+      await page.click(".inventory .remove")
+      await page.click("#top .inventory-toggle")
       await page.fill(`${col(0)} .composer .input`, "")
       // A new tab shares the device's storage (same context; every
       // `browser.newPage()` makes a new one) and opens the layout last saved.

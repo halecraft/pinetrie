@@ -86,6 +86,16 @@ They share `checks.ts` (recording a check, and stopping at one),
   `RunningHost.places` (`readPlaces`), and move cards through a session's
   port. A session that writes the places document keeps its own value for
   good (S76), so the one check that does joins a throwaway session for it.
+- **An inventory is checked from a second session of the same person**
+  (`host/cards`): `join(ch, "ada", …)` again is Ada from another seat, and
+  her inventory reaches it through the host. Another person's view is the
+  same document opened from their exchange, which keeps its own write.
+  The repair waits `STEADY_MS` before placing or clearing (S79), so a check
+  that reads slots another session wrote waits that long or more.
+- **A move enters the page's history when its answer arrives**, just after
+  the host's write a check reads from `host.places`. The browser checks wait
+  half a second before pressing an undo key: pressed sooner, it finds
+  nothing to undo.
 
 - **`slowToLoad` delays one document's first `currentMeta`**, by
   `LATE_LOAD_MS` (`host/support.ts`). Kyneta's `#hydrate` reads

@@ -180,11 +180,53 @@ test("setCommand: the command set, its place and placer kept", async () => {
   })
 })
 
+const sentChat = {
+  text: "hi",
+  at: atEntry(E1),
+  mode: "reply",
+  lane: null,
+  asksAgent: false,
+  mentions: [],
+  work: null,
+  card: { id: C1, seen: "" },
+  reserved: null,
+  base: null,
+} as const
+
 test("spend: the record goes, then its text; a card already gone answers the current rev", async () => {
   const { b, cards, commands, put } = setUp()
   put()
-  expect(await commands.spend(C1)).toBe(2)
-  expect(await commands.spend(C1)).toBe(2)
+  const sent = { sendId: "s-1", chat: sentChat }
+  expect(await commands.spend(C1, sent)).toBe(2)
+  expect(await commands.spend(C1, sent)).toBe(2)
   expect(readPlaces(b.places)).toEqual([])
   expect(cards.calls.map(c => c.method)).toEqual(["destroy", "destroy"])
+})
+
+test("spend: a fresh column's first send leaves its other cards drafting at the new message, in one step", async () => {
+  const { b, commands, put } = setUp()
+  const fresh = { kind: "fresh", column: "k" } as const
+  put({ place: fresh })
+  const C2 = cardId("c-2")
+  const C3 = cardId("c-3")
+  put({ id: C2, owner: BEA, placer: BEA, place: fresh })
+  put({ id: C3, place: { kind: "fresh", column: "other" } })
+  const sent = entryId("e-2")
+  writeEntry(
+    b.doc,
+    row(sent, E1, { role: "user", content: "hi", sendId: "s-1" }),
+  )
+  const rev = await commands.spend(C1, { sendId: "s-1", chat: sentChat })
+  expect(rev).toBe(readPlacesRev(b.places))
+  expect(readPlaces(b.places)).toEqual([
+    expect.objectContaining({
+      id: C2,
+      placer: BEA,
+      place: { kind: "drafting", at: atEntry(sent), lane: null },
+    }),
+    expect.objectContaining({
+      id: C3,
+      place: { kind: "fresh", column: "other" },
+    }),
+  ])
 })

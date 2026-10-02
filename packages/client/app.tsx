@@ -22,6 +22,8 @@ import { whenSettled } from "@kyneta/exchange"
 import { useDocStatus, useSelector } from "@kyneta/react"
 import {
   branchColors,
+  type CardId,
+  cardId,
   type EntryId,
   PENDING_TRACK,
   pathIds,
@@ -48,6 +50,8 @@ import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { foldMemory } from "./ask-fold.ts"
 import { cardMarks, ownCards } from "./card-marks.ts"
+import { intentsOf } from "./card-moves.ts"
+import { INVENTORY, RESTORE_AND_UNDO, restoreAsk } from "./card-words.ts"
 import { Column, type ColumnProps } from "./column.tsx"
 import { type Column as ColumnSpec, isPinned } from "./columns.ts"
 import type { SeenEnd } from "./follow.ts"
@@ -62,6 +66,10 @@ import {
   nameEffects,
   planIntent,
 } from "./intent.ts"
+import { heldBy, settleSlots } from "./inventory.ts"
+import type { Dock } from "./inventory-dock.ts"
+import { keyAct } from "./inventory-keys.ts"
+import { InventoryPanel } from "./inventory-panel.tsx"
 import {
   columnsOf,
   initialLayout,
@@ -70,10 +78,16 @@ import {
   resolveLayout,
 } from "./layout.ts"
 import type { Left } from "./left.ts"
+import type { Direction } from "./move-undo.ts"
 import { type AppPorts, perform } from "./perform.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { planReading, typingDue } from "./presence-report.ts"
 import { readSessionFacts } from "./projection.ts"
+import {
+  CARD_MIME,
+  composerPlacesStore,
+  targetOfElement,
+} from "./put-target.ts"
 import { EmptyRail, LiveRail } from "./rail.tsx"
 import { columnLandmarks } from "./rail-view.ts"
 import { firstLines, NO_TEXT, rootLabels } from "./root-label.ts"
@@ -85,6 +99,7 @@ import { tabsView } from "./tabs-view.ts"
 import type { RowMemory } from "./tool-row.ts"
 import { useColumnDrag } from "./use-column-drag.ts"
 import { useFilledCards } from "./use-filled-cards.ts"
+import { FLIGHT_MS, useFlight } from "./use-flight.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { useReveal } from "./use-reveal.ts"
@@ -104,7 +119,19 @@ export interface AppStores {
   /** Where this device last left each thread (ADR-0056). */
   readonly left: DeviceState<Left>
   readonly identity: DeviceState<Identity>
+  /** Where the inventory panel is docked, on this device (ADR-0048). */
+  readonly dock: DeviceState<Dock>
 }
+
+/** How long a card's drag held over a root's tab opens it. */
+const TAB_HOVER_MS = 600
+
+const cardOrNull = (id: string | undefined): CardId | null =>
+  id === undefined || id === "" ? null : cardId(id)
+
+/** Whether `el` is a text box, whose undo keys are its own. */
+const isTextBox = (el: Element | null): boolean =>
+  el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement
 
 /**
  * Bring a newly opened column's first message level with its fork point in
@@ -524,6 +551,56 @@ export function App({
   const [archiveQuery, setArchiveQuery] = useState("")
   const [archivePick, setArchivePick] = useState<EntryId | null>(null)
 
+  // Your inventory (ADR-0048 step 4): this tab's moves and your slots, the
+  // panel's selection, whether it is open (never stored), and its dock
+  // (this device's).
+  const moves = useSyncExternalStore(
+    session.moves.subscribe,
+    session.moves.current,
+  )
+  const storedSlots = useSyncExternalStore(
+    session.slots.subscribe,
+    session.slots.current,
+  )
+  const held = useMemo(
+    () => heldBy(cards, session.writer),
+    [cards, session.writer],
+  )
+  const intents = useMemo(() => intentsOf(moves), [moves])
+  const slots = useMemo(
+    () =>
+      settleSlots(
+        held.map(c => c.id),
+        storedSlots,
+        intents,
+      ),
+    [held, storedSlots, intents],
+  )
+  const [selected, setSelected] = useState(0)
+  const [inventoryOpen, setInventoryOpen] = useState(false)
+  const openNow = useRef(false)
+  openNow.current = inventoryOpen
+  const [dock, setDock] = useState<Dock>(() => stores.dock.load() ?? "centre")
+  useEffect(() => stores.dock.subscribe(d => setDock(d ?? "centre")), [stores])
+  const fly = useFlight()
+  // Each column's composer place (`composerPlace`), which a put lands in.
+  const [composers] = useState(() => composerPlacesStore())
+  // The column whose element last held focus: where a put by key lands.
+  const lastColumn = useRef<string | null>(null)
+  const [lastColumnKey, setLastColumnKey] = useState<string | null>(null)
+  // The archived-root dialog: an undo that would reopen something there.
+  const [asking, setAsking] = useState<{
+    readonly root: EntryId
+    readonly direction: Direction
+  } | null>(null)
+  const askDialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const el = askDialog.current
+    if (el === null) return
+    if (asking !== null && !el.open) el.showModal()
+    if (asking === null && el.open) el.close()
+  }, [asking])
+
   // An opened fold draws in its own ask (`AskWork`): a render of `App`
   // runs `useReveal`'s wait once it has.
   const [, setOpened] = useState(0)
@@ -541,18 +618,146 @@ export function App({
     },
     identity: stores.identity,
     reload: () => location.reload(),
+    inventory: {
+      // A take while the panel is closed shows it for the card's flight.
+      show: brief => {
+        if (brief && openNow.current) return
+        setInventoryOpen(true)
+        if (brief) setTimeout(() => setInventoryOpen(false), FLIGHT_MS * 2)
+      },
+      select: setSelected,
+    },
+    fly,
+    askRestore: (root, direction) => setAsking({ root, direction }),
+    intent: intent => onIntent(intent),
   }
   /** Carry out `effects`: the one way anything below acts. */
   const run = useStable((effects: readonly Effect[]) => perform(effects, ports))
   /** What a reader asked for, planned from this render's layout and facts. */
   const onIntent = useStable((intent: Intent) =>
     run(
-      planIntent(intent, { layout, index, archive, asks }, crypto.randomUUID()),
+      planIntent(
+        intent,
+        {
+          layout,
+          index,
+          archive,
+          asks,
+          cards: {
+            cards,
+            lanes,
+            me: session.writer,
+            slots,
+            selected,
+            history: moves.history,
+            composers: composers.current(),
+          },
+        },
+        crypto.randomUUID(),
+      ),
     ),
   )
+  // The keys (`keyAct`): decided there, from where focus is; nothing here.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement
+      const intent = keyAct(e, {
+        card:
+          el instanceof HTMLElement
+            ? cardOrNull(el.closest<HTMLElement>("[data-card]")?.dataset.card)
+            : null,
+        inText: isTextBox(el),
+        inPanel: el?.closest(".inventory") != null,
+        selected,
+        selectedCard: slots[String(selected)] ?? null,
+        column: lastColumn.current,
+      })
+      if (intent === null) return
+      e.preventDefault()
+      onIntent(intent)
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [onIntent, selected, slots])
+  // Where focus last was in a column: its key.
+  useEffect(() => {
+    const onFocus = (e: FocusEvent) => {
+      if (!(e.target instanceof Element)) return
+      const key = e.target.closest<HTMLElement>(".column")?.dataset.key
+      if (key === undefined) return
+      lastColumn.current = key
+      setLastColumnKey(key)
+    }
+    document.addEventListener("focusin", onFocus)
+    return () => document.removeEventListener("focusin", onFocus)
+  }, [])
+  // A card's drag (HTML drag and drop: it crosses elements and tabs). A
+  // drop lands only where put can (`targetOfElement`); held over a root's
+  // tab, the drag opens it.
+  useEffect(() => {
+    let hover: {
+      readonly root: EntryId
+      readonly timer: ReturnType<typeof setTimeout>
+    } | null = null
+    const carriesCard = (e: DragEvent) =>
+      e.dataTransfer?.types.includes(CARD_MIME) === true
+    const targetOf = (e: DragEvent) => {
+      const el =
+        e.target instanceof Element
+          ? e.target.closest<HTMLElement>("[data-put-column],[data-put-slot]")
+          : null
+      return el === null ? null : targetOfElement(el)
+    }
+    const onOver = (e: DragEvent) => {
+      if (!carriesCard(e)) return
+      const tab =
+        e.target instanceof Element
+          ? e.target.closest<HTMLElement>(".tab[data-root]")?.dataset.root
+          : undefined
+      // The tab's root, as your layout holds it.
+      const root = layout.open.find(r => r === tab)
+      if (root !== hover?.root) {
+        if (hover !== null) clearTimeout(hover.timer)
+        hover =
+          root === undefined
+            ? null
+            : {
+                root,
+                timer: setTimeout(
+                  () =>
+                    onIntent({
+                      kind: "show",
+                      tab: { kind: "root", root },
+                    }),
+                  TAB_HOVER_MS,
+                ),
+              }
+      }
+      if (targetOf(e) !== null) e.preventDefault()
+    }
+    const onDrop = (e: DragEvent) => {
+      const target = targetOf(e)
+      const card = e.dataTransfer?.getData(CARD_MIME) ?? ""
+      if (target === null || card === "") return
+      e.preventDefault()
+      onIntent({ kind: "put", card: cardId(card), target })
+    }
+    document.addEventListener("dragover", onOver)
+    document.addEventListener("drop", onDrop)
+    return () => {
+      if (hover !== null) clearTimeout(hover.timer)
+      document.removeEventListener("dragover", onOver)
+      document.removeEventListener("drop", onDrop)
+    }
+  }, [onIntent, layout.open])
   const openAt = (entry: EntryId) => onIntent({ kind: "openAt", entry })
   const dragColumn = useColumnDrag(strip, (from, to) =>
-    onIntent({ kind: "column", position: from, act: { kind: "move", to } }),
+    onIntent({
+      kind: "column",
+      position: from,
+      key: columns[from]?.key ?? "",
+      act: { kind: "move", to },
+    }),
   )
 
   // This device's name for you and the session's, made to agree once the
@@ -580,6 +785,7 @@ export function App({
     digests,
     colorOf,
     cards,
+    composers,
     index,
     lanes,
     nameOf,
@@ -637,7 +843,59 @@ export function App({
           session={session}
           runs={activity}
         />
+        <button
+          aria-pressed={inventoryOpen}
+          className="inventory-toggle"
+          onClick={() => setInventoryOpen(open => !open)}
+          title="your inventory: cards you keep for later"
+          type="button"
+        >
+          {INVENTORY} {held.length}
+        </button>
       </header>
+      {inventoryOpen && (
+        <InventoryPanel
+          colorOf={colorOf}
+          column={lastColumnKey}
+          dock={dock}
+          held={held}
+          intents={intents}
+          onDock={d => setDock(stores.dock.save(d))}
+          onIntent={onIntent}
+          reader={{ me: session.writer, nameOf }}
+          refusals={moves.refusals.filter(r => r.actedAt.kind === "inventory")}
+          selected={selected}
+          session={session}
+          slots={slots}
+        />
+      )}
+      <dialog
+        className="restore-ask"
+        onClose={() => setAsking(null)}
+        ref={askDialog}
+      >
+        {asking !== null && (
+          <form method="dialog">
+            <p>{restoreAsk(labelOf(asking.root))}</p>
+            <button
+              className="restore-and-undo"
+              onClick={() =>
+                onIntent({
+                  kind: "restoreAndUndo",
+                  root: asking.root,
+                  direction: asking.direction,
+                })
+              }
+              type="submit"
+            >
+              {RESTORE_AND_UNDO}
+            </button>{" "}
+            <button className="restore-cancel" type="submit">
+              cancel
+            </button>
+          </form>
+        )}
+      </dialog>
       {active === null || workspace.kind === "connecting" ? (
         <main id="workspace">
           <p className="connecting">connecting…</p>

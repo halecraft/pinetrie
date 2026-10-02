@@ -883,7 +883,8 @@ export const CARD_COMMANDS: readonly CardCommand[] = [
  * `threadOf` whenever it is needed, so it follows its thread as the thread
  * grows. Queued: above the line, waiting for its thread's lane, until the
  * host takes it or someone unqueues it. Fresh: an unsent branch or new tab,
- * by its column's key.
+ * by its column's key. Inventory: in its holder's inventory; which slot holds
+ * it is the holder's own document (`InventoryDoc`), not the host's (ADR-0059).
  */
 export type CardPlace =
   | {
@@ -907,6 +908,12 @@ export type CardPlace =
       readonly seen: string
     }
   | { readonly kind: "fresh"; readonly column: string }
+  | { readonly kind: "inventory"; readonly holder: WriterId }
+
+/** How many cards an inventory holds: a fixed grid (ADR-0048). */
+export const INVENTORY_SLOTS = 18
+/** The inventory grid's width: 3 rows of 6. */
+export const INVENTORY_COLUMNS = 6
 
 /**
  * The card a chat is sent from, with its text's version as its sender had it
@@ -940,6 +947,7 @@ export function keyOf(place: CardPlace): PlaceKey {
         seen: place.seen,
       }
     case "fresh":
+    case "inventory":
       return place
   }
 }
@@ -960,6 +968,8 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
       )
     case "fresh":
       return b.kind === "fresh" && a.column === b.column
+    case "inventory":
+      return b.kind === "inventory" && a.holder === b.holder
   }
 }
 
@@ -981,8 +991,12 @@ export type MoveRefusal =
   | "gone"
   /** A creation whose id is taken. */
   | "exists"
-  /** A removal of a card that is not in a fresh column. */
+  /** A removal of a card in neither a fresh column nor the sender's inventory. */
   | "not-fresh"
+  /** The sender's inventory holds `INVENTORY_SLOTS` cards already. */
+  | "full"
+  /** A move into or out of someone else's inventory. */
+  | "not-yours"
 
 /**
  * A place as flat strings, "" for none: how the places document stores it,
@@ -997,6 +1011,7 @@ export interface PlaceFields {
   readonly order: string
   readonly by: string
   readonly seen: string
+  readonly holder: string
 }
 
 const entryOrEmpty = (at: Position): string => (at.kind === "root" ? "" : at.id)
@@ -1013,6 +1028,7 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
         order: "",
         by: "",
         seen: "",
+        holder: "",
       }
     case "queued":
       return {
@@ -1023,6 +1039,7 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
         order: "order" in place ? place.order : "",
         by: "by" in place ? place.by : "",
         seen: place.seen,
+        holder: "",
       }
     case "fresh":
       return {
@@ -1033,6 +1050,18 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
         order: "",
         by: "",
         seen: "",
+        holder: "",
+      }
+    case "inventory":
+      return {
+        kind: "inventory",
+        at: "",
+        lane: "",
+        column: "",
+        order: "",
+        by: "",
+        seen: "",
+        holder: place.holder,
       }
   }
 }
@@ -1040,7 +1069,7 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
 /**
  * Flat strings -> a place; undefined for one that is malformed. A drafting
  * or queued card's `at` is an entry, never the root, and a fresh card's
- * column is never "". A drafting card whose lane is not a thread's keeps its
+ * column is never "", nor an inventory card's holder. A drafting card whose lane is not a thread's keeps its
  * place with no lane: dropped, its text would be swept at the next start,
  * and the lane only says which thread it follows. A queued card needs its
  * lane, its order and who queued it.
@@ -1049,6 +1078,10 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
   switch (f.kind) {
     case "fresh":
       return f.column === "" ? undefined : { kind: "fresh", column: f.column }
+    case "inventory":
+      return f.holder === ""
+        ? undefined
+        : { kind: "inventory", holder: f.holder as WriterId }
     case "drafting":
       return f.at === ""
         ? undefined

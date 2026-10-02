@@ -356,6 +356,14 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S79 — A second tab's repair cleared a slot just taken into ✅ PASS
+
+`findings/S79-the-repair-races-the-record.md`. The host's record of a
+take and the taking tab's slot write reach another tab apart, in either
+order, so S76's repair acting at once cleared the slot, or placed the card
+before the slot arrived. Acting on a card only once it has been held, or
+not, for 2 s kept every card in its slot.
+
 ### S76 — A card's place with one owner, and what a card's document costs ✅ PASS
 
 `findings/S76-a-place-with-one-owner.md`. Places written only by the host,

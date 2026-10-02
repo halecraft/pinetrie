@@ -10,7 +10,10 @@ knows its copy holds its move by a revision watermark, not by the reply
 alone (*A move is drawn at once*); a card's command is in the host's place
 record, set by a request, not in the card's own document. Implemented by
 `PLAN-2026-10-02-card-places`, for the places there are now (drafting,
-queued, fresh); the inventory is step 4's.
+queued, fresh); the inventory by `PLAN-2026-10-03-inventory`, with three
+more amended in place (2026-10-03, with Duane): you can remove a card from
+your own inventory; a swap is undone by swapping back, not by Kyneta's
+undo; and the repair acts on a card only once it is steady (S79).
 
 **Context.**
 
@@ -134,7 +137,11 @@ page ADR-0048 gives each session), is a Yjs document of slot to card id.
 
   So a crash between the host's acceptance and the slot's write loses
   nothing, and two tabs filling one slot both end up shown. It converged in
-  at most three writes in every case S76 tried.
+  at most three writes in every case S76 tried. *Amended (S79):* a tab
+  places a card, or clears its slot, only once the card has been held, or
+  not, for 2 s. The host's record and another tab's slot write arrive
+  apart, in either order, and a tab acting at once cleared a slot another
+  tab had just taken a card into. A card in two slots is settled at once.
 
 *A card's own document* holds its text. Its command (ADR-0055) is in the
 host's place record, set by a request: the take reads a card's command in
@@ -149,12 +156,20 @@ card is too many to hold (S76).
 *Creating a card* is a handoff from nowhere: the client makes the card's
 document, and asks the host to place it. The host records the sender as its
 owner. Undoing a creation empties the text: an empty card is neither shown
-nor marked, and the host sweeps it.
+nor marked, and the host sweeps it. *Removing a card* is a handoff to
+nowhere, allowed for a fresh column's card and for one in the sender's own
+inventory: neither is anywhere anyone else sees. A copy taken from a
+message is a creation into your inventory, and undoing it removes it.
 
 *Undo* (amends ADR-0052).
 - **Text: unchanged.** Each card's box undoes its own text's steps, through
   the tab's Kyneta stack.
-- **Your inventory's own moves**: Kyneta's undo on your inventory document.
+- **Your inventory's own moves**: a swap is undone by swapping back, only
+  while the two slots still hold what it wrote; a history entry names both
+  slots and their cards. A take's slot needs no undo of its own: the
+  repair clears it once the reverse handoff lands. So the tab keeps one
+  Kyneta stack, for texts. (*Amended in place, step 4:* this was Kyneta's
+  undo on your inventory document, whose only work would have been these.)
 - **A handoff is undone by the reverse handoff**, which the host refuses if
   the card has moved since. A take or a put also undoes its inventory half.
   Your undo leaves someone else's later move alone, as ADR-0048 asks, and a

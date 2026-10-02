@@ -40,7 +40,15 @@ hid the second case.
 - **Moves get one history per tab** (ADR-0048, step 4: take, put, queue,
   unqueue, the inventory). Undoing a move first brings its place into view
   (switching tabs, opening a column or the inventory), then undoes it there.
-  How is for step 4's plan.
+  *Built by `PLAN-2026-10-03-inventory`:* one press of the undo key outside
+  a box (Cmd+Z, or Ctrl+Z; Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y to redo)
+  shows the place the card goes back to, then sends the reverse move. A
+  fresh column closed since is reopened, as it was. In an archived root, a
+  dialog asks whether to restore it first. An undo the host refuses, or one
+  that can already see it would be, drops its entry and says why, where it
+  showed: kept, it would block every entry below it. A send and a discard
+  are final, and a composer's card coming into being is its text's first
+  step, so none of them enters the history.
 
 **Consequences.**
 - No new documents: the tab's one stack stays, and each card's editor passes

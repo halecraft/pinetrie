@@ -1,6 +1,7 @@
 import {
   type ArchiveRecord,
   atEntry,
+  cardId,
   type EntryLike,
   ERR,
   entryId,
@@ -190,6 +191,30 @@ describe("writesAt: the entry a command writes at", () => {
       "a mark: its entry",
       { kind: "mark", entry: entryId("b"), title: "Tab names" },
       "b",
+    ],
+    [
+      "a move into a thread: its entry",
+      {
+        kind: "move",
+        move: {
+          card: cardId("c"),
+          from: null,
+          to: { kind: "drafting", at: atEntry(entryId("b")), lane: null },
+        },
+      },
+      "b",
+    ],
+    [
+      "a move into an inventory",
+      {
+        kind: "move",
+        move: {
+          card: cardId("c"),
+          from: { kind: "drafting", at: atEntry(entryId("b")), lane: null },
+          to: { kind: "inventory", holder: writerId("ada@x.io") },
+        },
+      },
+      null,
     ],
   ] satisfies [string, Intent, string | null][])("%s", (_, intent, want) => {
     expect(at(intent)).toBe(want)

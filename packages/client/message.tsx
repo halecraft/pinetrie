@@ -7,10 +7,12 @@ import type { ToolCallView, TranscriptMessage } from "@pineta/core"
 import { readStreamText, type SessionDocHandle } from "@pineta/schema"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
+import { TAKE, TAKE_COPY } from "./card-words.ts"
 import { joinWords } from "./column-view.ts"
 import { COPIED, useCopy } from "./copy.ts"
 import { copyText } from "./copy-text.ts"
 import { plural } from "./counts.ts"
+import { newCardId } from "./ids.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 import { MessageText } from "./message-text.tsx"
 import {
@@ -22,6 +24,7 @@ import { speakerLabel, withContributors } from "./names.ts"
 import { nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import type { ScreenMemory } from "./screen-memory.ts"
+import { takeText } from "./take-text.ts"
 import {
   CALL_MARK,
   callStatus,
@@ -144,6 +147,38 @@ function Tools({
   return (
     <div className="tools">
       {tools.copy && <CopyButton node={node} />}
+      {tools.take && (
+        <button
+          aria-label={TAKE_COPY}
+          className="take-copy"
+          onClick={e => {
+            const msg = e.currentTarget.closest(".msg")
+            const selection = window.getSelection()
+            const range =
+              selection === null || selection.rangeCount === 0
+                ? null
+                : selection.getRangeAt(0)
+            onAct({
+              kind: "takeCopy",
+              card: newCardId(),
+              text: takeText(
+                node,
+                range === null || selection === null
+                  ? null
+                  : {
+                      text: selection.toString(),
+                      inside:
+                        msg?.contains(range.commonAncestorContainer) === true,
+                    },
+              ),
+            })
+          }}
+          title={TAKE_COPY}
+          type="button"
+        >
+          {TAKE}
+        </button>
+      )}
       {edit?.kind === "branch" && (
         <button
           className="edit"

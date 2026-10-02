@@ -82,6 +82,12 @@ export type LayoutAction =
       readonly key: string
       readonly action: Extract<ColumnAction, { kind: "sent" | "reserve" }>
     }
+  /**
+   * Put a closed fresh column back where it was, by its own key, and show its
+   * tab, so a card an undo returns to it is drawn there (ADR-0052: undo
+   * shows where it acts). Nothing when the layout holds the key.
+   */
+  | { readonly kind: "reopen"; readonly closed: ClosedColumn }
   /** Store what `resolveLayout` draws for these facts. */
   | ({ readonly kind: "resolve" } & LayoutFacts)
   /** Once, after the document settles: the roots it lacks go, and `active` is chosen. */
@@ -174,8 +180,60 @@ export function afterClosing(layout: Layout, closed: ActiveTab): ActiveTab {
   return at < 0 || next === undefined ? { kind: "archive" } : next
 }
 
+/**
+ * A fresh column a card left, kept whole so an undo can reopen it: its
+ * `Column`, and where it was, a root's tab at an index or a new tab of its
+ * own.
+ */
+export interface ClosedColumn {
+  readonly column: Column
+  readonly tab:
+    | { readonly kind: "root"; readonly root: EntryId; readonly index: number }
+    | { readonly kind: "new" }
+}
+
+/** Column `key` as `ClosedColumn` keeps it, if the layout holds it. */
+export function closedColumn(
+  layout: Layout,
+  key: string,
+): ClosedColumn | undefined {
+  const tab = layout.newTabs.find(c => c.key === key)
+  if (tab !== undefined) return { column: tab, tab: { kind: "new" } }
+  for (const [root, columns] of layout.roots) {
+    const index = columns.findIndex(c => c.key === key)
+    const column = columns[index]
+    if (column !== undefined)
+      return { column, tab: { kind: "root", root, index } }
+  }
+  return undefined
+}
+
+function reopen(state: Layout, { column, tab }: ClosedColumn): Layout {
+  if (tabOfColumn(state, column.key) !== undefined) return state
+  if (tab.kind === "new")
+    return {
+      ...state,
+      active: { kind: "new", key: column.key },
+      newTabs: [...state.newTabs, column],
+    }
+  const before = columnsOf(state, tab.root)
+  const at = Math.min(tab.index, before.length)
+  return {
+    ...state,
+    active: { kind: "root", root: tab.root },
+    open: opened(state.open, tab.root),
+    roots: withRoot(state.roots, tab.root, [
+      ...before.slice(0, at),
+      column,
+      ...before.slice(at),
+    ]),
+  }
+}
+
 export function layoutReducer(state: Layout, action: LayoutAction): Layout {
   switch (action.kind) {
+    case "reopen":
+      return reopen(state, action.closed)
     case "show": {
       // Showing a root is opening it.
       const open =
@@ -371,8 +429,8 @@ export function openBeside(
 
 /** What showing an entry means, for the shell to carry out. */
 export type OpenPlan =
-  /** A column of `root` already shows it: show the root and scroll there. */
-  | { readonly kind: "scroll"; readonly root: EntryId }
+  /** Column `key` of `root` already shows it: show the root and scroll there. */
+  | { readonly kind: "scroll"; readonly root: EntryId; readonly key: string }
   /** Show `root` and open a column anchored at the entry, after column `after`. */
   | { readonly kind: "open"; readonly root: EntryId; readonly after: number }
   /** Its root is archived and not the tab you are on: preview it in the Archive tab. */
@@ -394,17 +452,16 @@ export function planOpen(
   const here = layout.active?.kind === "root" && layout.active.root === root
   if (archive.get(root)?.state === "archived" && !here)
     return { kind: "preview", root }
+  const columns = columnsOf(layout, root)
   const views = projectColumns(
     index,
-    columnsOf(layout, root).map(c => ({
-      anchor: c.anchor,
-      pinned: isPinned(c),
-    })),
+    columns.map(c => ({ anchor: c.anchor, pinned: isPinned(c) })),
   )
   const paths = views.map(v =>
     v.tipId === null ? new Set<EntryId>() : pathIds(index, v.tipId),
   )
-  if (paths.some(p => p.has(id))) return { kind: "scroll", root }
+  const showing = columns[paths.findIndex(p => p.has(id))]
+  if (showing !== undefined) return { kind: "scroll", root, key: showing.key }
   return { kind: "open", root, after: openBeside(index, paths, id) }
 }
 

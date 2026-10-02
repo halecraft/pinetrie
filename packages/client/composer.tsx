@@ -2,6 +2,7 @@
 // (ADR-0048), and who else is typing here.
 
 import type {
+  CardId,
   CardPlace,
   CardRecord,
   CommandSummary,
@@ -49,16 +50,21 @@ export function Composer(p: {
   onSend: () => string | undefined
   onBranchInstead: (pending: Pending) => void
   onCreatesLane: (createsLane: boolean) => void
+  /** Told which card the box shows (`CardEditor`). */
+  onShows: (card: CardId | null) => void
   /** Where a read-only action goes (`ReadOnly.action.intent`). */
   onIntent: (intent: Intent) => void
   /** The column's acts: queueing your card, clearing its command. */
   onAct: (act: ColumnAct) => void
   readOnly: ReadOnly | null
   takeFocus: () => boolean
+  /** The column's key when a card may be put or dropped here (`put-target.ts`). */
+  putColumn: string | null
 }) {
   return (
     <form
       className="composer"
+      data-put-column={p.putColumn ?? undefined}
       onSubmit={event => {
         // The editor sends on Enter and on its button; a form submit is not one.
         event.preventDefault()
@@ -77,6 +83,7 @@ export function Composer(p: {
         onBranchInstead={p.onBranchInstead}
         onAct={p.onAct}
         onCreatesLane={p.onCreatesLane}
+        onShows={p.onShows}
         onIntent={p.onIntent}
         onSend={p.onSend}
         onTyping={p.onTyping}

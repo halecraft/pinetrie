@@ -263,8 +263,8 @@ const isCardCommand = (c: string): c is CardCommand =>
 /** A place's key -> the wire: its flat fields as JSON, `""` for none. */
 export const encodeKey = (key: PlaceKey | null): string => {
   if (key === null) return ""
-  const { kind, at, lane, column, seen } = placeFields(key)
-  return JSON.stringify({ kind, at, lane, column, seen })
+  const { kind, at, lane, column, seen, holder } = placeFields(key)
+  return JSON.stringify({ kind, at, lane, column, seen, holder })
 }
 
 /**
@@ -292,6 +292,7 @@ export function decodeKey(s: string): PlaceKey | null | undefined {
     order: "",
     by: "",
     seen: field("seen"),
+    holder: field("holder"),
   })
 }
 
@@ -300,6 +301,8 @@ const MOVE_REFUSALS: readonly MoveRefusal[] = [
   "gone",
   "exists",
   "not-fresh",
+  "full",
+  "not-yours",
 ]
 const isMoveRefusal = (c: string): c is MoveRefusal =>
   (MOVE_REFUSALS as readonly string[]).includes(c)

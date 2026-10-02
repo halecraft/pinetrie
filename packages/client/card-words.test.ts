@@ -13,9 +13,10 @@ import {
 const ME = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
-const refusal = (over: Partial<Refusal>): Refusal => ({
+type MoveRefused = Extract<Refusal, { fromQueue: boolean }>
+const refusal = (over: Partial<MoveRefused>): Refusal => ({
   card: cardId("c-1"),
-  lane: null,
+  actedAt: { kind: "inventory" },
   code: "gone",
   by: null,
   fromQueue: true,
@@ -61,6 +62,25 @@ describe("card words", () => {
       "refusalWords, moved by you in another tab",
       refusalWords(refusal({ code: "moved", by: ME }), READER),
       "not moved: you moved it first",
+    ],
+    [
+      "refusalWords, a full inventory",
+      refusalWords(refusal({ code: "full" }), READER),
+      "inventory full",
+    ],
+    [
+      "refusalWords, a keep without room",
+      refusalWords(
+        {
+          card: null,
+          actedAt: { kind: "inventory" },
+          code: "no-room",
+          need: 3,
+          free: 1,
+        },
+        READER,
+      ),
+      "not kept: needs 3 slots, 1 free",
     ],
   ])("%s", (_, words, expected) => {
     expect(words).toBe(expected)

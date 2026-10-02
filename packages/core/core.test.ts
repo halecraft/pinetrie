@@ -4,12 +4,16 @@
 import assert from "node:assert/strict"
 import {
   address,
+  atEntry,
+  type CardPlace,
   commitId,
   emailLocalPart,
   entryId,
   findSeqKeys,
   handleOf,
   indexTree,
+  keyOf,
+  keyOfFields,
   laneNameForThread,
   latestTip,
   messageText,
@@ -20,7 +24,10 @@ import {
   parseMentions,
   parseNewLane,
   parseTitle,
+  placeFields,
+  placeOfFields,
   projectTranscript,
+  sameKey,
   THE_AGENT,
   TRAILERS,
   trailerValues,
@@ -319,4 +326,56 @@ test("offerLedger reads the newest paragraph that names a source; none without o
   })
   expect(offerLedger("offer: yours, rewritten\n")).toBeNull()
   expect(offerLedger("offer: x\n\nPineta-Source: aaaa\n")).toBeNull()
+})
+
+describe("a card's place as flat fields (ADR-0059)", () => {
+  const ADA = writerId("ada@example.com")
+  const places: CardPlace[] = [
+    { kind: "drafting", at: atEntry(entryId("e-1")), lane: null },
+    {
+      kind: "queued",
+      at: atEntry(entryId("e-1")),
+      lane: laneNameForThread("x"),
+      order: "a",
+      by: ADA,
+      seen: "v",
+    },
+    { kind: "fresh", column: "k" },
+    { kind: "inventory", holder: ADA },
+  ]
+
+  test("every place, and its key, round-trips", () => {
+    for (const place of places) {
+      expect(placeOfFields(placeFields(place))).toEqual(place)
+      expect(keyOfFields(placeFields(keyOf(place)))).toEqual(keyOf(place))
+    }
+  })
+
+  test("an inventory needs its holder", () => {
+    const f = placeFields({ kind: "inventory", holder: ADA })
+    expect(placeOfFields({ ...f, holder: "" })).toBeUndefined()
+    expect(keyOfFields({ ...f, holder: "" })).toBeUndefined()
+  })
+
+  test("sameKey tells two holders apart", () => {
+    const bea = writerId("bea@example.com")
+    expect(
+      sameKey(
+        { kind: "inventory", holder: ADA },
+        { kind: "inventory", holder: ADA },
+      ),
+    ).toBe(true)
+    expect(
+      sameKey(
+        { kind: "inventory", holder: ADA },
+        { kind: "inventory", holder: bea },
+      ),
+    ).toBe(false)
+    expect(
+      sameKey(
+        { kind: "inventory", holder: ADA },
+        { kind: "fresh", column: "k" },
+      ),
+    ).toBe(false)
+  })
 })

@@ -212,6 +212,14 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         to: null,
       },
     },
+    {
+      kind: "move",
+      move: {
+        card: cardId("c-7"),
+        from: { kind: "fresh", column: "k-1" },
+        to: { kind: "inventory", holder: writerId("ada@example.com") },
+      },
+    },
     { kind: "set-command", card: cardId("c-7"), command: "bring-up-to-date" },
     { kind: "set-command", card: cardId("c-7"), command: null },
   ] as const
@@ -245,6 +253,13 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
       by: writerId("bea@example.com"),
     },
     { kind: "unmoved", code: "gone", place: null, by: null },
+    {
+      kind: "unmoved",
+      code: "not-yours",
+      place: { kind: "inventory", holder: writerId("bea@example.com") },
+      by: writerId("bea@example.com"),
+    },
+    { kind: "unmoved", code: "full", place: null, by: null },
     { kind: "refused", code: ERR.ARCHIVED, message: "archived by Bea" },
     { kind: "refused", code: ERR.ROOT_BUSY, message: "busy" },
     { kind: "failed", message: "setParticipantName is not in this port" },
@@ -268,6 +283,7 @@ test('decodeKey: "" is none; anything malformed is undefined', () => {
     "7",
     '{"kind":"pinned"}',
     '{"kind":"queued","at":"e-1","lane":"main"}',
+    '{"kind":"inventory","holder":""}',
   ])
     assert.equal(decodeKey(bad), undefined)
   assert.deepEqual(decodeKey(encodeKey({ kind: "fresh", column: "k" })), {

@@ -14,6 +14,8 @@ import type {
   CardRecord,
   EntryId,
   LaneName,
+  LaneView,
+  Move,
   OfferAction,
   Position,
   TreeIndex,
@@ -21,8 +23,24 @@ import type {
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
 import type { Density } from "./ask-words.ts"
+import {
+  planKeep,
+  planPut,
+  planRemove,
+  planTake,
+  planTakeCopy,
+  planUndoMove,
+  queueHow,
+} from "./card-intents.ts"
+import type {
+  HistoryEntry,
+  HistoryStep,
+  MoveHistory,
+  Refusal,
+} from "./card-moves.ts"
 import type { Pending, Prefill } from "./columns.ts"
 import type { Identity, NameStep } from "./identity.ts"
+import type { Slots } from "./inventory.ts"
 import {
   type ActiveTab,
   type Layout,
@@ -30,12 +48,22 @@ import {
   planOpen,
 } from "./layout.ts"
 import type { MessageAct } from "./message-tools.ts"
+import type { Direction } from "./move-undo.ts"
+import type { ComposerPlaces, PutTarget } from "./put-target.ts"
+import type { MoveHow } from "./session-view.ts"
 
 /** What a reader asks of one column. A message's acts are among them. */
 export type ColumnAct =
   | MessageAct
-  /** Close the column, discarding `discard` first: a fresh column's card. */
-  | { readonly kind: "close"; readonly discard: CardId | null }
+  /** Close the column, discarding `discard` first: a fresh column's cards. */
+  | { readonly kind: "close"; readonly discard: readonly CardId[] }
+  /**
+   * Close a fresh column, keeping `cards` (its cards with text) in your
+   * inventory first; it closes once every one is accepted.
+   */
+  | { readonly kind: "keep"; readonly cards: readonly CardId[] }
+  /** Take a card in this column into your inventory (ADR-0048). */
+  | { readonly kind: "take"; readonly card: CardId }
   /** Move the column to index `to`. */
   | { readonly kind: "move"; readonly to: number }
   /** Read the column at `density` (ADR-0056). */
@@ -94,6 +122,8 @@ export type Intent =
   | {
       readonly kind: "column"
       readonly position: number
+      /** The column's key: where a refusal of what it does is said. */
+      readonly key: string
       readonly act: ColumnAct
     }
   | { readonly kind: "show"; readonly tab: ActiveTab }
@@ -114,6 +144,29 @@ export type Intent =
   /** Show entry `entry`, wherever it is (`planOpen`). */
   | { readonly kind: "openAt"; readonly entry: EntryId }
   | { readonly kind: "signOut" }
+  /** Take `card` into your inventory: by key, wherever it is. */
+  | { readonly kind: "take"; readonly card: CardId }
+  /** Put `card` at `target`: a column's end, or a slot (a swap, or a take there). */
+  | { readonly kind: "put"; readonly card: CardId; readonly target: PutTarget }
+  /** Remove a card from your inventory: final, as a discard is. */
+  | { readonly kind: "remove"; readonly card: CardId }
+  /** Select an inventory slot. */
+  | { readonly kind: "selectSlot"; readonly slot: number }
+  /**
+   * Undo or redo your newest move, showing its place first. `restored`: a
+   * root just restored for it, read as restored whatever the copy says yet.
+   */
+  | {
+      readonly kind: "undoMove"
+      readonly direction: Direction
+      readonly restored: EntryId | null
+    }
+  /** The archived-root dialog's "restore and undo". */
+  | {
+      readonly kind: "restoreAndUndo"
+      readonly root: EntryId
+      readonly direction: Direction
+    }
 
 export type Effect =
   | { readonly kind: "layout"; readonly action: LayoutAction }
@@ -124,19 +177,71 @@ export type Effect =
       readonly root: EntryId
       readonly title: string | null
     }
-  | { readonly kind: "discardCard"; readonly card: CardId }
-  | { readonly kind: "createCard"; readonly card: CardRecord }
+  | {
+      readonly kind: "discardCard"
+      readonly card: CardId
+      readonly how: MoveHow
+    }
+  | {
+      readonly kind: "createCard"
+      readonly card: CardRecord
+      readonly text: string
+      readonly how: MoveHow
+    }
   | {
       readonly kind: "queueCard"
       readonly card: CardId
       readonly lane: LaneName
       readonly at: Position
+      readonly how: MoveHow
     }
   | {
       readonly kind: "unqueueCard"
       readonly card: CardId
       readonly lane: LaneName
       readonly by: WriterId
+      readonly how: MoveHow
+    }
+  /** A handoff: a take, a put, an undo's reverse (ADR-0059). */
+  | { readonly kind: "moveCard"; readonly move: Move; readonly how: MoveHow }
+  /** Swap two slots of your inventory. */
+  | {
+      readonly kind: "swapSlots"
+      readonly a: number
+      readonly b: number
+      readonly step: HistoryStep
+    }
+  /**
+   * Moves into your inventory, all sent at once; once each is answered,
+   * `afterKeep` decides whether `close` runs.
+   */
+  | {
+      readonly kind: "keep"
+      readonly moves: readonly { readonly move: Move; readonly how: MoveHow }[]
+      readonly close: readonly Effect[]
+    }
+  /** Drop a history entry undo could not act on, saying why. */
+  | {
+      readonly kind: "dropEntry"
+      readonly entry: HistoryEntry
+      readonly refusal: Refusal
+    }
+  /** Keep a refusal made before anything was sent. */
+  | { readonly kind: "refuse"; readonly refusal: Refusal }
+  /** Open the inventory; `brief`: only for a take's flight, if it was closed. */
+  | { readonly kind: "showInventory"; readonly brief: boolean }
+  | { readonly kind: "select"; readonly slot: number }
+  /** Ask whether to restore `root` to undo or redo there (the dialog). */
+  | {
+      readonly kind: "askRestore"
+      readonly root: EntryId
+      readonly direction: Direction
+    }
+  /** Restore `root`; once restored, ask for `next`, planned afresh. */
+  | {
+      readonly kind: "restoreThen"
+      readonly root: EntryId
+      readonly next: Intent
     }
   | {
       readonly kind: "setCommand"
@@ -171,6 +276,22 @@ export interface IntentState {
   readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
   /** Every ask (`indexAsks`): a pick into one's work opens its fold. */
   readonly asks: AskIndex
+  readonly cards: CardFacts
+}
+
+/** What the card intents decide from (ADR-0048 step 4). */
+export interface CardFacts {
+  /** Every card as drawn. */
+  readonly cards: readonly CardRecord[]
+  readonly lanes: readonly LaneView[]
+  readonly me: WriterId
+  /** Your inventory's slots as drawn (`settleSlots`). */
+  readonly slots: Slots
+  /** The selected slot. */
+  readonly selected: number
+  readonly history: MoveHistory
+  /** Each column's composer place, by key. */
+  readonly composers: ComposerPlaces
 }
 
 const layout = (action: LayoutAction): Effect => ({ kind: "layout", action })
@@ -189,7 +310,7 @@ export function planIntent(
 ): readonly Effect[] {
   switch (intent.kind) {
     case "column":
-      return planColumn(intent.position, intent.act, state, fresh)
+      return planColumn(intent.position, intent.key, intent.act, state, fresh)
     case "show":
       return [layout({ kind: "show", tab: intent.tab })]
     case "newTab":
@@ -222,6 +343,28 @@ export function planIntent(
       return planOpenAt(intent.entry, state, fresh)
     case "signOut":
       return [{ kind: "forgetIdentity" }, { kind: "reload" }]
+    case "take":
+      return planTake(intent.card, state)
+    case "put":
+      return planPut(intent.card, intent.target, state)
+    case "remove":
+      return planRemove(intent.card, state)
+    case "selectSlot":
+      return [{ kind: "select", slot: intent.slot }]
+    case "undoMove":
+      return planUndoMove(intent.direction, intent.restored, state, fresh)
+    case "restoreAndUndo":
+      return [
+        {
+          kind: "restoreThen",
+          root: intent.root,
+          next: {
+            kind: "undoMove",
+            direction: intent.direction,
+            restored: intent.root,
+          },
+        },
+      ]
   }
 }
 
@@ -232,7 +375,7 @@ export function planIntent(
  * fold first, whatever the column's density, so it is drawn to be revealed
  * (ADR-0056): forks, branch starts and people's messages are never in one.
  */
-function planOpenAt(
+export function planOpenAt(
   id: EntryId,
   state: IntentState,
   fresh: string,
@@ -271,6 +414,7 @@ function planOpenAt(
  */
 function planColumn(
   position: number,
+  key: string,
   act: ColumnAct,
   state: IntentState,
   fresh: string,
@@ -287,6 +431,11 @@ function planColumn(
     active?.kind === "new"
       ? [layout({ kind: "newTabColumn", key: active.key, action })]
       : onRoot(action)
+  /** Closing this column: a new tab's closes the tab. */
+  const closing = (): readonly Effect[] =>
+    active?.kind === "new"
+      ? [layout({ kind: "closeNewTab", key: active.key })]
+      : onRoot({ kind: "close", index: position })
   switch (act.kind) {
     case "openAt":
       return planOpenAt(act.entry, state, fresh)
@@ -321,12 +470,19 @@ function planColumn(
         }),
       )
     case "close": {
-      const discard: readonly Effect[] =
-        act.discard === null ? [] : [{ kind: "discardCard", card: act.discard }]
-      if (active?.kind === "new")
-        return [...discard, layout({ kind: "closeNewTab", key: active.key })]
-      return [...discard, ...onRoot({ kind: "close", index: position })]
+      const discard: readonly Effect[] = act.discard.map(card => ({
+        kind: "discardCard",
+        card,
+        how: queueHow(key, null),
+      }))
+      return [...discard, ...closing()]
     }
+    case "keep":
+      return planKeep(act.cards, key, closing(), state)
+    case "take":
+      return planTake(act.card, state)
+    case "takeCopy":
+      return planTakeCopy(act.card, act.text, state)
     case "move":
       return onRoot({ kind: "move", from: position, to: act.to })
     case "density":
@@ -335,19 +491,56 @@ function planColumn(
       return onColumn({ kind: "sent", key: act.key, sendId: act.sendId })
     case "reserve":
       return onColumn({ kind: "reserve", key: act.key, lane: act.lane })
-    case "queue":
-      return [{ kind: "queueCard", card: act.card, lane: act.lane, at: act.at }]
-    case "unqueue":
+    case "queue": {
+      const now = state.cards.cards.find(c => c.id === act.card)
+      const to = {
+        kind: "queued",
+        at: act.at,
+        lane: act.lane,
+        seen: "",
+      } as const
       return [
-        { kind: "unqueueCard", card: act.card, lane: act.lane, by: act.by },
+        {
+          kind: "queueCard",
+          card: act.card,
+          lane: act.lane,
+          at: act.at,
+          how: queueHow(key, now === undefined ? null : { card: now, to }),
+        },
       ]
+    }
+    case "unqueue": {
+      const now = state.cards.cards.find(c => c.id === act.card)
+      return [
+        {
+          kind: "unqueueCard",
+          card: act.card,
+          lane: act.lane,
+          by: act.by,
+          how: queueHow(
+            key,
+            now?.place.kind === "queued"
+              ? {
+                  card: now,
+                  to: { kind: "drafting", at: now.place.at, lane: act.lane },
+                }
+              : null,
+          ),
+        },
+      ]
+    }
     case "setCommand":
       return [{ kind: "setCommand", card: act.card, command: act.command }]
     case "bringUpToDate": {
       const { command } = act
       return [
         act.card === null
-          ? { kind: "createCard", card: { ...act.create, command } }
+          ? {
+              kind: "createCard",
+              card: { ...act.create, command },
+              text: "",
+              how: queueHow(key, null),
+            }
           : { kind: "setCommand", card: act.card, command },
         { kind: "armFocus", key: act.key },
       ]

@@ -33,6 +33,7 @@ import {
 import { readRunning } from "@pineta/reads"
 import {
   cardDocId,
+  InventoryDoc,
   PlacesDoc,
   type PlacesDocHandle,
   PRESENCE_DECAY,
@@ -202,12 +203,15 @@ export async function startHost({
     // A client does not reconnect: a closed channel is a seat that has left,
     // so there is nothing to wait for before its Line goes.
     departureTimeout: 0,
-    // Cards' texts are created by clients (ADR-0048): without this, a text
-    // the host never opened itself would be neither stored nor relayed (S58).
+    // Cards' texts and inventories are created by clients (ADR-0048,
+    // ADR-0059): without this, a document the host never opened itself would
+    // be neither stored nor relayed (S58). The host never writes an inventory.
     resolve: docId => {
       switch (resolveDoc(docId)) {
         case "text":
           return Interpret(TextDoc)
+        case "inventory":
+          return Interpret(InventoryDoc)
         case "reject":
           return Reject()
         case undefined:

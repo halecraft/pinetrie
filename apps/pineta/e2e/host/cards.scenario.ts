@@ -11,6 +11,8 @@ import { PLACES_DOC_ID } from "@pineta/protocol/messages"
 import { readLanes, readPlaces, readSeats, readTreeIndex } from "@pineta/reads"
 import {
   cardDocId,
+  InventoryDoc,
+  inventoryDocId,
   PlacesDoc,
   readLaneNames,
   readLaneTip,
@@ -290,6 +292,7 @@ async function run(check: Checks["check"]): Promise<void> {
       command: "",
       unsent: "",
       placer: mallory.writer,
+      holder: "",
     })
     await sleep(500)
     await ch.quiet()
@@ -298,6 +301,86 @@ async function run(check: Checks["check"]): Promise<void> {
       onHost(forged) === undefined,
     )
     await mallory.close()
+
+    // 4e. Your inventory (ADR-0059): a take reaches your other session's
+    // inventory and nobody else's; nobody else moves a card out of it; and it
+    // holds 18 cards. Each move is a client's request over the wire.
+    const ada2 = await join(ch, "ada", "cards")
+    const mine = { kind: "inventory", holder: ada.writer } as const
+    const into = (slot: number) =>
+      ({
+        actedAt: { kind: "inventory" },
+        history: { kind: "none" },
+        slot,
+      }) as const
+    const taking = newCard(ada, tipOf(), "for later")
+    await waitFor(() => onHost(taking) !== undefined, 5_000)
+    const took = await ada.moveCard(
+      { card: taking, from: drafting(tipOf()), to: mine },
+      into(3),
+    )
+    const otherSession = await waitFor(
+      () => ada2.slots.current()["3"] === taking,
+      5_000,
+    )
+    const beaView = bea.exchange.get(inventoryDocId(ada.writer), InventoryDoc)
+    beaView.slots.set("7", "planted")
+    await sleep(500)
+    await ch.quiet()
+    const hidden =
+      Object.keys(beaView.slots()).every(s => s === "7") &&
+      ada.slots.current()["7"] === undefined &&
+      ada2.slots.current()["7"] === undefined
+    check(
+      "a take reaches your other session's inventory and nobody else's, and nobody else writes it",
+      took.kind === "accepted" && otherSession >= 0 && hidden,
+      `${took.kind}; other session ${otherSession}; Bea sees ${JSON.stringify(beaView.slots())}`,
+    )
+    const stolen = await bea.moveCard(
+      {
+        card: taking,
+        from: mine,
+        to: { kind: "inventory", holder: bea.writer },
+      },
+      into(0),
+    )
+    check(
+      "a move out of someone else's inventory is refused, as not theirs",
+      stolen.kind === "refused" &&
+        stolen.refusal?.code === "not-yours" &&
+        onHost(taking)?.place.kind === "inventory",
+      JSON.stringify(stolen),
+    )
+    const filled = await Promise.all(
+      Array.from({ length: 17 }, (_, n) =>
+        ada.createCard(
+          {
+            id: cardId(crypto.randomUUID()),
+            owner: ada.writer,
+            placer: ada.writer,
+            place: mine,
+            command: null,
+            unsent: null,
+          },
+          `held ${n}`,
+          into(n < 3 ? n : n + 1),
+        ),
+      ),
+    )
+    const nineteenth = newCard(ada, tipOf(), "one too many")
+    await waitFor(() => onHost(nineteenth) !== undefined, 5_000)
+    const tooMany = await ada.moveCard(
+      { card: nineteenth, from: drafting(tipOf()), to: mine },
+      into(2),
+    )
+    check(
+      "the nineteenth card is refused: the inventory is full",
+      filled.every(a => a.kind === "accepted") &&
+        tooMany.kind === "refused" &&
+        tooMany.refusal?.code === "full",
+      JSON.stringify(tooMany),
+    )
+    await ada2.close()
 
     // 5. Bea sends Ada's card after Ada has left: Bea's message, with Ada,
     // named through her seat's record.

@@ -154,12 +154,23 @@ which are swept.
   lane does not decode: its lane is where it runs.
 - **A handoff is a compare-and-set on where a card is** (`planMove`, pure):
   accepted only if the card is still where its sender saw it, its `PlaceKey`
-  (`sameKey`, over its kind, `at` and lane). A key leaves out a queue's
-  order and queuer, so a reorder does not make someone else's unqueue fail. No `from` creates the card, its
-  sender its owner; no `to` removes it, and only a fresh column's card can be
-  removed. Queueing puts it after the lane's last card, queued by the
-  sender, and clears why it was not sent before; below the line again, it
-  keeps both. Refusals: `gone` (no record), `moved`, `exists`, `not-fresh`.
+  (`sameKey`, over its kind, `at` and lane, or an inventory's holder). A
+  key leaves out a queue's order and queuer, so a reorder does not make
+  someone else's unqueue fail. No `from` creates the card, its sender its
+  owner; no `to` removes it, and only a fresh column's card, or one in the
+  sender's own inventory, can be removed. Queueing puts it after the lane's
+  last card, queued by the sender, and clears why it was not sent before;
+  below the line, or into an inventory, it keeps both. Refusals: `gone` (no
+  record), `moved`, `exists`, `not-fresh`, `full`, `not-yours`.
+- **An inventory is its holder's alone** (`ownsPlace`): a move into or out
+  of someone else's is refused `not-yours`, checked on both ends, and a
+  move into yours `full` once it holds `INVENTORY_SLOTS` cards, the card
+  itself not counted. A creation obeys both. A taken card keeps its owner:
+  a take moves its place, not who wrote it.
+- **A fresh column's first send carries its other cards**
+  (`planFreshFollow`): each card fresh in the sent card's column goes to
+  drafting at the message the send wrote. The host's write, so it keeps
+  each card's placer, as `planUnsent` does.
 - **The placer is who put the card where it is**: the sender of every
   accepted move. A write the host makes itself keeps it (`planUnsent`,
   `planSetCommand`), so a refusal never names the host.

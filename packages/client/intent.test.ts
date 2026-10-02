@@ -14,6 +14,7 @@ import { describe, expect, test } from "vitest"
 import { tree } from "./fixtures.ts"
 import {
   afterRestore,
+  type CardFacts,
   claimFocus,
   type Effect,
   entryShown,
@@ -56,19 +57,31 @@ const at = (
   layout: Layout,
   archive = new Map<EntryId, ArchiveRecord>(),
   asks: AskIndex = indexAsks(index),
+  cards: CardFacts = NO_CARDS,
 ) => ({
   layout,
   index,
   archive,
   asks,
+  cards,
 })
+const ME = writerId("ada@x.io")
+const NO_CARDS: CardFacts = {
+  cards: [],
+  lanes: [],
+  me: ME,
+  slots: {},
+  selected: 0,
+  history: { undo: [], redo: [] },
+  composers: new Map(),
+}
 const R1 = at(onRoot("1-r1"))
 const plan = (intent: Intent, state: IntentState = R1) =>
   planIntent(intent, state, "k")
 const column = (
   act: Extract<Intent, { kind: "column" }>["act"],
   position = 0,
-): Intent => ({ kind: "column", position, act })
+): Intent => ({ kind: "column", position, key: "col-k", act })
 
 describe("planIntent", () => {
   test("× on a root's tab closes it for you, and writes nothing", () => {
@@ -147,8 +160,16 @@ describe("planIntent", () => {
   })
 
   test("closing a column discards its card first; a new tab's closes the tab", () => {
-    const close = column({ kind: "close", discard: cardId("c") }, 1)
-    const discard = { kind: "discardCard", card: "c" }
+    const close = column({ kind: "close", discard: [cardId("c")] }, 1)
+    const discard = {
+      kind: "discardCard",
+      card: "c",
+      how: {
+        actedAt: { kind: "column", key: "col-k" },
+        history: { kind: "none" },
+        slot: null,
+      },
+    }
     expect(plan(close)).toEqual([
       discard,
       {
@@ -164,9 +185,9 @@ describe("planIntent", () => {
       discard,
       { kind: "layout", action: { kind: "closeNewTab", key: "t" } },
     ])
-    expect(
-      plan(column({ kind: "close", discard: null }), at(onNewTab)),
-    ).toEqual([{ kind: "layout", action: { kind: "closeNewTab", key: "t" } }])
+    expect(plan(column({ kind: "close", discard: [] }), at(onNewTab))).toEqual([
+      { kind: "layout", action: { kind: "closeNewTab", key: "t" } },
+    ])
   })
 
   test.each([
@@ -298,14 +319,20 @@ describe("planIntent", () => {
       command: null,
       unsent: null,
     }
-    test("queue, unqueue and a command are one write each, on any tab", () => {
+    const here = { kind: "column", key: "col-k" } as const
+    const unrecorded = { actedAt: here, history: { kind: "none" }, slot: null }
+    test("queue, unqueue and a command are one write each, on any tab; a card the page holds is recorded", () => {
       for (const state of [R1, at(onNewTab)]) {
         expect(
           plan(column({ kind: "queue", card: c, lane, at: where }), state),
-        ).toEqual([{ kind: "queueCard", card: c, lane, at: where }])
+        ).toEqual([
+          { kind: "queueCard", card: c, lane, at: where, how: unrecorded },
+        ])
         expect(
           plan(column({ kind: "unqueue", card: c, lane, by: ada }), state),
-        ).toEqual([{ kind: "unqueueCard", card: c, lane, by: ada }])
+        ).toEqual([
+          { kind: "unqueueCard", card: c, lane, by: ada, how: unrecorded },
+        ])
         expect(
           plan(column({ kind: "setCommand", card: c, command: null }), state),
         ).toEqual([{ kind: "setCommand", card: c, command: null }])
@@ -342,6 +369,8 @@ describe("planIntent", () => {
         {
           kind: "createCard",
           card: { ...fresh, command: "bring-up-to-date" },
+          text: "",
+          how: unrecorded,
         },
         { kind: "armFocus", key: "col" },
       ])

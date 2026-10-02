@@ -190,7 +190,8 @@ document.
 
 `PlacesDoc` holds every card's record, keyed by card id: `json.bind` of a
 record of flat string rows (`owner`, `kind`, `at`, `lane`, `column`,
-`order`, `by`, `seen`, `command`, `unsent`, `placer`, "" for none), decoded in
+`order`, `by`, `seen`, `command`, `unsent`, `placer`, `holder`, "" for
+none), decoded in
 `@pineta/marginalia` (`decodeCard`), and `rev`. Only the host writes it,
 through `applyPlaceStep` (`apps/pineta/host/places.ts`).
 
@@ -213,6 +214,27 @@ through `applyPlaceStep` (`apps/pineta/host/places.ts`).
 - **A store from before ADR-0059 holds a `pineta:cards` document** that no
   code opens; delete it by hand. The startup sweep removes the texts no
   record names.
+- **`holder`** is whose inventory holds a card (`CardPlace` `inventory`);
+  rows written before it existed do not decode, and no stored session held
+  any.
+
+## Your inventory (`inventory.ts`, ADR-0059)
+
+`InventoryDoc` is `inventory:<writer>` (`inventoryDocId`,
+`writerOfInventoryDoc`): a Yjs document of slot index ("0"–"17") to card id,
+one per person, written only by that person's tabs. The host's places say
+whose inventory a card is in; this says which slot holds it, and each tab
+repairs it from the host's record (`planSlots`, `packages/client`).
+
+- **The host stores and relays it, and never writes it.** Its policy
+  shares and accepts it only with peers whose principal is its writer
+  (`apps/pineta/host/policy.ts`).
+- **A slot naming a card that is gone stays until written over**: the
+  repair clears only a slot whose card it has seen not held for a while,
+  and the panel draws a slot whose card is not held as empty.
+- **`writerOfInventoryDoc` names a writer only for an id
+  `inventoryDocId` makes**, so a hand-written `inventory:ada@x` names
+  nobody.
 
 ## Persistence
 

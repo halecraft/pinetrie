@@ -1236,16 +1236,23 @@ snapshot store; it never holds the places document itself.
   `yourCard` finds the card still drafting at the thread's end between the
   reply and the change, and takes it back.
 - **Refusals are values** (`Refusal`, kept by `movesStep` until your next
-  move in their lane), worded by `refusalWords`: an unqueue the take beat
-  says "already sent", a move someone made first names them.
+  move where you acted), worded by `refusalWords`: an unqueue the take beat
+  says "already sent", a move someone made first names them. Each move
+  carries where you were looking when you made it (`ActedAt`: a column's
+  key, or the inventory), and its refusal is drawn there: a column draws
+  its own, and the panel the inventory's.
 - **The store** is `snapshotStore` (`store.ts`): a new value tells its
   listeners, the same value does not, as `useSyncExternalStore` needs.
 
 - **Where the column's cards are.** `Column` resolves its thread's end with
   `threadOf`, as a reply would go, and finds your card there with `yourCard`
-  and everyone else's with `draftingAt`. A fresh column's card is found by
+  and everyone else's with `draftingAt`. A fresh column's cards are found by
   its key (`CardPlace` `fresh`). So a tab switch, a reload or another device
   finds the same card: it belongs to the thread, not to the mounted column.
+  Every card there but the one the composer shows is drawn above it: the
+  composer reports which it shows (`onShows`), so a card put where you
+  already had one is drawn too, and once a send frees the box it takes your
+  newest card there.
 - **One editor for every card: `card-editor.tsx`.** Your composer is one, and
   everyone else's cards above it are others, with a heading (`cardHeading`)
   and no where-menu. `Composer` is the column's foot: typing presence and your
@@ -1306,9 +1313,10 @@ snapshot store; it never holds the places document itself.
   reads them). Provisional (ADR-0048): undo does not remove a `clientID`, so
   someone who undid everything they wrote is still named. Step 6 replaces it
   with a projection of the card's history; marks do not use it.
-- **Closing a fresh column that holds text** asks in its header; discard
-  asks the host to remove the card, outside the undo stack, since no column
-  could show it again.
+- **Closing a fresh column whose cards hold text** asks in its header: keep
+  in inventory, the default (`keep`, below), or discard, which asks the host
+  to remove them, outside any history, since no column could show them
+  again.
 
 ## Marks for your cards (ADR-0048, step 2)
 
@@ -1323,7 +1331,7 @@ so it never lights the tab (`elsewhere`).
   ones holding text, the layout, the lanes and the index. A drafting card is
   placed by `cardEnd` and `rootOf`; a fresh card by `tabOfColumn`, so one
   typed in another browser tab or device, whose layout this one lacks, marks
-  nothing until the inventory (step 4) collects it.
+  nothing. A card in your inventory marks nothing: the inventory is no tab.
 - **The marks read text, not records:** a record outlives its text (an
   emptied card stays until sent or swept). `holdsText` is `needsCard` with
   the one blank prefill, `AGENT_PREFILL`, so a bare `@agent ` is nothing,
@@ -1342,6 +1350,85 @@ so it never lights the tab (`elsewhere`).
 - **Only your own cards count.** Cards you contributed to wait for step 6,
   where who contributed is a projection of the card's history and follows
   undo.
+
+## Your inventory (ADR-0048 step 4, ADR-0059)
+
+A panel floating over the columns (`inventory-panel.tsx`, drawn by `App`),
+docked left, centre or right by this device's choice (`inventory-dock.ts`,
+`snapTo`, kept as a `deviceState`), holding a 3 × 6 grid of slots and the
+selected card whole beside it (`BoundCardEditor`). Open or closed is `App`'s
+state, never stored.
+
+- **Two layers.** The host's records say which cards are in your inventory
+  (`CardPlace` `inventory`, `heldBy`); your inventory document
+  (`inventory:<you>`, `InventoryDoc`) says which slot holds each. The
+  session opens it and repairs it on every change (`planSlots`).
+- **`settleSlots` is the one slot rule** (`inventory.ts`): the panel draws
+  it (`inventoryView`), the repair writes towards it, and a take lands by the
+  same `firstEmpty`: the selected slot if empty, else the first empty.
+  `App` computes it once, with the takes in flight as intents
+  (`intentsOf`), and both the panel and the intents read that.
+- **The repair waits for a card to be steady** (`steadiness`, S79): it
+  places a card, or clears its slot, only once the card has been held, or
+  not, for `STEADY_MS`, and looks again then. It reads the host's records,
+  not the drawn ones, so a put in flight keeps its slot until accepted.
+  It writes nothing when nothing differs.
+- **A take's slot is written at the answer** (`tracked` in
+  `session-view.ts`, `takeWrites`), before the answer is recorded: if the
+  places reached the tab first, the answer drops the pending move at once,
+  and a repair in between would place the card in the first empty slot.
+  Until then the pending move's `slot` is an intent: drawn there, and left
+  alone by the repair.
+- **The history is in `MovesState`** (`card-moves.ts`). Each sent move says
+  what it does to it (`HistoryStep`): `record` on acceptance, `undo` and
+  `redo` leave their list when sent and go to the other once accepted,
+  `forget` for an undone creation, `none` for a send, a discard, a
+  composer's new card. A refused undo is dropped. A swap is recorded at
+  once (`swapped`), since no host is asked.
+- **`planUndo` decides** (`move-undo.ts`, pure): the reverse handoff, shown
+  first where the card goes back to (the inventory, a thread's end through
+  `openAt`, an open fresh column's tab, or `reopen` of a closed one, kept
+  whole in the entry as `ClosedColumn`), or a swap back while both slots
+  hold what it wrote, or a refusal it can already see. A place in an
+  archived root asks first, in a dialog (`askRestore`); its "restore and
+  undo" restores the root, then plans the undo afresh with that root read
+  as restored.
+- **One landing rule** (`put-target.ts`). A put and a drop name a
+  `PutTarget`: a column by key, or a slot. A column's place is its
+  composer's (`composerPlace`, `column-view.ts`), which each writable
+  `Column` publishes to `ComposerPlaces` as it renders; reading it redraws
+  nothing. A drop target carries `data-put-column` (the column's
+  `form.composer` and the cards above it) or `data-put-slot`, both written
+  by `datasetOf` and read by `targetOfElement`, so a drop lands exactly
+  where a put can. A slot as the target swaps a card already in your
+  inventory, and takes any other into that slot.
+- **Take, put, keep, remove, select and undo are intents** (`intent.ts`,
+  `card-intents.ts`), planned from `IntentState.cards` (`CardFacts`: the
+  drawn cards, the lanes, the drawn slots, the selection, the history and
+  the composer places), carried out by `perform`. A keep sends one take per
+  card and closes the column once every one is accepted (`afterKeep`).
+- **Drag** is HTML drag and drop, not the column drag's pointer events: it
+  crosses elements and tabs. A card's drag carries its id under
+  `CARD_MIME`; its handle is its take button, or a slot. `App` listens on
+  the document for `dragover` and `drop`; a drag held over a root's tab for
+  `TAB_HOVER_MS` opens it. `NOT_A_HANDLE` includes `[draggable='true']`, so
+  a card's drag never starts a column's.
+- **Keys** (`inventory-keys.ts`, `keyAct`): one table, read by one
+  `keydown` listener in `App` that decides nothing. Ctrl+Shift+I takes the
+  focused card (`data-card` on the focused element, a box's included);
+  Ctrl+Shift+O puts the selected one in the column whose element last held
+  focus; Cmd or Ctrl with Z, Shift+Z, or Ctrl+Y undo and redo a move, only
+  outside a text box, where the box's own text undo has them; arrows and
+  `hjkl` move through the grid while the panel has focus.
+- **A move flies** (`use-flight.ts`): `perform` measures the card's element
+  before the move (`ports.fly`), and once it is drawn elsewhere that
+  element animates from the old box. A take while the panel is closed opens
+  it briefly.
+- **Selectors for the browser suite:** `.inventory` (the panel),
+  `.inventory .slot[data-slot][data-card]` and `.slot-line`, `.inventory
+  .put`, `.inventory .remove`, `#top .inventory-toggle`, a card's `.take`, a
+  message's `.take-copy`, and a fresh column's `.close-keep`,
+  `.close-discard` and `.close-cancel`.
 
 ## Selectors in the browser suite
 

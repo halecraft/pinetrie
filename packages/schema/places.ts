@@ -23,7 +23,7 @@ import { type CardId, cardId } from "@pineta/core"
  */
 const StoredCard = Schema.struct.json({
   owner: Schema.string(),
-  /** `drafting`, `queued` or `fresh`: the place's kind (`CardPlace`). */
+  /** `drafting`, `queued`, `fresh` or `inventory`: the place's kind (`CardPlace`). */
   kind: Schema.string(),
   /** A drafting or queued card's entry. */
   at: Schema.string(),
@@ -43,6 +43,8 @@ const StoredCard = Schema.struct.json({
   unsent: Schema.string(),
   /** Who put it where it is. */
   placer: Schema.string(),
+  /** Whose inventory holds it. */
+  holder: Schema.string(),
 })
 
 export const PlacesDoc = json.bind(

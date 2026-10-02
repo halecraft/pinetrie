@@ -7,6 +7,7 @@ import {
   type BannerRecord,
   type BaseRecord,
   blobUrl,
+  type CardPlace,
   type ColumnView,
   type CommandSummary,
   type DiffSpan,
@@ -19,6 +20,7 @@ import {
   type LineRecord,
   messageText,
   type OfferRecord,
+  type Position,
   type ProjectRecord,
   promptOf,
   type RevisionRecord,
@@ -35,6 +37,7 @@ import {
   type TakeDestination,
 } from "@pineta/marginalia"
 import { commandWords } from "./card-words.ts"
+import type { Column } from "./columns.ts"
 import { speakerLabel } from "./names.ts"
 import { whereWords } from "./send.ts"
 
@@ -552,4 +555,19 @@ export function joinWords(join: LaneJoin): string {
   return join.from === null
     ? `${AGENT_MARK} ${name} joined`
     : `${AGENT_MARK} ${name}, from ${join.from.name ?? "the agent"}`
+}
+
+/**
+ * Where a column takes a card (ADR-0048): a fresh column's own key, else
+ * drafting at its end with its lane. The composer creates its card here, and
+ * a put or a drop lands here. None at the root: a column there has no end yet.
+ */
+export function composerPlace(
+  column: Pick<Column, "key" | "fresh" | "lane">,
+  at: Position,
+): CardPlace | null {
+  if (column.fresh !== undefined) return { kind: "fresh", column: column.key }
+  return at.kind === "entry"
+    ? { kind: "drafting", at, lane: column.lane ?? null }
+    : null
 }

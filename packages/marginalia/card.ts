@@ -8,6 +8,7 @@
 // next, and which are swept. Who wrote in it is `writersOf` (`seat.ts`).
 
 import {
+  atEntry,
   CARD_COMMANDS,
   type CardCommand,
   type CardId,
@@ -15,6 +16,7 @@ import {
   type CardRecord,
   cardId,
   type EntryId,
+  INVENTORY_SLOTS,
   keyOf,
   type LaneName,
   type LaneView,
@@ -48,6 +50,7 @@ const StoredCard = Type.Object({
   command: Type.String(),
   unsent: Type.String(),
   placer: Type.String({ minLength: 1 }),
+  holder: Type.String(),
 })
 
 /** The flat value the places document stores under a card's id. */
@@ -63,6 +66,7 @@ export interface StoredCardFields {
   readonly command: string
   readonly unsent: string
   readonly placer: string
+  readonly holder: string
 }
 
 /** A card record -> the flat value the places document stores under its id. */
@@ -296,14 +300,41 @@ function placeAt(
 }
 
 /**
+ * Whether `sender` may move a card into or out of `key`: every place but
+ * someone else's inventory (ADR-0059). Pure.
+ */
+export const ownsPlace = (key: PlaceKey, sender: WriterId): boolean =>
+  key.kind !== "inventory" || key.holder === sender
+
+/** Why a move into `to` is refused before the card is looked at; null for none. */
+function refuseInto(
+  to: PlaceKey,
+  cards: readonly CardRecord[],
+  card: CardId,
+  sender: WriterId,
+): MoveRefusal | null {
+  if (!ownsPlace(to, sender)) return "not-yours"
+  if (to.kind !== "inventory") return null
+  const held = cards.filter(
+    c =>
+      c.id !== card &&
+      c.place.kind === "inventory" &&
+      c.place.holder === sender,
+  ).length
+  return held >= INVENTORY_SLOTS ? "full" : null
+}
+
+/**
  * A handoff: a compare-and-set on where the card is. The host accepts a move
  * only if the card is still where its sender saw it; a reorder does not count
  * as moving it (`sameKey`). Every accepted move names its sender as the
  * card's placer. Pure.
  *
  * - No `from`: the card is created, its sender its owner, with no command.
- * - No `to`: the card is removed. Only a fresh column's card is: closing an
- *   unsent column is the only removal there is.
+ * - No `to`: the card is removed. Only a fresh column's card is, or one in
+ *   the sender's own inventory: neither is anywhere anyone else sees.
+ * - Into or out of an inventory: only its holder's, and into it only while
+ *   it holds fewer than `INVENTORY_SLOTS` cards. A creation obeys both.
  * - To the queue: after the lane's last card, queued by the sender, and why
  *   it was not sent before is cleared. Below the line again, it keeps both.
  */
@@ -316,6 +347,8 @@ export function planMove(
   if (move.from === null) {
     if (now !== undefined) return { kind: "refused", code: "exists", now }
     if (move.to === null) return { kind: "refused", code: "gone", now: null }
+    const refusal = refuseInto(move.to, cards, move.card, sender)
+    if (refusal !== null) return { kind: "refused", code: refusal, now: null }
     return {
       kind: "write",
       record: {
@@ -331,10 +364,14 @@ export function planMove(
   if (now === undefined) return { kind: "refused", code: "gone", now: null }
   if (!sameKey(keyOf(now.place), move.from))
     return { kind: "refused", code: "moved", now }
+  if (!ownsPlace(move.from, sender))
+    return { kind: "refused", code: "not-yours", now }
   if (move.to === null)
-    return now.place.kind === "fresh"
+    return now.place.kind === "fresh" || now.place.kind === "inventory"
       ? { kind: "remove", id: now.id }
       : { kind: "refused", code: "not-fresh", now }
+  const refusal = refuseInto(move.to, cards, move.card, sender)
+  if (refusal !== null) return { kind: "refused", code: refusal, now }
   return {
     kind: "write",
     record: {
@@ -344,6 +381,35 @@ export function planMove(
       unsent: move.to.kind === "queued" ? null : now.unsent,
     },
   }
+}
+
+/**
+ * What a fresh column's first send does to the column's other cards: each
+ * goes to drafting at `at`, the message the send wrote, on `lane`. The column
+ * has become that thread's, and a card left fresh under its key would be
+ * drawn nowhere. The host's write, not a person's move, so each card keeps its
+ * placer, as `planUnsent` does. Nothing when the sent card was not fresh.
+ * Pure.
+ */
+export function planFreshFollow(
+  cards: readonly CardRecord[],
+  sent: CardId,
+  at: EntryId,
+  lane: LaneName | null,
+): readonly PlaceStep[] {
+  const place = cards.find(c => c.id === sent)?.place
+  if (place?.kind !== "fresh") return []
+  return cards
+    .filter(
+      c =>
+        c.id !== sent &&
+        c.place.kind === "fresh" &&
+        c.place.column === place.column,
+    )
+    .map(c => ({
+      kind: "write",
+      record: { ...c, place: { kind: "drafting", at: atEntry(at), lane } },
+    }))
 }
 
 /**

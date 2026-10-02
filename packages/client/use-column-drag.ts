@@ -15,9 +15,9 @@ import {
 } from "react"
 import { edgeScroll, gapAt, landing } from "./reorder.ts"
 
-/** Where a press in a header starts no drag: its controls. */
+/** Where a press in a header starts no drag: its controls, and a card's own drag. */
 const NOT_A_HANDLE =
-  "button:not(.grip), a, input, textarea, select, summary, [role='menu']"
+  "button:not(.grip), a, input, textarea, select, summary, [role='menu'], [draggable='true']"
 
 /** How far, in px, a press moves before it is a drag rather than a click. */
 export const DRAG_START = 5
