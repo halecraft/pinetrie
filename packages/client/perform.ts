@@ -14,6 +14,8 @@ export interface AppPorts {
   >
   /** Scroll to an entry once it is drawn (`useReveal`). */
   readonly reveal: (entry: string) => void
+  /** Open an ask's fold (`FoldMemory`). */
+  readonly openFold: (ask: string) => void
   /** Select a root in the Archive tab. */
   readonly pickArchived: (root: string) => void
   /** The column keyed `key` takes focus when it mounts. */
@@ -47,6 +49,9 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "discardCard":
       ports.session.discardCard(effect.card)
+      return
+    case "openFold":
+      ports.openFold(effect.ask)
       return
     case "reveal":
       ports.reveal(effect.entry)

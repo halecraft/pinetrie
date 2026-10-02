@@ -79,6 +79,8 @@ const RevisionRecordSchema = Type.Object({
   snapshot: Type.Optional(
     Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
   ),
+  // Absent in records written before turns recorded their paths (ADR-0056).
+  paths: Type.Optional(Type.Array(Type.String())),
 })
 
 const ProjectRecordSchema = Type.Union([
@@ -175,6 +177,7 @@ export const decodeRevisionRecord = (
       r.snapshot === undefined || r.snapshot === null
         ? null
         : snapshotId(r.snapshot),
+    paths: r.paths ?? [],
   }))
 
 export const decodeProjectRecord = (
@@ -263,7 +266,7 @@ export function encodeWorkRecord(r: WorkRecord): {
       return {
         namespace: REVISION_NAMESPACE,
         key: r.record.entry,
-        value: { ...r.record },
+        value: { ...r.record, paths: [...r.record.paths] },
       }
     case "landing":
       return {
@@ -419,7 +422,8 @@ export const landingOutcome = (input: {
  * snapshot, and a commit when one was made. A prompt with nothing to commit
  * records the lane's newest revision, so a branch from it names the commit
  * its disk was at even after your `@-` moved. A lane working directly records
- * its prompts only, with neither.
+ * its prompts only, with neither. Only a turn's own commit carries the paths
+ * it changed: a prompt's newest revision is what came before it (ADR-0056).
  */
 export function planTurnRecord(input: {
   readonly entry: EntryId
@@ -434,14 +438,24 @@ export function planTurnRecord(input: {
   readonly newest: CommitId | null
   /** The turn's snapshot, or null when it failed. */
   readonly snapshot: SnapshotId | null
+  /** The paths `committed` changed (`changedPaths`); none without one. */
+  readonly paths: readonly string[]
 }): RevisionRecord | null {
   const { entry, lane } = input
   if (!input.own)
-    return input.isPrompt ? { entry, lane, commit: null, snapshot: null } : null
+    return input.isPrompt
+      ? { entry, lane, commit: null, snapshot: null, paths: [] }
+      : null
   if (!input.isPrompt && !input.toolCalls && input.committed === null)
     return null
   const commit = input.committed ?? (input.isPrompt ? input.newest : null)
-  return { entry, lane, commit, snapshot: input.snapshot }
+  return {
+    entry,
+    lane,
+    commit,
+    snapshot: input.snapshot,
+    paths: input.committed === null ? [] : input.paths,
+  }
 }
 
 /**

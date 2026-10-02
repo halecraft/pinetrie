@@ -283,6 +283,10 @@ containers, disks and the helper.
   prompt's `newest`). The ancestry query (`isAncestor`) runs only when `@`
   is empty and its one parent is not the bookmark: most turns change
   nothing, and cost no extra command.
+- **`changedPaths`** is a turn's paths, from the bookmark before it to its
+  commit, made or adopted, which its revision records (ADR-0056): read with
+  git, from the root, with `-z`, since git quotes a path with non-ASCII
+  characters otherwise (S70). An update's changed files use it too.
 - **An update merges a copy of your `@`**, made in the lane (`planYourCopy`),
   never your `@-`: the lane takes what you have, committed or not.
 - **The merge is committed at once,** even with nothing to resolve.
@@ -291,9 +295,9 @@ containers, disks and the helper.
 - **Conflicts** are read with `jj file list -T 'if(conflict, path ++ "\n")'`,
   and a conflicted file's content with `jj file show`: the host cannot read a
   lane's disk.
-- **A clean update's changed files come from git** (`git -C /workspace diff
-  --name-only`): jj's `--name-only` prints paths from the process's
-  directory, which in a lane is not the repo's.
+- **A clean update's changed files come from git** (`changedPaths`): jj's
+  `--name-only` prints paths from the process's directory, which in a lane
+  is not the repo's.
 
 ## Offers in your repo (`offer.ts`, `plan.ts`, ADR-0038, ADR-0039)
 
@@ -363,6 +367,14 @@ containers, disks and the helper.
   process's directory, and `root:` matches every file under a directory of
   that name. A commit id names one commit, so neither resolves a change id
   or meets a divergent one.
+- **A range reads in two commands** (ADR-0056, S70): `jj diff --from --to
+  -T RANGE_FILES` gives each file's path, display path and status, one JSON
+  object a line, since a `TreeDiffEntry` has no line counts; `jj diff
+  --from --to --git` gives the counts, one `diff --git` section per file in
+  the same order (`gitDiffCounts`). The two must list as many files, or the
+  read fails. A range has no description. `fileDiff` reads a range with
+  `--from --to`. A commit stays readable by id after it is abandoned, so a
+  lane's revisions can be read after a take or a split.
 - **`hostCommitIn`** splits a divergent revision's commits by the user of
   each one's newest evolog operation: the host's is abandoned, yours kept.
 

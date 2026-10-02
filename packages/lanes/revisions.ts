@@ -13,6 +13,7 @@ import {
   type EntryId,
   type LaneName,
   TRAILERS,
+  WORKSPACE_ROOT,
   type YoursNow,
 } from "@pineta/core"
 import { setBookmark } from "./bookmarks.ts"
@@ -130,4 +131,30 @@ export async function yoursAt(jj: Runner): Promise<YoursNow> {
   const [at] = await commitsOf(jj, "@")
   if (at === undefined) throw new Error("your repo has no @")
   return { at, parents: await commitsOf(jj, "@-") }
+}
+
+/**
+ * The paths changed from `from` to `to` in the lane's repo, from its root;
+ * from `to`'s parent when there is no `from` (ADR-0056): read with git, since jj's `--name-only` prints them from the
+ * process's directory, and with `-z`, since git quotes a path with
+ * non-ASCII characters otherwise (S70). `lane` runs in the lane, as
+ * `LaneHandle.runners.lane` does.
+ */
+export async function changedPaths(
+  lane: Runner,
+  from: CommitId | null,
+  to: CommitId,
+): Promise<readonly string[]> {
+  const ran = await lane([
+    "git",
+    "-C",
+    WORKSPACE_ROOT,
+    "diff",
+    "--name-only",
+    "-z",
+    from ?? `${to}^`,
+    to,
+  ])
+  if (!ran.ok) throw new Error(describeFailure("git diff --name-only", ran))
+  return ran.stdout.split("\0").filter(p => p !== "")
 }

@@ -482,17 +482,17 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a capsule ignores where it is clicked",
     file: "packages/client/rail.tsx",
-    from: "        p.onPick(pickAt(run.ids, at))",
-    to: "        p.onPick(pickAt(run.ids, at === null ? null : 0))",
+    from: "        p.onPick(pickAt(stretch.ids, at))",
+    to: "        p.onPick(pickAt(stretch.ids, at === null ? null : 0))",
     suite: "browser",
     scenario: "tools",
     expect:
       "a click lower on a capsule shows the message that far through its run",
   },
   {
-    name: "a run is drawn as one dot",
+    name: "a stretch is drawn as one dot",
     file: "packages/client/rail.tsx",
-    from: "      data-count={run.ids.length}",
+    from: "      data-count={stretch.ids.length}",
     to: "      data-count={1}",
     suite: "browser",
     scenario: "tools",
@@ -711,8 +711,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "live work is drawn a render behind the document",
     file: "packages/client/app.tsx",
-    from: "  const shared = {\n    activity,\n    live,\n",
-    to: "  const [lagged, setLagged] = useState(live)\n  useEffect(() => setLagged(live), [live])\n  const shared = {\n    activity,\n    live: lagged,\n",
+    from: "  const shared = {\n    activity,\n    asks,\n    folds,\n    stops,\n    live,\n",
+    // A frame behind, not a render: a render's passive effect can be
+    // flushed before paint by a later update in the same frame.
+    to: "  const [lagged, setLagged] = useState(live)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setLagged(live))\n    return () => cancelAnimationFrame(f)\n  }, [live])\n  const shared = {\n    activity,\n    asks,\n    folds,\n    stops,\n    live: lagged,\n",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -831,8 +833,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column forgets its end on unmount",
     file: "packages/client/use-follow.ts",
-    from: "  useLayoutEffect(() => () => leave?.(state.current.unseen), [leave])",
-    to: "  useLayoutEffect(() => () => {}, [leave])",
+    from: '      window.removeEventListener("pagehide", left)\n      left()\n',
+    to: '      window.removeEventListener("pagehide", left)\n',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1209,5 +1211,43 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "tools",
     expect: "stop ended the command at once, recorded as aborted",
+  },
+  {
+    name: "a stop is recorded under no one who pressed it",
+    file: "apps/pineta/host/commands/index.ts",
+    from: "        return respond(await handleStop(deps, intent.lane, writer))",
+    to: "        return respond(await handleStop(deps, intent.lane, intent.lane as never))",
+    suite: "host",
+    scenario: "tools",
+    expect: "the stop is recorded under its ask, naming who stopped it",
+  },
+  {
+    name: "the ask bar takes room",
+    file: "packages/client/index.html",
+    from: "      .ask-bar-slot { position: sticky; top: -.75rem; height: 0; z-index: 2; }",
+    to: "      .ask-bar-slot { position: sticky; top: -.75rem; height: 1.5rem; z-index: 2; }",
+    suite: "browser",
+    scenario: "tools",
+    expect: "the bar names the ask whose work is at the top, and takes no room",
+  },
+  {
+    name: "a hidden page leaves no mark where its threads were",
+    file: "packages/client/use-follow.ts",
+    from: '    document.addEventListener("visibilitychange", hidden)\n',
+    to: "",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a thread left while the page was hidden marks what came since, and the line takes no room",
+  },
+  {
+    name: "an ask's work never folds",
+    file: "packages/client/ask-work.tsx",
+    from: "  const open = foldOpen({",
+    to: "  const open = true || foldOpen({",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "an ask is open while it runs, and folds at its end above the view, the column at its end and the last word in view",
   },
 ]

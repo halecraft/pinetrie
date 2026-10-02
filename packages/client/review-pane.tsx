@@ -51,7 +51,10 @@ const REVIEW_PANE_PROPS = {
 } as const
 
 function ReviewPaneView(p: ReviewPaneProps) {
-  const revisions = useFetched(p.target.commits.map(reviewUrl), readReview)
+  const revisions = useFetched(
+    p.target.spans.map(s => reviewUrl(s)),
+    readReview,
+  )
   const view = reviewView(p.target, revisions)
   const pane = useRef<HTMLElement>(null)
   const head = useRef<HTMLDivElement>(null)
@@ -131,7 +134,7 @@ function ReviewPaneView(p: ReviewPaneProps) {
         {view.listed && (
           <nav aria-label="files" className="review-list">
             {view.revisions.map(r => (
-              <div className="review-list-revision" key={r.commit}>
+              <div className="review-list-revision" key={r.key}>
                 {r.state.kind !== "ready" ? (
                   <div className="review-note">
                     {r.state.kind === "loading" ? "…" : r.state.reason}
@@ -168,7 +171,7 @@ function ReviewPaneView(p: ReviewPaneProps) {
         )}
         <div className="review-diffs" onScroll={onScroll} ref={diffs}>
           {view.revisions.map(r => (
-            <div className="review-revision" key={r.commit}>
+            <div className="review-revision" key={r.key}>
               {r.state.kind !== "ready" ? (
                 <div className="review-note">
                   {r.state.kind === "loading"
@@ -224,7 +227,7 @@ function ReviewFileView({ row, watch }: ReviewFileProps) {
   }, [wanted, watch])
   const open = row.startsCollapsed === toggled
   const [diff] = useFetched(
-    open && wanted ? [diffUrl(row.commit, row.path)] : [],
+    open && wanted ? [diffUrl(row.span, row.path)] : [],
     readText,
   )
   const state = sectionState(row.startsCollapsed, toggled, wanted, diff ?? null)

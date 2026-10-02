@@ -6,8 +6,15 @@
 // under its position, as `LayoutAction` nests `ColumnAction` under a root, and
 // a message's acts (`MessageAct`) are among them.
 
-import type { ArchiveRecord, CardId, EntryId, TreeIndex } from "@pineta/core"
+import type {
+  ArchiveRecord,
+  AskIndex,
+  CardId,
+  EntryId,
+  TreeIndex,
+} from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
+import type { Density } from "./ask-words.ts"
 import type { Pending, Prefill } from "./columns.ts"
 import type { Identity, NameStep } from "./identity.ts"
 import {
@@ -25,6 +32,8 @@ export type ColumnAct =
   | { readonly kind: "close"; readonly discard: CardId | null }
   /** Move the column to index `to`. */
   | { readonly kind: "move"; readonly to: number }
+  /** Read the column at `density` (ADR-0056). */
+  | { readonly kind: "density"; readonly density: Density }
   /** A fresh column's first send, as send `sendId`. */
   | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
   /** After a conflict: a fresh column at `at`, which sends `pending` there. */
@@ -71,6 +80,8 @@ export type Effect =
   | { readonly kind: "discardCard"; readonly card: CardId }
   /** Scroll to entry `entry` once it is drawn (`useReveal`). */
   | { readonly kind: "reveal"; readonly entry: string }
+  /** Open ask `ask`'s fold, so what is revealed in it is drawn (ADR-0056). */
+  | { readonly kind: "openFold"; readonly ask: EntryId }
   /** Select `root` in the Archive tab, which previews it. */
   | { readonly kind: "pickArchived"; readonly root: string }
   /** The column keyed `key` takes focus when it mounts (`claimFocus`). */
@@ -87,6 +98,8 @@ export interface IntentState {
   readonly layout: Layout
   readonly index: TreeIndex
   readonly archive: ReadonlyMap<string, ArchiveRecord>
+  /** Every ask (`indexAsks`): a pick into one's work opens its fold. */
+  readonly asks: AskIndex
 }
 
 const layout = (action: LayoutAction): Effect => ({ kind: "layout", action })
@@ -144,7 +157,9 @@ export function planIntent(
 /**
  * Show entry `id` (`planOpen`): in view in the column that shows it, in a new
  * column beside the one sharing most of its path, or, in an archived root,
- * in the Archive tab's preview.
+ * in the Archive tab's preview. An entry of an ask's work opens the ask's
+ * fold first, whatever the column's density, so it is drawn to be revealed
+ * (ADR-0056): forks, branch starts and people's messages are never in one.
  */
 function planOpenAt(
   id: string,
@@ -153,11 +168,15 @@ function planOpenAt(
 ): readonly Effect[] {
   const plan = planOpen(state.layout, state.index, state.archive, id)
   if (plan === null) return []
+  const ask = state.asks.askOf.get(id as EntryId)
+  const fold: readonly Effect[] =
+    ask === undefined ? [] : [{ kind: "openFold", ask }]
   switch (plan.kind) {
     case "scroll":
-      return [{ kind: "reveal", entry: id }, showRoot(plan.root)]
+      return [...fold, { kind: "reveal", entry: id }, showRoot(plan.root)]
     case "open":
       return [
+        ...fold,
         { kind: "reveal", entry: id },
         showRoot(plan.root),
         layout({
@@ -232,6 +251,8 @@ function planColumn(
     }
     case "move":
       return onRoot({ kind: "move", from: position, to: act.to })
+    case "density":
+      return onRoot({ kind: "density", index: position, density: act.density })
     case "sent":
       if (active?.kind === "new")
         return [layout({ kind: "sent", key: active.key, sendId: act.sendId })]

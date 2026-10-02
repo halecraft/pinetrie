@@ -1,30 +1,35 @@
 // client/rail — one root's tree, beside its columns (ADR-0029).
 //
 // A dot per message, a capsule per stretch of uneventful messages, and a line
-// per parent link, drawn from `compactRail`. The rail is E (everything in this
+// per parent link, drawn from `compactRail`. A long ask is a dot and a
+// capsule of its own (ADR-0056). The rail is E (everything in this
 // root); the lit column is T (what the agent reads). Colours come from one palette indexed by track, which the column
 // headers and fork dots share, so a branch looks the same everywhere.
 
 import {
   type AgentRun,
+  type AskIndex,
   compactRail,
+  messageAt,
   PENDING_TRACK,
   type RailItem,
   type RailRow,
-  type RailRun,
+  type RailStretch,
+  type RevisionRecord,
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
 import { type ComponentProps, type CSSProperties, useMemo } from "react"
+import { askWords, workWords } from "./ask-words.ts"
 import { CardPip } from "./card-pip.tsx"
 import { nameFor } from "./presence.tsx"
 import {
   pickAt,
-  type RunFill,
   railItems,
   railKeep,
-  runFill,
-  runLabel,
+  type StretchFill,
+  stretchFill,
+  stretchWords,
 } from "./rail-view.ts"
 import type { SessionClient } from "./session-view.ts"
 import { useReadingAt } from "./use-presence.ts"
@@ -70,6 +75,7 @@ const x = (track: number) => PAD + track * GAP
 const y = (slot: number) => PAD + slot * ROW
 
 export function Rail({
+  index,
   items,
   open,
   activity,
@@ -77,7 +83,12 @@ export function Rail({
   here,
   yours,
   nameOf,
+  digests,
 }: {
+  /** The tree the items were compacted from: a long ask's capsule names its ask. */
+  index: TreeIndex
+  /** Each ask's model-written digest, which a long ask's capsule shows. */
+  digests: ReadonlyMap<string, { readonly text: string }>
   items: readonly RailItem[]
   /** Ids on any open column's path: marked `data-open`. */
   open: ReadonlySet<string>
@@ -94,7 +105,7 @@ export function Rail({
   /** A writer's name, for a capsule's label. */
   nameOf: (writer: WriterId) => string
 }) {
-  // Every message, a run's included, to the item that draws it.
+  // Every message, a stretch's included, to the item that draws it.
   const itemOf = new Map(items.flatMap(it => it.ids.map(id => [id, it])))
   const tracks = items.reduce((n, it) => Math.max(n, it.track + 1), 1)
   const last = items.at(-1)
@@ -110,7 +121,7 @@ export function Rail({
             const parent =
               it.parentId === null ? undefined : itemOf.get(it.parentId)
             if (parent === undefined || it.parentTrack === null) return null
-            // An edge leaves its parent's last slot: a run's bottom.
+            // An edge leaves its parent's last slot: a capsule's bottom.
             const from = parent.slot + parent.span - 1
             // Down the parent's track to its row, then across and down the
             // child's: a branch leaves its parent and runs on its own rail.
@@ -132,13 +143,17 @@ export function Rail({
         {/* Dots and capsules are buttons over the drawing, so they are
           reachable by keyboard and read as controls. */}
         {railItems(items, { open, yours }).map(([it, marks]) =>
-          it.kind === "run" ? (
+          it.kind === "stretch" ? (
             <Capsule
               key={it.ids[0]}
-              label={runLabel(it.ids.length, it.stats, nameOf)}
+              label={stretchWords(
+                askLine(index, it.ask, nameOf),
+                workWords(it.stats, nameOf),
+                it.ask === null ? null : (digests.get(it.ask)?.text ?? null),
+              )}
               onPick={onPick}
               open={marks.open}
-              run={it}
+              stretch={it}
             />
           ) : (
             <Dot
@@ -159,24 +174,39 @@ export function Rail({
   )
 }
 
+/** A long ask's first line, for its capsule's tooltip; null for any other stretch. */
+function askLine(
+  index: TreeIndex,
+  ask: string | null,
+  nameOf: (writer: WriterId) => string,
+): string | null {
+  const prompt = ask === null ? null : messageAt(index, ask)
+  return prompt === null ? null : askWords(prompt, nameOf)
+}
+
 /**
  * A root's rail with others' rings. It reads presence itself, so a presence
  * write redraws the rail and not the columns. Others' thread ends are kept
- * out of runs (`railKeep`), so which items are drawn depends on presence too.
+ * out of stretches (`railKeep`), so which items are drawn depends on
+ * presence too.
  */
 export function LiveRail({
   session,
-  index,
   rows,
   ends,
   names,
   colorOf,
+  asks,
+  revisions,
   ...rail
 }: {
   session: SessionClient
-  index: TreeIndex
   /** The root's rows (`projectRail`), before compacting. */
   rows: readonly RailRow[]
+  /** Every ask, which a long one's stretch keeps to (`indexAsks`). */
+  asks: AskIndex
+  /** The turns' revisions, whose paths a capsule counts. */
+  revisions: ReadonlyMap<string, RevisionRecord>
   /** Each open column's end (`ColumnView.tipId`). */
   ends: readonly (string | null)[]
   names: ReadonlyMap<WriterId, string>
@@ -193,15 +223,16 @@ export function LiveRail({
       ),
     [reading, names, colorOf],
   )
-  const { activity, yours } = rail
+  const { index, activity, yours } = rail
   const items = useMemo(
     () =>
       compactRail(
         index,
         rows,
         railKeep({ rings: here, activity, ends, cards: yours.ends }),
+        { asks, revisions },
       ),
-    [index, rows, here, activity, ends, yours.ends],
+    [index, rows, here, activity, ends, yours.ends, asks, revisions],
   )
   return (
     <Rail {...rail} here={here} items={items} nameOf={w => nameFor(names, w)} />
@@ -289,13 +320,8 @@ function Dot(p: {
   )
 }
 
-/**
- * A run: a capsule on its track, `span` rows long (one, and one more per digit
- * of its size), filled by who wrote it (`runFill`). A click opens the message at that point of the run (`pickAt`); the
- * column is where a run is read.
- */
-/** A capsule's background in its track's colour, by `runFill`. */
-const FILL: Record<RunFill, (color: string) => string> = {
+/** A capsule's background in its track's colour, by `stretchFill`. */
+const FILL: Record<StretchFill, (color: string) => string> = {
   agent: () => PANEL,
   people: color => color,
   // Half strength, blended with the panel rather than transparent: the track's
@@ -303,35 +329,42 @@ const FILL: Record<RunFill, (color: string) => string> = {
   mixed: color => `color-mix(in srgb, ${color} 50%, ${PANEL})`,
 }
 
+/**
+ * A stretch: a capsule on its track, `span` rows long (one, and one more per
+ * digit of its size), filled by who wrote it (`stretchFill`). A click opens
+ * the message at that point of the stretch (`pickAt`), its ask's fold
+ * included; the column is where a stretch is read.
+ */
 function Capsule(p: {
-  run: RailRun
+  stretch: RailStretch
   label: string
   open: boolean
   onPick: (id: string) => void
 }) {
-  const { run } = p
-  const color = trackColor(run.track)
-  const fill = runFill(run.ids.length, run.stats)
+  const { stretch } = p
+  const color = trackColor(stretch.track)
+  const fill = stretchFill(stretch.stats)
   return (
     <button
       aria-label={p.label}
-      className="rail-run"
-      data-count={run.ids.length}
-      data-entry={run.ids[0]}
+      className="rail-stretch"
+      data-ask={stretch.ask ?? undefined}
+      data-count={stretch.ids.length}
+      data-entry={stretch.ids[0]}
       data-fill={fill}
       data-open={p.open ? "yes" : "no"}
-      data-span={run.span}
-      data-track={run.track}
+      data-span={stretch.span}
+      data-track={stretch.track}
       onClick={e => {
         const box = e.currentTarget.getBoundingClientRect()
         // A click from the keyboard has no point: `detail` is 0.
         const at = e.detail === 0 ? null : (e.clientY - box.top) / box.height
-        p.onPick(pickAt(run.ids, at))
+        p.onPick(pickAt(stretch.ids, at))
       }}
       style={{
-        left: x(run.track) - DOT,
-        top: y(run.slot) - ROW / 2 + 2,
-        height: run.span * ROW - 4,
+        left: x(stretch.track) - DOT,
+        top: y(stretch.slot) - ROW / 2 + 2,
+        height: stretch.span * ROW - 4,
         borderColor: color,
         background: FILL[fill](color),
       }}

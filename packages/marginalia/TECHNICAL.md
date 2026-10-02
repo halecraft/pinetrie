@@ -216,6 +216,34 @@ one on any entry, since the rule is the same everywhere.
   decide by it. The decoder checks only the shape (a non-empty title): the
   host is the session's one writer, and stores only parsed titles.
 
+# Stops (`stop.ts`, ADR-0056)
+
+Who stopped an ask's run: a host-written `pineta.stop` value keyed by the
+ask's prompt, holding who and when. pi's entries say only that a run was
+aborted (S70), so this is the only place a stop is named. `planStop`
+(core) decides it, and writes none when the ask has one: the first press is
+the one named. A stop recorded for a run that answered anyway is ignored
+(`askOutcome`).
+
+# Digests (`digest.ts`, ADR-0056)
+
+A model's short summary of an ask's work, when `{ "digests": { "enabled":
+true } }` is in the user config (`decodeDigestConfig`). A host-written
+`pineta.digest` value keyed by the ask's prompt, replaced whole each time:
+a value, not a text, since nothing accumulates (ADR-0014). No agent reads
+it.
+
+- **`digestDue` is asked on events, never on a timer**: each turn done,
+  and the run's end. While the run lasts, only when nothing is asked
+  already, someone reads the thread (`readsAsk`, over presence's
+  `reading`) and `DIGEST_EVERY` has passed; at the end, once, for the
+  final one.
+- **`digestStillWanted` is the one race:** a live digest asked during the
+  run can come back after the final one was written, and is dropped. A
+  digest is keyed by its prompt, so no other ask's can land on it.
+- **`digestRequest`** is the skill, the ask, the run's newest work that fits
+  (`fitNewest`: the oldest is cut first), and the last digest.
+
 # Where lanes work (`work.ts`, ADR-0032 to ADR-0034, ADR-0038, ADR-0039)
 
 Host-written records, each with a total decoder. `encodeWorkRecord` is
@@ -225,7 +253,7 @@ through one `setWorkRecord`:
 | record | namespace | key | written |
 |---|---|---|---|
 | a lane's setting: its own copy, or directly in a directory | `pineta.lane` | the lane | once, when the lane is created |
-| the commit and disk at an entry | `pineta.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
+| the commit and disk at an entry, and the paths its commit changed | `pineta.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
 | how a resolution ended | `pineta.landing` | its own id | when its run ends |
 | a lane's offer in your repo | `pineta.offer` | the lane | when a trigger changed it, or it was taken |
 | a commit you have of a lane: delivered by a take, or a copy of your `@`; a start until a newer copy in the lane's history supersedes it (S51) | `pineta.have` | the commit | at a take, a fork from your `@`, and an update |
@@ -248,7 +276,11 @@ through one `setWorkRecord`:
   - A lane working directly records its prompts with neither: it counts as
     the lane above, and the walk passes it.
   - A record from before lane containers has no `snapshot` key, which decodes
-    as null. A project record of kind `workspaces` no longer decodes; the
+    as null.
+  - Only a turn's own commit carries `paths` (`changedPaths`, ADR-0056): a
+    prompt's newest revision is what came before it. A record from before
+    paths decodes with none. An ask's file count is the union of its turns'
+    paths (`workStats`), so it is what its review lists. A project record of kind `workspaces` no longer decodes; the
     host rewrites it at start.
 - **`forkPoint`** is where a new lane of its own starts: the nearest snapshot
   above it, else the base snapshot; and the nearest commit, else a copy of
@@ -304,15 +336,20 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   `Pineta-Thread`, `Pineta-Lane` and `Pineta-Entry`.
 - **The review's wire** (ADR-0047) is here, since the host and the page both
   import it:
-  - `reviewUrl` and `diffUrl` build `/offer/<OFFER_WIRE>/review/<commit>`
-    and `/offer/<OFFER_WIRE>/diff/<commit>?path=…`; `parseOfferPath` reads
-    them back, and calls anything else under `/offer/` `bad`, another
-    version included. An answer is cached as immutable under its URL, so a
-    change to the template (`REVISION_READ`, `@pineta/lanes`), the schema
+  - Every read is of a span (`DiffSpan`, ADR-0056): a revision, or a range
+    from one commit to another. `reviewUrl` and `diffUrl` build
+    `/offer/<OFFER_WIRE>/review/<span>` and
+    `/offer/<OFFER_WIRE>/diff/<span>?path=…`, the span as `spanKey` writes
+    it, `<commit>` or `<from>..<to>`; `parseOfferPath` reads them back, and
+    calls anything else under `/offer/` `bad`, another version included. An
+    answer is cached as immutable under its URL, so a change to the
+    templates (`REVISION_READ`, `RANGE_FILES`, `@pineta/lanes`), the schema
     or `fileDiff`'s flags bumps `OFFER_WIRE`.
   - `decodeRevisionReview` is the one schema: the host decodes jj's JSON
     with it, and the page the host's answer.
-  - `planOfferRead` serves only a commit in an open offer's `commits`, and
+  - `planOfferRead` serves only a revision in an open offer's `commits`,
+    or a range whose two commits one lane's `pineta.revision` records name
+    (an ask's work), each read from the record, never the request; and it
     refuses an empty path or one with a control character.
     `answerReview` and `answerDiff` settle what was read: 502 when the
     read failed, 413 past `MAX_DIFF_BYTES`.

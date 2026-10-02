@@ -11,7 +11,13 @@ import { committedProject, suiteModel, waitFor } from "../harness.ts"
 import { greyPng, RED_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { asPerson, chooseFromMenu, col, launchBrowser } from "./page.ts"
+import {
+  asPerson,
+  chooseFromMenu,
+  col,
+  launchBrowser,
+  readRaw,
+} from "./page.ts"
 
 export const scenario: Scenario = {
   run: ({ check }) => run(check),
@@ -221,6 +227,7 @@ async function run(check: Checks["check"]): Promise<void> {
         const say = async (text: string) => {
           await ip.fill(`${col(0)} .composer .input`, text)
           await ip.click(`${col(0)} .composer .send`)
+          await readRaw(ip)
         }
         const idle = () =>
           waitFor(() => Object.keys(imageHost.doc.activeRuns()).length === 0)

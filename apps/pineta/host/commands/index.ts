@@ -84,7 +84,7 @@ export function createCommands(deps: CommandDeps): Commands {
         await agent.setParticipantName(writer, intent.name)
         return respond({ kind: "named" })
       case "stop":
-        return respond(await handleStop(deps, intent.lane))
+        return respond(await handleStop(deps, intent.lane, writer))
       case "archive":
         return respond(await handleArchive(deps, writer, intent))
       case "mark":

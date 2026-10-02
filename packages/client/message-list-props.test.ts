@@ -1,5 +1,6 @@
 import type { ColumnView, LaneName } from "@pineta/core"
 import { expect, test } from "vitest"
+import { foldMemory } from "./ask-fold.ts"
 import type { LaneJoin } from "./column-view.ts"
 import {
   type MessageListProps,
@@ -30,17 +31,39 @@ const shared = {
   nameOf: new Map(),
   doc: {} as MessageListProps["doc"],
   onAct: () => {},
+  asks: { askOf: new Map(), work: new Map(), last: new Map() },
+  stops: new Map(),
+  revisions: new Map(),
+  folds: foldMemory(),
+  onReviewAsk: () => {},
+  digests: new Map(),
 }
 const props = (over: Partial<MessageListProps> = {}): MessageListProps => ({
   ...shared,
   view,
   lane: lane(),
   joins: joins(),
+  landmarks: ["e1"],
+  density: "story",
+  releasedTip: null,
+  runningAsk: null,
+  leftBefore: null,
   ...over,
 })
 
 test("a column's list draws the same from a lane and joins rebuilt unchanged", () => {
   expect(sameMessageListProps(props(), props())).toBe(true)
+})
+
+test("a column's list redraws when its density, its reader's release or its landmarks change, and not when they are rebuilt unchanged", () => {
+  expect(sameMessageListProps(props(), props({ landmarks: ["e1"] }))).toBe(true)
+  expect(sameMessageListProps(props(), props({ density: "outline" }))).toBe(
+    false,
+  )
+  expect(sameMessageListProps(props(), props({ releasedTip: "e1" }))).toBe(
+    false,
+  )
+  expect(sameMessageListProps(props(), props({ landmarks: [] }))).toBe(false)
 })
 
 test("a column's list redraws when its lane, joins or view change", () => {

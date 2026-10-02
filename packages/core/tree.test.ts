@@ -10,6 +10,7 @@ import {
   type EntryLike,
   entryId,
   followTip,
+  indexAsks,
   indexTree,
   type LaneName,
   laneNameForThread,
@@ -23,7 +24,8 @@ import {
   type RailItem,
   ROOT,
   rootOf,
-  runSpan,
+  type StopRecord,
+  stretchSpan,
   tailEdit,
   threadOf,
   toolLabel,
@@ -302,16 +304,19 @@ describe("compactRail", () => {
     keep: readonly string[] = [],
   ) => {
     const i = indexTree(entries)
-    return compactRail(i, projectRail(i, root), new Set(keep))
+    return compactRail(i, projectRail(i, root), new Set(keep), {
+      asks: indexAsks(i),
+      revisions: new Map(),
+    })
   }
   const shape = (items: readonly RailItem[]) =>
     items.map(it => (it.kind === "dot" ? it.ids[0] : [...it.ids]))
 
-  test("an agent loop between a question and its reply is one run", () => {
+  test("an agent loop between a question and its reply is one stretch", () => {
     const items = compact(loop(12), "000-q")
     expect(shape(items)).toEqual(["000-q", steps(12), "999-a"])
     expect(items[1]).toMatchObject({
-      kind: "run",
+      kind: "stretch",
       span: 3,
       stats: { people: 0, writers: [], calls: 12, failed: 0 },
     })
@@ -329,7 +334,7 @@ describe("compactRail", () => {
       "999-a",
     ])
   })
-  test("roots, forks, branches and thread ends are never in a run", () => {
+  test("roots, forks, branches and thread ends are never in a stretch", () => {
     const branched = tree({
       "01": null,
       "02": "01",
@@ -353,7 +358,7 @@ describe("compactRail", () => {
       "11",
     ])
   })
-  test("a kept message splits a run around it", () => {
+  test("a kept message splits a stretch around it", () => {
     const [a, b] = [steps(12).slice(0, 5), steps(12).slice(6)]
     expect(shape(compact(loop(12), "000-q", ["012-s"]))).toEqual([
       "000-q",
@@ -363,27 +368,30 @@ describe("compactRail", () => {
       "999-a",
     ])
   })
-  test("a failed call counts, its result below the run's last message included", () => {
-    const run = (failAt: number) =>
-      compact(loop(12, failAt), "000-q").find(it => it.kind === "run")
-    expect(run(3)).toMatchObject({ stats: { calls: 12, failed: 1 } })
-    expect(run(12)).toMatchObject({ stats: { calls: 12, failed: 1 } })
+  test("a failed call counts, its result below the stretch's last message included", () => {
+    const stretch = (failAt: number) =>
+      compact(loop(12, failAt), "000-q").find(it => it.kind === "stretch")
+    expect(stretch(3)).toMatchObject({ stats: { calls: 12, failed: 1 } })
+    expect(stretch(12)).toMatchObject({ stats: { calls: 12, failed: 1 } })
   })
-  test("a run's span is one row, and one more per digit of its size", () => {
-    expect([3, 9, 10, 99, 100].map(runSpan)).toEqual([2, 2, 3, 3, 4])
+  test("a stretch's span is one row, and one more per digit of its size", () => {
+    expect([3, 9, 10, 99, 100].map(stretchSpan)).toEqual([2, 2, 3, 3, 4])
     expect(compact(loop(100), "000-q")[1]).toMatchObject({ span: 4 })
   })
   test("every row is in exactly one item, in order, and slots add up", () => {
     const i = indexTree({ ...loop(12), ...tree({ "005-x": "004-s" }) })
     const rows = projectRail(i, "000-q")
-    const items = compactRail(i, rows, new Set())
+    const items = compactRail(i, rows, new Set(), {
+      asks: indexAsks(i),
+      revisions: new Map(),
+    })
     expect(items.flatMap(it => it.ids)).toEqual(rows.map(r => r.id))
     for (const [k, it] of items.entries())
       expect(it.slot).toBe(
         k === 0 ? 0 : (items[k - 1]?.slot ?? 0) + (items[k - 1]?.span ?? 0),
       )
   })
-  test("a run counts the messages people wrote, and who, in order", () => {
+  test("a stretch counts the messages people wrote, and who, in order", () => {
     const ada = writerId("w-ada")
     const bea = writerId("w-bea")
     const chat = (writer: typeof ada) => ({ role: "chat", author: "", writer })
@@ -731,18 +739,51 @@ describe("tool calls: paired with their results on the path", () => {
   })
 })
 
-test("planStop: abort a running lane; an idle one is already stopped; an unknown one is refused", () => {
+describe("planStop", () => {
+  const i = indexTree({
+    ...tree({ "1-p": null }),
+    "2-a": {
+      id: "2-a",
+      parentId: "1-p",
+      type: "message",
+      message: { role: "assistant", content: "working" },
+    },
+  })
+  const ada = writerId("ada")
   const lane = (running: boolean) => ({
     name: laneNameForThread("s"),
-    tip: null,
+    tip: "2-a",
     running,
     waiting: 0,
     askedBy: null,
     lastWaiting: null,
   })
-  expect(planStop([lane(true)], laneNameForThread("s"))).toBe("abort")
-  expect(planStop([lane(false)], laneNameForThread("s"))).toBe("idle")
-  expect(planStop([lane(true)], laneNameForThread("other"))).toBe("unknown")
+  const facts = (stops: ReadonlyMap<string, StopRecord> = new Map()) => ({
+    index: i,
+    stops,
+    by: ada,
+    now: 7,
+  })
+  const s = laneNameForThread("s")
+  test("a running lane is aborted, and its ask's stop recorded under its prompt", () => {
+    expect(planStop([lane(true)], s, facts())).toEqual({
+      kind: "abort",
+      record: { prompt: "1-p", value: { by: ada, at: 7 } },
+    })
+  })
+  test("the first stop recorded is kept: a second press records nothing", () => {
+    const first = new Map([["1-p", { by: writerId("bea"), at: 1 }]])
+    expect(planStop([lane(true)], s, facts(first))).toEqual({
+      kind: "abort",
+      record: null,
+    })
+  })
+  test("an idle lane is already stopped; an unknown one is refused", () => {
+    expect(planStop([lane(false)], s, facts())).toEqual({ kind: "idle" })
+    expect(planStop([lane(true)], laneNameForThread("other"), facts())).toEqual(
+      { kind: "unknown" },
+    )
+  })
 })
 
 describe("messageImages: only stored references", () => {

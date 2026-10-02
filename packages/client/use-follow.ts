@@ -21,6 +21,8 @@ export const PLACED = "pineta:placed"
 export interface Follow {
   /** Released, and content has arrived below since, or it was mounted behind. */
   readonly unseen: boolean
+  /** The column's tip when its reader left its end; null while following. */
+  readonly releasedTip: string | null
   /** Jump to the end, and follow it again. */
   readonly follow: () => void
 }
@@ -32,9 +34,12 @@ export interface Follow {
  * With `hold`, while `holding`, a shrink is taken up by `floor`, an element
  * after `content` inside the scroller.
  * With `seen`, it starts with ↓ new below showing when `seen.unseen` (read
- * at mount only), and tells `seen.leave` on unmount whether it was showing.
+ * at mount only), and tells `seen.leave` whether it was showing, and the
+ * tip it was released from: on unmount, and when the page is hidden, since
+ * most context switches leave the browser, not the tab (ADR-0056).
  * The first placement keeps it only short of the end: nothing clears it
  * before then, since a scroller's first resize comes after `alignOnOpen`.
+ * `tip` is the column's tip now, which a release keeps (`releasedTip`).
  */
 export function useFollow(
   scroller: RefObject<HTMLElement | null>,
@@ -45,18 +50,46 @@ export function useFollow(
   },
   seen?: {
     readonly unseen: boolean
-    readonly leave: (unseen: boolean) => void
+    /** The tip it was released from when it was last unmounted. */
+    readonly released: string | null
+    readonly leave: (left: {
+      readonly unseen: boolean
+      readonly released: string | null
+      readonly following: boolean
+    }) => void
   },
+  tip: string | null = null,
 ): Follow {
-  // A ref: it changes every frame while a reply streams. Only `unseen` is
-  // drawn, so only it is React state.
+  // A ref: it changes every frame while a reply streams. Only `unseen` and
+  // `releasedTip` are drawn, so only they are React state.
   const state = useRef<FollowState>({
     ...initialFollow,
     unseen: seen?.unseen ?? false,
+    releasedTip: seen?.released ?? null,
   })
   const [unseen, setUnseen] = useState(state.current.unseen)
+  const [releasedTip, setReleasedTip] = useState(state.current.releasedTip)
+  const tipNow = useRef(tip)
+  tipNow.current = tip
   const leave = seen?.leave
-  useLayoutEffect(() => () => leave?.(state.current.unseen), [leave])
+  useLayoutEffect(() => {
+    const left = () =>
+      leave?.({
+        unseen: state.current.unseen,
+        released: state.current.releasedTip,
+        following: state.current.following,
+      })
+    const hidden = () => {
+      if (document.visibilityState === "hidden") left()
+    }
+    document.addEventListener("visibilitychange", hidden)
+    window.addEventListener("pagehide", left)
+    return () => {
+      document.removeEventListener("visibilitychange", hidden)
+      window.removeEventListener("pagehide", left)
+      left()
+    }
+  }, [leave])
 
   const floorRef = hold?.floor
   const step = useCallback(
@@ -74,6 +107,7 @@ export function useFollow(
         clientHeight: el.clientHeight,
         content: content.current?.offsetHeight ?? el.scrollHeight,
         floor: floor?.offsetHeight ?? 0,
+        tip: tipNow.current,
       }
       const plan = follow(state.current, { ...event, at })
       state.current = plan.state
@@ -84,6 +118,7 @@ export function useFollow(
       // end, and each would read as the reader leaving.
       if (plan.scrollTo !== null) el.scrollTop = plan.scrollTo
       setUnseen(plan.state.unseen)
+      setReleasedTip(plan.state.releasedTip)
     },
     [scroller, content, floorRef],
   )
@@ -114,6 +149,7 @@ export function useFollow(
 
   return {
     unseen,
+    releasedTip,
     follow: useCallback(() => step({ kind: "follow" }), [step]),
   }
 }

@@ -15,9 +15,16 @@ const at = (
   scrollTop: number,
   scrollHeight: number,
   clientHeight = 300,
-  { content = scrollHeight, floor = 0 } = {},
+  { content = scrollHeight, floor = 0, tip = "t1" as string | null } = {},
 ) =>
-  ({ scrollTop, scrollHeight, clientHeight, content, floor }) satisfies Metrics
+  ({
+    scrollTop,
+    scrollHeight,
+    clientHeight,
+    content,
+    floor,
+    tip,
+  }) satisfies Metrics
 
 /** Following, left at the end of 1000 px of content in a 300 px viewport. */
 const atEnd = follow(initialFollow, {
@@ -36,6 +43,7 @@ test("following, a change of size scrolls to the end, and a narrower viewport do
     lastHeight: 1000,
     holding: false,
     held: 1000,
+    releasedTip: null,
   })
   const shorter = follow(atEnd, { kind: "resized", at: at(700, 1000, 200) })
   expect(shorter.scrollTo).toBe(800)
@@ -122,9 +130,9 @@ test("a column mounted behind keeps ↓ new below through its holding step and a
 describe("behind: a column mounted again", () => {
   test.each<[SeenEnd | undefined, boolean]>([
     [undefined, false],
-    [{ tip: "b", unseen: false }, false],
-    [{ tip: "a", unseen: false }, true],
-    [{ tip: "b", unseen: true }, true],
+    [{ tip: "b", unseen: false, released: null }, false],
+    [{ tip: "a", unseen: false, released: null }, true],
+    [{ tip: "b", unseen: true, released: "a" }, true],
   ])("seen %o at tip b is behind: %s", (seen, expected) => {
     expect(behind(seen, "b")).toBe(expected)
   })
@@ -253,5 +261,45 @@ describe("the floor, while work is written at the end", () => {
       at: at(430, 730, 300, { content: 730 }),
     })
     expect([shrank.floor, shrank.scrollTo]).toEqual([0, 430])
+  })
+})
+
+describe("releasedTip: the tip a reader left the end at (ADR-0056)", () => {
+  test("a scroll up keeps the tip of the moment, and more of the run does not move it", () => {
+    expect(released.releasedTip).toBe("t1")
+    const later = follow(released, {
+      kind: "resized",
+      at: at(300, 1400, 300, { tip: "t9" }),
+    }).state
+    const further = follow(later, {
+      kind: "scrolled",
+      at: at(100, 1400, 300, { tip: "t9" }),
+    }).state
+    expect(further.releasedTip).toBe("t1")
+  })
+  test("coming back to the end clears it, and leaving again keeps the new tip", () => {
+    const back = follow(released, {
+      kind: "scrolled",
+      at: at(1100, 1400, 300, { tip: "t9" }),
+    }).state
+    expect(back).toMatchObject({ following: true, releasedTip: null })
+    const again = follow(back, {
+      kind: "scrolled",
+      at: at(900, 1400, 300, { tip: "t9" }),
+    }).state
+    expect(again.releasedTip).toBe("t9")
+  })
+  test("a column mounted again released keeps its tip through a placement short of the end", () => {
+    const mounted: FollowState = { ...initialFollow, releasedTip: "t1" }
+    const placed = follow(mounted, {
+      kind: "placed",
+      at: at(0, 1000, 300, { tip: "t9" }),
+    })
+    expect(placed.state.releasedTip).toBe("t1")
+    const atEndNow = follow(mounted, {
+      kind: "placed",
+      at: at(700, 1000, 300, { tip: "t9" }),
+    })
+    expect(atEndNow.state.releasedTip).toBeNull()
   })
 })

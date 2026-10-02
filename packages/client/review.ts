@@ -2,7 +2,12 @@
 // each revision's title, body and files, what each file's section shows, and
 // a diff's lines by kind. `review-pane.tsx` draws it; `use-fetched.ts` reads.
 
-import type { CommitId, FileChange, RevisionReview } from "@pineta/core"
+import {
+  type DiffSpan,
+  type FileChange,
+  type RevisionReview,
+  spanKey,
+} from "@pineta/core"
 import { withoutTrailers } from "@pineta/marginalia"
 import type { ReviewTarget } from "./column-view.ts"
 
@@ -22,9 +27,9 @@ export const COLLAPSE_OVER = 400
 export const DIFF_LINES_SHOWN = 5000
 
 export interface FileRow {
-  /** `<commit>:<path>`: a stack can change one path in two revisions. */
+  /** `<span>:<path>` (`spanKey`): a stack can change one path in two revisions. */
   readonly key: string
-  readonly commit: CommitId
+  readonly span: DiffSpan
   readonly path: string
   readonly shown: string
   readonly letter: "A" | "M" | "D" | "C" | "R"
@@ -58,9 +63,11 @@ export interface ReviewView {
    * whose list heads each revision's files with its title instead.
    */
   readonly title: string | undefined
-  /** Bottom first, one per commit of the target. */
+  /** Bottom first, one per span of the target. */
   readonly revisions: readonly {
-    readonly commit: CommitId
+    readonly span: DiffSpan
+    /** `spanKey`'s. */
+    readonly key: string
     readonly state: Loaded<RevisionShown>
   }[]
 }
@@ -74,7 +81,7 @@ const LETTER: Record<FileChange, FileRow["letter"]> = {
 }
 
 /**
- * The review's rows from each commit's fetched review, in the target's
+ * The review's rows from each span's fetched review, in the target's
  * order. A file is flagged by path from the offer's record.
  */
 export function reviewView(
@@ -83,16 +90,17 @@ export function reviewView(
 ): ReviewView {
   const conflicts = new Set(target.conflicts)
   const yours = new Set(target.yourEdits)
-  const shown: ReviewView["revisions"] = target.commits.map((commit, i) => {
+  const shown: ReviewView["revisions"] = target.spans.map((span, i) => {
+    const key = spanKey(span)
     const got = revisions[i] ?? { kind: "loading" }
-    if (got.kind !== "ready") return { commit, state: got }
+    if (got.kind !== "ready") return { span, key, state: got }
     const text = withoutTrailers(got.value.description)
     const cut = text.indexOf("\n")
     const files = got.value.files.map(f => {
       const changed = f.added + f.removed
       return {
-        key: `${commit}:${f.path}`,
-        commit,
+        key: `${key}:${f.path}`,
+        span,
         path: f.path,
         shown: f.shown,
         letter: LETTER[f.change],
@@ -113,11 +121,15 @@ export function reviewView(
       }
     })
     return {
-      commit,
+      span,
+      key,
       state: {
         kind: "ready",
         value: {
-          title: (cut < 0 ? text : text.slice(0, cut)) || "(no description)",
+          title:
+            (cut < 0 ? text : text.slice(0, cut)) ||
+            target.title ||
+            "(no description)",
           body: cut < 0 ? "" : text.slice(cut + 1).trim(),
           files,
         },

@@ -79,7 +79,7 @@
       /* A running lane: a rail tip, a column's mark. */
       .pulse { animation: pulse 1s ease-in-out infinite; }
       /* A run of uneventful messages: a capsule, its length and fill inline. */
-      .rail-run { position: absolute; width: 8px; padding: 0; border: 1.5px solid; border-radius: 4px;
+      .rail-stretch { position: absolute; width: 8px; padding: 0; border: 1.5px solid; border-radius: 4px;
         box-sizing: border-box; }
       /* Others here (ADR-0024): the ring is inline style; several share a count. */
       .here-count { position: absolute; top: -9px; left: 7px; font-size: 9px; line-height: 1;
@@ -379,6 +379,48 @@
       @keyframes pulse-line { 50% { opacity: .35; transform: translateY(-.5rem) scaleX(1.6); } }
       /* The outline says a command is running; the line would say the model is. */
       .column-content:has(.tool.live[data-revealed]) .working-line { visibility: hidden; }
+      /* Asks (ADR-0056). A column's density: outline, story or raw. */
+      .column-head .density { display: inline-flex; flex: 0 0 auto; border: 1px solid #2c313a;
+        border-radius: 4px; overflow: hidden; }
+      .column-head .density-choice { padding: 0 .35rem; border-radius: 0; background: none;
+        color: #6f7784; font-size: .68rem; line-height: 1.4; }
+      .column-head .density-choice[aria-pressed="true"] { background: #23272e; color: #e6e6e6; }
+      /* An ask's work, folded to one line, or opened under it. */
+      .ask-fold, .ask-line { display: block; width: 100%; margin: 0 0 1rem; padding: .1rem .5rem;
+        text-align: left; font-size: .78rem; background: none; color: #8b93a1;
+        border-left: 2px solid #2f4a66; border-radius: 0; }
+      .ask-fold[aria-expanded="true"] { margin-bottom: .6rem; }
+      .ask-fold-head .ask-fold { padding-right: 4.5rem; }
+      .ask-fold::before, .ask-line::before { content: "▸ "; color: #6f7784; }
+      .ask-fold[aria-expanded="true"]::before, .ask-line[aria-expanded="true"]::before { content: "▾ "; }
+      .ask-fold:hover, .ask-line:hover { color: #e6e6e6; }
+      .ask-fold-head { position: relative; }
+      /* The files an ask changed: opens their review beside the column. */
+      .ask-files { position: absolute; top: .05rem; right: 0; padding: 0 .4rem; font-size: .72rem;
+        background: none; color: #9ecbff; border: 1px solid #2f4a66; border-radius: 3px; }
+      .ask-line.running { animation: pulse 1.2s ease-in-out infinite; color: #9ecbff; }
+      /* A model's summary of an ask's work: set apart from the agent's words. */
+      .ask-digest { margin: -.6rem 0 1rem; padding: .2rem .5rem; font-size: .8rem; font-style: italic;
+        color: #b2ccd6; border-left: 2px dotted #4a6577; }
+      .ask-digest::before { content: "summary · "; font-style: normal; color: #6f7784; }
+      .ask-outcome { margin: -.6rem 0 1rem; padding-left: .5rem; font-size: .78rem; color: #e0a080; }
+      /* Which ask the work at the top answers, while its message is out of
+         sight. The slot is sticky and zero-height, as .jump-slot is, so the
+         bar takes no room and the content's height is as it was. */
+      .ask-bar-slot { position: sticky; top: -.75rem; height: 0; z-index: 2; }
+      .ask-bar { position: absolute; top: 0; left: 0; right: 0; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; text-align: left; padding: .15rem .5rem;
+        font-size: .75rem; background: #1b1e24ee; color: #e0c080; border-radius: 0;
+        border-bottom: 1px solid #2c313a; }
+      /* Where this device last left the thread. Zero height, as the working
+         line is, so its arrival moves nothing; the rule and its words are
+         drawn in the gap above. */
+      .left-line { position: relative; height: 0; outline: 1px dashed #e0c080;
+        transform: translateY(-.5rem); }
+      .left-line::after { content: attr(data-words); position: absolute; right: 0; top: -.6rem;
+        padding: 0 .3rem; font-size: .65rem; line-height: 1.1rem; color: #e0c080; background: #14161a; }
+      /* In outline, the running ask's own line says the agent works. */
+      .column[data-density="outline"] .working-line { display: none; }
       .stop { margin-bottom: .35rem; padding: .1rem .6rem; font-size: .75rem;
         background: none; border: 1px solid #f28b82; color: #f28b82; }
       /* Waiting for the thread's lane: not in the tree yet. */

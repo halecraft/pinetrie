@@ -12,11 +12,14 @@
 
 import {
   type CommitId,
+  type DiffSpan,
   firstLine,
   type LandingRecord,
   type LaneName,
   type OfferRecord,
+  type RevisionRecord,
   type RevisionReview,
+  spanKey,
   type ThreadName,
   TRAILERS,
 } from "@pineta/core"
@@ -314,29 +317,53 @@ export const decodeRevisionReview = (
 ): RevisionReview | undefined => decodeWith(RevisionReviewSchema, value, r => r)
 
 /**
- * The version of what `/offer/` answers: `REVISION_READ` (`@pineta/lanes`),
- * `decodeRevisionReview`, and `fileDiff`'s flags. Every answer is cached as
- * immutable under a URL holding it, so a change to any of the three bumps it,
- * or pages keep the old shape.
+ * The version of what `/offer/` answers: `REVISION_READ` and the range read
+ * (`@pineta/lanes`), `decodeRevisionReview`, `fileDiff`'s flags, and the
+ * URLs' spans. Every answer is cached as immutable under a URL holding it,
+ * so a change to any of them bumps it, or pages keep the old shape.
  */
-export const OFFER_WIRE = 1
+export const OFFER_WIRE = 2
 
-/** What a page asks of an offer: a revision's review, or one file's diff. */
+/**
+ * What a page asks: a span's review, or one file's diff in it. The commits
+ * are the request's strings until `planOfferRead` finds them in a record.
+ */
 export type OfferAsk =
-  | { readonly kind: "review"; readonly commit: string }
-  | { readonly kind: "diff"; readonly commit: string; readonly path: string }
+  | { readonly kind: "review"; readonly span: AskedSpan }
+  | {
+      readonly kind: "diff"
+      readonly span: AskedSpan
+      readonly path: string
+    }
+
+/** A span as a request names it (`DiffSpan`), its commits unchecked. */
+export type AskedSpan =
+  | { readonly kind: "revision"; readonly commit: string }
+  | { readonly kind: "range"; readonly from: string; readonly to: string }
 
 const OFFER_PREFIX = "/offer/"
 
-/** A revision's review: `/offer/<OFFER_WIRE>/review/<commit>`. */
-export const reviewUrl = (commit: CommitId): string =>
-  `${OFFER_PREFIX}${OFFER_WIRE}/review/${commit}`
+/**
+ * A span's review: `/offer/<OFFER_WIRE>/review/<commit>` for a revision,
+ * `…/review/<from>..<to>` for a range (`spanKey`).
+ */
+export const reviewUrl = (span: DiffSpan): string =>
+  `${OFFER_PREFIX}${OFFER_WIRE}/review/${spanKey(span)}`
 
-/** One file's diff in a revision: `/offer/<OFFER_WIRE>/diff/<commit>?path=…`. */
-export const diffUrl = (commit: CommitId, path: string): string =>
-  `${OFFER_PREFIX}${OFFER_WIRE}/diff/${commit}?${new URLSearchParams({ path })}`
+/** One file's diff in a span: `/offer/<OFFER_WIRE>/diff/<span>?path=…`. */
+export const diffUrl = (span: DiffSpan, path: string): string =>
+  `${OFFER_PREFIX}${OFFER_WIRE}/diff/${spanKey(span)}?${new URLSearchParams({ path })}`
 
 const HEX = /^[0-9a-f]+$/
+
+/** `spanKey`'s string back as a span, or null. */
+function parseSpan(text: string | undefined): AskedSpan | null {
+  if (text === undefined) return null
+  const [from, to, ...more] = text.split("..")
+  if (from === undefined || !HEX.test(from) || more.length > 0) return null
+  if (to === undefined) return { kind: "revision", commit: from }
+  return HEX.test(to) ? { kind: "range", from, to } : null
+}
 
 /**
  * An `/offer/` path as an ask: `bad` for anything else under `/offer/`,
@@ -346,14 +373,15 @@ const HEX = /^[0-9a-f]+$/
 export function parseOfferPath(url: URL): OfferAsk | "bad" | null {
   if (url.pathname !== "/offer" && !url.pathname.startsWith(OFFER_PREFIX))
     return null
-  const [version, kind, commit, ...rest] = url.pathname
+  const [version, kind, named, ...rest] = url.pathname
     .slice(OFFER_PREFIX.length)
     .split("/")
   if (version !== String(OFFER_WIRE) || rest.length > 0) return "bad"
-  if (commit === undefined || !HEX.test(commit)) return "bad"
-  if (kind === "review") return { kind: "review", commit }
+  const span = parseSpan(named)
+  if (span === null) return "bad"
+  if (kind === "review") return { kind: "review", span }
   const path = url.searchParams.get("path")
-  if (kind === "diff" && path !== null) return { kind: "diff", commit, path }
+  if (kind === "diff" && path !== null) return { kind: "diff", span, path }
   return "bad"
 }
 
@@ -361,8 +389,8 @@ export function parseOfferPath(url: URL): OfferAsk | "bad" | null {
 export const MAX_DIFF_BYTES = 1024 * 1024
 
 export type OfferRead =
-  | { readonly kind: "review"; readonly commit: CommitId }
-  | { readonly kind: "diff"; readonly commit: CommitId; readonly path: string }
+  | { readonly kind: "review"; readonly span: DiffSpan }
+  | { readonly kind: "diff"; readonly span: DiffSpan; readonly path: string }
   | {
       readonly kind: "refused"
       readonly status: 400 | 404
@@ -374,23 +402,51 @@ export type OfferRead =
 const CONTROL = /[\u0000-\u001f\u007f]/
 
 /**
- * What a request may read: only a commit an open offer holds now, so a
- * request reaches nothing of your repo but what a take would bring.
+ * What a request may read, so it reaches nothing of your repo but what a
+ * thread made: a revision an open offer holds now (what a take would bring),
+ * or a range between two commits one lane's turns recorded (an ask's work,
+ * ADR-0056). The commits read are the records', never the request's strings.
  */
 export function planOfferRead(
-  offers: ReadonlyMap<string, OfferRecord>,
+  facts: {
+    readonly offers: ReadonlyMap<string, OfferRecord>
+    readonly revisions: ReadonlyMap<string, RevisionRecord>
+  },
   ask: OfferAsk,
 ): OfferRead {
-  // The commit read is the record's, never the request's string.
-  const commit = [...offers.values()]
-    .flatMap(o => (o.taken === null ? o.commits : []))
-    .find(c => c === ask.commit)
-  if (commit === undefined)
-    return { kind: "refused", status: 404, reason: "no open offer holds it" }
-  if (ask.kind === "review") return { kind: "review", commit }
+  const span = recordedSpan(facts, ask.span)
+  if (span === null)
+    return {
+      kind: "refused",
+      status: 404,
+      reason:
+        ask.span.kind === "revision"
+          ? "no open offer holds it"
+          : "no lane recorded both",
+    }
+  if (ask.kind === "review") return { kind: "review", span }
   if (ask.path === "" || CONTROL.test(ask.path))
     return { kind: "refused", status: 400, reason: "not a path" }
-  return { kind: "diff", commit, path: ask.path }
+  return { kind: "diff", span, path: ask.path }
+}
+
+function recordedSpan(
+  facts: Parameters<typeof planOfferRead>[0],
+  asked: AskedSpan,
+): DiffSpan | null {
+  if (asked.kind === "revision") {
+    const commit = [...facts.offers.values()]
+      .flatMap(o => (o.taken === null ? o.commits : []))
+      .find(c => c === asked.commit)
+    return commit === undefined ? null : { kind: "revision", commit }
+  }
+  const named = (c: string) =>
+    [...facts.revisions.values()].filter(r => r.commit === c)
+  for (const f of named(asked.from))
+    for (const t of named(asked.to))
+      if (f.lane === t.lane && f.commit !== null && t.commit !== null)
+        return { kind: "range", from: f.commit, to: t.commit }
+  return null
 }
 
 export type OfferAnswer =

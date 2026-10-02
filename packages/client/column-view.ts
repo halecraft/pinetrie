@@ -8,6 +8,7 @@ import {
   blobUrl,
   type ColumnView,
   type CommandSummary,
+  type DiffSpan,
   type EntryId,
   entryId,
   firstLine,
@@ -37,9 +38,19 @@ import { whereWords } from "./send.ts"
 /** The agent's mark, wherever the agent or a lane of it is named. */
 export const AGENT_MARK = "✦"
 
-/** A column's mark's tooltip: whether its lane is running. */
-export const workingWords = (running: boolean): string | undefined =>
-  running ? "the agent is working" : undefined
+/**
+ * A column's mark's tooltip: whether its lane is running, and on which ask
+ * (`askWords`, ADR-0056), when its message is known.
+ */
+export const workingWords = (
+  running: boolean,
+  ask: string | null,
+): string | undefined =>
+  running
+    ? ask === null
+      ? "the agent is working"
+      : `the agent is working on ${ask}`
+    : undefined
 
 /** What the host records about where lanes work, read with everything else. */
 export interface WorkFacts {
@@ -69,6 +80,8 @@ export interface LaneStretch {
  * The lanes along the path to `tip`, root first. An asked message belongs to
  * the lane its revision record names. The host writes that record when the
  * turn ends, so an asked message with none yet is `lane`'s running prompt.
+ * It reads compelled chats, where a lane joins; what started each run, land
+ * and stack messages included, is `indexAsks`'s.
  */
 export function lanesAlong(
   index: TreeIndex,
@@ -145,13 +158,17 @@ export interface LabelledButton {
 }
 
 /**
- * What a review of an offer is read from (ADR-0047): the commits it names, and
- * which of their files to flag.
+ * What a review is read from (ADR-0047): an offer's revisions, or an ask's
+ * range (ADR-0056), each a span, and which of their files to flag. `title`
+ * heads a review whose spans have no description: an ask's line.
  */
 export type ReviewTarget = Pick<
   OfferRecord,
-  "lane" | "commits" | "conflicts" | "yourEdits"
->
+  "lane" | "conflicts" | "yourEdits"
+> & {
+  readonly spans: readonly DiffSpan[]
+  readonly title?: string
+}
 
 /**
  * What became of a column's files: the offer, with what its review reads
@@ -335,7 +352,10 @@ function workStrip(f: ColumnFacts): WorkStrip {
         ? null
         : {
             lane: offer.lane,
-            commits: offer.commits,
+            spans: offer.commits.map(commit => ({
+              kind: "revision",
+              commit,
+            })),
             conflicts: offer.conflicts,
             yourEdits: offer.yourEdits,
           },

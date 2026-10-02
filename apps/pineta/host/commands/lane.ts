@@ -16,6 +16,7 @@ import {
   readLane,
   readLaneRecords,
   readLanes,
+  readStops,
   readThreadName,
   readTreeIndex,
 } from "@pineta/reads"
@@ -25,26 +26,41 @@ import type { LaneWork } from "../work/index.ts"
 
 export interface LaneDeps {
   readonly basics: Basics
-  readonly agent: Pick<Agent, "hold" | "lane">
+  readonly agent: Pick<Agent, "hold" | "lane" | "setStop">
   readonly work: Pick<LaneWork, "offers" | "prepareSplit" | "prepareUpdate">
   readonly start: Runs["start"]
 }
 
-/** Stop a thread's turn. The run's end then drains the lane, as any run's does. */
+/**
+ * Stop a thread's turn, recording who stopped its ask first (ADR-0056): the
+ * record is written before pi is asked to abort, so it is there when the
+ * run's end is drawn. The run's end then drains the lane, as any run's does.
+ */
 export async function handleStop(
   deps: Pick<LaneDeps, "basics" | "agent">,
   lane: LaneName,
+  by: WriterId,
 ): Promise<Outcome> {
   const { agent } = deps
-  const { doc } = deps.basics
-  const planned = planStop(readLanes(doc, readTreeIndex(doc)), lane)
-  if (planned === "unknown")
+  const { doc, now } = deps.basics
+  const index = readTreeIndex(doc)
+  const planned = planStop(readLanes(doc, index), lane, {
+    index,
+    stops: readStops(doc),
+    by,
+    now: now(),
+  })
+  if (planned.kind === "unknown")
     return {
       kind: "refused",
       code: ERR.UNKNOWN_TARGET,
       message: "no such lane to stop",
     }
-  if (planned === "abort") await agent.lane(lane).abort()
+  if (planned.kind === "abort") {
+    if (planned.record !== null)
+      await agent.setStop(planned.record.prompt, planned.record.value)
+    await agent.lane(lane).abort()
+  }
   return { kind: "stopped" }
 }
 

@@ -10,7 +10,6 @@ import {
   startOfOffer,
 } from "@pineta/lanes"
 import { readHaves, readThreadName } from "@pineta/reads"
-import { failed } from "../basics.ts"
 import { describe } from "./describe.ts"
 import { executeTake } from "./execute.ts"
 import { planTake } from "./plan.ts"
@@ -26,17 +25,13 @@ export function act(
 ): Promise<ErrCode | null> {
   const { ops, root, basics } = state
   const { doc, log } = basics
-  const describeLater = () =>
-    void state.serial
-      .track(describe(state, refresh, lane, false))
-      .catch(failed(basics, "describing its offer", lane))
+  // Tracked, and logged on failure, by `requestOutside`.
+  const describeLater = () => void describe(state, refresh, lane, false)
   if (action === "describe") {
     const o = state.offerOf(lane)
     if (o === undefined || o.taken !== null)
       return Promise.resolve(ERR.NO_OFFER)
-    void state.serial
-      .track(describe(state, refresh, lane, true))
-      .catch(failed(basics, "describing its offer", lane))
+    void describe(state, refresh, lane, true)
     return Promise.resolve(null)
   }
   return state.serial.run(async () => {

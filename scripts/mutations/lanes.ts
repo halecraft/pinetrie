@@ -437,4 +437,22 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a taken branch that holds all its lane's work",
   },
+  {
+    name: "a turn's paths are read quoted",
+    file: "packages/lanes/revisions.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '    "-z",\n    from ?? `${to}^`,',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "    from ?? `${to}^`,",
+    command: unit,
+    expect: "a path with a space and an accent",
+  },
+  {
+    name: "a range's counts take in its diff's headers",
+    file: "packages/lanes/offer.ts",
+    from: "    else if (header) continue\n",
+    to: "",
+    command: unit,
+    expect: "a review reads an offer's commit",
+  },
 ]

@@ -384,6 +384,30 @@ describe("encodeLayout / decodeLayout", () => {
     expect(trip(initialLayout())).toEqual(initialLayout())
   })
 
+  test("a column's density is kept, and a layout stored before densities still decodes (ADR-0056)", () => {
+    const l: Layout = {
+      active: { kind: "root", root: "1-r1" },
+      open: ["1-r1"],
+      roots: new Map([
+        [
+          "1-r1",
+          [
+            { key: "a", anchor: "1-r1", density: "outline" },
+            { key: "b", anchor: "2-a" },
+          ],
+        ],
+      ]),
+      newTabs: [],
+    }
+    expect(trip(l)).toEqual(l)
+    const before = JSON.parse(JSON.stringify(encodeLayout(l)))
+    delete before.roots["1-r1"][0].density
+    expect(decodeLayout(before)?.roots.get("1-r1")?.[0]).toEqual({
+      key: "a",
+      anchor: "1-r1",
+    })
+  })
+
   test("a message waiting to be sent is never stored, nor restored: it would be sent again", () => {
     const stored = encodeLayout({
       ...initialLayout(),

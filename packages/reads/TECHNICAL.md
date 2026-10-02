@@ -18,7 +18,8 @@ Reads the host decides from, or that more than one reader needs:
 of them), `readOutbox`,
 `readParticipantNames`, `readParticipants`, `readReading`, `readTyping`,
 `readAgentActivity`, `readSeats` and `readCards` (ADR-0048),
-`readArchive`, `readMarks` (ADR-0045), and
+`readArchive`, `readMarks` (ADR-0045), `readStops` and `readDigests`
+(ADR-0056), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
 `readProject` (`lanes`, or `direct` and why). `workAt` is where a lane created
 at an entry would work, and the commit and snapshot it would start from: the
@@ -52,9 +53,11 @@ Kyneta has let go.
   frozen. Kyneta gives an unchanged row the same object across writes, so a
   new entry decodes only itself.
 
-- **`readLanes`' `askedBy`** is the writer of the compelled message a running
-  lane is answering (the nearest compelled chat on its path), or else of the
-  first compelled message waiting for it. It is what a `conflict` names.
+- **`readLanes`' `askedBy`** is the writer of the message a running lane is
+  answering, its run's prompt (`promptOf`, the ask, ADR-0056), when a
+  person's message started it; or else of the first compelled message
+  waiting for it. A land or stack message names no one. It is what a
+  `conflict` names.
 - **`readLanes`' `lastWaiting`** is the writer of the newest item held for the
   lane, of any kind: a message queued now waits behind it, so it
   is who the queue button names. It is null exactly when `waiting` is 0. It

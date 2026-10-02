@@ -10,20 +10,24 @@
 //
 // Pure reads: no subscription, no pi.
 
-import type {
-  AgentRun,
-  ArchiveRecord,
-  LaneView,
-  MarkRecord,
-  SeatRecord,
-  TreeIndex,
+import {
+  type AgentRun,
+  type ArchiveRecord,
+  type AskIndex,
+  indexAsks,
+  type LaneView,
+  type MarkRecord,
+  type SeatRecord,
+  type StopRecord,
+  type TreeIndex,
 } from "@pineta/core"
-import type { Held } from "@pineta/marginalia"
+import type { DigestRecord, Held } from "@pineta/marginalia"
 import {
   readAgentActivity,
   readArchive,
   readBanners,
   readCommands,
+  readDigests,
   readLandings,
   readLaneRecords,
   readLanes,
@@ -35,6 +39,7 @@ import {
   readProject,
   readRevisions,
   readSeats,
+  readStops,
   readTreeIndex,
 } from "@pineta/reads"
 import { readStreamRecords, type SessionDocHandle } from "@pineta/schema"
@@ -44,6 +49,12 @@ import { type LiveWork, liveWork } from "./live.ts"
 /** The session's facts from one moment: the same reads the host decides from. */
 export interface SessionFacts {
   readonly index: TreeIndex
+  /** Every ask (ADR-0056), from `index`: the rail and the columns read one. */
+  readonly asks: AskIndex
+  /** Who stopped each ask, by its prompt. */
+  readonly stops: ReadonlyMap<string, StopRecord>
+  /** Each ask's model-written digest, when digests are on, by its prompt. */
+  readonly digests: ReadonlyMap<string, DigestRecord>
   /** How many entries the document holds, messages or not. */
   readonly count: number
   readonly activity: readonly AgentRun[]
@@ -65,6 +76,9 @@ export function readSessionFacts(doc: SessionDocHandle): SessionFacts {
   const activity = readAgentActivity(doc, index)
   return {
     index,
+    asks: indexAsks(index),
+    stops: readStops(doc),
+    digests: readDigests(doc),
     count: Object.keys(index.entries).length,
     activity,
     live: liveWork(readStreamRecords(doc), activity),

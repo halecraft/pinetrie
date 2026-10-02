@@ -1,6 +1,12 @@
-import { laneNameForThread, writerId } from "@pineta/core"
+import { laneNameForThread } from "@pineta/core"
 import { expect, test } from "vitest"
-import { pickAt, railItems, railKeep, runFill, runLabel } from "./rail-view.ts"
+import {
+  pickAt,
+  railItems,
+  railKeep,
+  stretchFill,
+  stretchWords,
+} from "./rail-view.ts"
 
 test("railKeep: rings, running tips, open columns' ends and your cards' ends", () => {
   const keep = railKeep({
@@ -12,25 +18,11 @@ test("railKeep: rings, running tips, open columns' ends and your cards' ends", (
   expect([...keep].sort()).toEqual(["c", "e", "r", "t"])
 })
 
-test("runLabel: each part that is not zero, people named", () => {
-  const ada = writerId("w-ada")
-  const bea = writerId("w-bea")
-  const name = (w: string) => (w === ada ? "Ada" : "Bea")
-  expect(
-    runLabel(
-      155,
-      { people: 12, writers: [ada, bea], calls: 211, failed: 2 },
-      name,
-    ),
-  ).toBe(
-    "12 messages from Ada and Bea · 143 agent messages · 211 tool calls · 2 failed",
+test("stretchWords: a long ask's capsule leads with its ask", () => {
+  expect(stretchWords('Ada: "Fix the rail"', "31 steps")).toBe(
+    'Ada: "Fix the rail" · 31 steps',
   )
-  expect(
-    runLabel(3, { people: 0, writers: [], calls: 1, failed: 0 }, name),
-  ).toBe("3 agent messages · 1 tool call")
-  expect(
-    runLabel(4, { people: 4, writers: [bea], calls: 0, failed: 0 }, name),
-  ).toBe("4 messages from Bea")
+  expect(stretchWords(null, "4 messages from Bea")).toBe("4 messages from Bea")
 })
 
 test("pickAt: the message as far through the run as the click is down it", () => {
@@ -43,17 +35,21 @@ test("pickAt: the message as far through the run as the click is down it", () =>
   expect(pickAt(ids, null)).toBe("a")
 })
 
-test("runFill: the agent alone, people alone, or both", () => {
-  const stats = (people: number) => ({
+test("stretchFill: the agent alone, people alone, or both", () => {
+  const stats = (people: number, agent: number) => ({
     people,
+    agent,
     writers: [],
     calls: 0,
     failed: 0,
+    files: [],
+    first: 0,
+    last: 0,
   })
-  expect(runFill(12, stats(0))).toBe("agent")
-  expect(runFill(12, stats(1))).toBe("mixed")
-  expect(runFill(12, stats(11))).toBe("mixed")
-  expect(runFill(12, stats(12))).toBe("people")
+  expect(stretchFill(stats(0, 12))).toBe("agent")
+  expect(stretchFill(stats(1, 11))).toBe("mixed")
+  expect(stretchFill(stats(11, 1))).toBe("mixed")
+  expect(stretchFill(stats(12, 0))).toBe("people")
 })
 
 test("railItems: a dot at a thread end holding your card carries your colour", () => {

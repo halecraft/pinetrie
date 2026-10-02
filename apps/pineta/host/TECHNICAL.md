@@ -31,6 +31,8 @@ wires them.
 | `offers/` | each lane's offer in your repo (§ Offers) |
 | `names.ts` | every lane's thread name (ADR-0039), one plan at a time |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, set by `set_banner` |
+| `digests.ts` | each ask's digest (ADR-0056), when the user config turns them on |
+| `outside.ts` | `requestOutside`: a model request outside the serial executor, its answer written inside it |
 | `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue`, `basics` |
 
 ## One serial executor
@@ -103,6 +105,32 @@ text names (`sweepTexts`).
 - **`executeChat` still checks a new lane's directory and asks pi for the
   lane.** Both are ports that may refuse, not facts to gather. The directory
   is checked first, so a refused send creates no lane.
+- **Stop records who pressed it before it aborts** (ADR-0056): `planStop`
+  gives the `pineta.stop` record for the running ask's prompt, unless one is
+  there, and `handleStop` writes it, then asks pi to abort, in one step. So
+  the record is there when the run's end is drawn, and the first press is
+  the one named.
+
+## Requests outside the queue (`outside.ts`)
+
+A model request takes seconds, and no command may wait on it. Banners,
+commit messages and digests ask with `requestOutside`: the request runs
+outside the serial executor, tracked so `quiet` waits for it, and its
+answer is written in a step of its own, after that step decides it is still
+wanted (`bannerStillWanted`, the offer's checks, `digestStillWanted`). A
+failure is logged, never thrown. With `held`, a key is in a set while the
+request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
+
+## Digests (`digests.ts`, ADR-0056)
+
+- **Asked on events**: the lane's `turnDone` hook, wrapped in `startHost`
+  after lane work records the turn, and each run's end. `digestDue` decides
+  in one step, from the stored digest, the request out, and presence: the
+  host holds the presence document, and `readsAsk` reads its `reading`
+  ends (S70).
+- **Only the ask goes out**: its message and its run's messages, newest
+  first within the budget, and the last digest. No agent reads the answer.
+- A missing `ask-digest` skill is logged, and nothing is asked.
 
 ## Banners (`banners.ts`, ADR-0050, ADR-0053)
 

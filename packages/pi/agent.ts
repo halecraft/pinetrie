@@ -39,6 +39,7 @@ import {
   type MarkRecord,
   type Position,
   type SeatRecord,
+  type StopRecord,
   type StoredImage,
   type StreamEvent,
   type WriterId,
@@ -51,10 +52,14 @@ import {
   type ChatMessage,
   type CommandSource,
   chatImageShas,
+  DIGEST_NAMESPACE,
+  type DigestRecord,
   encodeArchive,
+  encodeDigest,
   encodeHeld,
   encodeMark,
   encodeSeat,
+  encodeStop,
   encodeWorkRecord,
   expandSkill,
   type Held,
@@ -66,6 +71,7 @@ import {
   PARTICIPANT_NAMESPACE,
   resolveCommand,
   SEAT_NAMESPACE,
+  STOP_NAMESPACE,
   type StackMessage,
   type UpdateMessage,
   type WorkRecord,
@@ -361,6 +367,10 @@ export interface Agent {
   setMark(record: MarkRecord): Promise<void>
   /** Delete an entry's mark: its title was cleared. */
   removeMark(entry: EntryId): Promise<void>
+  /** Record who stopped the ask `prompt` started (ADR-0056). */
+  setStop(prompt: EntryId, record: StopRecord): Promise<void>
+  /** Write the ask `prompt` started a digest (ADR-0056). */
+  setDigest(prompt: EntryId, record: DigestRecord): Promise<void>
   /** Store one of the host's records (`WorkRecord`), under its namespace and key. */
   setWorkRecord(record: WorkRecord): Promise<void>
   /** Delete a lane's offer record: the offer was withdrawn (ADR-0039). */
@@ -397,10 +407,11 @@ export interface Agent {
   ): Promise<CommandRef | null>
   stats(): Promise<{ messageCount: number }>
   /**
-   * One request for a commit message (ADR-0038): no tools, no session, so
-   * nothing enters the tree or a lane's context. Null when it fails.
+   * One request outside every thread: an offer's commit message (ADR-0038)
+   * or an ask's digest (ADR-0056). No tools, no session, so nothing enters
+   * the tree or a lane's context. Null when it fails.
    */
-  describe(request: {
+  complete(request: {
     readonly system: string
     readonly user: string
   }): Promise<string | null>
@@ -687,7 +698,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     modelLabel: `${resolved.provider}/${resolved.id}`,
     lane: threadLane,
 
-    async describe({ system, user }) {
+    async complete({ system, user }) {
       try {
         const reply = await setup.models.completeSimple(setup.describeModel, {
           systemPrompt: system,
@@ -804,6 +815,14 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
 
     async removeMark(entry) {
       await session.deleteValue(value(MARK_NAMESPACE, entry), CTX)
+    },
+
+    async setStop(prompt, record) {
+      await put(STOP_NAMESPACE, prompt, encodeStop(record))
+    },
+
+    async setDigest(prompt, record) {
+      await put(DIGEST_NAMESPACE, prompt, encodeDigest(record))
     },
 
     async setWorkRecord(record) {

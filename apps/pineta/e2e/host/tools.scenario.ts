@@ -12,6 +12,7 @@ import {
   readLanes,
   readOutbox,
   readParticipantNames,
+  readStops,
   readTreeIndex,
 } from "@pineta/reads"
 import { readStreams } from "@pineta/schema"
@@ -203,6 +204,15 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     if (l5 !== undefined) await u.stop(l5.name)
     await u.stop(laneNameForThread("no-such-lane"))
+    // Who stopped it is recorded under the ask (ADR-0056): pi's entries say
+    // only that the run was aborted. Stopping it again, idle, records nothing.
+    const sleepAsk = idOfIn(th.doc, "sleep")
+    const stop = sleepAsk === null ? undefined : readStops(th.doc).get(sleepAsk)
+    check(
+      "the stop is recorded under its ask, naming who stopped it",
+      stop?.by === u.writer && readStops(th.doc).size === 1,
+      `${stop?.by ?? "none"}, ${readStops(th.doc).size} recorded`,
+    )
 
     // 6. Restart over the same store: everything is there, and a held message
     // is drained by the new host's startup, since no run's end will.

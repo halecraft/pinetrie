@@ -21,16 +21,20 @@ test("a blob's GET, with its hash or null; the upload's POST; else Vite", () => 
 
 test("an offer's read is a GET the wire accepts; anything else under /offer/ is bad", () => {
   const c = commitId("0123abcd")
-  expect(at("GET", reviewUrl(c))).toEqual({
+  const revision = { kind: "revision", commit: c } as const
+  const range = { kind: "range", from: c, to: commitId("4567ef") } as const
+  expect(at("GET", reviewUrl(revision))).toEqual({
     kind: "offer",
-    ask: { kind: "review", commit: c },
+    ask: { kind: "review", span: revision },
   })
-  expect(at("GET", diffUrl(c, "a b.txt"))).toEqual({
+  expect(at("GET", diffUrl(range, "a b.txt"))).toEqual({
     kind: "offer",
-    ask: { kind: "diff", commit: c, path: "a b.txt" },
+    ask: { kind: "diff", span: range, path: "a b.txt" },
   })
-  expect(at("POST", reviewUrl(c))).toEqual({ kind: "bad" })
+  expect(at("POST", reviewUrl(revision))).toEqual({ kind: "bad" })
   expect(at("GET", "/offer/anything")).toEqual({ kind: "bad" })
+  expect(at("GET", "/offer/2/review/0123..xyz")).toEqual({ kind: "bad" })
+  expect(at("GET", "/offer/1/review/0123abcd")).toEqual({ kind: "bad" })
 })
 
 describe("planRequest and planUpgrade: admission first", () => {
@@ -53,7 +57,7 @@ describe("planRequest and planUpgrade: admission first", () => {
       ["GET", "/"],
       ["GET", `/blob/${SHA}`],
       ["POST", "/blob"],
-      ["GET", reviewUrl(c)],
+      ["GET", reviewUrl({ kind: "revision", commit: c })],
     ] as const)
       expect(planRequest(facts(url), KEY, method)).toEqual({ kind: "refuse" })
     expect(planRequest(withCookie(`/blob/${SHA}`), KEY, "GET")).toEqual({

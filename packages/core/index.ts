@@ -311,6 +311,18 @@ export interface MarkRecord {
   readonly at: number
 }
 
+// --- stops (ADR-0056) --------------------------------------------------------
+
+/**
+ * Who stopped an ask's run: a host-written `pineta.stop` value keyed by the
+ * ask's prompt. pi's entries say a run was aborted, never by whom (S70).
+ */
+export interface StopRecord {
+  readonly by: WriterId
+  /** When Stop was pressed, in ms since the epoch. */
+  readonly at: number
+}
+
 /** A title's longest form, in UTF-16 code units. */
 export const MAX_TITLE = 80
 
@@ -456,6 +468,11 @@ export interface RevisionRecord {
    * and in records written before lane containers.
    */
   readonly snapshot: SnapshotId | null
+  /**
+   * The paths the turn's commit changed, from the repository's root; none
+   * for a prompt's record or a turn with no commit (ADR-0056).
+   */
+  readonly paths: readonly string[]
 }
 
 /**
@@ -557,6 +574,24 @@ export interface RevisionReview {
   readonly description: string
   readonly files: readonly ReviewFile[]
 }
+
+/**
+ * What a review reads (ADR-0047, ADR-0056): one revision, the diff from its
+ * parent to it, or a range, the diff from one commit to another, such as an
+ * ask's work across its turns' revisions. Commit ids name their content, so
+ * a review of either never changes.
+ */
+export type DiffSpan =
+  | { readonly kind: "revision"; readonly commit: CommitId }
+  | {
+      readonly kind: "range"
+      readonly from: CommitId
+      readonly to: CommitId
+    }
+
+/** A span as one string, for a key or a URL: `<commit>`, or `<from>..<to>`. */
+export const spanKey = (s: DiffSpan): string =>
+  s.kind === "revision" ? s.commit : `${s.from}..${s.to}`
 
 /** Your working copy as the host snapshotted it: `@`, and `@`'s parents. */
 export interface YoursNow {
@@ -900,6 +935,7 @@ export function orderNewEntries(
 
 // ── the tree ──────────────────────────────────────────────────────────────
 
+export * from "./asks.ts"
 export * from "./edits.ts"
 export * from "./images.ts"
 export * from "./presence.ts"

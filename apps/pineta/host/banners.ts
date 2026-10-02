@@ -16,6 +16,7 @@ import {
 import type { Agent } from "@pineta/pi"
 import { readBanners, readNames } from "@pineta/reads"
 import type { Basics } from "./basics.ts"
+import { requestOutside } from "./outside.ts"
 import type { Serial } from "./queue.ts"
 
 export interface Banners {
@@ -48,43 +49,47 @@ export function createBanners(deps: {
       record: { lane, sha, at: basics.now() },
     })
 
-  /** Start a new image, tracked, so `quiet` waits for it. */
-  const start = (lane: LaneName, direction: string | null, asked: boolean) => {
-    generating.add(lane)
-    void serial.track(
-      generate(lane, direction, asked).finally(() => generating.delete(lane)),
-    )
-  }
+  const failedFor = (lane: LaneName) => (why: string) =>
+    log(`[host] no banner for ${readNames(doc).get(lane) ?? lane}: ${why}`)
 
   /**
-   * The image, outside the serial (it takes seconds); then, inside it, the
-   * write, only if still wanted. Never rejects: a failure is logged, and the
-   * thread's next run's end tries again.
+   * A new image, outside the serial (it takes seconds); then, inside it, the
+   * write, only if still wanted (`requestOutside`). A failure is logged, and
+   * the thread's next run's end tries again.
    */
+  const start = (lane: LaneName, direction: string | null, asked: boolean) =>
+    void requestOutside({
+      serial,
+      held: { set: generating, key: lane },
+      request: () => generate(lane, direction),
+      settle: async image => {
+        if (!bannerStillWanted(asked, readBanners(doc).get(lane))) return
+        await write(lane, blobs.put(image).sha256)
+      },
+      failed: error =>
+        failedFor(lane)(error instanceof Error ? error.message : String(error)),
+    })
+
+  /** The image to write, or null: no name yet, no key, no skill, or every draw failed. */
   async function generate(
     lane: LaneName,
     direction: string | null,
-    asked: boolean,
-  ): Promise<void> {
+  ): Promise<StoredImage | null> {
     const agent = deps.agent()
     const name = readNames(doc).get(lane)
-    const failed = (why: string) =>
-      log(`[host] no banner for ${name ?? lane}: ${why}`)
-    try {
-      if (name === undefined) return failed("the thread has no name yet")
-      if (!(await agent.canDrawBanners())) return
-      const skill = await agent.skill("pineta:skill:column-banner")
-      if (skill === null) return failed("no column-banner skill")
-      const prompt = bannerPrompt({ template: skill.content, name, direction })
-      const image = await drawWithRetries(agent, prompt, failed)
-      if (image === null) return
-      await serial.run(async () => {
-        if (!bannerStillWanted(asked, readBanners(doc).get(lane))) return
-        await write(lane, blobs.put(image).sha256)
-      })
-    } catch (error) {
-      failed(error instanceof Error ? error.message : String(error))
+    const failed = failedFor(lane)
+    if (name === undefined) {
+      failed("the thread has no name yet")
+      return null
     }
+    if (!(await agent.canDrawBanners())) return null
+    const skill = await agent.skill("pineta:skill:column-banner")
+    if (skill === null) {
+      failed("no column-banner skill")
+      return null
+    }
+    const prompt = bannerPrompt({ template: skill.content, name, direction })
+    return drawWithRetries(agent, prompt, failed)
   }
 
   /** Up to `BANNER_ATTEMPTS` draws; each failure logged. */

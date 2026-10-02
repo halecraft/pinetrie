@@ -44,6 +44,7 @@ import { placement } from "./align.ts"
 import { appView, type ReadOnly, readOnlyWords, tabRail } from "./app-view.ts"
 import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
+import { foldMemory } from "./ask-fold.ts"
 import { cardMarks, ownCards } from "./card-marks.ts"
 import { Column, type ColumnProps } from "./column.tsx"
 import { type Column as ColumnSpec, isPinned } from "./columns.ts"
@@ -66,11 +67,13 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
+import type { Left } from "./left.ts"
 import { type AppPorts, perform } from "./perform.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { planReading, typingDue } from "./presence-report.ts"
 import { readSessionFacts } from "./projection.ts"
 import { EmptyRail, LiveRail } from "./rail.tsx"
+import { columnLandmarks } from "./rail-view.ts"
 import { firstLines, NO_TEXT, rootLabels } from "./root-label.ts"
 import { screenMemory } from "./screen-memory.ts"
 import type { SessionClient } from "./session-view.ts"
@@ -89,6 +92,8 @@ import { useStable } from "./use-stable.ts"
 export interface AppStores {
   readonly layout: TabState<Layout>
   readonly inbox: DeviceState<Inbox>
+  /** Where this device last left each thread (ADR-0056). */
+  readonly left: DeviceState<Left>
   readonly identity: DeviceState<Identity>
 }
 
@@ -181,6 +186,9 @@ export function App({
     archive,
     marks,
     workFacts,
+    asks,
+    stops,
+    digests,
   } = useSelector(doc, readSessionFacts)
   // Every card's record (ADR-0048): a second document, read on its own. An
   // unchanged card keeps its record object (`readCards`).
@@ -312,6 +320,16 @@ export function App({
   )
   // Each column's end, for the rail: one array while the views are the same.
   const ends = useMemo(() => views.map(v => v.tipId), [views])
+  // What no fold hides in this tab's columns: the rail's landmarks (ADR-0056).
+  const landmarks = useMemo(
+    () =>
+      columnLandmarks(rail, {
+        activity,
+        ends,
+        cards: yours.ends,
+      }),
+    [rail, activity, ends, yours.ends],
+  )
 
   // `App` writes presence and reads none: a read here would render every
   // column on each write, the refresh and others' typing included (S59).
@@ -422,6 +440,8 @@ export function App({
   // its rows as they were left (ADR-0049). Never pruned: a call id is not
   // reused.
   const [rows] = useState(() => screenMemory<RowMemory>())
+  // Each ask's fold as its reader chose it (ADR-0056), kept as rows are.
+  const [folds] = useState(() => foldMemory())
 
   // After the alignment above: a picked message the alignment left out of
   // view is scrolled to.
@@ -432,10 +452,17 @@ export function App({
   const [archiveQuery, setArchiveQuery] = useState("")
   const [archivePick, setArchivePick] = useState<string | null>(null)
 
+  // An opened fold draws in its own ask (`AskWork`): a render of `App`
+  // runs `useReveal`'s wait once it has.
+  const [, setOpened] = useState(0)
   const ports: AppPorts = {
     dispatch,
     session,
     reveal,
+    openFold: ask => {
+      folds.set(ask, "open")
+      setOpened(n => n + 1)
+    },
     pickArchived: setArchivePick,
     arm: key => {
       armed.current = key
@@ -447,7 +474,9 @@ export function App({
   const run = useStable((effects: readonly Effect[]) => perform(effects, ports))
   /** What a reader asked for, planned from this render's layout and facts. */
   const onIntent = useStable((intent: Intent) =>
-    run(planIntent(intent, { layout, index, archive }, crypto.randomUUID())),
+    run(
+      planIntent(intent, { layout, index, archive, asks }, crypto.randomUUID()),
+    ),
   )
   const openAt = (entry: string) => onIntent({ kind: "openAt", entry })
   const dragColumn = useColumnDrag(strip, (from, to) =>
@@ -469,7 +498,12 @@ export function App({
   /** The props every column shares, whichever tab draws it. */
   const shared = {
     activity,
+    asks,
+    folds,
+    stops,
     live,
+    left: stores.left,
+    digests,
     colorOf,
     cards,
     index,
@@ -583,6 +617,9 @@ export function App({
                 {workspace.kind === "root" ? (
                   <LiveRail
                     activity={activity}
+                    asks={asks}
+                    digests={digests}
+                    revisions={workFacts.revisions}
                     colorOf={colorOf}
                     ends={ends}
                     index={index}
@@ -610,6 +647,7 @@ export function App({
                         closable={slot.closable}
                         column={column}
                         count={workspace.slots.length}
+                        landmarks={landmarks}
                         seenEnd={seenEnds}
                         forks={colors.forks}
                         key={slot.key}
@@ -660,6 +698,7 @@ function Preview({
     | "column"
     | "count"
     | "forks"
+    | "landmarks"
     | "onIntent"
     | "onTyping"
     | "path"
@@ -689,6 +728,11 @@ function Preview({
   const column: ColumnSpec = { key: `preview-${root}`, anchor }
   const [view] = projectColumns(index, [{ anchor }])
   const rail = projectRail(index, root)
+  const landmarks = columnLandmarks(rail, {
+    activity: shared.activity,
+    ends: [view?.tipId ?? null],
+    cards: yours.ends,
+  })
   const path = pathIds(index, view?.tipId ?? null)
   const track = branchColors(rail, view === undefined ? [] : [view]).track[0]
   if (view === undefined) return null
@@ -696,6 +740,9 @@ function Preview({
     <div className="preview">
       <LiveRail
         activity={shared.activity}
+        asks={shared.asks}
+        digests={shared.digests}
+        revisions={shared.work.revisions}
         colorOf={shared.colorOf}
         ends={[view.tipId]}
         index={index}
@@ -713,6 +760,7 @@ function Preview({
           column={column}
           count={1}
           forks={new Map()}
+          landmarks={landmarks}
           onIntent={onPreviewIntent}
           onTyping={() => {}}
           path={path}

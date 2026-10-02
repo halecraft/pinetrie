@@ -10,6 +10,7 @@
 
 import {
   type CommitId,
+  type DiffSpan,
   type HaveRecord,
   HOST_OPERATOR,
   type LaneName,
@@ -204,38 +205,102 @@ export const REVISION_READ =
   '"]}"'
 
 /**
- * A revision's review as jj prints it, parsed but unchecked: the host decodes
- * it (`answerReview`). Null when jj fails or prints no JSON.
+ * A range's files, each as one JSON object per line: a `TreeDiffEntry` has
+ * a path, how it is shown and its status, but no line counts (S70), which
+ * `spanRead` takes from the range's git diff. A change to it bumps
+ * `OFFER_WIRE`.
+ */
+export const RANGE_FILES =
+  '"{\\"path\\":" ++ json(path) ++ ",\\"shown\\":" ++ json(display_diff_path) ++ ' +
+  '",\\"change\\":" ++ json(status) ++ "}\\n"'
+
+/**
+ * Lines added and removed in each file's section of a git diff, in order.
+ * Before a section's first `@@`, `--- a/x` and `+++ b/x` are headers.
+ */
+export function gitDiffCounts(
+  text: string,
+): readonly { readonly added: number; readonly removed: number }[] {
+  const out: { added: number; removed: number }[] = []
+  let header = true
+  for (const line of text.split("\n")) {
+    if (line.startsWith("diff --git ")) {
+      out.push({ added: 0, removed: 0 })
+      header = true
+      continue
+    }
+    const at = out.at(-1)
+    if (at === undefined) continue
+    if (line.startsWith("@@")) header = false
+    else if (header) continue
+    else if (line.startsWith("+")) at.added += 1
+    else if (line.startsWith("-")) at.removed += 1
+  }
+  return out
+}
+
+/**
+ * A span's review as jj prints it, parsed but unchecked: the host decodes
+ * it (`answerReview`). A revision is one `REVISION_READ`, its description
+ * and stats together. A range has no description: its files from
+ * `RANGE_FILES`, and their counts from its git diff, which lists them in
+ * the same order (S70). Null when jj fails, prints no JSON, or the two
+ * listings disagree.
  */
 export async function revisionRead(
   jj: Runner,
-  commit: CommitId,
+  span: DiffSpan,
 ): Promise<unknown> {
-  const ran = await jj(["log", "--no-graph", "-r", commit, "-T", REVISION_READ])
-  if (!ran.ok) return null
+  if (span.kind === "revision") {
+    const ran = await jj([
+      "log",
+      "--no-graph",
+      "-r",
+      span.commit,
+      "-T",
+      REVISION_READ,
+    ])
+    if (!ran.ok) return null
+    try {
+      return JSON.parse(ran.stdout) as unknown
+    } catch {
+      return null
+    }
+  }
+  const range = ["diff", "--from", span.from, "--to", span.to]
+  const files = await jj([...range, "-T", RANGE_FILES])
+  const git = await jj([...range, "--git"])
+  if (!files.ok || !git.ok) return null
   try {
-    return JSON.parse(ran.stdout) as unknown
+    const listed = lines(files.stdout).map(l => JSON.parse(l) as object)
+    const counts = gitDiffCounts(git.stdout)
+    if (counts.length !== listed.length) return null
+    return {
+      description: "",
+      files: listed.map((f, i) => ({ ...f, ...counts[i] })),
+    }
   } catch {
     return null
   }
 }
 
 /**
- * One file's git diff in a revision; null when jj fails. `root-file:` names
+ * One file's git diff in a span; null when jj fails. `root-file:` names
  * the file from the repo's root, and exactly it: a bare path is read from the
  * process's directory, and `root:` matches every file under a directory of
  * that name (S57). A change to the flags bumps `OFFER_WIRE`.
  */
 export async function fileDiff(
   jj: Runner,
-  commit: CommitId,
+  span: DiffSpan,
   path: string,
 ): Promise<string | null> {
   const ran = await jj([
     "diff",
     "--git",
-    "-r",
-    commit,
+    ...(span.kind === "revision"
+      ? ["-r", span.commit]
+      : ["--from", span.from, "--to", span.to]),
     "--",
     `root-file:${JSON.stringify(path)}`,
   ])

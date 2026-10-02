@@ -18,6 +18,10 @@
 // A scroller that is unmounted and mounted again (a column of a root tab
 // shown again) starts from a `SeenEnd`: whether it had moved past what its
 // reader saw. A placement short of the end keeps that, so ↓ new below shows.
+//
+// Released, it keeps the column's tip from when the reader left the end
+// (`releasedTip`): an ask whose run ended after it stays open under the
+// reader until they come back down (ADR-0056).
 
 /** What a scroller reports: read from the element, nothing else. */
 export interface Metrics {
@@ -31,6 +35,8 @@ export interface Metrics {
   readonly content: number
   /** The floor's height now. */
   readonly floor: number
+  /** The column's tip now: not the element's, but what a release keeps. */
+  readonly tip: string | null
 }
 
 export interface FollowState {
@@ -48,6 +54,8 @@ export interface FollowState {
   readonly holding: boolean
   /** The content's height and the floor's together, when last set. */
   readonly held: number
+  /** The column's tip when the reader left its end; null while following. */
+  readonly releasedTip: string | null
 }
 
 export type FollowEvent =
@@ -89,6 +97,7 @@ export const initialFollow: FollowState = {
   lastHeight: 0,
   holding: false,
   held: 0,
+  releasedTip: null,
 }
 
 const end = (m: Metrics) => Math.max(0, m.scrollHeight - m.clientHeight)
@@ -122,11 +131,20 @@ const toEnd = (state: FollowState, measured: Metrics): FollowPlan => {
       holding: state.holding,
       // What the cap gave up is not claimed again.
       held: m.content + capped,
+      releasedTip: null,
     },
     scrollTo: end(m),
     floor: capped,
   }
 }
+
+/**
+ * The tip a release keeps: the one from when the reader first left the end.
+ * Following, there is none; a scroller mounted again may start with one
+ * (`SeenEnd.released`) before its placement.
+ */
+const released = (state: FollowState, m: Metrics): string | null =>
+  state.releasedTip ?? m.tip
 
 export function follow(state: FollowState, event: FollowEvent): FollowPlan {
   const m = event.at
@@ -158,13 +176,24 @@ export function follow(state: FollowState, event: FollowEvent): FollowPlan {
       const seen = { lastTop: m.scrollTop, lastHeight: m.scrollHeight }
       if (movedUp)
         return {
-          state: { ...state, ...seen, following: false },
+          state: {
+            ...state,
+            ...seen,
+            following: false,
+            releasedTip: released(state, m),
+          },
           scrollTo: null,
           floor: m.floor,
         }
       if (gap(m) <= FOLLOW_SLACK)
         return {
-          state: { ...state, ...seen, following: true, unseen: false },
+          state: {
+            ...state,
+            ...seen,
+            following: true,
+            unseen: false,
+            releasedTip: null,
+          },
           scrollTo: null,
           floor: m.floor,
         }
@@ -172,10 +201,12 @@ export function follow(state: FollowState, event: FollowEvent): FollowPlan {
     }
     case "placed": {
       const at = withFloor(m, 0)
+      const following = gap(at) <= FOLLOW_SLACK
       return {
         state: {
           ...state,
-          following: gap(at) <= FOLLOW_SLACK,
+          following,
+          releasedTip: following ? null : released(state, m),
           unseen: state.unseen && gap(at) > FOLLOW_SLACK,
           lastTop: m.scrollTop,
           lastHeight: at.scrollHeight,
@@ -206,6 +237,8 @@ export interface SeenEnd {
   readonly tip: string | null
   /** Whether ↓ new below was showing. */
   readonly unseen: boolean
+  /** Its tip when its reader left its end, if they had (`releasedTip`). */
+  readonly released: string | null
 }
 
 /**

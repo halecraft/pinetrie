@@ -94,7 +94,7 @@ export async function openProfile(p: Page): Promise<boolean> {
 /** In the page: the messages its rail draws, a dot each and a capsule's count. */
 export const RAIL_MESSAGES = () =>
   document.querySelectorAll(".rail .rail-dot").length +
-  [...document.querySelectorAll(".rail .rail-run")].reduce(
+  [...document.querySelectorAll(".rail .rail-stretch")].reduce(
     (n, run) => n + Number(run.getAttribute("data-count")),
     0,
   )
@@ -235,9 +235,24 @@ export const col = (n: number) => `.column[data-position="${n}"]`
  */
 export const msg = (text: string) =>
   `.msg:has(> .text > p:only-child:text-is(${JSON.stringify(text)}))`
+/**
+ * Read column `n` raw (ADR-0056): every message and tool row, which the
+ * checks written before densities look at once a run has ended. A column
+ * opens in story, folding each ask's work; the choice is kept with it. Its
+ * control appears with its first message.
+ */
+export async function readRaw(p: Page, n = 0): Promise<void> {
+  const raw = `${col(n)} .density-choice[data-density="raw"]`
+  const shown = await p.waitForSelector(raw, { timeout: 15_000 }).then(
+    () => true,
+    () => false,
+  )
+  if (!shown) return
+  if ((await p.getAttribute(raw, "aria-pressed")) !== "true") await p.click(raw)
+}
 /** A root's tab. */
 export const tabSel = (root: string) => `#tabs .tab[data-root="${root}"]`
-/** The messages the rail on `p` accounts for: dots, and each run's count. */
+/** The messages the rail on `p` accounts for: dots, and each stretch's count. */
 export const railCount = (p: Page) => p.evaluate(RAIL_MESSAGES)
 /** Open root `r` from the Archive tab, and wait for its tab. */
 export const openFromArchive = async (p: Page, r: string) => {

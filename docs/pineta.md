@@ -379,7 +379,8 @@ string union `"pending" | "empty" | "populated"`, not an object.
 under a header showing who is here and your inbox of mentions: each
 column is one path on its own scroll, a branch opens beside its parent in its
 rail track's colour, and the rail draws the tab's root, with each uneventful
-stretch drawn as one capsule (ADR-0031). The Archive tab lists every root.
+stretch drawn as one capsule (ADR-0031), a long ask's work a capsule of its
+own (ADR-0056). The Archive tab lists every root.
 Views are pure functions over one `indexTree` (`packages/core/tree.ts`,
 `roots.ts`); which tab you are on, your open roots and each root's columns are
 a reducer in `packages/client/layout.ts`, never written, and the inbox is
@@ -419,6 +420,19 @@ stored as a pasted image is, under a `pineta.banner` value keyed by the
 lane, and drawn in place of the ✦ before the thread's name. A failed one is tried
 again at the thread's next run's end. The agent's `set_banner` sets a
 pasted image, or a new one from your words.
+
+**A column folds each ask's work** (ADR-0056). An ask is a message that
+started a run, with that run, read from the tree (`indexAsks`,
+`packages/core/asks.ts`). A column is read in outline, story or raw: story
+shows each ask's message, one digest line folding its work, and its last
+word. The rail and the column compact the same stretches: one landmark rule
+(`railLandmarks`) is drawn apart in both, and a long ask is a dot and a
+capsule of its own. A bar names the ask whose work is at the column's top; a
+"since you were here" line marks where this device last left a thread; an
+ask's files open a review of its range of revisions, from the paths each
+turn's revision records. Stop records who pressed it (`pineta.stop`). With
+`{ "digests": { "enabled": true } }`, a model writes each ask a short
+summary (`pineta.digest`, the `ask-digest` skill), which no agent reads.
 
 **Steps 1–5 are done** (ADR-0018). Now continue thickening (`docs/04-roadmap.md`), each step
 independently shippable:
@@ -574,6 +588,11 @@ context.**
   your working copy, or any directory, with no container, as you. A branch
   inherits its thread's setting. `PINETA_LANES=0` makes it the default. Such
   a thread shares its directory, and hot reload waits while one runs in yours.
+- **Summaries of asks** (ADR-0056): `{ "digests": { "enabled": true } }`
+  in `~/.config/pineta/config.json` has a model, the one commit messages
+  use, write each ask's work a short summary while someone reads the running
+  thread, at most once a minute, and once more when its run ends. Replace
+  the `ask-digest` skill to change what it asks.
 - `PINETA_TOOLS=0` removes the tools. A thread's agent that starts the
   development host itself needs `PINETA_PORT=0`, or it collides on 7391.
 - **Inviting a collaborator:** `PINETA_BIND=0.0.0.0` (or an address). The host

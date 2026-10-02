@@ -1,4 +1,11 @@
-import { type ArchiveRecord, cardId, entryId, writerId } from "@pineta/core"
+import {
+  type ArchiveRecord,
+  type AskIndex,
+  cardId,
+  entryId,
+  indexAsks,
+  writerId,
+} from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import { tree } from "./fixtures.ts"
 import {
@@ -41,10 +48,15 @@ const onNewTab: Layout = layoutReducer(initialLayout(), {
   key: "t",
   asksAgent: false,
 })
-const at = (layout: Layout, archive = new Map<string, ArchiveRecord>()) => ({
+const at = (
+  layout: Layout,
+  archive = new Map<string, ArchiveRecord>(),
+  asks: AskIndex = indexAsks(index),
+) => ({
   layout,
   index,
   archive,
+  asks,
 })
 const R1 = at(onRoot("1-r1"))
 const plan = (intent: Intent, state: IntentState = R1) =>
@@ -225,6 +237,29 @@ describe("planIntent", () => {
         { kind: "pickArchived", root: "5-r2" },
         { kind: "layout", action: { kind: "show", tab: { kind: "archive" } } },
       ])
+    })
+
+    test("a pick into an ask's work opens its fold before it is revealed (ADR-0056)", () => {
+      const asks: AskIndex = {
+        askOf: new Map([[entryId("4-c"), entryId("2-a")]]),
+        work: new Map([[entryId("2-a"), [entryId("4-c")]]]),
+        last: new Map([[entryId("2-a"), entryId("4-c")]]),
+      }
+      const effects = plan(
+        { kind: "openAt", entry: "4-c" },
+        at(onRoot("1-r1"), new Map(), asks),
+      )
+      expect(effects.slice(0, 2)).toEqual([
+        { kind: "openFold", ask: "2-a" },
+        { kind: "reveal", entry: "4-c" },
+      ])
+      // A message no run wrote opens nothing.
+      expect(
+        plan(
+          { kind: "openAt", entry: "3-b" },
+          at(onRoot("1-r1"), new Map(), asks),
+        ).some(e => e.kind === "openFold"),
+      ).toBe(false)
     })
 
     test("a message's closed branch opens as openAt does; no entry, nothing", () => {

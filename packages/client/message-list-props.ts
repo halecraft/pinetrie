@@ -2,8 +2,20 @@
 // how each prop is compared: `React.memo`'s rule for `MessageList`
 // (`sameProps`), kept pure (S59).
 
-import type { ColumnView, ThreadLane, TreeIndex, WriterId } from "@pineta/core"
+import type {
+  AskIndex,
+  ColumnView,
+  EntryId,
+  RevisionRecord,
+  StopRecord,
+  ThreadLane,
+  TreeIndex,
+  WriterId,
+} from "@pineta/core"
+import type { DigestRecord } from "@pineta/marginalia"
 import type { SessionDocHandle } from "@pineta/schema"
+import type { FoldMemory } from "./ask-fold.ts"
+import type { Density } from "./ask-words.ts"
 import type { LaneJoin } from "./column-view.ts"
 import type { LiveWork } from "./live.ts"
 import type { MessageAct } from "./message-tools.ts"
@@ -31,6 +43,31 @@ export interface MessageListProps {
   /** Where a running call's output is read. */
   doc: SessionDocHandle
   onAct: (act: MessageAct) => void
+  /** Every ask (`indexAsks`), from the same moment as `index`. */
+  asks: AskIndex
+  /**
+   * What the rail draws apart (`railLandmarks`), sorted: no fold hides them.
+   * A list, compared by value, since the running tips it holds change.
+   */
+  landmarks: readonly string[]
+  /** How much of each ask is drawn. */
+  density: Density
+  /** The column's tip when its reader left its end (`useFollow`). */
+  releasedTip: string | null
+  /** The prompt of the ask this column's lane runs, if it runs. */
+  runningAsk: string | null
+  /** Who stopped each ask, by its prompt. */
+  stops: ReadonlyMap<string, StopRecord>
+  /** The turns' revisions, whose paths an ask's digest counts. */
+  revisions: ReadonlyMap<string, RevisionRecord>
+  /** Each ask's fold, as the reader chose it. */
+  folds: FoldMemory
+  /** The message a "since you were here" line goes before (`leftLine`). */
+  leftBefore: string | null
+  /** Open the review of an ask's files (ADR-0056). */
+  onReviewAsk: (ask: EntryId) => void
+  /** Each ask's model-written digest, by its prompt. */
+  digests: ReadonlyMap<string, DigestRecord>
 }
 
 /**
@@ -44,7 +81,8 @@ export interface MessageListProps {
  * rebuilt on every render of the column, so they are compared by value. The
  * rest keep their identity while unchanged: memos in `App`, the facts,
  * `useSelector`'s names, `useStable`'s handler, the session's document, the
- * row memory made once in `App`.
+ * row and fold memories made once in `App`. A fold's choice is read by its
+ * own ask (`AskWork`), so opening one does not rebuild the list.
  */
 const MESSAGE_LIST_PROPS = {
   view: "identity",
@@ -59,6 +97,17 @@ const MESSAGE_LIST_PROPS = {
   nameOf: "identity",
   doc: "identity",
   onAct: "identity",
+  asks: "identity",
+  landmarks: "value",
+  density: "value",
+  releasedTip: "value",
+  runningAsk: "value",
+  stops: "value",
+  revisions: "value",
+  folds: "identity",
+  leftBefore: "value",
+  onReviewAsk: "identity",
+  digests: "value",
 } as const satisfies { readonly [K in keyof MessageListProps]-?: PropRule }
 
 /** Whether a column's message list would draw the same. */

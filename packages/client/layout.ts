@@ -408,6 +408,15 @@ const StoredColumn = Type.Object({
   anchor: Type.Union([Type.String(), Type.Null()]),
   lane: Type.Optional(Type.String()),
   asksAgent: Type.Optional(Type.Literal(true)),
+  // Optional, with no new `v`: absent is story, so a layout stored before
+  // densities decodes, and no one's tabs are dropped for it (ADR-0056).
+  density: Type.Optional(
+    Type.Union([
+      Type.Literal("outline"),
+      Type.Literal("story"),
+      Type.Literal("raw"),
+    ]),
+  ),
   fresh: Type.Optional(
     Type.Object({
       sendId: Type.Optional(Type.String()),
@@ -440,6 +449,7 @@ const toStored = (c: Column): Stored => ({
   anchor: c.anchor,
   ...(c.lane === undefined ? {} : { lane: c.lane }),
   ...(c.asksAgent ? { asksAgent: true } : {}),
+  ...(c.density === undefined ? {} : { density: c.density }),
   ...(c.fresh === undefined
     ? {}
     : {
@@ -464,6 +474,7 @@ const fromStored = (s: Stored): Column => ({
   // is exactly one lane's.
   ...(s.lane !== undefined && isLaneName(s.lane) ? { lane: s.lane } : {}),
   ...(s.asksAgent ? { asksAgent: true } : {}),
+  ...(s.density === undefined ? {} : { density: s.density }),
   ...(s.fresh === undefined
     ? {}
     : {

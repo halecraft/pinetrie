@@ -69,7 +69,7 @@ const revisions = (
   new Map(
     Object.entries(owners).map(([id, lane]) => [
       id,
-      { entry: entryId(id), lane, commit: null, snapshot: null },
+      { entry: entryId(id), lane, commit: null, snapshot: null, paths: [] },
     ]),
   )
 const stretches = (
@@ -385,7 +385,7 @@ describe("columnView: the work strip", () => {
       ).strip
     const target = {
       lane: B,
-      commits: [commitId("c1")],
+      spans: [{ kind: "revision", commit: commitId("c1") }],
       conflicts: [],
       yourEdits: ["a.txt"],
     }
@@ -455,11 +455,12 @@ describe("columnView: the work strip", () => {
 })
 
 describe("workingWords", () => {
-  test.each<[boolean, string | undefined]>([
-    [true, "the agent is working"],
-    [false, undefined],
-  ])("a lane running %s says %s", (running, words) => {
-    expect(workingWords(running)).toBe(words)
+  test.each<[boolean, string | null, string | undefined]>([
+    [true, null, "the agent is working"],
+    [true, 'Ada: "Fix it"', 'the agent is working on Ada: "Fix it"'],
+    [false, 'Ada: "Fix it"', undefined],
+  ])("a lane running %s on %s says %s", (running, ask, words) => {
+    expect(workingWords(running, ask)).toBe(words)
   })
 })
 

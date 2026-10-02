@@ -73,6 +73,10 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     "no page errors overall",
   ],
   "browser/tools": [
+    "an ask that ends under a reader scrolled into it stays open, and folds when they return to the end",
+    "a pick inside a capsule opens its ask's fold and brings its message into view",
+    "a fold's toggle redraws no list",
+    "a column's density is kept across a reload, and outline draws each ask as a line",
     "the agent's reply shows in its column while it is written",
     "a command that ends within half a second never opens its row",
     "a running command's output shows live in its column",

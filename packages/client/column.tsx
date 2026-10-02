@@ -3,16 +3,22 @@
 import { useSelector } from "@kyneta/react"
 import {
   type AgentRun,
+  type AskIndex,
+  askSpan,
   atEntry,
   type CardPlace,
   type CardRecord,
   type ColumnView,
+  type EntryId,
   entryId,
   type LaneView,
+  messageAt,
   nearestRevision,
   type Position,
+  promptOf,
   ROOT,
   type SeatRecord,
+  type StopRecord,
   type ThreadLane,
   type TreeIndex,
   threadOf,
@@ -20,6 +26,7 @@ import {
   workFor,
 } from "@pineta/core"
 import {
+  type DigestRecord,
   displayName,
   draftingAt,
   type Held,
@@ -31,8 +38,16 @@ import {
   type SessionDocHandle,
   type StreamRecord,
 } from "@pineta/schema"
-import { useCallback, useLayoutEffect, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
 import type { ReadOnly } from "./app-view.ts"
+import type { FoldMemory } from "./ask-fold.ts"
+import { askWords, DENSITIES, type Density, densityWords } from "./ask-words.ts"
 import { CardEditor } from "./card-editor.tsx"
 import {
   AGENT_MARK,
@@ -42,6 +57,7 @@ import {
   type HeadIdentity,
   type HeadOrigin,
   identityWords,
+  type ReviewTarget,
   type WorkFacts,
   type WorkStrip,
   workingWords,
@@ -51,19 +67,22 @@ import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { behind, type SeenEnd } from "./follow.ts"
 import type { ColumnAct, Intent } from "./intent.ts"
+import { type Left, leftLine } from "./left.ts"
 import type { LiveWork } from "./live.ts"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
 import { speakerLabel, withContributors } from "./names.ts"
-import { Avatars } from "./presence.tsx"
+import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import { ReviewPane } from "./review-pane.tsx"
 import type { ScreenMemory } from "./screen-memory.ts"
 import type { SessionClient } from "./session-view.ts"
+import type { DeviceState } from "./tab-state.ts"
 import type { RowMemory } from "./tool-row.ts"
-import { useFollow } from "./use-follow.ts"
+import { useAskBar } from "./use-ask-bar.ts"
+import { PLACED, useFollow } from "./use-follow.ts"
 import { useSeenBy } from "./use-presence.ts"
 import { useStable } from "./use-stable.ts"
 
@@ -130,6 +149,18 @@ export interface ColumnProps {
   seenEnd?: ScreenMemory<SeenEnd>
   /** Each tool row's state, by its call's id, across unmounts. */
   rows: ScreenMemory<RowMemory>
+  /** Every ask (`indexAsks`), from the same moment as `index`. */
+  asks: AskIndex
+  /** What the rail draws apart in this column's root, sorted: no fold hides it. */
+  landmarks: readonly string[]
+  /** Who stopped each ask, by its prompt (ADR-0056). */
+  stops: ReadonlyMap<string, StopRecord>
+  /** Each ask's fold, as the reader chose it, across unmounts. */
+  folds: FoldMemory
+  /** Each ask's model-written digest, by its prompt (ADR-0056). */
+  digests: ReadonlyMap<string, DigestRecord>
+  /** Where this device last left each thread (ADR-0056); none in a preview. */
+  left?: DeviceState<Left>
 }
 
 export function Column(p: ColumnProps) {
@@ -189,15 +220,49 @@ export function Column(p: ColumnProps) {
   const [mountedBehind] = useState(() =>
     behind(p.seenEnd?.get(p.column.key), view.tipId),
   )
-  const leave = useStable((unseen: boolean) =>
-    p.seenEnd?.remember(p.column.key, { tip: view.tipId, unseen }),
+  const [mountedReleased] = useState(
+    () => p.seenEnd?.get(p.column.key)?.released ?? null,
+  )
+  // Where this device last left the thread: read as the column mounts and
+  // when the page shows again, so the line stays where it was while you
+  // read below it (ADR-0056).
+  const leftLane = p.column.lane ?? null
+  const readLeft = useStable(() =>
+    leftLane === null ? undefined : p.left?.load()?.get(leftLane),
+  )
+  const [leftAt, setLeftAt] = useState(readLeft)
+  useEffect(() => {
+    const back = () => {
+      if (document.visibilityState === "visible") setLeftAt(readLeft())
+    }
+    document.addEventListener("visibilitychange", back)
+    return () => document.removeEventListener("visibilitychange", back)
+  }, [readLeft])
+  // Leaving, the column remembers its end, and a column bound to a lane at
+  // its end leaves the device a mark there: written only then, so watching
+  // writes nothing.
+  const leave = useStable(
+    (left: {
+      readonly unseen: boolean
+      readonly released: string | null
+      readonly following: boolean
+    }) => {
+      p.seenEnd?.remember(p.column.key, {
+        tip: view.tipId,
+        unseen: left.unseen,
+        released: left.released,
+      })
+      if (left.following && leftLane !== null && view.tipId !== null)
+        p.left?.save(new Map([[leftLane, view.tipId]]))
+    },
   )
   // While they do, the column does not get shorter at its end (S35).
   const end = useFollow(
     body,
     content,
     { floor, holding: streamingLanes.length > 0 },
-    { unseen: mountedBehind, leave },
+    { unseen: mountedBehind, released: mountedReleased, leave },
+    view.tipId,
   )
   // This thread's lane, as the host will find it: busy means a compelled
   // message waits.
@@ -210,6 +275,18 @@ export function Column(p: ColumnProps) {
   const lane: ThreadLane =
     thread.kind === "thread" ? thread.lane : { kind: "none" }
   const running = lane.kind === "lane" && lane.running
+  // The ask this column's lane is answering (ADR-0056).
+  const runningAsk =
+    lane.kind === "lane" && lane.running ? promptOf(index, lane.tip) : null
+  const density = p.column.density ?? "story"
+  const nameFn = (w: WriterId) => nameFor(p.nameOf, w)
+  const askLine = (ask: string | null): string | null => {
+    const prompt = ask === null ? null : messageAt(index, ask)
+    return prompt === null ? null : askWords(prompt, nameFn)
+  }
+  // Which ask the work at the top belongs to, while its message is out of
+  // sight (ADR-0056). Outline draws each ask's line under its message.
+  const atTop = useAskBar(body, density !== "outline")
   const waiting =
     lane.kind === "lane" ? p.outbox.filter(h => h.lane === lane.name) : []
   // Whether this column's next send would create a lane: the composer's to
@@ -236,9 +313,40 @@ export function Column(p: ColumnProps) {
   const [reviewing, setReviewing] = useState(false)
   // Reset in render, not an effect: no frame draws a review that is gone.
   if (review === null && reviewing) setReviewing(false)
+  // Or an ask's files, from its digest line (ADR-0056): one review at a time.
+  const [askReview, setAskReview] = useState<{
+    readonly ask: string
+    readonly target: ReviewTarget
+  } | null>(null)
   const reviewId = `review-${p.column.key}`
-  const toggleReview = useStable(() => setReviewing(r => !r))
-  const closeReview = useStable(() => setReviewing(false))
+  const toggleReview = useStable(() => {
+    setAskReview(null)
+    setReviewing(r => !r)
+  })
+  const closeReview = useStable(() => {
+    setAskReview(null)
+    setReviewing(false)
+  })
+  const reviewAsk = useStable((ask: EntryId) => {
+    const span = askSpan(index, p.asks, ask, p.work.revisions)
+    const lane = p.work.revisions.get(ask)?.lane
+    if (span === null || lane === undefined) return
+    setReviewing(false)
+    setAskReview(r =>
+      r?.ask === ask
+        ? null
+        : {
+            ask,
+            target: {
+              lane,
+              spans: [span],
+              conflicts: [],
+              yourEdits: [],
+              title: askLine(ask) ?? undefined,
+            },
+          },
+    )
+  })
   // An update's intent, put in this column's composer (ADR-0038).
   const [insert, setInsert] = useState<{
     readonly text: string
@@ -314,9 +422,10 @@ export function Column(p: ColumnProps) {
   return (
     <section
       className="column"
+      data-density={density}
       data-key={p.column.key}
       data-position={p.position}
-      data-reviewing={reviewing || undefined}
+      data-reviewing={reviewing || askReview !== null || undefined}
       data-track={p.track}
     >
       <div className="column-thread">
@@ -350,8 +459,20 @@ export function Column(p: ColumnProps) {
               identity={shows.identity}
               onOpen={openAt}
               running={running}
+              working={workingWords(running, askLine(runningAsk))}
             />
             <span className="head-space" />
+            {view.nodes.length > 0 && (
+              <DensityControl
+                density={density}
+                onChoose={d => {
+                  act({ kind: "density", density: d })
+                  // The reader's own move: at the end, it stays there, and
+                  // no floor holds the change (`follow.ts`).
+                  body.current?.dispatchEvent(new Event(PLACED))
+                }}
+              />
+            )}
             {p.showsPresence && view.tipId !== null && (
               <SeenBy
                 colorOf={p.colorOf}
@@ -398,6 +519,26 @@ export function Column(p: ColumnProps) {
           )}
         </header>
         <div className="column-body" ref={body}>
+          {atTop !== null && (
+            <div className="ask-bar-slot">
+              <button
+                className="ask-bar"
+                data-ask={atTop.ask}
+                data-where={atTop.kind}
+                onClick={() => {
+                  if (atTop.kind === "elsewhere") return openAt(atTop.ask)
+                  body.current
+                    ?.querySelector(`.msg[data-entry="${atTop.ask}"]`)
+                    ?.scrollIntoView({ block: "start" })
+                }}
+                title="the message this work answers"
+                type="button"
+              >
+                {atTop.kind === "elsewhere" && "↰ answering "}
+                {askLine(atTop.ask)}
+              </button>
+            </div>
+          )}
           {/* `useFollow` watches its height. Keep it unpositioned: it would
             become the messages' offsetParent, and `alignOnOpen` measures
             their offsetTop against the body's. */}
@@ -413,6 +554,21 @@ export function Column(p: ColumnProps) {
               nameOf={p.nameOf}
               onAct={act}
               rows={p.rows}
+              asks={p.asks}
+              density={density}
+              folds={p.folds}
+              landmarks={p.landmarks}
+              releasedTip={end.releasedTip}
+              revisions={p.work.revisions}
+              runningAsk={runningAsk}
+              onReviewAsk={reviewAsk}
+              digests={p.digests}
+              leftBefore={leftLine(
+                index,
+                leftAt,
+                view.nodes.map(n => n.id),
+              )}
+              stops={p.stops}
               doc={p.session.doc}
               shown={p.shown}
               tools={p.live.tools}
@@ -428,7 +584,8 @@ export function Column(p: ColumnProps) {
               )
             })}
             {/* Where the agent's next text will appear. It takes no height:
-            CSS hides it while a row the work opened runs. */}
+            CSS hides it while a row the work opened runs, and in outline,
+            where the running ask's own line pulses. */}
             {running && <div aria-hidden className="working-line" />}
             {/* Messages waiting for this thread's lane, in the order they will
             be taken. They are not in the tree yet. */}
@@ -572,13 +729,23 @@ export function Column(p: ColumnProps) {
           session={p.session}
         />
       </div>
-      {reviewing && review !== null && (
+      {askReview !== null ? (
         <ReviewPane
           id={reviewId}
-          line={shows.strip.kind === "offer" ? shows.strip.words.line : ""}
+          line="what this ask changed"
           onClose={closeReview}
-          target={review}
+          target={askReview.target}
         />
+      ) : (
+        reviewing &&
+        review !== null && (
+          <ReviewPane
+            id={reviewId}
+            line={shows.strip.kind === "offer" ? shows.strip.words.line : ""}
+            onClose={closeReview}
+            target={review}
+          />
+        )
       )}
     </section>
   )
@@ -640,14 +807,17 @@ function Reply({
 function ThreadMark({
   banner,
   running,
+  working,
 }: {
   banner: HeadBanner | null
   running: boolean
+  /** Its title while the lane runs (`workingWords`). */
+  working: string | undefined
 }) {
   return (
     <span
       className={running ? "thread-mark pulse" : "thread-mark"}
-      title={workingWords(running)}
+      title={working}
     >
       {banner === null ? (
         <span className="thread-star">{AGENT_MARK}</span>
@@ -693,17 +863,20 @@ function Identity({
   banner,
   onOpen,
   running,
+  working,
 }: {
   identity: HeadIdentity
   banner: HeadBanner | null
   onOpen: (id: string) => void
   running: boolean
+  working: string | undefined
 }) {
   if (identity.kind === "none") return null
   if (identity.kind === "pending")
     return (
       <span className="agent-name pending">
-        <ThreadMark banner={null} running={running} /> {identityWords(identity)}
+        <ThreadMark banner={null} running={running} working={working} />{" "}
+        {identityWords(identity)}
       </span>
     )
   const { start } = identity
@@ -718,7 +891,8 @@ function Identity({
       title="where this agent started"
       type="button"
     >
-      <ThreadMark banner={banner} running={running} /> {identityWords(identity)}
+      <ThreadMark banner={banner} running={running} working={working} />{" "}
+      {identityWords(identity)}
     </button>
   )
 }
@@ -838,5 +1012,38 @@ function WorkStripView({
         />
       )}
     </div>
+  )
+}
+
+/**
+ * How much of each ask the column draws (ADR-0056): outline, story or raw.
+ * The reader's choice, kept with the column, never written.
+ */
+function DensityControl({
+  density,
+  onChoose,
+}: {
+  density: Density
+  onChoose: (d: Density) => void
+}) {
+  return (
+    <span className="density" title="how much to show">
+      {DENSITIES.map(d => {
+        const words = densityWords(d)
+        return (
+          <button
+            aria-pressed={d === density}
+            className="density-choice"
+            data-density={d}
+            key={d}
+            onClick={() => onChoose(d)}
+            title={words.title}
+            type="button"
+          >
+            {words.label}
+          </button>
+        )
+      })}
+    </span>
   )
 }

@@ -368,7 +368,8 @@ The stores are built in `main.tsx`, the one module that touches
 given them (`AppStores`).
 
 `deviceState` keeps a value in the device's slot only, shared by the device's
-tabs: the inbox's seen state (`pineta-inbox:<session>`), and who you are
+tabs: the inbox's seen state (`pineta-inbox:<session>`), where each thread
+was left (`pineta-left:<session>`, ADR-0056), and who you are
 (`pineta-identity`, below), which `reconcileName`'s `store` also saves, with
 the same email, so it reloads no tab. Each save reads what is stored and merges into it
 (`mergeInbox`; the identity's merge takes the new value), so two tabs marking
@@ -413,33 +414,43 @@ error.
   from `page.context().newPage()` shares the main page's storage, so it is
   the same person.
 
-## Rail runs (ADR-0031)
+## Rail stretches (ADR-0031, ADR-0056)
 
-The rail draws `compactRail(index, projectRail(...), keep)`: a dot per
-landmark, and a capsule per run of three or more uneventful messages.
-`projectRail` still returns a row per message, and everything else reads
-those rows (tab summaries, archive search, `branchColors`).
+The rail draws `compactRail(index, projectRail(...), keep, { asks, revisions })`:
+a dot per landmark, and a capsule per stretch of three or more uneventful
+messages. `projectRail` still returns a row per message, and everything
+else reads those rows (tab summaries, archive search, `branchColors`).
 
-- **`compactRail` (core) is the rule; `railKeep` (`rail-view.ts`) is the
-  view's part of it:** rings, running tips, every open column's end,
-  and every thread end holding a card of yours, whose dot carries its mark.
-  A column's end is kept because a pinned column can end mid-stretch: inside a
-  run, half of it would be on the column's path, and where the column ends
-  would not show. So a run is all on an open path or all off it, and
-  `data-open` on its first message speaks for it.
+- **`railLandmarks` (core) is the rule, and the columns read it too:**
+  `railKeep` (`rail-view.ts`) is the view's part, rings, running tips,
+  every open column's end, and every thread end holding a card of yours,
+  whose dot carries its mark. A column's end is kept because a pinned column
+  can end mid-stretch: inside one, half of it would be on the column's path,
+  and where the column ends would not show. So a stretch is all on an open
+  path or all off it, and `data-open` on its first message speaks for it.
+  The columns fold around `columnLandmarks`, the same set but for the
+  rings: a ring is a thread end, which on a column's path is its own end,
+  and leaving presence out keeps a presence write from redrawing every
+  column (S59).
+- **A long ask is a dot and a capsule of its own** (ADR-0056): the prompt of
+  an ask whose run holds `MIN_STRETCH` agent messages is a landmark, and a
+  stretch never crosses its work's edge. Short exchanges merge as before.
+  The stretch carries its ask (`RailStretch.ask`), and its tooltip is
+  `stretchWords`: `askWords`, `workWords`, then the ask's digest.
 - **Every item has `slot`, `span` and `ids`;** a dot is an item with one id and
   a span of 1. An edge leaves its parent item's last slot, so the renderer
   never asks which kind an item is, only how to draw it.
 - **A click picks by where it lands** (`pickAt`, pure): a fraction of the way
-  down the capsule is that fraction through the run. A click from the keyboard
-  has `detail` 0 and no point, and picks the first message. A browser check
-  clicks at a point with `mouse.click`; `page.click` clicks the centre, which
-  is the run's middle message.
-- **Selectors:** `.rail-run[data-entry]` is a run's first message, with
-  `data-count`, `data-span` and `data-fill` (`agent`, `people` or `mixed`).
-  The browser suite's `railCount`
-  counts messages, as dots plus each run's `data-count`; a check counting
-  `.rail-dot` alone misses every message inside a run.
+  down the capsule is that fraction through the stretch. A click from the
+  keyboard has `detail` 0 and no point, and picks the first message. A
+  browser check clicks at a point with `mouse.click`; `page.click` clicks
+  the centre, which is the stretch's middle message. A pick into an ask's
+  work opens its fold first (`openFold`, below).
+- **Selectors:** `.rail-stretch[data-entry]` is a stretch's first message,
+  with `data-count`, `data-span`, `data-fill` (`agent`, `people` or
+  `mixed`) and, for a long ask's work, `data-ask`. The browser suite's
+  `railCount` counts messages, as dots plus each stretch's `data-count`; a
+  check counting `.rail-dot` alone misses every message inside one.
 - **A new tab's rail is `EmptyRail`:** a `.rail-start`, not a `.rail-dot`, so
   `railCount` never counts it. The rail's `min-width` is wider than one
   track, in both, so the columns keep their place; the browser suite checks `#strip`'s left edge
@@ -447,6 +458,58 @@ those rows (tab summaries, archive search, `branchColors`).
   `PAD` wide on both sides of its outer tracks.
 - **A capsule's background depends on its fill** (the panel's colour, the
   track's, or the two blended half and half), so a colour check reads a `.rail-dot`. Signals (`.pulse`, `[data-here]`, `.noted`) are always on dots.
+
+## Asks, densities and folds (ADR-0056)
+
+An ask is a message that started a run, with that run (`indexAsks`, core,
+kept per index). `readSessionFacts` reads it with the index, so the rail and
+the columns read one. `segmentPath` (core) decides what a column folds;
+`columnRows` (`ask-view.ts`) groups each ask's segments, and `AskWork`
+(`ask-work.tsx`) draws one ask's work.
+
+- **`AskWork` is `ToolRow`'s twin.** `foldOpen` (`ask-fold.ts`) is the
+  rule, as `rowSize` is; the reader's choice is kept in a `FoldMemory` by
+  the ask's prompt, made once in `App`, as tool rows' are. Each `AskWork`
+  reads its own key with `useSyncExternalStore`, so opening one redraws it
+  alone and `MessageList` gets no new prop. Its messages are drawn only
+  while open: a closed fold creates none of their elements (S59).
+- **Nothing is written when a run ends.** `foldOpen` reads
+  `endedWhileAway`: the run's last entry is past `releasedTip`, the
+  column's tip when its reader left its end (`follow.ts`). Following, there
+  is none, so an ended ask folds, above the view; scrolled away, it stays
+  open under the reader. An effect writing a "settled" flag when a run ends
+  would be an effect dispatching from document facts (S35).
+- **Density is the column's** (`Column.density`, absent is story), set by a
+  `density` column act and stored with the layout as an optional field,
+  with no new `v`: a layout stored before it decodes. A change dispatches
+  `PLACED`, so a column at its end stays there and no floor holds the
+  change.
+- **What `askView` decides:** the digest line (`workWords` over
+  `askStats`), the outcome's words, the live line while it runs, the last
+  word (hidden in outline), the summary, and the span its files open in a
+  review (`askSpan`). `askWords` says an ask the same everywhere: the bar,
+  the working mark's title, the rail's tooltip, outline.
+- **`openFold`:** `planIntent`'s `openAt` puts it before the reveal when
+  the entry is in an ask's work. `perform` sets the fold's memory and
+  renders `App` once, so `useReveal`'s wait finds the message drawn.
+  Forks, branch starts and people's messages are never in a fold.
+- **The ask bar is laid over the content**, in a sticky zero-height slot
+  before `.column-content`, as `.jump-slot` is: the follow rule reads the
+  content's own height and `alignOnOpen` its offsets, and a sticky header
+  among the messages would move both. `useAskBar` measures each
+  `.ask-work[data-ask-of]` and its message once a frame at most; `askAtTop`
+  decides.
+- **Since you were here** (`left.ts`): `pineta-left:<session>` on the
+  device, per lane, the column's tip when its reader left it at its end.
+  `seen.leave` writes it, on unmount, page hide and `pagehide`, in the same
+  call that saves `SeenEnd`; nothing is written while you watch, since each
+  write is a `storage` event in every other tab. A column reads it as it
+  mounts and when the page shows again, and `.left-line` takes no height.
+- **Selectors:** `.column[data-density]`, `.density-choice[data-density]`
+  (`aria-pressed`), `.ask-work[data-ask-of]`, `.ask-fold` (`aria-expanded`,
+  `data-first`), `.ask-files`, `.ask-line` (`.running`), `.ask-digest`,
+  `.ask-outcome`, `.ask-bar` (`data-ask`, `data-where`), `.left-line`.
+  The browser suite reads finished work raw (`readRaw`).
 
 ## Revealing a picked message (`use-reveal.ts`, S33)
 
@@ -687,6 +750,11 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   clamp keeps the column there. If a run ends shorter than its floor, the
   column moves once, then. A column that shrinks mid-run for another reason,
   such as a column opened to its left, keeps its floor until the run ends.
+- **A release keeps the tip it left at** (`releasedTip`, ADR-0056): set by
+  the first scroll up, kept while released however the run grows, and
+  cleared by following again. `SeenEnd.released` carries it across an
+  unmount; `seen.leave` also runs when the page is hidden. An ask whose
+  run ended after it stays open (`foldOpen`).
 - **The floor is at most a third of the view** (`FLOOR_MAX`, ADR-0049).
   `capFloor` applies wherever the floor is set, so a view that gets shorter
   cuts a standing floor too. `held` counts the capped floor, so what the cap
@@ -824,13 +892,15 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   by a border image outside the box, which takes no width: text wraps as its
   entry will.
 - **Stop** shows above the composer while the thread's lane runs, and sends
-  `stop`. It is the column's, not a card's.
+  `stop`. It is the column's, not a card's. The host records who sent it
+  under the ask (`pineta.stop`, ADR-0056).
 - **What the agent is doing shows in three places, none taking layout**
   (ADR-0054). `running` (`lane.running`, Stop's fact) is computed once in
   `Column`.
   - The mark before the thread's name (`.thread-mark`: the `✦`, or the
-    banner over it) pulses while it is true, titled by `workingWords`. The
-    square pulses, not the star, which a banner hides.
+    banner over it) pulses while it is true, titled by `workingWords`, which
+    names the running ask (`askWords`, ADR-0056). The square pulses, not
+    the star, which a banner hides.
   - A live row the work opened carries `data-revealed`, and
     `.tool.live[data-revealed]::after` draws a ring around it. A call
     shorter than `REVEAL_MS` is never revealed, so it shows none. The ring
@@ -839,7 +909,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     and sit centred in the column. The browser suite measures it from the
     row's box and the pseudo-element's resolved insets.
   - `.working-line` is drawn at the content's end for the whole run, before
-    the waiting messages. `.column-content:has(.tool.live[data-revealed])`
+    the waiting messages; in outline the running ask's own line pulses, and
+    `.column[data-density="outline"]` hides it. `.column-content:has(.tool.live[data-revealed])`
     hides it, so no value restates `ToolRow`'s live rule or `REVEAL_MS`.
   - **The line has zero height**, drawn by a shadow and lifted by a
     transform. An empty block's margins collapse through it, so the gap is
@@ -903,7 +974,11 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 
 ## Reviewing an offer (`review.ts`, `review-pane.tsx`, `use-fetched.ts`, ADR-0047)
 
-The offer's line opens a review, and the column widens to hold it.
+The offer's line opens a review, and the column widens to hold it. So does
+an ask's file count (ADR-0056): every review is of spans (`DiffSpan`), an
+offer's revisions or an ask's range from its prompt's commit to its last
+turn's, and `ReviewTarget.title` heads a range, which has no description.
+One review is open at a time.
 
 - **A column is `.column` > `.column-thread` + `.review`.** `.column` stays
   `#strip`'s direct child with its key, position and track, so dragging,
@@ -912,7 +987,7 @@ The offer's line opens a review, and the column widens to hold it.
   never stored, and is reset during render when the strip's `review` goes
   (a take, a withdrawal), so no frame draws a review that is gone. Hiding
   it instead would let the next offer open it unasked.
-- **Every URL names a commit** (`reviewUrl`, `diffUrl`, `@pineta/marginalia`),
+- **Every URL names its commits** (`reviewUrl`, `diffUrl`, `@pineta/marginalia`),
   and the answer is immutable, so the browser's HTTP cache is the only
   cache and `useFetched` has no refetch rule. The record's `commits` is what
   changes; the page never keys on its `at`, which every trigger rewrites.
@@ -1178,6 +1253,9 @@ shown by their email's part before the `@`. Each rendered chat carries its
   lines a column up on opening; the floor, after it, holds a following
   column's height (`useFollow`). The floor's rule measures `.column-content`,
   spacer included.
+- **A message folded into an ask's work is not drawn**, so it has no
+  `.msg[data-entry]` until its fold opens: a check on a finished run's
+  work reads the column raw (`readRaw`), or opens the fold.
 - **A streaming reply is a `.msg` with no `data-entry`**, as a waiting message
   is. Anything that means "a message in the tree" looks for
   `.msg[data-entry]`; the browser suite counts the agent's steps by

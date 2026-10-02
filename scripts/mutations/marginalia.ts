@@ -366,9 +366,9 @@ export const mutations: readonly Mutation[] = [
     name: "a review URL carries no version",
     file: "packages/marginalia/offer.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  `${OFFER_PREFIX}${OFFER_WIRE}/review/${commit}`",
+    from: "  `${OFFER_PREFIX}${OFFER_WIRE}/review/${spanKey(span)}`",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "  `${OFFER_PREFIX}review/${commit}`",
+    to: "  `${OFFER_PREFIX}review/${spanKey(span)}`",
     command: unit,
     expect: "the wire: every URL parses back",
   },
@@ -531,5 +531,22 @@ export const mutations: readonly Mutation[] = [
     to: "  return seats.map(s => s.clientId)",
     command: unit,
     expect: "planSeatSweep: a seat no text names goes",
+  },
+  {
+    name: "a range across two lanes is read",
+    file: "packages/marginalia/offer.ts",
+    from: "      if (f.lane === t.lane && f.commit !== null && t.commit !== null)",
+    to: "      if (f.commit !== null && t.commit !== null)",
+    command: unit,
+    expect: "a range only between two commits one lane's turns recorded",
+  },
+  {
+    name: "a live digest replaces the final one",
+    file: "packages/marginalia/digest.ts",
+    from: "): boolean => asked.final || stored?.final !== true",
+    to: "): boolean => true",
+    command: unit,
+    expect:
+      "digestStillWanted: a live digest that comes back after the final one is dropped",
   },
 ]

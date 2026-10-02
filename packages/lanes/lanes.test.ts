@@ -24,6 +24,7 @@ import {
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import {
   bookmarkOf,
+  changedPaths,
   changeOf,
   commitsOf,
   commitTurn,
@@ -285,6 +286,14 @@ describe("a lane's repo, with jj", () => {
     ])
     expect(committed.stdout).toContain("shared.txt")
     expect(committed.stdout).not.toContain(".plans")
+    // The turn's paths, from the lane's root, as its revision records them
+    // (ADR-0056): what git says changed, from the bookmark before it.
+    const laneGit: Runner = args =>
+      hostRunner(laneDir)(args.map(a => (a === WORKSPACE_ROOT ? laneDir : a)))
+    expect(await changedPaths(laneGit, base[0] ?? null, r1)).toEqual([
+      "shared.txt",
+    ])
+    expect(await changedPaths(laneGit, null, r1)).toEqual(["shared.txt"])
 
     // Your repo fetches it by bundle, as the lane's remote bookmark: out of
     // your default log, and immutable with jj's builtin config, your commit
@@ -561,7 +570,9 @@ describe("a lane's repo, with jj", () => {
     const [change] = offer.changes
     if (w === undefined || change === undefined) throw new Error("no offer")
 
-    expect(await revisionRead(ops, w)).toEqual({
+    const span = { kind: "revision", commit: w } as const
+    const read = await revisionRead(ops, span)
+    expect(read).toEqual({
       description: "feat: lane\n\nwhy\n",
       files: expect.arrayContaining([
         {
@@ -601,11 +612,25 @@ describe("a lane's repo, with jj", () => {
         },
       ]),
     })
-    expect(await fileDiff(ops, w, 'we"ird')).toContain("+quote")
-    expect(await fileDiff(ops, w, "a b.txt")).toContain("+space")
+    expect(await fileDiff(ops, span, 'we"ird')).toContain("+quote")
+    expect(await fileDiff(ops, span, "a b.txt")).toContain("+space")
     // One file exactly: a directory's name names none of its files.
-    expect(await fileDiff(ops, w, "dir")).toBe("")
-    expect(await fileDiff(ops, w, "dir/f.txt")).toContain("+under")
+    expect(await fileDiff(ops, span, "dir")).toBe("")
+    expect(await fileDiff(ops, span, "dir/f.txt")).toContain("+under")
+
+    // A range reads the same files, with no description, its counts from
+    // the range's git diff (ADR-0056, S70): here the range is the revision.
+    const [parent] = await commitsOf(ops, `${w}-`)
+    if (parent === undefined) throw new Error("no parent")
+    const range = { kind: "range", from: parent, to: w } as const
+    const byPath = (r: unknown) =>
+      [...((r as { files: { path: string }[] } | null)?.files ?? [])].sort(
+        (a, b) => a.path.localeCompare(b.path),
+      )
+    const ranged = await revisionRead(ops, range)
+    expect(ranged).toMatchObject({ description: "" })
+    expect(byPath(ranged)).toEqual(byPath(read))
+    expect(await fileDiff(ops, range, 'we"ird')).toContain("+quote")
 
     // You reword the offer: its commit changes, and the review of the new
     // one reads your words. `offerFacts` finds it by change id.
@@ -618,10 +643,17 @@ describe("a lane's repo, with jj", () => {
     const [now] = facts.commits
     if (now === undefined) throw new Error("no commit")
     expect(now).not.toBe(w)
-    expect(await revisionRead(ops, now)).toMatchObject({
+    expect(
+      await revisionRead(ops, { kind: "revision", commit: now }),
+    ).toMatchObject({
       description: "feat: as I want it\n",
     })
-    expect(await revisionRead(ops, commitId("1".repeat(40)))).toBeNull()
+    expect(
+      await revisionRead(ops, {
+        kind: "revision",
+        commit: commitId("1".repeat(40)),
+      }),
+    ).toBeNull()
   }, 60_000)
 
   /**
@@ -1222,4 +1254,32 @@ describe("a lane's repo, with jj", () => {
     ])
     expect(heads.stdout).not.toContain("pineta")
   }, 30_000)
+})
+
+test("changedPaths: a path with a space and an accent comes back as it is named (S70)", async () => {
+  const dir = await realpath(
+    await mkdtemp(path.join(tmpdir(), "pineta-paths-")),
+  )
+  try {
+    const git: Runner = args =>
+      hostRunner(dir)(args.map(a => (a === WORKSPACE_ROOT ? dir : a)))
+    const env = {
+      ...process.env,
+      JJ_USER: "Probe",
+      JJ_EMAIL: "probe@example.com",
+    }
+    await run("jj", ["git", "init", "--colocate", dir], { env })
+    const jj = (args: string[]) => run("jj", ["-R", dir, ...args], { env })
+    await writeFile(path.join(dir, "a.txt"), "a\n")
+    await jj(["commit", "-m", "one"])
+    const [from] = await commitsOf(hostJj(dir), "@-")
+    await mkdir(path.join(dir, "d"), { recursive: true })
+    await writeFile(path.join(dir, "d", "c é.txt"), "c\n")
+    await jj(["commit", "-m", "two"])
+    const [to] = await commitsOf(hostJj(dir), "@-")
+    if (from === undefined || to === undefined) throw new Error("no commits")
+    expect(await changedPaths(git, from, to)).toEqual(["d/c é.txt"])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })

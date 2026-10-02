@@ -5,6 +5,7 @@ import {
   type LandingRecord,
   laneNameForThread,
   type OfferRecord,
+  type RevisionRecord,
   type ThreadName,
   writerId,
 } from "@pineta/core"
@@ -316,16 +317,30 @@ describe("the review (ADR-0047)", () => {
   const C2 = commitId("c2")
   const open: OfferRecord = { ...offer, commits: [C1, C2] }
   const offers = new Map([[LANE, open]])
+  const facts = (
+    o: ReadonlyMap<string, OfferRecord>,
+    revisions: ReadonlyMap<string, RevisionRecord> = new Map(),
+  ) => ({ offers: o, revisions })
+  const rev = (c: string) => ({ kind: "revision", commit: c }) as const
   test("planOfferRead: only a commit an open offer holds now", () => {
-    expect(planOfferRead(offers, { kind: "review", commit: C2 })).toEqual({
+    expect(
+      planOfferRead(facts(offers), { kind: "review", span: rev(C2) }),
+    ).toEqual({
       kind: "review",
-      commit: C2,
+      span: rev(C2),
     })
     expect(
-      planOfferRead(offers, { kind: "diff", commit: C1, path: "a b.txt" }),
-    ).toEqual({ kind: "diff", commit: C1, path: "a b.txt" })
+      planOfferRead(facts(offers), {
+        kind: "diff",
+        span: rev(C1),
+        path: "a b.txt",
+      }),
+    ).toEqual({ kind: "diff", span: rev(C1), path: "a b.txt" })
     const status = (o: ReadonlyMap<string, OfferRecord>, commit: string) => {
-      const read = planOfferRead(o, { kind: "review", commit })
+      const read = planOfferRead(facts(o), {
+        kind: "review",
+        span: rev(commit),
+      })
       return read.kind === "refused" ? read.status : read.kind
     }
     // What the host last wrote is not what the offer is now.
@@ -334,10 +349,46 @@ describe("the review (ADR-0047)", () => {
     const taken = new Map([[LANE, { ...open, taken: "t" }]])
     expect(status(taken, C1)).toBe(404)
     const path = (p: string) => {
-      const read = planOfferRead(offers, { kind: "diff", commit: C1, path: p })
+      const read = planOfferRead(facts(offers), {
+        kind: "diff",
+        span: rev(C1),
+        path: p,
+      })
       return read.kind === "refused" ? read.status : read.kind
     }
     expect([path(""), path("a\nb"), path("a\u007f")]).toEqual([400, 400, 400])
+  })
+  test("planOfferRead: a range only between two commits one lane's turns recorded (ADR-0056)", () => {
+    const OTHER = laneNameForThread("other")
+    const record = (entry: string, lane: typeof LANE, commit: string) =>
+      [
+        entry,
+        {
+          entry: entryId(entry),
+          lane,
+          commit: commitId(commit),
+          snapshot: null,
+          paths: [],
+        },
+      ] as const
+    const revisions = new Map([
+      record("e1", LANE, "a1"),
+      record("e2", LANE, "a2"),
+      record("e3", OTHER, "b1"),
+    ])
+    const range = (from: string, to: string) =>
+      ({ kind: "range", from, to }) as const
+    const read = (from: string, to: string) =>
+      planOfferRead(facts(new Map(), revisions), {
+        kind: "review",
+        span: range(from, to),
+      })
+    expect(read("a1", "a2")).toEqual({
+      kind: "review",
+      span: range("a1", "a2"),
+    })
+    expect(read("a1", "b1")).toMatchObject({ kind: "refused", status: 404 })
+    expect(read("a1", "ffff")).toMatchObject({ kind: "refused", status: 404 })
   })
   test("answers: a review decoded, a diff within its size, else refused", () => {
     const review = {
@@ -375,15 +426,24 @@ describe("the review (ADR-0047)", () => {
   })
   test("the wire: every URL parses back to what built it", () => {
     const at = (u: string) => parseOfferPath(new URL(u, "http://host"))
-    const c = commitId("0123abcd")
-    expect(at(reviewUrl(c))).toEqual({ kind: "review", commit: c })
-    for (const path of ["a b.txt", 'we"ird', "q?x&y#z", "dir/é.md"])
-      expect(at(diffUrl(c, path))).toEqual({ kind: "diff", commit: c, path })
+    const c = { kind: "revision", commit: commitId("0123abcd") } as const
+    const r = {
+      kind: "range",
+      from: commitId("0123abcd"),
+      to: commitId("4567ef"),
+    } as const
+    for (const span of [c, r]) {
+      expect(at(reviewUrl(span))).toEqual({ kind: "review", span })
+      for (const path of ["a b.txt", 'we"ird', "q?x&y#z", "dir/é.md"])
+        expect(at(diffUrl(span, path))).toEqual({ kind: "diff", span, path })
+    }
     expect(
       at(reviewUrl(c).replace(`/${OFFER_WIRE}/`, `/${OFFER_WIRE + 1}/`)),
     ).toBe("bad")
-    expect(at(`/offer/${OFFER_WIRE}/diff/${c}`)).toBe("bad")
+    expect(at(`/offer/${OFFER_WIRE}/diff/${c.commit}`)).toBe("bad")
     expect(at(`/offer/${OFFER_WIRE}/review/not-hex`)).toBe("bad")
+    expect(at(`/offer/${OFFER_WIRE}/review/0123..not-hex`)).toBe("bad")
+    expect(at(`/offer/${OFFER_WIRE}/review/01..23..45`)).toBe("bad")
     expect(at(`${reviewUrl(c)}/more`)).toBe("bad")
     expect(at("/offer/anything")).toBe("bad")
     expect(at("/offer")).toBe("bad")

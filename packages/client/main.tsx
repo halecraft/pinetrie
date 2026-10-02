@@ -11,6 +11,7 @@ import { IDENTITY_KEY, type Identity, identityCodec } from "./identity.ts"
 import { askIdentity } from "./identity-form.tsx"
 import { decodeInbox, encodeInbox, type Inbox, mergeInbox } from "./inbox.ts"
 import { decodeLayout, encodeLayout } from "./layout.ts"
+import { decodeLeft, encodeLeft, type Left, mergeLeft } from "./left.ts"
 import { connectSession } from "./session-view.ts"
 import { deviceState, tabState } from "./tab-state.ts"
 
@@ -35,6 +36,17 @@ const stores: AppStores = {
     codec: { encode: encodeInbox, decode: decodeInbox },
     device: localStorage,
     merge: mergeInbox,
+    events: window,
+  }),
+  /**
+   * Where this device last left each thread (ADR-0056): shared by its tabs,
+   * kept across reloads, never in the document.
+   */
+  left: deviceState<Left>({
+    key: `pineta-left:${SESSION_DOC_ID}`,
+    codec: { encode: encodeLeft, decode: decodeLeft },
+    device: localStorage,
+    merge: mergeLeft,
     events: window,
   }),
   /**

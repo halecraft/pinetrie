@@ -14,7 +14,7 @@ import {
   toolLabel,
   turnEntry,
 } from "@pineta/core"
-import { bookmarkOf, commitTurn } from "@pineta/lanes"
+import { bookmarkOf, changedPaths, commitTurn } from "@pineta/lanes"
 import { planTurnRecord } from "@pineta/marginalia"
 import type { Agent, LaneHooks } from "@pineta/pi"
 import { readTreeIndex } from "@pineta/reads"
@@ -105,6 +105,7 @@ export function createTurns(deps: {
             committed: null,
             newest: null,
             snapshot: null,
+            paths: [],
           })
           if (revision !== null) await writeRevision(revision)
           return
@@ -113,7 +114,11 @@ export function createTurns(deps: {
         const jj = registry.laneJjOf(lane)
         // The commit is queued, so it never overlaps the last turn's
         // snapshot, and awaited, so the next request sees it.
-        const { committed, newest } = await handle.queue.enqueue(async () => {
+        const {
+          committed,
+          newest,
+          paths: changed,
+        } = await handle.queue.enqueue(async () => {
           const before = await bookmarkOf(jj, lane)
           const made = await commitTurn(jj, {
             title: titleOf(readTreeIndex(doc), entry),
@@ -121,7 +126,13 @@ export function createTurns(deps: {
             lane,
             bookmark: before,
           })
-          return { committed: made, newest: before }
+          // An adopted turn may be several of the agent's commits: its
+          // paths run from the bookmark before it.
+          const changed =
+            made === null
+              ? []
+              : await changedPaths(handle.runners.lane, before, made)
+          return { committed: made, newest: before, paths: changed }
         })
         const planned = planTurnRecord({
           entry,
@@ -132,6 +143,7 @@ export function createTurns(deps: {
           committed,
           newest,
           snapshot: snapshotId(entry),
+          paths: changed,
         })
         if (planned === null) return
         // The snapshot is queued and not awaited: the next tool call waits

@@ -11,6 +11,7 @@ import {
   type LaneView,
   type TreeIndex,
 } from "@pineta/core"
+import type { Density } from "./ask-words.ts"
 
 /**
  * Text a fresh column's composer starts with, unsent. A blank one means
@@ -48,6 +49,11 @@ export interface Column {
   readonly lane?: LaneName
   /** A Start Agent column: a message with no mention asks the agent. */
   readonly asksAgent?: true
+  /**
+   * How much of each ask is drawn (ADR-0056); absent is story. The reader's
+   * choice, never the document's.
+   */
+  readonly density?: Density
   /**
    * A fresh column: nothing of its own yet. Once its first message is sent,
    * `sendId` is that send's id, and `sync` anchors the column at the entry it
@@ -87,6 +93,12 @@ export type ColumnAction =
   | { readonly kind: "close"; readonly index: number }
   /** Move column `from` to index `to` (`reorder.ts`); the rest keep their order. */
   | { readonly kind: "move"; readonly from: number; readonly to: number }
+  /** Read column `index` at `density` (ADR-0056). */
+  | {
+      readonly kind: "density"
+      readonly index: number
+      readonly density: Density
+    }
   | {
       readonly kind: "sync"
       readonly index: TreeIndex
@@ -147,6 +159,10 @@ export function columnsReducer(
       const rest = state.filter((_, i) => i !== action.from)
       return [...rest.slice(0, to), column, ...rest.slice(to)]
     }
+    case "density":
+      return state.map((c, i) =>
+        i === action.index ? { ...c, density: action.density } : c,
+      )
     case "sync":
       return syncColumns(state, action.index, action.lanes)
     case "prune": {

@@ -1,7 +1,8 @@
 // e2e/browser/tools — a scripted tools host: tool rows, live output and Stop,
 // where the agent will work, the column's height while it works, commands,
 // widths, the thread's name and offer, the review, markdown, following, the
-// header's work, and the rail's capsules.
+// header's work, and the rail's capsules; first, each ask's work folded
+// and opened from the rail (ADR-0056), on a host of its own.
 
 import { execFileSync } from "node:child_process"
 import { existsSync, rmSync } from "node:fs"
@@ -10,6 +11,7 @@ import { workingWords } from "@pineta/client/column-view"
 import {
   atEntry,
   entryId,
+  messageText,
   projectRail,
   ROOT,
   type ThreadName,
@@ -18,6 +20,7 @@ import {
 import { scriptedModel } from "@pineta/pi"
 import {
   readLaneRecords,
+  readLanes,
   readNames,
   readOffers,
   readProject,
@@ -38,6 +41,7 @@ import {
   OWN_MENU,
   openFromArchive,
   railCount,
+  readRaw,
   recordFrames,
   seeInMenu,
   TO_AGENT,
@@ -55,6 +59,284 @@ async function run(
 ): Promise<void> {
   const browser = await launchBrowser()
   try {
+    // ── asks: each ask's work folds, and the rail opens it (ADR-0056) ─────
+    // No containers. The column is read in story, as a new one opens. A
+    // column is read raw in the blocks below (`readRaw`).
+    {
+      const work = committedProject("pineta-browser-asks-", {
+        "notes.txt": "hello\n",
+      })
+      const script = scriptedModel({ tokensPerSecond: 400 })
+      const askHost = await startHost({
+        model: { kind: "scripted", script },
+        tools: { project: work },
+        containers: false,
+        userConfig: path.join(work, "no-user-config.json"),
+        log: () => {},
+      })
+      const ap = await (await browser.newContext()).newPage()
+      await asPerson(ap, "asa@browser.test", "Asa")
+      try {
+        await ap.goto(askHost.httpUrl, { waitUntil: "domcontentloaded" })
+        await ap.click("#tabs .add-agent")
+        const say = async (text: string) => {
+          await ap.fill(`${col(0)} .composer .input`, text)
+          await ap.click(`${col(0)} .composer .send`)
+        }
+        const idle = () =>
+          waitFor(() => Object.keys(askHost.doc.activeRuns()).length === 0)
+        const askId = (text: string) => {
+          const index = readTreeIndex(askHost.doc)
+          return (
+            Object.keys(index.entries).find(
+              id => messageText(index.entries[id]?.message) === text,
+            ) ?? ""
+          )
+        }
+        /** Eight reads, a command that waits, then a reply: a run long enough to watch. */
+        const longRun = (reply: string) =>
+          script.use([
+            ...Array.from({ length: 8 }, () => ({
+              tool: "read",
+              args: { path: "notes.txt" },
+            })),
+            { tool: "bash", args: { command: "sleep 2; echo waited" } },
+            { text: reply },
+          ])
+        const bodyOf = `${col(0)} .column-body`
+        /** The column's scroll: how far from its end, and its content's height. */
+        const scroll = () =>
+          ap.$eval(bodyOf, b => ({
+            gap: Math.round(b.scrollHeight - b.scrollTop - b.clientHeight),
+            content:
+              b.querySelector<HTMLElement>(".column-content")?.offsetHeight ??
+              0,
+          }))
+        const inView = (sel: string) =>
+          ap
+            .$eval(
+              sel,
+              (m, b) => {
+                const body = document.querySelector(b)?.getBoundingClientRect()
+                const box = m.getBoundingClientRect()
+                return (
+                  body !== undefined &&
+                  box.bottom > body.top &&
+                  box.top < body.bottom
+                )
+              },
+              bodyOf,
+            )
+            .catch(() => false)
+
+        // 1. Running, the ask is open; at its end it folds above the view, and
+        // the column stays at its end with the last word in view.
+        longRun("Read it eight times.")
+        await say("read the notes, slowly")
+        await ap.waitForSelector(`${col(0)} .tool.live`, { timeout: 15_000 })
+        const first = askId("read the notes, slowly")
+        const work1 = `${col(0)} .ask-work[data-ask-of="${first}"]`
+        const openWhileRunning = (await ap.$(`${work1}[data-open]`)) !== null
+        const running = await scroll()
+        await idle()
+        const ended = await ap
+          .waitForSelector(`${work1}:not([data-open])`, { timeout: 10_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        await twoFrames(ap)
+        const after = await scroll()
+        check(
+          "an ask is open while it runs, and folds at its end above the view, the column at its end and the last word in view",
+          openWhileRunning &&
+            ended &&
+            after.content < running.content &&
+            after.gap <= 2 &&
+            (await inView(msg("Read it eight times."))) &&
+            (await ap.$(`${work1} .ask-fold[data-first]`)) !== null,
+          `${JSON.stringify({ openWhileRunning, ended, running, after })}`,
+        )
+
+        // 2. Scrolled up into a running ask's work, it stays open under the
+        // reader after its run ends, and folds when they come back down. The
+        // bar names the ask whose message is above, and takes no room.
+        longRun("Read it again.")
+        await say("read them once more")
+        await ap.waitForSelector(`${col(0)} .tool.live`, { timeout: 15_000 })
+        const second = askId("read them once more")
+        const work2 = `${col(0)} .ask-work[data-ask-of="${second}"]`
+        await ap.$eval(
+          bodyOf,
+          (b, id) => {
+            const m = b.querySelector<HTMLElement>(`.msg[data-entry="${id}"]`)
+            if (m !== null) b.scrollTop = m.offsetTop + m.offsetHeight + 40
+          },
+          second,
+        )
+        const bar = await ap
+          .waitForSelector(`${col(0)} .ask-bar[data-ask="${second}"]`, {
+            timeout: 5_000,
+          })
+          .then(
+            b => b.evaluate(n => n.textContent ?? ""),
+            () => "",
+          )
+        const slot = await ap
+          .$eval(
+            `${col(0)} .ask-bar-slot`,
+            n => n.getBoundingClientRect().height,
+          )
+          .catch(() => -1)
+        check(
+          "the bar names the ask whose work is at the top, and takes no room",
+          bar.includes('Asa: "read them once more"') && slot === 0,
+          `${JSON.stringify({ bar, slot })}`,
+        )
+        await idle()
+        await twoFrames(ap)
+        const stayed = (await ap.$(`${work2}[data-open]`)) !== null
+        await ap.$eval(bodyOf, b => {
+          b.scrollTop = b.scrollHeight
+        })
+        const folded = await ap
+          .waitForSelector(`${work2}:not([data-open])`, { timeout: 5_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        check(
+          "an ask that ends under a reader scrolled into it stays open, and folds when they return to the end",
+          stayed && folded,
+          `${JSON.stringify({ stayed, folded })}`,
+        )
+
+        // 3. A pick on the rail inside a long ask's capsule opens its fold and
+        // brings the message into view.
+        const capsule = `.rail .rail-stretch[data-ask="${first}"]`
+        await ap.click(capsule)
+        const opened = await ap
+          .waitForSelector(`${work1}[data-open]`, { timeout: 5_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        await twoFrames(ap)
+        const shown = await ap.$$eval(
+          `${work1} .msg[data-entry]`,
+          (ms, b) => {
+            const body = document.querySelector(b)?.getBoundingClientRect()
+            return ms.some(m => {
+              const box = m.getBoundingClientRect()
+              return (
+                body !== undefined &&
+                box.bottom > body.top &&
+                box.top < body.bottom
+              )
+            })
+          },
+          bodyOf,
+        )
+        check(
+          "a pick inside a capsule opens its ask's fold and brings its message into view",
+          opened && shown,
+          `${JSON.stringify({ opened, shown })}`,
+        )
+
+        // 4. A fold's toggle redraws its own ask, not the column's list. The
+        // column follows its end, and the press is the element's own, so no
+        // scroll releases it: a release redraws the list, rightly.
+        await ap.$eval(bodyOf, b => {
+          b.scrollTop = b.scrollHeight
+        })
+        await twoFrames(ap)
+        await componentRenders(ap)
+        await ap.$eval(`${work1} .ask-fold[data-first]`, b =>
+          (b as HTMLElement).click(),
+        )
+        await twoFrames(ap)
+        const toggled = await componentRenders(ap)
+        check(
+          "a fold's toggle redraws no list",
+          (await ap.$(`${work1}[data-open]`)) === null &&
+            !toggled.some(r => r.name === "MessageListView"),
+          `${toggled.map(r => r.name).join(", ")}`,
+        )
+
+        // 5. Since you were here: hidden, the page leaves its mark at the end;
+        // what arrives meanwhile is below the line when it shows again.
+        await ap.$eval(bodyOf, b => {
+          b.scrollTop = b.scrollHeight
+        })
+        await twoFrames(ap)
+        const visibility = (state: "hidden" | "visible") =>
+          ap.evaluate(v => {
+            Object.defineProperty(document, "visibilityState", {
+              value: v,
+              configurable: true,
+            })
+            document.dispatchEvent(new Event("visibilitychange"))
+          }, state)
+        await visibility("hidden")
+        const bo = await join(askHost, "bo", "asks")
+        script.use([{ text: "Back to you." }])
+        const lane = readLanes(askHost.doc, readTreeIndex(askHost.doc))[0]
+        await bo.chat(
+          "@agent anything new?",
+          atEntry(entryId(lane?.tip ?? "")),
+          {
+            lane: lane?.name,
+          },
+        )
+        await idle()
+        await ap.waitForSelector(msg("Back to you."), { timeout: 15_000 })
+        await visibility("visible")
+        const line = await ap
+          // Zero height: Playwright counts it hidden, so wait for it attached.
+          .waitForSelector(`${col(0)} .left-line`, {
+            state: "attached",
+            timeout: 5_000,
+          })
+          .then(
+            l =>
+              l.evaluate(n => ({
+                height: n.getBoundingClientRect().height,
+                next: n.nextElementSibling?.textContent ?? "",
+              })),
+            () => null,
+          )
+        check(
+          "a thread left while the page was hidden marks what came since, and the line takes no room",
+          line !== null &&
+            line.height === 0 &&
+            line.next.includes("anything new?"),
+          `${JSON.stringify(line)}`,
+        )
+        await bo.close()
+
+        // 6. A column's density is kept with it across a reload.
+        await ap.click(`${col(0)} .density-choice[data-density="outline"]`)
+        await ap.reload({ waitUntil: "domcontentloaded" })
+        const kept = await ap
+          .waitForSelector(`${col(0)}[data-density="outline"]`, {
+            timeout: 15_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        const lines = await ap.locator(`${col(0)} .ask-line`).count()
+        check(
+          "a column's density is kept across a reload, and outline draws each ask as a line",
+          kept && lines >= 2,
+          `${JSON.stringify({ kept, lines })}`,
+        )
+      } finally {
+        await ap.context().close()
+        await askHost.shutdown()
+      }
+    }
+
     {
       const work = committedProject("pineta-browser-tools-", {
         "notes.txt": "the secret word is MANGO\n",
@@ -85,6 +367,7 @@ async function run(
         const say = async (text: string) => {
           await tp.fill(`${col(0)} .composer .input`, text)
           await tp.click(`${col(0)} .composer .send`)
+          await readRaw(tp)
         }
         const toolIdle = () =>
           waitFor(() => Object.keys(toolHost.doc.activeRuns()).length === 0)
@@ -590,7 +873,9 @@ async function run(
             "the header's mark pulses while the agent works, and stops when it ends",
             pulsing &&
               starShows?.animation === "pulse-mark" &&
-              starShows.title === workingWords(true) &&
+              // It names the ask it works on (ADR-0056).
+              starShows.title?.startsWith(`${workingWords(true, null)} on `) ===
+                true &&
               ended.pulsing === 0,
             `${JSON.stringify({ starShows, ended })}`,
           )
@@ -1380,7 +1665,7 @@ async function run(
           b => b.scrollHeight > 2 * b.clientHeight,
         )
         const capsule = await tp
-          .$eval(".rail .rail-run", r => ({
+          .$eval(".rail .rail-stretch", r => ({
             count: Number(r.getAttribute("data-count")),
             span: Number(r.getAttribute("data-span")),
             height: r.getBoundingClientRect().height,
@@ -1484,7 +1769,7 @@ async function run(
           /** Click `fraction` of the way down the capsule. */
           const clickRun = async (scope: string, fraction: number) => {
             const box = await tp
-              .locator(`${scope} .rail-run[data-entry="${target}"]`)
+              .locator(`${scope} .rail-stretch[data-entry="${target}"]`)
               .boundingBox()
             if (box !== null)
               await tp.mouse.click(
@@ -1513,7 +1798,7 @@ async function run(
           // A run's messages are consecutive rows.
           const count = Number(
             await tp.getAttribute(
-              `.rail .rail-run[data-entry="${target}"]`,
+              `.rail .rail-stretch[data-entry="${target}"]`,
               "data-count",
             ),
           )

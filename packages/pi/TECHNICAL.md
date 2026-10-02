@@ -314,9 +314,9 @@ item 18, and in `lanes.test.ts` against the harness.
 - **Pineta's own skills** are in `skills/`, loaded after yours and the repo's
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `offer-stack`
-  (ADR-0038), and `column-banner` (ADR-0053), whose whole body is the image
-  model's prompt. So one of yours or the repo's
-  of the same name replaces Pineta's. All four are
+  (ADR-0038), `column-banner` (ADR-0053), whose whole body is the image
+  model's prompt, and `ask-digest` (ADR-0056). So one of yours or the repo's
+  of the same name replaces Pineta's. All five are
   `disable-model-invocation: true`: only the host asks for them.
   `Agent.skill(name)` reads the file at call time, without its frontmatter,
   and hashes it. The scripted and named model choices load no resources, so
@@ -379,10 +379,12 @@ only work, never correctness, and never touched the host's own stream writes.
 
 ### Values
 
-`setArchive`, `setMark` and `setWorkRecord` write `pineta.archive`,
-`pineta.mark` and the four work records through `Session.setValue`
-(ADR-0029, ADR-0045, ADR-0032): every setter's body is one `put`.
-`removeMark` and `removeOffer` delete theirs with `Session.deleteValue`. They use the
+`setArchive`, `setMark`, `setStop`, `setDigest` and `setWorkRecord` write
+`pineta.archive`, `pineta.mark`, `pineta.stop`, `pineta.digest` and the
+work records through `Session.setValue` (ADR-0029, ADR-0045, ADR-0056,
+ADR-0032): every setter's body is one `put`. A value can be written while a
+lane runs (S70): it does not go through the lane. `removeMark` and
+`removeOffer` delete theirs with `Session.deleteValue`. They use the
 generic value path, so conformance covers the storage shape. `setWorkRecord` takes its namespace and key from
 `encodeWorkRecord`, in marginalia.
 
@@ -431,13 +433,16 @@ Note what it does **not** do: it detects change, it does not design for it.
 Probes P1 and P2 in `sandbox/s17-typed-entries/` could each have failed while
 conformance stayed green, which is why they ran first.
 
-### Commit messages (`Agent.describe`, ADR-0038)
+### Requests outside every thread (`Agent.complete`, ADR-0038, ADR-0056)
 
-`describe({ system, user })` is one `completeSimple` request on
+`complete({ system, user })` is one `completeSimple` request on
 `describeModel`, with no tools and no session: nothing enters the tree or a
-lane's context. The host builds the request (`describeRequest`, in
-marginalia) and adds the trailers; this package only carries it out. A failed
-request returns null, and the offer keeps its placeholder.
+lane's context. It writes an offer's commit message (`describeRequest`)
+and an ask's digest (`digestRequest`, the `ask-digest` skill); the host
+builds each request and this package only carries it out. A failed request
+returns null: the offer keeps its placeholder, and the ask its last digest.
+A scripted model answers it from its own provider (`describe`), so neither
+takes a reply from the run's script.
 
 ### Banners' images (`Agent.drawBanner`, ADR-0050, ADR-0053)
 

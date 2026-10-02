@@ -7,6 +7,7 @@ import {
 } from "@pineta/core"
 import { withTrailers } from "@pineta/marginalia"
 import { describe, expect, test } from "vitest"
+import type { ReviewTarget } from "./column-view.ts"
 import { diffLines, type Loaded, reviewView, sectionState } from "./review.ts"
 
 const LANE = laneNameForThread("1")
@@ -20,9 +21,10 @@ const file = (path: string, added: number, removed: number): ReviewFile => ({
   removed,
 })
 const ready = <T>(value: T): Loaded<T> => ({ kind: "ready", value })
-const target = {
+const span = (commit: typeof C1) => ({ kind: "revision", commit }) as const
+const target: ReviewTarget = {
   lane: LANE,
-  commits: [C1, C2],
+  spans: [span(C1), span(C2)],
   conflicts: ["b.txt"],
   yourEdits: ["a.txt"],
 }
@@ -59,13 +61,13 @@ describe("reviewView", () => {
   })
   test("a revision still loading keeps its place", () => {
     const view = reviewView(target, [{ kind: "loading" }, ready(two)])
-    expect(view.revisions.map(r => [r.commit, r.state.kind])).toEqual([
+    expect(view.revisions.map(r => [r.key, r.state.kind])).toEqual([
       [C1, "loading"],
       [C2, "ready"],
     ])
   })
   test("the file list shows only when there is more than one file to list", () => {
-    const alone = { ...target, commits: [C1] }
+    const alone = { ...target, spans: [span(C1)] }
     const listed = (t: typeof target, got: Loaded<RevisionReview>[]) =>
       reviewView(t, got).listed
     expect([
@@ -81,14 +83,26 @@ describe("reviewView", () => {
     const title = (t: typeof target, got: Loaded<RevisionReview>[]) =>
       reviewView(t, got).title
     expect([
-      title({ ...target, commits: [C1] }, [ready(two)]),
-      title({ ...target, commits: [C1] }, [{ kind: "loading" }]),
+      title({ ...target, spans: [span(C1)] }, [ready(two)]),
+      title({ ...target, spans: [span(C1)] }, [{ kind: "loading" }]),
       title(target, [ready(one), ready(two)]),
     ]).toEqual(["feat: two", undefined, undefined])
   })
+  test("an ask's range, with no description, is headed by the ask (ADR-0056)", () => {
+    const ask: ReviewTarget = {
+      ...target,
+      spans: [{ kind: "range", from: C1, to: C2 }],
+      title: 'Ada: "Fix it"',
+    }
+    expect(
+      reviewView(ask, [
+        ready({ description: "", files: [file("a.txt", 1, 0)] }),
+      ]).title,
+    ).toBe('Ada: "Fix it"')
+  })
   test("a file over 400 changed lines starts collapsed; one at 400 does not", () => {
     const rows = (added: number) => {
-      const v = reviewView({ ...target, commits: [C1] }, [
+      const v = reviewView({ ...target, spans: [span(C1)] }, [
         ready({ description: "x", files: [file("a.txt", added, 0)] }),
       ]).revisions[0]?.state
       return v?.kind === "ready" ? v.value.files[0]?.startsCollapsed : null

@@ -203,6 +203,56 @@ so it is the one behind the menu. What each does is under "Starting" below.
 - On a narrow screen, columns stack as a back-navigable sequence (the macOS
   Finder column view on a phone), with a breadcrumb of fork points.
 
+### Asks: a message to the agent, and what was done for it (ADR-0056)
+
+An **ask** is a message that started a run, together with that run: a
+person's message to the agent, a land message or a stack message. A message
+for people only is not one. Nothing about an ask is stored; it is read from
+the tree.
+
+- **A column is read at one of three densities**, chosen in its header, kept
+  with the column and never written. A new column opens in story.
+
+  | density | an ask shows |
+  |---|---|
+  | **outline** | its message, and one line: how it ended, or what it is doing, and its digest |
+  | **story** | its message, a digest line folding its work, and its last word |
+  | **raw** | every message and tool row, under its digest line |
+
+  People's messages show at every density. Outline lists everyone's asks.
+- **An ask's digest line** counts its work: steps, tool calls, files its
+  turns changed, how long it took, and failures. A press opens or closes the
+  work under it. Its files open a review of what the ask alone changed, beside
+  the column, as an offer's review does.
+- **What the rail draws apart, no fold hides**: a fork, a branch's first
+  message, a running tip, an open column's end. Each splits the fold around it.
+- **The running ask is open** in story and raw: until its run ends, which
+  message is its last word is not known. It folds once its run has ended and
+  the column is at its end, so what folds is above the view. Scrolled up into
+  its work, it stays open under you until you come back down. Your choice,
+  open or closed, wins, and is kept while the page lives.
+- **An ask's last word** is its run's last message with text or a tool call:
+  its answer, or what it was doing when it stopped. A stopped ask says who
+  stopped it, "stopped by Bea" (a stop made before stops were recorded says
+  "stopped"); a failed one shows the error. A restart does not end a run:
+  the host resumes it.
+- **The ask stays in sight.** While the work at the top of the column belongs
+  to an ask whose message has scrolled away, a bar over the column's top
+  names it, `Ada: "Fix the rail…"`; a press scrolls to it. A column that
+  starts inside a run names the ask in a column to its left,
+  `↰ answering Ada: "…"`, and a press shows it there.
+- **A pick on the rail into an ask's work opens its fold**, then brings the
+  message into view.
+- **Since you were here.** Each device remembers, per thread, where its
+  column's end was when you left it at its end: switching tabs, hiding the
+  page or closing it. Coming back, a dashed line, "since you were here",
+  marks the first message after it. It takes no room.
+- **A summary, when digests are on** (`{ "digests": { "enabled": true } }` in
+  `~/.config/pineta/config.json`): a model's two or three sentences on an
+  ask's work, under its digest line, set apart from the agent's words. It is
+  refreshed at most once a minute while someone reads the running thread,
+  written once more when its run ends, and read by no agent.
+
 ### The rail: a root's tree, compactly
 
 - A git-graph strip at the left edge draws every branch in the tab's root as a
@@ -215,18 +265,21 @@ so it is the one behind the menu. What each does is under "Starting" below.
   on screen and where they sit in the whole.
 - **Clicking a message in the rail brings it into view**: in the column that
   shows it, or in a new column opened beside it.
-- **Uneventful stretches are capsules** (ADR-0031). A message is always its own
-  dot if it is the root's first message, a branch's first message, a fork, a
-  thread end, a thread end someone else follows, where the
-  agent is replying, or the end of a column you have open. Three or more other
-  messages in a row are one capsule on their track: 2 rows long for 3–9
-  messages, 3 for 10–99, 4 for 100–999. It is hollow when only the agent
-  wrote in it, solid when only people did, and filled at half strength for
-  both; its
-  tooltip gives the counts, failed tool calls included. Clicking
-  it opens the message at that point of the run: near its top, the first;
-  three quarters down, the message three quarters through. The column is where
-  it is read.
+- **Uneventful stretches are capsules** (ADR-0031, ADR-0056). A message is
+  always its own dot if it is the root's first message, a branch's first
+  message, a fork, a thread end, a thread end someone else follows, where
+  the agent is replying, the end of a column you have open, or the message
+  of an ask whose work is three agent messages or more. Three or more other
+  messages in a row are one capsule on their track, and a capsule never
+  crosses such an ask's edge: a long ask is a dot and a capsule of its own,
+  and short exchanges merge. A capsule is 2 rows long for 3–9 messages, 3
+  for 10–99, 4 for 100–999. It is hollow when only the agent wrote in it,
+  solid when only people did, and filled at half strength for both. Its
+  tooltip leads with its ask, then the counts, failed tool calls included,
+  then the ask's summary when there is one. Clicking it opens the message at
+  that point of the stretch, its ask's fold included: near its top, the
+  first; three quarters down, the message three quarters through. The column
+  is where it is read.
 - **Activity shows in the rail**: a pulsing dot where the agent is replying, a
   mark where a branch has messages you have not read.
 
@@ -325,11 +378,14 @@ The rail is E; the column is T. Seeing both at once is the product.
   its end as a column does. Each becomes the committed message or result in
   place, and a column at its end does not get shorter while the agent works
   (ADR-0044).
-  **Stop** ends the turn; messages waiting are then taken.
+  **Stop** ends the turn, and records who pressed it under the ask
+  (ADR-0056); messages waiting are then taken.
 - **A column says what its agent is doing** (ADR-0054), and none of it moves
   the column. While the agent works, the mark before the thread's name in the
-  header (its `✦`, or its banner, ADR-0053) pulses, titled "the agent is
-  working". A short line pulses at the
+  header (its `✦`, or its banner, ADR-0053) pulses, titled with the ask it
+  works on, "the agent is working on Ada: "Fix the rail…"" (ADR-0056). In
+  outline, the running ask's own line pulses instead of the line below. A
+  short line pulses at the
   end of the column, centred, where its next text will appear. While a
   command that has run for half a second is still running, its row is
   outlined instead, and the line hides: the wait is the machine's, not the

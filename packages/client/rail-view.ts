@@ -1,15 +1,22 @@
-// client/rail-view — the view's part of the rail's runs (`compactRail`). Pure.
+// client/rail-view — the view's part of the rail's stretches (`compactRail`).
+// Pure.
 
-import type { AgentRun, RunStats, WriterId } from "@pineta/core"
-import { listOf, plural } from "./counts.ts"
+import {
+  type AgentRun,
+  type RailRow,
+  railLandmarks,
+  type WorkStats,
+} from "@pineta/core"
 
 /**
- * The messages this view draws on their own, never inside a run: thread
+ * The messages this view draws on their own, never inside a stretch: thread
  * ends someone else follows, running lanes' tips, each open
  * column's end, and each thread end holding a card of yours, whose dot
  * carries its mark. A column's end is kept because a pinned column can end
- * mid-stretch: inside a run, half of it would be on the column's path and half
- * not, and where the column ends would not show.
+ * mid-stretch: inside one, half of it would be on the column's path and half
+ * not, and where the column ends would not show. The columns fold around the
+ * same messages (`railLandmarks`), without the rings: a thread end on a
+ * column's path is the column's own end.
  */
 export function railKeep(input: {
   /** Thread ends others follow: the rings' keys. */
@@ -26,47 +33,51 @@ export function railKeep(input: {
   return keep
 }
 
+const NO_RINGS: ReadonlyMap<string, unknown> = new Map()
+
 /**
- * What a run holds, as its tooltip says it: "12 messages from Ada and Bea ·
- * 143 agent messages · 211 tool calls · 2 failed". Parts that are zero are
- * left out.
+ * What a root's columns draw apart from any fold (ADR-0056): the rail's
+ * landmarks, kept as `railKeep` keeps them but for the rings. A ring is a
+ * thread end, and a thread end on a column's path is the column's own end,
+ * kept already; leaving presence out keeps a presence write from redrawing
+ * every column (S59). Sorted, so a list of the same is equal by value.
  */
-export function runLabel(
-  count: number,
-  stats: RunStats,
-  nameOf: (writer: WriterId) => string,
-): string {
-  const agent = count - stats.people
-  const from =
-    stats.writers.length === 0
-      ? ""
-      : ` from ${listOf(stats.writers.map(nameOf))}`
-  return [
-    stats.people > 0 ? `${plural(stats.people, "message")}${from}` : "",
-    agent > 0 ? plural(agent, "agent message") : "",
-    stats.calls > 0 ? plural(stats.calls, "tool call") : "",
-    stats.failed > 0 ? `${stats.failed} failed` : "",
-  ]
-    .filter(part => part !== "")
-    .join(" · ")
+export function columnLandmarks(
+  rows: readonly RailRow[],
+  keep: Omit<Parameters<typeof railKeep>[0], "rings">,
+): readonly string[] {
+  return [...railLandmarks(rows, railKeep({ ...keep, rings: NO_RINGS }))].sort()
 }
 
-/** Who wrote a run's messages: the agent alone, people alone, or both. */
-export type RunFill = "agent" | "people" | "mixed"
+/**
+ * A capsule's tooltip: its ask, when it is one long ask's work (ADR-0056),
+ * then what it holds (`workWords`), then its digest on a line of its own.
+ */
+export const stretchWords = (
+  ask: string | null,
+  work: string,
+  summary: string | null = null,
+): string =>
+  [ask === null ? work : `${ask} · ${work}`, summary]
+    .filter(t => t !== null)
+    .join("\n")
+
+/** Who wrote a stretch's messages: the agent alone, people alone, or both. */
+export type StretchFill = "agent" | "people" | "mixed"
 
 /**
- * A run's fill: hollow for the agent's work alone, solid for people alone,
+ * A stretch's fill: hollow for the agent's work alone, solid for people alone,
  * half strength for both. Three states rather than a share: a small share
  * filled only the capsule's rounded end, which read as a drawing fault.
  */
-export function runFill(count: number, stats: RunStats): RunFill {
+export function stretchFill(stats: WorkStats): StretchFill {
   if (stats.people === 0) return "agent"
-  return stats.people === count ? "people" : "mixed"
+  return stats.agent === 0 ? "people" : "mixed"
 }
 
 /**
- * The message a click `fraction` of the way down a run's capsule picks: the
- * one that far through the run. A capsule is drawn far shorter than its
+ * The message a click `fraction` of the way down a capsule picks: the one
+ * that far through its stretch. A capsule is drawn far shorter than its
  * messages, so this is approximate, one message per `1 / ids.length` of its
  * height. Null, a click with no point, picks the first.
  */
@@ -81,7 +92,7 @@ export function pickAt(
 
 /** What a rail item marks besides its place: decided here, drawn by `Rail`. */
 export interface RailMarks {
-  /** On an open column's path: `data-open`. A run's first message speaks for it. */
+  /** On an open column's path: `data-open`. A stretch's first message speaks for it. */
   readonly open: boolean
   /** Your colour when an unsent card of yours waits here (ADR-0048), else null. */
   readonly yours: string | null

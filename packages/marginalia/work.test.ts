@@ -55,6 +55,7 @@ describe("records: one encoder, total decoders", () => {
     lane: LANE,
     commit: C1,
     snapshot: snapshotId("e1"),
+    paths: ["a.txt", "d/c é.txt"],
   }
   const landing: LandingRecord = {
     id: "l1",
@@ -162,6 +163,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
     snapshot: S,
     toolCalls: false,
     own: true,
+    paths: ["a.txt"],
   }
   test("a prompt always gets a record: its disk, and a commit of edits, else the newest revision", () => {
     expect(planTurnRecord({ ...base, isPrompt: true, committed: C2 })).toEqual({
@@ -169,10 +171,18 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       lane: LANE,
       commit: C2,
       snapshot: S,
+      paths: ["a.txt"],
     })
+    // The newest revision is what came before the prompt: no paths of its own.
     expect(
       planTurnRecord({ ...base, isPrompt: true, committed: null }),
-    ).toEqual({ entry: base.entry, lane: LANE, commit: C1, snapshot: S })
+    ).toEqual({
+      entry: base.entry,
+      lane: LANE,
+      commit: C1,
+      snapshot: S,
+      paths: [],
+    })
   })
   test("a turn with tool calls gets its disk, and a commit only when one was made", () => {
     expect(
@@ -182,7 +192,13 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
         toolCalls: true,
         committed: C2,
       }),
-    ).toEqual({ entry: base.entry, lane: LANE, commit: C2, snapshot: S })
+    ).toEqual({
+      entry: base.entry,
+      lane: LANE,
+      commit: C2,
+      snapshot: S,
+      paths: ["a.txt"],
+    })
     expect(
       planTurnRecord({
         ...base,
@@ -190,7 +206,13 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
         toolCalls: true,
         committed: null,
       }),
-    ).toEqual({ entry: base.entry, lane: LANE, commit: null, snapshot: S })
+    ).toEqual({
+      entry: base.entry,
+      lane: LANE,
+      commit: null,
+      snapshot: S,
+      paths: [],
+    })
   })
   test("a turn with no tool calls and nothing committed gets none", () => {
     expect(
@@ -204,6 +226,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       lane: LANE,
       commit: null,
       snapshot: null,
+      paths: [],
     })
     expect(
       planTurnRecord({ ...direct, isPrompt: false, toolCalls: true }),
@@ -247,6 +270,7 @@ describe("planRetention: which snapshots go", () => {
     lane,
     commit: null,
     snapshot: snapshotId(entry),
+    paths: [],
   })
   const records = [
     rec("01-a"),

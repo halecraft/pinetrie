@@ -14,6 +14,7 @@ const ports = () => {
       setName: vi.fn(async () => answer),
     },
     reveal: vi.fn(),
+    openFold: vi.fn(),
     pickArchived: vi.fn(),
     arm: vi.fn(),
     identity: { save: vi.fn(), clear: vi.fn() },
@@ -54,6 +55,11 @@ test.each<Row>([
     args: ["c"],
   },
   { effect: { kind: "reveal", entry: "e" }, port: p => p.reveal, args: ["e"] },
+  {
+    effect: { kind: "openFold", ask: entryId("a") },
+    port: p => p.openFold,
+    args: ["a"],
+  },
   {
     effect: { kind: "pickArchived", root: "r" },
     port: p => p.pickArchived,

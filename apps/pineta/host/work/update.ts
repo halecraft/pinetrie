@@ -10,12 +10,12 @@ import {
   snapshotId,
   type TreeIndex,
   turnEntry,
-  WORKSPACE_ROOT,
   type WriterId,
 } from "@pineta/core"
 import {
   bookmarkOf,
   COPY_MESSAGE,
+  changedPaths,
   commitsOf,
   commitTurn,
   conflictContent,
@@ -24,7 +24,6 @@ import {
   executeOrThrow,
   hostJj,
   type LaneHandle,
-  lines,
   mergeYours,
   planYourCopy,
   type Runner,
@@ -146,6 +145,8 @@ export function createUpdates(deps: {
       lane,
       commit: merge,
       snapshot: snapped ? snapshotId(entry) : null,
+      // An update is in no ask, so no ask counts its files.
+      paths: [],
     })
     void deps.fetchLane(lane, [merge])
   }
@@ -186,19 +187,7 @@ export function createUpdates(deps: {
     },
   ) {
     const { copy, ours, merge } = merged
-    const files = lines(
-      (
-        await handle.runners.lane([
-          "git",
-          "-C",
-          WORKSPACE_ROOT,
-          "diff",
-          "--name-only",
-          ours,
-          merge,
-        ])
-      ).stdout,
-    )
+    const files = await changedPaths(handle.runners.lane, ours, merge)
     const commits = (
       await commitsOf(jj, `fork_point(${ours} | ${copy})..${copy}`)
     ).filter(c => c !== copy)

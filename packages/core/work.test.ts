@@ -71,11 +71,17 @@ const entries: Record<string, EntryLike> = Object.fromEntries(
 const index = indexTree(entries)
 const revisions: ReadonlyMap<string, RevisionRecord> = new Map(
   [
-    { entry: entryId("1-p1"), lane: A, commit: C1, snapshot: S1 },
-    { entry: entryId("2-m1"), lane: A, commit: C2, snapshot: S2 },
-    { entry: entryId("4-m2"), lane: A, commit: null, snapshot: S4 },
-    { entry: entryId("6-pb"), lane: B, commit: CB, snapshot: SB },
-    { entry: entryId("8-pd"), lane: D, commit: null, snapshot: null },
+    { entry: entryId("1-p1"), lane: A, commit: C1, snapshot: S1, paths: [] },
+    { entry: entryId("2-m1"), lane: A, commit: C2, snapshot: S2, paths: [] },
+    { entry: entryId("4-m2"), lane: A, commit: null, snapshot: S4, paths: [] },
+    { entry: entryId("6-pb"), lane: B, commit: CB, snapshot: SB, paths: [] },
+    {
+      entry: entryId("8-pd"),
+      lane: D,
+      commit: null,
+      snapshot: null,
+      paths: [],
+    },
   ].map(r => [r.entry, r]),
 )
 const near = (id: string) =>
@@ -120,7 +126,16 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
   })
   test("a record from before lane containers has a commit and no disk", () => {
     const old = new Map([
-      ["1-p1", { entry: entryId("1-p1"), lane: A, commit: C1, snapshot: null }],
+      [
+        "1-p1",
+        {
+          entry: entryId("1-p1"),
+          lane: A,
+          commit: C1,
+          snapshot: null,
+          paths: [],
+        },
+      ],
     ])
     expect(nearestRevision(index, old, atEntry(entryId("3-r1")))).toEqual({
       lane: A,

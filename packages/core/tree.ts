@@ -12,6 +12,7 @@
 // A tool's result is its own entry, but it belongs to its call: `projectSpine`
 // pairs it with the call on the same path, and it is never a message itself.
 
+import type { AskIndex } from "./asks.ts"
 import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
 import {
   atEntry,
@@ -20,6 +21,8 @@ import {
   entryId,
   type LaneName,
   type Position,
+  type RevisionRecord,
+  type StopRecord,
   type WriterId,
 } from "./index.ts"
 import { subjectOf, toolLabel, wholeToolLabel } from "./tools.ts"
@@ -64,6 +67,12 @@ export interface AgentMessageLike {
   /** Role `toolResult` only: the call it answers, and whether it failed. */
   readonly toolCallId?: string
   readonly isError?: boolean
+  /**
+   * Role `assistant` only: why pi's request ended. `aborted` is a Stop and
+   * `error` a failure (S70); either carries `errorMessage`.
+   */
+  readonly stopReason?: string
+  readonly errorMessage?: string
 }
 
 export interface EntryLike {
@@ -72,6 +81,8 @@ export interface EntryLike {
   readonly type: string
   /** Absent on entries that carry no message, e.g. a compaction. */
   readonly message?: AgentMessageLike
+  /** When it was written, in ms since the epoch: the row's column. */
+  readonly timestamp?: number
 }
 
 export interface TranscriptMessage {
@@ -237,6 +248,15 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   return calls.length === 0 ? message : { ...message, toolCalls: calls }
 }
 
+/** The message a reader sees at `id`, or null (`renderableMessage`). */
+export function messageAt(
+  index: TreeIndex,
+  id: string,
+): TranscriptMessage | null {
+  const entry = index.entries[id]
+  return entry === undefined ? null : renderableMessage(entry)
+}
+
 /** One call as a reader sees it, before its result is paired with it. */
 function callView(id: string, name: string, args: unknown): ToolCallView {
   const wholeLabel = wholeToolLabel(name, args)
@@ -307,16 +327,21 @@ const PROMPT_ROLES: ReadonlySet<string> = new Set([
   "stack",
 ])
 
+/** Whether a run can start with `entry` (`PROMPT_ROLES`). */
+export const startsRun = (entry: EntryLike | undefined): boolean => {
+  const role = entry?.message?.role
+  return role !== undefined && PROMPT_ROLES.has(role)
+}
+
 /**
  * The prompt of the run that wrote `tip`: its nearest ancestor-or-self a run
  * can start with. A lane is never written while it runs (S21), so no person's
- * message sits between a run's prompt and its tip.
+ * message sits between a run's prompt and its tip. `indexAsks` finds every
+ * run's prompt at once.
  */
 export function promptOf(index: TreeIndex, tip: string | null): EntryId | null {
-  for (const id of ancestry(index, tip).path) {
-    const role = index.entries[id]?.message?.role
-    if (role !== undefined && PROMPT_ROLES.has(role)) return entryId(id)
-  }
+  for (const id of ancestry(index, tip).path)
+    if (startsRun(index.entries[id])) return entryId(id)
   return null
 }
 
@@ -766,58 +791,115 @@ export interface RailDot extends RailItemBase {
 }
 
 /** A straight stretch of uneventful messages on one track, drawn as one capsule. */
-export interface RailRun extends RailItemBase {
-  readonly kind: "run"
-  readonly stats: RunStats
+export interface RailStretch extends RailItemBase {
+  readonly kind: "stretch"
+  readonly stats: WorkStats
+  /**
+   * The ask whose work it is, when it is all one long ask's work (ADR-0056);
+   * null for short exchanges merged together.
+   */
+  readonly ask: EntryId | null
 }
 
-/** What a run holds. The agent's messages are `ids.length - people`. */
-export interface RunStats {
+/**
+ * What some messages hold: a stretch on the rail, or an ask's work in a
+ * column. A long ask's stretch and its fold hold the same messages, so they
+ * count the same.
+ */
+export interface WorkStats {
   /** Messages people wrote: every role but `assistant`. */
   readonly people: number
   /** Who wrote them, in order of first message. */
   readonly writers: readonly WriterId[]
+  /** The agent's messages. */
+  readonly agent: number
   /** Tool calls in its messages, and how many of them failed. */
   readonly calls: number
   readonly failed: number
+  /** Paths its turns changed, from their revision records, sorted. */
+  readonly files: readonly string[]
+  /** Its first and last entries' timestamps, results included; 0 when unknown. */
+  readonly first: number
+  readonly last: number
 }
 
-export type RailItem = RailDot | RailRun
+export type RailItem = RailDot | RailStretch
 
-/** The shortest stretch drawn as a run: two dots are no taller than a capsule. */
-const MIN_RUN = 3
+/** The shortest stretch drawn as a capsule: two dots are no taller than one. */
+export const MIN_STRETCH = 3
 
-/** A run's rows: one, and one more per digit of its size (3–9 → 2, 10–99 → 3). */
-export const runSpan = (size: number): number => 1 + String(size).length
+/** A stretch's rows: one, and one more per digit of its size (3–9 → 2, 10–99 → 3). */
+export const stretchSpan = (size: number): number => 1 + String(size).length
+
+/**
+ * The rows drawn on their own whatever else holds: in `keep` (what the view
+ * needs to see: rings, running tips, open columns' ends, your cards'
+ * ends), the root's first message, a branch's first message, a fork, or a
+ * thread end. The rail and the column both read it (`compactRail`,
+ * `segmentPath`), so a fold never hides what the rail draws apart.
+ */
+export function railLandmarks(
+  rows: readonly RailRow[],
+  keep: ReadonlySet<string>,
+): ReadonlySet<string> {
+  const childRows = new Map<string, number>()
+  for (const r of rows)
+    if (r.parentId !== null)
+      childRows.set(r.parentId, (childRows.get(r.parentId) ?? 0) + 1)
+  return new Set(
+    rows
+      .filter(
+        r =>
+          keep.has(r.id) ||
+          r.parentId === null ||
+          // Off its parent's track means a branch's first message: only a
+          // younger child is, since the oldest keeps its parent's track
+          // (`projectRail`).
+          r.track !== r.parentTrack ||
+          childRows.get(r.id) !== 1,
+      )
+      .map(r => r.id),
+  )
+}
+
+/** What the rail reads besides the rows: the asks, and the turns' revisions. */
+export interface RailAsks {
+  readonly asks: AskIndex
+  readonly revisions: ReadonlyMap<string, RevisionRecord>
+}
 
 /**
  * What the rail draws: `projectRail`'s rows, with each straight stretch of
- * uneventful messages drawn as one run.
+ * uneventful messages drawn as one capsule.
  *
- * A row is uneventful when it is none of: in `keep` (what the view needs to
- * see: rings, running tips, open columns' ends, your cards' ends),
- * the root's first message, a branch's first message, a fork, or a thread
- * end. So a run holds no structure, and the compacted rail has every branch
+ * A row is uneventful when it is not one of `railLandmarks`, and not the
+ * prompt of a long ask: one whose run holds `MIN_STRETCH` agent messages
+ * or more (ADR-0056). A stretch never crosses a long ask's edge, so a long
+ * ask is a dot and a capsule of its own, while short exchanges still merge.
+ * So a stretch holds no structure, and the compacted rail has every branch
  * the full one has.
  * An uneventful row's only child is the next row in depth-first order, so a
- * run is a stretch of consecutive rows.
+ * stretch is a run of consecutive rows.
  */
 export function compactRail(
   index: TreeIndex,
   rows: readonly RailRow[],
   keep: ReadonlySet<string>,
+  { asks, revisions }: RailAsks,
 ): readonly RailItem[] {
-  const childRows = new Map<string, number>()
-  for (const r of rows)
-    if (r.parentId !== null)
-      childRows.set(r.parentId, (childRows.get(r.parentId) ?? 0) + 1)
+  const landmarks = railLandmarks(rows, keep)
+  const long = new Set<string>(
+    [...asks.work].flatMap(([prompt, work]) =>
+      work.length >= MIN_STRETCH ? [prompt] : [],
+    ),
+  )
   const uneventful = (r: RailRow): boolean =>
-    !keep.has(r.id) &&
-    r.parentId !== null &&
-    // Off its parent's track means a branch's first message: only a younger
-    // child is, since the oldest keeps its parent's track (`projectRail`).
-    r.track === r.parentTrack &&
-    childRows.get(r.id) === 1
+    !landmarks.has(r.id) && !long.has(r.id)
+  /** The long ask a row works for, or null: a stretch keeps to one. */
+  const longAsk = (id: string | undefined): EntryId | null => {
+    const prompt = id === undefined ? undefined : asks.askOf.get(entryId(id))
+    return prompt !== undefined && long.has(prompt) ? prompt : null
+  }
 
   const items: RailItem[] = []
   let slot = 0
@@ -828,7 +910,13 @@ export function compactRail(
   /** Row `j` carries on the stretch that row `j - 1` is in. */
   const continues = (j: number): boolean => {
     const r = rows[j]
-    return r !== undefined && uneventful(r) && r.parentId === rows[j - 1]?.id
+    const before = rows[j - 1]
+    return (
+      r !== undefined &&
+      uneventful(r) &&
+      r.parentId === before?.id &&
+      longAsk(r.id) === longAsk(before.id)
+    )
   }
   for (let i = 0; i < rows.length; ) {
     const start = rows[i]
@@ -842,16 +930,22 @@ export function compactRail(
     while (continues(end)) end += 1
     const stretch = rows.slice(i, end)
     const [first, ...more] = stretch
-    if (first === undefined || stretch.length < MIN_RUN) stretch.forEach(dot)
+    if (first === undefined || stretch.length < MIN_STRETCH)
+      stretch.forEach(dot)
     else {
-      const span = runSpan(stretch.length)
+      const span = stretchSpan(stretch.length)
+      const ids: readonly [string, ...string[]] = [
+        first.id,
+        ...more.map(r => r.id),
+      ]
       items.push({
-        kind: "run",
+        kind: "stretch",
         slot,
         span,
-        ids: [first.id, ...more.map(r => r.id)],
+        ids,
         ...edge(first),
-        stats: runStats(index, stretch, rows[end]?.id),
+        stats: workStats(index, ids, rows[end]?.id, revisions),
+        ask: longAsk(first.id),
       })
       slot += span
     }
@@ -867,40 +961,64 @@ const edge = (r: RailRow) => ({
 })
 
 /**
- * A run's stats. Its tool results are between its messages: below each
- * member, up to the row after it, which is the next member or `after`.
+ * What `ids`' messages hold, consecutive on one path. Their tool results are
+ * between them: below each, up to the next one, or `after` for the last.
  */
-function runStats(
+export function workStats(
   index: TreeIndex,
-  members: readonly RailRow[],
+  ids: readonly string[],
   after: string | undefined,
-): RunStats {
+  revisions: ReadonlyMap<string, RevisionRecord>,
+): WorkStats {
   const between: string[] = []
-  let people = 0
-  const calls: ToolCallView[] = []
-  for (const [k, m] of members.entries()) {
-    const entry = index.entries[m.id]
-    const message = entry === undefined ? null : renderableMessage(entry)
-    if (message?.role !== "assistant") people += 1
-    calls.push(...(message?.toolCalls ?? []))
-    const next = members[k + 1]?.id ?? after
+  for (const [k, id] of ids.entries()) {
+    const next = ids[k + 1] ?? after
     if (next === undefined) continue
     for (
-      let id = index.parentOf(next);
-      id !== null && id !== m.id;
-      id = index.parentOf(id)
+      let at = index.parentOf(next);
+      at !== null && at !== id;
+      at = index.parentOf(at)
     )
-      between.push(id)
+      between.push(at)
   }
-  const results = resultsOn(index, between)
+  return statsOf(index, ids, between, revisions)
+}
+
+/**
+ * What `messages` hold, with `others`, the entries among them that are no
+ * message (tool results), for their failures and their times. Files are the
+ * paths the messages' turns' revision records name.
+ */
+export function statsOf(
+  index: TreeIndex,
+  messages: readonly string[],
+  others: readonly string[],
+  revisions: ReadonlyMap<string, RevisionRecord>,
+): WorkStats {
+  let people = 0
+  const calls: ToolCallView[] = []
+  const files = new Set<string>()
+  const times: number[] = []
+  for (const id of [...messages, ...others]) {
+    const t = index.entries[id]?.timestamp
+    if (t !== undefined) times.push(t)
+  }
+  for (const id of messages) {
+    const message = messageAt(index, id)
+    if (message?.role !== "assistant") people += 1
+    calls.push(...(message?.toolCalls ?? []))
+    for (const p of revisions.get(id)?.paths ?? []) files.add(p)
+  }
+  const results = resultsOn(index, others)
   return {
     people,
-    writers: writersOf(
-      index,
-      members.map(m => m.id),
-    ),
+    writers: writersOf(index, messages),
+    agent: messages.length - people,
     calls: calls.length,
     failed: calls.filter(c => results.get(c.id)?.isError === true).length,
+    files: [...files].sort(),
+    first: times.length === 0 ? 0 : Math.min(...times),
+    last: times.length === 0 ? 0 : Math.max(...times),
   }
 }
 
@@ -1006,17 +1124,46 @@ export function threadOf(
   }
 }
 
+/** What stopping a thread's lane does (`planStop`). */
+export type StopPlan =
+  | {
+      readonly kind: "abort"
+      /** Who stopped the ask, to record under its prompt; null when it is recorded already. */
+      readonly record: {
+        readonly prompt: EntryId
+        readonly value: StopRecord
+      } | null
+    }
+  | { readonly kind: "idle" }
+  | { readonly kind: "unknown" }
+
 /**
- * What stopping a thread's lane does: abort its running turn; nothing when it
- * is idle (stopping is idempotent); refused for a lane that does not exist.
- * Pure.
+ * What stopping a thread's lane does: abort its running turn, recording who
+ * stopped its ask (ADR-0056), unless someone's stop is recorded already, so
+ * the first press is the one named; nothing when it is idle (stopping is
+ * idempotent); refused for a lane that does not exist. Pure.
  */
 export function planStop(
   lanes: readonly LaneView[],
   lane: LaneName,
-): "abort" | "idle" | "unknown" {
+  facts: {
+    readonly index: TreeIndex
+    readonly stops: ReadonlyMap<string, StopRecord>
+    readonly by: WriterId
+    readonly now: number
+  },
+): StopPlan {
   const found = lanes.find(l => l.name === lane)
-  return found === undefined ? "unknown" : found.running ? "abort" : "idle"
+  if (found === undefined) return { kind: "unknown" }
+  if (!found.running) return { kind: "idle" }
+  const prompt = promptOf(facts.index, found.tip)
+  return {
+    kind: "abort",
+    record:
+      prompt === null || facts.stops.has(prompt)
+        ? null
+        : { prompt, value: { by: facts.by, at: facts.now } },
+  }
 }
 
 /**

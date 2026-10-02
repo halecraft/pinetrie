@@ -17,7 +17,6 @@ import {
   type AgentRun,
   type ArchiveRecord,
   agentActivity,
-  ancestry,
   type BannerRecord,
   type CardRecord,
   type ChatMode,
@@ -35,9 +34,11 @@ import {
   type OfferRecord,
   type Position,
   type ProjectRecord,
+  promptOf,
   type RevisionRecord,
   type SeatRecord,
   type Sha256,
+  type StopRecord,
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
@@ -52,8 +53,11 @@ import {
   bannerRecords,
   COMMANDS_NAMESPACE,
   commandsRecord,
+  DIGEST_NAMESPACE,
+  type DigestRecord,
   decodeCard,
   decodeChat,
+  digestRecords,
   HAVE_NAMESPACE,
   type Held,
   haveRecords,
@@ -81,7 +85,9 @@ import {
   renderableMessage,
   revisionRecords,
   SEAT_NAMESPACE,
+  STOP_NAMESPACE,
   seatRecords,
+  stopRecords,
 } from "@pineta/marginalia"
 import {
   type CardsDocHandle,
@@ -160,10 +166,20 @@ export const readOutbox = (doc: SessionDocHandle): readonly Held[] =>
   heldMessages(readValues(doc, OUTBOX_NAMESPACE))
 
 /**
+ * Who asked the run that wrote `tip`: the writer of its prompt
+ * (`promptOf`, ADR-0056), when a person's message started it.
+ */
+function askerOf(index: TreeIndex, tip: string | null): WriterId | undefined {
+  const prompt = promptOf(index, tip)
+  const message = prompt === null ? undefined : index.entries[prompt]?.message
+  return message?.role === "chat" ? message.writer : undefined
+}
+
+/**
  * Every thread lane: its tip, whether it runs, how many messages wait for it,
- * who holds it (for a conflict's "by"): the writer of the compelled message
- * it is answering, or of the first one waiting; and who wrote the last one
- * waiting, whom a message queued now follows.
+ * who holds it (for a conflict's "by"): the writer of the ask it is
+ * answering (`askerOf`), or of the first message waiting; and who wrote the
+ * last one waiting, whom a message queued now follows.
  */
 export function readLanes(
   doc: SessionDocHandle,
@@ -179,9 +195,7 @@ export function readLanes(
     const waiting = outbox.filter(h => h.lane === name)
     const last = waiting.at(-1)
     const asking = running
-      ? ancestry(index, tip)
-          .path.map(id => index.entries[id]?.message)
-          .find(m => m?.role === "chat" && m.compelled === true)?.writer
+      ? askerOf(index, tip)
       : (() => {
           const first = waiting.find(heldRuns)
           return first === undefined ? undefined : heldBy(first)
@@ -326,6 +340,18 @@ export const readMarks = (
   doc: SessionDocHandle,
 ): ReadonlyMap<string, MarkRecord> =>
   markRecords(readValues(doc, MARK_NAMESPACE))
+
+/** Each ask's digest (`pineta.digest`, ADR-0056), by its prompt. */
+export const readDigests = (
+  doc: SessionDocHandle,
+): ReadonlyMap<string, DigestRecord> =>
+  digestRecords(readValues(doc, DIGEST_NAMESPACE))
+
+/** Who stopped each ask (`pineta.stop`, ADR-0056), by its prompt. */
+export const readStops = (
+  doc: SessionDocHandle,
+): ReadonlyMap<string, StopRecord> =>
+  stopRecords(readValues(doc, STOP_NAMESPACE))
 
 // ── where lanes work (ADR-0032, ADR-0033) ─────────────────────────────────
 

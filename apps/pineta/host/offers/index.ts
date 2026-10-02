@@ -19,7 +19,7 @@ import {
   planOfferRead,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
-import { readOffers } from "@pineta/reads"
+import { readOffers, readRevisions } from "@pineta/reads"
 import { type Basics, failed } from "../basics.ts"
 import { act } from "./act.ts"
 import { describe } from "./describe.ts"
@@ -56,7 +56,8 @@ export interface Offers {
     },
   ): Promise<string | null>
   /**
-   * A review or a diff a page asked for, of a commit an open offer holds now:
+   * A review or a diff a page asked for, of a commit an open offer holds now
+   * or a range one lane's turns recorded (ADR-0056):
    * gathered, planned (`planOfferRead`) and read on the queue for your repo.
    */
   read(ask: OfferAsk): Promise<OfferAnswer>
@@ -82,10 +83,9 @@ export function startOffers(input: {
     void serial
       .run(async () => {
         const outcome = await refresh.refresh(lane)
+        // Tracked, and logged on failure, by `requestOutside`.
         if (outcome === "built" && !state.running(lane))
-          void serial
-            .track(describe(state, refresh, lane, false))
-            .catch(failed(basics, "describing its offer", lane))
+          void describe(state, refresh, lane, false)
       })
       .catch(failed(basics, "refreshing its offer", lane))
   }
@@ -108,14 +108,20 @@ export function startOffers(input: {
     stackEnded: (lane, stack) => stackEnded(state, refresh, lane, stack),
     read(ask) {
       return serial.run(async () => {
-        const read = planOfferRead(readOffers(basics.doc), ask)
+        const read = planOfferRead(
+          {
+            offers: readOffers(basics.doc),
+            revisions: readRevisions(basics.doc),
+          },
+          ask,
+        )
         switch (read.kind) {
           case "refused":
             return read
           case "review":
-            return answerReview(await revisionRead(state.ops, read.commit))
+            return answerReview(await revisionRead(state.ops, read.span))
           case "diff":
-            return answerDiff(await fileDiff(state.ops, read.commit, read.path))
+            return answerDiff(await fileDiff(state.ops, read.span, read.path))
         }
       })
     },

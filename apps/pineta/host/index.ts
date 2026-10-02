@@ -16,7 +16,11 @@ import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
 import type { BlobStore, CardId, LaneName } from "@pineta/core"
 import { userConfigFile } from "@pineta/lanes"
-import { decodeBannerConfig, decodeCommandRenames } from "@pineta/marginalia"
+import {
+  decodeBannerConfig,
+  decodeCommandRenames,
+  decodeDigestConfig,
+} from "@pineta/marginalia"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
 import { Control } from "@pineta/protocol/line"
 import {
@@ -45,6 +49,7 @@ import { memoryBlobs } from "./blobs.ts"
 import { startCards } from "./cards.ts"
 import { createCommands } from "./commands/index.ts"
 import { startControl } from "./control.ts"
+import { createDigests } from "./digests.ts"
 import { hotReload as pauseHotReload } from "./hot-reload.ts"
 import { compactSession, sweepBlobs } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
@@ -246,6 +251,11 @@ export async function startHost({
     bannerConfig === null
       ? null
       : createBanners({ basics, serial, blobs, agent: theAgent })
+  // Each ask's digest, when the user config turns digests on (ADR-0056).
+  // Made before the agent, which it reads lazily, as banners do.
+  const digests = decodeDigestConfig(userJson)
+    ? createDigests({ basics, serial, presence, agent: theAgent })
+    : null
   // Every lane's thread name (ADR-0039), one plan at a time. A thread's
   // banner is drawn from its name, so it starts as the name is written.
   const ensureNames = createNames({
@@ -280,7 +290,14 @@ export async function startHost({
         : {
             project: work.project?.root ?? tools.project,
             access: work.access,
-            hooks: work.hooks,
+            hooks: {
+              ...work.hooks,
+              // A turn recorded, then its ask's live digest, when due.
+              turnDone: async (lane, tip) => {
+                await work.hooks.turnDone(lane, tip)
+                digests?.step(lane).catch(failed(basics, "digest", lane))
+              },
+            },
           },
     onStream: streamInto(basics),
     ...(bannerConfig === null || banners === null
@@ -330,6 +347,7 @@ export async function startHost({
     hotReload.runEnded()
     void settle([lane])
     banners?.due(lane).catch(failed(basics, "banner"))
+    digests?.ended(lane).catch(failed(basics, "digest", lane))
   })
 
   /**
