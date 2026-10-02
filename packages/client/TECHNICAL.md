@@ -714,13 +714,17 @@ serves the rail's outline and the column's spot.
   `useSyncExternalStore`), so a scroll redraws the outlines alone, not a
   column and not the rail's dots. `railView` turns a column's ids and
   edges into bands, one per track, of whole items, so an outline keeps the
-  shape of what it wraps; ticks, for each capsule shown in part, sliced as
-  `pickAt` reads it; and the `extent` the rail keeps in view.
+  shape of what it wraps; ticks, a line where the view's top or bottom
+  falls inside a capsule, sliced as `pickAt` reads it, at most two and one
+  when both fall within `EDGE_MERGE`; and the `extent` the rail keeps in
+  view. A tick never spans the part in view: seeing most of a capsule, it
+  read as the capsule's fill.
 - **Outlines are under the dots and ticks over them**: `RailViewport` is
   drawn after the dots, `.rail-view` has `z-index: -1` and `.rail-tick`
   `1`, and `.rail-tree` is `isolation: isolate`, so the outline's -1
-  stays inside the tree. A tick is wider than a capsule, with a dark edge:
-  on a capsule filled in the column's colour, those are what show.
+  stays inside the tree. A tick is 2 px, wider than a capsule, with a dark
+  edge, centred on its edge (`tickBox`): on a capsule filled in the
+  column's colour, its ends and edge are what show.
 - **The rail follows `moved`**, the column whose view changed last, in a
   layout effect that runs only when the views change: a redraw for
   presence or a new message leaves the rail's scroll alone. The store

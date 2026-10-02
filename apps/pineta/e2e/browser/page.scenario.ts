@@ -2140,44 +2140,58 @@ async function run(check: Checks["check"]): Promise<void> {
             await scrollTo("middle")
             await twoFrames(lp)
             // Halfway up 30 messages, the view is in a capsule: the outline
-            // wraps it whole, and a tick across it marks the view.
+            // wraps it whole, and a thin line across it marks each edge of the
+            // view that falls inside it, never a block that would read as a
+            // fill.
             const cut = await lp.evaluate(key => {
-              const tick = document.querySelector(
-                `.rail-tick[data-key="${key}"]`,
-              )
-              if (tick === null) return null
-              const t = tick.getBoundingClientRect()
-              const y = t.top + t.height / 2
-              const x = t.left + t.width / 2
-              const capsule = [
-                ...document.querySelectorAll(".rail-stretch"),
-              ].find(c => {
-                const r = c.getBoundingClientRect()
-                return (
-                  r.top <= y && y <= r.bottom && r.left <= x && x <= r.right
-                )
-              })
-              if (capsule === undefined) return { capsule: false }
-              const c = capsule.getBoundingClientRect()
-              const wraps = [
+              const ticks = [
+                ...document.querySelectorAll(`.rail-tick[data-key="${key}"]`),
+              ]
+              const outlines = [
                 ...document.querySelectorAll(`.rail-view[data-key="${key}"]`),
-              ].some(o => {
-                const r = o.getBoundingClientRect()
-                return r.top <= c.top && c.bottom <= r.bottom
-              })
+              ].map(o => o.getBoundingClientRect())
+              const capsules = [
+                ...document.querySelectorAll(".rail-stretch"),
+              ].map(c => c.getBoundingClientRect())
               return {
-                capsule: true,
-                wraps,
-                inside: t.top >= c.top - 1 && t.bottom <= c.bottom + 1,
-                wider: t.width > c.width,
+                lines: ticks.length,
+                each: ticks.map(tick => {
+                  const t = tick.getBoundingClientRect()
+                  const y = t.top + t.height / 2
+                  const x = t.left + t.width / 2
+                  const c = capsules.find(
+                    r =>
+                      r.top <= y &&
+                      y <= r.bottom &&
+                      r.left <= x &&
+                      x <= r.right,
+                  )
+                  return c === undefined
+                    ? { capsule: false }
+                    : {
+                        capsule: true,
+                        wraps: outlines.some(
+                          r => r.top <= c.top && c.bottom <= r.bottom,
+                        ),
+                        inside: t.top >= c.top - 1 && t.bottom <= c.bottom + 1,
+                        wider: t.width > c.width,
+                        thin: t.height <= 4,
+                      }
+                }),
               }
             }, key0)
             check(
-              "a view in part of a capsule outlines the capsule whole, with a tick across it",
-              cut?.capsule === true &&
-                cut.wraps === true &&
-                cut.inside === true &&
-                cut.wider === true,
+              "a view in part of a capsule outlines the capsule whole, with a thin line at each edge of the view inside it",
+              cut.lines >= 1 &&
+                cut.lines <= 2 &&
+                cut.each.every(
+                  e =>
+                    e.capsule &&
+                    e.wraps === true &&
+                    e.inside === true &&
+                    e.wider === true &&
+                    e.thin === true,
+                ),
               JSON.stringify(cut),
             )
             const where = () =>

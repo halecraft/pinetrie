@@ -31,22 +31,28 @@ first (and how far into it the view's top is) to the last.
   rounded outline around the whole dots and capsules in view, with a faint
   fill, under them (`railView`, `packages/client/rail-view.ts`). A column
   whose path changes track at a fork has one outline per track.
-- **A capsule the view shows only part of gets a tick** across it, over it,
-  in the column's colour with a dark edge, wider than the capsule: from where
-  the view's top falls in it to where its bottom does, each of its messages an
-  equal slice, as a click on it reads it (`pickAt`), and at least 2 px tall.
-  The outline says which items; the tick says where in one. *Amended in
-  review:* the outline first cut the capsule itself, and stretched to a
-  least height. A capsule holds up to 999 messages in four rows, so a view of
-  one message was a sliver, stretched into a 12 px box: neither a dot's
-  shape nor a capsule's, and hanging past the capsule's end.
+- **Where the view's top or bottom falls inside a capsule, a tick crosses
+  it there**: a 2 px line, over it, in the column's colour with a dark edge,
+  wider than the capsule, each of the capsule's messages an equal slice of
+  it, as a click on it reads it (`pickAt`). Only the first and last items
+  can be cut, so a view has at most two ticks. Two edges within
+  `EDGE_MERGE` (a quarter row) of each other in one capsule are one line.
+  The outline says which items; a tick says where the view starts or ends in
+  one.
+- *Amended in review, twice.* The outline first cut the capsule itself, and
+  stretched to a least height. A capsule holds up to 999 messages in four
+  rows, so a view of one message was a sliver, stretched into a 12 px box:
+  neither a dot's shape nor a capsule's, and hanging past the capsule's end.
+  Then the tick marked the part of a capsule in view; seeing most of one, it
+  was a solid block, which read as the capsule's own fill (people wrote
+  it). A tick now marks only an edge.
 - **Only the outlines read the views.** Columns write a `ViewportStore`
   made once in `App`, and `RailViewport` reads it with
   `useSyncExternalStore`, so a scroll redraws neither a column nor the
   rail's dots.
 - **The rail follows the column moved last**, scrolling only when that
   column's view leaves the rail's: its `extent`, where its edges fall, cut
-  in capsules as the tick is, not its outline, which can be a whole capsule
+  in capsules where the ticks are, not its outline, which can be a whole capsule
   far taller (`railScroll`). A column measured again, unmoved, is not one
   moved (`sameViewport`). It holds still while the
   pointer is over it, and for `RAIL_HOLD_MS` after the reader scrolls it or
@@ -89,6 +95,8 @@ first (and how far into it the view's top is) to the last.
   down but not on which track, and has to choose a column.
 - An outline cut at the view's edges inside a capsule (the first version):
   a few messages of a long capsule are under a pixel.
+- A tick over the part of a capsule in view (the second): seeing most of a
+  capsule, it filled it.
 - A bracket beside the track: it needs room between tracks, widening the
   rail.
 - Opening the capsule into dots where the view is: the rail's shape would

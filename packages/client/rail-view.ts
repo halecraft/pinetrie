@@ -140,8 +140,10 @@ export interface Band {
 }
 
 /**
- * Where in a capsule a column's view is, when it shows only part of it: the
- * capsule, and how far down it the view's top and bottom are (0 to 1).
+ * A line across a capsule where an edge of a column's view falls in it: the
+ * capsule, and how far down it (0 to 1). `from` and `to` are equal, unless
+ * both edges fall within `EDGE_MERGE` of each other in one capsule, when one
+ * line spans them.
  */
 export interface Tick {
   readonly track: number
@@ -169,12 +171,18 @@ export interface RailView {
  *
  * The bands are whole items, so an outline only ever wraps a dot or a capsule
  * entire, and keeps their shape: messages in a row on one track make one
- * band, whatever other tracks draw beside them. A capsule the view shows only
- * part of gets a tick at that part, each of its messages an equal slice of
- * it, as `pickAt` reads it: a fraction of a capsule can be less than a pixel,
- * and stretched into an outline it would match no shape on the rail.
- * Messages the rail does not draw are left out.
+ * band, whatever other tracks draw beside them.
+ *
+ * Where the view's top or bottom falls inside a capsule, a tick crosses it
+ * there, each of its messages an equal slice of it, as `pickAt` reads it.
+ * Only the first and last items can be cut, so a view has at most two: a
+ * tick marks an edge, never the part in view, which drawn filled would read
+ * as a capsule's own fill (people wrote it). Messages the rail does not draw
+ * are left out.
  */
+/** How close, in slots, two edges in one capsule are drawn as one line. */
+export const EDGE_MERGE = 0.25
+
 export function railView(
   itemOf: ReadonlyMap<string, ViewItem>,
   ids: readonly string[],
@@ -215,14 +223,33 @@ export function railView(
     })
   }
   const ticks: Tick[] = []
-  for (const [item, part] of parts)
-    if (item.ids.length > 1 && (part.from > 0 || part.to < 1))
-      ticks.push({
-        track: item.track,
-        slot: item.slot,
-        span: item.span,
-        ...part,
-      })
+  const items = [...parts]
+  const [head] = items
+  const tail = items.at(-1)
+  const line = (item: ViewItem, from: number, to: number): Tick => ({
+    track: item.track,
+    slot: item.slot,
+    span: item.span,
+    from,
+    to,
+  })
+  const top =
+    head !== undefined && head[0].ids.length > 1 && head[1].from > 0
+      ? head
+      : null
+  const bottom =
+    tail !== undefined && tail[0].ids.length > 1 && tail[1].to < 1 ? tail : null
+  if (
+    top !== null &&
+    bottom !== null &&
+    top[0] === bottom[0] &&
+    (bottom[1].to - top[1].from) * top[0].span < EDGE_MERGE
+  )
+    ticks.push(line(top[0], top[1].from, bottom[1].to))
+  else {
+    if (top !== null) ticks.push(line(top[0], top[1].from, top[1].from))
+    if (bottom !== null) ticks.push(line(bottom[0], bottom[1].to, bottom[1].to))
+  }
   const extent =
     tops.length === 0
       ? null

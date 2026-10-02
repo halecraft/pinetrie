@@ -294,7 +294,8 @@ the tree.
   mark where a branch has messages you have not read.
 - **The rail outlines what each column shows** (ADR-0058): a rounded outline
   in the column's colour around the whole dots and capsules in its view, and
-  a tick across a capsule it shows only part of, at that part. Both move as
+  a thin line across a capsule where the view's top or bottom falls inside
+  it: at most two, never a fill. Both move as
   the column scrolls, and the rail scrolls to keep the view of the column you
   move in view, except while your pointer is over the rail.
 

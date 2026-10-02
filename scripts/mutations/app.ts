@@ -1366,7 +1366,17 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "a view in part of a capsule outlines the capsule whole, with a tick across it",
+      "a view in part of a capsule outlines the capsule whole, with a thin line at each edge of the view inside it",
+  },
+  {
+    name: "a tick is drawn as a block down its capsule",
+    file: "packages/client/rail.tsx",
+    from: "  const height = Math.max(2, (t.to - t.from) * length)",
+    to: "  const height = Math.max(2, length / 2)",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a view in part of a capsule outlines the capsule whole, with a thin line at each edge of the view inside it",
   },
   {
     name: "a column leaving keeps no spot",

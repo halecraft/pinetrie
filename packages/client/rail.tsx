@@ -199,13 +199,17 @@ const OUTLINE = 14
 /** A tick's width: wider than a capsule, so its ends show on any fill. */
 const TICK = 12
 
-/** Where a tick is drawn, in px: on its capsule's box, at least 2 px tall. */
+/**
+ * Where a tick is drawn, in px: centred on its edge (or between two merged
+ * edges), at least 2 px tall, and kept on its capsule's box.
+ */
 const tickBox = (t: Tick): { top: number; height: number } => {
   const top = y(t.slot) - ROW / 2 + 2
   const length = t.span * ROW - 4
   const height = Math.max(2, (t.to - t.from) * length)
+  const middle = ((t.from + t.to) / 2) * length
   return {
-    top: Math.min(top + t.from * length, top + length - height),
+    top: top + Math.min(length - height, Math.max(0, middle - height / 2)),
     height,
   }
 }
@@ -213,7 +217,8 @@ const tickBox = (t: Tick): { top: number; height: number } => {
 /**
  * What each column shows, on the rail in its colour (`railView`, ADR-0058):
  * an outline around the whole dots and capsules in its view, under them, and
- * a tick across a capsule it shows only part of, over it. It reads the
+ * a tick across a capsule where the view's top or bottom falls in it, over
+ * it. It reads the
  * columns' views itself, so a scroll redraws these alone. The rail follows
  * the view's own extent, not its outline: a capsule outlined whole can be
  * far taller than what is in view. The rail follows the column moved last: it
