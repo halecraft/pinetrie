@@ -2,10 +2,11 @@
 // (ADR-0038, ADR-0039).
 //
 // Every operation runs on `OfferState`'s one queue for your repo, so no two
-// interleave: a trigger gathers (the lane's tip, where an offer starts, the
-// offer's facts), plans (`planRefresh`, then `planOfferEffects`), and
-// executes planned jj steps, then writes the `pineta.offer` record when it
-// changed. Triggers: a lane's fetch, a run's end, an offer action, and your
+// interleave: a trigger gathers (`offerNow`: where the offer sits and
+// starts, and the offer as your repo holds it), plans (`planRefresh`, then
+// `planOfferEffects`), and executes planned jj steps, then writes the
+// `pineta.offer` record, the page's cache, from the repo. The host decides
+// nothing from a record (ADR-0060). Triggers: a lane's fetch, a run's end, an offer action, and your
 // own jj operations (`watch.ts`). The queue also carries the reads a page asks
 // for (`read`, ADR-0047): a jj read can write (S57).
 
@@ -90,7 +91,7 @@ export function startOffers(input: {
   readonly agent: () => Agent
   /** Whether a lane is running now: an offer is described once it stops. */
   readonly running: (lane: LaneName) => boolean
-  /** After a take: the base snapshot follows your `@-`. */
+  /** After a take or a land: the base snapshot follows the line. */
   readonly taken: () => void
 }): Offers {
   const state = createOfferState(input)

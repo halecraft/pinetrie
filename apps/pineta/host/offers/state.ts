@@ -1,11 +1,14 @@
 // host/offers/state — what every offer module shares: your repo, its one
-// queue, the reads and writes over the `pineta.offer` records, and where a
-// lane's offer sits and starts, read from the repo (ADR-0060).
+// queue, and the one gather (`offerNow`): where a lane's offer sits and
+// starts, and the offer itself, read from the repo (ADR-0060). The
+// `pineta.offer` records are written here, and read only to skip a write
+// that changes nothing: the host decides nothing from them.
 
 import type {
   BaseRecord,
   CommitId,
   LaneName,
+  OfferInRepo,
   OfferRecord,
   ThreadName,
 } from "@pineta/core"
@@ -16,7 +19,7 @@ import {
   type LineConfig,
   laneBase,
   laneTipIn,
-  offerFacts,
+  readOffer,
   revsetName,
   startOfOffer,
   wipFacts,
@@ -62,12 +65,19 @@ export interface OfferState {
   readonly running: (lane: LaneName) => boolean
   /** After a take or a land: the base snapshot follows the line. */
   readonly taken: () => void
-  offerOf(lane: LaneName): OfferRecord | undefined
   nameOf(lane: LaneName): ThreadName | undefined
-  /** An offer's facts now, against what the host last wrote for it. */
-  factsOf(offer: OfferRecord, target: string): ReturnType<typeof offerFacts>
   /** Write an offer's record, when it changed. */
   write(record: OfferRecord): Promise<void>
+  /**
+   * The one gather every offer step plans from: where the lane's offer sits
+   * and starts (`placeOf`), and the offer as your repo holds it there; null
+   * offer with no name yet, no target (a WIP gone), or none in the repo.
+   */
+  offerNow(lane: LaneName): Promise<{
+    readonly place: OfferPlace
+    readonly name: ThreadName | undefined
+    readonly offer: OfferInRepo | null
+  } | null>
   /**
    * Where a lane's offer sits and starts, read from the repo, and the lane's
    * base written as its cache (`pineta.base`); null before the lane has a
@@ -88,7 +98,7 @@ export function createOfferState(input: {
   const { root, basics, line } = input
   const { doc } = basics
   const ops = hostOps(root)
-  const offerOf = (lane: LaneName) => readOffers(doc).get(lane)
+  const nameOf = (lane: LaneName) => readNames(doc).get(lane)
   const commitOf = async (bookmark: string) =>
     (await commitsOf(ops, `present(${revsetName(bookmark)})`))[0] ?? null
 
@@ -97,6 +107,27 @@ export function createOfferState(input: {
     const stored = readBases(doc).get(record.lane)
     if (stored !== undefined && !recordChanged(next, stored)) return
     await input.agent().setWorkRecord(next)
+  }
+
+  async function placeOf(lane: LaneName): Promise<OfferPlace | null> {
+    // gather
+    const tip = await laneTipIn(ops, lane)
+    if (tip === null) return null
+    const base = await laneBase(ops, tip, line)
+    if (base === null) return null
+    const state =
+      base.base.kind === "wip" && base.source !== null
+        ? wipState(await wipFacts(ops, line, base.base.bookmark, base.source))
+        : "ok"
+    const target =
+      base.base.kind === "wip" && state === "ok"
+        ? await commitOf(base.base.bookmark)
+        : state === "gone"
+          ? null
+          : await commitOf(line.onto)
+    const start = await startOfOffer(ops, { tip, base, line })
+    await writeBase({ lane, base: base.base, start: base.start, state })
+    return { tip, base, state, target, start }
   }
 
   return {
@@ -109,39 +140,23 @@ export function createOfferState(input: {
     serial: createSerial(),
     running: input.running,
     taken: input.taken,
-    offerOf,
-    nameOf: lane => readNames(doc).get(lane),
-    factsOf: (offer, target) =>
-      offerFacts(ops, {
-        changes: offer.host.changes,
-        wrote: offer.host.wrote,
-        target,
-      }),
+    nameOf,
     async write(record) {
       const next = { kind: "offer" as const, record }
-      const stored = offerOf(record.lane)
+      const stored = readOffers(doc).get(record.lane)
       if (stored !== undefined && !recordChanged(next, stored)) return
       await input.agent().setWorkRecord(next)
     },
-    async placeOf(lane) {
-      // gather
-      const tip = await laneTipIn(ops, lane)
-      if (tip === null) return null
-      const base = await laneBase(ops, tip, line)
-      if (base === null) return null
-      const state =
-        base.base.kind === "wip" && base.source !== null
-          ? wipState(await wipFacts(ops, line, base.base.bookmark, base.source))
-          : "ok"
-      const target =
-        base.base.kind === "wip" && state === "ok"
-          ? await commitOf(base.base.bookmark)
-          : state === "gone"
-            ? null
-            : await commitOf(line.onto)
-      const start = await startOfOffer(ops, { tip, base, line })
-      await writeBase({ lane, base: base.base, start: base.start, state })
-      return { tip, base, state, target, start }
+    placeOf,
+    async offerNow(lane) {
+      const place = await placeOf(lane)
+      if (place === null) return null
+      const name = nameOf(lane)
+      const offer =
+        name === undefined || place.target === null
+          ? null
+          : await readOffer(ops, { name, target: place.target })
+      return { place, name, offer }
     },
   }
 }

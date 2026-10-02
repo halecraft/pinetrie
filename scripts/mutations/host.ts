@@ -5,28 +5,38 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pineta/host"]
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "a refresh trusts the record over the repo's ledger",
-    file: "apps/pineta/host/offers/plan.ts",
-    from: "  ledger === null\n    ? { builtFrom: open.host.tip, builtOn: open.host.start }",
-    to: "  ledger !== undefined\n    ? { builtFrom: open.host.tip, builtOn: open.host.start }",
-    command: unit,
-    expect: "its message's ledger, over the record's copy",
+    name: "the watch looks only where a record is open",
+    file: "apps/pineta/host/offers/watch.ts",
+    from: "          bookmarked: await bookmarked(),",
+    to: "          bookmarked: [],",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a lost record changes nothing: the next trigger writes it again, and the offer keeps its change id",
   },
   {
-    name: "a write the record lost stays your edits' baseline",
+    name: "an offer reads as described from the start",
     file: "apps/pineta/host/offers/plan.ts",
-    from: "    ? facts.commits\n    : null",
-    to: "    ? null\n    : null",
+    from: "    described: !isWipLine(input.name, offer.firstLine),",
+    to: "    described: true,",
     command: unit,
-    expect: "one that differs, as the host's own lost write, is read now",
+    expect: "each revision's commit as it is now, and what the page shows",
   },
   {
-    name: "a rebase jj made resets the host's write",
+    name: "a stack is never stale",
     file: "apps/pineta/host/offers/plan.ts",
-    from: "  facts.revisions.some(r => !(r.sameDescription && r.sameChange))",
-    to: "  true",
+    from: "    stale: size > 1 && offerMoved(offer.ledger, input.place),",
+    to: "    stale: false,",
     command: unit,
-    expect: "a revision jj only rebased keeps the host's write",
+    expect: "a stack is stale when the lane moved past its ledger",
+  },
+  {
+    name: "a plan with no steps reads the offer again",
+    file: "apps/pineta/host/offers/execute.ts",
+    from: "        effects.steps.length === 0 ? before : await ports.read(),",
+    to: "        await ports.read(),",
+    command: unit,
+    expect: "none: no steps, so the read made before planning is recorded",
   },
   {
     name: "a host that admits others acts on the repo as its owner",
@@ -47,11 +57,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a starting host checks no offer until you run jj",
     file: "apps/pineta/host/offers/watch.ts",
-    from: "    touch: moved ? input.open : [],",
-    to: "    touch: moved && input.last !== null ? input.open : [],",
+    from: "    touch: moved ? [...new Set([...input.bookmarked, ...input.open])] : [],",
+    to: "    touch: moved && input.last !== null ? [...new Set([...input.bookmarked, ...input.open])] : [],",
     command: unit,
-    expect:
-      "planPoll: the first read and a new op touch every open offer and the line",
+    expect: "planPoll: the first read and a new op touch each lane",
   },
   {
     name: "a lane begins from a base it cannot",
@@ -84,14 +93,6 @@ export const mutations: readonly Mutation[] = [
     to: '  "quiet",\n  "close",',
     command: unit,
     expect: "planShutdown closes intake and the queues before it waits",
-  },
-  {
-    name: "an offer not yours keeps a stale baseline",
-    file: "apps/pineta/host/offers/plan.ts",
-    from: "      : (read ?? open.host.wrote)",
-    to: "      : open.host.wrote",
-    command: unit,
-    expect: "an offer not yours takes what was read as its baseline",
   },
   {
     name: "a store does not own its file",
@@ -521,14 +522,6 @@ export const mutations: readonly Mutation[] = [
     expect: "with a key, an upgrade without it is refused",
   },
   {
-    name: "the record keeps the host's commits",
-    file: "apps/pineta/host/offers/plan.ts",
-    from: "    commits: facts.commits,",
-    to: "    commits: at.commits,",
-    command: unit,
-    expect: "names each revision's commit as it is now",
-  },
-  {
     name: "a follow builds another offer",
     file: "apps/pineta/host/offers/plan.ts",
     from: '  if (plan === "build")',
@@ -539,10 +532,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a followed offer keeps the agent's message",
     file: "apps/pineta/host/offers/plan.ts",
-    from: "          description: c.wip,",
-    to: "          description: null,",
+    from: "          description: offerMessage(c.wip, {",
+    to: '          description: offerMessage("offer: scripted", {',
     command: unit,
-    expect: "an offer that follows is a work in progress again",
+    expect: "follow: planFollowOffer's steps",
   },
   {
     name: "a withdrawn offer keeps its record",
@@ -627,11 +620,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a followed offer is recorded with its old commits",
     file: "apps/pineta/host/offers/execute.ts",
-    from: "          : await ports.reread(after.reread)",
-    to: "          : after.at.commits",
+    from: "        effects.steps.length === 0 ? before : await ports.read(),",
+    to: "        before,",
     command: unit,
-    expect:
-      "follow: its steps run, then the offer is recorded with its commits read after them",
+    expect: "follow: its steps run, then the offer is read again",
   },
   {
     name: "a request outside the queue is untracked",

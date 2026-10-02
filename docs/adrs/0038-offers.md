@@ -18,6 +18,9 @@ above the tip's newest copy.
 Amended in place (S73, `PLAN-2026-10-01-offer-lost-write`): an offer is
 edited only by a change an operation not the host's made; an edited offer
 that conflicts says so.
+Amended in place (`PLAN-2026-10-02-offer-from-repo`): "edited" is a change
+an operation not the host's made since the host's newest version in the
+evolog, and the host keeps no record of what it wrote.
 **Amended by ADR-0060:** an offer sits on its thread's base (the
 integration line, or a WIP bookmark), and starts where the lane's
 `Pineta-Base` and taken offers' `Pineta-Source` trailers say; a take is a

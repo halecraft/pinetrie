@@ -2,14 +2,9 @@
 // and whether the stack a split's run made may replace the offer.
 
 import type { CommitId, LaneName } from "@pineta/core"
-import {
-  commitsOf,
-  executeOnHost,
-  lines,
-  type OfferSource,
-  planAbandonOffer,
-} from "@pineta/lanes"
+import { commitsOf, lines, type OfferSource } from "@pineta/lanes"
 import { acceptStack } from "@pineta/marginalia"
+import { changesOf } from "./plan.ts"
 import type { Refresh } from "./refresh.ts"
 import type { OfferState } from "./state.ts"
 
@@ -30,7 +25,7 @@ export function stackSpan(
  */
 export function stackEnded(
   state: OfferState,
-  refresh: Pick<Refresh, "build">,
+  refresh: Pick<Refresh, "rebuild">,
   lane: LaneName,
   stack: {
     readonly start: readonly CommitId[]
@@ -38,7 +33,7 @@ export function stackEnded(
     readonly top: CommitId | null
   },
 ): Promise<string | null> {
-  const { ops, root } = state
+  const { ops } = state
   return state.serial.run(async () => {
     if (stack.top === null) return "the stack's bookmark was not set"
     const revisions = await commitsOf(
@@ -66,23 +61,19 @@ export function stackEnded(
       ).stdout
       sources.push({ commit, description })
     }
-    const name = state.nameOf(lane)
+    const now = await state.offerNow(lane)
+    if (now === null) return "the thread's lane is not in your repo"
+    const { place, name, offer } = now
     if (name === undefined) return "the thread has no name yet"
-    const place = await state.placeOf(lane)
-    if (place === null || place.target === null)
+    if (place.target === null)
       return "the thread's base is gone: continue it on the line"
-    const { target } = place
-    const o = state.offerOf(lane)
-    if (o !== undefined && o.taken === null)
-      await executeOnHost(planAbandonOffer(root, o.host.changes))
-    await refresh.build(
+    // The stack was made from this tip and start: its ledger names them.
+    await refresh.rebuild(
       lane,
       name,
-      stack.tip,
-      stack.start,
-      target,
+      { ...place, tip: stack.tip, start: stack.start, target: place.target },
+      offer === null ? [] : changesOf(offer),
       sources,
-      true,
     )
     return null
   })

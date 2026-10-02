@@ -55,7 +55,7 @@ import {
   SPEC_LABEL,
   shellWord,
   specHashOf,
-  walkSince,
+  walkToHost,
   withoutPinetaHeads,
 } from "./index.ts"
 
@@ -928,7 +928,7 @@ describe("planTurnCommit: the turn's revision (S56)", () => {
   })
 })
 
-describe("walkSince", () => {
+describe("walkToHost", () => {
   // One line per version, newest first, as `jj evolog -T EVOLOG_ENTRY` prints them.
   const evolog = (...rows: readonly (readonly [string, string, string])[]) =>
     parseEvolog(
@@ -942,40 +942,38 @@ describe("walkSince", () => {
     )
   const HOST = "pineta-host@mac"
   const id = commitId
-  test("the host's own versions back to what it wrote: reached, none of yours", () => {
+  test("a revision the host made last: reached at once, none of yours", () => {
+    const entries = evolog(["c2", HOST, "c1"], ["c1", "you@mac", ""])
+    expect(walkToHost(entries, id("c2"))).toEqual({ reached: true, yours: [] })
+  })
+  test("your versions since the host's newest are listed, each with the one before it", () => {
     const entries = evolog(
-      ["c3", HOST, "c2"],
+      ["c4", "you@mac", "c3"],
+      ["c3", "you@mac", "c2"],
       ["c2", HOST, "c1"],
-      ["c1", HOST, ""],
+      ["c1", "you@mac", ""],
     )
-    expect(walkSince(entries, id("c3"), id("c1"))).toEqual({
+    expect(walkToHost(entries, id("c4"))).toEqual({
       reached: true,
-      yours: [],
+      yours: [
+        { from: id("c3"), to: id("c4") },
+        { from: id("c2"), to: id("c3") },
+      ],
     })
   })
-  test("a version of yours on the way is listed with the one before it", () => {
-    const entries = evolog(
-      ["c3", HOST, "c2"],
-      ["c2", "you@mac", "c1"],
-      ["c1", HOST, ""],
-    )
-    expect(walkSince(entries, id("c3"), id("c1"))).toEqual({
-      reached: true,
-      yours: [{ from: id("c1"), to: id("c2") }],
-    })
-  })
-  test("a walk that never meets what the host wrote is not reached", () => {
-    const entries = evolog(["c3", HOST, "c2"], ["c2", HOST, ""])
-    expect(walkSince(entries, id("c3"), id("c9")).reached).toBe(false)
+  test("a revision the host never made is not reached", () => {
+    const entries = evolog(["c2", "you@mac", "c1"], ["c1", "you@mac", ""])
+    expect(walkToHost(entries, id("c2")).reached).toBe(false)
   })
   test("of a squash's predecessors, only its own change's is followed", () => {
     const entries = parseEvolog(
       [
         "c2\tkchange\tyou@mac\tcx:kother,c1:kchange",
+        "cx\tkother\tpineta-host@mac\t",
         "c1\tkchange\tpineta-host@mac\t",
       ].join("\n"),
     )
-    expect(walkSince(entries, id("c2"), id("c1"))).toEqual({
+    expect(walkToHost(entries, id("c2"))).toEqual({
       reached: true,
       yours: [{ from: id("c1"), to: id("c2") }],
     })

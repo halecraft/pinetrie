@@ -137,12 +137,6 @@ const OfferRecordSchema = Type.Object({
   taken: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
   commits: Type.Array(Commit),
   at: Type.Number(),
-  host: Type.Object({
-    changes: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
-    wrote: Type.Array(Commit, { minItems: 1 }),
-    tip: Commit,
-    start: Type.Array(Commit, { minItems: 1 }),
-  }),
 })
 
 const BannerRecordSchema = Type.Object({
@@ -267,15 +261,20 @@ export const decodeOfferRecord = (value: unknown): OfferRecord | undefined =>
   decodeWith(OfferRecordSchema, value, r =>
     isLaneName(r.lane)
       ? {
-          ...r,
+          // Field by field: an older record has a `host` key, what the host
+          // once kept for itself, which a spread would carry along.
           lane: r.lane,
+          size: r.size,
+          stale: r.stale,
+          files: r.files,
+          conflicts: r.conflicts,
+          yourEdits: r.yourEdits,
+          described: r.described,
+          edited: r.edited,
+          bookmark: r.bookmark,
+          taken: r.taken,
           commits: r.commits.map(commitId),
-          host: {
-            changes: r.host.changes,
-            wrote: r.host.wrote.map(commitId),
-            tip: commitId(r.host.tip),
-            start: r.host.start.map(commitId),
-          },
+          at: r.at,
         }
       : undefined,
   )
@@ -351,12 +350,6 @@ export function encodeWorkRecord(r: WorkRecord): {
           conflicts: [...r.record.conflicts],
           yourEdits: [...r.record.yourEdits],
           commits: [...r.record.commits],
-          host: {
-            changes: [...r.record.host.changes],
-            wrote: [...r.record.host.wrote],
-            tip: r.record.host.tip,
-            start: [...r.record.host.start],
-          },
         },
       }
     case "line":

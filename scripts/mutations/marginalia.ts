@@ -6,6 +6,23 @@ const archive = "packages/marginalia/archive.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a forced describe is refused once described",
+    file: "packages/marginalia/offer.ts",
+    from: "  (force || isWipLine(name, offer.firstLine))",
+    to: "  isWipLine(name, offer.firstLine)",
+    command: unit,
+    expect: "describeWanted",
+  },
+  {
+    name: "another thread's WIP line counts as this one's",
+    file: "packages/marginalia/offer.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  line.startsWith(`WIP (${name}): `)",
+    to: '  line.startsWith("WIP (")',
+    command: unit,
+    expect: "the WIP line is this thread's",
+  },
+  {
     name: "a conflicted offer lands on the line",
     file: "packages/marginalia/offer.ts",
     from: "    input.conflicted\n      ? []",
@@ -41,10 +58,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host's own rewrite reads as your edit",
     file: "packages/marginalia/offer.ts",
-    from: "  (r.since === null || !r.since.reached || r.since.yoursChanged)",
+    from: "  !r.reached || r.yoursChanged",
     to: "  true",
     command: unit,
-    expect: "a change the evolog shows only the host made is not yours",
+    expect:
+      "a revision the host never made is yours; a version only the host made is not",
   },
   {
     name: "decoding skips the schema check",
@@ -245,18 +263,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an offer moved by you is refreshed anyway",
     file: "packages/marginalia/offer.ts",
-    from: "  const edited = !offer.placed ||",
-    to: "  const edited = false ||",
+    from: "  !offer.placed ||\n  !offer.chained ||",
+    to: "  false ||\n  !offer.chained ||",
     command: unit,
-    expect: "any failed edit test",
+    expect: "you edited it",
   },
   {
     name: "an edit to a stack's lower revision goes unnoticed",
     file: "packages/marginalia/offer.ts",
-    from: "offer.revisions.some(revisionEdited)",
-    to: "offer.revisions.slice(-1).some(revisionEdited)",
+    from: "  offer.revisions.some(r => revisionEdited(r.since))",
+    to: "  offer.revisions.slice(-1).some(r => revisionEdited(r.since))",
     command: unit,
-    expect: "any failed edit test",
+    expect: "you edited it",
   },
   {
     name: "a stack with a file missing is accepted",
@@ -295,8 +313,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an offer ignores a moved start",
     file: "packages/marginalia/offer.ts",
-    from: "    offer.builtFrom !== tip || !sameCommits(offer.builtOn, facts.start)",
-    to: "    offer.builtFrom !== tip",
+    from: "  ledger.source !== now.tip ||\n  !sameCommits(ledger.start, now.start)",
+    to: "  ledger.source !== now.tip",
     command: unit,
     expect: "where it starts moved",
   },

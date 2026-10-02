@@ -403,12 +403,6 @@ describe("columnView: the work strip", () => {
       taken: null,
       commits: [commitId("c1")],
       at: 1,
-      host: {
-        changes: ["c"],
-        wrote: [commitId("w")],
-        tip: commitId("t"),
-        start: [commitId("s")],
-      },
     }
     const strip = (offer: OfferRecord, running = false) =>
       columnView(
@@ -515,12 +509,6 @@ describe("offerWords", () => {
     taken: null,
     commits: [commitId("w")],
     at: 10,
-    host: {
-      changes: ["c"],
-      wrote: [commitId("w")],
-      tip: commitId("t"),
-      start: [commitId("s")],
-    },
   }
   const LINE_BASE = { base: { kind: "line" }, state: "ok" } as const
   const words = (

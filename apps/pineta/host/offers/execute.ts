@@ -1,26 +1,31 @@
 // host/offers/execute — carrying out an offer's plans (`plan.ts`) over
 // ports, so a test can check what each plan makes the host write.
 
-import type { CommitId, OfferRecord } from "@pineta/core"
+import type { OfferInRepo, OfferRecord } from "@pineta/core"
 import type { LaneStep, OfferSource } from "@pineta/lanes"
-import type { OfferAt, OfferEffects, planTake } from "./plan.ts"
+import type { OfferEffects, planTake } from "./plan.ts"
 
 export interface OfferPorts {
   /** Run jj steps on your repo, in order. */
   run(steps: readonly LaneStep[]): Promise<void>
   build(sources: readonly OfferSource[]): Promise<void>
-  /** The offer's commits now, after steps rewrote it. */
-  reread(offer: OfferRecord): Promise<readonly CommitId[]>
-  /** Write the record; `known`: with the facts read before planning. */
-  record(at: OfferAt, known: boolean): Promise<void>
-  repair(offer: OfferRecord, at: OfferAt): Promise<void>
+  /** The offer as your repo holds it now. */
+  read(): Promise<OfferInRepo | null>
+  /** Write the record from `offer`. */
+  record(offer: OfferInRepo | null): Promise<void>
+  repair(changes: readonly string[]): Promise<void>
   remove(): Promise<void>
 }
 
-/** A refresh's effects: its steps, then what it writes. */
+/**
+ * A refresh's effects: its steps, then what it writes. `before` is the offer
+ * read before planning: with no steps it is still the offer, so the common
+ * plan, `none`, reads nothing more.
+ */
 export async function executeOffer(
   ports: OfferPorts,
   effects: OfferEffects,
+  before: OfferInRepo | null,
 ): Promise<"built" | "other"> {
   await ports.run(effects.steps)
   const { after } = effects
@@ -30,16 +35,13 @@ export async function executeOffer(
     case "build":
       await ports.build(after.sources)
       break
-    case "record": {
-      const commits =
-        after.reread === null
-          ? after.at.commits
-          : await ports.reread(after.reread)
-      await ports.record({ ...after.at, commits }, after.known)
+    case "record":
+      await ports.record(
+        effects.steps.length === 0 ? before : await ports.read(),
+      )
       break
-    }
     case "repair":
-      await ports.repair(after.offer, after.at)
+      await ports.repair(after.changes)
       break
     case "remove":
       await ports.remove()

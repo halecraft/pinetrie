@@ -321,13 +321,21 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   write is tested over `record<T>()`; `packages/lanes/lanes.test.ts` proves
   the jj steps themselves against real jj.
 - `refresh.ts` builds and records, and carries out a refresh; `describe.ts`
-  asks the model outside the queue and writes inside it; `act.ts`,
+  gathers on the queue (the offer, its diff, your recent messages), asks the
+  model outside it, and writes inside it; `act.ts`,
   `stack.ts` and `watch.ts` (`planPoll`) are the actions, a split's stack
   and your jj operations.
-- **Where an offer sits and starts is read from the repo** (`placeOf`,
-  ADR-0060): its base from the lane's newest `Pineta-Base`, its target the
-  line's commit or the WIP's, its start `startOfOffer`. `placeOf` writes the
-  lane's `pineta.base` cache as it reads it.
+- **The host decides an offer only from your repo** (ADR-0060). One gather,
+  `offerNow`, reads where it sits and starts (`placeOf`: its base from the
+  lane's newest `Pineta-Base`, its target the line's commit or the WIP's,
+  its start `startOfOffer`) and the offer itself (`readOffer`). Refresh,
+  take, squash, describe and a split's replacement all plan from it.
+  `placeOf` writes the lane's `pineta.base` cache as it reads it.
+  `OfferState` has no record reader: `write` compares with the stored
+  record only to skip a write that changes nothing.
+- **A record is written from the repo after each step** (`executeOffer`):
+  from the read made before planning when the plan ran no steps (the
+  common `none` reads nothing more), else from a new read.
 - **A take names its destination** (`planTake`): one of
   `takeDestinations`, and refused (`bad_destination`) unless the bookmark is
   at or below the offer's bottom's parent, read in the same step. jj's
@@ -339,18 +347,18 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   (`lineCommands`: no invite key), since both act on the repo as its owner;
   Kyneta does not say which connection a seat came over. Others are refused
   `not_yours`.
-- **A new jj operation refreshes the line's record** and touches every open
-  offer (`planPoll`), so a land or a take moves every offer on the line.
-- **The first poll touches every open offer.** A host that just started
-  checks each one, so a record its predecessor lost (S73) is corrected before
-  you can take the offer.
+- **A new jj operation refreshes the line's record** and touches each lane
+  whose offer bookmark is in your repo, and each whose record is open
+  (`planPoll`), so a land or a take moves every offer on the line. The
+  record is only a hint of where to look: it is how an offer you abandoned
+  by hand is built again. The first poll does the same, so a host that just
+  started writes each offer's record from the repo.
 - **`Offers.stop()`** closes the poll and the offers' `Serial`; it is the
   `close` step of a shutdown. `touch`, `runEnded`, `act` and `stackEnded`
   need no check of their own: each goes through the closed queue.
-- **A record's baseline (`host.wrote`) is what was read** whenever the plan
-  is not `leave` or `repair` (`planOfferEffects`): an offer that is not
-  yours is safe to compare against as it is now. `leave` and `repair` keep
-  what the host wrote, against which your edit is seen.
+- **A model request gathers on the queue first; only the request is
+  outside** (`requestOutside`): a jj read can write (S57), so `describe`
+  reads your repo in a `serial.run` before it asks.
 
 ## Testing the shell
 

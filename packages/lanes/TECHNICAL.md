@@ -315,8 +315,8 @@ containers, disks and the helper.
 ## Offers in your repo (`offer.ts`, `plan.ts`, ADR-0038, ADR-0039)
 
 - **An offer's bookmark is `pineta-offer/<name>`**, the thread's two-word
-  name (`offerBookmark`). Take and repair use the bookmark the offer's record
-  holds, so an offer built under an older name is still found.
+  name (`offerBookmark`). Every step finds the offer by it: one built under
+  another name is not found, and a new one is built.
 
 - **Every host command on your repo carries `--ignore-working-copy` and
   `--config operation.username=pineta-host`** (`hostOps`, `hostOp`): it never
@@ -350,10 +350,12 @@ containers, disks and the helper.
   `present()`: one never fetched here names nothing you have. A squash of
   two taken offers keeps both trailer paragraphs, and `trailerValues` reads
   every one; jj's `trailers` template reads only the last (S77 item 6).
-- **An offer carries its ledger** (`withLedger`): `Pineta-Source: <tip>`
-  and `Pineta-Start`, on its line while it is a work in progress and kept
-  through a description. `offerFacts` reads it back (`offerLedger`), so a
-  record lost or stale costs nothing.
+- **Every revision of an offer carries the host's trailers and its ledger**
+  (`offerMessage`, marginalia): `Pineta-Thread`, `Pineta-Lane`,
+  `Pineta-Entry`, then `Pineta-Source: <tip>` and `Pineta-Start`, in one
+  paragraph, on its WIP line and kept through a description. The source is
+  the lane tip the whole offer holds, a stack's revisions included: taken,
+  it says you have that tip.
 - **`startOfOffer` is the one path to a start.** The host's refresh, its
   `squash` and `refresh` actions and `stackSpan` all use it: a start from
   another rule would read as a moved start to `planRefresh`, and a split
@@ -369,19 +371,25 @@ containers, disks and the helper.
   bookmark deleted. Never `--allow-backwards`: jj refuses a move that is
   not forward, so a stale take fails rather than drops commits (S77 item 1).
   It never rebases and never touches your `@`.
-- **`offerFacts` reads an offer by change id once, then names commits**
-  (`offerCommits`, which a read needing only the commits uses alone): its
-  edit tests (`sameAs`: the description and `jj interdiff`; and the bottom's
-  parent an ancestor of the target), files, conflicts and divergence.
-- **Only when a revision fails `sameAs` is its evolog read** (`evologOf`,
-  one `jj evolog -T EVOLOG_ENTRY`), and `walkSince` (pure) walks it back to
-  what the host wrote, through each version's predecessor of the same
-  change. Each version an operation not the host's made is checked with
-  `sameAs` against the one before it. A record write can be lost after its
-  jj steps landed (a restart between the two, S73), so the host's own commit
-  is recognised from the evolog, never from the record alone. A rebase jj
+- **`readOffer` reads an offer from your repo alone** (`OfferInRepo`,
+  ADR-0060): nothing the host remembers is needed, so a lost record costs
+  nothing. Its revisions (`offerRevisions`) are what is under the bookmark,
+  not already under the target, and carries the thread's trailer:
+  `(::<bookmark> ~ ::<target>) & (description(regex:"(?m)^Pineta-Thread:
+  <name>$") | <bookmark>)`. A taken offer below carries the same trailer, but
+  is under the target; your commits carry none. The bookmark's own commit
+  is always the top. A conflicted bookmark, or a change id naming two
+  commits, reads as divergent, with only the change ids. Every read after
+  the first names commits (S48 item 2). It returns facts; `planRefresh`,
+  `offerEdited` and `offerMoved` (marginalia) decide what they mean.
+- **Every revision's evolog is read, back to the host's newest version**
+  (`evologOf`, one `jj evolog -T EVOLOG_ENTRY`; `walkToHost`, pure),
+  through each version's predecessor of the same change. Each version an
+  operation not the host's made on the way is checked with `sameAs` (the
+  description and `jj interdiff`) against the one before it. A rebase jj
   made because you reworded a commit below is your operation (S48 item 7),
-  and changes nothing, so it is not an edit.
+  and changes nothing, so it is not an edit. The newest entry is usually
+  the host's, so the walk usually stops at once.
 - **A review reads by commit id** (ADR-0047): `revisionRead` runs
   `jj log -r <commit> -T REVISION_READ` and returns the parsed JSON,
   unchecked (the host decodes it), and `fileDiff` runs `jj diff --git -r
@@ -406,7 +414,7 @@ containers, disks and the helper.
 
 ## Tests
 
-- **`plan.test.ts`**: the planners, and `walkSince` over parsed evologs.
+- **`plan.test.ts`**: the planners, and `walkToHost` over parsed evologs.
 - **`lane.test.ts`**: the queue, and that each file a lane is pointed at
   inside Pineta's mount (`HELPER`, `LANE_NOTE`) exists in the install.
 - **`lanes.test.ts`**: the executor, and a lane's whole life against jj and

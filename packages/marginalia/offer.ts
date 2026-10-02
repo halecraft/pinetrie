@@ -18,6 +18,8 @@ import {
   firstLine,
   type LandingRecord,
   type LaneName,
+  type OfferInRepo,
+  type OfferLedger,
   type OfferRecord,
   type RevisionFacts,
   type RevisionRecord,
@@ -32,41 +34,56 @@ import { decodeWith } from "./decode.ts"
 import { fitNewest, LEFT_OUT_NOTE, leftOut } from "./request.ts"
 
 /**
- * Whether you edited a revision since the host last wrote it: it differs in
- * description or change, and the evolog does not show only the host's own
- * versions between (S73). A walk that never reached the host's commit
- * proves nothing, so that revision counts as yours.
+ * Whether you edited a revision: a version an operation not the host's made
+ * changed it since the host's newest version (S73). A revision the host
+ * never made is yours. A rebase jj made because you reworded a commit below
+ * is your operation but changes nothing (S48 item 7), so it is no edit.
  */
 export const revisionEdited = (r: RevisionFacts): boolean =>
-  !(r.sameDescription && r.sameChange) &&
-  (r.since === null || !r.since.reached || r.since.yoursChanged)
+  !r.reached || r.yoursChanged
 
-/** What a trigger found: the lane, your repo, and the offer if there is one. */
+/** An offer read from your repo, not divergent. */
+export type OfferNow = Extract<OfferInRepo, { readonly kind: "offer" }>
+
+/**
+ * Whether you edited the offer: a revision edited, a commit of yours between
+ * its revisions, or its bottom moved off its base (S48 item 7). The host
+ * never touches it again; nothing it writes later can hide your version.
+ */
+export const offerEdited = (offer: OfferNow): boolean =>
+  !offer.placed ||
+  !offer.chained ||
+  offer.revisions.some(r => revisionEdited(r.since))
+
+/**
+ * Whether the lane, or where the offer starts, moved since it was built or
+ * last followed: its ledger against the lane's tip and start now. An offer
+ * with no ledger, built before ADR-0060, reads as moved, so it is followed
+ * once, which writes one. A start is compared as a set: a merge's parents
+ * come in any order.
+ */
+export const offerMoved = (
+  ledger: OfferLedger | null,
+  now: { readonly tip: CommitId; readonly start: readonly CommitId[] },
+): boolean =>
+  ledger === null ||
+  ledger.source !== now.tip ||
+  !sameCommits(ledger.start, now.start)
+
+/** What a trigger found: the lane, and the offer as your repo holds it. */
 export interface RefreshFacts {
   /** The lane's tip in your repo; null before its first fetch. */
   readonly tip: CommitId | null
   /** Where an offer would start, and whether that is the tip: nothing new. */
   readonly start: readonly CommitId[]
-  readonly offer:
-    | (Pick<OfferRecord, "size" | "taken"> & {
-        readonly builtFrom: CommitId
-        /** Where it started when built or last followed. */
-        readonly builtOn: readonly CommitId[]
-        readonly revisions: readonly RevisionFacts[]
-        /** Its bottom's parent is an ancestor of the target (S48 item 7). */
-        readonly placed: boolean
-        /** Its bottom's parent is the target itself. */
-        readonly onTarget: boolean
-        /** Two visible commits share one of its change ids (S48 item 8). */
-        readonly divergent: boolean
-      })
-    | undefined
+  /** Null when there is none: never built, taken, or gone. */
+  readonly offer: OfferInRepo | null
 }
 
 /**
  * What a trigger does to a lane's offer:
  * - `none`: nothing to do;
- * - `build`: make an offer (there is none, or the last was taken);
+ * - `build`: make an offer (there is none: never built, taken, or gone);
  * - `follow`: the lane, or where the offer starts, moved under an unedited
  *   single offer: update it in place (ADR-0039, S49);
  * - `withdraw`: where it starts reached the lane's tip, so it holds nothing
@@ -91,15 +108,11 @@ export function planRefresh(facts: RefreshFacts): RefreshPlan {
   const { tip, offer } = facts
   if (tip === null) return "none"
   const nothingNew = facts.start.length === 1 && facts.start[0] === tip
-  if (offer === undefined || offer.taken !== null)
-    return nothingNew ? "none" : "build"
-  if (offer.divergent) return "repair"
-  const edited = !offer.placed || offer.revisions.some(revisionEdited)
-  if (edited) return "leave"
-  const moved =
-    offer.builtFrom !== tip || !sameCommits(offer.builtOn, facts.start)
-  if (moved) {
-    if (offer.size > 1) return "stale"
+  if (offer === null) return nothingNew ? "none" : "build"
+  if (offer.kind === "divergent") return "repair"
+  if (offerEdited(offer)) return "leave"
+  if (offerMoved(offer.ledger, { tip, start: facts.start })) {
+    if (offer.revisions.length > 1) return "stale"
     return nothingNew ? "withdraw" : "follow"
   }
   return offer.onTarget ? "none" : "refresh"
@@ -323,6 +336,24 @@ export function offerView(input: {
 export const wipDescription = (name: ThreadName, first: string): string =>
   `WIP (${name}): ${firstLine(first, 60) || "this thread's work"}`
 
+/**
+ * Whether an offer is one to ask a commit message for: a single revision,
+ * not yours, and still on its WIP line unless `force` asks again.
+ */
+export const describeWanted = (
+  offer: OfferInRepo | null,
+  name: ThreadName,
+  force: boolean,
+): offer is OfferNow =>
+  offer?.kind === "offer" &&
+  offer.revisions.length === 1 &&
+  !offerEdited(offer) &&
+  (force || isWipLine(name, offer.firstLine))
+
+/** Whether a first line is still the WIP line (`wipDescription`): no agent described it. */
+export const isWipLine = (name: ThreadName, line: string): boolean =>
+  line.startsWith(`WIP (${name}): `)
+
 /** A message with the host's own trailers: the thread, the lane and the newest entry. */
 export const withTrailers = (
   message: string,
@@ -360,6 +391,23 @@ export function withLedger(
     last.every(line => ours.some(t => line.startsWith(t)))
   return `${text}${endsInOurs ? "\n" : "\n\n"}${lines}\n`
 }
+
+/**
+ * A message for one revision of an offer: `message` with the host's
+ * trailers, then the offer's ledger, in one trailer paragraph. Every revision
+ * carries both: the thread's trailer is how the host finds the offer's
+ * revisions in your repo, and the ledger names the lane tip the whole offer
+ * holds, so a taken stack says you have that tip (ADR-0060).
+ */
+export const offerMessage = (
+  message: string,
+  at: {
+    readonly lane: LaneName
+    readonly name: ThreadName
+    readonly entry: string
+    readonly ledger: OfferLedger
+  },
+): string => withLedger(withTrailers(message, at), at.ledger)
 
 /**
  * The commit-message request: the skill as the system text, then your repo's

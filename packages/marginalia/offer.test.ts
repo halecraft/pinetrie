@@ -5,6 +5,7 @@ import {
   type LandingRecord,
   type LaneName,
   laneNameForThread,
+  type OfferInRepo,
   type OfferRecord,
   type RevisionRecord,
   type ThreadName,
@@ -23,11 +24,14 @@ import {
   decodeStack,
   decodeUpdate,
   describeRequest,
+  describeWanted,
   diffUrl,
   encodeUpdate,
   encodeWorkRecord,
+  isWipLine,
   MAX_DIFF_BYTES,
   OFFER_WIRE,
+  offerMoved,
   offerView,
   parseOfferPath,
   planOfferRead,
@@ -63,7 +67,6 @@ const offer: OfferRecord = {
   taken: null,
   commits: [commitId("w1")],
   at: 10,
-  host: { changes: ["ch1"], wrote: [commitId("w1")], tip: TIP, start: [BASE] },
 }
 
 describe("offerView: ADR-0038's table", () => {
@@ -164,107 +167,138 @@ describe("offerView: ADR-0038's table", () => {
 })
 
 describe("planRefresh", () => {
-  const clean = { sameDescription: true, sameChange: true, since: null }
+  const host = { reached: true, yoursChanged: false }
+  const rev = (since = host) => ({ commit: TIP, change: "k", since })
+  const read = (
+    o: Partial<Extract<OfferInRepo, { kind: "offer" }>> = {},
+  ): OfferInRepo => ({
+    kind: "offer",
+    revisions: [rev()],
+    chained: true,
+    ledger: { source: TIP, start: [BASE] },
+    firstLine: "WIP (t-1): x",
+    placed: true,
+    onTarget: true,
+    files: [],
+    conflicts: [],
+    ...o,
+  })
   const facts = (
-    o: Partial<NonNullable<RefreshFacts["offer"]>> | undefined,
+    offer: OfferInRepo | null,
     tip = TIP,
     start = [BASE],
-  ): RefreshFacts => ({
-    tip,
-    start,
-    offer:
-      o === undefined
-        ? undefined
-        : {
-            size: 1,
-            taken: null,
-            builtFrom: TIP,
-            builtOn: [BASE],
-            revisions: [clean],
-            placed: true,
-            onTarget: true,
-            divergent: false,
-            ...o,
-          },
-  })
-  test("no offer: build, unless the lane holds nothing you lack", () => {
-    expect(planRefresh(facts(undefined))).toBe("build")
-    expect(planRefresh(facts(undefined, TIP, [TIP]))).toBe("none")
-    expect(planRefresh({ tip: null, start: [], offer: undefined })).toBe("none")
-    expect(planRefresh(facts({ taken: "c" }))).toBe("build")
+  ): RefreshFacts => ({ tip, start, offer })
+  test("no offer in your repo (never built, taken, or gone): build, unless the lane holds nothing you lack", () => {
+    expect(planRefresh(facts(null))).toBe("build")
+    expect(planRefresh(facts(null, TIP, [TIP]))).toBe("none")
+    expect(planRefresh({ tip: null, start: [], offer: null })).toBe("none")
   })
   test("only the target moved: refresh; nothing moved: none", () => {
-    expect(planRefresh(facts({ onTarget: false }))).toBe("refresh")
-    expect(planRefresh(facts({}))).toBe("none")
+    expect(planRefresh(facts(read({ onTarget: false })))).toBe("refresh")
+    expect(planRefresh(facts(read()))).toBe("none")
   })
   test("the lane moved on: a single offer follows, a stack goes stale", () => {
-    expect(planRefresh(facts({ builtFrom: T2 }))).toBe("follow")
-    expect(
-      planRefresh(facts({ builtFrom: T2, size: 2, revisions: [clean, clean] })),
-    ).toBe("stale")
+    expect(planRefresh(facts(read(), T2))).toBe("follow")
+    expect(planRefresh(facts(read({ revisions: [rev(), rev()] }), T2))).toBe(
+      "stale",
+    )
   })
   test("where it starts moved (you took part of it): the same, or withdraw when nothing is left", () => {
-    expect(planRefresh(facts({ builtOn: [T2] }))).toBe("follow")
-    expect(planRefresh(facts({ builtOn: [BASE, T2] }, TIP, [T2, BASE]))).toBe(
-      "none",
+    expect(planRefresh(facts(read(), TIP, [T2]))).toBe("follow")
+    expect(
+      planRefresh(
+        facts(read({ ledger: { source: TIP, start: [BASE, T2] } }), TIP, [
+          T2,
+          BASE,
+        ]),
+      ),
+    ).toBe("none")
+    expect(
+      planRefresh(facts(read({ revisions: [rev(), rev()] }), TIP, [T2])),
+    ).toBe("stale")
+    expect(planRefresh(facts(read(), TIP, [TIP]))).toBe("withdraw")
+  })
+  test("an offer with no ledger, built before ADR-0060, reads as moved: it is followed once", () => {
+    expect(planRefresh(facts(read({ ledger: null })))).toBe("follow")
+  })
+  test("you edited it: a version of yours that changed a revision, a commit of yours between, or its bottom moved (S48 item 7)", () => {
+    const changed = { reached: true, yoursChanged: true }
+    expect(planRefresh(facts(read({ revisions: [rev(changed)] })))).toBe(
+      "leave",
     )
     expect(
-      planRefresh(facts({ size: 2, revisions: [clean, clean] }, TIP, [T2])),
-    ).toBe("stale")
-    expect(planRefresh(facts({}, TIP, [TIP]))).toBe("withdraw")
+      planRefresh(facts(read({ revisions: [rev(changed), rev()] }), T2)),
+    ).toBe("leave")
+    expect(planRefresh(facts(read({ chained: false })))).toBe("leave")
+    expect(planRefresh(facts(read({ placed: false, onTarget: false })))).toBe(
+      "leave",
+    )
+  })
+  test("a revision the host never made is yours; a version only the host made is not (S73)", () => {
     expect(
       planRefresh(
         facts(
-          {
-            revisions: [
-              { sameDescription: false, sameChange: true, since: null },
-            ],
-          },
-          TIP,
-          [T2],
+          read({ revisions: [rev({ reached: false, yoursChanged: false })] }),
         ),
       ),
     ).toBe("leave")
-  })
-  test("any failed edit test, on any revision, leaves it alone (S48 item 7)", () => {
-    expect(planRefresh(facts({ placed: false, onTarget: false }))).toBe("leave")
-    expect(
-      planRefresh(
-        facts({
-          revisions: [
-            { sameDescription: false, sameChange: true, since: null },
-          ],
-        }),
-      ),
-    ).toBe("leave")
-    expect(
-      planRefresh(
-        facts({
-          size: 2,
-          revisions: [
-            { sameDescription: true, sameChange: false, since: null },
-            clean,
-          ],
-        }),
-      ),
-    ).toBe("leave")
-  })
-  test("a change the evolog shows only the host made is not yours: the offer follows (S73)", () => {
-    const changed = (since: { reached: boolean; yoursChanged: boolean }) =>
-      planRefresh(
-        facts({
-          builtFrom: T2,
-          revisions: [{ sameDescription: true, sameChange: false, since }],
-        }),
-      )
-    expect(changed({ reached: true, yoursChanged: false })).toBe("follow")
-    expect(changed({ reached: true, yoursChanged: true })).toBe("leave")
-    expect(changed({ reached: false, yoursChanged: false })).toBe("leave")
+    expect(planRefresh(facts(read(), T2))).toBe("follow")
   })
   test("divergent: repair, before anything else", () => {
-    expect(planRefresh(facts({ divergent: true, placed: false }))).toBe(
-      "repair",
+    expect(
+      planRefresh(facts({ kind: "divergent", changes: ["k"] }, TIP, [TIP])),
+    ).toBe("repair")
+  })
+})
+
+describe("isWipLine, offerMoved, describeWanted", () => {
+  const NAME = "t-1" as ThreadName
+  const one = {
+    kind: "offer" as const,
+    revisions: [
+      {
+        commit: TIP,
+        change: "k",
+        since: { reached: true, yoursChanged: false },
+      },
+    ],
+    chained: true,
+    ledger: { source: TIP, start: [BASE] },
+    firstLine: "WIP (t-1): x",
+    placed: true,
+    onTarget: true,
+    files: [],
+    conflicts: [],
+  }
+  test("the WIP line is this thread's; an agent's message is not", () => {
+    expect(isWipLine(NAME, "WIP (t-1): x")).toBe(true)
+    expect(isWipLine(NAME, "fix: x")).toBe(false)
+    expect(isWipLine(NAME, "WIP (t-2): x")).toBe(false)
+  })
+  test("offerMoved: the tip, or the start as a set, against the ledger; no ledger is moved", () => {
+    const ledger = { source: TIP, start: [BASE, T2] }
+    expect(offerMoved(ledger, { tip: TIP, start: [T2, BASE] })).toBe(false)
+    expect(offerMoved(ledger, { tip: T2, start: [T2, BASE] })).toBe(true)
+    expect(offerMoved(ledger, { tip: TIP, start: [BASE] })).toBe(true)
+    expect(offerMoved(null, { tip: TIP, start: [BASE] })).toBe(true)
+  })
+  test("describeWanted: one revision, not yours, on its WIP line unless forced", () => {
+    expect(describeWanted(one, NAME, false)).toBe(true)
+    expect(describeWanted({ ...one, firstLine: "fix: x" }, NAME, false)).toBe(
+      false,
     )
+    expect(describeWanted({ ...one, firstLine: "fix: x" }, NAME, true)).toBe(
+      true,
+    )
+    expect(
+      describeWanted(
+        { ...one, revisions: [...one.revisions, ...one.revisions] },
+        NAME,
+        true,
+      ),
+    ).toBe(false)
+    expect(describeWanted({ ...one, chained: false }, NAME, true)).toBe(false)
+    expect(describeWanted(null, NAME, true)).toBe(false)
   })
 })
 
@@ -400,7 +434,7 @@ describe("the review (ADR-0047)", () => {
       })
       return read.kind === "refused" ? read.status : read.kind
     }
-    // What the host last wrote is not what the offer is now.
+    // A commit the offer no longer is, and one it never was.
     expect(status(offers, "w1")).toBe(404)
     expect(status(offers, "ffff")).toBe(404)
     const taken = new Map([[LANE, { ...open, taken: "t" }]])

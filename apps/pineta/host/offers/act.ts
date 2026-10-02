@@ -6,20 +6,20 @@ import { ERR, type ErrCode, type LaneName, type WriterId } from "@pineta/core"
 import {
   commitsOf,
   executeOnHost,
-  planAbandonOffer,
   revsetName,
+  yourEditsIn,
 } from "@pineta/lanes"
 import { takeDestinations } from "@pineta/marginalia"
 import { readThreadName } from "@pineta/reads"
 import { describe } from "./describe.ts"
 import { executeTake } from "./execute.ts"
-import { planTake } from "./plan.ts"
+import { changesOf, offerRecord, planTake } from "./plan.ts"
 import { type Refresh, wipLine } from "./refresh.ts"
 import type { OfferState } from "./state.ts"
 
 export function act(
   state: OfferState,
-  refresh: Pick<Refresh, "build" | "record">,
+  refresh: Pick<Refresh, "rebuild" | "record">,
   lane: LaneName,
   action: "take" | "squash" | "describe" | "refresh",
   by: WriterId,
@@ -29,24 +29,22 @@ export function act(
   const { doc, log } = basics
   // Tracked, and logged on failure, by `requestOutside`.
   const describeLater = () => void describe(state, refresh, lane, false)
-  if (action === "describe") {
-    const o = state.offerOf(lane)
-    if (o === undefined || o.taken !== null)
-      return Promise.resolve(ERR.NO_OFFER)
-    void describe(state, refresh, lane, true)
-    return Promise.resolve(null)
-  }
   return state.serial.run(async () => {
-    const o = state.offerOf(lane)
-    if (o === undefined || o.taken !== null) return ERR.NO_OFFER
-    if (o.host.changes.length === 0) return ERR.NO_OFFER
-    const place = await state.placeOf(lane)
-    if (place === null) return ERR.NO_OFFER
+    // gather: the offer as your repo holds it, and where it sits
+    const now = await state.offerNow(lane)
+    if (now === null || now.offer === null || now.name === undefined)
+      return ERR.NO_OFFER
+    if (action === "describe") {
+      // Tracked, and logged on failure, by `requestOutside`.
+      void describe(state, refresh, lane, true)
+      return null
+    }
+    const { place, name, offer } = now
+    if (place.target === null) return ERR.BAD_DESTINATION
+    const at = { ...place, target: place.target }
     if (action === "take") {
-      // gather: the offer as it is, where it may go, and what is below it
-      if (place.target === null) return ERR.BAD_DESTINATION
-      const facts = await state.factsOf(o, place.target)
-      const [bottom] = facts.commits
+      if (offer.kind === "divergent") return ERR.NO_OFFER
+      const [bottom] = offer.revisions
       if (bottom === undefined) return ERR.NO_OFFER
       const { base } = place.base
       const wipAhead =
@@ -62,7 +60,7 @@ export function act(
         base,
         state: place.state,
         onto: line.onto,
-        conflicted: facts.conflicts.length > 0,
+        conflicted: offer.conflicts.length > 0,
         wipAhead,
       })
       const below = new Set<string>()
@@ -71,15 +69,24 @@ export function act(
           (
             await commitsOf(
               ops,
-              `present(${revsetName(d.bookmark)}) & ::parents(${bottom})`,
+              `present(${revsetName(d.bookmark)}) & ::parents(${bottom.commit})`,
             )
           ).length > 0
         )
           below.add(d.bookmark)
+      const yourEdits = await yourEditsIn(ops, offer.files)
       // plan
       const planned = planTake({
         root,
-        offer: o,
+        offer,
+        record: offerRecord({
+          lane,
+          name,
+          offer,
+          place,
+          yourEdits,
+          now: basics.now(),
+        }),
         destinations,
         to,
         below: bookmark => below.has(bookmark),
@@ -104,18 +111,9 @@ export function act(
       return null
     }
     // squash and refresh: the offer rebuilt from the lane's tip, as one.
-    const name = state.nameOf(lane)
-    if (name === undefined || place.target === null) return ERR.NO_OFFER
-    await executeOnHost(planAbandonOffer(root, o.host.changes))
-    await refresh.build(
-      lane,
-      name,
-      place.tip,
-      place.start,
-      place.target,
-      [{ commit: place.tip, description: wipLine(doc, lane, name) }],
-      false,
-    )
+    await refresh.rebuild(lane, name, at, changesOf(offer), [
+      { commit: place.tip, description: wipLine(doc, lane, name) },
+    ])
     describeLater()
     return null
   })

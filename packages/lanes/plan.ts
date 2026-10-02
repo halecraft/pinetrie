@@ -1160,18 +1160,17 @@ export function parseEvolog(stdout: string): EvologEntry[] {
 }
 
 /**
- * The versions of a revision since the host last wrote it: walking back from
- * `from` to `wrote` through each entry's predecessor of the same change. It
- * stops, not `reached`, at an entry with no such predecessor, one the read
- * did not return, or a cycle. `yours` are the versions an operation not the
- * host's made, each with the version before it: only those can be your edit.
- * The host's record of its own version can be lost after its jj steps
- * landed (S73), so the evolog, not the record, says who made it.
+ * The versions of a revision since the host's newest: walking back from
+ * `from` through each entry's predecessor of the same change, until a
+ * version the host made (`reached`). It stops, not `reached`, at an entry
+ * with no such predecessor, one the read did not return, or a cycle.
+ * `yours` are the versions an operation not the host's made, each with the
+ * version before it: only those can be your edit. The evolog says who made
+ * each version, so nothing the host remembers is needed (S73).
  */
-export function walkSince(
+export function walkToHost(
   entries: readonly EvologEntry[],
   from: CommitId,
-  wrote: CommitId,
 ): {
   readonly reached: boolean
   readonly yours: readonly { readonly from: CommitId; readonly to: CommitId }[]
@@ -1181,13 +1180,13 @@ export function walkSince(
   const seen = new Set<CommitId>()
   let at = from
   for (;;) {
-    if (at === wrote) return { reached: true, yours }
     const entry = byCommit.get(at)
     if (entry === undefined || seen.has(at)) return { reached: false, yours }
+    if (entry.byHost) return { reached: true, yours }
     seen.add(at)
     const before = entry.predecessors.find(p => p.change === entry.change)
     if (before === undefined) return { reached: false, yours }
-    if (!entry.byHost) yours.push({ from: before.commit, to: at })
+    yours.push({ from: before.commit, to: at })
     at = before.commit
   }
 }

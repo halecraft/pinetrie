@@ -370,20 +370,22 @@ repo. The decisions are here; the jj steps that carry them out, and where an
 offer starts (`offerStart`), are `@pineta/lanes`'s.
 
 - **`planRefresh`** decides what a trigger does, from the lane's tip, where an
-  offer would start, and the offer's facts: `build` (none, or the last was
-  taken), `follow` (the lane, or where the offer starts, moved under a single
+  offer would start, and the offer as your repo holds it (`OfferInRepo`):
+  `build` (none: never built, taken, or gone), `follow` (the lane, or where the offer starts, moved under a single
   offer: updated in place, ADR-0039), `withdraw` (where it starts reached the
   tip: nothing left), `stale` (either moved under a stack), `refresh` (only
   the target moved), `leave` (you edited it), `repair` (a race left it
   divergent), or `none`. Where it starts is compared as a set: a merge's
   parents come in any order. `follow` is not `update`, which is "update from
-  my work" (`planUpdate`). An offer is edited when its bottom's parent is
-  not an ancestor of the target (S48 item 7), or when any revision is
-  edited (`revisionEdited`): it differs from what the host last wrote in
-  description or `jj interdiff`, and the evolog does not show that only the
-  host changed it since (`RevisionFacts.since`, S73). A walk that did not
-  reach the host's commit counts as yours. A revision you edit is never
-  touched again.
+  my work" (`planUpdate`). An offer is edited (`offerEdited`) when its
+  bottom's parent is not an ancestor of the target (S48 item 7), a commit of
+  yours sits between its revisions, or any revision is edited
+  (`revisionEdited`): a version an operation not the host's made changed it
+  since the host's newest version (S73). A revision the host never made is
+  yours. An offer you edit is never touched again, so nothing the host
+  writes can hide your version. Moved (`offerMoved`) is its ledger against
+  the lane's tip and start; an offer with no ledger reads as moved, and is
+  followed once. The record's `stale` uses the same rule.
 - **`offerView`** is ADR-0038's state table as a decision: the offer's
   state, its buttons, its menu, and the facts its words are made from
   (`OfferFacts`: files, size, conflicts, bookmark, …). It writes no words:
@@ -416,13 +418,14 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
     refuses an empty path or one with a control character.
     `answerReview` and `answerDiff` settle what was read: 502 when the
     read failed, 413 past `MAX_DIFF_BYTES`.
-- **An offer's `commits` are its revisions' commits as the host last read
-  them** (`offerFacts`), on every trigger. `host.wrote` is what the host
-  last wrote, the baseline for spotting your edits. Whenever the offer is
-  not yours (any plan but `leave` and `repair`), the record takes the
-  commits it read as the new baseline, so a rebase jj made under the host,
-  or a host write whose record was lost (S73), is the baseline from then on. A revision divergent at that read is left out of
-  `commits`, so a review can briefly show fewer revisions than `size`.
+- **An offer's record is the page's cache** (ADR-0060): written from the
+  repo after each of the host's steps, never read back to decide. Its
+  `commits` are the revisions' commits at that read, what a review may
+  read. A divergent offer is recorded only once repaired.
+- **`isWipLine`** is the test for "described": the first line is no longer
+  this thread's `wipDescription`. **`describeWanted`** says an offer is one
+  to ask a message for: one revision, not edited, on its WIP line unless
+  asked again.
 - **`withoutTrailers`** drops a last paragraph made only of the host's
   `TRAILERS` (`@pineta/core`), which `withTrailers` writes. A paragraph
   with any other line, your own trailers included, stays.

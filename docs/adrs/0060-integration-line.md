@@ -259,9 +259,12 @@ work on the immutable line.
 - **Setup also writes `revsets.log`**, adding the offers: an immutable
   head is out of jj's default log, so jj and jjui would not show an offer on
   the line (S77 item 8). It is shown, and written, with the immutable heads.
-- **An offer's ledger is read from its message** (`offerLedger`); the
-  record keeps a copy only for an offer whose message you rewrote without
-  it.
+- **The host decides an offer only from the repo, and its record is the
+  page's cache** (`PLAN-2026-10-02-offer-from-repo`). Its revisions are
+  found by its bookmark, its base and its thread's trailer; what it holds
+  and where it started, by its ledger; whether you edited it, by each
+  revision's evolog back to the host's newest version. A record lost or
+  stale changes nothing.
 
 **Alternatives rejected.**
 

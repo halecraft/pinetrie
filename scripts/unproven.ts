@@ -119,7 +119,7 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     "a bash timeout and an aborted run leave no process in the guest",
     "a turn's work is an offer in your repo, described, and its turns are not in your log",
     "every lane has a two-word name, unique; the offer's bookmark and trailer carry it",
-    "the offer's record names its commit as it is now, after jj rebased it under the host",
+    "the offer's record names its commit as it is now, after jj rebased it under the host, and the host wrote nothing",
     "a run that moves the lane keeps the offer's change id; it is a WIP line until each run ends",
     "after a take, the next offer holds only the new work",
     "split into a stack: the agent's stack becomes the offer, and squash makes it one again",

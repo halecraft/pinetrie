@@ -1,7 +1,7 @@
 // lanes/offer — what the host reads of an offer in your repo (ADR-0038).
 //
 // Reads only, each a query over `hostOps` returning values: the facts a
-// trigger plans from (`offerFacts`, `startOfOffer`, `laneTipIn`), your edits
+// trigger plans from (`readOffer`, `startOfOffer`, `laneTipIn`), your edits
 // (`yourEditsIn`), what a review shows of a commit (`revisionRead`,
 // `fileDiff`), and which of a divergent revision's commits the host made
 // (`hostCommitIn`, from `evologOf`). What the host then does is planned in `plan.ts`
@@ -13,9 +13,12 @@ import {
   commitId,
   type DiffSpan,
   type LaneName,
+  type OfferInRepo,
+  type OfferRevision,
   offerLedger,
   type RevisionFacts,
   type ThreadBase,
+  type ThreadName,
   TRAILERS,
   trailerValues,
 } from "@pineta/core"
@@ -25,10 +28,11 @@ import {
   type EvologEntry,
   type LineConfig,
   laneTipName,
+  offerBookmark,
   offerStart,
   parseEvolog,
   revsetName,
-  walkSince,
+  walkToHost,
 } from "./plan.ts"
 import { commitsOf } from "./revisions.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
@@ -142,50 +146,6 @@ export async function hasBookmark(jj: Runner, name: string): Promise<boolean> {
   return (await commitsOf(jj, `present(bookmarks(exact:"${name}"))`)).length > 0
 }
 
-/** What the host found of an offer, against what it last wrote. */
-export interface OfferFacts {
-  /** Per revision, bottom first: whether it is still as the host wrote it, and if not, who changed it. */
-  readonly revisions: readonly RevisionFacts[]
-  /** The bottom's parent is an ancestor of the target (S48 item 7). */
-  readonly placed: boolean
-  /** The bottom's parents are exactly the target. */
-  readonly onTarget: boolean
-  /** A revision's change id names two visible commits (S48 item 8). */
-  readonly divergent: boolean
-  /** Every revision still exists in your repo. */
-  readonly present: boolean
-  readonly files: readonly string[]
-  /** Files conflicting in its top: with your committed work (S48 item 3). */
-  readonly conflicts: readonly string[]
-  /** Each revision's commit now, bottom first. */
-  readonly commits: readonly CommitId[]
-  /** The top's ledger, from its message (`offerLedger`); null without one. */
-  readonly ledger: ReturnType<typeof offerLedger>
-}
-
-/**
- * An offer's revisions' commits now, from their change ids, bottom first. A
- * revision divergent or gone is left out of `commits`. Enough for a read
- * that needs only the commits, such as one after the host's own steps.
- */
-export async function offerCommits(
-  jj: Runner,
-  changes: readonly string[],
-): Promise<{
-  readonly commits: readonly CommitId[]
-  readonly divergent: boolean
-  readonly present: boolean
-}> {
-  const now: CommitId[][] = []
-  for (const change of changes)
-    now.push(await commitsOf(jj, `present(change_id(${change}))`))
-  return {
-    commits: now.flatMap(c => (c.length === 1 && c[0] ? [c[0]] : [])),
-    divergent: now.some(c => c.length > 1),
-    present: now.every(c => c.length === 1),
-  }
-}
-
 /** Whether `to` has `from`'s description, and `jj interdiff` between them is empty. */
 export async function sameAs(
   jj: Runner,
@@ -223,69 +183,96 @@ export async function evologOf(
 }
 
 /**
- * One revision against the commit the host last wrote for it: the two
- * tests, and, only when one fails, the evolog since (`walkSince`), with the
- * two tests again for each version of yours on the way.
+ * One revision's facts since the host's newest version of it: the evolog
+ * walked back to it (`walkToHost`), then each version of yours on the way
+ * against the one before it (`sameAs`).
  */
-async function revisionFacts(
-  jj: Runner,
-  wrote: CommitId,
-  commit: CommitId,
-): Promise<RevisionFacts> {
-  const same = await sameAs(jj, wrote, commit)
-  if (same.sameDescription && same.sameChange) return { ...same, since: null }
-  const walk = walkSince(await evologOf(jj, commit), commit, wrote)
+async function sinceHost(jj: Runner, commit: CommitId): Promise<RevisionFacts> {
+  const walk = walkToHost(await evologOf(jj, commit), commit)
   let yoursChanged = false
   for (const v of walk.yours) {
     const step = await sameAs(jj, v.from, v.to)
     if (!step.sameDescription || !step.sameChange) yoursChanged = true
   }
-  return { ...same, since: { reached: walk.reached, yoursChanged } }
+  return { reached: walk.reached, yoursChanged }
 }
 
 /**
- * An offer's facts: `changes` are its revisions' change ids, `wrote` the
- * commits the host last wrote for them, bottom first. A change id is used
- * only to find the revision's commit now; every later read names that
- * commit, so no read acts on a hidden one (S48 item 2).
+ * An offer's revisions in your repo, bottom first, each with its change id:
+ * what is under its bookmark and not already under its target, and carries
+ * its thread's trailer. A taken offer below carries a ledger too, but is
+ * under the target; your commits carry no thread trailer. The bookmark's own
+ * commit is always the top, so an offer built before the trailer was
+ * written there is still found. Empty with no bookmark.
  */
-export async function offerFacts(
+export async function offerRevisions(
   jj: Runner,
-  input: {
-    readonly changes: readonly string[]
-    readonly wrote: readonly CommitId[]
-    readonly target: string
-  },
-): Promise<OfferFacts> {
-  const { commits, divergent, present } = await offerCommits(jj, input.changes)
-  const empty: OfferFacts = {
-    revisions: [],
-    placed: false,
-    onTarget: false,
-    divergent,
-    present,
-    files: [],
-    conflicts: [],
-    commits,
-    ledger: null,
-  }
-  const bottom = commits[0]
-  const top = commits.at(-1)
-  if (divergent || !present || bottom === undefined || top === undefined)
-    return empty
-  const revisions: RevisionFacts[] = []
-  for (const [i, commit] of commits.entries()) {
-    const wrote = input.wrote[i]
-    revisions.push(
-      wrote === undefined
-        ? { sameDescription: false, sameChange: false, since: null }
-        : await revisionFacts(jj, wrote, commit),
-    )
-  }
-  const parents = await commitsOf(jj, `parents(${bottom})`)
+  input: { readonly name: ThreadName; readonly target: string },
+): Promise<{ readonly commit: CommitId; readonly change: string }[]> {
+  const bookmark = `bookmarks(exact:${revsetName(offerBookmark(input.name))})`
+  const thread = `description(regex:"(?m)^${TRAILERS.thread}: ${input.name}$")`
+  const ran = await jj([
+    "log",
+    "--no-graph",
+    "-r",
+    `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`,
+    "-T",
+    'commit_id ++ "\\t" ++ change_id ++ "\\n"',
+  ])
+  if (!ran.ok) throw new Error(describeFailure("jj log", ran))
+  return lines(ran.stdout)
+    .map(line => {
+      const [commit = "", change = ""] = line.split("\t")
+      return { commit: commitId(commit), change }
+    })
+    .toReversed()
+}
+
+/**
+ * An offer as your repo holds it now (`OfferInRepo`): its revisions and
+ * what each one's evolog says since the host's newest version, its ledger
+ * and first line, where it sits, its files and conflicts. Null when its
+ * bookmark is gone (you abandoned it, or took it by hand). Divergent when
+ * the bookmark is conflicted or a change id names two commits (S48 item 8):
+ * then only its change ids. Every read after the first names commits, so no
+ * read acts on a hidden one (S48 item 2).
+ */
+export async function readOffer(
+  jj: Runner,
+  input: { readonly name: ThreadName; readonly target: string },
+): Promise<OfferInRepo | null> {
+  const heads = await commitsOf(
+    jj,
+    `present(bookmarks(exact:${revsetName(offerBookmark(input.name))}))`,
+  )
+  const found = await offerRevisions(jj, input)
+  const [top] = heads
+  const [bottom] = found
+  if (top === undefined || bottom === undefined) return null
+  const changes = [...new Set(found.map(r => r.change))]
+  const visible = await commitsOf(
+    jj,
+    changes.map(c => `change_id(${c})`).join(" | "),
+  )
+  if (heads.length > 1 || visible.length > changes.length)
+    return { kind: "divergent", changes }
+  const revisions: OfferRevision[] = []
+  for (const r of found)
+    revisions.push({ ...r, since: await sinceHost(jj, r.commit) })
+  const chained =
+    found.at(-1)?.commit === top &&
+    (
+      await Promise.all(
+        found.slice(1).map(async (r, i) => {
+          const parents = await commitsOf(jj, `parents(${r.commit})`)
+          return parents.length === 1 && parents[0] === found[i]?.commit
+        }),
+      )
+    ).every(Boolean)
+  const parents = await commitsOf(jj, `parents(${bottom.commit})`)
   const placed =
-    (await commitsOf(jj, `parents(${bottom}) & ::(${input.target})`)).length ===
-    parents.length
+    (await commitsOf(jj, `parents(${bottom.commit}) & ::(${input.target})`))
+      .length === parents.length
   const target = await commitsOf(jj, input.target)
   const onTarget =
     parents.length === target.length && parents.every(p => target.includes(p))
@@ -293,7 +280,7 @@ export async function offerFacts(
     await query(jj, [
       "diff",
       "--from",
-      `parents(${bottom})`,
+      `parents(${bottom.commit})`,
       "--to",
       top,
       "--name-only",
@@ -309,20 +296,42 @@ export async function offerFacts(
       'if(conflict, path ++ "\\n")',
     ]),
   )
-  const ledger = offerLedger(
-    await query(jj, ["log", "--no-graph", "-r", top, "-T", "description"]),
-  )
+  const message = await query(jj, [
+    "log",
+    "--no-graph",
+    "-r",
+    top,
+    "-T",
+    "description",
+  ])
   return {
+    kind: "offer",
     revisions,
+    chained,
+    ledger: offerLedger(message),
+    firstLine: message.split("\n")[0] ?? "",
     placed,
     onTarget,
-    divergent,
-    present,
     files,
     conflicts,
-    commits,
-    ledger,
   }
+}
+
+/** The thread names whose offer bookmark is in your repo. */
+export async function offerNames(jj: Runner): Promise<ThreadName[]> {
+  const prefix = offerBookmark("" as ThreadName)
+  const ran = await jj([
+    "log",
+    "--no-graph",
+    "-r",
+    `bookmarks(glob:${revsetName(`${prefix}*`)})`,
+    "-T",
+    'local_bookmarks.map(|b| b.name()).join("\\n") ++ "\\n"',
+  ])
+  if (!ran.ok) throw new Error(describeFailure("jj log", ran))
+  return lines(ran.stdout)
+    .filter(b => b.startsWith(prefix))
+    .map(b => b.slice(prefix.length) as ThreadName)
 }
 
 /** Of `files`, those you are editing: changed in `@` as jj last saw it. */
@@ -475,22 +484,9 @@ export async function hostCommitIn(
     : null
 }
 
-/** A revision's change id, for the offer record. */
+/** A commit's change id. */
 export async function changeOf(jj: Runner, commit: string): Promise<string> {
   return (
     await query(jj, ["log", "--no-graph", "-r", commit, "-T", "change_id"])
   ).trim()
-}
-
-/** The commits an offer's bookmark and its revisions below it name, bottom first. */
-export async function offerRevisions(
-  jj: Runner,
-  bookmark: string,
-  size: number,
-): Promise<CommitId[]> {
-  const revs = await commitsOf(
-    jj,
-    `ancestors(present(bookmarks(exact:"${bookmark}")), ${size})`,
-  )
-  return revs.toReversed()
 }

@@ -590,12 +590,25 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     )
     // You reword the line's commit under the offer, which is immutable
     // until you say otherwise: jj rebases the offer, not the host, whose next
-    // trigger plans `none` and keeps `host.wrote`. The record's `commits`
-    // still names the offer as it is now, which is what a review reads
+    // trigger plans `none` and writes nothing to your repo. The record's
+    // `commits` names the offer as it is now, which is what a review reads
     // (ADR-0047). The first line stays, for the take below.
     // Landing moved every open offer: their writes are done first.
     await wh.quiet()
-    const wroteBefore = JSON.stringify(offerOf()?.host.wrote)
+    const commitsBefore = JSON.stringify(offerOf()?.commits)
+    /** Who made the offer's newest version: an operation's user. */
+    const newestBy = () =>
+      jj(
+        project,
+        "evolog",
+        "--no-graph",
+        "-n",
+        "1",
+        "-r",
+        offerBookmarkOf(two?.name),
+        "-T",
+        'if(operation, operation.user(), "")',
+      )
     jj(
       project,
       "describe",
@@ -619,12 +632,31 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       () => JSON.stringify(offerOf()?.commits) === JSON.stringify([offerNow()]),
       30_000,
     )
+    await wh.quiet()
     check(
-      "the offer's record names its commit as it is now, after jj rebased it under the host",
+      "the offer's record names its commit as it is now, after jj rebased it under the host, and the host wrote nothing",
       followed >= 0 &&
-        JSON.stringify(offerOf()?.host.wrote) === wroteBefore &&
-        wroteBefore !== JSON.stringify(offerOf()?.commits),
-      `${JSON.stringify({ before: wroteBefore, commits: offerOf()?.commits, wrote: offerOf()?.host.wrote, now: offerNow() })}`,
+        commitsBefore !== JSON.stringify(offerOf()?.commits) &&
+        !newestBy().startsWith("pineta-host@") &&
+        offerOf()?.edited === false,
+      `${JSON.stringify({ before: commitsBefore, commits: offerOf()?.commits, now: offerNow(), by: newestBy(), edited: offerOf()?.edited })}`,
+    )
+    // The record is the page's cache (ADR-0060): lost, the next trigger, a
+    // jj operation of yours, writes it again from the repo, and the offer
+    // is the same commit, not built anew.
+    const lostAt = offerNow()
+    if (two !== undefined) await wh.agent.removeOffer(two.name)
+    jj(project, "bookmark", "create", "e2e-poke", "-r", "@-")
+    const rewritten = await waitFor(
+      () => JSON.stringify(offerOf()?.commits) === JSON.stringify([lostAt]),
+      30_000,
+    )
+    await wh.quiet()
+    jj(project, "bookmark", "delete", "e2e-poke")
+    check(
+      "a lost record changes nothing: the next trigger writes it again, and the offer keeps its change id",
+      rewritten >= 0 && offerNow() === lostAt && offerChange() === firstChange,
+      `${JSON.stringify({ lostAt, now: offerNow(), record: offerOf()?.commits })}`,
     )
     // Bring it up to date: the project's work merged into the lane, and the
     // agent resolves the conflict, told what the card asked.

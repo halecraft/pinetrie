@@ -3,7 +3,8 @@ import {
   ERR,
   type LineRecord,
   laneNameForThread,
-  type OfferRecord,
+  type OfferInRepo,
+  type ThreadName,
 } from "@pineta/core"
 import {
   DEFAULT_LINE,
@@ -15,92 +16,106 @@ import {
   planLineSetup,
   planTakeOffer,
 } from "@pineta/lanes"
+import { offerMessage } from "@pineta/marginalia"
 import { describe, expect, test } from "vitest"
 import {
-  builtOf,
-  type OfferAt,
   offerRecord,
   planLineAction,
   planLineRecord,
   planOfferEffects,
   planTake,
   type RefreshContext,
-  readBaseline,
 } from "./plan.ts"
 
 const LANE = laneNameForThread("0123456789abcdef")
+const NAME = "amber-fox" as ThreadName
 const TIP = commitId("11111111")
 const NEW_TIP = commitId("22222222")
 const START = commitId("33333333")
-const WROTE = commitId("44444444")
 const NOW_COMMIT = commitId("55555555")
+const NOT_YOURS = { reached: true, yoursChanged: false }
 
-const offer = (overrides: Partial<OfferRecord> = {}): OfferRecord => ({
-  lane: LANE,
-  size: 1,
-  stale: false,
+/** An offer as your repo holds it: one revision, the host's, on its WIP line. */
+const offer = (
+  over: Partial<Extract<OfferInRepo, { kind: "offer" }>> = {},
+): Extract<OfferInRepo, { kind: "offer" }> => ({
+  kind: "offer",
+  revisions: [{ commit: NOW_COMMIT, change: "kxyz", since: NOT_YOURS }],
+  chained: true,
+  ledger: { source: TIP, start: [START] },
+  firstLine: `WIP (${NAME}): fix it`,
+  placed: true,
+  onTarget: true,
   files: ["a.txt"],
   conflicts: [],
-  yourEdits: [],
-  described: false,
-  edited: false,
-  bookmark: "pineta-offer/amber-fox",
-  taken: null,
-  commits: [WROTE],
-  at: 1,
-  host: { changes: ["kxyz"], wrote: [WROTE], tip: TIP, start: [START] },
-  ...overrides,
+  ...over,
 })
 
-const context = (open: OfferRecord | null): RefreshContext => ({
+const TRAILERS = { lane: LANE, name: NAME, entry: "e1" }
+const context = (read: OfferInRepo | null): RefreshContext => ({
   root: "/repo",
   tip: NEW_TIP,
   start: [START],
   target: "@-",
-  wip: "WIP (amber fox): fix it",
-  open,
-  live: true,
-  read: [NOW_COMMIT],
+  wip: "WIP (amber-fox): fix it",
+  trailers: TRAILERS,
+  offer: read,
 })
 
-describe("offerRecord", () => {
-  test("names each revision's commit as it is now, and keeps what the host wrote", () => {
-    const at: OfferAt = {
-      bookmark: "pineta-offer/amber-fox",
-      tip: TIP,
-      start: [START],
-      commits: [WROTE],
-      changes: ["kxyz"],
-      target: "@-",
-      stale: false,
-      described: true,
-      edited: false,
-    }
-    const r = offerRecord(
-      LANE,
-      at,
-      { files: ["a.txt"], conflicts: [], commits: [NOW_COMMIT] },
-      ["a.txt"],
-      7,
-    )
-    expect(r.commits).toEqual([NOW_COMMIT])
-    expect(r.host).toEqual({
-      changes: ["kxyz"],
-      wrote: [WROTE],
-      tip: TIP,
-      start: [START],
+describe("offerRecord: the page's cache, from the repo", () => {
+  const record = (o = offer(), tip = TIP) =>
+    offerRecord({
+      lane: LANE,
+      name: NAME,
+      offer: o,
+      place: { tip, start: [START] },
+      yourEdits: ["a.txt"],
+      now: 7,
     })
-    expect([r.size, r.yourEdits, r.at, r.taken]).toEqual([
-      1,
-      ["a.txt"],
-      7,
-      null,
-    ])
+  test("each revision's commit as it is now, and what the page shows", () => {
+    expect(record()).toEqual({
+      lane: LANE,
+      size: 1,
+      stale: false,
+      files: ["a.txt"],
+      conflicts: [],
+      yourEdits: ["a.txt"],
+      described: false,
+      edited: false,
+      bookmark: "pineta-offer/amber-fox",
+      taken: null,
+      commits: [NOW_COMMIT],
+      at: 7,
+    })
+  })
+  test("described once its first line is not the WIP line; edited once a version of yours changed it", () => {
+    expect(record(offer({ firstLine: "fix: it" })).described).toBe(true)
+    const yours = offer({
+      revisions: [
+        {
+          commit: NOW_COMMIT,
+          change: "kxyz",
+          since: { reached: true, yoursChanged: true },
+        },
+      ],
+    })
+    expect(record(yours).edited).toBe(true)
+  })
+  test("a stack is stale when the lane moved past its ledger; a single offer never is", () => {
+    const stack = offer({
+      revisions: [
+        { commit: commitId("b1"), change: "kb", since: NOT_YOURS },
+        { commit: commitId("b2"), change: "kt", since: NOT_YOURS },
+      ],
+    })
+    expect(record(stack, NEW_TIP).stale).toBe(true)
+    expect(record(stack, TIP).stale).toBe(false)
+    expect(record(offer(), NEW_TIP).stale).toBe(false)
   })
 })
 
 describe("planOfferEffects", () => {
-  test("follow plans planFollowOffer's steps, then a record read after them; never a build", () => {
+  test("follow: planFollowOffer's steps, its WIP line with the host's trailers and the new ledger, then a record", () => {
     const e = planOfferEffects("follow", context(offer()))
     expect(e.steps).toEqual(
       planFollowOffer({
@@ -109,22 +124,23 @@ describe("planOfferEffects", () => {
         start: [START],
         tip: NEW_TIP,
         target: "@-",
-        description: "WIP (amber fox): fix it",
+        description: offerMessage("WIP (amber-fox): fix it", {
+          ...TRAILERS,
+          ledger: { source: NEW_TIP, start: [START] },
+        }),
       }),
     )
-    expect(e.after).toMatchObject({
-      kind: "record",
-      reread: offer(),
-      at: { tip: NEW_TIP, described: false },
-    })
+    expect(e.after).toEqual({ kind: "record" })
     expect(e.built).toBe(true)
   })
 
-  test("an offer that follows is a work in progress again, its ledger the new tip (ADR-0060)", () => {
-    const steps = (described: boolean) =>
-      planOfferEffects("follow", context(offer({ described }))).steps
-    expect(steps(false)).toEqual(steps(true))
-    expect(steps(true).at(-1)?.argv).toContain("WIP (amber fox): fix it")
+  test("none, stale and leave run nothing and record: the read made before planning is still the offer", () => {
+    for (const plan of ["none", "stale", "leave"] as const)
+      expect(planOfferEffects(plan, context(offer()))).toEqual({
+        steps: [],
+        after: { kind: "record" },
+        built: false,
+      })
   })
 
   test("withdraw plans the abandon, then the record's removal", () => {
@@ -133,14 +149,13 @@ describe("planOfferEffects", () => {
     expect(e.after).toEqual({ kind: "remove" })
   })
 
-  test("an offer not yours takes what was read as its baseline; one you edited keeps what the host wrote", () => {
-    const wroteOf = (plan: "none" | "stale" | "leave") => {
-      const e = planOfferEffects(plan, context(offer()))
-      return e.after.kind === "record" ? e.after.at.commits : null
-    }
-    expect(wroteOf("none")).toEqual([NOW_COMMIT])
-    expect(wroteOf("stale")).toEqual([NOW_COMMIT])
-    expect(wroteOf("leave")).toEqual([WROTE])
+  test("repair names a divergent offer's change ids", () => {
+    expect(
+      planOfferEffects(
+        "repair",
+        context({ kind: "divergent", changes: ["ka", "kb"] }),
+      ).after,
+    ).toEqual({ kind: "repair", changes: ["ka", "kb"] })
   })
 
   test("build names the lane's tip as its one source, with the WIP line", () => {
@@ -148,7 +163,7 @@ describe("planOfferEffects", () => {
       steps: [],
       after: {
         kind: "build",
-        sources: [{ commit: NEW_TIP, description: "WIP (amber fox): fix it" }],
+        sources: [{ commit: NEW_TIP, description: "WIP (amber-fox): fix it" }],
       },
       built: true,
     })
@@ -157,12 +172,18 @@ describe("planOfferEffects", () => {
 
 describe("planTake (ADR-0060)", () => {
   const o = offer({
-    host: {
-      changes: ["kbot", "ktop"],
-      wrote: [WROTE, WROTE],
-      tip: TIP,
-      start: [START],
-    },
+    revisions: [
+      { commit: commitId("b1"), change: "kbot", since: NOT_YOURS },
+      { commit: commitId("b2"), change: "ktop", since: NOT_YOURS },
+    ],
+  })
+  const r = offerRecord({
+    lane: LANE,
+    name: NAME,
+    offer: o,
+    place: { tip: TIP, start: [START] },
+    yourEdits: [],
+    now: 1,
   })
   const wip = {
     bookmark: "wip/x",
@@ -180,6 +201,7 @@ describe("planTake (ADR-0060)", () => {
     planTake({
       root: "/repo",
       offer: o,
+      record: r,
       destinations: [wip, line],
       to,
       below,
@@ -190,11 +212,11 @@ describe("planTake (ADR-0060)", () => {
       kind: "take",
       steps: planTakeOffer({
         root: "/repo",
-        bookmark: o.bookmark,
+        bookmark: r.bookmark,
         top: "ktop",
         destination: "wip/x",
       }),
-      taken: { ...o, taken: "ktop", at: 9 },
+      taken: { ...r, taken: "ktop", at: 9 },
     })
   })
   test("a named destination among the offer's is taken there", () => {
@@ -265,46 +287,6 @@ describe("the line (ADR-0060)", () => {
     expect(planLineAction("land", set(2), "/repo")).toEqual({
       kind: "steps",
       steps: planLand({ root: "/repo", onto: "pineta-onto" }),
-    })
-  })
-})
-
-describe("readBaseline: what a refresh takes as your edits' baseline (S73)", () => {
-  const same = { sameDescription: true, sameChange: true, since: null }
-  const commits = [commitId("now")]
-  test("a revision jj only rebased keeps the host's write", () => {
-    expect(readBaseline({ commits, revisions: [same] })).toBeNull()
-  })
-  test("one that differs, as the host's own lost write, is read now", () => {
-    expect(
-      readBaseline({
-        commits,
-        revisions: [
-          same,
-          {
-            sameDescription: true,
-            sameChange: false,
-            since: { reached: true, yoursChanged: false },
-          },
-        ],
-      }),
-    ).toEqual(commits)
-  })
-})
-
-describe("builtOf: what an offer was built from and on (ADR-0060)", () => {
-  test("its message's ledger, over the record's copy", () => {
-    const ledger = { source: commitId("src"), start: [commitId("st")] }
-    expect(builtOf(ledger, offer())).toEqual({
-      builtFrom: ledger.source,
-      builtOn: ledger.start,
-    })
-  })
-  test("the record's copy when you rewrote the message without it", () => {
-    const o = offer()
-    expect(builtOf(null, o)).toEqual({
-      builtFrom: o.host.tip,
-      builtOn: o.host.start,
     })
   })
 })

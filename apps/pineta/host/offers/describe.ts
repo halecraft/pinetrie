@@ -2,13 +2,12 @@
 // (ADR-0038): a one-shot model request outside the thread.
 
 import { type LaneName, projectTranscript } from "@pineta/core"
-import { executeOnHost, lines, offerCommits, planDescribe } from "@pineta/lanes"
+import { executeOnHost, lines, planDescribe } from "@pineta/lanes"
 import {
   describeRequest,
-  revisionEdited,
+  describeWanted,
+  offerMessage,
   transcriptLines,
-  withLedger,
-  withTrailers,
 } from "@pineta/marginalia"
 import { readTreeIndex } from "@pineta/reads"
 import { readLaneTip } from "@pineta/schema"
@@ -21,10 +20,11 @@ import type { OfferState } from "./state.ts"
 const DESCRIBE_BUDGET = 24_000
 
 /**
- * Gathered and asked outside the queue (a model request takes seconds),
- * written inside it, and only while the offer is still the one asked about
- * and unedited (`requestOutside`). `force` asks again for an offer already
- * described. A failure is logged.
+ * Gathered from your repo on the queue, since a jj read can write (S57):
+ * the offer, its diff and your recent messages. Asked outside it (a model
+ * request takes seconds), and written inside it, only while the offer is
+ * still the one asked about (`describeWanted`, and the same commit).
+ * `force` asks again for an offer already described. A failure is logged.
  */
 export function describe(
   state: OfferState,
@@ -32,23 +32,21 @@ export function describe(
   lane: LaneName,
   force: boolean,
 ): Promise<void> {
-  const { ops, root } = state
+  const { ops, root, serial } = state
   const { doc } = state.basics
-  const before = state.offerOf(lane)
-  if (before === undefined || before.taken !== null || before.edited)
-    return Promise.resolve()
-  if (before.size !== 1 || (before.described && !force))
-    return Promise.resolve()
-  const [change] = before.host.changes
-  const [wrote] = before.host.wrote
-  if (change === undefined || wrote === undefined) return Promise.resolve()
-  const tip = readLaneTip(doc, lane)
-  return requestOutside({
-    serial: state.serial,
-    failed: failed(state.basics, "describing its offer", lane),
-    request: async () => {
-      const diff = (await ops(["diff", "-r", wrote, "--git"]).catch(() => null))
-        ?.stdout
+  const fail = failed(state.basics, "describing its offer", lane)
+  return serial
+    .run(async () => {
+      // gather
+      const now = await state.offerNow(lane)
+      if (now === null || now.name === undefined) return null
+      const { offer, name } = now
+      if (!describeWanted(offer, name, force)) return null
+      const [revision] = offer.revisions
+      if (revision === undefined) return null
+      const diff = (
+        await ops(["diff", "-r", revision.commit, "--git"]).catch(() => null)
+      )?.stdout
       const recent = lines(
         (
           await ops([
@@ -61,60 +59,60 @@ export function describe(
           ])
         ).stdout,
       )
-      const messages = transcriptLines(
-        projectTranscript(readTreeIndex(doc), tip),
-      )
-      const skill = await state.agent().skill("pineta:skill:commit-message")
-      return state.agent().complete(
-        describeRequest({
-          skill: skill?.content ?? "Write a commit message for this change.",
-          diff: diff ?? "",
-          messages,
-          recent,
-          budget: DESCRIBE_BUDGET,
-        }),
-      )
-    },
-    settle: async text => {
-      const now = state.offerOf(lane)
-      if (now === undefined || now.taken !== null || now.edited) return
-      const name = state.nameOf(lane)
-      // The offer followed its lane, or where it starts, while the model
-      // wrote: the message describes what it held then.
-      if (
-        name === undefined ||
-        now.host.changes[0] !== change ||
-        now.host.tip !== before.host.tip ||
-        now.host.start.join() !== before.host.start.join()
-      )
-        return
-      const place = await state.placeOf(lane)
-      if (place === null || place.target === null) return
-      const { target } = place
-      const facts = await state.factsOf(now, target)
-      if (facts.revisions.some(revisionEdited)) return
-      await executeOnHost(
-        planDescribe(
-          root,
-          change,
-          withLedger(withTrailers(text, { lane, name, entry: tip ?? "" }), {
-            source: now.host.tip,
-            start: now.host.start,
-          }),
-        ),
-      )
-      const after = await offerCommits(ops, now.host.changes)
-      await refresh.record(lane, {
-        bookmark: now.bookmark,
-        tip: now.host.tip,
-        start: now.host.start,
-        commits: after.commits,
-        changes: now.host.changes,
-        target,
-        stale: now.stale,
-        described: true,
-        edited: false,
+      return { commit: revision.commit, diff: diff ?? "", recent }
+    })
+    .then(gathered => {
+      if (gathered === null) return
+      const tip = readLaneTip(doc, lane)
+      return requestOutside({
+        serial,
+        failed: fail,
+        request: async () => {
+          const messages = transcriptLines(
+            projectTranscript(readTreeIndex(doc), tip),
+          )
+          const skill = await state.agent().skill("pineta:skill:commit-message")
+          return state.agent().complete(
+            describeRequest({
+              skill:
+                skill?.content ?? "Write a commit message for this change.",
+              diff: gathered.diff,
+              messages,
+              recent: gathered.recent,
+              budget: DESCRIBE_BUDGET,
+            }),
+          )
+        },
+        settle: async text => {
+          // The offer followed its lane, or you edited it, while the model
+          // wrote: the message describes what it held then.
+          const now = await state.offerNow(lane)
+          if (now === null || now.name === undefined) return
+          const { offer, name, place } = now
+          if (!describeWanted(offer, name, force)) return
+          const [revision] = offer.revisions
+          if (revision === undefined || revision.commit !== gathered.commit)
+            return
+          await executeOnHost(
+            planDescribe(
+              root,
+              revision.change,
+              offerMessage(text, {
+                lane,
+                name,
+                entry: tip ?? "",
+                ledger: offer.ledger ?? {
+                  source: place.tip,
+                  start: place.start,
+                },
+              }),
+            ),
+          )
+          const after = await state.offerNow(lane)
+          if (after !== null && after.name !== undefined)
+            await refresh.record(lane, after.name, after.place, after.offer)
+        },
       })
-    },
-  })
+    })
+    .catch(fail)
 }

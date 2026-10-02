@@ -8,6 +8,34 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the host's newest version does not stop the walk",
+    file: "packages/lanes/plan.ts",
+    from: "    if (entry.byHost) return { reached: true, yours }\n",
+    to: "",
+    command: unit,
+    expect: "walkToHost",
+  },
+  {
+    name: "an offer is its bookmark's commit alone",
+    file: "packages/lanes/offer.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`,",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "    `(::${bookmark} ~ ::(${input.target})) & ${bookmark}`,",
+    command: unit,
+    expect: "an offer on the line (ADR-0060)",
+  },
+  {
+    name: "an offer's revisions include what is already under its base",
+    file: "packages/lanes/offer.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`,",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "    `(::${bookmark}) & (${thread} | ${bookmark})`,",
+    command: unit,
+    expect: "an offer on the line (ADR-0060)",
+  },
+  {
     name: "setting up the line leaves your log as it was",
     file: "packages/lanes/plan.ts",
     from: '    "--repo",\n    "revsets.log",\n    input.log,\n  ),',
@@ -26,14 +54,6 @@ export const mutations: readonly Mutation[] = [
     expect: "added to jj's default when the repo defines none, and idempotent",
   },
   {
-    name: "an offer's facts carry no ledger",
-    file: "packages/lanes/offer.ts",
-    from: "    commits,\n    ledger,\n  }",
-    to: "    commits,\n    ledger: null,\n  }",
-    command: unit,
-    expect: "an offer on the line (ADR-0060)",
-  },
-  {
     name: "landing leaves the line where it was",
     file: "packages/lanes/plan.ts",
     from: '  onHost("jj", "-R", input.root, "bookmark", "move", input.onto, "--to", "@-"),',
@@ -47,9 +67,9 @@ export const mutations: readonly Mutation[] = [
     name: "a take finds no destination below the offer",
     file: "apps/pineta/host/offers/act.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "              `present(${revsetName(d.bookmark)}) & ::parents(${bottom})`,",
+    from: "              `present(${revsetName(d.bookmark)}) & ::parents(${bottom.commit})`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "              `present(${revsetName(d.bookmark)}) & ${bottom}::`,",
+    to: "              `present(${revsetName(d.bookmark)}) & ${bottom.commit}::`,",
     suite: "lanes",
     scenario: "main",
     expect:
@@ -128,10 +148,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a version of yours since the host's write goes unlisted",
     file: plan,
-    from: "    if (!entry.byHost) yours.push({ from: before.commit, to: at })",
+    from: "    yours.push({ from: before.commit, to: at })",
     to: "    if (false) yours.push({ from: before.commit, to: at })",
     command: unit,
-    expect: "a version of yours on the way is listed",
+    expect: "your versions since the host's newest are listed",
   },
   {
     name: "no operation reads as the host's",

@@ -1,40 +1,33 @@
 // host/offers/refresh — building an offer, writing its record, and what a
-// trigger does to it: gather, `planRefresh`, `planOfferEffects`, execute.
+// trigger does to it: gather (`offerNow`), `planRefresh`,
+// `planOfferEffects`, execute. The record is written from the repo after
+// each step, never read back to decide.
 
 import {
   type CommitId,
   firstPromptOf,
   type LaneName,
-  type OfferRecord,
+  type OfferInRepo,
   projectTranscript,
   type ThreadName,
 } from "@pineta/core"
 import {
-  changeOf,
   executeOnHost,
   hostCommitIn,
-  type OfferFacts,
   type OfferSource,
   offerBookmark,
-  offerCommits,
-  offerFacts,
-  offerRevisions,
+  planAbandonOffer,
   planOffer,
   planRepair,
+  readOffer,
   yourEditsIn,
 } from "@pineta/lanes"
-import { planRefresh, wipDescription, withLedger } from "@pineta/marginalia"
+import { offerMessage, planRefresh, wipDescription } from "@pineta/marginalia"
 import { readRevisions, readThreadName, readTreeIndex } from "@pineta/reads"
 import { readLaneTip, type SessionDocHandle } from "@pineta/schema"
 import { executeOffer } from "./execute.ts"
-import {
-  builtOf,
-  type OfferAt,
-  offerRecord,
-  planOfferEffects,
-  readBaseline,
-} from "./plan.ts"
-import type { OfferState } from "./state.ts"
+import { offerRecord, planOfferEffects } from "./plan.ts"
+import type { OfferPlace, OfferState } from "./state.ts"
 
 /**
  * An offer's line until an agent describes it: the thread's name and its
@@ -55,19 +48,30 @@ export function wipLine(
 export interface Refresh {
   /**
    * A new offer from `sources` (the lane's tip, or a stack's revisions) on
-   * `start`, under the lane's name.
+   * `start`, under the lane's name; their messages get the host's trailers
+   * and the offer's ledger (`offerMessage`).
    */
   build(
     lane: LaneName,
     name: ThreadName,
-    tip: CommitId,
-    start: readonly CommitId[],
-    target: string,
+    place: OfferPlace & { readonly target: CommitId },
     sources: readonly OfferSource[],
-    described: boolean,
   ): Promise<void>
-  /** Write the offer's record from what your repo holds now. */
-  record(lane: LaneName, at: OfferAt, known?: OfferFacts): Promise<void>
+  /** Abandon the offer's revisions (`changes`), then build anew. */
+  rebuild(
+    lane: LaneName,
+    name: ThreadName,
+    place: OfferPlace & { readonly target: CommitId },
+    changes: readonly string[],
+    sources: readonly OfferSource[],
+  ): Promise<void>
+  /** Write the offer's record from the offer as your repo holds it. */
+  record(
+    lane: LaneName,
+    name: ThreadName,
+    place: OfferPlace,
+    offer: OfferInRepo | null,
+  ): Promise<void>
   /** What a trigger does to one lane's offer: "built" when its content changed. */
   refresh(lane: LaneName): Promise<"built" | "other">
 }
@@ -76,82 +80,83 @@ export function createRefresh(state: OfferState): Refresh {
   const { root, ops, basics } = state
   const { doc, log } = basics
 
+  /** The record is the page's; a divergent offer is recorded once repaired. */
   async function record(
     lane: LaneName,
-    at: OfferAt,
-    known?: OfferFacts,
+    name: ThreadName,
+    place: OfferPlace,
+    offer: OfferInRepo | null,
   ): Promise<void> {
-    const facts =
-      known ??
-      (await offerFacts(ops, {
-        changes: at.changes,
-        wrote: at.commits,
-        target: at.target,
-      }))
+    if (offer === null || offer.kind === "divergent") return
     await state.write(
-      offerRecord(
+      offerRecord({
         lane,
-        at,
-        facts,
-        await yourEditsIn(ops, facts.files),
-        basics.now(),
-      ),
+        name,
+        offer,
+        place,
+        yourEdits: await yourEditsIn(ops, offer.files),
+        now: basics.now(),
+      }),
     )
   }
+
+  const readAt = (name: ThreadName, target: CommitId) =>
+    readOffer(ops, { name, target })
 
   async function build(
     lane: LaneName,
     name: ThreadName,
-    tip: CommitId,
-    start: readonly CommitId[],
-    target: string,
+    place: OfferPlace & { readonly target: CommitId },
     sources: readonly OfferSource[],
-    described: boolean,
   ): Promise<void> {
-    // Each revision names the lane commit it holds, and where the offer
-    // starts: taken, that is what you have of the lane (ADR-0060).
-    const ledgered = sources.map(source => ({
-      ...source,
-      description: withLedger(source.description, {
-        source: source.commit,
-        start,
-      }),
-    }))
+    const at = {
+      lane,
+      name,
+      entry: readLaneTip(doc, lane) ?? "",
+      ledger: { source: place.tip, start: place.start },
+    }
     await executeOnHost(
       planOffer({
         root,
         name,
-        start,
-        sources: ledgered,
-        target,
+        start: place.start,
+        sources: sources.map(source => ({
+          ...source,
+          description: offerMessage(source.description, at),
+        })),
+        target: place.target,
         nonce: `pineta-offer-${crypto.randomUUID()}`,
       }),
     )
-    const bookmark = offerBookmark(name)
-    const commits = await offerRevisions(ops, bookmark, sources.length)
-    await record(lane, {
-      bookmark,
-      tip,
-      start,
-      commits,
-      changes: await Promise.all(commits.map(c => changeOf(ops, c))),
-      target,
-      stale: false,
-      described,
-      edited: false,
-    })
+    await record(lane, name, place, await readAt(name, place.target))
   }
 
-  /** Each revision of `open` repaired (S48 item 18), then its record. */
-  async function repair(lane: LaneName, open: OfferRecord, at: OfferAt) {
-    const last = open.host.changes.length - 1
-    for (const [i, change] of open.host.changes.entries()) {
+  async function rebuild(
+    lane: LaneName,
+    name: ThreadName,
+    place: OfferPlace & { readonly target: CommitId },
+    changes: readonly string[],
+    sources: readonly OfferSource[],
+  ): Promise<void> {
+    await executeOnHost(planAbandonOffer(root, changes))
+    await build(lane, name, place, sources)
+  }
+
+  /** Each revision repaired (S48 item 18), then the record. */
+  async function repair(
+    lane: LaneName,
+    name: ThreadName,
+    place: OfferPlace & { readonly target: CommitId },
+    changes: readonly string[],
+  ) {
+    const last = changes.length - 1
+    for (const [i, change] of changes.entries()) {
       const split = await hostCommitIn(ops, change)
       if (split === null) continue
       await executeOnHost(
         planRepair({
           root,
-          bookmark: open.bookmark,
+          bookmark: offerBookmark(name),
           ...split,
           top: i === last,
         }),
@@ -160,65 +165,44 @@ export function createRefresh(state: OfferState): Refresh {
     log(
       `[host] ${readThreadName(doc, lane)}: your edit and the host's crossed; kept yours`,
     )
-    await record(lane, at)
+    await record(lane, name, place, await readAt(name, place.target))
   }
 
   async function refresh(lane: LaneName): Promise<"built" | "other"> {
     // gather
-    const name = state.nameOf(lane)
-    if (name === undefined) return "other"
-    const place = await state.placeOf(lane)
-    // No tip yet, or a WIP gone without landing: nothing moves (ADR-0060).
-    if (place === null || place.target === null) return "other"
+    const now = await state.offerNow(lane)
+    // No tip yet, no name, or a WIP gone without landing: nothing moves
+    // (ADR-0060).
+    if (now === null || now.name === undefined) return "other"
+    const { place, name, offer } = now
     const { tip, start, target } = place
-    const stored = state.offerOf(lane)
-    const open = stored !== undefined && stored.taken === null ? stored : null
-    const facts = open === null ? null : await state.factsOf(open, target)
-    // An offer you abandoned, or took by hand, is gone: a new one is built.
-    const live =
-      open !== null && facts !== null && (facts.present || facts.divergent)
+    if (target === null) return "other"
+    const at = { ...place, target }
     // plan
-    const planned = planRefresh({
-      tip,
-      start,
-      offer:
-        live && open !== null && facts !== null
-          ? {
-              size: open.size,
-              taken: open.taken,
-              ...builtOf(facts.ledger, open),
-              revisions: facts.revisions,
-              placed: facts.placed,
-              onTarget: facts.onTarget,
-              divergent: facts.divergent,
-            }
-          : undefined,
-    })
+    const planned = planRefresh({ tip, start, offer })
     const effects = planOfferEffects(planned, {
       root,
       tip,
       start,
       target,
-      wip: withLedger(wipLine(doc, lane, name), { source: tip, start }),
-      open: facts === null ? null : open,
-      live,
-      read: facts === null ? null : readBaseline(facts),
+      wip: wipLine(doc, lane, name),
+      trailers: { lane, name, entry: readLaneTip(doc, lane) ?? "" },
+      offer,
     })
     // execute
     return executeOffer(
       {
         run: executeOnHost,
-        build: sources => build(lane, name, tip, start, target, sources, false),
-        reread: async offer =>
-          (await offerCommits(ops, offer.host.changes)).commits,
-        record: (at, known) =>
-          record(lane, at, known && facts !== null ? facts : undefined),
-        repair: (offer, at) => repair(lane, offer, at),
+        build: sources => build(lane, name, at, sources),
+        read: () => readAt(name, target),
+        record: read => record(lane, name, place, read),
+        repair: changes => repair(lane, name, at, changes),
         remove: () => state.agent().removeOffer(lane),
       },
       effects,
+      offer,
     )
   }
 
-  return { build, record, refresh }
+  return { build, rebuild, record, refresh }
 }

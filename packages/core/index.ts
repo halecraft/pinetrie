@@ -439,27 +439,60 @@ export const NO_EDITOR = {
 export const HOST_OPERATOR = "pineta-host"
 
 /**
- * What the host found of one revision of an offer, against the commit it
- * last wrote for it (`offerFacts` in `@pineta/lanes` reads it,
- * `revisionEdited` in `@pineta/marginalia` decides from it).
+ * What a revision's evolog says since the host's newest version of it
+ * (`readOffer` in `@pineta/lanes` reads it, `revisionEdited` in
+ * `@pineta/marginalia` decides from it): whether the walk back reached a
+ * version the host made, and whether a version an operation not the host's
+ * made on the way changed it. Read from the repo, never from a record the
+ * host kept, which can be lost after its jj steps landed (S73).
  */
 export interface RevisionFacts {
-  /** The description is the one the host last wrote. */
-  readonly sameDescription: boolean
-  /** `jj interdiff` against the commit the host last wrote is empty. */
-  readonly sameChange: boolean
-  /**
-   * What the evolog says since the host's write, read only when one of the
-   * two differs (null otherwise): whether the walk back from the revision
-   * reached the host's commit, and whether a version of yours on the way
-   * changed it. The host's own versions never count: its record of one can
-   * be lost after its jj steps landed (S73).
-   */
-  readonly since: {
-    readonly reached: boolean
-    readonly yoursChanged: boolean
-  } | null
+  readonly reached: boolean
+  readonly yoursChanged: boolean
 }
+
+/** One revision of an offer, as your repo holds it now. */
+export interface OfferRevision {
+  readonly commit: CommitId
+  /** Its change id: what jj steps on it name (S48 item 2). */
+  readonly change: string
+  readonly since: RevisionFacts
+}
+
+/** An offer's ledger, as its top's message carries it (`offerLedger`). */
+export interface OfferLedger {
+  /** The lane tip it holds (`Pineta-Source`). */
+  readonly source: CommitId
+  /** Where it starts (`Pineta-Start`). */
+  readonly start: readonly CommitId[]
+}
+
+/**
+ * An offer as your repo holds it now (`readOffer` in `@pineta/lanes`): all
+ * the host decides an offer from. Facts only; what they mean is decided in
+ * `@pineta/marginalia` (`planRefresh`, `offerEdited`, `offerMoved`,
+ * `isWipLine`). A divergent offer is only its change ids: the repair needs
+ * nothing more, and every other read would name one of two commits.
+ */
+export type OfferInRepo =
+  | {
+      readonly kind: "offer"
+      /** Bottom first. */
+      readonly revisions: readonly OfferRevision[]
+      /** Each revision's parent is the one below it: no commit of yours between. */
+      readonly chained: boolean
+      readonly ledger: OfferLedger | null
+      /** The top's first line. */
+      readonly firstLine: string
+      /** The bottom's parent is an ancestor of the target (S48 item 7). */
+      readonly placed: boolean
+      /** The bottom's parents are exactly the target. */
+      readonly onTarget: boolean
+      readonly files: readonly string[]
+      /** Files conflicting in its top: with the work under it (S48 item 3). */
+      readonly conflicts: readonly string[]
+    }
+  | { readonly kind: "divergent"; readonly changes: readonly string[] }
 
 /**
  * The trailers the host writes into commit messages: a turn names its entry
@@ -500,10 +533,7 @@ export function trailerValues(
  * above it reads as the newest. Null when no paragraph names one, as after
  * you rewrote the message without them.
  */
-export function offerLedger(message: string): {
-  readonly source: CommitId
-  readonly start: readonly CommitId[]
-} | null {
+export function offerLedger(message: string): OfferLedger | null {
   const paragraph = message
     .split("\n\n")
     .filter(p => trailerValues(p, TRAILERS.source).length > 0)
@@ -657,8 +687,10 @@ export interface LandingRecord {
 /**
  * A lane's offer: one revision, or a stack, in your repo, holding the lane's
  * work you do not have yet (ADR-0038). A host-written `pineta.offer` value
- * keyed by lane. The page reads the top-level fields; `host` is what the host
- * remembers of what it wrote, and nothing else reads it. What a take would
+ * keyed by lane: the page's cache, written from the repo after each of the
+ * host's steps (`offerRecord`). The host never decides from it: it reads the
+ * offer from your repo (`OfferInRepo`), so a record lost or stale changes
+ * nothing. What a take would
  * bring, each revision's description, files and diffs, is not stored: the page
  * reads it by commit when it asks (`RevisionReview`, ADR-0047).
  */
@@ -683,21 +715,11 @@ export interface OfferRecord {
   readonly taken: string | null
   /**
    * Each revision's commit as the host last read it, bottom first: what a
-   * review names. Unlike `host.wrote`, it follows a rebase jj made under the
-   * offer, and your edits. A revision divergent at that read is left out.
+   * review may read. It follows a rebase jj made under the offer, and your
+   * edits.
    */
   readonly commits: readonly CommitId[]
   readonly at: number
-  readonly host: {
-    /** Each revision's change id, bottom first: its identity across rewrites. */
-    readonly changes: readonly string[]
-    /** The commit the host last wrote for each, bottom first. */
-    readonly wrote: readonly CommitId[]
-    /** The lane commit it was built from. */
-    readonly tip: CommitId
-    /** Where it started when built or last followed: what it holds is the tip's change since. */
-    readonly start: readonly CommitId[]
-  }
 }
 
 /** How jj says a file changed in a revision. */

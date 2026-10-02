@@ -56,7 +56,6 @@ import {
   newestBase,
   type OfferSource,
   offerBookmark,
-  offerFacts,
   offerRevisions,
   planAbandonOffer,
   planBaseRefresh,
@@ -71,6 +70,7 @@ import {
   planWipCopy,
   type Ran,
   type Runner,
+  readOffer,
   retireLaneBookmarks,
   revisionMessage,
   revisionRead,
@@ -658,7 +658,7 @@ describe("a lane's repo, with jj", () => {
     expect(await fileDiff(ops, range, 'we"ird')).toContain("+quote")
 
     // You reword the offer: its commit changes, and the review of the new
-    // one reads your words. `offerFacts` finds it by change id.
+    // one reads your words. `readOffer` finds it by its bookmark.
     await yoursJj([
       "describe",
       "--ignore-immutable",
@@ -667,16 +667,12 @@ describe("a lane's repo, with jj", () => {
       "-m",
       "feat: as I want it",
     ])
-    const facts = await offerFacts(ops, {
-      changes: offer.changes,
-      wrote: offer.commits,
-      target: "@-",
-    })
-    const [now] = facts.commits
+    const facts = await readOffer(ops, { name: NAME, target: "pineta-onto" })
+    const [now] = facts?.kind === "offer" ? facts.revisions : []
     if (now === undefined) throw new Error("no commit")
-    expect(now).not.toBe(w)
+    expect(now.commit).not.toBe(w)
     expect(
-      await revisionRead(ops, { kind: "revision", commit: now }),
+      await revisionRead(ops, { kind: "revision", commit: now.commit }),
     ).toMatchObject({
       description: "feat: as I want it\n",
     })
@@ -764,14 +760,13 @@ describe("a lane's repo, with jj", () => {
           nonce: `n-${Math.random().toString(36).slice(2)}`,
         }),
       )
-      const revs = await offerRevisions(
-        ops,
-        offerBookmark(name),
-        sources.length,
-      )
+      // Found in your repo as the host finds it, with nothing kept.
+      const read = await readOffer(ops, { name, target: await lineNow() })
+      if (read?.kind !== "offer") throw new Error("no offer read")
       return {
-        commits: revs,
-        changes: await Promise.all(revs.map(c => changeOf(ops, c))),
+        read,
+        commits: read.revisions.map(r => r.commit),
+        changes: read.revisions.map(r => r.change),
       }
     }
     let entry = 0
@@ -906,13 +901,7 @@ describe("a lane's repo, with jj", () => {
     const [c1] = one.changes
     const [w1] = one.commits
     if (c1 === undefined || w1 === undefined) throw new Error("no offer")
-    expect(
-      await offerFacts(ops, {
-        changes: one.changes,
-        wrote: one.commits,
-        target: await lineNow(),
-      }),
-    ).toMatchObject({
+    expect(one.read).toMatchObject({
       files: ["a.txt"],
       onTarget: true,
       placed: true,
@@ -945,26 +934,14 @@ describe("a lane's repo, with jj", () => {
     ).toBe(1)
     await executeOnHost(planDescribe(yoursDir, c1, "offer: described"))
 
-    // The host's rewrite whose record was lost (S73): against the stale
-    // commit it differs, but only the host changed it since.
-    expect(
-      (
-        await offerFacts(ops, {
-          changes: one.changes,
-          wrote: one.commits,
-          target: await lineNow(),
-        })
-      ).revisions,
-    ).toEqual([
-      {
-        sameDescription: false,
-        sameChange: true,
-        since: { reached: true, yoursChanged: false },
-      },
-    ])
-    // Your reword, on purpose: a change of yours, seen as an edit.
-    const [described] = await commitsOf(ops, `change_id(${c1})`)
-    if (described === undefined) throw new Error("no offer")
+    // The host rewrote it, and nothing recorded that: its newest version is
+    // the host's, so it is not yours (S73, by construction).
+    const sinceNow = async () => {
+      const read = await readOffer(ops, { name: NAME, target: await lineNow() })
+      return read?.kind === "offer" ? read.revisions.map(r => r.since) : null
+    }
+    expect(await sinceNow()).toEqual([{ reached: true, yoursChanged: false }])
+    // Your reword of the offer, on purpose: a change of yours, an edit.
     await yoursJj([
       "describe",
       "--ignore-immutable",
@@ -973,21 +950,7 @@ describe("a lane's repo, with jj", () => {
       "-m",
       "as I want",
     ])
-    expect(
-      (
-        await offerFacts(ops, {
-          changes: one.changes,
-          wrote: [described],
-          target: await lineNow(),
-        })
-      ).revisions,
-    ).toEqual([
-      {
-        sameDescription: false,
-        sameChange: true,
-        since: { reached: true, yoursChanged: true },
-      },
-    ])
+    expect(await sinceNow()).toEqual([{ reached: true, yoursChanged: true }])
     await executeOnHost(
       planDescribe(yoursDir, c1, `offer: lane\n\nPineta-Source: ${t1}\n`),
     )
@@ -1034,7 +997,9 @@ describe("a lane's repo, with jj", () => {
       "-r",
       c1,
       "-m",
-      `offer: lane\n\nPineta-Source: ${t1}\n`,
+      // As the host writes it: so the next offer's revisions are told
+      // from this one, taken, by its base, not its trailer.
+      `offer: lane\n\nPineta-Thread: ${NAME}\nPineta-Source: ${t1}\n`,
     ])
 
     // Take: the line moved forward to the offer, as the host; your @ and
@@ -1064,6 +1029,17 @@ describe("a lane's repo, with jj", () => {
     const next = await offer([t1])
     expect(next.files).toEqual(["b.txt"])
     expect(next.conflicted).toBe(false)
+    // You reword your commit under it: jj rebases the offer, as your
+    // operation, but changes nothing in it, so it is not yours (S48 item 7).
+    await yoursJj([
+      "describe",
+      "--ignore-immutable",
+      "-r",
+      line.onto,
+      "-m",
+      "yours: a.txt, reworded",
+    ])
+    expect(await sinceNow()).toEqual([{ reached: true, yoursChanged: false }])
 
     // The lane moves on: the offer follows it in place (ADR-0039), its
     // change kept, holding what a fresh build would.
@@ -1110,10 +1086,14 @@ describe("a lane's repo, with jj", () => {
       s2,
     ])
     await fetch([t2])
+    // Each revision names its thread, as the host writes it: found by that,
+    // above the taken offer and your commit under it, which are on the line.
+    const ours = `Pineta-Thread: ${NAME}\nPineta-Source: ${t2}`
     const stack = await build([
-      { commit: s1, description: `s1: d.txt\n\nPineta-Source: ${s1}\n` },
-      { commit: s2, description: `s2: e.txt\n\nPineta-Source: ${s2}\n` },
+      { commit: s1, description: `s1: d.txt\n\n${ours}\n` },
+      { commit: s2, description: `s2: e.txt\n\n${ours}\n` },
     ])
+    expect(stack.read).toMatchObject({ chained: true })
     const per = await Promise.all(
       stack.commits.map(async c =>
         lines((await ops(["diff", "-r", c, "--name-only"])).stdout),
@@ -1226,7 +1206,8 @@ describe("a lane's repo, with jj", () => {
         nonce: "n-wip",
       }),
     )
-    const [o] = await offerRevisions(rig.ops, offerBookmark(NAME), 1)
+    const found = await offerRevisions(rig.ops, { name: NAME, target })
+    const o = found[0]?.commit
     expect(
       lines((await rig.ops(["diff", "-r", o ?? "", "--name-only"])).stdout),
     ).toEqual(["tests.txt"])

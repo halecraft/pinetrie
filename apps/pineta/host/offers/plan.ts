@@ -13,8 +13,9 @@ import {
   type LaneName,
   type LineAction,
   type LineRecord,
+  type OfferInRepo,
   type OfferRecord,
-  type RevisionFacts,
+  type ThreadName,
 } from "@pineta/core"
 import {
   immutableHeads,
@@ -22,8 +23,8 @@ import {
   type LineConfig,
   type LineFacts,
   logRevset,
-  type OfferFacts,
   type OfferSource,
+  offerBookmark,
   planAbandonOffer,
   planFollowOffer,
   planLand,
@@ -31,53 +32,55 @@ import {
   planRefreshOffer,
   planTakeOffer,
 } from "@pineta/lanes"
-import type { RefreshPlan, TakeDestination } from "@pineta/marginalia"
+import {
+  isWipLine,
+  type OfferNow,
+  offerEdited,
+  offerMessage,
+  offerMoved,
+  type RefreshPlan,
+  type TakeDestination,
+} from "@pineta/marginalia"
 
-/** What an offer's record is written from: what the host built or kept. */
-export interface OfferAt {
-  readonly bookmark: string
-  readonly tip: CommitId
-  readonly start: readonly CommitId[]
-  /** The commits the host wrote, bottom first. */
-  readonly commits: readonly CommitId[]
-  readonly changes: readonly string[]
-  readonly target: string
-  readonly stale: boolean
-  readonly described: boolean
-  readonly edited: boolean
-}
+/** Each revision's change id, bottom first: what jj steps on it name. */
+export const changesOf = (offer: OfferInRepo): readonly string[] =>
+  offer.kind === "divergent"
+    ? offer.changes
+    : offer.revisions.map(r => r.change)
 
 /**
- * An offer's record, from what the host wrote (`at`) and the facts read
- * after. `commits` are the facts' (a review names each revision as it is
- * now); `host.wrote` keeps what the host wrote, the baseline for your edits.
+ * An offer's record, the page's cache, from the offer as your repo holds it
+ * (ADR-0060): what it holds, whether an agent described it, whether you
+ * edited it, and whether a stack's lane moved on (`offerMoved`, the rule
+ * `planRefresh` uses). `commits` are what a review may read.
  */
-export function offerRecord(
-  lane: LaneName,
-  at: OfferAt,
-  facts: Pick<OfferFacts, "files" | "conflicts" | "commits">,
-  yourEdits: readonly string[],
-  now: number,
-): OfferRecord {
+export function offerRecord(input: {
+  readonly lane: LaneName
+  readonly name: ThreadName
+  readonly offer: OfferNow
+  /** The lane's tip and where an offer starts now. */
+  readonly place: {
+    readonly tip: CommitId
+    readonly start: readonly CommitId[]
+  }
+  readonly yourEdits: readonly string[]
+  readonly now: number
+}): OfferRecord {
+  const { offer } = input
+  const size = offer.revisions.length
   return {
-    lane,
-    size: at.changes.length,
-    stale: at.stale,
-    files: facts.files,
-    conflicts: facts.conflicts,
-    yourEdits,
-    described: at.described,
-    edited: at.edited,
-    bookmark: at.bookmark,
+    lane: input.lane,
+    size,
+    stale: size > 1 && offerMoved(offer.ledger, input.place),
+    files: offer.files,
+    conflicts: offer.conflicts,
+    yourEdits: input.yourEdits,
+    described: !isWipLine(input.name, offer.firstLine),
+    edited: offerEdited(offer),
+    bookmark: offerBookmark(input.name),
     taken: null,
-    commits: facts.commits,
-    at: now,
-    host: {
-      changes: [...at.changes],
-      wrote: [...at.commits],
-      tip: at.tip,
-      start: [...at.start],
-    },
+    commits: offer.revisions.map(r => r.commit),
+    at: input.now,
   }
 }
 
@@ -87,17 +90,16 @@ export interface RefreshContext {
   readonly tip: CommitId
   readonly start: readonly CommitId[]
   readonly target: string
-  /** The offer's line until an agent describes it, with its ledger (`withLedger`). */
+  /** The WIP line, before its trailers (`wipDescription`). */
   readonly wip: string
-  /** The lane's offer while it is open, else null. */
-  readonly open: OfferRecord | null
-  /** The open offer's revisions are still in your repo, or divergent there. */
-  readonly live: boolean
-  /**
-   * The open offer's commits as the facts found them, when they differ from
-   * what the host wrote (`readBaseline`); null otherwise, or with no facts.
-   */
-  readonly read: readonly CommitId[] | null
+  /** The host's trailers for the offer's messages (`offerMessage`). */
+  readonly trailers: {
+    readonly lane: LaneName
+    readonly name: ThreadName
+    readonly entry: string
+  }
+  /** The offer as your repo holds it, read before planning; null with none. */
+  readonly offer: OfferInRepo | null
 }
 
 export interface OfferEffects {
@@ -106,60 +108,16 @@ export interface OfferEffects {
   /** What to do after them. */
   readonly after:
     | { readonly kind: "nothing" }
+    /** Build a new offer from these sources, their messages without trailers. */
     | { readonly kind: "build"; readonly sources: readonly OfferSource[] }
-    /**
-     * Write the record. `reread`: the steps rewrote this offer, so its
-     * commits are read after them. `known`: the facts read before planning
-     * still hold, and are written as they are.
-     */
-    | {
-        readonly kind: "record"
-        readonly at: OfferAt
-        readonly reread: OfferRecord | null
-        readonly known: boolean
-      }
+    /** Write the record from the offer as your repo holds it after the steps. */
+    | { readonly kind: "record" }
     /** Your edit and the host's crossed: repair each revision, then record. */
-    | {
-        readonly kind: "repair"
-        readonly offer: OfferRecord
-        readonly at: OfferAt
-      }
+    | { readonly kind: "repair"; readonly changes: readonly string[] }
     | { readonly kind: "remove" }
   /** The offer's content changed, so it is described once the lane stops. */
   readonly built: boolean
 }
-
-/**
- * The commits a refresh may take as the baseline for your edits: those read
- * now, only when a revision differs from what the host last wrote. Then the
- * host's own write was lost from the record (S73), or you edited it, which
- * `leave` sees against `wrote` regardless. A revision jj only rebased, as
- * when you reword the commit under it, keeps `wrote`. Pure.
- */
-export const readBaseline = (facts: {
-  readonly commits: readonly CommitId[]
-  readonly revisions: readonly RevisionFacts[]
-}): readonly CommitId[] | null =>
-  facts.revisions.some(r => !(r.sameDescription && r.sameChange))
-    ? facts.commits
-    : null
-
-/**
- * What an offer was built from and on, for `planRefresh`: the repo's ledger,
- * its top's `Pineta-Source` and `Pineta-Start` (ADR-0060), so a record
- * lost or stale costs nothing. The record's copy only for an offer whose
- * message you rewrote without them. Pure.
- */
-export const builtOf = (
-  ledger: {
-    readonly source: CommitId
-    readonly start: readonly CommitId[]
-  } | null,
-  open: OfferRecord,
-): { readonly builtFrom: CommitId; readonly builtOn: readonly CommitId[] } =>
-  ledger === null
-    ? { builtFrom: open.host.tip, builtOn: open.host.start }
-    : { builtFrom: ledger.source, builtOn: ledger.start }
 
 const NOTHING: OfferEffects = {
   steps: [],
@@ -181,126 +139,63 @@ export function planOfferEffects(
       },
       built: true,
     }
-  const { open } = c
-  if (open === null) return NOTHING
-  // The baseline your edits are seen against: what the host wrote, or, for
-  // an offer that is not yours, what was read now. A host write whose record
-  // was lost is then the baseline from the first trigger on (S73).
-  const read =
-    c.read !== null && c.read.length === open.host.changes.length
-      ? c.read
-      : null
-  const baseline =
-    plan === "leave" || plan === "repair"
-      ? open.host.wrote
-      : (read ?? open.host.wrote)
-  // What the record keeps unless the plan changes it.
-  const kept: OfferAt = {
-    bookmark: open.bookmark,
-    tip: open.host.tip,
-    start: open.host.start,
-    commits: baseline,
-    changes: open.host.changes,
-    target: c.target,
-    stale: open.stale,
-    described: open.described,
-    edited: open.edited,
-  }
-  const record = (at: OfferAt, reread: OfferRecord | null, built = false) =>
-    ({
-      steps: [],
-      after: { kind: "record", at, reread, known: false },
-      built,
-    }) as const
+  if (c.offer === null) return NOTHING
+  const changes = changesOf(c.offer)
+  const [bottom] = changes
+  if (bottom === undefined) return NOTHING
+  const record = { kind: "record" } as const
   switch (plan) {
     case "none":
-      return c.live
-        ? {
-            steps: [],
-            after: {
-              kind: "record",
-              at: kept,
-              reread: null,
-              known: true,
-            },
-            built: false,
-          }
-        : NOTHING
-    case "follow": {
-      const [change] = open.host.changes
-      if (change === undefined) return NOTHING
+    case "stale":
+    case "leave":
+      return { steps: [], after: record, built: false }
+    case "follow":
+      // It holds more now: a work in progress again, its ledger the new tip
+      // and start (ADR-0060).
       return {
-        ...record(
-          {
-            ...kept,
-            tip: c.tip,
-            start: c.start,
-            described: false,
-            edited: false,
-          },
-          open,
-          true,
-        ),
-        // It holds more now: a work in progress again, its ledger the new
-        // tip and start (ADR-0060).
         steps: planFollowOffer({
           root: c.root,
-          change,
+          change: bottom,
           start: c.start,
           tip: c.tip,
           target: c.target,
-          description: c.wip,
+          description: offerMessage(c.wip, {
+            ...c.trailers,
+            ledger: { source: c.tip, start: c.start },
+          }),
         }),
+        after: record,
+        built: true,
       }
-    }
     case "withdraw":
       return {
-        steps: planAbandonOffer(c.root, open.host.changes),
+        steps: planAbandonOffer(c.root, changes),
         after: { kind: "remove" },
         built: false,
       }
-    case "refresh": {
-      const [bottom] = open.host.changes
-      if (bottom === undefined) return NOTHING
+    case "refresh":
       return {
-        ...record({ ...kept, edited: false }, open),
         steps: planRefreshOffer(c.root, bottom, c.target),
-      }
-    }
-    case "stale":
-    case "leave":
-      return record(
-        {
-          ...kept,
-          stale: plan === "stale" || open.stale,
-          edited: plan === "leave",
-        },
-        null,
-      )
-    case "repair":
-      return {
-        steps: [],
-        after: {
-          kind: "repair",
-          offer: open,
-          at: { ...kept, edited: true },
-        },
+        after: record,
         built: false,
       }
+    case "repair":
+      return { steps: [], after: { kind: "repair", changes }, built: false }
   }
 }
 
 /**
- * A take (ADR-0060), decided from facts read in its own step: the
+ * A take (ADR-0060), decided from the offer read in its own step: the
  * destination asked for (`to`, else the default), which must be one of the
  * offer's destinations now and below the offer, so the move is forward;
- * then its steps and the record marked taken. Refused otherwise, or for an
- * offer with no revisions. What you have of the lane is the offer's own
- * `Pineta-Source`, which the take keeps.
+ * then its steps and the record marked taken. Refused otherwise. What you
+ * have of the lane is the offer's own `Pineta-Source`, which the take keeps.
  */
 export function planTake(input: {
   readonly root: string
-  readonly offer: OfferRecord
+  readonly offer: OfferNow
+  /** Its record now (`offerRecord`), which the take marks taken. */
+  readonly record: OfferRecord
   readonly destinations: readonly TakeDestination[]
   readonly to: string | null
   /** Whether `bookmark` points at, or below, the offer's bottom's parent. */
@@ -313,8 +208,8 @@ export function planTake(input: {
       readonly taken: OfferRecord
     }
   | { readonly kind: "refused"; readonly code: ErrCode } {
-  const { offer, now } = input
-  const top = offer.host.changes.at(-1)
+  const { record, now } = input
+  const top = input.offer.revisions.at(-1)?.change
   if (top === undefined) return { kind: "refused", code: ERR.NO_OFFER }
   const destination =
     input.to === null
@@ -326,11 +221,11 @@ export function planTake(input: {
     kind: "take",
     steps: planTakeOffer({
       root: input.root,
-      bookmark: offer.bookmark,
+      bookmark: record.bookmark,
       top,
       destination: destination.bookmark,
     }),
-    taken: { ...offer, taken: top, at: now },
+    taken: { ...record, taken: top, at: now },
   }
 }
 
