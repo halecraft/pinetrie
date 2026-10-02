@@ -9,7 +9,7 @@ import { readBanners, readCards, readLanes, readTreeIndex } from "@pineta/reads"
 import { readEntries, rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, join, noQueued, waitFor } from "../harness.ts"
+import { committedProject, idleNow, join, waitFor } from "../harness.ts"
 import { RED_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -42,10 +42,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const bu = await join(bh, "bea", "banners")
     await bu.setName("Bea")
     const bidle = async () => {
-      await waitFor(
-        () => Object.keys(bh.doc.activeRuns()).length === 0 && noQueued(bh),
-        60_000,
-      )
+      await waitFor(() => idleNow(bh), 60_000)
       await bh.quiet()
     }
     const blobAt = (sha: string) => fetch(`${bh.httpUrl}blob/${sha}`)

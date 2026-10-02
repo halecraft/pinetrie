@@ -17,7 +17,6 @@ import type {
   CardId,
   CardPlace,
   CardRecord,
-  ChatMode,
   CommandSummary,
   Position,
   ProjectRecord,
@@ -58,6 +57,7 @@ import {
   uploadImage,
 } from "./paste.ts"
 import {
+  type ComposerMode,
   placeholderWords,
   planSend,
   queues,
@@ -71,6 +71,27 @@ import {
   whereWords,
 } from "./send.ts"
 import type { ColumnHow, SessionClient } from "./session-view.ts"
+
+/**
+ * Bind a box to a card's text, its undo reaching only that card's steps
+ * (ADR-0052), and tell `onText` the text now and at every change, others'
+ * edits included. Returns the unbinding.
+ */
+function bindText(
+  session: SessionClient,
+  id: CardId,
+  el: HTMLTextAreaElement,
+  onText: (text: string) => void,
+): () => void {
+  const doc = session.cardText(id)
+  const off = attach(el, doc.text, { undo: session.undoFor(id) })
+  onText(doc.text())
+  const stop = subscribe(doc, () => onText(doc.text()))
+  return () => {
+    off()
+    stop()
+  }
+}
 
 /** Where a lane this editor's send creates would work, and the choices. */
 export interface Where {
@@ -194,24 +215,14 @@ export function CardEditor(p: {
     [plan.createsLane, onCreatesLane],
   )
 
-  /**
-   * Bind the box to a card's text, keeping the caret where it is. Its undo
-   * reaches only this card's steps (ADR-0052).
-   */
+  /** Bind the box to a card's text, keeping the caret where it is. */
   const bind = (id: CardId) => {
     const el = box.current
     if (el === null) return
     detach.current?.()
-    const doc = session.cardText(id)
     const { selectionStart, selectionEnd } = el
-    const off = attach(el, doc.text, { undo: session.undoFor(id) })
+    detach.current = bindText(session, id, el, setText)
     el.setSelectionRange(selectionStart, selectionEnd)
-    setText(doc.text())
-    const stop = subscribe(doc, () => setText(doc.text()))
-    detach.current = () => {
-      off()
-      stop()
-    }
   }
   /** Unbind the box, and empty it. */
   const unbind = () => {
@@ -315,7 +326,11 @@ export function CardEditor(p: {
     p.onAct({ kind: "queue", card: from, lane: p.lane.name, at: p.at })
     return true
   }
-  const send = async (message: string, as: ChatMode, from: CardId | null) => {
+  const send = async (
+    message: string,
+    as: ComposerMode,
+    from: CardId | null,
+  ) => {
     step({ kind: "send" })
     setConflict(null)
     if (as === "queue") {
@@ -631,15 +646,7 @@ export function QueuedCardEditor(p: {
   const [text, setText] = useState("")
   useEffect(() => {
     const el = box.current
-    if (el === null) return
-    const doc = session.cardText(card.id)
-    const off = attach(el, doc.text, { undo: session.undoFor(card.id) })
-    setText(doc.text())
-    const stop = subscribe(doc, () => setText(doc.text()))
-    return () => {
-      off()
-      stop()
-    }
+    return el === null ? undefined : bindText(session, card.id, el, setText)
   }, [session, card.id])
   return (
     <div className="card-editor queued" data-queued={card.id}>

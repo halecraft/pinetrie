@@ -449,7 +449,7 @@ export function offerWords(view: OfferView): OfferWords {
           : `${files} so far`
         : state === "busy"
           ? facts.activity === "resolution"
-            ? "resolving your work into this thread"
+            ? "resolving the project's work into this thread"
             : "splitting the offer into a stack"
           : state === "taken"
             ? `taken as ${(facts.taken ?? "").slice(0, 8)}`

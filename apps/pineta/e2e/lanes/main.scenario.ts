@@ -35,8 +35,8 @@ import type { Checks } from "../checks.ts"
 import {
   committedProject,
   containerProblem,
+  idleNow,
   join,
-  noQueued,
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
@@ -85,10 +85,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
   await wu.setName("Uma")
   const tree = () => readTreeIndex(wh.doc)
   const idle = async () => {
-    await waitFor(
-      () => Object.keys(wh.doc.activeRuns()).length === 0 && noQueued(wh),
-      180_000,
-    )
+    await waitFor(() => idleNow(wh), 180_000)
     await wh.quiet()
   }
   const idOf = (text: string): string | null => {

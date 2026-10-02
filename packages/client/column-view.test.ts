@@ -535,7 +535,12 @@ describe("offerWords", () => {
     ["nothing", undefined, "idle", "nothing to take yet"],
     ["running, nothing yet", undefined, "turn", "no files changed yet"],
     ["running", offer, "turn", "2 files so far"],
-    ["resolving", offer, "resolution", "resolving your work into this thread"],
+    [
+      "resolving",
+      offer,
+      "resolution",
+      "resolving the project's work into this thread",
+    ],
     ["ready", offer, "idle", "2 files ready"],
     [
       "ready, touching your edits",

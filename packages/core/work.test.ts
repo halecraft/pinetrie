@@ -240,7 +240,7 @@ describe("a turn's entry, and a run's prompt", () => {
   })
 })
 
-test("isBusy: running, or with messages waiting", () => {
+test("isBusy: running, or with cards queued", () => {
   const view = {
     name: A,
     tip: null,

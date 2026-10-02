@@ -1,6 +1,5 @@
 import {
   type Address,
-  type ChatMode,
   ERR,
   entryId,
   laneNameForThread,
@@ -13,6 +12,7 @@ import {
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
+  type ComposerMode,
   failedWords,
   lineWords,
   placeholderWords,
@@ -236,7 +236,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
 })
 
 describe("sendButton: the plan in words, and whether it can be pressed", () => {
-  const sent = (to: Address, mode: ChatMode = "reply"): SendPlan => ({
+  const sent = (to: Address, mode: ComposerMode = "reply"): SendPlan => ({
     mode,
     createsLane: false,
     to,

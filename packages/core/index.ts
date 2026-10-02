@@ -212,21 +212,25 @@ export const refused = (code: ErrCode, message: string): Refusal => ({
 })
 
 /**
- * How a message means to join the tree.
+ * How a client's message means to join the tree.
  *
  * - `reply`: continue the thread I am reading; I saw it end at `at`. If
  *   another writer compelled the agent there since, that is a race, and the
  *   sender is told (`conflict`) rather than guessed for.
- * - `queue`: the host's own, for a queued card it takes (ADR-0048): the
- *   lane's queue has already decided its turn, so only a run makes it busy.
- *   Never on the wire: a client queues a card instead.
  * - `branch`: start a thread at `at`, the root or any message. Every thread
  *   starts this way, and a branch never continues an existing lane: a
  *   compelled one is a new line of work (ADR-0021).
  */
-export type ChatMode = "reply" | "queue" | "branch"
-/** The modes a client may send. */
+export type ChatMode = "reply" | "branch"
 export const CHAT_MODES: readonly ChatMode[] = ["reply", "branch"]
+
+/**
+ * How the host plans a message: a client's mode, or `queue`, for a queued
+ * card it takes (ADR-0048). The lane's queue has already decided that card's
+ * turn, so only a run makes the lane busy, and a race does not count. A
+ * client never sends it: it queues a card instead.
+ */
+export type PlanMode = ChatMode | "queue"
 
 /**
  * A command whose SHAPE is already known to be valid. The protocol codec

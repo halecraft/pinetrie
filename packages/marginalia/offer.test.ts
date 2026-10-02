@@ -465,7 +465,7 @@ describe("the update and stack messages", () => {
     expect(m.content).toContain("- c.txt")
     expect(renderableMessage(m)).toEqual({
       role: "update",
-      content: "↓ your work merged in: 2 files changed",
+      content: "↓ brought up to date: 2 files changed",
     })
   })
   test("a stack message names where it starts and ends, and the bookmark to set", () => {

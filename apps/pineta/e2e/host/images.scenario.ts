@@ -9,7 +9,7 @@ import { readLaneNames } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { join, noQueued, waitFor } from "../harness.ts"
+import { idleNow, join, waitFor } from "../harness.ts"
 import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -73,11 +73,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // 3. A message shows it; the model reads it after the text.
     const iu = await join(ih, "ivy", "images")
     await iu.setName("Ivy")
-    const iidle = () =>
-      waitFor(
-        () => Object.keys(ih.doc.activeRuns()).length === 0 && noQueued(ih),
-        30_000,
-      )
+    const iidle = () => waitFor(() => idleNow(ih), 30_000)
     let seen: readonly string[] = []
     script.use([
       {

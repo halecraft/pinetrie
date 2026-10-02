@@ -46,7 +46,7 @@ are the only code that builds or reads the shape.
   | `queue` (the host's take) | as `reply` | as `reply` | as `reply` when only cards are queued; `busy` while it runs |
 
   `busy` writes nothing: the sender's client queues its card (ADR-0048).
-  `queue` is the host's own mode, for a card it takes, which heads the queue
+  `queue` is the host's own mode (`PlanMode`; a client sends a `ChatMode`), for a card it takes, which heads the queue
   it is in: so only a run makes the lane busy, and a race does not count.
   | `branch` | plain: `appendToTree` at `at`; compelled: `createAndRun` at `at` | the same: a branch never continues a lane | the same |
 

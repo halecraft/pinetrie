@@ -57,7 +57,7 @@ export const mutations: readonly Mutation[] = [
     expect: "newest is the largest id",
   },
   {
-    name: "waiting messages are not work",
+    name: "a root with cards queued is not work",
     file: roots,
     from: "    if (lane.tip === null || !isBusy(lane)) continue",
     to: "    if (lane.tip === null || !lane.running) continue",
@@ -274,12 +274,12 @@ export const mutations: readonly Mutation[] = [
     expect: "firstLine: the first non-empty line",
   },
   {
-    name: "a lane with messages waiting is not busy",
+    name: "isBusy ignores queued cards",
     file: "packages/core/tree.ts",
     from: "  lane.running || lane.waiting > 0",
     to: "  lane.running",
     command: unit,
-    expect: "isBusy: running, or with messages waiting",
+    expect: "isBusy: running, or with cards queued",
   },
   {
     name: "the walk stops at the first record, commit or not",

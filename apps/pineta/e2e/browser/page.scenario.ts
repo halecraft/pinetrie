@@ -27,7 +27,7 @@ import {
 import type { Page } from "@playwright/test"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { join, noQueued, suiteModel, waitFor } from "../harness.ts"
+import { idleNow, join, suiteModel, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
@@ -189,8 +189,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.fill(`${col(n)} .composer .input`, text)
         await page.click(`${col(n)} .composer .send`)
       }
-      const idle = () =>
-        waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+      const idle = () => waitFor(() => idleNow(host))
       /** Where the caret is in column `n`'s box, or null if it is not focused. */
       const caretIn = (n: number) =>
         page.$eval(`${col(n)} .composer .input`, box =>
@@ -790,9 +789,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `"${await label(0)}"`,
       )
       beasTurn.resume()
-      await waitFor(
-        () => Object.keys(host.doc.activeRuns()).length === 0 && noQueued(host),
-      )
+      await waitFor(() => idleNow(host))
       const asked = [
         "@agent Bea's turn",
         "@agent Bea again",
@@ -2311,7 +2308,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await second
           .waitForSelector(msg("B asks about this"), { timeout: 60_000 })
           .catch(() => null)
-        await waitFor(() => Object.keys(host.doc.activeRuns()).length === 0)
+        await waitFor(() => idleNow(host))
         // A's replica has everything the host has, and has drawn it, before the
         // cards below look for the column's last message in A's window.
         const total = String(Object.keys(host.doc.entries()).length)

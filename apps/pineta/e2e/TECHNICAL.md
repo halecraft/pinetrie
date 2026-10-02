@@ -10,7 +10,7 @@ The end-to-end suites, each a directory of scenarios:
 
 They share `checks.ts` (recording a check, and stopping at one),
 `scenario.ts` (choosing, skipping and running scenarios) and `harness.ts`
-(waiting, `noQueued`, throwaway projects, joining a host, `withHost`, the scripted model,
+(waiting, `idleNow`, throwaway projects, joining a host, `withHost`, the scripted model,
 `containerProblem`). A suite's own helpers are beside its scenarios:
 `host/support.ts`, `lanes/support.ts`, `browser/page.ts`.
 
@@ -72,7 +72,7 @@ They share `checks.ts` (recording a check, and stopping at one),
 
 ## Gotchas
 
-- **An idle wait checks the queue as well as the runs** (`noQueued`): a
+- **An idle wait checks the queue as well as the runs** (`idleNow`): a
   card queued while a run goes is taken only when it ends, so "no run" alone
   can return between a run's end and the take. A card a client has just
   queued may not have reached the host yet, so a step that queues waits for

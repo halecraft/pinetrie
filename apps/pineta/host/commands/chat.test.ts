@@ -22,7 +22,13 @@ import { readTreeIndex } from "@pineta/reads"
 import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { basics, methods, putValue, record, row } from "../fakes.ts"
-import { type Chat, type ChatDeps, executeChat, sendChat } from "./chat.ts"
+import {
+  type Chat,
+  type ChatDeps,
+  executeChat,
+  sendChat,
+  spendsCard,
+} from "./chat.ts"
 
 const ALICE = writerId("alice@example.com")
 const LANE = laneNameForThread("0123456789abcdef")
@@ -118,7 +124,6 @@ describe("sendChat", () => {
       putValue(b.doc, encodeWorkRecord({ kind: "project", record: project }))
     const cards = record<ChatDeps["cards"]>({
       writers: async () => [ALICE, BEA],
-      spend: async () => {},
     })
     const agent = record<ChatDeps["agent"]>({
       commands: () => [],
@@ -198,7 +203,7 @@ describe("sendChat", () => {
     expect(out).toEqual({ kind: "conflict", by: BEA })
   })
 
-  test("a message sent from a card carries its other writers, and spends the card (ADR-0048)", async () => {
+  test("a message sent from a card carries its other writers, and spends nothing itself (ADR-0048)", async () => {
     const { agent, cards, deps } = setUp()
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("from the card"),
@@ -211,12 +216,24 @@ describe("sendChat", () => {
     })
     expect(cards.calls.map(c => [c.method, ...c.args])).toEqual([
       ["writers", "c-1"],
-      ["spend", "c-1"],
     ])
   })
 
-  test("a refused send leaves its card", async () => {
-    const { cards, deps } = setUp()
+  test("spendsCard: written or running takes the card; busy, a conflict, a refusal or a failure leaves it", () => {
+    expect(
+      [
+        { kind: "appended", id: entryId("e") },
+        { kind: "started", runId: runId("r") },
+        { kind: "busy" },
+        { kind: "conflict", by: null },
+        { kind: "refused", code: ERR.REFUSED, message: "no" },
+        { kind: "failed", message: "boom" },
+      ].map(o => spendsCard(o as never)),
+    ).toEqual([true, true, false, false, false, false])
+  })
+
+  test("a send is refused for an image the host lacks, or when pi will not append it", async () => {
+    const { deps } = setUp()
     const missing = "b".repeat(64)
     // Refused before it is planned: an image the host does not store.
     const early = await sendChat(deps, ALICE, "s-1", {
@@ -237,11 +254,10 @@ describe("sendChat", () => {
       { ...chat("from the card"), card: cardId("c-1") },
     )
     expect([early.kind, late.kind]).toEqual(["refused", "refused"])
-    expect(cards.calls.map(c => c.method)).not.toContain("spend")
   })
 
-  test("a busy lane leaves the card: nothing was sent", async () => {
-    const { agent, cards, deps } = setUp()
+  test("a busy lane is answered busy, and nothing is written", async () => {
+    const { agent, deps } = setUp()
     writeLaneTip(deps.basics.doc, LANE, E1)
     beginRun(deps.basics.doc, LANE, runId("r-0"))
     putValue(deps.basics.doc, {
@@ -255,27 +271,10 @@ describe("sendChat", () => {
       card: cardId("c-1"),
     })
     expect(out).toEqual({ kind: "busy" })
-    expect(cards.calls.map(c => c.method)).not.toContain("spend")
     expect(agent.calls).toEqual([])
   })
 
-  test("a card the host took is not spent here: its record is gone, and the take destroys its text", async () => {
-    const { agent, cards, deps } = setUp()
-    const out = await sendChat(
-      deps,
-      ALICE,
-      "s-1",
-      { ...chat("from the queue"), card: cardId("c-1") },
-      { taken: true },
-    )
-    expect(out).toEqual({ kind: "appended", id: "e-2" })
-    expect(cards.calls.map(c => c.method)).toEqual(["writers"])
-    expect(
-      agent.calls.find(c => c.method === "appendToTree")?.args[0],
-    ).toMatchObject({ details: { contributors: [BEA] } })
-  })
-
-  test("a message with no card spends nothing and names no one else", async () => {
+  test("a message with no card names no one else", async () => {
     const { agent, cards, deps } = setUp()
     await sendChat(deps, ALICE, "s-1", chat("plain"))
     expect(cards.calls).toEqual([])

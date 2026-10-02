@@ -7,7 +7,7 @@ import { scriptedModel, sha256Of } from "@pineta/pi"
 import type { Page } from "@playwright/test"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, suiteModel, waitFor } from "../harness.ts"
+import { committedProject, idleNow, suiteModel, waitFor } from "../harness.ts"
 import { greyPng, RED_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -229,8 +229,7 @@ async function run(check: Checks["check"]): Promise<void> {
           await ip.click(`${col(0)} .composer .send`)
           await readRaw(ip)
         }
-        const idle = () =>
-          waitFor(() => Object.keys(imageHost.doc.activeRuns()).length === 0)
+        const idle = () => waitFor(() => idleNow(imageHost))
         script.use([
           { tool: "read", args: { path: "tall.png" } },
           { text: "A grey rectangle." },

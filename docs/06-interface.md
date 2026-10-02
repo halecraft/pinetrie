@@ -113,7 +113,7 @@ ever in the context of another. That is where the screen splits.
   everyone; restore from Archive". The `⋯` shows on the tab you are on, and on
   any other root tab while it is hovered or focused. Archive is for work that
   is done; **×** is for putting a tab away yourself. The Archive item is
-  disabled while the agent works in that root or messages wait there, with
+  disabled while the agent works in that root or cards are queued there, with
   the reason. Archiving
   writes a record, and takes the root out of every tab bar; no message
   changes.

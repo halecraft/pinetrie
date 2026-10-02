@@ -58,7 +58,7 @@ export type ArchivePlan =
 /** Why a root cannot be archived now, as the tab's menu and the host both say it. */
 export const ROOT_BUSY_REASON = {
   running: "the agent is working here",
-  waiting: "messages are queued here",
+  waiting: "cards are queued here",
 } as const
 
 /**

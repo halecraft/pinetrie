@@ -28,7 +28,7 @@ import {
 } from "@pineta/reads"
 import { readEntries, rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
-import { committedProject, join, noQueued, waitFor } from "../harness.ts"
+import { committedProject, idleNow, join, waitFor } from "../harness.ts"
 
 export const START_AGENT = { mode: "branch", asksAgent: true } as const
 export const BRANCH = { mode: "branch" } as const
@@ -168,10 +168,7 @@ export async function sectionHost(input: {
     `section-${process.pid}`,
   )
   const idle = async () => {
-    await waitFor(
-      () => Object.keys(host.doc.activeRuns()).length === 0 && noQueued(host),
-      300_000,
-    )
+    await waitFor(() => idleNow(host), 300_000)
     await host.quiet()
   }
   /** The lane whose thread holds the message with `text`. */

@@ -1,5 +1,12 @@
-import { entryId, laneNameForThread, writerId } from "@pineta/core"
+import {
+  atEntry,
+  ERR,
+  entryId,
+  laneNameForThread,
+  writerId,
+} from "@pineta/core"
 import { ARCHIVE_NAMESPACE, encodeArchive } from "@pineta/marginalia"
+import type { WireCommand } from "@pineta/protocol/codec"
 import type { Reply } from "@pineta/protocol/messages"
 import { writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
@@ -13,6 +20,10 @@ const NEW = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a3067862240")
 
 function setUp() {
   const b = basics()
+  const cards = record<CommandDeps["cards"]>({
+    writers: async () => [],
+    spend: async () => {},
+  })
   writeEntry(b.doc, row(ROOT_ID, null))
   const agent = record<CommandDeps["agent"]>({
     appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
@@ -21,8 +32,8 @@ function setUp() {
     basics: b,
     agent: agent.port,
     work: record<CommandDeps["work"]>().port,
-    blobs: record<CommandDeps["blobs"]>().port,
-    cards: record<CommandDeps["cards"]>().port,
+    blobs: record<CommandDeps["blobs"]>({ ref: () => undefined }).port,
+    cards: cards.port,
     start: () => {
       throw new Error("no run here")
     },
@@ -41,8 +52,8 @@ function setUp() {
       mode: "reply",
       lane: "",
       asksAgent: false,
-    }) as never
-  return { b, agent, commands, replies, sender, chat }
+    }) satisfies WireCommand
+  return { b, agent, cards, commands, replies, sender, chat }
 }
 
 test("a chat in an archived root is refused, and the agent is never called", async () => {
@@ -70,6 +81,48 @@ test("the command's id is the send's id", async () => {
   expect(agent.calls[0]?.args[0]).toMatchObject({
     details: { sendId: "c-2" },
   })
+})
+
+test("a chat command spends its card once written; a refused one leaves it", async () => {
+  const { cards, commands, replies, sender, chat } = setUp()
+  await commands.handle(sender, ALICE, { ...chat("c-4"), cardId: "card-1" })
+  // Refused by `sendChat` itself: an image the host does not store.
+  await commands.handle(sender, ALICE, {
+    ...chat("c-5"),
+    text: `look ![a](/blob/${"b".repeat(64)})`,
+    cardId: "card-2",
+  })
+  expect(replies.map(r => r.outcome)).toEqual(["appended", "refused"])
+  expect(
+    cards.calls.filter(c => c.method === "spend").map(c => c.args[0]),
+  ).toEqual(["card-1"])
+})
+
+test("a taken card in an archived root is refused, and the agent is never called", async () => {
+  const { b, agent, commands } = setUp()
+  putValue(b.doc, {
+    namespace: ARCHIVE_NAMESPACE,
+    key: ROOT_ID,
+    value: encodeArchive({
+      root: ROOT_ID,
+      state: "archived",
+      by: ALICE,
+      at: 1,
+    }),
+  })
+  const out = await commands.sendTaken(ALICE, "s-1", {
+    text: "from the queue",
+    at: atEntry(ROOT_ID),
+    mode: "queue",
+    lane: null,
+    asksAgent: false,
+    mentions: [],
+    work: null,
+    card: null,
+    reserved: null,
+  })
+  expect(out).toMatchObject({ kind: "refused", code: ERR.ARCHIVED })
+  expect(agent.calls).toEqual([])
 })
 
 test("a seat whose principal names nobody is refused whatever it sends", async () => {

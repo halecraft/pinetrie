@@ -19,7 +19,6 @@ import {
   agentActivity,
   type BannerRecord,
   type CardRecord,
-  type ChatMode,
   type CommandSummary,
   type EntryLike,
   type HaveRecord,
@@ -32,6 +31,7 @@ import {
   messageImages,
   nearestRevision,
   type OfferRecord,
+  type PlanMode,
   type Position,
   type ProjectRecord,
   promptOf,
@@ -413,7 +413,7 @@ export function worksOwn(
     readonly lane: ThreadLane
     /** The thread's end: where a reply would create its lane. */
     readonly end: Position
-    readonly mode: ChatMode
+    readonly mode: PlanMode
     /** Where a branch would start. */
     readonly at: Position
     readonly work: WorkSetting | null

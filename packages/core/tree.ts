@@ -16,10 +16,10 @@ import type { AskIndex } from "./asks.ts"
 import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
 import {
   atEntry,
-  type ChatMode,
   type EntryId,
   entryId,
   type LaneName,
+  type PlanMode,
   type Position,
   type RevisionRecord,
   type StopRecord,
@@ -1085,7 +1085,7 @@ export function threadOf(
   lanes: readonly LaneView[],
   send: {
     readonly at: Position
-    readonly mode: ChatMode
+    readonly mode: PlanMode
     readonly lane: LaneName | null
     readonly me: WriterId
   },
@@ -1173,7 +1173,7 @@ export function planStop(
  * agent work asks through the `@agent ` its composer starts with.
  */
 export const agentByDefault = (send: {
-  readonly mode: ChatMode
+  readonly mode: PlanMode
   readonly lane: ThreadLane
   readonly asksAgent: boolean
 }): boolean =>

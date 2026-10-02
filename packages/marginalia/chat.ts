@@ -19,7 +19,6 @@ import {
   type AgentMessageLike,
   address,
   agentByDefault,
-  type ChatMode,
   type CommandRef,
   ERR,
   IMAGE_MIMES,
@@ -28,6 +27,7 @@ import {
   isBusy,
   type LaneName,
   type Mention,
+  type PlanMode,
   type Position,
   type Refusal,
   type Responder,
@@ -316,7 +316,7 @@ export type ChatDecision =
 export function addressChat(input: {
   readonly mentions: readonly Mention[]
   readonly participants: readonly string[]
-  readonly mode: ChatMode
+  readonly mode: PlanMode
   readonly lane: ThreadLane
   readonly asksAgent: boolean
   /** The text is a command. */
@@ -352,7 +352,7 @@ export function planChat(input: {
   readonly author: WriterId
   readonly authorName: string
   readonly text: string
-  readonly mode: ChatMode
+  readonly mode: PlanMode
   /** What the sender saw: the end they read, or the branch point. */
   readonly at: Position
   /** The thread, from `threadOf`. */

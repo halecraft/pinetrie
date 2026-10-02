@@ -19,7 +19,13 @@ import { beginRun, readStreams } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, join, noQueued, waitFor } from "../harness.ts"
+import {
+  committedProject,
+  idleNow,
+  join,
+  noQueued,
+  waitFor,
+} from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
@@ -64,11 +70,7 @@ async function run(check: Checks["check"]): Promise<void> {
         log,
       })
     let th = await open(() => {})
-    const tidle = () =>
-      waitFor(
-        () => Object.keys(th.doc.activeRuns()).length === 0 && noQueued(th),
-        60_000,
-      )
+    const tidle = () => waitFor(() => idleNow(th), 60_000)
     const ttree = () => readTreeIndex(th.doc)
     const tlane = () => readLanes(th.doc, ttree(), readCards(th.cards))[0]
     // Every open stream at each change of the host's document.

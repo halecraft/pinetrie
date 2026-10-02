@@ -125,12 +125,15 @@ export function sendable(
  * What a composer's next send does, as values: `sendButton` and
  * `placeholderWords` say it.
  */
+/**
+ * What a composer's send does: a chat in its mode, or `queue`, which queues
+ * the card, by this client, and sends nothing: the host takes it when its
+ * lane is free (ADR-0048).
+ */
+export type ComposerMode = ChatMode | "queue"
+
 export interface SendPlan {
-  /**
-   * `queue`: the card is queued, by this client, and nothing is sent: the
-   * host takes it when its lane is free (ADR-0048).
-   */
-  readonly mode: ChatMode
+  readonly mode: ComposerMode
   /** The send creates a lane: the chip then says where it works. */
   readonly createsLane: boolean
   /** Who it is for: `addressChat`'s answer, unchanged. */
@@ -179,7 +182,7 @@ export function planSend(input: {
   const compelled = to.compels.kind === "agent"
   const queued =
     lane.kind === "lane" && (isBusy(lane) || input.command !== null)
-  const mode: ChatMode = fresh ? "branch" : queued ? "queue" : "reply"
+  const mode: ComposerMode = fresh ? "branch" : queued ? "queue" : "reply"
   return {
     mode,
     createsLane: compelled && (fresh || lane.kind === "none"),

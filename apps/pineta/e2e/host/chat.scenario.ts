@@ -11,7 +11,7 @@ import { projectTranscript, ROOT } from "@pineta/core"
 import { readCards, readLanes, readTreeIndex } from "@pineta/reads"
 import { readStreams } from "@pineta/schema"
 import type { Checks } from "../checks.ts"
-import { join, noQueued, suiteModel, waitFor, withHost } from "../harness.ts"
+import { idleNow, join, suiteModel, waitFor, withHost } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 import { at, START_AGENT, START_CHAT } from "./support.ts"
 
@@ -25,12 +25,7 @@ async function run(check: Checks["check"]): Promise<void> {
     { model: { kind: "scripted", script }, log: () => {} },
     async host => {
       const tree = () => readTreeIndex(host.doc)
-      const idle = () =>
-        waitFor(
-          () =>
-            Object.keys(host.doc.activeRuns()).length === 0 && noQueued(host),
-          60_000,
-        )
+      const idle = () => waitFor(() => idleNow(host), 60_000)
       /** The path to `tip`, as "role:text" (chat as "Name:text"). */
       const shape = (tip: string | null) =>
         projectTranscript(tree(), tip).map(m =>

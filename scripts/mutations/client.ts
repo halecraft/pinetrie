@@ -664,8 +664,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a busy lane never queues",
     file: send,
-    from: '  const mode: ChatMode = fresh ? "branch" : queued ? "queue" : "reply"',
-    to: '  const mode: ChatMode = fresh ? "branch" : "reply"',
+    from: '  const mode: ComposerMode = fresh ? "branch" : queued ? "queue" : "reply"',
+    to: '  const mode: ComposerMode = fresh ? "branch" : "reply"',
     command: unit,
     expect: "a busy lane queues the next card",
   },

@@ -13,7 +13,7 @@ import {
 } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, join, noQueued, waitFor } from "../harness.ts"
+import { committedProject, idleNow, join, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { at, BRANCH, idOfIn, START_AGENT } from "./support.ts"
@@ -41,11 +41,7 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     const du = await join(dh, "uma", "direct")
     await du.setName("Uma")
-    const didle = () =>
-      waitFor(
-        () => Object.keys(dh.doc.activeRuns()).length === 0 && noQueued(dh),
-        60_000,
-      )
+    const didle = () => waitFor(() => idleNow(dh), 60_000)
     const laneWith = (text: string) => {
       const id = idOfIn(dh.doc, text)
       const index = readTreeIndex(dh.doc)

@@ -45,9 +45,9 @@ function MessageView(p: MessageProps) {
       : node.role === "assistant"
         ? "agent"
         : node.role === "land"
-          ? "resolving your work"
+          ? "bringing up to date"
           : node.role === "update"
-            ? "your work"
+            ? "brought up to date"
             : node.role === "stack"
               ? "stack"
               : node.role

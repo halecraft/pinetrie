@@ -1,13 +1,14 @@
 // host/commands/chat — a human message, from a `chat` command or a queued
 // card the host took: the one send path, so a busy lane, conflicts and who a
-// message is for are decided once. A message sent from a card spends the card
-// (ADR-0048).
+// message is for are decided once. Who spends the card is the caller's:
+// the dispatcher for a `chat` command, the take for a queued card (ADR-0048).
 
 import {
   type BlobStore,
   ERR,
   type Intent,
   laneNameForThread,
+  type PlanMode,
   type TreeIndex,
   threadOf,
   type WorkSetting,
@@ -42,7 +43,10 @@ import type { CardPort } from "../cards.ts"
 import type { Runs } from "../runs.ts"
 import type { LaneWork } from "../work/index.ts"
 
-export type Chat = Omit<Extract<Intent, { kind: "chat" }>, "kind">
+/** A chat to send: a `chat` command's, or a taken card's, in mode `queue`. */
+export type Chat = Omit<Extract<Intent, { kind: "chat" }>, "kind" | "mode"> & {
+  readonly mode: PlanMode
+}
 
 export interface ChatDeps {
   readonly basics: Basics
@@ -52,8 +56,8 @@ export interface ChatDeps {
   >
   readonly work: Pick<LaneWork, "project" | "checkDirectory" | "prepareLane">
   readonly blobs: Pick<BlobStore, "ref">
-  /** Who wrote in a card, and spending it once it is sent (ADR-0048). */
-  readonly cards: Pick<CardPort, "writers" | "spend">
+  /** Who wrote in a card: its other writers are a message's contributors (ADR-0048). */
+  readonly cards: Pick<CardPort, "writers">
   readonly start: Runs["start"]
 }
 
@@ -66,19 +70,23 @@ export interface ChatContext {
 }
 
 /**
+ * Whether a send's answer took its card's text: written or running. A busy
+ * lane, a conflict, a refusal or a failure leaves the card, so nothing typed
+ * is lost: the sender's client queues a card the lane was busy for.
+ */
+export const spendsCard = (sent: Outcome): boolean =>
+  sent.kind === "appended" || sent.kind === "started"
+
+/**
  * Gather, `threadOf` and `planChat`, then `executeChat`. A message sent from
- * a card carries its other writers as contributors ("Ada, with Bea"), and
- * spends the card once it is written or running. A busy lane, a conflict or
- * a refusal leaves the card, so nothing typed is lost: the sender's client
- * queues a card the lane was busy for. A card the host took (`taken`) has no
- * record left, and `drain` destroys its text itself.
+ * a card carries its other writers as contributors ("Ada, with Bea"). It
+ * spends nothing: whether the card goes is the caller's (`spendsCard`).
  */
 export async function sendChat(
   deps: ChatDeps,
   writer: WriterId,
   sendId: string,
   chat: Chat,
-  how: { readonly taken: boolean } = { taken: false },
 ): Promise<Outcome> {
   const { agent, work, blobs, cards } = deps
   const { doc, newId } = deps.basics
@@ -178,8 +186,6 @@ export async function sendChat(
     writer,
     work: chat.work,
   })
-  const written = sent.kind === "appended" || sent.kind === "started"
-  if (chat.card !== null && written && !how.taken) await cards.spend(chat.card)
   return sent
 }
 

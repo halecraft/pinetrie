@@ -7,7 +7,7 @@ import { readCommands } from "@pineta/reads"
 import { readEntries, rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, join, noQueued, waitFor } from "../harness.ts"
+import { committedProject, idleNow, join, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { START_CHAT } from "./support.ts"
@@ -35,11 +35,7 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     const cu = await join(ch, "uma", "containers")
     await cu.setName("Uma")
-    const cidle = () =>
-      waitFor(
-        () => Object.keys(ch.doc.activeRuns()).length === 0 && noQueued(ch),
-        60_000,
-      )
+    const cidle = () => waitFor(() => idleNow(ch), 60_000)
     await waitFor(() => readCommands(ch.doc).length > 0, 10_000)
     check(
       "the host lists every command its pi loaded, each under its package",

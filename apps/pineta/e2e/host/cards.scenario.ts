@@ -12,7 +12,7 @@ import { cardDocId, readLaneNames, readLaneTip } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { join, noQueued, waitFor } from "../harness.ts"
+import { idleNow, join, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { at, LATE_LOAD_MS, START_AGENT, sleep, slowToLoad } from "./support.ts"
@@ -43,11 +43,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const l = readLaneNames(ch.doc)[0]
       return l === undefined ? null : readLaneTip(ch.doc, l)
     }
-    const cIdle = () =>
-      waitFor(
-        () => Object.keys(ch.doc.activeRuns()).length === 0 && noQueued(ch),
-        30_000,
-      )
+    const cIdle = () => waitFor(() => idleNow(ch), 30_000)
     const onHost = (id: CardId) => readCards(ch.cards).find(c => c.id === id)
     const drafting = (end: string | null) =>
       ({ kind: "drafting", at: at(end), lane: null }) as const

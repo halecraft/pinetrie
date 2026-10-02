@@ -10,7 +10,7 @@ import { readCards, readLanes, readTreeIndex } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, join, noQueued, waitFor } from "../harness.ts"
+import { committedProject, idleNow, join, waitFor } from "../harness.ts"
 import { RED_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -43,11 +43,7 @@ async function run(check: Checks["check"]): Promise<void> {
         log: () => {},
       })
     let th = await start()
-    const tidle = () =>
-      waitFor(
-        () => Object.keys(th.doc.activeRuns()).length === 0 && noQueued(th),
-        30_000,
-      )
+    const tidle = () => waitFor(() => idleNow(th), 30_000)
     const readCall = () => {
       const tree = readTreeIndex(th.doc)
       const spine = projectSpine(

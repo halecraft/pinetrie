@@ -1,4 +1,4 @@
-// update — your work merged into a thread, and the offer split into a stack
+// update — the project's work merged into a thread, and the offer split into a stack
 // (ADR-0038).
 //
 // Two pi `CustomMessage`s in `land.ts`'s pattern: `content` is what the model
@@ -73,7 +73,7 @@ const plural = (n: number, one: string, many: string) =>
 
 /** The one line a column shows for an update. */
 export const updateLine = (d: UpdateDetails): string =>
-  `↓ your work merged in: ${plural(d.files.length, "file", "files")} changed`
+  `↓ brought up to date: ${plural(d.files.length, "file", "files")} changed`
 
 /** The update message: what changed in this thread's files, for the model. */
 export function encodeUpdate(

@@ -845,7 +845,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `addressChat`'s `Address`, unchanged. A fresh column sends `branch`; a
   send to a busy lane (`isBusy`), plain or asking the agent, and a card
   with a command, queue: the editor queues the card itself (the `queue`
-  act), and sends nothing. A `busy` answer, the host's view of a lane the
+  act), and sends nothing: `SendPlan.mode` is a `ComposerMode`, whose `queue`
+  is the client's and never reaches the wire. A `busy` answer, the host's view of a lane the
   page thought idle, queues it too.
   `sendButton` words the plan (labels: `docs/06-interface.md`), and
   `placeholderWords` gives the box's placeholder: the composer holds only its
@@ -1049,7 +1050,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   box takes focus in a column already open. The card is then queued like any
   other (`planSend`), and the host carries the command out when it takes it.
 - **Land, update and stack messages** show as one line each, roles `land`
-  ("resolving your work"), `update` ("your work") and `stack`.
+  ("bringing up to date"), `update` ("brought up to date") and `stack`.
 - **The page header counts offers open** in your repo, as it counts
   mentions, and the agent's running threads; each row leads with the
   thread's name and opens its thread.

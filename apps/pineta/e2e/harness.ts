@@ -41,6 +41,14 @@ export const noQueued = (host: Pick<RunningHost, "cards">): boolean =>
   readCards(host.cards).every(c => c.place.kind !== "queued")
 
 /**
+ * The host has nothing to do: no lane runs, and no card waits for one. A card
+ * queued under a run is taken only as it ends, so "no run" alone can hold
+ * between a run's end and the take.
+ */
+export const idleNow = (host: Pick<RunningHost, "doc" | "cards">): boolean =>
+  Object.keys(host.doc.activeRuns()).length === 0 && noQueued(host)
+
+/**
  * A project for a host with tools: a jj repo, colocated with git, with
  * `files` committed. A lane starts from your committed work (`@-`,
  * ADR-0032), so what its agent should see must be committed. The path is the

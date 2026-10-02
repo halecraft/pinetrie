@@ -209,6 +209,32 @@ describe("drain", () => {
     expect(readCards(b.cards)[0]?.place.kind).toBe("queued")
   })
 
+  test("a send that throws writes the card back below the line, saying the host failed, and the next is taken", async () => {
+    const { b, events, deps } = setUp({ "c-1": "first", "c-2": "second" }, [])
+    const throwing: TakeDeps = {
+      ...deps,
+      send: async taken => {
+        if (taken.card.id === "c-1") throw new Error("store closed")
+        return deps.send(taken)
+      },
+    }
+    queue(b.cards, "c-1", "a")
+    queue(b.cards, "c-2", "b")
+    await drain(throwing, LANE)
+    expect(readCards(b.cards)).toEqual([
+      expect.objectContaining({
+        id: "c-1",
+        place: { kind: "drafting", at: atEntry(E1), lane: LANE },
+        unsent: "the host failed: store closed",
+      }),
+    ])
+    expect(events).toEqual([
+      "hydrate c-1,c-2",
+      "send c-2: second",
+      "destroy c-2",
+    ])
+  })
+
   test("an empty plain card starts nothing and is spent", async () => {
     const { b, events, deps } = setUp({ "c-1": "  " }, [])
     queue(b.cards, "c-1", "a")
@@ -286,6 +312,24 @@ describe("drain: bring up to date (ADR-0055)", () => {
       }),
     ])
     expect(events).toContain("send c-2: next")
+  })
+
+  test("an update that throws writes the card back with its command, saying the host failed", async () => {
+    const { b, deps } = setUp({ "c-1": "x" }, [])
+    const throwing: TakeDeps = {
+      ...deps,
+      work: {
+        prepareUpdate: async () => {
+          throw new Error("jj broke")
+        },
+      },
+    }
+    queue(b.cards, "c-1", "a", CMD)
+    await drain(throwing, LANE)
+    expect(readCards(b.cards)[0]).toMatchObject({
+      command: CMD,
+      unsent: "the host failed: jj broke",
+    })
   })
 
   test("its text refused after a clean update: back below the line without the command, which was carried out", async () => {

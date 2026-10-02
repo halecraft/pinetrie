@@ -29,7 +29,7 @@ import {
 } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, join, waitFor } from "../harness.ts"
+import { committedProject, idleNow, join, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
@@ -84,8 +84,7 @@ async function run(
           await ap.fill(`${col(0)} .composer .input`, text)
           await ap.click(`${col(0)} .composer .send`)
         }
-        const idle = () =>
-          waitFor(() => Object.keys(askHost.doc.activeRuns()).length === 0)
+        const idle = () => waitFor(() => idleNow(askHost))
         const askId = (text: string) => {
           const index = readTreeIndex(askHost.doc)
           return (
@@ -374,8 +373,7 @@ async function run(
           await tp.click(`${col(0)} .composer .send`)
           await readRaw(tp)
         }
-        const toolIdle = () =>
-          waitFor(() => Object.keys(toolHost.doc.activeRuns()).length === 0)
+        const toolIdle = () => waitFor(() => idleNow(toolHost))
         const appears = (sel: string, timeout = 20_000) =>
           tp.waitForSelector(sel, { timeout }).then(
             () => true,

@@ -121,7 +121,9 @@ text names (`sweepTexts`).
   `sendChat` has no gate of its own.
 - **A message sent from a card spends it** (ADR-0048): `sendChat` names the
   card's other writers as contributors, through the card port, and spends
-  the card after `executeChat` answers `appended` or `started`. The
+  nothing. The dispatcher's `chat` case spends the card when the answer
+  takes its text (`spendsCard`: `appended` or `started`); the take
+  destroys a taken card's text itself, since it deleted the record. The
   command's text is what is sent: the text its sender saw.
 - **A busy lane answers `busy` and writes nothing.** The sender's client
   queues its card itself: a card's place is a person's move, and the host
@@ -147,6 +149,8 @@ text names (`sweepTexts`).
   (`planUnsent`): drafting where it was queued, saying why, and never queued
   again, or the next drain would fail the same way (S69, answer 5). Its text
   is kept. After a clean update its command is cleared: it was carried out.
+  An update or a send that throws writes the card back the same way, saying
+  the host failed: the take has deleted its record, so nothing else would.
 - **Three things drain a lane:** a run's end (`settle`), startup
   (`recover`), and a change to the cards document. The watch reads records,
   never texts, so typing in a card costs it nothing. A lane's drain is queued

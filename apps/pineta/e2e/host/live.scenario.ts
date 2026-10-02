@@ -10,7 +10,7 @@ import { readBanners, readTreeIndex } from "@pineta/reads"
 import { readLaneNames, readLaneTip } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { join, waitFor } from "../harness.ts"
+import { idleNow, join, waitFor } from "../harness.ts"
 import { imageSize, RED_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -41,7 +41,7 @@ async function run(check: Checks["check"]): Promise<void> {
   })
   const asker = await join(live, "asker", "live")
   await asker.chat(PROMPT, ROOT, START_AGENT)
-  await waitFor(() => Object.keys(live.doc.activeRuns()).length === 0, 120_000)
+  await waitFor(() => idleNow(live), 120_000)
   const [lane] = readLaneNames(live.doc)
   const last = projectTranscript(
     readTreeIndex(live.doc),
@@ -64,7 +64,7 @@ async function run(check: Checks["check"]): Promise<void> {
     ROOT,
     START_AGENT,
   )
-  await waitFor(() => Object.keys(live.doc.activeRuns()).length === 0, 120_000)
+  await waitFor(() => idleNow(live), 120_000)
   // A Start Agent message begins a thread of its own: its lane is the new one.
   const imageLane = readLaneNames(live.doc).find(l => l !== lane)
   const seenBy = projectTranscript(
@@ -101,10 +101,7 @@ async function run(check: Checks["check"]): Promise<void> {
     ROOT,
     START_AGENT,
   )
-  await waitFor(
-    () => Object.keys(drawing.doc.activeRuns()).length === 0,
-    120_000,
-  )
+  await waitFor(() => idleNow(drawing), 120_000)
   await waitFor(() => readBanners(drawing.doc).size > 0, 120_000)
   await drawing.quiet()
   const [banner] = readBanners(drawing.doc).values()

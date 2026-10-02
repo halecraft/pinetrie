@@ -15,7 +15,7 @@ import {
 import type { Outcome } from "@pineta/protocol/codec"
 import { readCards, readRunning, readThreadName } from "@pineta/reads"
 import type { CardsDocHandle } from "@pineta/schema"
-import type { Basics } from "./basics.ts"
+import { type Basics, messageOf } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { Chat } from "./commands/chat.ts"
 import type { Runs } from "./runs.ts"
@@ -102,7 +102,11 @@ export async function drain(deps: TakeDeps, lane: LaneName): Promise<void> {
   }
 }
 
-/** One taken card, sent through its command. "ran": a run started, whose end drains again. */
+/**
+ * One taken card, sent through its command. "ran": a run started, whose end
+ * drains again. The take deleted its record, so a throw while it is carried
+ * out writes it back too, or the card would be lost.
+ */
 async function carryOut(
   deps: TakeDeps,
   lane: LaneName,
@@ -110,12 +114,15 @@ async function carryOut(
 ): Promise<"ran" | "next"> {
   const { card } = taken
   let sending = card
+  const hostFailed = (error: unknown) => {
+    unsent(deps, sending, `the host failed: ${messageOf(error)}`)
+    return null
+  }
   if (card.command === "bring-up-to-date") {
-    const prepared = await deps.work.prepareUpdate(
-      lane,
-      card.place.by,
-      taken.text,
-    )
+    const prepared = await deps.work
+      .prepareUpdate(lane, card.place.by, taken.text)
+      .catch(hostFailed)
+    if (prepared === null) return "next"
     if ("refused" in prepared) {
       unsent(deps, card, prepared.refused)
       return "next"
@@ -132,14 +139,13 @@ async function carryOut(
     await deps.texts.destroy(card.id)
     return "next"
   }
-  const sent = await deps.send(taken)
+  const sent = await deps.send(taken).catch(hostFailed)
+  if (sent === null) return "next"
   switch (sent.kind) {
     case "appended":
-      await deps.texts.destroy(card.id)
-      return "next"
     case "started":
       await deps.texts.destroy(card.id)
-      return "ran"
+      return sent.kind === "started" ? "ran" : "next"
     case "busy":
       // A run started under the take: the card goes back on top, as it was.
       deps.basics.cards.cards.set(card.id, encodeCard(sending))
@@ -149,6 +155,9 @@ async function carryOut(
       return "next"
     case "conflict":
       unsent(deps, sending, "two threads end here: send it from one of them")
+      return "next"
+    case "failed":
+      unsent(deps, sending, `the host failed: ${sent.message}`)
       return "next"
     default:
       unsent(deps, sending, `not sent: ${sent.kind}`)

@@ -355,9 +355,9 @@ describe("planResolution: the land message", () => {
     expect(m.customType).toBe(LAND_TYPE)
     const shown = renderableMessage(m)
     expect(shown.role).toBe("land")
-    expect(shown.content).toBe("⚠ resolving your work: 2 files conflict")
+    expect(shown.content).toBe("⚠ bringing up to date: 2 files conflict")
     expect(renderableMessage(plan([], 100_000)).content).toBe(
-      "✓ resolving your work: no conflicts",
+      "✓ bringing up to date: no conflicts",
     )
   })
 })
