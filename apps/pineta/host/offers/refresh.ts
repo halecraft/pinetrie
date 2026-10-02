@@ -27,7 +27,7 @@ import { readRevisions, readThreadName, readTreeIndex } from "@pineta/reads"
 import { readLaneTip, type SessionDocHandle } from "@pineta/schema"
 import { executeOffer } from "./execute.ts"
 import { offerRecord, planOfferEffects } from "./plan.ts"
-import type { OfferPlace, OfferState } from "./state.ts"
+import type { OfferPlace, OfferState, Placed } from "./state.ts"
 
 /**
  * An offer's line until an agent describes it: the thread's name and its
@@ -47,21 +47,15 @@ export function wipLine(
 
 export interface Refresh {
   /**
-   * A new offer from `sources` (the lane's tip, or a stack's revisions) on
-   * `start`, under the lane's name; their messages get the host's trailers
-   * and the offer's ledger (`offerMessage`).
+   * Abandon the offer's revisions (`changes`), then build a new one from
+   * `sources` (the lane's tip, or a stack's revisions) under the lane's
+   * name; their messages get the host's trailers and the offer's ledger
+   * (`offerMessage`).
    */
-  build(
-    lane: LaneName,
-    name: ThreadName,
-    place: OfferPlace & { readonly target: CommitId },
-    sources: readonly OfferSource[],
-  ): Promise<void>
-  /** Abandon the offer's revisions (`changes`), then build anew. */
   rebuild(
     lane: LaneName,
     name: ThreadName,
-    place: OfferPlace & { readonly target: CommitId },
+    place: Placed,
     changes: readonly string[],
     sources: readonly OfferSource[],
   ): Promise<void>
@@ -106,7 +100,7 @@ export function createRefresh(state: OfferState): Refresh {
   async function build(
     lane: LaneName,
     name: ThreadName,
-    place: OfferPlace & { readonly target: CommitId },
+    place: Placed,
     sources: readonly OfferSource[],
   ): Promise<void> {
     const at = {
@@ -134,7 +128,7 @@ export function createRefresh(state: OfferState): Refresh {
   async function rebuild(
     lane: LaneName,
     name: ThreadName,
-    place: OfferPlace & { readonly target: CommitId },
+    place: Placed,
     changes: readonly string[],
     sources: readonly OfferSource[],
   ): Promise<void> {
@@ -146,7 +140,7 @@ export function createRefresh(state: OfferState): Refresh {
   async function repair(
     lane: LaneName,
     name: ThreadName,
-    place: OfferPlace & { readonly target: CommitId },
+    place: Placed,
     changes: readonly string[],
   ) {
     const last = changes.length - 1
@@ -204,5 +198,5 @@ export function createRefresh(state: OfferState): Refresh {
     )
   }
 
-  return { build, rebuild, record, refresh }
+  return { rebuild, record, refresh }
 }

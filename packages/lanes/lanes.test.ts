@@ -37,7 +37,6 @@ import {
   executeOrThrow,
   fetchById,
   fileDiff,
-  hasBookmark,
   hostBytesRunner,
   hostCommitIn,
   hostJj,
@@ -1009,7 +1008,9 @@ describe("a lane's repo, with jj", () => {
     expect(await commitsOf(yoursJj, "@")).toEqual(atBefore)
     expect(await readFile(path.join(yoursDir, "wip.txt"), "utf8")).toBe("wip\n")
     expect(await changeOf(ops, await lineNow())).toBe(c1)
-    expect(await hasBookmark(ops, bookmark)).toBe(false)
+    expect(
+      await commitsOf(ops, `present(bookmarks(exact:"${bookmark}"))`),
+    ).toEqual([])
     // jj itself refuses a take that is not forward (S77 item 1).
     expect(
       (await ops(["bookmark", "move", line.onto, "--to", base[0] ?? ""])).ok,

@@ -46,6 +46,9 @@ export interface OfferPlace {
   readonly start: readonly CommitId[]
 }
 
+/** A place where the offer can sit: its base has a commit (not a WIP gone). */
+export type Placed = OfferPlace & { readonly target: CommitId }
+
 export interface OfferState {
   readonly root: string
   /** The integration line's names (ADR-0060). */

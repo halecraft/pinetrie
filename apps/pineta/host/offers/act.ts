@@ -75,6 +75,7 @@ export function act(
         )
           below.add(d.bookmark)
       const yourEdits = await yourEditsIn(ops, offer.files)
+      const takenAt = basics.now()
       // plan
       const planned = planTake({
         root,
@@ -85,12 +86,12 @@ export function act(
           offer,
           place,
           yourEdits,
-          now: basics.now(),
+          now: takenAt,
         }),
         destinations,
         to,
         below: bookmark => below.has(bookmark),
-        now: basics.now(),
+        now: takenAt,
       })
       if (planned.kind === "refused") return planned.code
       // execute

@@ -141,11 +141,6 @@ export async function startOfOffer(
   )
 }
 
-/** Whether a bookmark exists in your repo. */
-export async function hasBookmark(jj: Runner, name: string): Promise<boolean> {
-  return (await commitsOf(jj, `present(bookmarks(exact:"${name}"))`)).length > 0
-}
-
 /** Whether `to` has `from`'s description, and `jj interdiff` between them is empty. */
 export async function sameAs(
   jj: Runner,
