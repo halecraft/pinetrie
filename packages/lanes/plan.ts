@@ -1309,6 +1309,12 @@ export interface BaseFacts {
  * volume holds `lost+found`, which `jj git clone` refuses (S44 item 6). It then
  * takes your `@-` by id and installs. A refresh fetches and moves only when
  * your `@-` moved, and installs only when the lockfile changed.
+ *
+ * When your `@-` was rewritten rather than built on, the fetched ref moves
+ * sideways: the import abandons the commit it named, and rebases the base's
+ * working-copy commit, a child of it, with `--ignore-working-copy`. The
+ * working copy is then stale, and `jj new` refuses until `jj workspace
+ * update-stale`, which does nothing when it is not (S74).
  */
 export function planBaseRefresh(input: {
   readonly base: BaseFacts | null
@@ -1329,7 +1335,13 @@ export function planBaseRefresh(input: {
     install !== null && (base === null || base.lock !== input.lock)
   return [
     ...init,
-    ...(moved ? [fetchById(yours), inLane("jj", "new", ...yours)] : []),
+    ...(moved
+      ? [
+          fetchById(yours),
+          inLane("jj", "workspace", "update-stale"),
+          inLane("jj", "new", ...yours),
+        ]
+      : []),
     ...(installs ? [laneShell(install.command)] : []),
   ]
 }

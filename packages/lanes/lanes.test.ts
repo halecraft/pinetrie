@@ -1328,6 +1328,48 @@ describe("a lane's repo, with jj", () => {
     expect([lane.conflicted, lane.files]).toEqual([false, ["d.txt"]])
   }, 60_000)
 
+  test("a base refreshes after your @- was rewritten, not built on (S74)", async () => {
+    const yoursDir = path.join(top, "rewritten-yours")
+    const baseDir = path.join(top, "rewritten-base")
+    await run("mkdir", ["-p", yoursDir, baseDir])
+    await run("jj", ["git", "init", "--colocate", yoursDir])
+    const yoursJj = hostJj(yoursDir)
+    const inBase = (steps: readonly LaneStep[]) =>
+      executeOrThrow(
+        onHost(steps, {
+          "/mnt/host-working-copy": yoursDir,
+          "/workspace": baseDir,
+        }),
+        {
+          host: hostRunner(),
+          lane: hostRunner(baseDir),
+          laneBytes: hostBytesRunner(baseDir),
+        },
+      )
+    await writeFile(path.join(yoursDir, "a.txt"), "first\n")
+    await yoursJj(["commit", "-m", "yours"])
+    const first = await yoursNow(yoursJj)
+    await inBase(
+      planBaseRefresh({ base: null, yours: first, lock: null, install: null }),
+    )
+    // Your @- rewritten in place: the base's commit is no ancestor of it.
+    await writeFile(path.join(yoursDir, "a.txt"), "rewritten\n")
+    await yoursJj(["squash", "--into", "@-"])
+    const rewritten = await yoursNow(yoursJj)
+    expect(rewritten).not.toEqual(first)
+    await inBase(
+      planBaseRefresh({
+        base: { commits: first, lock: null },
+        yours: rewritten,
+        lock: null,
+        install: null,
+      }),
+    )
+    expect(await readFile(path.join(baseDir, "a.txt"), "utf8")).toBe(
+      "rewritten\n",
+    )
+  })
+
   test("retiring a repo from before offers: history kept, out of your log", async () => {
     const dir = path.join(top, "retire")
     await run("mkdir", ["-p", dir])

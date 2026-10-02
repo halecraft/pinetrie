@@ -8,6 +8,14 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a stale base working copy is not recovered",
+    file: plan,
+    from: '          inLane("jj", "workspace", "update-stale"),\n',
+    to: "",
+    command: unit,
+    expect: "a base refreshes after your @- was rewritten",
+  },
+  {
     name: "a version of yours since the host's write goes unlisted",
     file: plan,
     from: "    if (!entry.byHost) yours.push({ from: before.commit, to: at })",

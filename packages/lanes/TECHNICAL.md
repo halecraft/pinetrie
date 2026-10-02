@@ -92,6 +92,11 @@ containers, disks and the helper.
   the disk lacks the commit, and puts the commit on a branch
   (`refs/heads/pineta/fetched/<i>`). jj imports only branches, remote branches
   and tags, so it does not see a commit fetched with no ref (S44 item 7).
+  When your `@-` was rewritten, that branch moves sideways, and the import
+  (`--ignore-working-copy`) abandons the commit it named and rebases its
+  descendants. On the base disk the working-copy commit is one of them, so
+  the working copy goes stale: `planBaseRefresh` runs `jj workspace
+  update-stale` before `jj new`, which does nothing when it is fresh (S74).
 - **By bundle, into your repo** (`planFetch`): `git bundle create -` in the
   lane, written to a host file through the channel as bytes, then
   `git -C <root> fetch <file> +refs/heads/pineta/<lane>:refs/remotes/pineta-<lane>/tip`.

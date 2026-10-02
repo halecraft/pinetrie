@@ -774,6 +774,7 @@ describe("planBaseRefresh: the base snapshot at your @-", () => {
       "lane: git init -q",
       "lane: jj git init --colocate",
       `lane: ${fetchById([C1]).argv.join(" ")}`,
+      "lane: jj workspace update-stale",
       "lane: jj new c1",
       "lane: sh -c pnpm install --frozen-lockfile",
     ])
@@ -788,7 +789,7 @@ describe("planBaseRefresh: the base snapshot at your @-", () => {
       }),
     ).toEqual([])
   })
-  test("fetch and jj new when only your @- moved", () => {
+  test("fetch, recover a stale working copy, and jj new when only your @- moved", () => {
     expect(
       argvs(
         planBaseRefresh({
@@ -798,7 +799,11 @@ describe("planBaseRefresh: the base snapshot at your @-", () => {
           install,
         }),
       ),
-    ).toEqual([`lane: ${fetchById([C2]).argv.join(" ")}`, "lane: jj new c2"])
+    ).toEqual([
+      `lane: ${fetchById([C2]).argv.join(" ")}`,
+      "lane: jj workspace update-stale",
+      "lane: jj new c2",
+    ])
   })
   test("then the install when the lockfile changed too", () => {
     expect(
