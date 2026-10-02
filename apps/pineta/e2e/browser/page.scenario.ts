@@ -15,7 +15,9 @@ import {
 } from "@pineta/core"
 import {
   readCards,
+  readLanes,
   readMarks,
+  readNames,
   readParticipantNames,
   readTreeIndex,
   readTyping,
@@ -222,6 +224,15 @@ async function run(check: Checks["check"]): Promise<void> {
         "＋ agent's new tab is ready to type in: its box has focus",
         (await caretIn(0)) === 0,
       )
+      // Its thread is named before anything is typed (ADR-0057).
+      const nameBefore = await page
+        .waitForSelector(`${col(0)} .column-head .agent-name[data-thread]`, {
+          timeout: 15_000,
+        })
+        .then(
+          n => n.getAttribute("data-thread"),
+          () => null,
+        )
       /** Where the columns start: the rail's width, plus its border. */
       const stripLeft = () =>
         page.$eval("#strip", n => Math.round(n.getBoundingClientRect().left))
@@ -235,6 +246,24 @@ async function run(check: Checks["check"]): Promise<void> {
       // Structure, not the model's words: a reply appeared, in this column. What
       // the model says is `e2e:live`'s to check.
       await idle()
+      {
+        const [lane, ...others] = readLanes(host.doc, readTreeIndex(host.doc))
+        const laneName =
+          lane === undefined || others.length > 0
+            ? null
+            : readNames(host.doc).get(lane.name)
+        const nameAfter = await page.getAttribute(
+          `${col(0)} .column-head .agent-name`,
+          "data-thread",
+        )
+        check(
+          "a new agent is named before anything is typed, and its lane keeps that name",
+          nameBefore !== null &&
+            laneName === nameBefore &&
+            nameAfter === nameBefore,
+          `${nameBefore}, ${laneName}, ${nameAfter}`,
+        )
+      }
       const roles = await page.$$eval(`${col(0)} .msg`, ns =>
         ns.map(
           n =>
@@ -477,14 +506,15 @@ async function run(check: Checks["check"]): Promise<void> {
         caret === "@agent ".length,
         `${caret}`,
       )
-      // Its header says a new agent starts, for as long as its composer asks one.
+      // Its header says a new agent starts, for as long as its composer asks one:
+      // `new agent`, then its name once reserved (ADR-0057).
       {
-        const pending = `${col(1)} .column-head .agent-name.pending`
+        const agentName = `${col(1)} .column-head .agent-name`
         const appears = (present: boolean) =>
           page
             .waitForFunction(
               ([sel, want]) => (document.querySelector(sel) !== null) === want,
-              [pending, present] as const,
+              [agentName, present] as const,
               { timeout: 5_000 },
             )
             .then(

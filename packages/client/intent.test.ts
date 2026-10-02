@@ -4,6 +4,7 @@ import {
   cardId,
   entryId,
   indexAsks,
+  laneNameForThread,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
@@ -162,20 +163,21 @@ describe("planIntent", () => {
     ).toEqual([{ kind: "layout", action: { kind: "closeNewTab", key: "t" } }])
   })
 
-  test("a column's first send is its root's, or its new tab's", () => {
-    const sent = column({ kind: "sent", key: "col", sendId: "s" })
-    expect(plan(sent)).toEqual([
+  test.each([
+    ["first send", { kind: "sent", key: "t", sendId: "s" }],
+    [
+      "reservation (ADR-0057)",
+      { kind: "reserve", key: "t", lane: laneNameForThread("r") },
+    ],
+  ] as const)("a column's %s is its root's, or its new tab's", (_, action) => {
+    expect(plan(column(action))).toEqual([
       {
         kind: "layout",
-        action: {
-          kind: "columns",
-          root: "1-r1",
-          action: { kind: "sent", key: "col", sendId: "s" },
-        },
+        action: { kind: "columns", root: "1-r1", action },
       },
     ])
-    expect(plan(sent, at(onNewTab))).toEqual([
-      { kind: "layout", action: { kind: "sent", key: "t", sendId: "s" } },
+    expect(plan(column(action), at(onNewTab))).toEqual([
+      { kind: "layout", action: { kind: "newTabColumn", key: "t", action } },
     ])
   })
 

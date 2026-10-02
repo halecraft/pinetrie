@@ -231,8 +231,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup does not compact",
     file: "apps/pineta/host/index.ts",
-    from: "    settle,\n    cards: cardPort,\n    cardsDoc: cards,\n    ensureNames,\n  })",
-    to: "    settle: lanes =>\n      serial.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    cardsDoc: cards,\n    ensureNames,\n  })",
+    from: "    settle,\n    cards: cardPort,\n    cardsDoc: cards,\n    ensureNames: names.ensure,\n  })",
+    to: "    settle: lanes =>\n      serial.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    cardsDoc: cards,\n    ensureNames: names.ensure,\n  })",
     suite: "host",
     scenario: "tools",
     expect: "a starting host compacts the session it opened",
@@ -1211,6 +1211,36 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "tools",
     expect: "stop ended the command at once, recorded as aborted",
+  },
+  {
+    name: "a column never asks the host to name its reservation",
+    file: "packages/client/column.tsx",
+    from: '    else if (step.kind === "ask") void p.session.reserve(step.lane)',
+    to: '    else if (step.kind === "ask") void step.lane',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a new agent is named before anything is typed, and its lane keeps that name",
+  },
+  {
+    name: "a send leaves out its column's reservation",
+    file: "packages/client/session-view.ts",
+    from: "          reserved: how.reserved ?? null,",
+    to: "          reserved: null,",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a new agent is named before anything is typed, and its lane keeps that name",
+  },
+  {
+    name: "the wire drops a chat's reserved lane",
+    file: "packages/protocol/line.ts",
+    from: "  reserved: Schema.string(),\n",
+    to: "",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a new agent is named before anything is typed, and its lane keeps that name",
   },
   {
     name: "a stop is recorded under no one who pressed it",

@@ -1,5 +1,5 @@
 // e2e/browser/banner — a thread's banner in its column's header (ADR-0050,
-// ADR-0053).
+// ADR-0053), drawn before its first message (ADR-0057).
 
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -33,9 +33,8 @@ async function run(check: Checks["check"]): Promise<void> {
       await asPerson(bp, "bea@browser.test", "Bea")
       try {
         await bp.goto(bannerHost.httpUrl, { waitUntil: "domcontentloaded" })
+        // Drawn before the first message is typed (ADR-0057).
         await bp.click("#tabs .add-agent")
-        await bp.fill(`${col(0)} .composer .input`, "plan the parser")
-        await bp.click(`${col(0)} .composer .send`)
         const drawn = await bp
           .waitForSelector(`${col(0)} .column-head .banner[data-loaded]`, {
             timeout: 30_000,
@@ -99,6 +98,13 @@ async function run(check: Checks["check"]): Promise<void> {
             header.stripe === "4px",
           `${JSON.stringify(header)}`,
         )
+
+        // The first send makes the thread's root, whose tab the check below
+        // returns to. That the lane keeps the reserved name is `page`'s check:
+        // a scripted model draws one image for every name.
+        await bp.fill(`${col(0)} .composer .input`, "plan the parser")
+        await bp.click(`${col(0)} .composer .send`)
+        await bp.waitForSelector("#tabs .tab-root", { timeout: 15_000 })
 
         // Back to the tab, the column mounts again with its banner already there.
         await bp.click("#tabs .tab-archive")

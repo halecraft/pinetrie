@@ -6,6 +6,7 @@ import {
   type BlobStore,
   ERR,
   type Intent,
+  laneNameForThread,
   type TreeIndex,
   threadOf,
   type WorkSetting,
@@ -34,6 +35,7 @@ import {
   workAt,
   worksOwn,
 } from "@pineta/reads"
+import { readLaneNames } from "@pineta/schema"
 import type { Basics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { Runs } from "../runs.ts"
@@ -80,7 +82,7 @@ export async function sendChat(
   chat: Chat,
 ): Promise<Outcome> {
   const { agent, work, blobs, cards } = deps
-  const { doc } = deps.basics
+  const { doc, newId } = deps.basics
 
   // gather
   const index = readTreeIndex(doc)
@@ -158,6 +160,13 @@ export async function sendChat(
     participants: readParticipants(doc, index),
     asksAgent: chat.asksAgent,
     sendId,
+    // The ids a lane this creates may take (ADR-0057): the column's, unless
+    // pi holds it, else a new one.
+    newLane: {
+      reserved: chat.reserved,
+      held: new Set(readLaneNames(doc)),
+      spare: laneNameForThread(newId()),
+    },
     contributors,
   })
 
@@ -172,7 +181,8 @@ export async function sendChat(
 
 /**
  * Carry out a chat's decision. `createAndRun` still checks its directory and
- * asks pi for the lane here: both are ports that may refuse.
+ * asks pi to create the lane, under the id `planChat` chose, here: both are
+ * ports that may refuse.
  */
 export async function executeChat(
   deps: ChatDeps,
@@ -230,7 +240,7 @@ export async function executeChat(
           code: bad,
           message: "there is no such directory to work in",
         }
-      const created = await agent.createThreadLane(planned.at)
+      const created = await agent.createThreadLane(planned.at, planned.lane)
       if (created.kind === "refused") {
         return {
           kind: "refused",

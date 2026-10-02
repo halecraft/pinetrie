@@ -43,6 +43,8 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     (ADR-0033).
  *   - `offer` acts on that lane's offer in your repo; `mode` names the
  *     action: `take`, `split`, `squash`, `describe` or `refresh`.
+ *   - `reserve` asks the host to name the thread whose lane will be `lane`,
+ *     a new id the sender's column made, before the lane exists (ADR-0057).
  */
 export const COMMAND_KINDS = [
   "chat",
@@ -52,6 +54,7 @@ export const COMMAND_KINDS = [
   "mark",
   "update",
   "offer",
+  "reserve",
 ] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -89,6 +92,12 @@ export interface Command {
   readonly targetId: string
   /** `chat`: the card its text was sent from, or `""` (ADR-0048). */
   readonly cardId: string
+  /**
+   * `chat`: the lane id the sender's column reserved, or `""`: what a lane
+   * it creates is called (ADR-0057). Apart from `lane`, which decides where
+   * the message goes.
+   */
+  readonly reserved: string
 }
 
 /**
@@ -108,6 +117,7 @@ export const OUTCOME_KINDS = [
   "taken",
   "updated",
   "offered",
+  "reserved",
   "refused",
 ] as const
 export type OutcomeKind = (typeof OUTCOME_KINDS)[number]
@@ -148,6 +158,7 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   workDir: "",
   targetId: "",
   cardId: "",
+  reserved: "",
 })
 
 export const EMPTY_REPLY: Reply = Object.freeze({

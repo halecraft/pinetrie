@@ -193,6 +193,7 @@ const facts = (
     view,
     lane: { kind: "none" },
     createsLane: false,
+    reserved: null,
     mountedBanner: null,
     writable: true,
     nameOf: new Map([[ADA, "Ada"]]),
@@ -226,6 +227,47 @@ describe("columnView: the header", () => {
       kind: "pending",
     })
     expect(columnView(facts(1)).identity).toEqual({ kind: "none" })
+  })
+  test("a lane about to start is named by its reserved id, and only while the next send creates it (ADR-0057)", () => {
+    const sha = "a".repeat(64) as Sha256
+    const banners = new Map([[B, { lane: B, sha, at: 1 }]])
+    const about = (over: Partial<ColumnFacts>) =>
+      columnView(
+        facts(1, {
+          reserved: B,
+          work: work({ names: NAMES, banners }),
+          ...over,
+        }),
+      )
+    expect(about({ createsLane: true }).identity).toEqual({
+      kind: "agent",
+      name: COPPER,
+      start: null,
+    })
+    expect(about({ createsLane: true }).banner?.url).toBe(`/blob/${sha}`)
+    expect(about({ createsLane: false }).identity).toEqual({ kind: "none" })
+    expect(about({ createsLane: false }).banner).toBeNull()
+    expect(
+      columnView(facts(1, { createsLane: true, reserved: B })).identity,
+    ).toEqual({ kind: "pending" })
+  })
+  test.each([
+    ["no lane to create", { createsLane: false }, { kind: "none" }],
+    ["read-only", { createsLane: true, writable: false }, { kind: "none" }],
+    [
+      "a lane already, as the composer's report lags",
+      { createsLane: true, lane: onLane(laneView(B, "b2")) },
+      { kind: "none" },
+    ],
+    ["no reservation", { createsLane: true }, { kind: "mint" }],
+    ["unnamed", { createsLane: true, reserved: B }, { kind: "ask", lane: B }],
+    [
+      "named",
+      { createsLane: true, reserved: A, work: work({ names: NAMES }) },
+      { kind: "none" },
+    ],
+  ] as const)("the reserve step: %s (ADR-0057)", (_, over, step) => {
+    expect(columnView(facts(1, over)).reserve).toEqual(step)
   })
   test("the banner is the thread's at the column's end; a conversation has none", () => {
     const sha = "a".repeat(64) as Sha256

@@ -15,6 +15,7 @@ import {
   normalizeEmail,
   normalizeName,
   parseMentions,
+  parseNewLane,
   parseTitle,
   projectTranscript,
   THE_AGENT,
@@ -72,6 +73,20 @@ test("writerId and laneNameForThread: a person and a thread are never confused",
   // Different prefixes: a writer's id can never name a thread's lane.
   assert.equal(laneNameForThread("abc"), "t-abc")
   assert.notEqual(String(laneNameForThread("abc")), String(writerId("abc")))
+})
+
+test("parseNewLane: only t- and a lowercase uuidv7, since a container is named after it (ADR-0057)", () => {
+  const ok = "t-01a0f9eb-86e1-77ad-a822-2a306786223f"
+  assert.equal(parseNewLane(ok), ok)
+  for (const bad of [
+    "t-abc",
+    ok.toUpperCase(),
+    "t-01a0f9eb-86e1-47ad-a822-2a306786223f",
+    "t-01a0f9eb-86e1-77ad-c822-2a306786223f",
+    `${ok};rm -rf`,
+    ` ${ok}`,
+  ])
+    assert.equal(parseNewLane(bad), undefined, bad)
 })
 
 test("findSeqKeys: ADR-0013 — seq must not ride the wire", () => {

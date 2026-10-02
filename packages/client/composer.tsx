@@ -5,7 +5,6 @@ import type {
   CardPlace,
   CardRecord,
   CommandSummary,
-  LaneName,
   Position,
   SeatRecord,
   ThreadLane,
@@ -16,7 +15,7 @@ import type { Pending, Prefill } from "./columns.ts"
 import type { Intent } from "./intent.ts"
 import { nameFor } from "./presence.tsx"
 import type { Reader } from "./send.ts"
-import type { SessionClient } from "./session-view.ts"
+import type { ColumnHow, SessionClient } from "./session-view.ts"
 import { useTypingAt } from "./use-presence.ts"
 
 /**
@@ -33,8 +32,7 @@ export function Composer(p: {
   place: CardPlace | undefined
   at: Position
   lane: ThreadLane
-  boundLane: LaneName | undefined
-  asksAgent: boolean
+  how: ColumnHow
   fresh: boolean
   commands: readonly CommandSummary[]
   participants: readonly string[]
@@ -67,9 +65,8 @@ export function Composer(p: {
         <TypingLine end={p.typingAt} reader={p.reader} session={p.session} />
       )}
       <CardEditor
-        asksAgent={p.asksAgent}
         at={p.at}
-        boundLane={p.boundLane}
+        how={p.how}
         card={p.card}
         commands={p.commands}
         fresh={p.fresh}

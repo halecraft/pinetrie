@@ -1,4 +1,4 @@
-import { entryId, writerId } from "@pineta/core"
+import { entryId, laneNameForThread, writerId } from "@pineta/core"
 import { ARCHIVE_NAMESPACE, encodeArchive } from "@pineta/marginalia"
 import type { Reply } from "@pineta/protocol/messages"
 import { writeEntry } from "@pineta/schema"
@@ -8,6 +8,8 @@ import { type CommandDeps, createCommands } from "./index.ts"
 
 const ALICE = writerId("alice@example.com")
 const ROOT_ID = entryId("e-1")
+const HELD = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
+const NEW = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a3067862240")
 
 function setUp() {
   const b = basics()
@@ -24,6 +26,9 @@ function setUp() {
     start: () => {
       throw new Error("no run here")
     },
+    names: record<CommandDeps["names"]>({
+      reserve: async lane => (lane === HELD ? "held" : "name"),
+    }).port,
   })
   const replies: Reply[] = []
   const sender = { send: (r: Reply) => void replies.push(r) }
@@ -72,4 +77,16 @@ test("a seat whose principal names nobody is refused whatever it sends", async (
   await commands.handle(sender, undefined, chat("c-3"))
   expect(replies[0]).toMatchObject({ outcome: "refused" })
   expect(agent.calls).toEqual([])
+})
+
+test("a reservation is answered reserved, and refused for a lane pi holds (ADR-0057)", async () => {
+  const { commands, replies, sender } = setUp()
+  const reserve = (id: string, lane: string) =>
+    commands.handle(sender, ALICE, { id, kind: "reserve", lane } as never)
+  await reserve("c-4", NEW)
+  await reserve("c-5", HELD)
+  expect(replies.map(r => [r.id, r.outcome, r.errorCode])).toEqual([
+    ["c-4", "reserved", ""],
+    ["c-5", "refused", "lane_taken"],
+  ])
 })

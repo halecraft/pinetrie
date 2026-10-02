@@ -50,6 +50,9 @@ are the only code that builds or reads the shape.
   the sender saw; plain remarks, agent replies and sibling forks are not. A
   `branch` at a lane's tip is stepping down: a new thread there, the lane left
   where it is.
+- **`createAndRun` names the new lane's id**: the one the sender's column
+  reserved, unless pi holds it, else the spare the host made (`newLane`,
+  ADR-0057). The host decides every new lane's id here; pi makes none.
 - **Each chat stores its send's id** (`sendId`, the command's id), so the
   column that sent it finds it exactly (`TreeIndex.bySend`).
   `detailsFromStored` is the one conversion of stored details, for a chat and
@@ -185,7 +188,7 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   too. The state it already has is `unchanged`, and answered the same.
 - **The gate keys on the entry a command writes at.** `writesAt` names it for
   every intent (a chat's `at`, a mark's entry), or null for one that writes in no root (a new root, a name, a
-  stop, an archive action). `archivedAt` maps that entry to its root's
+  stop, an archive action, a reservation). `archivedAt` maps that entry to its root's
   record. One rule, applied by the host before dispatch
   (`apps/pineta/host/commands/index.ts`); `sendChat` needs no
   copy, since only the `chat` command calls it. A card is written by clients
@@ -257,7 +260,7 @@ through one `setWorkRecord`:
 | how a resolution ended | `pineta.landing` | its own id | when its run ends |
 | a lane's offer in your repo | `pineta.offer` | the lane | when a trigger changed it, or it was taken |
 | a commit you have of a lane: delivered by a take, or a copy of your `@`; a start until a newer copy in the lane's history supersedes it (S51) | `pineta.have` | the commit | at a take, a fork from your `@`, and an update |
-| a lane's name, `word-word` | `pineta.name` | the lane | once, at the host's start or before the lane's first run |
+| a thread's name, `word-word` | `pineta.name` | the lane | once: when a column reserves the lane (ADR-0057), else at the host's start or before the lane's first run |
 | a thread's column banner: the image's hash (ADR-0050, ADR-0053) | `pineta.banner` | the lane | when a banner is made or set |
 | what the host found where it runs: `lanes`, or `direct` and why | `pineta.project` | `project` | at every start |
 
@@ -380,6 +383,10 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   avoiding the stored names and those planned before it. The host runs it
   through one queue, at start and before a new lane's first run, so two
   lanes never plan the same name.
+- **`planReserve`** names a lane id a column reserved before its lane exists
+  (ADR-0057), as `planNames` would: `known` for an id with a name, `held`
+  for one pi holds. So a name can have no lane yet: read names by lane
+  (`readNames(doc).get(lane)`), never list them as threads.
 - **A name is stored, never recomputed**, so a changed word list renames
   nothing, and never changes: the offer's bookmark and older trailers name
   it. The decoder accepts only `word-word`; `ThreadName` is branded in

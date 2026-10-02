@@ -412,6 +412,14 @@ export const mutations: readonly Mutation[] = [
     expect: "a result's stored images are on its call",
   },
   {
+    name: "parseNewLane accepts any t- id",
+    file: "packages/core/index.ts",
+    from: "  NEW_LANE.test(s) ? (s as LaneName) : undefined",
+    to: '  s.startsWith("t-") ? (s as LaneName) : undefined',
+    command: unit,
+    expect: "parseNewLane: only t- and a lowercase uuidv7",
+  },
+  {
     name: "a stretch crosses a long ask's edge",
     file: tree,
     from: "      longAsk(r.id) === longAsk(before.id)",

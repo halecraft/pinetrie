@@ -30,6 +30,7 @@ import {
   type OfferAction,
   type Position,
   parseMentions,
+  parseNewLane,
   parseTitle,
   type Refusal,
   ROOT,
@@ -69,6 +70,8 @@ export type Outcome =
   | { readonly kind: "updated"; readonly text: string }
   /** An offer action was carried out (squash, describe, refresh). */
   | { readonly kind: "offered" }
+  /** A thread is named before its lane exists, or already was (ADR-0057). */
+  | { readonly kind: "reserved" }
   | Refusal
 
 /**
@@ -125,6 +128,9 @@ export function decodeCommand(
     const work = workFromWire(text(wire?.workKind), text(wire?.workDir))
     if (work === "invalid")
       return refused(ERR.BAD_DIRECTORY, "working directly needs a directory")
+    const reserved = text(wire?.reserved)
+    const reservedLane = reserved === "" ? null : parseNewLane(reserved)
+    if (reservedLane === undefined) return notNewLane(reserved)
     return {
       kind: "chat",
       text: body,
@@ -135,7 +141,15 @@ export function decodeCommand(
       mentions: parseMentions(body),
       work,
       card: cardFromWire(text(wire?.cardId)),
+      reserved: reservedLane,
     }
+  }
+  if (kind === "reserve") {
+    const lane = text(wire?.lane)
+    const reserved = parseNewLane(lane)
+    return reserved === undefined
+      ? notNewLane(lane)
+      : { kind: "reserve", lane: reserved }
   }
   if (kind === "update" || kind === "offer") {
     const lane = text(wire?.lane)
@@ -175,6 +189,9 @@ export function decodeCommand(
   }
   return refused(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
 }
+
+const notNewLane = (lane: string): Refusal =>
+  refused(ERR.UNKNOWN_TARGET, `not a new thread's lane: ${lane}`)
 
 /** A chat's card on the wire: `""` is none. */
 const cardFromWire = (id: string): CardId | null =>
@@ -221,6 +238,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         asksAgent: intent.asksAgent,
         ...workToWire(intent.work),
         cardId: intent.card ?? "",
+        reserved: intent.reserved ?? "",
       })
     case "name":
       return command({ id, kind: "name", text: intent.name })
@@ -249,6 +267,8 @@ export function encodeIntent(id: string, intent: Intent): Command {
         lane: intent.lane,
         mode: intent.action,
       })
+    case "reserve":
+      return command({ id, kind: "reserve", lane: intent.lane })
   }
 }
 
@@ -279,6 +299,8 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "updated", text: outcome.text })
     case "offered":
       return reply({ id, outcome: "offered" })
+    case "reserved":
+      return reply({ id, outcome: "reserved" })
     case "refused":
       return reply({
         id,
@@ -319,6 +341,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "updated", text: wire.text }
     case "offered":
       return { kind: "offered" }
+    case "reserved":
+      return { kind: "reserved" }
     case "refused":
       return refused(asErrCode(wire.errorCode), wire.errorMessage)
   }

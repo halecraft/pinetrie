@@ -18,6 +18,7 @@ import {
 } from "@pineta/reads"
 import type { SessionDocHandle } from "@pineta/schema"
 import type { ControlSender } from "../control.ts"
+import type { Names } from "../names.ts"
 import { type ArchiveDeps, handleArchive } from "./archive.ts"
 import { type ChatDeps, sendChat } from "./chat.ts"
 import { actOnOffer, handleStop, type LaneDeps, startUpdate } from "./lane.ts"
@@ -34,6 +35,7 @@ export interface CommandDeps {
   readonly blobs: ChatDeps["blobs"]
   readonly cards: ChatDeps["cards"]
   readonly start: ChatDeps["start"]
+  readonly names: Pick<Names, "reserve">
 }
 
 export interface Commands {
@@ -94,6 +96,16 @@ export function createCommands(deps: CommandDeps): Commands {
       case "offer":
         return respond(
           await actOnOffer(deps, intent.lane, intent.action, writer),
+        )
+      case "reserve":
+        return respond(
+          (await deps.names.reserve(intent.lane)) === "held"
+            ? {
+                kind: "refused",
+                code: ERR.LANE_TAKEN,
+                message: "that thread has started",
+              }
+            : { kind: "reserved" },
         )
     }
   }

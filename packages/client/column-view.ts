@@ -197,6 +197,8 @@ export interface ColumnFacts {
   readonly lane: ThreadLane
   /** The composer's next send would create a lane. */
   readonly createsLane: boolean
+  /** The id this column reserved for the lane its next send creates (ADR-0057). */
+  readonly reserved: LaneName | null
   /** The banner's URL as the column mounted (`bannerUrl`), or null. */
   readonly mountedBanner: string | null
   readonly writable: boolean
@@ -213,6 +215,33 @@ export interface ColumnShows {
   /** Dividers, by the entry they sit above. */
   readonly joins: ReadonlyMap<string, LaneJoin>
   readonly strip: WorkStrip
+  /** What `Column` does to have its thread named before it starts. */
+  readonly reserve: ReserveStep
+}
+
+/**
+ * How a column whose next send creates a lane gets its thread named before
+ * the send (ADR-0057). Asking again is harmless: the host does nothing for an
+ * id it has named.
+ */
+export type ReserveStep =
+  | { readonly kind: "none" }
+  /** Keep a new lane id on the column. */
+  | { readonly kind: "mint" }
+  /** Ask the host to name the thread under `lane`. */
+  | { readonly kind: "ask"; readonly lane: LaneName }
+
+/**
+ * The lane whose name and banner the header shows: the thread's, or the one
+ * this column's next send creates, by its reserved id.
+ */
+export function headLane(
+  lane: ThreadLane,
+  createsLane: boolean,
+  reserved: LaneName | null,
+): LaneName | null {
+  if (lane.kind === "lane") return lane.name
+  return createsLane ? reserved : null
 }
 
 export function columnView(f: ColumnFacts): ColumnShows {
@@ -223,21 +252,37 @@ export function columnView(f: ColumnFacts): ColumnShows {
     work.revisions,
     lane.kind === "lane" ? lane.name : null,
   )
+  const head = headLane(lane, f.createsLane, f.reserved)
   return {
-    identity: identityOf(lane, f.createsLane, work.names, stretches),
-    banner: bannerOf(bannerUrl(lane, work.banners), f.mountedBanner),
+    identity: identityOf(head, f.createsLane, work.names, stretches),
+    banner: bannerOf(bannerUrl(head, work.banners), f.mountedBanner),
     origin: originOf(f, stretches),
     joins: joinsOf(view, stretches, work.names),
     strip: workStrip(f),
+    reserve: reserveStep(f),
   }
 }
 
-/** The banner of `lane`'s thread, as a URL; none for a conversation. */
+/**
+ * Only where the thread has no lane: `createsLane` is the composer's report,
+ * a render behind, so a column that has just bound to its lane may still
+ * carry it.
+ */
+function reserveStep(f: ColumnFacts): ReserveStep {
+  if (!f.writable || !f.createsLane || f.lane.kind !== "none")
+    return { kind: "none" }
+  if (f.reserved === null) return { kind: "mint" }
+  return f.work.names.has(f.reserved)
+    ? { kind: "none" }
+    : { kind: "ask", lane: f.reserved }
+}
+
+/** The banner of the thread `headLane` gives, as a URL; null for none. */
 export function bannerUrl(
-  lane: ThreadLane,
+  lane: LaneName | null,
   banners: ReadonlyMap<LaneName, BannerRecord>,
 ): string | null {
-  const banner = lane.kind === "lane" ? banners.get(lane.name) : undefined
+  const banner = lane === null ? undefined : banners.get(lane)
   return banner === undefined ? null : blobUrl(banner.sha)
 }
 
@@ -246,26 +291,26 @@ const bannerOf = (
   mounted: string | null,
 ): HeadBanner | null => (url === null ? null : { url, fade: url !== mounted })
 
-/** A column's identity, after its mark: the thread's name, or a new agent. */
+/** A column's identity, after its mark: the thread's name, or a new agent not yet named. */
 export const identityWords = (
   identity: Exclude<HeadIdentity, { kind: "none" }>,
 ): string => (identity.kind === "agent" ? identity.name : "new agent")
 
+/** `head` is `headLane`'s: a lane not yet created has no start on the path. */
 function identityOf(
-  lane: ThreadLane,
+  head: LaneName | null,
   createsLane: boolean,
   names: ReadonlyMap<LaneName, ThreadName>,
   stretches: readonly LaneStretch[],
 ): HeadIdentity {
-  if (lane.kind === "none")
-    return createsLane ? { kind: "pending" } : { kind: "none" }
-  const name = names.get(lane.name)
+  if (head === null) return createsLane ? { kind: "pending" } : { kind: "none" }
+  const name = names.get(head)
   if (name === undefined) return { kind: "pending" }
   const last = stretches.at(-1)
   return {
     kind: "agent",
     name,
-    start: last?.lane === lane.name ? last.start : null,
+    start: last?.lane === head ? last.start : null,
   }
 }
 

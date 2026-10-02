@@ -40,8 +40,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a branch that was raced conflicts",
     file: "packages/marginalia/chat.ts",
-    from: '    return compelled\n      ? { kind: "createAndRun", at: input.at, details }',
-    to: '    if (race !== null) return { kind: "conflict", by: race.by }\n    return compelled\n      ? { kind: "createAndRun", at: input.at, details }',
+    from: '    return compelled\n      ? { kind: "createAndRun", at: input.at, lane: created, details }',
+    to: '    if (race !== null) return { kind: "conflict", by: race.by }\n    return compelled\n      ? { kind: "createAndRun", at: input.at, lane: created, details }',
     command: unit,
     expect: "always a new lane there",
   },
@@ -531,6 +531,22 @@ export const mutations: readonly Mutation[] = [
     to: "  return seats.map(s => s.clientId)",
     command: unit,
     expect: "planSeatSweep: a seat no text names goes",
+  },
+  {
+    name: "a reservation names a lane pi holds",
+    file: "packages/marginalia/names.ts",
+    from: '  if (held.has(lane)) return { kind: "held" }\n',
+    to: "",
+    command: unit,
+    expect: "an id already named is known, and one pi holds is refused",
+  },
+  {
+    name: "a new lane takes a reserved id pi holds",
+    file: "packages/marginalia/chat.ts",
+    from: "  const created = reserved === null || held.has(reserved) ? spare : reserved",
+    to: "  const created = reserved ?? spare",
+    command: unit,
+    expect: "a new lane takes its column's reserved id",
   },
   {
     name: "a range across two lanes is read",

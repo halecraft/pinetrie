@@ -35,7 +35,6 @@ import {
   entryId,
   hostPathInLane,
   type LaneName,
-  laneNameForThread,
   type MarkRecord,
   type Position,
   type SeatRecord,
@@ -348,8 +347,12 @@ export interface Agent {
    * planned, so no re-read is needed here.
    */
   appendToTree(message: ChatMessage, parent: Position): Promise<AppendOutcome>
-  /** Create a thread's lane at `at`. Called only where no lane is. */
-  createThreadLane(at: Position): Promise<CreateOutcome>
+  /**
+   * Create a thread's lane at `at`, named `lane` (the host decides the id,
+   * ADR-0057). Called only where no lane is; refused `lane_taken` for an id
+   * pi holds, since `harness.lane` would return that lane instead.
+   */
+  createThreadLane(at: Position, lane: LaneName): Promise<CreateOutcome>
   lane(name: LaneName): ThreadLaneHandle
   /** Hold a message in `pineta.outbox` until its lane is idle. */
   hold(item: Held): Promise<void>
@@ -768,8 +771,9 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       return { kind: "appended", id: entryId(id) }
     },
 
-    async createThreadLane(at) {
-      const name = laneNameForThread(uuidv7())
+    async createThreadLane(at, name) {
+      if (held.has(name) || hasLaneRecord(doc, name))
+        return { kind: "refused", code: ERR.LANE_TAKEN }
       try {
         // pi THROWS UnknownTarget for an entry it does not hold, where most of
         // its API returns a Result, so the throw is caught here and nothing

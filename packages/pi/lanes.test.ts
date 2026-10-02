@@ -9,6 +9,7 @@ import path from "node:path"
 import {
   type EntryId,
   type LaneName,
+  laneNameForThread,
   messageText,
   ROOT,
   THE_AGENT,
@@ -17,7 +18,7 @@ import {
 import { encodeChat } from "@pineta/marginalia"
 import { newSessionDoc, readEntries, rowMessage } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
-import { createAgent, withoutFrontmatter } from "./agent.ts"
+import { createAgent, newId, withoutFrontmatter } from "./agent.ts"
 import { type LaneChannel, openChannel } from "./lane-env.ts"
 import { type LaneAccess, type LaneFacts, laneGuidelines } from "./lanes.ts"
 import { scriptedModel } from "./scripted.ts"
@@ -177,7 +178,10 @@ describe("lanes in a harness", () => {
       },
     })
     const newLane = async (where: LaneAccess) => {
-      const made = await agent.createThreadLane(ROOT)
+      const made = await agent.createThreadLane(
+        ROOT,
+        laneNameForThread(newId()),
+      )
       if (made.kind !== "created") throw new Error("no lane")
       wheres.set(made.lane, where)
       return made.lane

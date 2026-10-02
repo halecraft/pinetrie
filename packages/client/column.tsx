@@ -56,7 +56,9 @@ import {
   type HeadBanner,
   type HeadIdentity,
   type HeadOrigin,
+  headLane,
   identityWords,
+  type ReserveStep,
   type ReviewTarget,
   type WorkFacts,
   type WorkStrip,
@@ -66,6 +68,7 @@ import type { Column as ColumnSpec, Pending } from "./columns.ts"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { behind, type SeenEnd } from "./follow.ts"
+import { newLaneName } from "./ids.ts"
 import type { ColumnAct, Intent } from "./intent.ts"
 import { type Left, leftLine } from "./left.ts"
 import type { LiveWork } from "./live.ts"
@@ -78,7 +81,7 @@ import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import { ReviewPane } from "./review-pane.tsx"
 import type { ScreenMemory } from "./screen-memory.ts"
-import type { SessionClient } from "./session-view.ts"
+import type { ColumnHow, SessionClient } from "./session-view.ts"
 import type { DeviceState } from "./tab-state.ts"
 import type { RowMemory } from "./tool-row.ts"
 import { useAskBar } from "./use-ask-bar.ts"
@@ -292,20 +295,43 @@ export function Column(p: ColumnProps) {
   // Whether this column's next send would create a lane: the composer's to
   // decide, as it is typed.
   const [createsLane, setCreatesLane] = useState(false)
+  const reserved = p.column.reserved ?? null
   // The banner drawn as the column mounts shows at once; one arriving later,
-  // a new one, fades in.
-  const [mountedBanner] = useState(() => bannerUrl(lane, p.work.banners))
+  // a new one, fades in. The composer reports `createsLane` only after the
+  // mount, so a reserved lane's banner counts as there already.
+  const [mountedBanner] = useState(() =>
+    bannerUrl(headLane(lane, true, reserved), p.work.banners),
+  )
   const shows = columnView({
     mountedBanner,
     index,
     view,
     lane,
     createsLane,
+    reserved,
     writable,
     nameOf: p.nameOf,
     lanes: p.lanes,
     work: p.work,
   })
+  // The thread is named before its first send (ADR-0057). The step changes
+  // with the person's typing (`createsLane`) and as the name arrives, so the
+  // effect runs once per step, not once per render.
+  const carryOut = useStable((step: ReserveStep) => {
+    if (step.kind === "mint")
+      act({ kind: "reserve", key: p.column.key, lane: newLaneName() })
+    else if (step.kind === "ask") void p.session.reserve(step.lane)
+  })
+  const reserve = shows.reserve
+  const reserving = reserve.kind === "ask" ? reserve.lane : reserve.kind
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per step, which `reserving` names
+  useEffect(() => carryOut(reserve), [reserving])
+  // What every send from this column carries, from any card at its end.
+  const how: ColumnHow = {
+    asksAgent: p.column.asksAgent === true,
+    ...(p.column.lane === undefined ? {} : { lane: p.column.lane }),
+    ...(reserved === null ? {} : { reserved }),
+  }
   // The review of the offer beside the thread (ADR-0047): your choice, kept
   // only while the column is mounted. Reset when the offer goes, so the
   // thread's next offer does not open it with nobody asking.
@@ -640,12 +666,11 @@ export function Column(p: ColumnProps) {
           <div className="cards">
             {others.map(c => (
               <CardEditor
-                asksAgent={p.column.asksAgent === true}
                 at={at}
-                boundLane={p.column.lane}
                 card={c}
                 commands={p.work.commands}
                 fresh={false}
+                how={how}
                 insert={null}
                 key={c.id}
                 lane={lane}
@@ -687,7 +712,6 @@ export function Column(p: ColumnProps) {
           </button>
         )}
         <Composer
-          asksAgent={p.column.asksAgent === true}
           card={mine}
           place={place}
           seats={p.seats}
@@ -704,7 +728,7 @@ export function Column(p: ColumnProps) {
           }}
           commands={p.work.commands}
           at={at}
-          boundLane={p.column.lane}
+          how={how}
           fresh={fresh}
           reader={{ me: p.session.writer, nameOf: p.nameOf }}
           prefill={p.column.fresh?.prefill}

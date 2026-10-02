@@ -11,6 +11,7 @@ import type {
   AskIndex,
   CardId,
   EntryId,
+  LaneName,
   TreeIndex,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
@@ -36,6 +37,8 @@ export type ColumnAct =
   | { readonly kind: "density"; readonly density: Density }
   /** A fresh column's first send, as send `sendId`. */
   | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
+  /** Keep `lane` as the id this column's next send creates a lane under (ADR-0057). */
+  | { readonly kind: "reserve"; readonly key: string; readonly lane: LaneName }
   /** After a conflict: a fresh column at `at`, which sends `pending` there. */
   | {
       readonly kind: "branchInstead"
@@ -195,8 +198,8 @@ function planOpenAt(
 
 /**
  * A column's act. One that changes the columns is the column action of the
- * root whose tab you are on; a new tab's one column can only send, and
- * close, which closes the tab.
+ * root whose tab you are on; a new tab's one column can only send, reserve
+ * its lane, and close, which closes the tab.
  */
 function planColumn(
   position: number,
@@ -209,6 +212,13 @@ function planColumn(
     active?.kind === "root"
       ? [layout({ kind: "columns", root: active.root, action })]
       : []
+  /** An action on the column itself, which may be a new tab's one column. */
+  const onColumn = (
+    action: Extract<LayoutAction, { kind: "newTabColumn" }>["action"],
+  ): readonly Effect[] =>
+    active?.kind === "new"
+      ? [layout({ kind: "newTabColumn", key: active.key, action })]
+      : onRoot(action)
   switch (act.kind) {
     case "openAt":
       return planOpenAt(act.entry, state, fresh)
@@ -254,9 +264,9 @@ function planColumn(
     case "density":
       return onRoot({ kind: "density", index: position, density: act.density })
     case "sent":
-      if (active?.kind === "new")
-        return [layout({ kind: "sent", key: active.key, sendId: act.sendId })]
-      return onRoot({ kind: "sent", key: act.key, sendId: act.sendId })
+      return onColumn({ kind: "sent", key: act.key, sendId: act.sendId })
+    case "reserve":
+      return onColumn({ kind: "reserve", key: act.key, lane: act.lane })
   }
 }
 

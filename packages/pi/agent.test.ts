@@ -1,13 +1,19 @@
-// The navigation error mapping, which is why it was extracted.
+// The facade over pi's lanes: its error mapping, and creating a lane under
+// the id the host gives.
 //
-// Co-located inside packages/pi for the same reason as storage.test.ts: this
-// concerns pi's error vocabulary, and a test under test/ would reach across
-// the boundary ADR-0003 holds. The function itself takes a plain string, so
-// no pi type is needed to exercise it.
+// Co-located inside packages/pi for the same reason as storage.test.ts: both
+// concern pi's behaviour, and a test under test/ would reach across the
+// boundary ADR-0003 holds.
 
-import { ERR } from "@pineta/core"
+import { ERR, laneNameForThread, ROOT } from "@pineta/core"
+import {
+  newSessionDoc,
+  readLaneNames,
+  type SessionDocHandle,
+} from "@pineta/schema"
 import { describe, expect, test } from "vitest"
-import { laneErrCode } from "./agent.ts"
+import { createAgent, laneErrCode, newId } from "./agent.ts"
+import { scriptedModel } from "./scripted.ts"
 
 describe("laneErrCode", () => {
   test("maps pi's refusals onto our codes", () => {
@@ -31,5 +37,39 @@ describe("laneErrCode", () => {
     // bad target, the other is "try again". Collapsing them would tell a user
     // to retry something that can never succeed.
     expect(laneErrCode("UnknownTarget")).not.toBe(laneErrCode("LaneBusy"))
+  })
+})
+
+describe("createThreadLane (ADR-0057)", () => {
+  const over = (doc: SessionDocHandle) =>
+    createAgent({
+      doc,
+      replicaId: "test",
+      model: { kind: "scripted", script: scriptedModel() },
+      tools: null,
+    })
+
+  test("creates the lane under the id it is given, and refuses one pi holds", async () => {
+    const doc = newSessionDoc()
+    const agent = await over(doc)
+    const lane = laneNameForThread(newId())
+    expect(await agent.createThreadLane(ROOT, lane)).toEqual({
+      kind: "created",
+      lane,
+    })
+    // `harness.lane` would return the lane it holds, ignoring where to create.
+    expect(await agent.createThreadLane(ROOT, lane)).toEqual({
+      kind: "refused",
+      code: ERR.LANE_TAKEN,
+    })
+    await agent.close()
+    // A later process holds it only in the document.
+    const later = await over(doc)
+    expect(await later.createThreadLane(ROOT, lane)).toEqual({
+      kind: "refused",
+      code: ERR.LANE_TAKEN,
+    })
+    expect(readLaneNames(doc)).toEqual([lane])
+    await later.close()
   })
 })

@@ -413,7 +413,8 @@ descriptions, section headers and boundaries are still to do.
 
 **A thread's column can have a banner** (ADR-0050, ADR-0053), when
 `~/.config/pineta/config.json` has `{ "banner": { "enabled": true } }` and
-pi has an OpenRouter key. As a thread is named, its name fills the
+pi has an OpenRouter key. A thread is named as its column first wants an
+agent, before its first message (ADR-0057), and its name then fills the
 `column-banner` skill, a prompt you can replace with your own, and Recraft
 V4.1 Flash draws a square pixel-art sprite of it. Only the name is sent. It is
 stored as a pasted image is, under a `pineta.banner` value keyed by the
@@ -561,7 +562,8 @@ context.**
   `lanes.shared`. A changed config reaches existing threads at their next
   run, after a host restart.
 - **Bringing a thread's work back** (ADR-0038 to ADR-0040, ADR-0047): each
-  thread has a two-word name, shown in its column's header, and keeps an
+  thread has a two-word name, shown in its column's header from before its
+  first message (ADR-0057), and keeps an
   offer in your repo, one commit on your `@-` under the bookmark
   `pineta-offer/<name>`. While the thread works, the offer reads
   `WIP (<name>): <its first message>` and grows in place; when a run ends,

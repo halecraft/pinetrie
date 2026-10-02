@@ -6,6 +6,7 @@ import {
   NOUNS,
   nameRecords,
   planNames,
+  planReserve,
   threadNameFor,
 } from "./index.ts"
 
@@ -81,6 +82,22 @@ describe("planNames", () => {
       threadNameFor(twin, new Set([wanted])),
     ])
     expect(planned[1]?.name).not.toBe(wanted)
+  })
+})
+
+describe("planReserve (ADR-0057)", () => {
+  const named = new Map([[A, "amber-fox" as ThreadName]])
+  test("an id already named is known, and one pi holds is refused", () => {
+    expect(planReserve(A, new Set(), named, 5)).toEqual({ kind: "known" })
+    expect(planReserve(B, new Set([B]), named, 5)).toEqual({ kind: "held" })
+  })
+  test("any other id is named as a lane would be, avoiding every stored name", () => {
+    const plan = planReserve(B, new Set([A]), named, 5)
+    expect(plan).toEqual({
+      kind: "name",
+      record: planNames([{ lane: B, createdAt: 5 }], named, 5)[0],
+    })
+    expect(plan.kind === "name" && plan.record.name).not.toBe("amber-fox")
   })
 })
 

@@ -6,6 +6,8 @@ shared), ADR-0038 (the column's offer table, and where the offer is shown)
 and ADR-0039 (the header's "amber-fox · own copy").
 **Amended by ADR-0047:** the offer's line opens its review, and its bookmark
 copies on a press.
+**Amended by ADR-0057:** a fresh column that wants an agent is
+named at once, so `✦ new agent` shows only until its name arrives.
 
 **Context.** A column's header was one row holding everything the column knew
 about itself: the grip, "from Ada: …" (or "thread", "new chat", "new · with

@@ -232,6 +232,22 @@ export const mutations: readonly Mutation[] = [
     expect: "stores the image it returns",
   },
   {
+    name: "createThreadLane returns a lane it holds",
+    file: "packages/pi/agent.ts",
+    from: '      if (held.has(name) || hasLaneRecord(doc, name))\n        return { kind: "refused", code: ERR.LANE_TAKEN }\n',
+    to: "",
+    command: unit,
+    expect: "creates the lane under the id it is given",
+  },
+  {
+    name: "createThreadLane forgets a lane an earlier process made",
+    file: "packages/pi/agent.ts",
+    from: "      if (held.has(name) || hasLaneRecord(doc, name))",
+    to: "      if (held.has(name))",
+    command: unit,
+    expect: "creates the lane under the id it is given",
+  },
+  {
     name: "a Recraft banner is drawn on no set background",
     file: "packages/pi/banner.ts",
     from: '  return modelId.startsWith("recraft/")',

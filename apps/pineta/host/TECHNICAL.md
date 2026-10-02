@@ -29,8 +29,8 @@ wires them.
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the image store, the SQLite store |
 | `work/` | lane containers and disks (§ Lane work) |
 | `offers/` | each lane's offer in your repo (§ Offers) |
-| `names.ts` | every lane's thread name (ADR-0039), one plan at a time |
-| `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, set by `set_banner` |
+| `names.ts` | every thread's name (ADR-0039): `ensure` for the lanes pi holds, `reserve` for a lane id a column reserved before its lane exists (ADR-0057), on one queue |
+| `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
 | `digests.ts` | each ask's digest (ADR-0056), when the user config turns them on |
 | `outside.ts` | `requestOutside`: a model request outside the serial executor, its answer written inside it |
 | `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue`, `basics` |
@@ -105,6 +105,12 @@ text names (`sweepTexts`).
 - **`executeChat` still checks a new lane's directory and asks pi for the
   lane.** Both are ports that may refuse, not facts to gather. The directory
   is checked first, so a refused send creates no lane.
+- **The new lane's id is decided before that, in `planChat`** (ADR-0057).
+  `sendChat` gathers `newLane` beside `sendId`: the column's reserved id,
+  the lanes pi holds, and a spare made with `newId`. pi makes no ids.
+- **`reserve` is answered `reserved`** whether it named the id or the id
+  had a name already, so a column may send it again; an id pi holds is
+  refused `lane_taken`.
 - **Stop records who pressed it before it aborts** (ADR-0056): `planStop`
   gives the `pineta.stop` record for the running ask's prompt, unless one is
   there, and `handleStop` writes it, then asks pi to abort, in one step. So
@@ -139,8 +145,9 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   write a pasted image. A new image is a `serial.track`ed task: the image takes seconds,
   outside the queue, then the write is a step of its own, only while
   `bannerStillWanted`. A missing `column-banner` skill is logged.
-- **A thread is due one as it is named** (`createNames`' `onNamed`), and
-  again at each run's end, which draws only when it still has none: the
+- **A thread is due one as it is named** (`createNames`' `onNamed`): as a
+  column reserves its lane (ADR-0057), or as a lane with no reservation is
+  created. It is due again at each run's end, which draws only when it still has none: the
   retry for a failed one. `recover` does not: turning banners on must not
   draw one for every thread that ever ran. Banners are made before
   `createNames`, which is made before lane work.

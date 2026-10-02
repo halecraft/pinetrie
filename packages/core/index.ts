@@ -83,9 +83,10 @@ export const emailLocalPart = (writer: WriterId): string => {
 
 declare const laneNameBrand: unique symbol
 /**
- * A thread's lane: a line of work (ADR-0019), created where agent work is first
- * wanted in a thread and never moved (ADR-0020). Only `laneNameForThread()`
- * can mint one, so no writer's id or `"main"` is assignable.
+ * A thread's lane: a line of work (ADR-0019), never moved (ADR-0020). Its id
+ * can exist before the lane does: a column reserves it, and the thread is
+ * named under it (ADR-0057). Only `laneNameForThread()` and the decoders
+ * mint one, so no writer's id or `"main"` is assignable.
  */
 export type LaneName = string & { readonly [laneNameBrand]: true }
 
@@ -98,6 +99,17 @@ export const laneNameForThread = (id: string): LaneName =>
 /** Whether untrusted text names a thread's lane: the codec's check. */
 export const isLaneName = (s: string): s is LaneName =>
   s.startsWith(LANE_PREFIX) && s.length > LANE_PREFIX.length
+
+const NEW_LANE =
+  /^t-[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+/**
+ * A new thread's lane id as a client makes it, `t-` and a lowercase uuidv7;
+ * undefined for anything else. Stricter than `isLaneName`: a lane's
+ * container and volume are named after its id (ADR-0057).
+ */
+export const parseNewLane = (s: string): LaneName | undefined =>
+  NEW_LANE.test(s) ? (s as LaneName) : undefined
 
 declare const entryIdBrand: unique symbol
 declare const runIdBrand: unique symbol
@@ -177,6 +189,8 @@ export const ERR = {
   IMAGE_MISSING: "image_missing",
   /** A title with a line break, or longer than `MAX_TITLE` (ADR-0045). */
   INVALID_TITLE: "invalid_title",
+  /** A new thread's lane id that names a lane pi already holds (ADR-0057). */
+  LANE_TAKEN: "lane_taken",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -237,7 +251,14 @@ export type Intent =
       readonly work: WorkSetting | null
       /** The card the text was sent from, spent once it is sent (ADR-0048). */
       readonly card: CardId | null
+      /**
+       * The lane id the sender's column reserved: the id a lane this message
+       * creates is created under, unless pi holds it (ADR-0057).
+       */
+      readonly reserved: LaneName | null
     }
+  /** Name a thread before its lane exists (ADR-0057). */
+  | { readonly kind: "reserve"; readonly lane: LaneName }
   /** Set the sender's display name: a label, never an identity. */
   | { readonly kind: "name"; readonly name: string }
   /** End a thread's running turn. Idempotent: an idle lane is already stopped. */

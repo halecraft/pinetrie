@@ -5,6 +5,7 @@ import { createHash } from "node:crypto"
 import { deflateSync } from "node:zlib"
 import {
   type ImageRef,
+  laneNameForThread,
   ROOT,
   type Sha256,
   type StoredImage,
@@ -14,7 +15,7 @@ import {
 import { encodeChat } from "@pineta/marginalia"
 import { newSessionDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { createAgent } from "./agent.ts"
+import { createAgent, newId } from "./agent.ts"
 import { prepareImage, readImageProcessor, sha256Of } from "./images.ts"
 import { scriptedModel } from "./scripted.ts"
 
@@ -131,7 +132,7 @@ test("the model reads a chat's text, then its image's bytes, from the store", as
       },
     },
   ])
-  const made = await agent.createThreadLane(ROOT)
+  const made = await agent.createThreadLane(ROOT, laneNameForThread(newId()))
   if (made.kind !== "created") throw new Error("no lane")
   const text = `what colour? ![red](/blob/${sha})`
   await agent.lane(made.lane).run(

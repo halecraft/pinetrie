@@ -87,6 +87,58 @@ describe("columnsReducer", () => {
     expect(sync([{ key: "k", anchor: "2-t" }], i, two)[0]?.lane).toBeUndefined()
   })
 
+  describe("a reserved lane (ADR-0057)", () => {
+    const R = laneNameForThread("r")
+    const reserve = (s: readonly Column[], key: string) =>
+      columnsReducer(s, { kind: "reserve", key, lane: R })
+
+    test("reserve keeps the id on the column keyed, and not on a bound one", () => {
+      const s = reserve([{ key: "k", anchor: "1-a" }], "k")
+      expect(s[0]?.reserved).toBe(R)
+      const bound: readonly Column[] = [{ key: "k", anchor: "1-a", lane: L }]
+      expect(reserve(bound, "k")).toBe(bound)
+      // No column takes it: the same list, so a root stores none of its own.
+      expect(reserve(s, "other")).toBe(s)
+    })
+
+    test("a fresh column binds to its reserved lane once the lane has a tip, before its message is indexed", () => {
+      const fresh = reserve(
+        [{ key: "k", anchor: "2-t", fresh: { sendId: "s-1" } }],
+        "k",
+      )
+      const i = tree({ "1-a": null, "2-t": "1-a" })
+      // Created at the root, a lane has no tip until its prompt.
+      expect(sync(fresh, i, [lane(null, R)])).toBe(fresh)
+      expect(sync(fresh, i, [lane("2-t", R)])).toEqual([
+        { key: "k", anchor: "2-t", lane: R },
+      ])
+    })
+
+    test("binds by id even while a second lane ends at the same tip", () => {
+      const s = reserve([{ key: "k", anchor: "2-t" }], "k")
+      const i = tree({ "1-a": null, "2-t": "1-a" })
+      expect(sync(s, i, [lane("2-t"), lane("2-t", R)])[0]?.lane).toBe(R)
+    })
+
+    test("a reservation that is no lane yet is kept as the column follows, and dropped as it binds to another", () => {
+      const s = reserve([{ key: "k", anchor: "1-a" }], "k")
+      const i = tree({ "1-a": null, "2-b": "1-a" })
+      expect(sync(s, i)).toEqual([{ key: "k", anchor: "2-b", reserved: R }])
+      expect(sync(s, i, [lane("2-b")])).toEqual([
+        { key: "k", anchor: "2-b", lane: L },
+      ])
+    })
+
+    test("a fresh column keeps it as it anchors at a message sent to people", () => {
+      const s = reserve(
+        [{ key: "k", anchor: "1-a", fresh: { sendId: "s-1" } }],
+        "k",
+      )
+      const i = tree({ "1-a": null, "2-m": "1-a" }, { "2-m": "s-1" })
+      expect(sync(s, i)).toEqual([{ key: "k", anchor: "2-m", reserved: R }])
+    })
+  })
+
   test("a fresh column anchors at the message its send wrote, whatever came first", () => {
     const start = columnsReducer([{ key: "k", anchor: "2-t" }], {
       kind: "openFresh",

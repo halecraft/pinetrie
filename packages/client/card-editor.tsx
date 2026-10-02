@@ -12,19 +12,17 @@
 
 import { attach } from "@kyneta/react"
 import { subscribe } from "@kyneta/schema"
-import {
-  type CardId,
-  type CardPlace,
-  type CardRecord,
-  type ChatMode,
-  type CommandSummary,
-  cardId,
-  type LaneName,
-  type Position,
-  type ProjectRecord,
-  type SeatRecord,
-  type ThreadLane,
-  type WorkSetting,
+import type {
+  CardId,
+  CardPlace,
+  CardRecord,
+  ChatMode,
+  CommandSummary,
+  Position,
+  ProjectRecord,
+  SeatRecord,
+  ThreadLane,
+  WorkSetting,
 } from "@pineta/core"
 import { spends, writersOf } from "@pineta/marginalia"
 import { textClients } from "@pineta/schema"
@@ -40,6 +38,7 @@ import {
 } from "./card-state.ts"
 import type { Pending, Prefill } from "./columns.ts"
 import { matchCommands } from "./commands.ts"
+import { newCardId } from "./ids.ts"
 import type { Intent } from "./intent.ts"
 import { Menu } from "./menu.tsx"
 import { cardHeading } from "./names.ts"
@@ -61,7 +60,7 @@ import {
   whereChoices,
   whereWords,
 } from "./send.ts"
-import type { SessionClient } from "./session-view.ts"
+import type { ColumnHow, SessionClient } from "./session-view.ts"
 
 /** Where a lane this editor's send creates would work, and the choices. */
 export interface Where {
@@ -70,21 +69,6 @@ export interface Where {
   readonly project: ProjectRecord | null
   /** Directories other lanes work in directly: offered again. */
   readonly usedDirs: readonly string[]
-}
-
-/**
- * A new card's id: a uuidv7, so ids sort oldest first and no two writers
- * mint one key (ADR-0016).
- */
-const newCardId = (): CardId => {
-  const time = Date.now().toString(16).padStart(12, "0")
-  const rand = [...crypto.getRandomValues(new Uint8Array(10))]
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("")
-  const variant = ((Number.parseInt(rand.slice(3, 4), 16) & 3) | 8).toString(16)
-  return cardId(
-    `${time.slice(0, 8)}-${time.slice(8)}-7${rand.slice(0, 3)}-${variant}${rand.slice(4, 7)}-${rand.slice(7, 19)}`,
-  )
 }
 
 /**
@@ -113,10 +97,11 @@ export function CardEditor(p: {
   at: Position
   /** The thread's lane, from `threadOf`: whether the agent is busy there. */
   lane: ThreadLane
-  /** The lane this column is bound to, which its sends name. */
-  boundLane: LaneName | undefined
-  /** A Start Agent column. */
-  asksAgent: boolean
+  /**
+   * What every send from this column carries: its bound lane, whether it is a
+   * Start Agent column, and its reserved lane (ADR-0057).
+   */
+  how: ColumnHow
   /** A fresh column: its first message starts the thread (`branch`). */
   fresh: boolean
   /** The commands the host's pi loaded, for completion (ADR-0036). */
@@ -175,7 +160,7 @@ export function CardEditor(p: {
     text,
     fresh: p.fresh,
     lane: p.lane,
-    asksAgent: p.asksAgent,
+    asksAgent: p.how.asksAgent,
     participants: p.participants,
     reader: p.reader,
   })
@@ -305,9 +290,8 @@ export function CardEditor(p: {
     setStatus("sending…")
     const id = p.onSend()
     const outcome = await session.chat(message, p.at, {
+      ...p.how,
       mode: as,
-      ...(p.boundLane === undefined ? {} : { lane: p.boundLane }),
-      asksAgent: p.asksAgent,
       ...(id === undefined ? {} : { id }),
       ...(plan.createsLane && choice !== null ? { work: choice } : {}),
       ...(from === null ? {} : { card: from }),

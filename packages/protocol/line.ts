@@ -29,6 +29,7 @@ const Command = Schema.struct({
   workDir: Schema.string(),
   targetId: Schema.string(),
   cardId: Schema.string(),
+  reserved: Schema.string(),
 })
 
 const Reply = Schema.struct({

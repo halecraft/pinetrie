@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import {
   type LaneName,
+  laneNameForThread,
   messageText,
   ROOT,
   type Sha256,
@@ -25,7 +26,7 @@ import {
   type SessionDocHandle,
 } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
-import { createAgent, drawnOf } from "./agent.ts"
+import { createAgent, drawnOf, newId } from "./agent.ts"
 import { BANNER_TOOL, bannerImageConfig, parseBannerArgs } from "./banner.ts"
 import {
   SCRIPTED_IMAGE_PNG,
@@ -144,7 +145,7 @@ describe("banners in a harness", () => {
     const script = scriptedModel()
     const asks: { lane: LaneName; ask: BannerAsk }[] = []
     const agent = await agentOver(doc, script, asks)
-    const made = await agent.createThreadLane(ROOT)
+    const made = await agent.createThreadLane(ROOT, laneNameForThread(newId()))
     if (made.kind !== "created") throw new Error("no lane")
     script.use([
       { tool: BANNER_TOOL, args: { direction: "at dusk" } },
@@ -164,7 +165,7 @@ describe("banners in a harness", () => {
   test("a lane stored before banners were on gets the tool at its next run's end", async () => {
     const doc = newSessionDoc()
     const before = await agentOver(doc, scriptedModel())
-    const made = await before.createThreadLane(ROOT)
+    const made = await before.createThreadLane(ROOT, laneNameForThread(newId()))
     if (made.kind !== "created") throw new Error("no lane")
     // A landing stores the lane's tools: then banners were off.
     await before.lane(made.lane).withGuidance(true)
@@ -183,7 +184,7 @@ describe("banners in a harness", () => {
   test("a lane stored while banners were on still runs once they are off, and its call says so", async () => {
     const doc = newSessionDoc()
     const before = await agentOver(doc, scriptedModel(), [])
-    const made = await before.createThreadLane(ROOT)
+    const made = await before.createThreadLane(ROOT, laneNameForThread(newId()))
     if (made.kind !== "created") throw new Error("no lane")
     await before.lane(made.lane).withGuidance(true)
     await before.lane(made.lane).withGuidance(false)

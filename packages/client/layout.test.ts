@@ -126,7 +126,11 @@ describe("layoutReducer", () => {
       key: "n",
       asksAgent: false,
     })
-    const sent = layoutReducer(opened, { kind: "sent", key: "n", sendId: "s" })
+    const sent = layoutReducer(opened, {
+      kind: "newTabColumn",
+      key: "n",
+      action: { kind: "sent", key: "n", sendId: "s" },
+    })
     expect(sync(sent)).toBe(sent)
     const written = tree({ ...parents, "7-r3": null }, { "7-r3": "s" })
     const synced = sync(sent, written)
@@ -134,6 +138,38 @@ describe("layoutReducer", () => {
     expect(synced.active).toEqual({ kind: "root", root: "7-r3" })
     expect(synced.open).toEqual(["1-r1", "7-r3"])
     expect(columnsOf(synced, "7-r3")).toEqual([{ key: "n", anchor: "7-r3" }])
+  })
+
+  test("a new tab bound by its reserved lane becomes that root's tab, in every browser tab holding it (ADR-0057)", () => {
+    const R = laneNameForThread("r")
+    const opened = layoutReducer(at(initialLayout()), {
+      kind: "newTab",
+      key: "n",
+      asksAgent: true,
+    })
+    const reserved = layoutReducer(opened, {
+      kind: "newTabColumn",
+      key: "n",
+      action: { kind: "reserve", key: "n", lane: R },
+    })
+    expect(reserved.newTabs[0]?.reserved).toBe(R)
+    // Sent from another browser tab: no send id here, only the lane.
+    const written = tree({ ...parents, "7-r3": null })
+    const lanes = [
+      {
+        name: R,
+        tip: "7-r3",
+        running: true,
+        waiting: 0,
+        askedBy: null,
+        lastWaiting: null,
+      },
+    ]
+    const synced = resolve(reserved, written, new Map(), lanes)
+    expect(synced.newTabs).toEqual([])
+    expect(columnsOf(synced, "7-r3")).toEqual([
+      { key: "n", anchor: "7-r3", lane: R, asksAgent: true },
+    ])
   })
 
   // A stored column that the grown tree moves on, so `sync` returns a new
@@ -496,6 +532,20 @@ describe("encodeLayout / decodeLayout", () => {
       null,
     ])
       expect(decodeLayout(raw)).toBeUndefined()
+  })
+
+  test("a reservation is stored, and one not in the host's shape is left off (ADR-0057)", () => {
+    const R = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
+    const l: Layout = {
+      ...initialLayout(),
+      newTabs: [{ key: "n", anchor: null, reserved: R, fresh: {} }],
+    }
+    expect(trip(l)).toEqual(l)
+    const raw = {
+      ...encodeLayout(l),
+      newTabs: [{ key: "n", anchor: null, reserved: "t-x" }],
+    }
+    expect(decodeLayout(raw)?.newTabs).toEqual([{ key: "n", anchor: null }])
   })
 
   test("a lane that is not a lane name is left off, and the column kept", () => {

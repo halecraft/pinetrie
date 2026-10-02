@@ -154,9 +154,10 @@ so it is the one behind the menu. What each does is under "Starting" below.
   aside of an aside opens a third column.
 - **A column's header says who works in it and where it came from**
   (ADR-0040). Its first row names the agent working there, `✦ amber-fox` in
-  the column's colour, which leads to where that agent started; `✦ new agent`
-  while the composer's next send would start one; or nothing, in a
-  conversation, where a message goes to people. Its second row, for a column
+  the column's colour, which leads to where that agent started. While the
+  composer's next send would start one, the agent to come is named already
+  (ADR-0057), with `✦ new agent` only until its name arrives. A conversation
+  shows nothing there, since a message goes to people. Its second row, for a column
   that forks, names the fork, `↰ Ada: “Say exactly…”`, and clicking it brings
   the fork point into view.
 - **Colour, not lines, links a branch to its parent.** Each open branch takes

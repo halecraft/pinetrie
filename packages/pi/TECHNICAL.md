@@ -57,8 +57,9 @@ for this reason.
 ### Lanes belong to threads, and never move (ADR-0020)
 
 The host owns one harness. A lane is a thread's line of work: created by
-`Agent.createThreadLane(at)` where agent work is first wanted in a thread, named
-`laneNameForThread(uuidv7)` (`t-…`), and never navigated. People own no lanes;
+`Agent.createThreadLane(at, lane)` where agent work is first wanted in a
+thread, under the id the host decided (`t-…`: the one a column reserved, or
+one the host made, ADR-0057), and never navigated. People own no lanes;
 a message records its writer (`details.author`, from the transport). A lane's
 tip is therefore always its thread's end, and `threadOf` finds a thread's
 lane from its end with no stored mapping.
@@ -67,7 +68,7 @@ The facade has no way to move a lane: `ThreadLaneHandle` offers only `append`
 and `run`. Nor is there a way to READ a tip through the agent: readers use the
 document, so observing a lane can never create one.
 
-Three facts from pi's source and the probes shape it:
+Four facts from pi's source and the probes shape it:
 
 - **`harness.lane(name, { createAt })` THROWS `UnknownTarget`** for an entry pi
   does not hold, where most of pi's API returns a `Result`. `createThreadLane`
@@ -77,6 +78,11 @@ Three facts from pi's source and the probes shape it:
 - **`harness.lane(name)` creates a missing lane.** So restoring a lane after a
   restart checks `hasLaneRecord` first: pi records a lane's `pi.branch.tip` key
   when it creates it, with a null value until the first entry.
+- **`harness.lane(name, { createAt })` returns a lane it holds**, and ignores
+  `createAt` (`dist/harness/runtime/harness.js`, `lane()`, in
+  `@earendil-works/pi-agent-core` 0.87.1). So `createThreadLane` refuses an
+  id pi holds, in memory or in the document, with `lane_taken`, before it
+  asks: otherwise a chosen id could write into another thread.
 - **A foreign-written entry is not navigable** (`unknown_target`): pi's session
   never saw it created. The Node e2e keeps a `writeEntry` fixture for that S3
   case.

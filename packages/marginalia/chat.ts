@@ -277,10 +277,14 @@ export type ChatDecision =
       readonly lane: LaneName
       readonly details: ChatDetails
     }
-  /** The agent is compelled here for the first time: create the thread's lane at `at`, then run. */
+  /**
+   * The agent is compelled here for the first time: create the thread's lane
+   * at `at`, under the id `lane`, then run.
+   */
   | {
       readonly kind: "createAndRun"
       readonly at: Position
+      readonly lane: LaneName
       readonly details: ChatDetails
     }
   /** The lane is busy: wait in its outbox, `position` messages ahead. */
@@ -354,6 +358,16 @@ export function planChat(input: {
   readonly asksAgent: boolean
   /** The command's id. */
   readonly sendId: string
+  /**
+   * The ids a lane this message creates may take (ADR-0057): the one its
+   * sender's column reserved, unless pi holds it already (`held`), else
+   * `spare`, which the host made.
+   */
+  readonly newLane: {
+    readonly reserved: LaneName | null
+    readonly held: ReadonlySet<string>
+    readonly spare: LaneName
+  }
   /** The other people who wrote in its card; empty for a message written alone. */
   readonly contributors: readonly WriterId[]
   /** The images its text shows, as `planImages` found them in the store. */
@@ -409,10 +423,12 @@ export function planChat(input: {
     ...(input.images.length === 0 ? {} : { images: input.images }),
   }
   const compelled = compels.kind === "agent"
+  const { reserved, held, spare } = input.newLane
+  const created = reserved === null || held.has(reserved) ? spare : reserved
 
   if (branch) {
     return compelled
-      ? { kind: "createAndRun", at: input.at, details }
+      ? { kind: "createAndRun", at: input.at, lane: created, details }
       : { kind: "appendToTree", parent: input.at, details }
   }
 
@@ -420,7 +436,7 @@ export function planChat(input: {
     if (!compelled) return { kind: "appendToTree", parent: end, details }
     if (input.mode === "reply" && race !== null)
       return { kind: "conflict", by: race.by }
-    return { kind: "createAndRun", at: end, details }
+    return { kind: "createAndRun", at: end, lane: created, details }
   }
 
   const name: LaneName = lane.name

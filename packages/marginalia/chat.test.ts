@@ -53,6 +53,8 @@ const lane = (
   ...over,
 })
 const NONE: ThreadLane = { kind: "none" }
+const SPARE = laneNameForThread("spare")
+const RESERVED = laneNameForThread("reserved")
 const ASK = parseMentions("@agent please")
 
 type PlanInput = Omit<Parameters<typeof planChat>[0], "thread"> &
@@ -75,6 +77,7 @@ const plan = (over: Partial<PlanInput>) => {
     participants: ["Alice", "Bo"],
     asksAgent: false,
     sendId: "s-1",
+    newLane: { reserved: null, held: new Set(), spare: SPARE },
     ...over,
   }
   const { end, race, lane: l, ...rest } = i
@@ -224,6 +227,22 @@ describe("planChat: a compelled message", () => {
       kind: "createAndRun",
       at: atEntry(E2),
     })
+  })
+  test("a new lane takes its column's reserved id, unless pi holds it, else the host's spare (ADR-0057)", () => {
+    const laneOf = (d: ReturnType<typeof plan>) =>
+      d.kind === "createAndRun" ? d.lane : d.kind
+    const ids = (reserved: typeof RESERVED | null, held: string[] = []) => ({
+      newLane: { reserved, held: new Set(held), spare: SPARE },
+    })
+    for (const mode of ["reply", "branch"] as const) {
+      expect(laneOf(plan({ mode, mentions: ASK, ...ids(RESERVED) }))).toBe(
+        RESERVED,
+      )
+      expect(
+        laneOf(plan({ mode, mentions: ASK, ...ids(RESERVED, [RESERVED]) })),
+      ).toBe(SPARE)
+      expect(laneOf(plan({ mode, mentions: ASK, ...ids(null) }))).toBe(SPARE)
+    }
   })
   test("a thread with a lane, or a Start Agent column, compels without a mention", () => {
     expect(kind(plan({ lane: lane() }))).toBe("run")

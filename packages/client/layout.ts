@@ -14,6 +14,7 @@ import {
   ancestry,
   isLaneName,
   type LaneView,
+  parseNewLane,
   pathIds,
   projectColumns,
   rootOf,
@@ -70,8 +71,15 @@ export type LayoutAction =
       readonly root: string
       readonly action: Exclude<ColumnAction, { kind: "sync" | "prune" }>
     }
-  /** A new tab's first send, as send `sendId`. */
-  | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
+  /**
+   * A column action on new tab `key`'s one column: its first send, or the
+   * lane id it reserves (ADR-0057).
+   */
+  | {
+      readonly kind: "newTabColumn"
+      readonly key: string
+      readonly action: Extract<ColumnAction, { kind: "sent" | "reserve" }>
+    }
   /** Store what `resolveLayout` draws for these facts. */
   | ({ readonly kind: "resolve" } & LayoutFacts)
   /** Once, after the document settles: the roots it lacks go, and `active` is chosen. */
@@ -219,11 +227,13 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
         ? state
         : { ...state, roots: withRoot(state.roots, action.root, after) }
     }
-    case "sent":
+    case "newTabColumn":
       return {
         ...state,
         newTabs: state.newTabs.map(c =>
-          c.key === action.key ? (columnsReducer([c], action)[0] ?? c) : c,
+          c.key === action.key
+            ? (columnsReducer([c], action.action)[0] ?? c)
+            : c,
         ),
       }
     case "resolve":
@@ -401,12 +411,15 @@ export function planOpen(
 // Kept per browser tab through `tab-state.ts`. Built field by field both ways,
 // so a field the schema does not name is never stored or restored.
 // `fresh.pending` is one: restoring it would send its message again.
-// `fresh.prefill` is stored: only `pending` is sent on opening.
+// `fresh.prefill` is stored: only `pending` is sent on opening. `reserved` is
+// stored, so a reload keeps the thread's name (ADR-0057). It is optional, so
+// a v4 layout stored without it still decodes.
 
 const StoredColumn = Type.Object({
   key: Type.String(),
   anchor: Type.Union([Type.String(), Type.Null()]),
   lane: Type.Optional(Type.String()),
+  reserved: Type.Optional(Type.String()),
   asksAgent: Type.Optional(Type.Literal(true)),
   // Optional, with no new `v`: absent is story, so a layout stored before
   // densities decodes, and no one's tabs are dropped for it (ADR-0056).
@@ -448,6 +461,7 @@ const toStored = (c: Column): Stored => ({
   key: c.key,
   anchor: c.anchor,
   ...(c.lane === undefined ? {} : { lane: c.lane }),
+  ...(c.reserved === undefined ? {} : { reserved: c.reserved }),
   ...(c.asksAgent ? { asksAgent: true } : {}),
   ...(c.density === undefined ? {} : { density: c.density }),
   ...(c.fresh === undefined
@@ -473,6 +487,7 @@ const fromStored = (s: Stored): Column => ({
   // Unrecognised, it is left off: `sync` binds the column again once its tip
   // is exactly one lane's.
   ...(s.lane !== undefined && isLaneName(s.lane) ? { lane: s.lane } : {}),
+  ...reservedFromStored(s.reserved),
   ...(s.asksAgent ? { asksAgent: true } : {}),
   ...(s.density === undefined ? {} : { density: s.density }),
   ...(s.fresh === undefined
@@ -491,6 +506,12 @@ const fromStored = (s: Stored): Column => ({
         },
       }),
 })
+
+/** A stored reservation, kept only in the shape the host accepts. */
+const reservedFromStored = (stored: string | undefined) => {
+  const reserved = stored === undefined ? undefined : parseNewLane(stored)
+  return reserved === undefined ? {} : { reserved }
+}
 
 export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
   v: 4,

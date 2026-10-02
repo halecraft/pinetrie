@@ -234,7 +234,7 @@ give the roots and each tab's signals.
 
 ## The column model (`columns.ts`)
 
-A column is `{ key, anchor, lane?, asksAgent?, fresh? }`, and `columnsReducer`
+A column is `{ key, anchor, lane?, reserved?, asksAgent?, fresh? }`, and `columnsReducer`
 is pure: keys come from the shell in the action, so the reducer has no hidden
 counter.
 
@@ -248,7 +248,17 @@ counter.
   its sends name the lane. A conversation stepped down at the lane's tip is
   newer, so following leaves would slide the agent's column into it, and send
   the agent's next message there. Binding waits while two lanes share the tip
-  (a compelled branch at a lane's tip, until its prompt commits). A bound or
+  (a compelled branch at a lane's tip, until its prompt commits).
+- **A column that reserved its lane binds to it by id** (ADR-0057), as a
+  fresh column finds its message by `sendId`: as soon as that lane has a tip,
+  before the other rules, whatever else ends there. A lane created at the
+  root has no tip until its prompt, so a new tab waits for it. `reserved` is
+  kept as the column follows a conversation, and dropped as it binds. A copy
+  of the column in another browser tab binds too, and a copied new tab moves
+  into the new root, as the sender's does.
+- **`reserve` returns the same list when no column takes it.** A root with
+  no stored columns would otherwise store its `first-<root>` column, and a
+  new tab moving into that root would land beside it, as a second column. A bound or
   fresh column is `pinned` in `projectColumns`: its path ends at its anchor.
 - **A null anchor** belongs only to a fresh column at the root: a new tab's.
 - **A fresh column** (`openFresh`: `→`, or "branch here" after a conflict; or
@@ -389,6 +399,10 @@ error.
   your tabs were yours, ADR-0030) is dropped once and overwritten by the first
   save, and the page opens on the Archive tab. A lane that is not a lane name
   is left off; `sync` binds the column again.
+- **`reserved` is stored** (ADR-0057), and decoded only in the shape the host
+  accepts (`parseNewLane`), so a reload keeps the thread's name. The device
+  slot copies it into a new browser tab, where the column binds to the lane
+  once either copy sends.
 - **`fresh.pending` is never stored**, by either side: restoring it would send
   its message again. A "branch here" column comes back empty. `fresh.prefill`
   is stored, blank or content: only `pending` is sent on opening. What was
@@ -601,6 +615,17 @@ became of its files (`strip`).
   next send would create a lane, so the header can say `✦ new agent`. It is a
   boolean, not the text lifted up: `Column` redraws only when it flips, not
   on every keystroke.
+- **The thread to come is named before the send** (ADR-0057). `headLane` is
+  the lane the header names and draws the banner of: the thread's, or the
+  column's reserved one while `createsLane`. `columnView` decides the
+  `reserve` step: `mint` a lane id (`newLaneName`, `ids.ts`) for a column
+  with none, `ask` the host to name it, else `none`. `Column` carries it out
+  in an effect keyed on the step. Asking again (a remount, StrictMode) is
+  harmless: the host does nothing for an id it has named.
+  - **Only where the thread has no lane.** `createsLane` is the composer's
+    report, a render behind: a column that has just bound still carries it
+    for that render. Its effect runs before `App`'s stores the layout, so a
+    `mint` then would act on a root whose columns are not stored yet.
 
 ## Words come from values
 
@@ -778,6 +803,10 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `sendButton` words the plan (labels: `docs/06-interface.md`), and
   `placeholderWords` gives the box's placeholder: the composer holds only its
   state and draws.
+- **Every send from a column carries its `ColumnHow`**: its bound lane,
+  whether it is a Start Agent column, and its reserved lane, built once by
+  `Column` for its composer and for everyone else's cards at its end, since
+  sending any of them here creates this column's lane.
 - **The queue names the last message waiting,** not who the agent is
   answering: the host takes held items in the order sent, whatever their kind,
   so a new one waits behind the newest (`LaneView.lastWaiting`). `queuePlace`

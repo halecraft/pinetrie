@@ -93,7 +93,7 @@ export function planArchive(input: {
 
 /**
  * The entry a command writes at, or null when it writes in no root: a new
- * thread at the root, a name, a stop, an archive action.
+ * thread at the root, a name, a stop, an archive action, a reservation.
  */
 export function writesAt(
   intent: Intent,
@@ -112,6 +112,7 @@ export function writesAt(
     case "name":
     case "stop":
     case "archive":
+    case "reserve":
       return null
   }
 }

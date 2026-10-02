@@ -41,12 +41,19 @@ export interface Column {
    */
   readonly anchor: string | null
   /**
-   * The lane this column's thread is (ADR-0021). Set once the column's end is
-   * exactly one lane's tip; from then on the column follows the lane, never
-   * the newest leaf, and its sends name it, because a conversation forked at
-   * the lane's tip is newer and is another thread.
+   * The lane this column's thread is (ADR-0021). Set once its reserved lane
+   * has a tip, or else once the column's end is exactly one lane's tip; from
+   * then on the column follows the lane, never the newest leaf, and its sends
+   * name it, because a conversation forked at the lane's tip is newer and is
+   * another thread.
    */
   readonly lane?: LaneName
+  /**
+   * The id of the lane this column's next send would create, made before the
+   * lane exists so its thread is named at once (ADR-0057). Dropped as the
+   * column binds.
+   */
+  readonly reserved?: LaneName
   /** A Start Agent column: a message with no mention asks the agent. */
   readonly asksAgent?: true
   /**
@@ -90,6 +97,8 @@ export type ColumnAction =
     }
   /** A fresh column sent its first message, as send `sendId`. */
   | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
+  /** Column `key` keeps `lane` as the id its next send creates a lane under. */
+  | { readonly kind: "reserve"; readonly key: string; readonly lane: LaneName }
   | { readonly kind: "close"; readonly index: number }
   /** Move column `from` to index `to` (`reorder.ts`); the rest keep their order. */
   | { readonly kind: "move"; readonly from: number; readonly to: number }
@@ -150,6 +159,16 @@ export function columnsReducer(
           ? { ...c, fresh: { sendId: action.sendId } }
           : c,
       )
+    case "reserve": {
+      // The same state when no column takes it: a root with no stored columns
+      // would otherwise store its first one.
+      const at = state.findIndex(
+        c => c.key === action.key && c.lane === undefined,
+      )
+      const column = state[at]
+      if (column === undefined || column.reserved === action.lane) return state
+      return state.with(at, { ...column, reserved: action.lane })
+    }
     case "close":
       return state.filter((_, i) => i !== action.index)
     case "move": {
@@ -177,6 +196,7 @@ export function columnsReducer(
 /**
  * Settle columns against the tree, once per change.
  *
+ * - A column whose reserved lane has a tip binds to it, by id (ADR-0057).
  * - A fresh column waits for the entry its send wrote, then anchors there.
  * - A bound column follows its lane: its anchor is the lane's tip.
  * - Any other column follows its own path: its anchor ADVANCES to its tip
@@ -205,14 +225,21 @@ function settle(
   index: TreeIndex,
   lanes: readonly LaneView[],
 ): Column {
-  const { fresh, lane, ...rest } = column
+  const { fresh, lane, reserved, ...rest } = column
+  if (reserved !== undefined) {
+    // Its own lane, known by id: no waiting for its tip to be one lane's.
+    const tip = lanes.find(l => l.name === reserved)?.tip ?? null
+    if (tip !== null) return { ...rest, anchor: tip, lane: reserved }
+  }
+  // Kept until the column binds: a conversation may yet ask the agent.
+  const kept = reserved === undefined ? {} : { reserved }
   if (fresh !== undefined) {
     const own =
       fresh.sendId === undefined ? undefined : index.bySend.get(fresh.sendId)
     // Anchored at its own message, it follows like any column from here.
     return own === undefined
       ? column
-      : settle({ ...rest, anchor: own }, index, lanes)
+      : settle({ ...rest, ...kept, anchor: own }, index, lanes)
   }
   if (lane !== undefined) {
     const tip = lanes.find(l => l.name === lane)?.tip ?? null
@@ -226,9 +253,7 @@ function settle(
   const ending = lanes.filter(l => l.tip === tip)
   const bound = ending.length === 1 ? ending[0]?.name : undefined
   if (tip === column.anchor && bound === undefined) return column
-  return {
-    ...rest,
-    anchor: tip,
-    ...(bound === undefined ? {} : { lane: bound }),
-  }
+  return bound === undefined
+    ? { ...rest, ...kept, anchor: tip }
+    : { ...rest, anchor: tip, lane: bound }
 }

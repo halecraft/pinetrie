@@ -560,8 +560,8 @@ export function threadNameFor(
 
 /**
  * A name for each lane that has none, oldest lane first, each avoiding the
- * names stored and those planned before it. What the host writes at start
- * and when it creates a lane: one step for both.
+ * names stored and those planned before it. What the host writes at start,
+ * when it creates a lane, and when a column reserves one (`planReserve`).
  */
 export function planNames(
   lanes: readonly { readonly lane: LaneName; readonly createdAt: number }[],
@@ -579,4 +579,29 @@ export function planNames(
     planned.push({ lane, name, at: now })
   }
   return planned
+}
+
+/** What a `reserve` command does (ADR-0057). */
+export type ReservePlan =
+  /** The id already has a name: nothing to write. */
+  | { readonly kind: "known" }
+  /** pi holds a lane by this id: it is no thread to come. */
+  | { readonly kind: "held" }
+  | { readonly kind: "name"; readonly record: NameRecord }
+
+/**
+ * Name a thread whose lane does not exist yet, as `planNames` names a lane:
+ * the pair its id hashes to, or the next free one. `held` is every lane pi
+ * holds.
+ */
+export function planReserve(
+  lane: LaneName,
+  held: ReadonlySet<string>,
+  names: ReadonlyMap<LaneName, ThreadName>,
+  now: number,
+): ReservePlan {
+  if (names.has(lane)) return { kind: "known" }
+  if (held.has(lane)) return { kind: "held" }
+  const name = threadNameFor(lane, new Set(names.values()))
+  return { kind: "name", record: { lane, name, at: now } }
 }

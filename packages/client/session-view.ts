@@ -122,6 +122,8 @@ export interface SessionClient {
   setName(name: string): Promise<Outcome>
   /** End the running turn of the thread whose lane is `lane`. */
   stop(lane: LaneName): Promise<Outcome>
+  /** Have the host name the thread a column's reserved lane will be (ADR-0057). */
+  reserve(lane: LaneName): Promise<Outcome>
   /**
    * A card's text: the same document for every caller. Call it only for a
    * card whose record is live: once the host has spent the card, this client
@@ -168,6 +170,13 @@ export interface ChatHow {
   readonly id?: string
   /** The card the text is sent from, which the host spends once it is sent. */
   readonly card?: CardId
+  /** The lane id the column reserved: what a lane this send creates is called (ADR-0057). */
+  readonly reserved?: LaneName
+}
+
+/** What every send from one column carries, whichever card it is sent from. */
+export type ColumnHow = Pick<ChatHow, "lane" | "reserved"> & {
+  readonly asksAgent: boolean
 }
 
 export async function connectSession(
@@ -317,6 +326,7 @@ export async function connectSession(
           mentions: parseMentions(text),
           work: how.work ?? null,
           card: how.card ?? null,
+          reserved: how.reserved ?? null,
         },
         how.id,
       )
@@ -326,6 +336,9 @@ export async function connectSession(
     },
     stop(lane) {
       return send({ kind: "stop", lane })
+    },
+    reserve(lane) {
+      return send({ kind: "reserve", lane })
     },
     cardText,
     createCard(card, text) {

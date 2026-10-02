@@ -256,9 +256,9 @@ export async function startHost({
   const digests = decodeDigestConfig(userJson)
     ? createDigests({ basics, serial, presence, agent: theAgent })
     : null
-  // Every lane's thread name (ADR-0039), one plan at a time. A thread's
+  // Every thread's name (ADR-0039, ADR-0057), one plan at a time. A thread's
   // banner is drawn from its name, so it starts as the name is written.
-  const ensureNames = createNames({
+  const names = createNames({
     basics,
     agent: { setWorkRecord: record => theAgent().setWorkRecord(record) },
     onNamed: lane => {
@@ -267,7 +267,7 @@ export async function startHost({
   })
   const work = await startLaneWork({
     basics,
-    ensureNames,
+    ensureNames: names.ensure,
     dir: tools?.project ?? null,
     defaultDirect: !lanes,
     containers,
@@ -327,6 +327,7 @@ export async function startHost({
     blobs,
     cards: cardPort,
     start: runs.start,
+    names,
   })
   const drain = (lane: LaneName) =>
     drainOutbox(
@@ -370,7 +371,7 @@ export async function startHost({
     settle,
     cards: cardPort,
     cardsDoc: cards,
-    ensureNames,
+    ensureNames: names.ensure,
   })
   const seats = startSeats({ exchange, basics, serial, agent })
   const control = startControl({

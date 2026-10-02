@@ -65,7 +65,7 @@ describe("executeChat", () => {
     const { agent, started, deps, context } = setUp(ERR.BAD_DIRECTORY)
     const out = await executeChat(
       deps,
-      { kind: "createAndRun", at: ROOT, details },
+      { kind: "createAndRun", at: ROOT, lane: LANE, details },
       context,
     )
     expect(out).toMatchObject({ kind: "refused", code: ERR.BAD_DIRECTORY })
@@ -77,11 +77,13 @@ describe("executeChat", () => {
     const { agent, work, started, deps, context } = setUp(null)
     const out = await executeChat(
       deps,
-      { kind: "createAndRun", at: ROOT, details },
+      { kind: "createAndRun", at: ROOT, lane: LANE, details },
       context,
     )
     expect(out).toEqual({ kind: "started", runId: "r-1" })
-    expect(methods(agent.calls)).toEqual(["createThreadLane"])
+    expect(agent.calls.map(c => [c.method, ...c.args])).toEqual([
+      ["createThreadLane", ROOT, LANE],
+    ])
     expect(methods(work.calls)).toEqual(["checkDirectory", "prepareLane"])
     expect(started).toEqual([LANE])
   })
@@ -116,6 +118,7 @@ describe("sendChat", () => {
     mentions: parseMentions(text),
     work: null,
     card: null,
+    reserved: null,
   })
   function setUp(project: ProjectRecord | null = null) {
     const b = basics()
@@ -161,6 +164,14 @@ describe("sendChat", () => {
     const out = await sendChat(deps, ALICE, "s-1", chat("do it", true))
     expect(out).toEqual({ kind: "started", runId: "r-1" })
     expect(started).toHaveLength(1)
+  })
+
+  test("a new lane is created under the column's reserved id (ADR-0057)", async () => {
+    const { agent, deps } = setUp()
+    const reserved = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
+    await sendChat(deps, ALICE, "s-1", { ...chat("do it", true), reserved })
+    const created = agent.calls.find(c => c.method === "createThreadLane")
+    expect(created?.args[1]).toBe(reserved)
   })
 
   test("a sent message keeps the images its text shows, as references", async () => {

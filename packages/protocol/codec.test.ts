@@ -26,6 +26,8 @@ import {
 } from "./codec.ts"
 import { reply } from "./messages.ts"
 
+const NEW_LANE = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
+
 const refusalCode = (x: ReturnType<typeof decodeCommand>) =>
   x.kind === "refused" ? x.code : `not refused: ${x.kind}`
 
@@ -103,6 +105,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       mentions: [{ kind: "agent", agent: THE_AGENT }],
       work: null,
       card: null,
+      reserved: NEW_LANE,
     },
     {
       kind: "chat",
@@ -114,6 +117,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       mentions: [{ kind: "person", name: "bob" }],
       work: { kind: "own" },
       card: cardId("c-7"),
+      reserved: null,
     },
     {
       kind: "chat",
@@ -125,6 +129,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       mentions: [],
       work: { kind: "direct", dir: "/tmp/elsewhere" },
       card: null,
+      reserved: null,
     },
     { kind: "name", name: "Alice" },
     { kind: "stop", lane: laneNameForThread("abc") },
@@ -135,6 +140,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "update", lane: laneNameForThread("abc") },
     { kind: "offer", lane: laneNameForThread("abc"), action: "take" },
     { kind: "offer", lane: laneNameForThread("abc"), action: "split" },
+    { kind: "reserve", lane: NEW_LANE },
   ] as const
   for (const intent of intents) {
     assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
@@ -157,6 +163,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "updated", text: "I've merged my latest work" },
     { kind: "updated", text: "" },
     { kind: "offered" },
+    { kind: "reserved" },
     { kind: "refused", code: ERR.ARCHIVED, message: "archived by Bea" },
     { kind: "refused", code: ERR.ROOT_BUSY, message: "busy" },
   ]
@@ -249,4 +256,23 @@ test("working directly needs a directory; an unknown work kind is refused", () =
     "refused",
   )
   assert.equal(decodeCommand({ ...base, workKind: "" }).kind, "chat")
+})
+
+test("decode: a reserved lane is a new thread's id, t- and a uuidv7, or none (ADR-0057)", () => {
+  const chat = (reserved: string) =>
+    decodeCommand({ kind: "chat", text: "hi", mode: "branch", reserved })
+  const reserve = (lane: string) => decodeCommand({ kind: "reserve", lane })
+  const none = chat("")
+  assert.equal(none.kind === "chat" ? none.reserved : "refused", null)
+  for (const bad of [
+    "t-abc",
+    "w-someone",
+    NEW_LANE.toUpperCase(),
+    "t-01a0f9eb-86e1-47ad-a822-2a306786223f",
+    `${NEW_LANE};rm`,
+    "t-01a0f9eb 86e1-77ad-a822-2a306786223f",
+  ]) {
+    assert.equal(refusalCode(chat(bad)), ERR.UNKNOWN_TARGET, bad)
+    assert.equal(refusalCode(reserve(bad)), ERR.UNKNOWN_TARGET, bad)
+  }
 })
