@@ -13,6 +13,7 @@ import path from "node:path"
 import { type ConnectOptions, connectSession } from "@pineta/client/session"
 import { prepareHost } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
+import { readCards } from "@pineta/reads"
 import {
   type RunningHost,
   type StartHostOptions,
@@ -34,6 +35,10 @@ export async function waitFor(
   }
   return -1
 }
+
+/** No card is queued on any lane (ADR-0048): nothing waits to be taken. */
+export const noQueued = (host: Pick<RunningHost, "cards">): boolean =>
+  readCards(host.cards).every(c => c.place.kind !== "queued")
 
 /**
  * A project for a host with tools: a jj repo, colocated with git, with

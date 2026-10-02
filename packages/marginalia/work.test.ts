@@ -1,7 +1,6 @@
 import {
   BASE_SNAPSHOT,
   commitId,
-  ERR,
   entryId,
   type LandingRecord,
   laneNameForThread,
@@ -24,7 +23,6 @@ import {
   planResolution,
   planRetention,
   planTurnRecord,
-  planUpdate,
   recordChanged,
   renderableMessage,
   showHostWorkingCopy,
@@ -34,14 +32,6 @@ const LANE = laneNameForThread("1")
 const ADA = writerId("ada")
 const C1 = commitId("c1")
 const C2 = commitId("c2")
-const view = {
-  name: LANE,
-  tip: null,
-  running: false,
-  waiting: 0,
-  askedBy: null,
-  lastWaiting: null,
-}
 
 describe("records: one encoder, total decoders", () => {
   const lane = {
@@ -117,30 +107,6 @@ describe("records: one encoder, total decoders", () => {
 })
 
 describe("landing", () => {
-  const own = {
-    lane: LANE,
-    work: { kind: "own" as const },
-    by: ADA,
-    createdAt: 1,
-  }
-  test("planUpdate: an idle own lane starts, a busy one holds, a direct one is refused", () => {
-    expect(planUpdate({ record: own, view })).toEqual({ kind: "start" })
-    expect(
-      planUpdate({ record: own, view: { ...view, running: true } }),
-    ).toEqual({
-      kind: "hold",
-      position: 0,
-    })
-    expect(
-      planUpdate({
-        record: { ...own, work: { kind: "direct", dir: "/x" } },
-        view,
-      }),
-    ).toEqual({ kind: "refused", code: ERR.NOT_OWN_COPY })
-    expect(planUpdate({ record: undefined, view })).toMatchObject({
-      kind: "refused",
-    })
-  })
   test("landingOutcome: the agent can always ask; conflicts left are never resolved", () => {
     expect(landingOutcome({ askedForGuidance: false, conflictsLeft: 0 })).toBe(
       "resolved",
@@ -341,14 +307,30 @@ describe("planResolution: the land message", () => {
     },
   })
   const details = { landing: "l1", lane: LANE, yours: [C1], by: ADA }
-  const plan = (files: ConflictFile[], budget: number) =>
+  const plan = (files: ConflictFile[], budget: number, intent = "") =>
     planResolution({
       skill: { path: "/s/SKILL.md", content: "SKILL TEXT", hash: "h" },
       files,
       budget,
       details,
+      intent,
       timestamp: 1,
     })
+  test("the person's text follows the conflict material, whole, under any budget", () => {
+    const m = plan([file("a.ts", 50)], 0, "then run the tests")
+    expect(m.content.endsWith("then run the tests")).toBe(true)
+    expect(m.content.indexOf("<<<<<<< a.ts")).toBeLessThan(
+      m.content.indexOf("then run the tests"),
+    )
+    expect(plan([file("a.ts", 1)], 100_000).content).not.toContain(
+      "What the person asked",
+    )
+  })
+  test("the intro names the project's work, not yours", () => {
+    expect(plan([file("a.ts", 1)], 100_000).content).toContain(
+      "The project's work was merged",
+    )
+  })
   test("the skill, every file and both labelled sides are always present", () => {
     const m = plan([file("a.ts", 3)], 100_000)
     expect(m.content).toContain("SKILL TEXT")

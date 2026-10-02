@@ -97,13 +97,6 @@ export function encodeUpdate(
   }
 }
 
-/**
- * The composer's intent after a clean update: editable, and sent only if the
- * person sends it.
- */
-export const updatePrefill = (d: UpdateDetails): string =>
-  `I've merged my latest work (${plural(d.files.length, "file", "files")} changed). Check that yours still fits with it.`
-
 // ── the stack's prompt ─────────────────────────────────────────────────────
 
 const StackDetailsSchema = Type.Object({

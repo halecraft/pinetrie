@@ -35,11 +35,15 @@ const drafting = (id: string, at: string, owner = ADA): CardRecord => ({
   id: cardId(id),
   owner,
   place: { kind: "drafting", at: atEntry(entryId(at)), lane: null },
+  command: null,
+  unsent: null,
 })
 const fresh = (id: string, column: string): CardRecord => ({
   id: cardId(id),
   owner: ADA,
   place: { kind: "fresh", column },
+  command: null,
+  unsent: null,
 })
 /** e1's tab open, holding a branch column; a new tab; g1's tab closed. */
 const layout: Layout = {

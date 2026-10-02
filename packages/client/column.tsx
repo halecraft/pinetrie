@@ -27,10 +27,9 @@ import {
 } from "@pineta/core"
 import {
   type DigestRecord,
-  displayName,
   draftingAt,
-  type Held,
   type OfferButton,
+  queuedOn,
   yourCard,
 } from "@pineta/marginalia"
 import {
@@ -44,11 +43,13 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react"
 import type { ReadOnly } from "./app-view.ts"
 import type { FoldMemory } from "./ask-fold.ts"
 import { askWords, DENSITIES, type Density, densityWords } from "./ask-words.ts"
-import { CardEditor } from "./card-editor.tsx"
+import { CardEditor, QueuedCardEditor } from "./card-editor.tsx"
+import { alreadySentWords } from "./card-words.ts"
 import {
   AGENT_MARK,
   bannerUrl,
@@ -68,14 +69,13 @@ import type { Column as ColumnSpec, Pending } from "./columns.ts"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { behind, type SeenEnd } from "./follow.ts"
-import { newLaneName } from "./ids.ts"
+import { newCardId, newLaneName } from "./ids.ts"
 import type { ColumnAct, Intent } from "./intent.ts"
 import { type Left, leftLine } from "./left.ts"
 import type { LiveWork } from "./live.ts"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
-import { speakerLabel, withContributors } from "./names.ts"
 import { Avatars, nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
@@ -126,7 +126,6 @@ export interface ColumnProps {
   /** The streams to draw, from the same moment as `index` (`liveWork`). */
   live: LiveWork
   lanes: readonly LaneView[]
-  outbox: readonly Held[]
   /** Where lanes work, the files at each entry, and landings (ADR-0032). */
   work: WorkFacts
   /** The ids on this column's path, which the app has already computed. */
@@ -290,8 +289,15 @@ export function Column(p: ColumnProps) {
   // Which ask the work at the top belongs to, while its message is out of
   // sight (ADR-0056). Outline draws each ask's line under its message.
   const atTop = useAskBar(body, density !== "outline")
-  const waiting =
-    lane.kind === "lane" ? p.outbox.filter(h => h.lane === lane.name) : []
+  // The cards queued for this thread's lane, above the line, in the order the
+  // host takes them (ADR-0048).
+  const queued = lane.kind === "lane" ? queuedOn(p.cards, lane.name) : []
+  // Your unqueues here that lost: the host had taken the card (S69).
+  const sentAnyway = useSyncExternalStore(
+    p.session.alreadySent.subscribe,
+    p.session.alreadySent.current,
+  ).filter(s => lane.kind === "lane" && s.lane === lane.name)
+  const reader = { me: p.session.writer, nameOf: p.nameOf }
   // Whether this column's next send would create a lane: the composer's to
   // decide, as it is typed.
   const [createsLane, setCreatesLane] = useState(false)
@@ -373,19 +379,26 @@ export function Column(p: ColumnProps) {
           },
     )
   })
-  // An update's intent, put in this column's composer (ADR-0038).
-  const [insert, setInsert] = useState<{
-    readonly text: string
-    readonly key: number
-  } | null>(null)
+  // Bringing the thread up to date is a command on your card here (ADR-0055):
+  // the one you have at its end, or a new one, focused, so you write what the
+  // agent should do with the new work.
   const actOnOffer = (button: OfferButton) => {
     if (lane.kind !== "lane") return
-    if (button === "update" || button === "resolve")
-      void p.session.update(lane.name).then(outcome => {
-        if (outcome.kind === "updated" && outcome.text !== "")
-          setInsert({ text: outcome.text, key: Date.now() })
-      })
-    else void p.session.offer(lane.name, button)
+    if (button !== "update" && button !== "resolve")
+      return act({ kind: "offer", lane: lane.name, action: button })
+    if (place?.kind !== "drafting") return
+    act({
+      kind: "bringUpToDate",
+      key: p.column.key,
+      card: mine?.id ?? null,
+      create: {
+        id: newCardId(),
+        owner: p.session.writer,
+        place,
+        command: null,
+        unsent: null,
+      },
+    })
   }
   // Where a lane this column's next send creates would work, before a choice.
   const defaultWork = workFor({
@@ -419,11 +432,13 @@ export function Column(p: ColumnProps) {
           p.lanes,
           index,
         )
+  // Every drafting card here but the composer's: everyone else's, and any
+  // other of yours, such as one someone unqueued while you typed this one.
   const others =
     fresh || threadEnd === null
       ? []
       : draftingAt(threadEnd, p.cards, p.lanes, index).filter(
-          c => c.owner !== p.session.writer,
+          c => c.id !== mine?.id,
         )
   const place: CardPlace | undefined = fresh
     ? { kind: "fresh", column: p.column.key }
@@ -613,34 +628,23 @@ export function Column(p: ColumnProps) {
             CSS hides it while a row the work opened runs, and in outline,
             where the running ask's own line pulses. */}
             {running && <div aria-hidden className="working-line" />}
-            {/* Messages waiting for this thread's lane, in the order they will
-            be taken. They are not in the tree yet. */}
-            {waiting.map((h, n) => (
-              <div className="msg waiting" data-held={h.id} key={h.id}>
-                <span className="role">
-                  {h.kind === "update"
-                    ? displayName(h.by, p.nameOf.get(h.by))
-                    : withContributors(
-                        speakerLabel(
-                          p.nameOf,
-                          h.details.author,
-                          h.details.authorName,
-                        ),
-                        (h.details.contributors ?? []).map(w =>
-                          displayName(w, p.nameOf.get(w)),
-                        ),
-                      )}{" "}
-                  · waiting · {n + 1} of {waiting.length}
-                </span>
-                {h.kind === "update" ? (
-                  <div className="update-waiting">merging your work</div>
-                ) : (
-                  <MessageText
-                    images={h.details.images}
-                    mode="committed"
-                    text={h.details.text}
-                  />
-                )}
+            {/* Cards queued for this thread's lane, in the order the host takes
+            them: not in the tree yet, and editable by anyone until taken. */}
+            {queued.map((c, n) => (
+              <QueuedCardEditor
+                card={c}
+                key={c.id}
+                n={n}
+                onAct={act}
+                onTyping={p.onTyping}
+                readOnly={p.readOnly}
+                reader={reader}
+                session={p.session}
+              />
+            ))}
+            {sentAnyway.map(s => (
+              <div className="already-sent" key={s.card}>
+                {alreadySentWords(s.by, reader)}
               </div>
             ))}
           </div>
@@ -671,9 +675,9 @@ export function Column(p: ColumnProps) {
                 commands={p.work.commands}
                 fresh={false}
                 how={how}
-                insert={null}
                 key={c.id}
                 lane={lane}
+                onAct={act}
                 onBranchInstead={branchInstead}
                 onCreatesLane={undefined}
                 onIntent={p.onIntent}
@@ -687,7 +691,7 @@ export function Column(p: ColumnProps) {
                 place={undefined}
                 prefill={undefined}
                 readOnly={p.readOnly}
-                reader={{ me: p.session.writer, nameOf: p.nameOf }}
+                reader={reader}
                 seats={p.seats}
                 session={p.session}
                 takeFocus={undefined}
@@ -705,7 +709,7 @@ export function Column(p: ColumnProps) {
           <button
             className="stop"
             onClick={() => void p.session.stop(lane.name)}
-            title="end the agent's turn here; messages waiting are then taken"
+            title="end the agent's turn here; cards queued are then taken"
             type="button"
           >
             Stop
@@ -741,13 +745,13 @@ export function Column(p: ColumnProps) {
             act({ kind: "sent", key: p.column.key, sendId })
             return sendId
           }}
+          onAct={act}
           onCreatesLane={setCreatesLane}
           onIntent={p.onIntent}
           onTyping={p.onTyping}
           takeFocus={() => p.takeFocus(p.column.key)}
           participants={p.participants}
           pending={p.column.fresh?.pending}
-          insert={insert}
           readOnly={p.readOnly}
           typingAt={p.showsPresence ? view.tipId : null}
           session={p.session}

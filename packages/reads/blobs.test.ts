@@ -1,5 +1,5 @@
 import { laneNameForThread, NOBODY, type Sha256, writerId } from "@pineta/core"
-import { encodeChat, type Held } from "@pineta/marginalia"
+import { encodeChat } from "@pineta/marginalia"
 import { expect, test } from "vitest"
 import { planSweep, referencedBlobs } from "./index.ts"
 
@@ -15,23 +15,7 @@ const details = (shas: readonly Sha256[]) => ({
   images: shas.map(image),
 })
 
-test("referencedBlobs: chats, tool results, held messages, typed texts and banners each keep theirs", () => {
-  const held: Held[] = [
-    {
-      kind: "chat",
-      id: "h1",
-      lane: laneNameForThread("1"),
-      details: details([sha("b")]),
-      timestamp: 1,
-    },
-    {
-      kind: "update",
-      id: "h2",
-      lane: laneNameForThread("1"),
-      by: writerId("ada"),
-      timestamp: 2,
-    },
-  ]
+test("referencedBlobs: chats, tool results, typed texts and banners each keep theirs", () => {
   const referenced = referencedBlobs({
     messages: [
       encodeChat(details([sha("a")]), 1),
@@ -46,8 +30,11 @@ test("referencedBlobs: chats, tool results, held messages, typed texts and banne
         ],
       },
     ],
-    held,
-    texts: [`a card ![](/blob/${sha("c")})`, "`![](/blob/dd)` no"],
+    texts: [
+      `a card ![](/blob/${sha("c")})`,
+      `a queued card ![](/blob/${sha("b")})`,
+      "`![](/blob/dd)` no",
+    ],
     banners: [{ lane: laneNameForThread("1"), sha: sha("g"), at: 1 }],
   })
   expect([...referenced].sort()).toEqual([

@@ -5,7 +5,7 @@ What the session document says, read once, by the host and the client alike.
 ## Why it exists
 
 The composer promises *send* or *queue*, and *agent will reply*, from the
-thread's lane, the outbox and the participants. The host then decides from the same
+thread's lane, its queued cards and the participants. The host then decides from the same
 facts. When the two read those facts separately, the promise holds only while
 two copies stay in step, which is the drift this project keeps meeting (S11,
 the scanner, the e2e projection). So both read here, through one set of
@@ -15,7 +15,7 @@ functions.
 
 Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes` (and `readLane`, one
-of them), `readOutbox`,
+of them), `readRunning`,
 `readParticipantNames`, `readParticipants`, `readReading`, `readTyping`,
 `readAgentActivity`, `readSeats` and `readCards` (ADR-0048),
 `readArchive`, `readMarks` (ADR-0045), `readStops` and `readDigests`
@@ -29,8 +29,8 @@ client-only read, in `packages/client/archive-rows.ts`. Live streams are read wi
 `@pineta/schema`; an entry count stays in `packages/client/projection.ts`.
 
 `readReferencedBlobs` is every image something still shows (ADR-0042): each
-chat's, each tool result's (`messageImages`, ADR-0051), each held message's,
-and each in the texts people type, cards', which its caller must
+chat's, each tool result's (`messageImages`, ADR-0051), and each in the
+texts people type, cards' (queued ones among them), which its caller must
 pass for every one, not only those it holds (the host gathers them all
 through its card port). `planSweep` decides which
 stored images to delete from it.
@@ -45,7 +45,7 @@ Kyneta has let go.
 ## Gotchas
 
 - **`readTreeIndex` returns the same index while the `entries` record is
-  unchanged**, so a write elsewhere (a checkpoint, the outbox, a lane tip)
+  unchanged**, so a write elsewhere (a checkpoint, a value, a lane tip)
   costs no indexing, and the host's many reads within one command share one
   index. Every caller shares it: copy a list before sorting it
   (`packages/core/roots.ts` does).
@@ -53,14 +53,18 @@ Kyneta has let go.
   frozen. Kyneta gives an unchanged row the same object across writes, so a
   new entry decodes only itself.
 
+- **`readLanes` reads two documents**: the session, and every card's record
+  (`readCards` of the cards document), passed in. A lane's `waiting` is its
+  queued cards (`queuedOn`), so a lane with cards queued is busy (`isBusy`)
+  even between two takes. The client reads lanes with its cards, in `App`;
+  a read that needs only runs and tips uses `readRunning` and
+  `readLaneNames`, as `readAgentActivity` does.
 - **`readLanes`' `askedBy`** is the writer of the message a running lane is
   answering, its run's prompt (`promptOf`, the ask, ADR-0056), when a
-  person's message started it; or else of the first compelled message
-  waiting for it. A land or stack message names no one. It is what a
-  `conflict` names.
-- **`readLanes`' `lastWaiting`** is the writer of the newest item held for the
-  lane, of any kind: a message queued now waits behind it, so it
-  is who the queue button names. It is null exactly when `waiting` is 0. It
+  person's message started it; or else who queued its first card. A land or
+  stack message names no one. It is what a `conflict` names.
+- **`readLanes`' `lastWaiting`** is who queued the lane's last card: a card
+  queued now waits behind it, so it is who the queue button names. It is null exactly when `waiting` is 0. It
   differs from `askedBy` while a run goes: `askedBy` is who the agent
   answers, `lastWaiting` who is last in line.
 - **A presence read gives one entry per key** (`readReading`, `readTyping`), as

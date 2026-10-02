@@ -4,8 +4,8 @@
 //
 // Host-written records, each a pi value under a `pineta.` namespace.
 // `encodeWorkRecord` is the one place their namespaces and keys are chosen;
-// each has a total decoder. The decisions an update needs (`planUpdate`,
-// `landingOutcome`), what a turn records (`planTurnRecord`), where a fork
+// each has a total decoder. How a resolution ended
+// (`landingOutcome`), what a turn records (`planTurnRecord`), where a fork
 // starts (`forkPoint`) and which snapshots go (`planRetention`) are pure,
 // over what the host gathers. An offer's own decisions are in `offer.ts`.
 
@@ -17,18 +17,14 @@ import {
   type CommitId,
   commitId,
   type EntryId,
-  ERR,
-  type ErrCode,
   entryId,
   type ForkStart,
   type HaveRecord,
   HOST_WORKING_COPY,
-  isBusy,
   isSha256,
   type LandingRecord,
   type LaneName,
   type LaneRecord,
-  type LaneView,
   type NameRecord,
   type OfferRecord,
   type ProjectRecord,
@@ -382,27 +378,7 @@ export const commandsRecord = (values: Stored): readonly CommandSummary[] =>
 export const projectRecord = (values: Stored): ProjectRecord | null =>
   decodeAll(values, decodeProjectRecord)[0] ?? null
 
-// ── updates ───────────────────────────────────────────────────────────────
-
-/**
- * What an `update` does. Only a lane with its own copy takes your work; a busy
- * lane holds it, as it would a message, which also covers an update or a
- * resolution already running.
- */
-export function planUpdate(input: {
-  readonly record: LaneRecord | undefined
-  readonly view: LaneView | undefined
-}):
-  | { readonly kind: "start" }
-  | { readonly kind: "hold"; readonly position: number }
-  | { readonly kind: "refused"; readonly code: ErrCode } {
-  const { record, view } = input
-  if (record === undefined || view === undefined || record.work.kind !== "own")
-    return { kind: "refused", code: ERR.NOT_OWN_COPY }
-  return isBusy(view)
-    ? { kind: "hold", position: view.waiting }
-    : { kind: "start" }
-}
+// ── resolutions ─────────────────────────────────────────────────────────
 
 /**
  * How a resolution run ended. The agent can always stop by asking; it can

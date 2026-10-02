@@ -65,7 +65,7 @@ describe("applyClean", () => {
         calls.push("stopped")
       },
     })
-    const prefill = await applyClean(ports.port, {
+    await applyClean(ports.port, {
       details: {
         lane: LANE,
         copy: commitId("c0ffee00"),
@@ -82,6 +82,5 @@ describe("applyClean", () => {
       "stopped",
     ])
     expect(methods(ports.calls)).toEqual(["append", "recordUpdate", "runEnded"])
-    expect(prefill).toContain("1 file changed")
   })
 })

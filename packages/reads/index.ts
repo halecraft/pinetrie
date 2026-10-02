@@ -59,11 +59,7 @@ import {
   decodeChat,
   digestRecords,
   HAVE_NAMESPACE,
-  type Held,
   haveRecords,
-  heldBy,
-  heldMessages,
-  heldRuns,
   LANDING_NAMESPACE,
   LANE_NAMESPACE,
   landingRecords,
@@ -73,7 +69,6 @@ import {
   NAME_NAMESPACE,
   nameRecords,
   OFFER_NAMESPACE,
-  OUTBOX_NAMESPACE,
   offerRecords,
   PARTICIPANT_NAMESPACE,
   PROJECT_NAMESPACE,
@@ -81,6 +76,7 @@ import {
   participants,
   pastedImages,
   projectRecord,
+  queuedOn,
   REVISION_NAMESPACE,
   renderableMessage,
   revisionRecords,
@@ -161,9 +157,9 @@ export function readTreeIndex(doc: SessionDocHandle): TreeIndex {
   return index
 }
 
-/** Every held message, oldest first (`pineta.outbox`). */
-export const readOutbox = (doc: SessionDocHandle): readonly Held[] =>
-  heldMessages(readValues(doc, OUTBOX_NAMESPACE))
+/** Whether a lane is running now: the session records its active run. */
+export const readRunning = (doc: SessionDocHandle, lane: LaneName): boolean =>
+  readActiveRun(doc, lane) !== undefined
 
 /**
  * Who asked the run that wrote `tip`: the writer of its prompt
@@ -176,37 +172,31 @@ function askerOf(index: TreeIndex, tip: string | null): WriterId | undefined {
 }
 
 /**
- * Every thread lane: its tip, whether it runs, how many messages wait for it,
- * who holds it (for a conflict's "by"): the writer of the ask it is
- * answering (`askerOf`), or of the first message waiting; and who wrote the
- * last one waiting, whom a message queued now follows.
+ * Every thread lane: its tip, whether it runs, how many cards are queued for
+ * it (ADR-0048), who holds it (for a conflict's "by"): the writer of the ask
+ * it is answering (`askerOf`), or who queued its first card; and who queued
+ * its last card, whom a card queued now follows. `cards` is every card's
+ * record (`readCards`).
  */
 export function readLanes(
   doc: SessionDocHandle,
   index: TreeIndex,
+  cards: readonly CardRecord[],
 ): readonly LaneView[] {
-  const outbox = readOutbox(doc)
   // Lane names are read from storage: branded here, the one edge they cross.
   return readLaneNames(doc).map(stored => {
     const name = stored as LaneName
     const tip = readLaneTip(doc, name)
-    const running = readActiveRun(doc, name) !== undefined
-    // In send order, so the last is whom a message queued now follows.
-    const waiting = outbox.filter(h => h.lane === name)
-    const last = waiting.at(-1)
-    const asking = running
-      ? askerOf(index, tip)
-      : (() => {
-          const first = waiting.find(heldRuns)
-          return first === undefined ? undefined : heldBy(first)
-        })()
+    const running = readRunning(doc, name)
+    const queue = queuedOn(cards, name)
+    const asking = running ? askerOf(index, tip) : queue[0]?.place.by
     return {
       name,
       tip,
       running,
-      waiting: waiting.length,
+      waiting: queue.length,
       askedBy: asking ?? null,
-      lastWaiting: last === undefined ? null : heldBy(last),
+      lastWaiting: queue.at(-1)?.place.by ?? null,
     }
   })
 }
@@ -215,18 +205,17 @@ export function readLanes(
 export const readLane = (
   doc: SessionDocHandle,
   lane: LaneName,
+  cards: readonly CardRecord[],
 ): LaneView | undefined =>
-  readLanes(doc, readTreeIndex(doc)).find(l => l.name === lane)
+  readLanes(doc, readTreeIndex(doc), cards).find(l => l.name === lane)
 
 /** Every lane the agent is replying on. */
-export function readAgentActivity(
-  doc: SessionDocHandle,
-  index: TreeIndex,
-): readonly AgentRun[] {
+export function readAgentActivity(doc: SessionDocHandle): readonly AgentRun[] {
   return agentActivity(
-    readLanes(doc, index)
-      .filter(l => l.running)
-      .map(l => ({ lane: l.name, tip: l.tip })),
+    readLaneNames(doc)
+      .map(stored => stored as LaneName)
+      .filter(lane => readRunning(doc, lane))
+      .map(lane => ({ lane, tip: readLaneTip(doc, lane) })),
   )
 }
 
@@ -464,15 +453,13 @@ export function workAt(
 
 /**
  * Every blob something still shows: each chat's images, each tool result's
- * (ADR-0051), each held message's, each `/blob/` image in the texts people
- * type, every card's (ADR-0048), and each thread's banner
- * (ADR-0050). A card holds what a composer has typed, pasted images
- * included, so the caller passes every text, not only those it has loaded.
- * Pure.
+ * (ADR-0051), each `/blob/` image in the texts people type, every card's
+ * (ADR-0048), queued ones among them, and each thread's banner (ADR-0050).
+ * A card holds what a composer has typed, pasted images included, so the
+ * caller passes every text, not only those it has loaded. Pure.
  */
 export function referencedBlobs(facts: {
   readonly messages: Iterable<unknown>
-  readonly held: readonly Held[]
   readonly texts: Iterable<string>
   readonly banners: Iterable<BannerRecord>
 }): ReadonlySet<Sha256> {
@@ -484,9 +471,6 @@ export function referencedBlobs(facts: {
     for (const image of messageImages(message as AgentMessageLike))
       shas.add(image.sha256)
   }
-  for (const held of facts.held)
-    if (held.kind === "chat")
-      for (const image of held.details.images ?? []) shas.add(image.sha256)
   for (const text of facts.texts)
     for (const sha of pastedImages(text)) shas.add(sha)
   return shas
@@ -499,7 +483,6 @@ export const readReferencedBlobs = (
 ): ReadonlySet<Sha256> =>
   referencedBlobs({
     messages: Object.values(readEntries(doc)).map(rowMessage),
-    held: readOutbox(doc),
     texts,
     banners: readBanners(doc).values(),
   })

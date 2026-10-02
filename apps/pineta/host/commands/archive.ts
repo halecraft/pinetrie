@@ -5,12 +5,12 @@ import type { Intent, WriterId } from "@pineta/core"
 import { planArchive } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
-import { readArchive, readLanes, readTreeIndex } from "@pineta/reads"
+import { readArchive, readCards, readLanes, readTreeIndex } from "@pineta/reads"
 import type { Basics } from "../basics.ts"
 import type { LaneWork } from "../work/index.ts"
 
 export interface ArchiveDeps {
-  readonly basics: Pick<Basics, "doc" | "now">
+  readonly basics: Pick<Basics, "doc" | "cards" | "now">
   readonly agent: Pick<Agent, "setArchive">
   readonly work: Pick<LaneWork, "archived" | "restored">
 }
@@ -21,7 +21,7 @@ export async function handleArchive(
   intent: Extract<Intent, { kind: "archive" }>,
 ): Promise<Outcome> {
   const { agent, work } = deps
-  const { doc, now } = deps.basics
+  const { doc, cards, now } = deps.basics
   // gather
   const index = readTreeIndex(doc)
   // plan (pure)
@@ -31,7 +31,7 @@ export async function handleArchive(
     by: writer,
     now: now(),
     index,
-    lanes: readLanes(doc, index),
+    lanes: readLanes(doc, index, readCards(cards)),
     archive: readArchive(doc),
   })
   // execute

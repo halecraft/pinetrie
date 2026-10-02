@@ -46,8 +46,11 @@ import { type Command, command, type Reply, reply } from "./messages.ts"
 export type Outcome =
   | { readonly kind: "started"; readonly runId: RunId }
   | { readonly kind: "appended"; readonly id: EntryId }
-  /** Waiting behind `position` messages for the thread's lane to be free. */
-  | { readonly kind: "queued"; readonly position: number }
+  /**
+   * The thread's lane is running, or has cards queued: nothing was written,
+   * and the sender's client queues its card (ADR-0048).
+   */
+  | { readonly kind: "busy" }
   /**
    * Someone took the slot first: `by` is their writer, the sender's own when
    * the host falls back to the lane's asker, or null when no one can be named
@@ -63,11 +66,6 @@ export type Outcome =
   | { readonly kind: "marked" }
   /** The lane's offer is in your history now (ADR-0038). */
   | { readonly kind: "taken" }
-  /**
-   * Your work was merged into the thread (ADR-0038). `text` is the composer's
-   * prefill after a clean merge; "" when there was nothing to merge.
-   */
-  | { readonly kind: "updated"; readonly text: string }
   /** An offer action was carried out (squash, describe, refresh). */
   | { readonly kind: "offered" }
   /** A thread is named before its lane exists, or already was (ADR-0057). */
@@ -156,11 +154,10 @@ export function decodeCommand(
       ? notNewLane(lane)
       : { kind: "reserve", lane: reserved }
   }
-  if (kind === "update" || kind === "offer") {
+  if (kind === "offer") {
     const lane = text(wire?.lane)
     if (!isLaneName(lane))
       return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
-    if (kind === "update") return { kind, lane }
     const action = text(wire?.mode)
     return isOfferAction(action)
       ? { kind, lane, action }
@@ -263,8 +260,6 @@ export function encodeIntent(id: string, intent: Intent): Command {
         targetId: intent.entry,
         text: intent.title ?? "",
       })
-    case "update":
-      return command({ id, kind: "update", lane: intent.lane })
     case "offer":
       return command({
         id,
@@ -284,8 +279,8 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "started", runId: outcome.runId })
     case "appended":
       return reply({ id, outcome: "appended", entryId: outcome.id })
-    case "queued":
-      return reply({ id, outcome: "queued", position: outcome.position })
+    case "busy":
+      return reply({ id, outcome: "busy" })
     case "conflict":
       return reply({ id, outcome: "conflict", by: outcome.by ?? "" })
     case "named":
@@ -300,8 +295,6 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "marked" })
     case "taken":
       return reply({ id, outcome: "taken" })
-    case "updated":
-      return reply({ id, outcome: "updated", text: outcome.text })
     case "offered":
       return reply({ id, outcome: "offered" })
     case "reserved":
@@ -325,8 +318,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "started", runId: runId(wire.runId) }
     case "appended":
       return { kind: "appended", id: entryId(wire.entryId) }
-    case "queued":
-      return { kind: "queued", position: wire.position }
+    case "busy":
+      return { kind: "busy" }
     case "conflict":
       return {
         kind: "conflict",
@@ -344,8 +337,6 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "marked" }
     case "taken":
       return { kind: "taken" }
-    case "updated":
-      return { kind: "updated", text: wire.text }
     case "offered":
       return { kind: "offered" }
     case "reserved":

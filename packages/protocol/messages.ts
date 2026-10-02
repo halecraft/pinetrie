@@ -10,7 +10,7 @@ export const CONTROL_TOPIC = "pineta.control"
 export const SESSION_DOC_ID = "pineta:session"
 /** Who is here, and what each person reads and types: ephemeral, never stored (ADR-0024). */
 export const PRESENCE_DOC_ID = "pineta:presence"
-/** Every card's record (ADR-0048): written by clients, and by the host only to spend one. */
+/** Every card's record (ADR-0048): written by clients, and by the host only to take one, write back one it could not send, or sweep. */
 export const CARDS_DOC_ID = "pineta:cards"
 
 /**
@@ -38,9 +38,6 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     (ADR-0029); `mode` names the action, `archive` or `restore`.
  *   - `mark` titles the entry `targetId` with `text` (ADR-0045); `""`
  *     clears its title.
- *   - `update` merges your work into the thread whose lane is `lane`
- *     (ADR-0038); the agent's resolution runs only when it conflicts
- *     (ADR-0033).
  *   - `offer` acts on that lane's offer in your repo; `mode` names the
  *     action: `take`, `split`, `squash`, `describe` or `refresh`.
  *   - `reserve` asks the host to name the thread whose lane will be `lane`,
@@ -52,7 +49,6 @@ export const COMMAND_KINDS = [
   "stop",
   "archive",
   "mark",
-  "update",
   "offer",
   "reserve",
 ] as const
@@ -76,7 +72,7 @@ export interface Command {
    * root. Only `codec.ts` interprets this; nothing past it sees `""`.
    */
   readonly parentId: string
-  /** `chat`: `reply`, `queue` or `branch`; `archive` and `offer`: the action; `""` otherwise. */
+  /** `chat`: `reply` or `branch`; `archive` and `offer`: the action; `""` otherwise. */
   readonly mode: string
   /** `chat`: the lane the sender's column is bound to, or `""`. */
   readonly lane: string
@@ -107,7 +103,7 @@ export interface Command {
 export const OUTCOME_KINDS = [
   "started",
   "appended",
-  "queued",
+  "busy",
   "conflict",
   "named",
   "stopped",
@@ -115,7 +111,6 @@ export const OUTCOME_KINDS = [
   "restored",
   "marked",
   "taken",
-  "updated",
   "offered",
   "reserved",
   "refused",
@@ -131,15 +126,11 @@ export interface Reply {
   readonly errorMessage: string
   /** Set only when a chat message was appended: its entry id. */
   readonly entryId: string
-  /** `queued`: how many messages wait ahead of it; -1 otherwise. */
-  readonly position: number
   /**
    * `conflict`: the writer id of who took the slot, or "" when none is known
    * or for any other outcome. The client names it, and can tell it is itself.
    */
   readonly by: string
-  /** `updated`: the composer's prefill after a clean update; "" otherwise. */
-  readonly text: string
 }
 
 /**
@@ -169,9 +160,7 @@ export const EMPTY_REPLY: Reply = Object.freeze({
   errorCode: "",
   errorMessage: "",
   entryId: "",
-  position: -1,
   by: "",
-  text: "",
 })
 
 export const command = (fields: Partial<Command>): Command => ({

@@ -124,8 +124,7 @@ export interface ChatMessage {
  * The text the model reads: what was typed, or for a command its expansion,
  * frozen when it was sent. The speaker's name is part of it, so pi's own
  * conversion carries attribution into context and a rename later cannot
- * rewrite what the agent already saw. Read from `details`, so a held message
- * encoded later reads the same.
+ * rewrite what the agent already saw.
  */
 export const attributed = (d: ChatDetails): string =>
   `${d.authorName}: ${d.command?.expanded ?? d.text}`
@@ -198,7 +197,7 @@ export function withChatImages<M>(
 
 /**
  * Details that matched `DetailsSchema` -> `ChatDetails`, branding the ids. The
- * one conversion, for a chat in the tree and a message held in the outbox.
+ * one conversion of a chat in the tree.
  */
 export const detailsFromStored = (
   d: Static<typeof DetailsSchema>,
@@ -258,6 +257,16 @@ export function renderableMessage(message: unknown): AgentMessageLike {
       }
 }
 
+/**
+ * After a run ends: a compelled message pi refused to run is still a person's
+ * message, so it is appended, with no reply, rather than lost. A run pi
+ * admitted, whatever became of the model's call, is done: its prompt is in
+ * the tree. Pure.
+ */
+export const settleRun = (
+  ran: { readonly kind: "ok" } | { readonly kind: "refused" },
+): "done" | "keep" => (ran.kind === "refused" ? "keep" : "done")
+
 export type ChatDecision =
   /** No lane at this thread: append with no lane, parented at exactly `parent`. */
   | {
@@ -287,13 +296,11 @@ export type ChatDecision =
       readonly lane: LaneName
       readonly details: ChatDetails
     }
-  /** The lane is busy: wait in its outbox, `position` messages ahead. */
-  | {
-      readonly kind: "hold"
-      readonly lane: LaneName
-      readonly details: ChatDetails
-      readonly position: number
-    }
+  /**
+   * The lane runs, or has cards queued: nothing is written, and the sender's
+   * client queues its card behind them (ADR-0048).
+   */
+  | { readonly kind: "busy" }
   /** Another writer took the slot. Nothing is written; the sender chooses. */
   | { readonly kind: "conflict"; readonly by: WriterId | null }
   /** Nothing is written: a `/package:name` that names no command. */
@@ -332,12 +339,14 @@ export function addressChat(input: {
  * - Who it is for is `addressChat`, which the composer runs too.
  * - `branch` starts a thread at `at` and never continues a lane: plain, it is
  *   appended there with no lane; compelled, it creates a new lane there.
- * - A thread lane that is running, or has messages waiting, is busy: a new
- *   message holds behind the ones ahead of it, and a lane is never written
- *   while it runs (S21).
+ * - A thread lane that is running, or has cards queued, is busy: a message
+ *   is not written, and its card is queued behind them, since a lane is never
+ *   written while it runs (S21).
  * - A compelled `reply` that another writer raced, or that finds the lane busy,
- *   is a conflict: the sender chooses to queue or to branch. `queue` means
- *   that choice was already made. Plain chat never conflicts.
+ *   is a conflict: the sender chooses to queue or to branch. Plain chat never
+ *   conflicts.
+ * - `queue` is the host taking a queued card: it is the queue's turn, so
+ *   only a run makes the lane busy.
  */
 export function planChat(input: {
   readonly author: WriterId
@@ -440,16 +449,14 @@ export function planChat(input: {
   }
 
   const name: LaneName = lane.name
-  const busy = isBusy(lane)
+  const busy = input.mode === "queue" ? lane.running : isBusy(lane)
   if (!compelled) {
     return busy
-      ? { kind: "hold", lane: name, details, position: lane.waiting }
+      ? { kind: "busy" }
       : { kind: "appendToLane", lane: name, details }
   }
   if (input.mode === "reply" && (race !== null || busy)) {
     return { kind: "conflict", by: race?.by ?? lane.askedBy }
   }
-  return busy
-    ? { kind: "hold", lane: name, details, position: lane.waiting }
-    : { kind: "run", lane: name, details }
+  return busy ? { kind: "busy" } : { kind: "run", lane: name, details }
 }

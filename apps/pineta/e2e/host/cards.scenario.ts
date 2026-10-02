@@ -4,21 +4,15 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import type { SessionClient } from "@pineta/client/session"
-import { type CardId, cardId, ROOT } from "@pineta/core"
+import { type CardId, cardId, type LaneName, ROOT } from "@pineta/core"
 import { yourCard } from "@pineta/marginalia"
 import { scriptedModel } from "@pineta/pi"
-import {
-  readCards,
-  readLanes,
-  readOutbox,
-  readSeats,
-  readTreeIndex,
-} from "@pineta/reads"
+import { readCards, readLanes, readSeats, readTreeIndex } from "@pineta/reads"
 import { cardDocId, readLaneNames, readLaneTip } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { join, waitFor } from "../harness.ts"
+import { join, noQueued, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { at, LATE_LOAD_MS, START_AGENT, sleep, slowToLoad } from "./support.ts"
@@ -51,9 +45,7 @@ async function run(check: Checks["check"]): Promise<void> {
     }
     const cIdle = () =>
       waitFor(
-        () =>
-          Object.keys(ch.doc.activeRuns()).length === 0 &&
-          readOutbox(ch.doc).length === 0,
+        () => Object.keys(ch.doc.activeRuns()).length === 0 && noQueued(ch),
         30_000,
       )
     const onHost = (id: CardId) => readCards(ch.cards).find(c => c.id === id)
@@ -65,7 +57,16 @@ async function run(check: Checks["check"]): Promise<void> {
       text: string,
     ): CardId => {
       const id = cardId(crypto.randomUUID())
-      who.createCard({ id, owner: who.writer, place: drafting(end) }, text)
+      who.createCard(
+        {
+          id,
+          owner: who.writer,
+          place: drafting(end),
+          command: null,
+          unsent: null,
+        },
+        text,
+      )
       return id
     }
 
@@ -98,7 +99,7 @@ async function run(check: Checks["check"]): Promise<void> {
       ada.writer,
       { kind: "end", end: grown ?? "" },
       readCards(ada.cards),
-      readLanes(ch.doc, idx),
+      readLanes(ch.doc, idx, readCards(ch.cards)),
       idx,
     )
     check(
@@ -178,14 +179,76 @@ async function run(check: Checks["check"]): Promise<void> {
     await waitFor(() => ch.cardText(c2) === "@agent me too", 5_000)
     await ada.chat("@agent me too", at(busyEnd), { card: c2 })
 
-    // 4. A plain message to the busy lane waits, and its card is spent.
-    const c3 = newCard(ada, busyEnd, "@Bea when it is done")
-    await waitFor(() => ch.cardText(c3) === "@Bea when it is done", 5_000)
-    await ada.chat("@Bea when it is done", at(busyEnd), {
-      card: c3,
-    })
+    // 4. The busy lane's queue (ADR-0048). A plain send is `busy`, and
+    // nothing is written. Bea queues Ada's card, and Ada edits it while it
+    // waits; Ada queues another and unqueues it.
+    const lane = (readLaneNames(ch.doc)[0] ?? "") as LaneName
+    const c3 = newCard(ada, busyEnd, "@Ada the plan")
+    await waitFor(() => ch.cardText(c3) === "@Ada the plan", 5_000)
+    const busy = await bea.chat("@Ada the plan", at(busyEnd), { card: c3 })
+    bea.queueCard(c3, { lane, at: at(busyEnd) })
+    await waitFor(() => ada.cardText(c3).text() === "@Ada the plan", 5_000)
+    ada.cardText(c3).text.insert(13, " is ready")
+    const c5 = newCard(ada, busyEnd, "@Bea never mind")
+    await waitFor(() => ch.cardText(c5) === "@Bea never mind", 5_000)
+    ada.queueCard(c5, { lane, at: at(busyEnd) })
+    await waitFor(() => onHost(c5)?.place.kind === "queued", 5_000)
+    ada.unqueueCard(c5, { lane, by: ada.writer })
+    await waitFor(
+      () =>
+        onHost(c5)?.place.kind === "drafting" &&
+        ch.cardText(c3) === "@Ada the plan is ready",
+      5_000,
+    )
     longOne.resume()
     await cIdle()
+    await ch.quiet()
+    const index3 = readTreeIndex(ch.doc)
+    const sent3 = Object.values(index3.entries).find(
+      e =>
+        e.message?.role === "chat" &&
+        e.message.content === "@Ada the plan is ready",
+    )?.message
+    check(
+      "a queued card is taken when the run ends: its queuer's message, with the edits made while it waited",
+      busy.kind === "busy" &&
+        sent3?.writer === bea.writer &&
+        sent3.contributors?.join() === ada.writer &&
+        onHost(c3) === undefined,
+      `${busy.kind}; ${sent3?.writer ?? "not sent"}`,
+    )
+    const neverSent = !Object.values(index3.entries).some(
+      e =>
+        e.message?.role === "chat" && e.message.content === "@Bea never mind",
+    )
+    check(
+      "an unqueued card is not sent, and is below the line again for everyone",
+      neverSent &&
+        onHost(c5)?.place.kind === "drafting" &&
+        readCards(bea.cards).find(c => c.id === c5)?.place.kind === "drafting",
+      `${neverSent}; ${onHost(c5)?.place.kind}`,
+    )
+
+    // 4b. A card queued on an idle thread is taken at once.
+    const idleEnd = tipOf()
+    const c6 = newCard(ada, idleEnd, "@Bea while it is quiet")
+    await waitFor(() => ch.cardText(c6) === "@Bea while it is quiet", 5_000)
+    ada.queueCard(c6, { lane, at: at(idleEnd) })
+    const taken = await waitFor(
+      () =>
+        Object.values(readTreeIndex(ch.doc).entries).some(
+          e =>
+            e.message?.role === "chat" &&
+            e.message.content === "@Bea while it is quiet",
+        ),
+      5_000,
+    )
+    check(
+      "a card queued on an idle thread is taken at once",
+      taken >= 0 && onHost(c6) === undefined,
+      `${taken} ms`,
+    )
+    await ch.quiet()
 
     // 5. Bea sends Ada's card after Ada has left: Bea's message, with Ada,
     // named through her seat's record.

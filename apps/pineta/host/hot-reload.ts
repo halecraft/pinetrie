@@ -7,9 +7,9 @@
 // are held, and its end reloads the page once (ADR-0022's reason).
 
 import path from "node:path"
-import type { ProjectRecord } from "@pineta/core"
-import { readLaneRecords, readLanes, readTreeIndex } from "@pineta/reads"
-import type { SessionDocHandle } from "@pineta/schema"
+import type { LaneName, ProjectRecord } from "@pineta/core"
+import { readLaneRecords, readRunning } from "@pineta/reads"
+import { readLaneNames, type SessionDocHandle } from "@pineta/schema"
 
 export type HotReload = ReturnType<typeof pausedWhile>
 
@@ -23,8 +23,9 @@ export function hotReload(input: {
     const project = input.project()
     if (project === null) return false
     const records = readLaneRecords(doc)
-    return readLanes(doc, readTreeIndex(doc)).some(l => {
-      const w = l.running ? records.get(l.name)?.work : undefined
+    return readLaneNames(doc).some(name => {
+      const lane = name as LaneName
+      const w = readRunning(doc, lane) ? records.get(lane)?.work : undefined
       return w?.kind === "direct" && isWithin(w.dir, project.root)
     })
   })

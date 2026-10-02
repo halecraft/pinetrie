@@ -58,12 +58,12 @@ export type ArchivePlan =
 /** Why a root cannot be archived now, as the tab's menu and the host both say it. */
 export const ROOT_BUSY_REASON = {
   running: "the agent is working here",
-  waiting: "messages are waiting here",
+  waiting: "messages are queued here",
 } as const
 
 /**
- * Decide an archive or restore. A root the agent works in, or where messages
- * wait, is not archived: stopping the run or holding the queue would do work
+ * Decide an archive or restore. A root the agent works in, or where cards are
+ * queued, is not archived: stopping the run or holding the queue would do work
  * nobody asked for, so the person chooses (ADR-0029). Restoring is never busy.
  */
 export function planArchive(input: {
@@ -102,9 +102,8 @@ export function writesAt(
   switch (intent.kind) {
     case "chat":
       return intent.at.kind === "root" ? null : intent.at.id
-    // An update and an offer act at their lane's tip: an archived root's lanes
-    // take no work in and offer none out.
-    case "update":
+    // An offer acts at its lane's tip: an archived root's lanes offer no
+    // work out.
     case "offer":
       return lanes.find(l => l.name === intent.lane)?.tip ?? null
     case "mark":

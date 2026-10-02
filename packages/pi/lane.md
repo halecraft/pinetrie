@@ -114,9 +114,10 @@ changes Pineta can keep this note true. You can skip them.
 
 - Several people may write in one thread. Each message you read begins with
   the name of the person who wrote it. <!-- packages/marginalia/chat.ts attributed -->
-- When the person sends you their own work ("update from my work"), Pineta
-  merges their `@`, uncommitted edits included, into `/workspace`, and a
-  note tells you what changed. <!-- packages/lanes/merge.ts mergeYours -->
+- When someone brings this thread up to date, Pineta merges the project's
+  work (the person's `@`, uncommitted edits included) into `/workspace`,
+  and a note tells you what changed. What they want done with it comes
+  after, as their message. <!-- packages/lanes/merge.ts mergeYours -->
 - If the merge conflicts, a Pineta message asks you to resolve it. Only
   then do you have `ask_for_guidance`: use it when the two sides meant
   different things. <!-- packages/marginalia/land.ts LAND_TYPE -->

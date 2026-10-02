@@ -1,8 +1,12 @@
 # ADR-0026 — Everything queued is a note; the queue waits at a note someone has open
 
-**Status:** Accepted. Amends ADR-0020 (the outbox) and ADR-0025 (the
-lifecycle, and how done is enforced). Evidence: S20, S21, S26, S28. To be
-implemented by `PLAN-2026-09-26-queued-notes`.
+**Status:** Superseded by ADR-0048 (step 3) and ADR-0055, never built:
+`PLAN-2026-09-26-queued-notes` was replaced by
+`PLAN-2026-10-01-queued-cards`. A queued message is a queued card, which
+anyone can edit or unqueue; the take is one synchronous step on the host
+(S69). The hold while someone types in a queued card waits for ADR-0048's
+step 7. Was: amends ADR-0020 (the outbox) and ADR-0025 (the lifecycle, and
+how done is enforced). Evidence: S20, S21, S26, S28.
 
 **Context.** A message waiting for a busy lane sits in `pineta.outbox` as a
 frozen copy of its text. It cannot be cancelled or changed, and someone who

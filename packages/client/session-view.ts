@@ -10,6 +10,7 @@ import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 
 import {
   type ArchiveAction,
+  type CardCommand,
   type CardId,
   type CardRecord,
   type ChatMode,
@@ -23,7 +24,14 @@ import {
   type WriterId,
   writerOfPrincipal,
 } from "@pineta/core"
-import { encodeCard } from "@pineta/marginalia"
+import {
+  encodeCard,
+  orderAfter,
+  queuedOn,
+  queueFields,
+  type StoredCardFields,
+  unqueueFields,
+} from "@pineta/marginalia"
 import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
 import {
@@ -33,6 +41,7 @@ import {
   type Reply,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
+import { readCards } from "@pineta/reads"
 import {
   CardsDoc,
   type CardsDocHandle,
@@ -49,7 +58,7 @@ import {
   TextDoc,
   type TextDocHandle,
 } from "@pineta/schema"
-import { hostLetGo, spentCards } from "./card-state.ts"
+import { alreadySent, hostLetGo, spentCards } from "./card-state.ts"
 
 /**
  * The `WebSocket` constructor to use. The browser supplies the global; Node
@@ -79,6 +88,21 @@ export interface ConnectOptions {
   readonly onChange?: () => void
 }
 
+/** A card this client unqueued that the host had already taken (S69). */
+export interface SentAnyway {
+  readonly card: CardId
+  readonly lane: LaneName
+  /** Who queued it: whose message it was sent as. */
+  readonly by: WriterId
+}
+
+/** What this client's unqueues that lost are, and a way to hear of a new one. */
+export interface AlreadySent {
+  current(): readonly SentAnyway[]
+  /** `listener` hears every change; returns its unsubscribe. */
+  subscribe(listener: () => void): () => void
+}
+
 export interface SessionClient {
   /** The email this client connected as. */
   readonly principal: string
@@ -95,8 +119,7 @@ export interface SessionClient {
   readonly presence: PresenceDocHandle
   /**
    * Every card's record (ADR-0048). Read it through `readCards`; write a
-   * card only through `createCard` and `discardCard`, and its text through
-   * its editor.
+   * card only through the methods below, and its text through its editor.
    */
   readonly cards: CardsDocHandle
   /**
@@ -141,15 +164,35 @@ export interface SessionClient {
    * discarded with its column, which nothing could show again.
    */
   discardCard(id: CardId): void
+  /**
+   * Queue a card on `lane`, from `at`: after the lane's last queued card,
+   * queued by you, `unsent` cleared. Field writes, outside the undo stack's
+   * gestures: a card's box undoes only its text (ADR-0052).
+   */
+  queueCard(
+    id: CardId,
+    where: { readonly lane: LaneName; readonly at: Position },
+  ): void
+  /**
+   * Take a queued card back below the line: its kind alone is written. The
+   * card is remembered until its fate is seen: taken first, it is in
+   * `alreadySent`.
+   */
+  unqueueCard(
+    id: CardId,
+    queued: { readonly lane: LaneName; readonly by: WriterId },
+  ): void
+  /** Set a card's command, or clear it with null (ADR-0055). */
+  setCommand(id: CardId, command: CardCommand | null): void
+  /**
+   * The cards you unqueued that the host had taken (S69), until your next
+   * send, queue or unqueue in their lane.
+   */
+  readonly alreadySent: AlreadySent
   /** Hide the root `root` for everyone, or bring it back (ADR-0029). */
   archive(action: ArchiveAction, root: EntryId): Promise<Outcome>
   /** Title the entry `entry`, or clear its title with null (ADR-0045). */
   mark(entry: EntryId, title: string | null): Promise<Outcome>
-  /**
-   * Merge your work into a lane (ADR-0038): `updated`, with the composer's
-   * prefill, when clean; `started`, the resolution run, when it conflicts.
-   */
-  update(lane: LaneName): Promise<Outcome>
   /** Act on a lane's offer in your repo: take it, split it, and so on. */
   offer(lane: LaneName, action: OfferAction): Promise<Outcome>
   /** Every reply as it arrived on the wire, for wire-level checks. */
@@ -214,12 +257,49 @@ export async function connectSession(
   // `dismiss` leaves a receiver's copy in place.
   const watched = new Map<CardId, () => void>()
   const letGo = new Set<CardId>()
+  // The cards this client unqueued, until their fate is seen, and the ones
+  // whose unqueue lost (S69). An unqueue that won is forgotten at your next
+  // send, queue or unqueue of the card, or in its lane.
+  const unqueued = new Map<CardId, { lane: LaneName; by: WriterId }>()
+  let sentAnyway: readonly SentAnyway[] = []
+  const sentListeners = new Set<() => void>()
+  const setSentAnyway = (next: readonly SentAnyway[]) => {
+    if (next === sentAnyway) return
+    sentAnyway = next
+    for (const listener of sentListeners) listener()
+  }
+  const forgetLane = (lane: LaneName) => {
+    for (const [id, u] of unqueued) if (u.lane === lane) unqueued.delete(id)
+    if (sentAnyway.some(s => s.lane === lane))
+      setSentAnyway(sentAnyway.filter(s => s.lane !== lane))
+  }
   const dropSpent = () => {
-    for (const id of spentCards(letGo, c => cards.cards.has(c))) {
+    const spent = spentCards(letGo, c => cards.cards.has(c))
+    const lost = alreadySent(new Set(unqueued.keys()), spent)
+    if (lost.length > 0)
+      setSentAnyway([
+        ...sentAnyway,
+        ...lost.flatMap(card => {
+          const u = unqueued.get(card)
+          unqueued.delete(card)
+          return u === undefined ? [] : [{ card, ...u }]
+        }),
+      ])
+    for (const id of spent) {
       letGo.delete(id)
       void exchange.destroy(cardDocId(id))
     }
   }
+  /** Write some of a card's fields, never the whole record (S58). */
+  const writeFields = (id: CardId, fields: Partial<StoredCardFields>) =>
+    batch(cards, d => {
+      const record = d.cards.at(id)
+      if (record === undefined) return
+      for (const key of Object.keys(fields) as (keyof StoredCardFields)[]) {
+        const value = fields[key]
+        if (value !== undefined) record[key].set(value)
+      }
+    })
   const hostIn = (states: readonly { peer: { peerId: string } }[]) =>
     states.some(s => s.peer.peerId === host.peerId)
   const cardText = (id: CardId): TextDocHandle => {
@@ -315,6 +395,8 @@ export async function connectSession(
     exchange,
     doc,
     chat(text, at, how = {}) {
+      if (how.card !== undefined) unqueued.delete(how.card)
+      if (how.lane !== undefined) forgetLane(how.lane)
       return send(
         {
           kind: "chat",
@@ -350,8 +432,26 @@ export async function connectSession(
     discardCard(id) {
       cards.cards.delete(id)
     },
-    update(lane) {
-      return send({ kind: "update", lane })
+    queueCard(id, { lane, at }) {
+      unqueued.delete(id)
+      forgetLane(lane)
+      const order = orderAfter(queuedOn(readCards(cards), lane))
+      writeFields(id, queueFields({ at, lane, by: me, order }))
+    },
+    unqueueCard(id, queued) {
+      forgetLane(queued.lane)
+      unqueued.set(id, queued)
+      writeFields(id, unqueueFields())
+    },
+    setCommand(id, command) {
+      writeFields(id, { command: command ?? "" })
+    },
+    alreadySent: {
+      current: () => sentAnyway,
+      subscribe(listener) {
+        sentListeners.add(listener)
+        return () => sentListeners.delete(listener)
+      },
     },
     offer(lane, action) {
       return send({ kind: "offer", lane, action })

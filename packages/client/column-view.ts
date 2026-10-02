@@ -32,6 +32,7 @@ import {
   type OfferView,
   offerView,
 } from "@pineta/marginalia"
+import { commandWords } from "./card-words.ts"
 import { speakerLabel } from "./names.ts"
 import { whereWords } from "./send.ts"
 
@@ -431,7 +432,7 @@ const BUTTON_LABEL: Record<OfferButton, string> = {
   describe: "rewrite description",
   refresh: "refresh (discards your edits)",
   resolve: "resolve in the thread",
-  update: "update from my work",
+  update: commandWords("bring-up-to-date"),
 }
 
 /** Every word an offer shows: its line, and its buttons' labels by state. */

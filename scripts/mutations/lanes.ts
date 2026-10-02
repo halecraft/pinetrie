@@ -438,6 +438,26 @@ export const mutations: readonly Mutation[] = [
     expect: "a taken branch that holds all its lane's work",
   },
   {
+    name: "the resolution is not told what the card asked",
+    file: "apps/pineta/host/work/update.ts",
+    from: "            details: { landing: basics.newId(), lane, yours: [copy], by },\n            intent,",
+    to: '            details: { landing: basics.newId(), lane, yours: [copy], by },\n            intent: "",',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a card that brings the thread up to date runs the resolution when it conflicts, with the card's text, and the offer comes back clean",
+  },
+  {
+    name: "a clean update refuses the card's text",
+    file: "apps/pineta/host/work/update.ts",
+    from: '          return { kind: "clean" }',
+    to: '          return { refused: "clean" }',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a card that brings the thread up to date writes the update in the thread, then sends its text",
+  },
+  {
     name: "a turn's paths are read quoted",
     file: "packages/lanes/revisions.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text

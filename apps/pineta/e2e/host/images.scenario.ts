@@ -3,13 +3,13 @@
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { cardId, type ImageRef, ROOT } from "@pineta/core"
+import { cardId, type ImageRef, type LaneName, ROOT } from "@pineta/core"
 import { scriptedModel, sha256Of } from "@pineta/pi"
-import { readOutbox } from "@pineta/reads"
+import { readLaneNames } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { join, waitFor } from "../harness.ts"
+import { join, noQueued, waitFor } from "../harness.ts"
 import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -75,9 +75,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await iu.setName("Ivy")
     const iidle = () =>
       waitFor(
-        () =>
-          Object.keys(ih.doc.activeRuns()).length === 0 &&
-          readOutbox(ih.doc).length === 0,
+        () => Object.keys(ih.doc.activeRuns()).length === 0 && noQueued(ih),
         30_000,
       )
     let seen: readonly string[] = []
@@ -99,7 +97,7 @@ async function run(check: Checks["check"]): Promise<void> {
       `${seen.at(-1)?.slice(-80)}`,
     )
 
-    // 4. A message that waits for its lane carries its images when drained.
+    // 4. A card queued for its lane carries its images when it is taken.
     const green = await upload(GREEN_PNG)
     const replyId = idOfIn(ih.doc, "a red one")
     const paused = script.pause("hold on")
@@ -109,7 +107,20 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     await waitFor(() => paused.reached, 10_000)
     const queuedText = `@agent and this? ![green](/blob/${green.sha256})`
-    await iu.chat(queuedText, at(replyId), { mode: "queue" })
+    const lane = readLaneNames(ih.doc)[0] as LaneName | undefined
+    const queued = cardId(crypto.randomUUID())
+    iu.createCard(
+      {
+        id: queued,
+        owner: iu.writer,
+        place: { kind: "drafting", at: at(replyId), lane: lane ?? null },
+        command: null,
+        unsent: null,
+      },
+      queuedText,
+    )
+    if (lane !== undefined) iu.queueCard(queued, { lane, at: at(replyId) })
+    await waitFor(() => ih.cardText(queued) === queuedText, 5_000)
 
     paused.resume()
     await iidle()
@@ -142,6 +153,8 @@ async function run(check: Checks["check"]): Promise<void> {
           at: at(idOfIn(ih.doc, "a green one")),
           lane: null,
         },
+        command: null,
+        unsent: null,
       },
       draftedText,
     )

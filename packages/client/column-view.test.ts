@@ -580,7 +580,7 @@ describe("offerWords", () => {
     ])
     expect(words(offer).menu.map(b => b.label)).toEqual([
       "rewrite description",
-      "update from my work",
+      "bring up to date",
     ])
   })
 })

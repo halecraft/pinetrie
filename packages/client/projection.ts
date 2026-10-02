@@ -1,9 +1,10 @@
 // client/projection — what `App` draws from, read from the session document in
 // one moment.
 //
-// The facts the host also decides from (the tree, lanes, the outbox, rules,
-// names, references) are read by `@pineta/reads`, shared with the host, so a
-// composer cannot promise what the host will not do. This only gathers them.
+// The facts the host also decides from (the tree, rules, names, references)
+// are read by `@pineta/reads`, shared with the host, so a composer cannot
+// promise what the host will not do. This only gathers them. Lanes are read
+// with the cards document, a second one, by `readLanes` in `App`.
 // Which streams are drawn is `liveWork` (`live.ts`), over the stream records
 // alone: a stream's text is read where it is drawn, so a delta does not
 // re-run this (S55).
@@ -15,13 +16,12 @@ import {
   type ArchiveRecord,
   type AskIndex,
   indexAsks,
-  type LaneView,
   type MarkRecord,
   type SeatRecord,
   type StopRecord,
   type TreeIndex,
 } from "@pineta/core"
-import type { DigestRecord, Held } from "@pineta/marginalia"
+import type { DigestRecord } from "@pineta/marginalia"
 import {
   readAgentActivity,
   readArchive,
@@ -30,11 +30,9 @@ import {
   readDigests,
   readLandings,
   readLaneRecords,
-  readLanes,
   readMarks,
   readNames,
   readOffers,
-  readOutbox,
   readParticipants,
   readProject,
   readRevisions,
@@ -60,8 +58,6 @@ export interface SessionFacts {
   readonly activity: readonly AgentRun[]
   /** The streams to draw, from the same moment as `index`. */
   readonly live: LiveWork
-  readonly lanes: readonly LaneView[]
-  readonly outbox: readonly Held[]
   readonly participants: readonly string[]
   /** Every seat the host has seen: who wrote in a card (ADR-0048). */
   readonly seats: readonly SeatRecord[]
@@ -73,7 +69,7 @@ export interface SessionFacts {
 
 export function readSessionFacts(doc: SessionDocHandle): SessionFacts {
   const index = readTreeIndex(doc)
-  const activity = readAgentActivity(doc, index)
+  const activity = readAgentActivity(doc)
   return {
     index,
     asks: indexAsks(index),
@@ -82,8 +78,6 @@ export function readSessionFacts(doc: SessionDocHandle): SessionFacts {
     count: Object.keys(index.entries).length,
     activity,
     live: liveWork(readStreamRecords(doc), activity),
-    lanes: readLanes(doc, index),
-    outbox: readOutbox(doc),
     participants: readParticipants(doc, index),
     seats: readSeats(doc),
     archive: readArchive(doc),

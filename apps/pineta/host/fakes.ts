@@ -6,6 +6,7 @@
 import type { LaneName } from "@pineta/core"
 import type { ThreadLaneHandle, WriteOutcome } from "@pineta/pi"
 import {
+  newCardsDoc,
   newSessionDoc,
   physicalKey,
   type SessionDocHandle,
@@ -105,7 +106,7 @@ export const row = (
 
 /**
  * One pi value, as pi stores it: `encodeWorkRecord`'s result, or an archive
- * record or a held item with its namespace and key.
+ * record with its namespace and key.
  */
 export function putValue(
   doc: SessionDocHandle,
@@ -119,13 +120,17 @@ export function putValue(
 }
 
 /** A fresh document, ids from a counter, a fixed clock, and the log's lines. */
-export function basics(doc = newSessionDoc()): Basics & {
+export function basics(
+  doc = newSessionDoc(),
+  cards = newCardsDoc(),
+): Basics & {
   readonly lines: string[]
 } {
   let n = 0
   const lines: string[] = []
   return {
     doc,
+    cards,
     log: m => lines.push(m),
     newId: () => `id-${String(++n).padStart(4, "0")}`,
     now: () => 1_000,

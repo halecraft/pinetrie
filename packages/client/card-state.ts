@@ -184,3 +184,14 @@ export const startText = (input: {
   input.pending === undefined && input.card === undefined
     ? (input.prefill?.text ?? "")
     : ""
+
+/**
+ * The cards this client unqueued whose unqueue lost (ADR-0048, S69): the
+ * host took them first, so their records are gone and their documents let
+ * go of (`spent`, from `spentCards`). An unqueued card the host did not take
+ * is still drafting, and never in `spent`.
+ */
+export const alreadySent = (
+  unqueued: ReadonlySet<CardId>,
+  spent: readonly CardId[],
+): CardId[] => spent.filter(id => unqueued.has(id))

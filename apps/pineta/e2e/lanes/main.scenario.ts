@@ -19,29 +19,31 @@ import {
 import { hostOps, startOfOffer } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
 import {
+  readCards,
   readHaves,
   readLandings,
   readLanes,
   readNames,
   readOffers,
-  readOutbox,
   readProject,
   readRevisions,
   readTreeIndex,
 } from "@pineta/reads"
-import { readEntries, rowMessage } from "@pineta/schema"
+import { readEntries, readEntryMessage, rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,
   containerProblem,
   join,
+  noQueued,
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 import {
   at,
   BRANCH,
+  bringUpToDate,
   cleanUp,
   container,
   inLane,
@@ -84,9 +86,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
   const tree = () => readTreeIndex(wh.doc)
   const idle = async () => {
     await waitFor(
-      () =>
-        Object.keys(wh.doc.activeRuns()).length === 0 &&
-        readOutbox(wh.doc).length === 0,
+      () => Object.keys(wh.doc.activeRuns()).length === 0 && noQueued(wh),
       180_000,
     )
     await wh.quiet()
@@ -103,18 +103,21 @@ async function mainSection(check: Checks["check"]): Promise<void> {
   const laneWith = (text: string) => {
     const id = idOf(text)
     const index = tree()
-    return readLanes(wh.doc, index).find(
+    return readLanes(wh.doc, index, readCards(wh.cards)).find(
       l => id !== null && ancestry(index, l.tip).path.includes(id),
     )
   }
   const tipOf = (text: string) => laneWith(text)?.tip ?? null
   const laneTip = (lane: LaneName) =>
-    readLanes(wh.doc, tree()).find(l => l.name === lane)?.tip ?? null
+    readLanes(wh.doc, tree(), readCards(wh.cards)).find(l => l.name === lane)
+      ?.tip ?? null
   /** Every tool result's text in a lane's thread, oldest first. */
   const toolResults = (lane: LaneName | undefined): string[] => {
     if (lane === undefined) return []
     const index = tree()
-    const tip = readLanes(wh.doc, index).find(l => l.name === lane)?.tip ?? null
+    const tip =
+      readLanes(wh.doc, index, readCards(wh.cards)).find(l => l.name === lane)
+        ?.tip ?? null
     const onPath = new Set(ancestry(index, tip).path)
     return Object.values(readEntries(wh.doc))
       .filter(r => onPath.has(r.id))
@@ -521,7 +524,9 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       lane === undefined
         ? ""
         : `pineta-offer/${readNames(wh.doc).get(lane) ?? ""}`
-    const allNamed = readLanes(wh.doc, tree()).every(l => names.has(l.name))
+    const allNamed = readLanes(wh.doc, tree(), readCards(wh.cards)).every(l =>
+      names.has(l.name),
+    )
     check(
       "every lane has a two-word name, unique; the offer's bookmark and trailer carry it",
       allNamed &&
@@ -606,7 +611,8 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         wroteBefore !== JSON.stringify(offerOf()?.commits),
       `${JSON.stringify({ commits: offerOf()?.commits, wrote: offerOf()?.host.wrote, now: offerNow() })}`,
     )
-    // Resolve in the thread: your work merged into the lane, the agent resolves.
+    // Bring it up to date: the project's work merged into the lane, and the
+    // agent resolves the conflict, told what the card asked.
     script.use([
       {
         tool: "write",
@@ -617,7 +623,10 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       },
       { text: "resolved: both kept" },
     ])
-    const resolving = two === undefined ? null : await wu.update(two.name)
+    const intent = "keep both sides"
+    if (two !== undefined)
+      bringUpToDate(wu, two.name, laneTip(two.name), intent)
+    await waitFor(() => readLandings(wh.doc).length > 0, 60_000)
     await idle()
     const landing = readLandings(wh.doc).at(-1)
     const landMessage = projectTranscript(tree(), landing?.prompt ?? null).at(
@@ -629,13 +638,22 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         offerOf()?.files.includes("shared.txt") === true,
       30_000,
     )
+    // What the model read: the land message's content, not its one line.
+    const stored =
+      landing === undefined
+        ? { present: false as const }
+        : readEntryMessage(wh.doc, landing.prompt)
+    const landPrompt = stored.present
+      ? (stored.message as { content?: unknown }).content
+      : undefined
     check(
-      "a conflicting update runs the resolution, and the offer comes back clean",
-      resolving?.kind === "started" &&
-        landMessage?.text.includes("1 file conflicts") === true &&
+      "a card that brings the thread up to date runs the resolution when it conflicts, with the card's text, and the offer comes back clean",
+      landMessage?.text.includes("1 file conflicts") === true &&
+        typeof landPrompt === "string" &&
+        landPrompt.endsWith(intent) &&
         landing?.state === "resolved" &&
         clean >= 0,
-      `${landing?.state ?? JSON.stringify(resolving)}`,
+      `${landing?.state ?? "no resolution"}`,
     )
     // The resolution moved the lane: the offer followed it in place, back to
     // a work in progress while the run went on, then described again.
@@ -699,20 +717,26 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       next >= 0,
       `${JSON.stringify(offerOf()?.files)}`,
     )
-    // A clean update: a fact in the thread, and the composer's prefill.
+    // A clean update: a fact in the thread, then the card's text, sent.
     writeFileSync(path.join(project, "yours.txt"), "yours\n")
     jj(project, "commit", "-m", "you add yours.txt")
-    const updated = two === undefined ? null : await wu.update(two.name)
-    const updateEntry = projectTranscript(
+    script.use([{ text: "it fits" }])
+    if (two !== undefined)
+      bringUpToDate(wu, two.name, laneTip(two.name), "check yours still fits")
+    await waitFor(() => idOf("it fits") !== null, 60_000)
+    await idle()
+    const afterUpdate = projectTranscript(
       tree(),
       two === undefined ? null : laneTip(two.name),
-    ).at(-1)
+    )
+      .slice(-3)
+      .map(m => `${m.role}:${m.text}`)
     check(
-      "a clean update writes a fact in the thread and returns the composer's prefill",
-      updated?.kind === "updated" &&
-        updated.text.includes("merged my latest work") &&
-        updateEntry?.role === "update",
-      `${JSON.stringify(updated)}`,
+      "a card that brings the thread up to date writes the update in the thread, then sends its text",
+      afterUpdate[0]?.startsWith("update:") === true &&
+        afterUpdate[1] === "chat:check yours still fits" &&
+        afterUpdate[2] === "assistant:it fits",
+      `${JSON.stringify(afterUpdate)}`,
     )
     // Split into a stack: the agent builds it in the lane; the host checks it
     // against the tip and makes it the offer. Squash brings it back to one.

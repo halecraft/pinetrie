@@ -10,7 +10,15 @@ export interface AppPorts {
   readonly dispatch: (action: LayoutAction) => void
   readonly session: Pick<
     SessionClient,
-    "archive" | "mark" | "discardCard" | "setName"
+    | "archive"
+    | "mark"
+    | "discardCard"
+    | "setName"
+    | "createCard"
+    | "queueCard"
+    | "unqueueCard"
+    | "setCommand"
+    | "offer"
   >
   /** Scroll to an entry once it is drawn (`useReveal`). */
   readonly reveal: (entry: string) => void
@@ -49,6 +57,27 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "discardCard":
       ports.session.discardCard(effect.card)
+      return
+    case "createCard":
+      ports.session.createCard(effect.card, "")
+      return
+    case "queueCard":
+      ports.session.queueCard(effect.card, {
+        lane: effect.lane,
+        at: effect.at,
+      })
+      return
+    case "unqueueCard":
+      ports.session.unqueueCard(effect.card, {
+        lane: effect.lane,
+        by: effect.by,
+      })
+      return
+    case "setCommand":
+      ports.session.setCommand(effect.card, effect.command)
+      return
+    case "offer":
+      void ports.session.offer(effect.lane, effect.action)
       return
     case "openFold":
       ports.openFold(effect.ask)

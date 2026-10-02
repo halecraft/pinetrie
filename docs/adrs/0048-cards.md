@@ -7,10 +7,13 @@ withdrawn from ADR-0025, ADR-0023 gains "tabs write cards", and ADR-0037
 gains "the host writes down each seat's person". Step 3's first part,
 notes removed, implemented by `PLAN-2026-10-01-notes-removed`: it supersedes
 the rest of ADR-0025 and amends ADR-0043 (no notes below messages) and
-ADR-0024 (no `editing` presence); its second part, queued cards, is
-`PLAN-2026-10-01-queued-cards`. The later steps would amend ADR-0026 (queued
-notes become queued cards) and ADR-0046 (a fixed line about pinned cards in
-the prompt). They also replace the
+ADR-0024 (no `editing` presence); its second part, queued cards and the
+take/unqueue race, implemented by `PLAN-2026-10-01-queued-cards`: it
+supersedes ADR-0026 (queued notes become queued cards), with ADR-0055, and
+amends ADR-0020 (nothing waits in `pineta.outbox`, which is gone). Probe 2
+is answered by S69. A later step would amend ADR-0046 (a fixed line about
+pinned cards in the prompt). Amended in place (2026-10-02): a queued card is
+*unqueued*, not stopped; "stop" is a run's word (ADR-0056). They also replace the
 inventory in `PLAN-2026-09-27-fold`, and Phases 2–7 of
 `PLAN-2026-09-29-branch-prefill-and-composers`. Amended by ADR-0052: Cmd+Z
 in a card undoes only that card's steps, never the tab's last step
@@ -116,11 +119,11 @@ who reads a card: a thought only for the team goes below the line.
 
 - **The line is the only commitment.** Above it the agent reads and will act;
   below it only people read and touch the cards. Queueing moves a card above the line and
-  stopping moves it back below. Staging several steps is putting several cards
+  unqueueing moves it back below. Staging several steps is putting several cards
   above it.
 - **The agent takes the top queued card.** It is the only move no person
   makes, and it is what queueing means.
-- **A stopped card stays in its column**, just below the line, a draft again.
+- **An unqueued card stays in its column**, just below the line, a draft again.
   It never returns to someone's composer (ADR-0026's concern), because it
   never left the thread.
 - **The usual case looks as it does today.** The composer is the one drafting
@@ -137,7 +140,7 @@ who reads a card: a thought only for the team goes below the line.
 4. **Taking from the past copies.** Taking a message, or a selection in one,
    makes a new card with its text. The message loses nothing.
 5. **In place, a card has its own actions:** send (Enter, as today), queue,
-   stop, reorder (Alt+↑/↓). These are what a card does, not where it goes.
+   unqueue, reorder (Alt+↑/↓). These are what a card does, not where it goes.
 6. A card looks and edits the same in every place.
 7. Every move can be undone, except send: the tree is immutable, so a sent
    card is spent.
@@ -200,11 +203,11 @@ it stays open while you work in them.
   4. it is not the card's expected fate: the agent taking a queued card is
      what queueing means.
 
-  A stopped card has not left its place; it gets a mark on itself ("stopped
-  by Bea"). A trace is gone once seen, as a seen mention is (ADR-0030).
+  An unqueued card has not left its place; it gets a mark on itself
+  ("unqueued by Bea"). A trace is gone once seen, as a seen mention is (ADR-0030).
   Traces at one spot collapse into one ("3 cards moved by Bea").
 - **Each card keeps its history:** created by, typed in by, moved, queued,
-  stopped, taken, sent. That is its provenance, reached from the card and
+  unqueued, taken, sent. That is its provenance, reached from the card and
   from a trace. Someone taking your card into their drawer is recorded there,
   not notified.
 - **Who contributed to a card is a projection of its history**: each edit,
@@ -241,7 +244,7 @@ Only yours: it answers "where was I?", and is not a busy indicator. Yours is
 the cards you own, and from step 6 also every card you contributed to (a
 projection of its history, below), so you can follow a card you helped
 write. A card is
-marked when someone else edited or stopped it, when its thread moved on since
+marked when someone else edited or unqueued it, when its thread moved on since
 you wrote it, and when a reminder on it is due.
 
 *Pinned cards and the agent.* Pinned cards are, figuratively, the thread's
@@ -276,7 +279,7 @@ multiplayer-sound: it reverses my operations as they now stand among everyone
 else's, which a stack of naive inverses does not.
 - **Text, inside a card:** your keystrokes, never a collaborator's. A
   collaborator's text typed inside yours survives your undo.
-- **Place:** take, put, queue, stop, discard, and moves in the drawer. A
+- **Place:** take, put, queue, unqueue, discard, and moves in the drawer. A
   place is restored only while it still holds what your step wrote: if Bea
   moved the card after you, your undo leaves her move alone.
 - **One gesture is one step**, across every document it wrote: a take that
@@ -323,9 +326,9 @@ where the card becomes a message in the immutable tree.
   writes pi's tree.
 - **The race at the boundary.** ADR-0026's serial executor orders a take
   against a cancel; with cards written by clients, the host taking a queued
-  card and someone stopping it are concurrent. Once the host's take is
-  written, it wins: the card is spent, and the stop leaves a mark, "already
-  sent".
+  card and someone unqueueing it are concurrent. Once the host's take is
+  written, it wins: the card is spent, and the unqueue leaves a mark,
+  "already sent".
 
 *Removed.* Notes in the tree: a note below a message (ADR-0043), origin notes,
 done / reopen / "changed since done", the notes index, and the rail's note
@@ -359,12 +362,12 @@ and a pinned card can quote one.
      restart, with undo from the start;
   2. marks for your unsent cards on root tabs and columns;
   3. notes become cards: notes in the tree removed, queued notes become queued
-     cards, the take/stop race;
+     cards, the take/unqueue race;
   4. the drawer: grid, take and put, drag, keys;
   5. several cards per place, and pinned cards read by the agent;
   6. traces and card history, and who contributed, projected from it (for
      marks, a card's heading and a sent message's "with");
-  7. queue control: staging, reordering, stops;
+  7. queue control: staging, reordering, unqueues;
   8. later: reminders (drawer cards that light up when due and reach your `@`
      inbox, separate from the queue), conditions on queued cards (ADR-0026),
      the agent suggesting next steps as drafting cards, and a summary of what
@@ -416,7 +419,7 @@ them:
 1. **Places as a CRDT:** a movable tree (Loro) or a place field per card. Two
    people move one card at once, and a card moves while being typed in.
    Which converges to something a person would accept?
-2. **The take/stop race:** the rule above holds, and the stopper's client
+2. **The take/unqueue race:** the rule above holds, and the unqueuer's client
    shows "already sent".
 3. **A spent card's document:** destroy or keep its text after a send. S28
    found a refused write unrecoverable; measure what a client still holding
@@ -461,7 +464,7 @@ beyond each card's history; whether the drawer crosses sessions.
 - **A list, or a free canvas, for the drawer.** A list has no addresses; a
   canvas is hard to use from the keyboard and grows messy. A fixed grid gives
   addresses and works with every input.
-- **Returning a stopped card to its sender's drawer.** It would move by
+- **Returning an unqueued card to its sender's drawer.** It would move by
   itself, out of the place everyone saw it in.
 - **Undo as our own stack of inverse commands.** Unsound with other people
   editing, and a retention rule for discarded cards would be needed. Kyneta's

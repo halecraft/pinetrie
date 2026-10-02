@@ -3,10 +3,12 @@
 
 import type { LaneName } from "@pineta/core"
 import { readThreadName } from "@pineta/reads"
-import type { SessionDocHandle } from "@pineta/schema"
+import type { CardsDocHandle, SessionDocHandle } from "@pineta/schema"
 
 export interface Basics {
   readonly doc: SessionDocHandle
+  /** Every card's record (ADR-0048): what is queued for each lane. */
+  readonly cards: CardsDocHandle
   readonly log: (message: string) => void
   readonly newId: () => string
   readonly now: () => number

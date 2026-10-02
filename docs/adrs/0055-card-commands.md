@@ -1,9 +1,10 @@
 # ADR-0055 — A command acts on a card, and is named last: "bring up to date" is the first
 
-**Status:** Proposed. Evidence: S69. Amends ADR-0038 ("Update from my work"
+**Status:** Accepted. Evidence: S69. Amends ADR-0038 ("Update from my work"
 becomes a card's command, and its prefill goes) and ADR-0036 (a second kind
-of command, which is not typed). Part of ADR-0048's step 3. To be
-implemented by `PLAN-2026-10-01-queued-cards`.
+of command, which is not typed). Part of ADR-0048's step 3. Implemented by
+`PLAN-2026-10-01-queued-cards`. Amended in place (2026-10-02): a queued card
+is *unqueued*, not stopped; "stop" is a run's word (ADR-0056).
 
 **Context.** ADR-0048 makes queued messages queued cards, and removes
 `pineta.outbox`. The outbox holds two kinds of thing: messages, and "Update
@@ -81,8 +82,8 @@ context first and choose what to do with it last. Vim has this shape:
 
 - `pineta.outbox` goes with nothing in its place: everything that waits
   for a thread is a queued card. An update waits in order with the
-  messages, can be stopped or edited while it waits, and follows the
-  take/stop rule (S69).
+  messages, can be unqueued or edited while it waits, and follows the
+  take/unqueue rule (S69).
 - A clean update with text costs one run, as sending the prefill did. A
   clean update with no text costs none.
 - The update's own entry keeps its revision (ADR-0038), so a branch below it

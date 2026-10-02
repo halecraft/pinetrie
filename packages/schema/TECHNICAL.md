@@ -238,7 +238,7 @@ no Loro and no wasm. Its in-memory op log grows with every edit until
 compacted (S25), so the host compacts it between runs (`apps/pineta/host/settle.ts`:
 after a run ends, and at startup): the store's records become the document as it stands,
 and the log is trimmed. What is lost is the history of edits to transient
-state: streams, cleared values, the outbox. The tree is explicit and
+state: streams and cleared values. The tree is explicit and
 immutable, so no conversation is lost. A client behind the compacted point
 receives the whole document once.
 

@@ -14,14 +14,14 @@ wires them.
 | `basics.ts` | `Basics` (doc, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
 | `queue.ts` | `createSerial`: the one serial executor |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), and the agent's `onStream` (`streamInto`) |
-| `outbox.ts` | `drain`: an idle lane's held messages and updates, oldest first |
+| `take.ts` | taking a lane's queued cards (ADR-0048): `takeTop`, and `drain`, which sends each through its command (ADR-0055) |
 | `settle.ts` | what happens between runs: drain, then compact and sweep |
 | `housekeeping.ts` | compacting the session, and deleting images nothing shows |
-| `cards.ts` | the card port (ADR-0048): who wrote in a card, spending one, and every card's text gathered for the sweeps; where the shell opens card documents |
+| `cards.ts` | the card port (ADR-0048): who wrote in a card, spending or destroying one, loading and reading texts for the take, and every card's text gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`) |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
-| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, update, offer); `index.ts` decodes, checks the archive, routes |
+| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, offer); `index.ts` decodes, checks the archive, routes, and sends a taken card behind the same check (`sendTaken`) |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
@@ -80,19 +80,20 @@ wires them.
 - **`ended` is one function, set once** in `startHost`: hot reload, then
   `settle`, banners and the final digest. It breaks a cycle: a run's end
   drains, the drain may run an update, and an update may start a run.
-  `runs.ts` imports neither the outbox nor the commands.
+  `runs.ts` imports neither the take nor the commands.
 - **`ended` is given the run's prompt**, read at the start of `end()`,
   before any step. A listener uses it, never the lane's tip: `settle`'s
-  drain is queued first, and appends a held message or starts the next run
+  drain is queued first, and takes a queued card or starts the next run
   before any step queued after it reads the lane. pi reports no prompt id,
   and the lookup gives the same answer as pi's own end tip (S71).
 
 ## Startup
 
 `recover` runs, in order: `clearStreams` (no stream survives a process),
-`ensureNames` (ADR-0039), `planStartup` over the outbox and `interrupted()`,
+`ensureNames` (ADR-0039), `planStartup` over the queued cards and `interrupted()`,
 each interrupted lane resumed before anything waiting for it (S36 item 18),
-`settle` for the other lanes with held messages, the project and commands
+`settle` for the other lanes with cards queued, the values an older host
+left in `pineta.outbox` deleted and each one's text logged, the project and commands
 records written only when changed, and the sweep of what no one will type in
 again: empty cards, card documents with no record, and seat records no stored
 text names (`sweepTexts`).
@@ -100,7 +101,7 @@ text names (`sweepTexts`).
 - **Commands are taken only after `recover`.** `Control.listen` is made
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
   a new message could run before an interrupted lane resumed, and jump a
-  held one.
+  queued card.
 - **The agent, lane work and banners are made in a cycle.** Lane work and
   banners are made first and read the agent lazily (`theAgent()`), because
   the agent is made with lane work's `access` and `hooks` and banners'
@@ -116,11 +117,43 @@ text names (`sweepTexts`).
 - **A command's id is its send's id.** The column that sent a chat finds its
   message by it (`TreeIndex.bySend`).
 - **The archive gate is in the dispatcher** (`refuseInArchive`). Only the
-  `chat` command calls `sendChat`, so `sendChat` has no gate of its own.
+  `chat` command and `sendTaken` call `sendChat`, both behind the gate, so
+  `sendChat` has no gate of its own.
 - **A message sent from a card spends it** (ADR-0048): `sendChat` names the
   card's other writers as contributors, through the card port, and spends
-  the card after `executeChat` answers `appended`, `started` or `queued`. The
+  the card after `executeChat` answers `appended` or `started`. The
   command's text is what is sent: the text its sender saw.
+- **A busy lane answers `busy` and writes nothing.** The sender's client
+  queues its card itself: a card's place is a person's move, and the host
+  writes cards only at the take (ADR-0048).
+
+## The queue (`take.ts`, ADR-0048, ADR-0055)
+
+- **The take is one synchronous step** (`takeTop`): read that the card is
+  queued and on top, read its text, delete its record. No `await` between,
+  so an unqueue the host has seen means the card is not taken, and one it
+  has not seen loses (S69). The unqueuer's client tells its person "already
+  sent" (`alreadySent` in `packages/client/card-state.ts`).
+- **`drain` loads each queued card's text before the take** (`hydrate`),
+  and checks again after every wait, so a card queued while texts load is
+  loaded too. `textNow` then reads a text with no wait.
+- **A taken card is sent through its command.** `bring-up-to-date` runs
+  `prepareUpdate` first: clean, the update is written, then the text, if
+  any, is sent; conflicted, the resolution run carries the text; nothing
+  new, the text alone; refused, the card goes back. The text is sent through
+  `sendTaken` in mode `queue`, as its queuer (`by`), with the card's other
+  writers as contributors. A card with no text starts no run.
+- **A card the host could not send goes back below the line, whole**
+  (`planUnsent`): drafting where it was queued, saying why, and never queued
+  again, or the next drain would fail the same way (S69, answer 5). Its text
+  is kept. After a clean update its command is cleared: it was carried out.
+- **Three things drain a lane:** a run's end (`settle`), startup
+  (`recover`), and a change to the cards document. The watch reads records,
+  never texts, so typing in a card costs it nothing. A lane's drain is queued
+  once until its step starts; a change while it runs queues one more, which
+  finds what the running one missed, or nothing. `runs.start` marks a lane
+  running at once (`beginRun`), so a drain behind a started run takes
+  nothing.
 - **`executeChat` still checks a new lane's directory and asks pi for the
   lane.** Both are ports that may refuse, not facts to gather. The directory
   is checked first, so a refused send creates no lane.
@@ -153,7 +186,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   and the prompt each run's end is given. The ask is `promptOf` that entry,
   which never changes: entries are written once (ADR-0004). `Digests` takes
   no lane, so it cannot read a lane's tip. At a run's end the tip is
-  already past the ask: a plain held message appended there would lose the
+  already past the ask: a plain queued card taken there would lose the
   ask its final digest, and a next run with work would take it, which then
   refuses that run every later digest.
 - **`planDigest` decides** in one step, from the stored digest, the request
@@ -254,7 +287,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   naming itself, so a module that touches an undeclared port fails at once.
   `fakeLane` holds a run open until the test finishes it. `row` and
   `writeEntry` put entries in the document, `putValue` a pi value (a work
-  record, an archive record, a held item, a participant's name), and `writeLaneTip` a lane's tip; a running lane is
+  record, an archive record, a participant's name), and `writeLaneTip` a lane's tip; a running lane is
   `beginRun`. Both of those are `@pineta/schema`'s.
 - **Admission is two pure plans**, `planRequest` and `planUpgrade`
   (`routes.ts`): every admission rule is a unit test there, and `http.ts`

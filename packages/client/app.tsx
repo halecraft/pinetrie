@@ -30,9 +30,15 @@ import {
   rootWork,
   summarizeRoots,
 } from "@pineta/core"
-import { readCards, readParticipantNames } from "@pineta/reads"
+import {
+  readCards,
+  readLanes,
+  readParticipantNames,
+  readTreeIndex,
+} from "@pineta/reads"
 import {
   type ComponentProps,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -179,8 +185,6 @@ export function App({
     count,
     activity,
     live,
-    lanes,
-    outbox,
     participants,
     seats,
     archive,
@@ -193,6 +197,15 @@ export function App({
   // Every card's record (ADR-0048): a second document, read on its own. An
   // unchanged card keeps its record object (`readCards`).
   const cards = useSelector(session.cards, readCards)
+  // Each lane, with its queue from the cards (ADR-0048): read again on every
+  // change to the session, as a run's start or end is one, and to the cards.
+  const lanes = useSelector(
+    doc,
+    useCallback(
+      (d: typeof doc) => readLanes(d, readTreeIndex(d), cards),
+      [cards],
+    ),
+  )
   // Its own read, not part of the facts: every message compares `nameOf` by
   // identity, so it may change only when a name does.
   const nameOf = useSelector(doc, readParticipantNames)
@@ -509,7 +522,6 @@ export function App({
     index,
     lanes,
     nameOf,
-    outbox,
     participants,
     rows,
     seats,

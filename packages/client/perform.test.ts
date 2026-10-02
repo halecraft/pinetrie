@@ -1,4 +1,11 @@
-import { cardId, entryId } from "@pineta/core"
+import {
+  atEntry,
+  type CardRecord,
+  cardId,
+  entryId,
+  laneNameForThread,
+  writerId,
+} from "@pineta/core"
 import { expect, test, vi } from "vitest"
 import type { Effect } from "./intent.ts"
 import { type AppPorts, perform } from "./perform.ts"
@@ -12,6 +19,11 @@ const ports = () => {
       mark: vi.fn(async () => answer),
       discardCard: vi.fn(),
       setName: vi.fn(async () => answer),
+      createCard: vi.fn(),
+      queueCard: vi.fn(),
+      unqueueCard: vi.fn(),
+      setCommand: vi.fn(),
+      offer: vi.fn(async () => answer),
     },
     reveal: vi.fn(),
     openFold: vi.fn(),
@@ -26,6 +38,16 @@ type Ports = ReturnType<typeof ports>
 const root = entryId("r")
 const identity = { email: "a@x.test", name: "Ada" }
 const show = { kind: "show", tab: { kind: "archive" } } as const
+const lane = laneNameForThread("x")
+const at = atEntry(entryId("e"))
+const ada = writerId("ada@x.test")
+const card: CardRecord = {
+  id: cardId("c"),
+  owner: ada,
+  place: { kind: "drafting", at, lane },
+  command: "bring-up-to-date",
+  unsent: null,
+}
 
 interface Row {
   readonly effect: Effect
@@ -78,6 +100,31 @@ test.each<Row>([
   },
   { effect: { kind: "forgetIdentity" }, port: p => p.identity.clear, args: [] },
   { effect: { kind: "reload" }, port: p => p.reload, args: [] },
+  {
+    effect: { kind: "createCard", card },
+    port: p => p.session.createCard,
+    args: [card, ""],
+  },
+  {
+    effect: { kind: "queueCard", card: cardId("c"), lane, at },
+    port: p => p.session.queueCard,
+    args: ["c", { lane, at }],
+  },
+  {
+    effect: { kind: "unqueueCard", card: cardId("c"), lane, by: ada },
+    port: p => p.session.unqueueCard,
+    args: ["c", { lane, by: ada }],
+  },
+  {
+    effect: { kind: "setCommand", card: cardId("c"), command: null },
+    port: p => p.session.setCommand,
+    args: ["c", null],
+  },
+  {
+    effect: { kind: "offer", lane, action: "take" },
+    port: p => p.session.offer,
+    args: [lane, "take"],
+  },
 ])("the $effect.kind effect is one port call", ({ effect, port, args }) => {
   const p = ports()
   perform([effect], p)

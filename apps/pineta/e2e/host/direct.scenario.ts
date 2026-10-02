@@ -6,14 +6,14 @@ import path from "node:path"
 import { ancestry, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
+  readCards,
   readLaneRecords,
   readLanes,
-  readOutbox,
   readTreeIndex,
 } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, join, waitFor } from "../harness.ts"
+import { committedProject, join, noQueued, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { at, BRANCH, idOfIn, START_AGENT } from "./support.ts"
@@ -43,15 +43,13 @@ async function run(check: Checks["check"]): Promise<void> {
     await du.setName("Uma")
     const didle = () =>
       waitFor(
-        () =>
-          Object.keys(dh.doc.activeRuns()).length === 0 &&
-          readOutbox(dh.doc).length === 0,
+        () => Object.keys(dh.doc.activeRuns()).length === 0 && noQueued(dh),
         60_000,
       )
     const laneWith = (text: string) => {
       const id = idOfIn(dh.doc, text)
       const index = readTreeIndex(dh.doc)
-      return readLanes(dh.doc, index).find(
+      return readLanes(dh.doc, index, readCards(dh.cards)).find(
         l => id !== null && ancestry(index, l.tip).path.includes(id),
       )
     }

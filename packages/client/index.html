@@ -243,7 +243,6 @@
       .review-diff [data-kind="meta"] { color: #6f7784; }
       .work .offer-take { border-color: #4f7a4f; color: #a8d8a8; }
       .work .work-warning { color: #e8c07a; }
-      .update-waiting { color: #8b93a1; font-style: italic; }
       .column-body { flex: 1; overflow-y: auto; padding: .75rem 1.75rem .75rem .75rem; }
 
       .msg { position: relative; margin: 0 0 1rem; }
@@ -429,8 +428,6 @@
       .column[data-density="outline"] .working-line { display: none; }
       .stop { margin-bottom: .35rem; padding: .1rem .6rem; font-size: .75rem;
         background: none; border: 1px solid #f28b82; color: #f28b82; }
-      /* Waiting for the thread's lane: not in the tree yet. */
-      .msg.waiting { opacity: .5; border-left: 2px dashed #777; padding-left: .75rem; }
       /* Someone else asked first: the sender chooses to wait or to branch. */
       .conflict { font-size: .8rem; color: #d0a15f; margin-bottom: .35rem; }
       .conflict button { padding: .1rem .5rem; font-size: .75rem; }
@@ -489,6 +486,16 @@
       .compose-row { display: flex; gap: .5rem; align-items: center; justify-content: flex-end;
         margin-top: .4rem; }
       .compose-row .send { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      /* Queued for the thread's lane, above the line: not in the tree yet,
+         and editable by anyone until the host takes it (ADR-0048). */
+      .card-editor.queued { margin: 0 0 1rem; padding-left: .5rem; border-left: 2px dashed #777; }
+      .card-editor.queued .compose-row { justify-content: flex-start; }
+      .unqueue { padding: .05rem .45rem; font-size: .72rem; }
+      /* An unqueue that lost: the card was taken first (S69). */
+      .already-sent { font-size: .75rem; color: #d0a15f; margin: 0 0 1rem; }
+      /* A command, named last: what the card is sent through (ADR-0055). */
+      .card-command { font-size: .75rem; color: #9ecbff; white-space: nowrap; }
+      .card-command-clear { padding: 0 .3rem; font-size: .72rem; background: none; border: none; color: #8b93a1; }
       .where-menu .where-trigger { padding: .2rem .5rem; background: none; border: 1px solid #3a3f48;
         color: #aab4c3; font-size: .75rem; white-space: nowrap; }
       .where-menu .where-trigger:hover { color: #e6e6e6; }

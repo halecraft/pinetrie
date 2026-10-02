@@ -16,9 +16,10 @@ import {
   type ChatDetails,
   type ChatMessage,
   encodeWorkRecord,
+  PARTICIPANT_NAMESPACE,
 } from "@pineta/marginalia"
 import { readTreeIndex } from "@pineta/reads"
-import { writeEntry } from "@pineta/schema"
+import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { basics, methods, putValue, record, row } from "../fakes.ts"
 import { type Chat, type ChatDeps, executeChat, sendChat } from "./chat.ts"
@@ -36,7 +37,6 @@ const details: ChatDetails = {
 function setUp(bad: typeof ERR.BAD_DIRECTORY | null) {
   const b = basics()
   const agent = record<ChatDeps["agent"]>({
-    hold: async () => {},
     createThreadLane: async () => ({ kind: "created", lane: LANE }),
   })
   const work = record<ChatDeps["work"]>({
@@ -88,20 +88,11 @@ describe("executeChat", () => {
     expect(started).toEqual([LANE])
   })
 
-  test("hold waits in the lane's outbox and answers queued", async () => {
-    const { agent, deps, context } = setUp(null)
-    const out = await executeChat(
-      deps,
-      { kind: "hold", lane: LANE, details, position: 2 },
-      context,
-    )
-    expect(out).toEqual({ kind: "queued", position: 2 })
-    expect(agent.calls[0]?.args[0]).toMatchObject({
-      kind: "chat",
-      lane: LANE,
-      details,
-      timestamp: 1_000,
-    })
+  test("busy writes nothing and answers busy: the sender's client queues its card", async () => {
+    const { agent, work, started, deps, context } = setUp(null)
+    const out = await executeChat(deps, { kind: "busy" }, context)
+    expect(out).toEqual({ kind: "busy" })
+    expect([agent.calls, work.calls, started]).toEqual([[], [], []])
   })
 })
 
@@ -247,6 +238,41 @@ describe("sendChat", () => {
     )
     expect([early.kind, late.kind]).toEqual(["refused", "refused"])
     expect(cards.calls.map(c => c.method)).not.toContain("spend")
+  })
+
+  test("a busy lane leaves the card: nothing was sent", async () => {
+    const { agent, cards, deps } = setUp()
+    writeLaneTip(deps.basics.doc, LANE, E1)
+    beginRun(deps.basics.doc, LANE, runId("r-0"))
+    putValue(deps.basics.doc, {
+      namespace: PARTICIPANT_NAMESPACE,
+      key: BEA,
+      value: "Bea",
+    })
+    const out = await sendChat(deps, ALICE, "s-1", {
+      ...chat("@bea when it is done"),
+      lane: LANE,
+      card: cardId("c-1"),
+    })
+    expect(out).toEqual({ kind: "busy" })
+    expect(cards.calls.map(c => c.method)).not.toContain("spend")
+    expect(agent.calls).toEqual([])
+  })
+
+  test("a card the host took is not spent here: its record is gone, and the take destroys its text", async () => {
+    const { agent, cards, deps } = setUp()
+    const out = await sendChat(
+      deps,
+      ALICE,
+      "s-1",
+      { ...chat("from the queue"), card: cardId("c-1") },
+      { taken: true },
+    )
+    expect(out).toEqual({ kind: "appended", id: "e-2" })
+    expect(cards.calls.map(c => c.method)).toEqual(["writers"])
+    expect(
+      agent.calls.find(c => c.method === "appendToTree")?.args[0],
+    ).toMatchObject({ details: { contributors: [BEA] } })
   })
 
   test("a message with no card spends nothing and names no one else", async () => {

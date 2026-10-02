@@ -2,7 +2,7 @@
 //
 // The one way a run starts. It announces its end and knows nothing of what
 // follows: `startHost` wires the drain and hot reload to `onEnded`, which is
-// what keeps the outbox and the commands out of this module.
+// what keeps the queue's take and the commands out of this module.
 
 import {
   type EntryId,

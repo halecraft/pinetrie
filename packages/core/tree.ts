@@ -1029,13 +1029,13 @@ export interface LaneView {
   readonly name: LaneName
   readonly tip: string | null
   readonly running: boolean
-  /** Messages waiting in its outbox. */
+  /** Cards queued for it (ADR-0048). */
   readonly waiting: number
-  /** Who the agent is answering, or who waits first: for a conflict's "by". */
+  /** Who the agent is answering, or who queued the first card: for a conflict's "by". */
   readonly askedBy: WriterId | null
   /**
-   * Who wrote the newest item in its outbox, whatever its kind: a message
-   * queued now waits behind it. Null when nothing waits.
+   * Who queued the last card in its queue: a card queued now waits behind
+   * it. Null when nothing waits.
    */
   readonly lastWaiting: WriterId | null
 }
@@ -1045,8 +1045,8 @@ export type ThreadLane =
   | ({ readonly kind: "lane" } & LaneView)
 
 /**
- * A lane is busy while it runs or has messages waiting: a new message then
- * waits behind them, or it would jump the queue (ADR-0020).
+ * A lane is busy while it runs or has cards queued: a new message then
+ * waits behind them, or it would jump the queue (ADR-0020, ADR-0048).
  */
 export const isBusy = (lane: LaneView): boolean =>
   lane.running || lane.waiting > 0

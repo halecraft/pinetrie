@@ -1,6 +1,7 @@
 import { type CardId, cardId } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
+  alreadySent,
   type EditorEvent,
   type EditorState,
   editorState,
@@ -159,6 +160,13 @@ test("spentCards: only the cards let go of whose records are gone", () => {
   const C2: CardId = cardId("c-2")
   expect(spentCards([C1, C2], id => id === C1)).toEqual([C2])
   expect(spentCards([C1], () => true)).toEqual([])
+})
+
+test("alreadySent: the unqueued cards the host took anyway, and no others", () => {
+  const C2: CardId = cardId("c-2")
+  const C3: CardId = cardId("c-3")
+  expect(alreadySent(new Set([C1, C2]), [C2, C3])).toEqual([C2])
+  expect(alreadySent(new Set([C1]), [])).toEqual([])
 })
 
 test("isRedo: the keys and input events attach redoes on", () => {

@@ -1,7 +1,7 @@
-// land — the prompt of a resolution run (ADR-0033, ADR-0038).
+// land — the prompt of a resolution run (ADR-0033, ADR-0038, ADR-0055).
 //
-// An update that conflicts merges your work into a lane, in the lane's own
-// copy, and the agent then resolves what conflicts. The run starts with a land
+// Bringing a thread up to date merges the project's work into its lane, in
+// the lane's own copy; when that conflicts, the agent resolves it. The run starts with a land
 // message: a pi
 // `CustomMessage`, like chat, whose `content` is what the model reads (the
 // resolution skill and the conflict material) and whose `details` are what the
@@ -101,8 +101,10 @@ export interface ConflictFile {
 /**
  * The land message for a resolution: the skill's text, then each conflicted
  * file with both sides labelled (ADR-0010: the labels are always present and
- * the destination's side is never dropped). Over `budget` characters, each
- * side's reasons are trimmed, oldest first; a file's content never is.
+ * the destination's side is never dropped), then what the person asked, the
+ * text of the card that brought the thread up to date (ADR-0055). Over
+ * `budget` characters, each side's reasons are trimmed, oldest first; a
+ * file's content and the person's text never are.
  */
 export function planResolution(input: {
   readonly skill: {
@@ -113,22 +115,27 @@ export function planResolution(input: {
   readonly files: readonly ConflictFile[]
   readonly budget: number
   readonly details: Omit<LandDetails, "files" | "skill">
+  /** The card's text: what the person wants done with the new work; "" for nothing. */
+  readonly intent: string
   readonly timestamp: number
 }): LandMessage {
   const { files } = input
   const intro =
     files.length === 0
-      ? "Your work was merged into this thread's own copy with no conflicts. Check that both sides still work together."
-      : `Your work was merged into this thread's own copy, and ${files.length} ${files.length === 1 ? "file conflicts" : "files conflict"}. Resolve them there.`
+      ? "The project's work was merged into this thread's own copy with no conflicts. Check that both sides still work together."
+      : `The project's work was merged into this thread's own copy, and ${files.length} ${files.length === 1 ? "file conflicts" : "files conflict"}. Resolve them there.`
+  const intent = input.intent.trim()
+  const asked = intent === "" ? "" : `\n\n## What the person asked\n\n${intent}`
   const skill = input.skill === null ? "" : `${input.skill.content.trim()}\n\n`
   const render = (f: ConflictFile, ours: string, theirs: string) =>
     `## ${f.path}\n\n\`\`\`\n${f.content}\n\`\`\`\n\n` +
     `### ${f.ours.label}: ${f.ours.who}\n${ours}\n` +
     `### ${f.theirs.label}: ${f.theirs.who}\n${theirs}\n`
-  // The fixed part: the skill, the intro, every file and both headings.
+  // The fixed part: the skill, the intro, every file, both headings and the ask.
   const base =
     skill.length +
     intro.length +
+    asked.length +
     files.map(f => render(f, "", "")).join("\n").length
   // What is left is shared across every side's reasons; each keeps its newest.
   const room = Math.max(0, input.budget - base)
@@ -153,7 +160,7 @@ export function planResolution(input: {
   return {
     role: "custom",
     customType: LAND_TYPE,
-    content: `${skill}${intro}\n\n${body}`.trimEnd(),
+    content: `${`${skill}${intro}\n\n${body}`.trimEnd()}${asked}`,
     display: true,
     details: {
       ...input.details,

@@ -6,9 +6,12 @@ import { execFileSync } from "node:child_process"
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import type { SessionClient } from "@pineta/client/session"
 import {
   ancestry,
   atEntry,
+  type CardId,
+  cardId,
   entryId,
   type LaneName,
   messageText,
@@ -18,19 +21,46 @@ import {
 } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
+  readCards,
   readLaneRecords,
   readLanes,
-  readOutbox,
   readTreeIndex,
 } from "@pineta/reads"
 import { readEntries, rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
-import { committedProject, join, waitFor } from "../harness.ts"
+import { committedProject, join, noQueued, waitFor } from "../harness.ts"
 
 export const START_AGENT = { mode: "branch", asksAgent: true } as const
 export const BRANCH = { mode: "branch" } as const
 export const at = (id: string | null): Position =>
   id === null ? ROOT : atEntry(entryId(id))
+
+/**
+ * Bring a thread up to date (ADR-0055), as its button and a send do: a card
+ * at the lane's tip with the command and `text`, queued. On an idle lane the
+ * host takes it at once.
+ */
+export function bringUpToDate(
+  session: SessionClient,
+  lane: LaneName,
+  tip: string | null,
+  text: string,
+): CardId {
+  const id = cardId(crypto.randomUUID())
+  const where = at(tip)
+  session.createCard(
+    {
+      id,
+      owner: session.writer,
+      place: { kind: "drafting", at: where, lane },
+      command: "bring-up-to-date",
+      unsent: null,
+    },
+    text,
+  )
+  session.queueCard(id, { lane, at: where })
+  return id
+}
 
 console.log("=== Pineta — lanes of their own, in containers ===\n")
 
@@ -139,9 +169,7 @@ export async function sectionHost(input: {
   )
   const idle = async () => {
     await waitFor(
-      () =>
-        Object.keys(host.doc.activeRuns()).length === 0 &&
-        readOutbox(host.doc).length === 0,
+      () => Object.keys(host.doc.activeRuns()).length === 0 && noQueued(host),
       300_000,
     )
     await host.quiet()
@@ -153,7 +181,7 @@ export async function sectionHost(input: {
       Object.keys(index.entries).find(
         e => projectTranscript(index, e).at(-1)?.text === text,
       ) ?? null
-    return readLanes(host.doc, index).find(
+    return readLanes(host.doc, index, readCards(host.cards)).find(
       l => id !== null && ancestry(index, l.tip).path.includes(id),
     )
   }

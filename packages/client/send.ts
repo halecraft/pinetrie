@@ -6,6 +6,7 @@
 import {
   type Address,
   agentByDefault,
+  type CardCommand,
   type ChatMode,
   isBusy,
   type ProjectRecord,
@@ -23,7 +24,8 @@ import type { Prefill } from "./columns.ts"
  * box was never cleared, and a message the host did not write leaves its card
  * where it was (ADR-0048), a conflict or a refusal such as a root archived a
  * moment before (ADR-0029). A failure leaves the card too, though the host
- * may have written the message before it failed.
+ * may have written the message before it failed. A `busy` answer queues the
+ * card (`queues`).
  */
 export interface SendSettled {
   readonly status: string
@@ -53,6 +55,22 @@ export const failedWords = (message: string): string =>
 const ordinal = (n: number): string =>
   n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`
 
+/** A queued card's place in its lane's queue, from 0: "1st in line". */
+export const lineWords = (n: number): string => `${ordinal(n + 1)} in line`
+
+/**
+ * Whether the host's answer took the card's text: written or running. Then
+ * the card is spent, and the box empties.
+ */
+export const spent = (outcome: Outcome): boolean =>
+  outcome.kind === "appended" || outcome.kind === "started"
+
+/**
+ * Whether the host's answer leaves the card to be queued: the lane was busy
+ * after all (`busy`), so the sender's client queues it (ADR-0048).
+ */
+export const queues = (outcome: Outcome): boolean => outcome.kind === "busy"
+
 export function settleSend(
   outcome: Outcome,
   message: string,
@@ -74,11 +92,6 @@ export function settleSend(
       }
     case "failed":
       return { status: failedWords(outcome.message), conflict: null }
-    case "queued":
-      return {
-        status: `waiting · ${ordinal(outcome.position + 1)} in line`,
-        conflict: null,
-      }
     default:
       return { status: "", conflict: null }
   }
@@ -87,20 +100,23 @@ export function settleSend(
 /**
  * What a composer sends: its text trimmed, or null for nothing to send. A
  * text that is only its column's blank prefill is nothing: `@agent ` alone
- * would ask the agent with no question. Nothing is sent while an image is
- * uploading: its markdown is not in the text yet.
+ * would ask the agent with no question. A card with a command is sent with
+ * no text: the command alone is something to do (ADR-0055). Nothing is sent
+ * while an image is uploading: its markdown is not in the text yet.
  */
 export function sendable(
   text: string,
   prefill: Prefill | undefined,
   uploading: boolean,
+  command: CardCommand | null = null,
 ): string | null {
   if (uploading) return null
   const message = text.trim()
-  return message === "" ||
+  const nothing =
+    message === "" ||
     (prefill?.blank === true && message === prefill.text.trim())
-    ? null
-    : message
+  if (!nothing) return message
+  return command === null ? null : ""
 }
 
 // ── before a send ─────────────────────────────────────────────────────────
@@ -110,6 +126,10 @@ export function sendable(
  * `placeholderWords` say it.
  */
 export interface SendPlan {
+  /**
+   * `queue`: the card is queued, by this client, and nothing is sent: the
+   * host takes it when its lane is free (ADR-0048).
+   */
   readonly mode: ChatMode
   /** The send creates a lane: the chip then says where it works. */
   readonly createsLane: boolean
@@ -126,8 +146,10 @@ export interface SendPlan {
  * the message is for is `addressChat`, which `planChat` runs too, over the
  * thread `threadOf` gives (ADR-0021).
  *
- * - A fresh column sends `branch`. Elsewhere, a send that asks the agent while
- *   its lane is busy queues behind the others.
+ * - A fresh column sends `branch`. Elsewhere, a send to a busy lane, plain or
+ *   asking the agent, queues its card behind the others; so does a card with
+ *   a command, even on an idle lane, since only the host's take carries a
+ *   command out (ADR-0055).
  * - A send that asks the agent creates a lane where there is none, and in a
  *   fresh column always, since a branch never continues a lane: then a chip
  *   says where that lane will work (ADR-0032).
@@ -139,6 +161,8 @@ export function planSend(input: {
   readonly asksAgent: boolean
   readonly participants: readonly string[]
   readonly reader: Reader
+  /** The card's command (ADR-0055), or null. */
+  readonly command: CardCommand | null
 }): SendPlan {
   const { fresh, lane } = input
   const how = {
@@ -153,12 +177,9 @@ export function planSend(input: {
     command: parseCommand(input.text) !== null,
   })
   const compelled = to.compels.kind === "agent"
-  const busy = lane.kind === "lane" && isBusy(lane)
-  const mode: ChatMode = fresh
-    ? "branch"
-    : compelled && busy
-      ? "queue"
-      : "reply"
+  const queued =
+    lane.kind === "lane" && (isBusy(lane) || input.command !== null)
+  const mode: ChatMode = fresh ? "branch" : queued ? "queue" : "reply"
   return {
     mode,
     createsLane: compelled && (fresh || lane.kind === "none"),
@@ -226,14 +247,14 @@ export const placeholderWords = (plan: SendPlan): string =>
 export type QueuePlace =
   /** Nothing waits: it is taken when the run ends. */
   | { readonly kind: "next" }
-  /** Behind `ahead` waiting items, the last of them yours. */
+  /** Behind `ahead` queued cards, the last of them yours. */
   | { readonly kind: "afterYours"; readonly ahead: number }
-  /** Behind `ahead` waiting items, the last of them `name`'s. */
+  /** Behind `ahead` queued cards, the last of them `name`'s. */
   | { readonly kind: "after"; readonly name: string; readonly ahead: number }
 
 /**
- * Where a message queued on `lane` would wait: behind the newest item in its
- * outbox, of any kind, since the host takes them in the order sent.
+ * Where a card queued on `lane` would wait: behind the last card in its
+ * queue, since the host takes them in order.
  */
 export function queuePlace(lane: ThreadLane, reader: Reader): QueuePlace {
   if (lane.kind === "none") return { kind: "next" }

@@ -12,7 +12,7 @@ import {
   type Store,
   whenHydrated,
 } from "@kyneta/exchange"
-import { Interpret, Reject } from "@kyneta/schema"
+import { Interpret, Reject, subscribe } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
 import type { BlobStore, CardId, LaneName } from "@pineta/core"
 import { userConfigFile } from "@pineta/lanes"
@@ -20,6 +20,7 @@ import {
   decodeBannerConfig,
   decodeCommandRenames,
   decodeDigestConfig,
+  queuedOn,
 } from "@pineta/marginalia"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
 import { Control } from "@pineta/protocol/line"
@@ -30,6 +31,7 @@ import {
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
+import { readCards, readRunning } from "@pineta/reads"
 import {
   CardsDoc,
   type CardsDocHandle,
@@ -55,7 +57,6 @@ import { compactSession, sweepBlobs } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { lineDocPrefix } from "./lines.ts"
 import { createNames } from "./names.ts"
-import { drain as drainOutbox } from "./outbox.ts"
 import { resolveDoc, writePolicy } from "./policy.ts"
 import { createSerial } from "./queue.ts"
 import { createRuns, streamInto } from "./runs.ts"
@@ -63,6 +64,7 @@ import { startSeats } from "./seats.ts"
 import { createSettle } from "./settle.ts"
 import { recover } from "./startup.ts"
 import { openStore } from "./store.ts"
+import { drain as drainQueue, takenChat } from "./take.ts"
 import { startLaneWork } from "./work/index.ts"
 
 /** How long an unreferenced image is kept (ADR-0042). */
@@ -225,7 +227,7 @@ export async function startHost({
   // Only storage is awaited: the host is the authority, with no peer upstream.
   await whenHydrated(doc)
   await whenHydrated(cards)
-  const basics: Basics = { doc, log, newId, now: Date.now }
+  const basics: Basics = { doc, cards, log, newId, now: Date.now }
 
   // --- where lanes work (ADR-0032, ADR-0034) --------------------------------
   // Lane work is made before the agent, which is made with lane work's
@@ -333,8 +335,15 @@ export async function startHost({
     names,
   })
   const drain = (lane: LaneName) =>
-    drainOutbox(
-      { basics, agent, start: runs.start, update: commands.update },
+    drainQueue(
+      {
+        basics,
+        texts: cardPort,
+        work,
+        start: runs.start,
+        send: taken =>
+          commands.sendTaken(taken.card.place.by, newId(), takenChat(taken)),
+      },
       lane,
     )
   const settle = createSettle({
@@ -355,6 +364,26 @@ export async function startHost({
     banners?.due(lane).catch(failed(basics, "banner"))
     if (prompt !== null) void digests?.ended(prompt, digestFailed(lane))
   })
+  // A card queued on a lane that is not running is taken at once (ADR-0048).
+  // Only the records are watched, never the texts, so typing in a card costs
+  // nothing here. A lane's drain is queued once until its step starts: a
+  // change while it runs queues one more, which finds what that one missed.
+  const draining = new Set<LaneName>()
+  const watchQueues = () => {
+    const records = readCards(cards)
+    const lanes = new Set<LaneName>()
+    for (const c of records)
+      if (c.place.kind === "queued") lanes.add(c.place.lane)
+    for (const lane of lanes) {
+      if (draining.has(lane) || readRunning(doc, lane)) continue
+      if (queuedOn(records, lane).length === 0) continue
+      draining.add(lane)
+      void serial.run(async () => {
+        draining.delete(lane)
+        await drain(lane)
+      })
+    }
+  }
 
   /**
    * Resolves when no queued step remains (a compaction after a run among
@@ -375,9 +404,9 @@ export async function startHost({
     start: runs.start,
     settle,
     cards: cardPort,
-    cardsDoc: cards,
     ensureNames: names.ensure,
   })
+  const unwatchQueues = subscribe(cards, watchQueues)
   const seats = startSeats({ exchange, basics, serial, agent })
   const control = startControl({
     exchange,
@@ -415,6 +444,7 @@ export async function startHost({
       try {
         await quiet()
       } catch {}
+      unwatchQueues()
       seats.stop()
       control.stop()
       try {

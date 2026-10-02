@@ -5,21 +5,21 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import type { Store } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
-import { laneNameForThread, NOBODY, projectSpine, ROOT } from "@pineta/core"
-import { newId as newHeldId, scriptedModel } from "@pineta/pi"
+import { cardId, laneNameForThread, projectSpine, ROOT } from "@pineta/core"
+import { scriptedModel } from "@pineta/pi"
 import { SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
+  readCards,
   readLanes,
-  readOutbox,
   readParticipantNames,
   readStops,
   readTreeIndex,
 } from "@pineta/reads"
-import { readStreams } from "@pineta/schema"
+import { beginRun, readStreams } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, join, waitFor } from "../harness.ts"
+import { committedProject, join, noQueued, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
@@ -66,13 +66,11 @@ async function run(check: Checks["check"]): Promise<void> {
     let th = await open(() => {})
     const tidle = () =>
       waitFor(
-        () =>
-          Object.keys(th.doc.activeRuns()).length === 0 &&
-          readOutbox(th.doc).length === 0,
+        () => Object.keys(th.doc.activeRuns()).length === 0 && noQueued(th),
         60_000,
       )
     const ttree = () => readTreeIndex(th.doc)
-    const tlane = () => readLanes(th.doc, ttree())[0]
+    const tlane = () => readLanes(th.doc, ttree(), readCards(th.cards))[0]
     // Every open stream at each change of the host's document.
     const watched: ReturnType<typeof readStreams>[] = []
     const watch = () =>
@@ -171,7 +169,8 @@ async function run(check: Checks["check"]): Promise<void> {
     await u.chat("look again", at(l4?.tip ?? null), { lane: l4?.name })
     await tidle()
 
-    // 5. Stop ends a running command; a message waiting is then taken.
+    // 5. Stop ends a running command; a message for the busy thread is
+    // answered busy, and nothing is written.
     const bob = await join(th, "bob", "tools")
     await bob.setName("Bob")
     script.use([
@@ -195,7 +194,7 @@ async function run(check: Checks["check"]): Promise<void> {
       .at(-1)
     check(
       "stop ended the command at once, recorded as aborted",
-      waiting.kind === "queued" &&
+      waiting.kind === "busy" &&
         stopped?.kind === "stopped" &&
         aborted?.result?.isError === true &&
         aborted.result.text.includes("aborted") &&
@@ -214,28 +213,43 @@ async function run(check: Checks["check"]): Promise<void> {
       `${stop?.by ?? "none"}, ${readStops(th.doc).size} recorded`,
     )
 
-    // 6. Restart over the same store: everything is there, and a held message
-    // is drained by the new host's startup, since no run's end will.
+    // 6. Restart over the same store: everything is there, and a card queued
+    // while the lane ran is taken by the new host's startup, since no run's
+    // end will. The run is the document's record alone, which a stopping
+    // host leaves and a starting one clears (`clearStreams`).
     const before = {
       entries: Object.keys(th.doc.entries()).length,
-      lanes: readLanes(th.doc, ttree()).map(l => `${l.name}@${l.tip}`),
+      lanes: readLanes(th.doc, ttree(), readCards(th.cards)).map(
+        l => `${l.name}@${l.tip}`,
+      ),
       names: [...readParticipantNames(th.doc).values()].sort(),
     }
     const l6 = tlane()
-    if (l6 !== undefined)
-      await th.agent.hold({
-        kind: "chat",
-        id: newHeldId(),
-        lane: l6.name,
-        details: {
-          author: u.writer,
-          authorName: "Uma",
-          text: "@Bob held across a restart",
-          compels: NOBODY,
-          sendId: "held-1",
+    const heldText = "@Bob queued across a restart"
+    if (l6 !== undefined && l6.tip !== null) {
+      beginRun(th.doc, l6.name, "r-held")
+      const held = cardId(crypto.randomUUID())
+      const where = at(l6.tip)
+      u.createCard(
+        {
+          id: held,
+          owner: u.writer,
+          place: { kind: "drafting", at: where, lane: l6.name },
+          command: null,
+          unsent: null,
         },
-        timestamp: Date.now(),
-      })
+        heldText,
+      )
+      u.queueCard(held, { lane: l6.name, at: where })
+      await waitFor(
+        () =>
+          th.cardText(held) === heldText &&
+          readCards(th.cards).some(
+            c => c.id === held && c.place.kind === "queued",
+          ),
+        5_000,
+      )
+    }
     // Written after the last compaction, so the store the next host opens holds
     // more than the compacted session: its startup must compact again.
     await u.setName("Uma, again")
@@ -253,7 +267,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await th.shutdown()
     await u.close()
     // The session loads late, so a host that did not wait for it would start
-    // from an empty session, and leave the held message undrained.
+    // from an empty session, and leave the queued card untaken.
     opened = openStore(dbFile)
     stored = opened.store
     th = await open(() => {}, slowToLoad(stored, SESSION_DOC_ID, LATE_LOAD_MS))
@@ -264,10 +278,7 @@ async function run(check: Checks["check"]): Promise<void> {
       `${linesAfter.length} stored`,
     )
     unwatch = watch()
-    await waitFor(
-      () => idOfIn(th.doc, "@Bob held across a restart") !== null,
-      15_000,
-    )
+    await waitFor(() => idOfIn(th.doc, heldText) !== null, 15_000)
     await th.quiet()
     const afterRestart = await storedRecords(stored, SESSION_DOC_ID)
     check(
@@ -277,17 +288,19 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     const after = {
       entries: Object.keys(th.doc.entries()).length - 1,
-      lanes: readLanes(th.doc, ttree()).map(l => `${l.name}@${l.tip}`),
+      lanes: readLanes(th.doc, ttree(), readCards(th.cards)).map(
+        l => `${l.name}@${l.tip}`,
+      ),
       names: [...readParticipantNames(th.doc).values()].sort(),
     }
     check(
-      "after a restart the session is all there, and the held message was drained",
+      "after a restart the session is all there, and the queued card was taken",
       JSON.stringify(after.names) ===
         JSON.stringify(
           before.names.map(n => (n === "Uma" ? "Uma, again" : n)).sort(),
         ) &&
         after.entries === before.entries &&
-        readOutbox(th.doc).length === 0,
+        noQueued(th),
       `${after.entries} entries`,
     )
     const u2 = await join(th, "uma", "tools")

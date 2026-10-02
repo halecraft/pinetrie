@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import {
   address,
   atEntry,
+  cardId,
   ERR,
   entryId,
   laneNameForThread,
@@ -21,13 +22,8 @@ import {
   decodeChat,
   detailsFromStored,
   encodeChat,
-  heldBy,
-  heldMessages,
-  heldRuns,
-  nextHeld,
   participants,
   planChat,
-  planDrain,
   planStartup,
   renderableMessage,
   settleRun,
@@ -139,14 +135,14 @@ describe("planChat: a command (ADR-0036)", () => {
       plan({ command, mentions: parseMentions("@bo look") }),
     ).toMatchObject({ kind: "createAndRun" })
   })
-  test("held, its details still encode to the expansion", () => {
-    const d = plan({ command, mode: "queue", lane: lane({ running: true }) })
-    expect(d.kind).toBe("hold")
-    const held = "details" in d ? d.details : undefined
+  test("stored, its details still encode to the expansion", () => {
+    const d = plan({ command, mode: "queue", lane: lane() })
+    expect(d.kind).toBe("run")
+    const sent = "details" in d ? d.details : undefined
     expect(
-      held === undefined
+      sent === undefined
         ? ""
-        : encodeChat(detailsFromStored(held as never), 1).content,
+        : encodeChat(detailsFromStored(sent as never), 1).content,
     ).toContain(command.expanded)
   })
   test("a command whose file cannot be read is refused, saying so", () => {
@@ -191,19 +187,13 @@ describe("planChat: plain messages never conflict", () => {
       lane: LANE,
     })
   })
-  test("a running lane, or one with messages waiting: held, behind them", () => {
-    expect(
-      plan({ mentions: TO_BO, lane: lane({ running: true }) }),
-    ).toMatchObject({
-      kind: "hold",
-      position: 0,
+  test("a running lane, or one with cards queued: busy, and nothing is written", () => {
+    expect(plan({ mentions: TO_BO, lane: lane({ running: true }) })).toEqual({
+      kind: "busy",
     })
-    expect(plan({ mentions: TO_BO, lane: lane({ waiting: 2 }) })).toMatchObject(
-      {
-        kind: "hold",
-        position: 2,
-      },
-    )
+    expect(plan({ mentions: TO_BO, lane: lane({ waiting: 2 }) })).toEqual({
+      kind: "busy",
+    })
   })
   test("another writer's compelled message below: still appended, never a conflict", () => {
     expect(kind(plan({ race: { by: BO } }))).toBe("appendToTree")
@@ -272,25 +262,27 @@ describe("planChat: a compelled message", () => {
       kind: "conflict",
       by: BO,
     })
-    // Idle for a moment between drained messages is still busy.
+    // Idle for a moment between taken cards is still busy.
     expect(kind(plan({ mentions: ASK, lane: lane({ waiting: 1 }) }))).toBe(
       "conflict",
     )
   })
-  test("queue: runs when idle, holds when busy, creates when there is no lane", () => {
-    expect(kind(plan({ mentions: ASK, mode: "queue", lane: lane() }))).toBe(
-      "run",
-    )
+  test("queue, the host's take: the cards behind it do not make the lane busy, a run does", () => {
     expect(
-      plan({
-        mentions: ASK,
-        mode: "queue",
-        lane: lane({ running: true, waiting: 1 }),
-      }),
-    ).toMatchObject({
-      kind: "hold",
-      position: 1,
-    })
+      kind(plan({ mentions: ASK, mode: "queue", lane: lane({ waiting: 2 }) })),
+    ).toBe("run")
+    expect(
+      kind(
+        plan({
+          mentions: parseMentions("@bo hi"),
+          mode: "queue",
+          lane: lane({ waiting: 2 }),
+        }),
+      ),
+    ).toBe("appendToLane")
+    expect(
+      plan({ mentions: ASK, mode: "queue", lane: lane({ running: true }) }),
+    ).toEqual({ kind: "busy" })
     expect(kind(plan({ mentions: ASK, mode: "queue", race: { by: BO } }))).toBe(
       "createAndRun",
     )
@@ -446,116 +438,56 @@ test("participants: named writers and every writer in the tree, the unnamed by t
   )
 })
 
-describe("outbox", () => {
-  const held = (id: string, laneName: string) => ({
-    id,
-    lane: laneName,
-    details: {
-      author: ALICE,
-      authorName: "Alice",
-      text: id,
-      compels: NOBODY,
-      sendId: id,
-    },
-    timestamp: 1,
-  })
-  test("heldMessages: oldest first, malformed values skipped", () => {
-    const h = heldMessages([
-      { value: held("3-c", "t-1") },
-      { value: { id: "2-x" } },
-      { value: held("1-a", "t-1") },
-    ])
-    expect(h.map(x => x.id)).toEqual(["1-a", "3-c"])
-  })
-  test("nextHeld: the oldest for the given lane only", () => {
-    const h = heldMessages([
-      { value: held("1-a", "t-other") },
-      { value: held("2-b", "t-1") },
-      { value: held("3-c", "t-1") },
-    ])
-    expect(nextHeld(h, laneNameForThread("1"))?.id).toBe("2-b")
-  })
-  test("a held record stored before landings had no kind, and is a chat", () => {
-    const [h] = heldMessages([{ value: held("1-a", "t-1") }])
-    expect(h?.kind).toBe("chat")
-  })
-  test("a held update decodes as one, may run the agent, and is its asker's", () => {
-    const update = {
-      kind: "update",
-      id: "1-a",
-      lane: "t-1",
-      by: ALICE,
-      timestamp: 1,
-    }
-    const [h] = heldMessages([
-      { value: update },
-      { value: { ...update, id: "2-b", by: 3 } },
-    ])
-    expect(h).toMatchObject({ kind: "update", by: ALICE })
-    expect(h === undefined ? null : [heldRuns(h), heldBy(h)]).toEqual([
-      true,
-      ALICE,
-    ])
-    expect(
-      heldMessages([
-        { value: update },
-        { value: { ...update, id: "2-b", by: 3 } },
-      ]),
-    ).toHaveLength(1)
-  })
-})
-
-describe("draining, settling and starting up", () => {
+describe("settling and starting up", () => {
   const LANE1 = laneNameForThread("1")
-  const held = (id: string, compels: Responder) => ({
-    kind: "chat" as const,
-    id,
-    lane: LANE1,
-    details: {
-      author: ALICE,
-      authorName: "Alice",
-      text: id,
-      compels,
-      sendId: id,
-    },
-    timestamp: 1,
-  })
-  test("planDrain: a plain message is appended, a compelled one is run, then idle", () => {
-    expect(planDrain([held("1-a", NOBODY)], LANE1)).toMatchObject({
-      kind: "append",
-    })
-    expect(planDrain([held("1-a", AGENT)], LANE1)).toMatchObject({
-      kind: "run",
-    })
-    expect(planDrain([], LANE1)).toEqual({ kind: "idle" })
-    const update = {
-      kind: "update" as const,
-      id: "0-z",
-      lane: LANE1,
+  const LANE2 = laneNameForThread("2")
+  const queuedOn = (lane: typeof LANE1, id: string) => ({
+    id: cardId(id),
+    owner: ALICE,
+    place: {
+      kind: "queued" as const,
+      at: atEntry(E1),
+      lane,
+      order: "a",
       by: ALICE,
-      timestamp: 1,
-    }
-    expect(planDrain([update, held("1-a", NOBODY)], LANE1)).toMatchObject({
-      kind: "update",
-    })
+    },
+    command: null,
+    unsent: null,
   })
   test("settleRun: a refused run keeps the message; an admitted one is done", () => {
     expect(settleRun({ kind: "refused" })).toBe("keep")
     expect(settleRun({ kind: "ok" })).toBe("done")
   })
-  test("planStartup: every lane with held messages drains, once", () => {
+  test("planStartup: every lane with queued cards drains, once", () => {
     const plan = planStartup({
-      held: [held("1-a", NOBODY), held("2-b", AGENT)],
+      cards: [queuedOn(LANE1, "c-1"), queuedOn(LANE1, "c-2")],
       interrupted: [],
+      outbox: [],
     })
-    expect(plan).toEqual({ resume: [], drain: [LANE1] })
+    expect(plan).toEqual({ resume: [], drain: [LANE1], discard: [] })
   })
   test("planStartup: an interrupted lane is resumed, and not drained", () => {
-    const LANE2 = laneNameForThread("2")
     const plan = planStartup({
-      held: [held("1-a", NOBODY), { ...held("2-b", AGENT), lane: LANE2 }],
+      cards: [queuedOn(LANE1, "c-1"), queuedOn(LANE2, "c-2")],
       interrupted: [LANE1],
+      outbox: [],
     })
-    expect(plan).toEqual({ resume: [LANE1], drain: [LANE2] })
+    expect(plan).toMatchObject({ resume: [LANE1], drain: [LANE2] })
+  })
+  test("planStartup: an old outbox's values are discarded, each with its text", () => {
+    const plan = planStartup({
+      cards: [],
+      interrupted: [],
+      outbox: [
+        { key: "h-1", value: { id: "h-1", details: { text: "hello" } } },
+        { key: "h-2", value: { kind: "update", id: "h-2" } },
+        { key: "h-3", value: 7 },
+      ],
+    })
+    expect(plan.discard).toEqual([
+      { key: "h-1", text: "hello" },
+      { key: "h-2", text: "(an update from your work)" },
+      { key: "h-3", text: "(unreadable)" },
+    ])
   })
 })

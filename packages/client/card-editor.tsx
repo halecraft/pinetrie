@@ -1,5 +1,6 @@
-// client/card-editor — one drafting card's editor (ADR-0048): your composer's
-// box, and every other card at a thread's end.
+// client/card-editor — one card's editor (ADR-0048): your composer's box,
+// every other drafting card at a thread's end, and each queued card above
+// the line (`QueuedCardEditor`).
 //
 // One uncontrolled textarea for the editor's whole life. Until there is
 // something worth keeping it is local; the input that makes it worth keeping
@@ -7,8 +8,8 @@
 // handler, so no keystroke falls between the card existing and the element
 // being bound, and focus and the caret never move. `editorState` decides each
 // step; this component carries it out. Every write the editor makes itself
-// (a command chosen, an update's intent, a pasted image) goes through the
-// element, so no path asks whether a card exists yet.
+// (a command chosen, a pasted image) goes through the element, so no path
+// asks whether a card exists yet.
 
 import { attach } from "@kyneta/react"
 import { subscribe } from "@kyneta/schema"
@@ -24,7 +25,7 @@ import type {
   ThreadLane,
   WorkSetting,
 } from "@pineta/core"
-import { spends, writersOf } from "@pineta/marginalia"
+import { type QueuedCard, writersOf } from "@pineta/marginalia"
 import { textClients } from "@pineta/schema"
 import { useEffect, useRef, useState } from "react"
 import type { ReadOnly } from "./app-view.ts"
@@ -36,10 +37,17 @@ import {
   isRedo,
   startText,
 } from "./card-state.ts"
+import {
+  CLEAR_COMMAND,
+  cardStatus,
+  commandTag,
+  queuedWords,
+  UNQUEUE,
+} from "./card-words.ts"
 import type { Pending, Prefill } from "./columns.ts"
 import { matchCommands } from "./commands.ts"
 import { newCardId } from "./ids.ts"
-import type { Intent } from "./intent.ts"
+import type { ColumnAct, Intent } from "./intent.ts"
 import { Menu } from "./menu.tsx"
 import { cardHeading } from "./names.ts"
 import {
@@ -52,11 +60,13 @@ import {
 import {
   placeholderWords,
   planSend,
+  queues,
   queueWords,
   type Reader,
   sendable,
   sendButton,
   settleSend,
+  spent,
   whereChoices,
   whereWords,
 } from "./send.ts"
@@ -82,7 +92,9 @@ export interface Where {
  * message got there first, or the lane became busy, the host writes nothing
  * and says so (`conflict`), and the sender chooses: queue, or branch here.
  * Either way, and after a refusal, the card is still there: nothing is put
- * back, because nothing was taken away.
+ * back, because nothing was taken away. A send to a busy lane, or of a card
+ * with a command, queues the card instead: this client writes its place,
+ * and the host takes it in turn (ADR-0048, ADR-0055).
  */
 export function CardEditor(p: {
   session: SessionClient
@@ -116,11 +128,6 @@ export function CardEditor(p: {
   prefill: Prefill | undefined
   /** A first message to send at once: this column was opened to send it. */
   pending: Pending | undefined
-  /**
-   * Text to put in the box, unsent and editable: an update's intent
-   * (ADR-0038). Each new `key` puts it there once, after what is typed.
-   */
-  insert: { readonly text: string; readonly key: number } | null
   /** Where a lane the send creates works; absent for someone else's card. */
   where: Where | undefined
   readOnly: ReadOnly | null
@@ -134,7 +141,12 @@ export function CardEditor(p: {
   onCreatesLane: ((createsLane: boolean) => void) | undefined
   /** Where a read-only action goes (`ReadOnly.action.intent`). */
   onIntent: (intent: Intent) => void
-  /** Whether this column was just opened: then the box takes focus, once. */
+  /** The column's acts: queueing a card, clearing its command. */
+  onAct: (act: ColumnAct) => void
+  /**
+   * Whether this column asked for focus: just opened, or its card given a
+   * command. Asked on mounting and when the command changes.
+   */
   takeFocus: (() => boolean) | undefined
 }) {
   const { session, card, prefill, pending } = p
@@ -156,6 +168,7 @@ export function CardEditor(p: {
     line: string
   } | null>(null)
   const [choice, setChoice] = useState<WorkSetting | null>(null)
+  const command = card?.command ?? null
   const plan = planSend({
     text,
     fresh: p.fresh,
@@ -163,6 +176,7 @@ export function CardEditor(p: {
     asksAgent: p.how.asksAgent,
     participants: p.participants,
     reader: p.reader,
+    command,
   })
   const button = sendButton(plan, {
     uploading: uploading > 0,
@@ -225,7 +239,13 @@ export function CardEditor(p: {
           )
             return next
           session.createCard(
-            { id: next.state.card, owner: session.writer, place: p.place },
+            {
+              id: next.state.card,
+              owner: session.writer,
+              place: p.place,
+              command: null,
+              unsent: null,
+            },
             el.value,
           )
           break
@@ -285,8 +305,25 @@ export function CardEditor(p: {
     [],
   )
 
+  /**
+   * Queue the card on this column's lane, from its end. False when there is
+   * no card or no lane to queue on: nothing was queued.
+   */
+  const queueHere = (from: CardId | null): boolean => {
+    if (from === null || p.lane.kind !== "lane" || p.at.kind !== "entry")
+      return false
+    p.onAct({ kind: "queue", card: from, lane: p.lane.name, at: p.at })
+    return true
+  }
   const send = async (message: string, as: ChatMode, from: CardId | null) => {
     step({ kind: "send" })
+    setConflict(null)
+    if (as === "queue") {
+      p.onSend()
+      step({ kind: "settled", spent: queueHere(from) })
+      setStatus("")
+      return
+    }
     setStatus("sending…")
     const id = p.onSend()
     const outcome = await session.chat(message, p.at, {
@@ -296,7 +333,10 @@ export function CardEditor(p: {
       ...(plan.createsLane && choice !== null ? { work: choice } : {}),
       ...(from === null ? {} : { card: from }),
     })
-    step({ kind: "settled", spent: spends(outcome) })
+    step({
+      kind: "settled",
+      spent: spent(outcome) || (queues(outcome) && queueHere(from)),
+    })
     const settled = settleSend(outcome, message, p.reader)
     setConflict(settled.conflict)
     setStatus(settled.status)
@@ -316,10 +356,11 @@ export function CardEditor(p: {
   // A column you just opened is for typing in: focus lands after its
   // prefill (`onFocus`). After the strip's alignment, which is a layout
   // effect; the focus scrolls a column opened past the strip's edge into view.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once, on opening
+  // A card given a command asks again: you write what to do with it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on opening, and when the command changes
   useEffect(() => {
     if (p.takeFocus?.() === true) box.current?.focus()
-  }, [])
+  }, [command])
 
   /**
    * Write into the box as typing would: the element changes, and its `input`
@@ -332,22 +373,13 @@ export function CardEditor(p: {
     el.dispatchEvent(new Event("input", { bubbles: true }))
   }
 
-  // An insert is put in the box once per key, after whatever is already typed.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once per insert
-  useEffect(() => {
-    const el = box.current
-    if (p.insert === null || p.insert.text === "" || el === null) return
-    if (el.value.trim() === "") write(0, el.value.length, p.insert.text)
-    else write(el.value.length, el.value.length, `\n\n${p.insert.text}`)
-  }, [p.insert?.key])
-
   const choose = (name: string) => {
     write(0, box.current?.value.length ?? 0, `/${name} `)
     setPicked(0)
   }
 
   const submit = async () => {
-    const message = sendable(text, prefill, uploading > 0)
+    const message = sendable(text, prefill, uploading > 0, command)
     const now = current.current
     if (message === null || p.readOnly !== null || now.kind === "sending")
       return
@@ -401,10 +433,9 @@ export function CardEditor(p: {
           <span className="conflict-text">{conflict.line}</span>{" "}
           <button
             className="queue-after"
-            onClick={() => {
-              setConflict(null)
+            onClick={() =>
               void send(conflict.text, "queue", cardOf(current.current))
-            }}
+            }
             title={queue.title ?? undefined}
             type="button"
           >
@@ -536,6 +567,22 @@ export function CardEditor(p: {
         </div>
       ) : (
         <div className="compose-row">
+          {card !== undefined && command !== null && (
+            <span className="card-command">
+              {commandTag(command)}{" "}
+              <button
+                aria-label={CLEAR_COMMAND}
+                className="card-command-clear"
+                onClick={() =>
+                  p.onAct({ kind: "setCommand", card: card.id, command: null })
+                }
+                title={CLEAR_COMMAND}
+                type="button"
+              >
+                ×
+              </button>
+            </span>
+          )}
           {plan.createsLane &&
             work !== null &&
             p.where !== undefined &&
@@ -558,7 +605,77 @@ export function CardEditor(p: {
           </button>
         </div>
       )}
-      <span className="status">{status}</span>
+      <span className="status">{cardStatus(status, card?.unsent ?? null)}</span>
+    </div>
+  )
+}
+
+/**
+ * A queued card above the line (ADR-0048): its text, which anyone here may
+ * edit until the host takes it, who queued it and its place in line, its
+ * command, and a button that unqueues it. It is always bound: a queued card
+ * exists.
+ */
+export function QueuedCardEditor(p: {
+  session: SessionClient
+  card: QueuedCard
+  /** Its place in its lane's queue, from 0. */
+  n: number
+  reader: Reader
+  readOnly: ReadOnly | null
+  onAct: (act: ColumnAct) => void
+  onTyping: () => void
+}) {
+  const { session, card } = p
+  const box = useRef<HTMLTextAreaElement>(null)
+  const [text, setText] = useState("")
+  useEffect(() => {
+    const el = box.current
+    if (el === null) return
+    const doc = session.cardText(card.id)
+    const off = attach(el, doc.text, { undo: session.undoFor(card.id) })
+    setText(doc.text())
+    const stop = subscribe(doc, () => setText(doc.text()))
+    return () => {
+      off()
+      stop()
+    }
+  }, [session, card.id])
+  return (
+    <div className="card-editor queued" data-queued={card.id}>
+      <div className="card-heading">
+        {queuedWords(card.place.by, p.n, p.reader)}
+      </div>
+      <textarea
+        autoComplete="off"
+        className="input"
+        data-card={card.id}
+        onInput={p.onTyping}
+        readOnly={p.readOnly !== null}
+        ref={box}
+        rows={Math.min(8, Math.max(1, text.split("\n").length))}
+      />
+      <div className="compose-row">
+        {card.command !== null && (
+          <span className="card-command">{commandTag(card.command)}</span>
+        )}
+        {p.readOnly === null && (
+          <button
+            className="unqueue"
+            onClick={() =>
+              p.onAct({
+                kind: "unqueue",
+                card: card.id,
+                lane: card.place.lane,
+                by: card.place.by,
+              })
+            }
+            type="button"
+          >
+            {UNQUEUE}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

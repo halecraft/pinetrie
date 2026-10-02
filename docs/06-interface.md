@@ -195,7 +195,12 @@ so it is the one behind the menu. What each does is under "Starting" below.
   (ADR-0040): an agent on its own copy shows its offer in plain words ("2
   files ready"), with **take** and its bookmark, which a press copies; one
   working directly says "changes land directly in your working copy", and
-  warns while another agent works in the same directory.
+  warns while another agent works in the same directory. Its **⋯** menu
+  holds **bring up to date**, and when your edits and the offer conflict,
+  **resolve in the thread** does the same: each puts the command on your
+  card at the thread's end, making one if you have none, and focuses it: the composer shows "→ bring
+  up to date", with a × that sends it as a plain message instead. What you
+  write is what the agent should do with the new work (ADR-0055).
 - **A column widens to review its offer** (ADR-0047). The offer's line opens
   the review to the right of the thread, which keeps its place and width: a
   file list when there is more than one file, and one scroll of every file's diff, each file's head pinned
@@ -309,8 +314,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   `agent`, is refused: no mention could reach it.
 - **The send button says what the message will do**: "send", "send to Ada"
   ("send to Ada +2" for three), "send to agent", or, while the agent is busy,
-  "queue up next", "queue after Bea" or "queue after yours", naming the last
-  message already waiting. It uses the host's own decision (`addressChat`,
+  "queue up next", "queue after Bea" or "queue after yours", naming who
+  queued the last card already waiting. It uses the host's own decision (`addressChat`,
   over `threadOf`), so it cannot promise a reply that will not come. When the
   send starts an agent, a chip beside the button says where it will work ("on
   a copy ▾"), and opens the choices.
@@ -380,7 +385,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   place, and a column at its end does not get shorter while the agent works
   (ADR-0044).
   **Stop** ends the turn, and records who pressed it under the ask
-  (ADR-0056); messages waiting are then taken.
+  (ADR-0056); cards queued are then taken.
 - **A column says what its agent is doing** (ADR-0054), and none of it moves
   the column. While the agent works, the mark before the thread's name in the
   header (its `✦`, or its banner, ADR-0053) pulses, titled with the ask it
@@ -437,8 +442,17 @@ The rail is E; the column is T. Seeing both at once is the product.
   hold text: emptied, sent or discarded, the dot goes. A bare `@agent ` is
   nothing typed.
 - **Sending spends the card.** The box stays as it was until the host
-  answers: written, running or waiting, the card is gone and the box empty; a
+  answers: written or running, the card is gone and the box empty; a
   conflict or a refusal leaves the card, so nothing is lost or put back.
+- **A send to a busy thread queues your card above the line** (ADR-0048), as
+  does a card with a command, even on an idle thread. A queued card is drawn
+  after the thread's last message, headed "queued by Bea · 1st in line", with
+  "→ bring up to date" when it has the command, and **unqueue**. Anyone here
+  can edit it until the host takes it, when the lane is free, in order. An
+  unqueued card goes back below the line. Unqueue a card the host had already
+  taken and your column says "already sent as Bea's message: it was taken
+  before you unqueued it". A card the host could not send is back below the
+  line saying "not sent: …" until it is queued again.
 - **Cmd+Z in a box undoes only that box's card**, never anything in another
   column or tab (ADR-0052). After you undo past a card's first keystroke,
   the box is empty and Cmd+Shift+Z there brings the card back.

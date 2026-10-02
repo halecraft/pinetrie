@@ -10,7 +10,7 @@
 
 import type { ProjectRecord } from "@pineta/core"
 import type { Agent, LaneHooks } from "@pineta/pi"
-import { readLane } from "@pineta/reads"
+import { readRunning } from "@pineta/reads"
 import type { Basics } from "../basics.ts"
 import { type Offers, startOffers } from "../offers/index.ts"
 import { createSerial } from "../queue.ts"
@@ -83,7 +83,7 @@ export async function startLaneWork(input: {
           root,
           basics,
           agent: input.agent,
-          running: lane => readLane(doc, lane)?.running === true,
+          running: lane => readRunning(doc, lane),
           taken: () => setup.refreshBaseSoon(),
         })
   const containers = createContainers({

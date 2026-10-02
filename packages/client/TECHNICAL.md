@@ -14,10 +14,12 @@ the document's entries, and returns the same index until one changes. The
 columns, the rail and the agent's path all read that one index
 (`packages/core/tree.ts`). `App` reads it through `readSessionFacts`
 (`projection.ts`), together with the entry count, the agent's activity, the
-streams to draw (`liveWork`, over the stream records alone), the lanes, the
-outbox, the participants, the archive and the work facts, so they
-are always from the same moment. `resolveLayout` takes the index, the lanes
-and the archive together.
+streams to draw (`liveWork`, over the stream records alone), the
+participants, the archive and the work facts, so they are always from the
+same moment. The lanes are read from two documents, the session and the
+cards (`readLanes(doc, index, cards)`), by a `useSelector` over the session
+whose selector changes with the cards. `resolveLayout` takes the index, the
+lanes and the archive together.
 
 ## Renders (S54, S59)
 
@@ -799,7 +801,10 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   (`@pineta/marginalia`), the function `planChat` runs on the host, so the
   button cannot promise a reply the host will not start. `SendPlan.to` is
   `addressChat`'s `Address`, unchanged. A fresh column sends `branch`; a
-  send that asks the agent while its lane is busy (`isBusy`) queues.
+  send to a busy lane (`isBusy`), plain or asking the agent, and a card
+  with a command, queue: the editor queues the card itself (the `queue`
+  act), and sends nothing. A `busy` answer, the host's view of a lane the
+  page thought idle, queues it too.
   `sendButton` words the plan (labels: `docs/06-interface.md`), and
   `placeholderWords` gives the box's placeholder: the composer holds only its
   state and draws.
@@ -807,9 +812,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   whether it is a Start Agent column, and its reserved lane, built once by
   `Column` for its composer and for everyone else's cards at its end, since
   sending any of them here creates this column's lane.
-- **The queue names the last message waiting,** not who the agent is
-  answering: the host takes held items in the order sent, whatever their kind,
-  so a new one waits behind the newest (`LaneView.lastWaiting`). `queuePlace`
+- **The queue names who queued the last card,** not who the agent is
+  answering: the host takes queued cards in order, so a new one waits behind
+  the last (`LaneView.lastWaiting`). `queuePlace`
   tells yours from someone else's by the column's `session.writer`;
   `queueWords` says it, with a `title` counting the queue when more than one
   waits ("3 waiting ahead").
@@ -825,12 +830,28 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   Its outcome is checked in e2e; the prompt's rendering is not exercised in the
   browser suite, because no honest browser action can force the crossing.
 - **Failed.** A command the host threw on comes back `failed` with the
-  error's message. The card keeps its text (`spends` is false), as for a
+  error's message. The card keeps its text (`spent` is false), as for a
   refusal, but `failedWords` never says "not sent": the host may have written
   the message before it failed. The profile form words a failed rename with
   the same function, through `renameProblem` (`identity.ts`).
-- **Waiting messages** from `pineta.outbox` show dimmed in their column, in the
-  order they will be taken. They are not in the tree yet.
+- **Queued cards** (ADR-0048) are drawn after the thread's last message and
+  its working line, above the line, in the order the host takes them
+  (`queuedOn`), each a `QueuedCardEditor`: always bound, editable by anyone
+  here, with `queuedWords`, its command's `commandTag` and **unqueue**. They
+  are not in the tree yet. Below the line, the column shows every drafting
+  card at its end but the composer's (`others` filters on id, not owner), so
+  a card of yours someone unqueued while you typed another shows there.
+- **Queue, unqueue and a command are field writes outside the undo stack's
+  gestures** (`SessionClient.queueCard`, `unqueueCard`, `setCommand`): a
+  card's box undoes only its text (ADR-0052), and moves wait for step 4's
+  history. The client remembers what it unqueued; one whose record goes and
+  whose document the host lets go of was taken first (S69), and
+  `SessionClient.alreadySent` holds it, read by the column through
+  `useSyncExternalStore`, until your next send, queue or unqueue in its
+  lane. An unqueue that won is forgotten the same way, so a card you
+  unqueued that someone else sends later also reads as already sent.
+- **A card the host could not send** carries `unsent` until it is queued
+  again; its editor's status says it (`cardStatus`).
 
 ## Pasting an image (`paste.ts`, ADR-0042)
 
@@ -943,7 +964,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     and sit centred in the column. The browser suite measures it from the
     row's box and the pseudo-element's resolved insets.
   - `.working-line` is drawn at the content's end for the whole run, before
-    the waiting messages; in outline the running ask's own line pulses, and
+    the queued cards; in outline the running ask's own line pulses, and
     `.column[data-density="outline"]` hides it. `.column-content:has(.tool.live[data-revealed])`
     hides it, so no value restates `ToolRow`'s live rule or `REVEAL_MS`.
   - **The line has zero height**, drawn by a shadow and lifted by a
@@ -974,14 +995,17 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   review while the offer is open and holds files (ADR-0047, below), the
   bookmark apart, which a press copies to find it in jj or jjui, its
   buttons, and a `⋯` menu for the rest
-  ("update from my work", "rewrite description"). What the lane runs now
+  ("bring up to date", "rewrite description"). What the lane runs now
   (`activityOf`: a turn, a resolution, or a split, from its latest prompt's
   role) comes first: while it runs, the line counts files so far and offers
   nothing. A lane that works directly says where its changes land, and names
   other lanes running in the same directory now.
-- **An update's prefill** goes into that column's composer, unsent: `update`
-  answers `updated` with the text, and the column hands it to the composer
-  as `insert` with a fresh key, which lands once after whatever is typed.
+- **"Bring up to date" is a command on your card** (ADR-0055): the button is
+  the `bringUpToDate` act, which sets the command on your card at the
+  column's end, or creates one with it, and arms the column's focus. The
+  editor asks `takeFocus` again whenever its card's command changes, so the
+  box takes focus in a column already open. The card is then queued like any
+  other (`planSend`), and the host carries the command out when it takes it.
 - **Land, update and stack messages** show as one line each, roles `land`
   ("resolving your work"), `update` ("your work") and `stack`.
 - **The page header counts offers open** in your repo, as it counts

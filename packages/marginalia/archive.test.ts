@@ -117,7 +117,7 @@ describe("planArchive", () => {
     expect(plan({ lanes: [lane("a", { waiting: 1 })] })).toEqual({
       kind: "refused",
       code: ERR.ROOT_BUSY,
-      message: "messages are waiting here",
+      message: "messages are queued here",
     })
   })
   test("work in another root does not stop it, and restoring is never busy", () => {

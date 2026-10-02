@@ -171,7 +171,7 @@ export const ERR = {
   INVALID_NAME: "invalid_name",
   /** A write in a root someone archived (ADR-0029). The message names them. */
   ARCHIVED: "archived",
-  /** Archiving a root where the agent is working or messages are waiting. */
+  /** Archiving a root where the agent is working or cards are queued. */
   ROOT_BUSY: "root_busy",
   /** A lane pi holds an operation open on: after a crash, until it resumes. */
   BUSY: "busy",
@@ -217,13 +217,16 @@ export const refused = (code: ErrCode, message: string): Refusal => ({
  * - `reply`: continue the thread I am reading; I saw it end at `at`. If
  *   another writer compelled the agent there since, that is a race, and the
  *   sender is told (`conflict`) rather than guessed for.
- * - `queue`: add this to the agent's work in this thread, whenever it is free.
+ * - `queue`: the host's own, for a queued card it takes (ADR-0048): the
+ *   lane's queue has already decided its turn, so only a run makes it busy.
+ *   Never on the wire: a client queues a card instead.
  * - `branch`: start a thread at `at`, the root or any message. Every thread
  *   starts this way, and a branch never continues an existing lane: a
  *   compelled one is a new line of work (ADR-0021).
  */
 export type ChatMode = "reply" | "queue" | "branch"
-export const CHAT_MODES: readonly ChatMode[] = ["reply", "queue", "branch"]
+/** The modes a client may send. */
+export const CHAT_MODES: readonly ChatMode[] = ["reply", "branch"]
 
 /**
  * A command whose SHAPE is already known to be valid. The protocol codec
@@ -249,7 +252,7 @@ export type Intent =
        * default (ADR-0032). Read only when the message creates a lane.
        */
       readonly work: WorkSetting | null
-      /** The card the text was sent from, spent once it is sent (ADR-0048). */
+      /** The card the text was sent from, spent once it is written or running (ADR-0048). */
       readonly card: CardId | null
       /**
        * The lane id the sender's column reserved: the id a lane this message
@@ -275,11 +278,6 @@ export type Intent =
       readonly entry: EntryId
       readonly title: string | null
     }
-  /**
-   * Merge your work into a lane: a fact in the thread when it merges cleanly,
-   * the resolution run when it conflicts (ADR-0038, ADR-0033).
-   */
-  | { readonly kind: "update"; readonly lane: LaneName }
   /** Act on a lane's offer in your repo (ADR-0038). */
   | {
       readonly kind: "offer"
@@ -666,17 +664,33 @@ export interface HaveRecord {
 
 // --- cards (ADR-0048) --------------------------------------------------------
 
+/** A command a card is sent through (ADR-0055); a plain card has none. */
+export type CardCommand = "bring-up-to-date"
+export const CARD_COMMANDS: readonly CardCommand[] = ["bring-up-to-date"]
+
 /**
  * Where a card is. Drafting: below the line at a thread's end, kept as a send
  * carries it (where it started, and its column's lane) and resolved through
  * `threadOf` whenever it is needed, so it follows its thread as the thread
- * grows. Fresh: an unsent branch or new tab, by its column's key.
+ * grows. Queued: above the line, waiting for its thread's lane, until the
+ * host takes it or someone unqueues it. Fresh: an unsent branch or new tab,
+ * by its column's key.
  */
 export type CardPlace =
   | {
       readonly kind: "drafting"
       readonly at: Position
       readonly lane: LaneName | null
+    }
+  | {
+      readonly kind: "queued"
+      /** Where it was queued: an unqueue puts it back here. */
+      readonly at: Position
+      readonly lane: LaneName
+      /** Sorts the lane's queue; ties go by id (S69). */
+      readonly order: string
+      /** Who queued it: its message's author. */
+      readonly by: WriterId
     }
   | { readonly kind: "fresh"; readonly column: string }
 
@@ -690,6 +704,10 @@ export interface CardRecord {
   /** Who created it: whose composer it is. */
   readonly owner: WriterId
   readonly place: CardPlace
+  /** What it is sent through when taken (ADR-0055); null for a plain message. */
+  readonly command: CardCommand | null
+  /** Why the host could not send it, until it is queued again; null when it never failed. */
+  readonly unsent: string | null
 }
 
 /**

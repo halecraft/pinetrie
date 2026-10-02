@@ -1,6 +1,7 @@
-// host/commands/chat — a human message, from a `chat` command: the one send
-// path, so queueing, conflicts and who a message is for are decided once.
-// A message sent from a card spends the card (ADR-0048).
+// host/commands/chat — a human message, from a `chat` command or a queued
+// card the host took: the one send path, so a busy lane, conflicts and who a
+// message is for are decided once. A message sent from a card spends the card
+// (ADR-0048).
 
 import {
   type BlobStore,
@@ -22,11 +23,11 @@ import {
   planChat,
   planImages,
   resolveCommand,
-  spends,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
+  readCards,
   readLanes,
   readParticipantNames,
   readParticipants,
@@ -47,12 +48,7 @@ export interface ChatDeps {
   readonly basics: Basics
   readonly agent: Pick<
     Agent,
-    | "appendToTree"
-    | "commands"
-    | "createThreadLane"
-    | "expand"
-    | "hold"
-    | "lane"
+    "appendToTree" | "commands" | "createThreadLane" | "expand" | "lane"
   >
   readonly work: Pick<LaneWork, "project" | "checkDirectory" | "prepareLane">
   readonly blobs: Pick<BlobStore, "ref">
@@ -72,14 +68,17 @@ export interface ChatContext {
 /**
  * Gather, `threadOf` and `planChat`, then `executeChat`. A message sent from
  * a card carries its other writers as contributors ("Ada, with Bea"), and
- * spends the card once it is written, running or waiting (`spends`). A
- * conflict or a refusal leaves the card, so nothing typed is lost.
+ * spends the card once it is written or running. A busy lane, a conflict or
+ * a refusal leaves the card, so nothing typed is lost: the sender's client
+ * queues a card the lane was busy for. A card the host took (`taken`) has no
+ * record left, and `drain` destroys its text itself.
  */
 export async function sendChat(
   deps: ChatDeps,
   writer: WriterId,
   sendId: string,
   chat: Chat,
+  how: { readonly taken: boolean } = { taken: false },
 ): Promise<Outcome> {
   const { agent, work, blobs, cards } = deps
   const { doc, newId } = deps.basics
@@ -94,12 +93,16 @@ export async function sendChat(
       : (await cards.writers(chat.card)).filter(w => w !== writer)
 
   // plan (pure)
-  const thread = threadOf(index, readLanes(doc, index), {
-    at: chat.at,
-    mode: chat.mode,
-    lane: chat.lane,
-    me: writer,
-  })
+  const thread = threadOf(
+    index,
+    readLanes(doc, index, readCards(deps.basics.cards)),
+    {
+      at: chat.at,
+      mode: chat.mode,
+      lane: chat.lane,
+      me: writer,
+    },
+  )
   // An entry or lane this document does not hold has nowhere to go: refused
   // before anything is written, as pi would refuse a lane there.
   if (thread.kind === "unknown") {
@@ -175,7 +178,8 @@ export async function sendChat(
     writer,
     work: chat.work,
   })
-  if (chat.card !== null && spends(sent)) await cards.spend(chat.card)
+  const written = sent.kind === "appended" || sent.kind === "started"
+  if (chat.card !== null && written && !how.taken) await cards.spend(chat.card)
   return sent
 }
 
@@ -190,22 +194,14 @@ export async function executeChat(
   context: ChatContext,
 ): Promise<Outcome> {
   const { agent, work } = deps
-  const { doc, log, now, newId } = deps.basics
+  const { doc, log, now } = deps.basics
   const { index, writer } = context
   const message = (details: ChatDetails) => encodeChat(details, now())
   switch (planned.kind) {
     case "refused":
     case "conflict":
+    case "busy":
       return planned
-    case "hold":
-      await agent.hold({
-        kind: "chat",
-        id: newId(),
-        lane: planned.lane,
-        details: planned.details,
-        timestamp: now(),
-      })
-      return { kind: "queued", position: planned.position }
     case "appendToTree":
     case "appendToLane": {
       const appended =

@@ -93,13 +93,13 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 992/992 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 620 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 1042/1042 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 654 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 12 scenarios, 30 checks, on the scripted model (S67) |
+| end-to-end | `pnpm run e2e` | 12 scenarios, 33 checks, on the scripted model (S67) |
 | with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
 | **real browser** | `pnpm run e2e:browser` | 4 scenarios, 141 checks; in a lane with no containers, the 6 that need one report SKIP |
-| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 17 host and lanes scenarios ≤ ⌊√902⌋; 4 browser ≤ ⌊√17⌋ |
+| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 17 host and lanes scenarios ≤ ⌊√935⌋; 4 browser ≤ ⌊√17⌋ |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -116,7 +116,7 @@ packages/core/         @pineta/core         declares NOTHING
 packages/schema/       @pineta/schema       Kyneta only; the document shape
 packages/pi/           @pineta/pi           THE pi boundary
 packages/protocol/     @pineta/protocol     the wire contract and its codec
-packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: chat, outbox
+packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: chat, cards
 packages/reads/        @pineta/reads        document reads shared by host and client
 packages/lanes/        @pineta/lanes        lane containers, disks, and jj/git (ADR-0032–0034, 0038)
 packages/client/       @pineta/client       browser UI; owns its Vite build
@@ -153,7 +153,8 @@ answer changed: lanes now belong to threads, the host is their only writer, and
 **ADR-0020 — lanes belong to threads and never move; people own none.** A lane
 is created where agent work is first wanted in a thread, and its tip is always
 the thread's end. Conversation threads have no lane. A running lane is never
-written: messages wait in `pineta.outbox`. A compelled reply another writer
+written: a message for it is a queued card (ADR-0048), and the host takes
+queued cards in order when the lane is idle. A compelled reply another writer
 raced is a `conflict`; the sender chooses to queue or branch. Supersedes
 ADR-0011.
 
@@ -170,19 +171,27 @@ message.
 
 **ADR-0048 — everything unsent is a card.** What you type is a card on its
 thread: its record in the cards document and its text in a Yjs document, both
-written by clients; the host only spends a card when it is sent, and sweeps
-empty ones. Everyone at a thread's end sees and can edit its cards. Who wrote
-in one comes from its `clientID`s, through the host's `pineta.seat` records.
-Undo is Kyneta's stack, one per tab, in memory. Built so far: the drafting
-card (step 1), marks for your unsent cards (step 2), and notes removed (step
-3's first part).
+written by clients; the host spends a card when it is sent, takes queued
+ones, and sweeps empty ones. Everyone at a thread's end sees and can edit its
+cards. Who wrote in one comes from its `clientID`s, through the host's
+`pineta.seat` records. Undo is Kyneta's stack, one per tab, in memory. Built
+so far: the drafting card (step 1), marks for your unsent cards (step 2), and
+step 3: notes removed, and queued cards. A send to a busy thread queues your
+card above the line, where anyone can edit it or unqueue it until the host
+takes it; the take reads and deletes the card in one synchronous step, so an
+unqueue it has not seen loses and its client says "already sent" (S69).
+`pineta.outbox` is gone.
 
-**ADR-0026 — everything queued is a note; the queue waits at a
-note someone has open.** A message waiting for a busy lane becomes a `queued`
-note that anyone can edit, cancel, or release from someone's hold. The host
-takes notes in order and stops at one someone is editing. It refuses no write
-to a note that has a record, because a refused write cannot be recovered from
-(S28). Replaces `pineta.outbox`.
+**ADR-0055 — a command acts on a card, and is named last.** A card's
+`command` is how it is sent; the host carries it out when it takes the card.
+The first is "bring up to date": the project's work comes into the thread's
+own copy (ADR-0038's update), then the card's text is sent, or carries into
+the resolution run when it conflicts. Its button sets the command on your
+card at the thread's end. Typed `/` commands stay as ADR-0036 has them.
+
+**ADR-0026 — everything queued is a note, superseded by ADR-0048 and
+ADR-0055.** Queued notes were never built; a queued message is a queued card.
+The hold while someone types in a queued card waits for ADR-0048's step 7.
 
 **ADR-0029 — a tab per root, an archive shared by everyone.** A column's
 context is its path to its root, so the screen splits there: a root tab has

@@ -4,7 +4,8 @@
 // done, so it lights only its own row, never the Archive tab. They answer "where was I?",
 // so they count only the cards you own (contributors wait for step 6's
 // history). A card counts while it holds text, not while its record exists:
-// a record outlives its text. Pure.
+// a record outlives its text. Only drafting and fresh cards count: a queued
+// card is on its way to being sent, not left somewhere. Pure.
 
 import {
   type CardId,
@@ -100,6 +101,8 @@ export function cardMarks(input: {
         if (tab?.kind === "root") roots.add(tab.root)
         break
       }
+      case "queued":
+        break
     }
   }
   const tabbed = new Set(

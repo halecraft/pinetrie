@@ -114,7 +114,7 @@ packages/     libraries; their boundaries are enforced by resolution
   schema/        @pineta/schema       Kyneta only; the document shape (TECHNICAL.md)
   pi/            @pineta/pi           THE pi boundary (TECHNICAL.md)
   protocol/      @pineta/protocol     the wire contract and its codec
-  marginalia/    @pineta/marginalia   Pineta's shapes stored in pi: chat, threads, outbox
+  marginalia/    @pineta/marginalia   Pineta's shapes stored in pi: chat, threads, cards
   reads/         @pineta/reads        document reads shared by the host and the client
   lanes/         @pineta/lanes        a lane's container and disk: the one place container, jj and git run (TECHNICAL.md)
   client/        @pineta/client       browser UI and session client; owns its Vite build
@@ -126,7 +126,7 @@ Unit tests sit beside the code they test. `workspace.test.ts` at the root is
 the one exception: it checks the manifests.
 
 The host's shell, `apps/pineta/host/`, is split by responsibility: runs, the
-outbox, settling, startup, each command, HTTP. Each module takes its
+queue's take, settling, startup, each command, HTTP. Each module takes its
 dependencies as a parameter, and `index.ts` alone wires them. Its order rules
 (a run's end, startup) are in `apps/pineta/host/TECHNICAL.md`.
 

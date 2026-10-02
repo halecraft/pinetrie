@@ -3,6 +3,7 @@
 import type { LaneName } from "@pineta/core"
 import {
   encodeWorkRecord,
+  LEGACY_OUTBOX_NAMESPACE,
   planCardSweep,
   planSeatSweep,
   planStartup,
@@ -10,13 +11,8 @@ import {
   type WorkRecord,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
-import { readCards, readOutbox, readSeats, readThreadName } from "@pineta/reads"
-import {
-  type CardsDocHandle,
-  cardIdOfDoc,
-  clearStreams,
-  readValues,
-} from "@pineta/schema"
+import { readCards, readSeats, readThreadName } from "@pineta/reads"
+import { cardIdOfDoc, clearStreams, readValues } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { Serial } from "./queue.ts"
@@ -24,7 +20,7 @@ import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
 export interface StartupDeps {
-  readonly basics: Pick<Basics, "doc" | "log">
+  readonly basics: Pick<Basics, "doc" | "cards" | "log">
   readonly agent: Pick<
     Agent,
     | "commands"
@@ -32,6 +28,7 @@ export interface StartupDeps {
     | "refusedCommands"
     | "setWorkRecord"
     | "removeSeat"
+    | "removeHeld"
   >
   readonly work: Pick<LaneWork, "project">
   /** Name every lane that has none (ADR-0039). */
@@ -40,27 +37,32 @@ export interface StartupDeps {
   readonly start: Runs["start"]
   readonly settle: (lanes: readonly LaneName[]) => Promise<void>
   readonly cards: Pick<CardPort, "texts" | "stored" | "remove">
-  readonly cardsDoc: CardsDocHandle
 }
 
 /**
  * In order: no stream survives a process, so clear them; name every lane
  * that has none (ADR-0039); resume each lane a crash interrupted, in its own
- * directory, and settle the others with messages held for them
- * (`planStartup`); write what the host found and the commands its pi loaded,
- * each only when it changed, after the startup compaction; and sweep what
- * no one will type in again (`sweepTexts`).
+ * directory, and settle the others with cards queued for them
+ * (`planStartup`); delete what an older host left in its outbox, logging
+ * each one's text; write what the host found and the commands its pi
+ * loaded, each only when it changed, after the startup compaction; and
+ * sweep what no one will type in again (`sweepTexts`).
  * Nothing else runs yet, so clearing the streams needs no serial step.
  */
 export async function recover(deps: StartupDeps): Promise<void> {
   const { agent, work, serial, settle } = deps
-  const { doc, log } = deps.basics
+  const { doc, cards, log } = deps.basics
   clearStreams(doc)
   await deps.ensureNames()
   const planned = planStartup({
-    held: readOutbox(doc),
+    cards: readCards(cards),
     interrupted: await agent.interrupted(),
+    outbox: readValues(doc, LEGACY_OUTBOX_NAMESPACE),
   })
+  for (const held of planned.discard) {
+    log(`[host] deleted a message an older host held, never sent: ${held.text}`)
+    await agent.removeHeld(held.key)
+  }
   for (const lane of planned.resume) {
     log(
       `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,
@@ -103,7 +105,7 @@ async function sweepTexts(deps: StartupDeps): Promise<void> {
   // gather
   const texts = await cards.texts()
   const stored = await cards.stored()
-  const records = readCards(deps.cardsDoc)
+  const records = readCards(deps.basics.cards)
   const seats = readSeats(doc)
   // plan
   const swept = planCardSweep({

@@ -39,9 +39,7 @@ const Reply = Schema.struct({
   errorCode: Schema.string(),
   errorMessage: Schema.string(),
   entryId: Schema.string(),
-  position: Schema.number(),
   by: Schema.string(),
-  text: Schema.string(),
 })
 
 /** Asymmetric: client sends Command, host sends Reply. */

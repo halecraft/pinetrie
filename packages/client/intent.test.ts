@@ -1,6 +1,8 @@
 import {
   type ArchiveRecord,
   type AskIndex,
+  atEntry,
+  type CardRecord,
   cardId,
   entryId,
   indexAsks,
@@ -271,6 +273,66 @@ describe("planIntent", () => {
       expect(entryShown({ kind: "openAt", entry: "3-b" })).toBe("3-b")
       expect(entryShown({ kind: "signOut" })).toBe(null)
       expect(plan({ kind: "openAt", entry: "nowhere" })).toEqual([])
+    })
+  })
+
+  describe("cards (ADR-0048, ADR-0055)", () => {
+    const lane = laneNameForThread("x")
+    const where = atEntry(entryId("3-b"))
+    const ada = writerId("ada@x.test")
+    const c = cardId("c-1")
+    const fresh: CardRecord = {
+      id: cardId("c-new"),
+      owner: ada,
+      place: { kind: "drafting", at: where, lane },
+      command: null,
+      unsent: null,
+    }
+    test("queue, unqueue and a command are one write each, on any tab", () => {
+      for (const state of [R1, at(onNewTab)]) {
+        expect(
+          plan(column({ kind: "queue", card: c, lane, at: where }), state),
+        ).toEqual([{ kind: "queueCard", card: c, lane, at: where }])
+        expect(
+          plan(column({ kind: "unqueue", card: c, lane, by: ada }), state),
+        ).toEqual([{ kind: "unqueueCard", card: c, lane, by: ada }])
+        expect(
+          plan(column({ kind: "setCommand", card: c, command: null }), state),
+        ).toEqual([{ kind: "setCommand", card: c, command: null }])
+      }
+    })
+    test("bring up to date sets the command on your card at the end, and focuses its column", () => {
+      expect(
+        plan(
+          column({ kind: "bringUpToDate", key: "col", card: c, create: fresh }),
+        ),
+      ).toEqual([
+        { kind: "setCommand", card: c, command: "bring-up-to-date" },
+        { kind: "armFocus", key: "col" },
+      ])
+    })
+    test("bring up to date with no card of yours there creates one, with the command", () => {
+      expect(
+        plan(
+          column({
+            kind: "bringUpToDate",
+            key: "col",
+            card: null,
+            create: fresh,
+          }),
+        ),
+      ).toEqual([
+        {
+          kind: "createCard",
+          card: { ...fresh, command: "bring-up-to-date" },
+        },
+        { kind: "armFocus", key: "col" },
+      ])
+    })
+    test("an offer's other buttons are one command each", () => {
+      expect(plan(column({ kind: "offer", lane, action: "split" }))).toEqual([
+        { kind: "offer", lane, action: "split" },
+      ])
     })
   })
 

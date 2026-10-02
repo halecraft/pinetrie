@@ -1,7 +1,12 @@
 // host/work/archive — a root archived or restored (ADR-0029): its lanes'
 // disks deleted, their history out of your repo, or back.
 
-import { type EntryId, nearestRevision, rootOf } from "@pineta/core"
+import {
+  type EntryId,
+  type LaneName,
+  nearestRevision,
+  rootOf,
+} from "@pineta/core"
 import {
   type DiskPaths,
   executeOnHost,
@@ -11,13 +16,12 @@ import {
   removeSnapshots,
 } from "@pineta/lanes"
 import { planRetention } from "@pineta/marginalia"
+import { readLaneRecords, readRevisions, readTreeIndex } from "@pineta/reads"
 import {
-  readLaneRecords,
-  readLanes,
-  readRevisions,
-  readTreeIndex,
-} from "@pineta/reads"
-import { readLaneTip, type SessionDocHandle } from "@pineta/schema"
+  readLaneNames,
+  readLaneTip,
+  type SessionDocHandle,
+} from "@pineta/schema"
 import { type Basics, failed } from "../basics.ts"
 import type { Serial } from "../queue.ts"
 import type { LaneRegistry } from "./registry.ts"
@@ -26,14 +30,16 @@ import type { LaneRegistry } from "./registry.ts"
 function lanesIn(doc: SessionDocHandle, treeRoot: string) {
   const index = readTreeIndex(doc)
   const records = readLaneRecords(doc)
-  return readLanes(doc, index)
-    .filter(
-      l =>
-        l.tip !== null &&
-        rootOf(index, l.tip) === treeRoot &&
-        records.get(l.name)?.work.kind === "own",
-    )
-    .map(l => l.name)
+  return readLaneNames(doc)
+    .map(name => name as LaneName)
+    .filter(lane => {
+      const tip = readLaneTip(doc, lane)
+      return (
+        tip !== null &&
+        rootOf(index, tip) === treeRoot &&
+        records.get(lane)?.work.kind === "own"
+      )
+    })
 }
 
 export interface Archive {

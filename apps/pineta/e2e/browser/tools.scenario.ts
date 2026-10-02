@@ -19,6 +19,7 @@ import {
 } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
+  readCards,
   readLaneRecords,
   readLanes,
   readNames,
@@ -280,7 +281,11 @@ async function run(
         await visibility("hidden")
         const bo = await join(askHost, "bo", "asks")
         script.use([{ text: "Back to you." }])
-        const lane = readLanes(askHost.doc, readTreeIndex(askHost.doc))[0]
+        const lane = readLanes(
+          askHost.doc,
+          readTreeIndex(askHost.doc),
+          readCards(askHost.cards),
+        )[0]
         await bo.chat(
           "@agent anything new?",
           atEntry(entryId(lane?.tip ?? "")),
@@ -808,7 +813,7 @@ async function run(
 
         // While the lane runs, its header's mark pulses and a line at the
         // column's end says more is coming. The line takes no height, whether
-        // it is the content's last child or sits above a waiting message.
+        // it is the content's last child or sits above a queued card.
         {
           const thinking = script.pause("think a while")
           script.use([{ text: "thought" }, { text: "after the thought" }])
@@ -857,9 +862,10 @@ async function run(
           await waitFor(() => thinking.reached)
           await twoFrames(tp)
           const last = await lineShows()
-          // A message sent now waits behind the paused run, below the line.
+          // A message sent now is a card queued behind the paused run, below
+          // the line.
           await say("wait behind it")
-          await appears(`${col(0)} .msg.waiting`, 10_000)
+          await appears(`${col(0)} .card-editor.queued`, 10_000)
           await twoFrames(tp)
           const above = await lineShows()
           thinking.resume()
@@ -889,7 +895,7 @@ async function run(
             placed(last) &&
               last?.next === null &&
               placed(above) &&
-              above?.next?.includes("waiting") === true &&
+              above?.next?.includes("queued") === true &&
               ended.line === 0,
             `${JSON.stringify({ last, above, ended })}`,
           )

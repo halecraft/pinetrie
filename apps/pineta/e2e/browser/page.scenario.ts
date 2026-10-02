@@ -7,8 +7,10 @@ import { IDENTITY_KEY, identityCodec } from "@pineta/client/identity"
 import { type ButtonWords, queueWords } from "@pineta/client/send"
 import {
   atEntry,
+  cardId,
   entryId,
   handleOf,
+  type LaneName,
   projectRail,
   ROOT,
   writerId,
@@ -25,7 +27,7 @@ import {
 import type { Page } from "@playwright/test"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { join, suiteModel, waitFor } from "../harness.ts"
+import { join, noQueued, suiteModel, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
@@ -247,7 +249,11 @@ async function run(check: Checks["check"]): Promise<void> {
       // the model says is `e2e:live`'s to check.
       await idle()
       {
-        const [lane, ...others] = readLanes(host.doc, readTreeIndex(host.doc))
+        const [lane, ...others] = readLanes(
+          host.doc,
+          readTreeIndex(host.doc),
+          readCards(host.cards),
+        )
         const laneName =
           lane === undefined || others.length > 0
             ? null
@@ -702,30 +708,95 @@ async function run(check: Checks["check"]): Promise<void> {
             () => true,
             () => false,
           )
-      await other.chat("@agent Bea again", atEntry(entryId(await tipOf0())), {
-        mode: "queue",
-      })
+      // Bea queues a card behind her run, as her client does when she sends.
+      await waitFor(() => Object.keys(host.doc.activeRuns()).length > 0, 15_000)
+      const beaLane = Object.keys(host.doc.activeRuns())[0] as
+        | LaneName
+        | undefined
+      const beaEnd = atEntry(entryId(await tipOf0()))
+      const again = cardId(crypto.randomUUID())
+      other.createCard(
+        {
+          id: again,
+          owner: other.writer,
+          place: { kind: "drafting", at: beaEnd, lane: beaLane ?? null },
+          command: null,
+          unsent: null,
+        },
+        "@agent Bea again",
+      )
+      if (beaLane !== undefined)
+        other.queueCard(again, { lane: beaLane, at: beaEnd })
+      // Hers is queued first: a mutant that draws no queued card fails at
+      // the check below, not here.
+      await waitFor(
+        () =>
+          readCards(host.cards).some(
+            c => c.id === again && c.place.kind === "queued",
+          ),
+        15_000,
+      )
       await page.click(`${col(0)} .composer .send`)
-      const waiting = await page
-        .waitForSelector(`${col(0)} ${msg("@agent after Bea")}.waiting`, {
-          timeout: 15_000,
-        })
+      // Yours is queued after hers, above the line; her edit to it shows.
+      const queuedHere = await waitFor(
+        () =>
+          readCards(host.cards).some(
+            c =>
+              c.place.kind === "queued" &&
+              host.cardText(c.id) === "@agent after Bea",
+          ),
+        15_000,
+      )
+      const yours = readCards(host.cards).find(
+        c =>
+          c.place.kind === "queued" &&
+          host.cardText(c.id) === "@agent after Bea",
+      )
+      if (yours !== undefined) {
+        const theirs = other.cardText(yours.id)
+        await waitFor(() => theirs.text() === "@agent after Bea", 15_000)
+        theirs.text.insert(16, ", and Bea's too")
+      }
+      const drawn = await page
+        .waitForFunction(
+          ([c, id]) => {
+            const thread = document.querySelector(`${c} .column-content`)
+            const cards = [
+              ...(thread?.querySelectorAll(".card-editor.queued") ?? []),
+            ]
+            const last = cards.at(-1)
+            return (
+              cards.length === 2 &&
+              last?.getAttribute("data-queued") === id &&
+              last.querySelector("textarea")?.value ===
+                "@agent after Bea, and Bea's too"
+            )
+          },
+          [col(0), yours?.id ?? ""] as const,
+          { timeout: 15_000 },
+        )
         .then(
           () => true,
           () => false,
         )
-      check("the queued message shows in its column, waiting", waiting)
+      check(
+        "your queued card is drawn above the line, last in its queue, and another writer's edit to it shows",
+        queuedHere >= 0 && drawn,
+        `${queuedHere} ms`,
+      )
       check(
         "with your own message last in line, it says it will queue after yours",
         await queueButton(queueWords({ kind: "afterYours", ahead: 2 })),
         `"${await label(0)}"`,
       )
       beasTurn.resume()
-      await idle()
+      await waitFor(
+        () => Object.keys(host.doc.activeRuns()).length === 0 && noQueued(host),
+      )
       const asked = [
         "@agent Bea's turn",
         "@agent Bea again",
-        "@agent after Bea",
+        "@agent after Bea, and Bea's too",
       ]
       await page.$$eval(
         `${col(0)} .msg`,

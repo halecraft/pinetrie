@@ -1,8 +1,14 @@
-import { laneNameForThread, NOBODY, writerId } from "@pineta/core"
-import { encodeHeld, type Held, OUTBOX_NAMESPACE } from "@pineta/marginalia"
 import {
+  atEntry,
+  type CardRecord,
+  cardId,
+  entryId,
+  laneNameForThread,
+  writerId,
+} from "@pineta/core"
+import {
+  beginRun,
   newSessionDoc,
-  physicalKey,
   type StoredEntryRow,
   writeEntry,
   writeLaneTip,
@@ -36,30 +42,50 @@ test("readTreeIndex keeps the index, and each unchanged entry, until entries cha
   expect(after.childrenOf.get("e2")).toEqual(["e3"])
 })
 
-test("readLanes: lastWaiting is the writer of the newest item waiting, whom a message queued now follows", () => {
+test("readLanes: a lane's queued cards are what waits; askedBy is who queued the first, lastWaiting the last", () => {
   const doc = newSessionDoc()
   const lane = laneNameForThread("0123456789abcdef")
   writeEntry(doc, row("e1", null))
   writeLaneTip(doc, lane, "e1")
-  const held = (id: string, email: string): Held => ({
-    kind: "chat",
-    id,
-    lane,
-    details: {
-      author: writerId(email),
-      authorName: email,
-      text: id,
-      compels: NOBODY,
-      sendId: id,
+  const queued = (id: string, order: string, email: string): CardRecord => ({
+    id: cardId(id),
+    owner: writerId("ada@x.io"),
+    place: {
+      kind: "queued",
+      at: atEntry(entryId("e1")),
+      lane,
+      order,
+      by: writerId(email),
     },
-    timestamp: 1,
+    command: null,
+    unsent: null,
   })
-  for (const h of [held("1-a", "ada@x.io"), held("2-b", "bea@x.io")])
-    doc.values.set(physicalKey(OUTBOX_NAMESPACE, h.id), {
-      namespace: OUTBOX_NAMESPACE,
-      key: h.id,
-      value: encodeHeld(h),
-    })
-  const view = readLanes(doc, readTreeIndex(doc)).find(l => l.name === lane)
-  expect(view).toMatchObject({ waiting: 2, lastWaiting: writerId("bea@x.io") })
+  const drafting: CardRecord = {
+    id: cardId("c-0"),
+    owner: writerId("cy@x.io"),
+    place: { kind: "drafting", at: atEntry(entryId("e1")), lane },
+    command: null,
+    unsent: null,
+  }
+  const cards = [
+    queued("c-2", "b", "bea@x.io"),
+    queued("c-1", "a", "ada@x.io"),
+    drafting,
+  ]
+  const view = readLanes(doc, readTreeIndex(doc), cards).find(
+    l => l.name === lane,
+  )
+  expect(view).toMatchObject({
+    running: false,
+    waiting: 2,
+    askedBy: writerId("ada@x.io"),
+    lastWaiting: writerId("bea@x.io"),
+  })
+  expect(readLanes(doc, readTreeIndex(doc), [])[0]).toMatchObject({
+    waiting: 0,
+    askedBy: null,
+    lastWaiting: null,
+  })
+  beginRun(doc, lane, "r-1")
+  expect(readLanes(doc, readTreeIndex(doc), cards)[0]?.running).toBe(true)
 })

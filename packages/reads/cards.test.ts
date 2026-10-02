@@ -14,6 +14,8 @@ const card = (id: string, owner = "p-ada"): CardRecord => ({
   id: cardId(id),
   owner: writerId(owner),
   place: { kind: "drafting", at: atEntry(entryId("e1")), lane: null },
+  command: null,
+  unsent: null,
 })
 
 test("readCards: oldest first, malformed ones left out, an unchanged card the same object", () => {

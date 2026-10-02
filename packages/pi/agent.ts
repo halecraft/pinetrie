@@ -55,18 +55,16 @@ import {
   type DigestRecord,
   encodeArchive,
   encodeDigest,
-  encodeHeld,
   encodeMark,
   encodeSeat,
   encodeStop,
   encodeWorkRecord,
   expandSkill,
-  type Held,
   type LandMessage,
+  LEGACY_OUTBOX_NAMESPACE,
   labelCommands,
   MARK_NAMESPACE,
   OFFER_NAMESPACE,
-  OUTBOX_NAMESPACE,
   PARTICIPANT_NAMESPACE,
   resolveCommand,
   SEAT_NAMESPACE,
@@ -354,10 +352,8 @@ export interface Agent {
    */
   createThreadLane(at: Position, lane: LaneName): Promise<CreateOutcome>
   lane(name: LaneName): ThreadLaneHandle
-  /** Hold a message in `pineta.outbox` until its lane is idle. */
-  hold(item: Held): Promise<void>
-  /** Remove a held message: it has been taken. */
-  release(id: string): Promise<void>
+  /** Delete a value an old host left in `pineta.outbox`. */
+  removeHeld(key: string): Promise<void>
   /** Store a writer's display name in `pineta.participant`, keyed by writer. */
   setParticipantName(writer: WriterId, name: string): Promise<void>
   /** Store a seat's record in `pineta.seat`, keyed by its `clientID` (ADR-0048). */
@@ -554,7 +550,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       systemPrompt: promptFor,
       toProviderMessages: messages =>
         providerMessages(messages, options.blobs ?? NO_BLOBS),
-      // Pineta's outbox means pi's own queue is never used; should it be, it
+      // Pineta's queued cards mean pi's own queue is never used; should it be, it
       // answers one message at a time rather than batching them (S20).
       followUpMode: "one-at-a-time",
     },
@@ -789,12 +785,8 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       }
     },
 
-    async hold(item) {
-      await put(OUTBOX_NAMESPACE, item.id, encodeHeld(item))
-    },
-
-    async release(id) {
-      await session.deleteValue(value(OUTBOX_NAMESPACE, id), CTX)
+    async removeHeld(key) {
+      await session.deleteValue(value(LEGACY_OUTBOX_NAMESPACE, key), CTX)
     },
 
     async setParticipantName(writer, displayName) {

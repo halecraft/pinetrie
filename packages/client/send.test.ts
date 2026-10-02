@@ -14,15 +14,18 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   failedWords,
+  lineWords,
   placeholderWords,
   planSend,
   queuePlace,
+  queues,
   queueWords,
   raceWords,
   type SendPlan,
   sendable,
   sendButton,
   settleSend,
+  spent,
   whereChoices,
   whereWords,
 } from "./send.ts"
@@ -72,17 +75,43 @@ describe("settleSend", () => {
       conflict: null,
     })
   })
-  test("a written, started or queued message says only where it waits", () => {
+  test("a written, started or busy send says nothing: a queued card says where it waits", () => {
     expect(
       settleSend({ kind: "appended", id: entryId("e") }, "hi", READER),
     ).toEqual({ status: "", conflict: null })
     expect(
       settleSend({ kind: "started", runId: runId("r") }, "hi", READER),
     ).toEqual({ status: "", conflict: null })
-    expect(settleSend({ kind: "queued", position: 1 }, "hi", READER)).toEqual({
-      status: "waiting · 2nd in line",
+    expect(settleSend({ kind: "busy" }, "hi", READER)).toEqual({
+      status: "",
       conflict: null,
     })
+  })
+  test("spent: written or running; queues: busy; a conflict or a refusal neither", () => {
+    const outcomes = [
+      { kind: "appended", id: entryId("e") },
+      { kind: "started", runId: runId("r") },
+      { kind: "busy" },
+      { kind: "conflict", by: null },
+      { kind: "refused", code: ERR.REFUSED, message: "no" },
+      { kind: "failed", message: "store closed" },
+    ] as const
+    expect(outcomes.map(o => [spent(o), queues(o)])).toEqual([
+      [true, false],
+      [true, false],
+      [false, true],
+      [false, false],
+      [false, false],
+      [false, false],
+    ])
+  })
+  test.each([
+    [0, "1st in line"],
+    [1, "2nd in line"],
+    [2, "3rd in line"],
+    [9, "10th in line"],
+  ])("lineWords(%i) is %s", (n, words) => {
+    expect(lineWords(n)).toBe(words)
   })
   test("a failure says the host failed, never that nothing was sent", () => {
     expect(
@@ -111,6 +140,14 @@ describe("sendable", () => {
     const edit = { text: "@agent try again ", blank: false }
     expect(sendable(edit.text, edit, false)).toBe("@agent try again")
   })
+  test("a card with a command is sent with no text (ADR-0055)", () => {
+    expect(sendable("  ", blank, false, "bring-up-to-date")).toBe("")
+    expect(sendable("@agent ", blank, false, "bring-up-to-date")).toBe("")
+    expect(sendable("check it", blank, false, "bring-up-to-date")).toBe(
+      "check it",
+    )
+    expect(sendable("", blank, true, "bring-up-to-date")).toBeNull()
+  })
 })
 
 describe("planSend: what the send does, as the host will decide (ADR-0021)", () => {
@@ -125,6 +162,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       asksAgent: false,
       participants: ["Ada", "Bea", "Cy"],
       reader: READER,
+      command: null,
       ...over,
     })
   test("in a conversation, a message is sent, to whoever it names", () => {
@@ -158,7 +196,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       agentByDefault: true,
     })
   })
-  test("a busy lane queues the agent's next question, never a person's message", () => {
+  test("a busy lane queues the next card, a question or a person's message (ADR-0048)", () => {
     expect(plan("hi", { lane: lane({ running: true }) })).toMatchObject({
       mode: "queue",
       queue: { kind: "next" },
@@ -170,9 +208,20 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       queue: { kind: "after", name: "Bea", ahead: 3 },
     })
     expect(plan("@ada hi", { lane: lane({ running: true }) })).toMatchObject({
-      mode: "reply",
+      mode: "queue",
       to: { compels: NOBODY, people: ["Ada"] },
     })
+  })
+  test("a card with a command is queued, even on an idle lane; with no lane it is not (ADR-0055)", () => {
+    expect(
+      plan("check it", { lane: lane(), command: "bring-up-to-date" }).mode,
+    ).toBe("queue")
+    expect(plan("check it", { lane: lane() }).mode).toBe("reply")
+    expect(plan("hi", { command: "bring-up-to-date" }).mode).toBe("reply")
+    expect(
+      plan("hi", { fresh: true, lane: lane(), command: "bring-up-to-date" })
+        .mode,
+    ).toBe("branch")
   })
   test("a fresh column branches, and creates a lane when it asks the agent", () => {
     expect(plan("hi", { fresh: true })).toMatchObject({

@@ -9,10 +9,15 @@
 import type {
   ArchiveRecord,
   AskIndex,
+  CardCommand,
   CardId,
+  CardRecord,
   EntryId,
   LaneName,
+  OfferAction,
+  Position,
   TreeIndex,
+  WriterId,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
 import type { Density } from "./ask-words.ts"
@@ -44,6 +49,43 @@ export type ColumnAct =
       readonly kind: "branchInstead"
       readonly at: EntryId
       readonly pending: Pending
+    }
+  /** Queue a card on the column's lane, from where it was (ADR-0048). */
+  | {
+      readonly kind: "queue"
+      readonly card: CardId
+      readonly lane: LaneName
+      readonly at: Position
+    }
+  /** Take a queued card back below the line; `by` queued it. */
+  | {
+      readonly kind: "unqueue"
+      readonly card: CardId
+      readonly lane: LaneName
+      readonly by: WriterId
+    }
+  /** Set a card's command, or clear it with null (ADR-0055). */
+  | {
+      readonly kind: "setCommand"
+      readonly card: CardId
+      readonly command: CardCommand | null
+    }
+  /**
+   * The bring-up-to-date button: your card at the column's end, `card`, or
+   * `create` when you have none there, gets the command, and the column
+   * keyed `key` takes focus (ADR-0055).
+   */
+  | {
+      readonly kind: "bringUpToDate"
+      readonly key: string
+      readonly card: CardId | null
+      readonly create: CardRecord
+    }
+  /** Act on the lane's offer in your repo (ADR-0038). */
+  | {
+      readonly kind: "offer"
+      readonly lane: LaneName
+      readonly action: OfferAction
     }
 
 export type Intent =
@@ -81,6 +123,29 @@ export type Effect =
       readonly title: string | null
     }
   | { readonly kind: "discardCard"; readonly card: CardId }
+  | { readonly kind: "createCard"; readonly card: CardRecord }
+  | {
+      readonly kind: "queueCard"
+      readonly card: CardId
+      readonly lane: LaneName
+      readonly at: Position
+    }
+  | {
+      readonly kind: "unqueueCard"
+      readonly card: CardId
+      readonly lane: LaneName
+      readonly by: WriterId
+    }
+  | {
+      readonly kind: "setCommand"
+      readonly card: CardId
+      readonly command: CardCommand | null
+    }
+  | {
+      readonly kind: "offer"
+      readonly lane: LaneName
+      readonly action: OfferAction
+    }
   /** Scroll to entry `entry` once it is drawn (`useReveal`). */
   | { readonly kind: "reveal"; readonly entry: string }
   /** Open ask `ask`'s fold, so what is revealed in it is drawn (ADR-0056). */
@@ -267,6 +332,25 @@ function planColumn(
       return onColumn({ kind: "sent", key: act.key, sendId: act.sendId })
     case "reserve":
       return onColumn({ kind: "reserve", key: act.key, lane: act.lane })
+    case "queue":
+      return [{ kind: "queueCard", card: act.card, lane: act.lane, at: act.at }]
+    case "unqueue":
+      return [
+        { kind: "unqueueCard", card: act.card, lane: act.lane, by: act.by },
+      ]
+    case "setCommand":
+      return [{ kind: "setCommand", card: act.card, command: act.command }]
+    case "bringUpToDate": {
+      const command: CardCommand = "bring-up-to-date"
+      return [
+        act.card === null
+          ? { kind: "createCard", card: { ...act.create, command } }
+          : { kind: "setCommand", card: act.card, command },
+        { kind: "armFocus", key: act.key },
+      ]
+    }
+    case "offer":
+      return [{ kind: "offer", lane: act.lane, action: act.action }]
   }
 }
 

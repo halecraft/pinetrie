@@ -3,13 +3,14 @@
 //
 // A card's text is its own `TextDoc` (`card:<id>`); its record, here, says
 // where it is and whose it is. Clients write both directly: the host writes
-// this document only to spend a card, when it becomes a message, and to
-// sweep empty ones when it starts. It is Yjs
+// this document only to take a queued card, to write back one it could not
+// send, and to sweep empty ones when it starts. It is Yjs
 // because several clients write it at once. Each card is a struct of flat
 // strings, written whole when the card is created and never set whole again:
 // a whole-record set concurrent with the host's delete brings a spent card
 // back, where a field write loses to it (S58). Keys are card ids, uuidv7, so
-// no two writers create one key (ADR-0016).
+// no two writers create one key (ADR-0016). A field added after cards were
+// first stored is missing from older records, and `decodeCard` reads it as "".
 
 import {
   type BoundSchema,
@@ -25,14 +26,22 @@ export const CardsDoc = yjs.bind(
     cards: Schema.record(
       Schema.struct({
         owner: Schema.string(),
-        /** `drafting` or `fresh`: the place's kind (`CardPlace`). */
+        /** `drafting`, `queued` or `fresh`: the place's kind (`CardPlace`). */
         kind: Schema.string(),
-        /** A drafting card's entry, "" for none. */
+        /** A drafting or queued card's entry, "" for none. */
         at: Schema.string(),
-        /** A drafting card's lane, "" for none. */
+        /** A drafting or queued card's lane, "" for none. */
         lane: Schema.string(),
         /** A fresh card's column key, "" for none. */
         column: Schema.string(),
+        /** A queued card's place in its lane's queue (S69), "" for none. */
+        order: Schema.string(),
+        /** Who queued it, "" for none. */
+        by: Schema.string(),
+        /** Its command (ADR-0055), "" for none. */
+        command: Schema.string(),
+        /** Why the host could not send it, "" for none. */
+        unsent: Schema.string(),
       }),
     ),
   }),

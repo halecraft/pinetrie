@@ -32,7 +32,6 @@ import {
   type RefreshFacts,
   renderableMessage,
   reviewUrl,
-  updatePrefill,
   wipDescription,
   withoutTrailers,
   withTrailers,
@@ -468,7 +467,6 @@ describe("the update and stack messages", () => {
       role: "update",
       content: "↓ your work merged in: 2 files changed",
     })
-    expect(updatePrefill(details)).toContain("2 files changed")
   })
   test("a stack message names where it starts and ends, and the bookmark to set", () => {
     const m = planStack({

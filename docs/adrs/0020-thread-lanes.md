@@ -2,7 +2,9 @@
 
 **Status:** Accepted. Supersedes ADR-0011. Amends ADR-0018 and ADR-0019.
 Evidence: S19, S20, S21. Amended by ADR-0021 (the lane is also the thread's
-mode) and by ADR-0026 (what waits is a note, not an outbox entry).
+mode), and by ADR-0048 (step 3) with ADR-0055: what waits for a busy lane is
+a queued card, written by clients and taken by the host; nothing waits in
+`pineta.outbox`, which is gone. (ADR-0026 said a note, and was never built.)
 
 **Context.** ADR-0011 gave every writer a lane, so two writers never contend for
 a tip; ADR-0018 then ran every model turn on one agent lane that travelled to

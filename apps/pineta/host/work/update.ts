@@ -1,5 +1,6 @@
-// host/work/update — your work merged into a lane (ADR-0038), and the
-// resolution run's outcome when it conflicts (ADR-0033).
+// host/work/update — the project's work merged into a lane, when the host
+// takes a card whose command is `bring-up-to-date` (ADR-0038, ADR-0055), and
+// the resolution run's outcome when it conflicts (ADR-0033).
 
 import {
   type CommitId,
@@ -38,7 +39,6 @@ import {
   landingOutcome,
   planResolution,
   type UpdateDetails,
-  updatePrefill,
 } from "@pineta/marginalia"
 import type { Agent, LaneChannel, ThreadLaneHandle } from "@pineta/pi"
 import { readTreeIndex } from "@pineta/reads"
@@ -71,7 +71,7 @@ export function reasonOf(index: TreeIndex, description: string): string {
 /**
  * A clean update's writes, in order: the update as a fact in the thread, its
  * revision (so a branch below it starts with the merged files), then the
- * lane stopped as after a run. Returns the composer's prefill.
+ * lane stopped as after a run.
  */
 export async function applyClean(
   ports: {
@@ -84,16 +84,15 @@ export async function applyClean(
     readonly merge: CommitId
     readonly now: number
   },
-): Promise<string> {
+): Promise<void> {
   const appended = await ports.append(encodeUpdate(clean.details, clean.now))
   if (appended.kind === "appended")
     await ports.recordUpdate(appended.id, clean.merge)
   ports.runEnded()
-  return updatePrefill(clean.details)
 }
 
 export type Prepared =
-  | { readonly kind: "clean"; readonly prefill: string }
+  | { readonly kind: "clean" }
   | { readonly kind: "conflicted"; readonly message: LandMessage }
   | { readonly kind: "nothing" }
   | { readonly refused: string }
@@ -101,10 +100,11 @@ export type Prepared =
 export interface Updates {
   /**
    * Merge a copy of your `@` into the lane (ADR-0038). Clean: the update is
-   * appended to the thread, and its prefill returned. Conflicted: the land
-   * message for the resolution run. Nothing new: nothing to do.
+   * appended to the thread. Conflicted: the land message for the resolution
+   * run, with `intent` (the card's text) after the conflicts. Nothing new:
+   * nothing to do.
    */
-  prepareUpdate(lane: LaneName, by: WriterId): Promise<Prepared>
+  prepareUpdate(lane: LaneName, by: WriterId, intent: string): Promise<Prepared>
   /** A resolution run ended: its outcome, from the repository. */
   landingEnded(lane: LaneName, prompt: EntryId): Promise<void>
   /** pi's hook: the resolution run's agent asked for guidance. */
@@ -247,7 +247,7 @@ export function createUpdates(deps: {
       asked.add(lane)
     },
 
-    async prepareUpdate(lane, by) {
+    async prepareUpdate(lane, by, intent) {
       const { root } = setup
       if (!registry.isOwn(lane) || root === null)
         return { refused: "the lane has no copy of its own" }
@@ -264,7 +264,7 @@ export function createUpdates(deps: {
         const conflicted = await conflictsIn(jj)
         if (conflicted.length === 0) {
           const gathered = await gatherClean(handle, jj, { copy, ours, merge })
-          const prefill = await applyClean(
+          await applyClean(
             {
               append: message => deps.agent().lane(lane).append(message),
               recordUpdate: (entry, at) => recordUpdate(lane, entry, at),
@@ -276,7 +276,7 @@ export function createUpdates(deps: {
               now: basics.now(),
             },
           )
-          return { kind: "clean", prefill }
+          return { kind: "clean" }
         }
         const files = await gatherConflicts(jj, conflicted, { copy, ours })
         const skill = await deps.agent().skill("pineta:skill:resolve-conflicts")
@@ -288,6 +288,7 @@ export function createUpdates(deps: {
             files,
             budget: RESOLUTION_BUDGET,
             details: { landing: basics.newId(), lane, yours: [copy], by },
+            intent,
             timestamp: basics.now(),
           }),
         }

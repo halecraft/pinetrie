@@ -38,12 +38,16 @@ are the only code that builds or reads the shape.
 - **`planChat` decides what a message does** (ADR-0020), over the thread
   `threadOf` gives, and names exactly where to write:
 
-  | a message… | no lane | idle lane | busy lane (running, or messages waiting) |
+  | a message… | no lane | idle lane | busy lane (running, or cards queued) |
   |---|---|---|---|
-  | plain | `appendToTree` at the end | `appendToLane` | `hold` |
+  | plain | `appendToTree` at the end | `appendToLane` | `busy` |
   | compelled `reply`, not raced | `createAndRun` at the end | `run` | `conflict` |
   | compelled `reply`, raced | `conflict` | `conflict` | `conflict` |
-  | compelled `queue` | `createAndRun` | `run` | `hold` |
+  | `queue` (the host's take) | as `reply` | as `reply` | as `reply` when only cards are queued; `busy` while it runs |
+
+  `busy` writes nothing: the sender's client queues its card (ADR-0048).
+  `queue` is the host's own mode, for a card it takes, which heads the queue
+  it is in: so only a run makes the lane busy, and a race does not count.
   | `branch` | plain: `appendToTree` at `at`; compelled: `createAndRun` at `at` | the same: a branch never continues a lane | the same |
 
   A race is another writer's compelled message on the thread's path since what
@@ -55,15 +59,13 @@ are the only code that builds or reads the shape.
   ADR-0057). The host decides every new lane's id here; pi makes none.
 - **Each chat stores its send's id** (`sendId`, the command's id), so the
   column that sent it finds it exactly (`TreeIndex.bySend`).
-  `detailsFromStored` is the one conversion of stored details, for a chat and
-  for a held message alike.
+  `detailsFromStored` is the one conversion of stored details.
 - **`renderableMessage`** turns a stored chat into role `chat` with its author
   and whether it compelled the agent, for `core`'s projections, which only
   admit the role and so need no schema library.
 - **A chat's images are references** (ADR-0042). `details.images` lists an
   `ImageRef` (hash, type, size) for each `/blob/` image its text shows, in
-  order: the host fills it when the message is sent, and a held message keeps
-  it. `content` stays the attributed text, so no image's bytes are stored.
+  order: the host fills it when the message is sent. `content` stays the attributed text, so no image's bytes are stored.
   `withChatImages` is what the model reads: each chat with images gets
   `[text, ...image parts]`, from base64 the caller gathered
   (`chatImageShas` says which), with a missing blob named as text.
@@ -103,58 +105,60 @@ are the only code that builds or reads the shape.
   exact match.
 - **A command message** keeps `details.text` as typed and `details.command`
   (`CommandRef`: name, kind, file, hash, expansion). `attributed` reads the
-  expansion, so a message held in the outbox, whose details are encoded
-  later, gives the model the same text. `planChat` makes a command compel
+  expansion, so the model reads what the command meant when it was sent. `planChat` makes a command compel
   the agent, and refuses an unknown one (`ERR.UNKNOWN_COMMAND`).
 - **`pineta.commands`** is a host-written record of every command's summary,
   for the composer's completion. `recordChanged` is how the host writes a
   record at start only when it changed.
 
-# The outbox (`outbox.ts`)
+# Runs and startup (`chat.ts`, `startup.ts`)
 
-A thread's lane is never written while it runs (S21), so every message for a
-busy thread waits in `pineta.outbox`, keyed by its own id (ADR-0016), with a
-total decoder like every shape here. An update waits there too (ADR-0038): a
-held item is `kind: "chat"` or `kind: "update"`, and a record with no `kind`
-decodes as a chat. `heldBy` and `heldRuns` read either kind; `planDrain`
-takes a held update, which may run the resolution. Ids are uuidv7, so `heldMessages` sorts
-into send order, and `nextHeld` takes a lane's oldest. "A lane with messages
-waiting" counts as busy even between two of them, or a new message would jump
-the queue. The host executes three pure decisions from here:
-
-- **`planDrain`**: when a lane's run ends, its oldest held message is appended
-  (plain) or run (compelled); that run's end brings the next step. A plain
-  message is released only once it is written, so a refused append stays held.
-- **`settleRun`**: a compelled message pi refuses to run is kept, appended with
-  no reply, rather than lost; the author already heard `started`.
-- **`planStartup`**: a starting host resumes every lane a crash interrupted,
-  whose run's end then drains it, and drains every other lane with messages
-  held for it, since no run's end will. What does not survive a process
-  (runs and streams) is cleared first, by `clearStreams` in
-  `@pineta/schema`.
+- **`settleRun`** (`chat.ts`): a compelled message pi refuses to run is kept,
+  appended with no reply, rather than lost; the author already heard
+  `started`.
+- **`planStartup`** (`startup.ts`): a starting host resumes every lane a
+  crash interrupted, whose run's end then drains it, and drains every other
+  lane with cards queued for it, since no run's end will. What does not
+  survive a process (runs and streams) is cleared first, by `clearStreams`
+  in `@pineta/schema`. Values an older host left in `pineta.outbox`
+  (`LEGACY_OUTBOX_NAMESPACE`) are discarded, each with its text for the
+  log: nothing shows them.
 
 # Cards (`card.ts`, ADR-0048)
 
 What you type is a card. Its record is in the cards document (`CardsDoc` in
 `@pineta/schema`) and its text in a `TextDoc`, both written by clients; the
-host writes only to spend a card, when it is sent, and to sweep empty ones
-when it starts. This module decodes a record and decides where a card sits.
+host writes only to spend a card, when it is sent, to take a queued one, to
+write back one it could not send, and to sweep empty ones when it starts.
+This module decodes a record, and decides where a card sits and which
+queued card is taken next.
 
 - **The stored record is flat strings**, "" for none (`encodeCard`,
-  `decodeCard`, total). A drafting card's `at` is never the root; a fresh
-  card's `column` is never "". Clients write a card whole once and only its
-  fields after, since a whole-record write concurrent with a spend brings the
-  card back (S58).
+  `decodeCard`, total). A drafting or queued card's `at` is never the root;
+  a fresh card's `column` is never ""; a queued card has its `lane`,
+  `order` and `by`. `order`, `by`, `command` and `unsent` came later:
+  missing, they read as "". A `command` this build does not know makes the
+  card malformed. Clients write a card whole once and only its fields after,
+  since a whole-record write concurrent with a spend brings the card back
+  (S58); `queueFields` and `unqueueFields` are those writes, as values. An
+  unqueue writes only `kind`: the card goes back to where it was queued.
 - **A drafting card is resolved, never stored as an end.** `placeEnd` runs
   `threadOf` from where it started and its column's lane, as a reply from
   there would go, so the card follows its thread as the thread grows.
-  `cardEnd` is that for a card; `draftingAt(end, …)` is everyone's cards
-  whose end is `end`; `yourCard` is your own at an end or a fresh column, and
-  never another writer's.
-- **`spends(outcome)`**: written, running or waiting spends the card; a
-  conflict or a refusal leaves it.
-- **`planCardSweep`**: records whose text is empty, and stored `card:`
-  documents with no record, a spent or empty card's among them.
+  `cardEnd` is that for a drafting card; `draftingAt(end, …)` is everyone's
+  drafting cards whose end is `end`; `yourCard` is your own at an end or a
+  fresh column, never another writer's, and the newest of yours there (ids
+  are uuidv7), so a card someone unqueued does not take your composer.
+- **The queue is fields, not a list** (S69): `queuedOn(cards, lane)` sorts
+  a lane's queued cards by `order`, then id, so two people queueing at once
+  agree on the order. `orderAfter` keys are fixed-width base-36 integers,
+  started mid-range and stepped, so string order is numeric order and there
+  is room before and between. `planTake` takes nothing while the lane runs,
+  else its top card. `planUnsent` is the whole record a refused take
+  writes back: drafting where it was queued, saying why, never queued.
+- **`planCardSweep`**: records whose text is empty and that carry no
+  command, and stored `card:` documents with no record, a spent or empty
+  card's among them.
 
 # Seats (`seat.ts`, ADR-0048)
 
@@ -307,9 +311,10 @@ through one `setWorkRecord`:
 - **A resolution in progress has no record**: it is a running lane whose
   prompt is a land message. A `running` state would repeat that, and a crash
   would leave it stale. A run whose prompt is a land message ends with its
-  outcome, however it started: from an update, the outbox or a resume.
-- **`planUpdate`** refuses a lane with no copy of its own, and holds an
-  update for a busy lane as it would a message (`isBusy`).
+  outcome, however it started: from a card that brought the thread up to
+  date, or a resume.
+- **`planResolution`**'s prompt names the project's work, and ends with the
+  card's text, whole, under its own heading (ADR-0055).
 - **`landingOutcome`** is resolved only when the agent did not ask for
   guidance and jj finds no conflicts: the agent can always stop, and can never
   claim a success the repository contradicts (ADR-0033).
@@ -420,8 +425,8 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
 Two pi `CustomMessage`s in `land.ts`'s pattern. An update (`pineta.update`,
 role `update`) is a fact in the thread, never a prompt: which of your commits
 came in and which files changed, so the agent's next run reads them again.
-`updatePrefill` is the composer's editable intent after a clean update. A
-stack message (`pineta.stack`, role `stack`) is the prompt of the run that
+The card that brought the thread up to date carries what the person wants
+done with it (ADR-0055); its text is sent after the update. A stack message (`pineta.stack`, role `stack`) is the prompt of the run that
 splits an offer: the `offer-stack` skill, the commit the stack starts from,
 the tip it must match, and the bookmark to leave on it.
 

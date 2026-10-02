@@ -12,7 +12,7 @@ import type {
 import type { ReadOnly } from "./app-view.ts"
 import { CardEditor, type Where } from "./card-editor.tsx"
 import type { Pending, Prefill } from "./columns.ts"
-import type { Intent } from "./intent.ts"
+import type { ColumnAct, Intent } from "./intent.ts"
 import { nameFor } from "./presence.tsx"
 import type { Reader } from "./send.ts"
 import type { ColumnHow, SessionClient } from "./session-view.ts"
@@ -22,7 +22,8 @@ import { useTypingAt } from "./use-presence.ts"
  * The column's foot. What you type here is your drafting card at this
  * thread's end, or this fresh column's: created with the first keystroke worth
  * keeping, and kept across tab switches, reloads and restarts (ADR-0048).
- * Sending it spends it; a conflict or a refusal leaves it.
+ * Sending it spends it; a conflict or a refusal leaves it; a busy thread, or
+ * a command, queues it above the line.
  */
 export function Composer(p: {
   session: SessionClient
@@ -40,7 +41,6 @@ export function Composer(p: {
   seats: readonly SeatRecord[]
   prefill: Prefill | undefined
   pending: Pending | undefined
-  insert: { readonly text: string; readonly key: number } | null
   where: Where
   /** The thread end whose typists it names; null names none. */
   typingAt: string | null
@@ -50,6 +50,8 @@ export function Composer(p: {
   onCreatesLane: (createsLane: boolean) => void
   /** Where a read-only action goes (`ReadOnly.action.intent`). */
   onIntent: (intent: Intent) => void
+  /** The column's acts: queueing your card, clearing its command. */
+  onAct: (act: ColumnAct) => void
   readOnly: ReadOnly | null
   takeFocus: () => boolean
 }) {
@@ -70,9 +72,9 @@ export function Composer(p: {
         card={p.card}
         commands={p.commands}
         fresh={p.fresh}
-        insert={p.insert}
         lane={p.lane}
         onBranchInstead={p.onBranchInstead}
+        onAct={p.onAct}
         onCreatesLane={p.onCreatesLane}
         onIntent={p.onIntent}
         onSend={p.onSend}

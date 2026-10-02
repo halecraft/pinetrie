@@ -10,7 +10,7 @@ The end-to-end suites, each a directory of scenarios:
 
 They share `checks.ts` (recording a check, and stopping at one),
 `scenario.ts` (choosing, skipping and running scenarios) and `harness.ts`
-(waiting, throwaway projects, joining a host, `withHost`, the scripted model,
+(waiting, `noQueued`, throwaway projects, joining a host, `withHost`, the scripted model,
 `containerProblem`). A suite's own helpers are beside its scenarios:
 `host/support.ts`, `lanes/support.ts`, `browser/page.ts`.
 
@@ -71,6 +71,17 @@ They share `checks.ts` (recording a check, and stopping at one),
   the actions a later step depends on, and the waits that let it start.
 
 ## Gotchas
+
+- **An idle wait checks the queue as well as the runs** (`noQueued`): a
+  card queued while a run goes is taken only when it ends, so "no run" alone
+  can return between a run's end and the take. A card a client has just
+  queued may not have reached the host yet, so a step that queues waits for
+  what the take makes (a message, a landing) before it waits for idle.
+- **A card queued for the restart in `host/tools` is queued under a run
+  that is only the document's record** (`beginRun`). Queued on an idle lane,
+  the host's watch would take it before the restart; the record is what a
+  stopping host leaves, and the next host's startup clears it, then takes
+  the card.
 
 - **`slowToLoad` delays one document's first `currentMeta`**, by
   `LATE_LOAD_MS` (`host/support.ts`). Kyneta's `#hydrate` reads

@@ -39,13 +39,33 @@ test('decode: parentId "" is the root, where only a branch starts a thread', () 
     mode: "branch",
   })
   assert.equal(branch.kind === "chat" ? branch.at.kind : "", "root")
-  for (const mode of ["reply", "queue"])
-    assert.equal(
-      refusalCode(
-        decodeCommand({ kind: "chat", text: "hi", parentId: "", mode }),
-      ),
-      ERR.NO_ANCHOR,
-    )
+  assert.equal(
+    refusalCode(
+      decodeCommand({ kind: "chat", text: "hi", parentId: "", mode: "reply" }),
+    ),
+    ERR.NO_ANCHOR,
+  )
+})
+
+test("decode: queue is the host's own mode, never a client's (ADR-0048)", () => {
+  assert.equal(
+    refusalCode(
+      decodeCommand({
+        kind: "chat",
+        text: "hi",
+        parentId: "e-1",
+        mode: "queue",
+      }),
+    ),
+    ERR.UNKNOWN_KIND,
+  )
+})
+
+test("decode: the update command is gone (ADR-0055): an unknown kind", () => {
+  assert.equal(
+    refusalCode(decodeCommand({ kind: "update", lane: "lane:abc" })),
+    ERR.UNKNOWN_KIND,
+  )
 })
 
 test("decode: thread defaults are gone; a lane must be a thread's", () => {
@@ -111,7 +131,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       kind: "chat",
       text: "hi @bob",
       at: atEntry(entryId("e-5")),
-      mode: "queue",
+      mode: "reply",
       lane: laneNameForThread("abc"),
       asksAgent: false,
       mentions: [{ kind: "person", name: "bob" }],
@@ -137,7 +157,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "archive", action: "restore", root: entryId("e-1") },
     { kind: "mark", entry: entryId("e-1"), title: "Tab names" },
     { kind: "mark", entry: entryId("e-1"), title: null },
-    { kind: "update", lane: laneNameForThread("abc") },
     { kind: "offer", lane: laneNameForThread("abc"), action: "take" },
     { kind: "offer", lane: laneNameForThread("abc"), action: "split" },
     { kind: "reserve", lane: NEW_LANE },
@@ -150,7 +169,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
 test("encodeOutcome -> decodeReply round-trips every outcome", () => {
   const outcomes: Outcome[] = [
     { kind: "started", runId: runId("r-1") },
-    { kind: "queued", position: 2 },
+    { kind: "busy" },
     { kind: "conflict", by: writerId("bea@example.com") },
     { kind: "conflict", by: null },
     { kind: "appended", id: entryId("e-1") },
@@ -160,8 +179,6 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "restored" },
     { kind: "marked" },
     { kind: "taken" },
-    { kind: "updated", text: "I've merged my latest work" },
-    { kind: "updated", text: "" },
     { kind: "offered" },
     { kind: "reserved" },
     { kind: "refused", code: ERR.ARCHIVED, message: "archived by Bea" },

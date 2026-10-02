@@ -6,8 +6,13 @@ import {
   runId,
   writerId,
 } from "@pineta/core"
-import { encodeCard, encodeSeat, SEAT_NAMESPACE } from "@pineta/marginalia"
-import { newCardsDoc } from "@pineta/schema"
+import {
+  encodeCard,
+  encodeSeat,
+  LEGACY_OUTBOX_NAMESPACE,
+  SEAT_NAMESPACE,
+} from "@pineta/marginalia"
+import { newCardsDoc, physicalKey, readValues } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { basics, putValue, record } from "./fakes.ts"
 import { createSerial } from "./queue.ts"
@@ -22,9 +27,27 @@ const emptyCards = () =>
 
 test("recover resumes each interrupted lane before it settles the others, and names lanes first", async () => {
   const LANE = laneNameForThread("0123456789abcdef")
+  const OTHER = laneNameForThread("fedcba9876543210")
+  const cardsDoc = newCardsDoc()
+  cardsDoc.cards.set(
+    "c-1",
+    encodeCard({
+      id: cardId("c-1"),
+      owner: writerId("ada@x.io"),
+      place: {
+        kind: "queued",
+        at: atEntry(entryId("e-1")),
+        lane: OTHER,
+        order: "a",
+        by: writerId("ada@x.io"),
+      },
+      command: null,
+      unsent: null,
+    }),
+  )
   const events: string[] = []
   const deps: StartupDeps = {
-    basics: basics(),
+    basics: basics(undefined, cardsDoc),
     agent: record<StartupDeps["agent"]>({
       interrupted: async () => {
         events.push("interrupted")
@@ -48,20 +71,57 @@ test("recover resumes each interrupted lane before it settles the others, and na
       events.push(`settle ${lanes.join(",")}`)
     },
     cards: emptyCards(),
-    cardsDoc: newCardsDoc(),
   }
   await recover(deps)
-  expect(events).toEqual(["names", "interrupted", `resume ${LANE}`, "settle "])
+  expect(events).toEqual([
+    "names",
+    "interrupted",
+    `resume ${LANE}`,
+    `settle ${OTHER}`,
+  ])
+})
+
+test("recover deletes what an older host held in its outbox, logging each one's text", async () => {
+  const b = basics()
+  putValue(b.doc, {
+    namespace: LEGACY_OUTBOX_NAMESPACE,
+    key: "h-1",
+    value: { id: "h-1", details: { text: "run the tests" } },
+  })
+  const agent = record<StartupDeps["agent"]>({
+    interrupted: async () => [],
+    commands: () => [],
+    refusedCommands: () => [],
+    setWorkRecord: async () => {},
+    removeSeat: async () => {},
+    removeHeld: async key => {
+      b.doc.values.delete(physicalKey(LEGACY_OUTBOX_NAMESPACE, key))
+    },
+  })
+  await recover({
+    basics: b,
+    agent: agent.port,
+    work: record<StartupDeps["work"]>({ project: null }).port,
+    ensureNames: async () => {},
+    serial: createSerial(),
+    start: () => runId("r-1"),
+    settle: async () => {},
+    cards: emptyCards(),
+  })
+  expect(readValues(b.doc, LEGACY_OUTBOX_NAMESPACE)).toEqual([])
+  expect(b.lines.some(l => l.includes("run the tests"))).toBe(true)
 })
 
 test("recover sweeps empty cards, texts no record names, and seats no text names (ADR-0048)", async () => {
-  const b = basics()
   const cardsDoc = newCardsDoc()
+  const b = basics(undefined, cardsDoc)
   const card = (id: string) =>
     encodeCard({
       id: cardId(id),
       owner: writerId("ada@x.io"),
       place: { kind: "drafting", at: atEntry(entryId("e-1")), lane: null },
+      command: null,
+      unsent: null,
     })
   cardsDoc.cards.set("c-full", card("c-full"))
   cardsDoc.cards.set("c-empty", card("c-empty"))
@@ -99,7 +159,6 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
     start: () => runId("r-1"),
     settle: async () => {},
     cards: cards.port,
-    cardsDoc,
   })
   expect(cards.calls.find(c => c.method === "remove")?.args[0]).toEqual({
     records: ["c-empty"],

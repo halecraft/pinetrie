@@ -104,15 +104,16 @@ the alternative a second host would need: read the thread's end inside
   but dropped from its next turn (S19).
 - **Not while it runs.** A message appended to a running lane lands by timing:
   inside the agent's turn, as a prompt the agent answers, or after the reply
-  while a queued question is never answered (S21 Q3). The host holds such
-  messages in `pineta.outbox` (`Agent.hold`/`release`) and drains them when the
-  lane is idle; see `packages/marginalia/TECHNICAL.md`.
+  while a queued question is never answered (S21 Q3). A message for a busy
+  lane is a queued card instead (ADR-0048), which the host takes when the
+  lane is idle; see `apps/pineta/host/TECHNICAL.md`. `Agent.removeHeld`
+  deletes what an older host left in `pineta.outbox`.
 - **A pi run can only start with `prompt`**, so a compelled chat is passed to
   `ThreadLaneHandle.run` as the prompt itself: a pi `CustomMessage`, which pi's
   default `convertToLlm` sends as a `user` message with its `content`.
 - The harness is created with `followUpMode: "one-at-a-time"`, so that pi's own
   queue, if ever reached, answers one message at a time rather than batching
-  (S20). Pineta's outbox means the host does not use it.
+  (S20). Pineta's queued cards mean the host does not use it.
 
 `laneErrCode(tag)` maps pi's refusal tags for runs and lane creation, so none of
 pi's vocabulary passes the boundary (ADR-0003): `UnknownTarget` and `LaneBusy`

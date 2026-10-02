@@ -7,6 +7,9 @@ bookmark), ADR-0033 (landing) and ADR-0034 (how work moves into your repo).
 strip, and its lines become plain words, with the bookmark shown apart.
 **Amended by ADR-0047:** the preview is in Pineta too: the column widens to
 show each revision's description, files and diffs.
+**Amended by ADR-0055:** "Update from my work" becomes a card's command,
+"bring up to date", carried out when the host takes the card; its prefill
+goes, and the card's text is the intent.
 Amended in place (S51, `PLAN-2026-09-29-offer-start`): the newest copy of
 your `@` in a lane's history supersedes the haves recorded before it.
 

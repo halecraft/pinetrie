@@ -139,7 +139,7 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "tools",
     expect:
-      "after a restart the session is all there, and the held message was drained",
+      "after a restart the session is all there, and the queued card was taken",
   },
   {
     name: "the host binds every interface by default",
@@ -231,8 +231,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup does not compact",
     file: "apps/pineta/host/index.ts",
-    from: "    settle,\n    cards: cardPort,\n    cardsDoc: cards,\n    ensureNames: names.ensure,\n  })",
-    to: "    settle: lanes =>\n      serial.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    cardsDoc: cards,\n    ensureNames: names.ensure,\n  })",
+    from: "    settle,\n    cards: cardPort,\n    ensureNames: names.ensure,\n  })",
+    to: "    settle: lanes =>\n      serial.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    ensureNames: names.ensure,\n  })",
     suite: "host",
     scenario: "tools",
     expect: "a starting host compacts the session it opened",
@@ -1279,5 +1279,44 @@ export const mutations: readonly Mutation[] = [
     scenario: "tools",
     expect:
       "an ask is open while it runs, and folds at its end above the view, the column at its end and the last word in view",
+  },
+  {
+    name: "the take sends as the card's owner, not who queued it",
+    file: "apps/pineta/host/index.ts",
+    from: "          commands.sendTaken(taken.card.place.by, newId(), takenChat(taken)),",
+    to: "          commands.sendTaken(taken.card.owner, newId(), takenChat(taken)),",
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a queued card is taken when the run ends: its queuer's message, with the edits made while it waited",
+  },
+  {
+    name: "the cards watch never drains",
+    file: "apps/pineta/host/index.ts",
+    from: "  const unwatchQueues = subscribe(cards, watchQueues)",
+    to: "  const unwatchQueues = subscribe(cards, () => void watchQueues)",
+    suite: "host",
+    scenario: "cards",
+    expect: "a card queued on an idle thread is taken at once",
+  },
+  {
+    name: "an unqueue writes nothing",
+    file: "packages/client/session-view.ts",
+    from: "      writeFields(id, unqueueFields())",
+    to: "      void unqueueFields",
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "an unqueued card is not sent, and is below the line again for everyone",
+  },
+  {
+    name: "queued cards are not drawn",
+    file: "packages/client/column.tsx",
+    from: "            {queued.map((c, n) => (",
+    to: "            {queued.slice(0, 0).map((c, n) => (",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "your queued card is drawn above the line, last in its queue, and another writer's edit to it shows",
   },
 ]

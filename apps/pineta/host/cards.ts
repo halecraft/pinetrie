@@ -1,9 +1,9 @@
 // host/cards — where the host's shell opens card documents (ADR-0048).
 // `startHost` reads one more, for the suites (`RunningHost.cardText`).
 //
-// Clients write cards; the host only reads who wrote in one, spends one when
-// it is sent, and sweeps. It also gathers every card's text for the sweeps,
-// so no text is read twice.
+// Clients write cards; the host only reads who wrote in one, takes queued
+// ones (`take.ts`), spends one when it is sent, and sweeps. It also gathers
+// every card's text for the sweeps, so no text is read twice.
 
 import { type Exchange, type Store, whenHydrated } from "@kyneta/exchange"
 import type { CardId, WriterId } from "@pineta/core"
@@ -33,6 +33,12 @@ export interface CardPort {
    * destroys its own copy once it has seen both (S64).
    */
   spend(id: CardId): Promise<void>
+  /** Destroy its document: it was taken and sent, and the take deleted its record. */
+  destroy(id: CardId): Promise<void>
+  /** Load these cards' texts, so `textNow` reads each whole. */
+  hydrate(ids: readonly CardId[]): Promise<void>
+  /** A card's text as the host holds it now, with no wait: after `hydrate`. */
+  textNow(id: CardId): string
   /** Every live card's text, with who wrote in it. */
   texts(): Promise<readonly GatheredText[]>
   /** Every stored card text document, by id. */
@@ -78,6 +84,11 @@ export function startCards(input: {
       return writersOf(textClients(await text(cardDocId(id))), readSeats(doc))
     },
     spend: id => remove({ records: [id], docs: [cardDocId(id)] }),
+    destroy: id => remove({ records: [], docs: [cardDocId(id)] }),
+    async hydrate(ids) {
+      for (const id of ids) await text(cardDocId(id))
+    },
+    textNow: id => exchange.get(cardDocId(id), TextDoc).text(),
     async texts() {
       const out: GatheredText[] = []
       for (const c of readCards(cards)) {
