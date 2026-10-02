@@ -18,6 +18,7 @@ import type {
   CardPlace,
   CardRecord,
   CommandSummary,
+  LineRecord,
   Position,
   ProjectRecord,
   SeatRecord,
@@ -56,6 +57,7 @@ import {
   uploadImage,
 } from "./paste.ts"
 import {
+  baseChoices,
   type ComposerMode,
   placeholderWords,
   planSend,
@@ -98,6 +100,8 @@ export interface Where {
   readonly project: ProjectRecord | null
   /** Directories other lanes work in directly: offered again. */
   readonly usedDirs: readonly string[]
+  /** The integration line, for the bases a new lane may start from (ADR-0060). */
+  readonly line: LineRecord | null
 }
 
 /**
@@ -185,6 +189,8 @@ export function CardEditor(p: {
     line: string
   } | null>(null)
   const [choice, setChoice] = useState<WorkSetting | null>(null)
+  /** The WIP a new lane of its own starts from; null for the line (ADR-0060). */
+  const [base, setBase] = useState<string | null>(null)
   const command = card?.command ?? null
   const plan = planSend({
     text,
@@ -326,6 +332,9 @@ export function CardEditor(p: {
       mode: as,
       ...(id === undefined ? {} : { id }),
       ...(plan.createsLane && choice !== null ? { work: choice } : {}),
+      ...(plan.createsLane && work?.kind === "own" && base !== null
+        ? { base }
+        : {}),
       ...(from === null ? {} : { card: from }),
     })
     step({ kind: "settled", spent: spent(outcome) })
@@ -579,6 +588,9 @@ export function CardEditor(p: {
                 usedDirs={p.where.usedDirs}
                 work={work}
                 choose={setChoice}
+                line={p.where.line}
+                base={base}
+                chooseBase={setBase}
               />
             )}
           <button
@@ -659,34 +671,58 @@ export function QueuedCardEditor(p: {
   )
 }
 
-/** The chip that says where a new thread's agent works, and changes it. */
+/**
+ * The chip that says where a new thread's agent works, and changes it; for a
+ * copy, also where it starts: the line, or a WIP (ADR-0060), rarely chosen.
+ */
 function WhereMenu(p: {
   project: ProjectRecord
   usedDirs: readonly string[]
   work: WorkSetting
   choose: (work: WorkSetting) => void
+  line: LineRecord | null
+  base: string | null
+  chooseBase: (base: string | null) => void
 }) {
+  const bases =
+    p.work.kind === "own"
+      ? baseChoices(p.line, p.base).map(c => ({
+          key: c.key,
+          label: c.row,
+          className: c.chosen ? "where-base chosen" : "where-base",
+          data: { base: c.base ?? "" },
+          onChoose: () => p.chooseBase(c.base),
+        }))
+      : []
   return (
     <Menu
       className="where-menu"
       heading="where the agent works"
-      items={whereChoices(p.project, p.usedDirs).map(c => ({
-        key: c.key,
-        label: c.row,
-        className: c.className,
-        disabled: c.disabled,
-        ...(c.title === undefined ? {} : { title: c.title }),
-        onChoose: () => {
-          if (c.setting !== null) return p.choose(c.setting)
-          const dir = window.prompt("The directory to work in")?.trim()
-          if (dir !== undefined && dir !== "") p.choose({ kind: "direct", dir })
-        },
-      }))}
+      items={[
+        ...whereChoices(p.project, p.usedDirs).map(c => ({
+          key: c.key,
+          label: c.row,
+          className: c.className,
+          disabled: c.disabled,
+          ...(c.title === undefined ? {} : { title: c.title }),
+          onChoose: () => {
+            if (c.setting !== null) return p.choose(c.setting)
+            const dir = window.prompt("The directory to work in")?.trim()
+            if (dir !== undefined && dir !== "")
+              p.choose({ kind: "direct", dir })
+          },
+        })),
+        ...bases,
+      ]}
       label="where the agent works"
       trigger={
         <>
           <span className="where-words" data-work={p.work.kind}>
-            {whereWords(p.work, p.project)}
+            {whereWords(
+              p.work,
+              p.project,
+              p.work.kind === "own" ? p.base : null,
+            )}
           </span>
           <span className="where-caret">▾</span>
         </>

@@ -121,6 +121,8 @@ export function writesAt(
     case "stop":
     case "archive":
     case "reserve":
+    // The line is your repo's, in no root.
+    case "line":
     // A command acts only when its card is taken, behind the take's own check.
     case "set-command":
       return null

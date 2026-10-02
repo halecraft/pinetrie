@@ -8,6 +8,116 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "setting up the line leaves your log as it was",
+    file: "packages/lanes/plan.ts",
+    from: '    "--repo",\n    "revsets.log",\n    input.log,\n  ),',
+    to: '    "--repo",\n    "revsets.log",\n    "builtin_log()",\n  ),',
+    command: unit,
+    expect: "an offer on the line (ADR-0060)",
+  },
+  {
+    name: "the offers are added to your log again at each setup",
+    file: "packages/lanes/plan.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  return base.endsWith(added) ? base : `${base} | ${added}`\n}\n\n/**\n * Set up",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "  return `${base} | ${added}`\n}\n\n/**\n * Set up",
+    command: unit,
+    expect: "added to jj's default when the repo defines none, and idempotent",
+  },
+  {
+    name: "an offer's facts carry no ledger",
+    file: "packages/lanes/offer.ts",
+    from: "    commits,\n    ledger,\n  }",
+    to: "    commits,\n    ledger: null,\n  }",
+    command: unit,
+    expect: "an offer on the line (ADR-0060)",
+  },
+  {
+    name: "landing leaves the line where it was",
+    file: "packages/lanes/plan.ts",
+    from: '  onHost("jj", "-R", input.root, "bookmark", "move", input.onto, "--to", "@-"),',
+    to: '  onHost("jj", "-R", input.root, "bookmark", "move", input.onto, "--to", "@--"),',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "the offer follows the line when you land your commit, and says it conflicts with it",
+  },
+  {
+    name: "a take finds no destination below the offer",
+    file: "apps/pineta/host/offers/act.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "              `present(${revsetName(d.bookmark)}) & ::parents(${bottom})`,",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "              `present(${revsetName(d.bookmark)}) & ${bottom}::`,",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "taking the offer moves the line to it, on your landed commit; your working copy is untouched",
+  },
+  {
+    name: "a new thread begins at your @-",
+    file: "packages/lanes/line.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  const [lineCommit] = await commitsOf(jj, `present(${onto})`)",
+    to: '  const [lineCommit] = await commitsOf(jj, "@-")',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a new root thread starts at the line: it has what you landed, and not what you have not",
+  },
+  {
+    name: "the line's heads fail a repo with no line",
+    file: "packages/lanes/plan.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  const onto = `present(${revsetName(line.onto)})`",
+    to: "  const onto = revsetName(line.onto)",
+    command: unit,
+    expect: "added to jj's builtin when the repo defines none, with present()",
+  },
+  {
+    name: "the user's line name wins over the project's",
+    file: "packages/lanes/plan.ts",
+    from: "    const value = project[key] ?? user[key]",
+    to: "    const value = user[key] ?? project[key]",
+    command: unit,
+    expect: "the project's name wins over the user's",
+  },
+  {
+    name: "a bookmark name may hold ..",
+    file: "packages/lanes/plan.ts",
+    from: '  !name.includes("..") &&',
+    to: "",
+    command: unit,
+    expect: "isBookmarkName: git's rules",
+  },
+  {
+    name: "an offer starts at its base, ignoring what you took",
+    file: "packages/lanes/plan.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  const had = sources === "" ? input.start : `${input.start} | ::(${sources})`',
+    to: "  const had = input.start",
+    command: unit,
+    expect:
+      "offerStart: the base's commit, and the history of each taken source",
+  },
+  {
+    name: "a take may move the line backwards",
+    file: "packages/lanes/plan.ts",
+    from: '      "move",\n      input.destination,',
+    to: '      "move",\n      "--allow-backwards",\n      input.destination,',
+    command: unit,
+    expect: "planTakeOffer: the destination moved forward to the top",
+  },
+  {
+    name: "taken offers' sources are not read",
+    file: "packages/lanes/offer.ts",
+    from: "  return [...new Set(trailerValues(ran.stdout, TRAILERS.source))].map(commitId)",
+    to: "  return []",
+    command: unit,
+    expect: "an offer on the line (ADR-0060)",
+  },
+  {
     name: "a stale base working copy is not recovered",
     file: plan,
     from: '          inLane("jj", "workspace", "update-stale"),\n',
@@ -30,7 +140,7 @@ export const mutations: readonly Mutation[] = [
     from: "  user.startsWith(`${HOST_OPERATOR}@`)",
     to: "  false",
     command: unit,
-    expect: "an offer: built, refreshed, left",
+    expect: "an offer on the line (ADR-0060)",
   },
   {
     name: "retiring removes nothing of Pineta's line",
@@ -85,8 +195,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an update's merge is left uncommitted",
     file: "packages/lanes/merge.ts",
-    from: '  const commit = await jj(["commit", "-m", "update: your work"])',
-    to: '  const commit = await jj(["log", "-r", "@"])',
+    from: '  const made = await jj(["new", ours, from, "-m", message])\n  if (!made.ok) throw new Error(describeFailure("jj new", made))\n  const commit = await jj(["commit", "-m", message])',
+    to: '  const made = await jj(["new", ours, from, "-m", message])\n  if (!made.ok) throw new Error(describeFailure("jj new", made))\n  const commit = await jj(["log", "-r", "@"])',
     command: unit,
     expect: "the whole life of a lane",
   },
@@ -243,19 +353,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an offer is moved by its bottom revision alone",
     file: plan,
-    from: '): LaneStep[] => [hostOp(root, "rebase", "-s", bottom, "-o", target)]',
-    to: '): LaneStep[] => [hostOp(root, "rebase", "-r", bottom, "-o", target)]',
+    from: '): LaneStep[] => [hostRewrite(root, "rebase", "-s", bottom, "-o", target)]',
+    to: '): LaneStep[] => [hostRewrite(root, "rebase", "-r", bottom, "-o", target)]',
     command: unit,
     expect: "planOffer: a commit per source",
-  },
-  {
-    name: "a have your repo lacks fails every offer's start",
-    file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '  haves.length === 0 ? null : haves.map(h => `present(${h.commit})`).join(" | ")',
-    to: '  haves.length === 0 ? null : haves.map(h => h.commit).join(" | ")',
-    command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
-    expect: "an offer: built, refreshed",
   },
   {
     name: "a follow restores the tip where the offer sits",
@@ -263,23 +364,15 @@ export const mutations: readonly Mutation[] = [
     from: '      ...input.start.flatMap(c => ["-o", c]),',
     to: '      ...["-o", input.target],',
     command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
-    expect: "an offer: built, refreshed",
+    expect: "an offer on the line (ADR-0060)",
   },
   {
     name: "the repair keeps the host's commit",
     file: plan,
-    from: '  hostOp(input.root, "abandon", input.hosts),',
-    to: '  hostOp(input.root, "abandon", input.yours),',
+    from: '  hostRewrite(input.root, "abandon", input.hosts),',
+    to: '  hostRewrite(input.root, "abandon", input.yours),',
     command: unit,
-    expect: "an offer: built",
-  },
-  {
-    name: "pineta-onto does not follow a take",
-    file: plan,
-    from: "    ...(input.onto\n      ? [",
-    to: "    ...(false\n      ? [",
-    command: unit,
-    expect: "planTakeOffer",
+    expect: "an offer on the line (ADR-0060)",
   },
   {
     name: "retiring deletes before it moves",
@@ -292,10 +385,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fork's copy is a child of your @ itself",
     file: plan,
-    from: '  inLane("jj", "new", ...yours.parents, "-m", COPY_MESSAGE),',
-    to: '  inLane("jj", "new", yours.at, "-m", COPY_MESSAGE),',
+    from: '  inLane("jj", "new", wip.under),',
+    to: '  inLane("jj", "new", wip.commit),',
     command: unit,
-    expect: "planForkSetup: a copy of your @",
+    expect: "planForkSetup: a WIP's copy on the line commit under it",
   },
   {
     name: "a lane's tip is fetched as a local bookmark",
@@ -306,30 +399,6 @@ export const mutations: readonly Mutation[] = [
     to: "      `+refs/heads/${bookmark}:refs/heads/${bookmark}`,",
     command: unit,
     expect: "planFetch",
-  },
-  {
-    name: "an older copy stays a start",
-    file: plan,
-    from: "  const held = inside.filter(h => h.at >= newest)",
-    to: "  const held = inside",
-    command: unit,
-    expect: "the newest copy, and what came after it",
-  },
-  {
-    name: "a have before the newest copy stays a start",
-    file: plan,
-    from: "  const held = inside.filter(h => h.at >= newest)",
-    to: '  const held = inside.filter(h => h.kind === "delivered" || h.at >= newest)',
-    command: unit,
-    expect: "starts at the newest copy (S51)",
-  },
-  {
-    name: "the host starts from every have",
-    file: "packages/lanes/offer.ts",
-    from: "  const haves = startHaves(input.haves, new Set(inTip), new Set(holdTip))",
-    to: "  const haves = { held: input.haves, beside: [], since: [] }",
-    command: unit,
-    expect: "starts at the newest copy (S51)",
   },
   {
     name: "the image ignores Pineta's Playwright version",
@@ -447,26 +516,10 @@ export const mutations: readonly Mutation[] = [
     expect: "planStartFrom: a volume starts from it",
   },
   {
-    name: "a have that holds the tip is dropped",
-    file: "packages/lanes/plan.ts",
-    from: "  if (holding.length > 0) return { held: holding, beside: [], since: [] }\n",
-    to: "",
-    command: unit,
-    expect: "a have that holds the tip is kept alone",
-  },
-  {
-    name: "a start never reads which haves hold the tip",
-    file: "packages/lanes/offer.ts",
-    from: "  const haves = startHaves(input.haves, new Set(inTip), new Set(holdTip))",
-    to: "  const haves = startHaves(input.haves, new Set(inTip), new Set(holdTip.slice(0, 0)))",
-    command: unit,
-    expect: "a taken branch that holds all its lane's work",
-  },
-  {
     name: "the resolution is not told what the card asked",
     file: "apps/pineta/host/work/update.ts",
-    from: "            details: { landing: basics.newId(), lane, yours: [copy], by },\n            intent,",
-    to: '            details: { landing: basics.newId(), lane, yours: [copy], by },\n            intent: "",',
+    from: "              by,\n            },\n            intent,",
+    to: '              by,\n            },\n            intent: "",',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -481,24 +534,6 @@ export const mutations: readonly Mutation[] = [
     scenario: "main",
     expect:
       "a card that brings the thread up to date writes the update in the thread, then sends its text",
-  },
-  {
-    name: "a delivered commit beside the tip is dropped",
-    file: plan,
-    from: "    since.length === 0 ? [] : haves.filter(h => !inTip.has(h.commit))",
-    to: "    since.length === 0 ? [] : haves.filter(h => !inTip.has(h.commit)).slice(0, 0)",
-    command: unit,
-    expect: "a branch of a thread taken after the fork offers only its own",
-  },
-  {
-    name: "a commit beside the tip counts below the newest copy",
-    file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  const shared = `(::(${besides}) & (${above})::)`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "  const shared = `::(${besides})`",
-    command: unit,
-    expect: "a branch taken before its lane's update adds nothing",
   },
   {
     name: "a turn's paths are read quoted",

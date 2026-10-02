@@ -7,6 +7,7 @@ import {
   describeRequest,
   revisionEdited,
   transcriptLines,
+  withLedger,
   withTrailers,
 } from "@pineta/marginalia"
 import { readTreeIndex } from "@pineta/reads"
@@ -87,14 +88,19 @@ export function describe(
         now.host.start.join() !== before.host.start.join()
       )
         return
-      const target = await state.targetNow()
+      const place = await state.placeOf(lane)
+      if (place === null || place.target === null) return
+      const { target } = place
       const facts = await state.factsOf(now, target)
       if (facts.revisions.some(revisionEdited)) return
       await executeOnHost(
         planDescribe(
           root,
           change,
-          withTrailers(text, { lane, name, entry: tip ?? "" }),
+          withLedger(withTrailers(text, { lane, name, entry: tip ?? "" }), {
+            source: now.host.tip,
+            start: now.host.start,
+          }),
         ),
       )
       const after = await offerCommits(ops, now.host.changes)

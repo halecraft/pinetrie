@@ -27,10 +27,12 @@ import {
   readAgentActivity,
   readArchive,
   readBanners,
+  readBases,
   readCommands,
   readDigests,
   readLandings,
   readLaneRecords,
+  readLine,
   readMarks,
   readNames,
   readOffers,
@@ -92,6 +94,8 @@ export function readSessionFacts(doc: SessionDocHandle): SessionFacts {
       offers: readOffers(doc),
       names: readNames(doc),
       banners: readBanners(doc),
+      line: readLine(doc),
+      bases: readBases(doc),
     },
   }
 }

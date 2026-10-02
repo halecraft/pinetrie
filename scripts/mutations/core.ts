@@ -9,6 +9,22 @@ const core = "packages/core/index.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "an offer's ledger is read from its oldest paragraph",
+    file: "packages/core/index.ts",
+    from: "    .filter(p => trailerValues(p, TRAILERS.source).length > 0)\n    .at(-1)",
+    to: "    .filter(p => trailerValues(p, TRAILERS.source).length > 0)\n    .at(0)",
+    command: unit,
+    expect: "offerLedger reads the newest paragraph that names a source",
+  },
+  {
+    name: "a trailer is read from the last paragraph only",
+    file: "packages/core/index.ts",
+    from: "    .filter(line => line.startsWith(prefix))",
+    to: "    .filter(line => line.startsWith(prefix))\n    .slice(-1)",
+    command: unit,
+    expect: "trailerValues reads a trailer from every paragraph",
+  },
+  {
     name: "the youngest child continues the parent's track",
     file: tree,
     from: "    const tracks = children.map((_, i) => (i === 0 ? track : claim()))",

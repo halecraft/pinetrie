@@ -1,12 +1,31 @@
-import { commitId, laneNameForThread, type OfferRecord } from "@pineta/core"
-import { planAbandonOffer, planFollowOffer, planTakeOffer } from "@pineta/lanes"
+import {
+  commitId,
+  ERR,
+  type LineRecord,
+  laneNameForThread,
+  type OfferRecord,
+} from "@pineta/core"
+import {
+  DEFAULT_LINE,
+  immutableHeads,
+  logRevset,
+  planAbandonOffer,
+  planFollowOffer,
+  planLand,
+  planLineSetup,
+  planTakeOffer,
+} from "@pineta/lanes"
 import { describe, expect, test } from "vitest"
 import {
+  builtOf,
   type OfferAt,
   offerRecord,
+  planLineAction,
+  planLineRecord,
   planOfferEffects,
   planTake,
   type RefreshContext,
+  readBaseline,
 } from "./plan.ts"
 
 const LANE = laneNameForThread("0123456789abcdef")
@@ -90,7 +109,7 @@ describe("planOfferEffects", () => {
         start: [START],
         tip: NEW_TIP,
         target: "@-",
-        description: null,
+        description: "WIP (amber fox): fix it",
       }),
     )
     expect(e.after).toMatchObject({
@@ -101,20 +120,11 @@ describe("planOfferEffects", () => {
     expect(e.built).toBe(true)
   })
 
-  test("a described offer that follows is a work in progress again; an undescribed one keeps its line", () => {
+  test("an offer that follows is a work in progress again, its ledger the new tip (ADR-0060)", () => {
     const steps = (described: boolean) =>
       planOfferEffects("follow", context(offer({ described }))).steps
-    expect(steps(true)).toEqual(
-      planFollowOffer({
-        root: "/repo",
-        change: "kxyz",
-        start: [START],
-        tip: NEW_TIP,
-        target: "@-",
-        description: "WIP (amber fox): fix it",
-      }),
-    )
-    expect(steps(false)).not.toEqual(steps(true))
+    expect(steps(false)).toEqual(steps(true))
+    expect(steps(true).at(-1)?.argv).toContain("WIP (amber fox): fix it")
   })
 
   test("withdraw plans the abandon, then the record's removal", () => {
@@ -145,41 +155,156 @@ describe("planOfferEffects", () => {
   })
 })
 
-describe("planTake", () => {
-  test("its steps are planTakeOffer's; it delivers the offer's tip as a have, and marks the offer taken as its top", () => {
-    const o = offer({
-      host: {
-        changes: ["kbot", "ktop"],
-        wrote: [WROTE, WROTE],
-        tip: TIP,
-        start: [START],
-      },
-    })
-    const planned = planTake({
+describe("planTake (ADR-0060)", () => {
+  const o = offer({
+    host: {
+      changes: ["kbot", "ktop"],
+      wrote: [WROTE, WROTE],
+      tip: TIP,
+      start: [START],
+    },
+  })
+  const wip = {
+    bookmark: "wip/x",
+    kind: "wip",
+    bringsAlong: 0,
+    final: false,
+  } as const
+  const line = {
+    bookmark: "pineta-onto",
+    kind: "line",
+    bringsAlong: 2,
+    final: true,
+  } as const
+  const take = (to: string | null, below = (_: string) => true) =>
+    planTake({
       root: "/repo",
-      lane: LANE,
       offer: o,
-      target: "@-",
-      underYou: true,
+      destinations: [wip, line],
+      to,
+      below,
       now: 9,
     })
-    expect(planned?.steps).toEqual(
-      planTakeOffer({
+  test("the default destination moves forward to the top, and the offer is marked taken", () => {
+    expect(take(null)).toEqual({
+      kind: "take",
+      steps: planTakeOffer({
         root: "/repo",
         bookmark: o.bookmark,
-        bottom: "kbot",
         top: "ktop",
-        target: "@-",
-        underYou: true,
-        onto: false,
+        destination: "wip/x",
       }),
-    )
-    expect(planned?.have).toEqual({
-      lane: LANE,
-      commit: TIP,
-      kind: "delivered",
-      at: 9,
+      taken: { ...o, taken: "ktop", at: 9 },
     })
-    expect(planned?.taken).toMatchObject({ taken: "ktop", at: 9 })
+  })
+  test("a named destination among the offer's is taken there", () => {
+    const planned = take("pineta-onto")
+    expect(
+      planned.kind === "take" && planned.steps[0]?.argv.join(" "),
+    ).toContain("bookmark move pineta-onto --to ktop")
+  })
+  test("a destination not among the offer's, or not below it, is refused", () => {
+    expect(take("main")).toEqual({ kind: "refused", code: ERR.BAD_DESTINATION })
+    expect(take(null, () => false)).toEqual({
+      kind: "refused",
+      code: ERR.BAD_DESTINATION,
+    })
+  })
+})
+
+describe("the line (ADR-0060)", () => {
+  const facts = {
+    commit: null,
+    heads: "trunk()",
+    log: null,
+    wips: [],
+    yours: { behind: 0, ahead: null },
+  } as const
+  const record = (over: Partial<LineRecord> = {}): LineRecord => ({
+    ...planLineRecord(facts, DEFAULT_LINE, true),
+    ...over,
+  })
+  test("planLineRecord proposes your heads with the line's added", () => {
+    expect(record().heads).toEqual({
+      current: "trunk()",
+      proposed: immutableHeads(DEFAULT_LINE, "trunk()"),
+    })
+    expect(record().log).toEqual({ current: null, proposed: logRevset(null) })
+  })
+  test("setup writes the bookmark at your @- and exactly the proposed heads and log", () => {
+    expect(planLineAction("setup", record(), "/repo")).toEqual({
+      kind: "steps",
+      steps: planLineSetup({
+        root: "/repo",
+        onto: "pineta-onto",
+        heads: immutableHeads(DEFAULT_LINE, "trunk()"),
+        log: logRevset(null),
+      }),
+    })
+  })
+  test("a host that admits others refuses both; a set line refuses setup", () => {
+    expect(
+      planLineAction("setup", record({ commands: false }), "/repo"),
+    ).toEqual({ kind: "refused", code: ERR.NOT_YOURS })
+    expect(
+      planLineAction("land", record({ commands: false }), "/repo"),
+    ).toEqual({ kind: "refused", code: ERR.NOT_YOURS })
+    expect(
+      planLineAction("setup", record({ commit: commitId("c1") }), "/repo").kind,
+    ).toBe("refused")
+  })
+  test("land: only with a line, and your work above it", () => {
+    expect(planLineAction("land", record(), "/repo")).toEqual({
+      kind: "refused",
+      code: ERR.NO_LINE,
+    })
+    const set = (ahead: number | null) =>
+      record({ commit: commitId("c1"), yours: { behind: 0, ahead } })
+    expect(planLineAction("land", set(null), "/repo").kind).toBe("refused")
+    expect(planLineAction("land", set(0), "/repo").kind).toBe("refused")
+    expect(planLineAction("land", set(2), "/repo")).toEqual({
+      kind: "steps",
+      steps: planLand({ root: "/repo", onto: "pineta-onto" }),
+    })
+  })
+})
+
+describe("readBaseline: what a refresh takes as your edits' baseline (S73)", () => {
+  const same = { sameDescription: true, sameChange: true, since: null }
+  const commits = [commitId("now")]
+  test("a revision jj only rebased keeps the host's write", () => {
+    expect(readBaseline({ commits, revisions: [same] })).toBeNull()
+  })
+  test("one that differs, as the host's own lost write, is read now", () => {
+    expect(
+      readBaseline({
+        commits,
+        revisions: [
+          same,
+          {
+            sameDescription: true,
+            sameChange: false,
+            since: { reached: true, yoursChanged: false },
+          },
+        ],
+      }),
+    ).toEqual(commits)
+  })
+})
+
+describe("builtOf: what an offer was built from and on (ADR-0060)", () => {
+  test("its message's ledger, over the record's copy", () => {
+    const ledger = { source: commitId("src"), start: [commitId("st")] }
+    expect(builtOf(ledger, offer())).toEqual({
+      builtFrom: ledger.source,
+      builtOn: ledger.start,
+    })
+  })
+  test("the record's copy when you rewrote the message without it", () => {
+    const o = offer()
+    expect(builtOf(null, o)).toEqual({
+      builtFrom: o.host.tip,
+      builtOn: o.host.start,
+    })
   })
 })

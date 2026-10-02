@@ -29,7 +29,7 @@ import {
   settled,
 } from "./cards.ts"
 import { type Chat, type ChatDeps, sendChat, spendsCard } from "./chat.ts"
-import { actOnOffer, handleStop, type LaneDeps } from "./lane.ts"
+import { actOnLine, actOnOffer, handleStop, type LaneDeps } from "./lane.ts"
 import { handleMark, type MarkDeps } from "./mark.ts"
 
 export interface CommandDeps {
@@ -143,8 +143,10 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(await handleMark(deps, writer, intent))
       case "offer":
         return settled(
-          await actOnOffer(deps, intent.lane, intent.action, writer),
+          await actOnOffer(deps, intent.lane, intent.action, writer, intent.to),
         )
+      case "line":
+        return settled(await actOnLine(deps, intent.action))
       case "reserve":
         return settled(
           (await deps.names.reserve(intent.lane)) === "held"

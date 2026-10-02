@@ -10,10 +10,14 @@ import { execFileSync } from "node:child_process"
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { type ConnectOptions, connectSession } from "@pineta/client/session"
+import {
+  type ConnectOptions,
+  connectSession,
+  type SessionClient,
+} from "@pineta/client/session"
 import { prepareHost } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
-import { readPlaces } from "@pineta/reads"
+import { readLine, readPlaces } from "@pineta/reads"
 import {
   type RunningHost,
   type StartHostOptions,
@@ -89,6 +93,23 @@ export const join = (
     principal: `${name}@${scenario}.test`,
     ...options,
   })
+
+/**
+ * Set up the integration line at your `@-`, as the header's menu does
+ * (ADR-0060): a new thread with no history of its own starts there. Waits for
+ * the host's line record; does nothing when the line is set up already.
+ */
+export async function setUpLine(
+  doc: Parameters<typeof readLine>[0],
+  user: Pick<SessionClient, "line">,
+): Promise<void> {
+  await waitFor(() => readLine(doc) !== null, 60_000)
+  if (readLine(doc)?.commit !== null) return
+  const done = await user.line("setup")
+  if (done.kind !== "line-moved")
+    throw new Error(`the line was not set up: ${JSON.stringify(done)}`)
+  await waitFor(() => readLine(doc)?.commit !== null, 30_000)
+}
 
 /** What the suites' agent says when nothing is scripted. */
 const SUITE_REPLY =

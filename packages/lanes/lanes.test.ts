@@ -14,7 +14,6 @@ import {
   commitId,
   type EntryId,
   entryId,
-  type HaveRecord,
   type LaneName,
   laneNameForThread,
   NO_EDITOR,
@@ -23,6 +22,7 @@ import {
 } from "@pineta/core"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import {
+  baseMessage,
   bookmarkOf,
   changedPaths,
   changeOf,
@@ -30,10 +30,12 @@ import {
   commitTurn,
   conflictContent,
   conflictsIn,
+  DEFAULT_LINE,
   entryOfMessage,
   execute,
   executeOnHost,
   executeOrThrow,
+  fetchById,
   fileDiff,
   hasBookmark,
   hostBytesRunner,
@@ -41,38 +43,42 @@ import {
   hostJj,
   hostOps,
   hostRunner,
+  immutableHeads,
   LANE_JJ_CONFIG,
   type LaneStep,
+  laneBase,
   laneIgnores,
+  laneRefSteps,
   laneTipIn,
   lines,
-  mergeYours,
+  logRevset,
+  mergeBase,
+  newestBase,
   type OfferSource,
-  ONTO_BOOKMARK,
   offerBookmark,
   offerFacts,
   offerRevisions,
   planAbandonOffer,
   planBaseRefresh,
+  planDescribe,
   planFetch,
   planFollowOffer,
   planForkSetup,
+  planLineSetup,
   planOffer,
-  planRefreshOffer,
   planRepair,
   planTakeOffer,
-  planYourCopy,
+  planWipCopy,
   type Ran,
   type Runner,
   retireLaneBookmarks,
   revisionMessage,
   revisionRead,
+  revsetName,
   run,
   sideHistory,
   stackBookmark,
   startOfOffer,
-  yoursAt,
-  yoursNow,
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
@@ -243,7 +249,7 @@ describe("a lane's repo, with jj", () => {
     // Your committed work: a file with three lines.
     await writeFile(path.join(yoursDir, "shared.txt"), "one\ntwo\nthree\n")
     await yoursJj(["commit", "-m", "your base"])
-    const base = await yoursNow(yoursJj)
+    const base = await commitsOf(yoursJj, "@-")
     expect(base).toHaveLength(1)
 
     // The base disk: git and jj initialized, your @- fetched by id, jj new.
@@ -310,25 +316,37 @@ describe("a lane's repo, with jj", () => {
       (await laneJj(["describe", "-r", base[0] ?? "", "-m", "x"])).ok,
     ).toBe(false)
 
-    // You change the same line, commit, and keep editing.
+    // You change the same line on a WIP (ADR-0060), and commit.
     await yoursJj(["new"])
     await writeFile(
       path.join(yoursDir, "shared.txt"),
       "one\ntwo (you)\nthree\n",
     )
     await yoursJj(["commit", "-m", "you edit line two"])
-    await writeFile(path.join(yoursDir, "still-editing.txt"), "wip\n")
+    await yoursJj(["bookmark", "create", "wip/x", "-r", "@-"])
+    const wipNow = async () => {
+      const [commit] = await commitsOf(yoursJj, "wip/x")
+      if (commit === undefined) throw new Error("no wip")
+      return { bookmark: "wip/x", commit, under: base[0] ?? commit }
+    }
 
-    // An update: a copy of your @ made in the lane, merged; the line conflicts.
-    const at = await yoursAt(yoursJj)
-    await inLane(laneDir, planYourCopy(at))
+    // An update: a copy of the WIP made in the lane, on the line commit
+    // under it, merged; the line conflicts.
+    const wip1 = await wipNow()
+    await inLane(laneDir, planWipCopy(wip1))
     const [copy] = await commitsOf(laneJj, "@-")
     if (copy === undefined) throw new Error("no copy")
     expect(
-      (await laneJj(["file", "show", "-r", copy, 'root:"still-editing.txt"']))
-        .stdout,
-    ).toBe("wip\n")
-    const { ours, merge } = await mergeYours(laneJj, LANE, [copy])
+      (await laneJj(["file", "show", "-r", copy, 'root:"shared.txt"'])).stdout,
+    ).toContain("two (you)")
+    // The copy is no commit of yours: your WIP stays yours (ADR-0060).
+    expect(await commitsOf(laneJj, `${copy} & ${wip1.commit}`)).toEqual([])
+    expect(await newestBase(laneJj, copy)).toEqual({
+      at: copy,
+      bookmark: "wip/x",
+      commit: wip1.commit,
+    })
+    const { ours, merge } = await mergeBase(laneJj, LANE, copy, "update: wip/x")
     expect(merge).not.toBeNull()
     expect(await conflictsIn(laneJj)).toEqual(["shared.txt"])
     expect(await conflictContent(laneJj, "shared.txt")).toContain("<<<<<<<")
@@ -338,9 +356,11 @@ describe("a lane's repo, with jj", () => {
         entryOfMessage,
       ),
     ).toEqual(["e-1"])
-    expect(await sideHistory(laneJj, sides, [copy], "shared.txt")).toEqual([
-      "you edit line two",
-    ])
+    expect(
+      (await sideHistory(laneJj, sides, [copy], "shared.txt")).map(
+        d => d.split("\n")[0],
+      ),
+    ).toEqual(["copy of wip/x"])
 
     // The agent resolves; the resolution is a turn; nothing conflicts.
     await writeFile(
@@ -353,8 +373,10 @@ describe("a lane's repo, with jj", () => {
     })
     if (resolved === null) throw new Error("the resolution committed nothing")
     expect(await conflictsIn(laneJj)).toEqual([])
-    // Updating again finds your work already there.
-    expect((await mergeYours(laneJj, LANE, [copy])).merge).toBeNull()
+    // Updating again finds the WIP already there.
+    expect(
+      (await mergeBase(laneJj, LANE, copy, "update: wip/x")).merge,
+    ).toBeNull()
 
     // A clean update: the merge is committed even with nothing to resolve,
     // so the lane's newest revision holds your work, and its own.
@@ -363,10 +385,13 @@ describe("a lane's repo, with jj", () => {
     await yoursJj(["new"])
     await writeFile(path.join(yoursDir, "yours-only.txt"), "yours\n")
     await yoursJj(["commit", "-m", "you add a file"])
-    await inLane(laneDir, planYourCopy(await yoursAt(yoursJj)))
+    await yoursJj(["bookmark", "move", "wip/x", "--to", "@-"])
+    // The next copy sits on the last one: the merge brings in only what
+    // the WIP changed since, not the line two the lane already resolved.
+    await inLane(laneDir, planWipCopy({ ...(await wipNow()), under: copy }))
     const [cleanCopy] = await commitsOf(laneJj, "@-")
     if (cleanCopy === undefined) throw new Error("no copy")
-    const updated = await mergeYours(laneJj, LANE, [cleanCopy])
+    const updated = await mergeBase(laneJj, LANE, cleanCopy, "update: wip/x")
     expect(updated.merge).not.toBeNull()
     expect(await conflictsIn(laneJj)).toEqual([])
     const newest = await bookmarkOf(laneJj, LANE)
@@ -421,17 +446,17 @@ describe("a lane's repo, with jj", () => {
     // The fork cannot rewrite what it inherited.
     expect((await forkJj(["describe", "-r", point, "-m", "x"])).ok).toBe(false)
 
-    // A root fork from a copy of your @: it sees your uncommitted file, and
-    // its work back in your repo makes nothing divergent (S48 item 10).
+    // A root fork from a copy of the WIP (ADR-0060): it sees the WIP's
+    // files, and its work back in your repo makes nothing divergent.
     await cp(laneDir, rootDir, { recursive: true, verbatimSymlinks: true })
     await inLane(
       rootDir,
-      planForkSetup(ROOT, { kind: "copy", ...(await yoursAt(yoursJj)) }),
+      planForkSetup(ROOT, { kind: "wip", ...(await wipNow()) }),
     )
     const rootJj = laneJjAt(rootDir)
-    expect(
-      await readFile(path.join(rootDir, "still-editing.txt"), "utf8"),
-    ).toBe("wip\n")
+    expect(await readFile(path.join(rootDir, "yours-only.txt"), "utf8")).toBe(
+      "yours\n",
+    )
     const [rootCopy] = await commitsOf(
       rootJj,
       `bookmarks(exact:"pineta/${ROOT}")`,
@@ -514,21 +539,21 @@ describe("a lane's repo, with jj", () => {
     }, 60_000)
 
   test("an update merges on an adopted commit; a stack's commits are never adopted", async () => {
-    const { laneDir, yoursJj, yoursDir, laneJj, inLane, edit, base } =
+    const { laneDir, yoursJj, yoursDir, laneJj, inLane, edit, base, lineNow } =
       await turnRig("adopt")
     await edit(laneDir, "b.txt", "b\n")
     await laneJj(["commit", "-m", "mine"])
     const mine = await turnOn(laneJj, { ...TURN, entry: entryId("e-2") })
     if (mine === null) throw new Error("the agent's commit was not adopted")
 
-    // An update merges your work into the lane at its bookmark: on the
+    // An update merges the line into the lane at its bookmark: on the
     // agent's commit, so the merge keeps b.txt.
     await edit(yoursDir, "yours.txt", "yours\n")
     await yoursJj(["commit", "-m", "you add a file"])
-    await inLane(planYourCopy(await yoursAt(yoursJj)))
-    const [copy] = await commitsOf(laneJj, "@-")
-    if (copy === undefined) throw new Error("no copy")
-    const { ours, merge } = await mergeYours(laneJj, LANE, [copy])
+    await yoursJj(["bookmark", "move", "pineta-onto", "--to", "@-"])
+    const line = await lineNow()
+    await inLane([fetchById([line])])
+    const { ours, merge } = await mergeBase(laneJj, LANE, line, "update")
     expect(ours).toBe(mine)
     expect(await filesAt(laneJj, merge ?? "none()")).toEqual(
       expect.arrayContaining(["b.txt", "yours.txt"]),
@@ -634,7 +659,14 @@ describe("a lane's repo, with jj", () => {
 
     // You reword the offer: its commit changes, and the review of the new
     // one reads your words. `offerFacts` finds it by change id.
-    await yoursJj(["describe", "-r", change, "-m", "feat: as I want it"])
+    await yoursJj([
+      "describe",
+      "--ignore-immutable",
+      "-r",
+      change,
+      "-m",
+      "feat: as I want it",
+    ])
     const facts = await offerFacts(ops, {
       changes: offer.changes,
       wrote: offer.commits,
@@ -658,7 +690,8 @@ describe("a lane's repo, with jj", () => {
 
   /**
    * Your repo and one lane's, in `top/<tag>-…`, with the lane's steps run on
-   * the host, and an offer built as the host builds it.
+   * the host, and an offer built as the host builds it, on the line
+   * (ADR-0060).
    */
   const offerRig = async (tag: string) => {
     const yoursDir = path.join(top, `${tag}-yours`)
@@ -668,6 +701,7 @@ describe("a lane's repo, with jj", () => {
     const yoursJj = hostJj(yoursDir)
     const ops = hostOps(yoursDir)
     const laneJj = laneJjAt(laneDir)
+    const line = DEFAULT_LINE
     const runnersAt = (dir: string) => ({
       host: hostRunner(),
       lane: hostRunner(dir),
@@ -695,22 +729,38 @@ describe("a lane's repo, with jj", () => {
       )
     const edit = async (dir: string, file: string, text: string) =>
       writeFile(path.join(dir, file), text)
+    /** The line's commit now. */
+    const lineNow = async (): Promise<CommitId> => {
+      const [c] = await commitsOf(ops, `present(${revsetName(line.onto)})`)
+      if (c === undefined) throw new Error("no line")
+      return c
+    }
+    /** Set the line up at your `@-`, as the host does on your command. */
+    const setUpLine = () =>
+      executeOnHost(
+        planLineSetup({
+          root: yoursDir,
+          onto: line.onto,
+          heads: immutableHeads(line, null),
+          log: logRevset(null),
+        }),
+      )
     const build = async (
       sources: readonly OfferSource[],
-      haves: readonly HaveRecord[] = [],
-      target = "@-",
-      name = NAME,
+      name: ThreadName = NAME,
     ) => {
       const tip = await laneTipIn(ops, LANE)
       if (tip === null) throw new Error("no tip")
-      const start = await startOfOffer(ops, { tip, target, haves })
+      const base = await laneBase(ops, tip, line)
+      if (base === null) throw new Error("no base")
+      const start = await startOfOffer(ops, { tip, base, line })
       await executeOnHost(
         planOffer({
           root: yoursDir,
           name,
           start,
           sources,
-          target,
+          target: await lineNow(),
           nonce: `n-${Math.random().toString(36).slice(2)}`,
         }),
       )
@@ -724,10 +774,6 @@ describe("a lane's repo, with jj", () => {
         changes: await Promise.all(revs.map(c => changeOf(ops, c))),
       }
     }
-    /** What you have, as the host records it: each one newer than the last. */
-    const haves: HaveRecord[] = []
-    const have = (commit: CommitId, kind: HaveRecord["kind"]) =>
-      haves.push({ lane: LANE, commit, kind, at: haves.length + 1 })
     let entry = 0
     const turn = async () => {
       const t = await turnOn(laneJj, {
@@ -737,23 +783,28 @@ describe("a lane's repo, with jj", () => {
       if (t === null) throw new Error("the turn committed nothing")
       return t
     }
-    /** "Update from my work": a copy of your @ merged into the lane; the lane takes yours where they conflict. */
-    const update = async (yours: Record<string, string>) => {
-      await inLane(planYourCopy(await yoursAt(yoursJj)))
-      const [copy] = await commitsOf(laneJj, "@-")
-      if (copy === undefined) throw new Error("no copy")
-      await mergeYours(laneJj, LANE, [copy])
-      for (const [file, text] of Object.entries(yours))
+    /** "Bring up to date" on the line: its commit merged into the lane; the lane takes `resolve` where they conflict. */
+    const update = async (resolve: Record<string, string>) => {
+      const commit = await lineNow()
+      await inLane([fetchById([commit])])
+      await mergeBase(
+        laneJj,
+        LANE,
+        commit,
+        baseMessage(`update: ${line.onto}`, { bookmark: line.onto, commit }),
+      )
+      for (const [file, text] of Object.entries(resolve))
         await edit(laneDir, file, text)
       await turn()
-      have(copy, "copy")
     }
-    /** The offer's conflicts and files, as built from the lane's tip now, after fetching it from `from`. */
+    /** An offer of the lane's tip, fetched from `from`, its ledger naming the tip. */
     const offer = async (from: readonly CommitId[]) => {
       await fetch(from)
       const tip = await laneTipIn(ops, LANE)
       if (tip === null) throw new Error("no tip")
-      const built = await build([{ commit: tip, description: "WIP" }], haves)
+      const built = await build([
+        { commit: tip, description: `WIP\n\nPineta-Source: ${tip}\n` },
+      ])
       const [commit] = built.commits
       if (commit === undefined) throw new Error("no offer")
       return {
@@ -763,7 +814,7 @@ describe("a lane's repo, with jj", () => {
         files: lines((await ops(["diff", "-r", commit, "--name-only"])).stdout),
       }
     }
-    /** Take `offer`'s one revision under your `@`, and record the lane's tip as delivered. */
+    /** Take `offered` onto the line: its bookmark moved forward, as the host. */
     const take = async (offered: {
       readonly built: { readonly changes: readonly string[] }
     }) => {
@@ -773,16 +824,10 @@ describe("a lane's repo, with jj", () => {
         planTakeOffer({
           root: yoursDir,
           bookmark: offerBookmark(NAME),
-          bottom: change,
           top: change,
-          target: "@-",
-          underYou: true,
-          onto: false,
+          destination: line.onto,
         }),
       )
-      const taken = await laneTipIn(ops, LANE)
-      if (taken === null) throw new Error("no tip")
-      have(taken, "delivered")
     }
     return {
       yoursDir,
@@ -790,12 +835,13 @@ describe("a lane's repo, with jj", () => {
       yoursJj,
       ops,
       laneJj,
+      line,
       inLane,
       fetch,
       edit,
+      lineNow,
+      setUpLine,
       build,
-      haves,
-      have,
       turn,
       update,
       offer,
@@ -803,34 +849,151 @@ describe("a lane's repo, with jj", () => {
     }
   }
 
-  /** `offerRig`, with your base commit, the lane on it, and a first turn writing `a.txt`. */
+  /** `offerRig`, with your base commit as the line, the lane started on it, and a first turn writing `a.txt`. */
   const turnRig = async (tag: string) => {
     const rig = await offerRig(tag)
     await rig.edit(rig.yoursDir, "base.txt", "base\n")
     await rig.yoursJj(["commit", "-m", "your base"])
-    const base = await yoursNow(rig.yoursJj)
+    const base = await commitsOf(rig.yoursJj, "@-")
+    const [line] = base
+    if (line === undefined) throw new Error("no base")
+    await rig.setUpLine()
     await rig.inLane(
       planBaseRefresh({ base: null, yours: base, lock: null, install: null }),
     )
-    await rig.inLane(planForkSetup(LANE, { kind: "commits", commits: base }))
+    await rig.inLane(
+      planForkSetup(LANE, { kind: "line", onto: rig.line.onto, commit: line }),
+    )
     await rig.edit(rig.laneDir, "a.txt", "a\n")
     const first = await turnOn(rig.laneJj, { ...TURN, entry: entryId("e-1") })
     if (first === null) throw new Error("the first turn committed nothing")
     return { ...rig, base, first }
   }
 
-  test("an offer: built, refreshed, left, repaired, taken, and the next one", async () => {
+  test("an offer on the line (ADR-0060): built, immutable, refreshed, followed, taken by a forward move, and the next one", async () => {
     const {
       yoursDir,
       laneDir,
       yoursJj,
       ops,
       laneJj,
-      inLane,
+      line,
       fetch,
       edit,
       build,
-    } = await offerRig("offer")
+      lineNow,
+      take,
+      offer,
+      base,
+    } = await turnRig("offer")
+    const bookmark = offerBookmark(NAME)
+    await fetch(base)
+    const t1 = await laneTipIn(ops, LANE)
+    if (t1 === null) throw new Error("no tip")
+    // You work on above the line: your stack is yours, and mutable.
+    await edit(yoursDir, "c.txt", "c yours\n")
+    await yoursJj(["commit", "-m", "yours: c.txt"])
+    await edit(yoursDir, "wip.txt", "wip\n")
+
+    // Built by the host on the line: immutable, so you cannot edit it by
+    // accident; the host's own rewrites pass `--ignore-immutable`.
+    const one = await build([
+      {
+        commit: t1,
+        description: `offer: lane\n\nPineta-Source: ${t1}\nPineta-Start: ${base[0]}\n`,
+      },
+    ])
+    const [c1] = one.changes
+    const [w1] = one.commits
+    if (c1 === undefined || w1 === undefined) throw new Error("no offer")
+    expect(
+      await offerFacts(ops, {
+        changes: one.changes,
+        wrote: one.commits,
+        target: await lineNow(),
+      }),
+    ).toMatchObject({
+      files: ["a.txt"],
+      onTarget: true,
+      placed: true,
+      // Its ledger, read from its message: no record needed (ADR-0060).
+      ledger: { source: t1, start: base },
+    })
+    expect((await yoursJj(["describe", "-r", c1, "-m", "mine"])).ok).toBe(false)
+    // Yet your log shows it: setup added the offers to `revsets.log`, since
+    // jj's default leaves an immutable head out (S77 item 8).
+    expect(
+      (
+        await yoursJj([
+          "log",
+          "--no-graph",
+          "-T",
+          'description.first_line() ++ "\\n"',
+        ])
+      ).stdout,
+    ).toContain("offer: lane")
+    expect(
+      (await commitsOf(yoursJj, `${c1} & immutable()`)).length,
+    ).toBeGreaterThan(0)
+    expect(
+      (
+        await commitsOf(
+          yoursJj,
+          `description(exact:"yours: c.txt\n") & mutable()`,
+        )
+      ).length,
+    ).toBe(1)
+    await executeOnHost(planDescribe(yoursDir, c1, "offer: described"))
+
+    // The host's rewrite whose record was lost (S73): against the stale
+    // commit it differs, but only the host changed it since.
+    expect(
+      (
+        await offerFacts(ops, {
+          changes: one.changes,
+          wrote: one.commits,
+          target: await lineNow(),
+        })
+      ).revisions,
+    ).toEqual([
+      {
+        sameDescription: false,
+        sameChange: true,
+        since: { reached: true, yoursChanged: false },
+      },
+    ])
+    // Your reword, on purpose: a change of yours, seen as an edit.
+    const [described] = await commitsOf(ops, `change_id(${c1})`)
+    if (described === undefined) throw new Error("no offer")
+    await yoursJj([
+      "describe",
+      "--ignore-immutable",
+      "-r",
+      c1,
+      "-m",
+      "as I want",
+    ])
+    expect(
+      (
+        await offerFacts(ops, {
+          changes: one.changes,
+          wrote: [described],
+          target: await lineNow(),
+        })
+      ).revisions,
+    ).toEqual([
+      {
+        sameDescription: false,
+        sameChange: true,
+        since: { reached: true, yoursChanged: true },
+      },
+    ])
+    await executeOnHost(
+      planDescribe(yoursDir, c1, `offer: lane\n\nPineta-Source: ${t1}\n`),
+    )
+
+    // A race: your edit and a host rewrite from the same operation make it
+    // divergent. The host keeps yours (S48 item 8).
     const opNow = async () =>
       (
         await yoursJj([
@@ -844,109 +1007,18 @@ describe("a lane's repo, with jj", () => {
           "id",
         ])
       ).stdout.trim()
-    const opsSince = async (op: string) => {
-      const all = await yoursJj([
-        "op",
-        "log",
-        "--ignore-working-copy",
-        "--no-graph",
-        "-T",
-        'id ++ " " ++ description.first_line() ++ "\\n"',
-      ])
-      const out: string[] = []
-      for (const l of lines(all.stdout)) {
-        if (l.startsWith(op)) break
-        out.push(l.slice(l.indexOf(" ") + 1))
-      }
-      return out
-    }
-    const bookmark = offerBookmark(NAME)
-
-    for (const f of ["a.txt", "b.txt", "c.txt"])
-      await edit(yoursDir, f, `${f} 1\n${f} 2\n${f} 3\n`)
-    await yoursJj(["commit", "-m", "base"])
-    const base = await yoursNow(yoursJj)
-    await inLane(
-      planBaseRefresh({ base: null, yours: base, lock: null, install: null }),
-    )
-    await inLane(planForkSetup(LANE, { kind: "commits", commits: base }))
-    await edit(laneDir, "a.txt", "a.txt lane\na.txt 2\na.txt 3\n")
-    const t1 = await turnOn(laneJj, { ...TURN, entry: entryId("e-1") })
-    if (t1 === null) throw new Error("no turn")
-    await fetch(base)
-    // You move on: a commit of your own, and an edit you keep.
-    await edit(yoursDir, "c.txt", "c.txt yours\nc.txt 2\nc.txt 3\n")
-    await yoursJj(["commit", "-m", "yours: c.txt"])
-    await edit(yoursDir, "wip.txt", "wip\n")
-    await yoursJj(["status"])
-
-    // Built by the host: one mutable revision on your @-, the lane's file
-    // only; no host operation snapshotted your working copy.
-    const before = await opNow()
-    const one = await build([{ commit: t1, description: "offer: lane" }])
-    expect(
-      (await opsSince(before)).filter(d => d.includes("snapshot")),
-    ).toEqual([])
-    const [c1] = one.changes
-    const [w1] = one.commits
-    if (c1 === undefined || w1 === undefined) throw new Error("no offer")
-    const facts = (wrote: readonly CommitId[], changes = one.changes) =>
-      offerFacts(ops, { changes, wrote, target: "@-" })
-    expect(await facts([w1])).toMatchObject({
-      files: ["a.txt"],
-      onTarget: true,
-      placed: true,
-      divergent: false,
-      revisions: [{ sameDescription: true, sameChange: true, since: null }],
-    })
-    expect(await commitsOf(yoursJj, "divergent()")).toEqual([])
-
-    // You commit again: the offer is behind, not edited; the host refreshes.
-    await edit(yoursDir, "c.txt", "c.txt yours 2\nc.txt 2\nc.txt 3\n")
-    await yoursJj(["commit", "-m", "yours: c.txt again"])
-    expect(await facts([w1])).toMatchObject({ onTarget: false, placed: true })
-    await executeOnHost(planRefreshOffer(yoursDir, c1, "@-"))
-    const refreshed = await facts([w1])
-    expect(refreshed).toMatchObject({
-      onTarget: true,
-      revisions: [{ sameDescription: true, sameChange: true, since: null }],
-    })
-
-    // You reword it: edited; the host leaves it. The evolog walks back
-    // through the host's rebase to what it wrote, and finds your change.
-    await yoursJj(["describe", "-r", c1, "-m", "offer: as I want it"])
-    expect((await facts([w1])).revisions).toEqual([
-      {
-        sameDescription: false,
-        sameChange: true,
-        since: { reached: true, yoursChanged: true },
-      },
-    ])
-    await yoursJj(["describe", "-r", c1, "-m", "offer: lane"])
-
-    // The host rewrites it and its record is lost (S73): against the stale
-    // commit it differs, but only the host changed it since.
-    const [beforeHost] = await commitsOf(ops, `change_id(${c1})`)
-    if (beforeHost === undefined) throw new Error("no offer")
-    await ops(["describe", "-r", c1, "-m", "offer: the host's line"])
-    expect((await facts([beforeHost])).revisions).toEqual([
-      {
-        sameDescription: false,
-        sameChange: true,
-        since: { reached: true, yoursChanged: false },
-      },
-    ])
-    await ops(["describe", "-r", c1, "-m", "offer: lane"])
-
-    // A race: your edit and a host refresh from the same operation. The
-    // host keeps yours (S48 item 8).
-    const [at1] = refreshed.commits
-    if (at1 === undefined) throw new Error("no offer")
     const op = await opNow()
-    await edit(yoursDir, "wip2.txt", "more\n")
-    await yoursJj(["squash", "--into", c1, "root:wip2.txt"])
-    await ops(["--at-operation", op, "describe", "-r", c1, "-m", "offer: host"])
-    expect((await facts([at1])).divergent).toBe(true)
+    await yoursJj(["describe", "--ignore-immutable", "-r", c1, "-m", "yours"])
+    await ops([
+      "--at-operation",
+      op,
+      "--ignore-immutable",
+      "describe",
+      "-r",
+      c1,
+      "-m",
+      `offer: lane\n\nPineta-Source: ${t1}\n\nhost`,
+    ])
     const split = await hostCommitIn(ops, c1)
     if (split === null) throw new Error("no split")
     await executeOnHost(
@@ -956,86 +1028,71 @@ describe("a lane's repo, with jj", () => {
     expect(await commitsOf(yoursJj, `bookmarks(exact:"${bookmark}")`)).toEqual([
       split.yours,
     ])
+    await yoursJj([
+      "describe",
+      "--ignore-immutable",
+      "-r",
+      c1,
+      "-m",
+      `offer: lane\n\nPineta-Source: ${t1}\n`,
+    ])
 
-    // Take: under your edits; your wip file kept.
-    await executeOnHost(
-      planTakeOffer({
-        root: yoursDir,
-        bookmark,
-        bottom: c1,
-        top: c1,
-        target: "@-",
-        underYou: true,
-        onto: false,
-      }),
-    )
-    expect(await changeOf(ops, (await commitsOf(ops, "@-"))[0] ?? "")).toBe(c1)
-    expect(await readFile(path.join(yoursDir, "a.txt"), "utf8")).toContain(
-      "a.txt lane",
-    )
+    // Take: the line moved forward to the offer, as the host; your @ and
+    // your files untouched; the offer's bookmark gone.
+    const atBefore = await commitsOf(yoursJj, "@")
+    await take({ built: one })
+    expect(await commitsOf(yoursJj, "@")).toEqual(atBefore)
     expect(await readFile(path.join(yoursDir, "wip.txt"), "utf8")).toBe("wip\n")
+    expect(await changeOf(ops, await lineNow())).toBe(c1)
     expect(await hasBookmark(ops, bookmark)).toBe(false)
+    // jj itself refuses a take that is not forward (S77 item 1).
+    expect(
+      (await ops(["bookmark", "move", line.onto, "--to", base[0] ?? ""])).ok,
+    ).toBe(false)
 
-    // The next turn: its offer holds only what came after the take.
-    const delivered: HaveRecord = {
-      lane: LANE,
-      commit: t1,
-      kind: "delivered",
-      at: 1,
-    }
-    await edit(laneDir, "b.txt", "b.txt lane\nb.txt 2\nb.txt 3\n")
+    // You land work of your own on the line, changing what you took.
+    await yoursJj(["new", line.onto])
+    await edit(yoursDir, "a.txt", "a, then yours\n")
+    await yoursJj(["commit", "-m", "yours: a.txt"])
+    await yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
+
+    // The next turn: its offer starts at what the take's Pineta-Source names,
+    // and holds only what came after; it does not bring a.txt back.
+    await edit(laneDir, "b.txt", "b\n")
     const t2 = await turnOn(laneJj, { ...TURN, entry: entryId("e-2") })
     if (t2 === null) throw new Error("no turn")
-    await fetch([t1])
-    const two = await build(
-      [{ commit: t2, description: "offer: b" }],
-      [delivered],
-    )
-    expect(
-      (await offerFacts(ops, { ...two, wrote: two.commits, target: "@-" }))
-        .files,
-    ).toEqual(["b.txt"])
+    const next = await offer([t1])
+    expect(next.files).toEqual(["b.txt"])
+    expect(next.conflicted).toBe(false)
 
-    // pineta-onto on a side commit: the offer goes there; take moves only
-    // bookmarks, and @ does not change.
-    await executeOnHost(planAbandonOffer(yoursDir, two.changes))
-    await yoursJj(["new", "--no-edit", "@-", "-m", "side"])
-    await yoursJj([
-      "bookmark",
-      "set",
-      ONTO_BOOKMARK,
-      "-r",
-      'latest(description(exact:"side\\n"))',
-    ])
-    const beside = await build(
-      [{ commit: t2, description: "offer: b" }],
-      [delivered],
-      ONTO_BOOKMARK,
-    )
-    const atBefore = await commitsOf(yoursJj, "@")
-    const [bc] = beside.changes
-    if (bc === undefined) throw new Error("no offer")
+    // The lane moves on: the offer follows it in place (ADR-0039), its
+    // change kept, holding what a fresh build would.
+    await edit(laneDir, "f.txt", "f\n")
+    const t3 = await turnOn(laneJj, { ...TURN, entry: entryId("e-3") })
+    if (t3 === null) throw new Error("no turn")
+    await fetch([t2])
+    const [nc] = next.built.changes
+    if (nc === undefined) throw new Error("no offer")
+    const b3 = await laneBase(ops, t3, line)
+    if (b3 === null) throw new Error("no base")
     await executeOnHost(
-      planTakeOffer({
+      planFollowOffer({
         root: yoursDir,
-        bookmark,
-        bottom: bc,
-        top: bc,
-        target: ONTO_BOOKMARK,
-        underYou: false,
-        onto: true,
+        change: nc,
+        start: await startOfOffer(ops, { tip: t3, base: b3, line }),
+        tip: t3,
+        target: await lineNow(),
+        description: `WIP\n\nPineta-Source: ${t3}\n`,
       }),
     )
-    expect(await commitsOf(yoursJj, "@")).toEqual(atBefore)
+    const [followed] = await commitsOf(ops, `change_id(${nc})`)
     expect(
-      await changeOf(
-        ops,
-        (await commitsOf(ops, `bookmarks(exact:"${ONTO_BOOKMARK}")`))[0] ?? "",
-      ),
-    ).toBe(bc)
+      lines((await ops(["diff", "-r", followed ?? "", "--name-only"])).stdout),
+    ).toEqual(["b.txt", "f.txt"])
+    expect(await commitsOf(ops, `${followed} & conflicts()`)).toEqual([])
 
-    // A stack: one revision per lane revision, each with its own file, the
-    // top with the tip's files (S48 item 18).
+    // A stack: one revision per lane revision, each with its own file.
+    await executeOnHost(planAbandonOffer(yoursDir, next.built.changes))
     await laneJj(["new", t2])
     await edit(laneDir, "d.txt", "d\n")
     await laneJj(["commit", "-m", "s1: d.txt"])
@@ -1053,279 +1110,136 @@ describe("a lane's repo, with jj", () => {
       s2,
     ])
     await fetch([t2])
-    await yoursJj(["bookmark", "delete", ONTO_BOOKMARK])
-    const stack = await build(
-      [
-        { commit: s1, description: "s1: d.txt" },
-        { commit: s2, description: "s2: e.txt" },
-      ],
-      [delivered, { ...delivered, commit: t2 }],
-    )
+    const stack = await build([
+      { commit: s1, description: `s1: d.txt\n\nPineta-Source: ${s1}\n` },
+      { commit: s2, description: `s2: e.txt\n\nPineta-Source: ${s2}\n` },
+    ])
     const per = await Promise.all(
       stack.commits.map(async c =>
         lines((await ops(["diff", "-r", c, "--name-only"])).stdout),
       ),
     )
-    expect(per).toEqual([["d.txt"], ["e.txt"]])
-    const [bottom, topChange] = stack.changes
-    if (bottom === undefined || topChange === undefined)
-      throw new Error("no stack")
-    await executeOnHost(
-      planTakeOffer({
-        root: yoursDir,
-        bookmark,
-        bottom,
-        top: topChange,
-        target: "@-",
-        underYou: true,
-        onto: false,
-      }),
-    )
-    expect(await changeOf(ops, (await commitsOf(ops, "@-"))[0] ?? "")).toBe(
-      topChange,
-    )
-    expect(await commitsOf(yoursJj, "divergent()")).toEqual([])
-
-    // An offer follows its lane in place (ADR-0039, S49): the same change id
-    // and bookmark, and the tree a fresh build gives, from a moved tip and
-    // from a moved start, conflicted exactly when that build is.
-    // A copy your repo does not hold yet (its lane never fetched) is no
-    // start, and breaks nothing.
-    let haves: HaveRecord[] = [
-      delivered,
-      { ...delivered, commit: t2 },
-      { ...delivered, commit: s2 },
-      { ...delivered, commit: commitId("1".repeat(40)), kind: "copy" },
-    ]
-    const turn = async (file: string, text: string, n: number) => {
-      await edit(laneDir, file, text)
-      const t = await turnOn(laneJj, {
-        ...TURN,
-        entry: entryId(`e-f${n}`),
-      })
-      if (t === null) throw new Error("no turn")
-      await fetch([s2])
-      return t
-    }
-    const t3 = await turn("g.txt", "g\n", 3)
-    const open = await build([{ commit: t3, description: "WIP" }], haves)
-    const [oc] = open.changes
-    if (oc === undefined) throw new Error("no offer")
-    const follow = async () => {
-      const tip = await laneTipIn(ops, LANE)
-      if (tip === null) throw new Error("no tip")
-      const start = await startOfOffer(ops, { tip, target: "@-", haves })
-      const at = await commitsOf(yoursJj, "@")
-      await executeOnHost(
-        planFollowOffer({
-          root: yoursDir,
-          change: oc,
-          start,
-          tip,
-          target: "@-",
-          description: null,
-        }),
-      )
-      expect(await commitsOf(yoursJj, "@")).toEqual(at)
-      const [now] = await commitsOf(ops, `bookmarks(exact:"${bookmark}")`)
-      expect(await changeOf(ops, now ?? "")).toBe(oc)
-      const fresh = await build(
-        [{ commit: tip, description: "WIP" }],
-        haves,
-        "@-",
-        "fresh-copy" as ThreadName,
-      )
-      const [fc] = fresh.changes
-      if (fc === undefined) throw new Error("no fresh offer")
-      expect(
-        (await ops(["diff", "--from", fc, "--to", oc, "--name-only"])).stdout,
-      ).toBe("")
-      const conflicted = async (c: string) =>
-        (await commitsOf(ops, `${c} & conflicts()`)).length > 0
-      const both = [await conflicted(oc), await conflicted(fc)]
-      await executeOnHost(planAbandonOffer(yoursDir, fresh.changes))
-      return {
-        files: lines((await ops(["diff", "-r", oc, "--name-only"])).stdout),
-        conflicted: both[0],
-        fresh: both[1],
-      }
-    }
-    // The lane moves on.
-    await turn("h.txt", "h\n", 4)
-    expect(await follow()).toEqual({
-      files: ["g.txt", "h.txt"],
-      conflicted: false,
-      fresh: false,
-    })
-    // You commit an edit to h.txt, then the lane moves: conflicted, as a
-    // fresh build is.
-    await edit(yoursDir, "h.txt", "h yours\n")
-    await yoursJj(["commit", "-m", "yours: h.txt"])
-    await turn("i.txt", "i\n", 5)
-    expect(await follow()).toEqual({
-      files: ["g.txt", "h.txt", "i.txt"],
-      conflicted: true,
-      fresh: true,
-    })
-    // Where it starts moves, not the lane: g.txt's turn delivered, as a
-    // parent thread's take would.
-    haves = [...haves, { ...delivered, commit: t3 }]
-    expect((await follow()).files).toEqual(["h.txt", "i.txt"])
+    expect(per).toEqual([["b.txt", "d.txt"], ["e.txt"]])
   }, 60_000)
 
-  /** `offerRig`, with your base commit of `files`, and the lane on it. */
-  const copyRig = async (tag: string, files: readonly string[]) => {
-    const rig = await offerRig(tag)
-    for (const f of files) await rig.edit(rig.yoursDir, f, `${f}\n`)
-    await rig.yoursJj(["commit", "-m", "base"])
-    const base = await yoursNow(rig.yoursJj)
+  test("a squash of two taken offers keeps both sources: the next offer starts above them (S77 item 6)", async () => {
+    const { laneDir, yoursJj, ops, edit, offer, take, turn, lineNow, base } =
+      await turnRig("squashed")
+    const first = await offer(base)
+    await take(first)
+    const t1 = await laneTipIn(ops, LANE)
+    if (t1 === null) throw new Error("no tip")
+    await edit(laneDir, "b.txt", "b\n")
+    const t2 = await turn()
+    const second = await offer([t1])
+    await take(second)
+    // You squash the two taken offers, as jj's editor offers both messages.
+    const line = await lineNow()
+    const ran = await run(
+      "jj",
+      [
+        "-R",
+        (await yoursJj(["root"])).stdout.trim(),
+        "squash",
+        "--ignore-immutable",
+        "--from",
+        line,
+        "--into",
+        `${line}-`,
+      ],
+      { env: { ...NO_EDITOR, JJ_EDITOR: "true" } },
+    )
+    expect(ran.ok, ran.stderr).toBe(true)
+    await edit(laneDir, "c.txt", "c\n")
+    await turn()
+    expect((await offer([t2])).files).toEqual(["c.txt"])
+    expect(await commitsOf(ops, "divergent()")).toEqual([])
+  }, 60_000)
+
+  test("a lane's ref deleted and imported: the history under the line is kept (S78)", async () => {
+    const { yoursDir, yoursJj, ops, edit, offer, take, base } =
+      await turnRig("refgone")
+    await take(await offer(base))
+    await edit(yoursDir, "mine.txt", "mine\n")
+    await yoursJj(["commit", "-m", "mine on the line"])
+    await yoursJj(["bookmark", "move", "pineta-onto", "--to", "@-"])
+    const before = await commitsOf(ops, "::@-")
+    await executeOnHost(laneRefSteps(yoursDir, [{ lane: LANE, commit: null }]))
+    expect(await commitsOf(ops, "::@-")).toEqual(before)
+    expect(await commitsOf(ops, "conflicts()")).toEqual([])
+  }, 60_000)
+
+  test("a thread on a WIP starts from its copy, and freezes nothing of yours (ADR-0060)", async () => {
+    const rig = await offerRig("wipcopy")
+    await rig.edit(rig.yoursDir, "base.txt", "base\n")
+    await rig.yoursJj(["commit", "-m", "your base"])
+    const base = await commitsOf(rig.yoursJj, "@-")
+    const [line] = base
+    if (line === undefined) throw new Error("no base")
+    await rig.setUpLine()
+    await rig.edit(rig.yoursDir, "wip.txt", "half done\n")
+    await rig.yoursJj(["commit", "-m", "wip: half done"])
+    await rig.yoursJj(["bookmark", "create", "wip/search", "-r", "@-"])
+    const [wip] = await commitsOf(rig.yoursJj, "wip/search")
+    if (wip === undefined) throw new Error("no wip")
     await rig.inLane(
       planBaseRefresh({ base: null, yours: base, lock: null, install: null }),
     )
-    return {
-      ...rig,
-      base,
-      offer: () => rig.offer(base),
-      /** Start the lane from a copy of your `@` as it is now, recorded as a have. */
-      fork: async () => {
-        await rig.inLane(
-          planForkSetup(LANE, {
-            kind: "copy",
-            ...(await yoursAt(rig.yoursJj)),
-          }),
-        )
-        const [copy] = await commitsOf(
-          rig.laneJj,
-          `bookmarks(exact:"pineta/${LANE}")`,
-        )
-        if (copy === undefined) throw new Error("no copy")
-        rig.have(copy, "copy")
-      },
-      /** Put the lane's working copy and bookmark on `commit`: one lane, two lines. */
-      moveTo: async (commit: CommitId) => {
-        await rig.laneJj(["new", commit])
-        await rig.laneJj([
-          "bookmark",
-          "set",
-          "--allow-backwards",
-          `pineta/${LANE}`,
-          "-r",
-          commit,
-        ])
-      },
-    }
-  }
-
-  test("an offer after you committed your edits differently starts at the newest copy (S51)", async () => {
-    const {
-      yoursDir,
-      laneDir,
-      yoursJj,
-      edit,
-      turn,
-      update,
-      offer,
-      take,
-      fork,
-    } = await copyRig("s51", ["a.txt", "b.txt", "c.txt"])
-    // The lane starts from a copy of your @, holding an edit you have not
-    // committed.
-    await edit(yoursDir, "a.txt", "a, as you were trying it\n")
-    await fork()
-    await edit(laneDir, "b.txt", "b, the lane's\n")
-    await turn()
-    // You commit that edit, differently, then update the lane.
-    await edit(yoursDir, "a.txt", "a, as you kept it\n")
-    await yoursJj(["commit", "-m", "yours: a.txt"])
-    await update({ "a.txt": "a, as you kept it\n" })
-    const clean = await offer()
-    expect([clean.conflicted, clean.files]).toEqual([false, ["b.txt"]])
-
-    // Delivered: you take it, change its line in a commit of yours, and
-    // update again.
-    await take(clean)
-    await edit(yoursDir, "b.txt", "b, as you changed it\n")
-    await yoursJj(["commit", "-m", "yours: b.txt"])
-    await update({ "b.txt": "b, as you changed it\n" })
-    await edit(laneDir, "c.txt", "c, the lane's\n")
-    await turn()
-    const again = await offer()
-    expect([again.conflicted, again.files]).toEqual([false, ["c.txt"]])
-  }, 60_000)
-
-  test("a taken branch that holds all its lane's work puts the lane's offer start at its tip (S51)", async () => {
-    const { laneDir, ops, fetch, edit, base, haves, have, turn, fork } =
-      await copyRig("holds-tip", ["a.txt"])
-    // The lane starts from a copy of your @: a have in its tip's history.
-    await fork()
-    await edit(laneDir, "parent.txt", "parent\n")
-    const tip = await turn()
-    // A branch forked at that tip turns once more, and you take its offer:
-    // its delivered have descends from the lane's tip, and holds all of it.
-    await edit(laneDir, "branch.txt", "branch\n")
-    have(await turn(), "delivered")
-    await fetch(base)
-    expect(await startOfOffer(ops, { tip, target: "@-", haves })).toEqual([tip])
-    // With no copy in the tip's history, the rule for haves beside the tip
-    // (S72) does not apply: only the read of which haves hold the tip finds
-    // the branch.
-    const branchOnly = haves.filter(h => h.kind === "delivered")
+    await rig.inLane(
+      planForkSetup(LANE, {
+        kind: "wip",
+        bookmark: "wip/search",
+        commit: wip,
+        under: line,
+      }),
+    )
+    expect(await readFile(path.join(rig.laneDir, "wip.txt"), "utf8")).toBe(
+      "half done\n",
+    )
+    await rig.edit(rig.laneDir, "tests.txt", "tests\n")
+    await rig.turn()
+    await rig.fetch(base)
+    // The lane's tip is immutable in your repo; your WIP is not.
+    expect((await commitsOf(rig.yoursJj, `${wip} & mutable()`)).length).toBe(1)
+    const tip = await laneTipIn(rig.ops, LANE)
+    if (tip === null) throw new Error("no tip")
+    expect(await laneBase(rig.ops, tip, rig.line)).toMatchObject({
+      base: { kind: "wip", bookmark: "wip/search" },
+      source: wip,
+    })
+    // You amend the WIP: the offer, from the copy, placed on the WIP now,
+    // holds only the lane's file.
+    await rig.edit(rig.yoursDir, "wip.txt", "half done, amended\n")
+    await rig.yoursJj(["squash", "--into", "wip/search"])
+    const b = await laneBase(rig.ops, tip, rig.line)
+    if (b === null) throw new Error("no base")
+    const start = await startOfOffer(rig.ops, { tip, base: b, line: rig.line })
+    const [target] = await commitsOf(rig.ops, "wip/search")
+    if (target === undefined) throw new Error("no wip")
+    await executeOnHost(
+      planOffer({
+        root: rig.yoursDir,
+        name: NAME,
+        start,
+        sources: [{ commit: tip, description: "WIP" }],
+        target,
+        nonce: "n-wip",
+      }),
+    )
+    const [o] = await offerRevisions(rig.ops, offerBookmark(NAME), 1)
     expect(
-      await startOfOffer(ops, { tip, target: "@-", haves: branchOnly }),
-    ).toEqual([tip])
-  }, 60_000)
-
-  test("a branch of a thread taken after the fork offers only its own (S72)", async () => {
-    const { laneDir, ops, edit, haves, turn, offer, take, fork, moveTo } =
-      await copyRig("s72-branch", ["a.txt"])
-    await fork()
-    await edit(laneDir, "a.txt", "a, at the fork\n")
-    const at = await turn()
-    // The parent goes on from the fork point, and you take its offer.
-    await edit(laneDir, "a.txt", "a, the parent's later work\n")
-    await turn()
-    await take(await offer())
-    // The branch goes on from the fork point too.
-    await moveTo(at)
-    await edit(laneDir, "b.txt", "b, the branch's\n")
-    const tip = await turn()
-    const branch = await offer()
-    expect(await startOfOffer(ops, { tip, target: "@-", haves })).toEqual([at])
-    expect([branch.conflicted, branch.files]).toEqual([false, ["b.txt"]])
-  }, 60_000)
-
-  test("a branch taken before its lane's update adds nothing to the lane's start (S51, S72)", async () => {
-    const {
-      yoursDir,
-      laneDir,
-      yoursJj,
-      edit,
-      turn,
-      update,
-      offer,
-      take,
-      fork,
-      moveTo,
-    } = await copyRig("s72-before", ["a.txt", "b.txt", "c.txt", "d.txt"])
-    // The lane starts from a copy holding an edit you have not committed.
-    await edit(yoursDir, "a.txt", "a, as you were trying it\n")
-    await fork()
-    await edit(laneDir, "b.txt", "b, the lane's\n")
-    const own = await turn()
-    // A branch goes on from there, and you take its offer.
-    await edit(laneDir, "c.txt", "c, the branch's\n")
-    await turn()
-    await take(await offer())
-    // The lane goes back to its own line: `mergeYours` merges on its bookmark.
-    await moveTo(own)
-    // You commit that edit, differently, then update the lane.
-    await edit(yoursDir, "a.txt", "a, as you kept it\n")
-    await yoursJj(["commit", "-m", "yours: a.txt"])
-    await update({ "a.txt": "a, as you kept it\n" })
-    await edit(laneDir, "d.txt", "d, the lane's\n")
-    await turn()
-    const lane = await offer()
-    expect([lane.conflicted, lane.files]).toEqual([false, ["d.txt"]])
+      lines((await rig.ops(["diff", "-r", o ?? "", "--name-only"])).stdout),
+    ).toEqual(["tests.txt"])
+    // Taken into the WIP: a forward move; the WIP stays mutable.
+    await executeOnHost(
+      planTakeOffer({
+        root: rig.yoursDir,
+        bookmark: offerBookmark(NAME),
+        top: o ?? "",
+        destination: "wip/search",
+      }),
+    )
+    expect(await commitsOf(rig.ops, "wip/search & mutable()")).toEqual([o])
   }, 60_000)
 
   test("a base refreshes after your @- was rewritten, not built on (S74)", async () => {
@@ -1348,14 +1262,14 @@ describe("a lane's repo, with jj", () => {
       )
     await writeFile(path.join(yoursDir, "a.txt"), "first\n")
     await yoursJj(["commit", "-m", "yours"])
-    const first = await yoursNow(yoursJj)
+    const first = await commitsOf(yoursJj, "@-")
     await inBase(
       planBaseRefresh({ base: null, yours: first, lock: null, install: null }),
     )
     // Your @- rewritten in place: the base's commit is no ancestor of it.
     await writeFile(path.join(yoursDir, "a.txt"), "rewritten\n")
     await yoursJj(["squash", "--into", "@-"])
-    const rewritten = await yoursNow(yoursJj)
+    const rewritten = await commitsOf(yoursJj, "@-")
     expect(rewritten).not.toEqual(first)
     await inBase(
       planBaseRefresh({

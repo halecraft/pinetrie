@@ -314,7 +314,13 @@ describe("planIntent", () => {
     test("bring up to date sets the command on your card at the end, and focuses its column", () => {
       expect(
         plan(
-          column({ kind: "bringUpToDate", key: "col", card: c, create: fresh }),
+          column({
+            kind: "bringUpToDate",
+            key: "col",
+            card: c,
+            create: fresh,
+            command: "bring-up-to-date",
+          }),
         ),
       ).toEqual([
         { kind: "setCommand", card: c, command: "bring-up-to-date" },
@@ -329,6 +335,7 @@ describe("planIntent", () => {
             key: "col",
             card: null,
             create: fresh,
+            command: "bring-up-to-date",
           }),
         ),
       ).toEqual([
@@ -340,9 +347,22 @@ describe("planIntent", () => {
       ])
     })
     test("an offer's other buttons are one command each", () => {
-      expect(plan(column({ kind: "offer", lane, action: "split" }))).toEqual([
-        { kind: "offer", lane, action: "split" },
-      ])
+      expect(
+        plan(column({ kind: "offer", lane, action: "split", to: null })),
+      ).toEqual([{ kind: "offer", lane, action: "split", to: null }])
+    })
+    test("continue on the line sets its own command (ADR-0060)", () => {
+      expect(
+        plan(
+          column({
+            kind: "bringUpToDate",
+            key: "col",
+            card: c,
+            create: fresh,
+            command: "continue-on-line",
+          }),
+        )[0],
+      ).toEqual({ kind: "setCommand", card: c, command: "continue-on-line" })
     })
   })
 

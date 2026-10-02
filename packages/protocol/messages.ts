@@ -39,7 +39,10 @@ export const HOST_PRINCIPAL = "pineta-host"
  *   - `mark` titles the entry `targetId` with `text` (ADR-0045); `""`
  *     clears its title.
  *   - `offer` acts on that lane's offer in your repo; `mode` names the
- *     action: `take`, `split`, `squash`, `describe` or `refresh`.
+ *     action: `take`, `split`, `squash`, `describe` or `refresh`. A take
+ *     names its destination bookmark in `targetId`, `""` for the default.
+ *   - `line` sets up the integration line (`mode` `setup`) or lands your
+ *     work on it (`land`), ADR-0060.
  *   - `reserve` asks the host to name the thread whose lane will be `lane`,
  *     a new id the sender's column made, before the lane exists (ADR-0057).
  *   - `move` hands the card `cardId` from the place `from` to the place
@@ -58,6 +61,7 @@ export const COMMAND_KINDS = [
   "reserve",
   "move",
   "set-command",
+  "line",
 ] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -94,7 +98,10 @@ export interface Command {
    */
   readonly workKind: string
   readonly workDir: string
-  /** `archive`: the root; `mark`: the entry. Separate from `parentId` on purpose. */
+  /**
+   * `archive`: the root; `mark`: the entry; `offer` `take`: the destination
+   * bookmark, `""` for the default. Separate from `parentId` on purpose.
+   */
   readonly targetId: string
   /** `chat`: the card its text was sent from, or `""` (ADR-0048); `move`, `set-command`: the card. */
   readonly cardId: string
@@ -110,6 +117,11 @@ export interface Command {
    * the message goes.
    */
   readonly reserved: string
+  /**
+   * `chat`: the WIP bookmark a lane it creates starts from, or `""` for the
+   * line (ADR-0060).
+   */
+  readonly base: string
 }
 
 /**
@@ -129,6 +141,7 @@ export const OUTCOME_KINDS = [
   "taken",
   "offered",
   "reserved",
+  "line-moved",
   "moved",
   "queued",
   "unmoved",
@@ -179,6 +192,7 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   targetId: "",
   cardId: "",
   reserved: "",
+  base: "",
   seen: "",
   from: "",
   to: "",

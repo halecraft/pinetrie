@@ -200,6 +200,19 @@ export const ERR = {
   INVALID_TITLE: "invalid_title",
   /** A new thread's lane id that names a lane pi already holds (ADR-0057). */
   LANE_TAKEN: "lane_taken",
+  /**
+   * A command that acts on the repo as its owner (set up the line, land your
+   * work) from a host that admits others: it has an invite key (ADR-0060).
+   */
+  NOT_YOURS: "not_yours",
+  /** An offer taken, or work landed, before the line is set up (ADR-0060). */
+  NO_LINE: "no_line",
+  /** A take to a bookmark that is not one of the offer's destinations now. */
+  BAD_DESTINATION: "bad_destination",
+  /** A new thread's base that is not a WIP bookmark above the line. */
+  BAD_BASE: "bad_base",
+  /** Bringing a thread up to date with a WIP bookmark that is gone (ADR-0060). */
+  BASE_GONE: "base_gone",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -275,6 +288,11 @@ export type Intent =
        * creates is created under, unless pi holds it (ADR-0057).
        */
       readonly reserved: LaneName | null
+      /**
+       * The WIP bookmark a lane this message creates starts from; null for the
+       * line (ADR-0060). Read only when the message creates a lane.
+       */
+      readonly base: string | null
     }
   /** Name a thread before its lane exists (ADR-0057). */
   | { readonly kind: "reserve"; readonly lane: LaneName }
@@ -294,12 +312,18 @@ export type Intent =
       readonly entry: EntryId
       readonly title: string | null
     }
-  /** Act on a lane's offer in your repo (ADR-0038). */
+  /**
+   * Act on a lane's offer in your repo (ADR-0038). A take names its
+   * destination bookmark, null for the default (ADR-0060).
+   */
   | {
       readonly kind: "offer"
       readonly lane: LaneName
       readonly action: OfferAction
+      readonly to: string | null
     }
+  /** Set up the integration line, or land your work on it (ADR-0060). */
+  | { readonly kind: "line"; readonly action: LineAction }
   /** Move a card, create one, or remove one (ADR-0059). */
   | { readonly kind: "move"; readonly move: Move }
   /** Set a card's command, or clear it with null (ADR-0055). */
@@ -322,6 +346,13 @@ export const OFFER_ACTIONS: readonly OfferAction[] = [
   "describe",
   "refresh",
 ]
+
+/**
+ * What can be done with the integration line (ADR-0060): set it up at your
+ * `@-`, writing your repo's immutable heads, or land your work on it.
+ */
+export type LineAction = "setup" | "land"
+export const LINE_ACTIONS: readonly LineAction[] = ["setup", "land"]
 
 // --- the archive (ADR-0029) --------------------------------------------------
 
@@ -432,13 +463,65 @@ export interface RevisionFacts {
 
 /**
  * The trailers the host writes into commit messages: a turn names its entry
- * and lane (ADR-0032), an offer its thread too (ADR-0039).
+ * and lane (ADR-0032), an offer its thread too (ADR-0039). The ledger
+ * (ADR-0060): a lane's start or update names its base, `<bookmark>@<commit>`;
+ * an offer names the lane tip it holds and where it starts.
  */
 export const TRAILERS = {
   thread: "Pineta-Thread",
   lane: "Pineta-Lane",
   entry: "Pineta-Entry",
+  base: "Pineta-Base",
+  source: "Pineta-Source",
+  start: "Pineta-Start",
 } as const
+
+/**
+ * Every value of trailer `key` in a message, from every paragraph, in order.
+ * A squash of two commits keeps both messages, so a message can hold two
+ * trailer paragraphs; jj's `trailers` template reads only the last (S77).
+ */
+export function trailerValues(
+  message: string,
+  key: (typeof TRAILERS)[keyof typeof TRAILERS],
+): string[] {
+  const prefix = `${key}: `
+  return message
+    .split("\n")
+    .filter(line => line.startsWith(prefix))
+    .map(line => line.slice(prefix.length).trim())
+    .filter(v => v !== "")
+}
+
+/**
+ * An offer's ledger as its message carries it (ADR-0060): the lane tip it
+ * holds (`Pineta-Source`) and where it starts (`Pineta-Start`), from the
+ * last paragraph that names a source, so a message holding an older ledger
+ * above it reads as the newest. Null when no paragraph names one, as after
+ * you rewrote the message without them.
+ */
+export function offerLedger(message: string): {
+  readonly source: CommitId
+  readonly start: readonly CommitId[]
+} | null {
+  const paragraph = message
+    .split("\n\n")
+    .filter(p => trailerValues(p, TRAILERS.source).length > 0)
+    .at(-1)
+  if (paragraph === undefined) return null
+  const source = trailerValues(paragraph, TRAILERS.source).at(-1)
+  const start = trailerValues(paragraph, TRAILERS.start)
+  if (source === undefined || start.length === 0) return null
+  return { source: commitId(source), start: start.map(commitId) }
+}
+
+/**
+ * Where a thread's lane starts and is brought up to date from (ADR-0060):
+ * the integration line, or a WIP bookmark you chose at its first message.
+ */
+export type ThreadBase =
+  | { readonly kind: "line" }
+  | { readonly kind: "wip"; readonly bookmark: string }
 
 declare const commitIdBrand: unique symbol
 /**
@@ -497,7 +580,7 @@ declare const snapshotIdBrand: unique symbol
  */
 export type SnapshotId = string & { readonly [snapshotIdBrand]: true }
 export const snapshotId = (id: string): SnapshotId => id as SnapshotId
-/** The project's disk at your `@-`, which root lanes fork from. */
+/** The project's disk at the line's commit, which root lanes fork from (ADR-0060). */
 export const BASE_SNAPSHOT = snapshotId("base")
 
 /** Where a lane's tools work: its own container and disk, or directly in a directory. */
@@ -659,16 +742,22 @@ export type DiffSpan =
 export const spanKey = (s: DiffSpan): string =>
   s.kind === "revision" ? s.commit : `${s.from}..${s.to}`
 
-/** Your working copy as the host snapshotted it: `@`, and `@`'s parents. */
-export interface YoursNow {
-  readonly at: CommitId
-  readonly parents: readonly CommitId[]
-}
-
-/** What a fork starts on: a commit a lane recorded, or a copy of your `@`. */
+/**
+ * What a fork starts on (ADR-0060): a commit a lane recorded (a branch below
+ * agent work), the line's commit, or a copy of a WIP bookmark made on the
+ * line commit under it, so the lane freezes nothing of yours.
+ */
 export type ForkStart =
   | { readonly kind: "commits"; readonly commits: readonly CommitId[] }
-  | ({ readonly kind: "copy" } & YoursNow)
+  | { readonly kind: "line"; readonly onto: string; readonly commit: CommitId }
+  | {
+      readonly kind: "wip"
+      readonly bookmark: string
+      /** The WIP's commit: whose files the copy holds. */
+      readonly commit: CommitId
+      /** The line commit under the WIP: the copy's parent. */
+      readonly under: CommitId
+    }
 
 declare const threadNameBrand: unique symbol
 /**
@@ -696,26 +785,75 @@ export interface BannerRecord {
 }
 
 /**
- * A commit you already have, though your repo holds it only as lane history:
- * a lane commit a take delivered, or a copy of your `@` made in a lane at a
- * fork or an update. A host-written `pineta.have` value keyed by commit.
- * Where an offer starts is read from these (ADR-0038); the newest copy in a
- * lane's history supersedes the haves recorded before it (`startHaves`, S51),
- * and a delivered commit beside a lane's tip counts for the history it
- * shares with the tip at or above that copy (S72).
+ * The integration line in your repo, as the host last read it (ADR-0060): a
+ * host-written `pineta.line` value, a cache the page reads. The repo is the
+ * truth; the host rewrites this whenever your repo's operation head moves.
  */
-export interface HaveRecord {
+export interface LineRecord {
+  /** The line's bookmark, and the prefix that makes a bookmark a WIP. */
+  readonly onto: string
+  readonly wipPrefix: string
+  /** The line's commit; null before it is set up. */
+  readonly commit: CommitId | null
+  /**
+   * Your repo's `immutable_heads()` now (null: jj's builtin), and what
+   * setting up the line writes. Equal once it is written.
+   */
+  readonly heads: { readonly current: string | null; readonly proposed: string }
+  /**
+   * Your repo's `revsets.log` now (null: jj's default), and what setting up
+   * the line writes: the offers added, since an immutable head is out of
+   * jj's default log (S77 item 8).
+   */
+  readonly log: { readonly current: string | null; readonly proposed: string }
+  /** The WIP bookmarks a thread may start from, newest first. */
+  readonly wips: readonly {
+    readonly bookmark: string
+    readonly commit: CommitId
+    /** Line commits it lacks: how far it is behind the line. */
+    readonly behind: number
+    /** Its commits not on the line: what lands with it. */
+    readonly ahead: number
+  }[]
+  /**
+   * Your `@-` against the line: the line commits it lacks, and the commits
+   * of yours above the line when it descends from it (null when it does not).
+   */
+  readonly yours: { readonly behind: number; readonly ahead: number | null }
+  /**
+   * Whether this host takes `line` commands (set up, land): only when it
+   * admits no one but this machine (no invite key), since they act on the
+   * repo as its owner.
+   */
+  readonly commands: boolean
+}
+
+/**
+ * A thread's base as its lane's history says it (ADR-0060): a host-written
+ * `pineta.base` value keyed by lane, a cache the page reads. `start` is the
+ * commit the lane's newest `Pineta-Base` trailer names, or the line commit it
+ * forked from when it has none.
+ */
+export interface BaseRecord {
   readonly lane: LaneName
-  readonly commit: CommitId
-  readonly kind: "delivered" | "copy"
-  readonly at: number
+  readonly base: ThreadBase
+  readonly start: CommitId
+  /** A WIP base: on the line now (landed), gone without landing, or neither. */
+  readonly state: "ok" | "landed" | "gone"
 }
 
 // --- cards (ADR-0048) --------------------------------------------------------
 
-/** A command a card is sent through (ADR-0055); a plain card has none. */
-export type CardCommand = "bring-up-to-date"
-export const CARD_COMMANDS: readonly CardCommand[] = ["bring-up-to-date"]
+/**
+ * A command a card is sent through (ADR-0055); a plain card has none. Both
+ * bring the thread up to date with its base; `continue-on-line` moves a
+ * thread whose WIP is gone to the line first (ADR-0060).
+ */
+export type CardCommand = "bring-up-to-date" | "continue-on-line"
+export const CARD_COMMANDS: readonly CardCommand[] = [
+  "bring-up-to-date",
+  "continue-on-line",
+]
 
 /**
  * Where a card is. Drafting: below the line at a thread's end, kept as a send

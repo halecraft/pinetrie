@@ -24,7 +24,7 @@ const LandDetailsSchema = Type.Object({
   /** The resolution's id: its record takes it when the run ends. */
   landing: Type.String({ minLength: 1 }),
   lane: Type.String({ minLength: 1 }),
-  /** The copy of your `@` that was merged. */
+  /** The base's commit that was merged: the line's, or a WIP's copy (ADR-0060). */
   yours: Type.Array(Type.String({ minLength: 1 })),
   /** The files that conflicted when it merged. */
   files: Type.Array(Type.String()),

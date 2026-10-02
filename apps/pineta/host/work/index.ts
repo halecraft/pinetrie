@@ -9,6 +9,7 @@
 // flag, `fetch`'s queues). Offers are `host/offers/`'s.
 
 import type { ProjectRecord } from "@pineta/core"
+import { DEFAULT_LINE } from "@pineta/lanes"
 import type { Agent, LaneHooks } from "@pineta/pi"
 import { readRunning } from "@pineta/reads"
 import type { Basics } from "../basics.ts"
@@ -32,7 +33,7 @@ export type LaneWork = Pick<
   Containers,
   "access" | "beforeRun" | "runEnded" | "close"
 > &
-  Pick<NewLanes, "checkDirectory" | "prepareLane"> &
+  Pick<NewLanes, "checkDirectory" | "checkBegin" | "prepareLane"> &
   Pick<Updates, "prepareUpdate" | "landingEnded"> &
   Pick<Splits, "prepareSplit" | "splitEnded"> &
   Archive & {
@@ -67,6 +68,11 @@ export async function startLaneWork(input: {
   readonly agent: () => Agent
   /** Name every lane that has none (`host/names.ts`): a new lane, before its first run. */
   readonly ensureNames: () => Promise<void>
+  /**
+   * Whether `line` commands are taken (ADR-0060): they act on the repo as its
+   * owner, so only on a host that admits no one but this machine.
+   */
+  readonly lineCommands: boolean
 }): Promise<LaneWork> {
   const { basics } = input
   const { doc } = basics
@@ -81,6 +87,8 @@ export async function startLaneWork(input: {
       ? null
       : startOffers({
           root,
+          line: setup.lanes?.line ?? DEFAULT_LINE,
+          lineCommands: input.lineCommands,
           basics,
           agent: input.agent,
           running: lane => readRunning(doc, lane),
@@ -149,6 +157,7 @@ export async function startLaneWork(input: {
       askedForGuidance: updates.askedForGuidance,
     },
     checkDirectory: newLanes.checkDirectory,
+    checkBegin: newLanes.checkBegin,
     prepareLane: newLanes.prepareLane,
     beforeRun: containers.beforeRun,
     runEnded: containers.runEnded,

@@ -9,6 +9,8 @@ replaces its jj workspace per lane, the rewrite of the history the model is
 sent, the refusal of other lanes' paths, and dependency setup. Keeps its turn
 revisions, its fork-point rule, landing, working directly, and your working
 copy being yours.
+**Amended by ADR-0060:** the base snapshot is the integration line's
+commit, and work reaches your repo by a forward bookmark move.
 
 **Context.** ADR-0032 gave each lane a jj workspace on the host and made a
 branch's inherited history read as if it had always worked there, by

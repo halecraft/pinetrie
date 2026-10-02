@@ -10,6 +10,8 @@ import type { LaneName, ProjectRecord } from "@pineta/core"
 import {
   BASE_LANE,
   checkImage,
+  commitsOf,
+  DEFAULT_LINE,
   type DiskPaths,
   decodeLaneConfig,
   ensureRuntime,
@@ -19,6 +21,7 @@ import {
   type LaneSpec,
   laneContainer,
   laneIgnoreDir,
+  lineConfig,
   type Mount,
   NO_GRANTS,
   normalShared,
@@ -32,7 +35,7 @@ import {
   projectContainerfile,
   readLaneConfig,
   refreshBase,
-  yoursNow,
+  revsetName,
 } from "@pineta/lanes"
 import type { Agent } from "@pineta/pi"
 import { type Basics, failed, messageOf } from "../basics.ts"
@@ -90,6 +93,12 @@ export interface Setup {
   specOf(lane: LaneName, ready: Ready, base?: boolean): LaneSpec
   /** Refresh the base snapshot after the refreshes queued before, in the background. */
   refreshBaseSoon(): void
+  /**
+   * The base snapshot at the line's commit now, after the refreshes queued
+   * before: a fork from it waits for this, since the line may have been set
+   * up or moved since the last refresh (ADR-0060).
+   */
+  baseAtLine(): Promise<void>
 }
 
 export async function startSetup(input: {
@@ -191,12 +200,20 @@ export async function startSetup(input: {
     }
   }
 
+  /**
+   * The base snapshot at the line's commit (ADR-0060): every lane starts
+   * from the line, or from a WIP's copy on it. Nothing to do before the line
+   * is set up.
+   */
   async function refreshBaseNow(at: string, disk: DiskPaths, r: Ready) {
     const jj = hostJj(at)
-    const yours = await yoursNow(jj)
+    const onto = revsetName((lanes?.line ?? DEFAULT_LINE).onto)
+    const yours = await commitsOf(jj, `present(${onto})`)
+    const [line] = yours
+    if (line === undefined) return
     const install = lanes?.config.install ?? null
     const lock =
-      install === null ? null : await lockHashAt(jj, "@-", install.lockfile)
+      install === null ? null : await lockHashAt(jj, line, install.lockfile)
     const made = await refreshBase({
       paths: disk,
       // Nothing in the base should see a shared directory.
@@ -208,9 +225,7 @@ export async function startSetup(input: {
       open: openLink,
     })
     if (made)
-      log(
-        `[host] the base snapshot is at your @- (${yours.map(c => c.slice(0, 8)).join(", ")})`,
-      )
+      log(`[host] the base snapshot is at the line (${line.slice(0, 8)})`)
   }
 
   // --- the images, runtime and base snapshot, in the background ----------
@@ -224,13 +239,14 @@ export async function startSetup(input: {
 
   /** The base snapshot's refreshes, one at a time. */
   const base = createSerial()
-  function refreshBaseSoon(): void {
+  async function baseAtLine(): Promise<void> {
     if (ready === null || root === null || paths === null) return
     const [at, disk] = [root, paths]
+    await base.run(async () => refreshBaseNow(at, disk, await ready))
+  }
+  function refreshBaseSoon(): void {
     void serial.track(
-      base
-        .run(async () => refreshBaseNow(at, disk, await ready))
-        .catch(failed(basics, "refreshing the base snapshot")),
+      baseAtLine().catch(failed(basics, "refreshing the base snapshot")),
     )
   }
 
@@ -244,6 +260,7 @@ export async function startSetup(input: {
     hostPaths,
     specOf,
     refreshBaseSoon,
+    baseAtLine,
   }
 }
 
@@ -281,7 +298,9 @@ async function prepareLanes(
   }
   for (const r of sharing.refused)
     log(`[host] ${r.path} is not shared: ${r.reason}`)
-  return { config, ...sharing }
+  const { line, refused } = lineConfig(user.offers, config.offers)
+  for (const r of refused) log(`[host] ${r}`)
+  return { config, line, ...sharing }
 }
 
 /** The images, the lane runtime, links and identity; then the base snapshot. */

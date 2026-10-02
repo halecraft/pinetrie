@@ -6,6 +6,39 @@ const archive = "packages/marginalia/archive.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a conflicted offer lands on the line",
+    file: "packages/marginalia/offer.ts",
+    from: "    input.conflicted\n      ? []",
+    to: "    false\n      ? []",
+    command: unit,
+    expect: "a conflicted offer never lands on the line",
+  },
+  {
+    name: "a WIP squashed into the line is not landed",
+    file: "packages/marginalia/work.ts",
+    from: '  if (facts.bookmark !== null) return facts.bookmarkInLine ? "landed" : "ok"',
+    to: '  if (facts.bookmark !== null) return "ok"',
+    command: unit,
+    expect: "the bookmark on the line (landed, or squashed into it)",
+  },
+  {
+    name: "a landed WIP's thread stays on the WIP",
+    file: "packages/marginalia/work.ts",
+    from: '    wip.state !== "landed"',
+    to: "    true",
+    command: unit,
+    expect:
+      "a line thread, a lane with no base, and a landed WIP merge the line",
+  },
+  {
+    name: "any bookmark is a base",
+    file: "packages/marginalia/work.ts",
+    from: "  if (!base.startsWith(input.wipPrefix) || facts.wip === null)",
+    to: "  if (facts.wip === null)",
+    command: unit,
+    expect: "no line: no_line; a base that is no WIP above the line: bad_base",
+  },
+  {
     name: "the host's own rewrite reads as your edit",
     file: "packages/marginalia/offer.ts",
     from: "  (r.since === null || !r.since.reached || r.since.yoursChanged)",

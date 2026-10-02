@@ -3,8 +3,10 @@
 
 import {
   ERR,
+  type ErrCode,
   isBusy,
   type LaneName,
+  type LineAction,
   type OfferAction,
   planStop,
   type WriterId,
@@ -71,6 +73,7 @@ export async function actOnOffer(
   lane: LaneName,
   action: OfferAction,
   by: WriterId,
+  to: string | null = null,
 ): Promise<Outcome> {
   const { work } = deps
   const offers = work.offers
@@ -97,12 +100,47 @@ export async function actOnOffer(
       runId: deps.start(lane, { kind: "prompt", message }),
     }
   }
-  const refused = await offers.act(lane, action, by)
+  const refused = await offers.act(lane, action, by, to)
   if (refused !== null)
+    return { kind: "refused", code: refused, message: offerRefusal(refused) }
+  return action === "take" ? { kind: "taken" } : { kind: "offered" }
+}
+
+/** Why an offer action was refused, worded once. */
+export function offerRefusal(code: ErrCode): string {
+  return code === ERR.BAD_DESTINATION
+    ? "the offer cannot be taken there now: a conflicted offer goes only into a WIP, and the destination must sit below it"
+    : "this thread has no offer in your repo"
+}
+
+/** Why a `line` command was refused, worded once (ADR-0060). */
+export function lineRefusal(action: LineAction, code: ErrCode): string {
+  switch (code) {
+    case ERR.NOT_YOURS:
+      return "this host admits others, so it does not act on the repo as its owner: use jj on its machine"
+    case ERR.NO_LINE:
+      return "set up the line first"
+    default:
+      return action === "setup"
+        ? "the line is already set up"
+        : "your @- is not above the line: rebase onto it first"
+  }
+}
+
+/** A `line` command: set up the integration line, or land your work (ADR-0060). */
+export async function actOnLine(
+  deps: Pick<LaneDeps, "work">,
+  action: LineAction,
+): Promise<Outcome> {
+  const offers = deps.work.offers
+  if (offers === null)
     return {
       kind: "refused",
-      code: refused,
-      message: "this thread has no offer in your repo",
+      code: ERR.NOT_OWN_COPY,
+      message: "this host has no lanes of their own",
     }
-  return action === "take" ? { kind: "taken" } : { kind: "offered" }
+  const refused = await offers.line(action)
+  return refused === null
+    ? { kind: "line-moved" }
+    : { kind: "refused", code: refused, message: lineRefusal(action, refused) }
 }

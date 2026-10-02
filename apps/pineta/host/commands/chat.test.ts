@@ -1,6 +1,7 @@
 import {
   cardId,
   ERR,
+  type ErrCode,
   entryId,
   laneNameForThread,
   NOBODY,
@@ -40,7 +41,10 @@ const details: ChatDetails = {
   sendId: "s-1",
 }
 
-function setUp(bad: typeof ERR.BAD_DIRECTORY | null) {
+function setUp(
+  bad: typeof ERR.BAD_DIRECTORY | null,
+  begin: ErrCode | null = null,
+) {
   const b = basics()
   const agent = record<ChatDeps["agent"]>({
     createThreadLane: async () => ({ kind: "created", lane: LANE }),
@@ -48,6 +52,7 @@ function setUp(bad: typeof ERR.BAD_DIRECTORY | null) {
   const work = record<ChatDeps["work"]>({
     project: null,
     checkDirectory: async () => bad,
+    checkBegin: async () => begin,
     prepareLane: async () => {},
   })
   const started: string[] = []
@@ -62,7 +67,12 @@ function setUp(bad: typeof ERR.BAD_DIRECTORY | null) {
       return runId("r-1")
     },
   }
-  const context = { index: readTreeIndex(b.doc), writer: ALICE, work: null }
+  const context = {
+    index: readTreeIndex(b.doc),
+    writer: ALICE,
+    work: null,
+    base: null,
+  }
   return { agent, work, started, deps, context }
 }
 
@@ -90,8 +100,24 @@ describe("executeChat", () => {
     expect(agent.calls.map(c => [c.method, ...c.args])).toEqual([
       ["createThreadLane", ROOT, LANE],
     ])
-    expect(methods(work.calls)).toEqual(["checkDirectory", "prepareLane"])
+    expect(methods(work.calls)).toEqual([
+      "checkDirectory",
+      "checkBegin",
+      "prepareLane",
+    ])
     expect(started).toEqual([LANE])
+  })
+
+  test("createAndRun from a base that cannot begin refuses, and never creates the lane (ADR-0060)", async () => {
+    const { agent, started, deps, context } = setUp(null, ERR.BAD_BASE)
+    const out = await executeChat(
+      deps,
+      { kind: "createAndRun", at: ROOT, lane: LANE, details },
+      { ...context, base: "wip/gone" },
+    )
+    expect(out).toMatchObject({ kind: "refused", code: ERR.BAD_BASE })
+    expect(agent.calls).toEqual([])
+    expect(started).toEqual([])
   })
 
   test("busy writes nothing and answers busy: the sender's client queues its card", async () => {
@@ -116,6 +142,7 @@ describe("sendChat", () => {
     work: null,
     card: null,
     reserved: null,
+    base: null,
   })
   function setUp(project: ProjectRecord | null = null) {
     const b = basics()
@@ -137,6 +164,7 @@ describe("sendChat", () => {
       work: record<ChatDeps["work"]>({
         project,
         checkDirectory: async () => null,
+        checkBegin: async () => null,
         prepareLane: async () => {},
       }).port,
       blobs: record<ChatDeps["blobs"]>({
@@ -198,7 +226,12 @@ describe("sendChat", () => {
     const out = await executeChat(
       deps,
       { kind: "conflict", by: BEA },
-      { index: readTreeIndex(deps.basics.doc), writer: ALICE, work: null },
+      {
+        index: readTreeIndex(deps.basics.doc),
+        writer: ALICE,
+        work: null,
+        base: null,
+      },
     )
     expect(out).toEqual({ kind: "conflict", by: BEA })
   })

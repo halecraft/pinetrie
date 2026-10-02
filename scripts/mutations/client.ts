@@ -16,6 +16,32 @@ const copyText = "packages/client/copy-text.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a take does not say where it goes",
+    file: "packages/client/column-view.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '    const where = first === undefined ? "" : ` ${destinationWords(first)}`',
+    to: '    const where = ""',
+    command: unit,
+    expect: "the labels follow the state, and name the take's destination",
+  },
+  {
+    name: "a host that admits others offers the line's actions",
+    file: "packages/client/line-view.ts",
+    from: '      actions: record.commands ? ["setup"] : [],',
+    to: '      actions: ["setup"],',
+    command: unit,
+    expect: "a host that admits others offers no line action",
+  },
+  {
+    name: "a thread whose WIP is gone is offered a plain update",
+    file: "packages/marginalia/offer.ts",
+    from: '      ...(gone ? menu.map(b => (b === "update" ? "continue" : b)) : menu),',
+    to: "      ...menu,",
+    command: unit,
+    expect:
+      "a WIP gone without landing offers no take, and continuing on the line",
+  },
+  {
     name: "an edited offer hides its conflicts",
     file: "packages/client/column-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text

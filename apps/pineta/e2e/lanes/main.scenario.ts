@@ -17,10 +17,9 @@ import {
   ROOT,
   rootOf,
 } from "@pineta/core"
-import { hostOps, startOfOffer } from "@pineta/lanes"
+import { DEFAULT_LINE, hostOps, laneBase, startOfOffer } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
 import {
-  readHaves,
   readLandings,
   readLanes,
   readNames,
@@ -38,6 +37,7 @@ import {
   containerProblem,
   idleNow,
   join,
+  setUpLine,
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
@@ -132,6 +132,9 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       readProject(wh.doc)?.kind === "lanes",
       `${JSON.stringify(readProject(wh.doc))}`,
     )
+    // Threads start at the integration line (ADR-0060): set it up at the
+    // project's commit, as the header's menu does.
+    await setUpLine(wh.doc, wu)
 
     // ── 1. Two lanes at once: the same file, the same port, their own ──────
     const serve =
@@ -400,7 +403,8 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         "file",
         "list",
         "-r",
-        `present(bookmarks(exact:"pineta-offer/${committerOffer}"))`,
+        // An empty revision set, before the offer is built, is no files.
+        `latest(present(bookmarks(exact:"pineta-offer/${committerOffer}")) | root())`,
         'root:"mine.txt"',
       ).trim() !== ""
     check(
@@ -568,26 +572,39 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         .filter(l => l !== "" && !l.startsWith("pineta-offer-"))
         .reverse()
         .filter((l, i, all) => l !== all[i - 1])
-    // You change the same line, commit, and keep editing: the offer shows the
-    // conflict before you take it.
+    // You change the same line, commit, land it on the line, and keep
+    // editing: the offer follows the line and shows the conflict before you
+    // take it (ADR-0060).
     writeFileSync(path.join(project, "shared.txt"), "one\ntwo (you)\nthree\n")
     jj(project, "commit", "-m", "you edit line two")
+    const landed = await wu.line("land")
     writeFileSync(path.join(project, "still-editing.txt"), "wip\n")
     const conflicted = await waitFor(
       () => offerOf()?.conflicts.includes("shared.txt") === true,
       30_000,
     )
     check(
-      "the offer follows your commit, and says it conflicts with your work",
-      conflicted >= 0,
-      `${JSON.stringify(offerOf()?.conflicts)}`,
+      "the offer follows the line when you land your commit, and says it conflicts with it",
+      landed.kind === "line-moved" && conflicted >= 0,
+      `${JSON.stringify({ landed, conflicts: offerOf()?.conflicts })}`,
     )
-    // You reword the commit under the offer: jj rebases the offer, not the
-    // host, whose next trigger plans `none` and keeps `host.wrote`. The
-    // record's `commits` still names the offer as it is now, which is what
-    // a review reads (ADR-0047). The first line stays, for the take below.
+    // You reword the line's commit under the offer, which is immutable
+    // until you say otherwise: jj rebases the offer, not the host, whose next
+    // trigger plans `none` and keeps `host.wrote`. The record's `commits`
+    // still names the offer as it is now, which is what a review reads
+    // (ADR-0047). The first line stays, for the take below.
+    // Landing moved every open offer: their writes are done first.
+    await wh.quiet()
     const wroteBefore = JSON.stringify(offerOf()?.host.wrote)
-    jj(project, "describe", "-r", "@-", "-m", "you edit line two\n\nreworded")
+    jj(
+      project,
+      "describe",
+      "--ignore-immutable",
+      "-r",
+      "pineta-onto",
+      "-m",
+      "you edit line two\n\nreworded",
+    )
     const offerNow = () =>
       jj(
         project,
@@ -607,7 +624,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       followed >= 0 &&
         JSON.stringify(offerOf()?.host.wrote) === wroteBefore &&
         wroteBefore !== JSON.stringify(offerOf()?.commits),
-      `${JSON.stringify({ commits: offerOf()?.commits, wrote: offerOf()?.host.wrote, now: offerNow() })}`,
+      `${JSON.stringify({ before: wroteBefore, commits: offerOf()?.commits, wrote: offerOf()?.host.wrote, now: offerNow() })}`,
     )
     // Bring it up to date: the project's work merged into the lane, and the
     // agent resolves the conflict, told what the card asked.
@@ -670,26 +687,39 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         history.length % 2 === 0,
       `${JSON.stringify(history)}`,
     )
-    // Take: one commit under your edits; your uncommitted file kept.
-    const taken = two === undefined ? null : await wu.offer(two.name, "take")
-    const below = jj(
+    // Take: the line moves forward to the offer, which stays one commit on
+    // your landed one; your working copy is untouched (ADR-0060).
+    const atBefore = jj(
       project,
       "log",
       "--no-graph",
       "-r",
-      "@--",
+      "@",
       "-T",
-      "description.first_line()",
+      "commit_id",
+    )
+    const taken =
+      two === undefined ? null : await wu.offer(two.name, "take", "pineta-onto")
+    const lineLog = jj(
+      project,
+      "log",
+      "--no-graph",
+      "-r",
+      "pineta-onto | pineta-onto-",
+      "-T",
+      'description.first_line() ++ "\n"',
     )
     check(
-      "taking the offer puts one commit under your edits, your uncommitted file kept",
+      "taking the offer moves the line to it, on your landed commit; your working copy is untouched",
       taken?.kind === "taken" &&
+        lineLog === "offer: scripted\nyou edit line two\n" &&
+        jj(project, "log", "--no-graph", "-r", "@", "-T", "commit_id") ===
+          atBefore &&
         readFileSync(path.join(project, "shared.txt"), "utf8") ===
-          "one\ntwo (you, and lane)\nthree\n" &&
+          "one\ntwo (you)\nthree\n" &&
         readFileSync(path.join(project, "still-editing.txt"), "utf8") ===
-          "wip\n" &&
-        below === "you edit line two",
-      `${JSON.stringify(taken)}, below: ${below}`,
+          "wip\n",
+      `${JSON.stringify(taken)}, line: ${lineLog}`,
     )
     // The next turn's offer holds only what came after.
     script.use([
@@ -715,9 +745,12 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       next >= 0,
       `${JSON.stringify(offerOf()?.files)}`,
     )
-    // A clean update: a fact in the thread, then the card's text, sent.
+    // A clean update: a fact in the thread, then the card's text, sent. Your
+    // work goes on the line first, rebased onto what you took, then landed.
     writeFileSync(path.join(project, "yours.txt"), "yours\n")
     jj(project, "commit", "-m", "you add yours.txt")
+    jj(project, "rebase", "-b", "@", "-o", "pineta-onto")
+    await wu.line("land")
     script.use([{ text: "it fits" }])
     if (two !== undefined)
       bringUpToDate(wu, two.name, laneTip(two.name), "check yours still fits")
@@ -753,13 +786,18 @@ async function mainSection(check: Checks["check"]): Promise<void> {
             "commit_id",
           )
     // Where the host starts the offer, as it computes it.
-    const start = (
-      await startOfOffer(hostOps(project), {
-        tip: commitId(laneTipCommit),
-        target: "@-",
-        haves: readHaves(wh.doc),
-      })
-    ).join(" ")
+    const tipCommit = commitId(laneTipCommit)
+    const base = await laneBase(hostOps(project), tipCommit, DEFAULT_LINE)
+    const start =
+      base === null
+        ? ""
+        : (
+            await startOfOffer(hostOps(project), {
+              tip: tipCommit,
+              base,
+              line: DEFAULT_LINE,
+            })
+          ).join(" ")
     script.use([
       {
         tool: "bash",
@@ -786,18 +824,29 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       `${JSON.stringify({ split, size: offerOf()?.size })}`,
     )
 
-    // A new root thread sees work you have not committed.
+    // A new root thread starts at the line: what you landed, not what you
+    // committed and have not landed, nor your working copy (ADR-0060).
+    writeFileSync(path.join(project, "unlanded.txt"), "not landed\n")
+    jj(project, "commit", "-m", "you add unlanded.txt")
     writeFileSync(path.join(project, "unsaved.txt"), "not committed\n")
     script.use([
-      { tool: "bash", args: { command: "cat unsaved.txt" } },
+      {
+        tool: "bash",
+        args: { command: "cat yours.txt unlanded.txt unsaved.txt 2>&1" },
+      },
       { text: "seen" },
     ])
-    await wu.chat("read my unsaved file", ROOT, START_AGENT)
+    await wu.chat("read my files", ROOT, START_AGENT)
     await idle()
-    const seenUnsaved = toolResults(laneWith("read my unsaved file")?.name)
+    const seenUnsaved = toolResults(laneWith("read my files")?.name)
     check(
-      "a new root thread starts from a copy of your @: it sees your uncommitted file",
-      seenUnsaved.some(t => t.includes("not committed")) &&
+      "a new root thread starts at the line: it has what you landed, and not what you have not",
+      seenUnsaved.some(
+        t =>
+          t.includes("yours") &&
+          !t.includes("not landed") &&
+          !t.includes("not committed"),
+      ) &&
         jj(
           project,
           "log",
@@ -845,7 +894,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     }
     const branchA = await branchWriting("@agent branch a", "branch-a.txt")
     const aBefore = { files: filesOf(branchA), change: changeOf(branchA) }
-    await wu.offer(lane2 ?? ("" as LaneName), "take")
+    await wu.offer(lane2 ?? ("" as LaneName), "take", "pineta-onto")
     const shrunk = await waitFor(
       () => filesOf(branchA) === JSON.stringify(["branch-a.txt"]),
       30_000,
@@ -873,7 +922,11 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     await waitFor(() => offerOf()?.files.includes("more.txt") === true, 30_000)
     const branchB = await branchWriting("@agent branch b", "branch-b.txt")
     await wh.quiet()
-    const takenB = await wu.offer(branchB ?? ("" as LaneName), "take")
+    const takenB = await wu.offer(
+      branchB ?? ("" as LaneName),
+      "take",
+      "pineta-onto",
+    )
     const withdrawn = await waitFor(() => offerOf() === undefined, 30_000)
     check(
       "taking a branch that holds all its parent's work withdraws the parent's offer: no record, no bookmark",

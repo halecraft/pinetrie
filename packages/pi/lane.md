@@ -63,9 +63,13 @@ changes Pineta can keep this note true. You can skip them.
 
 ## What the person gets
 
-- Your work reaches the person as one commit on their `@-`, bookmarked
-  `pineta-offer/<thread name>`: the offer. They take it when they choose.
-  <!-- packages/lanes/plan.ts offerBookmark -->
+- Your work reaches the person as one commit on their integration line
+  (`pineta-onto`, unless they named it otherwise), or on the WIP bookmark
+  this thread started from, bookmarked `pineta-offer/<thread name>`: the
+  offer. They take it when they choose. <!-- packages/lanes/plan.ts offerBookmark -->
+- This thread started from that line, or from a copy of that WIP: the
+  commit in your history whose message carries `Pineta-Base`. Leave it as it
+  is. <!-- packages/lanes/plan.ts baseMessage -->
 - While you work, the offer is described `WIP (<thread name>): <first
   message>`. When a run ends, another agent writes its description; you
   don't need to. <!-- packages/marginalia/offer.ts wipDescription -->
@@ -114,10 +118,11 @@ changes Pineta can keep this note true. You can skip them.
 
 - Several people may write in one thread. Each message you read begins with
   the name of the person who wrote it. <!-- packages/marginalia/chat.ts attributed -->
-- When someone brings this thread up to date, Pineta merges the project's
-  work (the person's `@`, uncommitted edits included) into `/workspace`,
-  and a note tells you what changed. What they want done with it comes
-  after, as their message. <!-- packages/lanes/merge.ts mergeYours -->
+- When someone brings this thread up to date, Pineta merges the thread's
+  base into `/workspace`: the integration line's newest commit, or a fresh
+  copy of the WIP it started from. A note tells you what changed. What they
+  want done with it comes after, as their message.
+  <!-- packages/lanes/merge.ts mergeBase -->
 - If the merge conflicts, a Pineta message asks you to resolve it. Only
   then do you have `ask_for_guidance`: use it when the two sides meant
   different things. <!-- packages/marginalia/land.ts LAND_TYPE -->

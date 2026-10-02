@@ -4,6 +4,7 @@
 import assert from "node:assert/strict"
 import {
   address,
+  commitId,
   emailLocalPart,
   entryId,
   findSeqKeys,
@@ -15,11 +16,14 @@ import {
   NOBODY,
   normalizeEmail,
   normalizeName,
+  offerLedger,
   parseMentions,
   parseNewLane,
   parseTitle,
   projectTranscript,
   THE_AGENT,
+  TRAILERS,
+  trailerValues,
   writerId,
   writerOfPrincipal,
 } from "@pineta/core"
@@ -283,4 +287,36 @@ describe("address: mentions pick who a message is for (ADR-0021)", () => {
       "guest-x4bu",
     ])
   })
+})
+
+test("trailerValues reads a trailer from every paragraph, as a squash leaves two (S77)", () => {
+  const squashed = [
+    "taken one",
+    "",
+    "Pineta-Source: aaaa",
+    "",
+    "taken two",
+    "",
+    "Pineta-Lane: t-2",
+    "Pineta-Source: bbbb",
+    "",
+  ].join("\n")
+  expect(trailerValues(squashed, TRAILERS.source)).toEqual(["aaaa", "bbbb"])
+  expect(trailerValues(squashed, TRAILERS.base)).toEqual([])
+})
+
+test("offerLedger reads the newest paragraph that names a source; none without one (ADR-0060)", () => {
+  const one =
+    "offer: x\n\nPineta-Source: aaaa\nPineta-Start: s1\nPineta-Start: s2\n"
+  expect(offerLedger(one)).toEqual({
+    source: commitId("aaaa"),
+    start: [commitId("s1"), commitId("s2")],
+  })
+  const squashed = `${one}\nPineta-Source: bbbb\nPineta-Start: s3\n`
+  expect(offerLedger(squashed)).toEqual({
+    source: commitId("bbbb"),
+    start: [commitId("s3")],
+  })
+  expect(offerLedger("offer: yours, rewritten\n")).toBeNull()
+  expect(offerLedger("offer: x\n\nPineta-Source: aaaa\n")).toBeNull()
 })

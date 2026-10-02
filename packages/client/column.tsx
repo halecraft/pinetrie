@@ -409,14 +409,31 @@ export function Column(p: ColumnProps) {
   // Bringing the thread up to date is a command on your card here (ADR-0055):
   // the one you have at its end, or a new one, focused, so you write what the
   // agent should do with the new work.
+  // A take names its destination: the default, or the line (ADR-0060).
   const actOnOffer = (button: OfferButton) => {
     if (lane.kind !== "lane") return
-    if (button !== "update" && button !== "resolve")
-      return act({ kind: "offer", lane: lane.name, action: button })
+    if (button === "take" || button === "take-line") {
+      const destinations =
+        shows.strip.kind === "offer" ? shows.strip.destinations : []
+      const to =
+        button === "take"
+          ? destinations[0]
+          : destinations.find(d => d.kind === "line")
+      if (to === undefined) return
+      return act({
+        kind: "offer",
+        lane: lane.name,
+        action: "take",
+        to: to.bookmark,
+      })
+    }
+    if (button !== "update" && button !== "resolve" && button !== "continue")
+      return act({ kind: "offer", lane: lane.name, action: button, to: null })
     if (place?.kind !== "drafting") return
     act({
       kind: "bringUpToDate",
       key: p.column.key,
+      command: button === "continue" ? "continue-on-line" : "bring-up-to-date",
       card: mine?.id ?? null,
       create: {
         id: newCardId(),
@@ -530,6 +547,9 @@ export function Column(p: ColumnProps) {
               running={running}
               working={workingWords(running, askLine(runningAsk))}
             />
+            {shows.base !== null && (
+              <span className="thread-base">{shows.base}</span>
+            )}
             <span className="head-space" />
             {view.nodes.length > 0 && (
               <DensityControl
@@ -750,6 +770,7 @@ export function Column(p: ColumnProps) {
           where={{
             defaultWork,
             project: p.work.project,
+            line: p.work.line,
             usedDirs: [
               ...new Set(
                 [...p.work.lanes.values()].flatMap(r =>

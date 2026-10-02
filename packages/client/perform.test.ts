@@ -126,9 +126,9 @@ test.each<Row>([
     args: ["c", null],
   },
   {
-    effect: { kind: "offer", lane, action: "take" },
+    effect: { kind: "offer", lane, action: "take", to: "wip/x" },
     port: p => p.session.offer,
-    args: [lane, "take"],
+    args: [lane, "take", "wip/x"],
   },
 ])("the $effect.kind effect is one port call", ({ effect, port, args }) => {
   const p = ports()

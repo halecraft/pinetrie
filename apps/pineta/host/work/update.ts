@@ -1,10 +1,13 @@
-// host/work/update — the project's work merged into a lane, when the host
-// takes a card whose command is `bring-up-to-date` (ADR-0038, ADR-0055), and
-// the resolution run's outcome when it conflicts (ADR-0033).
+// host/work/update — a thread's base merged into its lane, when the host
+// takes a card whose command is `bring-up-to-date` or `continue-on-line`
+// (ADR-0055, ADR-0060), and the resolution run's outcome when it conflicts
+// (ADR-0033).
 
 import {
   type CommitId,
   type EntryId,
+  ERR,
+  type ErrCode,
   firstLine,
   type LaneName,
   messageText,
@@ -14,22 +17,29 @@ import {
   type WriterId,
 } from "@pineta/core"
 import {
+  baseMessage,
+  beginFacts,
+  bookmarkName,
   bookmarkOf,
-  COPY_MESSAGE,
   changedPaths,
   commitsOf,
   commitTurn,
   conflictContent,
   conflictsIn,
+  DEFAULT_LINE,
   entryOfMessage,
   executeOrThrow,
+  fetchById,
   hostJj,
   type LaneHandle,
-  mergeYours,
-  planYourCopy,
+  markBase,
+  mergeBase,
+  newestBase,
+  planWipCopy,
   type Runner,
+  revsetName,
   sideHistory,
-  yoursAt,
+  wipFacts,
 } from "@pineta/lanes"
 import {
   type ConflictFile,
@@ -38,19 +48,28 @@ import {
   type LandMessage,
   landingOutcome,
   planResolution,
+  planUpdateFrom,
   type UpdateDetails,
+  type UpdateFrom,
+  wipState,
 } from "@pineta/marginalia"
 import type { Agent, LaneChannel, ThreadLaneHandle } from "@pineta/pi"
 import { readTreeIndex } from "@pineta/reads"
 import { readEntryMessage, readLaneTip } from "@pineta/schema"
 import { type Basics, failed, messageOf } from "../basics.ts"
 import type { Containers } from "./containers.ts"
-import { writeCopy } from "./create.ts"
 import { snapshotOnQueue } from "./disk.ts"
 import type { Fetches } from "./fetch.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
+
+/** Why an update was refused, worded once (ADR-0060). */
+export function updateRefusal(code: ErrCode): string {
+  return code === ERR.NO_LINE
+    ? "set up the line first"
+    : "this thread's WIP bookmark is gone: continue it on the line"
+}
 
 /** How long a resolution prompt's reasons may run before the oldest go (ADR-0033). */
 const RESOLUTION_BUDGET = 60_000
@@ -99,12 +118,18 @@ export type Prepared =
 
 export interface Updates {
   /**
-   * Merge a copy of your `@` into the lane (ADR-0038). Clean: the update is
-   * appended to the thread. Conflicted: the land message for the resolution
-   * run, with `intent` (the card's text) after the conflicts. Nothing new:
-   * nothing to do.
+   * Merge the thread's base into the lane (ADR-0060): the line's commit, or a
+   * fresh copy of its WIP; with `toLine`, the line, moving the thread there.
+   * Clean: the update is appended to the thread. Conflicted: the land
+   * message for the resolution run, with `intent` (the card's text) after
+   * the conflicts. Nothing new: nothing to do.
    */
-  prepareUpdate(lane: LaneName, by: WriterId, intent: string): Promise<Prepared>
+  prepareUpdate(
+    lane: LaneName,
+    by: WriterId,
+    intent: string,
+    toLine: boolean,
+  ): Promise<Prepared>
   /** A resolution run ended: its outcome, from the repository. */
   landingEnded(lane: LaneName, prompt: EntryId): Promise<void>
   /** pi's hook: the resolution run's agent asked for guidance. */
@@ -113,7 +138,7 @@ export interface Updates {
 
 export function createUpdates(deps: {
   readonly basics: Basics
-  readonly setup: Pick<Setup, "root" | "paths">
+  readonly setup: Pick<Setup, "root" | "paths" | "lanes">
   readonly registry: LaneRegistry
   readonly agent: () => Agent
   readonly containers: Pick<Containers, "beforeRun" | "runEnded">
@@ -122,6 +147,7 @@ export function createUpdates(deps: {
 }): Updates {
   const { basics, setup, registry, containers } = deps
   const { doc } = basics
+  const line = setup.lanes?.line ?? DEFAULT_LINE
   /** Resolution runs whose agent called `ask_for_guidance`. */
   const asked = new Set<LaneName>()
 
@@ -152,14 +178,20 @@ export function createUpdates(deps: {
   }
 
   /**
-   * On the lane's queue: anything edited since the last run committed, a
-   * copy of your `@` made, and merged in.
+   * On the lane's queue: anything edited since the last run committed, then
+   * the base merged in: the line's commit, fetched, with its `Pineta-Base`
+   * on the merge; or a fresh copy of the WIP, which carries it, made on the
+   * lane's last copy (`after`), so the merge brings in only what the WIP
+   * changed since, never conflicts the lane already resolved. A thread moved
+   * to the line with nothing to merge gets a commit that says so.
    */
-  const mergeYourCopy = (
+  const mergeOnQueue = (
     lane: LaneName,
     handle: LaneHandle<LaneChannel>,
     jj: Runner,
-    yours: Awaited<ReturnType<typeof yoursAt>>,
+    from: Exclude<UpdateFrom, { kind: "nothing" }>,
+    moving: boolean,
+    after: CommitId | null,
   ) =>
     handle.queue.enqueue(async () => {
       const tip = readLaneTip(doc, lane)
@@ -170,29 +202,41 @@ export function createUpdates(deps: {
           lane,
           bookmark: await bookmarkOf(jj, lane),
         })
-      await executeOrThrow(planYourCopy(yours), handle.runners)
+      if (from.kind === "line") {
+        const message = baseMessage(`update: ${from.onto}`, {
+          bookmark: from.onto,
+          commit: from.commit,
+        })
+        await executeOrThrow([fetchById([from.commit])], handle.runners)
+        const merged = await mergeBase(jj, lane, from.commit, message)
+        if (merged.merge === null && moving) await markBase(jj, lane, message)
+        return { from: from.commit, ...merged }
+      }
+      await executeOrThrow(
+        planWipCopy({ ...from, under: after ?? from.under }),
+        handle.runners,
+      )
       const [copy] = await commitsOf(jj, "@-")
-      if (copy === undefined) throw new Error("the copy of your @ is missing")
-      return { copy, ...(await mergeYours(jj, lane, [copy])) }
+      if (copy === undefined) throw new Error("the WIP's copy is missing")
+      const merged = await mergeBase(jj, lane, copy, `update: ${from.bookmark}`)
+      return { from: copy, ...merged }
     })
 
-  /** What changed under the agent, and your commits that came in. */
+  /** What changed under the agent, and the commits that came in. */
   async function gatherClean(
     handle: LaneHandle<LaneChannel>,
     jj: Runner,
     merged: {
-      readonly copy: CommitId
+      readonly from: CommitId
       readonly ours: CommitId
       readonly merge: CommitId
     },
+    came: string,
   ) {
-    const { copy, ours, merge } = merged
+    const { ours, merge } = merged
     const files = await changedPaths(handle.runners.lane, ours, merge)
-    const commits = (
-      await commitsOf(jj, `fork_point(${ours} | ${copy})..${copy}`)
-    ).filter(c => c !== copy)
     const titles: string[] = []
-    for (const c of commits) {
+    for (const c of await commitsOf(jj, came)) {
       const ran = await jj([
         "log",
         "--ignore-working-copy",
@@ -202,8 +246,7 @@ export function createUpdates(deps: {
         "-T",
         "description.first_line()",
       ])
-      if (ran.ok && ran.stdout.trim() !== COPY_MESSAGE)
-        titles.push(ran.stdout.trim())
+      if (ran.ok && ran.stdout.trim() !== "") titles.push(ran.stdout.trim())
     }
     return { files, commits: titles }
   }
@@ -212,13 +255,14 @@ export function createUpdates(deps: {
   async function gatherConflicts(
     jj: Runner,
     conflicted: readonly string[],
-    merged: { readonly copy: CommitId; readonly ours: CommitId },
+    merged: { readonly from: CommitId; readonly ours: CommitId },
+    base: string,
   ): Promise<ConflictFile[]> {
-    const { copy, ours } = merged
+    const { from, ours } = merged
     const files: ConflictFile[] = []
     for (const file of conflicted) {
       const reasons = async (side: readonly CommitId[], asMessages: boolean) =>
-        (await sideHistory(jj, { ours, theirs: [copy] }, side, file)).map(
+        (await sideHistory(jj, { ours, theirs: [from] }, side, file)).map(
           description =>
             asMessages
               ? reasonOf(readTreeIndex(doc), description)
@@ -234,8 +278,8 @@ export function createUpdates(deps: {
         },
         theirs: {
           label: "theirs",
-          who: "your working copy",
-          reasons: await reasons([copy], false),
+          who: base,
+          reasons: await reasons([from], false),
         },
       })
     }
@@ -247,7 +291,7 @@ export function createUpdates(deps: {
       asked.add(lane)
     },
 
-    async prepareUpdate(lane, by, intent) {
+    async prepareUpdate(lane, by, intent, toLine) {
       const { root } = setup
       if (!registry.isOwn(lane) || root === null)
         return { refused: "the lane has no copy of its own" }
@@ -255,15 +299,59 @@ export function createUpdates(deps: {
         containers.beforeRun(lane)
         const handle = registry.handleOf(lane)
         const jj = registry.laneJjOf(lane)
-        const yours = await yoursAt(hostJj(root))
-        // execute: anything edited since the last run, a copy of your @, the merge
-        const merged = await mergeYourCopy(lane, handle, jj, yours)
-        const { copy, ours, merge } = merged
-        await writeCopy(deps.agent(), lane, copy, basics.now())
+        const yours = hostJj(root)
+        // gather: the lane's base, from its history; the line and the WIP, from your repo
+        const newest = await handle.queue.enqueue(() =>
+          newestBase(jj, `bookmarks(exact:${revsetName(bookmarkName(lane))})`),
+        )
+        const [lineCommit] = await commitsOf(
+          yours,
+          `present(${revsetName(line.onto)})`,
+        )
+        const onWip = newest !== null && newest.bookmark !== line.onto
+        const wip = onWip
+          ? {
+              state: wipState(
+                await wipFacts(yours, line, newest.bookmark, newest.commit),
+              ),
+              now: (await beginFacts(yours, line, newest.bookmark)).wip,
+            }
+          : null
+        // plan
+        const from = planUpdateFrom({
+          onto: line.onto,
+          newest,
+          toLine,
+          line: lineCommit ?? null,
+          wip,
+        })
+        if (typeof from === "string") return { refused: updateRefusal(from) }
+        if (from.kind === "nothing") return { kind: "nothing" }
+        const base = from.kind === "line" ? from.onto : from.bookmark
+        const moving = toLine && onWip
+        // execute: anything edited since the last run, the base, the merge
+        const merged = await mergeOnQueue(
+          lane,
+          handle,
+          jj,
+          from,
+          moving,
+          onWip ? newest.at : null,
+        )
+        const { ours, merge } = merged
         if (merge === null) return { kind: "nothing" }
         const conflicted = await conflictsIn(jj)
         if (conflicted.length === 0) {
-          const gathered = await gatherClean(handle, jj, { copy, ours, merge })
+          const came =
+            from.kind === "line"
+              ? `fork_point(${ours} | ${from.commit})..${from.commit}`
+              : `${from.under}..${from.commit}`
+          const gathered = await gatherClean(
+            handle,
+            jj,
+            { ...merged, merge },
+            came,
+          )
           await applyClean(
             {
               append: message => deps.agent().lane(lane).append(message),
@@ -271,14 +359,14 @@ export function createUpdates(deps: {
               runEnded: () => containers.runEnded(lane),
             },
             {
-              details: { lane, copy, ...gathered, by },
+              details: { lane, base, merged: merged.from, ...gathered, by },
               merge,
               now: basics.now(),
             },
           )
           return { kind: "clean" }
         }
-        const files = await gatherConflicts(jj, conflicted, { copy, ours })
+        const files = await gatherConflicts(jj, conflicted, merged, base)
         const skill = await deps.agent().skill("pineta:skill:resolve-conflicts")
         // plan
         return {
@@ -287,7 +375,12 @@ export function createUpdates(deps: {
             skill,
             files,
             budget: RESOLUTION_BUDGET,
-            details: { landing: basics.newId(), lane, yours: [copy], by },
+            details: {
+              landing: basics.newId(),
+              lane,
+              yours: [merged.from],
+              by,
+            },
             intent,
             timestamp: basics.now(),
           }),

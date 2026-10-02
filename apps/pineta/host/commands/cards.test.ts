@@ -143,6 +143,7 @@ describe("a chat from a card that found its lane busy", () => {
     work: null,
     card: { id: C1, seen: "" },
     reserved: null,
+    base: null,
   } as const
 
   test("its card is queued behind the others in the same step, and answered queued with the rev", async () => {

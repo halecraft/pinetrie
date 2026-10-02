@@ -1,6 +1,6 @@
 // work — where lanes work, the disk and files at each entry, resolutions,
-// offers, what you have of lanes, and lanes' names (ADR-0032 to ADR-0034,
-// ADR-0038, ADR-0039), and threads' banners.
+// offers, the integration line and threads' bases, and lanes' names
+// (ADR-0032 to ADR-0034, ADR-0038, ADR-0039, ADR-0060), and threads' banners.
 //
 // Host-written records, each a pi value under a `pineta.` namespace.
 // `encodeWorkRecord` is the one place their namespaces and keys are chosen;
@@ -13,19 +13,22 @@ import {
   type Above,
   BASE_SNAPSHOT,
   type BannerRecord,
+  type BaseRecord,
   type CommandSummary,
   type CommitId,
   commitId,
   type EntryId,
+  ERR,
+  type ErrCode,
   entryId,
   type ForkStart,
-  type HaveRecord,
   HOST_WORKING_COPY,
   isLaneName,
   isSha256,
   type LandingRecord,
   type LaneName,
   type LaneRecord,
+  type LineRecord,
   type NameRecord,
   type OfferRecord,
   type ProjectRecord,
@@ -34,7 +37,6 @@ import {
   snapshotId,
   type ThreadName,
   type WriterId,
-  type YoursNow,
 } from "@pineta/core"
 import { Type } from "typebox"
 import { decodeAll, decodeWith } from "./decode.ts"
@@ -43,7 +45,14 @@ export const LANE_NAMESPACE = "pineta.lane"
 export const REVISION_NAMESPACE = "pineta.revision"
 export const LANDING_NAMESPACE = "pineta.landing"
 export const OFFER_NAMESPACE = "pineta.offer"
-export const HAVE_NAMESPACE = "pineta.have"
+/**
+ * Where ADR-0038 kept the commits you had of lanes; ADR-0060's trailers
+ * replace them. A starting host deletes what an older one left there.
+ */
+export const LEGACY_HAVE_NAMESPACE = "pineta.have"
+export const LINE_NAMESPACE = "pineta.line"
+export const BASE_NAMESPACE = "pineta.base"
+const LINE_KEY = "line"
 export const NAME_NAMESPACE = "pineta.name"
 export const BANNER_NAMESPACE = "pineta.banner"
 export const PROJECT_NAMESPACE = "pineta.project"
@@ -148,12 +157,63 @@ const NameRecordSchema = Type.Object({
   at: Type.Number(),
 })
 
-const HaveRecordSchema = Type.Object({
-  lane: Type.String({ minLength: 1 }),
-  commit: Commit,
-  kind: Type.Union([Type.Literal("delivered"), Type.Literal("copy")]),
-  at: Type.Number(),
+const LineRecordSchema = Type.Object({
+  onto: Type.String({ minLength: 1 }),
+  wipPrefix: Type.String({ minLength: 1 }),
+  commit: Type.Union([Commit, Type.Null()]),
+  heads: Type.Object({
+    current: Type.Union([Type.String(), Type.Null()]),
+    proposed: Type.String({ minLength: 1 }),
+  }),
+  log: Type.Object({
+    current: Type.Union([Type.String(), Type.Null()]),
+    proposed: Type.String({ minLength: 1 }),
+  }),
+  wips: Type.Array(
+    Type.Object({
+      bookmark: Type.String({ minLength: 1 }),
+      commit: Commit,
+      behind: Type.Integer({ minimum: 0 }),
+      ahead: Type.Integer({ minimum: 0 }),
+    }),
+  ),
+  yours: Type.Object({
+    behind: Type.Integer({ minimum: 0 }),
+    ahead: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
+  }),
+  commands: Type.Boolean(),
 })
+
+const BaseRecordSchema = Type.Object({
+  lane: Type.String({ minLength: 1 }),
+  base: Type.Union([
+    Type.Object({ kind: Type.Literal("line") }),
+    Type.Object({
+      kind: Type.Literal("wip"),
+      bookmark: Type.String({ minLength: 1 }),
+    }),
+  ]),
+  start: Commit,
+  state: Type.Union([
+    Type.Literal("ok"),
+    Type.Literal("landed"),
+    Type.Literal("gone"),
+  ]),
+})
+
+export const decodeLineRecord = (value: unknown): LineRecord | undefined =>
+  decodeWith(LineRecordSchema, value, r => ({
+    ...r,
+    commit: r.commit === null ? null : commitId(r.commit),
+    wips: r.wips.map(w => ({ ...w, commit: commitId(w.commit) })),
+  }))
+
+export const decodeBaseRecord = (value: unknown): BaseRecord | undefined =>
+  decodeWith(BaseRecordSchema, value, r =>
+    isLaneName(r.lane)
+      ? { ...r, lane: r.lane, start: commitId(r.start) }
+      : undefined,
+  )
 
 export const decodeLaneRecord = (value: unknown): LaneRecord | undefined =>
   decodeWith(LaneRecordSchema, value, r =>
@@ -234,13 +294,6 @@ export const decodeBannerRecord = (value: unknown): BannerRecord | undefined =>
       : undefined,
   )
 
-export const decodeHaveRecord = (value: unknown): HaveRecord | undefined =>
-  decodeWith(HaveRecordSchema, value, r =>
-    isLaneName(r.lane)
-      ? { ...r, lane: r.lane, commit: commitId(r.commit) }
-      : undefined,
-  )
-
 /** The commands the host's pi loaded, as people see them (ADR-0036). */
 export interface CommandsRecord {
   readonly commands: readonly CommandSummary[]
@@ -256,7 +309,8 @@ export type WorkRecord =
   | { readonly kind: "revision"; readonly record: RevisionRecord }
   | { readonly kind: "landing"; readonly record: LandingRecord }
   | { readonly kind: "offer"; readonly record: OfferRecord }
-  | { readonly kind: "have"; readonly record: HaveRecord }
+  | { readonly kind: "line"; readonly record: LineRecord }
+  | { readonly kind: "base"; readonly record: BaseRecord }
   | { readonly kind: "name"; readonly record: NameRecord }
   | { readonly kind: "banner"; readonly record: BannerRecord }
   | { readonly kind: "project"; readonly record: ProjectRecord }
@@ -305,11 +359,23 @@ export function encodeWorkRecord(r: WorkRecord): {
           },
         },
       }
-    case "have":
+    case "line":
       return {
-        namespace: HAVE_NAMESPACE,
-        key: r.record.commit,
-        value: { ...r.record },
+        namespace: LINE_NAMESPACE,
+        key: LINE_KEY,
+        value: {
+          ...r.record,
+          heads: { ...r.record.heads },
+          log: { ...r.record.log },
+          wips: r.record.wips.map(w => ({ ...w })),
+          yours: { ...r.record.yours },
+        },
+      }
+    case "base":
+      return {
+        namespace: BASE_NAMESPACE,
+        key: r.record.lane,
+        value: { ...r.record, base: { ...r.record.base } },
       }
     case "name":
       return {
@@ -385,9 +451,15 @@ export const bannerRecords = (
 ): ReadonlyMap<LaneName, BannerRecord> =>
   new Map(decodeAll(values, decodeBannerRecord).map(r => [r.lane, r]))
 
-/** Stored `pineta.have` values -> every commit you have of lanes. */
-export const haveRecords = (values: Stored): readonly HaveRecord[] =>
-  decodeAll(values, decodeHaveRecord)
+/** The stored `pineta.line` value, or null before a host wrote one. */
+export const lineRecord = (values: Stored): LineRecord | null =>
+  decodeAll(values, decodeLineRecord)[0] ?? null
+
+/** Stored `pineta.base` values -> each lane's base, by lane. */
+export const baseRecords = (
+  values: Stored,
+): ReadonlyMap<LaneName, BaseRecord> =>
+  new Map(decodeAll(values, decodeBaseRecord).map(r => [r.lane, r]))
 
 /** The stored `pineta.commands` value's commands; none before a host wrote one. */
 export const commandsRecord = (values: Stored): readonly CommandSummary[] =>
@@ -416,7 +488,7 @@ export const landingOutcome = (input: {
  * that made tool calls, since ignored files change without a commit: its
  * snapshot, and a commit when one was made. A prompt with nothing to commit
  * records the lane's newest revision, so a branch from it names the commit
- * its disk was at even after your `@-` moved. A lane working directly records
+ * its disk was at even after its base moved. A lane working directly records
  * its prompts only, with neither. Only a turn's own commit carries the paths
  * it changed: a prompt's newest revision is what came before it (ADR-0056).
  */
@@ -453,20 +525,120 @@ export function planTurnRecord(input: {
   }
 }
 
+/** Where agent work begins when nothing is above: the line, or a WIP's copy. */
+export type ForkBegin = Extract<ForkStart, { readonly kind: "line" | "wip" }>
+
+/**
+ * Where a new lane begins when it has no agent work to inherit (ADR-0060),
+ * from the thread's base and what the host read of your repo: the line's
+ * commit, or a copy of the WIP on the line commit under it. Refused with no
+ * line (`no_line`), and for a base that is not a WIP bookmark above the line
+ * (`bad_base`). Pure.
+ */
+export function planBegin(input: {
+  /** The WIP bookmark chosen at the first message; null for the line. */
+  readonly base: string | null
+  readonly onto: string
+  readonly wipPrefix: string
+  readonly facts: {
+    /** The line's commit; null before it is set up. */
+    readonly line: CommitId | null
+    /** The WIP's commit and the line commit under it; null when it is no WIP above the line. */
+    readonly wip: { readonly commit: CommitId; readonly under: CommitId } | null
+  }
+}): ForkBegin | ErrCode {
+  const { base, facts } = input
+  if (facts.line === null) return ERR.NO_LINE
+  if (base === null)
+    return { kind: "line", onto: input.onto, commit: facts.line }
+  if (!base.startsWith(input.wipPrefix) || facts.wip === null)
+    return ERR.BAD_BASE
+  return { kind: "wip", bookmark: base, ...facts.wip }
+}
+
+/** What an update merges into a lane (ADR-0060). */
+export type UpdateFrom =
+  | { readonly kind: "line"; readonly onto: string; readonly commit: CommitId }
+  | {
+      readonly kind: "wip"
+      readonly bookmark: string
+      readonly commit: CommitId
+      readonly under: CommitId
+    }
+  /** The base already holds nothing the lane lacks. */
+  | { readonly kind: "nothing" }
+
+/**
+ * What bringing a thread up to date merges (ADR-0060): always its base. A
+ * lane whose newest `Pineta-Base` names a WIP merges a fresh copy of it,
+ * unless that copy is of the WIP's commit now; one on the line, or with none
+ * (a lane from before the line), merges the line's commit. A WIP that landed
+ * hands the thread to the line; one gone without landing refuses
+ * (`base_gone`), until `toLine` ("continue on the line") moves it there.
+ * With no line, refused (`no_line`). Pure.
+ */
+export function planUpdateFrom(input: {
+  readonly onto: string
+  /** The lane's newest `Pineta-Base`, or null. */
+  readonly newest: {
+    readonly bookmark: string
+    readonly commit: CommitId
+  } | null
+  /** "continue on the line": the thread moves to the line, whatever its base. */
+  readonly toLine: boolean
+  readonly line: CommitId | null
+  /** For a WIP base: its state, and its commit and the line commit under it now. */
+  readonly wip: {
+    readonly state: "ok" | "landed" | "gone"
+    readonly now: { readonly commit: CommitId; readonly under: CommitId } | null
+  } | null
+}): UpdateFrom | ErrCode {
+  const { newest, wip } = input
+  if (input.line === null) return ERR.NO_LINE
+  const onWip =
+    !input.toLine &&
+    newest !== null &&
+    newest.bookmark !== input.onto &&
+    wip !== null &&
+    wip.state !== "landed"
+  if (!onWip) return { kind: "line", onto: input.onto, commit: input.line }
+  if (wip.state === "gone" || wip.now === null) return ERR.BASE_GONE
+  return wip.now.commit === newest.commit
+    ? { kind: "nothing" }
+    : { kind: "wip", bookmark: newest.bookmark, ...wip.now }
+}
+
+/**
+ * A WIP base's state (ADR-0060): landed when its bookmark points into the
+ * line (moved there, or squashed into the line, which keeps the bookmark and
+ * drops the WIP's change, S77 item 2), or, with the bookmark gone, when the
+ * commit the lane's `Pineta-Base` names, or its change, is on the line.
+ * Gone when the bookmark is gone and the WIP did not land; else ok. Pure.
+ */
+export function wipState(facts: {
+  /** Where the WIP bookmark points now; null when it is gone. */
+  readonly bookmark: CommitId | null
+  /** The bookmark's commit is in the line's history. */
+  readonly bookmarkInLine: boolean
+  /** The commit `Pineta-Base` names, or its change, is in the line's history. */
+  readonly sourceInLine: boolean
+}): "ok" | "landed" | "gone" {
+  if (facts.bookmark !== null) return facts.bookmarkInLine ? "landed" : "ok"
+  return facts.sourceInLine ? "landed" : "gone"
+}
+
 /**
  * Where a new lane of its own starts. With a revision above it: the nearest
  * snapshot above, else the base snapshot, and that revision's commit. With
  * none (a root thread, or a branch above any agent work): the base snapshot,
- * and a copy of your `@` as it is now, made in the lane on `@`'s parents, so
- * the lane sees your uncommitted edits (ADR-0038). Never `@` itself: that
- * commit would come back into your repo with the lane's work and make your
- * `@` divergent (S48 item 10). Either way the fork starts on a commit of its
- * own, because a cloned disk carries its parent's working-copy change, which
- * the fork must leave (S42 item 2).
+ * which is the line's, and `begin`: the line, or a WIP's copy (ADR-0060).
+ * Either way the fork starts on a commit of its own, because a cloned disk
+ * carries its parent's working-copy change, which the fork must leave (S42
+ * item 2).
  */
 export const forkPoint = (input: {
   readonly above: Above
-  readonly yours: YoursNow
+  readonly begin: ForkBegin
 }): {
   readonly snapshot: SnapshotId
   readonly start: ForkStart
@@ -474,7 +646,7 @@ export const forkPoint = (input: {
   input.above.commit === null
     ? {
         snapshot: input.above.snapshot ?? BASE_SNAPSHOT,
-        start: { kind: "copy", ...input.yours },
+        start: input.begin,
       }
     : {
         snapshot: input.above.snapshot ?? BASE_SNAPSHOT,

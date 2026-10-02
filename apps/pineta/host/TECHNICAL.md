@@ -324,6 +324,23 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   asks the model outside the queue and writes inside it; `act.ts`,
   `stack.ts` and `watch.ts` (`planPoll`) are the actions, a split's stack
   and your jj operations.
+- **Where an offer sits and starts is read from the repo** (`placeOf`,
+  ADR-0060): its base from the lane's newest `Pineta-Base`, its target the
+  line's commit or the WIP's, its start `startOfOffer`. `placeOf` writes the
+  lane's `pineta.base` cache as it reads it.
+- **A take names its destination** (`planTake`): one of
+  `takeDestinations`, and refused (`bad_destination`) unless the bookmark is
+  at or below the offer's bottom's parent, read in the same step. jj's
+  refusal of a backwards move is the second guard (S77 item 1).
+- **The `line` command** (`offers/line.ts`): `setup` creates the line's
+  bookmark at your `@-` and writes `immutable_heads()` and `revsets.log`
+  to the repo's config, the text the header's menu showed; `land` moves the line to your
+  `@-`, as you. Only a host that admits no one else takes it
+  (`lineCommands`: no invite key), since both act on the repo as its owner;
+  Kyneta does not say which connection a seat came over. Others are refused
+  `not_yours`.
+- **A new jj operation refreshes the line's record** and touches every open
+  offer (`planPoll`), so a land or a take moves every offer on the line.
 - **The first poll touches every open offer.** A host that just started
   checks each one, so a record its predecessor lost (S73) is corrected before
   you can take the offer.

@@ -1,8 +1,8 @@
-// lanes/base — the base snapshot: the project's disk at your `@-`
-// (ADR-0034).
+// lanes/base — the base snapshot: the project's disk at the integration
+// line's commit (ADR-0034, ADR-0060).
 //
 // Root lanes fork from it as other lanes fork from a turn's snapshot. It is
-// your repo's `@-`, fetched by id, and its dependencies installed in Linux:
+// the line's commit, fetched by id, and its dependencies installed in Linux:
 // the only install; no lane ever installs. It is made and refreshed in a
 // scratch lane, then snapshotted back as `base.img` as a turn is, so a fork
 // never reads it half-written. `base.json` beside it says what it holds.

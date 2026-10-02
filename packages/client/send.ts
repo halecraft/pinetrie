@@ -9,6 +9,7 @@ import {
   type CardCommand,
   type ChatMode,
   isBusy,
+  type LineRecord,
   type ProjectRecord,
   parseMentions,
   type ThreadLane,
@@ -298,9 +299,17 @@ export function raceWords(by: WriterId | null, reader: Reader): string {
 
 // ── where a new lane works ────────────────────────────────────────────────
 
-/** Where a lane works, in the chip's words. */
-export function whereWords(work: WorkSetting, project: ProjectRecord): string {
-  if (work.kind === "own") return "on a copy"
+/**
+ * Where a lane works, in the chip's words: on a copy of a WIP when it starts
+ * from one (ADR-0060), else on a copy of the line.
+ */
+export function whereWords(
+  work: WorkSetting,
+  project: ProjectRecord,
+  base: string | null = null,
+): string {
+  if (work.kind === "own")
+    return base === null ? "on a copy" : `on a copy of ${base}`
   return work.dir === project.root ? "in your working copy" : `in ${work.dir}`
 }
 
@@ -363,5 +372,46 @@ export function whereChoices(
       disabled: false,
       title: undefined,
     },
+  ]
+}
+
+// ── where a new lane starts (ADR-0060) ────────────────────────────────────
+
+/** A row of the where menu that picks a new lane's base. */
+export interface BaseChoice {
+  readonly key: string
+  /** The WIP bookmark it picks; null for the line. */
+  readonly base: string | null
+  readonly row: string
+  readonly chosen: boolean
+}
+
+/**
+ * The bases a new lane may start from: the line, then each WIP bookmark above
+ * it, with how far it is behind the line. None with no line yet: no lane of
+ * its own can start then.
+ */
+export function baseChoices(
+  line: LineRecord | null,
+  chosen: string | null,
+): readonly BaseChoice[] {
+  if (line === null || line.commit === null) return []
+  const behind = (n: number) =>
+    n === 0
+      ? ""
+      : ` · ${n} ${n === 1 ? "commit" : "commits"} behind ${line.onto}`
+  return [
+    {
+      key: "base:line",
+      base: null,
+      row: `starts from ${line.onto}`,
+      chosen: chosen === null,
+    },
+    ...line.wips.map(w => ({
+      key: `base:${w.bookmark}`,
+      base: w.bookmark,
+      row: `starts from ${w.bookmark}${behind(w.behind)}`,
+      chosen: chosen === w.bookmark,
+    })),
   ]
 }

@@ -1,6 +1,6 @@
 // lanes/bookmarks — `pineta/<lane>`, in a lane's own repo.
 //
-// The bookmark moves with every revision (`commitTurn`, `mergeYours`). In your
+// The bookmark moves with every revision (`commitTurn`, `mergeBase`). In your
 // repo a lane's history is not a bookmark of yours but a remote bookmark,
 // `tip@pineta-<lane>` (`laneTipIn`, `laneRefSteps`), which jj keeps out of
 // your default log and immutable (ADR-0038, S48 item 11).

@@ -141,6 +141,7 @@ test("a taken card in an archived root is refused, and the agent is never called
     work: null,
     card: null,
     reserved: null,
+    base: null,
   })
   expect(out).toMatchObject({ kind: "refused", code: ERR.ARCHIVED })
   expect(agent.calls).toEqual([])

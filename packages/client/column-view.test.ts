@@ -148,6 +148,8 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   offers: new Map(),
   names: new Map(),
   banners: new Map(),
+  line: null,
+  bases: new Map(),
   ...over,
 })
 const laneView = (name: LaneName, tip: string, running = false): LaneView => ({
@@ -520,10 +522,26 @@ describe("offerWords", () => {
       start: [commitId("s")],
     },
   }
+  const LINE_BASE = { base: { kind: "line" }, state: "ok" } as const
   const words = (
     o: OfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" = "idle",
-  ) => offerWords(offerView({ offer: o, activity, landing: undefined }))
+    base: Parameters<typeof offerView>[0]["base"] = LINE_BASE,
+  ) =>
+    offerWords(
+      offerView({
+        offer: o,
+        activity,
+        landing: undefined,
+        base,
+        onto: "pineta-onto",
+        wipAhead: 2,
+      }),
+    )
+  const WIP_BASE = {
+    base: { kind: "wip", bookmark: "wip/search" },
+    state: "ok",
+  } as const
   test.each([
     ["nothing", undefined, "idle", "nothing to take yet"],
     ["running, nothing yet", undefined, "turn", "no files changed yet"],
@@ -552,14 +570,14 @@ describe("offerWords", () => {
       "conflicts",
       { ...offer, conflicts: ["a.txt"] },
       "idle",
-      "conflicts with your edits in 1 file",
+      "conflicts with pineta-onto in 1 file",
     ],
     ["edited", { ...offer, edited: true }, "idle", "you edited this offer"],
     [
       "edited, and conflicting",
       { ...offer, edited: true, conflicts: ["a.txt", "b.txt"] },
       "idle",
-      "you edited this offer \u00b7 conflicts with your edits in 2 files",
+      "you edited this offer \u00b7 conflicts with pineta-onto in 2 files",
     ],
     ["taken", { ...offer, taken: "zz12345678ab" }, "idle", "taken as zz123456"],
   ] as const)("%s", (_, o, activity, line) => {
@@ -567,32 +585,59 @@ describe("offerWords", () => {
     expect(w.line).toBe(line)
     expect(w.line).not.toMatch(/`|pineta-offer/)
   })
-  test("the labels follow the state", () => {
-    const labels = (o: OfferRecord) => words(o).buttons.map(b => b.label)
-    expect(labels(offer)).toEqual(["take", "split into a stack"])
+  test("the labels follow the state, and name the take's destination (ADR-0060)", () => {
+    const labels = (
+      o: OfferRecord,
+      base = LINE_BASE as Parameters<typeof words>[2],
+    ) => words(o, "idle", base).buttons.map(b => b.label)
+    expect(labels(offer)).toEqual([
+      "take onto pineta-onto",
+      "split into a stack",
+    ])
     expect(labels({ ...offer, size: 3 })).toEqual([
-      "take stack",
+      "take stack onto pineta-onto",
       "squash to one",
     ])
     expect(labels({ ...offer, size: 3, stale: true })).toEqual([
       "split again",
-      "take stack and the rest",
-    ])
-    expect(labels({ ...offer, conflicts: ["a.txt"] })).toEqual([
-      "resolve in the thread",
-      "take anyway",
+      "take stack and the rest onto pineta-onto",
     ])
     expect(labels({ ...offer, edited: true })).toEqual([
-      "take",
-      "refresh (discards your edits)",
-    ])
-    expect(labels({ ...offer, edited: true, conflicts: ["a.txt"] })).toEqual([
-      "take anyway",
+      "take onto pineta-onto",
       "refresh (discards your edits)",
     ])
     expect(words(offer).menu.map(b => b.label)).toEqual([
       "rewrite description",
-      "bring up to date",
+      "bring up to date with pineta-onto",
+    ])
+  })
+  test("only a clean offer lands on the line: a conflicted one on the line is resolved, on a WIP taken anyway into it", () => {
+    const conflicted = { ...offer, conflicts: ["a.txt"] }
+    expect(words(conflicted).buttons.map(b => b.label)).toEqual([
+      "resolve in the thread",
+    ])
+    expect(
+      words(conflicted, "idle", WIP_BASE).buttons.map(b => b.label),
+    ).toEqual(["resolve in the thread", "take anyway into wip/search"])
+    expect(
+      words(conflicted, "idle", WIP_BASE).menu.map(b => b.label),
+    ).not.toContain("land on pineta-onto, with your 2 commits beneath it")
+  })
+  test("a WIP thread takes into its WIP, and offers the line with its commits", () => {
+    const w = words(offer, "idle", WIP_BASE)
+    expect(w.buttons[0]?.label).toBe("take into wip/search")
+    expect(w.menu.map(b => b.label)).toEqual([
+      "rewrite description",
+      "bring up to date with wip/search",
+      "land on pineta-onto, with your 2 commits beneath it",
+    ])
+  })
+  test("a WIP gone without landing offers no take, and continuing on the line", () => {
+    const w = words(offer, "idle", { ...WIP_BASE, state: "gone" })
+    expect(w.buttons.map(b => b.label)).toEqual(["split into a stack"])
+    expect(w.menu.map(b => b.label)).toEqual([
+      "rewrite description",
+      "continue on pineta-onto",
     ])
   })
 })

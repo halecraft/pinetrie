@@ -283,7 +283,7 @@ it.
 - **`digestRequest`** is the skill, the ask, the run's newest work that fits
   (`fitNewest`: the oldest is cut first), and the last digest.
 
-# Where lanes work (`work.ts`, ADR-0032 to ADR-0034, ADR-0038, ADR-0039)
+# Where lanes work (`work.ts`, ADR-0032 to ADR-0034, ADR-0038, ADR-0039, ADR-0060)
 
 Host-written records, each with a total decoder. `encodeWorkRecord` is
 the one place their namespaces and keys are chosen, and the agent writes them
@@ -295,7 +295,8 @@ through one `setWorkRecord`:
 | the commit and disk at an entry, and the paths its commit changed | `pineta.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
 | how a resolution ended | `pineta.landing` | its own id | when its run ends |
 | a lane's offer in your repo | `pineta.offer` | the lane | when a trigger changed it, or it was taken |
-| a commit you have of a lane: delivered by a take, or a copy of your `@`; a start until a newer copy in the lane's history supersedes it (S51) | `pineta.have` | the commit | at a take, a fork from your `@`, and an update |
+| the integration line: its commit, the WIP bookmarks above it, your `@-` against it, and whether this host takes `line` commands | `pineta.line` | `line` | when your repo's operation head moves |
+| a lane's base, as its newest `Pineta-Base` says it, and whether a WIP base landed or is gone | `pineta.base` | the lane | when a refresh reads the lane |
 | a thread's name, `word-word` | `pineta.name` | the lane | once: when a column reserves the lane (ADR-0057), else at the host's start or before the lane's first run |
 | a thread's column banner: the image's hash (ADR-0050, ADR-0053) | `pineta.banner` | the lane | when a banner is made or set |
 | what the host found where it runs: `lanes`, or `direct` and why | `pineta.project` | `project` | at every start |
@@ -321,11 +322,30 @@ through one `setWorkRecord`:
     paths decodes with none. An ask's file count is the union of its turns'
     paths (`workStats`), so it is what its review lists. A project record of kind `workspaces` no longer decodes; the
     host rewrites it at start.
+- **`pineta.line` and `pineta.base` are caches** (ADR-0060): the repo is
+  the ledger, and the host rewrites each from it. A lost one costs a read.
+  The old `pineta.have` namespace (`LEGACY_HAVE_NAMESPACE`) is only
+  deleted, at startup.
 - **`forkPoint`** is where a new lane of its own starts: the nearest snapshot
-  above it, else the base snapshot; and the nearest commit, else a copy of
-  your `@` (ADR-0038), made in the lane on `@`'s parents so the lane sees your
-  uncommitted edits. The start is always named: a cloned disk carries its
+  above it, else the base snapshot; and the nearest commit, else the
+  thread's base (`planBegin`): the line's commit, or a WIP's copy on the line
+  commit under it. The start is always named: a cloned disk carries its
   parent's working-copy change, and the fork must leave it.
+- **`planBegin`** refuses a lane with no line (`no_line`), and a base that
+  is not a bookmark with the WIP prefix above the line (`bad_base`). The
+  host checks it before the lane is created, so a refused send creates
+  nothing.
+- **`wipState`** says what became of a WIP base: `ok`, `landed` (its
+  bookmark in the line's history, or, with the bookmark gone, the lane's
+  copy's source there: a squash or a rebase onto the line) or `gone` (S77
+  item 2). **`planUpdateFrom`** then says what bringing a thread up to date
+  merges: always its base, the line once a WIP landed, and refused
+  (`base_gone`) for a gone WIP until "continue on the line".
+- **`takeDestinations`** lists where a take may move a bookmark, the
+  default first: the thread's WIP, then the line, with how many of the WIP's
+  commits land along. A conflicted offer never lands on the line: the line
+  is immutable, and the conflict would stay in its history. A gone WIP has
+  none.
 - **`planRetention`** keeps every snapshot of an open root, and each lane's
   newest when the root is archived; the base snapshot is never deleted.
 - **`showHostWorkingCopy`** shows a path under your working copy's root as the same

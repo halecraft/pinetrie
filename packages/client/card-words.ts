@@ -6,11 +6,21 @@ import { displayName } from "@pineta/marginalia"
 import type { Refusal } from "./card-moves.ts"
 import { lineWords, type Reader } from "./send.ts"
 
-/** A command's name as people read it: the button's label too. */
-export const commandWords = (command: CardCommand): string => {
+/**
+ * A command's name as people read it: the button's label too. `base` names
+ * the thread's base, and the line for `continue-on-line` (ADR-0060).
+ */
+export const commandWords = (
+  command: CardCommand,
+  base: string | null = null,
+): string => {
   switch (command) {
     case "bring-up-to-date":
-      return "bring up to date"
+      return base === null
+        ? "bring up to date"
+        : `bring up to date with ${base}`
+    case "continue-on-line":
+      return base === null ? "continue on the line" : `continue on ${base}`
   }
 }
 

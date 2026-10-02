@@ -279,6 +279,7 @@ export async function startHost({
     containers,
     userConfig: { file: userConfig, json: userJson },
     agent: theAgent,
+    lineCommands: key === null,
   })
 
   // --- pi stack ------------------------------------------------------------

@@ -11,6 +11,7 @@ import {
   type EntryId,
   firstLine,
   type LaneName,
+  type LineRecord,
   messageText,
   rootOf,
   type TreeIndex,
@@ -25,6 +26,7 @@ import {
   withOpenMenus,
 } from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
+import { lineView, lineWords } from "./line-view.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, nameFor } from "./presence.tsx"
 import { type Me, Profile } from "./profile.tsx"
@@ -43,6 +45,7 @@ export function Header({
   mentions,
   inbox,
   offers,
+  line,
   names,
   onOpen,
   me,
@@ -60,6 +63,8 @@ export function Header({
   inbox: InboxView
   /** Threads with an offer open in your repo, at their lane's tip (ADR-0038). */
   offers: readonly { readonly lane: LaneName; readonly tip: EntryId }[]
+  /** The integration line (ADR-0060), as the host last read it. */
+  line: LineRecord | null
   /** Each lane's name: a thread's row leads with it (ADR-0039). */
   names: ReadonlyMap<string, string>
   /** Open an entry as your tab (`planOpen`). */
@@ -162,6 +167,7 @@ export function Header({
         }
         triggerClassName="offers-trigger"
       />
+      <LineMenu line={line} session={session} />
       <InboxMenu
         inbox={inbox}
         labelOf={labelOf}
@@ -295,6 +301,47 @@ function InboxMenu({
         </>
       }
       triggerClassName="inbox-trigger"
+    />
+  )
+}
+
+/**
+ * The integration line (ADR-0060): set it up, land your work, and how far
+ * your work is from it. Absent on a host with no lanes of their own.
+ */
+function LineMenu({
+  line,
+  session,
+}: {
+  line: LineRecord | null
+  session: Pick<SessionClient, "line">
+}) {
+  const view = lineView(line)
+  const words = lineWords(view)
+  const notes: MenuItem[] = words.notes.map((note, i) => ({
+    key: `note-${i}`,
+    className: "line-note",
+    label: note,
+    disabled: true,
+    onChoose: () => {},
+  }))
+  const actions: MenuItem[] = words.actions.map(a => ({
+    key: a.action,
+    className: "line-action",
+    data: { action: a.action },
+    label: a.label,
+    onChoose: () => void session.line(a.action),
+  }))
+  return (
+    <Menu
+      className={`line line-${view.state}`}
+      gone={view.state === "absent"}
+      heading={words.heading}
+      items={[...notes, ...actions]}
+      label={words.label}
+      title={words.label}
+      trigger={<span className="line-mark">{words.trigger}</span>}
+      triggerClassName="line-trigger"
     />
   )
 }

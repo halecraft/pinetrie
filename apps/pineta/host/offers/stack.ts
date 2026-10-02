@@ -5,14 +5,11 @@ import type { CommitId, LaneName } from "@pineta/core"
 import {
   commitsOf,
   executeOnHost,
-  laneTipIn,
   lines,
   type OfferSource,
   planAbandonOffer,
-  startOfOffer,
 } from "@pineta/lanes"
 import { acceptStack } from "@pineta/marginalia"
-import { readHaves } from "@pineta/reads"
 import type { Refresh } from "./refresh.ts"
 import type { OfferState } from "./state.ts"
 
@@ -21,17 +18,9 @@ export function stackSpan(
   state: OfferState,
   lane: LaneName,
 ): Promise<{ readonly start: CommitId[]; readonly tip: CommitId } | null> {
-  const { ops } = state
   return state.serial.run(async () => {
-    const tip = await laneTipIn(ops, lane)
-    if (tip === null) return null
-    const target = await state.targetNow()
-    const start = await startOfOffer(ops, {
-      tip,
-      target,
-      haves: readHaves(state.basics.doc),
-    })
-    return { start, tip }
+    const place = await state.placeOf(lane)
+    return place === null ? null : { start: [...place.start], tip: place.tip }
   })
 }
 
@@ -79,10 +68,13 @@ export function stackEnded(
     }
     const name = state.nameOf(lane)
     if (name === undefined) return "the thread has no name yet"
+    const place = await state.placeOf(lane)
+    if (place === null || place.target === null)
+      return "the thread's base is gone: continue it on the line"
+    const { target } = place
     const o = state.offerOf(lane)
     if (o !== undefined && o.taken === null)
       await executeOnHost(planAbandonOffer(root, o.host.changes))
-    const target = await state.targetNow()
     await refresh.build(
       lane,
       name,

@@ -5,6 +5,63 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pineta/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a refresh trusts the record over the repo's ledger",
+    file: "apps/pineta/host/offers/plan.ts",
+    from: "  ledger === null\n    ? { builtFrom: open.host.tip, builtOn: open.host.start }",
+    to: "  ledger !== undefined\n    ? { builtFrom: open.host.tip, builtOn: open.host.start }",
+    command: unit,
+    expect: "its message's ledger, over the record's copy",
+  },
+  {
+    name: "a write the record lost stays your edits' baseline",
+    file: "apps/pineta/host/offers/plan.ts",
+    from: "    ? facts.commits\n    : null",
+    to: "    ? null\n    : null",
+    command: unit,
+    expect: "one that differs, as the host's own lost write, is read now",
+  },
+  {
+    name: "a rebase jj made resets the host's write",
+    file: "apps/pineta/host/offers/plan.ts",
+    from: "  facts.revisions.some(r => !(r.sameDescription && r.sameChange))",
+    to: "  true",
+    command: unit,
+    expect: "a revision jj only rebased keeps the host's write",
+  },
+  {
+    name: "a host that admits others acts on the repo as its owner",
+    file: "apps/pineta/host/offers/plan.ts",
+    from: '  if (!record.commands) return { kind: "refused", code: ERR.NOT_YOURS }',
+    to: '  if (false) return { kind: "refused", code: ERR.NOT_YOURS }',
+    command: unit,
+    expect: "a host that admits others refuses both",
+  },
+  {
+    name: "a take moves a bookmark that is not below the offer",
+    file: "apps/pineta/host/offers/plan.ts",
+    from: "  if (destination === undefined || !input.below(destination.bookmark))",
+    to: "  if (destination === undefined)",
+    command: unit,
+    expect: "a destination not among the offer's, or not below it, is refused",
+  },
+  {
+    name: "a starting host checks no offer until you run jj",
+    file: "apps/pineta/host/offers/watch.ts",
+    from: "    touch: moved ? input.open : [],",
+    to: "    touch: moved && input.last !== null ? input.open : [],",
+    command: unit,
+    expect:
+      "planPoll: the first read and a new op touch every open offer and the line",
+  },
+  {
+    name: "a lane begins from a base it cannot",
+    file: "apps/pineta/host/commands/chat.ts",
+    from: "      if (begin !== null)",
+    to: "      if (false)",
+    command: unit,
+    expect: "createAndRun from a base that cannot begin refuses",
+  },
+  {
     name: "a closed serial still runs new steps",
     file: "apps/pineta/host/queue.ts",
     from: "      if (closed) {",
@@ -35,14 +92,6 @@ export const mutations: readonly Mutation[] = [
     to: "      : open.host.wrote",
     command: unit,
     expect: "an offer not yours takes what was read as its baseline",
-  },
-  {
-    name: "a starting host checks no offer until you run jj",
-    file: "apps/pineta/host/offers/watch.ts",
-    from: "    touch: op === last ? [] : input.open,",
-    to: "    touch: last === null || op === last ? [] : input.open,",
-    command: unit,
-    expect: "planPoll: the first read and a new op touch every open offer",
   },
   {
     name: "a store does not own its file",
@@ -197,7 +246,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card that brings the thread up to date is sent as a plain one",
     file: "apps/pineta/host/take.ts",
-    from: '  if (card.command === "bring-up-to-date") {',
+    from: "  if (card.command !== null) {",
     to: "  if (false) {",
     command: unit,
     expect: "clean: the update, then the card's text as a message",
@@ -490,10 +539,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a followed offer keeps the agent's message",
     file: "apps/pineta/host/offers/plan.ts",
-    from: "          description: open.described ? c.wip : null,",
+    from: "          description: c.wip,",
     to: "          description: null,",
     command: unit,
-    expect: "a described offer that follows is a work in progress again",
+    expect: "an offer that follows is a work in progress again",
   },
   {
     name: "a withdrawn offer keeps its record",
@@ -502,14 +551,6 @@ export const mutations: readonly Mutation[] = [
     to: '        after: { kind: "nothing" },',
     command: unit,
     expect: "withdraw plans the abandon",
-  },
-  {
-    name: "a delivery is not recorded as a have",
-    file: "apps/pineta/host/offers/plan.ts",
-    from: '      kind: "delivered",',
-    to: '      kind: "copy",',
-    command: unit,
-    expect: "it delivers the offer's tip as a have",
   },
   {
     name: "a missing directory is worked in anyway",
@@ -591,14 +632,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "follow: its steps run, then the offer is recorded with its commits read after them",
-  },
-  {
-    name: "a take writes no have",
-    file: "apps/pineta/host/offers/execute.ts",
-    from: "  await ports.writeHave(planned.have)\n",
-    to: "",
-    command: unit,
-    expect: "a take runs its steps, delivers its have",
   },
   {
     name: "a request outside the queue is untracked",
@@ -739,8 +772,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an update that throws loses its card",
     file: "apps/pineta/host/take.ts",
-    from: "      .prepareUpdate(lane, card.place.by, taken.text)\n      .catch(hostFailed)",
-    to: "      .prepareUpdate(lane, card.place.by, taken.text)",
+    from: '        card.command === "continue-on-line",\n      )\n      .catch(hostFailed)',
+    to: '        card.command === "continue-on-line",\n      )',
     command: unit,
     expect: "an update that throws writes the card back with its command",
   },

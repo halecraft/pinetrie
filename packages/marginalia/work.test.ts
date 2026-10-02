@@ -1,6 +1,7 @@
 import {
   BASE_SNAPSHOT,
   commitId,
+  ERR,
   entryId,
   type LandingRecord,
   laneNameForThread,
@@ -20,12 +21,15 @@ import {
   forkPoint,
   LAND_TYPE,
   landingOutcome,
+  planBegin,
   planResolution,
   planRetention,
   planTurnRecord,
+  planUpdateFrom,
   recordChanged,
   renderableMessage,
   showHostWorkingCopy,
+  wipState,
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
@@ -202,30 +206,122 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
 
 describe("forkPoint: a snapshot to clone, and what to start on", () => {
   const S = snapshotId("e")
-  const yours = {
-    at: commitId("w"),
-    parents: [commitId("y1"), commitId("y2")],
-  }
+  const begin = {
+    kind: "line",
+    onto: "pineta-onto",
+    commit: commitId("l1"),
+  } as const
   test("from a turn: its snapshot and the commit above", () => {
     expect(
-      forkPoint({ above: { lane: LANE, commit: C2, snapshot: S }, yours }),
+      forkPoint({ above: { lane: LANE, commit: C2, snapshot: S }, begin }),
     ).toEqual({ snapshot: S, start: { kind: "commits", commits: [C2] } })
   })
   test("from a lane before lane containers: the base snapshot at its commit", () => {
     expect(
-      forkPoint({ above: { lane: LANE, commit: C2, snapshot: null }, yours }),
+      forkPoint({ above: { lane: LANE, commit: C2, snapshot: null }, begin }),
     ).toEqual({
       snapshot: BASE_SNAPSHOT,
       start: { kind: "commits", commits: [C2] },
     })
   })
-  test("from nothing: the base snapshot and a copy of your @, never @ itself (ADR-0038)", () => {
+  test("from nothing: the base snapshot, and where agent work begins (ADR-0060)", () => {
     expect(
-      forkPoint({ above: { lane: null, commit: null, snapshot: null }, yours }),
-    ).toEqual({
-      snapshot: BASE_SNAPSHOT,
-      start: { kind: "copy", at: yours.at, parents: yours.parents },
+      forkPoint({ above: { lane: null, commit: null, snapshot: null }, begin }),
+    ).toEqual({ snapshot: BASE_SNAPSHOT, start: begin })
+  })
+})
+
+describe("planBegin: the line, or a WIP's copy (ADR-0060)", () => {
+  const L = commitId("l1")
+  const wip = { commit: commitId("w1"), under: commitId("l0") }
+  const begin = (
+    base: string | null,
+    facts: Parameters<typeof planBegin>[0]["facts"],
+  ) => planBegin({ base, onto: "pineta-onto", wipPrefix: "wip/", facts })
+  test("the line's commit by default", () => {
+    expect(begin(null, { line: L, wip: null })).toEqual({
+      kind: "line",
+      onto: "pineta-onto",
+      commit: L,
     })
+  })
+  test("a WIP above the line: its copy on the line commit under it", () => {
+    expect(begin("wip/x", { line: L, wip })).toEqual({
+      kind: "wip",
+      bookmark: "wip/x",
+      ...wip,
+    })
+  })
+  test("no line: no_line; a base that is no WIP above the line: bad_base", () => {
+    expect(begin(null, { line: null, wip: null })).toBe(ERR.NO_LINE)
+    expect(begin("main", { line: L, wip })).toBe(ERR.BAD_BASE)
+    expect(begin("wip/x", { line: L, wip: null })).toBe(ERR.BAD_BASE)
+  })
+})
+
+describe("wipState: landed, gone, or ok (ADR-0060, S77 item 2)", () => {
+  const W = commitId("w1")
+  test.each([
+    [
+      "the bookmark above the line",
+      { bookmark: W, bookmarkInLine: false, sourceInLine: false },
+      "ok",
+    ],
+    [
+      "the bookmark on the line (landed, or squashed into it)",
+      { bookmark: W, bookmarkInLine: true, sourceInLine: false },
+      "landed",
+    ],
+    [
+      "the bookmark gone, its work on the line",
+      { bookmark: null, bookmarkInLine: false, sourceInLine: true },
+      "landed",
+    ],
+    [
+      "the bookmark gone, its work not",
+      { bookmark: null, bookmarkInLine: false, sourceInLine: false },
+      "gone",
+    ],
+  ] as const)("%s: %s", (_, facts, state) => {
+    expect(wipState(facts)).toBe(state)
+  })
+})
+
+describe("planUpdateFrom: always the thread's base (ADR-0060)", () => {
+  const L = commitId("l1")
+  const W = commitId("w1")
+  const now = { commit: commitId("w2"), under: commitId("l0") }
+  const from = (over: Partial<Parameters<typeof planUpdateFrom>[0]> = {}) =>
+    planUpdateFrom({
+      onto: "pineta-onto",
+      newest: { bookmark: "wip/x", commit: W },
+      toLine: false,
+      line: L,
+      wip: { state: "ok", now },
+      ...over,
+    })
+  test("a WIP thread merges a fresh copy of its WIP; nothing when it has not moved", () => {
+    expect(from()).toEqual({ kind: "wip", bookmark: "wip/x", ...now })
+    expect(from({ wip: { state: "ok", now: { ...now, commit: W } } })).toEqual({
+      kind: "nothing",
+    })
+  })
+  test("a line thread, a lane with no base, and a landed WIP merge the line", () => {
+    const line = { kind: "line", onto: "pineta-onto", commit: L }
+    expect(from({ newest: { bookmark: "pineta-onto", commit: L } })).toEqual(
+      line,
+    )
+    expect(from({ newest: null, wip: null })).toEqual(line)
+    expect(from({ wip: { state: "landed", now: null } })).toEqual(line)
+  })
+  test("a gone WIP refuses until continued on the line; no line refuses", () => {
+    expect(from({ wip: { state: "gone", now: null } })).toBe(ERR.BASE_GONE)
+    expect(from({ wip: { state: "gone", now: null }, toLine: true })).toEqual({
+      kind: "line",
+      onto: "pineta-onto",
+      commit: L,
+    })
+    expect(from({ line: null })).toBe(ERR.NO_LINE)
   })
 })
 

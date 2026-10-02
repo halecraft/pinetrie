@@ -70,6 +70,7 @@ export const takenChat = (taken: Taken): Chat => ({
   work: null,
   card: { id: taken.card.id, seen: taken.card.place.seen },
   reserved: null,
+  base: null,
 })
 
 export interface TakeDeps {
@@ -128,9 +129,14 @@ async function carryOut(
     unsent(deps, sending, `the host failed: ${messageOf(error)}`)
     return null
   }
-  if (card.command === "bring-up-to-date") {
+  if (card.command !== null) {
     const prepared = await deps.work
-      .prepareUpdate(lane, card.place.by, taken.text)
+      .prepareUpdate(
+        lane,
+        card.place.by,
+        taken.text,
+        card.command === "continue-on-line",
+      )
       .catch(hostFailed)
     if (prepared === null) return "next"
     if ("refused" in prepared) {

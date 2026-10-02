@@ -62,6 +62,7 @@ import {
   encodeWorkRecord,
   expandSkill,
   type LandMessage,
+  LEGACY_HAVE_NAMESPACE,
   LEGACY_OUTBOX_NAMESPACE,
   labelCommands,
   MARK_NAMESPACE,
@@ -355,6 +356,8 @@ export interface Agent {
   lane(name: LaneName): ThreadLaneHandle
   /** Delete a value an old host left in `pineta.outbox`. */
   removeHeld(key: string): Promise<void>
+  /** Delete a value an old host left in `pineta.have` (ADR-0060 replaced them). */
+  removeHave(key: string): Promise<void>
   /** Store a writer's display name in `pineta.participant`, keyed by writer. */
   setParticipantName(writer: WriterId, name: string): Promise<void>
   /** Store a seat's record in `pineta.seat`, keyed by its `clientID` (ADR-0048). */
@@ -792,6 +795,10 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
 
     async removeHeld(key) {
       await session.deleteValue(value(LEGACY_OUTBOX_NAMESPACE, key), CTX)
+    },
+
+    async removeHave(key) {
+      await session.deleteValue(value(LEGACY_HAVE_NAMESPACE, key), CTX)
     },
 
     async setParticipantName(writer, displayName) {

@@ -244,7 +244,7 @@ stream, written as text edits; pi's checkpoints are stored the same way. Stop
 ends a thread's turn. The session persists in `.pineta/pineta.db`.
 
 **ADR-0060 — takes stack on an integration line; the repo is the ledger**
-(accepted; not built). A take moves one bookmark forward to the offer,
+(built). A take moves one bookmark forward to the offer,
 never your `@`: the line (`pineta-onto`, immutable) or a `wip/` bookmark a
 thread forked from, each named on the take button; only a clean offer
 lands on the line. A thread's base is the line, or a WIP chosen at its

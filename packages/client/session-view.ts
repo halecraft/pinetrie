@@ -18,6 +18,7 @@ import {
   type Intent,
   keyOf,
   type LaneName,
+  type LineAction,
   type Move,
   type OfferAction,
   type Position,
@@ -194,7 +195,14 @@ export interface SessionClient {
   /** Title the entry `entry`, or clear its title with null (ADR-0045). */
   mark(entry: EntryId, title: string | null): Promise<Outcome>
   /** Act on a lane's offer in your repo: take it, split it, and so on. */
-  offer(lane: LaneName, action: OfferAction): Promise<Outcome>
+  /** An offer action; a take names its destination bookmark, null for the default. */
+  offer(
+    lane: LaneName,
+    action: OfferAction,
+    to?: string | null,
+  ): Promise<Outcome>
+  /** Set up the integration line, or land your work on it (ADR-0060). */
+  line(action: LineAction): Promise<Outcome>
   /** Every reply as it arrived on the wire, for wire-level checks. */
   readonly replies: readonly Reply[]
   close(): Promise<void>
@@ -215,10 +223,12 @@ export interface ChatHow {
   readonly card?: CardId
   /** The lane id the column reserved: what a lane this send creates is called (ADR-0057). */
   readonly reserved?: LaneName
+  /** The WIP bookmark a lane this send creates starts from; absent, the line (ADR-0060). */
+  readonly base?: string
 }
 
 /** What every send from one column carries, whichever card it is sent from. */
-export type ColumnHow = Pick<ChatHow, "lane" | "reserved"> & {
+export type ColumnHow = Pick<ChatHow, "lane" | "reserved" | "base"> & {
   readonly asksAgent: boolean
 }
 
@@ -450,6 +460,7 @@ export async function connectSession(
             ? null
             : { id: card.id, seen: textVersion(cardText(card.id)) },
         reserved: how.reserved ?? null,
+        base: how.base ?? null,
       }
       // A send takes its card out of the composer: drawn gone until the copy
       // holds what the host did with it, spent or queued.
@@ -531,8 +542,11 @@ export async function connectSession(
       current: () => moves.current().refusals,
       subscribe: moves.subscribe,
     },
-    offer(lane, action) {
-      return send({ kind: "offer", lane, action })
+    offer(lane, action, to = null) {
+      return send({ kind: "offer", lane, action, to })
+    },
+    line(action) {
+      return send({ kind: "line", action })
     },
     archive(action, root) {
       return send({ kind: "archive", action, root })

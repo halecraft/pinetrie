@@ -1,7 +1,7 @@
 // host/offers/execute — carrying out an offer's plans (`plan.ts`) over
 // ports, so a test can check what each plan makes the host write.
 
-import type { CommitId, HaveRecord, OfferRecord } from "@pineta/core"
+import type { CommitId, OfferRecord } from "@pineta/core"
 import type { LaneStep, OfferSource } from "@pineta/lanes"
 import type { OfferAt, OfferEffects, planTake } from "./plan.ts"
 
@@ -48,18 +48,16 @@ export async function executeOffer(
   return effects.built ? "built" : "other"
 }
 
-/** A take, in order: its steps, the have it delivers, the record taken, then the base snapshot follows. */
+/** A take, in order: its steps, the record taken, then the base snapshot follows the line. */
 export async function executeTake(
   ports: {
     readonly run: OfferPorts["run"]
-    writeHave(have: HaveRecord): Promise<void>
     writeTaken(offer: OfferRecord): Promise<void>
     taken(): void
   },
-  planned: NonNullable<ReturnType<typeof planTake>>,
+  planned: Extract<ReturnType<typeof planTake>, { kind: "take" }>,
 ): Promise<void> {
   await ports.run(planned.steps)
-  await ports.writeHave(planned.have)
   await ports.writeTaken(planned.taken)
   ports.taken()
 }

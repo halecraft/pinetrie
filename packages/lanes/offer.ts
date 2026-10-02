@@ -8,21 +8,26 @@
 // (`planOffer`, `planTakeOffer`, `planRepair`) and decided in
 // `@pineta/marginalia`'s `offer.ts`.
 
-import type {
-  CommitId,
-  DiffSpan,
-  HaveRecord,
-  LaneName,
-  RevisionFacts,
-} from "@pineta/core"
 import {
-  anyHave,
+  type CommitId,
+  commitId,
+  type DiffSpan,
+  type LaneName,
+  offerLedger,
+  type RevisionFacts,
+  type ThreadBase,
+  TRAILERS,
+  trailerValues,
+} from "@pineta/core"
+import { newestBase } from "./merge.ts"
+import {
   EVOLOG_ENTRY,
   type EvologEntry,
+  type LineConfig,
   laneTipName,
   offerStart,
   parseEvolog,
-  startHaves,
+  revsetName,
   walkSince,
 } from "./plan.ts"
 import { commitsOf } from "./revisions.ts"
@@ -43,27 +48,93 @@ export async function laneTipIn(
   return tip ?? null
 }
 
+/** A lane's base, read from its history in your repo (ADR-0060). */
+export interface LaneBase {
+  readonly base: ThreadBase
+  /**
+   * Where the lane's own work begins: the line commit its base names, or the
+   * WIP's copy; for a lane with no `Pineta-Base`, the newest line commit in
+   * its history.
+   */
+  readonly start: CommitId
+  /** The commit its `Pineta-Base` names (the WIP's, for a WIP); null with none. */
+  readonly source: CommitId | null
+}
+
 /**
- * Where an offer starts, as commits: which haves the lane tip's history holds,
- * and which hold the tip (read), how `startHaves` counts each of them (pure),
- * then `offerStart`'s revset (read). The host's every start comes from here, so an offer is
- * built, followed and split from one start.
+ * A lane's base, from the newest `Pineta-Base` in the history of its tip in
+ * your repo; a lane with none (one from before the line) is on the line.
+ * Null when no line commit is in its history either.
+ */
+export async function laneBase(
+  jj: Runner,
+  tip: CommitId,
+  line: LineConfig,
+): Promise<LaneBase | null> {
+  const newest = await newestBase(jj, tip)
+  if (newest === null) {
+    const [start] = await commitsOf(
+      jj,
+      `latest(heads(::${tip} & ::present(${revsetName(line.onto)})))`,
+    )
+    return start === undefined
+      ? null
+      : { base: { kind: "line" }, start, source: null }
+  }
+  return newest.bookmark === line.onto
+    ? { base: { kind: "line" }, start: newest.commit, source: newest.commit }
+    : {
+        base: { kind: "wip", bookmark: newest.bookmark },
+        start: newest.at,
+        source: newest.commit,
+      }
+}
+
+/**
+ * The lane commits taken offers name, from their `Pineta-Source` trailers in
+ * `::onto`, and in `::<wip>` for a lane on a WIP: what you already have of
+ * lanes. Read from every paragraph of each message (S77 item 6).
+ */
+export async function takenSources(
+  jj: Runner,
+  line: LineConfig,
+  base: ThreadBase,
+): Promise<CommitId[]> {
+  const heads = [
+    `present(${revsetName(line.onto)})`,
+    ...(base.kind === "wip" ? [`present(${revsetName(base.bookmark)})`] : []),
+  ].join(" | ")
+  const ran = await jj([
+    "log",
+    "--ignore-working-copy",
+    "--no-graph",
+    "-r",
+    `::(${heads}) & description(regex:"(?m)^${TRAILERS.source}: ")`,
+    "-T",
+    'description ++ "\\n"',
+  ])
+  if (!ran.ok) throw new Error(describeFailure("jj log", ran))
+  return [...new Set(trailerValues(ran.stdout, TRAILERS.source))].map(commitId)
+}
+
+/**
+ * Where an offer starts, as commits: the lane's base and the taken offers'
+ * sources (read), then `offerStart`'s revset (read). The host's every start
+ * comes from here, so an offer is built, followed and split from one start.
  */
 export async function startOfOffer(
   jj: Runner,
   input: {
     readonly tip: CommitId
-    readonly target: string
-    readonly haves: readonly HaveRecord[]
+    readonly base: LaneBase
+    readonly line: LineConfig
   },
 ): Promise<CommitId[]> {
-  const any = anyHave(input.haves)
-  const inTip =
-    any === null ? [] : await commitsOf(jj, `::${input.tip} & (${any})`)
-  const holdTip =
-    any === null ? [] : await commitsOf(jj, `${input.tip}:: & (${any})`)
-  const haves = startHaves(input.haves, new Set(inTip), new Set(holdTip))
-  return commitsOf(jj, offerStart({ ...input, haves }))
+  const sources = await takenSources(jj, input.line, input.base.base)
+  return commitsOf(
+    jj,
+    offerStart({ tip: input.tip, start: input.base.start, sources }),
+  )
 }
 
 /** Whether a bookmark exists in your repo. */
@@ -88,6 +159,8 @@ export interface OfferFacts {
   readonly conflicts: readonly string[]
   /** Each revision's commit now, bottom first. */
   readonly commits: readonly CommitId[]
+  /** The top's ledger, from its message (`offerLedger`); null without one. */
+  readonly ledger: ReturnType<typeof offerLedger>
 }
 
 /**
@@ -194,6 +267,7 @@ export async function offerFacts(
     files: [],
     conflicts: [],
     commits,
+    ledger: null,
   }
   const bottom = commits[0]
   const top = commits.at(-1)
@@ -235,6 +309,9 @@ export async function offerFacts(
       'if(conflict, path ++ "\\n")',
     ]),
   )
+  const ledger = offerLedger(
+    await query(jj, ["log", "--no-graph", "-r", top, "-T", "description"]),
+  )
   return {
     revisions,
     placed,
@@ -244,6 +321,7 @@ export async function offerFacts(
     files,
     conflicts,
     commits,
+    ledger,
   }
 }
 

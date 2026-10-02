@@ -56,14 +56,19 @@ containers, disks and the helper.
 
 ## Forks
 
-- **A fork with no revision above it starts from a copy of your `@`**
-  (`planYourCopy`, ADR-0038): a commit on `@`'s parents with `@`'s files, made
-  in the lane, so the lane sees your uncommitted edits. Never `@` itself: that
-  commit would come back into your repo with the lane's work, and your `@`
-  would be divergent (S48 item 10). Its id is known only once made, so the
-  fork's config reads it (`jj log -r @-`) when it writes the file. When your
-  `@`'s lockfile differs from the base disk's (installed at `@-`), the fork
-  installs.
+- **A fork with no revision above it starts from its thread's base**
+  (`planForkSetup`, ADR-0060): on the line, an empty commit on the line's
+  commit (`planLineStart`); on a WIP, a copy of the WIP made in the lane
+  (`planWipCopy`): a commit on the line commit under the WIP, with the WIP's
+  files restored. Never the WIP's own commits: the lane's tip, a remote
+  bookmark and immutable in your repo, would make them immutable too (S48
+  item 11), and your WIP would freeze. Either commit carries
+  `Pineta-Base: <bookmark>@<commit>` (`baseMessage`), the lane's ledger of
+  its base. The base disk is the line's, so a WIP whose lockfile differs
+  from the line's installs (`installIfLockMoved`).
+- **The base snapshot is the line's commit** (`refreshBase`), and
+  refreshes after a take or a land. A fork from it first waits for a
+  refresh (`baseAtLine`): the line may have been set up or moved since.
 - **`jj new` runs first in a fork** (`planForkSetup`). A clone carries its
   parent's working-copy change. Without `jj new`, the fork's first turn reuses
   that change's id, and your repo sees a divergent change (S42 item 2).
@@ -292,8 +297,11 @@ containers, disks and the helper.
   commit, made or adopted, which its revision records (ADR-0056): read with
   git, from the root, with `-z`, since git quotes a path with non-ASCII
   characters otherwise (S70). An update's changed files use it too.
-- **An update merges a copy of your `@`**, made in the lane (`planYourCopy`),
-  never your `@-`: the lane takes what you have, committed or not.
+- **An update merges the thread's base** (`mergeBase`, ADR-0060): the
+  line's commit, or a fresh copy of the WIP (`planWipCopy`) made on the
+  lane's previous copy, so conflicts the lane already resolved do not come
+  back. The merge carries `Pineta-Base`, and `newestBase` reads the newest
+  one in a lane's history: its base, and where its offers start.
 - **The merge is committed at once,** even with nothing to resolve.
   Otherwise an empty merge stays the lane's working copy, which every snapshot
   rewrites. A mutation shows `lanes.test.ts` fails without it.
@@ -313,8 +321,16 @@ containers, disks and the helper.
 - **Every host command on your repo carries `--ignore-working-copy` and
   `--config operation.username=pineta-host`** (`hostOps`, `hostOp`): it never
   snapshots your working copy, and the evolog says which commits the host
-  made (S48 items 1 and 8). Take is the exception: it updates your files, so
-  it runs as you (`hostJj`).
+  made (S48 items 1 and 8). Landing your work is the exception: it moves the
+  line to your commits, your act, so it runs as you (`hostJj`, `planLand`).
+- **The line is immutable** (`immutableHeads`, written to the repo's config
+  only by the `line` command's setup): `present(<onto>)`, and the offers on
+  it, joined to the repo's own definition. `present()`, or a repo without
+  the bookmark fails every jj command (S77 item 3). The host's rewrites of an
+  offer pass `--ignore-immutable` (`hostRewrite`); a bookmark move rewrites
+  no commit and needs none (S77 item 7). An immutable head is out of jj's
+  default log, so setup adds the offers to the repo's `revsets.log` too
+  (`logRevset`), or jj and jjui would not show them (S77 item 8).
 - **An offer is built by nonce, never by a commit id kept between steps**
   (`planOffer`): `jj new` has no template, so each commit is named by a
   unique description (`nonceRevset`) until its last step describes it
@@ -324,58 +340,35 @@ containers, disks and the helper.
   source, each with that source's files restored, on the one before; the
   first on the start (a merge when the start names several heads), then all
   rebased onto the target. A stack's sources are the agent's revisions.
-- **Where an offer starts is `offerStart`'s revset**: the newest ancestors of
-  the lane's tip you already have, S48 items 15 to 17. That is
-  `heads(::tip & (::(target | held) | (::(beside) & (since)::)))`: your
-  commits, the history of each `pineta.have` commit (delivered lane commits,
-  copies of your `@`) `startHaves` holds, and what each have beside the tip
-  shares with it at or above the newest copy. With nothing beside, the
-  second term is left out. Each have is `present()` (`anyHave`): a copy is made in a lane and reaches
-  your repo only with that lane's work, and one never fetched would fail every
-  lane's revset.
-- **The newest copy of your `@` in the tip's history supersedes older haves**
-  (`startHaves`, S51). A copy holds everything you had when it was made. An
-  older copy's uncommitted edits, or a delivered commit, may since have
-  become commits of yours with other content, and a start merging both
-  conflicts where they differ. "Newest in the tip's history", not the lane's
-  newest: a branch forked before its parent's update holds only the older
-  copy, and must keep it.
-- **A have that holds the tip wins over every other** (`startHaves`). When
-  you take a branch of a lane, its delivered commit descends from the
-  lane's tip, so it is not in the tip's history, yet you have all the lane
-  holds. Those haves alone are kept, and the start is the tip: the lane's
-  offer is withdrawn. Filtering them out, as the rule above alone did, left
-  the start below the tip, and the offer was followed into an empty one.
-  The start is one commit, never a merge, so the conflict S51 prevents
-  cannot come back.
-- **A have beside the tip counts for the history it shares with the tip at
-  or above the tip's newest copy** (`startHaves`' `beside` and `since`,
-  S72). Beside means neither in the tip's history nor holding it: a parent
-  lane's tip, taken after this lane forked. Without the rule, a branch of a
-  thread taken after the fork re-offers the parent's work up to the fork
-  point, and conflicts with what you took. Without the anchor at the newest
-  copy, a branch taken before its lane's update brings the lane's old copy
-  back into the lane's start (S51's conflict). It applies only when the
-  tip's history holds a copy; a lane without one still needs the read of
-  which haves hold the tip. The limit: a branch brought up to date before
-  its parent was taken has a copy newer than its fork point, so the parent's
-  delivered commit adds nothing, and the offer carries the parent's work up
-  to the fork. Bringing the branch up to date again fixes it: the new copy
-  holds what you took.
-- **`startOfOffer` is the one path to a start:** a read of which haves the
-  tip's history holds and which hold the tip, `startHaves`, then
-  `offerStart`'s revset. The host's
-  refresh, its `squash` and `refresh` actions and `stackSpan` all use it: a
-  start from another rule would read as a moved start to `planRefresh`, and
-  a split would build on it.
+- **Where an offer starts is read from the repo** (`startOfOffer`,
+  `offerStart`, ADR-0060): `heads(::tip & (<base start> | ::(<sources>)))`.
+  The base start is the commit the lane's newest `Pineta-Base` names
+  (`laneBase`); for a lane with none, from before the line, the newest line
+  commit in the tip's history. The sources are the lane commits that taken
+  offers' `Pineta-Source` trailers name, in `::<onto>` and in `::<wip>`
+  for a lane on a WIP (`takenSources`, `description(regex:…)`), each
+  `present()`: one never fetched here names nothing you have. A squash of
+  two taken offers keeps both trailer paragraphs, and `trailerValues` reads
+  every one; jj's `trailers` template reads only the last (S77 item 6).
+- **An offer carries its ledger** (`withLedger`): `Pineta-Source: <tip>`
+  and `Pineta-Start`, on its line while it is a work in progress and kept
+  through a description. `offerFacts` reads it back (`offerLedger`), so a
+  record lost or stale costs nothing.
+- **`startOfOffer` is the one path to a start.** The host's refresh, its
+  `squash` and `refresh` actions and `stackSpan` all use it: a start from
+  another rule would read as a moved start to `planRefresh`, and a split
+  would build on it.
 - **An offer follows its lane in place** (`planFollowOffer`, S49): `rebase -s`
   back onto the start, `restore --from <tip>`, `rebase -s` onto the target.
   Restoring where it sits would give it the tip's tree, dropping your work
   under it. The change id and bookmark stay, and jj records no operation for
   a restore that changes nothing. `planOffer` and the follow both end with
   `planRefreshOffer`'s rebase.
-- **Take is `jj rebase -r <bottom>::<top> -A <target> -B @`** when the target
-  is an ancestor of `@`; otherwise only bookmarks move (`planTakeOffer`).
+- **A take is a forward bookmark move** (`planTakeOffer`, ADR-0060): `jj
+  bookmark move <destination> --to <top>` as the host, then the offer's
+  bookmark deleted. Never `--allow-backwards`: jj refuses a move that is
+  not forward, so a stale take fails rather than drops commits (S77 item 1).
+  It never rebases and never touches your `@`.
 - **`offerFacts` reads an offer by change id once, then names commits**
   (`offerCommits`, which a read needing only the commits uses alone): its
   edit tests (`sameAs`: the description and `jj interdiff`; and the bottom's

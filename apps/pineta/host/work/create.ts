@@ -1,13 +1,13 @@
 // host/work/create — a new lane: where it works, its record and name, and,
-// for a lane of its own, its fork from where it branched (ADR-0032,
-// ADR-0034, ADR-0038).
+// for a lane of its own, its fork from where it branched, or from the line
+// or a WIP's copy where nothing is above (ADR-0032, ADR-0034, ADR-0060).
 
 import { stat } from "node:fs/promises"
 import {
   BASE_SNAPSHOT,
-  type CommitId,
   ERR,
   type ErrCode,
+  type ForkStart,
   type LaneName,
   nearestRevision,
   type Position,
@@ -15,14 +15,15 @@ import {
   type WriterId,
 } from "@pineta/core"
 import {
-  bookmarkOf,
+  beginFacts,
+  DEFAULT_LINE,
   executeOrThrow,
   hostJj,
   planFork,
   removeLane,
-  yoursAt,
+  revsetName,
 } from "@pineta/lanes"
-import { forkPoint } from "@pineta/marginalia"
+import { type ForkBegin, forkPoint, planBegin } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readRevisions, readTreeIndex } from "@pineta/reads"
 import { type Basics, failed } from "../basics.ts"
@@ -43,39 +44,41 @@ export async function checkDirectory(
 
 /**
  * What a fork is planned from: the revision nearest above where it branched,
- * and your `@`. Read only once every turn record being written has been, so
- * a branch at a turn whose snapshot is still running gets that turn's disk.
+ * and where agent work begins with none above (the line, or a WIP's copy).
+ * Read only once every turn record being written has been, so a branch at a
+ * turn whose snapshot is still running gets that turn's disk.
  */
 export async function forkFacts(ports: {
   readonly pendingRecords: Turns["pendingRecords"]
   readonly nearest: () => ReturnType<typeof nearestRevision>
-  readonly yours: () => ReturnType<typeof yoursAt>
-}): Promise<Parameters<typeof forkPoint>[0]> {
+  readonly begin: () => Promise<ForkBegin | ErrCode>
+}): Promise<Parameters<typeof forkPoint>[0] | ErrCode> {
   await ports.pendingRecords()
   const above = ports.nearest()
-  return { above, yours: await ports.yours() }
+  const begin = await ports.begin()
+  return typeof begin === "string" ? begin : { above, begin }
 }
-
-/** A copy of your `@` made in a lane: a commit you have (ADR-0038). */
-export const writeCopy = (
-  agent: Pick<Agent, "setWorkRecord">,
-  lane: LaneName,
-  commit: CommitId,
-  at: number,
-) =>
-  agent.setWorkRecord({
-    kind: "have",
-    record: { lane, commit, kind: "copy", at },
-  })
 
 export interface NewLanes {
   checkDirectory: typeof checkDirectory
+  /**
+   * Whether a new lane of its own can begin at `at` from `base` (a WIP
+   * bookmark, null for the line), checked before the lane is made: null, or
+   * why not (ADR-0060). A lane with agent work above inherits it, and needs
+   * neither.
+   */
+  checkBegin(
+    work: WorkSetting | null,
+    at: Position,
+    base: string | null,
+  ): Promise<ErrCode | null>
   /** Record a new lane, name it, and, for its own copy, queue its fork. */
   prepareLane(
     lane: LaneName,
     work: WorkSetting | null,
     at: Position,
     by: WriterId,
+    base: string | null,
   ): Promise<void>
 }
 
@@ -92,24 +95,53 @@ export function createNewLanes(deps: {
   const { basics, setup, registry, serial } = deps
   const { doc } = basics
 
+  const line = setup.lanes?.line ?? DEFAULT_LINE
+
   /**
-   * The install to run in a fork from a copy of your `@`: the base disk was
-   * installed at your `@-`, so a lockfile you changed since needs its own.
+   * The install to run in a fork from a WIP's copy: the base disk was
+   * installed at the line's commit, so a WIP whose lockfile differs from it
+   * needs its own.
    */
-  async function installIfLockMoved(at: string): Promise<string | null> {
+  async function installIfLockMoved(
+    at: string,
+    start: ForkStart,
+  ): Promise<string | null> {
     const install = setup.lanes?.config.install ?? null
-    if (install === null) return null
+    if (install === null || start.kind !== "wip") return null
     const jj = hostJj(at)
-    return (await lockHashAt(jj, "@", install.lockfile)) ===
-      (await lockHashAt(jj, "@-", install.lockfile))
+    return (await lockHashAt(jj, start.commit, install.lockfile)) ===
+      (await lockHashAt(
+        jj,
+        `present(${revsetName(line.onto)})`,
+        install.lockfile,
+      ))
       ? null
       : install.command
+  }
+
+  /** Where agent work begins for `base`, read from your repo now. */
+  async function beginAt(root: string, base: string | null) {
+    return planBegin({
+      base,
+      onto: line.onto,
+      wipPrefix: line.wipPrefix,
+      facts: await beginFacts(hostJj(root), line, base),
+    })
   }
 
   return {
     checkDirectory,
 
-    async prepareLane(lane, work, at, by) {
+    async checkBegin(work, at, base) {
+      const { root } = setup
+      if (work?.kind !== "own" || root === null) return null
+      const above = nearestRevision(readTreeIndex(doc), readRevisions(doc), at)
+      if (above.commit !== null) return null
+      const begin = await beginAt(root, base)
+      return typeof begin === "string" ? begin : null
+    },
+
+    async prepareLane(lane, work, at, by, base) {
       if (work !== null)
         await deps.agent().setWorkRecord({
           kind: "lane",
@@ -119,7 +151,7 @@ export function createNewLanes(deps: {
       if (work === null) return
       const { root, paths, ready } = setup
       if (work.kind !== "own" || root === null || paths === null) return
-      const [base, disk] = [root, paths]
+      const [at0, disk] = [root, paths]
       const handle = registry.handleOf(lane)
       void serial.track(
         handle.queue
@@ -127,14 +159,16 @@ export function createNewLanes(deps: {
             async () => {
               if (ready === null) throw new Error("lanes of their own are off")
               const r = await ready
-              const point = forkPoint(
-                await forkFacts({
-                  pendingRecords: deps.pendingRecords,
-                  nearest: () =>
-                    nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
-                  yours: () => yoursAt(hostJj(base)),
-                }),
-              )
+              const facts = await forkFacts({
+                pendingRecords: deps.pendingRecords,
+                nearest: () =>
+                  nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
+                begin: () => beginAt(at0, base),
+              })
+              if (typeof facts === "string")
+                throw new Error(`the lane cannot begin: ${facts}`)
+              const point = forkPoint(facts)
+              if (point.snapshot === BASE_SNAPSHOT) await setup.baseAtLine()
               await removeLane(handle.container)
               await executeOrThrow(
                 planFork({
@@ -142,22 +176,11 @@ export function createNewLanes(deps: {
                   paths: disk,
                   spec: setup.specOf(lane, r),
                   env: process.env,
-                  install:
-                    point.start.kind === "copy"
-                      ? await installIfLockMoved(base)
-                      : null,
+                  install: await installIfLockMoved(at0, point.start),
                 }),
                 handle.runners,
               )
               await handle.start()
-              // A copy of your `@` is a commit you have: an offer starts
-              // above it, never handing your own edits back (ADR-0038).
-              if (point.start.kind === "copy") {
-                const copy = await bookmarkOf(registry.laneJjOf(lane), lane)
-                if (copy !== null)
-                  await writeCopy(deps.agent(), lane, copy, basics.now())
-              }
-              if (point.snapshot === BASE_SNAPSHOT) setup.refreshBaseSoon()
             },
             { fatal: true },
           )

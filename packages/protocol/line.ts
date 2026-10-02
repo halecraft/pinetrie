@@ -30,6 +30,7 @@ const Command = Schema.struct({
   targetId: Schema.string(),
   cardId: Schema.string(),
   reserved: Schema.string(),
+  base: Schema.string(),
   seen: Schema.string(),
   from: Schema.string(),
   to: Schema.string(),

@@ -62,23 +62,24 @@ describe("executeOffer", () => {
   })
 })
 
-test("a take runs its steps, delivers its have, marks the offer taken, then the base snapshot follows", async () => {
+test("a take runs its steps, marks the offer taken, then the base snapshot follows the line", async () => {
   const planned = planTake({
     root: "/repo",
-    lane: LANE,
     offer,
-    target: "@-",
-    underYou: false,
+    destinations: [
+      { bookmark: "pineta-onto", kind: "line", bringsAlong: 0, final: true },
+    ],
+    to: null,
+    below: () => true,
     now: 5,
   })
-  if (planned === null) throw new Error("no take")
+  if (planned.kind !== "take") throw new Error("no take")
   const p = record<Parameters<typeof executeTake>[0]>({
     run: async () => {},
-    writeHave: async () => {},
     writeTaken: async () => {},
     taken: () => {},
   })
   await executeTake(p.port, planned)
-  expect(methods(p.calls)).toEqual(["run", "writeHave", "writeTaken", "taken"])
-  expect(p.calls[1]?.args[0]).toEqual(planned.have)
+  expect(methods(p.calls)).toEqual(["run", "writeTaken", "taken"])
+  expect(p.calls[1]?.args[0]).toEqual(planned.taken)
 })

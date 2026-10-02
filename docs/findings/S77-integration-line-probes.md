@@ -94,6 +94,17 @@ offer, as a take would, succeeded with the bookmark immutable: a bookmark
 move rewrites no commit. Rebasing the WIP onto the moved line succeeded, and
 the WIP stayed mutable.
 
+**8. jj's default log hides an immutable offer** (measured after the
+build, with `e2e:lanes`). A repo with `pineta-onto`, an offer on it, and
+your `@` beside: with the offers in `immutable_heads()`, `jj log` showed
+your work and the line, and not the offer; with only the line there, it
+showed all three. `builtin_log()` is `present(@) | ancestors(immutable_heads().., 2) | trunk()`,
+and an immutable head is not in `immutable_heads()..`. jjui, which uses the
+same default revset, hides it too. So setting up the line also adds the
+offers to the repo's `revsets.log` (`logRevset`): `builtin_log() |
+bookmarks(glob:"pineta-offer/*")`, shown before it is written, as the
+immutable heads are.
+
 **What follows for ADR-0060.**
 
 - The extension to `immutable_heads()` wraps the line in `present()`.

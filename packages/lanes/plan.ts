@@ -11,7 +11,6 @@ import {
   type CommitId,
   commitId,
   type ForkStart,
-  type HaveRecord,
   HOST_OPERATOR,
   HOST_WORKING_COPY,
   hostPathInLane,
@@ -21,6 +20,7 @@ import {
   type ProjectRecord,
   type SnapshotId,
   type ThreadName,
+  TRAILERS,
   WORKSPACE_ROOT,
 } from "@pineta/core"
 
@@ -323,6 +323,11 @@ export interface LaneConfig {
   readonly install: Install | null
   /** Relative paths, as written; `planShared` decides which apply. */
   readonly shared: readonly string[]
+  /** The `offers` key's names, as written; null where absent (`lineConfig`). */
+  readonly offers: {
+    readonly onto: string | null
+    readonly wipPrefix: string | null
+  }
 }
 
 /**
@@ -339,10 +344,16 @@ export function decodeLaneConfig(
   pnpmLock: boolean,
 ): LaneConfig {
   const lanes = isRecord(json) ? json.lanes : undefined
+  const offersKey = isRecord(json) ? json.offers : undefined
+  const named = (v: unknown) => (typeof v === "string" ? v : null)
+  const offers = isRecord(offersKey)
+    ? { onto: named(offersKey.onto), wipPrefix: named(offersKey.wipPrefix) }
+    : { onto: null, wipPrefix: null }
   const pnpm: Install | null = pnpmLock
     ? { command: "pnpm install --frozen-lockfile", lockfile: "pnpm-lock.yaml" }
     : null
-  if (!isRecord(lanes)) return { grants: NO_GRANTS, install: pnpm, shared: [] }
+  if (!isRecord(lanes))
+    return { grants: NO_GRANTS, install: pnpm, shared: [], offers }
   const mounts = Array.isArray(lanes.mounts)
     ? lanes.mounts.flatMap(m =>
         isRecord(m) &&
@@ -375,8 +386,148 @@ export function decodeLaneConfig(
     },
     install,
     shared: strings(lanes.shared),
+    offers,
   }
 }
+
+/** The integration line's bookmark and the WIP bookmarks' prefix (ADR-0060). */
+export interface LineConfig {
+  readonly onto: string
+  readonly wipPrefix: string
+}
+
+export const DEFAULT_LINE: LineConfig = {
+  onto: "pineta-onto",
+  wipPrefix: "wip/",
+}
+
+/**
+ * Whether `name` is usable as a bookmark, by git's ref-name rules, which a
+ * colocated repo's bookmarks must meet: no space or control character, none
+ * of `~^:?*[\\@{`, no `..`, no `//`, not starting with `-` or `/`, not ending
+ * with `/`, `.` or `.lock`.
+ */
+export const isBookmarkName = (name: string): boolean =>
+  name !== "" &&
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the rule is about them
+  !/[\x00-\x20\x7f~^:?*[\\@{]/.test(name) &&
+  !name.includes("..") &&
+  !name.includes("//") &&
+  !name.startsWith("-") &&
+  !name.startsWith("/") &&
+  !name.endsWith("/") &&
+  !name.endsWith(".") &&
+  !name.endsWith(".lock")
+
+/**
+ * The line's names from the user's config and the project's: the project's
+ * value wins, since the bookmark belongs to the repo. A name that is not a
+ * bookmark falls back to the default, with why. The WIP prefix is checked as
+ * the start of a name (`<prefix>x`).
+ */
+export function lineConfig(
+  user: LaneConfig["offers"],
+  project: LaneConfig["offers"],
+): { readonly line: LineConfig; readonly refused: readonly string[] } {
+  const refused: string[] = []
+  const pick = (
+    key: keyof LaneConfig["offers"],
+    valid: (v: string) => boolean,
+  ): string => {
+    const value = project[key] ?? user[key]
+    if (value === null) return DEFAULT_LINE[key]
+    if (valid(value)) return value
+    refused.push(
+      `offers.${key} "${value}" is not a bookmark name; using "${DEFAULT_LINE[key]}"`,
+    )
+    return DEFAULT_LINE[key]
+  }
+  return {
+    line: {
+      onto: pick("onto", isBookmarkName),
+      wipPrefix: pick("wipPrefix", v => isBookmarkName(`${v}x`)),
+    },
+    refused,
+  }
+}
+
+/**
+ * Your repo's `immutable_heads()` with the line and the offers on it added
+ * (ADR-0060): `current` is the definition the repo has, null for jj's
+ * builtin. `present()`, or a repo with no line fails every jj command
+ * (S77). An offer is immutable only while its parent is the line, so nothing
+ * of yours above the line is frozen. Given its own output, it returns it.
+ */
+export function immutableHeads(
+  line: LineConfig,
+  current: string | null,
+): string {
+  const onto = `present(${revsetName(line.onto)})`
+  const added = `${onto} | (bookmarks(glob:${revsetName("pineta-offer/*")}) & children(${onto}))`
+  const base = (current ?? "builtin_immutable_heads()").trim()
+  return base.endsWith(added) ? base : `${base} | ${added}`
+}
+
+/**
+ * Your repo's `revsets.log` with the offers added (ADR-0060): `current` is
+ * the definition the repo has, null for jj's default. An offer on the line is
+ * an immutable head, which `builtin_log()` leaves out, so jj and jjui would
+ * not show it (S77 item 8). Given its own output, it returns it.
+ */
+export function logRevset(current: string | null): string {
+  const added = `bookmarks(glob:${revsetName("pineta-offer/*")})`
+  const base = (current ?? "builtin_log()").trim()
+  return base.endsWith(added) ? base : `${base} | ${added}`
+}
+
+/**
+ * Set up the integration line (ADR-0060): its bookmark at your `@-`, as the
+ * host, then your repo's `immutable_heads()` (`immutableHeads`), written in
+ * the repo's own config. Run only on your command, after you saw `heads`.
+ */
+export const planLineSetup = (input: {
+  readonly root: string
+  readonly onto: string
+  readonly heads: string
+  readonly log: string
+}): LaneStep[] => [
+  hostOp(input.root, "bookmark", "create", input.onto, "-r", "@-"),
+  onHost(
+    "jj",
+    "-R",
+    input.root,
+    "config",
+    "set",
+    "--repo",
+    'revset-aliases."immutable_heads()"',
+    input.heads,
+  ),
+  onHost(
+    "jj",
+    "-R",
+    input.root,
+    "config",
+    "set",
+    "--repo",
+    "revsets.log",
+    input.log,
+  ),
+]
+
+/**
+ * Land your work (ADR-0060): the line moved to your `@-`, as you, since it is
+ * your act. Without `--allow-backwards`, jj refuses a move that is not
+ * forward (S77 item 1).
+ */
+export const planLand = (input: {
+  readonly root: string
+  readonly onto: string
+}): LaneStep[] => [
+  onHost("jj", "-R", input.root, "bookmark", "move", input.onto, "--to", "@-"),
+]
+
+/** A revset string literal, so a bookmark name is never parsed as a revset. */
+export const revsetName = (name: string): string => JSON.stringify(name)
 
 /** Where a shared directory may never be: repos, Pineta's own, dependencies. */
 const NEVER_SHARED = [".git", ".jj", ".pineta", "node_modules"]
@@ -636,23 +787,63 @@ const restoreVolume = (
   ...cloneFile(snapshotFile(paths, id), volumeImage(paths, volume)),
 ]
 
-/** The description of a copy of your `@` made in a lane. */
-export const COPY_MESSAGE = "your working copy"
+/**
+ * A commit's message that names a lane's base (ADR-0060): the line or a WIP
+ * bookmark, and the commit it pointed at. The newest such commit in a lane's
+ * history is the thread's base (`laneBase`).
+ */
+export const baseMessage = (
+  title: string,
+  base: { readonly bookmark: string; readonly commit: CommitId },
+): string => `${title}\n\n${TRAILERS.base}: ${base.bookmark}@${base.commit}\n`
+
+/** `<bookmark>@<commit>`, a `Pineta-Base` value, read back; null if malformed. */
+export function parseBase(
+  value: string,
+): { readonly bookmark: string; readonly commit: CommitId } | null {
+  const at = value.lastIndexOf("@")
+  if (at <= 0 || at === value.length - 1) return null
+  return { bookmark: value.slice(0, at), commit: commitId(value.slice(at + 1)) }
+}
 
 /**
- * The lane steps that make a copy of your `@`: a commit on `@`'s parents with
- * `@`'s files and a change id of its own, left as `@-`. Never `@` itself,
- * which would come back into your repo with the lane's work and make your
- * `@` divergent (S48 item 10).
+ * The lane steps that start a lane on the line: an empty commit on the line's
+ * commit naming it, left as `@-`. Its trailer says the thread is on the line.
  */
-export const planYourCopy = (yours: {
-  readonly at: CommitId
-  readonly parents: readonly CommitId[]
+export const planLineStart = (onto: string, commit: CommitId): LaneStep[] => [
+  fetchById([commit]),
+  inLane("jj", "new", commit),
+  inLane(
+    "jj",
+    "commit",
+    "-m",
+    baseMessage(`base: ${onto}`, { bookmark: onto, commit }),
+  ),
+]
+
+/**
+ * The lane steps that make a copy of a WIP (ADR-0060): a commit on the line
+ * commit under it, with the WIP's files and a change id of its own, left as
+ * `@-`. Never the WIP's own commits: the lane's tip, immutable in your repo,
+ * would make them immutable (S48 item 11).
+ */
+export const planWipCopy = (wip: {
+  readonly bookmark: string
+  readonly commit: CommitId
+  readonly under: CommitId
 }): LaneStep[] => [
-  fetchById([yours.at, ...yours.parents]),
-  inLane("jj", "new", ...yours.parents, "-m", COPY_MESSAGE),
-  inLane("jj", "restore", "--from", yours.at),
-  inLane("jj", "commit", "-m", COPY_MESSAGE),
+  fetchById([wip.commit, wip.under]),
+  inLane("jj", "new", wip.under),
+  inLane("jj", "restore", "--from", wip.commit),
+  inLane(
+    "jj",
+    "commit",
+    "-m",
+    baseMessage(`copy of ${wip.bookmark}`, {
+      bookmark: wip.bookmark,
+      commit: wip.commit,
+    }),
+  ),
 ]
 
 /**
@@ -661,8 +852,9 @@ export const planYourCopy = (yours: {
  * inherited history made immutable. Without it, the fork's first turn reuses
  * its parent's change id, and your repo sees a divergent change. A base with
  * several parents is committed once, empty, so the bookmark names one commit.
- * A copy of your `@` is its own base, installing dependencies when your `@`'s
- * lockfile differs from the base disk's (`install`).
+ * A lane starting on the line or a WIP's copy is based on the commit that
+ * names it (ADR-0060), installing dependencies when a WIP's lockfile differs
+ * from the base disk's, which is the line's (`install`).
  */
 export function planForkSetup(
   lane: LaneName,
@@ -670,18 +862,20 @@ export function planForkSetup(
   install: string | null = null,
 ): LaneStep[] {
   const base: LaneStep[] =
-    start.kind === "copy"
-      ? planYourCopy(start)
-      : [
-          fetchById(start.commits),
-          inLane("jj", "new", ...start.commits),
-          ...(start.commits.length > 1
-            ? [inLane("jj", "commit", "-m", `base: ${lane}`)]
-            : []),
-        ]
-  // A copy's id is known only once made: the config names it by reading @-.
+    start.kind === "line"
+      ? planLineStart(start.onto, start.commit)
+      : start.kind === "wip"
+        ? planWipCopy(start)
+        : [
+            fetchById(start.commits),
+            inLane("jj", "new", ...start.commits),
+            ...(start.commits.length > 1
+              ? [inLane("jj", "commit", "-m", `base: ${lane}`)]
+              : []),
+          ]
+  // A start made here is known only once made: the config reads @-.
   const immutable =
-    start.kind === "copy" || start.commits.length > 1
+    start.kind !== "commits" || start.commits.length > 1
       ? `"$(jj --ignore-working-copy log --no-graph -r @- -T commit_id)"`
       : shellWord(start.commits[0] ?? "")
   return [
@@ -901,27 +1095,22 @@ export const hostOp = (root: string, ...args: string[]): LaneStep =>
   )
 
 /**
- * Where an offer starts, as a revset: the newest ancestors of the lane's tip
- * you already have. That is your commits (`::target`), all the history of
- * each `held` have, and the history each `beside` have shares with the tip at
- * or above `since` (`startHaves`). The haves are lane commits a take
- * delivered, and copies of your `@` made in a lane (ADR-0038, S48 items 15 to
- * 17). Without the copies, an offer would hand your own uncommitted edits
- * back to you. Several heads start the offer from their merge.
+ * Where an offer starts, as a revset (ADR-0060): the newest ancestors of the
+ * lane's tip you already have. That is the commit the lane's base names
+ * (`start`: the line's commit, or the WIP's copy), and every lane commit a
+ * taken offer's `Pineta-Source` names, with their history: a parent lane's
+ * work taken after this lane forked, or a branch of this lane taken whole.
+ * Each source is `present()`: one not fetched here names nothing you have.
+ * Several heads start the offer from their merge.
  */
 export function offerStart(input: {
   readonly tip: CommitId
-  readonly target: string
-  readonly haves: StartHaves
+  readonly start: CommitId
+  readonly sources: readonly CommitId[]
 }): string {
-  const { held, beside, since } = input.haves
-  const all = [input.target, anyHave(held)].filter(r => r !== null).join(" | ")
-  const besides = anyHave(beside)
-  const above = anyHave(since)
-  if (besides === null || above === null)
-    return `heads(::${input.tip} & ::(${all}))`
-  const shared = `(::(${besides}) & (${above})::)`
-  return `heads(::${input.tip} & (::(${all}) | ${shared}))`
+  const sources = input.sources.map(c => `present(${c})`).join(" | ")
+  const had = sources === "" ? input.start : `${input.start} | ::(${sources})`
+  return `heads(::${input.tip} & (${had}))`
 }
 
 /** One version of a commit in `jj evolog`: who made it, and from what. */
@@ -1003,68 +1192,19 @@ export function walkSince(
   }
 }
 
-/**
- * Any of the haves' commits, as a revset; null for none. A copy is made in a
- * lane, so your repo holds it only once that lane's work is fetched: each is
- * `present()`, or one copy never fetched would fail the whole revset.
- */
-export const anyHave = (haves: readonly HaveRecord[]): string | null =>
-  haves.length === 0 ? null : haves.map(h => `present(${h.commit})`).join(" | ")
-
-/** The haves an offer starts from (S51, S72). */
-export interface StartHaves {
-  /** In the tip's history, or holding it: all of each one's history is had. */
-  readonly held: readonly HaveRecord[]
-  /**
-   * Beside the tip (neither in its history nor holding it): had only where
-   * it shares the tip's history at or above `since`. Empty when `since` is.
-   */
-  readonly beside: readonly HaveRecord[]
-  /** The newest copies in the tip's history (two when recorded at once). */
-  readonly since: readonly HaveRecord[]
-}
-
-/**
- * The haves an offer starts from, given which of them the lane tip's history
- * holds, and which hold the tip (S51, S72).
- *
- * A have that holds the tip (a branch of this lane, taken) means you have all
- * the lane holds: those alone are held, and the offer starts at the tip.
- * Otherwise, a copy of your `@` holds everything you had when it was made, so
- * the newest copy in the tip's history supersedes every have recorded before
- * it: an older copy's uncommitted edits, or a delivered commit, may since
- * have become commits of yours with other content. A start at the tip is one
- * commit, never a merge, so it cannot bring that back.
- *
- * A have beside the tip (a parent lane's tip, taken after this lane forked)
- * shares part of the tip's history, and you have that part, but only at or
- * above the newest copy: below it are your own commits or an older copy,
- * which that copy supersedes. A copy beside the tip shares only your own
- * commits with it, so it is in `beside` but adds nothing.
- */
-export function startHaves(
-  haves: readonly HaveRecord[],
-  inTip: ReadonlySet<CommitId>,
-  holdTip: ReadonlySet<CommitId> = new Set(),
-): StartHaves {
-  const holding = haves.filter(h => holdTip.has(h.commit))
-  if (holding.length > 0) return { held: holding, beside: [], since: [] }
-  const inside = haves.filter(h => inTip.has(h.commit))
-  const copies = inside.filter(h => h.kind === "copy")
-  // -Infinity with no copy: then every have in the tip is held.
-  const newest = Math.max(...copies.map(h => h.at))
-  const since = copies.filter(h => h.at === newest)
-  const held = inside.filter(h => h.at >= newest)
-  const beside =
-    since.length === 0 ? [] : haves.filter(h => !inTip.has(h.commit))
-  return { held, beside, since }
-}
-
 /** One revision of an offer: the lane commit whose files it has, and its message. */
 export interface OfferSource {
   readonly commit: CommitId
   readonly description: string
 }
+
+/**
+ * A host operation that rewrites an offer. An offer on the line is immutable
+ * (ADR-0060), so the host's own rewrites of it pass `--ignore-immutable`; a
+ * bookmark move rewrites no commit and needs none (S77 item 7).
+ */
+const hostRewrite = (root: string, ...args: string[]): LaneStep =>
+  hostOp(root, "--ignore-immutable", ...args)
 
 /**
  * The revset naming the `i`th commit an offer's plan makes, until the plan's
@@ -1102,7 +1242,7 @@ export function planOffer(input: {
       "-m",
       `${nonce}-${i}`,
     ),
-    hostOp(root, "restore", "--from", source.commit, "--into", at(i)),
+    hostRewrite(root, "restore", "--from", source.commit, "--into", at(i)),
   ])
   const top = sources.length - 1
   return [
@@ -1118,7 +1258,7 @@ export function planOffer(input: {
       at(top),
     ),
     ...sources.map((source, i) =>
-      hostOp(root, "describe", "-r", at(i), "-m", source.description),
+      hostRewrite(root, "describe", "-r", at(i), "-m", source.description),
     ),
   ]
 }
@@ -1128,7 +1268,7 @@ export const planRefreshOffer = (
   root: string,
   bottom: string,
   target: string,
-): LaneStep[] => [hostOp(root, "rebase", "-s", bottom, "-o", target)]
+): LaneStep[] => [hostRewrite(root, "rebase", "-s", bottom, "-o", target)]
 
 /**
  * A single offer following its lane in place (ADR-0039): back onto where it
@@ -1148,14 +1288,14 @@ export function planFollowOffer(input: {
 }): LaneStep[] {
   const { root, change } = input
   return [
-    hostOp(
+    hostRewrite(
       root,
       "rebase",
       "-s",
       change,
       ...input.start.flatMap(c => ["-o", c]),
     ),
-    hostOp(root, "restore", "--from", input.tip, "--into", change),
+    hostRewrite(root, "restore", "--from", input.tip, "--into", change),
     ...planRefreshOffer(root, change, input.target),
     ...(input.description === null
       ? []
@@ -1168,14 +1308,14 @@ export const planAbandonOffer = (
   root: string,
   changes: readonly string[],
 ): LaneStep[] =>
-  changes.length === 0 ? [] : [hostOp(root, "abandon", ...changes)]
+  changes.length === 0 ? [] : [hostRewrite(root, "abandon", ...changes)]
 
 /** One revision of an offer described again (an agent's commit message). */
 export const planDescribe = (
   root: string,
   change: string,
   message: string,
-): LaneStep[] => [hostOp(root, "describe", "-r", change, "-m", message)]
+): LaneStep[] => [hostRewrite(root, "describe", "-r", change, "-m", message)]
 
 /**
  * After a race left a revision divergent: abandon the commit the host's own
@@ -1189,7 +1329,7 @@ export const planRepair = (input: {
   readonly yours: CommitId
   readonly top: boolean
 }): LaneStep[] => [
-  hostOp(input.root, "abandon", input.hosts),
+  hostRewrite(input.root, "abandon", input.hosts),
   ...(input.top
     ? [
         hostOp(
@@ -1206,60 +1346,32 @@ export const planRepair = (input: {
 ]
 
 /**
- * Take an offer. Under your edits when the target is an ancestor of `@`:
- * `jj rebase -r <bottom>::<top> -A <target> -B @`, run as you, since it
- * updates your files (S48 items 5 and 18). Otherwise it already sits on the
- * target, beside `@`, and only bookmarks move. Then `pineta-onto`, when you
- * set it, moves to the top, so offers taken stack in the order taken, and the
- * offer's bookmark goes.
+ * Take an offer (ADR-0060): its destination bookmark moved forward to its
+ * top, as the host, then the offer's bookmark deleted. Never a rebase, and
+ * never your `@`. Without `--allow-backwards`, jj itself refuses a move that
+ * is not forward (S77 item 1), so a take planned on stale facts fails rather
+ * than moving the bookmark anywhere else.
  */
 export function planTakeOffer(input: {
   readonly root: string
   /** The offer's bookmark, as its record holds it. */
   readonly bookmark: string
-  readonly bottom: string
   readonly top: string
-  readonly target: string
-  readonly underYou: boolean
-  readonly onto: boolean
+  /** The bookmark the take moves: the line, or a WIP. */
+  readonly destination: string
 }): LaneStep[] {
-  const { root } = input
   return [
-    ...(input.underYou
-      ? [
-          onHost(
-            "jj",
-            "-R",
-            root,
-            "rebase",
-            "-r",
-            `${input.bottom}::${input.top}`,
-            "-A",
-            input.target,
-            "-B",
-            "@",
-          ),
-        ]
-      : []),
-    ...(input.onto
-      ? [
-          hostOp(
-            root,
-            "bookmark",
-            "set",
-            "--allow-backwards",
-            ONTO_BOOKMARK,
-            "-r",
-            input.top,
-          ),
-        ]
-      : []),
-    hostOp(root, "bookmark", "delete", input.bookmark),
+    hostOp(
+      input.root,
+      "bookmark",
+      "move",
+      input.destination,
+      "--to",
+      input.top,
+    ),
+    hostOp(input.root, "bookmark", "delete", input.bookmark),
   ]
 }
-
-/** The bookmark you set to say where offers go; `@-` without it (ADR-0038). */
-export const ONTO_BOOKMARK = "pineta-onto"
 
 /**
  * Retire what Pineta wrote into your repo before ADR-0038, in S48 item 21's
@@ -1307,10 +1419,12 @@ export interface BaseFacts {
  * Making or refreshing the base snapshot, run in a scratch lane. A new base
  * is `git init` and `jj git init --colocate`, not `jj git clone`: a fresh
  * volume holds `lost+found`, which `jj git clone` refuses (S44 item 6). It then
- * takes your `@-` by id and installs. A refresh fetches and moves only when
- * your `@-` moved, and installs only when the lockfile changed.
+ * takes the line's commit (`yours`) by id and installs. A refresh fetches and
+ * moves only when that commit moved, and installs only when the lockfile
+ * changed.
  *
- * When your `@-` was rewritten rather than built on, the fetched ref moves
+ * When the commit was rewritten rather than built on (a line moved with
+ * `--ignore-immutable`, or your `@-` before ADR-0060), the fetched ref moves
  * sideways: the import abandons the commit it named, and rebases the base's
  * working-copy commit, a child of it, with `--ignore-working-copy`. The
  * working copy is then stale, and `jj new` refuses until `jj workspace

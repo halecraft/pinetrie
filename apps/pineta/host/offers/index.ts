@@ -9,8 +9,14 @@
 // own jj operations (`watch.ts`). The queue also carries the reads a page asks
 // for (`read`, ADR-0047): a jj read can write (S57).
 
-import type { CommitId, ErrCode, LaneName, WriterId } from "@pineta/core"
-import { fileDiff, revisionRead } from "@pineta/lanes"
+import type {
+  CommitId,
+  ErrCode,
+  LaneName,
+  LineAction,
+  WriterId,
+} from "@pineta/core"
+import { fileDiff, type LineConfig, revisionRead } from "@pineta/lanes"
 import {
   answerDiff,
   answerReview,
@@ -23,6 +29,7 @@ import { readOffers, readRevisions } from "@pineta/reads"
 import { type Basics, failed } from "../basics.ts"
 import { act } from "./act.ts"
 import { describe } from "./describe.ts"
+import { createLine } from "./line.ts"
 import { createRefresh } from "./refresh.ts"
 import { stackEnded, stackSpan } from "./stack.ts"
 import { createOfferState } from "./state.ts"
@@ -33,11 +40,12 @@ export interface Offers {
   touch(lane: LaneName): void
   /** A run on `lane` ended: refresh its offer, then describe it if it changed. */
   runEnded(lane: LaneName): void
-  /** An offer action other than a split. */
+  /** An offer action other than a split; a take names its destination, null for the default. */
   act(
     lane: LaneName,
     action: "take" | "squash" | "describe" | "refresh",
     by: WriterId,
+    to?: string | null,
   ): Promise<ErrCode | null>
   /** Where a split's stack starts and ends: the offer's start and the lane's tip. */
   stackSpan(
@@ -61,6 +69,8 @@ export interface Offers {
    * gathered, planned (`planOfferRead`) and read on the queue for your repo.
    */
   read(ask: OfferAsk): Promise<OfferAnswer>
+  /** A `line` command (ADR-0060): null when carried out, else why not. */
+  line(action: LineAction): Promise<ErrCode | null>
   /** Settles when no offer work is queued or running. */
   quiet(): Promise<void>
   /**
@@ -72,6 +82,10 @@ export interface Offers {
 
 export function startOffers(input: {
   readonly root: string
+  /** The integration line's names (ADR-0060). */
+  readonly line: LineConfig
+  /** Whether this host takes `line` commands: it admits no one else. */
+  readonly lineCommands: boolean
   readonly basics: Basics
   readonly agent: () => Agent
   /** Whether a lane is running now: an offer is described once it stops. */
@@ -94,7 +108,11 @@ export function startOffers(input: {
       .catch(failed(basics, "refreshing its offer", lane))
   }
 
-  const watch = startWatch(state, touch)
+  const line = createLine(state)
+  const watch = startWatch(state, {
+    line: () => void line.refresh().catch(failed(basics, "reading the line")),
+    touch,
+  })
 
   return {
     touch,
@@ -107,7 +125,9 @@ export function startOffers(input: {
         )
         .catch(failed(basics, "refreshing its offer", lane))
     },
-    act: (lane, action, by) => act(state, refresh, lane, action, by),
+    act: (lane, action, by, to = null) =>
+      act(state, refresh, lane, action, by, to),
+    line: action => line.act(action),
     stackSpan: lane => stackSpan(state, lane),
     stackEnded: (lane, stack) => stackEnded(state, refresh, lane, stack),
     read(ask) {

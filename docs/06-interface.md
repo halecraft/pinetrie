@@ -63,6 +63,15 @@ the session, from live data only, as a document editor shows the people in it.
 - **The agent:** one avatar while it works, pulsing, with the number of
   threads it is working in. A click lists them, and a row opens one. Idle, it
   is not shown.
+- **The line** (ADR-0060): a menu for the integration line, where finished
+  work lands. Before it exists it offers **set up the line**, showing the
+  bookmark it makes at your `@-` and the exact `immutable_heads()` and
+  `revsets.log` text it writes to your repo's config (the log, so jj and
+  jjui show the offers), done only when you choose it. After, it
+  offers **land my work (N commits)**, which moves the line forward to your
+  `@-`, or says "your work is 3 commits behind pineta-onto: rebase onto it
+  in jj". A host that admits others offers neither, and says to use jj on
+  its machine.
 - **A menu you opened stays open until you close it.** The header's avatars
   and counts come from live data, but when what one stands for goes while
   its menu is open (a person leaves, the agent finishes, the last offer is
@@ -159,7 +168,9 @@ so it is the one behind the menu. What each does is under "Starting" below.
   (ADR-0057), with `✦ new agent` only until its name arrives. A conversation
   shows nothing there, since a message goes to people. Its second row, for a column
   that forks, names the fork, `↰ Ada: “Say exactly…”`, and clicking it brings
-  the fork point into view.
+  the fork point into view. A thread that started from a WIP says so, "on
+  wip/search", or "wip/search is gone" once it is (ADR-0060); one on the
+  line says nothing.
 - **Colour, not lines, links a branch to its parent.** Each open branch takes
   its rail track's colour: its column's header carries a stripe of it and a dot
   beside its fork, and the fork point in the parent column shows a dot of it.
@@ -197,10 +208,18 @@ so it is the one behind the menu. What each does is under "Starting" below.
   grew meanwhile, it comes back at its old end, with ↓ new below.
 - **Above the composer, a work strip says what became of the agent's files**
   (ADR-0040): an agent on its own copy shows its offer in plain words ("2
-  files ready"), with **take** and its bookmark, which a press copies; one
+  files ready"), with **take** and its bookmark, which a press copies. The
+  take names where it goes (ADR-0060): "take onto pineta-onto", or "take into
+  wip/search" for a thread on a WIP, whose menu also offers "land on
+  pineta-onto, with your 2 commits beneath it". A take moves that bookmark
+  forward to the offer and never touches your working copy. An offer that
+  conflicts is never taken onto the line; its button is **resolve in the
+  thread**. One
   working directly says "changes land directly in your working copy", and
   warns while another agent works in the same directory. Its **⋯** menu
-  holds **bring up to date**, and when your edits and the offer conflict,
+  holds **bring up to date with** the thread's base (the line, or its WIP),
+  or, once its WIP is gone, **continue on pineta-onto**; and when your edits
+  and the offer conflict,
   **resolve in the thread** does the same: each puts the command on your
   card at the thread's end, making one if you have none, and focuses it: the composer shows "→ bring
   up to date", with a × that sends it as a plain message instead. What you
@@ -328,7 +347,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   queued the last card already waiting. It uses the host's own decision (`addressChat`,
   over `threadOf`), so it cannot promise a reply that will not come. When the
   send starts an agent, a chip beside the button says where it will work ("on
-  a copy ▾"), and opens the choices.
+  a copy ▾"), and opens the choices. For a copy, they include where it
+  **starts from**: the line, or a WIP bookmark, with how far that is behind
+  the line (ADR-0060).
 - **Who else is here** (ADR-0024) shows where there is room for it:
   - the **rail** rings the dot at the end of each thread someone else follows,
     in their colour, with a count when several do; hovering names them. The

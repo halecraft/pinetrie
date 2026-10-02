@@ -25,7 +25,7 @@ import { ancestry, type TreeIndex } from "./tree.ts"
 export interface Above {
   /** The nearest record's lane; null where no run has been. */
   readonly lane: LaneName | null
-  /** The nearest recorded commit; null means your `@-`. */
+  /** The nearest recorded commit; null means the thread's base (ADR-0060). */
   readonly commit: CommitId | null
   /** The nearest recorded snapshot; null means the base snapshot. */
   readonly snapshot: SnapshotId | null

@@ -54,7 +54,10 @@ export interface ChatDeps {
     Agent,
     "appendToTree" | "commands" | "createThreadLane" | "expand" | "lane"
   >
-  readonly work: Pick<LaneWork, "project" | "checkDirectory" | "prepareLane">
+  readonly work: Pick<
+    LaneWork,
+    "project" | "checkDirectory" | "checkBegin" | "prepareLane"
+  >
   readonly blobs: Pick<BlobStore, "ref">
   /** Who wrote in a card: its other writers are a message's contributors (ADR-0048). */
   readonly cards: Pick<CardPort, "writers">
@@ -67,6 +70,8 @@ export interface ChatContext {
   readonly writer: WriterId
   /** Where the send asked a new lane to work, if anywhere. */
   readonly work: WorkSetting | null
+  /** The WIP bookmark a new lane begins from; null for the line (ADR-0060). */
+  readonly base: string | null
 }
 
 /**
@@ -185,6 +190,7 @@ export async function sendChat(
     index,
     writer,
     work: chat.work,
+    base: chat.base,
   })
   return sent
 }
@@ -242,6 +248,16 @@ export async function executeChat(
           code: bad,
           message: "there is no such directory to work in",
         }
+      const begin = await work.checkBegin(setting, planned.at, context.base)
+      if (begin !== null)
+        return {
+          kind: "refused",
+          code: begin,
+          message:
+            begin === ERR.NO_LINE
+              ? "set up the line first: a new thread's lane starts from it"
+              : `${context.base ?? "that"} is no WIP bookmark above the line`,
+        }
       const created = await agent.createThreadLane(planned.at, planned.lane)
       if (created.kind === "refused") {
         return {
@@ -250,7 +266,13 @@ export async function executeChat(
           message: "pi refused to start the thread's lane",
         }
       }
-      await work.prepareLane(created.lane, setting, planned.at, writer)
+      await work.prepareLane(
+        created.lane,
+        setting,
+        planned.at,
+        writer,
+        context.base,
+      )
       log(
         `[host] ${writer.slice(-8)} starts ${readThreadName(doc, created.lane)}`,
       )

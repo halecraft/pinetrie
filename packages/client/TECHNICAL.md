@@ -607,8 +607,20 @@ became of its files (`strip`).
   words it**: its line and each button's label, by state. An offer that
   conflicts says so even when it is `edited` (S73), and its take reads
   "take anyway" whatever the state, as it does when a resolution asked for
-  you. The bookmark is a
-  fact of its own, drawn apart (`.offer-bookmark`), never in the line.
+  you. Each take names where it goes (ADR-0060): "take onto pineta-onto",
+  "take into wip/search", and, from a WIP thread's menu, "land on
+  pineta-onto, with your 2 commits beneath it". A conflicted offer on the
+  line offers "resolve in the thread", never a take onto it. The bookmark is
+  a fact of its own, drawn apart (`.offer-bookmark`), never in the line.
+- **A thread's base** shows in its header only when it is not the line
+  (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
+  update becomes "continue on pineta-onto" and no take is offered. Bringing up to date says its base:
+  "bring up to date with wip/search".
+- **The header's line menu** (`LineMenu`, `lineView`, `lineWords`) offers
+  "set up the line", showing the config text it writes (`immutable_heads()`
+  and `revsets.log`), and "land my work
+  (N commits)", or says how far your work is behind the line. A host that
+  admits others offers neither, and says to use jj on its machine.
 - **The header's clicks are `openAt` intents** (`planOpen`), which reveal
   the entry in whichever column shows it. A column's lane may have
   started in a column to its left.
@@ -1051,7 +1063,11 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   a copy, your working copy, directories other lanes used, and "in another
   directory…", each row the chip's words and what the choice means for your
   files ("· you take its changes", "· edits your files"). A copy is disabled,
-  with the project's reason, where the project cannot have one. The choice is
+  with the project's reason, where the project cannot have one. For a copy,
+  the menu also lists where the thread starts from (`baseChoices`): the
+  line, then each WIP bookmark with how far it is behind the line; the chip
+  then names the WIP. The base is each editor's state, as the work choice
+  is, and is sent with the chat. The choice is
   the composer's state until sent, as `asksAgent` is; its default is
   `workFor`, the host's own decision. The chip's words are `.where-words`,
   with `data-work` (`own` or `direct`): `Menu` passes no attributes to its

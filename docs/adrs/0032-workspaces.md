@@ -17,6 +17,8 @@ longer says where it works and that the directory is shared; its work strip
 says where its changes land, and warns only while another lane runs there.
 Amended in place (`PLAN-2026-09-30-agent-commits`, S56): a commit the
 agent made itself in a turn is that turn's revision.
+**Amended by ADR-0060:** a lane with no revision above it starts at the
+integration line, or a copy of a WIP bookmark, not your `@-`.
 
 **Context.** The agent's tools run in the repo the host runs from, so two
 threads running tools at once share one directory and can collide. ADR-0022

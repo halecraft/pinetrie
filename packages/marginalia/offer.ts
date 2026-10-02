@@ -11,6 +11,7 @@
 // (`startOfOffer`), are in `@pineta/lanes`.
 
 import {
+  type BaseRecord,
   type CommitId,
   type DiffSpan,
   type EntryId,
@@ -22,6 +23,7 @@ import {
   type RevisionRecord,
   type RevisionReview,
   spanKey,
+  type ThreadBase,
   type ThreadName,
   TRAILERS,
 } from "@pineta/core"
@@ -124,9 +126,60 @@ export function acceptStack(input: {
 
 // ── its state and buttons ─────────────────────────────────────────────────
 
-/** A button beside the offer, or in its menu. */
+/**
+ * Where a take may move a bookmark to the offer (ADR-0060): a forward move,
+ * never a rebase, so every destination gives the same tree.
+ */
+export interface TakeDestination {
+  readonly bookmark: string
+  readonly kind: "line" | "wip"
+  /** Commits of yours that land with the offer: the WIP's, onto the line. */
+  readonly bringsAlong: number
+  /** What moves is immutable after: the line. */
+  readonly final: boolean
+}
+
+/**
+ * The bookmarks a take may move to the offer, the default first (ADR-0060):
+ * the one the lane is based on, and, for a WIP, the line too, landing the
+ * WIP's commits with it. Only a clean offer lands on the line: the line is
+ * immutable, and a conflict taken onto it would stay in its history. A WIP
+ * gone without landing has none; one that landed is the line's. Pure.
+ */
+export function takeDestinations(input: {
+  readonly base: ThreadBase
+  readonly state: "ok" | "landed" | "gone"
+  readonly onto: string
+  readonly conflicted: boolean
+  /** The WIP's commits above the line, for a WIP base. */
+  readonly wipAhead: number
+}): readonly TakeDestination[] {
+  const line = (bringsAlong: number): TakeDestination[] =>
+    input.conflicted
+      ? []
+      : [{ bookmark: input.onto, kind: "line", bringsAlong, final: true }]
+  if (input.state === "gone") return []
+  if (input.base.kind === "line" || input.state === "landed") return line(0)
+  return [
+    {
+      bookmark: input.base.bookmark,
+      kind: "wip",
+      bringsAlong: 0,
+      final: false,
+    },
+    ...line(input.wipAhead),
+  ]
+}
+
+/**
+ * A button beside the offer, or in its menu. `take` takes it to its default
+ * destination; `take-line` onto the line, from a WIP thread; `continue`
+ * moves a thread whose WIP is gone to the line (ADR-0060).
+ */
 export type OfferButton =
   | "take"
+  | "take-line"
+  | "continue"
   | "split"
   | "squash"
   | "describe"
@@ -158,6 +211,8 @@ export interface OfferView {
   readonly buttons: readonly OfferButton[]
   /** Buttons in the offer's menu. */
   readonly menu: readonly OfferButton[]
+  /** Where `take` (the first) and `take-line` (the line, from a WIP) go. */
+  readonly destinations: readonly TakeDestination[]
   readonly facts: OfferFacts
 }
 
@@ -176,16 +231,26 @@ export interface OfferFacts {
   readonly bookmark: string | null
   /** The change id it was taken as, or null. */
   readonly taken: string | null
+  /** The thread's base: the line's bookmark, or its WIP's (ADR-0060). */
+  readonly base: string
+  /** The line's bookmark. */
+  readonly onto: string
 }
 
 /**
  * The offer's state and buttons. `landing` is the lane's latest resolution;
- * it asks for you only when newer than the offer.
+ * it asks for you only when newer than the offer. `base` is the lane's
+ * (`pineta.base`), null before the host read it, as the line; `onto` and
+ * `wipAhead` come from the line's record. A take is offered only with a
+ * destination (`takeDestinations`).
  */
 export function offerView(input: {
   readonly offer: OfferRecord | undefined
   readonly activity: OfferActivity
   readonly landing: LandingRecord | undefined
+  readonly base: Pick<BaseRecord, "base" | "state"> | null
+  readonly onto: string
+  readonly wipAhead: number
 }): OfferView {
   const { offer, activity, landing } = input
   const open = offer?.taken === null ? offer : undefined
@@ -197,12 +262,41 @@ export function offerView(input: {
     touchesYourEdits: (open?.yourEdits.length ?? 0) > 0,
     bookmark: open?.bookmark ?? null,
     taken: offer?.taken ?? null,
+    base:
+      input.base?.base.kind === "wip" && input.base.state === "ok"
+        ? input.base.base.bookmark
+        : input.onto,
+    onto: input.onto,
   }
+  const destinations =
+    open === undefined
+      ? []
+      : takeDestinations({
+          base: input.base?.base ?? { kind: "line" },
+          state: input.base?.state ?? "ok",
+          onto: input.onto,
+          conflicted: open.conflicts.length > 0,
+          wipAhead: input.wipAhead,
+        })
+  const gone = input.base?.state === "gone"
+  const takes = (buttons: readonly OfferButton[]): readonly OfferButton[] =>
+    destinations.length === 0 ? buttons.filter(b => b !== "take") : buttons
   const view = (
     state: OfferView["state"],
     buttons: readonly OfferButton[],
     menu: readonly OfferButton[],
-  ): OfferView => ({ state, buttons, menu, facts })
+  ): OfferView => ({
+    state,
+    buttons: takes(buttons),
+    // A thread whose WIP is gone is brought up to date only by moving it to
+    // the line.
+    menu: [
+      ...(gone ? menu.map(b => (b === "update" ? "continue" : b)) : menu),
+      ...(destinations.length > 1 ? (["take-line"] as const) : []),
+    ],
+    destinations,
+    facts,
+  })
   if (activity === "turn") return view("running", [], [])
   if (activity !== "idle") return view("busy", [], [])
   if (offer === undefined) return view("nothing", [], ["update"])
@@ -239,6 +333,33 @@ export const withTrailers = (
   },
 ): string =>
   `${message.trim()}\n\n${TRAILERS.thread}: ${at.name}\n${TRAILERS.lane}: ${at.lane}\n${TRAILERS.entry}: ${at.entry}\n`
+
+/**
+ * A message with the offer's ledger (ADR-0060): the lane commit it holds
+ * (`Pineta-Source`) and where it starts (`Pineta-Start`, one per commit).
+ * Added to the host's trailer paragraph when the message ends in one, else
+ * as a paragraph of its own. Taken, the offer keeps them: they say what you
+ * have of the lane, wherever its commit goes.
+ */
+export function withLedger(
+  message: string,
+  ledger: {
+    readonly source: CommitId
+    readonly start: readonly CommitId[]
+  },
+): string {
+  const lines = [
+    `${TRAILERS.source}: ${ledger.source}`,
+    ...ledger.start.map(c => `${TRAILERS.start}: ${c}`),
+  ].join("\n")
+  const text = message.trimEnd()
+  const ours = Object.values(TRAILERS).map(t => `${t}: `)
+  const last = text.slice(text.lastIndexOf("\n\n") + 2).split("\n")
+  const endsInOurs =
+    text.includes("\n\n") &&
+    last.every(line => ours.some(t => line.startsWith(t)))
+  return `${text}${endsInOurs ? "\n" : "\n\n"}${lines}\n`
+}
 
 /**
  * The commit-message request: the skill as the system text, then your repo's

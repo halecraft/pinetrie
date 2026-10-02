@@ -624,6 +624,7 @@ export function App({
           mentions={mentions}
           nameOf={nameOf}
           names={workFacts.names}
+          line={workFacts.line}
           offers={view.offers}
           me={{
             writer: session.writer,

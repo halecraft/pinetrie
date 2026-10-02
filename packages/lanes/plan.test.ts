@@ -1,30 +1,33 @@
 import {
   BASE_SNAPSHOT,
   commitId,
-  type HaveRecord,
   laneNameForThread,
   snapshotId,
   type ThreadName,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
-  anyHave,
-  COPY_MESSAGE,
+  baseMessage,
+  DEFAULT_LINE,
   decodeLaneConfig,
   FETCHED_REF,
   fetchById,
   forkConfig,
   imageRefusal,
+  immutableHeads,
+  isBookmarkName,
   type LaneSpec,
   type LaneStep,
   laneIgnores,
   laneRefSteps,
+  lineConfig,
+  logRevset,
   mountArgs,
   NO_GRANTS,
   nonceRevset,
-  ONTO_BOOKMARK,
   offerStart,
   PINETA_HEADS,
+  parseBase,
   parseEvolog,
   planBaseRefresh,
   planBundle,
@@ -52,7 +55,6 @@ import {
   SPEC_LABEL,
   shellWord,
   specHashOf,
-  startHaves,
   walkSince,
   withoutPinetaHeads,
 } from "./index.ts"
@@ -259,6 +261,57 @@ describe("planRun: a lane's container", () => {
   })
 })
 
+describe("lineConfig: the project's names win, and a bad one falls back", () => {
+  const none = { onto: null, wipPrefix: null }
+  test("defaults with nothing set", () => {
+    expect(lineConfig(none, none)).toEqual({ line: DEFAULT_LINE, refused: [] })
+  })
+  test("the project's name wins over the user's", () => {
+    expect(
+      lineConfig(
+        { onto: "mine", wipPrefix: "draft/" },
+        { onto: "trunk", wipPrefix: null },
+      ).line,
+    ).toEqual({ onto: "trunk", wipPrefix: "draft/" })
+  })
+  test("a name that is no bookmark falls back, saying why", () => {
+    const r = lineConfig(none, { onto: "has space", wipPrefix: "a..b/" })
+    expect(r.line).toEqual(DEFAULT_LINE)
+    expect(r.refused).toHaveLength(2)
+    expect(r.refused[0]).toContain("has space")
+  })
+  test("isBookmarkName: git's rules", () => {
+    for (const ok of ["pineta-onto", "wip/x", "a.b"])
+      expect(isBookmarkName(ok)).toBe(true)
+    for (const bad of ["", "a b", "a..b", "-a", "a/", "a.lock", "a@b", "a:b"])
+      expect(isBookmarkName(bad)).toBe(false)
+  })
+})
+
+describe("logRevset: the offers added to your log (S77 item 8)", () => {
+  test("added to jj's default when the repo defines none, and idempotent", () => {
+    const once = logRevset(null)
+    expect(once).toBe('builtin_log() | bookmarks(glob:"pineta-offer/*")')
+    expect(logRevset(once)).toBe(once)
+    expect(logRevset("@ | trunk()")).toBe(
+      '@ | trunk() | bookmarks(glob:"pineta-offer/*")',
+    )
+  })
+})
+
+describe("immutableHeads: the line and its offers added to yours", () => {
+  test("added to jj's builtin when the repo defines none, with present()", () => {
+    expect(immutableHeads(DEFAULT_LINE, null)).toBe(
+      'builtin_immutable_heads() | present("pineta-onto") | (bookmarks(glob:"pineta-offer/*") & children(present("pineta-onto")))',
+    )
+  })
+  test("joined to your own definition, and idempotent", () => {
+    const once = immutableHeads(DEFAULT_LINE, "trunk() | tags()")
+    expect(once.startsWith("trunk() | tags() | ")).toBe(true)
+    expect(immutableHeads(DEFAULT_LINE, once)).toBe(once)
+  })
+})
+
 describe("decodeLaneConfig: grants, the install and shared directories, total", () => {
   const empty = (pnpm: boolean) => decodeLaneConfig(undefined, "/p", pnpm)
   test("nothing, or anything malformed, grants and shares nothing", () => {
@@ -267,6 +320,7 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
         grants: NO_GRANTS,
         install: null,
         shared: [],
+        offers: { onto: null, wipPrefix: null },
       })
     expect(
       decodeLaneConfig(
@@ -285,7 +339,14 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
       grants: { ssh: false, env: ["OK_1"], mounts: [] },
       install: null,
       shared: [".plans"],
+      offers: { onto: null, wipPrefix: null },
     })
+  })
+  test("offers: the line's names, as written", () => {
+    expect(
+      decodeLaneConfig({ offers: { onto: "trunk", wipPrefix: 3 } }, "/p", false)
+        .offers,
+    ).toEqual({ onto: "trunk", wipPrefix: null })
   })
   test("mount sources are relative to the project", () => {
     expect(
@@ -417,148 +478,61 @@ test("planForkSetup: a base with several parents is committed once, so the bookm
   ])
 })
 
-test("planForkSetup: a copy of your @, never @ itself; its id read for the config (ADR-0038)", () => {
-  const W = commitId("w1")
+test("planForkSetup: on the line, an empty commit naming it; its id read for the config (ADR-0060)", () => {
   const steps = argvs(
-    planForkSetup(LANE, { kind: "copy", at: W, parents: [C1] }, "pnpm i"),
+    planForkSetup(LANE, { kind: "line", onto: "pineta-onto", commit: C1 }),
   )
-  expect(steps.slice(1, 4)).toEqual([
-    `lane: jj new c1 -m ${COPY_MESSAGE}`,
-    "lane: jj restore --from w1",
-    `lane: jj commit -m ${COPY_MESSAGE}`,
+  expect(steps.slice(1, 3)).toEqual([
+    "lane: jj new c1",
+    `lane: jj commit -m ${baseMessage("base: pineta-onto", { bookmark: "pineta-onto", commit: C1 })}`,
   ])
-  expect(steps.some(s => s.includes("jj new w1"))).toBe(false)
-  expect(steps.at(-2)).toContain(
+  expect(steps.at(-1)).toContain(
     "jj --ignore-working-copy log --no-graph -r @-",
   )
+})
+
+test("planForkSetup: a WIP's copy on the line commit under it, never the WIP's own commits (ADR-0060)", () => {
+  const W = commitId("w1")
+  const steps = argvs(
+    planForkSetup(
+      LANE,
+      { kind: "wip", bookmark: "wip/x", commit: W, under: C1 },
+      "pnpm i",
+    ),
+  )
+  expect(steps.slice(1, 4)).toEqual([
+    "lane: jj new c1",
+    "lane: jj restore --from w1",
+    `lane: jj commit -m ${baseMessage("copy of wip/x", { bookmark: "wip/x", commit: W })}`,
+  ])
+  expect(steps.some(s => s.includes("jj new w1"))).toBe(false)
   expect(steps.at(-1)).toBe("lane: sh -c pnpm i")
+})
+
+test("baseMessage and parseBase round-trip a Pineta-Base", () => {
+  const m = baseMessage("copy of wip/a@b", { bookmark: "wip/a@b", commit: C1 })
+  expect(m).toBe("copy of wip/a@b\n\nPineta-Base: wip/a@b@c1\n")
+  expect(parseBase("wip/a@b@c1")).toEqual({ bookmark: "wip/a@b", commit: C1 })
+  expect(parseBase("nope")).toBeNull()
 })
 
 describe("offers (ADR-0038)", () => {
   const root = "/y"
   const op = (...args: string[]) =>
     `host: jj -R /y --ignore-working-copy --config operation.username=pineta-host ${args.join(" ")}`
-  test("offerStart: your commits, each held have's history, and what a have beside shares above the newest copy", () => {
-    const none = { held: [], beside: [], since: [] }
-    expect(offerStart({ tip: C1, target: "@-", haves: none })).toBe(
-      "heads(::c1 & ::(@-))",
+  /** A rewrite of an offer, which may be immutable on the line (ADR-0060). */
+  const rw = (...args: string[]) => op("--ignore-immutable", ...args)
+  test("offerStart: the base's commit, and the history of each taken source (ADR-0060)", () => {
+    expect(offerStart({ tip: C1, start: C2, sources: [] })).toBe(
+      "heads(::c1 & (c2))",
     )
-    const c2: HaveRecord = { lane: LANE, commit: C2, kind: "copy", at: 1 }
-    const d: HaveRecord = {
-      lane: LANE,
-      commit: commitId("d"),
-      kind: "delivered",
-      at: 2,
-    }
     expect(
       offerStart({
         tip: C1,
-        target: ONTO_BOOKMARK,
-        haves: { held: [c2, d], beside: [], since: [c2] },
+        start: C2,
+        sources: [commitId("t1"), commitId("t2")],
       }),
-    ).toBe("heads(::c1 & ::(pineta-onto | present(c2) | present(d)))")
-    expect(
-      offerStart({
-        tip: C1,
-        target: "@-",
-        haves: { held: [c2], beside: [d], since: [c2] },
-      }),
-    ).toBe(
-      "heads(::c1 & (::(@- | present(c2)) | (::(present(d)) & (present(c2))::)))",
-    )
-  })
-  test("anyHave: each commit present(), or null for none", () => {
-    expect(anyHave([])).toBeNull()
-    expect(
-      anyHave([
-        { lane: LANE, commit: C1, kind: "copy", at: 1 },
-        { lane: LANE, commit: C2, kind: "delivered", at: 2 },
-      ]),
-    ).toBe("present(c1) | present(c2)")
-  })
-  describe("startHaves: the newest copy in the tip's history supersedes older haves", () => {
-    const have = (
-      commit: string,
-      kind: HaveRecord["kind"],
-      at: number,
-    ): HaveRecord => ({ lane: LANE, commit: commitId(commit), kind, at })
-    const ids = (haves: readonly HaveRecord[]) => haves.map(h => h.commit)
-    const counted = (
-      haves: readonly HaveRecord[],
-      inTip: readonly string[],
-      holdTip: readonly string[] = [],
-    ) => {
-      const s = startHaves(
-        haves,
-        new Set(inTip.map(commitId)),
-        new Set(holdTip.map(commitId)),
-      )
-      return { held: ids(s.held), beside: ids(s.beside), since: ids(s.since) }
-    }
-    const c1 = have("c1", "copy", 1)
-    const d2 = have("d2", "delivered", 2)
-    const c3 = have("c3", "copy", 3)
-    const d4 = have("d4", "delivered", 4)
-    test.each([
-      [
-        "none in the tip, so no copy: none counted",
-        [c1, d2],
-        [],
-        { held: [], beside: [], since: [] },
-      ],
-      [
-        "delivered only: all held",
-        [d2, d4],
-        ["d2", "d4"],
-        { held: ["d2", "d4"], beside: [], since: [] },
-      ],
-      [
-        "copies and delivered: the newest copy, and what came after it",
-        [c1, d2, c3, d4],
-        ["c1", "d2", "c3", "d4"],
-        { held: ["c3", "d4"], beside: [], since: ["c3"] },
-      ],
-      [
-        "the newest copy outside the tip (a branch forked before its lane's update): the older one held",
-        [c1, c3],
-        ["c1"],
-        { held: ["c1"], beside: ["c3"], since: ["c1"] },
-      ],
-      [
-        "a delivered have beside the tip, with a copy in the tip: beside, above that copy (S72)",
-        [c1, d4],
-        ["c1"],
-        { held: ["c1"], beside: ["d4"], since: ["c1"] },
-      ],
-      [
-        "haves of both kinds beside the tip: all beside",
-        [c1, d2, c3, d4],
-        ["c3"],
-        { held: ["c3"], beside: ["c1", "d2", "d4"], since: ["c3"] },
-      ],
-      [
-        "no copy in the tip: none beside",
-        [d2, c3, d4],
-        ["d2"],
-        { held: ["d2"], beside: [], since: [] },
-      ],
-      [
-        "two copies recorded at once: both held, both since",
-        [c1, have("c1b", "copy", 1)],
-        ["c1", "c1b"],
-        { held: ["c1", "c1b"], beside: [], since: ["c1", "c1b"] },
-      ],
-    ] as const)("%s", (_, haves, inTip, expected) => {
-      expect(counted(haves, inTip)).toEqual(expected)
-    })
-    test("a have that holds the tip is kept alone, whatever copy is newer", () => {
-      // A branch of the lane, taken: its tip descends from this lane's.
-      const branch = have("b5", "delivered", 5)
-      const c6 = have("c6", "copy", 6)
-      expect(counted([c1, d2, branch, c6], ["c1", "d2", "c6"], ["b5"])).toEqual(
-        { held: ["b5"], beside: [], since: [] },
-      )
-    })
+    ).toBe("heads(::c1 & (c2 | ::(present(t1) | present(t2))))")
   })
   test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {
     const n = (i: number) => nonceRevset("N", i)
@@ -578,10 +552,10 @@ describe("offers (ADR-0038)", () => {
       ),
     ).toEqual([
       op("new", "--no-edit", "c1", "c2", "-m", "N-0"),
-      op("restore", "--from", "s1", "--into", n(0)),
+      rw("restore", "--from", "s1", "--into", n(0)),
       op("new", "--no-edit", n(0), "-m", "N-1"),
-      op("restore", "--from", "s2", "--into", n(1)),
-      op("rebase", "-s", n(0), "-o", "@-"),
+      rw("restore", "--from", "s2", "--into", n(1)),
+      rw("rebase", "-s", n(0), "-o", "@-"),
       op(
         "bookmark",
         "set",
@@ -590,8 +564,8 @@ describe("offers (ADR-0038)", () => {
         "-r",
         n(1),
       ),
-      op("describe", "-r", n(0), "-m", "one"),
-      op("describe", "-r", n(1), "-m", "two"),
+      rw("describe", "-r", n(0), "-m", "one"),
+      rw("describe", "-r", n(1), "-m", "two"),
     ])
   })
   test("planFollowOffer: back onto the start, the tip restored, onto the target; described only when asked", () => {
@@ -607,33 +581,26 @@ describe("offers (ADR-0038)", () => {
         }),
       )
     expect(follow(null)).toEqual([
-      op("rebase", "-s", "ch", "-o", "c1", "-o", "c2"),
-      op("restore", "--from", "t2", "--into", "ch"),
-      op("rebase", "-s", "ch", "-o", "@-"),
+      rw("rebase", "-s", "ch", "-o", "c1", "-o", "c2"),
+      rw("restore", "--from", "t2", "--into", "ch"),
+      rw("rebase", "-s", "ch", "-o", "@-"),
     ])
     expect(follow("WIP (amber-fox): x").at(-1)).toBe(
-      op("describe", "-r", "ch", "-m", "WIP (amber-fox): x"),
+      rw("describe", "-r", "ch", "-m", "WIP (amber-fox): x"),
     )
   })
-  test("planTakeOffer: under your edits as you, else bookmarks only; pineta-onto follows", () => {
-    const take = (underYou: boolean, onto: boolean) =>
+  test("planTakeOffer: the destination moved forward to the top, as the host, never with --allow-backwards (ADR-0060)", () => {
+    expect(
       argvs(
         planTakeOffer({
           root,
           bookmark: "pineta-offer/amber-fox",
-          bottom: "b",
           top: "t",
-          target: "@-",
-          underYou,
-          onto,
+          destination: "pineta-onto",
         }),
-      )
-    expect(take(true, false)).toEqual([
-      "host: jj -R /y rebase -r b::t -A @- -B @",
-      op("bookmark", "delete", "pineta-offer/amber-fox"),
-    ])
-    expect(take(false, true)).toEqual([
-      op("bookmark", "set", "--allow-backwards", ONTO_BOOKMARK, "-r", "t"),
+      ),
+    ).toEqual([
+      op("bookmark", "move", "pineta-onto", "--to", "t"),
       op("bookmark", "delete", "pineta-offer/amber-fox"),
     ])
   })

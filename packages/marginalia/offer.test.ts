@@ -2,13 +2,14 @@ import {
   commitId,
   type EntryId,
   entryId,
-  type HaveRecord,
   type LandingRecord,
   type LaneName,
   laneNameForThread,
   type OfferRecord,
   type RevisionRecord,
   type ThreadName,
+  TRAILERS,
+  trailerValues,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
@@ -16,7 +17,8 @@ import {
   acceptStack,
   answerDiff,
   answerReview,
-  decodeHaveRecord,
+  decodeBaseRecord,
+  decodeLineRecord,
   decodeOfferRecord,
   decodeStack,
   decodeUpdate,
@@ -34,7 +36,9 @@ import {
   type RefreshFacts,
   renderableMessage,
   reviewUrl,
+  takeDestinations,
   wipDescription,
+  withLedger,
   withoutTrailers,
   withTrailers,
 } from "./index.ts"
@@ -67,7 +71,15 @@ describe("offerView: ADR-0038's table", () => {
     o: OfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" | "split" = "idle",
     landing?: LandingRecord,
-  ) => offerView({ offer: o, activity, landing })
+  ) =>
+    offerView({
+      offer: o,
+      activity,
+      landing,
+      base: null,
+      onto: "pineta-onto",
+      wipAhead: 0,
+    })
   const at = (v: ReturnType<typeof view>) => [v.state, v.buttons, v.menu]
   test("every state, with its buttons", () => {
     expect(at(view(undefined))).toEqual(["nothing", [], ["update"]])
@@ -79,9 +91,10 @@ describe("offerView: ADR-0038's table", () => {
       ["take", "split"],
       ["describe", "update"],
     ])
+    // Only a clean offer lands on the line (ADR-0060): no take on a line thread.
     expect(at(view({ ...offer, conflicts: ["a.txt"] }))).toEqual([
       "conflicts",
-      ["resolve", "take"],
+      ["resolve"],
       [],
     ])
     expect(at(view({ ...offer, size: 2 }))).toEqual([
@@ -123,6 +136,8 @@ describe("offerView: ADR-0038's table", () => {
       touchesYourEdits: false,
       bookmark: "pineta-offer/t-1",
       taken: null,
+      base: "pineta-onto",
+      onto: "pineta-onto",
     })
     expect(view(offer, "turn").facts.files).toBe(2)
     const none = view(undefined).facts
@@ -320,15 +335,33 @@ describe("the commit message", () => {
 })
 
 describe("records", () => {
-  test("an offer and a have round-trip, keyed by lane and by commit", () => {
+  test("an offer, the line and a base round-trip (ADR-0060)", () => {
     const o = encodeWorkRecord({ kind: "offer", record: offer })
     expect([o.namespace, o.key]).toEqual(["pineta.offer", LANE])
     expect(decodeOfferRecord(structuredClone(o.value))).toEqual(offer)
-    const h: HaveRecord = { lane: LANE, commit: COPY, kind: "copy", at: 3 }
-    const e = encodeWorkRecord({ kind: "have", record: h })
-    expect([e.namespace, e.key]).toEqual(["pineta.have", COPY])
-    expect(decodeHaveRecord(structuredClone(e.value))).toEqual(h)
     expect(decodeOfferRecord({ ...offer, size: 0 })).toBeUndefined()
+    const line = {
+      onto: "pineta-onto",
+      wipPrefix: "wip/",
+      commit: COPY,
+      heads: { current: null, proposed: "builtin_immutable_heads() | …" },
+      log: { current: null, proposed: "builtin_log() | …" },
+      wips: [{ bookmark: "wip/x", commit: TIP, behind: 1, ahead: 2 }],
+      yours: { behind: 0, ahead: null },
+      commands: true,
+    }
+    const l = encodeWorkRecord({ kind: "line", record: line })
+    expect([l.namespace, l.key]).toEqual(["pineta.line", "line"])
+    expect(decodeLineRecord(structuredClone(l.value))).toEqual(line)
+    const base = {
+      lane: LANE,
+      base: { kind: "wip", bookmark: "wip/x" },
+      start: COPY,
+      state: "ok",
+    } as const
+    const b = encodeWorkRecord({ kind: "base", record: base })
+    expect([b.namespace, b.key]).toEqual(["pineta.base", LANE])
+    expect(decodeBaseRecord(structuredClone(b.value))).toEqual(base)
   })
   test("an offer stored before its commits were kept does not decode", () => {
     const { commits: _, ...before } = offer
@@ -479,7 +512,8 @@ describe("the review (ADR-0047)", () => {
 describe("the update and stack messages", () => {
   const details = {
     lane: LANE,
-    copy: COPY,
+    base: "pineta-onto",
+    merged: COPY,
     commits: ["feat: yours"],
     files: ["a.txt", "c.txt"],
     by: ADA,
@@ -490,7 +524,7 @@ describe("the update and stack messages", () => {
     expect(m.content).toContain("- c.txt")
     expect(renderableMessage(m)).toEqual({
       role: "update",
-      content: "↓ brought up to date: 2 files changed",
+      content: "↓ brought up to date with pineta-onto: 2 files changed",
     })
   })
   test("a stack message names where it starts and ends, and the bookmark to set", () => {
@@ -508,5 +542,64 @@ describe("the update and stack messages", () => {
       skill: { hash: "h" },
     })
     expect(renderableMessage(m)).toMatchObject({ role: "stack" })
+  })
+})
+
+describe("takeDestinations (ADR-0060)", () => {
+  const line = { kind: "line" } as const
+  const wip = { kind: "wip", bookmark: "wip/x" } as const
+  const of = (over: Partial<Parameters<typeof takeDestinations>[0]> = {}) =>
+    takeDestinations({
+      base: line,
+      state: "ok",
+      onto: "pineta-onto",
+      conflicted: false,
+      wipAhead: 2,
+      ...over,
+    }).map(d => [d.bookmark, d.bringsAlong, d.final])
+  test("a line thread: the line, final", () => {
+    expect(of()).toEqual([["pineta-onto", 0, true]])
+  })
+  test("a WIP thread: its WIP first, then the line with the WIP's commits", () => {
+    expect(of({ base: wip })).toEqual([
+      ["wip/x", 0, false],
+      ["pineta-onto", 2, true],
+    ])
+  })
+  test("a conflicted offer never lands on the line: only into a WIP", () => {
+    expect(of({ conflicted: true })).toEqual([])
+    expect(of({ base: wip, conflicted: true })).toEqual([["wip/x", 0, false]])
+  })
+  test("a landed WIP is the line's; a gone one has none", () => {
+    expect(of({ base: wip, state: "landed" })).toEqual([
+      ["pineta-onto", 0, true],
+    ])
+    expect(of({ base: wip, state: "gone" })).toEqual([])
+  })
+})
+
+describe("withLedger (ADR-0060)", () => {
+  const ledger = {
+    source: commitId("t1"),
+    start: [commitId("s1"), commitId("s2")],
+  }
+  test("joins the host's trailer paragraph, read back from it", () => {
+    const m = withLedger(
+      withTrailers("feat: x", {
+        lane: LANE,
+        name: "amber-fox" as ThreadName,
+        entry: "e",
+      }),
+      ledger,
+    )
+    expect(m.split("\n\n")).toHaveLength(2)
+    expect(trailerValues(m, TRAILERS.source)).toEqual(["t1"])
+    expect(trailerValues(m, TRAILERS.start)).toEqual(["s1", "s2"])
+    expect(withoutTrailers(m)).toBe("feat: x")
+  })
+  test("a message with no trailers gets a paragraph of its own", () => {
+    expect(withLedger("WIP (amber-fox): x", ledger).split("\n\n")).toHaveLength(
+      2,
+    )
   })
 })

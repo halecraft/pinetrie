@@ -29,7 +29,13 @@ import {
 } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, idleNow, join, waitFor } from "../harness.ts"
+import {
+  committedProject,
+  idleNow,
+  join,
+  setUpLine,
+  waitFor,
+} from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
@@ -363,6 +369,12 @@ async function run(
       // host's project record says so, with its reason where they do not.
       const project = readProject(toolHost.doc)
       const noContainers = project?.kind === "direct" ? project.reason : null
+      // A new thread of its own starts at the integration line (ADR-0060).
+      if (noContainers === null) {
+        const owner = await join(toolHost, "owner", "tools")
+        await setUpLine(toolHost.doc, owner)
+        await owner.close()
+      }
       const tp = await browser.newPage()
       await asPerson(tp, "tools@browser.test", "Tess")
       try {
@@ -1264,7 +1276,7 @@ async function run(
             "the offer's line opens its review beside the thread, which keeps its 28rem: a row per file, and a file's diff",
             "typing beside an open review redraws none of it",
             "a file's head stays pinned while its diff scrolls, and the list brings a file to the top",
-            "the column's foot shows the thread's offer in words, its bookmark apart, and Take brings it into your working copy",
+            "the column's foot shows the thread's offer in words, its bookmark apart, and Take moves the line to it, leaving your working copy",
             "the review closes, and after the take there is none to open",
           ])
             skip(label, noContainers)
@@ -1369,13 +1381,31 @@ async function run(
             .catch(() => {})
           const closed = await appears(`${col(0)}:not(:has(.review))`, 5_000)
           if (takeShown) await tp.click(`${col(0)} .work .offer-take`)
+          // The take moves the line forward to the offer (ADR-0060).
+          const onLine = () => {
+            try {
+              return execFileSync(
+                "jj",
+                [
+                  "-R",
+                  work,
+                  "file",
+                  "list",
+                  "-r",
+                  "pineta-onto",
+                  'root:"from-lane.txt"',
+                ],
+                { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+              ).includes("from-lane.txt")
+            } catch {
+              return false
+            }
+          }
           const took =
-            (await waitFor(
-              () => existsSync(path.join(work, "from-lane.txt")),
-              10_000,
-            )) >= 0
+            (await waitFor(onLine, 10_000)) >= 0 &&
+            !existsSync(path.join(work, "from-lane.txt"))
           check(
-            "the column's foot shows the thread's offer in words, its bookmark apart, and Take brings it into your working copy",
+            "the column's foot shows the thread's offer in words, its bookmark apart, and Take moves the line to it, leaving your working copy",
             takeShown &&
               bookmark.startsWith("pineta-offer/") &&
               !line.includes("`") &&

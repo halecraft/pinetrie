@@ -129,6 +129,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       work: null,
       card: null,
       reserved: NEW_LANE,
+      base: "wip/search",
     },
     {
       kind: "chat",
@@ -141,6 +142,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       work: { kind: "own" },
       card: { id: cardId("c-7"), seen: "v-1" },
       reserved: null,
+      base: null,
     },
     {
       kind: "chat",
@@ -153,6 +155,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       work: { kind: "direct", dir: "/tmp/elsewhere" },
       card: null,
       reserved: null,
+      base: null,
     },
     { kind: "name", name: "Alice" },
     { kind: "stop", lane: laneNameForThread("abc") },
@@ -160,8 +163,21 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "archive", action: "restore", root: entryId("e-1") },
     { kind: "mark", entry: entryId("e-1"), title: "Tab names" },
     { kind: "mark", entry: entryId("e-1"), title: null },
-    { kind: "offer", lane: laneNameForThread("abc"), action: "take" },
-    { kind: "offer", lane: laneNameForThread("abc"), action: "split" },
+    { kind: "offer", lane: laneNameForThread("abc"), action: "take", to: null },
+    {
+      kind: "offer",
+      lane: laneNameForThread("abc"),
+      action: "take",
+      to: "wip/search",
+    },
+    {
+      kind: "offer",
+      lane: laneNameForThread("abc"),
+      action: "split",
+      to: null,
+    },
+    { kind: "line", action: "setup" },
+    { kind: "line", action: "land" },
     { kind: "reserve", lane: NEW_LANE },
     {
       kind: "move",
@@ -219,6 +235,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "taken" },
     { kind: "offered" },
     { kind: "reserved" },
+    { kind: "line-moved" },
     { kind: "queued" },
     { kind: "moved" },
     {

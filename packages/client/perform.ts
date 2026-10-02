@@ -78,7 +78,7 @@ function performOne(effect: Effect, ports: AppPorts): void {
       ports.session.setCommand(effect.card, effect.command)
       return
     case "offer":
-      void ports.session.offer(effect.lane, effect.action)
+      void ports.session.offer(effect.lane, effect.action, effect.to)
       return
     case "openFold":
       ports.openFold(effect.ask)

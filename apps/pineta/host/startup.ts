@@ -3,6 +3,7 @@
 import type { LaneName } from "@pineta/core"
 import {
   encodeWorkRecord,
+  LEGACY_HAVE_NAMESPACE,
   LEGACY_OUTBOX_NAMESPACE,
   planCardSweep,
   planSeatSweep,
@@ -35,6 +36,7 @@ export interface StartupDeps {
     | "setWorkRecord"
     | "removeSeat"
     | "removeHeld"
+    | "removeHave"
   >
   readonly work: Pick<LaneWork, "project">
   /** Name every lane that has none (ADR-0039). */
@@ -75,6 +77,13 @@ export async function recover(deps: StartupDeps): Promise<void> {
     log(`[host] deleted a message an older host held, never sent: ${held.text}`)
     await agent.removeHeld(held.key)
   }
+  // What you had of lanes is in taken commits' trailers now (ADR-0060).
+  const haves = readValues(doc, LEGACY_HAVE_NAMESPACE)
+  for (const { key } of haves) await agent.removeHave(key)
+  if (haves.length > 0)
+    log(
+      `[host] deleted ${haves.length} records an older host kept of what you had of lanes`,
+    )
   for (const lane of planned.resume) {
     log(
       `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,

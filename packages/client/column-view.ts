@@ -5,6 +5,7 @@
 import {
   ancestry,
   type BannerRecord,
+  type BaseRecord,
   blobUrl,
   type ColumnView,
   type CommandSummary,
@@ -15,6 +16,7 @@ import {
   type LaneName,
   type LaneRecord,
   type LaneView,
+  type LineRecord,
   messageText,
   type OfferRecord,
   type ProjectRecord,
@@ -30,6 +32,7 @@ import {
   type OfferButton,
   type OfferView,
   offerView,
+  type TakeDestination,
 } from "@pineta/marginalia"
 import { commandWords } from "./card-words.ts"
 import { speakerLabel } from "./names.ts"
@@ -66,6 +69,10 @@ export interface WorkFacts {
   readonly names: ReadonlyMap<LaneName, ThreadName>
   /** Each thread's column banner. */
   readonly banners: ReadonlyMap<LaneName, BannerRecord>
+  /** The integration line, as the host last read it (ADR-0060). */
+  readonly line: LineRecord | null
+  /** Each lane's base, as its history says it (ADR-0060). */
+  readonly bases: ReadonlyMap<LaneName, BaseRecord>
 }
 
 // ── which lane worked where ───────────────────────────────────────────────
@@ -181,6 +188,8 @@ export type WorkStrip =
       readonly words: OfferWords
       readonly bookmark: string | null
       readonly review: ReviewTarget | null
+      /** Where `take` and `take-line` go (ADR-0060). */
+      readonly destinations: OfferView["destinations"]
     }
   | {
       readonly kind: "direct"
@@ -217,6 +226,8 @@ export interface ColumnShows {
   readonly strip: WorkStrip
   /** What `Column` does to have its thread named before it starts. */
   readonly reserve: ReserveStep
+  /** The thread's base when it is not the line (ADR-0060), worded; null otherwise. */
+  readonly base: string | null
 }
 
 /**
@@ -260,6 +271,7 @@ export function columnView(f: ColumnFacts): ColumnShows {
     joins: joinsOf(view, stretches, work.names),
     strip: workStrip(f),
     reserve: reserveStep(f),
+    base: baseWords(head === null ? undefined : work.bases.get(head)),
   }
 }
 
@@ -290,6 +302,22 @@ const bannerOf = (
   url: string | null,
   mounted: string | null,
 ): HeadBanner | null => (url === null ? null : { url, fade: url !== mounted })
+
+/**
+ * A thread's base in its header (ADR-0060): the WIP it is on, or that the
+ * WIP is gone; nothing for the line, or a WIP that landed on it.
+ */
+export function baseWords(base: BaseRecord | undefined): string | null {
+  if (base === undefined || base.base.kind !== "wip") return null
+  switch (base.state) {
+    case "ok":
+      return `on ${base.base.bookmark}`
+    case "gone":
+      return `${base.base.bookmark} is gone`
+    case "landed":
+      return null
+  }
+}
 
 /** A column's identity, after its mark: the thread's name, or a new agent not yet named. */
 export const identityWords = (
@@ -382,16 +410,24 @@ function workStrip(f: ColumnFacts): WorkStrip {
   }
   if (project.kind !== "lanes") return NO_STRIP
   const offer = work.offers.get(lane.name)
+  const base = work.bases.get(lane.name) ?? null
   const view = offerView({
     offer,
     activity: activityOf(f.index, lane),
     landing: work.landings.filter(l => l.lane === lane.name).at(-1),
+    base,
+    onto: work.line?.onto ?? "",
+    wipAhead:
+      work.line?.wips.find(
+        w => base?.base.kind === "wip" && w.bookmark === base.base.bookmark,
+      )?.ahead ?? 0,
   })
   return {
     kind: "offer",
     state: view.state,
     words: offerWords(view),
     bookmark: view.facts.bookmark,
+    destinations: view.destinations,
     review:
       offer === undefined || offer.taken !== null || offer.files.length === 0
         ? null
@@ -424,15 +460,20 @@ export function activityOf(
 const count = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`
 
-const BUTTON_LABEL: Record<OfferButton, string> = {
-  take: "take",
+const BUTTON_LABEL: Record<
+  Exclude<OfferButton, "take" | "take-line" | "update" | "continue">,
+  string
+> = {
   split: "split into a stack",
   squash: "squash to one",
   describe: "rewrite description",
   refresh: "refresh (discards your edits)",
   resolve: "resolve in the thread",
-  update: commandWords("bring-up-to-date"),
 }
+
+/** "onto" the line, "into" a WIP: a take's destination, as said (ADR-0060). */
+const destinationWords = (d: TakeDestination): string =>
+  `${d.kind === "line" ? "onto" : "into"} ${d.bookmark}`
 
 /** Every word an offer shows: its line, and its buttons' labels by state. */
 export function offerWords(view: OfferView): OfferWords {
@@ -442,7 +483,7 @@ export function offerWords(view: OfferView): OfferWords {
   const conflicts =
     facts.conflicts === 0
       ? ""
-      : `conflicts with your edits in ${count(facts.conflicts, "file", "files")}`
+      : `conflicts with ${facts.base} in ${count(facts.conflicts, "file", "files")}`
   const line =
     state === "nothing"
       ? "nothing to take yet"
@@ -467,16 +508,36 @@ export function offerWords(view: OfferView): OfferWords {
                     : state === "stack"
                       ? `a stack of ${facts.size} · ${files} ready${yours}`
                       : `${files} ready${yours}`
-  const label = (button: OfferButton): string =>
-    button === "take" && state === "stack"
-      ? "take stack"
-      : button === "take" && state === "stale"
-        ? "take stack and the rest"
-        : button === "take" && (facts.conflicts > 0 || state === "needs_you")
-          ? "take anyway"
-          : button === "split" && state === "stale"
-            ? "split again"
-            : BUTTON_LABEL[button]
+  const [first] = view.destinations
+  const toLine = view.destinations.find(d => d.kind === "line")
+  const take = (): string => {
+    const where = first === undefined ? "" : ` ${destinationWords(first)}`
+    return state === "stack"
+      ? `take stack${where}`
+      : state === "stale"
+        ? `take stack and the rest${where}`
+        : facts.conflicts > 0 || state === "needs_you"
+          ? `take anyway${where}`
+          : `take${where}`
+  }
+  const label = (button: OfferButton): string => {
+    switch (button) {
+      case "take":
+        return take()
+      case "take-line":
+        return toLine === undefined || toLine.bringsAlong === 0
+          ? `land on ${facts.onto}`
+          : `land on ${facts.onto}, with your ${count(toLine.bringsAlong, "commit", "commits")} beneath it`
+      case "update":
+        return commandWords("bring-up-to-date", facts.base)
+      case "continue":
+        return commandWords("continue-on-line", facts.onto)
+      case "split":
+        return state === "stale" ? "split again" : BUTTON_LABEL[button]
+      default:
+        return BUTTON_LABEL[button]
+    }
+  }
   const labelled = (button: OfferButton) => ({ button, label: label(button) })
   return {
     line,

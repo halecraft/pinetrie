@@ -18,6 +18,11 @@ above the tip's newest copy.
 Amended in place (S73, `PLAN-2026-10-01-offer-lost-write`): an offer is
 edited only by a change an operation not the host's made; an edited offer
 that conflicts says so.
+**Amended by ADR-0060:** an offer sits on its thread's base (the
+integration line, or a WIP bookmark), and starts where the lane's
+`Pineta-Base` and taken offers' `Pineta-Source` trailers say; a take is a
+forward bookmark move, never a rebase under your `@`; `pineta.have` and
+copies of your `@` are gone, and a root thread starts at the line.
 
 **Context.** Taking a thread's work today rebases your `@` onto the lane's
 merge (ADR-0034). Every turn commit the lane made becomes an ancestor of your

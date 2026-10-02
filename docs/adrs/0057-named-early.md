@@ -5,6 +5,8 @@ Amends ADR-0039 (a name is planned for a lane that does not exist yet, and
 the host, not pi, decides a new thread's lane id, taking the client's),
 ADR-0040 (`✦ new agent` lasts only until the name arrives) and ADR-0053 (the
 icon starts as the column opens, not at the first send).
+Amended by ADR-0060: the first send carries the thread's base, which the
+host checks before it creates the lane.
 
 **Context.** A thread's name (ADR-0039) and its icon (ADR-0053) are keyed by
 its lane, and the lane is made only by the first send: `createThreadLane`

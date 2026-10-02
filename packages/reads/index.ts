@@ -18,17 +18,18 @@ import {
   type ArchiveRecord,
   agentActivity,
   type BannerRecord,
+  type BaseRecord,
   type CardRecord,
   type CommandSummary,
   type EntryId,
   type EntryLike,
   entryId,
-  type HaveRecord,
   indexTree,
   type LandingRecord,
   type LaneName,
   type LaneRecord,
   type LaneView,
+  type LineRecord,
   type MarkRecord,
   messageImages,
   nearestRevision,
@@ -52,7 +53,9 @@ import {
   ARCHIVE_NAMESPACE,
   archiveRecords,
   BANNER_NAMESPACE,
+  BASE_NAMESPACE,
   bannerRecords,
+  baseRecords,
   COMMANDS_NAMESPACE,
   commandsRecord,
   DIGEST_NAMESPACE,
@@ -60,12 +63,12 @@ import {
   decodeCard,
   decodeChat,
   digestRecords,
-  HAVE_NAMESPACE,
-  haveRecords,
   LANDING_NAMESPACE,
   LANE_NAMESPACE,
+  LINE_NAMESPACE,
   landingRecords,
   laneRecords,
+  lineRecord,
   MARK_NAMESPACE,
   markRecords,
   NAME_NAMESPACE,
@@ -366,9 +369,15 @@ export const readOffers = (
 ): ReadonlyMap<LaneName, OfferRecord> =>
   offerRecords(readValues(doc, OFFER_NAMESPACE))
 
-/** The commits you have of lanes: delivered by a take, or copies of your `@`. */
-export const readHaves = (doc: SessionDocHandle): readonly HaveRecord[] =>
-  haveRecords(readValues(doc, HAVE_NAMESPACE))
+/** The integration line as the host last read it (ADR-0060); null before it wrote one. */
+export const readLine = (doc: SessionDocHandle): LineRecord | null =>
+  lineRecord(readValues(doc, LINE_NAMESPACE))
+
+/** Each lane's base as its history says it (ADR-0060), by lane. */
+export const readBases = (
+  doc: SessionDocHandle,
+): ReadonlyMap<LaneName, BaseRecord> =>
+  baseRecords(readValues(doc, BASE_NAMESPACE))
 
 /** Each lane's name (`pineta.name`, ADR-0039), by lane. */
 export const readNames = (

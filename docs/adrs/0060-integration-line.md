@@ -1,7 +1,7 @@
 # ADR-0060 — Takes stack on an integration line; the repo is the ledger
 
 **Status:** Accepted (Duane, 2026-10-02). Evidence: S48, S51, S72, S73,
-S74, S77, S78. Amends ADR-0038 (where
+S74, S77, S78. Implemented by `PLAN-2026-10-02-integration-line`. Amends ADR-0038 (where
 an offer sits and starts, what a take does, what you already have, and
 where a root thread starts: the line, not your `@`), ADR-0032 (where a
 lane starts) and ADR-0034 (how work moves into your repo).
@@ -241,6 +241,27 @@ work on the immutable line.
 - Migration: existing open offers are rebuilt on the line; `pineta.have`
   records are read once to write `Pineta-Source` where a taken commit lacks
   one, then deleted.
+
+**As built.** Where the build departs from the text above:
+
+- **`line` commands are a host's, not a seat's.** Kyneta does not tell the
+  host which connection a seat came over, so a host with an invite key
+  (one that admits others) refuses setup and land (`not_yours`), and the
+  page offers neither.
+- **The base is chosen per composer**, as the work choice is, and sent with
+  the first message; nothing is kept on the column.
+- **A WIP thread's update copies onto the lane's previous copy**, not the
+  line commit under the WIP, so conflicts the lane already resolved do not
+  come back.
+- **No migration of `pineta.have`:** stored values are deleted at
+  startup. A lane with no `Pineta-Base` is on the line, and starts at the
+  newest line commit in its history.
+- **Setup also writes `revsets.log`**, adding the offers: an immutable
+  head is out of jj's default log, so jj and jjui would not show an offer on
+  the line (S77 item 8). It is shown, and written, with the immutable heads.
+- **An offer's ledger is read from its message** (`offerLedger`); the
+  record keeps a copy only for an offer whose message you rewrote without
+  it.
 
 **Alternatives rejected.**
 

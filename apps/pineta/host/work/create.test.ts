@@ -15,16 +15,16 @@ test("forkFacts reads nothing before every pending turn record is written", asyn
       read.push("nearest")
       return { lane: null, commit: null, snapshot: null }
     },
-    yours: async () => {
-      read.push("yours")
-      return { at: commitId("aaaa0000"), parents: [] }
+    begin: async () => {
+      read.push("begin")
+      return { kind: "line", onto: "pineta-onto", commit: commitId("aaaa0000") }
     },
   })
   await new Promise(r => setTimeout(r, 10))
   expect(read).toEqual([])
   pending.resolve()
   await facts
-  expect(read).toEqual(["nearest", "yours"])
+  expect(read).toEqual(["nearest", "begin"])
 })
 
 test("checkDirectory refuses a file and a missing path, and takes a directory", async () => {

@@ -71,21 +71,23 @@ export type ColumnAct =
       readonly command: CardCommand | null
     }
   /**
-   * The bring-up-to-date button: your card at the column's end, `card`, or
-   * `create` when you have none there, gets the command, and the column
-   * keyed `key` takes focus (ADR-0055).
+   * The bring-up-to-date button, or continue-on-line's (ADR-0060): your card
+   * at the column's end, `card`, or `create` when you have none there, gets
+   * `command`, and the column keyed `key` takes focus (ADR-0055).
    */
   | {
       readonly kind: "bringUpToDate"
       readonly key: string
       readonly card: CardId | null
       readonly create: CardRecord
+      readonly command: CardCommand
     }
-  /** Act on the lane's offer in your repo (ADR-0038). */
+  /** Act on the lane's offer in your repo; a take names its destination (ADR-0060). */
   | {
       readonly kind: "offer"
       readonly lane: LaneName
       readonly action: OfferAction
+      readonly to: string | null
     }
 
 export type Intent =
@@ -145,6 +147,7 @@ export type Effect =
       readonly kind: "offer"
       readonly lane: LaneName
       readonly action: OfferAction
+      readonly to: string | null
     }
   /** Scroll to entry `entry` once it is drawn (`useReveal`). */
   | { readonly kind: "reveal"; readonly entry: EntryId }
@@ -341,7 +344,7 @@ function planColumn(
     case "setCommand":
       return [{ kind: "setCommand", card: act.card, command: act.command }]
     case "bringUpToDate": {
-      const command: CardCommand = "bring-up-to-date"
+      const { command } = act
       return [
         act.card === null
           ? { kind: "createCard", card: { ...act.create, command } }
@@ -350,7 +353,7 @@ function planColumn(
       ]
     }
     case "offer":
-      return [{ kind: "offer", lane: act.lane, action: act.action }]
+      return [{ kind: "offer", lane: act.lane, action: act.action, to: act.to }]
   }
 }
 

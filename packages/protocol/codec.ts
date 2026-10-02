@@ -26,6 +26,8 @@ import {
   type Intent,
   isLaneName,
   keyOfFields,
+  LINE_ACTIONS,
+  type LineAction,
   MAX_TITLE,
   type MoveRefusal,
   normalizeName,
@@ -90,6 +92,8 @@ export type Outcome =
   | { readonly kind: "offered" }
   /** A thread is named before its lane exists, or already was (ADR-0057). */
   | { readonly kind: "reserved" }
+  /** The integration line was set up, or moved forward to your work (ADR-0060). */
+  | { readonly kind: "line-moved" }
   | Refusal
   /**
    * The host failed carrying the command out, and may have done part of it:
@@ -154,6 +158,7 @@ export function decodeCommand(
     const reserved = text(wire?.reserved)
     const reservedLane = reserved === "" ? null : parseNewLane(reserved)
     if (reservedLane === undefined) return notNewLane(reserved)
+    const base = text(wire?.base)
     return {
       kind: "chat",
       text: body,
@@ -165,7 +170,14 @@ export function decodeCommand(
       work,
       card: cardFromWire(text(wire?.cardId), text(wire?.seen)),
       reserved: reservedLane,
+      base: base === "" ? null : base,
     }
+  }
+  if (kind === "line") {
+    const action = text(wire?.mode)
+    return isLineAction(action)
+      ? { kind, action }
+      : refused(ERR.UNKNOWN_KIND, `unknown line action: ${action}`)
   }
   if (kind === "move") {
     const card = text(wire?.cardId)
@@ -204,8 +216,9 @@ export function decodeCommand(
     if (!isLaneName(lane))
       return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
     const action = text(wire?.mode)
+    const to = text(wire?.targetId)
     return isOfferAction(action)
-      ? { kind, lane, action }
+      ? { kind, lane, action, to: action === "take" && to !== "" ? to : null }
       : refused(ERR.UNKNOWN_KIND, `unknown offer action: ${action}`)
   }
   if (kind === "archive") {
@@ -294,6 +307,9 @@ const isMoveRefusal = (c: string): c is MoveRefusal =>
 const isOfferAction = (a: string): a is OfferAction =>
   (OFFER_ACTIONS as readonly string[]).includes(a)
 
+const isLineAction = (a: string): a is LineAction =>
+  (LINE_ACTIONS as readonly string[]).includes(a)
+
 const isArchiveAction = (a: string): a is ArchiveAction =>
   (ARCHIVE_ACTIONS as readonly string[]).includes(a)
 
@@ -334,6 +350,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         cardId: intent.card?.id ?? "",
         seen: intent.card?.seen ?? "",
         reserved: intent.reserved ?? "",
+        base: intent.base ?? "",
       })
     case "name":
       return command({ id, kind: "name", text: intent.name })
@@ -359,7 +376,10 @@ export function encodeIntent(id: string, intent: Intent): Command {
         kind: "offer",
         lane: intent.lane,
         mode: intent.action,
+        targetId: intent.to ?? "",
       })
+    case "line":
+      return command({ id, kind: "line", mode: intent.action })
     case "reserve":
       return command({ id, kind: "reserve", lane: intent.lane })
     case "move":
@@ -418,6 +438,8 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "offered" })
     case "reserved":
       return reply({ id, outcome: "reserved" })
+    case "line-moved":
+      return reply({ id, outcome: "line-moved" })
     case "queued":
       return reply({ id, outcome: "queued" })
     case "moved":
@@ -472,6 +494,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "offered" }
     case "reserved":
       return { kind: "reserved" }
+    case "line-moved":
+      return { kind: "line-moved" }
     case "queued":
       return { kind: "queued" }
     case "moved":

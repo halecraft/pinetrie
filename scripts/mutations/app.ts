@@ -7,6 +7,16 @@ import type { Mutation } from "../mutate.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the take button takes nowhere",
+    file: "packages/client/column.tsx",
+    from: "          ? destinations[0]\n",
+    to: "          ? destinations[1]\n",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "the column's foot shows the thread's offer in words, its bookmark apart, and Take moves the line to it, leaving your working copy",
+  },
+  {
     name: "a column you open does not take focus",
     file: "packages/client/card-editor.tsx",
     from: "    if (p.takeFocus?.() === true) box.current?.focus()",
@@ -512,7 +522,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the chip hides its choice",
     file: "packages/client/card-editor.tsx",
-    from: "            {whereWords(p.work, p.project)}\n",
+    from: '            {whereWords(\n              p.work,\n              p.project,\n              p.work.kind === "own" ? p.base : null,\n            )}\n',
     to: "",
     suite: "browser",
     scenario: "tools",

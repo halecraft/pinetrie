@@ -28,9 +28,16 @@ import {
 } from "@pineta/reads"
 import { readEntries, rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
-import { committedProject, idleNow, join, waitFor } from "../harness.ts"
+import {
+  committedProject,
+  idleNow,
+  join,
+  setUpLine,
+  waitFor,
+} from "../harness.ts"
 
 export const START_AGENT = { mode: "branch", asksAgent: true } as const
+
 export const BRANCH = { mode: "branch" } as const
 export const at = (id: string | null): Position =>
   id === null ? ROOT : atEntry(entryId(id))
@@ -168,6 +175,7 @@ export async function sectionHost(input: {
     `u${Math.random().toString(36).slice(2, 10)}`,
     `section-${process.pid}`,
   )
+  await setUpLine(host.doc, user)
   const idle = async () => {
     await waitFor(() => idleNow(host), 300_000)
     await host.quiet()

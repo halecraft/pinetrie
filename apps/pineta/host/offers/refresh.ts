@@ -13,7 +13,6 @@ import {
   changeOf,
   executeOnHost,
   hostCommitIn,
-  laneTipIn,
   type OfferFacts,
   type OfferSource,
   offerBookmark,
@@ -22,19 +21,19 @@ import {
   offerRevisions,
   planOffer,
   planRepair,
-  startOfOffer,
   yourEditsIn,
 } from "@pineta/lanes"
-import { planRefresh, wipDescription } from "@pineta/marginalia"
-import {
-  readHaves,
-  readRevisions,
-  readThreadName,
-  readTreeIndex,
-} from "@pineta/reads"
+import { planRefresh, wipDescription, withLedger } from "@pineta/marginalia"
+import { readRevisions, readThreadName, readTreeIndex } from "@pineta/reads"
 import { readLaneTip, type SessionDocHandle } from "@pineta/schema"
 import { executeOffer } from "./execute.ts"
-import { type OfferAt, offerRecord, planOfferEffects } from "./plan.ts"
+import {
+  builtOf,
+  type OfferAt,
+  offerRecord,
+  planOfferEffects,
+  readBaseline,
+} from "./plan.ts"
 import type { OfferState } from "./state.ts"
 
 /**
@@ -109,12 +108,21 @@ export function createRefresh(state: OfferState): Refresh {
     sources: readonly OfferSource[],
     described: boolean,
   ): Promise<void> {
+    // Each revision names the lane commit it holds, and where the offer
+    // starts: taken, that is what you have of the lane (ADR-0060).
+    const ledgered = sources.map(source => ({
+      ...source,
+      description: withLedger(source.description, {
+        source: source.commit,
+        start,
+      }),
+    }))
     await executeOnHost(
       planOffer({
         root,
         name,
         start,
-        sources,
+        sources: ledgered,
         target,
         nonce: `pineta-offer-${crypto.randomUUID()}`,
       }),
@@ -158,14 +166,11 @@ export function createRefresh(state: OfferState): Refresh {
   async function refresh(lane: LaneName): Promise<"built" | "other"> {
     // gather
     const name = state.nameOf(lane)
-    const tip = await laneTipIn(ops, lane)
-    if (tip === null || name === undefined) return "other"
-    const target = await state.targetNow()
-    const start = await startOfOffer(ops, {
-      tip,
-      target,
-      haves: readHaves(doc),
-    })
+    if (name === undefined) return "other"
+    const place = await state.placeOf(lane)
+    // No tip yet, or a WIP gone without landing: nothing moves (ADR-0060).
+    if (place === null || place.target === null) return "other"
+    const { tip, start, target } = place
     const stored = state.offerOf(lane)
     const open = stored !== undefined && stored.taken === null ? stored : null
     const facts = open === null ? null : await state.factsOf(open, target)
@@ -181,8 +186,7 @@ export function createRefresh(state: OfferState): Refresh {
           ? {
               size: open.size,
               taken: open.taken,
-              builtFrom: open.host.tip,
-              builtOn: open.host.start,
+              ...builtOf(facts.ledger, open),
               revisions: facts.revisions,
               placed: facts.placed,
               onTarget: facts.onTarget,
@@ -195,10 +199,10 @@ export function createRefresh(state: OfferState): Refresh {
       tip,
       start,
       target,
-      wip: wipLine(doc, lane, name),
+      wip: withLedger(wipLine(doc, lane, name), { source: tip, start }),
       open: facts === null ? null : open,
       live,
-      read: facts === null ? null : facts.commits,
+      read: facts === null ? null : readBaseline(facts),
     })
     // execute
     return executeOffer(
