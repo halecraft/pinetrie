@@ -9,7 +9,10 @@ import { nameHint } from "./identity.ts"
 export const NAME_PROBLEM = `a name with a letter or digit, up to ${MAX_NAME_LENGTH} characters, and not “agent”`
 
 export interface NameProblem {
-  /** `name` for the client's own rule; a refusal's code for the host's. */
+  /**
+   * `name` for the client's own rule; a refusal's code for the host's;
+   * `failed` when the host failed carrying the rename out.
+   */
   readonly code: string
   readonly message: string
 }

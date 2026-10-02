@@ -48,6 +48,16 @@ wires them.
   still gets the rejection. `@pineta/lanes`' `createQueue` is the opposite: a
   fatal failure breaks it until `reset`, which a lane's disk needs and a host
   step must not have.
+- **Voiding `serial.run`'s promise is safe; awaiting it in a voided function
+  is not.** The tail's `.catch` is attached to the very promise `run`
+  returns, so a voided one is handled. An `await` of it inside an async
+  function whose own promise is voided throws there, and that function's
+  promise rejects unhandled, which ends the process. So the command loop
+  (`control.ts`) voids each step: an await there would end a seat's
+  commands at the first one that throws.
+- **A failed drain is logged against its lane** (`settle.ts`), and the
+  settle still drains the other lanes, compacts and sweeps. A throw there
+  would also leave `compactionQueued` set, and no later settle would compact.
 - **`RunningHost.quiet()`** is `serial.idle()`, then lane work's `quiet()`,
   then `exchange.flush()`. The suites await it before they check, so any
   background promise must be a `serial.run` or `serial.track`, or `quiet`
@@ -94,6 +104,10 @@ text names (`sweepTexts`).
 
 ## Commands
 
+- **Every command gets exactly one reply.** `handle` sends it from one place,
+  after `outcomeOf`. A command that throws is logged (`[host] a <kind>
+  command failed: …`) and answered `failed`, not `refused`: the host may have
+  written part of it. The seat's loop goes on to its next command.
 - **A command's id is its send's id.** The column that sent a chat finds its
   message by it (`TreeIndex.bySend`).
 - **The archive gate is in the dispatcher** (`refuseInArchive`). Only the

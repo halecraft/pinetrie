@@ -13,6 +13,7 @@ import {
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
+  failedWords,
   placeholderWords,
   planSend,
   queuePlace,
@@ -82,6 +83,12 @@ describe("settleSend", () => {
       status: "waiting · 2nd in line",
       conflict: null,
     })
+  })
+  test("a failure says the host failed, never that nothing was sent", () => {
+    expect(
+      settleSend({ kind: "failed", message: "store closed" }, "hi", READER),
+    ).toEqual({ status: "the host failed: store closed", conflict: null })
+    expect(failedWords("store closed")).not.toMatch(/not sent/)
   })
 })
 

@@ -17,7 +17,10 @@ export type ControlSender = Parameters<
   Parameters<ControlListener["onReceive"]>[0]
 >[0]
 
-/** Run each command from each seat in a serial step; a departed seat's Line goes. */
+/**
+ * Run each command from each seat in a serial step; a failed step does not end
+ * its seat's commands. A departed seat's Line goes.
+ */
 export function startControl(input: {
   /** Only the peers: who each seat is, and when one leaves. */
   readonly exchange: {
@@ -37,8 +40,11 @@ export function startControl(input: {
     lines.set(sender.peer, manager)
     const writer = writerOfPrincipal(exchange.peers.get(sender.peer)?.principal)
     void (async () => {
+      // Not awaited: the serial reports a failed step, and an await here would
+      // throw out of this loop, end the seat's commands, and reject unhandled.
+      // The steps still join the serial in arrival order.
       for await (const cmd of receiver)
-        await serial.run(() => input.handle(sender, writer, cmd))
+        void serial.run(() => input.handle(sender, writer, cmd))
     })()
   })
   // A seat that has left never returns, so its Line goes (host/lines.ts).

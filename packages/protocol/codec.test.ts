@@ -24,7 +24,7 @@ import {
   encodeOutcome,
   type Outcome,
 } from "./codec.ts"
-import { reply } from "./messages.ts"
+import { OUTCOME_KINDS, reply } from "./messages.ts"
 
 const NEW_LANE = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
 
@@ -166,10 +166,13 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "reserved" },
     { kind: "refused", code: ERR.ARCHIVED, message: "archived by Bea" },
     { kind: "refused", code: ERR.ROOT_BUSY, message: "busy" },
+    { kind: "failed", message: "setParticipantName is not in this port" },
   ]
   for (const outcome of outcomes) {
     assert.deepEqual(decodeReply(encodeOutcome("c-1", outcome)), outcome)
   }
+  // A kind added to the wire without a case here fails this, not silence.
+  assert.deepEqual(new Set(outcomes.map(o => o.kind)), new Set(OUTCOME_KINDS))
 })
 
 test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {

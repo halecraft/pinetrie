@@ -13,6 +13,7 @@ import { planRename } from "./identity.ts"
 import { NAME_PROBLEM, NameInput, type NameProblem } from "./name-input.tsx"
 import { Popover } from "./popover.tsx"
 import { Initial, nameFor } from "./presence.tsx"
+import { failedWords } from "./send.ts"
 
 export interface Me {
   readonly writer: WriterId
@@ -77,6 +78,13 @@ export function Profile({
                 const outcome = await rename(plan.name)
                 if (outcome.kind === "refused") {
                   setProblem({ code: outcome.code, message: outcome.message })
+                  return
+                }
+                if (outcome.kind === "failed") {
+                  setProblem({
+                    code: "failed",
+                    message: failedWords(outcome.message),
+                  })
                   return
                 }
               }

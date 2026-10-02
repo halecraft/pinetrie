@@ -824,6 +824,11 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   chooses `queue` itself, so a true conflict needs two sends to cross in flight.
   Its outcome is checked in e2e; the prompt's rendering is not exercised in the
   browser suite, because no honest browser action can force the crossing.
+- **Failed.** A command the host threw on comes back `failed` with the
+  error's message. The card keeps its text (`spends` is false), as for a
+  refusal, but `failedWords` never says "not sent": the host may have written
+  the message before it failed. The profile form words a failed rename with
+  the same function.
 - **Waiting messages** from `pineta.outbox` show dimmed in their column, in the
   order they will be taken. They are not in the tree yet.
 

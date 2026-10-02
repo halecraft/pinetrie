@@ -119,6 +119,7 @@ export const OUTCOME_KINDS = [
   "offered",
   "reserved",
   "refused",
+  "failed",
 ] as const
 export type OutcomeKind = (typeof OUTCOME_KINDS)[number]
 

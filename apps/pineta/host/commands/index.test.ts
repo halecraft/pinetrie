@@ -79,6 +79,26 @@ test("a seat whose principal names nobody is refused whatever it sends", async (
   expect(agent.calls).toEqual([])
 })
 
+test("a command that throws is answered failed, and logged", async () => {
+  const { b, commands, replies, sender } = setUp()
+  // The agent port has no `setParticipantName`, so `record` throws.
+  await commands.handle(sender, ALICE, {
+    id: "c-4",
+    kind: "name",
+    text: "Alice",
+  } as never)
+  expect(replies).toEqual([
+    expect.objectContaining({
+      id: "c-4",
+      outcome: "failed",
+      errorMessage: "setParticipantName is not in this port",
+    }),
+  ])
+  expect(b.lines).toEqual([
+    "[host] a name command failed: setParticipantName is not in this port",
+  ])
+})
+
 test("a reservation is answered reserved, and refused for a lane pi holds (ADR-0057)", async () => {
   const { commands, replies, sender } = setUp()
   const reserve = (id: string, lane: string) =>

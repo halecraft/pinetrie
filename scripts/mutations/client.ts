@@ -1557,6 +1557,14 @@ export const mutations: readonly Mutation[] = [
     expect: "a message's closed branch opens as openAt does",
   },
   {
+    name: "a failure reads as sent",
+    file: send,
+    from: "      return { status: failedWords(outcome.message), conflict: null }",
+    to: '      return { status: "", conflict: null }',
+    command: unit,
+    expect: "a failure says the host failed",
+  },
+  {
     name: "a column binds to its reserved lane before it has a tip",
     file: "packages/client/columns.ts",
     from: "    if (tip !== null) return { ...rest, anchor: tip, lane: reserved }",

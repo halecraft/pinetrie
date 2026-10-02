@@ -10,8 +10,9 @@ import type { Serial } from "./queue.ts"
  * compaction; a run it starts streams while the session compacts. A run's
  * end is when the session's op log has grown most and its streams have just
  * closed. A compaction queued and not yet started absorbs the next request:
- * several runs ending together compact once. A failed compaction or sweep is
- * logged, and the host carries on.
+ * several runs ending together compact once. A failed drain, compaction or
+ * sweep is logged, and the step goes on: the other lanes still drain, and the
+ * session still compacts.
  */
 export function createSettle(input: {
   readonly basics: Pick<Basics, "doc" | "log">
@@ -26,19 +27,12 @@ export function createSettle(input: {
     const compact = !compactionQueued
     compactionQueued = true
     return serial.run(async () => {
-      for (const lane of lanes) await input.drain(lane)
+      for (const lane of lanes)
+        await input.drain(lane).catch(failed(basics, "draining", lane))
       if (!compact) return
       compactionQueued = false
-      try {
-        await input.compact()
-      } catch (error) {
-        failed(basics, "compaction")(error)
-      }
-      try {
-        await input.sweep()
-      } catch (error) {
-        failed(basics, "deleting unreferenced images")(error)
-      }
+      await input.compact().catch(failed(basics, "compaction"))
+      await input.sweep().catch(failed(basics, "deleting unreferenced images"))
     })
   }
 }

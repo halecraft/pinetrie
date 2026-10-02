@@ -73,6 +73,11 @@ export type Outcome =
   /** A thread is named before its lane exists, or already was (ADR-0057). */
   | { readonly kind: "reserved" }
   | Refusal
+  /**
+   * The host failed carrying the command out, and may have done part of it:
+   * unlike a refusal, it does not say that nothing was written.
+   */
+  | { readonly kind: "failed"; readonly message: string }
 
 /**
  * A command as it arrives: untrusted. Every field is `unknown` because this
@@ -308,6 +313,8 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
         errorCode: outcome.code,
         errorMessage: outcome.message,
       })
+    case "failed":
+      return reply({ id, outcome: "failed", errorMessage: outcome.message })
   }
 }
 
@@ -345,6 +352,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "reserved" }
     case "refused":
       return refused(asErrCode(wire.errorCode), wire.errorMessage)
+    case "failed":
+      return { kind: "failed", message: wire.errorMessage }
   }
 }
 

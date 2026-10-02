@@ -1047,8 +1047,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher answers archive without archiving",
     file: "apps/pineta/host/commands/index.ts",
-    from: '      case "archive":\n        return respond(await handleArchive(deps, writer, intent))',
-    to: '      case "archive":\n        return respond({ kind: "archived" })',
+    from: '      case "archive":\n        return handleArchive(deps, writer, intent)',
+    to: '      case "archive":\n        return { kind: "archived" }',
     suite: "host",
     scenario: "archive",
     expect: "a root is archived, by its archiver, and another client sees it",
@@ -1056,8 +1056,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher answers mark without titling",
     file: "apps/pineta/host/commands/index.ts",
-    from: '      case "mark":\n        return respond(await handleMark(deps, writer, intent))',
-    to: '      case "mark":\n        return respond({ kind: "marked" })',
+    from: '      case "mark":\n        return handleMark(deps, writer, intent)',
+    to: '      case "mark":\n        return { kind: "marked" }',
     suite: "host",
     scenario: "archive",
     expect: "a root is titled, by its writer",
@@ -1245,8 +1245,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stop is recorded under no one who pressed it",
     file: "apps/pineta/host/commands/index.ts",
-    from: "        return respond(await handleStop(deps, intent.lane, writer))",
-    to: "        return respond(await handleStop(deps, intent.lane, intent.lane as never))",
+    from: "        return handleStop(deps, intent.lane, writer)",
+    to: "        return handleStop(deps, intent.lane, intent.lane as never)",
     suite: "host",
     scenario: "tools",
     expect: "the stop is recorded under its ask, naming who stopped it",

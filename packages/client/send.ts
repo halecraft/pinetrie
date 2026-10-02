@@ -22,7 +22,8 @@ import type { Prefill } from "./columns.ts"
  * What the composer shows after the host answers. Nothing is put back: the
  * box was never cleared, and a message the host did not write leaves its card
  * where it was (ADR-0048), a conflict or a refusal such as a root archived a
- * moment before (ADR-0029).
+ * moment before (ADR-0029). A failure leaves the card too, though the host
+ * may have written the message before it failed.
  */
 export interface SendSettled {
   readonly status: string
@@ -41,6 +42,13 @@ export interface Reader {
   readonly me: WriterId
   readonly nameOf: ReadonlyMap<WriterId, string>
 }
+
+/**
+ * A command the host failed carrying out, in the client's words. Never "not
+ * sent": the host may have written part of it before it failed.
+ */
+export const failedWords = (message: string): string =>
+  `the host failed: ${message}`
 
 const ordinal = (n: number): string =>
   n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`
@@ -64,6 +72,8 @@ export function settleSend(
         status: `not sent: ${outcome.message}`,
         conflict: null,
       }
+    case "failed":
+      return { status: failedWords(outcome.message), conflict: null }
     case "queued":
       return {
         status: `waiting · ${ordinal(outcome.position + 1)} in line`,
