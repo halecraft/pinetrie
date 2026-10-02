@@ -14,7 +14,7 @@ function MessageListView(p: MessageListProps) {
   const { view, index } = p
   return view.nodes.map((node, i) => (
     <Message
-      doc={p.session.doc}
+      doc={p.doc}
       rows={p.rows}
       streams={callStreams(node.toolCalls, p.tools)}
       closedBranches={node.branches.filter(b => !p.shown.has(b.rootId))}

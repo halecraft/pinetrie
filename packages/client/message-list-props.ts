@@ -3,12 +3,12 @@
 // (`sameProps`), kept pure (S59).
 
 import type { ColumnView, ThreadLane, TreeIndex, WriterId } from "@pineta/core"
+import type { SessionDocHandle } from "@pineta/schema"
 import type { LaneJoin } from "./column-view.ts"
 import type { LiveWork } from "./live.ts"
 import type { MessageAct } from "./message-tools.ts"
 import { type PropRule, sameProps } from "./same-props.ts"
 import type { ScreenMemory } from "./screen-memory.ts"
-import type { SessionClient } from "./session-view.ts"
 import type { RowMemory } from "./tool-row.ts"
 
 export interface MessageListProps {
@@ -28,7 +28,8 @@ export interface MessageListProps {
   /** Each tool row's state, by call id, across unmounts. */
   rows: ScreenMemory<RowMemory>
   nameOf: ReadonlyMap<WriterId, string>
-  session: SessionClient
+  /** Where a running call's output is read. */
+  doc: SessionDocHandle
   onAct: (act: MessageAct) => void
 }
 
@@ -42,8 +43,8 @@ export interface MessageListProps {
  * value would spend part of what skipping saves. `lane` and `joins` are
  * rebuilt on every render of the column, so they are compared by value. The
  * rest keep their identity while unchanged: memos in `App`, the facts,
- * `useSelector`'s names, `useStable`'s handler, a state setter, the row
- * memory made once in `App`.
+ * `useSelector`'s names, `useStable`'s handler, the session's document, the
+ * row memory made once in `App`.
  */
 const MESSAGE_LIST_PROPS = {
   view: "identity",
@@ -56,7 +57,7 @@ const MESSAGE_LIST_PROPS = {
   tools: "identity",
   rows: "identity",
   nameOf: "identity",
-  session: "identity",
+  doc: "identity",
   onAct: "identity",
 } as const satisfies { readonly [K in keyof MessageListProps]-?: PropRule }
 

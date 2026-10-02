@@ -413,7 +413,7 @@ export function Column(p: ColumnProps) {
               nameOf={p.nameOf}
               onAct={act}
               rows={p.rows}
-              session={p.session}
+              doc={p.session.doc}
               shown={p.shown}
               tools={p.live.tools}
               view={view}
