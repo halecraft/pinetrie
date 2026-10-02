@@ -30,6 +30,7 @@ import { type QueuedCard, writersOf } from "@pineta/marginalia"
 import { textClients } from "@pineta/schema"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import type { ReadOnly } from "./app-view.ts"
+import { NOT_RECORDED } from "./card-moves.ts"
 import {
   type EditorEvent,
   type EditorState,
@@ -74,11 +75,7 @@ import {
   whereChoices,
   whereWords,
 } from "./send.ts"
-import {
-  type ColumnHow,
-  NOT_RECORDED,
-  type SessionClient,
-} from "./session-view.ts"
+import type { ColumnHow, SessionClient } from "./session-view.ts"
 
 /**
  * Bind a box to a card's text, its undo reaching only that card's steps

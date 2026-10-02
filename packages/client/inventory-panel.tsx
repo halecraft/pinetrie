@@ -21,18 +21,9 @@ import {
 import type { Intent } from "./intent.ts"
 import { type Intents, inventoryView, type Slots } from "./inventory.ts"
 import { type Dock, snapTo } from "./inventory-dock.ts"
-import { datasetOf } from "./put-target.ts"
+import { dropProps } from "./put-target.ts"
 import type { Reader } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
-
-/** The `data-*` attributes `datasetOf` gives, as React props. */
-const dataProps = (dataset: Readonly<Record<string, string>>) =>
-  Object.fromEntries(
-    Object.entries(dataset).map(([k, v]) => [
-      `data-${k.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`)}`,
-      v,
-    ]),
-  )
 
 /**
  * The text of each card in `ids`, read from its document and kept current.
@@ -136,7 +127,7 @@ export function InventoryPanel(p: {
               className={slot.card === null ? "slot empty" : "slot"}
               data-card={slot.card?.id}
               data-slot={slot.index}
-              {...dataProps(datasetOf({ kind: "inventory", slot: slot.index }))}
+              {...dropProps({ kind: "inventory", slot: slot.index })}
               draggable={slot.card !== null}
               key={slot.index}
               onClick={() =>

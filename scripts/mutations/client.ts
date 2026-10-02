@@ -2127,7 +2127,7 @@ export const mutations: readonly Mutation[] = [
     name: "a slot is marked under another name",
     file: "packages/client/put-target.ts",
     from: "    : { [PUT_SLOT]: String(target.slot) }",
-    to: "    : { putslot: String(target.slot) }",
+    to: '    : { "data-slot": String(target.slot) }',
     command: unit,
     expect: "a drop on",
   },

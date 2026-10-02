@@ -86,6 +86,7 @@ import { readSessionFacts } from "./projection.ts"
 import {
   CARD_MIME,
   composerPlacesStore,
+  DROP_ZONE,
   targetOfElement,
 } from "./put-target.ts"
 import { EmptyRail, LiveRail } from "./rail.tsx"
@@ -704,7 +705,7 @@ export function App({
     const targetOf = (e: DragEvent) => {
       const el =
         e.target instanceof Element
-          ? e.target.closest<HTMLElement>("[data-put-column],[data-put-slot]")
+          ? e.target.closest<HTMLElement>(DROP_ZONE)
           : null
       return el === null ? null : targetOfElement(el)
     }

@@ -23,7 +23,9 @@ import {
   AT_INVENTORY,
   type HistoryEntry,
   type MoveAnswer,
+  type MoveHow,
   NO_STEP,
+  NOT_RECORDED,
   type Refusal,
 } from "./card-moves.ts"
 import type { CardFacts, Effect, IntentState } from "./intent.ts"
@@ -42,36 +44,30 @@ import {
   type UndoPlan,
 } from "./move-undo.ts"
 import { type PutTarget, placeOfTarget } from "./put-target.ts"
-import type { MoveHow } from "./session-view.ts"
 
 const at = (key: string): ActedAt => ({ kind: "column", key })
 
 /**
- * A move made in column `key`: recorded as `card`'s move to `to` when given,
- * else not recorded (a discard, a composer's new card).
+ * A move made in column `key`, recorded as `card`'s move to `to`: a queue or
+ * an unqueue. With no card the page holds, it is made all the same, and not
+ * recorded.
  */
-export function queueHow(
+export function columnMove(
   key: string,
   moved: { readonly card: CardRecord; readonly to: PlaceKey } | null,
 ): MoveHow {
+  if (moved === null) return NOT_RECORDED(key)
+  const move: Move = {
+    card: moved.card.id,
+    from: keyOf(moved.card.place),
+    to: moved.to,
+  }
   return {
     actedAt: at(key),
-    history:
-      moved === null
-        ? NO_STEP
-        : {
-            kind: "record",
-            entry: {
-              kind: "handoff",
-              move: {
-                card: moved.card.id,
-                from: keyOf(moved.card.place),
-                to: moved.to,
-              },
-              slot: null,
-              column: null,
-            },
-          },
+    history: {
+      kind: "record",
+      entry: { kind: "handoff", move, slot: null, column: null },
+    },
     slot: null,
   }
 }

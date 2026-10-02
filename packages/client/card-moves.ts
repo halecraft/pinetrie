@@ -82,6 +82,27 @@ export type HistoryStep =
 
 export const NO_STEP: HistoryStep = { kind: "none" }
 
+/** What a move carries besides its target: where it was made, its history, a take's slot. */
+export interface MoveHow {
+  readonly actedAt: ActedAt
+  readonly history: HistoryStep
+  /** The slot a move into your inventory takes; null for any other move. */
+  readonly slot: number | null
+}
+
+/** A move made in column `key` that enters no history: a send, a composer's new card, a discard. */
+export const NOT_RECORDED = (key: string): MoveHow => ({
+  actedAt: { kind: "column", key },
+  history: NO_STEP,
+  slot: null,
+})
+
+/**
+ * A move made with no page: a suite's client. Its refusals are kept where no
+ * column is, and it enters no history.
+ */
+export const OFF_PAGE: MoveHow = NOT_RECORDED("")
+
 export interface MoveHistory {
   /** Newest last. */
   readonly undo: readonly HistoryEntry[]

@@ -84,7 +84,7 @@ import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
-import type { ComposerPlacesStore } from "./put-target.ts"
+import { type ComposerPlacesStore, dropProps } from "./put-target.ts"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import { ReviewPane } from "./review-pane.tsx"
@@ -768,7 +768,12 @@ export function Column(p: ColumnProps) {
         {/* Everyone else's cards at this end (ADR-0048): shown in full, each
           editable and sendable by anyone here. */}
         {others.length > 0 && (
-          <div className="cards" data-put-column={putColumn ?? undefined}>
+          <div
+            className="cards"
+            {...(putColumn === null
+              ? {}
+              : dropProps({ kind: "column", key: putColumn }))}
+          >
             {others.map(c => (
               <CardEditor
                 at={at}

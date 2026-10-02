@@ -62,17 +62,18 @@ import {
   textVersion,
 } from "@pineta/schema"
 import {
-  type ActedAt,
   answerOf,
   type HistoryEntry,
   type HistoryStep,
   intentsOf,
   type MoveAnswer,
+  type MoveHow,
   type MovesEvent,
   type MovesState,
   movesStep,
   NO_MOVES,
   NO_STEP,
+  OFF_PAGE,
   type Pending,
   type Refusal,
   withPending,
@@ -280,27 +281,6 @@ export type ColumnHow = Pick<ChatHow, "lane" | "reserved" | "base"> & {
   readonly asksAgent: boolean
   readonly column: string
 }
-
-/** What a move carries besides its target: where it was made, its history, a take's slot. */
-export interface MoveHow {
-  readonly actedAt: ActedAt
-  readonly history: HistoryStep
-  /** The slot a move into your inventory takes; null for any other move. */
-  readonly slot: number | null
-}
-
-/** A move made in column `key` that enters no history: a send, a composer's new card, a discard. */
-export const NOT_RECORDED = (key: string): MoveHow => ({
-  actedAt: { kind: "column", key },
-  history: NO_STEP,
-  slot: null,
-})
-
-/**
- * A move made with no page: a suite's client. Its refusals are kept where no
- * column is, and it enters no history.
- */
-export const OFF_PAGE: MoveHow = NOT_RECORDED("")
 
 export async function connectSession(
   options: ConnectOptions,

@@ -24,19 +24,21 @@ import type {
 import type { Outcome } from "@pineta/protocol/codec"
 import type { Density } from "./ask-words.ts"
 import {
+  columnMove,
   planKeep,
   planPut,
   planRemove,
   planTake,
   planTakeCopy,
   planUndoMove,
-  queueHow,
 } from "./card-intents.ts"
-import type {
-  HistoryEntry,
-  HistoryStep,
-  MoveHistory,
-  Refusal,
+import {
+  type HistoryEntry,
+  type HistoryStep,
+  type MoveHistory,
+  type MoveHow,
+  NOT_RECORDED,
+  type Refusal,
 } from "./card-moves.ts"
 import type { Pending, Prefill } from "./columns.ts"
 import type { Identity, NameStep } from "./identity.ts"
@@ -50,7 +52,6 @@ import {
 import type { MessageAct } from "./message-tools.ts"
 import type { Direction } from "./move-undo.ts"
 import type { ComposerPlaces, PutTarget } from "./put-target.ts"
-import type { MoveHow } from "./session-view.ts"
 
 /** What a reader asks of one column. A message's acts are among them. */
 export type ColumnAct =
@@ -473,7 +474,7 @@ function planColumn(
       const discard: readonly Effect[] = act.discard.map(card => ({
         kind: "discardCard",
         card,
-        how: queueHow(key, null),
+        how: NOT_RECORDED(key),
       }))
       return [...discard, ...closing()]
     }
@@ -505,7 +506,7 @@ function planColumn(
           card: act.card,
           lane: act.lane,
           at: act.at,
-          how: queueHow(key, now === undefined ? null : { card: now, to }),
+          how: columnMove(key, now === undefined ? null : { card: now, to }),
         },
       ]
     }
@@ -517,7 +518,7 @@ function planColumn(
           card: act.card,
           lane: act.lane,
           by: act.by,
-          how: queueHow(
+          how: columnMove(
             key,
             now?.place.kind === "queued"
               ? {
@@ -539,7 +540,7 @@ function planColumn(
               kind: "createCard",
               card: { ...act.create, command },
               text: "",
-              how: queueHow(key, null),
+              how: NOT_RECORDED(key),
             }
           : { kind: "setCommand", card: act.card, command },
         { kind: "armFocus", key: act.key },

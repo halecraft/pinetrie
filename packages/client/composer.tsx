@@ -16,6 +16,7 @@ import { CardEditor, type Where } from "./card-editor.tsx"
 import type { Pending, Prefill } from "./columns.ts"
 import type { ColumnAct, Intent } from "./intent.ts"
 import { nameFor } from "./presence.tsx"
+import { dropProps } from "./put-target.ts"
 import type { Reader } from "./send.ts"
 import type { ColumnHow, SessionClient } from "./session-view.ts"
 import { useTypingAt } from "./use-presence.ts"
@@ -64,7 +65,9 @@ export function Composer(p: {
   return (
     <form
       className="composer"
-      data-put-column={p.putColumn ?? undefined}
+      {...(p.putColumn === null
+        ? {}
+        : dropProps({ kind: "column", key: p.putColumn }))}
       onSubmit={event => {
         // The editor sends on Enter and on its button; a form submit is not one.
         event.preventDefault()

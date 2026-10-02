@@ -8,10 +8,9 @@ import {
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
 import { expect, test, vi } from "vitest"
-import type { MoveAnswer } from "./card-moves.ts"
+import type { MoveAnswer, MoveHow } from "./card-moves.ts"
 import type { Effect } from "./intent.ts"
 import { type AppPorts, perform } from "./perform.ts"
-import type { MoveHow } from "./session-view.ts"
 
 const accepted: MoveAnswer = { kind: "accepted", rev: 1 }
 const how: MoveHow = {

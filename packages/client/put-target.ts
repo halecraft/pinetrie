@@ -25,25 +25,28 @@ export type PutTarget =
 export const CARD_MIME = "application/x-pineta-card"
 
 /** The attribute a column's drop zone carries: its key. */
-export const PUT_COLUMN = "putColumn"
+const PUT_COLUMN = "data-put-column"
 /** The attribute a slot carries: its index. */
-export const PUT_SLOT = "putSlot"
+const PUT_SLOT = "data-put-slot"
 
-/** The `dataset` an element marked as `target` carries. */
-export function datasetOf(target: PutTarget): Readonly<Record<string, string>> {
+/** What an element a drop may land on matches: either mark. */
+export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_SLOT}]`
+
+/** The attributes that mark an element as `target`, spread onto it by the page. */
+export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
   return target.kind === "column"
     ? { [PUT_COLUMN]: target.key }
     : { [PUT_SLOT]: String(target.slot) }
 }
 
-/** The target an element marks, by `data-put-column` or `data-put-slot`; null for none. */
+/** The target an element marks (`dropProps`); null for none. */
 export function targetOfElement(el: {
-  readonly dataset: Readonly<Record<string, string | undefined>>
+  getAttribute(name: string): string | null
 }): PutTarget | null {
-  const key = el.dataset[PUT_COLUMN]
-  if (key !== undefined && key !== "") return { kind: "column", key }
-  const slot = el.dataset[PUT_SLOT]
-  if (slot === undefined || !/^\d+$/.test(slot)) return null
+  const key = el.getAttribute(PUT_COLUMN)
+  if (key !== null && key !== "") return { kind: "column", key }
+  const slot = el.getAttribute(PUT_SLOT)
+  if (slot === null || !/^\d+$/.test(slot)) return null
   return { kind: "inventory", slot: Number(slot) }
 }
 

@@ -3,13 +3,17 @@ import { describe, expect, test } from "vitest"
 import { composerPlace } from "./column-view.ts"
 import {
   composerPlacesStore,
-  datasetOf,
+  dropProps,
   type PutTarget,
   placeOfTarget,
   targetOfElement,
 } from "./put-target.ts"
 
 const ME = writerId("ada@x.io")
+/** An element carrying `attrs`, as the page spreads them. */
+const marked = (attrs: Readonly<Record<string, string>>) => ({
+  getAttribute: (name: string) => attrs[name] ?? null,
+})
 const LANE = laneNameForThread("x")
 const E1 = atEntry(entryId("e-1"))
 
@@ -28,7 +32,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   ]
 
   test.each(targets)("a drop on %o lands where a put to it lands", target => {
-    const dropped = targetOfElement({ dataset: datasetOf(target) })
+    const dropped = targetOfElement(marked(dropProps(target)))
     expect(dropped).toEqual(target)
     expect(
       dropped === null ? null : placeOfTarget(dropped, store.current(), ME),
@@ -54,8 +58,8 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   })
 
   test("an element with no mark, or a slot that is no number, is no target", () => {
-    expect(targetOfElement({ dataset: {} })).toBeNull()
-    expect(targetOfElement({ dataset: { putSlot: "x" } })).toBeNull()
+    expect(targetOfElement(marked({}))).toBeNull()
+    expect(targetOfElement(marked({ "data-put-slot": "x" }))).toBeNull()
   })
 })
 
