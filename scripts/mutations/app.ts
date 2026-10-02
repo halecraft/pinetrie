@@ -45,7 +45,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a banner is asked for wide, not square",
     file: "packages/pi/agent.ts",
-    from: `              image_config: { aspect_ratio: "1:1" },`,
+    from: "              image_config: bannerImageConfig(imageModel.id),",
     to: `              image_config: { aspect_ratio: "21:9" },`,
     command: live,
     expect: "a real image model draws a thread's banner, square",

@@ -17,7 +17,10 @@ banners to one model. And a banner came only after a run had ended.
   before the thread's name, in the fixed square that holds the star (✦)
   when there is no banner, so its arrival moves nothing. The prompt asks for
   a sprite on plain black; `mix-blend-mode: lighten` against the header's
-  own background removes the black. Black in the sprite would go with it
+  own background removes the black. A Recraft model is also sent
+  OpenRouter's `image_config.background_rgb_color` of `[0, 0, 0]`, so the
+  black is set by a parameter and not left to the prompt alone. Black in
+  the sprite would go with it
   (a toucan lost its body), so the prompt asks for a white outline and no
   pure black in the sprite. With no crop, the record has no `focus`, and
   `set_banner` takes only an image or words.

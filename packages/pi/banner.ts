@@ -1,6 +1,7 @@
 // pi/banner — `set_banner`, the tool that sets a thread's column banner when
 // the person asks, and the arguments it takes. The host decides and writes
-// (`planAsk`); this only reads the call.
+// (`planAsk`); this only reads the call. Also what a banner's image request
+// adds for OpenRouter (`bannerImageConfig`).
 
 import { blobOfUrl, isSha256, type LaneName, type Sha256 } from "@pineta/core"
 import type { BannerAnswer, BannerAsk } from "@pineta/marginalia"
@@ -34,6 +35,22 @@ export function parseBannerArgs(args: {
     }
   const direction = args.direction?.trim() || null
   return { image, direction }
+}
+
+/**
+ * OpenRouter's `image_config` for a banner, which pi-ai does not send. 1:1
+ * suits every model, since OpenRouter clamps a ratio to what the model has.
+ * A Recraft model is also given the black background that the prompt asks
+ * for and the client blends away (ADR-0053). The field is Recraft's alone,
+ * so another model is not sent it. Pure.
+ */
+export function bannerImageConfig(modelId: string): {
+  readonly aspect_ratio: "1:1"
+  readonly background_rgb_color?: readonly [number, number, number]
+} {
+  return modelId.startsWith("recraft/")
+    ? { aspect_ratio: "1:1", background_rgb_color: [0, 0, 0] }
+    : { aspect_ratio: "1:1" }
 }
 
 /** The host's answer, as the agent reads it. */

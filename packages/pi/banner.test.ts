@@ -26,7 +26,7 @@ import {
 } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { createAgent, drawnOf } from "./agent.ts"
-import { BANNER_TOOL, parseBannerArgs } from "./banner.ts"
+import { BANNER_TOOL, bannerImageConfig, parseBannerArgs } from "./banner.ts"
 import {
   SCRIPTED_IMAGE_PNG,
   type ScriptedModel,
@@ -34,6 +34,21 @@ import {
 } from "./scripted.ts"
 
 const SHA = "c".repeat(64) as Sha256
+
+describe("bannerImageConfig", () => {
+  test("a Recraft model is asked for a square on the black the client blends away", () => {
+    expect(bannerImageConfig("recraft/recraft-v4.1-flash")).toEqual({
+      aspect_ratio: "1:1",
+      background_rgb_color: [0, 0, 0],
+    })
+  })
+
+  test("another model is asked only for a square", () => {
+    expect(bannerImageConfig("google/gemini-3.1-flash-image")).toEqual({
+      aspect_ratio: "1:1",
+    })
+  })
+})
 
 describe("parseBannerArgs", () => {
   test("a pasted image by its path or its hash", () => {

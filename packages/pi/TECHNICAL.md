@@ -451,9 +451,15 @@ request returns null, and the offer keeps its placeholder.
 - **The registry does not read `auth.json`.** `images.apiKey(provider)`
   asks the `ModelRuntime` (`getAuth`), which reads `auth.json` and then
   `OPENROUTER_API_KEY`, and the key is passed as `apiKey`.
-- **pi-ai sends no aspect ratio.** `drawBanner` adds OpenRouter's
-  `image_config.aspect_ratio`, always 1:1, in `onPayload`. OpenRouter
-  clamps a ratio to what the model has, and every model has 1:1.
+- **pi-ai sends no `image_config`.** `drawBanner` adds
+  `bannerImageConfig` in `onPayload`: `aspect_ratio` always 1:1, since
+  OpenRouter clamps a ratio to what the model has and every model has 1:1.
+  A `recraft/` model also gets `background_rgb_color: [0, 0, 0]`, the black
+  that the client's `mix-blend-mode: lighten` removes. Only Recraft models
+  take that field, so no other model is sent it. Its `[r, g, b]` shape
+  comes from OpenRouter's image docs as archived in June 2026; the current
+  page no longer documents it, and the model's OpenRouter description
+  names it.
 - **`drawBanner` never rejects**: `drawn` with an image, or `failed` and
   why. The image is fitted in pi, as `read`'s are (`drawnOf` runs
   `prepareImage`), so the host stores what it is given; bytes that are not an

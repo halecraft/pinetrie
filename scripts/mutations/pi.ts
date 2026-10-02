@@ -231,4 +231,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "stores the image it returns",
   },
+  {
+    name: "a Recraft banner is drawn on no set background",
+    file: "packages/pi/banner.ts",
+    from: '  return modelId.startsWith("recraft/")',
+    to: '  return modelId.startsWith("recraft-")',
+    command: unit,
+    expect: "the black the client blends away",
+  },
+  {
+    name: "every model is sent Recraft's background",
+    file: "packages/pi/banner.ts",
+    from: '    : { aspect_ratio: "1:1" }',
+    to: '    : { aspect_ratio: "1:1", background_rgb_color: [0, 0, 0] }',
+    command: unit,
+    expect: "another model is asked only for a square",
+  },
 ]

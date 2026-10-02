@@ -77,7 +77,7 @@ import {
   readLaneTip,
   type SessionDocHandle,
 } from "@pineta/schema"
-import { BANNER_TOOL, bannerTool } from "./banner.ts"
+import { BANNER_TOOL, bannerImageConfig, bannerTool } from "./banner.ts"
 import { DEFAULT_AGENT_DIR, type ModelChoice, setUpModel } from "./config.ts"
 import {
   buildSystemPrompt,
@@ -721,11 +721,9 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
           {
             apiKey,
             timeoutMs: DRAW_TIMEOUT_MS,
-            // pi-ai sends no ratio; OpenRouter clamps it to what the
-            // model has, and every model has 1:1.
             onPayload: payload => ({
               ...(payload as object),
-              image_config: { aspect_ratio: "1:1" },
+              image_config: bannerImageConfig(imageModel.id),
             }),
           },
         )
