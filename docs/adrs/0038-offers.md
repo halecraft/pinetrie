@@ -12,6 +12,9 @@ show each revision's description, files and diffs.
 goes, and the card's text is the intent.
 Amended in place (S51, `PLAN-2026-09-29-offer-start`): the newest copy of
 your `@` in a lane's history supersedes the haves recorded before it.
+Amended in place (S72, `PLAN-2026-10-02-offer-start-beside`): a commit
+delivered beside a lane's tip counts for the history the two share at or
+above the tip's newest copy.
 
 **Context.** Taking a thread's work today rebases your `@` onto the lane's
 merge (ADR-0034). Every turn commit the lane made becomes an ancestor of your
@@ -37,7 +40,8 @@ pull request.
   that you already have, your own commits and every lane commit a take has
   delivered, to the lane's tip. So a branch of a thread you never took
   offers its parent's work with its own, and a branch of one you took offers
-  only its own. A conversation thread has no lane, and a lane working
+  only its own, unless the branch was brought up to date before that take
+  (S72); bringing it up to date again restores it. A conversation thread has no lane, and a lane working
   directly edits your files already; neither has an offer.
   - **It sits on `pineta-onto`, if you set that bookmark, else on your
     `@-`.** Not on `@`: `@` is rewritten on every snapshot, and an offer on
@@ -95,7 +99,11 @@ pull request.
   it was made, so the newest copy in the lane's history supersedes every have
   recorded before it. An older copy's uncommitted edits, or a delivered
   commit, may since have become commits of yours with other content, and
-  starting from both would put the two versions in conflict.
+  starting from both would put the two versions in conflict. *Amended
+  (S72):* a commit delivered beside the lane's tip counts for the history
+  the two share at or above the tip's newest copy, so a branch of a thread
+  taken after the fork offers only its own, unless the branch was brought
+  up to date before that take; bringing it up to date again restores it.
 - **The lane's history stays out of your view.** It is fetched as remote
   bookmarks (`refs/remotes/pineta-<lane>/…`), which jj shows only on request
   and treats as immutable with its builtin config: no remote is added and

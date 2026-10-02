@@ -36,7 +36,7 @@ export async function laneTipIn(
 
 /**
  * Where an offer starts, as commits: which haves the lane tip's history holds,
- * and which hold the tip (read), the ones `startHaves` keeps of them (pure),
+ * and which hold the tip (read), how `startHaves` counts each of them (pure),
  * then `offerStart`'s revset (read). The host's every start comes from here, so an offer is
  * built, followed and split from one start.
  */

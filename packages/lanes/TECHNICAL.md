@@ -320,9 +320,12 @@ containers, disks and the helper.
   first on the start (a merge when the start names several heads), then all
   rebased onto the target. A stack's sources are the agent's revisions.
 - **Where an offer starts is `offerStart`'s revset**: the newest ancestors of
-  the lane's tip you already have, your commits and the `pineta.have`
-  commits (delivered lane commits, copies of your `@`), S48 items 15 to 17.
-  Each have is `present()` (`anyHave`): a copy is made in a lane and reaches
+  the lane's tip you already have, S48 items 15 to 17. That is
+  `heads(::tip & (::(target | held) | (::(beside) & (since)::)))`: your
+  commits, the history of each `pineta.have` commit (delivered lane commits,
+  copies of your `@`) `startHaves` holds, and what each have beside the tip
+  shares with it at or above the newest copy. With nothing beside, the
+  second term is left out. Each have is `present()` (`anyHave`): a copy is made in a lane and reaches
   your repo only with that lane's work, and one never fetched would fail every
   lane's revset.
 - **The newest copy of your `@` in the tip's history supersedes older haves**
@@ -340,6 +343,20 @@ containers, disks and the helper.
   the start below the tip, and the offer was followed into an empty one.
   The start is one commit, never a merge, so the conflict S51 prevents
   cannot come back.
+- **A have beside the tip counts for the history it shares with the tip at
+  or above the tip's newest copy** (`startHaves`' `beside` and `since`,
+  S72). Beside means neither in the tip's history nor holding it: a parent
+  lane's tip, taken after this lane forked. Without the rule, a branch of a
+  thread taken after the fork re-offers the parent's work up to the fork
+  point, and conflicts with what you took. Without the anchor at the newest
+  copy, a branch taken before its lane's update brings the lane's old copy
+  back into the lane's start (S51's conflict). It applies only when the
+  tip's history holds a copy; a lane without one still needs the read of
+  which haves hold the tip. The limit: a branch brought up to date before
+  its parent was taken has a copy newer than its fork point, so the parent's
+  delivered commit adds nothing, and the offer carries the parent's work up
+  to the fork. Bringing the branch up to date again fixes it: the new copy
+  holds what you took.
 - **`startOfOffer` is the one path to a start:** a read of which haves the
   tip's history holds and which hold the tip, `startHaves`, then
   `offerStart`'s revset. The host's
@@ -393,7 +410,10 @@ containers, disks and the helper.
   on it, while a stack's commits are never adopted; an offer built, refreshed, left, repaired,
   taken under your edits and beside them, the next offer, and a stack; an
   offer following a moved tip, your conflicting commit and a moved start,
-  each checked against a fresh build; a review of an offer's commit (its
+  each checked against a fresh build; an offer after you committed your
+  edits differently, after a taken branch that holds the lane's tip, from a
+  branch whose parent was taken after the fork (S72), and from a lane after
+  a branch of it was taken before its update (S51, S72); a review of an offer's commit (its
   description, a rename, names with a space and a quote, and one file's
   diff, never a directory's); and retiring a repo from before offers.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,

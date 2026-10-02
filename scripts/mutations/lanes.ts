@@ -285,16 +285,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an older copy stays a start",
     file: plan,
-    from: "  return newest === null ? held : held.filter(h => h.at >= newest.at)",
-    to: "  return held",
+    from: "  const held = inside.filter(h => h.at >= newest)",
+    to: "  const held = inside",
     command: unit,
     expect: "the newest copy, and what came after it",
   },
   {
     name: "a have before the newest copy stays a start",
     file: plan,
-    from: "  return newest === null ? held : held.filter(h => h.at >= newest.at)",
-    to: '  return newest === null ? held : held.filter(h => h.kind === "delivered" || h.at >= newest.at)',
+    from: "  const held = inside.filter(h => h.at >= newest)",
+    to: '  const held = inside.filter(h => h.kind === "delivered" || h.at >= newest)',
     command: unit,
     expect: "starts at the newest copy (S51)",
   },
@@ -302,7 +302,7 @@ export const mutations: readonly Mutation[] = [
     name: "the host starts from every have",
     file: "packages/lanes/offer.ts",
     from: "  const haves = startHaves(input.haves, new Set(inTip), new Set(holdTip))",
-    to: "  const haves = input.haves",
+    to: "  const haves = { held: input.haves, beside: [], since: [] }",
     command: unit,
     expect: "starts at the newest copy (S51)",
   },
@@ -424,7 +424,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a have that holds the tip is dropped",
     file: "packages/lanes/plan.ts",
-    from: "  if (holding.length > 0) return holding\n",
+    from: "  if (holding.length > 0) return { held: holding, beside: [], since: [] }\n",
     to: "",
     command: unit,
     expect: "a have that holds the tip is kept alone",
@@ -436,6 +436,24 @@ export const mutations: readonly Mutation[] = [
     to: "  const haves = startHaves(input.haves, new Set(inTip), new Set(holdTip.slice(0, 0)))",
     command: unit,
     expect: "a taken branch that holds all its lane's work",
+  },
+  {
+    name: "a delivered commit beside the tip is dropped",
+    file: plan,
+    from: "    since.length === 0 ? [] : haves.filter(h => !inTip.has(h.commit))",
+    to: "    since.length === 0 ? [] : haves.filter(h => !inTip.has(h.commit)).slice(0, 0)",
+    command: unit,
+    expect: "a branch of a thread taken after the fork offers only its own",
+  },
+  {
+    name: "a commit beside the tip counts below the newest copy",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  const shared = `(::(${besides}) & (${above})::)`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "  const shared = `::(${besides})`",
+    command: unit,
+    expect: "a branch taken before its lane's update adds nothing",
   },
   {
     name: "the resolution is not told what the card asked",

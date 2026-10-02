@@ -436,20 +436,34 @@ describe("offers (ADR-0038)", () => {
   const root = "/y"
   const op = (...args: string[]) =>
     `host: jj -R /y --ignore-working-copy --config operation.username=pineta-host ${args.join(" ")}`
-  test("offerStart: your commits, and every commit a have records", () => {
-    expect(offerStart({ tip: C1, target: "@-", haves: [] })).toBe(
+  test("offerStart: your commits, each held have's history, and what a have beside shares above the newest copy", () => {
+    const none = { held: [], beside: [], since: [] }
+    expect(offerStart({ tip: C1, target: "@-", haves: none })).toBe(
       "heads(::c1 & ::(@-))",
     )
+    const c2: HaveRecord = { lane: LANE, commit: C2, kind: "copy", at: 1 }
+    const d: HaveRecord = {
+      lane: LANE,
+      commit: commitId("d"),
+      kind: "delivered",
+      at: 2,
+    }
     expect(
       offerStart({
         tip: C1,
         target: ONTO_BOOKMARK,
-        haves: [
-          { lane: LANE, commit: C2, kind: "copy", at: 1 },
-          { lane: LANE, commit: commitId("d"), kind: "delivered", at: 2 },
-        ],
+        haves: { held: [c2, d], beside: [], since: [c2] },
       }),
     ).toBe("heads(::c1 & ::(pineta-onto | present(c2) | present(d)))")
+    expect(
+      offerStart({
+        tip: C1,
+        target: "@-",
+        haves: { held: [c2], beside: [d], since: [c2] },
+      }),
+    ).toBe(
+      "heads(::c1 & (::(@- | present(c2)) | (::(present(d)) & (present(c2))::)))",
+    )
   })
   test("anyHave: each commit present(), or null for none", () => {
     expect(anyHave([])).toBeNull()
@@ -466,53 +480,82 @@ describe("offers (ADR-0038)", () => {
       kind: HaveRecord["kind"],
       at: number,
     ): HaveRecord => ({ lane: LANE, commit: commitId(commit), kind, at })
-    const kept = (haves: readonly HaveRecord[], inTip: readonly string[]) =>
-      startHaves(haves, new Set(inTip.map(commitId))).map(h => h.commit)
+    const ids = (haves: readonly HaveRecord[]) => haves.map(h => h.commit)
+    const counted = (
+      haves: readonly HaveRecord[],
+      inTip: readonly string[],
+      holdTip: readonly string[] = [],
+    ) => {
+      const s = startHaves(
+        haves,
+        new Set(inTip.map(commitId)),
+        new Set(holdTip.map(commitId)),
+      )
+      return { held: ids(s.held), beside: ids(s.beside), since: ids(s.since) }
+    }
     const c1 = have("c1", "copy", 1)
     const d2 = have("d2", "delivered", 2)
     const c3 = have("c3", "copy", 3)
     const d4 = have("d4", "delivered", 4)
     test.each([
-      ["none in the tip: none kept", [c1, d2], [], []],
-      ["delivered only: all kept", [d2, d4], ["d2", "d4"], ["d2", "d4"]],
+      [
+        "none in the tip, so no copy: none counted",
+        [c1, d2],
+        [],
+        { held: [], beside: [], since: [] },
+      ],
+      [
+        "delivered only: all held",
+        [d2, d4],
+        ["d2", "d4"],
+        { held: ["d2", "d4"], beside: [], since: [] },
+      ],
       [
         "copies and delivered: the newest copy, and what came after it",
         [c1, d2, c3, d4],
         ["c1", "d2", "c3", "d4"],
-        ["c3", "d4"],
+        { held: ["c3", "d4"], beside: [], since: ["c3"] },
       ],
       [
-        "the newest copy outside the tip (a branch forked before its lane's update): the older one kept",
+        "the newest copy outside the tip (a branch forked before its lane's update): the older one held",
         [c1, c3],
         ["c1"],
-        ["c1"],
+        { held: ["c1"], beside: ["c3"], since: ["c1"] },
       ],
       [
-        "a have outside the tip, however new: never kept",
+        "a delivered have beside the tip, with a copy in the tip: beside, above that copy (S72)",
         [c1, d4],
         ["c1"],
-        ["c1"],
+        { held: ["c1"], beside: ["d4"], since: ["c1"] },
       ],
       [
-        "two copies recorded at once: both kept",
+        "haves of both kinds beside the tip: all beside",
+        [c1, d2, c3, d4],
+        ["c3"],
+        { held: ["c3"], beside: ["c1", "d2", "d4"], since: ["c3"] },
+      ],
+      [
+        "no copy in the tip: none beside",
+        [d2, c3, d4],
+        ["d2"],
+        { held: ["d2"], beside: [], since: [] },
+      ],
+      [
+        "two copies recorded at once: both held, both since",
         [c1, have("c1b", "copy", 1)],
         ["c1", "c1b"],
-        ["c1", "c1b"],
+        { held: ["c1", "c1b"], beside: [], since: ["c1", "c1b"] },
       ],
     ] as const)("%s", (_, haves, inTip, expected) => {
-      expect(kept(haves, inTip)).toEqual(expected)
+      expect(counted(haves, inTip)).toEqual(expected)
     })
     test("a have that holds the tip is kept alone, whatever copy is newer", () => {
       // A branch of the lane, taken: its tip descends from this lane's.
       const branch = have("b5", "delivered", 5)
       const c6 = have("c6", "copy", 6)
-      expect(
-        startHaves(
-          [c1, d2, branch, c6],
-          new Set(["c1", "d2", "c6"].map(commitId)),
-          new Set([commitId("b5")]),
-        ).map(h => h.commit),
-      ).toEqual(["b5"])
+      expect(counted([c1, d2, branch, c6], ["c1", "d2", "c6"], ["b5"])).toEqual(
+        { held: ["b5"], beside: [], since: [] },
+      )
     })
   })
   test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {

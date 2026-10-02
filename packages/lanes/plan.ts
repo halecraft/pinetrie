@@ -900,21 +900,26 @@ export const hostOp = (root: string, ...args: string[]): LaneStep =>
 
 /**
  * Where an offer starts, as a revset: the newest ancestors of the lane's tip
- * you already have. That is your commits (`::target`) and the `pineta.have`
- * commits `startHaves` keeps: lane commits a take delivered, and copies of
- * your `@` made in a lane (ADR-0038, S48 items 15 to 17). Without the
- * copies, an offer would hand your own uncommitted edits back to you. Several
- * heads start the offer from their merge.
+ * you already have. That is your commits (`::target`), all the history of
+ * each `held` have, and the history each `beside` have shares with the tip at
+ * or above `since` (`startHaves`). The haves are lane commits a take
+ * delivered, and copies of your `@` made in a lane (ADR-0038, S48 items 15 to
+ * 17). Without the copies, an offer would hand your own uncommitted edits
+ * back to you. Several heads start the offer from their merge.
  */
 export function offerStart(input: {
   readonly tip: CommitId
   readonly target: string
-  readonly haves: readonly HaveRecord[]
+  readonly haves: StartHaves
 }): string {
-  const had = [input.target, anyHave(input.haves)]
-    .filter(r => r !== null)
-    .join(" | ")
-  return `heads(::${input.tip} & ::(${had}))`
+  const { held, beside, since } = input.haves
+  const all = [input.target, anyHave(held)].filter(r => r !== null).join(" | ")
+  const besides = anyHave(beside)
+  const above = anyHave(since)
+  if (besides === null || above === null)
+    return `heads(::${input.tip} & ::(${all}))`
+  const shared = `(::(${besides}) & (${above})::)`
+  return `heads(::${input.tip} & (::(${all}) | ${shared}))`
 }
 
 /**
@@ -925,33 +930,53 @@ export function offerStart(input: {
 export const anyHave = (haves: readonly HaveRecord[]): string | null =>
   haves.length === 0 ? null : haves.map(h => `present(${h.commit})`).join(" | ")
 
+/** The haves an offer starts from (S51, S72). */
+export interface StartHaves {
+  /** In the tip's history, or holding it: all of each one's history is had. */
+  readonly held: readonly HaveRecord[]
+  /**
+   * Beside the tip (neither in its history nor holding it): had only where
+   * it shares the tip's history at or above `since`. Empty when `since` is.
+   */
+  readonly beside: readonly HaveRecord[]
+  /** The newest copies in the tip's history (two when recorded at once). */
+  readonly since: readonly HaveRecord[]
+}
+
 /**
- * The haves an offer can start from, given which of them the lane tip's
- * history holds, and which hold the tip (S51).
+ * The haves an offer starts from, given which of them the lane tip's history
+ * holds, and which hold the tip (S51, S72).
  *
  * A have that holds the tip (a branch of this lane, taken) means you have all
- * the lane holds: those alone are kept, and the offer starts at the tip.
+ * the lane holds: those alone are held, and the offer starts at the tip.
  * Otherwise, a copy of your `@` holds everything you had when it was made, so
  * the newest copy in the tip's history supersedes every have recorded before
  * it: an older copy's uncommitted edits, or a delivered commit, may since
  * have become commits of yours with other content. A start at the tip is one
  * commit, never a merge, so it cannot bring that back.
+ *
+ * A have beside the tip (a parent lane's tip, taken after this lane forked)
+ * shares part of the tip's history, and you have that part, but only at or
+ * above the newest copy: below it are your own commits or an older copy,
+ * which that copy supersedes. A copy beside the tip shares only your own
+ * commits with it, so it is in `beside` but adds nothing.
  */
 export function startHaves(
   haves: readonly HaveRecord[],
   inTip: ReadonlySet<CommitId>,
   holdTip: ReadonlySet<CommitId> = new Set(),
-): readonly HaveRecord[] {
+): StartHaves {
   const holding = haves.filter(h => holdTip.has(h.commit))
-  if (holding.length > 0) return holding
-  const held = haves.filter(h => inTip.has(h.commit))
-  const newest = held
-    .filter(h => h.kind === "copy")
-    .reduce<HaveRecord | null>(
-      (n, h) => (n === null || h.at > n.at ? h : n),
-      null,
-    )
-  return newest === null ? held : held.filter(h => h.at >= newest.at)
+  if (holding.length > 0) return { held: holding, beside: [], since: [] }
+  const inside = haves.filter(h => inTip.has(h.commit))
+  const copies = inside.filter(h => h.kind === "copy")
+  // -Infinity with no copy: then every have in the tip is held.
+  const newest = Math.max(...copies.map(h => h.at))
+  const since = copies.filter(h => h.at === newest)
+  const held = inside.filter(h => h.at >= newest)
+  const beside =
+    since.length === 0 ? [] : haves.filter(h => !inTip.has(h.commit))
+  return { held, beside, since }
 }
 
 /** One revision of an offer: the lane commit whose files it has, and its message. */

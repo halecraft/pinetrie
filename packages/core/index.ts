@@ -657,7 +657,9 @@ export interface BannerRecord {
  * a lane commit a take delivered, or a copy of your `@` made in a lane at a
  * fork or an update. A host-written `pineta.have` value keyed by commit.
  * Where an offer starts is read from these (ADR-0038); the newest copy in a
- * lane's history supersedes the haves recorded before it (`startHaves`, S51).
+ * lane's history supersedes the haves recorded before it (`startHaves`, S51),
+ * and a delivered commit beside a lane's tip counts for the history it
+ * shares with the tip at or above that copy (S72).
  */
 export interface HaveRecord {
   readonly lane: LaneName
