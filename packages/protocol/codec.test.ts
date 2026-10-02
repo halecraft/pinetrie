@@ -19,10 +19,13 @@ import {
 import { test } from "vitest"
 import {
   decodeCommand,
+  decodeKey,
   decodeReply,
   encodeIntent,
+  encodeKey,
   encodeOutcome,
   type Outcome,
+  revOfReply,
 } from "./codec.ts"
 import { OUTCOME_KINDS, reply } from "./messages.ts"
 
@@ -136,7 +139,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       asksAgent: false,
       mentions: [{ kind: "person", name: "bob" }],
       work: { kind: "own" },
-      card: cardId("c-7"),
+      card: { id: cardId("c-7"), seen: "v-1" },
       reserved: null,
     },
     {
@@ -160,6 +163,41 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "offer", lane: laneNameForThread("abc"), action: "take" },
     { kind: "offer", lane: laneNameForThread("abc"), action: "split" },
     { kind: "reserve", lane: NEW_LANE },
+    {
+      kind: "move",
+      move: {
+        card: cardId("c-7"),
+        from: null,
+        to: { kind: "fresh", column: "k-1" },
+      },
+    },
+    {
+      kind: "move",
+      move: {
+        card: cardId("c-7"),
+        from: {
+          kind: "drafting",
+          at: atEntry(entryId("e-5")),
+          lane: laneNameForThread("abc"),
+        },
+        to: {
+          kind: "queued",
+          at: atEntry(entryId("e-5")),
+          lane: laneNameForThread("abc"),
+          seen: "v-2",
+        },
+      },
+    },
+    {
+      kind: "move",
+      move: {
+        card: cardId("c-7"),
+        from: { kind: "drafting", at: atEntry(entryId("e-5")), lane: null },
+        to: null,
+      },
+    },
+    { kind: "set-command", card: cardId("c-7"), command: "bring-up-to-date" },
+    { kind: "set-command", card: cardId("c-7"), command: null },
   ] as const
   for (const intent of intents) {
     assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
@@ -181,6 +219,15 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "taken" },
     { kind: "offered" },
     { kind: "reserved" },
+    { kind: "queued" },
+    { kind: "moved" },
+    {
+      kind: "unmoved",
+      code: "moved",
+      place: { kind: "fresh", column: "k-1" },
+      by: writerId("bea@example.com"),
+    },
+    { kind: "unmoved", code: "gone", place: null, by: null },
     { kind: "refused", code: ERR.ARCHIVED, message: "archived by Bea" },
     { kind: "refused", code: ERR.ROOT_BUSY, message: "busy" },
     { kind: "failed", message: "setParticipantName is not in this port" },
@@ -190,6 +237,37 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
   }
   // A kind added to the wire without a case here fails this, not silence.
   assert.deepEqual(new Set(outcomes.map(o => o.kind)), new Set(OUTCOME_KINDS))
+})
+
+test("a reply carries the places document's rev when its step wrote it; none is null", () => {
+  assert.equal(revOfReply(encodeOutcome("c", { kind: "moved" }, 7)), 7)
+  assert.equal(revOfReply(encodeOutcome("c", { kind: "named" })), null)
+})
+
+test('decodeKey: "" is none; anything malformed is undefined', () => {
+  assert.equal(decodeKey(""), null)
+  for (const bad of [
+    "{",
+    "7",
+    '{"kind":"pinned"}',
+    '{"kind":"queued","at":"e-1","lane":"main"}',
+  ])
+    assert.equal(decodeKey(bad), undefined)
+  assert.deepEqual(decodeKey(encodeKey({ kind: "fresh", column: "k" })), {
+    kind: "fresh",
+    column: "k",
+  })
+})
+
+test("decode: a move needs its card and a place; set-command a known command", () => {
+  for (const wire of [
+    { kind: "move", cardId: "", to: encodeKey({ kind: "fresh", column: "k" }) },
+    { kind: "move", cardId: "c-1" },
+    { kind: "move", cardId: "c-1", to: "{" },
+    { kind: "set-command", cardId: "c-1", mode: "pull" },
+    { kind: "set-command", cardId: "" },
+  ])
+    assert.equal(decodeCommand(wire).kind, "refused")
 })
 
 test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
@@ -213,12 +291,18 @@ test("decode: notes on messages are gone (ADR-0048): a note command is an unknow
     )
 })
 
-test("decode: a chat's card is its id, or none", () => {
+test("decode: a chat's card is its id and its text's version, or none", () => {
   const chat = (cardId: string) =>
-    decodeCommand({ kind: "chat", text: "hi", mode: "branch", cardId })
+    decodeCommand({
+      kind: "chat",
+      text: "hi",
+      mode: "branch",
+      cardId,
+      seen: "v",
+    })
   const card = (i: ReturnType<typeof chat>) =>
     "kind" in i && i.kind === "chat" ? i.card : "refused"
-  assert.equal(card(chat("c-1")), "c-1")
+  assert.deepEqual(card(chat("c-1")), { id: "c-1", seen: "v" })
   assert.equal(card(chat("")), null)
   assert.equal(card(chat("  ")), null)
 })

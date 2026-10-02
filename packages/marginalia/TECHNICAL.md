@@ -52,7 +52,7 @@ are the only code that builds or reads the shape.
   | compelled `reply`, raced | `conflict` | `conflict` | `conflict` |
   | `queue` (the host's take) | as `reply` | as `reply` | as `reply` when only cards are queued; `busy` while it runs |
 
-  `busy` writes nothing: the sender's client queues its card (ADR-0048).
+  `busy` writes nothing: the dispatcher queues the chat's card in the same step, and answers `queued` (ADR-0059).
   `queue` is the host's own mode (`PlanMode`; a client sends a `ChatMode`), for a card it takes, which heads the queue
   it is in: so only a run makes the lane busy, and a race does not count.
   | `branch` | plain: `appendToTree` at `at`; compelled: `createAndRun` at `at` | the same: a branch never continues a lane | the same |
@@ -131,29 +131,40 @@ are the only code that builds or reads the shape.
   (`LEGACY_OUTBOX_NAMESPACE`) are discarded, each with its text for the
   log: nothing shows them.
 
-# Cards (`card.ts`, ADR-0048)
+# Cards (`card.ts`, ADR-0048, ADR-0059)
 
-What you type is a card. Its record is in the cards document (`CardsDoc` in
-`@pineta/schema`) and its text in a `TextDoc`, both written by clients; the
-host writes only to spend a card, when it is sent, to take a queued one, to
-write back one it could not send, and to sweep empty ones when it starts.
-This module decodes a record, and decides where a card sits and which
-queued card is taken next.
+What you type is a card. Its text is a `TextDoc`, written by clients; its
+record is in the places document (`PlacesDoc` in `@pineta/schema`), which
+only the host writes. This module decodes a record, decides where a card
+sits, which moves the host accepts, which queued card is taken next, and
+which are swept.
 
 - **The stored record is flat strings**, "" for none (`encodeCard`,
-  `decodeCard`, total). A drafting or queued card's `at` is never the root;
-  a fresh card's `column` is never ""; a queued card has its `lane`,
-  `order` and `by`, and `seen`, its text's version as its queuer had it
-  (S72). `order`, `by`, `command` and `unsent` came later:
-  missing, they read as "". A `command` this build does not know makes the
-  card malformed. Clients write a card whole once and only its fields after,
-  since a whole-record write concurrent with a spend brings the card back
-  (S58); `queueFields` and `unqueueFields` are those writes, as values. An
-  unqueue writes only `kind`: the card goes back to where it was queued. A
-  drafting card whose lane fails `isLaneName` keeps its place with no lane:
-  dropped, it would be swept with its text at the next start
-  (`planCardSweep`), and the lane only says which thread it follows. A
-  queued card with such a lane does not decode: its lane is where it runs.
+  `decodeCard`, total). Where a card is goes through core's `placeFields`
+  and `placeOfFields`, which the wire's key codec uses too, so the two
+  cannot drift. A drafting or queued card's `at` is never the root; a fresh
+  card's `column` is never ""; a queued card has its `lane`, `order` and
+  `by`, and `seen`, its text's version as its queuer had it (S72), which
+  the queue's key carries from the client. Every field is required: the
+  host writes a record whole. A
+  `command` this build does not know makes the card malformed. A drafting
+  card whose lane fails `isLaneName` keeps its place with no lane: dropped,
+  it would be swept with its text at the next start (`planCardSweep`), and
+  the lane only says which thread it follows. A queued card with such a
+  lane does not decode: its lane is where it runs.
+- **A handoff is a compare-and-set on where a card is** (`planMove`, pure):
+  accepted only if the card is still where its sender saw it, its `PlaceKey`
+  (`sameKey`, over its kind, `at` and lane). A key leaves out a queue's
+  order and queuer, so a reorder does not make someone else's unqueue fail. No `from` creates the card, its
+  sender its owner; no `to` removes it, and only a fresh column's card can be
+  removed. Queueing puts it after the lane's last card, queued by the
+  sender, and clears why it was not sent before; below the line again, it
+  keeps both. Refusals: `gone` (no record), `moved`, `exists`, `not-fresh`.
+- **The placer is who put the card where it is**: the sender of every
+  accepted move. A write the host makes itself keeps it (`planUnsent`,
+  `planSetCommand`), so a refusal never names the host.
+- **`planMoveCommand`** is a move and the lane to drain: the one the card
+  ends queued on, when it is not running.
 - **A drafting card is resolved, never stored as an end.** `placeEnd` runs
   `threadOf` from where it started and its column's lane, as a reply from
   there would go, so the card follows its thread as the thread grows.
@@ -162,11 +173,11 @@ queued card is taken next.
   fresh column, never another writer's, and the newest of yours there (ids
   are uuidv7), so a card someone unqueued does not take your composer.
 - **The queue is fields, not a list** (S69): `queuedOn(cards, lane)` sorts
-  a lane's queued cards by `order`, then id, so two people queueing at once
-  agree on the order. `orderAfter` keys are fixed-width base-36 integers,
-  started mid-range and stepped, so string order is numeric order and there
-  is room before and between. `planTake` takes nothing while the lane runs,
-  else its top card. `planUnsent` is the whole record a refused take
+  a lane's queued cards by `order`, then id. `orderAfter` keys are
+  fixed-width base-36 integers, started mid-range and stepped, so string
+  order is numeric order and there is room before and between. Only the
+  host assigns them now (`planMove`). `planTake` takes nothing while the
+  lane runs, else its top card. `planUnsent` is the step a refused take
   writes back: drafting where it was queued, saying why, never queued.
 - **`planCardSweep`**: records whose text is empty and that carry no
   command, and stored `card:` documents with no record, a spent or empty
@@ -207,8 +218,9 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   stop, an archive action, a reservation). `archivedAt` maps that entry to its root's
   record. One rule, applied by the host before dispatch
   (`apps/pineta/host/commands/index.ts`); `sendChat` needs no
-  copy, since only the `chat` command calls it. A card is written by clients
-  and so passes no gate, but the composer in an archived root is read-only.
+  copy, since only the `chat` command calls it. A card's move writes at its
+  target's `at`, so no card moves into an archived root; a command on a
+  card writes nowhere, and the take's own gate stops a card with one.
 - **Yjs writes are not refused for archiving.** A card's text in an archived
   root stays writable to the host's policy (a refused write cannot be
   recovered from, S28); the composer there is read-only.

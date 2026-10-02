@@ -109,6 +109,7 @@ async function run(check: Checks["check"]): Promise<void> {
       {
         id: queued,
         owner: iu.writer,
+        placer: iu.writer,
         place: { kind: "drafting", at: at(replyId), lane: lane ?? null },
         command: null,
         unsent: null,
@@ -144,6 +145,7 @@ async function run(check: Checks["check"]): Promise<void> {
       {
         id: drafted,
         owner: iu.writer,
+        placer: iu.writer,
         place: {
           kind: "drafting",
           at: at(idOfIn(ih.doc, "a green one")),

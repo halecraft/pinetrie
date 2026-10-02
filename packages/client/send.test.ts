@@ -18,7 +18,6 @@ import {
   placeholderWords,
   planSend,
   queuePlace,
-  queues,
   queueWords,
   raceWords,
   type SendPlan,
@@ -87,22 +86,24 @@ describe("settleSend", () => {
       conflict: null,
     })
   })
-  test("spent: written or running; queues: busy; a conflict or a refusal neither", () => {
+  test("spent: written, running, or queued by the host; busy, a conflict, a refusal or a failure not", () => {
     const outcomes = [
       { kind: "appended", id: entryId("e") },
       { kind: "started", runId: runId("r") },
+      { kind: "queued" },
       { kind: "busy" },
       { kind: "conflict", by: null },
       { kind: "refused", code: ERR.REFUSED, message: "no" },
       { kind: "failed", message: "store closed" },
     ] as const
-    expect(outcomes.map(o => [spent(o), queues(o)])).toEqual([
-      [true, false],
-      [true, false],
-      [false, true],
-      [false, false],
-      [false, false],
-      [false, false],
+    expect(outcomes.map(spent)).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
     ])
   })
   test.each([

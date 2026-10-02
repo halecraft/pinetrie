@@ -293,6 +293,7 @@ describe("planIntent", () => {
     const fresh: CardRecord = {
       id: cardId("c-new"),
       owner: ada,
+      placer: ada,
       place: { kind: "drafting", at: where, lane },
       command: null,
       unsent: null,

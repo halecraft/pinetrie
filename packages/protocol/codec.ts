@@ -14,7 +14,8 @@ import {
   ARCHIVE_ACTIONS,
   type ArchiveAction,
   atEntry,
-  type CardId,
+  CARD_COMMANDS,
+  type CardCommand,
   CHAT_MODES,
   type ChatMode,
   cardId,
@@ -24,19 +25,24 @@ import {
   entryId,
   type Intent,
   isLaneName,
+  keyOfFields,
   MAX_TITLE,
+  type MoveRefusal,
   normalizeName,
   OFFER_ACTIONS,
   type OfferAction,
+  type PlaceKey,
   type Position,
   parseMentions,
   parseNewLane,
   parseTitle,
+  placeFields,
   type Refusal,
   ROOT,
   type RunId,
   refused,
   runId,
+  type SentCard,
   type WorkSetting,
   type WriterId,
 } from "@pineta/core"
@@ -47,10 +53,24 @@ export type Outcome =
   | { readonly kind: "started"; readonly runId: RunId }
   | { readonly kind: "appended"; readonly id: EntryId }
   /**
-   * The thread's lane is running, or has cards queued: nothing was written,
-   * and the sender's client queues its card (ADR-0048).
+   * The thread's lane is running, or has cards queued: nothing was written.
+   * A chat sent from a card is queued instead (`queued`).
    */
   | { readonly kind: "busy" }
+  /** The lane was busy, so the host queued the chat's card behind the others (ADR-0059). */
+  | { readonly kind: "queued" }
+  /** A move or a command on a card was carried out (ADR-0059). */
+  | { readonly kind: "moved" }
+  /**
+   * A move the host refused (ADR-0059): why, where the card is now (null
+   * when it is gone), and who put it there.
+   */
+  | {
+      readonly kind: "unmoved"
+      readonly code: MoveRefusal
+      readonly place: PlaceKey | null
+      readonly by: WriterId | null
+    }
   /**
    * Someone took the slot first: `by` is their writer, the sender's own when
    * the host falls back to the lane's asker, or null when no one can be named
@@ -143,8 +163,33 @@ export function decodeCommand(
       asksAgent: wire?.asksAgent === true,
       mentions: parseMentions(body),
       work,
-      card: cardFromWire(text(wire?.cardId)),
+      card: cardFromWire(text(wire?.cardId), text(wire?.seen)),
       reserved: reservedLane,
+    }
+  }
+  if (kind === "move") {
+    const card = text(wire?.cardId)
+    if (card === "")
+      return refused(ERR.UNKNOWN_TARGET, "a move must name its card")
+    const from = decodeKey(text(wire?.from))
+    const to = decodeKey(text(wire?.to))
+    if (from === undefined || to === undefined)
+      return refused(ERR.UNKNOWN_TARGET, "a move names a malformed place")
+    if (from === null && to === null)
+      return refused(ERR.UNKNOWN_TARGET, "a move must name a place")
+    return { kind: "move", move: { card: cardId(card), from, to } }
+  }
+  if (kind === "set-command") {
+    const card = text(wire?.cardId)
+    if (card === "")
+      return refused(ERR.UNKNOWN_TARGET, "a command must name its card")
+    const name = text(wire?.mode)
+    if (name !== "" && !isCardCommand(name))
+      return refused(ERR.UNKNOWN_KIND, `unknown card command: ${name}`)
+    return {
+      kind: "set-command",
+      card: cardId(card),
+      command: name === "" ? null : name,
     }
   }
   if (kind === "reserve") {
@@ -195,9 +240,56 @@ export function decodeCommand(
 const notNewLane = (lane: string): Refusal =>
   refused(ERR.UNKNOWN_TARGET, `not a new thread's lane: ${lane}`)
 
-/** A chat's card on the wire: `""` is none. */
-const cardFromWire = (id: string): CardId | null =>
-  id === "" ? null : cardId(id)
+/** A chat's card on the wire, with its text's version: `""` is none. */
+const cardFromWire = (id: string, seen: string): SentCard | null =>
+  id === "" ? null : { id: cardId(id), seen }
+
+const isCardCommand = (c: string): c is CardCommand =>
+  (CARD_COMMANDS as readonly string[]).includes(c)
+
+/** A place's key -> the wire: its flat fields as JSON, `""` for none. */
+export const encodeKey = (key: PlaceKey | null): string => {
+  if (key === null) return ""
+  const { kind, at, lane, column, seen } = placeFields(key)
+  return JSON.stringify({ kind, at, lane, column, seen })
+}
+
+/**
+ * The wire -> a place's key: null for `""`, undefined for anything
+ * malformed. The flat fields are read by core's `keyOfFields`, as the
+ * places document's are by `placeOfFields`, so the two cannot drift.
+ */
+export function decodeKey(s: string): PlaceKey | null | undefined {
+  if (s === "") return null
+  let value: unknown
+  try {
+    value = JSON.parse(s)
+  } catch {
+    return undefined
+  }
+  if (typeof value !== "object" || value === null) return undefined
+  const v = value as Record<string, unknown>
+  const field = (k: string) =>
+    typeof v[k] === "string" ? (v[k] as string) : ""
+  return keyOfFields({
+    kind: field("kind"),
+    at: field("at"),
+    lane: field("lane"),
+    column: field("column"),
+    order: "",
+    by: "",
+    seen: field("seen"),
+  })
+}
+
+const MOVE_REFUSALS: readonly MoveRefusal[] = [
+  "moved",
+  "gone",
+  "exists",
+  "not-fresh",
+]
+const isMoveRefusal = (c: string): c is MoveRefusal =>
+  (MOVE_REFUSALS as readonly string[]).includes(c)
 
 const isOfferAction = (a: string): a is OfferAction =>
   (OFFER_ACTIONS as readonly string[]).includes(a)
@@ -239,7 +331,8 @@ export function encodeIntent(id: string, intent: Intent): Command {
         lane: intent.lane ?? "",
         asksAgent: intent.asksAgent,
         ...workToWire(intent.work),
-        cardId: intent.card ?? "",
+        cardId: intent.card?.id ?? "",
+        seen: intent.card?.seen ?? "",
         reserved: intent.reserved ?? "",
       })
     case "name":
@@ -269,11 +362,37 @@ export function encodeIntent(id: string, intent: Intent): Command {
       })
     case "reserve":
       return command({ id, kind: "reserve", lane: intent.lane })
+    case "move":
+      return command({
+        id,
+        kind: "move",
+        cardId: intent.move.card,
+        from: encodeKey(intent.move.from),
+        to: encodeKey(intent.move.to),
+      })
+    case "set-command":
+      return command({
+        id,
+        kind: "set-command",
+        cardId: intent.card,
+        mode: intent.command ?? "",
+      })
   }
 }
 
-/** Outcome -> the flat wire reply. */
-export function encodeOutcome(id: string, outcome: Outcome): Reply {
+/**
+ * Outcome -> the flat wire reply. `rev` is the places document's after the
+ * command's step, when the step wrote it or refused a move (ADR-0059).
+ */
+export function encodeOutcome(
+  id: string,
+  outcome: Outcome,
+  rev: number | null = null,
+): Reply {
+  return { ...outcomeToWire(id, outcome), rev: rev ?? 0 }
+}
+
+function outcomeToWire(id: string, outcome: Outcome): Reply {
   switch (outcome.kind) {
     case "started":
       return reply({ id, outcome: "started", runId: outcome.runId })
@@ -299,6 +418,18 @@ export function encodeOutcome(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "offered" })
     case "reserved":
       return reply({ id, outcome: "reserved" })
+    case "queued":
+      return reply({ id, outcome: "queued" })
+    case "moved":
+      return reply({ id, outcome: "moved" })
+    case "unmoved":
+      return reply({
+        id,
+        outcome: "unmoved",
+        errorCode: outcome.code,
+        place: encodeKey(outcome.place),
+        by: outcome.by ?? "",
+      })
     case "refused":
       return reply({
         id,
@@ -341,12 +472,27 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "offered" }
     case "reserved":
       return { kind: "reserved" }
+    case "queued":
+      return { kind: "queued" }
+    case "moved":
+      return { kind: "moved" }
+    case "unmoved":
+      return {
+        kind: "unmoved",
+        code: isMoveRefusal(wire.errorCode) ? wire.errorCode : "gone",
+        place: decodeKey(wire.place) ?? null,
+        by: wire.by === "" ? null : (wire.by as WriterId),
+      }
     case "refused":
       return refused(asErrCode(wire.errorCode), wire.errorMessage)
     case "failed":
       return { kind: "failed", message: wire.errorMessage }
   }
 }
+
+/** A reply's `rev`: the places document's after its step, or null for none. */
+export const revOfReply = (wire: Reply): number | null =>
+  wire.rev > 0 ? wire.rev : null
 
 const positionToWire = (p: Position): string => (p.kind === "root" ? "" : p.id)
 const positionFromWire = (s: string): Position =>

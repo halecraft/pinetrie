@@ -2,7 +2,7 @@
 // (ADR-0048), and who wrote in it.
 //
 // Typed text is the one thing people edit together, so it is a CRDT
-// (ADR-0023); a card's record is in the cards document (`card.ts`). Kyneta gives each peer's
+// (ADR-0023); a card's record is in the places document (`places.ts`). Kyneta gives each peer's
 // Yjs `clientID` from its seat (`yjsClientId`), so the operations in a text
 // say which seat wrote them, and the seat's principal says who that is
 // (ADR-0037). The host writes that down once per seat (`pineta.seat`), so

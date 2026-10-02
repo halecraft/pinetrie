@@ -85,10 +85,10 @@ export const mutations: readonly Mutation[] = [
     expect: "referencedBlobs: chats, tool results",
   },
   {
-    name: "readCards gives an unchanged card a new object",
+    name: "readPlaces gives an unchanged card a new object",
     file: "packages/reads/index.ts",
-    from: "      was !== undefined && was.stored === stored",
-    to: '      was !== undefined && was.stored === "never"',
+    from: "  if (was !== undefined && (was === null || was.id === id)) return was",
+    to: "  if (false) return was",
     command: unit,
     expect: "an unchanged card the same object",
   },

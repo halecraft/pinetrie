@@ -11,8 +11,8 @@ import {
 } from "@pineta/core"
 import { encodeCard } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
-import { readCards } from "@pineta/reads"
-import { beginRun, newCardsDoc } from "@pineta/schema"
+import { readPlaces, readPlacesRev } from "@pineta/reads"
+import { beginRun, newPlacesDoc } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
 import { basics, record } from "./fakes.ts"
@@ -31,7 +31,7 @@ const BEA = writerId("bea@x.io")
 const E1 = entryId("e-1")
 
 const queue = (
-  cards: ReturnType<typeof newCardsDoc>,
+  cards: ReturnType<typeof newPlacesDoc>,
   id: string,
   order: string,
   command: CardCommand | null = null,
@@ -41,6 +41,7 @@ const queue = (
     encodeCard({
       id: cardId(id),
       owner: ADA,
+      placer: ADA,
       place: {
         kind: "queued",
         at: atEntry(E1),
@@ -67,7 +68,7 @@ const takenOf = (top: TakeTop): Taken | null =>
 
 describe("takeTop", () => {
   test("reads the top queued card and deletes its record before it returns", () => {
-    const cards = newCardsDoc()
+    const cards = newPlacesDoc()
     queue(cards, "c-2", "b")
     queue(cards, "c-1", "a")
     const taken = takenOf(
@@ -80,11 +81,23 @@ describe("takeTop", () => {
     )
     expect(taken?.card.id).toBe("c-1")
     expect(taken?.text).toBe("text of c-1")
-    expect(readCards(cards).map(c => c.id)).toEqual(["c-2"])
+    expect(readPlaces(cards).map(c => c.id)).toEqual(["c-2"])
+  })
+
+  test("its removal raises the places document's rev, so a client whose unqueue it beat settles (ADR-0059)", () => {
+    const cards = newPlacesDoc()
+    queue(cards, "c-1", "a")
+    takeTop(
+      cards,
+      LANE,
+      false,
+      held(() => "x"),
+    )
+    expect(readPlacesRev(cards)).toBe(1)
   })
 
   test("takes nothing while the lane runs, or when nothing is queued", () => {
-    const cards = newCardsDoc()
+    const cards = newPlacesDoc()
     queue(cards, "c-1", "a")
     expect(
       takeTop(
@@ -96,10 +109,10 @@ describe("takeTop", () => {
     ).toEqual({
       kind: "idle",
     })
-    expect(readCards(cards)).toHaveLength(1)
+    expect(readPlaces(cards)).toHaveLength(1)
     expect(
       takeTop(
-        newCardsDoc(),
+        newPlacesDoc(),
         LANE,
         false,
         held(() => "x"),
@@ -110,9 +123,10 @@ describe("takeTop", () => {
   })
 
   test("an unqueued card is not taken", () => {
-    const cards = newCardsDoc()
+    const cards = newPlacesDoc()
     queue(cards, "c-1", "a")
-    cards.cards.at("c-1")?.kind.set("drafting")
+    const row = cards.cards()["c-1"]
+    if (row !== undefined) cards.cards.set("c-1", { ...row, kind: "drafting" })
     expect(
       takeTop(
         cards,
@@ -124,7 +138,7 @@ describe("takeTop", () => {
   })
 
   test("a top card whose text the host does not yet hold is behind, and stays: the next waits behind it (S72)", () => {
-    const cards = newCardsDoc()
+    const cards = newPlacesDoc()
     queue(cards, "c-1", "a")
     queue(cards, "c-2", "b")
     const top = takeTop(
@@ -134,12 +148,12 @@ describe("takeTop", () => {
       held(() => "x", ["c-1"]),
     )
     expect(top.kind === "behind" ? top.card.id : top.kind).toBe("c-1")
-    expect(readCards(cards).map(c => c.id)).toEqual(["c-1", "c-2"])
+    expect(readPlaces(cards).map(c => c.id)).toEqual(["c-1", "c-2"])
   })
 })
 
 test("takenChat: the queuer's message, in the queue's mode, from the card", () => {
-  const cards = newCardsDoc()
+  const cards = newPlacesDoc()
   queue(cards, "c-1", "a")
   const taken = takenOf(
     takeTop(
@@ -154,7 +168,7 @@ test("takenChat: the queuer's message, in the queue's mode, from the card", () =
     at: atEntry(E1),
     mode: "queue",
     lane: LANE,
-    card: "c-1",
+    card: { id: "c-1", seen: "" },
     mentions: [{ kind: "agent" }],
   })
 })
@@ -211,11 +225,11 @@ describe("drain", () => {
       undefined,
       ["c-1"],
     )
-    queue(b.cards, "c-1", "a")
-    queue(b.cards, "c-2", "b")
+    queue(b.places, "c-1", "a")
+    queue(b.places, "c-2", "b")
     await drain(deps, LANE)
     expect(events).toEqual(["hydrate c-1,c-2", "behind c-1"])
-    expect(readCards(b.cards)).toHaveLength(2)
+    expect(readPlaces(b.places)).toHaveLength(2)
   })
 
   test("loads every queued text first, then sends in order until one starts a run", async () => {
@@ -226,9 +240,9 @@ describe("drain", () => {
         { kind: "started", runId: runId("r-1") },
       ],
     )
-    queue(b.cards, "c-1", "a")
-    queue(b.cards, "c-2", "b")
-    queue(b.cards, "c-3", "c")
+    queue(b.places, "c-1", "a")
+    queue(b.places, "c-2", "b")
+    queue(b.places, "c-3", "c")
     await drain(deps, LANE)
     expect(events).toEqual([
       "hydrate c-1,c-2,c-3",
@@ -237,21 +251,21 @@ describe("drain", () => {
       "send c-2: @agent second",
       "destroy c-2",
     ])
-    expect(readCards(b.cards).map(c => c.id)).toEqual(["c-3"])
+    expect(readPlaces(b.places).map(c => c.id)).toEqual(["c-3"])
   })
 
   test("takes nothing while the lane runs", async () => {
     const { b, events, deps } = setUp({ "c-1": "first" }, [])
-    queue(b.cards, "c-1", "a")
+    queue(b.places, "c-1", "a")
     beginRun(b.doc, LANE, runId("r-0"))
     await drain(deps, LANE)
     expect(events).toEqual(["hydrate c-1"])
-    expect(readCards(b.cards)).toHaveLength(1)
+    expect(readPlaces(b.places)).toHaveLength(1)
   })
 
   test("a card queued while texts load is loaded before it is taken", async () => {
     const { b, events, deps } = setUp({ "c-1": "first", "c-2": "second" }, [])
-    queue(b.cards, "c-1", "a")
+    queue(b.places, "c-1", "a")
     const hydrate = deps.texts.hydrate
     let once = false
     const late: TakeDeps = {
@@ -259,7 +273,7 @@ describe("drain", () => {
       texts: {
         hydrate: async ids => {
           await hydrate(ids)
-          if (!once) queue(b.cards, "c-2", "b")
+          if (!once) queue(b.places, "c-2", "b")
           once = true
         },
         textNow: id => deps.texts.textNow(id),
@@ -282,8 +296,8 @@ describe("drain", () => {
     const { b, events, deps } = setUp({ "c-1": "look", "c-2": "next" }, [
       { kind: "refused", code: ERR.IMAGE_MISSING, message: "no such image" },
     ])
-    queue(b.cards, "c-1", "a")
-    queue(b.cards, "c-2", "b")
+    queue(b.places, "c-1", "a")
+    queue(b.places, "c-2", "b")
     await drain(deps, LANE)
     expect(events).toEqual([
       "hydrate c-1,c-2",
@@ -291,7 +305,7 @@ describe("drain", () => {
       "send c-2: next",
       "destroy c-2",
     ])
-    expect(readCards(b.cards)).toEqual([
+    expect(readPlaces(b.places)).toEqual([
       expect.objectContaining({
         id: "c-1",
         place: { kind: "drafting", at: atEntry(E1), lane: LANE },
@@ -303,9 +317,9 @@ describe("drain", () => {
 
   test("busy under the take: the card goes back on top as it was, and the drain stops", async () => {
     const { b, deps } = setUp({ "c-1": "x" }, [{ kind: "busy" }])
-    queue(b.cards, "c-1", "a")
+    queue(b.places, "c-1", "a")
     await drain(deps, LANE)
-    expect(readCards(b.cards)[0]?.place.kind).toBe("queued")
+    expect(readPlaces(b.places)[0]?.place.kind).toBe("queued")
   })
 
   test("a send that throws writes the card back below the line, saying the host failed, and the next is taken", async () => {
@@ -317,10 +331,10 @@ describe("drain", () => {
         return deps.send(taken)
       },
     }
-    queue(b.cards, "c-1", "a")
-    queue(b.cards, "c-2", "b")
+    queue(b.places, "c-1", "a")
+    queue(b.places, "c-2", "b")
     await drain(throwing, LANE)
-    expect(readCards(b.cards)).toEqual([
+    expect(readPlaces(b.places)).toEqual([
       expect.objectContaining({
         id: "c-1",
         place: { kind: "drafting", at: atEntry(E1), lane: LANE },
@@ -336,7 +350,7 @@ describe("drain", () => {
 
   test("an empty plain card starts nothing and is spent", async () => {
     const { b, events, deps } = setUp({ "c-1": "  " }, [])
-    queue(b.cards, "c-1", "a")
+    queue(b.places, "c-1", "a")
     await drain(deps, LANE)
     expect(events).toEqual(["hydrate c-1", "destroy c-1"])
   })
@@ -349,7 +363,7 @@ describe("drain: bring up to date (ADR-0055)", () => {
     const { b, events, deps } = setUp({ "c-1": "check yours" }, [], {
       kind: "clean",
     })
-    queue(b.cards, "c-1", "a", CMD)
+    queue(b.places, "c-1", "a", CMD)
     await drain(deps, LANE)
     expect(events).toEqual([
       "hydrate c-1",
@@ -361,14 +375,14 @@ describe("drain: bring up to date (ADR-0055)", () => {
 
   test("clean with no text: the update alone, and no run", async () => {
     const { b, events, deps } = setUp({ "c-1": "" }, [], { kind: "clean" })
-    queue(b.cards, "c-1", "a", CMD)
+    queue(b.places, "c-1", "a", CMD)
     await drain(deps, LANE)
     expect(events).toEqual(["hydrate c-1", `update by ${BEA}: `, "destroy c-1"])
   })
 
   test("nothing new: the text alone", async () => {
     const { b, events, deps } = setUp({ "c-1": "go on" }, [])
-    queue(b.cards, "c-1", "a", CMD)
+    queue(b.places, "c-1", "a", CMD)
     await drain(deps, LANE)
     expect(events.slice(2)).toEqual(["send c-1: go on", "destroy c-1"])
   })
@@ -383,8 +397,8 @@ describe("drain: bring up to date (ADR-0055)", () => {
         message,
       },
     )
-    queue(b.cards, "c-1", "a", CMD)
-    queue(b.cards, "c-2", "b")
+    queue(b.places, "c-1", "a", CMD)
+    queue(b.places, "c-2", "b")
     await drain(deps, LANE)
     expect(events).toEqual([
       "hydrate c-1,c-2",
@@ -392,17 +406,17 @@ describe("drain: bring up to date (ADR-0055)", () => {
       "destroy c-1",
       "start pineta.land",
     ])
-    expect(readCards(b.cards).map(c => c.id)).toEqual(["c-2"])
+    expect(readPlaces(b.places).map(c => c.id)).toEqual(["c-2"])
   })
 
   test("refused: back below the line with its command, saying why, and the next card is taken", async () => {
     const { b, events, deps } = setUp({ "c-1": "x", "c-2": "next" }, [], {
       refused: "the lane has no copy of its own",
     })
-    queue(b.cards, "c-1", "a", CMD)
-    queue(b.cards, "c-2", "b")
+    queue(b.places, "c-1", "a", CMD)
+    queue(b.places, "c-2", "b")
     await drain(deps, LANE)
-    expect(readCards(b.cards)).toEqual([
+    expect(readPlaces(b.places)).toEqual([
       expect.objectContaining({
         id: "c-1",
         command: CMD,
@@ -423,9 +437,9 @@ describe("drain: bring up to date (ADR-0055)", () => {
         },
       },
     }
-    queue(b.cards, "c-1", "a", CMD)
+    queue(b.places, "c-1", "a", CMD)
     await drain(throwing, LANE)
-    expect(readCards(b.cards)[0]).toMatchObject({
+    expect(readPlaces(b.places)[0]).toMatchObject({
       command: CMD,
       unsent: "the host failed: jj broke",
     })
@@ -437,9 +451,9 @@ describe("drain: bring up to date (ADR-0055)", () => {
       [{ kind: "refused", code: ERR.REFUSED, message: "pi refused" }],
       { kind: "clean" },
     )
-    queue(b.cards, "c-1", "a", CMD)
+    queue(b.places, "c-1", "a", CMD)
     await drain(deps, LANE)
-    expect(readCards(b.cards)[0]).toMatchObject({
+    expect(readPlaces(b.places)[0]).toMatchObject({
       command: null,
       unsent: "pi refused",
     })

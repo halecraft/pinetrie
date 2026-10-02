@@ -4,7 +4,7 @@
 // The facts the host also decides from (the tree, rules, names, references)
 // are read by `@pineta/reads`, shared with the host, so a composer cannot
 // promise what the host will not do. This only gathers them. Lanes are read
-// with the cards document, a second one, by `readLanes` in `App`.
+// with the cards (`session.cards`), read on their own, by `readLanes` in `App`.
 // Which streams are drawn is `liveWork` (`live.ts`), over the stream records
 // alone: a stream's text is read where it is drawn, so a delta does not
 // re-run this (S55).

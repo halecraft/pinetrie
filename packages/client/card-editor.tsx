@@ -33,7 +33,6 @@ import {
   type EditorState,
   type EditorStep,
   editorState,
-  isRedo,
   startText,
 } from "./card-state.ts"
 import {
@@ -60,7 +59,6 @@ import {
   type ComposerMode,
   placeholderWords,
   planSend,
-  queues,
   queueWords,
   type Reader,
   sendable,
@@ -114,8 +112,8 @@ export interface Where {
  * and says so (`conflict`), and the sender chooses: queue, or branch here.
  * Either way, and after a refusal, the card is still there: nothing is put
  * back, because nothing was taken away. A send to a busy lane, or of a card
- * with a command, queues the card instead: this client writes its place,
- * and the host takes it in turn (ADR-0048, ADR-0055).
+ * with a command, queues the card instead: this client asks the host to, and
+ * the host takes it in turn (ADR-0055, ADR-0059).
  */
 export function CardEditor(p: {
   session: SessionClient
@@ -173,9 +171,7 @@ export function CardEditor(p: {
   const { session, card, prefill, pending } = p
   const box = useRef<HTMLTextAreaElement>(null)
   const [state, setState] = useState<EditorState>(() =>
-    card === undefined
-      ? { kind: "local", last: null }
-      : { kind: "bound", card: card.id },
+    card === undefined ? { kind: "local" } : { kind: "bound", card: card.id },
   )
   // The state as the handlers last left it, read synchronously between renders.
   const current = useRef(state)
@@ -254,6 +250,7 @@ export function CardEditor(p: {
               id: next.state.card,
               owner: session.writer,
               place: p.place,
+              placer: session.writer,
               command: null,
               unsent: null,
             },
@@ -266,11 +263,6 @@ export function CardEditor(p: {
           break
         case "detach":
           unbind()
-          break
-        case "redo":
-          // The card comes back as its record does, and `found` binds it.
-          if (next.state.kind === "local" && next.state.last !== null)
-            void session.undoFor(next.state.last).redo()
           break
       }
     return next
@@ -294,18 +286,6 @@ export function CardEditor(p: {
       step({ kind: "gone" })
     }
   }, [card?.id])
-  // A redo from the Edit menu or a touch keyboard, in a box holding no card.
-  // A native listener: React's `onBeforeInput` carries no `inputType`.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once; `step` reads refs
-  useEffect(() => {
-    const el = box.current
-    if (el === null) return
-    const onBeforeInput = (e: InputEvent) => {
-      if (isRedo(e) && step({ kind: "redo" }).claims) e.preventDefault()
-    }
-    el.addEventListener("beforeinput", onBeforeInput)
-    return () => el.removeEventListener("beforeinput", onBeforeInput)
-  }, [])
   // Unbound on unmount. StrictMode mounts twice, so the handle is cleared
   // too: the second mount binds again.
   useEffect(
@@ -348,10 +328,7 @@ export function CardEditor(p: {
       ...(plan.createsLane && choice !== null ? { work: choice } : {}),
       ...(from === null ? {} : { card: from }),
     })
-    step({
-      kind: "settled",
-      spent: spent(outcome) || (queues(outcome) && queueHere(from)),
-    })
+    step({ kind: "settled", spent: spent(outcome) })
     const settled = settleSend(outcome, message, p.reader)
     setConflict(settled.conflict)
     setStatus(settled.status)
@@ -536,11 +513,6 @@ export function CardEditor(p: {
         }}
         onKeyDown={e => {
           if (e.nativeEvent.isComposing) return
-          // Bound, `attach` takes the undo keys, and the step claims none.
-          if (isRedo(e) && step({ kind: "redo" }).claims) {
-            e.preventDefault()
-            return
-          }
           // While commands are offered, the keys move through them.
           if (highlighted !== undefined) {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {

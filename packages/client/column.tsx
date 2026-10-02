@@ -49,7 +49,7 @@ import type { ReadOnly } from "./app-view.ts"
 import type { FoldMemory } from "./ask-fold.ts"
 import { askWords, DENSITIES, type Density, densityWords } from "./ask-words.ts"
 import { CardEditor, QueuedCardEditor } from "./card-editor.tsx"
-import { alreadySentWords } from "./card-words.ts"
+import { refusalWords } from "./card-words.ts"
 import {
   AGENT_MARK,
   bannerUrl,
@@ -318,11 +318,12 @@ export function Column(p: ColumnProps) {
   // The cards queued for this thread's lane, above the line, in the order the
   // host takes them (ADR-0048).
   const queued = lane.kind === "lane" ? queuedOn(p.cards, lane.name) : []
-  // Your unqueues here that lost: the host had taken the card (S69).
-  const sentAnyway = useSyncExternalStore(
-    p.session.alreadySent.subscribe,
-    p.session.alreadySent.current,
-  ).filter(s => lane.kind === "lane" && s.lane === lane.name)
+  // Your moves here the host refused: an unqueue it had taken the card
+  // before (S69), or a move someone else made first (ADR-0059).
+  const refused = useSyncExternalStore(
+    p.session.refusals.subscribe,
+    p.session.refusals.current,
+  ).filter(r => lane.kind === "lane" && r.lane === lane.name)
   const reader = { me: p.session.writer, nameOf: p.nameOf }
   // Whether this column's next send would create a lane: the composer's to
   // decide, as it is typed.
@@ -421,6 +422,7 @@ export function Column(p: ColumnProps) {
         id: newCardId(),
         owner: p.session.writer,
         place,
+        placer: p.session.writer,
         command: null,
         unsent: null,
       },
@@ -668,9 +670,9 @@ export function Column(p: ColumnProps) {
                 session={p.session}
               />
             ))}
-            {sentAnyway.map(s => (
-              <div className="already-sent" key={s.card}>
-                {alreadySentWords(s.by, reader)}
+            {refused.map(r => (
+              <div className="refused-move" key={r.card}>
+                {refusalWords(r, reader)}
               </div>
             ))}
           </div>

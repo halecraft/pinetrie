@@ -15,9 +15,9 @@ import {
 import { scriptedModel } from "@pineta/pi"
 import { SESSION_DOC_ID } from "@pineta/protocol/messages"
 import {
-  readCards,
   readLanes,
   readParticipantNames,
+  readPlaces,
   readStops,
   readTreeIndex,
 } from "@pineta/reads"
@@ -78,7 +78,7 @@ async function run(check: Checks["check"]): Promise<void> {
     let th = await open(() => {})
     const tidle = () => waitFor(() => idleNow(th), 60_000)
     const ttree = () => readTreeIndex(th.doc)
-    const tlane = () => readLanes(th.doc, ttree(), readCards(th.cards))[0]
+    const tlane = () => readLanes(th.doc, ttree(), readPlaces(th.places))[0]
     // Every open stream at each change of the host's document.
     const watched: ReturnType<typeof readStreams>[] = []
     const watch = () =>
@@ -227,7 +227,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // host leaves and a starting one clears (`clearStreams`).
     const before = {
       entries: Object.keys(th.doc.entries()).length,
-      lanes: readLanes(th.doc, ttree(), readCards(th.cards)).map(
+      lanes: readLanes(th.doc, ttree(), readPlaces(th.places)).map(
         l => `${l.name}@${l.tip}`,
       ),
       names: [...readParticipantNames(th.doc).values()].sort(),
@@ -242,6 +242,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           id: held,
           owner: u.writer,
+          placer: u.writer,
           place: { kind: "drafting", at: where, lane: l6.name },
           command: null,
           unsent: null,
@@ -252,7 +253,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await waitFor(
         () =>
           th.cardText(held) === heldText &&
-          readCards(th.cards).some(
+          readPlaces(th.places).some(
             c => c.id === held && c.place.kind === "queued",
           ),
         5_000,
@@ -296,7 +297,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     const after = {
       entries: Object.keys(th.doc.entries()).length - 1,
-      lanes: readLanes(th.doc, ttree(), readCards(th.cards)).map(
+      lanes: readLanes(th.doc, ttree(), readPlaces(th.places)).map(
         l => `${l.name}@${l.tip}`,
       ),
       names: [...readParticipantNames(th.doc).values()].sort(),

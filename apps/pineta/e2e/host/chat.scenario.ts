@@ -8,7 +8,7 @@
 
 import { subscribe } from "@kyneta/schema"
 import { type EntryId, projectTranscript, ROOT } from "@pineta/core"
-import { readCards, readLanes, readTreeIndex } from "@pineta/reads"
+import { readLanes, readPlaces, readTreeIndex } from "@pineta/reads"
 import { readStreams } from "@pineta/schema"
 import type { Checks } from "../checks.ts"
 import { idleNow, join, suiteModel, waitFor, withHost } from "../harness.ts"
@@ -43,7 +43,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await client.chat("hello", ROOT, START_AGENT)
       await idle()
       unsample()
-      const lane = readLanes(host.doc, tree(), readCards(host.cards))[0]
+      const lane = readLanes(host.doc, tree(), readPlaces(host.places))[0]
       const first = shape(lane?.tip ?? null)
       check(
         "the thread reads the message, then the agent's reply",
@@ -75,10 +75,11 @@ async function run(check: Checks["check"]): Promise<void> {
         at(one.kind === "appended" ? one.id : null),
       )
       await idle()
-      const asked = readLanes(host.doc, tree(), readCards(host.cards)).find(l =>
-        projectTranscript(tree(), l.tip).some(m =>
-          m.text.includes("who told us"),
-        ),
+      const asked = readLanes(host.doc, tree(), readPlaces(host.places)).find(
+        l =>
+          projectTranscript(tree(), l.tip).some(m =>
+            m.text.includes("who told us"),
+          ),
       )
       const given =
         projectTranscript(tree(), asked?.tip ?? null).at(-1)?.text ?? ""

@@ -44,6 +44,7 @@ const ada = writerId("ada@x.test")
 const card: CardRecord = {
   id: cardId("c"),
   owner: ada,
+  placer: ada,
   place: { kind: "drafting", at, lane },
   command: "bring-up-to-date",
   unsent: null,

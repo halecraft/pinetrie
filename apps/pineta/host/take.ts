@@ -1,23 +1,24 @@
 // host/take — taking a lane's queued cards, top first (ADR-0048, ADR-0055).
 //
-// Clients queue and unqueue cards; the host takes them, and only when the
-// lane is not running, since a lane is never written while it runs (S21).
-// The take is where the cards people still edit meet the tree.
+// People queue and unqueue cards through handoffs (ADR-0059); the host takes
+// them, and only when the lane is not running, since a lane is never written
+// while it runs (S21). The take is where the cards people still edit meet
+// the tree.
 
 import { type CardId, type LaneName, parseMentions } from "@pineta/core"
 import {
-  encodeCard,
   planTake,
   planUnsent,
   type QueuedCard,
   queuedOn,
 } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
-import { readCards, readRunning, readThreadName } from "@pineta/reads"
-import type { CardsDocHandle } from "@pineta/schema"
+import { readPlaces, readRunning, readThreadName } from "@pineta/reads"
+import type { PlacesDocHandle } from "@pineta/schema"
 import { type Basics, messageOf } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { Chat } from "./commands/chat.ts"
+import { applyPlaceStep } from "./places.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -35,26 +36,26 @@ export type TakeTop =
 
 /**
  * Take a lane's top queued card: read that it is queued and on top, read its
- * text, and delete its record. Synchronous, so no unqueue can land between
- * the read and the delete: an unqueue the host has seen means the card is not
- * taken, and one it has not seen loses (S69, consequence 1). Idle when the
- * lane runs or nothing is queued. A card whose text the host does not yet
- * hold as its queuer had it is `behind`, and stays: Kyneta keeps no order
- * between documents, so its record can arrive before its text (S72). `texts`
- * must answer from texts already loaded.
+ * text, and remove its record. Synchronous: an unqueue is a step on the same
+ * `Serial` as the drain, so it runs before the take or after it, never
+ * between, and one after it is refused as gone. Idle when the lane runs or
+ * nothing is queued. A card whose text the host does not yet hold as its
+ * queuer had it is `behind`, and stays: Kyneta keeps no order between
+ * documents, so its record can arrive before its text (S72). `texts` must
+ * answer from texts already loaded.
  */
 export function takeTop(
-  cards: CardsDocHandle,
+  places: PlacesDocHandle,
   lane: LaneName,
   running: boolean,
   texts: Pick<CardPort, "textNow" | "holds">,
 ): TakeTop {
-  const step = planTake(readCards(cards), lane, running)
+  const step = planTake(readPlaces(places), lane, running)
   if (step.kind === "idle") return { kind: "idle" }
   const { card } = step
   if (!texts.holds(card.id, card.place.seen)) return { kind: "behind", card }
   const text = texts.textNow(card.id)
-  cards.cards.delete(card.id)
+  applyPlaceStep(places, { kind: "remove", id: card.id })
   return { kind: "taken", taken: { card, text } }
 }
 
@@ -67,12 +68,12 @@ export const takenChat = (taken: Taken): Chat => ({
   asksAgent: false,
   mentions: parseMentions(taken.text),
   work: null,
-  card: taken.card.id,
+  card: { id: taken.card.id, seen: taken.card.place.seen },
   reserved: null,
 })
 
 export interface TakeDeps {
-  readonly basics: Pick<Basics, "doc" | "cards" | "log">
+  readonly basics: Pick<Basics, "doc" | "places" | "log">
   readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds" | "destroy">
   readonly work: Pick<LaneWork, "prepareUpdate">
   readonly start: Runs["start"]
@@ -87,14 +88,14 @@ export interface TakeDeps {
  * left. Each card's text is loaded before the take, so the take reads it
  * whole. A taken card is spent once its message is written or running;
  * one that could not be sent goes back below the line, saying why
- * (`planUnsent`, S69 answer 5). A run's end, startup and a change to the
- * cards document each drain again.
+ * (`planUnsent`, S69 answer 5). A run's end, startup and a move that queues
+ * a card on an idle lane each drain again.
  */
 export async function drain(deps: TakeDeps, lane: LaneName): Promise<void> {
-  const { doc, cards } = deps.basics
+  const { doc, places } = deps.basics
   const loaded = new Set<CardId>()
   for (;;) {
-    const loading = queuedOn(readCards(cards), lane)
+    const loading = queuedOn(readPlaces(places), lane)
       .map(c => c.id)
       .filter(id => !loaded.has(id))
     if (loading.length > 0) {
@@ -103,7 +104,7 @@ export async function drain(deps: TakeDeps, lane: LaneName): Promise<void> {
       continue
     }
     // No await between the check above and the take.
-    const top = takeTop(cards, lane, readRunning(doc, lane), deps.texts)
+    const top = takeTop(places, lane, readRunning(doc, lane), deps.texts)
     if (top.kind === "idle") return
     // The queue waits for its top card: those behind it keep their turn.
     if (top.kind === "behind") return deps.behind(top.card)
@@ -157,7 +158,7 @@ async function carryOut(
       return sent.kind === "started" ? "ran" : "next"
     case "busy":
       // A run started under the take: the card goes back on top, as it was.
-      deps.basics.cards.cards.set(card.id, encodeCard(sending))
+      applyPlaceStep(deps.basics.places, { kind: "write", record: sending })
       return "ran"
     case "refused":
       unsent(deps, sending, sent.message)
@@ -176,8 +177,8 @@ async function carryOut(
 
 /** Write a card the host could not send back below the line, whole, saying why. */
 function unsent(deps: TakeDeps, card: QueuedCard, reason: string): void {
-  const { doc, cards, log } = deps.basics
-  cards.cards.set(card.id, planUnsent(card, reason))
+  const { doc, places, log } = deps.basics
+  applyPlaceStep(places, planUnsent(card, reason))
   log(
     `[host] ${readThreadName(doc, card.place.lane)}: a queued card was not sent: ${reason}`,
   )

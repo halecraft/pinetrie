@@ -10,8 +10,8 @@ export const CONTROL_TOPIC = "pineta.control"
 export const SESSION_DOC_ID = "pineta:session"
 /** Who is here, and what each person reads and types: ephemeral, never stored (ADR-0024). */
 export const PRESENCE_DOC_ID = "pineta:presence"
-/** Every card's record (ADR-0048): written by clients, and by the host only to take one, write back one it could not send, or sweep. */
-export const CARDS_DOC_ID = "pineta:cards"
+/** Where every card is (ADR-0059): written only by the host, through handoffs. */
+export const PLACES_DOC_ID = "pineta:places"
 
 /**
  * The host's principal. Kyneta issues each peer its id (its seat), so a client
@@ -42,6 +42,11 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     action: `take`, `split`, `squash`, `describe` or `refresh`.
  *   - `reserve` asks the host to name the thread whose lane will be `lane`,
  *     a new id the sender's column made, before the lane exists (ADR-0057).
+ *   - `move` hands the card `cardId` from the place `from` to the place
+ *     `to` (ADR-0059), each an encoded key, `""` for none: no `from`
+ *     creates the card, and no `to` removes it.
+ *   - `set-command` sets the card `cardId`'s command to `mode`, or
+ *     clears it with `""` (ADR-0055).
  */
 export const COMMAND_KINDS = [
   "chat",
@@ -51,6 +56,8 @@ export const COMMAND_KINDS = [
   "mark",
   "offer",
   "reserve",
+  "move",
+  "set-command",
 ] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -72,7 +79,10 @@ export interface Command {
    * root. Only `codec.ts` interprets this; nothing past it sees `""`.
    */
   readonly parentId: string
-  /** `chat`: `reply` or `branch`; `archive` and `offer`: the action; `""` otherwise. */
+  /**
+   * `chat`: `reply` or `branch`; `archive` and `offer`: the action;
+   * `set-command`: the command; `""` otherwise.
+   */
   readonly mode: string
   /** `chat`: the lane the sender's column is bound to, or `""`. */
   readonly lane: string
@@ -86,8 +96,14 @@ export interface Command {
   readonly workDir: string
   /** `archive`: the root; `mark`: the entry. Separate from `parentId` on purpose. */
   readonly targetId: string
-  /** `chat`: the card its text was sent from, or `""` (ADR-0048). */
+  /** `chat`: the card its text was sent from, or `""` (ADR-0048); `move`, `set-command`: the card. */
   readonly cardId: string
+  /** `chat`: the card's text version as the sender had it (S72), or `""`. */
+  readonly seen: string
+  /** `move`: where the sender saw the card, an encoded key, or `""` to create it. */
+  readonly from: string
+  /** `move`: where it goes, an encoded key, or `""` to remove it. */
+  readonly to: string
   /**
    * `chat`: the lane id the sender's column reserved, or `""`: what a lane
    * it creates is called (ADR-0057). Apart from `lane`, which decides where
@@ -113,6 +129,9 @@ export const OUTCOME_KINDS = [
   "taken",
   "offered",
   "reserved",
+  "moved",
+  "queued",
+  "unmoved",
   "refused",
   "failed",
 ] as const
@@ -127,10 +146,19 @@ export interface Reply {
   /** Set only when a chat message was appended: its entry id. */
   readonly entryId: string
   /**
-   * `conflict`: the writer id of who took the slot, or "" when none is known
-   * or for any other outcome. The client names it, and can tell it is itself.
+   * `conflict`: the writer id of who took the slot; `unmoved`: who put the
+   * card where it is now. "" when none is known, or for any other outcome.
+   * The client names it, and can tell it is itself.
    */
   readonly by: string
+  /** `unmoved`: why (a `MoveRefusal`), in `errorCode`; and where the card is now, an encoded key, or `""` when it is gone. */
+  readonly place: string
+  /**
+   * The places document's `rev` after the command's step, when the step
+   * wrote it or refused a move; 0 otherwise (ADR-0059). A client draws its
+   * move until its copy reaches it.
+   */
+  readonly rev: number
 }
 
 /**
@@ -151,6 +179,9 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   targetId: "",
   cardId: "",
   reserved: "",
+  seen: "",
+  from: "",
+  to: "",
 })
 
 export const EMPTY_REPLY: Reply = Object.freeze({
@@ -161,6 +192,8 @@ export const EMPTY_REPLY: Reply = Object.freeze({
   errorMessage: "",
   entryId: "",
   by: "",
+  place: "",
+  rev: 0,
 })
 
 export const command = (fields: Partial<Command>): Command => ({

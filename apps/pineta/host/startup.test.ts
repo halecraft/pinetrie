@@ -12,8 +12,9 @@ import {
   LEGACY_OUTBOX_NAMESPACE,
   SEAT_NAMESPACE,
 } from "@pineta/marginalia"
+import { readPlaces, readPlacesRev } from "@pineta/reads"
 import {
-  newCardsDoc,
+  newPlacesDoc,
   physicalKey,
   readValues,
   writeLaneTip,
@@ -45,7 +46,7 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
   cards: record<StartupDeps["cards"]>({
     texts: async () => [],
     stored: async () => [],
-    remove: async () => {},
+    destroyDocs: async () => {},
   }).port,
   ...over,
 })
@@ -53,12 +54,13 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
 test("recover resumes each interrupted lane before it settles the others, and names lanes first", async () => {
   const LANE = laneNameForThread("0123456789abcdef")
   const OTHER = laneNameForThread("fedcba9876543210")
-  const cardsDoc = newCardsDoc()
-  cardsDoc.cards.set(
+  const placesDoc = newPlacesDoc()
+  placesDoc.cards.set(
     "c-1",
     encodeCard({
       id: cardId("c-1"),
       owner: writerId("ada@x.io"),
+      placer: writerId("ada@x.io"),
       place: {
         kind: "queued",
         at: atEntry(entryId("e-1")),
@@ -74,7 +76,7 @@ test("recover resumes each interrupted lane before it settles the others, and na
   const events: string[] = []
   await recover(
     deps({
-      basics: basics(undefined, cardsDoc),
+      basics: basics(undefined, placesDoc),
       agent: agentPort({
         interrupted: async () => {
           events.push("interrupted")
@@ -132,18 +134,19 @@ test("recover deletes what an older host held in its outbox, logging each one's 
 })
 
 test("recover sweeps empty cards, texts no record names, and seats no text names (ADR-0048)", async () => {
-  const cardsDoc = newCardsDoc()
-  const b = basics(undefined, cardsDoc)
+  const placesDoc = newPlacesDoc()
+  const b = basics(undefined, placesDoc)
   const card = (id: string) =>
     encodeCard({
       id: cardId(id),
       owner: writerId("ada@x.io"),
+      placer: writerId("ada@x.io"),
       place: { kind: "drafting", at: atEntry(entryId("e-1")), lane: null },
       command: null,
       unsent: null,
     })
-  cardsDoc.cards.set("c-full", card("c-full"))
-  cardsDoc.cards.set("c-empty", card("c-empty"))
+  placesDoc.cards.set("c-full", card("c-full"))
+  placesDoc.cards.set("c-empty", card("c-empty"))
   for (const clientId of [11, 22])
     putValue(b.doc, {
       namespace: SEAT_NAMESPACE,
@@ -161,13 +164,15 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
       { id: cardId("c-empty"), text: "", clients: [] },
     ],
     stored: async () => ["card:c-full", "card:c-empty", "card:c-gone"],
-    remove: async () => {},
+    destroyDocs: async () => {},
   })
   await recover(deps({ basics: b, agent: agent.port, cards: cards.port }))
-  expect(cards.calls.find(c => c.method === "remove")?.args[0]).toEqual({
-    records: ["c-empty"],
-    docs: ["card:c-empty", "card:c-gone"],
-  })
+  expect(readPlaces(placesDoc).map(c => c.id)).toEqual(["c-full"])
+  expect(readPlacesRev(placesDoc)).toBe(1)
+  expect(cards.calls.find(c => c.method === "destroyDocs")?.args[0]).toEqual([
+    "card:c-empty",
+    "card:c-gone",
+  ])
   expect(
     agent.calls.filter(c => c.method === "removeSeat").map(c => c.args[0]),
   ).toEqual([22])

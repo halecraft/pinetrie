@@ -20,12 +20,12 @@ import {
 import { hostOps, startOfOffer } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
 import {
-  readCards,
   readHaves,
   readLandings,
   readLanes,
   readNames,
   readOffers,
+  readPlaces,
   readProject,
   readRevisions,
   readTreeIndex,
@@ -101,20 +101,20 @@ async function mainSection(check: Checks["check"]): Promise<void> {
   const laneWith = (text: string) => {
     const id = idOf(text)
     const index = tree()
-    return readLanes(wh.doc, index, readCards(wh.cards)).find(
+    return readLanes(wh.doc, index, readPlaces(wh.places)).find(
       l => id !== null && ancestry(index, l.tip).path.includes(id),
     )
   }
   const tipOf = (text: string) => laneWith(text)?.tip ?? null
   const laneTip = (lane: LaneName) =>
-    readLanes(wh.doc, tree(), readCards(wh.cards)).find(l => l.name === lane)
+    readLanes(wh.doc, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
   /** Every tool result's text in a lane's thread, oldest first. */
   const toolResults = (lane: LaneName | undefined): string[] => {
     if (lane === undefined) return []
     const index = tree()
     const tip =
-      readLanes(wh.doc, index, readCards(wh.cards)).find(l => l.name === lane)
+      readLanes(wh.doc, index, readPlaces(wh.places)).find(l => l.name === lane)
         ?.tip ?? null
     const onPath = new Set(ancestry(index, tip).path)
     return Object.values(readEntries(wh.doc))
@@ -522,7 +522,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       lane === undefined
         ? ""
         : `pineta-offer/${readNames(wh.doc).get(lane) ?? ""}`
-    const allNamed = readLanes(wh.doc, tree(), readCards(wh.cards)).every(l =>
+    const allNamed = readLanes(wh.doc, tree(), readPlaces(wh.places)).every(l =>
       names.has(l.name),
     )
     check(

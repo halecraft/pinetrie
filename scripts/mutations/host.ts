@@ -171,8 +171,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "takeTop deletes after a microtask",
     file: "apps/pineta/host/take.ts",
-    from: "  cards.cards.delete(card.id)",
-    to: "  queueMicrotask(() => cards.cards.delete(card.id))",
+    from: '  applyPlaceStep(places, { kind: "remove", id: card.id })',
+    to: '  queueMicrotask(() => applyPlaceStep(places, { kind: "remove", id: card.id }))',
     command: unit,
     expect:
       "reads the top queued card and deletes its record before it returns",
@@ -276,16 +276,15 @@ export const mutations: readonly Mutation[] = [
     to: "  if (docId === PRESENCE_DOC_ID) return false",
     command: unit,
     expect:
-      "acceptsWrite: the session is the host's; presence is each client's",
+      "acceptsWrite: the session and the places are the host's; presence is each client's",
   },
   {
     name: "the host accepts session writes",
     file: "apps/pineta/host/policy.ts",
-    from: "  if (docId === SESSION_DOC_ID) return false",
-    to: "  if (docId === SESSION_DOC_ID) return undefined",
+    from: "  if (docId === SESSION_DOC_ID || docId === PLACES_DOC_ID) return false",
+    to: "  if (docId === PLACES_DOC_ID) return false",
     command: unit,
-    expect:
-      "acceptsWrite: the session is the host's; presence is each client's",
+    expect: "acceptsWrite: the session and the places are the host's",
   },
   {
     name: "the host shares every command Line with every client",
@@ -339,8 +338,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host skips the archive gate for chat",
     file: "apps/pineta/host/commands/index.ts",
-    from: "    if (archived !== null) return archived",
-    to: '    if (archived !== null && intent.kind !== "chat") return archived',
+    from: "    if (archived !== null) return settled(archived)",
+    to: '    if (archived !== null && intent.kind !== "chat") return settled(archived)',
     command: unit,
     expect: "a chat in an archived root is refused",
   },
@@ -403,7 +402,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the sweep reads no typed texts",
     file: "apps/pineta/host/housekeeping.ts",
-    from: "  const texts = (await input.texts()).map(t => t.text)",
+    from: "  const texts = (await input.texts(ids)).map(t => t.text)",
     to: "  const texts: string[] = []",
     command: unit,
     expect: "an image only a card's text shows is kept past its grace",
@@ -419,7 +418,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a throwing command gets no reply",
     file: "apps/pineta/host/commands/index.ts",
-    from: '        return { kind: "failed", message: messageOf(error) }',
+    from: '        return settled({ kind: "failed", message: messageOf(error) })',
     to: "        throw error",
     command: unit,
     expect: "a command that throws is answered failed",
@@ -644,10 +643,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "acceptsWrite refuses card documents",
     file: "apps/pineta/host/policy.ts",
-    from: "  if (docId === CARDS_DOC_ID || cardIdOfDoc(docId) !== undefined) return true",
-    to: "  if (docId === CARDS_DOC_ID || cardIdOfDoc(docId) !== undefined) return false",
+    from: "  if (cardIdOfDoc(docId) !== undefined) return true",
+    to: "  if (cardIdOfDoc(docId) !== undefined) return false",
     command: unit,
-    expect: "cards are written by clients",
+    expect: "cards' texts are written by clients",
   },
   {
     name: "resolveDoc leaves a card's text to Kyneta's default",
@@ -655,7 +654,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (cardIdOfDoc(docId) !== undefined) return "text"',
     to: '  if (cardIdOfDoc(docId) === "never") return "text"',
     command: unit,
-    expect: "resolveDoc: the cards document",
+    expect: "resolveDoc: a card's text, a tab's undo stack",
   },
   {
     name: "the startup sweeps nothing",
@@ -684,8 +683,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a reservation of a lane pi holds is answered reserved",
     file: "apps/pineta/host/commands/index.ts",
-    from: '        return (await deps.names.reserve(intent.lane)) === "held"',
-    to: '        return (await deps.names.reserve(intent.lane)) === "known"',
+    from: '          (await deps.names.reserve(intent.lane)) === "held"',
+    to: '          (await deps.names.reserve(intent.lane)) === "known"',
     command: unit,
     expect: "a reservation is answered reserved, and refused",
   },
@@ -748,16 +747,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher never spends a chat's card",
     file: "apps/pineta/host/commands/index.ts",
-    from: "          await deps.cards.spend(intent.card)",
-    to: "          void intent.card",
+    from: "          return settled(sent, await cardCommands.spend(card.id))",
+    to: "          return settled(sent)",
     command: unit,
     expect: "a chat command spends its card once written",
   },
   {
     name: "the dispatcher spends a refused chat's card",
     file: "apps/pineta/host/commands/index.ts",
-    from: "        if (intent.card !== null && spendsCard(sent))",
-    to: "        if (intent.card !== null)",
+    from: "        if (spendsCard(sent))\n",
+    to: '        if (sent.kind !== "busy")\n',
     command: unit,
     expect: "a chat command spends its card once written",
   },
@@ -772,7 +771,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the take skips the archive gate",
     file: "apps/pineta/host/commands/index.ts",
-    from: '        refuseInArchive(doc, cards, () =>\n          chat.at.kind === "root" ? null : chat.at.id,\n        ) ??',
+    from: '        refuseInArchive(doc, places, () =>\n          chat.at.kind === "root" ? null : chat.at.id,\n        ) ??',
     to: "        null ??",
     command: unit,
     expect: "a taken card in an archived root is refused",
@@ -801,5 +800,45 @@ export const mutations: readonly Mutation[] = [
     // tsc names no failing check (`failingChecks`): with typecheck clean,
     // any error is the mutant's.
     command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  {
+    name: "the host accepts a client's write to the places (unit)",
+    file: "apps/pineta/host/policy.ts",
+    from: "  if (docId === SESSION_DOC_ID || docId === PLACES_DOC_ID) return false",
+    to: "  if (docId === SESSION_DOC_ID) return false",
+    command: unit,
+    expect: "acceptsWrite: the session and the places are the host's",
+  },
+  {
+    name: "a removal leaves the places document's rev behind",
+    file: "apps/pineta/host/places.ts",
+    from: "    d.rev.set(rev)",
+    to: '    if (step.kind === "write") d.rev.set(rev)',
+    command: unit,
+    expect: "applyPlaceStep: one rev per write and per removal",
+  },
+  {
+    name: "a refused move names no placer",
+    file: "apps/pineta/host/commands/cards.ts",
+    from: "          by: step.now?.placer ?? null,",
+    to: "          by: null,",
+    command: unit,
+    expect: "a move someone else made first",
+  },
+  {
+    name: "a busy chat's card is not queued",
+    file: "apps/pineta/host/commands/cards.ts",
+    from: '      if (step.kind !== "write") return null',
+    to: "      return null",
+    command: unit,
+    expect: "its card is queued behind the others",
+  },
+  {
+    name: "a removed card keeps its text",
+    file: "apps/pineta/host/commands/cards.ts",
+    from: '    if (step.kind === "remove") await deps.cards.destroy(step.id)',
+    to: "",
+    command: unit,
+    expect: "a removal destroys the text after the record",
   },
 ]

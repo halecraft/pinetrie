@@ -30,12 +30,7 @@ import {
   rootWork,
   summarizeRoots,
 } from "@pineta/core"
-import {
-  readCards,
-  readLanes,
-  readParticipantNames,
-  readTreeIndex,
-} from "@pineta/reads"
+import { readLanes, readParticipantNames, readTreeIndex } from "@pineta/reads"
 import {
   type ComponentProps,
   useCallback,
@@ -45,6 +40,7 @@ import {
   useReducer,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react"
 import { placement } from "./align.ts"
 import { appView, type ReadOnly, readOnlyWords, tabRail } from "./app-view.ts"
@@ -241,9 +237,13 @@ export function App({
     stops,
     digests,
   } = useSelector(doc, readSessionFacts)
-  // Every card's record (ADR-0048): a second document, read on its own. An
-  // unchanged card keeps its record object (`readCards`).
-  const cards = useSelector(session.cards, readCards)
+  // Every card's record (ADR-0059): the host's places, with this tab's moves
+  // drawn over them until its copy holds them. An unchanged card keeps its
+  // record object (`readPlaces`).
+  const cards = useSyncExternalStore(
+    session.cards.subscribe,
+    session.cards.current,
+  )
   // Each lane, with its queue from the cards (ADR-0048): read again on every
   // change to the session, as a run's start or end is one, and to the cards.
   const lanes = useSelector(

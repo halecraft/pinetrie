@@ -57,7 +57,7 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     "Cmd+Z undoes your last run of typing, and Cmd+Shift+Z redoes it",
     "a sent card leaves the box empty, and a tab switch does not bring it back",
     "Cmd+Z after a send changes nothing",
-    "Cmd+Z past a card's creation removes it, and Cmd+Shift+Z in its box brings it back",
+    "Cmd+Z past a card's creation empties it and keeps its record, and Cmd+Shift+Z in its box brings its text back",
     "a new branch's text is kept across a tab switch",
     "closing a new branch that holds text asks first, and discarding removes its card",
     "a card of yours with text marks its root's tab and its thread's end on the rail",

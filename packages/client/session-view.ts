@@ -16,7 +16,9 @@ import {
   type ChatMode,
   type EntryId,
   type Intent,
+  keyOf,
   type LaneName,
+  type Move,
   type OfferAction,
   type Position,
   parseMentions,
@@ -25,28 +27,24 @@ import {
   writerOfPrincipal,
 } from "@pineta/core"
 import {
-  encodeCard,
-  orderAfter,
-  queuedOn,
-  queueFields,
-  type StoredCardFields,
-  unqueueFields,
-} from "@pineta/marginalia"
-import { decodeReply, encodeIntent, type Outcome } from "@pineta/protocol/codec"
+  decodeReply,
+  encodeIntent,
+  type Outcome,
+  revOfReply,
+} from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
 import {
-  CARDS_DOC_ID,
   HOST_PRINCIPAL,
+  PLACES_DOC_ID,
   PRESENCE_DOC_ID,
   type Reply,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
-import { readCards } from "@pineta/reads"
+import { readPlaces, readPlacesRev } from "@pineta/reads"
 import {
-  CardsDoc,
-  type CardsDocHandle,
   cardDocId,
   cardIdOfDoc,
+  PlacesDoc,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
@@ -59,7 +57,17 @@ import {
   type TextDocHandle,
   textVersion,
 } from "@pineta/schema"
-import { alreadySent, hostLetGo, spentCards } from "./card-state.ts"
+import {
+  answerOf,
+  type MovesEvent,
+  movesStep,
+  NO_MOVES,
+  type Pending,
+  type Refusal,
+  withPending,
+} from "./card-moves.ts"
+import { hostLetGo, spentCards } from "./card-state.ts"
+import { type SnapshotStore, snapshotStore } from "./store.ts"
 
 /**
  * The `WebSocket` constructor to use. The browser supplies the global; Node
@@ -89,20 +97,8 @@ export interface ConnectOptions {
   readonly onChange?: () => void
 }
 
-/** A card this client unqueued that the host had already taken (S69). */
-export interface SentAnyway {
-  readonly card: CardId
-  readonly lane: LaneName
-  /** Who queued it: whose message it was sent as. */
-  readonly by: WriterId
-}
-
-/** What this client's unqueues that lost are, and a way to hear of a new one. */
-export interface AlreadySent {
-  current(): readonly SentAnyway[]
-  /** `listener` hears every change; returns its unsubscribe. */
-  subscribe(listener: () => void): () => void
-}
+/** A value to read, and a way to hear it change: `useSyncExternalStore`'s shape. */
+export type Readable<T> = Pick<SnapshotStore<T>, "current" | "subscribe">
 
 export interface SessionClient {
   /** The email this client connected as. */
@@ -119,10 +115,13 @@ export interface SessionClient {
   /** Who is here (ADR-0024). Write only through the methods below. */
   readonly presence: PresenceDocHandle
   /**
-   * Every card's record (ADR-0048). Read it through `readCards`; write a
-   * card only through the methods below, and its text through its editor.
+   * Every card's record (ADR-0059): the host's, with this tab's moves the
+   * copy does not yet hold drawn over them (`withPending`). The places
+   * document itself is never exposed: a client's write to it is refused, and
+   * the writer's copy then keeps its own value for good (S76). Move a card
+   * only through the methods below, and write its text through its editor.
    */
-  readonly cards: CardsDocHandle
+  readonly cards: Readable<readonly CardRecord[]>
   /**
    * This tab's undo stack, narrowed to one card: undo and redo take only the
    * steps that wrote its text, its creation among them (ADR-0052). The stack
@@ -156,40 +155,40 @@ export interface SessionClient {
    */
   cardText(id: CardId): TextDocHandle
   /**
-   * Create a card holding `text`: its record and its text in one undo step,
-   * so undoing past the first keystroke removes it again.
+   * Create a card holding `text`: its text in one undo step, so undoing past
+   * the first keystroke empties it, and a request that the host place it
+   * (ADR-0059), then one for its command when it has one.
    */
   createCard(card: CardRecord, text: string): void
   /**
-   * Delete a card's record, outside the undo stack: a fresh column's card
-   * discarded with its column, which nothing could show again.
+   * Ask the host to remove a card, outside the undo stack: a fresh column's
+   * card discarded with its column, which nothing could show again.
    */
   discardCard(id: CardId): void
   /**
-   * Queue a card on `lane`, from `at`: after the lane's last queued card,
-   * queued by you, `unsent` cleared. Field writes, outside the undo stack's
-   * gestures: a card's box undoes only its text (ADR-0052).
+   * Ask the host to queue a card on `lane`, from `at`: after the lane's
+   * last queued card, queued by you. Not undoable: a card's box undoes only
+   * its text (ADR-0052).
    */
   queueCard(
     id: CardId,
     where: { readonly lane: LaneName; readonly at: Position },
   ): void
   /**
-   * Take a queued card back below the line: its kind alone is written. The
-   * card is remembered until its fate is seen: taken first, it is in
-   * `alreadySent`.
+   * Ask the host to take a queued card back below the line, where it was
+   * queued. If the host took it first, the refusal says it was sent.
    */
   unqueueCard(
     id: CardId,
     queued: { readonly lane: LaneName; readonly by: WriterId },
   ): void
-  /** Set a card's command, or clear it with null (ADR-0055). */
+  /** Ask the host to set a card's command, or clear it with null (ADR-0055). */
   setCommand(id: CardId, command: CardCommand | null): void
   /**
-   * The cards you unqueued that the host had taken (S69), until your next
-   * send, queue or unqueue in their lane.
+   * Your moves the host refused (ADR-0059), until your next send, queue or
+   * unqueue in their lane.
    */
-  readonly alreadySent: AlreadySent
+  readonly refusals: Readable<readonly Refusal[]>
   /** Hide the root `root` for everyone, or bring it back (ADR-0029). */
   archive(action: ArchiveAction, root: EntryId): Promise<Outcome>
   /** Title the entry `entry`, or clear its title with null (ADR-0045). */
@@ -251,56 +250,34 @@ export async function connectSession(
   )
 
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
-  const cards = exchange.get(CARDS_DOC_ID, CardsDoc)
+  // Never written here: `cards` is how the page reads it (ADR-0059).
+  const places = exchange.get(PLACES_DOC_ID, PlacesDoc)
   // Each card document this client opens is watched until the host destroys
   // it, and then this client's copy is destroyed too, so no step on it stands
-  // and a redo in an emptied box cannot write into it (S64). The host's
+  // and no undo or redo in its box can write into it (S64). The host's
   // `dismiss` leaves a receiver's copy in place.
   const watched = new Map<CardId, () => void>()
   const letGo = new Set<CardId>()
-  // The cards this client unqueued, until their fate is seen, and the ones
-  // whose unqueue lost (S69). An unqueue that won is forgotten at your next
-  // send, queue or unqueue of the card, or in its lane.
-  const unqueued = new Map<CardId, { lane: LaneName; by: WriterId }>()
-  let sentAnyway: readonly SentAnyway[] = []
-  const sentListeners = new Set<() => void>()
-  const setSentAnyway = (next: readonly SentAnyway[]) => {
-    if (next === sentAnyway) return
-    sentAnyway = next
-    for (const listener of sentListeners) listener()
-  }
-  const forgetLane = (lane: LaneName) => {
-    for (const [id, u] of unqueued) if (u.lane === lane) unqueued.delete(id)
-    if (sentAnyway.some(s => s.lane === lane))
-      setSentAnyway(sentAnyway.filter(s => s.lane !== lane))
-  }
   const dropSpent = () => {
-    const spent = spentCards(letGo, c => cards.cards.has(c))
-    const lost = alreadySent(new Set(unqueued.keys()), spent)
-    if (lost.length > 0)
-      setSentAnyway([
-        ...sentAnyway,
-        ...lost.flatMap(card => {
-          const u = unqueued.get(card)
-          unqueued.delete(card)
-          return u === undefined ? [] : [{ card, ...u }]
-        }),
-      ])
-    for (const id of spent) {
+    const held = places.cards()
+    for (const id of spentCards(letGo, c => held[c] !== undefined)) {
       letGo.delete(id)
       void exchange.destroy(cardDocId(id))
     }
   }
-  /** Write some of a card's fields, never the whole record (S58). */
-  const writeFields = (id: CardId, fields: Partial<StoredCardFields>) =>
-    batch(cards, d => {
-      const record = d.cards.at(id)
-      if (record === undefined) return
-      for (const key of Object.keys(fields) as (keyof StoredCardFields)[]) {
-        const value = fields[key]
-        if (value !== undefined) record[key].set(value)
-      }
-    })
+  // The moves this tab sent, and the cards as the page reads them: the
+  // host's records with those moves drawn over them (card-moves.ts).
+  let records = readPlaces(places)
+  const moves = snapshotStore(NO_MOVES)
+  const cards = snapshotStore(withPending(records, NO_MOVES, me))
+  const redraw = () => cards.set(withPending(records, moves.current(), me))
+  const dispatch = (event: MovesEvent) => {
+    moves.set(movesStep(moves.current(), event))
+    redraw()
+  }
+  /** A card as the page reads it now. */
+  const cardNow = (id: CardId): CardRecord | undefined =>
+    cards.current().find(c => c.id === id)
   const hostIn = (states: readonly { peer: { peerId: string } }[]) =>
     states.some(s => s.peer.peerId === host.peerId)
   const cardText = (id: CardId): TextDocHandle => {
@@ -329,7 +306,7 @@ export async function connectSession(
     exchange,
     docId: `undo:${exchange.peerId}`,
     key: "cards",
-    scope: id => id === CARDS_DOC_ID || cardIdOfDoc(id) !== undefined,
+    scope: id => cardIdOfDoc(id) !== undefined,
   })
   const presence = exchange.get(
     PRESENCE_DOC_ID,
@@ -351,29 +328,89 @@ export async function connectSession(
   })()
 
   const unsubscribe = subscribe(doc, () => options.onChange?.())
-  const unsubscribeCards = subscribe(cards, () => {
+  const unsubscribePlaces = subscribe(places, () => {
+    records = readPlaces(places)
+    dispatch({ kind: "changed", rev: readPlacesRev(places) })
     dropSpent()
     options.onChange?.()
   })
+  // A client does not reconnect: once the host has gone, no move of this
+  // tab's will be answered.
+  const unsubscribePeers = exchange.peers.subscribe(() => {
+    if (!exchange.peers.current.has(host.peerId)) dispatch({ kind: "hostLeft" })
+  })
 
   /**
-   * Encode an intent, send it, and resolve with the decoded outcome. The id is
-   * a UUID, because a chat's id is its send id, stored with the message.
+   * Encode an intent, send it, and resolve with the decoded outcome and the
+   * places document's `rev` the reply carries. The id is a UUID, because a
+   * chat's id is its send id, stored with the message.
    */
-  function send(
+  function request(
     intent: Intent,
     id: string = crypto.randomUUID(),
-  ): Promise<Outcome> {
+  ): Promise<{ readonly outcome: Outcome; readonly rev: number | null }> {
     const settled = new Promise<Reply>(resolve => replyWaiters.set(id, resolve))
     sender.send(encodeIntent(id, intent))
-    return settled.then(decodeReply)
+    return settled.then(reply => ({
+      outcome: decodeReply(reply),
+      rev: revOfReply(reply),
+    }))
+  }
+  const send = (intent: Intent, id?: string): Promise<Outcome> =>
+    request(intent, id).then(r => r.outcome)
+
+  /**
+   * Send a request that moves a card: drawn at once as `pending`, until this
+   * tab's copy holds what the host did, and answered as the host answers it.
+   * `lane`: the lane it is queued on or for, whose refusals it clears;
+   * `queuedBy`: who queued the card, when it was queued.
+   */
+  function tracked(
+    intent: Intent,
+    pending: Pending,
+    how: {
+      readonly card: CardId
+      readonly lane: LaneName | null
+      readonly queuedBy: WriterId | null
+    },
+  ): Promise<{ readonly outcome: Outcome; readonly rev: number | null }> {
+    dispatch({ kind: "sent", pending, lane: how.lane })
+    const reply = request(intent, pending.id)
+    void reply.then(({ outcome, rev }) =>
+      dispatch({
+        kind: "answered",
+        id: pending.id,
+        answer: answerOf(outcome, rev, how),
+      }),
+    )
+    return reply
+  }
+
+  /** A move, tracked; with `draft`, a creation, drawn as that record. */
+  function sendMove(
+    move: Move,
+    how: {
+      readonly lane: LaneName | null
+      readonly queuedBy: WriterId | null
+      readonly draft?: CardRecord
+    },
+  ): void {
+    const id = crypto.randomUUID()
+    const answer = { state: "sent" } as const
+    void tracked(
+      { kind: "move", move },
+      how.draft === undefined
+        ? { id, kind: "move", move, answer }
+        : { id, kind: "create", draft: how.draft, answer },
+      { card: move.card, lane: how.lane, queuedBy: how.queuedBy },
+    )
   }
 
   return {
     principal,
     writer: me,
     presence,
-    cards,
+    cards: { current: cards.current, subscribe: cards.subscribe },
     undoFor(id) {
       const docs = [cardDocId(id)]
       return {
@@ -396,23 +433,40 @@ export async function connectSession(
     exchange,
     doc,
     chat(text, at, how = {}) {
-      if (how.card !== undefined) unqueued.delete(how.card)
-      if (how.lane !== undefined) forgetLane(how.lane)
-      return send(
-        {
-          kind: "chat",
-          text,
-          at,
-          mode: how.mode ?? "reply",
-          lane: how.lane ?? null,
-          asksAgent: how.asksAgent === true,
-          mentions: parseMentions(text),
-          work: how.work ?? null,
-          card: how.card ?? null,
-          reserved: how.reserved ?? null,
-        },
-        how.id,
-      )
+      const id = how.id ?? crypto.randomUUID()
+      const card = how.card === undefined ? undefined : cardNow(how.card)
+      const intent: Intent = {
+        kind: "chat",
+        text,
+        at,
+        mode: how.mode ?? "reply",
+        lane: how.lane ?? null,
+        asksAgent: how.asksAgent === true,
+        mentions: parseMentions(text),
+        work: how.work ?? null,
+        // Queued when the lane is busy, it waits for this much text (S72).
+        card:
+          card === undefined
+            ? null
+            : { id: card.id, seen: textVersion(cardText(card.id)) },
+        reserved: how.reserved ?? null,
+      }
+      // A send takes its card out of the composer: drawn gone until the copy
+      // holds what the host did with it, spent or queued.
+      const sent =
+        card === undefined
+          ? request(intent, id)
+          : tracked(
+              intent,
+              {
+                id,
+                kind: "move",
+                move: { card: card.id, from: keyOf(card.place), to: null },
+                answer: { state: "sent" },
+              },
+              { card: card.id, lane: how.lane ?? null, queuedBy: null },
+            )
+      return sent.then(r => r.outcome)
     },
     setName(name) {
       return send({ kind: "name", name })
@@ -425,36 +479,57 @@ export async function connectSession(
     },
     cardText,
     createCard(card, text) {
+      const draft: CardRecord = { ...card, owner: me, placer: me }
       undo.gesture(() => {
-        cards.cards.set(card.id, encodeCard(card))
         cardText(card.id).text.insert(0, text)
       })
+      sendMove(
+        { card: card.id, from: null, to: keyOf(card.place) },
+        { lane: null, queuedBy: null, draft: { ...draft, command: null } },
+      )
+      if (card.command !== null)
+        void send({ kind: "set-command", card: card.id, command: card.command })
     },
     discardCard(id) {
-      cards.cards.delete(id)
+      const card = cardNow(id)
+      if (card === undefined) return
+      sendMove(
+        { card: id, from: keyOf(card.place), to: null },
+        { lane: null, queuedBy: null },
+      )
     },
     queueCard(id, { lane, at }) {
-      unqueued.delete(id)
-      forgetLane(lane)
-      const order = orderAfter(queuedOn(readCards(cards), lane))
+      const card = cardNow(id)
+      if (card === undefined) return
       // The text as this client has it: the host waits for that much (S72).
       const seen = textVersion(cardText(id))
-      writeFields(id, queueFields({ at, lane, by: me, order, seen }))
+      sendMove(
+        {
+          card: id,
+          from: keyOf(card.place),
+          to: { kind: "queued", at, lane, seen },
+        },
+        { lane, queuedBy: null },
+      )
     },
     unqueueCard(id, queued) {
-      forgetLane(queued.lane)
-      unqueued.set(id, queued)
-      writeFields(id, unqueueFields())
+      const card = cardNow(id)
+      if (card === undefined || card.place.kind !== "queued") return
+      sendMove(
+        {
+          card: id,
+          from: keyOf(card.place),
+          to: { kind: "drafting", at: card.place.at, lane: card.place.lane },
+        },
+        { lane: queued.lane, queuedBy: queued.by },
+      )
     },
     setCommand(id, command) {
-      writeFields(id, { command: command ?? "" })
+      void send({ kind: "set-command", card: id, command })
     },
-    alreadySent: {
-      current: () => sentAnyway,
-      subscribe(listener) {
-        sentListeners.add(listener)
-        return () => sentListeners.delete(listener)
-      },
+    refusals: {
+      current: () => moves.current().refusals,
+      subscribe: moves.subscribe,
     },
     offer(lane, action) {
       return send({ kind: "offer", lane, action })
@@ -469,7 +544,8 @@ export async function connectSession(
     async close() {
       try {
         unsubscribe?.()
-        unsubscribeCards?.()
+        unsubscribePlaces?.()
+        unsubscribePeers()
         for (const stop of watched.values()) stop()
         watched.clear()
         undo.dispose()

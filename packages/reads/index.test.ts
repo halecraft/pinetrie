@@ -52,6 +52,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
   const queued = (id: string, order: string, email: string): CardRecord => ({
     id: cardId(id),
     owner: writerId("ada@x.io"),
+    placer: writerId("ada@x.io"),
     place: {
       kind: "queued",
       at: atEntry(entryId("e1")),
@@ -66,6 +67,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
   const drafting: CardRecord = {
     id: cardId("c-0"),
     owner: writerId("cy@x.io"),
+    placer: writerId("cy@x.io"),
     place: { kind: "drafting", at: atEntry(entryId("e1")), lane },
     command: null,
     unsent: null,

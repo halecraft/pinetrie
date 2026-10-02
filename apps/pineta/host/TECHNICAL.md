@@ -11,18 +11,19 @@ wires them.
 | module | owns |
 |---|---|
 | `index.ts` | `startHost`: the store, the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents, lane work and the agent, then the wiring below |
-| `basics.ts` | `Basics` (doc, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
+| `basics.ts` | `Basics` (doc, places, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
+| `places.ts` | `applyPlaceStep`: the one writer of the places document (ADR-0059), which raises its `rev` with every write |
 | `queue.ts` | `createSerial`: the one serial executor, which a shutdown closes |
 | `shutdown.ts` | the order a host stops in (`planShutdown`) |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), and the agent's `onStream` (`streamInto`) |
 | `take.ts` | taking a lane's queued cards (ADR-0048): `takeTop`, and `drain`, which sends each through its command (ADR-0055) |
 | `settle.ts` | what happens between runs: drain, then compact and sweep |
-| `housekeeping.ts` | compacting the session, and deleting images nothing shows |
-| `cards.ts` | the card port (ADR-0048): who wrote in a card, spending or destroying one, loading and reading texts for the take, and every card's text gathered for the sweeps; where the shell opens card documents |
+| `housekeeping.ts` | compacting the session and the places, and deleting images nothing shows |
+| `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the take, and the texts of given cards gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`) |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
-| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, offer); `index.ts` decodes, checks the archive, routes, and sends a taken card behind the same check (`sendTaken`) |
+| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, offer), `cards` (a move, a command, a busy chat's card queued, a sent card spent: ADR-0059); `index.ts` decodes, checks the archive, routes, and sends a taken card behind the same check (`sendTaken`) |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
@@ -120,8 +121,7 @@ text names (`sweepTexts`).
 ## Shutdown
 
 `planShutdown` (`shutdown.ts`) returns the order, and `shutdown()` carries
-it out, each step in its own `try`: `intake` (the cards' watch, seats,
-control), `close` (the host's `Serial` and the offers'), `quiet`, `agent`,
+it out, each step in its own `try`: `intake` (seats, control), `close` (the host's `Serial` and the offers'), `quiet`, `agent`,
 `work` (the containers), `exchange`, `server`.
 
 - **The queues close before `quiet`.** `quiet` waits only for what is queued
@@ -146,20 +146,34 @@ control), `close` (the host's `Serial` and the offers'), `quiet`, `agent`,
 - **A message sent from a card spends it** (ADR-0048): `sendChat` names the
   card's other writers as contributors, through the card port, and spends
   nothing. The dispatcher's `chat` case spends the card when the answer
-  takes its text (`spendsCard`: `appended` or `started`); the take
-  destroys a taken card's text itself, since it deleted the record. The
-  command's text is what is sent: the text its sender saw.
-- **A busy lane answers `busy` and writes nothing.** The sender's client
-  queues its card itself: a card's place is a person's move, and the host
-  writes cards only at the take (ADR-0048).
+  takes its text (`spendsCard`: `appended` or `started`): the record goes,
+  then the text, and the reply carries the places' `rev`. The take destroys
+  a taken card's text itself, since it removed the record. The command's
+  text is what is sent: the text its sender saw.
+- **A busy lane answers a chat from a card `queued`** (ADR-0059): the
+  dispatcher queues the card behind the others in the same step
+  (`queueBusy`), so no other send gets between. A chat with no card, or one
+  whose card the host does not hold, still answers `busy`.
+- **Every write to the places goes through `applyPlaceStep`** (`places.ts`),
+  which raises `rev` in the same batch. A client draws a move it sent until
+  its copy reaches the `rev` the reply carried (`packages/client/card-moves.ts`),
+  so a write that skipped `rev` would leave a move drawn over a record that
+  had changed.
+- **`move` and `set-command` are handoffs** (`commands/cards.ts`): gather
+  the places and whether the lane runs, plan (`planMoveCommand`,
+  `planSetCommand`), then write. An accepted move answers `moved` with its
+  `rev`; a refusal answers `unmoved` with its code, where the card is now,
+  who put it there, and the current `rev`. A move that leaves a card queued
+  on a lane that is not running queues the lane's drain, a voided
+  `serial.run` behind the move's own step.
 
 ## The queue (`take.ts`, ADR-0048, ADR-0055)
 
 - **The take is one synchronous step** (`takeTop`): read that the card is
-  queued and on top, read its text, delete its record. No `await` between,
-  so an unqueue the host has seen means the card is not taken, and one it
-  has not seen loses (S69). The unqueuer's client tells its person "already
-  sent" (`alreadySent` in `packages/client/card-state.ts`).
+  queued and on top, read its text, remove its record (raising `rev`). A
+  move and a drain are steps on one `Serial`, so an unqueue lands before the
+  take or after it, never between: before, the card is not taken; after, the
+  unqueue is refused `gone`, and its client says "already sent" (S69).
 - **`drain` loads each queued card's text before the take** (`hydrate`),
   and checks again after every wait, so a card queued while texts load is
   loaded too. `textNow` then reads a text with no wait.
@@ -181,10 +195,10 @@ control), `close` (the host's `Serial` and the offers'), `quiet`, `agent`,
   An update or a send that throws writes the card back the same way, saying
   the host failed: the take has deleted its record, so nothing else would.
 - **Three things drain a lane:** a run's end (`settle`), startup
-  (`recover`), and a change to the cards document. The watch reads records,
-  never texts, so typing in a card costs it nothing. A lane's drain is queued
-  once until its step starts; a change while it runs queues one more, which
-  finds what the running one missed, or nothing. `runs.start` marks a lane
+  (`recover`), and a move that leaves a card queued on it while it is not
+  running (`queueDrain` in `index.ts`). A lane's drain is queued once until
+  its step starts; a move while it runs queues one more, which finds what the
+  running one missed, or nothing. `runs.start` marks a lane
   running at once (`beginRun`), so a drain behind a started run takes
   nothing.
 - **`executeChat` still checks a new lane's directory and asks pi for the

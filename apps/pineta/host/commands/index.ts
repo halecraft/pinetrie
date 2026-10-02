@@ -12,17 +12,22 @@ import {
 } from "@pineta/protocol/codec"
 import {
   readArchive,
-  readCards,
   readLanes,
   readParticipantNames,
+  readPlaces,
   readTreeIndex,
 } from "@pineta/reads"
-import type { CardsDocHandle, SessionDocHandle } from "@pineta/schema"
+import type { PlacesDocHandle, SessionDocHandle } from "@pineta/schema"
 import { failed, messageOf } from "../basics.ts"
-import type { CardPort } from "../cards.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"
 import { type ArchiveDeps, handleArchive } from "./archive.ts"
+import {
+  type CardCommandDeps,
+  createCardCommands,
+  type Settled,
+  settled,
+} from "./cards.ts"
 import { type Chat, type ChatDeps, sendChat, spendsCard } from "./chat.ts"
 import { actOnOffer, handleStop, type LaneDeps } from "./lane.ts"
 import { handleMark, type MarkDeps } from "./mark.ts"
@@ -36,9 +41,10 @@ export interface CommandDeps {
     Pick<Agent, "setParticipantName">
   readonly work: ChatDeps["work"] & ArchiveDeps["work"] & LaneDeps["work"]
   readonly blobs: ChatDeps["blobs"]
-  readonly cards: ChatDeps["cards"] & Pick<CardPort, "spend">
+  readonly cards: ChatDeps["cards"] & CardCommandDeps["cards"]
   readonly start: ChatDeps["start"]
   readonly names: Pick<Names, "reserve">
+  readonly drain: CardCommandDeps["drain"]
 }
 
 export interface Commands {
@@ -63,7 +69,8 @@ export interface Commands {
 
 export function createCommands(deps: CommandDeps): Commands {
   const { agent } = deps
-  const { doc, cards, newId } = deps.basics
+  const { doc, places, newId } = deps.basics
+  const cardCommands = createCardCommands(deps)
 
   async function handle(
     sender: Pick<ControlSender, "send">,
@@ -71,15 +78,15 @@ export function createCommands(deps: CommandDeps): Commands {
     wire: WireCommand,
   ): Promise<void> {
     const id = typeof wire.id === "string" ? wire.id : ""
-    const outcome = await outcomeOf(writer, wire, id).catch(
-      (error: unknown): Outcome => {
+    const done = await outcomeOf(writer, wire, id).catch(
+      (error: unknown): Settled => {
         const kind = typeof wire.kind === "string" ? wire.kind : "malformed"
         failed(deps.basics, `a ${kind} command`)(error)
-        return { kind: "failed", message: messageOf(error) }
+        return settled({ kind: "failed", message: messageOf(error) })
       },
     )
     // Sent here alone, after the catch: a send that throws gets no second reply.
-    sender.send(encodeOutcome(id, outcome))
+    sender.send(encodeOutcome(id, done.outcome, done.rev))
   }
 
   /** Decode, check and carry out one command, and say what came of it. */
@@ -87,20 +94,20 @@ export function createCommands(deps: CommandDeps): Commands {
     writer: WriterId | undefined,
     wire: WireCommand,
     id: string,
-  ): Promise<Outcome> {
+  ): Promise<Settled> {
     if (writer === undefined)
-      return {
+      return settled({
         kind: "refused",
         code: ERR.INVALID_IDENTITY,
         message: "connect with your email as your principal",
-      }
+      })
 
     const intent = decodeCommand(wire)
-    if (intent.kind === "refused") return intent
-    const archived = refuseInArchive(doc, cards, lanes =>
+    if (intent.kind === "refused") return settled(intent)
+    const archived = refuseInArchive(doc, places, lanes =>
       writesAt(intent, lanes),
     )
-    if (archived !== null) return archived
+    if (archived !== null) return settled(archived)
     switch (intent.kind) {
       case "chat": {
         // The command's id is the send's id: its column finds its message by it.
@@ -110,29 +117,44 @@ export function createCommands(deps: CommandDeps): Commands {
           id === "" ? newId() : id,
           intent,
         )
-        if (intent.card !== null && spendsCard(sent))
-          await deps.cards.spend(intent.card)
-        return sent
+        const card = intent.card
+        if (card === null) return settled(sent)
+        if (spendsCard(sent))
+          return settled(sent, await cardCommands.spend(card.id))
+        if (sent.kind === "busy")
+          return (
+            (await cardCommands.queueBusy(writer, { ...intent, card })) ??
+            settled(sent)
+          )
+        return settled(sent)
       }
+      case "move":
+        return cardCommands.move(writer, intent.move)
+      case "set-command":
+        return cardCommands.setCommand(intent.card, intent.command)
       case "name":
         await agent.setParticipantName(writer, intent.name)
-        return { kind: "named" }
+        return settled({ kind: "named" })
       case "stop":
-        return handleStop(deps, intent.lane, writer)
+        return settled(await handleStop(deps, intent.lane, writer))
       case "archive":
-        return handleArchive(deps, writer, intent)
+        return settled(await handleArchive(deps, writer, intent))
       case "mark":
-        return handleMark(deps, writer, intent)
+        return settled(await handleMark(deps, writer, intent))
       case "offer":
-        return actOnOffer(deps, intent.lane, intent.action, writer)
+        return settled(
+          await actOnOffer(deps, intent.lane, intent.action, writer),
+        )
       case "reserve":
-        return (await deps.names.reserve(intent.lane)) === "held"
-          ? {
-              kind: "refused",
-              code: ERR.LANE_TAKEN,
-              message: "that thread has started",
-            }
-          : { kind: "reserved" }
+        return settled(
+          (await deps.names.reserve(intent.lane)) === "held"
+            ? {
+                kind: "refused",
+                code: ERR.LANE_TAKEN,
+                message: "that thread has started",
+              }
+            : { kind: "reserved" },
+        )
     }
   }
 
@@ -140,7 +162,7 @@ export function createCommands(deps: CommandDeps): Commands {
     handle,
     async sendTaken(writer, sendId, chat) {
       return (
-        refuseInArchive(doc, cards, () =>
+        refuseInArchive(doc, places, () =>
           chat.at.kind === "root" ? null : chat.at.id,
         ) ?? (await sendChat(deps, writer, sendId, chat))
       )
@@ -157,13 +179,13 @@ export function createCommands(deps: CommandDeps): Commands {
  */
 function refuseInArchive(
   doc: SessionDocHandle,
-  cards: CardsDocHandle,
+  places: PlacesDocHandle,
   writes: (lanes: readonly LaneView[]) => EntryId | null,
 ): Outcome | null {
   const archive = readArchive(doc)
   if (archive.size === 0) return null
   const index = readTreeIndex(doc)
-  const at = writes(readLanes(doc, index, readCards(cards)))
+  const at = writes(readLanes(doc, index, readPlaces(places)))
   const record = archivedAt(index, archive, at)
   if (record === null) return null
   const names = readParticipantNames(doc)

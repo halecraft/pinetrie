@@ -3,13 +3,16 @@
 
 import type { LaneName } from "@pineta/core"
 import { readThreadName } from "@pineta/reads"
-import type { CardsDocHandle, SessionDocHandle } from "@pineta/schema"
+import type { PlacesDocHandle, SessionDocHandle } from "@pineta/schema"
 import { SerialClosed } from "./queue.ts"
 
 export interface Basics {
   readonly doc: SessionDocHandle
-  /** Every card's record (ADR-0048): what is queued for each lane. */
-  readonly cards: CardsDocHandle
+  /**
+   * Where every card is (ADR-0059): what is queued for each lane. Written
+   * only through `applyPlaceStep` (`places.ts`).
+   */
+  readonly places: PlacesDocHandle
   readonly log: (message: string) => void
   readonly newId: () => string
   readonly now: () => number

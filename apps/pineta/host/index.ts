@@ -12,7 +12,7 @@ import {
   type Store,
   whenHydrated,
 } from "@kyneta/exchange"
-import { Interpret, Reject, subscribe } from "@kyneta/schema"
+import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
 import type { BlobStore, CardId, LaneName } from "@pineta/core"
 import { userConfigFile } from "@pineta/lanes"
@@ -20,22 +20,21 @@ import {
   decodeBannerConfig,
   decodeCommandRenames,
   decodeDigestConfig,
-  queuedOn,
 } from "@pineta/marginalia"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
 import { Control } from "@pineta/protocol/line"
 import {
-  CARDS_DOC_ID,
   CONTROL_TOPIC,
   HOST_PRINCIPAL,
+  PLACES_DOC_ID,
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
-import { readCards, readRunning } from "@pineta/reads"
+import { readRunning } from "@pineta/reads"
 import {
-  CardsDoc,
-  type CardsDocHandle,
   cardDocId,
+  PlacesDoc,
+  type PlacesDocHandle,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
@@ -139,8 +138,11 @@ export interface RunningHost {
   readonly wsUrl: string
   readonly doc: SessionDocHandle
   readonly presence: PresenceDocHandle
-  /** Every card's record, as the host holds them (ADR-0048). */
-  readonly cards: CardsDocHandle
+  /**
+   * Where every card is, as the host holds it (ADR-0059): for the suites to
+   * read. Only `applyPlaceStep` writes it.
+   */
+  readonly places: PlacesDocHandle
   /** A card's text as the host holds it: for the suites. */
   cardText(id: CardId): string
   readonly agent: Agent
@@ -200,12 +202,10 @@ export async function startHost({
     // A client does not reconnect: a closed channel is a seat that has left,
     // so there is nothing to wait for before its Line goes.
     departureTimeout: 0,
-    // Cards are created by clients (ADR-0048): without this, a card the host
-    // never opened itself would be neither stored nor relayed (S58).
+    // Cards' texts are created by clients (ADR-0048): without this, a text
+    // the host never opened itself would be neither stored nor relayed (S58).
     resolve: docId => {
       switch (resolveDoc(docId)) {
-        case "cards":
-          return Interpret(CardsDoc)
         case "text":
           return Interpret(TextDoc)
         case "reject":
@@ -218,17 +218,18 @@ export async function startHost({
 
   // The session document is BOTH pi's storage and the thing we replicate.
   const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
-  // Clients may write presence and cards, never the session (host/policy.ts).
+  // Clients may write presence and cards' texts, never the session or the
+  // places (host/policy.ts).
   exchange.register(writePolicy)
   // Held here so the host relays it between clients (ADR-0024).
   const presence = exchange.get(PRESENCE_DOC_ID, presenceDoc(presenceDecay))
-  // Every card's record, which clients write (ADR-0048).
-  const cards: CardsDocHandle = exchange.get(CARDS_DOC_ID, CardsDoc)
+  // Where every card is, which only the host writes (ADR-0059).
+  const places: PlacesDocHandle = exchange.get(PLACES_DOC_ID, PlacesDoc)
   // A stored session loads asynchronously; pi must see it before it starts.
   // Only storage is awaited: the host is the authority, with no peer upstream.
   await whenHydrated(doc)
-  await whenHydrated(cards)
-  const basics: Basics = { doc, cards, log, newId, now: Date.now }
+  await whenHydrated(places)
+  const basics: Basics = { doc, places, log, newId, now: Date.now }
 
   // --- where lanes work (ADR-0032, ADR-0034) --------------------------------
   // Lane work is made before the agent, which is made with lane work's
@@ -324,7 +325,7 @@ export async function startHost({
   const hotReload = pauseHotReload({ doc, project: () => work.project })
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
-  const cardPort = startCards({ exchange, store, doc, cards })
+  const cardPort = startCards({ exchange, store, doc })
   const runs = createRuns({ basics, agent, work })
   const commands = createCommands({
     basics,
@@ -334,6 +335,7 @@ export async function startHost({
     cards: cardPort,
     start: runs.start,
     names,
+    drain: lane => queueDrain(lane),
   })
   // Cards whose text the host is waiting for, each once (`behind`).
   const awaiting = new Set<CardId>()
@@ -351,7 +353,7 @@ export async function startHost({
           awaiting.add(card.id)
           void cardPort.whenHolds(card.id, card.place.seen).then(() => {
             awaiting.delete(card.id)
-            watchQueues()
+            queueDrain(card.place.lane)
           })
         },
       },
@@ -375,25 +377,18 @@ export async function startHost({
     banners?.due(lane).catch(failed(basics, "banner"))
     if (prompt !== null) void digests?.ended(prompt, digestFailed(lane))
   })
-  // A card queued on a lane that is not running is taken at once (ADR-0048).
-  // Only the records are watched, never the texts, so typing in a card costs
-  // nothing here. A lane's drain is queued once until its step starts: a
-  // change while it runs queues one more, which finds what that one missed.
+  // A card queued on a lane that is not running is taken at once (ADR-0059):
+  // the move that queued it asks for a drain. A lane's drain is queued once
+  // until its step starts: a move while it runs queues one more, which finds
+  // what that one missed.
   const draining = new Set<LaneName>()
-  const watchQueues = () => {
-    const records = readCards(cards)
-    const lanes = new Set<LaneName>()
-    for (const c of records)
-      if (c.place.kind === "queued") lanes.add(c.place.lane)
-    for (const lane of lanes) {
-      if (draining.has(lane) || readRunning(doc, lane)) continue
-      if (queuedOn(records, lane).length === 0) continue
-      draining.add(lane)
-      void serial.run(async () => {
-        draining.delete(lane)
-        await drain(lane)
-      })
-    }
+  const queueDrain = (lane: LaneName) => {
+    if (draining.has(lane) || readRunning(doc, lane)) return
+    draining.add(lane)
+    void serial.run(async () => {
+      draining.delete(lane)
+      await drain(lane)
+    })
   }
 
   /**
@@ -417,7 +412,6 @@ export async function startHost({
     cards: cardPort,
     ensureNames: names.ensure,
   })
-  const unwatchQueues = subscribe(cards, watchQueues)
   const seats = startSeats({ exchange, basics, serial, agent })
   const control = startControl({
     exchange,
@@ -444,7 +438,7 @@ export async function startHost({
     wsUrl: server.wsUrl,
     doc,
     presence,
-    cards,
+    places,
     cardText: (id: CardId) => exchange.get(cardDocId(id), TextDoc).text(),
     agent,
     key,
@@ -454,7 +448,6 @@ export async function startHost({
       const carry = async (step: ShutdownStep): Promise<void> => {
         switch (step) {
           case "intake":
-            unwatchQueues()
             seats.stop()
             control.stop()
             return

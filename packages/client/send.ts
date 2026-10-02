@@ -24,8 +24,9 @@ import type { Prefill } from "./columns.ts"
  * box was never cleared, and a message the host did not write leaves its card
  * where it was (ADR-0048), a conflict or a refusal such as a root archived a
  * moment before (ADR-0029). A failure leaves the card too, though the host
- * may have written the message before it failed. A `busy` answer queues the
- * card (`queues`).
+ * may have written the message before it failed. A send that found its lane
+ * busy is queued by the host in the same step (`queued`): the card has left
+ * the composer, as a sent one has (ADR-0059).
  */
 export interface SendSettled {
   readonly status: string
@@ -59,17 +60,13 @@ const ordinal = (n: number): string =>
 export const lineWords = (n: number): string => `${ordinal(n + 1)} in line`
 
 /**
- * Whether the host's answer took the card's text: written or running. Then
- * the card is spent, and the box empties.
+ * Whether the host's answer took the card out of the composer: written,
+ * running, or queued behind a busy lane. Then the box empties.
  */
 export const spent = (outcome: Outcome): boolean =>
-  outcome.kind === "appended" || outcome.kind === "started"
-
-/**
- * Whether the host's answer leaves the card to be queued: the lane was busy
- * after all (`busy`), so the sender's client queues it (ADR-0048).
- */
-export const queues = (outcome: Outcome): boolean => outcome.kind === "busy"
+  outcome.kind === "appended" ||
+  outcome.kind === "started" ||
+  outcome.kind === "queued"
 
 export function settleSend(
   outcome: Outcome,
@@ -126,9 +123,9 @@ export function sendable(
  * `placeholderWords` say it.
  */
 /**
- * What a composer's send does: a chat in its mode, or `queue`, which queues
- * the card, by this client, and sends nothing: the host takes it when its
- * lane is free (ADR-0048).
+ * What a composer's send does: a chat in its mode, or `queue`, which asks
+ * the host to queue the card and sends no chat: the host takes it when its
+ * lane is free (ADR-0059).
  */
 export type ComposerMode = ChatMode | "queue"
 

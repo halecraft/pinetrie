@@ -19,11 +19,11 @@ import {
 } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
-  readCards,
   readLaneRecords,
   readLanes,
   readNames,
   readOffers,
+  readPlaces,
   readProject,
   readTreeIndex,
 } from "@pineta/reads"
@@ -283,7 +283,7 @@ async function run(
         const lane = readLanes(
           askHost.doc,
           readTreeIndex(askHost.doc),
-          readCards(askHost.cards),
+          readPlaces(askHost.places),
         )[0]
         await bo.chat(
           "@agent anything new?",

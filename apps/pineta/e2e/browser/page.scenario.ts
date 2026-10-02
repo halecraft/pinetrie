@@ -16,11 +16,11 @@ import {
   writerId,
 } from "@pineta/core"
 import {
-  readCards,
   readLanes,
   readMarks,
   readNames,
   readParticipantNames,
+  readPlaces,
   readTreeIndex,
   readTyping,
 } from "@pineta/reads"
@@ -251,7 +251,7 @@ async function run(check: Checks["check"]): Promise<void> {
         const [lane, ...others] = readLanes(
           host.doc,
           readTreeIndex(host.doc),
-          readCards(host.cards),
+          readPlaces(host.places),
         )
         const laneName =
           lane === undefined || others.length > 0
@@ -718,6 +718,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           id: again,
           owner: other.writer,
+          placer: other.writer,
           place: { kind: "drafting", at: beaEnd, lane: beaLane ?? null },
           command: null,
           unsent: null,
@@ -730,7 +731,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // the check below, not here.
       await waitFor(
         () =>
-          readCards(host.cards).some(
+          readPlaces(host.places).some(
             c => c.id === again && c.place.kind === "queued",
           ),
         15_000,
@@ -739,14 +740,14 @@ async function run(check: Checks["check"]): Promise<void> {
       // Yours is queued after hers, above the line; her edit to it shows.
       const queuedHere = await waitFor(
         () =>
-          readCards(host.cards).some(
+          readPlaces(host.places).some(
             c =>
               c.place.kind === "queued" &&
               host.cardText(c.id) === "@agent after Bea",
           ),
         15_000,
       )
-      const yours = readCards(host.cards).find(
+      const yours = readPlaces(host.places).find(
         c =>
           c.place.kind === "queued" &&
           host.cardText(c.id) === "@agent after Bea",
@@ -2517,39 +2518,33 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         // After a send, Cmd+Z in the emptied box changes nothing, here or in
         // the other root.
-        const cardsAfterSend = readCards(host.cards).length
+        const cardsAfterSend = readPlaces(host.places).length
         await page.focus(box)
         await page.keyboard.press("ControlOrMeta+z")
         await waitFor(() => false, 300)
         check(
           "Cmd+Z after a send changes nothing",
           (await hasValue(page, box, "")) &&
-            readCards(host.cards).length === cardsAfterSend,
-          `${readCards(host.cards).length} cards, ${cardsAfterSend} before`,
+            readPlaces(host.places).length === cardsAfterSend,
+          `${readPlaces(host.places).length} cards, ${cardsAfterSend} before`,
         )
-        // Undo past a card's creation empties the box and removes the card;
-        // Cmd+Shift+Z in the same box brings it back.
+        // Undo past a card's creation empties the box and keeps the card,
+        // whose record only the host writes (ADR-0059); Cmd+Shift+Z in the
+        // same box brings its text back.
         await page.keyboard.type("x")
         await waitFor(
-          () => readCards(host.cards).length > cardsAfterSend,
+          () => readPlaces(host.places).length > cardsAfterSend,
           5_000,
         )
         await page.keyboard.press("ControlOrMeta+z")
+        await waitFor(() => false, 300)
         const unmade =
           (await hasValue(page, box, "")) &&
-          (await waitFor(
-            () => readCards(host.cards).length === cardsAfterSend,
-            5_000,
-          )) >= 0
+          readPlaces(host.places).length === cardsAfterSend + 1
         await page.keyboard.press("ControlOrMeta+Shift+z")
-        const remade =
-          (await hasValue(page, box, "x")) &&
-          (await waitFor(
-            () => readCards(host.cards).length > cardsAfterSend,
-            5_000,
-          )) >= 0
+        const remade = await hasValue(page, box, "x")
         check(
-          "Cmd+Z past a card's creation removes it, and Cmd+Shift+Z in its box brings it back",
+          "Cmd+Z past a card's creation empties it and keeps its record, and Cmd+Shift+Z in its box brings its text back",
           unmade && remade,
           `${unmade}, ${remade}`,
         )
@@ -2578,7 +2573,7 @@ async function run(check: Checks["check"]): Promise<void> {
           freshKept && freshText.endsWith("a fresh thought"),
           `${await boxValue(page, freshBox)}`,
         )
-        const cardsBefore = readCards(host.cards).length
+        const cardsBefore = readPlaces(host.places).length
         await page.click(`${col(1)} .close`)
         const asks = await page
           .waitForSelector(`${col(1)} .close-ask`, { timeout: 5_000 })
@@ -2597,10 +2592,10 @@ async function run(check: Checks["check"]): Promise<void> {
             () => true,
             () => false,
           )
-        await waitFor(() => readCards(host.cards).length < cardsBefore, 5_000)
+        await waitFor(() => readPlaces(host.places).length < cardsBefore, 5_000)
         check(
           "closing a new branch that holds text asks first, and discarding removes its card",
-          asks && closed && readCards(host.cards).length === cardsBefore - 1,
+          asks && closed && readPlaces(host.places).length === cardsBefore - 1,
         )
         // Marks (ADR-0048, step 2): a pip where a card of yours holds text.
         const pipIn = (p: typeof page, sel: string) =>
@@ -2640,7 +2635,7 @@ async function run(check: Checks["check"]): Promise<void> {
         // Sam sees Ada's card above his composer, and no mark: it is not his.
         await hasValue(second, theirs, "where was I")
         // Emptied, the card's record stays, and the marks go: they read its text.
-        const records = readCards(host.cards).length
+        const records = readPlaces(host.places).length
         await page.focus(box)
         await page.keyboard.press("ControlOrMeta+a")
         await page.keyboard.press("Backspace")
@@ -2648,8 +2643,8 @@ async function run(check: Checks["check"]): Promise<void> {
           (await pipGone(page, tabSel(here))) && (await pipGone(page, railDot))
         check(
           "a card emptied marks nothing, though its record stays",
-          unmarked && readCards(host.cards).length === records,
-          `${unmarked}; ${readCards(host.cards).length} records, ${records} before`,
+          unmarked && readPlaces(host.places).length === records,
+          `${unmarked}; ${readPlaces(host.places).length} records, ${records} before`,
         )
         // A root whose tab you closed is marked in the Archive tab and its row.
         await page.keyboard.type("back tomorrow")

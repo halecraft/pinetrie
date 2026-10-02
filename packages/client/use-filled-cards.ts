@@ -24,7 +24,7 @@ export function useFilledCards(
   mine: readonly CardRecord[],
 ): ReadonlySet<CardId> {
   const [filled, setFilled] = useState<ReadonlySet<CardId>>(() => new Set())
-  // Keyed on the ids, not the array: `readCards` keeps unchanged records, but
+  // Keyed on the ids, not the array: `readPlaces` keeps unchanged records, but
   // the filtered list is new whenever any card changes.
   const ids = mine.map(c => c.id).join(" ")
   useEffect(() => {

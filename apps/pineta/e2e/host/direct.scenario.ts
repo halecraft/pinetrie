@@ -6,9 +6,9 @@ import path from "node:path"
 import { ancestry, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
-  readCards,
   readLaneRecords,
   readLanes,
+  readPlaces,
   readTreeIndex,
 } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
@@ -45,7 +45,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const laneWith = (text: string) => {
       const id = idOfIn(dh.doc, text)
       const index = readTreeIndex(dh.doc)
-      return readLanes(dh.doc, index, readCards(dh.cards)).find(
+      return readLanes(dh.doc, index, readPlaces(dh.places)).find(
         l => id !== null && ancestry(index, l.tip).path.includes(id),
       )
     }

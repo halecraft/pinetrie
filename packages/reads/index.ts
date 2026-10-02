@@ -88,7 +88,7 @@ import {
   stopRecords,
 } from "@pineta/marginalia"
 import {
-  type CardsDocHandle,
+  type PlacesDocHandle,
   type PresenceDocHandle,
   readActiveRun,
   readEntries,
@@ -182,7 +182,7 @@ function askerOf(index: TreeIndex, tip: EntryId | null): WriterId | undefined {
  * it (ADR-0048), who holds it (for a conflict's "by"): the writer of the ask
  * it is answering (`askerOf`), or who queued its first card; and who queued
  * its last card, whom a card queued now follows. `cards` is every card's
- * record (`readCards`).
+ * record (`readPlaces`).
  */
 export function readLanes(
   doc: SessionDocHandle,
@@ -289,37 +289,34 @@ export const readTyping = presenceField(doc => doc.typing())
 export const readSeats = (doc: SessionDocHandle): readonly SeatRecord[] =>
   seatRecords(readValues(doc, SEAT_NAMESPACE))
 
-// Each cards document's records as last decoded, by card id, with the stored
-// value they came from: a Yjs read gives new objects every time, so an
-// unchanged card keeps its record object only through this (S54).
-const decodedCards = new WeakMap<
-  object,
-  Map<string, { readonly stored: string; readonly card: CardRecord }>
->()
+// Each stored card row as last decoded. Kyneta gives an unchanged `json`
+// row the same object across writes, so an unchanged card keeps its record
+// object, and a change to one card redraws only what shows it (S54).
+const decodedRows = new WeakMap<object, CardRecord | null>()
+
+const decodeRow = (id: string, row: object): CardRecord | null => {
+  const was = decodedRows.get(row)
+  if (was !== undefined && (was === null || was.id === id)) return was
+  const card = decodeCard(id, row) ?? null
+  decodedRows.set(row, card)
+  return card
+}
 
 /**
- * Every card's record (ADR-0048), oldest first (ids are uuidv7). A card that
- * does not decode is left out. An unchanged card is the same object as last
- * time, so a change to one card redraws only what shows it.
+ * Every card's record (ADR-0059), oldest first (ids are uuidv7), from the
+ * places document. A card that does not decode is left out.
  */
-export function readCards(cards: CardsDocHandle): readonly CardRecord[] {
-  const before = decodedCards.get(cards) ?? new Map()
-  const now = new Map<string, { stored: string; card: CardRecord }>()
-  for (const [id, value] of Object.entries(cards.cards())) {
-    const stored = JSON.stringify(value)
-    const was = before.get(id)
-    const card =
-      was !== undefined && was.stored === stored
-        ? was.card
-        : decodeCard(id, value)
-    if (card !== undefined) now.set(id, { stored, card })
-  }
-  decodedCards.set(cards, now)
-  return [...now.keys()].sort().flatMap(id => {
-    const got = now.get(id)
-    return got === undefined ? [] : [got.card]
-  })
+export function readPlaces(places: PlacesDocHandle): readonly CardRecord[] {
+  return Object.entries(places.cards() as Record<string, object>)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .flatMap(([id, row]) => {
+      const card = decodeRow(id, row)
+      return card === null ? [] : [card]
+    })
 }
+
+/** The places document's `rev`: raised with every write (ADR-0059). */
+export const readPlacesRev = (places: PlacesDocHandle): number => places.rev()
 
 /** Every root's archive record (`pineta.archive`, ADR-0029), keyed by root. */
 export const readArchive = (

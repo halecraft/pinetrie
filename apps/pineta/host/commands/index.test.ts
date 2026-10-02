@@ -1,5 +1,6 @@
 import {
   atEntry,
+  cardId,
   ERR,
   entryId,
   laneNameForThread,
@@ -8,9 +9,11 @@ import {
 import { ARCHIVE_NAMESPACE, encodeArchive } from "@pineta/marginalia"
 import type { WireCommand } from "@pineta/protocol/codec"
 import type { Reply } from "@pineta/protocol/messages"
+import { readPlaces } from "@pineta/reads"
 import { writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { basics, putValue, record, row } from "../fakes.ts"
+import { applyPlaceStep } from "../places.ts"
 import { type CommandDeps, createCommands } from "./index.ts"
 
 const ALICE = writerId("alice@example.com")
@@ -22,8 +25,9 @@ function setUp() {
   const b = basics()
   const cards = record<CommandDeps["cards"]>({
     writers: async () => [],
-    spend: async () => {},
+    destroy: async () => {},
   })
+  const drains: string[] = []
   writeEntry(b.doc, row(ROOT_ID, null))
   const agent = record<CommandDeps["agent"]>({
     appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
@@ -40,6 +44,7 @@ function setUp() {
     names: record<CommandDeps["names"]>({
       reserve: async lane => (lane === HELD ? "held" : "name"),
     }).port,
+    drain: lane => void drains.push(lane),
   })
   const replies: Reply[] = []
   const sender = { send: (r: Reply) => void replies.push(r) }
@@ -53,7 +58,7 @@ function setUp() {
       lane: "",
       asksAgent: false,
     }) satisfies WireCommand
-  return { b, agent, cards, commands, replies, sender, chat }
+  return { b, agent, cards, commands, replies, sender, chat, drains }
 }
 
 test("a chat in an archived root is refused, and the agent is never called", async () => {
@@ -83,8 +88,20 @@ test("the command's id is the send's id", async () => {
   })
 })
 
-test("a chat command spends its card once written; a refused one leaves it", async () => {
-  const { cards, commands, replies, sender, chat } = setUp()
+test("a chat command spends its card once written, record then text, answering with its rev; a refused one leaves it", async () => {
+  const { b, cards, commands, replies, sender, chat } = setUp()
+  for (const id of ["card-1", "card-2"])
+    applyPlaceStep(b.places, {
+      kind: "write",
+      record: {
+        id: cardId(id),
+        owner: ALICE,
+        placer: ALICE,
+        place: { kind: "drafting", at: atEntry(ROOT_ID), lane: null },
+        command: null,
+        unsent: null,
+      },
+    })
   await commands.handle(sender, ALICE, { ...chat("c-4"), cardId: "card-1" })
   // Refused by `sendChat` itself: an image the host does not store.
   await commands.handle(sender, ALICE, {
@@ -92,9 +109,13 @@ test("a chat command spends its card once written; a refused one leaves it", asy
     text: `look ![a](/blob/${"b".repeat(64)})`,
     cardId: "card-2",
   })
-  expect(replies.map(r => r.outcome)).toEqual(["appended", "refused"])
+  expect(replies.map(r => [r.outcome, r.rev])).toEqual([
+    ["appended", 3],
+    ["refused", 0],
+  ])
+  expect(readPlaces(b.places).map(c => c.id)).toEqual(["card-2"])
   expect(
-    cards.calls.filter(c => c.method === "spend").map(c => c.args[0]),
+    cards.calls.filter(c => c.method === "destroy").map(c => c.args[0]),
   ).toEqual(["card-1"])
 })
 

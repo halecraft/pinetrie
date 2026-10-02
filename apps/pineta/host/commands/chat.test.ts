@@ -207,7 +207,7 @@ describe("sendChat", () => {
     const { agent, cards, deps } = setUp()
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("from the card"),
-      card: cardId("c-1"),
+      card: { id: cardId("c-1"), seen: "" },
     })
     expect(out).toEqual({ kind: "appended", id: "e-2" })
     const appended = agent.calls.find(c => c.method === "appendToTree")
@@ -238,7 +238,7 @@ describe("sendChat", () => {
     // Refused before it is planned: an image the host does not store.
     const early = await sendChat(deps, ALICE, "s-1", {
       ...chat(`look ![a](/blob/${missing})`),
-      card: cardId("c-1"),
+      card: { id: cardId("c-1"), seen: "" },
     })
     // Refused as it is written: pi will not append it.
     const late = await sendChat(
@@ -251,7 +251,7 @@ describe("sendChat", () => {
       },
       ALICE,
       "s-2",
-      { ...chat("from the card"), card: cardId("c-1") },
+      { ...chat("from the card"), card: { id: cardId("c-1"), seen: "" } },
     )
     expect([early.kind, late.kind]).toEqual(["refused", "refused"])
   })
@@ -268,7 +268,7 @@ describe("sendChat", () => {
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("@bea when it is done"),
       lane: LANE,
-      card: cardId("c-1"),
+      card: { id: cardId("c-1"), seen: "" },
     })
     expect(out).toEqual({ kind: "busy" })
     expect(agent.calls).toEqual([])

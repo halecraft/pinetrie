@@ -7,8 +7,14 @@ import type { SessionClient } from "@pineta/client/session"
 import { type CardId, cardId, entryId, type LaneName, ROOT } from "@pineta/core"
 import { yourCard } from "@pineta/marginalia"
 import { scriptedModel } from "@pineta/pi"
-import { readCards, readLanes, readSeats, readTreeIndex } from "@pineta/reads"
-import { cardDocId, readLaneNames, readLaneTip } from "@pineta/schema"
+import { PLACES_DOC_ID } from "@pineta/protocol/messages"
+import { readLanes, readPlaces, readSeats, readTreeIndex } from "@pineta/reads"
+import {
+  cardDocId,
+  PlacesDoc,
+  readLaneNames,
+  readLaneTip,
+} from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
@@ -44,7 +50,7 @@ async function run(check: Checks["check"]): Promise<void> {
       return l === undefined ? null : readLaneTip(ch.doc, l)
     }
     const cIdle = () => waitFor(() => idleNow(ch), 30_000)
-    const onHost = (id: CardId) => readCards(ch.cards).find(c => c.id === id)
+    const onHost = (id: CardId) => readPlaces(ch.places).find(c => c.id === id)
     const drafting = (end: string | null) =>
       ({ kind: "drafting", at: at(end), lane: null }) as const
     const newCard = (
@@ -57,6 +63,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           id,
           owner: who.writer,
+          placer: who.writer,
           place: drafting(end),
           command: null,
           unsent: null,
@@ -76,7 +83,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const c1 = newCard(ada, end, "@agent next: ")
     const beaSees = await waitFor(
       () =>
-        readCards(bea.cards).some(c => c.id === c1) &&
+        bea.cards.current().some(c => c.id === c1) &&
         bea.cardText(c1).text() === "@agent next: ",
       5_000,
     )
@@ -94,8 +101,8 @@ async function run(check: Checks["check"]): Promise<void> {
     const found = yourCard(
       ada.writer,
       { kind: "end", end: grown ?? entryId("") },
-      readCards(ada.cards),
-      readLanes(ch.doc, idx, readCards(ch.cards)),
+      ada.cards.current(),
+      readLanes(ch.doc, idx, readPlaces(ch.places)),
       idx,
     )
     check(
@@ -112,8 +119,9 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 2b. Undo in a card reaches only that card (ADR-0052): A's undo passes
     // over B's newer creation. A sent card's copy is destroyed once the host
-    // lets go of it (S64), so its steps no longer stand; undoing past a card's
-    // creation keeps the copy, so redo brings it back.
+    // lets go of it (S64), so its steps no longer stand. Undoing past a card's
+    // creation empties it and keeps its record, which only the host writes
+    // (ADR-0059), so redo brings its text back.
     const kept = newCard(ada, tipOf(), "kept")
     ada.undoFor(kept).typing(() => ada.cardText(kept).text.insert(4, " more"))
     const spentCard = newCard(ada, tipOf(), "@Bea spent")
@@ -133,8 +141,9 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     const sentUndo = await ada.undoFor(spentCard).undo()
     await ada.undoFor(kept).undo()
-    const uncreated = await waitFor(() => onHost(kept) === undefined, 5_000)
+    const emptied = await waitFor(() => ch.cardText(kept) === "", 5_000)
     await ch.quiet()
+    const recordKept = onHost(kept) !== undefined
     const stillHeld = ada.exchange.has(cardDocId(kept))
     await ada.undoFor(kept).redo()
     const redone = await waitFor(
@@ -142,27 +151,16 @@ async function run(check: Checks["check"]): Promise<void> {
       5_000,
     )
     check(
-      "undo in a card reaches only that card, and a sent card's steps act on nothing; undoing past a card's creation and redoing brings back its record and text",
+      "undo in a card reaches only that card, and a sent card's steps act on nothing; undoing past a card's creation empties it and keeps its record, and redo brings its text back",
       own >= 0 &&
         othersLeft &&
         dropped >= 0 &&
         !sentUndo &&
-        uncreated >= 0 &&
+        emptied >= 0 &&
+        recordKept &&
         stillHeld &&
         redone >= 0,
-      `${[own, othersLeft, dropped, sentUndo, uncreated, stillHeld, redone].join()}; ${ch.cardText(kept)}`,
-    )
-    // Creating another card writes another key and another text, so it clears
-    // nothing of the first card's redo: the redo brings it back whole (S64,
-    // addendum 3).
-    await ada.undoFor(kept).undo()
-    await waitFor(() => onHost(kept) === undefined, 5_000)
-    const other = newCard(ada, tipOf(), "another")
-    await waitFor(() => onHost(other) !== undefined, 5_000)
-    await ada.undoFor(kept).redo()
-    await waitFor(
-      () => onHost(kept) !== undefined && ch.cardText(kept) === "kept",
-      5_000,
+      `${[own, othersLeft, dropped, sentUndo, emptied, recordKept, stillHeld, redone].join()}; ${ch.cardText(kept)}`,
     )
 
     // 3. A compelled send to a busy lane is a conflict, and the card stays.
@@ -175,14 +173,19 @@ async function run(check: Checks["check"]): Promise<void> {
     await waitFor(() => ch.cardText(c2) === "@agent me too", 5_000)
     await ada.chat("@agent me too", at(busyEnd), { card: c2 })
 
-    // 4. The busy lane's queue (ADR-0048). A plain send is `busy`, and
-    // nothing is written. Bea queues Ada's card, and Ada edits it while it
-    // waits; Ada queues another and unqueues it.
+    // 4. The busy lane's queue (ADR-0048, ADR-0059). Bea sends Ada's card
+    // there: the host queues it in the same step, as Bea's. Ada edits it while
+    // it waits; Ada queues another and unqueues it.
     const lane = (readLaneNames(ch.doc)[0] ?? "") as LaneName
     const c3 = newCard(ada, busyEnd, "@Ada the plan")
-    await waitFor(() => ch.cardText(c3) === "@Ada the plan", 5_000)
+    await waitFor(
+      () =>
+        ch.cardText(c3) === "@Ada the plan" &&
+        bea.cards.current().some(c => c.id === c3),
+      5_000,
+    )
     const busy = await bea.chat("@Ada the plan", at(busyEnd), { card: c3 })
-    bea.queueCard(c3, { lane, at: at(busyEnd) })
+    await waitFor(() => onHost(c3)?.place.kind === "queued", 5_000)
     await waitFor(() => ada.cardText(c3).text() === "@Ada the plan", 5_000)
     ada.cardText(c3).text.insert(13, " is ready")
     const c5 = newCard(ada, busyEnd, "@Bea never mind")
@@ -206,8 +209,8 @@ async function run(check: Checks["check"]): Promise<void> {
         e.message.content === "@Ada the plan is ready",
     )?.message
     check(
-      "a queued card is taken when the run ends: its queuer's message, with the edits made while it waited",
-      busy.kind === "busy" &&
+      "a send that finds its lane busy queues its card in one step, and the card is taken when the run ends: its queuer's message, with the edits made while it waited",
+      busy.kind === "queued" &&
         sent3?.writer === bea.writer &&
         sent3.contributors?.join() === ada.writer &&
         onHost(c3) === undefined,
@@ -221,7 +224,7 @@ async function run(check: Checks["check"]): Promise<void> {
       "an unqueued card is not sent, and is below the line again for everyone",
       neverSent &&
         onHost(c5)?.place.kind === "drafting" &&
-        readCards(bea.cards).find(c => c.id === c5)?.place.kind === "drafting",
+        bea.cards.current().find(c => c.id === c5)?.place.kind === "drafting",
       `${neverSent}; ${onHost(c5)?.place.kind}`,
     )
 
@@ -246,6 +249,55 @@ async function run(check: Checks["check"]): Promise<void> {
       `${taken} ms`,
     )
     await ch.quiet()
+
+    // 4c. An unqueue sent right behind a queue on an idle thread: the queue's
+    // step queued the drain, so the take is on the host's `Serial` first, and
+    // the unqueue is refused as gone (ADR-0059). Ada's client says it was sent.
+    const quickEnd = tipOf()
+    const c7 = newCard(ada, quickEnd, "@Bea too quick")
+    await waitFor(() => ch.cardText(c7) === "@Bea too quick", 5_000)
+    ada.queueCard(c7, { lane, at: at(quickEnd) })
+    ada.unqueueCard(c7, { lane, by: ada.writer })
+    const told = await waitFor(
+      () =>
+        ada.refusals.current().some(r => r.card === c7 && r.code === "gone"),
+      5_000,
+    )
+    await ch.quiet()
+    const sent7 = Object.values(readTreeIndex(ch.doc).entries).some(
+      e => e.message?.role === "chat" && e.message.content === "@Bea too quick",
+    )
+    check(
+      "an unqueue the take got to first is refused as gone, and its client says it was sent",
+      told >= 0 && sent7 && onHost(c7) === undefined,
+      `${told}; sent ${sent7}`,
+    )
+
+    // 4d. A client's write to the places document is refused: only the host
+    // writes it (ADR-0059). A throwaway session writes it, since the writer's
+    // copy keeps its own value for good (S76).
+    const mallory = await join(ch, "mallory", "cards")
+    const forged = cardId(crypto.randomUUID())
+    mallory.exchange.get(PLACES_DOC_ID, PlacesDoc).cards.set(forged, {
+      owner: mallory.writer,
+      kind: "fresh",
+      at: "",
+      lane: "",
+      column: "forged",
+      order: "",
+      by: "",
+      seen: "",
+      command: "",
+      unsent: "",
+      placer: mallory.writer,
+    })
+    await sleep(500)
+    await ch.quiet()
+    check(
+      "a client's write to the places is refused: the host's copy is unchanged",
+      onHost(forged) === undefined,
+    )
+    await mallory.close()
 
     // 5. Bea sends Ada's card after Ada has left: Bea's message, with Ada,
     // named through her seat's record.

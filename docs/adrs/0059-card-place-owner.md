@@ -7,7 +7,10 @@ document of its own, of slots), ADR-0052 (how a move is undone), ADR-0023
 lives). For ADR-0048's step 4, and it changes how step 3's queue and
 unqueue are written. Amended in place (2026-10-02, with Duane): a tab
 knows its copy holds its move by a revision watermark, not by the reply
-alone (*A move is drawn at once*).
+alone (*A move is drawn at once*); a card's command is in the host's place
+record, set by a request, not in the card's own document. Implemented by
+`PLAN-2026-10-02-card-places`, for the places there are now (drafting,
+queued, fresh); the inventory is step 4's.
 
 **Context.**
 
@@ -83,6 +86,11 @@ card, the place the sender saw it in, and the place it should go.
   take is written it wins, and a later unqueue is refused with "already
   sent". An unqueue the host saw first is respected (S69's rule, now
   decided where it happens).
+- **A queue names the text it queues.** The request, like the text, can
+  reach the host first, since Kyneta keeps no order between a Line and a
+  document (S72). A queued key carries the text's version as its queuer had
+  it (`seen`), and so does a chat whose busy lane queues its card; the
+  host takes the card only once its copy of the text holds that much.
 - **A move is drawn at once.** The tab draws its waiting handoffs over the
   host's places until its own copy of them holds the move. A refused one
   is dropped at the reply, and the card is drawn where the host says it
@@ -128,10 +136,15 @@ page ADR-0048 gives each session), is a Yjs document of slot to card id.
   nothing, and two tabs filling one slot both end up shown. It converged in
   at most three writes in every case S76 tried.
 
-*A card's own document* holds its text and its command (ADR-0055), which
-clients set. A tab opens only the cards it shows: its columns' cards and
-your inventory. A card's document costs about 17 KB in an Exchange, so a
-session's every card is too many to hold (S76).
+*A card's own document* holds its text. Its command (ADR-0055) is in the
+host's place record, set by a request: the take reads a card's command in
+the step that reads its place, and a command written into the card's
+document would travel apart from a queue request on the Line, so the card
+could be taken before it arrived and sent as a plain message. Requests on
+one Line keep their order, so "set the command, then queue" holds. A tab
+opens only the cards it shows: its columns' cards and your inventory. A
+card's document costs about 17 KB in an Exchange, so a session's every
+card is too many to hold (S76).
 
 *Creating a card* is a handoff from nowhere: the client makes the card's
 document, and asks the host to place it. The host records the sender as its
@@ -164,9 +177,8 @@ nor marked, and the host sweeps it.
   copies.
 
 **Consequences.**
-- The cards document goes. A card's record is split: its place, owner and
-  `unsent` into the host's `places`; its command into the card's own
-  document, beside its text.
+- The cards document goes. A card's record (place, owner, placer, command,
+  `unsent`) is in the host's `places`; its text stays in its own document.
 - The host gains commands for cards: handoffs, creation. ADR-0048's "the
   host acts only at the boundary with pi" and its smaller host no longer
   hold. In return, the policy's invariants become the host's own checks.
@@ -187,8 +199,9 @@ nor marked, and the host sweeps it.
   unloads a document while keeping it stored (S76). Both are asked of
   Kyneta; until then a tab's and the host's memory grow with the cards they
   have opened.
-- Whether stored cards are carried over from the cards document is the
-  plan's to decide.
+- Stored cards are not carried over: no code reads the old cards document,
+  and the startup sweep removes the texts no record names. The only stored
+  session held two drafts, kept by hand.
 
 **Alternatives rejected.**
 - **Places in the cards document, written by clients** (ADR-0048, S75). A

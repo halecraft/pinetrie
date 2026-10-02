@@ -94,7 +94,8 @@ export function planArchive(input: {
 
 /**
  * The entry a command writes at, or null when it writes in no root: a new
- * thread at the root, a name, a stop, an archive action, a reservation.
+ * thread at the root, a name, a stop, an archive action, a reservation, a
+ * card's command, or a card's move into a fresh column or its removal.
  */
 export function writesAt(
   intent: Intent,
@@ -109,10 +110,19 @@ export function writesAt(
       return lanes.find(l => l.name === intent.lane)?.tip ?? null
     case "mark":
       return intent.entry
+    // A move into a thread writes at its end; a fresh column has no root yet.
+    case "move": {
+      const to = intent.move.to
+      return to === null || to.kind === "fresh" || to.at.kind === "root"
+        ? null
+        : to.at.id
+    }
     case "name":
     case "stop":
     case "archive":
     case "reserve":
+    // A command acts only when its card is taken, behind the take's own check.
+    case "set-command":
       return null
   }
 }

@@ -6,7 +6,7 @@ import path from "node:path"
 import { subscribe } from "@kyneta/schema"
 import { projectSpine, ROOT } from "@pineta/core"
 import { scriptedModel, sha256Of } from "@pineta/pi"
-import { readCards, readLanes, readTreeIndex } from "@pineta/reads"
+import { readLanes, readPlaces, readTreeIndex } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
@@ -48,7 +48,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const tree = readTreeIndex(th.doc)
       const spine = projectSpine(
         tree,
-        readLanes(th.doc, tree, readCards(th.cards))[0]?.tip ?? null,
+        readLanes(th.doc, tree, readPlaces(th.places))[0]?.tip ?? null,
       ).spine
       return spine
         .flatMap(n => n.toolCalls ?? [])
@@ -103,7 +103,11 @@ async function run(check: Checks["check"]): Promise<void> {
     await sleep(GRACE_MS + 200)
     const tv = await join(th, "tia", "tool-images")
     script.use([{ text: "still red" }])
-    const tip = readLanes(th.doc, readTreeIndex(th.doc), readCards(th.cards))[0]
+    const tip = readLanes(
+      th.doc,
+      readTreeIndex(th.doc),
+      readPlaces(th.places),
+    )[0]
     await tv.chat("@agent and now?", at(tip?.tip ?? null), {
       lane: tip?.name,
     })

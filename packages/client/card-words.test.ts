@@ -1,17 +1,26 @@
-import { writerId } from "@pineta/core"
+import { cardId, writerId } from "@pineta/core"
 import { describe, expect, test } from "vitest"
+import type { Refusal } from "./card-moves.ts"
 import {
-  alreadySentWords,
   cardStatus,
   commandTag,
   commandWords,
   queuedWords,
+  refusalWords,
   unsentWords,
 } from "./card-words.ts"
 
 const ME = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
+const refusal = (over: Partial<Refusal>): Refusal => ({
+  card: cardId("c-1"),
+  lane: null,
+  code: "gone",
+  by: null,
+  fromQueue: true,
+  ...over,
+})
 
 describe("card words", () => {
   test.each([
@@ -29,14 +38,29 @@ describe("card words", () => {
     ],
     ["unsentWords", unsentWords("no such image"), "not sent: no such image"],
     [
-      "alreadySentWords, yours",
-      alreadySentWords(ME, READER),
+      "refusalWords, an unqueue the take beat, yours",
+      refusalWords(refusal({ by: ME }), READER),
       "already sent as your message: it was taken before you unqueued it",
     ],
     [
-      "alreadySentWords, Bea's",
-      alreadySentWords(BEA, READER),
+      "refusalWords, an unqueue the take beat, Bea's",
+      refusalWords(refusal({ by: BEA }), READER),
       "already sent as Bea's message: it was taken before you unqueued it",
+    ],
+    [
+      "refusalWords, gone from a drafting place",
+      refusalWords(refusal({ fromQueue: false }), READER),
+      "not moved: it was sent or removed first",
+    ],
+    [
+      "refusalWords, moved by Bea first",
+      refusalWords(refusal({ code: "moved", by: BEA }), READER),
+      "not moved: Bea moved it first",
+    ],
+    [
+      "refusalWords, moved by you in another tab",
+      refusalWords(refusal({ code: "moved", by: ME }), READER),
+      "not moved: you moved it first",
     ],
   ])("%s", (_, words, expected) => {
     expect(words).toBe(expected)

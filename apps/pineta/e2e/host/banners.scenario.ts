@@ -5,7 +5,12 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { type ImageRef, messageText, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
-import { readBanners, readCards, readLanes, readTreeIndex } from "@pineta/reads"
+import {
+  readBanners,
+  readLanes,
+  readPlaces,
+  readTreeIndex,
+} from "@pineta/reads"
 import { readEntries, rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
@@ -56,7 +61,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const [first] = readLanes(
         bh.doc,
         readTreeIndex(bh.doc),
-        readCards(bh.cards),
+        readPlaces(bh.places),
       )
       return first === undefined
         ? undefined
@@ -69,7 +74,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const [lane] = readLanes(
       bh.doc,
       readTreeIndex(bh.doc),
-      readCards(bh.cards),
+      readPlaces(bh.places),
     ).map(l => l.name)
     const made = lane === undefined ? undefined : readBanners(bh.doc).get(lane)
     check(

@@ -259,8 +259,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "App reads typing presence again",
     file: "packages/client/app.tsx",
-    from: "  const cards = useSelector(session.cards, readCards)",
-    to: "  const cards = useSelector(session.cards, readCards)\n  useSelector(session.presence, d => d.typing())",
+    from: "    session.cards.current,\n  )",
+    to: "    session.cards.current,\n  )\n  useSelector(session.presence, d => d.typing())",
     suite: "browser",
     scenario: "page",
     expect: "your typing redraws nothing outside your composer",
@@ -268,8 +268,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "App reads reading presence again",
     file: "packages/client/app.tsx",
-    from: "  const cards = useSelector(session.cards, readCards)",
-    to: "  const cards = useSelector(session.cards, readCards)\n  useSelector(session.presence, d => d.reading())",
+    from: "    session.cards.current,\n  )",
+    to: "    session.cards.current,\n  )\n  useSelector(session.presence, d => d.reading())",
     suite: "browser",
     scenario: "page",
     expect:
@@ -993,7 +993,7 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "cards",
     expect:
-      "undo in a card reaches only that card, and a sent card's steps act on nothing; undoing past a card's creation and redoing brings back its record and text",
+      "undo in a card reaches only that card, and a sent card's steps act on nothing; undoing past a card's creation empties it and keeps its record, and redo brings its text back",
   },
   {
     name: "a client destroys a card whenever its host's state changes",
@@ -1003,7 +1003,7 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "cards",
     expect:
-      "undo in a card reaches only that card, and a sent card's steps act on nothing; undoing past a card's creation and redoing brings back its record and text",
+      "undo in a card reaches only that card, and a sent card's steps act on nothing; undoing past a card's creation empties it and keeps its record, and redo brings its text back",
   },
   {
     name: "undoFor undoes the tab's last step",
@@ -1013,7 +1013,7 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "cards",
     expect:
-      "undo in a card reaches only that card, and a sent card's steps act on nothing; undoing past a card's creation and redoing brings back its record and text",
+      "undo in a card reaches only that card, and a sent card's steps act on nothing; undoing past a card's creation empties it and keeps its record, and redo brings its text back",
   },
   {
     name: "undoFor undoes the tab's last step, in the browser",
@@ -1047,8 +1047,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher answers archive without archiving",
     file: "apps/pineta/host/commands/index.ts",
-    from: '      case "archive":\n        return handleArchive(deps, writer, intent)',
-    to: '      case "archive":\n        return { kind: "archived" }',
+    from: "        return settled(await handleArchive(deps, writer, intent))",
+    to: '        return settled({ kind: "archived" })',
     suite: "host",
     scenario: "archive",
     expect: "a root is archived, by its archiver, and another client sees it",
@@ -1056,8 +1056,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher answers mark without titling",
     file: "apps/pineta/host/commands/index.ts",
-    from: '      case "mark":\n        return handleMark(deps, writer, intent)',
-    to: '      case "mark":\n        return { kind: "marked" }',
+    from: "        return settled(await handleMark(deps, writer, intent))",
+    to: '        return settled({ kind: "marked" })',
     suite: "host",
     scenario: "archive",
     expect: "a root is titled, by its writer",
@@ -1225,8 +1225,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a send leaves out its column's reservation",
     file: "packages/client/session-view.ts",
-    from: "          reserved: how.reserved ?? null,",
-    to: "          reserved: null,",
+    from: "        reserved: how.reserved ?? null,",
+    to: "        reserved: null,",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1245,8 +1245,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stop is recorded under no one who pressed it",
     file: "apps/pineta/host/commands/index.ts",
-    from: "        return handleStop(deps, intent.lane, writer)",
-    to: "        return handleStop(deps, intent.lane, intent.lane as never)",
+    from: "        return settled(await handleStop(deps, intent.lane, writer))",
+    to: "        return settled(await handleStop(deps, intent.lane, intent.lane as never))",
     suite: "host",
     scenario: "tools",
     expect: "the stop is recorded under its ask, naming who stopped it",
@@ -1288,23 +1288,23 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "cards",
     expect:
-      "a queued card is taken when the run ends: its queuer's message, with the edits made while it waited",
+      "a send that finds its lane busy queues its card in one step, and the card is taken when the run ends: its queuer's message, with the edits made while it waited",
   },
   {
-    name: "the cards watch never drains",
+    name: "a queue move asks for no drain",
     file: "apps/pineta/host/index.ts",
-    from: "  const unwatchQueues = subscribe(cards, watchQueues)",
-    to: "  const unwatchQueues = subscribe(cards, () => void watchQueues)",
+    from: "    drain: lane => queueDrain(lane),\n",
+    to: "    drain: () => {},\n",
     suite: "host",
     scenario: "cards",
     expect:
       "a card queued on an idle thread is taken at once, with all its text, though its record can reach the host before its text",
   },
   {
-    name: "an unqueue writes nothing",
+    name: "an unqueue is never sent",
     file: "packages/client/session-view.ts",
-    from: "      writeFields(id, unqueueFields())",
-    to: "      void unqueueFields",
+    from: '      if (card === undefined || card.place.kind !== "queued") return',
+    to: "      if (card !== undefined) return",
     suite: "host",
     scenario: "cards",
     expect:
@@ -1386,5 +1386,25 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect: "a column shown again is where its reader left it",
+  },
+  {
+    name: "the drain waits behind a move that came after the queue",
+    file: "apps/pineta/host/index.ts",
+    from: "    void serial.run(async () => {\n      draining.delete(lane)\n      await drain(lane)\n    })",
+    to: "    setTimeout(\n      () =>\n        void serial.run(async () => {\n          draining.delete(lane)\n          await drain(lane)\n        }),\n      300,\n    )",
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "an unqueue the take got to first is refused as gone, and its client says it was sent",
+  },
+  {
+    name: "the host accepts a client's write to the places",
+    file: "apps/pineta/host/policy.ts",
+    from: "  if (docId === SESSION_DOC_ID || docId === PLACES_DOC_ID) return false",
+    to: "  if (docId === SESSION_DOC_ID) return false",
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a client's write to the places is refused: the host's copy is unchanged",
   },
 ]

@@ -79,9 +79,13 @@ They share `checks.ts` (recording a check, and stopping at one),
   what the take makes (a message, a landing) before it waits for idle.
 - **A card queued for the restart in `host/tools` is queued under a run
   that is only the document's record** (`beginRun`). Queued on an idle lane,
-  the host's watch would take it before the restart; the record is what a
+  the move's drain would take it before the restart; the record is what a
   stopping host leaves, and the next host's startup clears it, then takes
   the card.
+- **The places are the host's alone** (ADR-0059): read them through
+  `RunningHost.places` (`readPlaces`), and move cards through a session's
+  port. A session that writes the places document keeps its own value for
+  good (S76), so the one check that does joins a throwaway session for it.
 
 - **`slowToLoad` delays one document's first `currentMeta`**, by
   `LATE_LOAD_MS` (`host/support.ts`). Kyneta's `#hydrate` reads

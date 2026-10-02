@@ -444,6 +444,7 @@ describe("settling and starting up", () => {
   const queuedOn = (lane: typeof LANE1, id: string) => ({
     id: cardId(id),
     owner: ALICE,
+    placer: ALICE,
     place: {
       kind: "queued" as const,
       at: atEntry(E1),

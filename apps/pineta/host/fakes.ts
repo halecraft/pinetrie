@@ -6,7 +6,7 @@
 import type { LaneName } from "@pineta/core"
 import type { ThreadLaneHandle, WriteOutcome } from "@pineta/pi"
 import {
-  newCardsDoc,
+  newPlacesDoc,
   newSessionDoc,
   physicalKey,
   type SessionDocHandle,
@@ -122,7 +122,7 @@ export function putValue(
 /** A fresh document, ids from a counter, a fixed clock, and the log's lines. */
 export function basics(
   doc = newSessionDoc(),
-  cards = newCardsDoc(),
+  places = newPlacesDoc(),
 ): Basics & {
   readonly lines: string[]
 } {
@@ -130,7 +130,7 @@ export function basics(
   const lines: string[] = []
   return {
     doc,
-    cards,
+    places,
     log: m => lines.push(m),
     newId: () => `id-${String(++n).padStart(4, "0")}`,
     now: () => 1_000,

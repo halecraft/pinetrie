@@ -17,7 +17,7 @@ Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes` (and `readLane`, one
 of them), `readRunning`,
 `readParticipantNames`, `readParticipants`, `readReading`, `readTyping`,
-`readAgentActivity`, `readSeats` and `readCards` (ADR-0048),
+`readAgentActivity`, `readSeats`, `readPlaces` and `readPlacesRev` (ADR-0059),
 `readArchive`, `readMarks` (ADR-0045), `readStops` and `readDigests`
 (ADR-0056), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
@@ -67,7 +67,7 @@ Kyneta has let go.
   new entry decodes only itself.
 
 - **`readLanes` reads two documents**: the session, and every card's record
-  (`readCards` of the cards document), passed in. A lane's `waiting` is its
+  (`readPlaces` of the places document), passed in. A lane's `waiting` is its
   queued cards (`queuedOn`), so a lane with cards queued is busy (`isBusy`)
   even between two takes. The client reads lanes with its cards, in `App`;
   a read that needs only runs and tips uses `readRunning` and
@@ -97,8 +97,7 @@ Kyneta has let go.
 - **`readRenderableEntries` decodes chat** (`renderableMessage`), so the index
   carries each chat's writer, whether it compelled the agent, and its send id:
   `threadOf`'s race reads the first two, a fresh column the third.
-- **`readCards` keeps an unchanged card the same object.** A Yjs read gives
-  new objects every time, so it remembers each card's decoded record beside
-  the stored value it came from, per cards document, and reuses the record
-  while that value is unchanged (S54's rule, by value here). A change to one
-  card redraws only what shows it.
+- **`readPlaces` keeps an unchanged card the same object.** Kyneta gives an
+  unchanged `json` row the same object across writes, so the decoded record
+  is kept in a `WeakMap` keyed by the row (S54's rule). A change to one card
+  redraws only what shows it.

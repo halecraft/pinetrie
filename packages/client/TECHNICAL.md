@@ -869,8 +869,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   send to a busy lane (`isBusy`), plain or asking the agent, and a card
   with a command, queue: the editor queues the card itself (the `queue`
   act), and sends nothing: `SendPlan.mode` is a `ComposerMode`, whose `queue`
-  is the client's and never reaches the wire. A `busy` answer, the host's view of a lane the
-  page thought idle, queues it too.
+  is the client's and never reaches the wire. A send the host finds busy,
+  where the page thought the lane idle, the host queues in the same step,
+  and answers `queued` (ADR-0059).
   `sendButton` words the plan (labels: `docs/06-interface.md`), and
   `placeholderWords` gives the box's placeholder: the composer holds only its
   state and draws.
@@ -907,18 +908,17 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   are not in the tree yet. Below the line, the column shows every drafting
   card at its end but the composer's (`others` filters on id, not owner), so
   a card of yours someone unqueued while you typed another shows there.
-- **Queueing writes the text's version too** (`seen`, `textVersion`): the
-  host takes the card only once it holds that much of the text, since the
-  record can reach it first (S72).
-- **Queue, unqueue and a command are field writes outside the undo stack's
-  gestures** (`SessionClient.queueCard`, `unqueueCard`, `setCommand`): a
-  card's box undoes only its text (ADR-0052), and moves wait for step 4's
-  history. The client remembers what it unqueued; one whose record goes and
-  whose document the host lets go of was taken first (S69), and
-  `SessionClient.alreadySent` holds it, read by the column through
+- **A queue sends the text's version too** (`seen`, `textVersion`), in the
+  queued key, and so does a chat sent from a card (`SentCard`), which the
+  host queues when the lane is busy: the host takes the card only once it
+  holds that much of the text, since the request can reach it first (S72).
+- **Queue, unqueue and a command are requests to the host, outside the undo
+  stack** (`SessionClient.queueCard`, `unqueueCard`, `setCommand`): a card's
+  box undoes only its text (ADR-0052), and moves wait for step 4's history.
+  An unqueue the host's take got to first is refused `gone` (S69, ADR-0059);
+  `SessionClient.refusals` holds it, read by the column through
   `useSyncExternalStore`, until your next send, queue or unqueue in its
-  lane. An unqueue that won is forgotten the same way, so a card you
-  unqueued that someone else sends later also reads as already sent.
+  lane, and the column says "already sent".
 - **A card the host could not send** carries `unsent` until it is queued
   again; its editor's status says it (`cardStatus`).
 
@@ -1196,10 +1196,34 @@ pipeline keeps the tree a pure function, testable without a DOM.
 
 ## Drafting cards (ADR-0048)
 
-What you type is a card: a record in the cards document (`session.cards`,
-read with `readCards`) and a `TextDoc` of its own (`session.cardText`). This
-client writes both; the host only spends a card when it is sent, and sweeps
-empty ones when it starts (S58).
+What you type is a card: a record in the places document, which only the
+host writes (ADR-0059), and a `TextDoc` of its own (`session.cardText`),
+which this client writes. The page reads the records as `session.cards`, a
+snapshot store; it never holds the places document itself.
+
+- **Every move is a request to the host** (`session-view.ts`): creating a
+  card (its text in one undo step, then a `move` from nowhere, then its
+  command), queueing, unqueueing, discarding, and setting a command. The host
+  applies each in arrival order or refuses it.
+- **The tab's moves are one pure reducer** (`card-moves.ts`, `movesStep`):
+  sent, answered, the copy changed, the host left. `withPending` draws each
+  move the copy does not yet hold over the host's records, so a move shows
+  at once. An accepted move stays drawn until the copy's `rev` reaches the
+  one its reply carried: the reply and the change to the places reach the tab
+  separately, in either order, and a move can be overtaken (taken, moved
+  back) before the copy catches up. Dropped at the reply, the card would
+  jump back and a new card would leave its editor; dropped when the card
+  looks moved, an overtaken move would be drawn for good. With nothing drawn,
+  `withPending` returns the host's records array itself.
+- **A send is a move of its card**: out of the composer until the copy holds
+  what the host did with it, spent or queued. Without it, the composer's
+  `yourCard` finds the card still drafting at the thread's end between the
+  reply and the change, and takes it back.
+- **Refusals are values** (`Refusal`, kept by `movesStep` until your next
+  move in their lane), worded by `refusalWords`: an unqueue the take beat
+  says "already sent", a move someone made first names them.
+- **The store** is `snapshotStore` (`store.ts`): a new value tells its
+  listeners, the same value does not, as `useSyncExternalStore` needs.
 
 - **Where the column's cards are.** `Column` resolves its thread's end with
   `threadOf`, as a reply would go, and finds your card there with `yourCard`
@@ -1217,7 +1241,7 @@ empty ones when it starts (S58).
   Kyneta's `attach`, in that one handler: no keystroke falls between them,
   and focus and the caret stay where they are. A card that already exists is
   attached on mount. `editorState` (`card-state.ts`, pure) decides every step
-  and names its acts in order (`create`, `attach`, `detach`, `redo`); the
+  and names its acts in order (`create`, `attach`, `detach`); the
   component carries them out in turn. A new card is `create` then
   `attach`: bound first, the binding would write into a card that does not
   exist yet, and the first run of typing would be lost.
@@ -1240,26 +1264,18 @@ empty ones when it starts (S58).
   counts only once the card was seen in the records: a card just created is
   not there until the records redraw.
 - **Undo** is the tab's Kyneta stack (`session.undo`, `createUndoStack`), in
-  memory, over the cards document and every `card:` document. A box undoes
+  memory, over every `card:` document. A box undoes
   only its own card (ADR-0052): `attach` sends Cmd+Z, Cmd+Shift+Z and Ctrl+Y
   to `session.undoFor(card)`, which passes Kyneta the card's text document
   (`undo({ docs })`), so it takes that card's newest step even under newer
   steps in other cards. `SessionClient` exposes only `undoFor`: the stack's
   own `undo()` takes its top step, which can be anywhere.
-  Creating a card is one step with its first text, so undoing past it removes
-  the record. Typing is grouped by word.
-- **An emptied box can redo its card.** When a bound card goes without a send
-  from this box (your undo past its creation, or someone else's send),
-  `editorState` keeps it as `local.last`; a redo there (`isRedo`: the keys,
-  and a `beforeinput` of `historyRedo`, which takes a native listener)
-  redoes through `undoFor(last)`, and the record coming back binds the box
-  (`found`). Whether the key is the editor's is the step's `claims`: every
-  emptied box claims it, with a card to redo or not, and a bound box never
-  does, since Kyneta's binding takes the undo keys. Another card's creation leaves that redo alone: Kyneta
-  conflicts steps by the record keys and texts they write, not by document
-  (S64, addendum 3).
+  Creating a card is one step with its first text, so undoing past it empties
+  the card; its record, which only the host writes, stays, so the box stays
+  bound to it, and Cmd+Shift+Z there brings the text back. Typing is grouped
+  by word.
 - **A card the host spent is destroyed on every client holding it** (S64),
-  so no step on it stands, and a redo in an emptied box cannot write into it.
+  so no step on it stands, and no undo or redo in its box can write into it.
   The host's `dismiss` leaves a receiver's copy, so `connectSession`
   watches each card document `cardText` opens, the client's one opener of
   them: `hostLetGo` says the host left it while connected, and `spentCards`
@@ -1275,8 +1291,8 @@ empty ones when it starts (S58).
   someone who undid everything they wrote is still named. Step 6 replaces it
   with a projection of the card's history; marks do not use it.
 - **Closing a fresh column that holds text** asks in its header; discard
-  deletes the record outside the undo stack, since no column could show it
-  again.
+  asks the host to remove the card, outside the undo stack, since no column
+  could show it again.
 
 ## Marks for your cards (ADR-0048, step 2)
 

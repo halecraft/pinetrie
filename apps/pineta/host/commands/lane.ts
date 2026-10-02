@@ -12,9 +12,9 @@ import {
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
-  readCards,
   readLane,
   readLanes,
+  readPlaces,
   readStops,
   readTreeIndex,
 } from "@pineta/reads"
@@ -40,9 +40,9 @@ export async function handleStop(
   by: WriterId,
 ): Promise<Outcome> {
   const { agent } = deps
-  const { doc, cards, now } = deps.basics
+  const { doc, places, now } = deps.basics
   const index = readTreeIndex(doc)
-  const planned = planStop(readLanes(doc, index, readCards(cards)), lane, {
+  const planned = planStop(readLanes(doc, index, readPlaces(places)), lane, {
     index,
     stops: readStops(doc),
     by,
@@ -81,8 +81,8 @@ export async function actOnOffer(
       message: "this host has no lanes of their own",
     }
   if (action === "split") {
-    const { doc, cards } = deps.basics
-    const view = readLane(doc, lane, readCards(cards))
+    const { doc, places } = deps.basics
+    const view = readLane(doc, lane, readPlaces(places))
     if (view === undefined || isBusy(view))
       return {
         kind: "refused",

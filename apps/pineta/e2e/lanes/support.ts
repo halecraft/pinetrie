@@ -21,9 +21,9 @@ import {
 } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import {
-  readCards,
   readLaneRecords,
   readLanes,
+  readPlaces,
   readTreeIndex,
 } from "@pineta/reads"
 import { readEntries, rowMessage } from "@pineta/schema"
@@ -52,6 +52,7 @@ export function bringUpToDate(
     {
       id,
       owner: session.writer,
+      placer: session.writer,
       place: { kind: "drafting", at: where, lane },
       command: "bring-up-to-date",
       unsent: null,
@@ -178,7 +179,7 @@ export async function sectionHost(input: {
       Object.values(index.entries).find(
         e => projectTranscript(index, e.id).at(-1)?.text === text,
       )?.id ?? null
-    return readLanes(host.doc, index, readCards(host.cards)).find(
+    return readLanes(host.doc, index, readPlaces(host.places)).find(
       l => id !== null && ancestry(index, l.tip).path.includes(id),
     )
   }

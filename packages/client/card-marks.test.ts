@@ -25,6 +25,7 @@ const tree = (...more: EntryLike[]): TreeIndex =>
 const drafting = (id: string, at: string, owner = ADA): CardRecord => ({
   id: cardId(id),
   owner,
+  placer: owner,
   place: { kind: "drafting", at: atEntry(entryId(at)), lane: null },
   command: null,
   unsent: null,
@@ -32,6 +33,7 @@ const drafting = (id: string, at: string, owner = ADA): CardRecord => ({
 const fresh = (id: string, column: string): CardRecord => ({
   id: cardId(id),
   owner: ADA,
+  placer: ADA,
   place: { kind: "fresh", column },
   command: null,
   unsent: null,

@@ -13,7 +13,7 @@ import path from "node:path"
 import { type ConnectOptions, connectSession } from "@pineta/client/session"
 import { prepareHost } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
-import { readCards } from "@pineta/reads"
+import { readPlaces } from "@pineta/reads"
 import {
   type RunningHost,
   type StartHostOptions,
@@ -37,15 +37,15 @@ export async function waitFor(
 }
 
 /** No card is queued on any lane (ADR-0048): nothing waits to be taken. */
-export const noQueued = (host: Pick<RunningHost, "cards">): boolean =>
-  readCards(host.cards).every(c => c.place.kind !== "queued")
+export const noQueued = (host: Pick<RunningHost, "places">): boolean =>
+  readPlaces(host.places).every(c => c.place.kind !== "queued")
 
 /**
  * The host has nothing to do: no lane runs, and no card waits for one. A card
  * queued under a run is taken only as it ends, so "no run" alone can hold
  * between a run's end and the take.
  */
-export const idleNow = (host: Pick<RunningHost, "doc" | "cards">): boolean =>
+export const idleNow = (host: Pick<RunningHost, "doc" | "places">): boolean =>
   Object.keys(host.doc.activeRuns()).length === 0 && noQueued(host)
 
 /**

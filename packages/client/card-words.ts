@@ -3,6 +3,7 @@
 
 import type { CardCommand, WriterId } from "@pineta/core"
 import { displayName } from "@pineta/marginalia"
+import type { Refusal } from "./card-moves.ts"
 import { lineWords, type Reader } from "./send.ts"
 
 /** A command's name as people read it: the button's label too. */
@@ -34,13 +35,29 @@ export const queuedWords = (by: WriterId, n: number, reader: Reader): string =>
 export const unsentWords = (reason: string): string => `not sent: ${reason}`
 
 /**
- * An unqueue that lost (S69): the host had taken the card, so it was sent
- * as its queuer's message.
+ * A move of yours the host refused (ADR-0059). Gone from the queue, the host
+ * had taken the card first (S69), so it was sent as its queuer's message;
+ * moved, someone else moved it first.
  */
-export const alreadySentWords = (by: WriterId, reader: Reader): string =>
-  by === reader.me
-    ? "already sent as your message: it was taken before you unqueued it"
-    : `already sent as ${displayName(by, reader.nameOf.get(by))}'s message: it was taken before you unqueued it`
+export function refusalWords(refusal: Refusal, reader: Reader): string {
+  const { by } = refusal
+  switch (refusal.code) {
+    case "gone":
+      if (!refusal.fromQueue) return "not moved: it was sent or removed first"
+      return by === null
+        ? "already sent: it was taken before you unqueued it"
+        : by === reader.me
+          ? "already sent as your message: it was taken before you unqueued it"
+          : `already sent as ${displayName(by, reader.nameOf.get(by))}'s message: it was taken before you unqueued it`
+    case "moved":
+      return by === null
+        ? "not moved: someone moved it first"
+        : `not moved: ${who(by, reader)} moved it first`
+    case "exists":
+    case "not-fresh":
+      return "not moved"
+  }
+}
 
 /**
  * What an editor's status line says: what its last send said, else why the

@@ -30,6 +30,9 @@ const Command = Schema.struct({
   targetId: Schema.string(),
   cardId: Schema.string(),
   reserved: Schema.string(),
+  seen: Schema.string(),
+  from: Schema.string(),
+  to: Schema.string(),
 })
 
 const Reply = Schema.struct({
@@ -40,6 +43,8 @@ const Reply = Schema.struct({
   errorMessage: Schema.string(),
   entryId: Schema.string(),
   by: Schema.string(),
+  place: Schema.string(),
+  rev: Schema.number(),
 })
 
 /** Asymmetric: client sends Command, host sends Reply. */

@@ -159,8 +159,8 @@ Measured before building (the plan's Phase 0):
 ## Typed text (`text.ts`, ADR-0048)
 
 A card's text is a Yjs document, `TextDoc` (`{ text: Schema.text() }`), with
-id `card:<card id>` (`cardDocId`, `cardIdOfDoc`, in `card.ts`). People type
-together there, so it is a CRDT (ADR-0023); a card's record is in the cards
+id `card:<card id>` (`cardDocId`, `cardIdOfDoc`, in `places.ts`). People type
+together there, so it is a CRDT (ADR-0023); a card's record is in the places
 document.
 
 - **`seatOf(peerId, principal)` is the one place a seat becomes a person**:
@@ -186,21 +186,33 @@ document.
   document (S24); at a card's size its history is small.
 - **Yjs costs the page about 36 kB gzipped.** It is plain JavaScript: no wasm.
 
-## Cards (`card.ts`, ADR-0048)
+## Places (`places.ts`, ADR-0059)
 
-`CardsDoc` holds every card's record, keyed by card id: `yjs.bind` of a
-record of flat string structs (`owner`, `kind`, `at`, `lane`, `column`, ""
-for none), decoded in `@pineta/marginalia` (`decodeCard`). Clients write it;
-the host only deletes, to spend or sweep.
+`PlacesDoc` holds every card's record, keyed by card id: `json.bind` of a
+record of flat string rows (`owner`, `kind`, `at`, `lane`, `column`,
+`order`, `by`, `seen`, `command`, `unsent`, `placer`, "" for none), decoded in
+`@pineta/marginalia` (`decodeCard`), and `rev`. Only the host writes it,
+through `applyPlaceStep` (`apps/pineta/host/places.ts`).
 
-- **Written whole once, then field by field** (S58): a host's delete beats a
-  concurrent field write, but a concurrent whole-record set brings the card
-  back. Keys are uuidv7, so no two writers create one (ADR-0016).
-- **A live Yjs document, never compacted** (S24), as a card's text is. A
-  spent card's text document is destroyed instead (`exchange.destroy`),
-  which stores nothing more even while its owner still holds a replica.
-- **`newCardsDoc()`** is one with no Exchange, for tests, as `newSessionDoc`
-  is.
+- **A place does not merge** (S75), so it is not a CRDT: one writer, in
+  arrival order, through handoffs the host applies or refuses (ADR-0059).
+- **A client must never write it.** The host's policy refuses the write,
+  and the writer's copy then keeps its own value for good, even after the
+  host writes that card again (S28, S76). The client keeps the document
+  private: the page reads `SessionClient.cards`.
+- **`rev` is raised with every write, in the same batch.** A reply to a
+  move carries it, and a client draws its move until its copy's `rev`
+  reaches it (`packages/client/card-moves.ts`). A write that skipped `rev`
+  would leave a client drawing a move over a record that had changed.
+- **A row is one leaf** (`Schema.struct.json`): the host writes a record
+  whole. Kyneta gives an unchanged row the same object across writes, which
+  `readPlaces` relies on.
+- **Compacted with the session** (`compactSession`), as `json` keeps an op
+  log until it is (S25).
+- **`newPlacesDoc()`** is one with no Exchange, for tests.
+- **A store from before ADR-0059 holds a `pineta:cards` document** that no
+  code opens; delete it by hand. The startup sweep removes the texts no
+  record names.
 
 ## Persistence
 
@@ -208,7 +220,7 @@ The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`
 over `node:sqlite`, `.pineta/pineta.db` by default. It holds every document the
 host serves, one append-only record stream per document: the `SessionDoc`,
 which is also pi's storage, each live card's text, the
-cards document, and each connected client's command Line. A tab's undo stack
+places document, and each connected client's command Line. A tab's undo stack
 is never stored here: the host rejects it (`resolveDoc`). It is not a pi session file.
 
 - **The store owns its file** (S47, `apps/pineta/host/store.ts`): exclusive

@@ -26,7 +26,8 @@ operations is provisional until then. Amended by ADR-0059: a card's place
 has one owner at a time, the session's host or a person's inventory; the
 host writes places, and moves between owners are handoffs it applies or
 refuses; the inventory is a document of slots that only its person's tabs
-write; the cards document goes.
+write; the cards document goes. Places written by the host, for the
+places there are now, implemented by `PLAN-2026-10-02-card-places`.
 
 **Context.**
 

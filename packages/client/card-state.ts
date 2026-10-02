@@ -22,13 +22,8 @@ export const needsCard = (
 ): boolean => sendable(text, prefill, false) !== null
 
 export type EditorState =
-  /**
-   * No card: the element holds what is typed, and nothing else does. `last`
-   * is the card the box was bound to until it went without a send from here
-   * (your undo past its creation, or someone else's send), which a redo in
-   * the box can bring back.
-   */
-  | { readonly kind: "local"; readonly last: CardId | null }
+  /** No card: the element holds what is typed, and nothing else does. */
+  | { readonly kind: "local" }
   /** The element is bound to this card's text. */
   | { readonly kind: "bound"; readonly card: CardId }
   /** A send is in flight, from this card or, with null, from the box alone. */
@@ -39,11 +34,12 @@ export type EditorEvent =
   | { readonly kind: "input"; readonly text: string; readonly card: CardId }
   /** Your card here exists: found on opening, or made by another of your tabs. */
   | { readonly kind: "found"; readonly card: CardId }
-  /** Your card here is gone: someone sent it, or it was discarded. */
+  /**
+   * Your card here is gone: someone sent it, or it was discarded. An undo
+   * past its creation only empties it (ADR-0059), so it is not gone.
+   */
   | { readonly kind: "gone" }
   | { readonly kind: "send" }
-  /** A redo in the box while it holds no card (`isRedo`). */
-  | { readonly kind: "redo" }
   /** The host answered the send; `spent` is whether it took the card's text. */
   | { readonly kind: "settled"; readonly spent: boolean }
 
@@ -51,10 +47,9 @@ export type EditorEvent =
  * What the component does on the way to the next state:
  * - `create`: write the card from the element's text;
  * - `attach`: bind the element to the card, which exists;
- * - `detach`: unbind it, and empty it;
- * - `redo`: redo the last card's history (`local.last`).
+ * - `detach`: unbind it, and empty it.
  */
-export type EditorAct = "create" | "attach" | "detach" | "redo"
+export type EditorAct = "create" | "attach" | "detach"
 
 export interface EditorStep {
   readonly state: EditorState
@@ -64,17 +59,14 @@ export interface EditorStep {
    * the first run of typing would be lost.
    */
   readonly acts: readonly EditorAct[]
-  /**
-   * The key that made a `redo` step is the editor's: its default is
-   * prevented. Bound, Kyneta's binding takes the undo keys itself.
-   */
-  readonly claims: boolean
 }
+
+const LOCAL: EditorState = { kind: "local" }
 
 const step = (
   state: EditorState,
   acts: readonly EditorAct[] = [],
-): EditorStep => ({ state, acts, claims: false })
+): EditorStep => ({ state, acts })
 const stay = (state: EditorState): EditorStep => step(state)
 
 export function editorState(
@@ -94,16 +86,7 @@ export function editorState(
     case "gone":
       // While sending, the host spends the card as part of this send: the
       // reply says how it went.
-      return state.kind === "bound"
-        ? step({ kind: "local", last: state.card }, ["detach"])
-        : stay(state)
-    case "redo":
-      // An emptied box takes the redo key, with a card to bring back or not.
-      if (state.kind !== "local") return stay(state)
-      return {
-        ...step(state, state.last === null ? [] : ["redo"]),
-        claims: true,
-      }
+      return state.kind === "bound" ? step(LOCAL, ["detach"]) : stay(state)
     case "send":
       return state.kind === "sending"
         ? stay(state)
@@ -113,41 +96,19 @@ export function editorState(
           })
     case "settled":
       if (state.kind !== "sending") return stay(state)
-      if (event.spent) return step({ kind: "local", last: null }, ["detach"])
+      if (event.spent) return step(LOCAL, ["detach"])
       // A conflict or a refusal: nothing was sent, and the card is still
       // there, so nothing is restored.
       return state.card === null
-        ? stay({ kind: "local", last: null })
+        ? stay(LOCAL)
         : stay({ kind: "bound", card: state.card })
   }
-}
-
-/** A key press or an input event, as much of either as `isRedo` reads. */
-export type RedoEvent =
-  | {
-      readonly key: string
-      readonly metaKey: boolean
-      readonly ctrlKey: boolean
-      readonly shiftKey: boolean
-    }
-  | { readonly inputType: string }
-
-/**
- * Whether an event asks to redo: Cmd/Ctrl+Shift+Z or Ctrl+Y, or a
- * `historyRedo` input (the Edit menu, a touch keyboard). The same events
- * Kyneta's `attach` redoes on, which it does not export.
- */
-export function isRedo(e: RedoEvent): boolean {
-  if ("inputType" in e) return e.inputType === "historyRedo"
-  if (!(e.metaKey || e.ctrlKey)) return false
-  const key = e.key.toLowerCase()
-  return (key === "z" && e.shiftKey) || (key === "y" && e.ctrlKey)
 }
 
 /**
  * Whether the host let go of a card's document: it left the document while
  * still connected. Only the host destroys card documents, and only those of
- * cards it has spent or swept (S64). An undo past a card's creation, yours or
+ * cards it has spent, removed or swept (S64). An undo past a card's creation, yours or
  * another's, leaves the host in place; a departing host leaves
  * `exchange.peers` first, and a dropped one leaves nothing.
  */
@@ -184,14 +145,3 @@ export const startText = (input: {
   input.pending === undefined && input.card === undefined
     ? (input.prefill?.text ?? "")
     : ""
-
-/**
- * The cards this client unqueued whose unqueue lost (ADR-0048, S69): the
- * host took them first, so their records are gone and their documents let
- * go of (`spent`, from `spentCards`). An unqueued card the host did not take
- * is still drafting, and never in `spent`.
- */
-export const alreadySent = (
-  unqueued: ReadonlySet<CardId>,
-  spent: readonly CardId[],
-): CardId[] => spent.filter(id => unqueued.has(id))

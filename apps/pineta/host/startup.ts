@@ -11,7 +11,7 @@ import {
   type WorkRecord,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
-import { readCards, readSeats, readThreadName } from "@pineta/reads"
+import { readPlaces, readSeats, readThreadName } from "@pineta/reads"
 import {
   cardIdOfDoc,
   clearStreams,
@@ -20,12 +20,13 @@ import {
 } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
+import { applyPlaceStep } from "./places.ts"
 import type { Serial } from "./queue.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
 export interface StartupDeps {
-  readonly basics: Pick<Basics, "doc" | "cards" | "log">
+  readonly basics: Pick<Basics, "doc" | "places" | "log">
   readonly agent: Pick<
     Agent,
     | "commands"
@@ -41,7 +42,7 @@ export interface StartupDeps {
   readonly serial: Serial
   readonly start: Runs["start"]
   readonly settle: (lanes: readonly LaneName[]) => Promise<void>
-  readonly cards: Pick<CardPort, "texts" | "stored" | "remove">
+  readonly cards: Pick<CardPort, "texts" | "stored" | "destroyDocs">
 }
 
 /**
@@ -57,7 +58,7 @@ export interface StartupDeps {
  */
 export async function recover(deps: StartupDeps): Promise<void> {
   const { agent, work, serial, settle } = deps
-  const { doc, cards, log } = deps.basics
+  const { doc, places, log } = deps.basics
   clearStreams(doc)
   const { malformed } = readStoredLanes(doc)
   if (malformed.length > 0)
@@ -66,7 +67,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
     )
   await deps.ensureNames()
   const planned = planStartup({
-    cards: readCards(cards),
+    cards: readPlaces(places),
     interrupted: await agent.interrupted(),
     outbox: readValues(doc, LEGACY_OUTBOX_NAMESPACE),
   })
@@ -112,11 +113,11 @@ export async function recover(deps: StartupDeps): Promise<void> {
  */
 async function sweepTexts(deps: StartupDeps): Promise<void> {
   const { agent, cards } = deps
-  const { doc, log } = deps.basics
+  const { doc, places, log } = deps.basics
   // gather
-  const texts = await cards.texts()
+  const texts = await cards.texts(readPlaces(places).map(c => c.id))
   const stored = await cards.stored()
-  const records = readCards(deps.basics.cards)
+  const records = readPlaces(places)
   const seats = readSeats(doc)
   // plan
   const swept = planCardSweep({
@@ -129,8 +130,9 @@ async function sweepTexts(deps: StartupDeps): Promise<void> {
     seats,
     texts.flatMap(t => t.clients),
   )
-  // execute
-  await cards.remove(swept)
+  // execute: each record, then the texts (S64)
+  for (const id of swept.records) applyPlaceStep(places, { kind: "remove", id })
+  await cards.destroyDocs(swept.docs)
   for (const clientId of staleSeats) await agent.removeSeat(clientId)
   if (swept.records.length + swept.docs.length + staleSeats.length > 0)
     log(

@@ -7,7 +7,7 @@ import {
 } from "@kyneta/schema"
 import { cardId, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
-import { cardDocId, cardIdOfDoc } from "./card.ts"
+import { cardDocId, cardIdOfDoc } from "./places.ts"
 import { seatOf, TextDoc, textClients, textHolds, textVersion } from "./text.ts"
 
 test("seatOf: each seat's person, by the clientID its document carries (ADR-0037)", () => {

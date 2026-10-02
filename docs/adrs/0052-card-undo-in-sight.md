@@ -5,7 +5,10 @@
 "the stack is per tab"). Implementation: `PLAN-2026-10-01-card-undo-scope`.
 Amended by ADR-0059: a move between owners is undone by the reverse
 handoff, which the host refuses if the card has moved since; your
-inventory's own moves by Kyneta's undo on your inventory document.
+inventory's own moves by Kyneta's undo on your inventory document. An undo
+past a card's creation empties its text and keeps its record, which only
+the host writes, so the box stays bound to it and Cmd+Shift+Z there brings
+the text back (*The box remembers its card…* no longer applies).
 
 **Context.** ADR-0048 gave each browser tab one undo stack over every card,
 and Cmd+Z in any card's box undid the tab's last step. That step can be

@@ -455,17 +455,20 @@ The rail is E; the column is T. Seeing both at once is the product.
   answers: written or running, the card is gone and the box empty; a
   conflict or a refusal leaves the card, so nothing is lost or put back.
 - **A send to a busy thread queues your card above the line** (ADR-0048), as
-  does a card with a command, even on an idle thread. A queued card is drawn
+  does a card with a command, even on an idle thread. Every move shows at
+  once and is the host's to make (ADR-0059). A queued card is drawn
   after the thread's last message, headed "queued by Bea · 1st in line", with
   "→ bring up to date" when it has the command, and **unqueue**. Anyone here
   can edit it until the host takes it, when the lane is free, in order. An
   unqueued card goes back below the line. Unqueue a card the host had already
   taken and your column says "already sent as Bea's message: it was taken
-  before you unqueued it". A card the host could not send is back below the
-  line saying "not sent: …" until it is queued again.
+  before you unqueued it". A move someone else made first is undone on your
+  screen, saying "not moved: Bea moved it first". A card the host could not
+  send is back below the line saying "not sent: …" until it is queued again.
 - **Cmd+Z in a box undoes only that box's card**, never anything in another
   column or tab (ADR-0052). After you undo past a card's first keystroke,
-  the box is empty and Cmd+Shift+Z there brings the card back.
+  the box is empty but keeps its card, and Cmd+Shift+Z there brings the text
+  back.
 - **Cmd+Z and Cmd+Shift+Z** undo and redo your own typing in a card, never
   someone else's. Each tab has its own history, which a reload forgets.
 - **Closing a new branch that holds text asks** "discard what you typed?";

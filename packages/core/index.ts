@@ -158,6 +158,8 @@ export type Position =
 
 export const ROOT: Position = { kind: "root" }
 export const atEntry = (id: EntryId): Position => ({ kind: "entry", id })
+export const samePosition = (a: Position, b: Position): boolean =>
+  a.kind === "root" ? b.kind === "root" : b.kind === "entry" && a.id === b.id
 
 // --- commands ---------------------------------------------------------------
 
@@ -263,8 +265,11 @@ export type Intent =
        * default (ADR-0032). Read only when the message creates a lane.
        */
       readonly work: WorkSetting | null
-      /** The card the text was sent from, spent once it is written or running (ADR-0048). */
-      readonly card: CardId | null
+      /**
+       * The card the text was sent from, spent once it is written or running
+       * (ADR-0048), or queued when the lane is busy (ADR-0059).
+       */
+      readonly card: SentCard | null
       /**
        * The lane id the sender's column reserved: the id a lane this message
        * creates is created under, unless pi holds it (ADR-0057).
@@ -294,6 +299,14 @@ export type Intent =
       readonly kind: "offer"
       readonly lane: LaneName
       readonly action: OfferAction
+    }
+  /** Move a card, create one, or remove one (ADR-0059). */
+  | { readonly kind: "move"; readonly move: Move }
+  /** Set a card's command, or clear it with null (ADR-0055). */
+  | {
+      readonly kind: "set-command"
+      readonly card: CardId
+      readonly command: CardCommand | null
     }
 
 /**
@@ -736,15 +749,202 @@ export type CardPlace =
   | { readonly kind: "fresh"; readonly column: string }
 
 /**
- * A card's record, in the cards document, which clients write. Its text is
- * its own document; who wrote in it is read from that document's operations
- * (`writersOf`), never stored here.
+ * The card a chat is sent from, with its text's version as its sender had it
+ * (`textVersion`): queued, the host takes it only once it holds that much
+ * of the text (S72).
+ */
+export interface SentCard {
+  readonly id: CardId
+  readonly seen: string
+}
+
+type OmitEach<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+
+/**
+ * Where a card is, without what the host assigns when it queues one (its
+ * order and who queued it). A move compares it and targets it. A queued key
+ * keeps its text's version (`seen`), which the queuer sends with the move
+ * (S72).
+ */
+export type PlaceKey = OmitEach<CardPlace, "order" | "by">
+
+export function keyOf(place: CardPlace): PlaceKey {
+  switch (place.kind) {
+    case "drafting":
+      return place
+    case "queued":
+      return {
+        kind: "queued",
+        at: place.at,
+        lane: place.lane,
+        seen: place.seen,
+      }
+    case "fresh":
+      return place
+  }
+}
+
+/**
+ * Whether two keys name one place. A queue's order is not part of a key, so
+ * a reorder does not make someone else's unqueue fail.
+ */
+export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
+  switch (a.kind) {
+    case "drafting":
+      return (
+        b.kind === "drafting" && samePosition(a.at, b.at) && a.lane === b.lane
+      )
+    case "queued":
+      return (
+        b.kind === "queued" && samePosition(a.at, b.at) && a.lane === b.lane
+      )
+    case "fresh":
+      return b.kind === "fresh" && a.column === b.column
+  }
+}
+
+/**
+ * A handoff (ADR-0059): move a card from where its sender saw it to another
+ * place. `from` null creates the card; `to` null removes it.
+ */
+export interface Move {
+  readonly card: CardId
+  readonly from: PlaceKey | null
+  readonly to: PlaceKey | null
+}
+
+/** Why the host refused a move (ADR-0059). */
+export type MoveRefusal =
+  /** The card is no longer where the sender saw it. */
+  | "moved"
+  /** The card has no record: sent, or discarded. */
+  | "gone"
+  /** A creation whose id is taken. */
+  | "exists"
+  /** A removal of a card that is not in a fresh column. */
+  | "not-fresh"
+
+/**
+ * A place as flat strings, "" for none: how the places document stores it,
+ * and how the wire carries a key. `placeFields` writes this shape, and
+ * `placeOfFields` and `keyOfFields` read it.
+ */
+export interface PlaceFields {
+  readonly kind: string
+  readonly at: string
+  readonly lane: string
+  readonly column: string
+  readonly order: string
+  readonly by: string
+  readonly seen: string
+}
+
+const entryOrEmpty = (at: Position): string => (at.kind === "root" ? "" : at.id)
+
+/** A place (or a key, whose `order` and `by` are "") as flat strings. */
+export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
+  switch (place.kind) {
+    case "drafting":
+      return {
+        kind: "drafting",
+        at: entryOrEmpty(place.at),
+        lane: place.lane ?? "",
+        column: "",
+        order: "",
+        by: "",
+        seen: "",
+      }
+    case "queued":
+      return {
+        kind: "queued",
+        at: entryOrEmpty(place.at),
+        lane: place.lane,
+        column: "",
+        order: "order" in place ? place.order : "",
+        by: "by" in place ? place.by : "",
+        seen: place.seen,
+      }
+    case "fresh":
+      return {
+        kind: "fresh",
+        at: "",
+        lane: "",
+        column: place.column,
+        order: "",
+        by: "",
+        seen: "",
+      }
+  }
+}
+
+/**
+ * Flat strings -> a place; undefined for one that is malformed. A drafting
+ * or queued card's `at` is an entry, never the root, and a fresh card's
+ * column is never "". A drafting card whose lane is not a thread's keeps its
+ * place with no lane: dropped, its text would be swept at the next start,
+ * and the lane only says which thread it follows. A queued card needs its
+ * lane, its order and who queued it.
+ */
+export function placeOfFields(f: PlaceFields): CardPlace | undefined {
+  switch (f.kind) {
+    case "fresh":
+      return f.column === "" ? undefined : { kind: "fresh", column: f.column }
+    case "drafting":
+      return f.at === ""
+        ? undefined
+        : {
+            kind: "drafting",
+            at: atEntry(entryId(f.at)),
+            lane: isLaneName(f.lane) ? f.lane : null,
+          }
+    case "queued":
+      return f.at === "" || !isLaneName(f.lane) || f.order === "" || f.by === ""
+        ? undefined
+        : {
+            kind: "queued",
+            at: atEntry(entryId(f.at)),
+            lane: f.lane,
+            order: f.order,
+            by: f.by as WriterId,
+            seen: f.seen,
+          }
+    default:
+      return undefined
+  }
+}
+
+/**
+ * Flat strings -> a key, as a move names one; undefined for one that is
+ * malformed. A queued key has no order and no queuer, and keeps its text's
+ * version.
+ */
+export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
+  if (f.kind !== "queued") return placeOfFields(f)
+  return f.at === "" || !isLaneName(f.lane)
+    ? undefined
+    : {
+        kind: "queued",
+        at: atEntry(entryId(f.at)),
+        lane: f.lane,
+        seen: f.seen,
+      }
+}
+
+/**
+ * A card's record, in the places document, which only the host writes
+ * (ADR-0059). Its text is its own document; who wrote in it is read from
+ * that document's operations (`writersOf`), never stored here.
  */
 export interface CardRecord {
   readonly id: CardId
   /** Who created it: whose composer it is. */
   readonly owner: WriterId
   readonly place: CardPlace
+  /**
+   * Who put it where it is: the sender of the last move the host accepted.
+   * A write the host makes itself (a refused take written back) keeps it.
+   */
+  readonly placer: WriterId
   /** What it is sent through when taken (ADR-0055); null for a plain message. */
   readonly command: CardCommand | null
   /** Why the host could not send it, until it is queued again; null when it never failed. */

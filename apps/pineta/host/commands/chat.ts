@@ -28,10 +28,10 @@ import {
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
-  readCards,
   readLanes,
   readParticipantNames,
   readParticipants,
+  readPlaces,
   readThreadName,
   readTreeIndex,
   workAt,
@@ -98,12 +98,12 @@ export async function sendChat(
   const contributors =
     chat.card === null
       ? []
-      : (await cards.writers(chat.card)).filter(w => w !== writer)
+      : (await cards.writers(chat.card.id)).filter(w => w !== writer)
 
   // plan (pure)
   const thread = threadOf(
     index,
-    readLanes(doc, index, readCards(deps.basics.cards)),
+    readLanes(doc, index, readPlaces(deps.basics.places)),
     {
       at: chat.at,
       mode: chat.mode,

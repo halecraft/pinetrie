@@ -1,15 +1,13 @@
-// card — a card's record and where it sits (ADR-0048).
+// card — a card's record and where it sits (ADR-0048, ADR-0059).
 //
-// A card is live text in a place. Its text is its own `TextDoc` and its record
-// is in the cards document (`CardsDoc` in @pineta/schema), both written by
-// clients; the host writes only to take a queued card, to write back one it
-// could not send, and to sweep empty ones when it starts.
-// This module decodes the record, and decides where a card sits now, which
-// queued card is taken next, and which are swept. Who wrote in it is
-// `writersOf` (`seat.ts`).
+// A card is live text in a place. Its text is its own `TextDoc`, written by
+// clients; its record is in the places document (`PlacesDoc` in
+// @pineta/schema), which only the host writes, through handoffs it applies
+// or refuses (`planMove`). This module decodes a record, and decides where a
+// card sits now, which moves the host accepts, which queued card is taken
+// next, and which are swept. Who wrote in it is `writersOf` (`seat.ts`).
 
 import {
-  atEntry,
   CARD_COMMANDS,
   type CardCommand,
   type CardId,
@@ -17,11 +15,16 @@ import {
   type CardRecord,
   cardId,
   type EntryId,
-  entryId,
-  isLaneName,
+  keyOf,
   type LaneName,
   type LaneView,
+  type Move,
+  type MoveRefusal,
+  type PlaceKey,
   type Position,
+  placeFields,
+  placeOfFields,
+  sameKey,
   type TreeIndex,
   threadOf,
   type WriterId,
@@ -30,32 +33,27 @@ import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 
 /**
- * A card as the cards document stores it: flat strings, "" for none. A
- * drafting or queued card's `at` is always an entry: a thread's end is never
- * the root. The fields after `column` came later, so a record stored before
- * them lacks them, and they read as "".
+ * A card as the places document stores it: flat strings, "" for none. The
+ * host writes a record whole, so every field is there.
  */
 const StoredCard = Type.Object({
   owner: Type.String({ minLength: 1 }),
-  kind: Type.Union([
-    Type.Literal("drafting"),
-    Type.Literal("queued"),
-    Type.Literal("fresh"),
-  ]),
+  kind: Type.String(),
   at: Type.String(),
   lane: Type.String(),
   column: Type.String(),
-  order: Type.Optional(Type.String()),
-  by: Type.Optional(Type.String()),
-  seen: Type.Optional(Type.String()),
-  command: Type.Optional(Type.String()),
-  unsent: Type.Optional(Type.String()),
+  order: Type.String(),
+  by: Type.String(),
+  seen: Type.String(),
+  command: Type.String(),
+  unsent: Type.String(),
+  placer: Type.String({ minLength: 1 }),
 })
 
-/** The flat value the cards document stores under a card's id. */
+/** The flat value the places document stores under a card's id. */
 export interface StoredCardFields {
   readonly owner: string
-  readonly kind: CardPlace["kind"]
+  readonly kind: string
   readonly at: string
   readonly lane: string
   readonly column: string
@@ -64,104 +62,48 @@ export interface StoredCardFields {
   readonly seen: string
   readonly command: string
   readonly unsent: string
+  readonly placer: string
 }
 
-const entryOrEmpty = (at: Position): string => (at.kind === "root" ? "" : at.id)
-
-/** A card record -> the flat value the cards document stores under its id. */
-export function encodeCard({
+/** A card record -> the flat value the places document stores under its id. */
+export const encodeCard = ({
   owner,
   place,
+  placer,
   command,
   unsent,
-}: CardRecord): StoredCardFields {
-  const rest = { owner, command: command ?? "", unsent: unsent ?? "" }
-  switch (place.kind) {
-    case "drafting":
-      return {
-        ...rest,
-        kind: "drafting",
-        at: entryOrEmpty(place.at),
-        lane: place.lane ?? "",
-        column: "",
-        order: "",
-        by: "",
-        seen: "",
-      }
-    case "queued":
-      return {
-        ...rest,
-        kind: "queued",
-        at: entryOrEmpty(place.at),
-        lane: place.lane,
-        column: "",
-        order: place.order,
-        by: place.by,
-        seen: place.seen,
-      }
-    case "fresh":
-      return {
-        ...rest,
-        kind: "fresh",
-        at: "",
-        lane: "",
-        column: place.column,
-        order: "",
-        by: "",
-        seen: "",
-      }
-  }
-}
+}: CardRecord): StoredCardFields => ({
+  owner,
+  ...placeFields(place),
+  command: command ?? "",
+  unsent: unsent ?? "",
+  placer,
+})
 
 const isCommand = (s: string): s is CardCommand =>
   (CARD_COMMANDS as readonly string[]).includes(s)
 
 /**
  * A stored card -> its record; undefined for one that is malformed, a
- * command this build does not know among them. Total. A drafting card's
- * lane that is not a thread's is dropped and the card kept: the startup
- * sweep deletes the text of a card that does not decode (`planCardSweep`).
- * A queued card needs its lane, so one with such a lane does not decode.
+ * command this build does not know among them. Total. Where it is is read by
+ * core's `placeOfFields`, as a move's key on the wire is by `keyOfFields`.
  */
 export const decodeCard = (
   id: string,
   value: unknown,
 ): CardRecord | undefined =>
   decodeWith(StoredCard, value, c => {
-    const order = c.order ?? ""
-    const by = c.by ?? ""
-    const command = c.command ?? ""
-    const place: CardPlace | undefined =
-      c.kind === "fresh"
-        ? c.column === ""
-          ? undefined
-          : { kind: "fresh", column: c.column }
-        : c.at === ""
-          ? undefined
-          : c.kind === "drafting"
-            ? {
-                kind: "drafting",
-                at: atEntry(entryId(c.at)),
-                lane: isLaneName(c.lane) ? c.lane : null,
-              }
-            : !isLaneName(c.lane) || order === "" || by === ""
-              ? undefined
-              : {
-                  kind: "queued",
-                  at: atEntry(entryId(c.at)),
-                  lane: c.lane,
-                  order,
-                  by: by as WriterId,
-                  seen: c.seen ?? "",
-                }
+    const place = placeOfFields(c)
     if (place === undefined) return undefined
+    const { command } = c
     if (command !== "" && !isCommand(command)) return undefined
     return {
       id: cardId(id),
       owner: c.owner as WriterId,
       place,
+      placer: c.placer as WriterId,
       command: command === "" ? null : command,
-      unsent: (c.unsent ?? "") === "" ? null : (c.unsent ?? null),
+      unsent: c.unsent === "" ? null : c.unsent,
     }
   })
 
@@ -294,37 +236,6 @@ export function orderAfter(queue: readonly QueuedCard[]): string {
   )
 }
 
-/**
- * The fields a client writes to queue a card: its place becomes queued, and
- * `unsent` is cleared. Written field by field, never the whole record (S58).
- */
-export const queueFields = (queue: {
-  readonly at: Position
-  readonly lane: LaneName
-  readonly by: WriterId
-  readonly order: string
-  readonly seen: string
-}): Pick<
-  StoredCardFields,
-  "kind" | "at" | "lane" | "order" | "by" | "seen" | "unsent"
-> => ({
-  kind: "queued",
-  at: entryOrEmpty(queue.at),
-  lane: queue.lane,
-  order: queue.order,
-  by: queue.by,
-  seen: queue.seen,
-  unsent: "",
-})
-
-/**
- * The fields a client writes to unqueue a card: only its kind. Its `at` and
- * `lane` are where it was queued, so it goes back there, below the line.
- */
-export const unqueueFields = (): Pick<StoredCardFields, "kind"> => ({
-  kind: "drafting",
-})
-
 /** What an idle lane's queue gives up next. */
 export type TakeStep =
   | { readonly kind: "idle" }
@@ -342,21 +253,128 @@ export function planTake(
 }
 
 /**
- * A taken card the host could not send, as the whole record it writes back:
- * drafting where it was queued, saying why. Never queued again, or the next
- * drain would take it and fail the same way (S69, answer 5).
+ * A taken card the host could not send, written back: drafting where it was
+ * queued, saying why, its command and placer kept, since the host's own
+ * write is nobody's move. Never queued again, or the next drain would take
+ * it and fail the same way (S69, answer 5).
  */
-export const planUnsent = (
-  card: QueuedCard,
-  reason: string,
-): StoredCardFields =>
-  encodeCard({
-    id: card.id,
-    owner: card.owner,
+export const planUnsent = (card: QueuedCard, reason: string): PlaceStep => ({
+  kind: "write",
+  record: {
+    ...card,
     place: { kind: "drafting", at: card.place.at, lane: card.place.lane },
-    command: card.command,
     unsent: reason,
-  })
+  },
+})
+
+// ── handoffs (ADR-0059) ───────────────────────────────────────────────────
+
+/** A write to the places document, as the host's one writer carries it out. */
+export type PlaceStep =
+  | { readonly kind: "write"; readonly record: CardRecord }
+  | { readonly kind: "remove"; readonly id: CardId }
+
+/** What the host makes of a move: a step to carry out, or a refusal. */
+export type MoveStep =
+  | PlaceStep
+  | {
+      readonly kind: "refused"
+      readonly code: MoveRefusal
+      /** The card as it is, or null when it is gone. */
+      readonly now: CardRecord | null
+    }
+
+/** A key as the place it becomes, with what the host assigns to a queued one. */
+function placeAt(
+  key: PlaceKey,
+  cards: readonly CardRecord[],
+  sender: WriterId,
+): CardPlace {
+  return key.kind === "queued"
+    ? { ...key, order: orderAfter(queuedOn(cards, key.lane)), by: sender }
+    : key
+}
+
+/**
+ * A handoff: a compare-and-set on where the card is. The host accepts a move
+ * only if the card is still where its sender saw it; a reorder does not count
+ * as moving it (`sameKey`). Every accepted move names its sender as the
+ * card's placer. Pure.
+ *
+ * - No `from`: the card is created, its sender its owner, with no command.
+ * - No `to`: the card is removed. Only a fresh column's card is: closing an
+ *   unsent column is the only removal there is.
+ * - To the queue: after the lane's last card, queued by the sender, and why
+ *   it was not sent before is cleared. Below the line again, it keeps both.
+ */
+export function planMove(
+  cards: readonly CardRecord[],
+  move: Move,
+  sender: WriterId,
+): MoveStep {
+  const now = cards.find(c => c.id === move.card)
+  if (move.from === null) {
+    if (now !== undefined) return { kind: "refused", code: "exists", now }
+    if (move.to === null) return { kind: "refused", code: "gone", now: null }
+    return {
+      kind: "write",
+      record: {
+        id: move.card,
+        owner: sender,
+        place: placeAt(move.to, cards, sender),
+        placer: sender,
+        command: null,
+        unsent: null,
+      },
+    }
+  }
+  if (now === undefined) return { kind: "refused", code: "gone", now: null }
+  if (!sameKey(keyOf(now.place), move.from))
+    return { kind: "refused", code: "moved", now }
+  if (move.to === null)
+    return now.place.kind === "fresh"
+      ? { kind: "remove", id: now.id }
+      : { kind: "refused", code: "not-fresh", now }
+  return {
+    kind: "write",
+    record: {
+      ...now,
+      place: placeAt(move.to, cards, sender),
+      placer: sender,
+      unsent: move.to.kind === "queued" ? null : now.unsent,
+    },
+  }
+}
+
+/**
+ * A move and what follows it: the lane to drain, when the move leaves the
+ * card queued on a lane that is not running. Pure.
+ */
+export function planMoveCommand(
+  cards: readonly CardRecord[],
+  move: Move,
+  sender: WriterId,
+  running: (lane: LaneName) => boolean,
+): { readonly step: MoveStep; readonly drain: LaneName | null } {
+  const step = planMove(cards, move, sender)
+  const lane =
+    step.kind === "write" && step.record.place.kind === "queued"
+      ? step.record.place.lane
+      : null
+  return { step, drain: lane !== null && !running(lane) ? lane : null }
+}
+
+/** Set a card's command, or clear it: its place and placer kept. Pure. */
+export function planSetCommand(
+  cards: readonly CardRecord[],
+  card: CardId,
+  command: CardCommand | null,
+): MoveStep {
+  const now = cards.find(c => c.id === card)
+  return now === undefined
+    ? { kind: "refused", code: "gone", now: null }
+    : { kind: "write", record: { ...now, command } }
+}
 
 /**
  * What a starting host deletes: records whose text is empty and that carry

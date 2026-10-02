@@ -5,8 +5,8 @@ becomes a card's command, and its prefill goes) and ADR-0036 (a second kind
 of command, which is not typed). Part of ADR-0048's step 3. Implemented by
 `PLAN-2026-10-01-queued-cards`. Amended in place (2026-10-02): a queued card
 is *unqueued*, not stopped; "stop" is a run's word (ADR-0056). Amended by
-ADR-0059: a card's command lives in the card's own document, beside its
-text, and the cards document goes.
+ADR-0059: a card's command is in the host's place record, set by a
+request, and the cards document goes.
 
 **Context.** ADR-0048 makes queued messages queued cards, and removes
 `pineta.outbox`. The outbox holds two kinds of thing: messages, and "Update
