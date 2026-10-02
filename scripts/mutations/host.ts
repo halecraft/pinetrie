@@ -609,7 +609,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a late live digest overwrites the final one",
     file: "apps/pineta/host/digests.ts",
-    from: "          if (!digestStillWanted(readDigests(doc).get(ask), { final })) return\n",
+    from: "            if (!digestStillWanted(readDigests(doc).get(ask), { final })) return\n",
     to: "",
     command: unit,
     expect: "a live digest that comes back after the final one is dropped",
@@ -629,5 +629,13 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect: "holds its key while out",
+  },
+  {
+    name: "a run's end names no prompt",
+    file: "apps/pineta/host/runs.ts",
+    from: "          return ended(lane, prompt?.id ?? null)\n",
+    to: "          return ended(lane, null)\n",
+    command: unit,
+    expect: "ended is given the prompt the run answered",
   },
 ]

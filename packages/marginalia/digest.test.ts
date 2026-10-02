@@ -1,3 +1,4 @@
+import { type EntryLike, entryId, indexAsks, indexTree } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   DIGEST_EVERY,
@@ -8,6 +9,7 @@ import {
   digestRequest,
   digestStillWanted,
   encodeDigest,
+  planDigest,
 } from "./index.ts"
 
 describe("digestDue", () => {
@@ -83,4 +85,66 @@ test("digestRequest: the ask always, the newest work that fits, and the summary 
   expect(user).not.toContain("step 0\n")
   expect(user).toContain("earlier left out")
   expect(user).toContain("The summary so far:\nReading the rail.")
+})
+
+describe("planDigest", () => {
+  const at = (
+    id: string,
+    parentId: string | null,
+    message: Record<string, unknown>,
+  ): EntryLike => ({ id, parentId, type: "message", message })
+  // Two chat asks, a land ask, and a message no run answered, in a line.
+  const index = indexTree(
+    Object.fromEntries(
+      [
+        at("p-0", null, { role: "chat", author: "Ada", content: "first" }),
+        at("w-0", "p-0", { role: "assistant", content: "did first" }),
+        at("p-1", "w-0", { role: "chat", author: "Bea", content: "second" }),
+        at("w-1", "p-1", { role: "assistant", content: "reading" }),
+        at("w-2", "w-1", { role: "assistant", content: "did second" }),
+        at("p-2", "w-2", { role: "land", content: "land it" }),
+        at("w-3", "p-2", { role: "assistant", content: "landed" }),
+        at("p-3", "w-3", { role: "chat", author: "Ada", content: "thanks" }),
+      ].map(e => [e.id, e]),
+    ),
+  )
+  const asks = indexAsks(index)
+  const plan = (
+    ask: string,
+    over: Partial<Parameters<typeof planDigest>[0]> = {},
+  ) =>
+    planDigest({
+      index,
+      asks,
+      ask: entryId(ask),
+      ended: true,
+      stored: undefined,
+      inFlight: false,
+      reading: false,
+      now: 0,
+      ...over,
+    })
+
+  test("an ask's own message and only its work", () => {
+    expect(plan("p-1")).toEqual({
+      final: true,
+      said: "Bea: second",
+      work: ["agent: reading", "agent: did second"],
+      previous: null,
+    })
+  })
+
+  test("a land ask is its own message", () => {
+    expect(plan("p-2")).toMatchObject({
+      said: "land: land it",
+      work: ["agent: landed"],
+    })
+  })
+
+  test("no work, or not due, is no plan", () => {
+    expect(plan("p-3")).toBeNull()
+    expect(
+      plan("p-1", { stored: { text: "done", at: 0, final: true } }),
+    ).toBeNull()
+  })
 })

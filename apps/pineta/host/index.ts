@@ -256,6 +256,8 @@ export async function startHost({
   const digests = decodeDigestConfig(userJson)
     ? createDigests({ basics, serial, presence, agent: theAgent })
     : null
+  const digestFailed = (lane: LaneName) =>
+    failed(basics, "summarizing its ask", lane)
   // Every thread's name (ADR-0039, ADR-0057), one plan at a time. A thread's
   // banner is drawn from its name, so it starts as the name is written.
   const names = createNames({
@@ -292,10 +294,11 @@ export async function startHost({
             access: work.access,
             hooks: {
               ...work.hooks,
-              // A turn recorded, then its ask's live digest, when due.
+              // A turn recorded, then a live digest of the ask `tip` is in,
+              // when due.
               turnDone: async (lane, tip) => {
                 await work.hooks.turnDone(lane, tip)
-                digests?.step(lane).catch(failed(basics, "digest", lane))
+                void digests?.step(tip, digestFailed(lane))
               },
             },
           },
@@ -343,12 +346,14 @@ export async function startHost({
       sweepBlobs({ basics, blobs, grace: blobGraceMs, texts: cardPort.texts }),
   })
   // A run's end: hot reload may reload the page, then the lane drains and
-  // the session compacts. A thread whose banner failed tries again.
-  runs.onEnded(lane => {
+  // the session compacts. A thread whose banner failed tries again. The
+  // final digest is for the run's prompt: the drain queued before it may
+  // append to the lane or start its next run.
+  runs.onEnded((lane, prompt) => {
     hotReload.runEnded()
     void settle([lane])
     banners?.due(lane).catch(failed(basics, "banner"))
-    digests?.ended(lane).catch(failed(basics, "digest", lane))
+    if (prompt !== null) void digests?.ended(prompt, digestFailed(lane))
   })
 
   /**

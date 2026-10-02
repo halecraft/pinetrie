@@ -47,8 +47,11 @@ export interface Runs {
   /**
    * Set once: called after each run's end has closed its streams and stopped
    * its lane. Set after `createRuns`, since what it calls starts runs.
+   * `prompt` is the run's prompt, read before any step of its end, or null
+   * when the lane has none. A listener uses it rather than the lane's tip,
+   * which a drain may already have moved on to the next ask.
    */
-  onEnded(ended: (lane: LaneName) => void): void
+  onEnded(ended: (lane: LaneName, prompt: EntryId | null) => void): void
 }
 
 /** One step of a run's end, in the order `planRunEnd` returns them. */
@@ -103,7 +106,7 @@ export function createRuns(deps: {
 }): Runs {
   const { basics, agent, work } = deps
   const { doc, log } = basics
-  let ended: (lane: LaneName) => void = () => {}
+  let ended: (lane: LaneName, prompt: EntryId | null) => void = () => {}
 
   /** The prompt of the lane's latest run, and its role: `land` and `stack` end specially. */
   function latestPrompt(
@@ -143,7 +146,7 @@ export function createRuns(deps: {
           log(`[host] run ${id.slice(-8)} done`)
           return
         case "ended":
-          return ended(lane)
+          return ended(lane, prompt?.id ?? null)
       }
     }
     try {

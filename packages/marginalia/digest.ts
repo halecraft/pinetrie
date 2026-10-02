@@ -3,10 +3,21 @@
 // value keyed by the ask's prompt; no agent reads it, so it puts no tokens in
 // any context. The host carries the plan out (`apps/pineta/host/digests.ts`).
 
-import type { AskIndex, EntryId } from "@pineta/core"
+import {
+  type AskIndex,
+  type EntryId,
+  projectTranscript,
+  type TreeIndex,
+} from "@pineta/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
-import { fitNewest, LEFT_OUT_NOTE, leftOut } from "./request.ts"
+import {
+  fitNewest,
+  LEFT_OUT_NOTE,
+  leftOut,
+  transcriptLine,
+  transcriptLines,
+} from "./request.ts"
 
 /** pi value namespace for digests. The key is the ask's prompt. */
 export const DIGEST_NAMESPACE = "pineta.digest"
@@ -82,6 +93,49 @@ export function digestDue(input: {
     input.reading &&
     (stored === undefined || input.now - stored.at >= DIGEST_EVERY)
   )
+}
+
+/** A digest to ask for: whether it is the final one, and its request's parts. */
+export interface DigestPlan {
+  readonly final: boolean
+  /** The ask's message, as a transcript line. */
+  readonly said: string
+  /** The run's messages, as transcript lines, oldest first. */
+  readonly work: readonly string[]
+  readonly previous: string | null
+}
+
+/**
+ * Pure. The digest to ask for `ask` now, or null: none when its run has no
+ * work yet or `digestDue` says no. The lines come from the ask's own entries,
+ * walked up from its run's last entry, so they do not depend on where its
+ * lane went after. `said` is worded from the prompt itself: `transcriptLines`
+ * leaves out a land or stack message.
+ */
+export function planDigest(input: {
+  readonly index: TreeIndex
+  readonly asks: AskIndex
+  readonly ask: EntryId
+  readonly ended: boolean
+  readonly stored: DigestRecord | undefined
+  readonly inFlight: boolean
+  readonly reading: boolean
+  readonly now: number
+}): DigestPlan | null {
+  const { index, asks, ask, stored } = input
+  const last = asks.last.get(ask)
+  if (!asks.work.has(ask) || last === undefined) return null
+  if (!digestDue(input)) return null
+  const path = projectTranscript(index, last)
+  const prompt = path.find(m => m.id === ask)
+  return {
+    final: input.ended,
+    said: prompt === undefined ? "" : transcriptLine(prompt),
+    work: transcriptLines(
+      path.filter(m => asks.askOf.get(m.id as EntryId) === ask),
+    ),
+    previous: stored?.text ?? null,
+  }
 }
 
 /**

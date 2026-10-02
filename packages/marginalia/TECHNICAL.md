@@ -241,9 +241,17 @@ it.
   already, someone reads the thread (`readsAsk`, over presence's
   `reading`) and `DIGEST_EVERY` has passed; at the end, once, for the
   final one.
-- **`digestStillWanted` is the one race:** a live digest asked during the
-  run can come back after the final one was written, and is dropped. A
-  digest is keyed by its prompt, so no other ask's can land on it.
+- **`planDigest`** is the decision and the request's parts: `digestDue`,
+  then the ask's message as one line and its run's messages, walked up from
+  the run's last entry (`AskIndex.last`) and kept to the ask's own. The
+  ask's line is worded from its prompt entry (`transcriptLine`), since
+  `transcriptLines` leaves out land and stack messages.
+- **`digestStillWanted` is the race a write settles:** a live digest asked
+  during the run can come back after the final one was written, and is
+  dropped. A digest is keyed by its prompt, so no other ask's can land on
+  it, as long as the host names the right prompt: it takes the ask from
+  the entry an event names, never a lane's tip (`apps/pineta/host/TECHNICAL.md`,
+  "Digests").
 - **`digestRequest`** is the skill, the ask, the run's newest work that fits
   (`fitNewest`: the oldest is cut first), and the last digest.
 

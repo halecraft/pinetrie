@@ -78,9 +78,14 @@ wires them.
 - **A failure before `endRun` is logged as `run end failed`,** and `endRun`
   and every step after it still run.
 - **`ended` is one function, set once** in `startHost`: hot reload, then
-  `settle`. It breaks a cycle: a run's end drains, the drain may run an
-  update, and an update may start a run. `runs.ts` imports neither the
-  outbox nor the commands.
+  `settle`, banners and the final digest. It breaks a cycle: a run's end
+  drains, the drain may run an update, and an update may start a run.
+  `runs.ts` imports neither the outbox nor the commands.
+- **`ended` is given the run's prompt**, read at the start of `end()`,
+  before any step. A listener uses it, never the lane's tip: `settle`'s
+  drain is queued first, and appends a held message or starts the next run
+  before any step queued after it reads the lane. pi reports no prompt id,
+  and the lookup gives the same answer as pi's own end tip (S71).
 
 ## Startup
 
@@ -143,13 +148,21 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 ## Digests (`digests.ts`, ADR-0056)
 
-- **Asked on events**: the lane's `turnDone` hook, wrapped in `startHost`
-  after lane work records the turn, and each run's end. `digestDue` decides
-  in one step, from the stored digest, the request out, and presence: the
-  host holds the presence document, and `readsAsk` reads its `reading`
-  ends (S70).
-- **Only the ask goes out**: its message and its run's messages, newest
-  first within the budget, and the last digest. No agent reads the answer.
+- **Asked on events, each naming an entry**: the tip the lane's `turnDone`
+  hook is given (wrapped in `startHost` after lane work records the turn),
+  and the prompt each run's end is given. The ask is `promptOf` that entry,
+  which never changes: entries are written once (ADR-0004). `Digests` takes
+  no lane, so it cannot read a lane's tip. At a run's end the tip is
+  already past the ask: a plain held message appended there would lose the
+  ask its final digest, and a next run with work would take it, which then
+  refuses that run every later digest.
+- **`planDigest` decides** in one step, from the stored digest, the request
+  out, and presence: the host holds the presence document, and `readsAsk`
+  reads its `reading` ends (S70).
+- **Only the ask goes out**: its message, worded from its prompt entry so a
+  land or stack ask is named too, its run's messages read up from the run's
+  last entry, newest first within the budget, and the last digest. No agent
+  reads the answer.
 - A missing `ask-digest` skill is logged, and nothing is asked.
 
 ## Banners (`banners.ts`, ADR-0050, ADR-0053)

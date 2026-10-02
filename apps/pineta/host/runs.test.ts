@@ -1,9 +1,14 @@
 import { ERR, entryId, laneNameForThread, NOBODY, writerId } from "@pineta/core"
 import { encodeChat } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
-import { readActiveRun, readStreams } from "@pineta/schema"
+import {
+  readActiveRun,
+  readStreams,
+  writeEntry,
+  writeLaneTip,
+} from "@pineta/schema"
 import { describe, expect, test } from "vitest"
-import { basics, deferred, fakeLane, methods, record } from "./fakes.ts"
+import { basics, deferred, fakeLane, methods, record, row } from "./fakes.ts"
 import { createRuns, planRunEnd, streamInto } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -59,12 +64,18 @@ function setUp(lane = fakeLane(LANE)) {
   })
   const agent = record<Pick<Agent, "lane">>({ lane: () => lane.lane })
   const runs = createRuns({ basics: b, agent: agent.port, work: work.port })
-  const ended = deferred<{ running: boolean; open: number; work: string[] }>()
-  runs.onEnded(l =>
+  const ended = deferred<{
+    running: boolean
+    open: number
+    work: string[]
+    prompt: string | null
+  }>()
+  runs.onEnded((l, prompt) =>
     ended.resolve({
       running: readActiveRun(b.doc, l) !== undefined,
       open: readStreams(b.doc).filter(s => s.lane === l).length,
       work: methods(work.calls),
+      prompt,
     }),
   )
   return { b, lane, runs, ended: ended.promise }
@@ -81,7 +92,24 @@ describe("a run's end", () => {
       running: false,
       open: 0,
       work: ["beforeRun", "runEnded"],
+      prompt: null,
     })
+  })
+
+  test("ended is given the prompt the run answered", async () => {
+    const { b, lane, runs, ended } = setUp()
+    runs.start(LANE, { kind: "prompt", message: chat })
+    writeEntry(
+      b.doc,
+      row(entryId("p-1"), null, { role: "chat", content: "hi" }),
+    )
+    writeEntry(
+      b.doc,
+      row(entryId("a-1"), "p-1", { role: "assistant", content: "hello" }),
+    )
+    writeLaneTip(b.doc, LANE, "a-1")
+    lane.finish({ kind: "ok" })
+    expect((await ended).prompt).toBe("p-1")
   })
 
   test("a failing step before endRun is logged, and endRun and ended still run", async () => {

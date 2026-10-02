@@ -5,9 +5,20 @@
 import type { TranscriptMessage } from "@pineta/core"
 
 /**
- * Each chat, prompt and agent reply, as `speaker: text`; tool results are
- * left out. A chat's speaker is its author as sent.
+ * One message as `speaker: text`. A chat's speaker is its author as sent;
+ * a land, update or stack message carries no author, so its role speaks.
  */
+export const transcriptLine = (m: TranscriptMessage): string => {
+  const speaker =
+    m.role === "assistant"
+      ? "agent"
+      : m.role === "chat" || m.role === "user"
+        ? (m.author ?? "someone")
+        : m.role
+  return `${speaker}: ${m.text}`
+}
+
+/** Each chat, prompt and agent reply as `transcriptLine`; the rest are left out. */
 export const transcriptLines = (
   messages: readonly TranscriptMessage[],
 ): string[] =>
@@ -15,10 +26,7 @@ export const transcriptLines = (
     .filter(
       m => m.role === "chat" || m.role === "user" || m.role === "assistant",
     )
-    .map(
-      m =>
-        `${m.role === "assistant" ? "agent" : (m.author ?? "someone")}: ${m.text}`,
-    )
+    .map(transcriptLine)
 
 /**
  * The newest `lines` that fit in `room` characters, each as `- line\n`, and

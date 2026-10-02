@@ -565,4 +565,28 @@ export const mutations: readonly Mutation[] = [
     expect:
       "digestStillWanted: a live digest that comes back after the final one is dropped",
   },
+  {
+    name: "a digest's work holds earlier asks",
+    file: "packages/marginalia/digest.ts",
+    from: "      path.filter(m => asks.askOf.get(m.id as EntryId) === ask),\n",
+    to: "      path,\n",
+    command: unit,
+    expect: "an ask's own message and only its work",
+  },
+  {
+    name: "a final digest reads no work",
+    file: "packages/marginalia/digest.ts",
+    from: "  const path = projectTranscript(index, last)\n",
+    to: "  const path = projectTranscript(index, ask)\n",
+    command: unit,
+    expect: "an ask's own message and only its work",
+  },
+  {
+    name: "a land ask's digest names the agent as the ask",
+    file: "packages/marginalia/digest.ts",
+    from: '    said: prompt === undefined ? "" : transcriptLine(prompt),\n',
+    to: '    said: transcriptLines(path.filter(m => m.id === ask || asks.askOf.get(m.id as EntryId) === ask))[0] ?? "",\n',
+    command: unit,
+    expect: "a land ask is its own message",
+  },
 ]
