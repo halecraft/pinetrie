@@ -953,7 +953,8 @@ if (LIVE) {
   await asker.close()
   await live.shutdown()
 
-  // A banner drawn by the real image model (S60): the configured ratio, wide.
+  // A banner drawn by the real image model: a square icon, as the request's
+  // `aspect_ratio` of 1:1 asks (ADR-0053).
   const bannerConfig = path.join(
     mkdtempSync(path.join(tmpdir(), "pineta-live-banner-")),
     "config.json",
@@ -989,8 +990,8 @@ if (LIVE) {
     `  banner: ${JSON.stringify(size)} ${served?.headers.get("content-type")} ${bannerLog.filter(l => l.includes("banner")).join(" | ")}`,
   )
   ok(
-    served?.status === 200 && size !== null && size.width >= size.height * 4,
-    "a real image model draws a thread's banner, as wide as the configured ratio asks",
+    served?.status === 200 && size !== null && size.width === size.height,
+    `a real image model draws a thread's banner, square as its request asks (${size?.width}×${size?.height})`,
   )
   await painter.close()
   await drawing.shutdown()

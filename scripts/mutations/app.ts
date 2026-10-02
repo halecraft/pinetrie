@@ -43,6 +43,14 @@ export const mutations: readonly Mutation[] = [
     expect: "the model's reply contains the requested token",
   },
   {
+    name: "a banner is asked for wide, not square",
+    file: "packages/pi/agent.ts",
+    from: `              image_config: { aspect_ratio: "1:1" },`,
+    to: `              image_config: { aspect_ratio: "21:9" },`,
+    command: live,
+    expect: "a real image model draws a thread's banner, square",
+  },
+  {
     name: "a new column is not aligned with its fork point",
     file: "packages/client/app.tsx",
     from: "      alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)",
