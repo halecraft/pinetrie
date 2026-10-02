@@ -14,6 +14,7 @@ with a conversation **tree** as the primary object rather than a transcript.
 | `04-roadmap.md` | Sequencing: spikes → walking skeleton → v1 demo. |
 | `05-stack.md` | Stack decisions and why: TypeScript on Node, pnpm, Vite, React. |
 | `06-interface.md` | The interface: columns for reading paths, a rail for the tree's shape. |
+| `the-jujutsu-repo.md` | The jj repo the host serves: what Pineta writes there, and how jj and jjui see it. |
 | `pineta.md` | Handoff: where the project is, and how to pick it up. |
 | `findings/` | Spike and probe results, each with its evidence. |
 

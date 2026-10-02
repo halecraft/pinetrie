@@ -16,6 +16,14 @@ const copyText = "packages/client/copy-text.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the line's menu says nothing of jjui's own revset",
+    file: "packages/client/line-view.ts",
+    from: "            JJUI_NOTE,\n",
+    to: "",
+    command: unit,
+    expect: "no line yet: set up at your @-, showing the heads it writes",
+  },
+  {
     name: "a take does not say where it goes",
     file: "packages/client/column-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text

@@ -105,6 +105,13 @@ offers to the repo's `revsets.log` (`logRevset`): `builtin_log() |
 bookmarks(glob:"pineta-offer/*")`, shown before it is written, as the
 immutable heads are.
 
+jjui's own `[revisions] revset` replaces `revsets.log` for jjui (seen with
+jjui 0.10.9, whose config set `present(@) | ancestors(immutable_heads().., 2)
+| ancestors(@, 5) | present(trunk())`): `jj log` showed an offer on the
+line, and jjui did not. The setup cannot reach that file; the line menu says
+to add `bookmarks(glob:"pineta-offer/*")` to it, and
+`docs/the-jujutsu-repo.md` shows how.
+
 **What follows for ADR-0060.**
 
 - The extension to `immutable_heads()` wraps the line in `present()`.

@@ -67,7 +67,8 @@ the session, from live data only, as a document editor shows the people in it.
   work lands. Before it exists it offers **set up the line**, showing the
   bookmark it makes at your `@-` and the exact `immutable_heads()` and
   `revsets.log` text it writes to your repo's config (the log, so jj and
-  jjui show the offers), done only when you choose it. After, it
+  jjui show the offers), and what to add to a jjui revset of its own
+  (`docs/the-jujutsu-repo.md`), done only when you choose it. After, it
   offers **land my work (N commits)**, which moves the line forward to your
   `@-`, or says "your work is 3 commits behind pineta-onto: rebase onto it
   in jj". A host that admits others offers neither, and says to use jj on

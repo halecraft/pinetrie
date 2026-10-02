@@ -26,6 +26,7 @@ describe("lineView and lineWords (ADR-0060)", () => {
     ])
     expect(words.notes[1]).toContain("builtin_immutable_heads() | …")
     expect(words.notes[2]).toContain("builtin_log() | …")
+    expect(words.notes[3]).toContain('bookmarks(glob:"pineta-offer/*")')
   })
   test("a host that admits others offers no line action, and says why", () => {
     const view = lineView(record({ commit: null, commands: false }))

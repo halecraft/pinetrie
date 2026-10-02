@@ -74,6 +74,13 @@ export interface LineWords {
 const count = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`
 
+/**
+ * jjui's own `[revisions] revset` replaces `revsets.log`, so the log the
+ * setup writes does not reach it (S77 item 8, `docs/the-jujutsu-repo.md`).
+ */
+const JJUI_NOTE =
+  'jjui with a revset of its own: add | bookmarks(glob:"pineta-offer/*") to it'
+
 export function lineWords(view: LineView): LineWords {
   const { onto, heads, log, behind, ahead, commands } = view.facts
   if (view.state !== "set")
@@ -86,6 +93,7 @@ export function lineWords(view: LineView): LineWords {
             `${onto} goes at your @-`,
             `your repo's immutable heads become: ${heads}`,
             `its log, so jj and jjui show the offers: ${log}`,
+            JJUI_NOTE,
           ]
         : [`this host admits others: create ${onto} with jj on its machine`],
       actions: view.actions.map(action => ({
