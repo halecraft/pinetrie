@@ -1,13 +1,13 @@
-// client/menu — a popover whose box is a list of items. Placement and closing
-// are `Popover`'s (`popover.tsx`).
+// client/menu — a popover whose box is a list of items, in sections. Placement
+// and closing are `Popover`'s (`popover.tsx`).
 
-import type { ReactNode } from "react"
+import { type ReactNode, useId } from "react"
 import { Popover } from "./popover.tsx"
 
 /** A menu's items that can take focus, in order. */
 const focusable = (list: HTMLElement | null): HTMLButtonElement[] => [
   ...(list?.querySelectorAll<HTMLButtonElement>(
-    '[role="menuitem"]:not(:disabled)',
+    ':is([role="menuitem"], [role="menuitemradio"]):not(:disabled)',
   ) ?? []),
 ]
 
@@ -21,7 +21,23 @@ export interface MenuItem {
   readonly data?: Readonly<Record<string, string>>
   /** The menu stays open after it is chosen: a filter, say. */
   readonly keepOpen?: boolean
+  /**
+   * One of a choice, marked when it is the current one: drawn as a radio
+   * item with a ✓. Absent for an item that does something.
+   */
+  readonly checked?: boolean
   readonly onChoose: () => void
+}
+
+/**
+ * A run of a menu's items under one heading, after lines of text that say
+ * how things stand (`notes`), which are not items and take no focus.
+ */
+export interface MenuSection {
+  readonly key: string
+  readonly heading?: string
+  readonly notes?: readonly string[]
+  readonly items: readonly MenuItem[]
 }
 
 export function Menu({
@@ -30,8 +46,7 @@ export function Menu({
   triggerClassName,
   label,
   title,
-  heading,
-  items,
+  sections,
   onToggle,
   gone,
 }: {
@@ -44,11 +59,11 @@ export function Menu({
   label: string
   title?: string
   /**
-   * Shown above the items, outside the `role="menu"` list, which may hold only
-   * menu items; the list takes its name from it.
+   * The first section's heading is the menu's, shown above the list,
+   * outside it, and the list takes its name from it. Each later section is a
+   * group inside the list, named by its own.
    */
-  heading?: string
-  items: readonly MenuItem[]
+  sections: readonly MenuSection[]
   /** `Popover`'s: told when the menu opens or closes. */
   onToggle?: (open: boolean) => void
   /** `Popover`'s: no trigger is drawn, except while the menu is open. */
@@ -59,7 +74,7 @@ export function Menu({
       boxClassName="popover menu"
       className={className}
       gone={gone}
-      heading={heading}
+      heading={sections[0]?.heading}
       label={label}
       // Opened, the first item takes focus.
       onOpen={box => focusable(box)[0]?.focus()}
@@ -86,30 +101,106 @@ export function Menu({
           className="menu-items"
           role="menu"
         >
-          {items.map(item => (
-            <button
-              {...Object.fromEntries(
-                Object.entries(item.data ?? {}).map(([k, v]) => [
-                  `data-${k}`,
-                  v,
-                ]),
-              )}
-              className={item.className}
-              disabled={item.disabled}
-              key={item.key}
-              onClick={() => {
-                if (!item.keepOpen) close(false)
-                item.onChoose()
-              }}
-              role="menuitem"
-              title={item.title}
-              type="button"
-            >
-              {item.label}
-            </button>
+          {sections.map((section, i) => (
+            <Section
+              close={close}
+              first={i === 0}
+              key={section.key}
+              section={section}
+            />
           ))}
         </div>
       )}
     </Popover>
+  )
+}
+
+/**
+ * One section: a group named by its heading, but the first, whose heading
+ * names the whole menu. A group's notes describe it, so a screen reader
+ * reads them with it.
+ */
+function Section({
+  section,
+  first,
+  close,
+}: {
+  section: MenuSection
+  first: boolean
+  close: (refocus: boolean) => void
+}) {
+  const notesId = useId()
+  const { heading, notes = [], items } = section
+  const described = notes.length === 0 ? undefined : notesId
+  const body = (
+    <>
+      {notes.length > 0 && (
+        <div className="menu-notes" id={notesId}>
+          {notes.map(note => (
+            <p className="menu-note" key={note}>
+              {note}
+            </p>
+          ))}
+        </div>
+      )}
+      {items.map(item => (
+        <Item close={close} item={item} key={item.key} />
+      ))}
+    </>
+  )
+  if (first || heading === undefined)
+    return (
+      <div className="menu-section" role="none">
+        {body}
+      </div>
+    )
+  return (
+    <fieldset
+      aria-describedby={described}
+      aria-label={heading}
+      className="menu-section"
+    >
+      <p aria-hidden className="menu-heading">
+        {heading}
+      </p>
+      {body}
+    </fieldset>
+  )
+}
+
+/** An item: one that does something, or one of a choice, with its ✓. */
+function Item({
+  item,
+  close,
+}: {
+  item: MenuItem
+  close: (refocus: boolean) => void
+}) {
+  const shared = {
+    ...Object.fromEntries(
+      Object.entries(item.data ?? {}).map(([k, v]) => [`data-${k}`, v]),
+    ),
+    className: item.className,
+    disabled: item.disabled,
+    onClick: () => {
+      if (!item.keepOpen) close(false)
+      item.onChoose()
+    },
+    title: item.title,
+    type: "button" as const,
+  }
+  if (item.checked === undefined)
+    return (
+      <button {...shared} role="menuitem">
+        {item.label}
+      </button>
+    )
+  return (
+    <button {...shared} aria-checked={item.checked} role="menuitemradio">
+      <span aria-hidden className="menu-check">
+        {item.checked ? "✓" : ""}
+      </span>
+      {item.label}
+    </button>
   )
 }

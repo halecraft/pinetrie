@@ -359,7 +359,13 @@ export function createUpdates(deps: {
               runEnded: () => containers.runEnded(lane),
             },
             {
-              details: { lane, base, merged: merged.from, ...gathered, by },
+              details: {
+                lane,
+                base: { kind: from.kind, bookmark: base },
+                merged: merged.from,
+                ...gathered,
+                by,
+              },
               merge,
               now: basics.now(),
             },

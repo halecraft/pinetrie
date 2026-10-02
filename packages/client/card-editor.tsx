@@ -23,6 +23,7 @@ import type {
   Position,
   ProjectRecord,
   SeatRecord,
+  ThreadBase,
   ThreadLane,
   WorkSetting,
 } from "@pineta/core"
@@ -41,7 +42,7 @@ import {
 import {
   CLEAR_COMMAND,
   cardStatus,
-  commandTag,
+  commandNote,
   queuedWords,
   TAKE,
   TAKE_TITLE,
@@ -176,6 +177,8 @@ export function CardEditor(p: {
   onIntent: (intent: Intent) => void
   /** The column's acts: queueing a card, clearing its command. */
   onAct: (act: ColumnAct) => void
+  /** The thread's base (`effectiveBase`): what a card's command catches up with. */
+  threadBase: ThreadBase
   /**
    * Whether this column asked for focus: just opened, or its card given a
    * command. Asked on mounting and when the command changes.
@@ -198,7 +201,9 @@ export function CardEditor(p: {
     text: string
     line: string
   } | null>(null)
-  const [choice, setChoice] = useState<WorkSetting | null>(null)
+  const [choice, setChoice] = useState<WorkSetting | null>(
+    prefill?.work ?? null,
+  )
   /** The WIP a new lane of its own starts from; null for the line (ADR-0060). */
   const [base, setBase] = useState<string | null>(null)
   const command = card?.command ?? null
@@ -473,6 +478,22 @@ export function CardEditor(p: {
           </button>
         </div>
       )}
+      {card !== undefined && command !== null && p.readOnly === null && (
+        <div className="card-command">
+          {commandNote(command, p.threadBase)}{" "}
+          <button
+            aria-label={CLEAR_COMMAND}
+            className="card-command-clear"
+            onClick={() =>
+              p.onAct({ kind: "setCommand", card: card.id, command: null })
+            }
+            title={CLEAR_COMMAND}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {matches.length > 0 && p.readOnly === null && (
         <div className="command-menu" role="listbox">
           {matches.map(c => (
@@ -578,35 +599,21 @@ export function CardEditor(p: {
         </div>
       ) : (
         <div className="compose-row">
-          {card !== undefined && command !== null && (
-            <span className="card-command">
-              {commandTag(command)}{" "}
-              <button
-                aria-label={CLEAR_COMMAND}
-                className="card-command-clear"
-                onClick={() =>
-                  p.onAct({ kind: "setCommand", card: card.id, command: null })
-                }
-                title={CLEAR_COMMAND}
-                type="button"
-              >
-                ×
-              </button>
-            </span>
-          )}
           {plan.createsLane &&
             work !== null &&
             p.where !== undefined &&
             p.where.project !== null && (
-              <WhereMenu
-                project={p.where.project}
-                usedDirs={p.where.usedDirs}
-                work={work}
-                choose={setChoice}
-                line={p.where.line}
-                base={base}
-                chooseBase={setBase}
-              />
+              <div className="where-line">
+                <WhereMenu
+                  project={p.where.project}
+                  usedDirs={p.where.usedDirs}
+                  work={work}
+                  choose={setChoice}
+                  line={p.where.line}
+                  base={base}
+                  chooseBase={setBase}
+                />
+              </div>
             )}
           {card !== undefined && (
             <TakeButton
@@ -716,6 +723,8 @@ export function QueuedCardEditor(p: {
   n: number
   reader: Reader
   readOnly: ReadOnly | null
+  /** The thread's base (`effectiveBase`): what its command catches up with. */
+  threadBase: ThreadBase
   onAct: (act: ColumnAct) => void
   onTyping: () => void
 }) {
@@ -724,16 +733,22 @@ export function QueuedCardEditor(p: {
     <BoundCardEditor
       card={card}
       className="card-editor queued"
-      heading={queuedWords(card.place.by, p.n, p.reader)}
+      heading={
+        <>
+          {queuedWords(card.place.by, p.n, p.reader)}
+          {card.command !== null && (
+            <div className="card-command">
+              {commandNote(card.command, p.threadBase)}
+            </div>
+          )}
+        </>
+      }
       onTyping={p.onTyping}
       queued={card.id}
       readOnly={p.readOnly !== null}
       rows={1}
       session={p.session}
     >
-      {card.command !== null && (
-        <span className="card-command">{commandTag(card.command)}</span>
-      )}
       {p.readOnly === null && (
         <>
           <button
@@ -761,8 +776,10 @@ export function QueuedCardEditor(p: {
 }
 
 /**
- * The chip that says where a new thread's agent works, and changes it; for a
- * copy, also where it starts: the line, or a WIP (ADR-0060), rarely chosen.
+ * The line under the box that says where a new thread's agent works, and
+ * what that does to your files; it opens the menu that changes it. A lane of
+ * its own may start from a WIP instead of the project (ADR-0060), offered
+ * only when there is one.
  */
 function WhereMenu(p: {
   project: ProjectRecord
@@ -773,37 +790,59 @@ function WhereMenu(p: {
   base: string | null
   chooseBase: (base: string | null) => void
 }) {
-  const bases =
-    p.work.kind === "own"
-      ? baseChoices(p.line, p.base).map(c => ({
-          key: c.key,
-          label: c.row,
-          className: c.chosen ? "where-base chosen" : "where-base",
-          data: { base: c.base ?? "" },
-          onChoose: () => p.chooseBase(c.base),
-        }))
-      : []
+  const row = (name: string, detail: string | null) => (
+    <>
+      <span className="where-name">{name}</span>
+      {detail !== null && <span className="where-detail">{detail}</span>}
+    </>
+  )
+  const bases = p.work.kind === "own" ? baseChoices(p.line, p.base) : []
   return (
     <Menu
       className="where-menu"
-      heading="where the agent works"
-      items={[
-        ...whereChoices(p.project, p.usedDirs).map(c => ({
-          key: c.key,
-          label: c.row,
-          className: c.className,
-          disabled: c.disabled,
-          ...(c.title === undefined ? {} : { title: c.title }),
-          onChoose: () => {
-            if (c.setting !== null) return p.choose(c.setting)
-            const dir = window.prompt("The directory to work in")?.trim()
-            if (dir !== undefined && dir !== "")
-              p.choose({ kind: "direct", dir })
-          },
-        })),
-        ...bases,
-      ]}
       label="where the agent works"
+      sections={[
+        {
+          key: "work",
+          heading: "where the agent works",
+          items: whereChoices(
+            p.project,
+            p.usedDirs,
+            p.work,
+            p.line?.onto ?? null,
+          ).map(c => ({
+            key: c.key,
+            label: row(c.row, c.detail),
+            className: c.className,
+            disabled: c.disabled,
+            ...(c.checked === undefined ? {} : { checked: c.checked }),
+            ...(c.title === undefined ? {} : { title: c.title }),
+            onChoose: () => {
+              if (c.setting !== null) return p.choose(c.setting)
+              const dir = window.prompt("The directory to work in")?.trim()
+              if (dir !== undefined && dir !== "")
+                p.choose({ kind: "direct", dir })
+            },
+          })),
+        },
+        ...(bases.length === 0
+          ? []
+          : [
+              {
+                key: "base",
+                heading: "start from",
+                items: bases.map(c => ({
+                  key: c.key,
+                  label: row(c.row, c.detail),
+                  className: "where-base",
+                  checked: c.chosen,
+                  title: c.title,
+                  data: { base: c.base ?? "" },
+                  onChoose: () => p.chooseBase(c.base),
+                })),
+              },
+            ]),
+      ]}
       trigger={
         <>
           <span className="where-words" data-work={p.work.kind}>

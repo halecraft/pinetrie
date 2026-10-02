@@ -4,7 +4,12 @@
 // execute, each in one step on the offers' queue.
 
 import type { ErrCode, LineAction } from "@pineta/core"
-import { executeOnHost, lineFacts } from "@pineta/lanes"
+import {
+  executeOnHost,
+  hostRunner,
+  lineFacts,
+  type Runner,
+} from "@pineta/lanes"
 import { recordChanged } from "@pineta/marginalia"
 import { readLine } from "@pineta/reads"
 import { planLineAction, planLineRecord } from "./plan.ts"
@@ -20,10 +25,11 @@ export interface Line {
 export function createLine(state: OfferState): Line {
   const { ops, root, basics } = state
   const { doc } = basics
+  const git: Runner = args => hostRunner(root)(["git", ...args])
 
   async function record() {
     const next = planLineRecord(
-      await lineFacts(ops, state.line),
+      await lineFacts(ops, git, state.line),
       state.line,
       state.lineCommands,
     )

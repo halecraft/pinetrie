@@ -26,6 +26,7 @@ import {
   bookmarkOf,
   changedPaths,
   changeOf,
+  changesNoFile,
   commitsOf,
   commitTurn,
   conflictContent,
@@ -49,6 +50,7 @@ import {
   laneIgnores,
   laneRefSteps,
   laneTipIn,
+  lineFacts,
   lines,
   logRevset,
   mergeBase,
@@ -60,6 +62,7 @@ import {
   planBaseRefresh,
   planDescribe,
   planFetch,
+  planFollow,
   planFollowOffer,
   planForkSetup,
   planLineSetup,
@@ -1148,6 +1151,96 @@ describe("a lane's repo, with jj", () => {
     await executeOnHost(laneRefSteps(yoursDir, [{ lane: LANE, commit: null }]))
     expect(await commitsOf(ops, "::@-")).toEqual(before)
     expect(await commitsOf(ops, "conflicts()")).toEqual([])
+  }, 60_000)
+
+  test("update my files (S80): a preview that writes nothing, then your work rebased onto the line, conflicts recorded", async () => {
+    const { yoursDir, yoursJj, ops, edit, line, setUpLine } =
+      await offerRig("follow")
+    const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
+    const change = async (rev: string) =>
+      (
+        await yoursJj(["log", "--no-graph", "-r", rev, "-T", "change_id"])
+      ).stdout.trim()
+    await edit(yoursDir, "f.txt", "a\nb\nc\n")
+    await edit(yoursDir, "g.txt", "base\n")
+    await yoursJj(["commit", "-m", "L0"])
+    await setUpLine()
+    // Your work: Y1 changes g.txt, with a second head on it besides @.
+    await edit(yoursDir, "g.txt", "yours\n")
+    await yoursJj(["describe", "-m", "Y1"])
+    const y1 = await change("@")
+    await yoursJj(["new", y1, "-m", "sibling"])
+    await edit(yoursDir, "s.txt", "s\n")
+    await yoursJj(["new", y1])
+    // A file in @, so leaving it does not abandon it as empty.
+    await edit(yoursDir, "h.txt", "h\n")
+    const at = await change("@")
+    // The line moves on: L1 changes f.txt and g.txt.
+    await yoursJj(["new", line.onto, "-m", "L1"])
+    await edit(yoursDir, "f.txt", "a\nB\nc\n")
+    await edit(yoursDir, "g.txt", "line\n")
+    await yoursJj(["bookmark", "move", line.onto, "--to", "@"])
+    await yoursJj(["edit", at])
+    // Not yet snapshotted: the rebase, run as you, snapshots it first.
+    await edit(yoursDir, "i.txt", "i\n")
+    const before = (await yoursJj(["op", "log", "-n", "1", "-T", "id"])).stdout
+    const facts = await lineFacts(ops, git, line)
+    expect(facts.yours.behind).toBe(1)
+    expect(facts.yours.follow).toEqual({
+      files: ["f.txt", "g.txt"],
+      conflicts: ["g.txt"],
+      heads: 1,
+    })
+    expect(facts.yours.conflicts).toEqual({ commits: 0, files: [] })
+    // The preview wrote no operation.
+    expect(
+      (
+        await yoursJj([
+          "--ignore-working-copy",
+          "op",
+          "log",
+          "-n",
+          "1",
+          "-T",
+          "id",
+        ])
+      ).stdout,
+    ).toBe(before)
+    await executeOnHost(planFollow({ root: yoursDir, onto: line.onto }))
+    const after = await lineFacts(ops, git, line)
+    expect(after.yours.behind).toBe(0)
+    expect(after.yours.follow).toBe(null)
+    // Y1 and @ conflict; the sibling moved too, and conflicts outside @'s line.
+    expect(after.yours.conflicts).toEqual({ commits: 2, files: ["g.txt"] })
+    expect(await readFile(path.join(yoursDir, "h.txt"), "utf8")).toBe("h\n")
+    expect(await readFile(path.join(yoursDir, "i.txt"), "utf8")).toBe("i\n")
+    expect(await readFile(path.join(yoursDir, "f.txt"), "utf8")).toBe(
+      "a\nB\nc\n",
+    )
+    expect(
+      await commitsOf(
+        ops,
+        `description(exact:"sibling\\n") & ${revsetName(line.onto)}::`,
+      ),
+    ).toHaveLength(1)
+  }, 60_000)
+
+  test("a lane whose work undoes itself changes no file, over a range jj diffs as one", async () => {
+    const { laneDir, ops, turn, fetch, base } = await turnRig("undone")
+    await fetch(base)
+    const first = await laneTipIn(ops, LANE)
+    if (first === null) throw new Error("no tip")
+    expect(await changesNoFile(ops, { start: base, tip: first })).toBe(false)
+    await rm(path.join(laneDir, "a.txt"))
+    await turn()
+    await fetch(base)
+    const undone = await laneTipIn(ops, LANE)
+    if (undone === null) throw new Error("no tip")
+    expect(await changesNoFile(ops, { start: base, tip: undone })).toBe(true)
+    expect(await changesNoFile(ops, { start: [first], tip: undone })).toBe(
+      false,
+    )
+    expect(await changesNoFile(ops, { start: [], tip: undone })).toBe(false)
   }, 60_000)
 
   test("a thread on a WIP starts from its copy, and freezes nothing of yours (ADR-0060)", async () => {

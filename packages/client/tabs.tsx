@@ -24,7 +24,7 @@ import { Menu } from "./menu.tsx"
 import { Avatars } from "./presence.tsx"
 import { planTitle, renameKey } from "./root-label.ts"
 import type { SessionClient } from "./session-view.ts"
-import { renameIntent, type TabsView } from "./tabs-view.ts"
+import { dropsWords, renameIntent, type TabsView } from "./tabs-view.ts"
 import { useReadingAt } from "./use-presence.ts"
 
 /** Left and Right move focus between tabs. */
@@ -174,34 +174,46 @@ export function TabBar({
               {tab.menu.length > 0 && (
                 <Menu
                   className="tab-more"
-                  items={tab.menu.map(item =>
-                    item.kind === "rename"
-                      ? {
-                          key: "rename",
-                          className: "rename-root",
-                          title: "change this thread's title for everyone",
-                          label: "Rename",
-                          onChoose: () => setRenaming(root),
-                        }
-                      : {
-                          key: "archive",
-                          className: "archive-root",
-                          disabled: item.busy !== null,
-                          title: "hide for everyone; restore from Archive",
-                          label: (
-                            <>
-                              Archive
-                              {item.busy !== null && (
-                                <span className="why">
-                                  {" "}
-                                  · {ROOT_BUSY_REASON[item.busy]}
-                                </span>
-                              )}
-                            </>
-                          ),
-                          onChoose: () => onIntent(item.intent),
-                        },
-                  )}
+                  sections={[
+                    {
+                      key: "root",
+                      items: tab.menu.map(item =>
+                        item.kind === "rename"
+                          ? {
+                              key: "rename",
+                              className: "rename-root",
+                              title: "change this thread's title for everyone",
+                              label: "Rename",
+                              onChoose: () => setRenaming(root),
+                            }
+                          : {
+                              key: "archive",
+                              className: "archive-root",
+                              disabled: item.busy !== null,
+                              title: "hide for everyone; restore from Archive",
+                              label: (
+                                <>
+                                  Archive
+                                  {item.busy !== null && (
+                                    <span className="why">
+                                      {" "}
+                                      · {ROOT_BUSY_REASON[item.busy]}
+                                    </span>
+                                  )}
+                                  {item.busy === null &&
+                                    dropsWords(item.drops) !== null && (
+                                      <span className="why drops">
+                                        {" "}
+                                        · {dropsWords(item.drops)}
+                                      </span>
+                                    )}
+                                </>
+                              ),
+                              onChoose: () => onIntent(item.intent),
+                            },
+                      ),
+                    },
+                  ]}
                   label="more for this thread"
                   trigger="⋯"
                   triggerClassName="tab-menu"
@@ -332,14 +344,19 @@ function AddTab({
       </button>
       <Menu
         className="add-more"
-        items={[
+        sections={[
           {
-            key: "conversation",
-            className: "add-conversation",
-            title:
-              "a new conversation: the agent answers only when @agent is mentioned",
-            label: "conversation",
-            onChoose: () => onIntent(add.conversation),
+            key: "add",
+            items: [
+              {
+                key: "conversation",
+                className: "add-conversation",
+                title:
+                  "a new conversation: the agent answers only when @agent is mentioned",
+                label: "conversation",
+                onChoose: () => onIntent(add.conversation),
+              },
+            ],
           },
         ]}
         label="other ways to start"

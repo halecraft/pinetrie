@@ -121,13 +121,21 @@ export function lineRefusal(action: LineAction, code: ErrCode): string {
     case ERR.NO_LINE:
       return "set up the line first"
     default:
-      return action === "setup"
-        ? "the line is already set up"
-        : "your @- is not above the line: rebase onto it first"
+      switch (action) {
+        case "setup":
+          return "the line is already set up"
+        case "land":
+          return "your @- is not above the line: rebase onto it first"
+        case "follow":
+          return "your files have nothing to take from the project, or share no commit with it"
+      }
   }
 }
 
-/** A `line` command: set up the integration line, or land your work (ADR-0060). */
+/**
+ * A `line` command: set up the integration line, land your work (ADR-0060),
+ * or update your files from it (ADR-0061).
+ */
 export async function actOnLine(
   deps: Pick<LaneDeps, "work">,
   action: LineAction,

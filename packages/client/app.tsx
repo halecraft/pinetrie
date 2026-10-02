@@ -96,7 +96,7 @@ import { screenMemory } from "./screen-memory.ts"
 import type { SessionClient } from "./session-view.ts"
 import type { DeviceState, TabState } from "./tab-state.ts"
 import { TabBar } from "./tabs.tsx"
-import { tabsView } from "./tabs-view.ts"
+import { offeredByRoot, tabsView } from "./tabs-view.ts"
 import type { RowMemory } from "./tool-row.ts"
 import { useColumnDrag } from "./use-column-drag.ts"
 import { useFilledCards } from "./use-filled-cards.ts"
@@ -475,6 +475,10 @@ export function App({
       }),
     [active, columns, colors.track, archive, nameOf, workFacts.offers, lanes],
   )
+  const offered = useMemo(
+    () => offeredByRoot(index, view.offers, workFacts.names),
+    [index, view.offers, workFacts.names],
+  )
 
   // Your inbox: the messages that mention you, and which you have seen.
   const mentions = useMemo(
@@ -832,6 +836,8 @@ export function App({
           nameOf={nameOf}
           names={workFacts.names}
           line={workFacts.line}
+          project={workFacts.project}
+          onIntent={onIntent}
           offers={view.offers}
           me={{
             writer: session.writer,
@@ -918,6 +924,7 @@ export function App({
               marks,
               archived: archivedRoots,
               work,
+              offered,
               unsent,
             })}
           />

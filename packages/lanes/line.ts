@@ -1,6 +1,8 @@
 // lanes/line — the integration line in your repo (ADR-0060): what it is now,
-// read as values for the host to plan from. Reads only; the host's steps
-// that set it up and move it are `planLineSetup` and `planLand` (`plan.ts`).
+// read as values for the host to plan from, and what updating your files
+// from it would do (ADR-0061, S80). Reads only; the host's steps that set it
+// up, move it and rebase your work onto it are `planLineSetup`, `planLand`
+// and `planFollow` (`plan.ts`).
 
 import { type CommitId, commitId } from "@pineta/core"
 import { changeOf } from "./offer.ts"
@@ -28,17 +30,48 @@ export interface LineFacts {
   }[]
   /**
    * Your `@-` against the line: the line commits it lacks, and, when it
-   * descends from the line, the commits of yours above it (else null).
+   * descends from the line, the commits of yours above it (else null); what
+   * updating your files would do (null when it cannot or need not); and the
+   * conflicts jj records in your work above the line.
    */
-  readonly yours: { readonly behind: number; readonly ahead: number | null }
+  readonly yours: {
+    readonly behind: number
+    readonly ahead: number | null
+    readonly follow: FollowPreview | null
+    readonly conflicts: YourConflicts
+  }
+}
+
+/**
+ * What `planFollow`'s rebase would do to your files (S80), read without
+ * writing anything jj or jjui shows: `git merge-tree` of the line and `@`
+ * as last snapshotted, from their fork point.
+ */
+export interface FollowPreview {
+  /** Files your working copy would see change. */
+  readonly files: readonly string[]
+  /** Of those, the ones that would conflict. */
+  readonly conflicts: readonly string[]
+  /** Heads of yours besides `@` that move with it: `-b @` takes them. */
+  readonly heads: number
+}
+
+/** Your conflicted commits above the line, and the conflicted files in `@`. */
+export interface YourConflicts {
+  readonly commits: number
+  readonly files: readonly string[]
 }
 
 const count = async (jj: Runner, revset: string): Promise<number> =>
   (await commitsOf(jj, revset)).length
 
-/** Read the line's facts from your repo (`jj` as the host reads it). */
+/**
+ * Read the line's facts from your repo (`jj` as the host reads it, `git` on
+ * the same repo, for the preview).
+ */
 export async function lineFacts(
   jj: Runner,
+  git: Runner,
   line: LineConfig,
 ): Promise<LineFacts> {
   const onto = revsetName(line.onto)
@@ -56,7 +89,12 @@ export async function lineFacts(
       heads: heads.ok ? heads.stdout.trim() : null,
       log,
       wips: [],
-      yours: { behind: 0, ahead: null },
+      yours: {
+        behind: 0,
+        ahead: null,
+        follow: null,
+        conflicts: { commits: 0, files: [] },
+      },
     }
   const listed = await jj([
     "log",
@@ -85,16 +123,73 @@ export async function lineFacts(
         })
   }
   const descends = (await count(jj, `${onto} & ::@-`)) > 0
+  const behind = await count(jj, `::${onto} ~ ::@-`)
   return {
     commit,
     heads: heads.ok ? heads.stdout.trim() : null,
     log,
     wips,
     yours: {
-      behind: await count(jj, `::${onto} ~ ::@-`),
+      behind,
       ahead: descends ? await count(jj, `${onto}..@-`) : null,
+      follow: behind === 0 ? null : await followPreview(jj, git, onto),
+      conflicts: {
+        commits: await count(jj, `(::@ ~ ::${onto}) & conflicts()`),
+        files: await conflictedFiles(jj),
+      },
     },
   }
+}
+
+/**
+ * `git merge-tree` exits 1 on conflicts and prints the merged tree, then the
+ * conflicting paths, then a blank line and its messages (S80 item 3). Null
+ * when `@` descends from no commit of the line, or git cannot merge.
+ */
+async function followPreview(
+  jj: Runner,
+  git: Runner,
+  onto: string,
+): Promise<FollowPreview | null> {
+  if ((await count(jj, `(::@ & ::${onto}) ~ root()`)) === 0) return null
+  const [base] = await commitsOf(jj, `fork_point(${onto} | @)`)
+  const [line] = await commitsOf(jj, onto)
+  const [at] = await commitsOf(jj, "@")
+  if (base === undefined || line === undefined || at === undefined) return null
+  const merged = await git([
+    "merge-tree",
+    "--write-tree",
+    "--name-only",
+    `--merge-base=${base}`,
+    line,
+    at,
+  ])
+  if (!merged.ok && merged.code !== 1) return null
+  const [tree = "", ...rest] = merged.stdout.split("\n")
+  const blank = rest.indexOf("")
+  const conflicts = (blank < 0 ? rest : rest.slice(0, blank)).filter(
+    p => p !== "",
+  )
+  const changed = await git(["diff", "--name-only", at, tree.trim()])
+  if (!changed.ok) return null
+  return {
+    files: lines(changed.stdout),
+    conflicts,
+    heads: await count(jj, `heads(roots(${onto}..@)::) ~ @`),
+  }
+}
+
+/** The conflicted files in `@`, as last snapshotted. */
+async function conflictedFiles(jj: Runner): Promise<string[]> {
+  const ran = await jj([
+    "file",
+    "list",
+    "-r",
+    "@",
+    "-T",
+    'if(conflict, path ++ "\\n")',
+  ])
+  return ran.ok ? lines(ran.stdout) : []
 }
 
 /**

@@ -18,6 +18,7 @@ import {
   firstLine,
   type LandingRecord,
   type LaneName,
+  type LineRecord,
   type OfferInRepo,
   type OfferLedger,
   type OfferRecord,
@@ -70,15 +71,24 @@ export const offerMoved = (
   ledger.source !== now.tip ||
   !sameCommits(ledger.start, now.start)
 
-/** What a trigger found: the lane, and the offer as your repo holds it. */
-export interface RefreshFacts {
-  /** The lane's tip in your repo; null before its first fetch. */
-  readonly tip: CommitId | null
-  /** Where an offer would start, and whether that is the tip: nothing new. */
-  readonly start: readonly CommitId[]
-  /** Null when there is none: never built, taken, or gone. */
-  readonly offer: OfferInRepo | null
-}
+/**
+ * What a trigger found: the offer as your repo holds it (null when there is
+ * none: never built, taken, or gone), and, for a thread not archived, its
+ * lane.
+ */
+export type RefreshFacts =
+  /** The thread's root is archived (ADR-0029). */
+  | { readonly archived: true; readonly offer: OfferInRepo | null }
+  | {
+      readonly archived: false
+      /** The lane's tip in your repo. */
+      readonly tip: CommitId
+      /** Where an offer would start; the tip itself when nothing is new. */
+      readonly start: readonly CommitId[]
+      /** The lane's work since its start changes no file. */
+      readonly empty: boolean
+      readonly offer: OfferInRepo | null
+    }
 
 /**
  * What a trigger does to a lane's offer:
@@ -86,8 +96,11 @@ export interface RefreshFacts {
  * - `build`: make an offer (there is none: never built, taken, or gone);
  * - `follow`: the lane, or where the offer starts, moved under an unedited
  *   single offer: update it in place (ADR-0039, S49);
- * - `withdraw`: where it starts reached the lane's tip, so it holds nothing
- *   you lack: abandon it (S49 item 5);
+ * - `withdraw`: it holds nothing you lack (where it starts reached the
+ *   lane's tip, or the lane's work changes no file), or its thread is
+ *   archived: abandon it (S49 item 5);
+ * - `forget`: there is no offer and none to build: remove a record left
+ *   from one;
  * - `stale`: the lane, or where it starts, moved under a stack: kept, marked
  *   stale;
  * - `refresh`: only the target moved: rebase the offer onto it;
@@ -99,19 +112,28 @@ export type RefreshPlan =
   | "build"
   | "follow"
   | "withdraw"
+  | "forget"
   | "stale"
   | "refresh"
   | "leave"
   | "repair"
 
+/**
+ * An archived thread's offer goes whatever its state, an edited one too:
+ * an offer is immutable, so editing one is an expert's own act. A lane whose
+ * work changes no file is never built: withdrawing what was built would
+ * repeat on every poll, since each step moves your repo's operation head.
+ */
 export function planRefresh(facts: RefreshFacts): RefreshPlan {
-  const { tip, offer } = facts
-  if (tip === null) return "none"
-  const nothingNew = facts.start.length === 1 && facts.start[0] === tip
-  if (offer === null) return nothingNew ? "none" : "build"
+  const { offer } = facts
+  if (facts.archived) return offer === null ? "forget" : "withdraw"
+  const { tip, start } = facts
+  const nothingNew = facts.empty || (start.length === 1 && start[0] === tip)
+  if (offer === null) return nothingNew ? "forget" : "build"
   if (offer.kind === "divergent") return "repair"
   if (offerEdited(offer)) return "leave"
-  if (offerMoved(offer.ledger, { tip, start: facts.start })) {
+  if (facts.empty) return "withdraw"
+  if (offerMoved(offer.ledger, { tip, start })) {
     if (offer.revisions.length > 1) return "stale"
     return nothingNew ? "withdraw" : "follow"
   }
@@ -200,8 +222,16 @@ export type OfferButton =
   | "resolve"
   | "update"
 
-/** What the lane is running now, as far as the offer cares. */
-export type OfferActivity = "idle" | "turn" | "resolution" | "split"
+/**
+ * What the lane is running now, as far as the offer cares; `catch-up`: a
+ * card that brings it up to date is queued, and taken before anything else.
+ */
+export type OfferActivity =
+  | "idle"
+  | "turn"
+  | "resolution"
+  | "split"
+  | "catch-up"
 
 /**
  * One state of a lane's offer, what can be done in it (ADR-0038's table), and
@@ -244,10 +274,48 @@ export interface OfferFacts {
   readonly bookmark: string | null
   /** The change id it was taken as, or null. */
   readonly taken: string | null
-  /** The thread's base: the line's bookmark, or its WIP's (ADR-0060). */
-  readonly base: string
-  /** The line's bookmark. */
+  /**
+   * The thread's base, as it is brought up to date and taken (ADR-0060): its
+   * WIP, or the line once the WIP landed or for a line thread.
+   */
+  readonly base: ThreadBase
+  /** The line's bookmark, for titles. */
   readonly onto: string
+  /** The thread's base has moved on since the lane last forked or caught up. */
+  readonly behind: boolean
+}
+
+/**
+ * The base a thread is brought up to date with and taken to (ADR-0060): its
+ * WIP while the WIP is there, else the line: for a line thread, a WIP that
+ * landed, and one gone (which only "continue on the line" moves). Null, the
+ * lane's base not yet read, is the line.
+ */
+export const effectiveBase = (
+  base: Pick<BaseRecord, "base" | "state"> | null,
+): ThreadBase =>
+  base?.base.kind === "wip" && base.state === "ok"
+    ? base.base
+    : { kind: "line" }
+
+/**
+ * Whether a thread's base has moved on since its lane last forked from it or
+ * caught up (ADR-0060): the commit its newest `Pineta-Base` names (`start`)
+ * is not where the base is now, the line's commit or the WIP's. Never for a
+ * WIP gone, which only "continue on the line" moves, nor before the line is
+ * set up.
+ */
+export function baseBehind(
+  base: BaseRecord | undefined,
+  line: LineRecord | null,
+): boolean {
+  if (base === undefined || line === null || line.commit === null) return false
+  if (base.state === "gone") return false
+  const bookmark =
+    base.base.kind === "wip" && base.state === "ok" ? base.base.bookmark : null
+  if (bookmark === null) return base.start !== line.commit
+  const wip = line.wips.find(w => w.bookmark === bookmark)
+  return wip !== undefined && wip.commit !== base.start
 }
 
 /**
@@ -259,13 +327,24 @@ export interface OfferFacts {
  */
 export function offerView(input: {
   readonly offer: OfferRecord | undefined
-  readonly activity: OfferActivity
+  readonly activity: Exclude<OfferActivity, "catch-up">
   readonly landing: LandingRecord | undefined
   readonly base: Pick<BaseRecord, "base" | "state"> | null
   readonly onto: string
   readonly wipAhead: number
+  /** `baseBehind`: the base has moved on, so catching up is offered beside it. */
+  readonly behind: boolean
+  /**
+   * A card bringing the thread up to date: one of yours still drafting, whose
+   * send does it (so the strip offers it no more), or one queued.
+   */
+  readonly catchUp: "drafted" | "queued" | null
 }): OfferView {
-  const { offer, activity, landing } = input
+  const { offer, landing } = input
+  const activity: OfferActivity =
+    input.activity === "idle" && input.catchUp === "queued"
+      ? "catch-up"
+      : input.activity
   const open = offer?.taken === null ? offer : undefined
   const facts: OfferFacts = {
     activity,
@@ -275,11 +354,9 @@ export function offerView(input: {
     touchesYourEdits: (open?.yourEdits.length ?? 0) > 0,
     bookmark: open?.bookmark ?? null,
     taken: offer?.taken ?? null,
-    base:
-      input.base?.base.kind === "wip" && input.base.state === "ok"
-        ? input.base.base.bookmark
-        : input.onto,
+    base: effectiveBase(input.base),
     onto: input.onto,
+    behind: input.behind,
   }
   const destinations =
     open === undefined
@@ -294,22 +371,39 @@ export function offerView(input: {
   const gone = input.base?.state === "gone"
   const takes = (buttons: readonly OfferButton[]): readonly OfferButton[] =>
     destinations.length === 0 ? buttons.filter(b => b !== "take") : buttons
+  const catching = (b: OfferButton) => b === "update" || b === "continue"
   const view = (
     state: OfferView["state"],
     buttons: readonly OfferButton[],
-    menu: readonly OfferButton[],
-  ): OfferView => ({
-    state,
-    buttons: takes(buttons),
+    listed: readonly OfferButton[],
+  ): OfferView => {
     // A thread whose WIP is gone is brought up to date only by moving it to
     // the line.
-    menu: [
-      ...(gone ? menu.map(b => (b === "update" ? "continue" : b)) : menu),
-      ...(destinations.length > 1 ? (["take-line"] as const) : []),
-    ],
-    destinations,
-    facts,
-  })
+    const menu = gone
+      ? listed.map(b => (b === "update" ? "continue" : b))
+      : listed
+    // Behind its base, catching up stands beside the offer; your card already
+    // carrying it offers it no more.
+    const shown =
+      input.catchUp === "drafted"
+        ? { buttons, menu: menu.filter(b => !catching(b)) }
+        : input.behind && menu.includes("update")
+          ? {
+              buttons: [...buttons, "update" as const],
+              menu: menu.filter(b => b !== "update"),
+            }
+          : { buttons, menu }
+    return {
+      state,
+      buttons: takes(shown.buttons),
+      menu: [
+        ...shown.menu,
+        ...(destinations.length > 1 ? (["take-line"] as const) : []),
+      ],
+      destinations,
+      facts,
+    }
+  }
   if (activity === "turn") return view("running", [], [])
   if (activity !== "idle") return view("busy", [], [])
   if (offer === undefined) return view("nothing", [], ["update"])
@@ -317,6 +411,9 @@ export function offerView(input: {
   if (landing?.state === "needs_you" && landing.at > offer.at)
     return view("needs_you", ["take"], ["update"])
   if (offer.edited) return view("edited", ["take", "refresh"], ["update"])
+  // The lane's work is already where the offer sits, by a route the ledger
+  // does not record (a squash that dropped its trailers): nothing to take.
+  if (offer.files.length === 0) return view("nothing", [], ["update"])
   if (offer.conflicts.length > 0)
     return view("conflicts", ["resolve", "take"], [])
   if (offer.size > 1)

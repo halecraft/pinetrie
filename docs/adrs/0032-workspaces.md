@@ -19,6 +19,9 @@ Amended in place (`PLAN-2026-09-30-agent-commits`, S56): a commit the
 agent made itself in a turn is that turn's revision.
 **Amended by ADR-0060:** a lane with no revision above it starts at the
 integration line, or a copy of a WIP bookmark, not your `@-`.
+Amended by ADR-0061: where a new thread's agent works is a line left of
+the send button, saying what it does to your files, and its menu marks the
+choice.
 
 **Context.** The agent's tools run in the repo the host runs from, so two
 threads running tools at once share one directory and can collide. ADR-0022

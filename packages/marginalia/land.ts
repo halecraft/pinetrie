@@ -82,8 +82,8 @@ export const decodeLand = (message: unknown): LandDetails | undefined =>
 /** The one line a column shows for a land message. */
 export const landLine = (d: LandDetails): string =>
   d.files.length === 0
-    ? "✓ bringing up to date: no conflicts"
-    : `⚠ bringing up to date: ${d.files.length} ${d.files.length === 1 ? "file conflicts" : "files conflict"}`
+    ? "✓ catching up: no conflicts"
+    : `⚠ catching up: ${d.files.length} ${d.files.length === 1 ? "file conflicts" : "files conflict"}`
 
 /** One side of a conflicted file, labelled: why it changed, as the tree says. */
 export interface Side {

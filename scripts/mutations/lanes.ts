@@ -8,6 +8,43 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "update my files moves only @'s line",
+    file: "packages/lanes/plan.ts",
+    from: '    "rebase",\n    "-b",\n    "@",\n',
+    to: '    "rebase",\n    "-r",\n    "@",\n',
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
+    expect:
+      "update my files (S80): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
+  },
+  {
+    name: "the preview names no conflict",
+    file: "packages/lanes/line.ts",
+    from: "  const conflicts = (blank < 0 ? rest : rest.slice(0, blank)).filter(",
+    to: "  const conflicts = [].filter(",
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
+    expect:
+      "update my files (S80): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
+  },
+  {
+    name: "the preview counts no other head",
+    file: "packages/lanes/line.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    heads: await count(jj, `heads(roots(${onto}..@)::) ~ @`),",
+    to: "    heads: 0,",
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
+    expect:
+      "update my files (S80): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
+  },
+  {
+    name: "a lane's work always changes a file",
+    file: "packages/lanes/offer.ts",
+    from: "  return ran.ok && lines(ran.stdout).length === 0\n",
+    to: "  return false\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanes/lanes.test.ts"],
+    expect:
+      "a lane whose work undoes itself changes no file, over a range jj diffs as one",
+  },
+  {
     name: "the host's newest version does not stop the walk",
     file: "packages/lanes/plan.ts",
     from: "    if (entry.byHost) return { reached: true, yours }\n",

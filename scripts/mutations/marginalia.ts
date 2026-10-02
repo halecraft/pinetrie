@@ -6,6 +6,104 @@ const archive = "packages/marginalia/archive.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "behind its base, catching up stays in the menu",
+    file: "packages/marginalia/offer.ts",
+    from: '        : input.behind && menu.includes("update")',
+    to: '        : false && menu.includes("update")',
+    command: unit,
+    expect:
+      "behind its base, catching up stands beside the offer; with nothing to take, alone",
+  },
+  {
+    name: "a drafted catch-up is offered again on the strip",
+    file: "packages/marginalia/offer.ts",
+    from: '      input.catchUp === "drafted"',
+    to: "      false",
+    command: unit,
+    expect:
+      "a card bringing the thread up to date: drafting, the strip offers it no more; queued on an idle lane, the offer is busy with it",
+  },
+  {
+    name: "a queued catch-up is no activity",
+    file: "packages/marginalia/offer.ts",
+    from: '    input.activity === "idle" && input.catchUp === "queued"',
+    to: "    false",
+    command: unit,
+    expect:
+      "a card bringing the thread up to date: drafting, the strip offers it no more; queued on an idle lane, the offer is busy with it",
+  },
+  {
+    name: "a line thread is never behind",
+    file: "packages/marginalia/offer.ts",
+    from: "  if (bookmark === null) return base.start !== line.commit",
+    to: "  if (bookmark === null) return false",
+    command: unit,
+    expect:
+      "baseBehind: the commit a lane last took from its base is not the base's now",
+  },
+  {
+    name: "a WIP thread is never behind",
+    file: "packages/marginalia/offer.ts",
+    from: "  return wip !== undefined && wip.commit !== base.start",
+    to: "  return false",
+    command: unit,
+    expect:
+      "baseBehind: the commit a lane last took from its base is not the base's now",
+  },
+  {
+    name: "the line is named by its bookmark",
+    file: "packages/marginalia/work.ts",
+    from: '  base.kind === "line" ? "the project" : base.bookmark',
+    to: '  base.kind === "line" ? "pineta-onto" : base.bookmark',
+    command: unit,
+    expect:
+      "an update round-trips, shows one line, and tells the model what changed",
+  },
+  {
+    name: "an update on the line is stored as a WIP's",
+    file: "packages/marginalia/update.ts",
+    from: '            line: details.base.kind === "line",',
+    to: "            line: false,",
+    command: unit,
+    expect:
+      "an update round-trips, shows one line, and tells the model what changed",
+  },
+  {
+    name: "an offer of no files can be taken",
+    file: "packages/marginalia/offer.ts",
+    from: '  if (offer.files.length === 0) return view("nothing", [], ["update"])\n',
+    to: "",
+    command: unit,
+    expect: "every state, with its buttons",
+  },
+  {
+    name: "a record left from a gone offer is kept",
+    file: "packages/marginalia/offer.ts",
+    from: '  if (offer === null) return nothingNew ? "forget" : "build"',
+    to: '  if (offer === null) return nothingNew ? "none" : "build"',
+    command: unit,
+    expect:
+      "no offer in your repo (never built, taken, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten",
+  },
+  {
+    name: "a lane whose work undoes itself is offered",
+    file: "packages/marginalia/offer.ts",
+    from: "  const nothingNew = facts.empty || (start.length === 1 && start[0] === tip)",
+    to: "  const nothingNew = start.length === 1 && start[0] === tip",
+    command: unit,
+    expect:
+      "a lane whose work changes no file is never built, and its offer is withdrawn unless you edited it",
+  },
+  {
+    name: "an archived thread's offer stays",
+    file: "packages/marginalia/offer.ts",
+    from: '  if (facts.archived) return offer === null ? "forget" : "withdraw"',
+    to: '  if (facts.archived) return offer === null ? "forget" : "none"',
+    command: unit,
+    expect:
+      "an archived thread's offer is withdrawn, an edited one too; with none, its record is forgotten",
+  },
+  {
     name: "a forced describe is refused once described",
     file: "packages/marginalia/offer.ts",
     from: "  (force || isWipLine(name, offer.firstLine))",

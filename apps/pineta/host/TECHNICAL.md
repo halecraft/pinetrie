@@ -336,7 +336,12 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   model outside it, and writes inside it; `act.ts`,
   `stack.ts` and `watch.ts` (`planPoll`) are the actions, a split's stack
   and your jj operations.
-- **The host decides an offer only from your repo** (ADR-0060). One gather,
+- **The host decides an offer only from your repo** (ADR-0060), and the
+  archive. A refresh gathers with `refreshNow`: for a thread whose root is
+  archived, only its offer, read against the line; else `offerNow`'s facts
+  and whether the lane's work changes any file (`changesNoFile`). Archived
+  is read from the archive record, not from the lane's tip being missing:
+  a tip missing for one import (S78) must not withdraw a live offer. One gather,
   `offerNow`, reads where it sits and starts (`placeOf`: its base from the
   lane's newest `Pineta-Base`, its target the line's commit or the WIP's,
   its start `startOfOffer`) and the offer itself (`readOffer`). Refresh,
@@ -346,7 +351,14 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   record only to skip a write that changes nothing.
 - **A record is written from the repo after each step** (`executeOffer`):
   from the read made before planning when the plan ran no steps (the
-  common `none` reads nothing more), else from a new read.
+  common `none` reads nothing more), else from a new read. `withdraw` and
+  `forget` remove it, and `OfferState.remove` skips a record that is not
+  there. A refresh with no place (an archived thread) plans only those two;
+  the ports that need a place reject if reached without one.
+- **A root archived or restored moves its lanes' refs on the offers'
+  queue** (`Offers.moveLanes`, called by `work/archive.ts`), then touches
+  each lane: an archived thread's offer is withdrawn, a restored one's built
+  again (ADR-0061).
 - **A take names its destination** (`planTake`): one of
   `takeDestinations`, and refused (`bad_destination`) unless the bookmark is
   at or below the offer's bottom's parent, read in the same step. jj's
@@ -354,8 +366,11 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 - **The `line` command** (`offers/line.ts`): `setup` creates the line's
   bookmark at your `@-` and writes `immutable_heads()` and `revsets.log`
   to the repo's config, the text the header's menu showed; `land` moves the line to your
-  `@-`, as you. Only a host that admits no one else takes it
-  (`lineCommands`: no invite key), since both act on the repo as its owner;
+  `@-`, as you; `follow` rebases your work onto the line, as you
+  (`planFollow`, ADR-0061), only while the record it plans from has a
+  preview (`yours.follow`): the one you were shown. The record's preview
+  runs `git merge-tree` on your repo (a `git` runner beside `ops`). Only a host that admits no one else takes it
+  (`lineCommands`: no invite key), since all three act on the repo as its owner;
   Kyneta does not say which connection a seat came over. Others are refused
   `not_yours`.
 - **A new jj operation refreshes the line's record** and touches each lane

@@ -258,6 +258,16 @@ commits it makes, and finds yours by ancestry and change id; the session
 document becomes a cache. It answers S73 and S74, and replaces
 ADR-0038's take, offer start and `pineta.have`.
 
+**ADR-0061 — the integration line is "the project"** (built). The page names places by what they are for:
+the project, your files, a thread's own copy, your unfinished work; jj names
+go in titles. A take is "add to the project", bringing up to date is
+"catch up", and a thread whose base moved on says so, with catching up
+beside its offer. The composer says what a send does to your files.
+Archiving a root withdraws its threads' offers. "Update my files" rebases
+your work onto the line, as you, after a preview from `git merge-tree`
+(S80); what conflicts, "resolve with the agent" hands to a thread in your
+files.
+
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold

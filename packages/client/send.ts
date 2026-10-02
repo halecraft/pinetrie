@@ -138,6 +138,14 @@ export interface SendPlan {
   readonly to: Address
   /** Where a queued send would wait: the button's in `queue` mode, and a conflict's. */
   readonly queue: QueuePlace
+  /**
+   * The card's command (ADR-0055), and whether it has text to send after
+   * it: the button then names the command.
+   */
+  readonly command: {
+    readonly command: CardCommand
+    readonly text: boolean
+  } | null
   /** A message naming no one asks the agent (`agentByDefault`). */
   readonly agentByDefault: boolean
 }
@@ -187,6 +195,10 @@ export function planSend(input: {
     to,
     queue: queuePlace(lane, input.reader),
     agentByDefault: agentByDefault(how),
+    command:
+      input.command === null
+        ? null
+        : { command: input.command, text: input.text.trim() !== "" },
   }
 }
 
@@ -217,9 +229,11 @@ export const UPLOADING = "uploading image…"
 export function sendButton(plan: SendPlan, busy: EditorBusy): SendButton {
   const words = busy.uploading
     ? { label: UPLOADING, title: null }
-    : plan.mode === "queue"
-      ? queueWords(plan.queue)
-      : recipientWords(plan.to)
+    : plan.command !== null
+      ? commandSendWords(plan.command, plan.queue)
+      : plan.mode === "queue"
+        ? queueWords(plan.queue)
+        : recipientWords(plan.to)
   return { ...words, disabled: busy.uploading || busy.sending }
 }
 
@@ -240,9 +254,31 @@ export function recipientWords(to: Address): ButtonWords {
       }
 }
 
-/** The box's placeholder: whether a message naming no one asks the agent. */
+/**
+ * The send button of a card with a command (ADR-0055): the command, then
+ * the card's text if it has some. Where it waits goes in its title.
+ */
+export function commandSendWords(
+  command: NonNullable<SendPlan["command"]>,
+  queue: QueuePlace,
+): ButtonWords {
+  const verb = command.command === "bring-up-to-date" ? "catch up" : "continue"
+  return {
+    label: command.text ? `${verb} and send` : verb,
+    title: queue.kind === "next" ? null : queueWords(queue).label,
+  }
+}
+
+/**
+ * The box's placeholder: with a command, that its text is optional; else
+ * whether a message naming no one asks the agent.
+ */
 export const placeholderWords = (plan: SendPlan): string =>
-  plan.agentByDefault ? "send to agent…" : "say something · @agent to ask"
+  plan.command !== null
+    ? "what should the agent do with the new work? (optional)"
+    : plan.agentByDefault
+      ? "send to agent…"
+      : "say something · @agent to ask"
 
 /** Where a message queued now would wait: what the queue button says. */
 export type QueuePlace =
@@ -300,8 +336,9 @@ export function raceWords(by: WriterId | null, reader: Reader): string {
 // ── where a new lane works ────────────────────────────────────────────────
 
 /**
- * Where a lane works, in the chip's words: on a copy of a WIP when it starts
- * from one (ADR-0060), else on a copy of the line.
+ * Where a new thread's agent works, and what that means for your files: the
+ * line under the box, which opens the where menu. A lane of its own starts
+ * from the project unless it starts from a WIP (ADR-0060).
  */
 export function whereWords(
   work: WorkSetting,
@@ -309,29 +346,43 @@ export function whereWords(
   base: string | null = null,
 ): string {
   if (work.kind === "own")
-    return base === null ? "on a copy" : `on a copy of ${base}`
-  return work.dir === project.root ? "in your working copy" : `in ${work.dir}`
+    return base === null
+      ? "works on its own copy · your files stay as they are"
+      : `starts from your unfinished work: ${base}`
+  return work.dir === project.root
+    ? "edits your files directly"
+    : `edits files in ${work.dir}`
 }
 
-/** A row of the where menu. */
+/** A row of the where menu: its name, what it means, and whether it is chosen. */
 export interface WhereChoice {
   readonly key: string
   readonly className: "where-own" | "where-yours" | "where-used" | "where-other"
-  /** The setting it picks; null for "in another directory…", which asks for one. */
+  /** The setting it picks; null for "another directory…", which asks for one. */
   readonly setting: WorkSetting | null
   readonly row: string
+  readonly detail: string | null
+  /** Whether it is the current choice; undefined for one that asks. */
+  readonly checked: boolean | undefined
   readonly disabled: boolean
   readonly title: string | undefined
 }
 
 /**
- * The where menu's rows, in order. A row with a setting starts with the chip's
- * words for it, so the chip and the menu say the same thing.
+ * The where menu's first section, in order: its own copy, your files, each
+ * directory another lane works in, and another directory. `onto` is the
+ * line's bookmark, for its own copy's title; null before the line is read.
  */
 export function whereChoices(
   project: ProjectRecord,
   usedDirs: readonly string[],
+  work: WorkSetting,
+  onto: string | null = null,
 ): readonly WhereChoice[] {
+  const chosen = (setting: WorkSetting) =>
+    setting.kind === work.kind &&
+    (setting.kind === "own" ||
+      (work.kind === "direct" && setting.dir === work.dir))
   const own: WorkSetting = { kind: "own" }
   const yours: WorkSetting = { kind: "direct", dir: project.root }
   return [
@@ -339,15 +390,24 @@ export function whereChoices(
       key: "own",
       className: "where-own",
       setting: own,
-      row: `${whereWords(own, project)} · you take its changes`,
+      row: "its own copy",
+      detail: "you review its work, then add it to the project",
+      checked: chosen(own),
       disabled: project.kind !== "lanes",
-      title: project.kind === "direct" ? project.reason : undefined,
+      title:
+        project.kind === "direct"
+          ? project.reason
+          : onto === null
+            ? undefined
+            : `a lane of its own, cloned from ${onto}; its work comes back as pineta-offer/<thread>`,
     },
     {
       key: "yours",
       className: "where-yours",
       setting: yours,
-      row: `${whereWords(yours, project)} · edits your files`,
+      row: "your files",
+      detail: "it edits them directly",
+      checked: chosen(yours),
       disabled: false,
       title: undefined,
     },
@@ -359,7 +419,9 @@ export function whereChoices(
           key: dir,
           className: "where-used",
           setting,
-          row: whereWords(setting, project),
+          row: dir,
+          detail: "another thread works there",
+          checked: chosen(setting),
           disabled: false,
           title: undefined,
         }
@@ -368,7 +430,9 @@ export function whereChoices(
       key: "other",
       className: "where-other",
       setting: null,
-      row: "in another directory…",
+      row: "another directory…",
+      detail: null,
+      checked: undefined,
       disabled: false,
       title: undefined,
     },
@@ -383,35 +447,42 @@ export interface BaseChoice {
   /** The WIP bookmark it picks; null for the line. */
   readonly base: string | null
   readonly row: string
+  readonly detail: string | null
   readonly chosen: boolean
+  /** The jj facts: the bookmark and its commit. */
+  readonly title: string
 }
 
 /**
- * The bases a new lane may start from: the line, then each WIP bookmark above
- * it, with how far it is behind the line. None with no line yet: no lane of
- * its own can start then.
+ * The bases a new lane may start from: the project, then each WIP bookmark
+ * above it, with how far it is behind the project. None with no line yet, nor
+ * with no WIP: the project is then the only start, and needs no choosing.
  */
 export function baseChoices(
   line: LineRecord | null,
   chosen: string | null,
 ): readonly BaseChoice[] {
-  if (line === null || line.commit === null) return []
+  if (line === null || line.commit === null || line.wips.length === 0) return []
   const behind = (n: number) =>
     n === 0
-      ? ""
-      : ` · ${n} ${n === 1 ? "commit" : "commits"} behind ${line.onto}`
+      ? "your unfinished work"
+      : `your unfinished work · ${n} ${n === 1 ? "commit" : "commits"} behind the project`
   return [
     {
       key: "base:line",
       base: null,
-      row: `starts from ${line.onto}`,
+      row: "the project",
+      detail: null,
       chosen: chosen === null,
+      title: `${line.onto} at ${line.commit.slice(0, 8)}`,
     },
     ...line.wips.map(w => ({
       key: `base:${w.bookmark}`,
       base: w.bookmark,
-      row: `starts from ${w.bookmark}${behind(w.behind)}`,
+      row: w.bookmark,
+      detail: behind(w.behind),
       chosen: chosen === w.bookmark,
+      title: `${w.bookmark} at ${w.commit.slice(0, 8)}, copied for the thread`,
     })),
   ]
 }

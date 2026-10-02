@@ -2,7 +2,14 @@
 // decided. PURE: `TabBar` (`tabs.tsx`) draws it, and each click sends the
 // intent it names.
 
-import type { EntryId, MarkRecord } from "@pineta/core"
+import {
+  type EntryId,
+  type LaneName,
+  type MarkRecord,
+  rootOf,
+  type ThreadName,
+  type TreeIndex,
+} from "@pineta/core"
 import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
 import { type ActiveTab, type Layout, sameTab, tabBar } from "./layout.ts"
@@ -11,10 +18,14 @@ import { NO_TEXT } from "./root-label.ts"
 /** What a root tab's ⋯ offers. */
 export type TabMenuItem =
   | { readonly kind: "rename" }
-  /** Archive, refused while the agent works in the root (`rootWork`). */
+  /**
+   * Archive, refused while the agent works in the root (`rootWork`). It
+   * withdraws the offers of its threads named in `drops` (ADR-0061).
+   */
   | {
       readonly kind: "archive"
       readonly busy: "running" | "waiting" | null
+      readonly drops: readonly ThreadName[]
       readonly intent: Intent
     }
 
@@ -69,6 +80,8 @@ export interface TabsViewInput {
   readonly archived: ReadonlySet<EntryId>
   /** The agent's work in each root (`rootWork`). */
   readonly work: ReadonlyMap<string, "running" | "waiting">
+  /** The threads with an open offer, by root (`offeredByRoot`). */
+  readonly offered: ReadonlyMap<EntryId, readonly ThreadName[]>
   readonly unsent: CardMarks
 }
 
@@ -122,6 +135,7 @@ function tabView(tab: ActiveTab, input: TabsViewInput): TabView {
               {
                 kind: "archive",
                 busy: input.work.get(root) ?? null,
+                drops: input.offered.get(root) ?? [],
                 intent: { kind: "archive", root },
               },
             ],
@@ -131,6 +145,31 @@ function tabView(tab: ActiveTab, input: TabsViewInput): TabView {
     }
   }
 }
+
+/**
+ * The threads with an open offer, by their root: what archiving that root
+ * withdraws. `offers` are the open offers with a tip (`appView`'s).
+ */
+export function offeredByRoot(
+  index: TreeIndex,
+  offers: readonly { readonly lane: LaneName; readonly tip: EntryId }[],
+  names: ReadonlyMap<LaneName, ThreadName>,
+): ReadonlyMap<EntryId, readonly ThreadName[]> {
+  const byRoot = new Map<EntryId, ThreadName[]>()
+  for (const { lane, tip } of offers) {
+    const root = rootOf(index, tip)
+    const name = names.get(lane)
+    if (root === null || name === undefined) continue
+    byRoot.set(root, [...(byRoot.get(root) ?? []), name])
+  }
+  return byRoot
+}
+
+/** What archiving a root does to its threads' offers, beside its button. */
+export const dropsWords = (drops: readonly ThreadName[]): string | null =>
+  drops.length === 0
+    ? null
+    : `work not added to the project goes: ${drops.join(", ")}`
 
 /** What a root tab's rename field sends, once planned (`planTitle`). */
 export const renameIntent = (root: EntryId, title: string | null): Intent => ({

@@ -122,6 +122,8 @@
       .column-head button { background: none; border: none; border-radius: 0; padding: 0; color: inherit; }
       .column-head .head-row { display: flex; gap: .5rem; align-items: center; min-height: 1.5rem; }
       .column-head .head-space { flex: 1; }
+      /* The thread's base has new work it lacks (`behindMark`). */
+      .column-head .thread-behind { color: #e8c07a; cursor: help; }
       /* The mark before a thread's name: a fixed square holding the star, and
          the banner, a sprite on black, laid over it, so the name never moves
          when one arrives. `isolation` makes the header's own background what
@@ -250,6 +252,7 @@
       .review-diff [data-kind="hunk"] { color: #7fa7d8; }
       .review-diff [data-kind="meta"] { color: #6f7784; }
       .work .offer-take { border-color: #4f7a4f; color: #a8d8a8; }
+      .work .offer-update { border-color: #6b5a33; color: #e8c07a; }
       .work .work-warning { color: #e8c07a; }
       .column-body { flex: 1; overflow-y: auto; padding: .75rem 1.75rem .75rem .75rem; }
 
@@ -530,15 +533,22 @@
       dialog.restore-ask { background: #171a1f; color: inherit; border: 1px solid #3a3f48;
         border-radius: 8px; }
       dialog.restore-ask::backdrop { background: rgb(0 0 0 / .5); }
-      /* A command, named last: what the card is sent through (ADR-0055). */
-      .card-command { font-size: .75rem; color: #9ecbff; white-space: nowrap; }
+      /* A card's command (ADR-0055), above its box: what sending it does first. */
+      .card-command { margin-bottom: .3rem; font-size: .75rem; color: #e8c07a; }
       .card-command-clear { padding: 0 .3rem; font-size: .72rem; background: none; border: none; color: #8b93a1; }
-      .where-menu .where-trigger { padding: .2rem .5rem; background: none; border: 1px solid #3a3f48;
-        color: #aab4c3; font-size: .75rem; white-space: nowrap; }
+      /* Where a new thread's agent works, said as what it does to your files:
+         a line of text left of the send button, not a second button. */
+      .where-line { flex: 1; min-width: 0; display: flex; }
+      .where-line .where-menu { flex: 1; min-width: 0; display: flex; }
+      .where-menu .where-trigger { flex: 1; min-width: 0; display: flex; padding: 0; background: none;
+        border: none; color: #8b93a1; font-size: .75rem; text-align: left; }
       .where-menu .where-trigger:hover { color: #e6e6e6; }
-      .where-menu .where-words { display: inline-block; max-width: 11rem; overflow: hidden;
-        text-overflow: ellipsis; vertical-align: bottom; }
-      .where-menu .where-caret { margin-left: .35rem; }
+      .where-menu .where-words { min-width: 0; overflow: hidden; white-space: nowrap;
+        text-overflow: ellipsis; }
+      .where-menu .where-trigger:hover .where-words { text-decoration: underline; }
+      .where-menu .where-caret { flex: none; margin-left: .35rem; }
+      .menu-section:has([role="menuitemradio"]) [role="menuitem"] { padding-left: 1.6rem; }
+      .where-menu .where-detail { display: block; margin-left: 1.1rem; font-size: .72rem; color: #8b93a1; }
       .status { font-size: .75rem; color: #d0a15f; }
       input, .card-editor textarea {
         flex: 1; padding: .5rem .7rem; border-radius: 6px;
@@ -579,6 +589,15 @@
       .inbox-count { min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #f28b82;
         color: #111; font-size: .72rem; text-align: center; }
       .menu-heading { margin: .1rem .5rem .3rem; font-size: .75rem; color: #8b93a1; }
+      /* A later section of a menu: its heading under a rule. Notes say how
+         things stand, as text, not as items. A choice's ✓ keeps its column
+         whether it is chosen or not, so the names line up. */
+      .menu-section { display: flex; flex-direction: column; }
+      fieldset.menu-section { min-width: 0; margin: 0; padding: 0; border: 0; }
+      .menu-section + .menu-section { margin-top: .25rem; padding-top: .25rem;
+        border-top: 1px solid #2c313a; }
+      .menu-note { margin: .1rem .5rem .3rem; font-size: .75rem; color: #aab4c3; }
+      .menu .menu-check { display: inline-block; width: 1.1rem; color: #9ecbff; }
       .here-thread, .inbox-row { display: flex; flex-direction: column; max-width: 22rem; }
       .here-root, .inbox-who { font-size: .72rem; color: #8b93a1; }
       .here-name { font-family: ui-monospace, monospace; font-size: .75rem; color: #d7dde6; }

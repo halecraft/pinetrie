@@ -22,6 +22,7 @@ import { scriptedModel } from "@pineta/pi"
 import {
   readLandings,
   readLanes,
+  readLine,
   readNames,
   readOffers,
   readPlaces,
@@ -778,10 +779,45 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       `${JSON.stringify(offerOf()?.files)}`,
     )
     // A clean update: a fact in the thread, then the card's text, sent. Your
-    // work goes on the line first, rebased onto what you took, then landed.
+    // work goes on the line first: "update my files" rebases it onto what you
+    // took, as you, after the line's record previews it (ADR-0061); then it
+    // is landed.
     writeFileSync(path.join(project, "yours.txt"), "yours\n")
     jj(project, "commit", "-m", "you add yours.txt")
-    jj(project, "rebase", "-b", "@", "-o", "pineta-onto")
+    const previewed = await waitFor(
+      () => (readLine(wh.doc)?.yours.follow ?? null) !== null,
+      30_000,
+    )
+    const preview = readLine(wh.doc)?.yours.follow
+    const updated = await wu.line("follow")
+    const followedBy = jj(
+      project,
+      "op",
+      "log",
+      "-n",
+      "1",
+      "--no-graph",
+      "-T",
+      "user",
+    )
+    check(
+      "update my files previews what it changes, then rebases your work onto the project, as you",
+      previewed >= 0 &&
+        preview?.conflicts.length === 0 &&
+        updated.kind === "line-moved" &&
+        jj(
+          project,
+          "log",
+          "--no-graph",
+          "-r",
+          "pineta-onto & ::@-",
+          "-T",
+          "commit_id",
+        ) !== "" &&
+        existsSync(path.join(project, "yours.txt")) &&
+        !followedBy.startsWith("pineta-host"),
+      `${JSON.stringify({ preview, updated, followedBy })}`,
+    )
     await wu.line("land")
     script.use([{ text: "it fits" }])
     if (two !== undefined)
@@ -990,6 +1026,32 @@ async function mainSection(check: Checks["check"]): Promise<void> {
           r.snapshot !== null,
       )
     const before = inRootOne(readRevisions(wh.doc))
+    // The root's open offers, by lane: archiving withdraws them, and
+    // restoring builds them again.
+    const offeredInRootOne = [...readOffers(wh.doc).values()]
+      .filter(o => {
+        const tip = laneTip(o.lane)
+        return (
+          o.taken === null &&
+          rootOne !== null &&
+          tip !== null &&
+          rootOf(tree(), tip) === rootOne
+        )
+      })
+      .map(o => o.lane)
+    const offerBookmarks = () =>
+      offeredInRootOne.filter(
+        lane =>
+          jj(
+            project,
+            "log",
+            "--no-graph",
+            "-r",
+            `present(bookmarks(exact:"${offerBookmarkOf(lane)}"))`,
+            "-T",
+            "commit_id",
+          ) !== "",
+      )
     if (rootOne !== null) await wu.archive("archive", entryId(rootOne))
     await wh.quiet()
     const kept = before.filter(r =>
@@ -1009,7 +1071,26 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         !sh(`container list -a --quiet`).includes(container(one.name)),
       `${before.length} → ${kept.length}`,
     )
+    check(
+      "archiving a root withdraws its threads' offers: no bookmark in your repo, no record",
+      offeredInRootOne.length > 0 &&
+        offerBookmarks().length === 0 &&
+        offeredInRootOne.every(lane => !readOffers(wh.doc).has(lane)),
+      `${JSON.stringify({ offered: offeredInRootOne, left: offerBookmarks() })}`,
+    )
     if (rootOne !== null) await wu.archive("restore", entryId(rootOne))
+    const rebuilt = await waitFor(
+      () =>
+        offeredInRootOne.length > 0 &&
+        offerBookmarks().length === offeredInRootOne.length &&
+        offeredInRootOne.every(lane => readOffers(wh.doc).has(lane)),
+      30_000,
+    )
+    check(
+      "restoring it builds their offers again",
+      rebuilt >= 0,
+      `${JSON.stringify({ offered: offeredInRootOne, back: offerBookmarks() })}`,
+    )
     script.use([
       { tool: "bash", args: { command: "cat shared.txt" } },
       { text: "back" },

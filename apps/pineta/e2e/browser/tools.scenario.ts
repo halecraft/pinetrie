@@ -401,8 +401,8 @@ async function run(
         }
 
         // ── where the agent will work, said before sending (ADR-0032) ───────
-        // The button says what the send does; the chip beside it, where the new
-        // thread's agent works.
+        // The button says what the send does; the line beside it, where the new
+        // thread's agent works and what that does to your files.
         const send = `${col(0)} .composer .send`
         const chip = `${col(0)} .where-trigger`
         /** The chip's words, its setting, and the button's words. */
@@ -433,9 +433,10 @@ async function run(
           const again = await said()
           check(
             "the chip says where the new thread's agent works, and the menu changes it",
-            onCopy === `on a copy | own | ${TO_AGENT}` &&
+            onCopy ===
+              `works on its own copy · your files stay as they are | own | ${TO_AGENT}` &&
               chose &&
-              direct === `in your working copy | direct | ${TO_AGENT}` &&
+              direct === `edits your files directly | direct | ${TO_AGENT}` &&
               again === onCopy,
             `${onCopy}; ${direct}; ${again}`,
           )

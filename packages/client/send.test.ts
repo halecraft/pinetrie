@@ -166,6 +166,17 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       command: null,
       ...over,
     })
+  test("a card's command, and whether it has text to send after", () => {
+    expect(plan("then test", { command: "bring-up-to-date" }).command).toEqual({
+      command: "bring-up-to-date",
+      text: true,
+    })
+    expect(plan("  ", { command: "bring-up-to-date" }).command).toEqual({
+      command: "bring-up-to-date",
+      text: false,
+    })
+    expect(plan("hi").command).toBe(null)
+  })
   test("in a conversation, a message is sent, to whoever it names", () => {
     expect(plan("hi")).toEqual({
       mode: "reply",
@@ -173,6 +184,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       to: { compels: NOBODY, people: [] },
       queue: { kind: "next" },
       agentByDefault: false,
+      command: null,
     })
     expect(plan("@ada hi").to).toEqual({ compels: NOBODY, people: ["Ada"] })
     expect(plan("@ada @bea @cy").to.people).toEqual(["Ada", "Bea", "Cy"])
@@ -243,6 +255,7 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
     to,
     queue: { kind: "after", name: "Bea", ahead: 3 },
     agentByDefault: false,
+    command: null,
   })
   const IDLE = { uploading: false, sending: false }
   const people = (...names: string[]): Address => ({
@@ -293,15 +306,45 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
       null,
       true,
     ],
+    [
+      "a card with a command names it, its wait in the title",
+      {
+        ...sent(AGENT, "queue"),
+        command: { command: "bring-up-to-date", text: false },
+      },
+      IDLE,
+      "catch up",
+      "queue after Bea",
+      false,
+    ],
+    [
+      "a card with a command and text sends the text after",
+      {
+        ...sent(AGENT, "queue"),
+        queue: { kind: "next" },
+        command: { command: "bring-up-to-date", text: true },
+      },
+      IDLE,
+      "catch up and send",
+      null,
+      false,
+    ],
   ] as const)("%s", (_, plan, busy, label, title, disabled) => {
     expect(sendButton(plan, busy)).toEqual({ label, title, disabled })
   })
+
   test("placeholderWords says whether a message naming no one asks the agent", () => {
     const plan = sent(people())
     expect(placeholderWords({ ...plan, agentByDefault: true })).toBe(
       "send to agent…",
     )
     expect(placeholderWords(plan)).toBe("say something · @agent to ask")
+    expect(
+      placeholderWords({
+        ...plan,
+        command: { command: "bring-up-to-date", text: false },
+      }),
+    ).toBe("what should the agent do with the new work? (optional)")
   })
 })
 
@@ -376,33 +419,61 @@ describe("where a new lane works: the chip and its menu", () => {
     root: "/work",
     reason: "not a jj repo",
   }
-  test("whereWords says each setting", () => {
-    expect(whereWords({ kind: "own" }, lanes)).toBe("on a copy")
+  test("whereWords says each setting by what it does to your files", () => {
+    expect(whereWords({ kind: "own" }, lanes)).toBe(
+      "works on its own copy · your files stay as they are",
+    )
+    expect(whereWords({ kind: "own" }, lanes, "wip/search")).toBe(
+      "starts from your unfinished work: wip/search",
+    )
     expect(whereWords({ kind: "direct", dir: "/work" }, lanes)).toBe(
-      "in your working copy",
+      "edits your files directly",
     )
     expect(whereWords({ kind: "direct", dir: "/tmp/x" }, lanes)).toBe(
-      "in /tmp/x",
+      "edits files in /tmp/x",
     )
   })
-  test("each row with a setting starts with the chip's words for it", () => {
-    for (const c of whereChoices(lanes, ["/tmp/x"]))
-      if (c.setting !== null)
-        expect(c.row.startsWith(whereWords(c.setting, lanes))).toBe(true)
+  test("the current choice is checked; another directory, which asks, is neither", () => {
+    const own = whereChoices(lanes, ["/tmp/x"], { kind: "own" })
+    expect(own.map(c => [c.key, c.checked])).toEqual([
+      ["own", true],
+      ["yours", false],
+      ["/tmp/x", false],
+      ["other", undefined],
+    ])
+    expect(
+      whereChoices(lanes, ["/tmp/x"], { kind: "direct", dir: "/tmp/x" }).map(
+        c => c.checked,
+      ),
+    ).toEqual([false, false, true, undefined])
+    expect(own[0]?.detail).toBe(
+      "you review its work, then add it to the project",
+    )
   })
   test("the working copy is never a used directory's row", () => {
     expect(
-      whereChoices(lanes, ["/work", "/tmp/x"]).map(c => c.className),
+      whereChoices(lanes, ["/work", "/tmp/x"], { kind: "own" }).map(
+        c => c.className,
+      ),
     ).toEqual(["where-own", "where-yours", "where-used", "where-other"])
   })
   test("a copy cannot be chosen where the project cannot have one, and says why", () => {
     expect(
-      whereChoices(direct, []).map(c => [c.key, c.disabled, c.title]),
+      whereChoices(direct, [], { kind: "own" }).map(c => [
+        c.key,
+        c.disabled,
+        c.title,
+      ]),
     ).toEqual([
       ["own", true, "not a jj repo"],
       ["yours", false, undefined],
       ["other", false, undefined],
     ])
-    expect(whereChoices(lanes, [])[0]?.disabled).toBe(false)
+    expect(whereChoices(lanes, [], { kind: "own" })[0]?.disabled).toBe(false)
+    expect(
+      whereChoices(lanes, [], { kind: "own" }, "pineta-onto")[0]?.title,
+    ).toBe(
+      "a lane of its own, cloned from pineta-onto; its work comes back as pineta-offer/<thread>",
+    )
   })
 })

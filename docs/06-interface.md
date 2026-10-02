@@ -63,16 +63,27 @@ the session, from live data only, as a document editor shows the people in it.
 - **The agent:** one avatar while it works, pulsing, with the number of
   threads it is working in. A click lists them, and a row opens one. Idle, it
   is not shown.
-- **The line** (ADR-0060): a menu for the integration line, where finished
-  work lands. Before it exists it offers **set up the line**, showing the
+- **The project** (ADR-0060, ADR-0061): a menu for the integration line,
+  "◆ the project", where finished work is added; its bookmark is in its
+  title. Before it exists it offers **set up the project**, showing the
   bookmark it makes at your `@-` and the exact `immutable_heads()` and
   `revsets.log` text it writes to your repo's config (the log, so jj and
   jjui show the offers), and what to add to a jjui revset of its own
-  (`docs/the-jujutsu-repo.md`), done only when you choose it. After, it
-  offers **land my work (N commits)**, which moves the line forward to your
-  `@-`, or says "your work is 3 commits behind pineta-onto: rebase onto it
-  in jj". A host that admits others offers neither, and says to use jj on
-  its machine.
+  (`docs/the-jujutsu-repo.md`), done only when you choose it. After, it says
+  where your files stand ("your files have everything in the project", or
+  "the project has 3 commits your files don't", with what updating would
+  change, what would conflict, and how many other lines of your work move
+  with it) and offers **update my files**, which rebases your work onto the
+  project, as you (ADR-0061); **add my work to the project (N commits)**,
+  which moves the line forward to your `@-`; and, when your files have
+  conflicts, **resolve with the agent**, which opens a new agent tab working
+  in your files, its box holding the `resolve-conflicts` skill and the
+  files, for you to send. A command refused or failed says why there. With
+  no commit in common with the project, it says to rebase in jj. A host
+  that admits others offers none of these, and says to use jj on its
+  machine.
+- **Work ready to add to the project** (⇣, with a count): the threads with
+  an open offer, each opening its thread.
 - **A menu you opened stays open until you close it.** The header's avatars
   and counts come from live data, but when what one stands for goes while
   its menu is open (a person leaves, the agent finishes, the last offer is
@@ -126,7 +137,9 @@ ever in the context of another. That is where the screen splits.
   disabled while the agent works in that root or cards are queued there, with
   the reason. Archiving
   writes a record, and takes the root out of every tab bar; no message
-  changes.
+  changes. It withdraws the root's threads' offers from your repo, and the
+  item names them first ("work not added to the project goes: amber-fox");
+  restoring builds them again (ADR-0061).
 - **If someone archives the tab you are on**, it stays while you are there,
   read-only, saying who archived it, with **Restore**. It leaves the bar when
   you switch away.
@@ -209,22 +222,27 @@ so it is the one behind the menu. What each does is under "Starting" below.
   grew meanwhile, it comes back at its old end, with ↓ new below.
 - **Above the composer, a work strip says what became of the agent's files**
   (ADR-0040): an agent on its own copy shows its offer in plain words ("2
-  files ready"), with **take** and its bookmark, which a press copies. The
-  take names where it goes (ADR-0060): "take onto pineta-onto", or "take into
-  wip/search" for a thread on a WIP, whose menu also offers "land on
-  pineta-onto, with your 2 commits beneath it". A take moves that bookmark
-  forward to the offer and never touches your working copy. An offer that
-  conflicts is never taken onto the line; its button is **resolve in the
-  thread**. One
-  working directly says "changes land directly in your working copy", and
-  warns while another agent works in the same directory. Its **⋯** menu
-  holds **bring up to date with** the thread's base (the line, or its WIP),
-  or, once its WIP is gone, **continue on pineta-onto**; and when your edits
-  and the offer conflict,
-  **resolve in the thread** does the same: each puts the command on your
-  card at the thread's end, making one if you have none, and focuses it: the composer shows "→ bring
-  up to date", with a × that sends it as a plain message instead. What you
-  write is what the agent should do with the new work (ADR-0055).
+  files ready"), with **add** and its bookmark, which a press copies. The
+  button names where the work goes (ADR-0060, ADR-0061): "add to the
+  project", or "add to wip/search" for a thread on a WIP, whose menu also
+  offers "add to the project, with your 2 commits beneath it"; its title
+  names the bookmark it moves. A take moves that bookmark forward to the
+  offer and never touches your working copy. An offer that conflicts is
+  never added to the project; its button is **resolve in the thread**. One
+  working directly says "edits your files directly", and warns while
+  another agent works in the same directory. Its **⋯** menu holds **catch
+  up with** the thread's base (the project, or its WIP), or, once its WIP is
+  gone, **continue from the project**. When the base has new work the
+  thread lacks, the strip says so ("2 files ready · the project has new
+  work"), catching up stands beside the offer, and the column's header shows
+  ↓, titled with the bookmark and both commits. Catching up, and **resolve
+  in the thread** when your edits and the offer conflict, put the command
+  on your card at the thread's end, making one if you have none, and focus
+  it: the composer says above its box "↓ catches up with the project first,
+  then sends what you write", with a × that sends it as a plain message
+  instead, and its button reads "catch up", or "catch up and send". What you
+  write is what the agent should do with the new work (ADR-0055); while it
+  is queued, the strip says "catching up with the project…".
 - **A column widens to review its offer** (ADR-0047). The offer's line opens
   the review to the right of the thread, which keeps its place and width: a
   file list when there is more than one file, and one scroll of every file's diff, each file's head pinned
@@ -347,10 +365,12 @@ The rail is E; the column is T. Seeing both at once is the product.
   "queue up next", "queue after Bea" or "queue after yours", naming who
   queued the last card already waiting. It uses the host's own decision (`addressChat`,
   over `threadOf`), so it cannot promise a reply that will not come. When the
-  send starts an agent, a chip beside the button says where it will work ("on
-  a copy ▾"), and opens the choices. For a copy, they include where it
-  **starts from**: the line, or a WIP bookmark, with how far that is behind
-  the line (ADR-0060).
+  send starts an agent, a line left of the button says where it will work, by
+  what that does to your files ("works on its own copy · your files stay as
+  they are ▾", or "edits your files directly"), and opens the choices, the
+  current one checked (ADR-0061). When you have WIP bookmarks, a second
+  section says where its copy **starts from**: the project, or a WIP, with
+  how far that is behind the project (ADR-0060).
 - **Who else is here** (ADR-0024) shows where there is room for it:
   - the **rail** rings the dot at the end of each thread someone else follows,
     in their colour, with a count when several do; hovering names them. The
@@ -480,7 +500,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   does a card with a command, even on an idle thread. Every move shows at
   once and is the host's to make (ADR-0059). A queued card is drawn
   after the thread's last message, headed "queued by Bea · 1st in line", with
-  "→ bring up to date" when it has the command, and **unqueue**. Anyone here
+  what its command does first when it has one, and **unqueue**. Anyone here
   can edit it until the host takes it, when the lane is free, in order. An
   unqueued card goes back below the line. Unqueue a card the host had already
   taken and your column says "already sent as Bea's message: it was taken

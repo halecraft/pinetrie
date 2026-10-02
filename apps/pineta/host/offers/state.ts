@@ -1,6 +1,8 @@
 // host/offers/state — what every offer module shares: your repo, its one
-// queue, and the one gather (`offerNow`): where a lane's offer sits and
-// starts, and the offer itself, read from the repo (ADR-0060). The
+// queue, and the gathers: `offerNow` (where a lane's offer sits and starts,
+// and the offer itself, read from the repo, ADR-0060), and `refreshNow`,
+// which also reads an archived thread's offer and whether the lane's work
+// changes any file. The
 // `pineta.offer` records are written here, and read only to skip a write
 // that changes nothing: the host decides nothing from them.
 
@@ -13,6 +15,7 @@ import type {
   ThreadName,
 } from "@pineta/core"
 import {
+  changesNoFile,
   commitsOf,
   hostOps,
   type LaneBase,
@@ -24,9 +27,21 @@ import {
   startOfOffer,
   wipFacts,
 } from "@pineta/lanes"
-import { recordChanged, wipState } from "@pineta/marginalia"
+import {
+  archivedAt,
+  type RefreshFacts,
+  recordChanged,
+  wipState,
+} from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
-import { readBases, readNames, readOffers } from "@pineta/reads"
+import {
+  readArchive,
+  readBases,
+  readNames,
+  readOffers,
+  readTreeIndex,
+} from "@pineta/reads"
+import { readLaneTip } from "@pineta/schema"
 import type { Basics } from "../basics.ts"
 import { createSerial, type Serial } from "../queue.ts"
 
@@ -48,6 +63,14 @@ export interface OfferPlace {
 
 /** A place where the offer can sit: its base has a commit (not a WIP gone). */
 export type Placed = OfferPlace & { readonly target: CommitId }
+
+/** What a refresh plans from: `planRefresh`'s facts, and where they were read. */
+export interface RefreshNow {
+  readonly name: ThreadName
+  /** Null for an archived thread, whose lane's history left your repo. */
+  readonly place: Placed | null
+  readonly facts: RefreshFacts
+}
 
 export interface OfferState {
   readonly root: string
@@ -71,6 +94,8 @@ export interface OfferState {
   nameOf(lane: LaneName): ThreadName | undefined
   /** Write an offer's record, when it changed. */
   write(record: OfferRecord): Promise<void>
+  /** Remove an offer's record, when there is one. */
+  remove(lane: LaneName): Promise<void>
   /**
    * The one gather every offer step plans from: where the lane's offer sits
    * and starts (`placeOf`), and the offer as your repo holds it there; null
@@ -87,6 +112,13 @@ export interface OfferState {
    * tip here, or a line commit in its history.
    */
   placeOf(lane: LaneName): Promise<OfferPlace | null>
+  /**
+   * What a refresh plans from. An archived thread's offer is read against
+   * the line: its lane's history is gone, and with it its base, and the
+   * thread's trailer leaves a WIP's own commits out of the offer. Null when
+   * nothing moves: no name yet, a lane not placed here, or a WIP gone.
+   */
+  refreshNow(lane: LaneName): Promise<RefreshNow | null>
 }
 
 export function createOfferState(input: {
@@ -150,7 +182,39 @@ export function createOfferState(input: {
       if (stored !== undefined && !recordChanged(next, stored)) return
       await input.agent().setWorkRecord(next)
     },
+    async remove(lane) {
+      if (readOffers(doc).has(lane)) await input.agent().removeOffer(lane)
+    },
     placeOf,
+    async refreshNow(lane) {
+      const name = nameOf(lane)
+      if (name === undefined) return null
+      const archived =
+        archivedAt(
+          readTreeIndex(doc),
+          readArchive(doc),
+          readLaneTip(doc, lane),
+        ) !== null
+      if (archived) {
+        const target = `present(${revsetName(line.onto)})`
+        const offer = await readOffer(ops, { name, target })
+        return { name, place: null, facts: { archived, offer } }
+      }
+      const place = await placeOf(lane)
+      if (place === null || place.target === null) return null
+      const { tip, start, target } = place
+      return {
+        name,
+        place: { ...place, target },
+        facts: {
+          archived,
+          tip,
+          start,
+          empty: await changesNoFile(ops, { start, tip }),
+          offer: await readOffer(ops, { name, target }),
+        },
+      }
+    },
     async offerNow(lane) {
       const place = await placeOf(lane)
       if (place === null) return null

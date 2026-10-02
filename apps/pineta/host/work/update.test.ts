@@ -68,7 +68,7 @@ describe("applyClean", () => {
     await applyClean(ports.port, {
       details: {
         lane: LANE,
-        base: "pineta-onto",
+        base: { kind: "line", bookmark: "pineta-onto" },
         merged: commitId("c0ffee00"),
         commits: [],
         files: ["a.txt"],

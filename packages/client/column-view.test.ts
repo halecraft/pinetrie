@@ -20,6 +20,7 @@ import {
 import { offerView } from "@pineta/marginalia"
 import { describe, expect, test } from "vitest"
 import {
+  behindMark,
   type ColumnFacts,
   columnView,
   identityWords,
@@ -192,6 +193,7 @@ const facts = (
     mountedBanner: null,
     writable: true,
     nameOf: new Map([[ADA, "Ada"]]),
+    catchUp: null,
     lanes: [],
     work: work(),
     ...over,
@@ -459,7 +461,7 @@ describe("columnView: the work strip", () => {
     )
     expect(shows.strip).toEqual({
       kind: "direct",
-      line: "changes land directly in your working copy",
+      line: "edits your files directly",
       alsoHere: [AMBER],
     })
     const idle = columnView(
@@ -471,7 +473,7 @@ describe("columnView: the work strip", () => {
     )
     expect(idle.strip).toEqual({
       kind: "direct",
-      line: "changes land directly in /elsewhere",
+      line: "edits files in /elsewhere",
       alsoHere: [],
     })
     const quiet = columnView(
@@ -515,6 +517,7 @@ describe("offerWords", () => {
     o: OfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" = "idle",
     base: Parameters<typeof offerView>[0]["base"] = LINE_BASE,
+    catching: { behind?: boolean; catchUp?: "drafted" | "queued" } = {},
   ) =>
     offerWords(
       offerView({
@@ -524,6 +527,8 @@ describe("offerWords", () => {
         base,
         onto: "pineta-onto",
         wipAhead: 2,
+        behind: catching.behind ?? false,
+        catchUp: catching.catchUp ?? null,
       }),
     )
   const WIP_BASE = {
@@ -531,14 +536,14 @@ describe("offerWords", () => {
     state: "ok",
   } as const
   test.each([
-    ["nothing", undefined, "idle", "nothing to take yet"],
+    ["nothing", undefined, "idle", "nothing to add yet"],
     ["running, nothing yet", undefined, "turn", "no files changed yet"],
     ["running", offer, "turn", "2 files so far"],
     [
       "resolving",
       offer,
       "resolution",
-      "resolving the project's work into this thread",
+      "resolving the project's new work into this thread",
     ],
     ["ready", offer, "idle", "2 files ready"],
     [
@@ -558,75 +563,137 @@ describe("offerWords", () => {
       "conflicts",
       { ...offer, conflicts: ["a.txt"] },
       "idle",
-      "conflicts with pineta-onto in 1 file",
+      "conflicts with the project in 1 file",
     ],
     ["edited", { ...offer, edited: true }, "idle", "you edited this offer"],
     [
       "edited, and conflicting",
       { ...offer, edited: true, conflicts: ["a.txt", "b.txt"] },
       "idle",
-      "you edited this offer \u00b7 conflicts with pineta-onto in 2 files",
+      "you edited this offer \u00b7 conflicts with the project in 2 files",
     ],
-    ["taken", { ...offer, taken: "zz12345678ab" }, "idle", "taken as zz123456"],
+    ["taken", { ...offer, taken: "zz12345678ab" }, "idle", "added as zz123456"],
   ] as const)("%s", (_, o, activity, line) => {
     const w = words(o, activity)
     expect(w.line).toBe(line)
     expect(w.line).not.toMatch(/`|pineta-offer/)
   })
-  test("the labels follow the state, and name the take's destination (ADR-0060)", () => {
+  test("the labels follow the state, and name where a take adds the work", () => {
     const labels = (
       o: OfferRecord,
       base = LINE_BASE as Parameters<typeof words>[2],
     ) => words(o, "idle", base).buttons.map(b => b.label)
-    expect(labels(offer)).toEqual([
-      "take onto pineta-onto",
-      "split into a stack",
-    ])
+    expect(labels(offer)).toEqual(["add to the project", "split into a stack"])
     expect(labels({ ...offer, size: 3 })).toEqual([
-      "take stack onto pineta-onto",
+      "add stack to the project",
       "squash to one",
     ])
     expect(labels({ ...offer, size: 3, stale: true })).toEqual([
       "split again",
-      "take stack and the rest onto pineta-onto",
+      "add stack and the rest to the project",
     ])
     expect(labels({ ...offer, edited: true })).toEqual([
-      "take onto pineta-onto",
+      "add to the project",
       "refresh (discards your edits)",
     ])
     expect(words(offer).menu.map(b => b.label)).toEqual([
       "rewrite description",
-      "bring up to date with pineta-onto",
+      "catch up with the project",
     ])
   })
-  test("only a clean offer lands on the line: a conflicted one on the line is resolved, on a WIP taken anyway into it", () => {
+  test("the jj facts are titles: which bookmark a take moves, and what catching up merges", () => {
+    const w = words(offer)
+    expect(w.buttons[0]?.title).toBe(
+      "moves pineta-onto forward to pineta-offer/amber-fox",
+    )
+    expect(w.menu.find(b => b.button === "update")?.title).toBe(
+      "merges pineta-onto into this thread's copy",
+    )
+    expect(words(offer, "idle", WIP_BASE).buttons[0]?.title).toBe(
+      "moves wip/search forward to pineta-offer/amber-fox",
+    )
+  })
+  test("behind its base, the strip says so and offers catching up beside the offer", () => {
+    const behind = words(offer, "idle", LINE_BASE, { behind: true })
+    expect(behind.line).toBe("2 files ready · the project has new work")
+    expect(behind.buttons.map(b => b.label)).toContain(
+      "catch up with the project",
+    )
+    expect(words(undefined, "idle", LINE_BASE, { behind: true }).line).toBe(
+      "the project has new work since this thread started",
+    )
+    expect(words(undefined, "idle", WIP_BASE, { behind: true }).line).toBe(
+      "wip/search has new work since this thread started",
+    )
+  })
+  test("a queued catch-up is the offer's activity: the strip says it is catching up", () => {
+    expect(words(offer, "idle", LINE_BASE, { catchUp: "queued" }).line).toBe(
+      "catching up with the project…",
+    )
+  })
+  test("only a clean offer lands on the line: a conflicted one on the line is resolved, on a WIP added anyway to it", () => {
     const conflicted = { ...offer, conflicts: ["a.txt"] }
     expect(words(conflicted).buttons.map(b => b.label)).toEqual([
       "resolve in the thread",
     ])
     expect(
       words(conflicted, "idle", WIP_BASE).buttons.map(b => b.label),
-    ).toEqual(["resolve in the thread", "take anyway into wip/search"])
+    ).toEqual(["resolve in the thread", "add anyway to wip/search"])
     expect(
       words(conflicted, "idle", WIP_BASE).menu.map(b => b.label),
-    ).not.toContain("land on pineta-onto, with your 2 commits beneath it")
+    ).not.toContain("add to the project, with your 2 commits beneath it")
   })
-  test("a WIP thread takes into its WIP, and offers the line with its commits", () => {
+  test("a WIP thread adds to its WIP, and offers the project with its commits", () => {
     const w = words(offer, "idle", WIP_BASE)
-    expect(w.buttons[0]?.label).toBe("take into wip/search")
+    expect(w.buttons[0]?.label).toBe("add to wip/search")
     expect(w.menu.map(b => b.label)).toEqual([
       "rewrite description",
-      "bring up to date with wip/search",
-      "land on pineta-onto, with your 2 commits beneath it",
+      "catch up with wip/search",
+      "add to the project, with your 2 commits beneath it",
     ])
   })
-  test("a WIP gone without landing offers no take, and continuing on the line", () => {
+  test("a WIP gone without landing offers no take, and continuing from the project", () => {
     const w = words(offer, "idle", { ...WIP_BASE, state: "gone" })
     expect(w.buttons.map(b => b.label)).toEqual(["split into a stack"])
     expect(w.menu.map(b => b.label)).toEqual([
       "rewrite description",
-      "continue on pineta-onto",
+      "continue from the project",
     ])
+  })
+})
+
+describe("behindMark: the header's mark for a base that moved on", () => {
+  const line = {
+    onto: "pineta-onto",
+    wipPrefix: "wip/",
+    commit: commitId("bbbbbbbbbbbb"),
+    heads: { current: null, proposed: "" },
+    log: { current: null, proposed: "" },
+    wips: [],
+    yours: {
+      behind: 0,
+      ahead: null,
+      follow: null,
+      conflicts: { commits: 0, files: [] },
+    },
+    commands: true,
+  }
+  const base = {
+    lane: laneNameForThread("1"),
+    base: { kind: "line" as const },
+    start: commitId("aaaaaaaaaaaa"),
+    state: "ok" as const,
+  }
+  test("worded as the project, with the bookmark and both commits in its title", () => {
+    expect(behindMark(base, line)).toEqual({
+      mark: "↓",
+      title:
+        "the project has new work since this thread started · pineta-onto: aaaaaaaa → bbbbbbbb",
+    })
+  })
+  test("none once caught up, or before the host read the base", () => {
+    expect(behindMark({ ...base, start: line.commit }, line)).toBe(null)
+    expect(behindMark(undefined, line)).toBe(null)
   })
 })
 

@@ -5,6 +5,62 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pineta/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "update my files runs with no preview",
+    file: "apps/pineta/host/offers/plan.ts",
+    from: "      return record.yours.follow === null",
+    to: "      return false",
+    command: unit,
+    expect:
+      "follow: only with a line and a preview, the one you were shown; a conflict in it refuses nothing",
+  },
+  {
+    name: "the line's preview runs no git",
+    file: "apps/pineta/host/offers/line.ts",
+    from: '  const git: Runner = args => hostRunner(root)(["git", ...args])',
+    to: '  const git: Runner = args => hostRunner(root)(["false", ...args])',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "update my files previews what it changes, then rebases your work onto the project, as you",
+  },
+  {
+    name: "forget keeps the record",
+    file: "apps/pineta/host/offers/plan.ts",
+    from: '  if (plan === "forget") return REMOVE\n',
+    to: "",
+    command: unit,
+    expect:
+      "forget removes the record and runs nothing; withdraw with no offer left only removes it",
+  },
+  {
+    name: "an archived thread's offer is not withdrawn",
+    file: "apps/pineta/host/offers/plan.ts",
+    from: "    return { ...REMOVE, steps: planAbandonOffer(c.root, changes) }\n  if (place === null) return NOTHING\n",
+    to: '  if (place === null) return NOTHING\n  if (plan === "withdraw")\n    return { ...REMOVE, steps: planAbandonOffer(c.root, changes) }\n',
+    command: unit,
+    expect:
+      "an archived thread has no place: withdraw still abandons its offer, and nothing else acts",
+  },
+  {
+    name: "the host never reads an archived thread as archived",
+    file: "apps/pineta/host/offers/state.ts",
+    from: "      if (archived) {\n",
+    to: "      if (false) {\n",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "archiving a root withdraws its threads' offers: no bookmark in your repo, no record",
+  },
+  {
+    name: "restoring does not refresh its lanes",
+    file: "apps/pineta/host/offers/index.ts",
+    from: "      for (const { lane } of updates) touch(lane)\n",
+    to: "",
+    suite: "lanes",
+    scenario: "main",
+    expect: "restoring it builds their offers again",
+  },
+  {
     name: "the watch looks only where a record is open",
     file: "apps/pineta/host/offers/watch.ts",
     from: "          bookmarked: await bookmarked(),",
@@ -527,7 +583,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (plan === "build")',
     to: '  if (plan === "build" || plan === "follow")',
     command: unit,
-    expect: "follow plans planFollowOffer's steps",
+    expect: "follow: planFollowOffer's steps",
   },
   {
     name: "a followed offer keeps the agent's message",
@@ -540,8 +596,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a withdrawn offer keeps its record",
     file: "apps/pineta/host/offers/plan.ts",
-    from: '        after: { kind: "remove" },',
-    to: '        after: { kind: "nothing" },',
+    from: '  after: { kind: "remove" },',
+    to: '  after: { kind: "nothing" },',
     command: unit,
     expect: "withdraw plans the abandon",
   },

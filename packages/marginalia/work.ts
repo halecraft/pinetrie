@@ -35,6 +35,7 @@ import {
   type RevisionRecord,
   type SnapshotId,
   snapshotId,
+  type ThreadBase,
   type ThreadName,
   type WriterId,
 } from "@pineta/core"
@@ -174,6 +175,18 @@ const LineRecordSchema = Type.Object({
   yours: Type.Object({
     behind: Type.Integer({ minimum: 0 }),
     ahead: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
+    follow: Type.Union([
+      Type.Object({
+        files: Type.Array(Type.String()),
+        conflicts: Type.Array(Type.String()),
+        heads: Type.Integer({ minimum: 0 }),
+      }),
+      Type.Null(),
+    ]),
+    conflicts: Type.Object({
+      commits: Type.Integer({ minimum: 0 }),
+      files: Type.Array(Type.String()),
+    }),
   }),
   commands: Type.Boolean(),
 })
@@ -361,7 +374,21 @@ export function encodeWorkRecord(r: WorkRecord): {
           heads: { ...r.record.heads },
           log: { ...r.record.log },
           wips: r.record.wips.map(w => ({ ...w })),
-          yours: { ...r.record.yours },
+          yours: {
+            ...r.record.yours,
+            follow:
+              r.record.yours.follow === null
+                ? null
+                : {
+                    ...r.record.yours.follow,
+                    files: [...r.record.yours.follow.files],
+                    conflicts: [...r.record.yours.follow.conflicts],
+                  },
+            conflicts: {
+              ...r.record.yours.conflicts,
+              files: [...r.record.yours.conflicts.files],
+            },
+          },
         },
       }
     case "base":
@@ -600,6 +627,14 @@ export function planUpdateFrom(input: {
     ? { kind: "nothing" }
     : { kind: "wip", bookmark: newest.bookmark, ...wip.now }
 }
+
+/**
+ * A thread's base as people read it: the integration line is "the project",
+ * whatever its bookmark is called; a WIP is its bookmark. The one place a
+ * base is worded: the bookmark of the line goes in titles only.
+ */
+export const baseName = (base: ThreadBase): string =>
+  base.kind === "line" ? "the project" : base.bookmark
 
 /**
  * A WIP base's state (ADR-0060): landed when its bookmark points into the

@@ -26,6 +26,8 @@ integration line, or a WIP bookmark), and starts where the lane's
 `Pineta-Base` and taken offers' `Pineta-Source` trailers say; a take is a
 forward bookmark move, never a rebase under your `@`; `pineta.have` and
 copies of your `@` are gone, and a root thread starts at the line.
+Amended by ADR-0061: archiving a root withdraws its threads' offers, and a
+refresh that finds no offer and none to build removes its record.
 
 **Context.** Taking a thread's work today rebases your `@` onto the lane's
 merge (ADR-0034). Every turn commit the lane made becomes an ancestor of your

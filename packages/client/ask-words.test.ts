@@ -30,8 +30,8 @@ describe("askWords", () => {
     ],
     [
       "a land message is its own line",
-      { role: "land", text: "bringing up to date" },
-      "bringing up to date",
+      { role: "land", text: "✓ catching up: no conflicts" },
+      "✓ catching up: no conflicts",
     ],
   ])("%s", (_, prompt, words) => {
     expect(askWords(prompt, nameOf)).toBe(words)

@@ -164,34 +164,33 @@ export function createRefresh(state: OfferState): Refresh {
 
   async function refresh(lane: LaneName): Promise<"built" | "other"> {
     // gather
-    const now = await state.offerNow(lane)
-    // No tip yet, no name, or a WIP gone without landing: nothing moves
-    // (ADR-0060).
-    if (now === null || now.name === undefined) return "other"
-    const { place, name, offer } = now
-    const { tip, start, target } = place
-    if (target === null) return "other"
-    const at = { ...place, target }
+    const now = await state.refreshNow(lane)
+    if (now === null) return "other"
+    const { name, place, facts } = now
+    const { offer } = facts
     // plan
-    const planned = planRefresh({ tip, start, offer })
+    const planned = planRefresh(facts)
     const effects = planOfferEffects(planned, {
       root,
-      tip,
-      start,
-      target,
+      place,
       wip: wipLine(doc, lane, name),
       trailers: { lane, name, entry: readLaneTip(doc, lane) ?? "" },
       offer,
     })
-    // execute
+    // execute: with no place, `planOfferEffects` plans none of the steps
+    // that need one.
+    const placed = <T>(go: (at: Placed) => Promise<T>): Promise<T> =>
+      place === null
+        ? Promise.reject(new Error(`${lane}: an offer step needs a place`))
+        : go(place)
     return executeOffer(
       {
         run: executeOnHost,
-        build: sources => build(lane, name, at, sources),
-        read: () => readAt(name, target),
-        record: read => record(lane, name, place, read),
-        repair: changes => repair(lane, name, at, changes),
-        remove: () => state.agent().removeOffer(lane),
+        build: sources => placed(at => build(lane, name, at, sources)),
+        read: () => placed(at => readAt(name, at.target)),
+        record: read => placed(at => record(lane, name, at, read)),
+        repair: changes => placed(at => repair(lane, name, at, changes)),
+        remove: () => state.remove(lane),
       },
       effects,
       offer,

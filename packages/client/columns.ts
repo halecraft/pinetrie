@@ -11,6 +11,7 @@ import {
   type LaneName,
   type LaneView,
   type TreeIndex,
+  type WorkSetting,
 } from "@pineta/core"
 import type { Density } from "./ask-words.ts"
 
@@ -22,6 +23,11 @@ import type { Density } from "./ask-words.ts"
 export interface Prefill {
   readonly text: string
   readonly blank: boolean
+  /**
+   * Where a lane its send creates works, chosen for you: "resolve with the
+   * agent" works in your files (ADR-0061). Absent, the default (`workFor`).
+   */
+  readonly work?: WorkSetting
 }
 
 /**

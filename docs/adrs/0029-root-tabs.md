@@ -7,6 +7,8 @@ else its first message's first line. Amends ADR-0027 (a stored layout holds a
 tab and columns per root), ADR-0028 (marks stay inside a root; focus is
 withdrawn), ADR-0021 (where Start Chat and Start Agent live) and ADR-0024
 (which columns report presence).
+Amended by ADR-0061: archiving a root withdraws its threads' offers from
+your repo, and restoring builds them again.
 
 **Context.** The rail draws every tree in one strip, one after another, and
 columns from different trees sit side by side. `projectRail` starts each

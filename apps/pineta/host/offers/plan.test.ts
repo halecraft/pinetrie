@@ -11,6 +11,7 @@ import {
   immutableHeads,
   logRevset,
   planAbandonOffer,
+  planFollow,
   planFollowOffer,
   planLand,
   planLineSetup,
@@ -54,9 +55,7 @@ const offer = (
 const TRAILERS = { lane: LANE, name: NAME, entry: "e1" }
 const context = (read: OfferInRepo | null): RefreshContext => ({
   root: "/repo",
-  tip: NEW_TIP,
-  start: [START],
-  target: "@-",
+  place: { tip: NEW_TIP, start: [START], target: "@-" },
   wip: "WIP (amber-fox): fix it",
   trailers: TRAILERS,
   offer: read,
@@ -147,6 +146,25 @@ describe("planOfferEffects", () => {
     const e = planOfferEffects("withdraw", context(offer()))
     expect(e.steps).toEqual(planAbandonOffer("/repo", ["kxyz"]))
     expect(e.after).toEqual({ kind: "remove" })
+  })
+
+  test("forget removes the record and runs nothing; withdraw with no offer left only removes it", () => {
+    const removes = { steps: [], after: { kind: "remove" }, built: false }
+    expect(planOfferEffects("forget", context(null))).toEqual(removes)
+    expect(planOfferEffects("withdraw", context(null))).toEqual(removes)
+  })
+
+  test("an archived thread has no place: withdraw still abandons its offer, and nothing else acts", () => {
+    const archived = { ...context(offer()), place: null }
+    expect(planOfferEffects("withdraw", archived).steps).toEqual(
+      planAbandonOffer("/repo", ["kxyz"]),
+    )
+    for (const plan of ["build", "follow", "refresh", "none"] as const)
+      expect(planOfferEffects(plan, archived)).toEqual({
+        steps: [],
+        after: { kind: "nothing" },
+        built: false,
+      })
   })
 
   test("repair names a divergent offer's change ids", () => {
@@ -240,7 +258,12 @@ describe("the line (ADR-0060)", () => {
     heads: "trunk()",
     log: null,
     wips: [],
-    yours: { behind: 0, ahead: null },
+    yours: {
+      behind: 0,
+      ahead: null,
+      follow: null,
+      conflicts: { commits: 0, files: [] },
+    },
   } as const
   const record = (over: Partial<LineRecord> = {}): LineRecord => ({
     ...planLineRecord(facts, DEFAULT_LINE, true),
@@ -281,12 +304,48 @@ describe("the line (ADR-0060)", () => {
       code: ERR.NO_LINE,
     })
     const set = (ahead: number | null) =>
-      record({ commit: commitId("c1"), yours: { behind: 0, ahead } })
+      record({
+        commit: commitId("c1"),
+        yours: {
+          behind: 0,
+          ahead,
+          follow: null,
+          conflicts: { commits: 0, files: [] },
+        },
+      })
     expect(planLineAction("land", set(null), "/repo").kind).toBe("refused")
     expect(planLineAction("land", set(0), "/repo").kind).toBe("refused")
     expect(planLineAction("land", set(2), "/repo")).toEqual({
       kind: "steps",
       steps: planLand({ root: "/repo", onto: "pineta-onto" }),
     })
+  })
+  test("follow: only with a line and a preview, the one you were shown; a conflict in it refuses nothing", () => {
+    const preview = { files: ["a.txt"], conflicts: ["a.txt"], heads: 0 }
+    const set = (follow: typeof preview | null) =>
+      record({
+        commit: commitId("c1"),
+        yours: {
+          behind: 2,
+          ahead: 1,
+          follow,
+          conflicts: { commits: 0, files: [] },
+        },
+      })
+    expect(planLineAction("follow", record(), "/repo")).toEqual({
+      kind: "refused",
+      code: ERR.NO_LINE,
+    })
+    expect(planLineAction("follow", set(null), "/repo")).toEqual({
+      kind: "refused",
+      code: ERR.REFUSED,
+    })
+    expect(planLineAction("follow", set(preview), "/repo")).toEqual({
+      kind: "steps",
+      steps: planFollow({ root: "/repo", onto: "pineta-onto" }),
+    })
+    expect(
+      planLineAction("follow", { ...set(preview), commands: false }, "/repo"),
+    ).toEqual({ kind: "refused", code: ERR.NOT_YOURS })
   })
 })

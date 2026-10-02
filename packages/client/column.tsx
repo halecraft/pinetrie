@@ -27,6 +27,7 @@ import {
 import {
   type DigestRecord,
   draftingAt,
+  effectiveBase,
   type OfferButton,
   queuedOn,
   yourCard,
@@ -351,8 +352,41 @@ export function Column(p: ColumnProps) {
   const [mountedBanner] = useState(() =>
     bannerUrl(headLane(lane, true, reserved), p.work.banners),
   )
+  // The cards at this column's end (ADR-0048): yours, which the composer
+  // edits, and everyone else's, drawn above it. A thread's cards are found
+  // by where its thread ends now; a fresh column's by its key.
+  const threadEnd =
+    thread.kind === "thread" && thread.end.kind === "entry"
+      ? thread.end.id
+      : null
+  const mine = fresh
+    ? yourCard(
+        p.session.writer,
+        { kind: "fresh", column: p.column.key },
+        p.cards,
+        p.lanes,
+        index,
+      )
+    : threadEnd === null
+      ? undefined
+      : yourCard(
+          p.session.writer,
+          { kind: "end", end: threadEnd },
+          p.cards,
+          p.lanes,
+          index,
+        )
+  // What a card's command catches up with (ADR-0060).
+  const threadBase = effectiveBase(
+    lane.kind === "lane" ? (p.work.bases.get(lane.name) ?? null) : null,
+  )
   const shows = columnView({
     mountedBanner,
+    catchUp: queued.some(c => c.command !== null)
+      ? "queued"
+      : (mine?.command ?? null) !== null
+        ? "drafted"
+        : null,
     index,
     view,
     lane,
@@ -470,30 +504,6 @@ export function Column(p: ColumnProps) {
     project: p.work.project,
   })
 
-  // The cards at this column's end (ADR-0048): yours, which the composer
-  // edits, and everyone else's, drawn above it. A thread's cards are found
-  // by where its thread ends now; a fresh column's by its key.
-  const threadEnd =
-    thread.kind === "thread" && thread.end.kind === "entry"
-      ? thread.end.id
-      : null
-  const mine = fresh
-    ? yourCard(
-        p.session.writer,
-        { kind: "fresh", column: p.column.key },
-        p.cards,
-        p.lanes,
-        index,
-      )
-    : threadEnd === null
-      ? undefined
-      : yourCard(
-          p.session.writer,
-          { kind: "end", end: threadEnd },
-          p.cards,
-          p.lanes,
-          index,
-        )
   // Every card here but the one the composer shows: everyone else's, and
   // any other of yours, such as one someone unqueued while you typed this
   // one, or one put here while you had one. A fresh column's are those under
@@ -590,6 +600,11 @@ export function Column(p: ColumnProps) {
             />
             {shows.base !== null && (
               <span className="thread-base">{shows.base}</span>
+            )}
+            {shows.behind !== null && (
+              <span className="thread-behind" title={shows.behind.title}>
+                {shows.behind.mark}
+              </span>
             )}
             <span className="head-space" />
             {view.nodes.length > 0 && (
@@ -741,6 +756,7 @@ export function Column(p: ColumnProps) {
                 readOnly={p.readOnly}
                 reader={reader}
                 session={p.session}
+                threadBase={threadBase}
               />
             ))}
             {refused.map(r => (
@@ -799,6 +815,7 @@ export function Column(p: ColumnProps) {
                 seats={p.seats}
                 session={p.session}
                 takeFocus={undefined}
+                threadBase={threadBase}
                 where={undefined}
               />
             ))}
@@ -850,6 +867,7 @@ export function Column(p: ColumnProps) {
           onIntent={p.onIntent}
           onTyping={p.onTyping}
           takeFocus={() => p.takeFocus(p.column.key)}
+          threadBase={threadBase}
           putColumn={putColumn}
           participants={p.participants}
           pending={p.column.fresh?.pending}
@@ -1115,11 +1133,12 @@ function WorkStripView({
       )}
       {strip.bookmark !== null && <Bookmark name={strip.bookmark} />}
       <span className="work-space" />
-      {words.buttons.map(({ button, label }) => (
+      {words.buttons.map(({ button, label, title }) => (
         <button
           className={`offer-${button}`}
           key={button}
           onClick={() => act(button)}
+          title={title}
           type="button"
         >
           {label}
@@ -1128,12 +1147,18 @@ function WorkStripView({
       {words.menu.length > 0 && (
         <Menu
           className="offer-more"
-          items={words.menu.map(({ button, label }) => ({
-            key: button,
-            label,
-            className: `offer-${button}`,
-            onChoose: () => act(button),
-          }))}
+          sections={[
+            {
+              key: "offer",
+              items: words.menu.map(({ button, label, title }) => ({
+                key: button,
+                label,
+                className: `offer-${button}`,
+                ...(title === undefined ? {} : { title }),
+                onChoose: () => act(button),
+              })),
+            },
+          ]}
           label="more for this thread's offer"
           title="this thread's offer"
           trigger="⋯"

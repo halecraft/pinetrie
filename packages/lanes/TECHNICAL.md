@@ -321,7 +321,8 @@ containers, disks and the helper.
 - **Every host command on your repo carries `--ignore-working-copy` and
   `--config operation.username=pineta-host`** (`hostOps`, `hostOp`): it never
   snapshots your working copy, and the evolog says which commits the host
-  made (S48 items 1 and 8). Landing your work is the exception: it moves the
+  made (S48 items 1 and 8). Updating your files (`planFollow`: `jj rebase -b
+  @ -d <onto>`) is one exception, since it changes your files; landing your work is the other: it moves the
   line to your commits, your act, so it runs as you (`hostJj`, `planLand`).
 - **The line is immutable** (`immutableHeads`, written to the repo's config
   only by the `line` command's setup): `present(<onto>)`, and the offers on
@@ -356,6 +357,20 @@ containers, disks and the helper.
   paragraph, on its WIP line and kept through a description. The source is
   the lane tip the whole offer holds, a stack's revisions included: taken,
   it says you have that tip.
+- **`lineFacts` previews updating your files** (`yours.follow`, S80):
+  `git merge-tree --write-tree --name-only --merge-base=<fork point> <onto>
+  <@>` exits 1 on conflicts and prints the merged tree, the conflicting
+  paths, a blank line, then its messages; the tree against `@`'s names the
+  files that change. It writes only a tree object. It reads `@` as last
+  snapshotted: the host never snapshots your files. Null when nothing is
+  behind, or `@` shares no commit with the line but the root. `-b @`
+  moves every head on your work, which the preview counts: `-r` would
+  strip them of the commits under them. `yours.conflicts` counts your
+  conflicted commits above the line, and lists `@`'s conflicted files.
+- **`changesNoFile`** says whether a lane's work since its start changes
+  no file: one `jj diff -r '(<start>)..<tip>' --name-only`, which diffs a
+  range from its roots' parents, merged for several, to its tip. jj refuses
+  a range with gaps; that reads as a change, so the offer is built.
 - **`startOfOffer` is the one path to a start.** The host's refresh, its
   `squash` and `refresh` actions and `stackSpan` all use it: a start from
   another rule would read as a moved start to `planRefresh`, and a split

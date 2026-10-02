@@ -365,11 +365,18 @@ in it opens a tab until you choose.
   mounted with `gone` when there is nothing to list (no trigger drawn unless
   open), and keeps a person who leaves while their menu is open
   (`withOpenMenus`, told by `onToggle`) until you close it.
-- **`Menu`** (`menu.tsx`) is a `Popover` whose box is a `role="menu"` list:
-  the header's people, agent, offers and `@`, the tab's `⋯`, the add tab's
-  menu and the composer's where chip. Items can carry `data-*` attributes
-  (`MenuItem.data`). A heading is drawn above the list, not in it, since a
-  menu holds only menu items; the list is named by it (`aria-labelledby`).
+- **`Menu`** (`menu.tsx`) is a `Popover` whose box is a `role="menu"` list,
+  in sections (`MenuSection`): the header's people, agent, offers, `@` and
+  project, the tab's `⋯`, the add tab's menu and the composer's where line.
+  The first section's heading is drawn above the list, not in it, since a
+  menu holds only menu items, and names it (`aria-labelledby`); each later
+  section is a `<fieldset>` (role `group`, which Biome asks for as the
+  element) named by its own, which is drawn `aria-hidden`. A section's notes
+  are text, not items, and describe it (`aria-describedby`): the project
+  menu's "your files have everything in the project". Items can carry
+  `data-*` attributes (`MenuItem.data`); one with `checked` is a
+  `menuitemradio` with a ✓, and the arrow keys and the opening focus take
+  both kinds.
 - **`.initial` is the circle; `.avatar` is a person shown here.** The browser
   suite counts people by `.avatar`, and proves you are never among them by
   it. So your profile's trigger (`.me`), the agent's mark (`.agent-mark`)
@@ -603,24 +610,44 @@ became of its files (`strip`).
   column's lane's running prompt, so it falls back to the column's lane.
   With no revisions at all (a host without a project), every asked message
   falls back, and the whole path reads as the column's lane.
+- **A base is worded by `baseName` alone** (`@pineta/marginalia`,
+  ADR-0061): the line is "the project", a WIP its bookmark. The words take
+  core's `ThreadBase`, never a bookmark string, and the line's bookmark
+  goes only in titles: `offerWords`' button titles ("moves pineta-onto
+  forward to pineta-offer/amber-fox"), `behindMark`'s, `baseChoices`'.
 - **`offerView` (`@pineta/marginalia`) decides an offer; `offerWords`
-  words it**: its line and each button's label, by state. An offer that
-  conflicts says so even when it is `edited` (S73), and its take reads
-  "take anyway" whatever the state, as it does when a resolution asked for
-  you. Each take names where it goes (ADR-0060): "take onto pineta-onto",
-  "take into wip/search", and, from a WIP thread's menu, "land on
-  pineta-onto, with your 2 commits beneath it". A conflicted offer on the
+  words it**: its line and each button's label and title, by state. An
+  offer that conflicts says so even when it is `edited` (S73), and its take
+  reads "add anyway" whatever the state, as it does when a resolution asked
+  for you. Each take names where the work goes (ADR-0060, ADR-0061): "add to
+  the project", "add to wip/search", and, from a WIP thread's menu, "add to
+  the project, with your 2 commits beneath it". A conflicted offer on the
   line offers "resolve in the thread", never a take onto it. The bookmark is
   a fact of its own, drawn apart (`.offer-bookmark`), never in the line.
+- **A thread behind its base** (`baseBehind`, from `pineta.base`'s
+  `start` against `pineta.line`'s commits, with no host fact of its own):
+  the strip's line adds "· the project has new work", or is that alone with
+  nothing to add; catching up moves from the `⋯` menu to the buttons; the
+  header shows `behindMark`'s ↓. `ColumnFacts.catchUp` is a card at the
+  thread's end with a command: yours drafting (the strip offers catching up
+  no more), or one queued (`offerView`'s `catch-up` activity: "catching up
+  with the project…").
 - **A thread's base** shows in its header only when it is not the line
   (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
-  update becomes "continue on pineta-onto" and no take is offered. Bringing up to date says its base:
-  "bring up to date with wip/search".
-- **The header's line menu** (`LineMenu`, `lineView`, `lineWords`) offers
-  "set up the line", showing the config text it writes (`immutable_heads()`
-  and `revsets.log`), and "land my work
-  (N commits)", or says how far your work is behind the line. A host that
-  admits others offers neither, and says to use jj on its machine.
+  update becomes "continue from the project" and no take is offered.
+  Catching up says its base: "catch up with wip/search".
+- **The header's project menu** (`LineMenu`, `lineView`, `lineWords`)
+  offers "set up the project", showing the config text it writes
+  (`immutable_heads()` and `revsets.log`); then notes of where your files
+  stand, from the line's record: conflicts first, then what the project has
+  that your files lack, with the record's preview of updating (ADR-0061).
+  Its actions (`LineMenuAction`): "resolve with the agent" when your work
+  has conflicts, "update my files" only with a preview, "add my work to the
+  project (N commits)". The first is no `line` command: `resolveIntent`
+  opens a new agent tab whose `Prefill` carries its text and its work
+  setting (your files), which the editor starts its choice from. A refused
+  or failed command is said at the top of the notes (`lineOutcomeWords`).
+  A host that admits others offers none, and says to use jj on its machine.
 - **The header's clicks are `openAt` intents** (`planOpen`), which reveal
   the entry in whichever column shows it. A column's lane may have
   started in a column to its left.
@@ -916,7 +943,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **Queued cards** (ADR-0048) are drawn after the thread's last message and
   its working line, above the line, in the order the host takes them
   (`queuedOn`), each a `QueuedCardEditor`: always bound, editable by anyone
-  here, with `queuedWords`, its command's `commandTag` and **unqueue**. They
+  here, with `queuedWords`, its command's `commandNote` and **unqueue**. They
   are not in the tree yet. Below the line, the column shows every drafting
   card at its end but the composer's (`others` filters on id, not owner), so
   a card of yours someone unqueued while you typed another shows there.
@@ -1056,18 +1083,21 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   - Playwright counts a zero-height element as hidden: wait for
     `.working-line` with `state: "attached"`, or read its computed
     `visibility` (S67).
-- **Where a new thread's agent works** (ADR-0032). When a send would create a
-  lane (it asks the agent where no lane is, or it is a branch), a chip left of
-  the button says where, in `whereWords`'s words: "on a copy ▾", "in your
-  working copy ▾" or "in <dir> ▾". It opens a menu of `whereChoices` (`send.ts`):
-  a copy, your working copy, directories other lanes used, and "in another
-  directory…", each row the chip's words and what the choice means for your
-  files ("· you take its changes", "· edits your files"). A copy is disabled,
-  with the project's reason, where the project cannot have one. For a copy,
-  the menu also lists where the thread starts from (`baseChoices`): the
-  line, then each WIP bookmark with how far it is behind the line; the chip
-  then names the WIP. The base is each editor's state, as the work choice
-  is, and is sent with the chat. The choice is
+- **Where a new thread's agent works** (ADR-0032, ADR-0061). When a send would
+  create a lane (it asks the agent where no lane is, or it is a branch), a
+  line left of the button (`.where-line`) says where, in `whereWords`'s
+  words, by what it does to your files: "works on its own copy · your files
+  stay as they are ▾", "edits your files directly ▾" or "edits files in
+  <dir> ▾". It opens a menu whose first section is `whereChoices`
+  (`send.ts`): its own copy, your files, directories other lanes used, and
+  "another directory…", each a name and what it means ("you review its
+  work, then add it to the project", "it edits them directly"), the current
+  one checked. Its own copy is disabled, with the project's reason, where
+  the project cannot have one. For its own copy, and only when there are
+  WIP bookmarks, a second section lists where the thread starts from
+  (`baseChoices`): the project, then each WIP with how far it is behind the
+  project; the line then names the WIP. The base is each editor's state, as
+  the work choice is, and is sent with the chat. The choice is
   the composer's state until sent, as `asksAgent` is; its default is
   `workFor`, the host's own decision. The chip's words are `.where-words`,
   with `data-work` (`own` or `direct`): `Menu` passes no attributes to its
@@ -1080,22 +1110,30 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   review while the offer is open and holds files (ADR-0047, below), the
   bookmark apart, which a press copies to find it in jj or jjui, its
   buttons, and a `⋯` menu for the rest
-  ("bring up to date", "rewrite description"). What the lane runs now
-  (`activityOf`: a turn, a resolution, or a split, from its latest prompt's
-  role) comes first: while it runs, the line counts files so far and offers
-  nothing. A lane that works directly says where its changes land, and names
-  other lanes running in the same directory now.
+  ("catch up with the project", "rewrite description"). What the lane runs
+  now (`activityOf`: a turn, a resolution, or a split, from its latest
+  prompt's role) comes first: while it runs, the line counts files so far
+  and offers nothing. A lane that works directly says so ("edits your files
+  directly"), and names other lanes running in the same directory now.
 - **"Bring up to date" is a command on your card** (ADR-0055): the button is
   the `bringUpToDate` act, which sets the command on your card at the
   column's end, or creates one with it, and arms the column's focus. The
   editor asks `takeFocus` again whenever its card's command changes, so the
-  box takes focus in a column already open. The card is then queued like any
-  other (`planSend`), and the host carries the command out when it takes it.
+  box takes focus in a column already open. The card says above its box what
+  sending it does first (`commandNote`), its placeholder says its text is
+  optional, and its button names the command (`commandSendWords`: "catch
+  up", "catch up and send"), its queue place in the title. The card is
+  then queued like any other (`planSend`, which carries the command), and
+  the host carries the command out when it takes it.
 - **Land, update and stack messages** show as one line each, roles `land`
-  ("bringing up to date"), `update` ("brought up to date") and `stack`.
-- **The page header counts offers open** in your repo, as it counts
-  mentions, and the agent's running threads; each row leads with the
-  thread's name and opens its thread.
+  ("catching up"), `update` ("caught up") and `stack`. The update's line
+  is marginalia's `updateLine`, which names its base by `baseName` from
+  the update's stored `line` flag.
+- **The page header counts offers open** in your repo ("work ready to add to
+  the project"), as it counts mentions, and the agent's running threads;
+  each row leads with the thread's name and opens its thread. Archive in a
+  tab's `⋯` names the threads whose offers it withdraws (`offeredByRoot`,
+  `dropsWords`).
 - **Selectors in the browser suite:** a column's offer is `.work.offer`, with
   `data-state` (`ready`, `conflicts`, `stack`, and the rest of
   `offerView`'s states); its line is `.offer-line` (a button when the offer

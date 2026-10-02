@@ -526,6 +526,28 @@ export const planLand = (input: {
   onHost("jj", "-R", input.root, "bookmark", "move", input.onto, "--to", "@-"),
 ]
 
+/**
+ * Update your files from the line (ADR-0061): your work above it rebased onto
+ * it, as you, since it changes your files; jj snapshots them first. `-b @`
+ * moves every head on your work with `@` (S80 item 1); `-r` would strip
+ * them of the commits under them. A conflict is recorded, not refused.
+ */
+export const planFollow = (input: {
+  readonly root: string
+  readonly onto: string
+}): LaneStep[] => [
+  onHost(
+    "jj",
+    "-R",
+    input.root,
+    "rebase",
+    "-b",
+    "@",
+    "-d",
+    revsetName(input.onto),
+  ),
+]
+
 /** A revset string literal, so a bookmark name is never parsed as a revset. */
 export const revsetName = (name: string): string => JSON.stringify(name)
 

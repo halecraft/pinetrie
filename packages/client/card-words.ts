@@ -1,32 +1,40 @@
 // client/card-words — what a card says about its place and its command
 // (ADR-0048, ADR-0055), each label in one function. Pure.
 
-import type { CardCommand, WriterId } from "@pineta/core"
-import { displayName } from "@pineta/marginalia"
+import type { CardCommand, ThreadBase, WriterId } from "@pineta/core"
+import { baseName, displayName } from "@pineta/marginalia"
 import type { Refusal } from "./card-moves.ts"
 import { lineWords, type Reader } from "./send.ts"
 
 /**
- * A command's name as people read it: the button's label too. `base` names
- * the thread's base, and the line for `continue-on-line` (ADR-0060).
+ * A command's name as people read it: the strip's button. `base` is the
+ * thread's (`effectiveBase`); `continue-on-line` always moves it to the
+ * project (ADR-0060).
  */
 export const commandWords = (
   command: CardCommand,
-  base: string | null = null,
+  base: ThreadBase,
 ): string => {
   switch (command) {
     case "bring-up-to-date":
-      return base === null
-        ? "bring up to date"
-        : `bring up to date with ${base}`
+      return `catch up with ${baseName(base)}`
     case "continue-on-line":
-      return base === null ? "continue on the line" : `continue on ${base}`
+      return "continue from the project"
   }
 }
 
-/** A command on a card, named last: what the card is sent through. */
-export const commandTag = (command: CardCommand): string =>
-  `→ ${commandWords(command)}`
+/**
+ * What a card with a command does when sent, above its box, and on a queued
+ * one: the command first, then the card's text as the agent's next message.
+ */
+export const commandNote = (command: CardCommand, base: ThreadBase): string => {
+  switch (command) {
+    case "bring-up-to-date":
+      return `↓ catches up with ${baseName(base)} first, then sends what you write`
+    case "continue-on-line":
+      return "↓ continues from the project first, then sends what you write"
+  }
+}
 
 /** A queued card's button that takes it back below the line. */
 export const UNQUEUE = "unqueue"

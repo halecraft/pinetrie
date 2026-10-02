@@ -38,9 +38,7 @@ const BEFORE = offer("b0")
 const AFTER = offer("a1")
 const context: RefreshContext = {
   root: "/repo",
-  tip: commitId("22222222"),
-  start: [TIP],
-  target: "@-",
+  place: { tip: commitId("22222222"), start: [TIP], target: "@-" },
   wip: "WIP (amber-fox): fix it",
   trailers: { lane: LANE, name: NAME, entry: "e1" },
   offer: BEFORE,

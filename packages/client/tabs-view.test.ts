@@ -1,13 +1,25 @@
-import { entryId, type MarkRecord, writerId } from "@pineta/core"
+import {
+  entryId,
+  type LaneName,
+  type MarkRecord,
+  type ThreadName,
+  writerId,
+} from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import type { CardMarks } from "./card-marks.ts"
+import { tree } from "./fixtures.ts"
 import {
   type ActiveTab,
   initialLayout,
   type Layout,
   layoutReducer,
 } from "./layout.ts"
-import { type TabsViewInput, tabsView } from "./tabs-view.ts"
+import {
+  dropsWords,
+  offeredByRoot,
+  type TabsViewInput,
+  tabsView,
+} from "./tabs-view.ts"
 
 const R1: ActiveTab = { kind: "root", root: entryId("r1") }
 const R2: ActiveTab = { kind: "root", root: entryId("r2") }
@@ -47,6 +59,7 @@ const input = (over: Partial<TabsViewInput> = {}): TabsViewInput => ({
   marks: new Map([[entryId("r1"), mark]]),
   archived: new Set(),
   work: new Map(),
+  offered: new Map(),
   unsent: none,
   ...over,
 })
@@ -80,8 +93,40 @@ describe("tabsView", () => {
     expect(r1?.kind === "root" && r1.menu[1]).toEqual({
       kind: "archive",
       busy: "running",
+      drops: [],
       intent: { kind: "archive", root: "r1" },
     })
+  })
+
+  test("Archive names the threads whose offers it withdraws", () => {
+    const amber = "amber-fox" as ThreadName
+    const [, r1, r2] = tabs({ offered: new Map([[entryId("r1"), [amber]]]) })
+    expect(r1?.kind === "root" && r1.menu[1]).toMatchObject({ drops: [amber] })
+    expect(r2?.kind === "root" && r2.menu[1]).toMatchObject({ drops: [] })
+    expect(dropsWords([amber, "cozy-mallard" as ThreadName])).toBe(
+      "work not added to the project goes: amber-fox, cozy-mallard",
+    )
+    expect(dropsWords([])).toBe(null)
+  })
+
+  test("offeredByRoot: each open offer's thread, under the root its tip is in", () => {
+    const index = tree({ r1: null, a: "r1", r2: null })
+    const lane = (n: string) => n as LaneName
+    const names = new Map([
+      [lane("l1"), "amber-fox" as ThreadName],
+      [lane("l2"), "cozy-mallard" as ThreadName],
+    ])
+    expect(
+      offeredByRoot(
+        index,
+        [
+          { lane: lane("l1"), tip: entryId("a") },
+          { lane: lane("l2"), tip: entryId("r1") },
+          { lane: lane("l3"), tip: entryId("r2") },
+        ],
+        names,
+      ),
+    ).toEqual(new Map([[entryId("r1"), ["amber-fox", "cozy-mallard"]]]))
   })
 
   test("a pip on each tab holding a card of yours, and on Archive for one elsewhere", () => {

@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest"
 import type { Refusal } from "./card-moves.ts"
 import {
   cardStatus,
-  commandTag,
+  commandNote,
   commandWords,
   queuedWords,
   refusalWords,
@@ -25,8 +25,26 @@ const refusal = (over: Partial<MoveRefused>): Refusal => ({
 
 describe("card words", () => {
   test.each([
-    ["commandWords", commandWords("bring-up-to-date"), "bring up to date"],
-    ["commandTag", commandTag("bring-up-to-date"), "→ bring up to date"],
+    [
+      "commandWords, on the line",
+      commandWords("bring-up-to-date", { kind: "line" }),
+      "catch up with the project",
+    ],
+    [
+      "commandWords, on a WIP",
+      commandWords("bring-up-to-date", { kind: "wip", bookmark: "wip/a" }),
+      "catch up with wip/a",
+    ],
+    [
+      "commandWords, a WIP gone",
+      commandWords("continue-on-line", { kind: "line" }),
+      "continue from the project",
+    ],
+    [
+      "commandNote",
+      commandNote("bring-up-to-date", { kind: "line" }),
+      "↓ catches up with the project first, then sends what you write",
+    ],
     [
       "queuedWords, yours",
       queuedWords(ME, 0, READER),

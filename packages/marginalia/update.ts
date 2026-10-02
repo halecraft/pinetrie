@@ -13,10 +13,12 @@ import {
   firstLine,
   isLaneName,
   type LaneName,
+  type ThreadBase,
   type WriterId,
 } from "@pineta/core"
 import { type Static, Type } from "typebox"
 import { decodeWith } from "./decode.ts"
+import { baseName } from "./work.ts"
 
 export const UPDATE_TYPE = "pineta.update"
 export const STACK_TYPE = "pineta.stack"
@@ -28,6 +30,11 @@ const UpdateDetailsSchema = Type.Object({
    * WIP. Absent in updates stored before ADR-0060, which merged your `@`.
    */
   base: Type.Optional(Type.String({ minLength: 1 })),
+  /**
+   * Whether `base` is the line. Absent in updates stored before it was
+   * written, whose base is named by its bookmark.
+   */
+  line: Type.Optional(Type.Boolean()),
   /** The commit merged: the line's, or the WIP's copy; `copy` before ADR-0060. */
   copy: Type.String({ minLength: 1 }),
   /** The commits that came in, newest first: each one's first line. */
@@ -44,8 +51,11 @@ const UpdateSchema = Type.Object({
 
 export interface UpdateDetails {
   readonly lane: LaneName
-  /** The bookmark merged in; null for an update stored before ADR-0060. */
-  readonly base: string | null
+  /**
+   * The base merged in, with its bookmark, which the model reads; null for
+   * an update stored before ADR-0060.
+   */
+  readonly base: (ThreadBase & { readonly bookmark: string }) | null
   /** The commit merged: the line's, or the WIP's copy. */
   readonly merged: CommitId
   readonly commits: readonly string[]
@@ -70,7 +80,10 @@ const fromStoredUpdate = (
   isLaneName(d.lane)
     ? {
         lane: d.lane,
-        base: d.base ?? null,
+        base:
+          d.base === undefined
+            ? null
+            : { kind: d.line === true ? "line" : "wip", bookmark: d.base },
         merged: commitId(d.copy),
         commits: d.commits,
         files: d.files,
@@ -87,7 +100,7 @@ const plural = (n: number, one: string, many: string) =>
 
 /** The one line a column shows for an update. */
 export const updateLine = (d: UpdateDetails): string =>
-  `↓ brought up to date${d.base === null ? "" : ` with ${d.base}`}: ${plural(d.files.length, "file", "files")} changed`
+  `↓ caught up${d.base === null ? "" : ` with ${baseName(d.base)}`}: ${plural(d.files.length, "file", "files")} changed`
 
 /** The update message: what changed in this thread's files, for the model. */
 export function encodeUpdate(
@@ -98,7 +111,7 @@ export function encodeUpdate(
     details.commits.length === 0
       ? "- (none named)\n"
       : details.commits.map(c => `- ${firstLine(c, 200)}\n`).join("")
-  const what = details.base ?? "The person's work"
+  const what = details.base?.bookmark ?? "The person's work"
   const files = details.files.map(f => `- ${f}\n`).join("") || "- (none)\n"
   return {
     role: "custom",
@@ -109,7 +122,12 @@ export function encodeUpdate(
     display: true,
     details: {
       lane: details.lane,
-      ...(details.base === null ? {} : { base: details.base }),
+      ...(details.base === null
+        ? {}
+        : {
+            base: details.base.bookmark,
+            line: details.base.kind === "line",
+          }),
       copy: details.merged,
       commits: [...details.commits],
       files: [...details.files],

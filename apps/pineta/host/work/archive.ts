@@ -1,12 +1,11 @@
 // host/work/archive — a root archived or restored (ADR-0029): its lanes'
-// disks deleted, their history out of your repo, or back.
+// disks deleted, their history out of your repo and their offers withdrawn,
+// or both back.
 
 import { nearestRevision, rootOf } from "@pineta/core"
 import {
   type DiskPaths,
-  executeOnHost,
   laneContainer,
-  laneRefSteps,
   removeLane,
   removeSnapshots,
 } from "@pineta/lanes"
@@ -18,6 +17,7 @@ import {
   type SessionDocHandle,
 } from "@pineta/schema"
 import { type Basics, failed } from "../basics.ts"
+import type { Offers } from "../offers/index.ts"
 import type { Serial } from "../queue.ts"
 import type { LaneRegistry } from "./registry.ts"
 
@@ -36,38 +36,35 @@ function lanesIn(doc: SessionDocHandle, treeRoot: string) {
 }
 
 export interface Archive {
-  /** A root was archived: its lanes' disks and bookmarks go. */
+  /** A root was archived: its lanes' disks, bookmarks and offers go. */
   archived(root: string): Promise<void>
-  /** A root was restored: its lanes' bookmarks come back. */
+  /** A root was restored: its lanes' bookmarks and offers come back. */
   restored(root: string): Promise<void>
 }
 
 export function createArchive(deps: {
   readonly basics: Basics
-  /** The project root when lanes have their own copies, else null. */
-  readonly root: string | null
+  /** Your repo's offers when lanes have their own copies, else null. */
+  readonly offers: Pick<Offers, "moveLanes"> | null
   readonly paths: DiskPaths | null
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly serial: Serial
 }): Archive {
-  const { basics, root, paths, registry, serial } = deps
+  const { basics, offers, paths, registry, serial } = deps
   const { doc } = basics
   return {
     async archived(archivedRoot) {
-      if (root === null || paths === null) return
+      if (offers === null || paths === null) return
       const lanes = lanesIn(doc, archivedRoot)
       for (const lane of lanes) {
         await registry.forget(lane)
         await removeLane(laneContainer(lane))
       }
       // Their history leaves your repo: readable by id, out of every log.
-      await executeOnHost(
-        laneRefSteps(
-          root,
-          lanes.map(lane => ({ lane, commit: null })),
-        ),
-      ).catch(failed(basics, "deleting archived lanes' history"))
+      await offers
+        .moveLanes(lanes.map(lane => ({ lane, commit: null })))
+        .catch(failed(basics, "deleting archived lanes' history"))
       const inRoot = new Set<string>(lanes)
       const doomed = planRetention({
         records: [...readRevisions(doc).values()].filter(r =>
@@ -83,7 +80,7 @@ export function createArchive(deps: {
     },
 
     async restored(restoredRoot) {
-      if (root === null) return
+      if (offers === null) return
       const index = readTreeIndex(doc)
       const revisions = readRevisions(doc)
       const updates = lanesIn(doc, restoredRoot).flatMap(lane => {
@@ -95,9 +92,9 @@ export function createArchive(deps: {
         })
         return commit === null ? [] : [{ lane, commit }]
       })
-      await executeOnHost(laneRefSteps(root, updates)).catch(
-        failed(basics, "restoring lanes' history"),
-      )
+      await offers
+        .moveLanes(updates)
+        .catch(failed(basics, "restoring lanes' history"))
     },
   }
 }

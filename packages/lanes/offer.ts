@@ -141,6 +141,25 @@ export async function startOfOffer(
   )
 }
 
+/**
+ * Whether a lane's work since `start` changes no file: one diff over
+ * `start..tip`, from its roots' parents (merged, for several) to the tip. jj
+ * refuses a range with gaps; that reads as a change, so the offer is built.
+ */
+export async function changesNoFile(
+  jj: Runner,
+  input: { readonly start: readonly CommitId[]; readonly tip: CommitId },
+): Promise<boolean> {
+  if (input.start.length === 0) return false
+  const ran = await jj([
+    "diff",
+    "-r",
+    `(${input.start.join(" | ")})..${input.tip}`,
+    "--name-only",
+  ])
+  return ran.ok && lines(ran.stdout).length === 0
+}
+
 /** Whether `to` has `from`'s description, and `jj interdiff` between them is empty. */
 export async function sameAs(
   jj: Runner,

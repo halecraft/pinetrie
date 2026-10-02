@@ -16,6 +16,121 @@ const copyText = "packages/client/copy-text.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "conflicts in your files offer no agent",
+    file: "packages/client/line-view.ts",
+    from: '        ...(conflicted ? (["resolve"] as const) : []),',
+    to: "",
+    command: unit,
+    expect: "conflicts in your files: said first, and resolved with the agent",
+  },
+  {
+    name: "a preview offers no update",
+    file: "packages/client/line-view.ts",
+    from: '        ...(yours.follow !== null ? (["follow"] as const) : []),',
+    to: "",
+    command: unit,
+    expect:
+      "behind, with a preview: what updating changes and what would conflict, then the action",
+  },
+  {
+    name: "the preview hides what would conflict",
+    file: "packages/client/line-view.ts",
+    from: "  if (follow.conflicts.length > 0)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect:
+      "behind, with a preview: what updating changes and what would conflict, then the action",
+  },
+  {
+    name: "a line command's refusal is not said",
+    file: "packages/client/line-view.ts",
+    from: '  outcome.kind === "refused"\n',
+    to: '  outcome.kind === "line-moved"\n',
+    command: unit,
+    expect: "lineOutcomeWords: a refusal or a failure is said; a move is not",
+  },
+  {
+    name: "a prefill forgets where its agent works",
+    file: "packages/client/layout.ts",
+    from: "                    : { work: { ...c.fresh.prefill.work } }),",
+    to: "                    : {}),",
+    command: unit,
+    expect:
+      "a prefill, blank or content, and where its agent works, is stored and restored",
+  },
+  {
+    name: "the where menu checks nothing",
+    file: "packages/client/send.ts",
+    from: "      checked: chosen(own),",
+    to: "      checked: false,",
+    command: unit,
+    expect:
+      "the current choice is checked; another directory, which asks, is neither",
+  },
+  {
+    name: "the bases are offered with no WIP to choose",
+    file: "packages/client/send.ts",
+    from: "  if (line === null || line.commit === null || line.wips.length === 0)",
+    to: "  if (line === null || line.commit === null)",
+    command: unit,
+    expect:
+      "baseChoices: the project first, then each WIP with how far behind it is; none with no line, or no WIP",
+  },
+  {
+    name: "catching up says nothing of what it merges",
+    file: "packages/client/column-view.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "          title: `merges ${baseBookmark} into this thread's copy`,",
+    to: "",
+    command: unit,
+    expect:
+      "the jj facts are titles: which bookmark a take moves, and what catching up merges",
+  },
+  {
+    name: "an offer's line says nothing of its base moving on",
+    file: "packages/client/column-view.ts",
+    from: '    facts.behind &&\n    state !== "nothing" &&',
+    to: '    false &&\n    state !== "nothing" &&',
+    command: unit,
+    expect:
+      "behind its base, the strip says so and offers catching up beside the offer",
+  },
+  {
+    name: "the header never marks a thread behind",
+    file: "packages/client/column-view.ts",
+    from: "  if (base === undefined || line === null || !baseBehind(base, line))",
+    to: "  if (true)",
+    command: unit,
+    expect:
+      "worded as the project, with the bookmark and both commits in its title",
+  },
+  {
+    name: "a command's button never says it sends the text",
+    file: "packages/client/send.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    label: command.text ? `${verb} and send` : verb,",
+    to: "    label: verb,",
+    command: unit,
+    expect: "a card with a command and text sends the text after",
+  },
+  {
+    name: "a command's placeholder asks for a message",
+    file: "packages/client/send.ts",
+    from: '  plan.command !== null\n    ? "what should the agent do with the new work? (optional)"\n    : plan.agentByDefault',
+    to: "  plan.agentByDefault",
+    command: unit,
+    expect:
+      "placeholderWords says whether a message naming no one asks the agent",
+  },
+  {
+    name: "archiving names no offer it withdraws",
+    file: "packages/client/tabs-view.ts",
+    from: "                drops: input.offered.get(root) ?? [],",
+    to: "                drops: [],",
+    command: unit,
+    expect: "Archive names the threads whose offers it withdraws",
+  },
+  {
     name: "the line's menu says nothing of jjui's own revset",
     file: "packages/client/line-view.ts",
     from: "            JJUI_NOTE,\n",
@@ -27,27 +142,27 @@ export const mutations: readonly Mutation[] = [
     name: "a take does not say where it goes",
     file: "packages/client/column-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '    const where = first === undefined ? "" : ` ${destinationWords(first)}`',
-    to: '    const where = ""',
+    from: '      first === undefined ? "" : ` to ${baseName(destinationBase(first))}`',
+    to: '      ""',
     command: unit,
-    expect: "the labels follow the state, and name the take's destination",
+    expect: "the labels follow the state, and name where a take adds the work",
   },
   {
     name: "a host that admits others offers the line's actions",
     file: "packages/client/line-view.ts",
-    from: '      actions: record.commands ? ["setup"] : [],',
-    to: '      actions: ["setup"],',
+    from: '    return { state: "unset", actions: commands ? ["setup"] : [], facts }',
+    to: '    return { state: "unset", actions: ["setup"], facts }',
     command: unit,
     expect: "a host that admits others offers no line action",
   },
   {
     name: "a thread whose WIP is gone is offered a plain update",
     file: "packages/marginalia/offer.ts",
-    from: '      ...(gone ? menu.map(b => (b === "update" ? "continue" : b)) : menu),',
-    to: "      ...menu,",
+    from: '      ? listed.map(b => (b === "update" ? "continue" : b))',
+    to: "      ? listed",
     command: unit,
     expect:
-      "a WIP gone without landing offers no take, and continuing on the line",
+      "a WIP gone without landing offers no take, and continuing from the project",
   },
   {
     name: "an edited offer hides its conflicts",
@@ -813,12 +928,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a working copy reads as a directory",
     file: send,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '  return work.dir === project.root ? "in your working copy" : `in ${work.dir}`',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: "  return `in ${work.dir}`",
+    from: '  return work.dir === project.root\n    ? "edits your files directly"',
+    to: '  return false\n    ? "edits your files directly"',
     command: unit,
-    expect: "whereWords says each setting",
+    expect: "whereWords says each setting by what it does to your files",
   },
   {
     name: "a content prefill sent unchanged sends nothing",
@@ -1778,8 +1891,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a client view mints an entry id",
     file: "packages/client/tabs-view.ts",
-    from: 'import type { EntryId, MarkRecord } from "@pineta/core"',
-    to: 'import { type EntryId, entryId, type MarkRecord } from "@pineta/core"\nexport const minted = entryId',
+    from: "  type EntryId,\n  type LaneName,\n  type MarkRecord,",
+    to: "  type EntryId,\n  entryId,\n  type LaneName,\n  type MarkRecord,",
     command: ["pnpm", "exec", "biome", "lint", "packages/client/tabs-view.ts"],
     expect: "Mint an id only where it enters",
   },

@@ -145,7 +145,7 @@ export async function startLaneWork(input: {
     beforeRun: containers.beforeRun,
     fetchLane,
   })
-  const archive = createArchive({ basics, root, paths, registry, serial })
+  const archive = createArchive({ basics, offers, paths, registry, serial })
 
   return {
     project: setup.project,

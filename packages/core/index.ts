@@ -351,8 +351,8 @@ export const OFFER_ACTIONS: readonly OfferAction[] = [
  * What can be done with the integration line (ADR-0060): set it up at your
  * `@-`, writing your repo's immutable heads, or land your work on it.
  */
-export type LineAction = "setup" | "land"
-export const LINE_ACTIONS: readonly LineAction[] = ["setup", "land"]
+export type LineAction = "setup" | "land" | "follow"
+export const LINE_ACTIONS: readonly LineAction[] = ["setup", "land", "follow"]
 
 // --- the archive (ADR-0029) --------------------------------------------------
 
@@ -839,9 +839,26 @@ export interface LineRecord {
   }[]
   /**
    * Your `@-` against the line: the line commits it lacks, and the commits
-   * of yours above the line when it descends from it (null when it does not).
+   * of yours above the line when it descends from it (null when it does
+   * not). `follow` is what updating your files would do (ADR-0061, S80):
+   * the files that change, those that conflict, and your other heads that
+   * move with `@`; null when nothing is behind, or `@` descends from no
+   * line commit. `conflicts` are your conflicted commits above the line and
+   * the conflicted files in `@`.
    */
-  readonly yours: { readonly behind: number; readonly ahead: number | null }
+  readonly yours: {
+    readonly behind: number
+    readonly ahead: number | null
+    readonly follow: {
+      readonly files: readonly string[]
+      readonly conflicts: readonly string[]
+      readonly heads: number
+    } | null
+    readonly conflicts: {
+      readonly commits: number
+      readonly files: readonly string[]
+    }
+  }
   /**
    * Whether this host takes `line` commands (set up, land): only when it
    * admits no one but this machine (no invite key), since they act on the

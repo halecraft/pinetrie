@@ -13,6 +13,7 @@ import {
   type LaneName,
   type LineRecord,
   messageText,
+  type ProjectRecord,
   rootOf,
   type TreeIndex,
   type WriterId,
@@ -26,7 +27,13 @@ import {
   withOpenMenus,
 } from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
-import { lineView, lineWords } from "./line-view.ts"
+import type { Intent } from "./intent.ts"
+import {
+  lineOutcomeWords,
+  lineView,
+  lineWords,
+  resolveIntent,
+} from "./line-view.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, nameFor } from "./presence.tsx"
 import { type Me, Profile } from "./profile.tsx"
@@ -46,8 +53,10 @@ export function Header({
   inbox,
   offers,
   line,
+  project,
   names,
   onOpen,
+  onIntent,
   me,
 }: {
   session: SessionClient
@@ -65,10 +74,14 @@ export function Header({
   offers: readonly { readonly lane: LaneName; readonly tip: EntryId }[]
   /** The integration line (ADR-0060), as the host last read it. */
   line: LineRecord | null
+  /** Where the host runs: "resolve with the agent" works in its root. */
+  project: ProjectRecord | null
   /** Each lane's name: a thread's row leads with it (ADR-0039). */
   names: ReadonlyMap<string, string>
   /** Open an entry as your tab (`planOpen`). */
   onOpen: (id: EntryId) => void
+  /** Where the project menu's "resolve with the agent" goes. */
+  onIntent: (intent: Intent) => void
   me: Me
 }) {
   const working = runs.length > 0
@@ -111,17 +124,22 @@ export function Header({
         <Menu
           className={working ? "here-agent running" : "here-agent"}
           gone={!working}
-          heading={
-            working ? "The agent is working in" : "The agent has finished"
-          }
-          items={runs.map(r =>
-            thread(
-              r.lane,
-              r.tip,
-              rootOf(index, r.tip) ?? r.tip,
-              names.get(r.lane),
-            ),
-          )}
+          sections={[
+            {
+              key: "runs",
+              heading: working
+                ? "The agent is working in"
+                : "The agent has finished",
+              items: runs.map(r =>
+                thread(
+                  r.lane,
+                  r.tip,
+                  rootOf(index, r.tip) ?? r.tip,
+                  names.get(r.lane),
+                ),
+              ),
+            },
+          ]}
           label={
             working
               ? `the agent is working in ${runs.length} ${runs.length === 1 ? "thread" : "threads"}`
@@ -140,21 +158,32 @@ export function Header({
       <Menu
         className="offers"
         gone={!offering}
-        heading={offering ? "Offers in your repo" : "No offers left to take."}
-        items={offers.map(o =>
-          thread(
-            o.lane,
-            o.tip,
-            rootOf(index, o.tip) ?? o.tip,
-            names.get(o.lane),
-          ),
-        )}
+        sections={[
+          {
+            key: "offers",
+            heading: offering
+              ? "Work ready to add to the project"
+              : "Nothing left to add to the project.",
+            items: offers.map(o =>
+              thread(
+                o.lane,
+                o.tip,
+                rootOf(index, o.tip) ?? o.tip,
+                names.get(o.lane),
+              ),
+            ),
+          },
+        ]}
         label={
           offering
-            ? `${offers.length} ${offers.length === 1 ? "offer" : "offers"} ready in your repo`
-            : "no offers left to take"
+            ? `${offers.length} ${offers.length === 1 ? "thread has" : "threads have"} work ready to add to the project`
+            : "nothing left to add to the project"
         }
-        title={offering ? "offers ready to take" : "no offers left to take"}
+        title={
+          offering
+            ? "work ready to add to the project"
+            : "nothing left to add to the project"
+        }
         trigger={
           <>
             <span className="offer-mark">⇣</span>
@@ -167,7 +196,12 @@ export function Header({
         }
         triggerClassName="offers-trigger"
       />
-      <LineMenu line={line} session={session} />
+      <LineMenu
+        line={line}
+        onIntent={onIntent}
+        project={project}
+        session={session}
+      />
       <InboxMenu
         inbox={inbox}
         labelOf={labelOf}
@@ -211,12 +245,15 @@ function People({
     <Menu
       className="here-person"
       gone={gone}
-      heading={
-        gone
-          ? `${nameFor(nameOf, p.writer)} has left`
-          : `${nameFor(nameOf, p.writer)} is in`
-      }
-      items={p.threads.map(t => thread(t.end, t.end, t.root))}
+      sections={[
+        {
+          key: "threads",
+          heading: gone
+            ? `${nameFor(nameOf, p.writer)} has left`
+            : `${nameFor(nameOf, p.writer)} is in`,
+          items: p.threads.map(t => thread(t.end, t.end, t.root)),
+        },
+      ]}
       key={p.writer}
       label={`${nameFor(nameOf, p.writer)}: where they are`}
       onToggle={open =>
@@ -284,10 +321,16 @@ function InboxMenu({
   return (
     <Menu
       className="inbox"
-      heading={
-        mentions.length === 0 ? "No one has mentioned you." : "Mentions of you"
-      }
-      items={mentions.length === 0 ? [] : [...controls, ...rows]}
+      sections={[
+        {
+          key: "mentions",
+          heading:
+            mentions.length === 0
+              ? "No one has mentioned you."
+              : "Mentions of you",
+          items: mentions.length === 0 ? [] : [...controls, ...rows],
+        },
+      ]}
       label={`mentions of you: ${inbox.unseen} unseen`}
       title="mentions of you"
       trigger={
@@ -306,38 +349,55 @@ function InboxMenu({
 }
 
 /**
- * The integration line (ADR-0060): set it up, land your work, and how far
- * your work is from it. Absent on a host with no lanes of their own.
+ * The project, the integration line (ADR-0060, ADR-0061): set it up, where
+ * your files stand against it, and moving work between them. Absent on a
+ * host with no lanes of their own.
  */
 function LineMenu({
   line,
+  project,
   session,
+  onIntent,
 }: {
   line: LineRecord | null
+  project: ProjectRecord | null
   session: Pick<SessionClient, "line">
+  onIntent: (intent: Intent) => void
 }) {
   const view = lineView(line)
   const words = lineWords(view)
-  const notes: MenuItem[] = words.notes.map((note, i) => ({
-    key: `note-${i}`,
-    className: "line-note",
-    label: note,
-    disabled: true,
-    onChoose: () => {},
-  }))
-  const actions: MenuItem[] = words.actions.map(a => ({
-    key: a.action,
-    className: "line-action",
-    data: { action: a.action },
-    label: a.label,
-    onChoose: () => void session.line(a.action),
-  }))
+  const resolve = resolveIntent(project, view.facts)
+  // What the last command here said, until the next.
+  const [said, setSaid] = useState<string | null>(null)
+  const actions = words.actions.flatMap(({ action, label }): MenuItem[] => {
+    const item = (onChoose: () => void): MenuItem[] => [
+      {
+        key: action,
+        className: "line-action",
+        data: { action },
+        label,
+        onChoose,
+      },
+    ]
+    if (action !== "resolve")
+      return item(() => {
+        setSaid(null)
+        void session.line(action).then(o => setSaid(lineOutcomeWords(o)))
+      })
+    return resolve === null ? [] : item(() => onIntent(resolve))
+  })
   return (
     <Menu
       className={`line line-${view.state}`}
       gone={view.state === "absent"}
-      heading={words.heading}
-      items={[...notes, ...actions]}
+      sections={[
+        {
+          key: "line",
+          heading: words.heading,
+          notes: said === null ? words.notes : [said, ...words.notes],
+          items: actions,
+        },
+      ]}
       label={words.label}
       title={words.label}
       trigger={<span className="line-mark">{words.trigger}</span>}

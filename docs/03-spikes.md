@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S80 — "Update my files": which rebase, a preview, and conflicts ✅ PASS
+
+`findings/S80-update-my-files.md`. `jj rebase -b @ -d <onto>` moves your
+work above the line, other heads on it included; `-r '<onto>..@'` would
+strip those heads of the commits under them. `git merge-tree` previews the
+files that change and conflict in `@` without writing anything jj or jjui
+sees. A conflict does not stop the rebase: the lowest conflicted commit and
+everything above it are marked, and the markers land in `@`'s files only.
+
 ### S79 — A second tab's repair cleared a slot just taken into ✅ PASS
 
 `findings/S79-the-repair-races-the-record.md`. The host's record of a

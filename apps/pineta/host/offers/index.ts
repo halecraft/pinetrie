@@ -2,13 +2,14 @@
 // (ADR-0038, ADR-0039).
 //
 // Every operation runs on `OfferState`'s one queue for your repo, so no two
-// interleave: a trigger gathers (`offerNow`: where the offer sits and
+// interleave: a trigger gathers (`refreshNow`: where the offer sits and
 // starts, and the offer as your repo holds it), plans (`planRefresh`, then
 // `planOfferEffects`), and executes planned jj steps, then writes the
 // `pineta.offer` record, the page's cache, from the repo. The host decides
 // nothing from a record (ADR-0060). Triggers: a lane's fetch, a run's end, an offer action, and your
-// own jj operations (`watch.ts`). The queue also carries the reads a page asks
-// for (`read`, ADR-0047): a jj read can write (S57).
+// own jj operations (`watch.ts`), and a root archived or restored
+// (`moveLanes`). The queue also carries the reads a page asks for (`read`,
+// ADR-0047): a jj read can write (S57).
 
 import type {
   CommitId,
@@ -17,7 +18,13 @@ import type {
   LineAction,
   WriterId,
 } from "@pineta/core"
-import { fileDiff, type LineConfig, revisionRead } from "@pineta/lanes"
+import {
+  executeOnHost,
+  fileDiff,
+  type LineConfig,
+  laneRefSteps,
+  revisionRead,
+} from "@pineta/lanes"
 import {
   answerDiff,
   answerReview,
@@ -39,6 +46,17 @@ import { startWatch } from "./watch.ts"
 export interface Offers {
   /** Something changed for `lane`: its fetch finished, or you ran jj. */
   touch(lane: LaneName): void
+  /**
+   * Set lanes' history in your repo, or delete it with a null commit (a root
+   * archived or restored, ADR-0029), then refresh each lane's offer: an
+   * archived thread's is withdrawn, a restored one's built again.
+   */
+  moveLanes(
+    updates: readonly {
+      readonly lane: LaneName
+      readonly commit: CommitId | null
+    }[],
+  ): Promise<void>
   /** A run on `lane` ended: refresh its offer, then describe it if it changed. */
   runEnded(lane: LaneName): void
   /** An offer action other than a split; a take names its destination, null for the default. */
@@ -117,6 +135,10 @@ export function startOffers(input: {
 
   return {
     touch,
+    async moveLanes(updates) {
+      await serial.run(() => executeOnHost(laneRefSteps(state.root, updates)))
+      for (const { lane } of updates) touch(lane)
+    },
     runEnded(lane) {
       void serial
         .track(

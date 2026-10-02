@@ -381,12 +381,17 @@ repo. The decisions are here; the jj steps that carry them out, and where an
 offer starts (`offerStart`), are `@pineta/lanes`'s.
 
 - **`planRefresh`** decides what a trigger does, from the lane's tip, where an
-  offer would start, and the offer as your repo holds it (`OfferInRepo`):
-  `build` (none: never built, taken, or gone), `follow` (the lane, or where the offer starts, moved under a single
+  offer would start, whether the lane's work changes any file (`empty`), and
+  the offer as your repo holds it (`OfferInRepo`); or, for a thread whose
+  root is archived, the offer alone (ADR-0061): `build` (none: never built,
+  taken, or gone), `follow` (the lane, or where the offer starts, moved under a single
   offer: updated in place, ADR-0039), `withdraw` (where it starts reached the
-  tip: nothing left), `stale` (either moved under a stack), `refresh` (only
+  tip, the lane's work changes no file, or the thread is archived, edited or
+  not), `forget` (no offer and none to build: a record left from one
+  goes), `stale` (either moved under a stack), `refresh` (only
   the target moved), `leave` (you edited it), `repair` (a race left it
-  divergent), or `none`. Where it starts is compared as a set: a merge's
+  divergent), or `none`. An empty lane is never built: withdrawn after a
+  build, it would be built again on the next poll. Where it starts is compared as a set: a merge's
   parents come in any order. `follow` is not `update`, which is "update from
   my work" (`planUpdate`). An offer is edited (`offerEdited`) when its
   bottom's parent is not an ancestor of the target (S48 item 7), a commit of
@@ -399,10 +404,19 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   followed once. The record's `stale` uses the same rule.
 - **`offerView`** is ADR-0038's state table as a decision: the offer's
   state, its buttons, its menu, and the facts its words are made from
-  (`OfferFacts`: files, size, conflicts, bookmark, …). It writes no words:
-  the line and the button labels are the client's (`offerWords`,
-  `@pineta/client`, ADR-0040). A resolution that asked for you counts only
-  when newer than the offer.
+  (`OfferFacts`: files, size, conflicts, bookmark, the base as
+  `effectiveBase` gives it, …). It writes no words: the line and the button
+  labels are the client's (`offerWords`, `@pineta/client`, ADR-0040). A
+  resolution that asked for you counts only when newer than the offer. An
+  open offer with no files is `nothing`: its work is already where it sits,
+  by a route the ledger does not record. Behind its base (`baseBehind`),
+  catching up moves from the menu to the buttons; a card of yours drafting
+  with the command removes it, and one queued makes the offer busy
+  (`catch-up`).
+- **`baseName`** (`work.ts`) is the one wording of a base: "the project"
+  for the line, the bookmark for a WIP (ADR-0061). `updateLine` uses it
+  through the update's stored `line` flag; an update stored before the flag
+  names its base by its bookmark.
 - **`acceptStack`** takes an agent's stack only when its top has exactly the
   tip's files.
 - **`describeRequest`** is the commit-message request: the skill, your

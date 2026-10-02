@@ -18,6 +18,7 @@ import {
   acceptStack,
   answerDiff,
   answerReview,
+  baseBehind,
   decodeBaseRecord,
   decodeLineRecord,
   decodeOfferRecord,
@@ -74,6 +75,7 @@ describe("offerView: ADR-0038's table", () => {
     o: OfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" | "split" = "idle",
     landing?: LandingRecord,
+    catching: { behind?: boolean; catchUp?: "drafted" | "queued" | null } = {},
   ) =>
     offerView({
       offer: o,
@@ -82,10 +84,17 @@ describe("offerView: ADR-0038's table", () => {
       base: null,
       onto: "pineta-onto",
       wipAhead: 0,
+      behind: catching.behind ?? false,
+      catchUp: catching.catchUp ?? null,
     })
   const at = (v: ReturnType<typeof view>) => [v.state, v.buttons, v.menu]
   test("every state, with its buttons", () => {
     expect(at(view(undefined))).toEqual(["nothing", [], ["update"]])
+    expect(at(view({ ...offer, files: [] }))).toEqual([
+      "nothing",
+      [],
+      ["update"],
+    ])
     expect(at(view(offer, "turn"))).toEqual(["running", [], []])
     expect(at(view(offer, "resolution"))).toEqual(["busy", [], []])
     expect(at(view(offer, "split"))).toEqual(["busy", [], []])
@@ -139,8 +148,9 @@ describe("offerView: ADR-0038's table", () => {
       touchesYourEdits: false,
       bookmark: "pineta-offer/t-1",
       taken: null,
-      base: "pineta-onto",
+      base: { kind: "line" },
       onto: "pineta-onto",
+      behind: false,
     })
     expect(view(offer, "turn").facts.files).toBe(2)
     const none = view(undefined).facts
@@ -151,6 +161,91 @@ describe("offerView: ADR-0038's table", () => {
       null,
       "zz12345678",
     ])
+  })
+  test("behind its base, catching up stands beside the offer; with nothing to take, alone", () => {
+    const behind = { behind: true }
+    expect(at(view(offer, "idle", undefined, behind))).toEqual([
+      "ready",
+      ["take", "split", "update"],
+      ["describe"],
+    ])
+    expect(at(view(undefined, "idle", undefined, behind))).toEqual([
+      "nothing",
+      ["update"],
+      [],
+    ])
+    expect(view(undefined, "idle", undefined, behind).facts.behind).toBe(true)
+    // Running, nothing to catch up with is offered at all.
+    expect(at(view(offer, "turn", undefined, behind))).toEqual([
+      "running",
+      [],
+      [],
+    ])
+  })
+  test("a card bringing the thread up to date: drafting, the strip offers it no more; queued on an idle lane, the offer is busy with it", () => {
+    expect(
+      at(view(offer, "idle", undefined, { behind: true, catchUp: "drafted" })),
+    ).toEqual(["ready", ["take", "split"], ["describe"]])
+    const queued = view(offer, "idle", undefined, { catchUp: "queued" })
+    expect([queued.state, queued.buttons, queued.facts.activity]).toEqual([
+      "busy",
+      [],
+      "catch-up",
+    ])
+    expect(
+      view(offer, "turn", undefined, { catchUp: "queued" }).facts.activity,
+    ).toBe("turn")
+  })
+  test("baseBehind: the commit a lane last took from its base is not the base's now", () => {
+    const L1 = commitId("l1")
+    const L2 = commitId("l2")
+    const W1 = commitId("w1")
+    const line = (
+      commit: typeof L1 | null,
+      wips = [] as { bookmark: string; commit: typeof L1 }[],
+    ) => ({
+      onto: "pineta-onto",
+      wipPrefix: "wip/",
+      commit,
+      heads: { current: null, proposed: "" },
+      log: { current: null, proposed: "" },
+      wips: wips.map(w => ({ ...w, behind: 0, ahead: 1 })),
+      yours: {
+        behind: 0,
+        ahead: null,
+        follow: null,
+        conflicts: { commits: 0, files: [] },
+      },
+      commands: true,
+    })
+    const onLine = {
+      lane: LANE,
+      base: { kind: "line" as const },
+      start: L1,
+      state: "ok" as const,
+    }
+    const onWip = {
+      lane: LANE,
+      base: { kind: "wip" as const, bookmark: "wip/a" },
+      start: W1,
+      state: "ok" as const,
+    }
+    expect(baseBehind(onLine, line(L1))).toBe(false)
+    expect(baseBehind(onLine, line(L2))).toBe(true)
+    expect(baseBehind(onLine, line(null))).toBe(false)
+    expect(baseBehind(undefined, line(L2))).toBe(false)
+    expect(
+      baseBehind(onWip, line(L2, [{ bookmark: "wip/a", commit: W1 }])),
+    ).toBe(false)
+    expect(
+      baseBehind(
+        onWip,
+        line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }]),
+      ),
+    ).toBe(true)
+    // Landed: on the line now, and caught up with it only once merged.
+    expect(baseBehind({ ...onWip, state: "landed" }, line(L2))).toBe(true)
+    expect(baseBehind({ ...onWip, state: "gone" }, line(L2))).toBe(false)
   })
   test("a resolution that asked you counts only when newer than the offer", () => {
     const asked: LandingRecord = {
@@ -187,11 +282,31 @@ describe("planRefresh", () => {
     offer: OfferInRepo | null,
     tip = TIP,
     start = [BASE],
-  ): RefreshFacts => ({ tip, start, offer })
-  test("no offer in your repo (never built, taken, or gone): build, unless the lane holds nothing you lack", () => {
+    empty = false,
+  ): RefreshFacts => ({ archived: false, tip, start, empty, offer })
+  test("no offer in your repo (never built, taken, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten", () => {
     expect(planRefresh(facts(null))).toBe("build")
-    expect(planRefresh(facts(null, TIP, [TIP]))).toBe("none")
-    expect(planRefresh({ tip: null, start: [], offer: null })).toBe("none")
+    expect(planRefresh(facts(null, TIP, [TIP]))).toBe("forget")
+  })
+  test("a lane whose work changes no file is never built, and its offer is withdrawn unless you edited it", () => {
+    expect(planRefresh(facts(null, TIP, [BASE], true))).toBe("forget")
+    expect(planRefresh(facts(read(), TIP, [BASE], true))).toBe("withdraw")
+    expect(
+      planRefresh(facts(read({ chained: false }), TIP, [BASE], true)),
+    ).toBe("leave")
+  })
+  test("an archived thread's offer is withdrawn, an edited one too; with none, its record is forgotten", () => {
+    expect(planRefresh({ archived: true, offer: read() })).toBe("withdraw")
+    expect(
+      planRefresh({ archived: true, offer: read({ chained: false }) }),
+    ).toBe("withdraw")
+    expect(
+      planRefresh({
+        archived: true,
+        offer: { kind: "divergent", changes: ["k"] },
+      }),
+    ).toBe("withdraw")
+    expect(planRefresh({ archived: true, offer: null })).toBe("forget")
   })
   test("only the target moved: refresh; nothing moved: none", () => {
     expect(planRefresh(facts(read({ onTarget: false })))).toBe("refresh")
@@ -381,7 +496,12 @@ describe("records", () => {
       heads: { current: null, proposed: "builtin_immutable_heads() | …" },
       log: { current: null, proposed: "builtin_log() | …" },
       wips: [{ bookmark: "wip/x", commit: TIP, behind: 1, ahead: 2 }],
-      yours: { behind: 0, ahead: null },
+      yours: {
+        behind: 0,
+        ahead: null,
+        follow: null,
+        conflicts: { commits: 0, files: [] },
+      },
       commands: true,
     }
     const l = encodeWorkRecord({ kind: "line", record: line })
@@ -546,7 +666,7 @@ describe("the review (ADR-0047)", () => {
 describe("the update and stack messages", () => {
   const details = {
     lane: LANE,
-    base: "pineta-onto",
+    base: { kind: "line" as const, bookmark: "pineta-onto" },
     merged: COPY,
     commits: ["feat: yours"],
     files: ["a.txt", "c.txt"],
@@ -558,7 +678,15 @@ describe("the update and stack messages", () => {
     expect(m.content).toContain("- c.txt")
     expect(renderableMessage(m)).toEqual({
       role: "update",
-      content: "↓ brought up to date with pineta-onto: 2 files changed",
+      content: "↓ caught up with the project: 2 files changed",
+    })
+    expect(m.content).toContain("pineta-onto was merged into this thread")
+    const wip = {
+      ...details,
+      base: { kind: "wip" as const, bookmark: "wip/a" },
+    }
+    expect(renderableMessage(encodeUpdate(wip, 5))).toMatchObject({
+      content: "↓ caught up with wip/a: 2 files changed",
     })
   })
   test("a stack message names where it starts and ends, and the bookmark to set", () => {

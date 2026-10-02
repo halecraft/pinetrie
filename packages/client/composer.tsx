@@ -9,6 +9,7 @@ import type {
   EntryId,
   Position,
   SeatRecord,
+  ThreadBase,
   ThreadLane,
 } from "@pineta/core"
 import type { ReadOnly } from "./app-view.ts"
@@ -58,6 +59,8 @@ export function Composer(p: {
   /** The column's acts: queueing your card, clearing its command. */
   onAct: (act: ColumnAct) => void
   readOnly: ReadOnly | null
+  /** The thread's base: what a card's command catches up with. */
+  threadBase: ThreadBase
   takeFocus: () => boolean
   /** The column's key when a card may be put or dropped here (`put-target.ts`). */
   putColumn: string | null
@@ -88,6 +91,7 @@ export function Composer(p: {
         onCreatesLane={p.onCreatesLane}
         onShows={p.onShows}
         onIntent={p.onIntent}
+        threadBase={p.threadBase}
         onSend={p.onSend}
         onTyping={p.onTyping}
         participants={p.participants}

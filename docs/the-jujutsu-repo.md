@@ -12,6 +12,11 @@ host, and works in the repo with jj directly. People in a session never
 touch the repo: their threads' agents work in lanes of their own, and their
 work reaches the repo as offers.
 
+The page names these things by what they are for, not by their jj names
+(ADR-0061): the line is **the project**, a take is **add to the project**,
+bringing a thread up to date is **catch up**, and landing your work is
+**add my work to the project**. The jj names are in the page's titles.
+
 ## Bookmarks
 
 | bookmark | whose | what it is |
@@ -19,7 +24,7 @@ work reaches the repo as offers.
 | `pineta-onto` | the owner's, moved by the host on a take | **The integration line**: where finished work lands. It only moves forward. Immutable once set up. |
 | `pineta-offer/<name>` | the host's | **An offer**: a thread's work as one revision, or a stack, on the thread's base. Immutable while it sits on the line. `<name>` is the thread's two-word name. |
 | `wip/*` | the owner's | **A work in progress** a thread may start from, chosen at its first message. Never touched by the host, except a take into it. |
-| `tip@pineta-<lane>` | the host's | **A lane's history**, fetched from the lane. A remote bookmark, untracked, so jj treats it as immutable and leaves it out of the default log. Archiving a thread deletes its lane's. |
+| `tip@pineta-<lane>` | the host's | **A lane's history**, fetched from the lane. A remote bookmark, untracked, so jj treats it as immutable and leaves it out of the default log. Archiving a thread deletes its lane's, and abandons its offer; restoring brings both back. |
 
 The names `pineta-onto` and `wip/` are the defaults. A project sets its own
 in `pineta.json`, or a person in `$XDG_CONFIG_HOME/pineta/config.json`; the
@@ -35,15 +40,27 @@ refuses a move that is not forward, so a stale take fails instead of
 dropping commits. Only an offer with no conflicts can be taken onto the
 line.
 
-**Land my work**, in the page's line menu, moves `pineta-onto` forward to
-the owner's `@-`. It runs as the owner, not as `pineta-host`, since it
+**Update my files**, in the page's project menu, is the one act of
+Pineta's that moves the owner's `@` (ADR-0061, S80): `jj rebase -b @ -d
+pineta-onto`, run as the owner. It moves the owner's work above the line
+and every head on it, other heads besides `@` included. Before it is
+offered, the menu shows a preview made with `git merge-tree`, which writes
+nothing jj or jjui shows: the files that change, those that would
+conflict, and the other heads that move. A conflict does not stop it: jj
+marks the lowest conflicted commit and those above it, and the markers are
+in `@`'s files. "Resolve with the agent" then opens a thread working in
+the owner's files with the `resolve-conflicts` skill, which resolves at
+the lowest conflicted commit (`jj new`, resolve, `jj squash`).
+
+**Land my work** ("add my work to the project", in the page's project
+menu) moves `pineta-onto` forward to the owner's `@-`. It runs as the owner, not as `pineta-host`, since it
 moves the line to the owner's commits: the operation log shows it as the
 owner's act. Moving the line by hand is the same
 act: `jj bookmark move pineta-onto --to @-`.
 
 ## Config the host writes
 
-"Set up the line", in the page's line menu, writes two settings to the
+"Set up the project", in the page's project menu, writes two settings to the
 repo's own config (`jj config set --repo`), shown in full before anything
 is written, and only when chosen:
 
@@ -116,9 +133,11 @@ believes:
   host never touches that offer again. The evolog says who made each
   version, so this holds across a host restart.
 - **Abandoning an offer, or deleting its bookmark,** discards it: the host
-  builds a new one when the thread has work not taken.
+  builds a new one when the thread has work not taken. To be rid of a
+  thread's offer, archive the thread: the host abandons the offer, and
+  builds it again if the thread is restored.
 - **A `wip/` bookmark** is the owner's to rebase, amend or move. A thread
   started from it is brought up to date with a fresh copy of it. Once the
   WIP's commits are on the line, its threads move to the line; if the
   bookmark is deleted without landing, their updates stop until "continue
-  on pineta-onto".
+  from the project".

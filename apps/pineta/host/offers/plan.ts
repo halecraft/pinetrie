@@ -26,6 +26,7 @@ import {
   type OfferSource,
   offerBookmark,
   planAbandonOffer,
+  planFollow,
   planFollowOffer,
   planLand,
   planLineSetup,
@@ -87,9 +88,15 @@ export function offerRecord(input: {
 /** What a refresh was planned from, besides `planRefresh`'s answer. */
 export interface RefreshContext {
   readonly root: string
-  readonly tip: CommitId
-  readonly start: readonly CommitId[]
-  readonly target: string
+  /**
+   * The lane's tip, where an offer starts and where it sits; null for an
+   * archived thread, which `planRefresh` only withdraws or forgets.
+   */
+  readonly place: {
+    readonly tip: CommitId
+    readonly start: readonly CommitId[]
+    readonly target: string
+  } | null
   /** The WIP line, before its trailers (`wipDescription`). */
   readonly wip: string
   /** The host's trailers for the offer's messages (`offerMessage`). */
@@ -125,24 +132,40 @@ const NOTHING: OfferEffects = {
   built: false,
 }
 
-/** What each `planRefresh` answer does to a lane's offer. */
+const REMOVE: OfferEffects = {
+  steps: [],
+  after: { kind: "remove" },
+  built: false,
+}
+
+/**
+ * What each `planRefresh` answer does to a lane's offer. Only `withdraw` and
+ * `forget` act without a place; any other answer without one does nothing.
+ */
 export function planOfferEffects(
   plan: RefreshPlan,
   c: RefreshContext,
 ): OfferEffects {
+  if (plan === "forget") return REMOVE
+  const { place } = c
   if (plan === "build")
-    return {
-      steps: [],
-      after: {
-        kind: "build",
-        sources: [{ commit: c.tip, description: c.wip }],
-      },
-      built: true,
-    }
-  if (c.offer === null) return NOTHING
+    return place === null
+      ? NOTHING
+      : {
+          steps: [],
+          after: {
+            kind: "build",
+            sources: [{ commit: place.tip, description: c.wip }],
+          },
+          built: true,
+        }
+  if (c.offer === null) return plan === "withdraw" ? REMOVE : NOTHING
   const changes = changesOf(c.offer)
   const [bottom] = changes
   if (bottom === undefined) return NOTHING
+  if (plan === "withdraw")
+    return { ...REMOVE, steps: planAbandonOffer(c.root, changes) }
+  if (place === null) return NOTHING
   const record = { kind: "record" } as const
   switch (plan) {
     case "none":
@@ -156,26 +179,20 @@ export function planOfferEffects(
         steps: planFollowOffer({
           root: c.root,
           change: bottom,
-          start: c.start,
-          tip: c.tip,
-          target: c.target,
+          start: place.start,
+          tip: place.tip,
+          target: place.target,
           description: offerMessage(c.wip, {
             ...c.trailers,
-            ledger: { source: c.tip, start: c.start },
+            ledger: { source: place.tip, start: place.start },
           }),
         }),
         after: record,
         built: true,
       }
-    case "withdraw":
-      return {
-        steps: planAbandonOffer(c.root, changes),
-        after: { kind: "remove" },
-        built: false,
-      }
     case "refresh":
       return {
-        steps: planRefreshOffer(c.root, bottom, c.target),
+        steps: planRefreshOffer(c.root, bottom, place.target),
         after: record,
         built: false,
       }
@@ -286,5 +303,11 @@ export function planLineAction(
       return record.yours.ahead === null || record.yours.ahead === 0
         ? { kind: "refused", code: ERR.REFUSED }
         : { kind: "steps", steps: planLand({ root, onto: record.onto }) }
+    case "follow":
+      // Only with a preview: it is what you were shown before you chose it.
+      if (record.commit === null) return { kind: "refused", code: ERR.NO_LINE }
+      return record.yours.follow === null
+        ? { kind: "refused", code: ERR.REFUSED }
+        : { kind: "steps", steps: planFollow({ root, onto: record.onto }) }
   }
 }
