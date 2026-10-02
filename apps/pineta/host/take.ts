@@ -27,25 +27,35 @@ export interface Taken {
   readonly text: string
 }
 
+/** What a take found: nothing to take, a top card whose text is behind, or a card taken. */
+export type TakeTop =
+  | { readonly kind: "idle" }
+  | { readonly kind: "behind"; readonly card: QueuedCard }
+  | { readonly kind: "taken"; readonly taken: Taken }
+
 /**
  * Take a lane's top queued card: read that it is queued and on top, read its
  * text, and delete its record. Synchronous, so no unqueue can land between
  * the read and the delete: an unqueue the host has seen means the card is not
- * taken, and one it has not seen loses (S69, consequence 1). Null when the
- * lane runs or nothing is queued. `textOf` must answer from a text already
- * loaded.
+ * taken, and one it has not seen loses (S69, consequence 1). Idle when the
+ * lane runs or nothing is queued. A card whose text the host does not yet
+ * hold as its queuer had it is `behind`, and stays: Kyneta keeps no order
+ * between documents, so its record can arrive before its text (S72). `texts`
+ * must answer from texts already loaded.
  */
 export function takeTop(
   cards: CardsDocHandle,
   lane: LaneName,
   running: boolean,
-  textOf: (id: CardId) => string,
-): Taken | null {
+  texts: Pick<CardPort, "textNow" | "holds">,
+): TakeTop {
   const step = planTake(readCards(cards), lane, running)
-  if (step.kind === "idle") return null
-  const text = textOf(step.card.id)
-  cards.cards.delete(step.card.id)
-  return { card: step.card, text }
+  if (step.kind === "idle") return { kind: "idle" }
+  const { card } = step
+  if (!texts.holds(card.id, card.place.seen)) return { kind: "behind", card }
+  const text = texts.textNow(card.id)
+  cards.cards.delete(card.id)
+  return { kind: "taken", taken: { card, text } }
 }
 
 /** A taken card's text as its queuer's message, in the queue's own mode. */
@@ -63,11 +73,13 @@ export const takenChat = (taken: Taken): Chat => ({
 
 export interface TakeDeps {
   readonly basics: Pick<Basics, "doc" | "cards" | "log">
-  readonly texts: Pick<CardPort, "hydrate" | "textNow" | "destroy">
+  readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds" | "destroy">
   readonly work: Pick<LaneWork, "prepareUpdate">
   readonly start: Runs["start"]
   /** Send a taken card's text as its queuer's message, through `sendChat`. */
   readonly send: (taken: Taken) => Promise<Outcome>
+  /** The top card's text is behind: drain the lane again once the host holds it. */
+  readonly behind: (card: QueuedCard) => void
 }
 
 /**
@@ -91,14 +103,11 @@ export async function drain(deps: TakeDeps, lane: LaneName): Promise<void> {
       continue
     }
     // No await between the check above and the take.
-    const taken = takeTop(
-      cards,
-      lane,
-      readRunning(doc, lane),
-      deps.texts.textNow,
-    )
-    if (taken === null) return
-    if ((await carryOut(deps, lane, taken)) === "ran") return
+    const top = takeTop(cards, lane, readRunning(doc, lane), deps.texts)
+    if (top.kind === "idle") return
+    // The queue waits for its top card: those behind it keep their turn.
+    if (top.kind === "behind") return deps.behind(top.card)
+    if ((await carryOut(deps, lane, top.taken)) === "ran") return
   }
 }
 

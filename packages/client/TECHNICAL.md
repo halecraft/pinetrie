@@ -903,6 +903,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   are not in the tree yet. Below the line, the column shows every drafting
   card at its end but the composer's (`others` filters on id, not owner), so
   a card of yours someone unqueued while you typed another shows there.
+- **Queueing writes the text's version too** (`seen`, `textVersion`): the
+  host takes the card only once it holds that much of the text, since the
+  record can reach it first (S72).
 - **Queue, unqueue and a command are field writes outside the undo stack's
   gestures** (`SessionClient.queueCard`, `unqueueCard`, `setCommand`): a
   card's box undoes only its text (ADR-0052), and moves wait for step 4's

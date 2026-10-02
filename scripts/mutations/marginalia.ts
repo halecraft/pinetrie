@@ -552,8 +552,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "queueing keeps why a card was not sent",
     file: "packages/marginalia/card.ts",
-    from: '  by: queue.by,\n  unsent: "",',
-    to: "  by: queue.by,",
+    from: '  seen: queue.seen,\n  unsent: "",',
+    to: "  seen: queue.seen,",
     command: unit,
     expect: "queueFields writes the queued place and clears unsent",
   },

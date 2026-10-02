@@ -6,6 +6,7 @@
 // every card's text for the sweeps, so no text is read twice.
 
 import { type Exchange, type Store, whenHydrated } from "@kyneta/exchange"
+import { subscribe } from "@kyneta/schema"
 import type { CardId, WriterId } from "@pineta/core"
 import { writersOf } from "@pineta/marginalia"
 import { readCards, readSeats } from "@pineta/reads"
@@ -15,6 +16,7 @@ import {
   type SessionDocHandle,
   TextDoc,
   textClients,
+  textHolds,
 } from "@pineta/schema"
 
 /** A card's text, as the sweeps need it. */
@@ -39,6 +41,13 @@ export interface CardPort {
   hydrate(ids: readonly CardId[]): Promise<void>
   /** A card's text as the host holds it now, with no wait: after `hydrate`. */
   textNow(id: CardId): string
+  /**
+   * Whether the host's copy of a card's text holds `seen` (`textHolds`): what
+   * its queuer had when they queued it.
+   */
+  holds(id: CardId, seen: string): boolean
+  /** Resolves once the host's copy holds `seen`. */
+  whenHolds(id: CardId, seen: string): Promise<void>
   /** Every live card's text, with who wrote in it. */
   texts(): Promise<readonly GatheredText[]>
   /** Every stored card text document, by id. */
@@ -89,6 +98,18 @@ export function startCards(input: {
       for (const id of ids) await text(cardDocId(id))
     },
     textNow: id => exchange.get(cardDocId(id), TextDoc).text(),
+    holds: (id, seen) => textHolds(exchange.get(cardDocId(id), TextDoc), seen),
+    whenHolds(id, seen) {
+      const t = exchange.get(cardDocId(id), TextDoc)
+      return new Promise(resolve => {
+        if (textHolds(t, seen)) return resolve()
+        const stop = subscribe(t, () => {
+          if (!textHolds(t, seen)) return
+          stop()
+          resolve()
+        })
+      })
+    },
     async texts() {
       const out: GatheredText[] = []
       for (const c of readCards(cards)) {

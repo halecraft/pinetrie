@@ -335,6 +335,8 @@ export async function startHost({
     start: runs.start,
     names,
   })
+  // Cards whose text the host is waiting for, each once (`behind`).
+  const awaiting = new Set<CardId>()
   const drain = (lane: LaneName) =>
     drainQueue(
       {
@@ -344,6 +346,14 @@ export async function startHost({
         start: runs.start,
         send: taken =>
           commands.sendTaken(taken.card.place.by, newId(), takenChat(taken)),
+        behind: card => {
+          if (awaiting.has(card.id)) return
+          awaiting.add(card.id)
+          void cardPort.whenHolds(card.id, card.place.seen).then(() => {
+            awaiting.delete(card.id)
+            watchQueues()
+          })
+        },
       },
       lane,
     )

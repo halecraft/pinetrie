@@ -143,7 +143,8 @@ queued card is taken next.
 - **The stored record is flat strings**, "" for none (`encodeCard`,
   `decodeCard`, total). A drafting or queued card's `at` is never the root;
   a fresh card's `column` is never ""; a queued card has its `lane`,
-  `order` and `by`. `order`, `by`, `command` and `unsent` came later:
+  `order` and `by`, and `seen`, its text's version as its queuer had it
+  (S72). `order`, `by`, `command` and `unsent` came later:
   missing, they read as "". A `command` this build does not know makes the
   card malformed. Clients write a card whole once and only its fields after,
   since a whole-record write concurrent with a spend brings the card back

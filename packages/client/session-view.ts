@@ -57,6 +57,7 @@ import {
   seatKey,
   TextDoc,
   type TextDocHandle,
+  textVersion,
 } from "@pineta/schema"
 import { alreadySent, hostLetGo, spentCards } from "./card-state.ts"
 
@@ -436,7 +437,9 @@ export async function connectSession(
       unqueued.delete(id)
       forgetLane(lane)
       const order = orderAfter(queuedOn(readCards(cards), lane))
-      writeFields(id, queueFields({ at, lane, by: me, order }))
+      // The text as this client has it: the host waits for that much (S72).
+      const seen = textVersion(cardText(id))
+      writeFields(id, queueFields({ at, lane, by: me, order, seen }))
     },
     unqueueCard(id, queued) {
       forgetLane(queued.lane)

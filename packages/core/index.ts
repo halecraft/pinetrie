@@ -727,6 +727,11 @@ export type CardPlace =
       readonly order: string
       /** Who queued it: its message's author. */
       readonly by: WriterId
+      /**
+       * The text's version as its queuer had it (`textVersion`), "" for none:
+       * the host takes the card only once it holds that much (S72).
+       */
+      readonly seen: string
     }
   | { readonly kind: "fresh"; readonly column: string }
 

@@ -11,8 +11,14 @@
 // A text's document is never compacted: Kyneta cannot compact a live Yjs
 // document (S24). A spent card's is destroyed instead.
 
-import { type BoundSchema, type DocRef, Schema, unwrap } from "@kyneta/schema"
-import { yjs, yjsClientId } from "@kyneta/yjs-schema"
+import {
+  type BoundSchema,
+  type DocRef,
+  Schema,
+  unwrap,
+  version,
+} from "@kyneta/schema"
+import { YjsVersion, yjs, yjsClientId } from "@kyneta/yjs-schema"
 import { type WriterId, writerOfPrincipal } from "@pineta/core"
 
 export const TextDoc = yjs.bind(Schema.struct({ text: Schema.text() }))
@@ -45,4 +51,31 @@ export const textClients = (doc: TextDocHandle): number[] => {
     unwrap(doc) as { store: { clients: ReadonlyMap<number, unknown> } }
   ).store.clients
   return [...clients.keys()].filter(c => c !== 0)
+}
+
+/**
+ * The text's version, serialized: what a client writes on a card it queues,
+ * so the host takes the card only once it holds that much of the text.
+ * Kyneta keeps no order between documents, so a card's record can reach the
+ * host before the text typed just before it (S72).
+ */
+export const textVersion = (doc: TextDocHandle): string =>
+  version(doc).serialize()
+
+/**
+ * Whether this copy of the text holds everything in `seen` (`textVersion`):
+ * equal or ahead. "" (a card queued before versions were written) is held.
+ * A version this build cannot read is held too: nothing would ever come to
+ * wait for.
+ */
+export function textHolds(doc: TextDocHandle, seen: string): boolean {
+  if (seen === "") return true
+  let wanted: YjsVersion
+  try {
+    wanted = YjsVersion.parse(seen)
+  } catch {
+    return true
+  }
+  const order = version(doc).compare(wanted)
+  return order === "equal" || order === "ahead"
 }

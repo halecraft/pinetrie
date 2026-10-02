@@ -65,6 +65,7 @@ test("recover resumes each interrupted lane before it settles the others, and na
         lane: OTHER,
         order: "a",
         by: writerId("ada@x.io"),
+        seen: "",
       },
       command: null,
       unsent: null,

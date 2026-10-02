@@ -8,7 +8,7 @@ import {
 import { cardId, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
 import { cardDocId, cardIdOfDoc } from "./card.ts"
-import { seatOf, TextDoc, textClients } from "./text.ts"
+import { seatOf, TextDoc, textClients, textHolds, textVersion } from "./text.ts"
 
 test("seatOf: each seat's person, by the clientID its document carries (ADR-0037)", () => {
   // Pinned to real documents, so a change in how Kyneta derives a clientID
@@ -54,4 +54,20 @@ test("a card's document id names its card, and no other document does", () => {
   expect(cardIdOfDoc(cardDocId(id))).toBe(id)
   expect(cardIdOfDoc("card:")).toBeUndefined()
   expect(cardIdOfDoc("note:0199-card")).toBeUndefined()
+})
+
+test("textHolds: a copy holds a version once every write in it has arrived, others' later writes included (S72)", () => {
+  const ada = createDocAs("0f3c9a2b7d1e4f60a8b9c0d1e2f3a4b5", TextDoc)
+  const host = createDocAs("a1b2c3d4e5f60718293a4b5c6d7e8f90", TextDoc)
+  const bea = createDocAs("9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b", TextDoc)
+  batch(ada, d => d.text.insert(0, "Ada."))
+  const queued = textVersion(ada)
+  expect(textHolds(host, queued)).toBe(false)
+  // Bea's write arrives first: still not Ada's.
+  batch(bea, d => d.text.insert(0, "Bea. "))
+  merge(host, exportEntirety(bea))
+  expect(textHolds(host, queued)).toBe(false)
+  merge(host, exportEntirety(ada))
+  expect(textHolds(host, queued)).toBe(true)
+  expect(textHolds(host, "")).toBe(true)
 })

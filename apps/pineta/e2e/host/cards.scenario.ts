@@ -225,10 +225,11 @@ async function run(check: Checks["check"]): Promise<void> {
       `${neverSent}; ${onHost(c5)?.place.kind}`,
     )
 
-    // 4b. A card queued on an idle thread is taken at once.
+    // 4b. A card queued on an idle thread is taken at once. It is queued as
+    // soon as it is made, as the bring-up-to-date button's card can be: its
+    // record can reach the host before its text (S72), and the take waits.
     const idleEnd = tipOf()
     const c6 = newCard(ada, idleEnd, "@Bea while it is quiet")
-    await waitFor(() => ch.cardText(c6) === "@Bea while it is quiet", 5_000)
     ada.queueCard(c6, { lane, at: at(idleEnd) })
     const taken = await waitFor(
       () =>
@@ -240,7 +241,7 @@ async function run(check: Checks["check"]): Promise<void> {
       5_000,
     )
     check(
-      "a card queued on an idle thread is taken at once",
+      "a card queued on an idle thread is taken at once, with all its text, though its record can reach the host before its text",
       taken >= 0 && onHost(c6) === undefined,
       `${taken} ms`,
     )

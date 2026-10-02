@@ -38,6 +38,8 @@ export const CardsDoc = yjs.bind(
         order: Schema.string(),
         /** Who queued it, "" for none. */
         by: Schema.string(),
+        /** The text's version when it was queued (`textVersion`), "" for none. */
+        seen: Schema.string(),
         /** Its command (ADR-0055), "" for none. */
         command: Schema.string(),
         /** Why the host could not send it, "" for none. */

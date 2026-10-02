@@ -450,6 +450,7 @@ describe("settling and starting up", () => {
       lane,
       order: "a",
       by: ALICE,
+      seen: "",
     },
     command: null,
     unsent: null,

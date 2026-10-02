@@ -58,6 +58,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
       lane,
       order,
       by: writerId(email),
+      seen: "",
     },
     command: null,
     unsent: null,

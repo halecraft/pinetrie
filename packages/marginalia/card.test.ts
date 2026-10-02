@@ -60,7 +60,7 @@ const card = (over: Partial<CardRecord> = {}): CardRecord => ({
 const LANE = laneNameForThread("x")
 const queued = (id: string, order: string, lane = LANE): QueuedCard => ({
   ...card({ id: cardId(id) }),
-  place: { kind: "queued", at: atEntry(E2), lane, order, by: BEA },
+  place: { kind: "queued", at: atEntry(E2), lane, order, by: BEA, seen: "" },
 })
 const laneAt = (tip: string): LaneView[] => [
   {
@@ -198,13 +198,20 @@ describe("the queue", () => {
 
   test("queueFields writes the queued place and clears unsent; unqueueFields writes only the kind", () => {
     expect(
-      queueFields({ at: atEntry(E2), lane: LANE, by: BEA, order: "k" }),
+      queueFields({
+        at: atEntry(E2),
+        lane: LANE,
+        by: BEA,
+        order: "k",
+        seen: "v",
+      }),
     ).toEqual({
       kind: "queued",
       at: "e2",
       lane: LANE,
       order: "k",
       by: BEA,
+      seen: "v",
       unsent: "",
     })
     expect(unqueueFields()).toEqual({ kind: "drafting" })
@@ -303,7 +310,13 @@ describe("storage", () => {
     expect(decodeCard("c", null)).toBeUndefined()
     expect(decodeCard("c", { ...ok, command: "pull" })).toBeUndefined()
     expect(
-      decodeCard("c", { ...ok, kind: "queued", lane: "lane:x", by: "p-bea" }),
+      decodeCard("c", {
+        ...ok,
+        kind: "queued",
+        lane: "lane:x",
+        by: "p-bea",
+        seen: "",
+      }),
     ).toBeUndefined()
   })
 

@@ -47,6 +47,7 @@ const StoredCard = Type.Object({
   column: Type.String(),
   order: Type.Optional(Type.String()),
   by: Type.Optional(Type.String()),
+  seen: Type.Optional(Type.String()),
   command: Type.Optional(Type.String()),
   unsent: Type.Optional(Type.String()),
 })
@@ -60,6 +61,7 @@ export interface StoredCardFields {
   readonly column: string
   readonly order: string
   readonly by: string
+  readonly seen: string
   readonly command: string
   readonly unsent: string
 }
@@ -84,6 +86,7 @@ export function encodeCard({
         column: "",
         order: "",
         by: "",
+        seen: "",
       }
     case "queued":
       return {
@@ -94,6 +97,7 @@ export function encodeCard({
         column: "",
         order: place.order,
         by: place.by,
+        seen: place.seen,
       }
     case "fresh":
       return {
@@ -104,6 +108,7 @@ export function encodeCard({
         column: place.column,
         order: "",
         by: "",
+        seen: "",
       }
   }
 }
@@ -147,6 +152,7 @@ export const decodeCard = (
                   lane: c.lane,
                   order,
                   by: by as WriterId,
+                  seen: c.seen ?? "",
                 }
     if (place === undefined) return undefined
     if (command !== "" && !isCommand(command)) return undefined
@@ -297,15 +303,17 @@ export const queueFields = (queue: {
   readonly lane: LaneName
   readonly by: WriterId
   readonly order: string
+  readonly seen: string
 }): Pick<
   StoredCardFields,
-  "kind" | "at" | "lane" | "order" | "by" | "unsent"
+  "kind" | "at" | "lane" | "order" | "by" | "seen" | "unsent"
 > => ({
   kind: "queued",
   at: entryOrEmpty(queue.at),
   lane: queue.lane,
   order: queue.order,
   by: queue.by,
+  seen: queue.seen,
   unsent: "",
 })
 

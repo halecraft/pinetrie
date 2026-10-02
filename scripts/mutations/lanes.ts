@@ -455,24 +455,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a taken branch that holds all its lane's work",
   },
   {
-    name: "a delivered commit beside the tip is dropped",
-    file: plan,
-    from: "    since.length === 0 ? [] : haves.filter(h => !inTip.has(h.commit))",
-    to: "    since.length === 0 ? [] : haves.filter(h => !inTip.has(h.commit)).slice(0, 0)",
-    command: unit,
-    expect: "a branch of a thread taken after the fork offers only its own",
-  },
-  {
-    name: "a commit beside the tip counts below the newest copy",
-    file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  const shared = `(::(${besides}) & (${above})::)`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "  const shared = `::(${besides})`",
-    command: unit,
-    expect: "a branch taken before its lane's update adds nothing",
-  },
-  {
     name: "the resolution is not told what the card asked",
     file: "apps/pineta/host/work/update.ts",
     from: "            details: { landing: basics.newId(), lane, yours: [copy], by },\n            intent,",
@@ -491,6 +473,24 @@ export const mutations: readonly Mutation[] = [
     scenario: "main",
     expect:
       "a card that brings the thread up to date writes the update in the thread, then sends its text",
+  },
+  {
+    name: "a delivered commit beside the tip is dropped",
+    file: plan,
+    from: "    since.length === 0 ? [] : haves.filter(h => !inTip.has(h.commit))",
+    to: "    since.length === 0 ? [] : haves.filter(h => !inTip.has(h.commit)).slice(0, 0)",
+    command: unit,
+    expect: "a branch of a thread taken after the fork offers only its own",
+  },
+  {
+    name: "a commit beside the tip counts below the newest copy",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  const shared = `(::(${besides}) & (${above})::)`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "  const shared = `::(${besides})`",
+    command: unit,
+    expect: "a branch taken before its lane's update adds nothing",
   },
   {
     name: "a turn's paths are read quoted",

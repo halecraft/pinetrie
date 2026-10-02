@@ -14,8 +14,16 @@ import type { Outcome } from "@pineta/protocol/codec"
 import { readCards } from "@pineta/reads"
 import { beginRun, newCardsDoc } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
+import type { CardPort } from "./cards.ts"
 import { basics, record } from "./fakes.ts"
-import { drain, type TakeDeps, type Taken, takenChat, takeTop } from "./take.ts"
+import {
+  drain,
+  type TakeDeps,
+  type Taken,
+  type TakeTop,
+  takenChat,
+  takeTop,
+} from "./take.ts"
 
 const LANE = laneNameForThread("0123456789abcdef")
 const ADA = writerId("ada@x.io")
@@ -33,18 +41,43 @@ const queue = (
     encodeCard({
       id: cardId(id),
       owner: ADA,
-      place: { kind: "queued", at: atEntry(E1), lane: LANE, order, by: BEA },
+      place: {
+        kind: "queued",
+        at: atEntry(E1),
+        lane: LANE,
+        order,
+        by: BEA,
+        seen: "",
+      },
       command,
       unsent: null,
     }),
   )
+
+/** Texts as the host holds them, all whole unless named in `behind`. */
+const held = (
+  textOf: (id: CardId) => string,
+  behind: readonly string[] = [],
+): Pick<CardPort, "textNow" | "holds"> => ({
+  textNow: textOf,
+  holds: id => !behind.includes(id),
+})
+const takenOf = (top: TakeTop): Taken | null =>
+  top.kind === "taken" ? top.taken : null
 
 describe("takeTop", () => {
   test("reads the top queued card and deletes its record before it returns", () => {
     const cards = newCardsDoc()
     queue(cards, "c-2", "b")
     queue(cards, "c-1", "a")
-    const taken = takeTop(cards, LANE, false, id => `text of ${id}`)
+    const taken = takenOf(
+      takeTop(
+        cards,
+        LANE,
+        false,
+        held(id => `text of ${id}`),
+      ),
+    )
     expect(taken?.card.id).toBe("c-1")
     expect(taken?.text).toBe("text of c-1")
     expect(readCards(cards).map(c => c.id)).toEqual(["c-2"])
@@ -53,23 +86,69 @@ describe("takeTop", () => {
   test("takes nothing while the lane runs, or when nothing is queued", () => {
     const cards = newCardsDoc()
     queue(cards, "c-1", "a")
-    expect(takeTop(cards, LANE, true, () => "x")).toBeNull()
+    expect(
+      takeTop(
+        cards,
+        LANE,
+        true,
+        held(() => "x"),
+      ),
+    ).toEqual({
+      kind: "idle",
+    })
     expect(readCards(cards)).toHaveLength(1)
-    expect(takeTop(newCardsDoc(), LANE, false, () => "x")).toBeNull()
+    expect(
+      takeTop(
+        newCardsDoc(),
+        LANE,
+        false,
+        held(() => "x"),
+      ),
+    ).toEqual({
+      kind: "idle",
+    })
   })
 
   test("an unqueued card is not taken", () => {
     const cards = newCardsDoc()
     queue(cards, "c-1", "a")
     cards.cards.at("c-1")?.kind.set("drafting")
-    expect(takeTop(cards, LANE, false, () => "x")).toBeNull()
+    expect(
+      takeTop(
+        cards,
+        LANE,
+        false,
+        held(() => "x"),
+      ).kind,
+    ).toBe("idle")
+  })
+
+  test("a top card whose text the host does not yet hold is behind, and stays: the next waits behind it (S72)", () => {
+    const cards = newCardsDoc()
+    queue(cards, "c-1", "a")
+    queue(cards, "c-2", "b")
+    const top = takeTop(
+      cards,
+      LANE,
+      false,
+      held(() => "x", ["c-1"]),
+    )
+    expect(top.kind === "behind" ? top.card.id : top.kind).toBe("c-1")
+    expect(readCards(cards).map(c => c.id)).toEqual(["c-1", "c-2"])
   })
 })
 
 test("takenChat: the queuer's message, in the queue's mode, from the card", () => {
   const cards = newCardsDoc()
   queue(cards, "c-1", "a")
-  const taken = takeTop(cards, LANE, false, () => "@agent go")
+  const taken = takenOf(
+    takeTop(
+      cards,
+      LANE,
+      false,
+      held(() => "@agent go"),
+    ),
+  )
   expect(taken === null ? null : takenChat(taken)).toMatchObject({
     text: "@agent go",
     at: atEntry(E1),
@@ -86,6 +165,7 @@ function setUp(
   prepared: Awaited<ReturnType<TakeDeps["work"]["prepareUpdate"]>> = {
     kind: "nothing",
   },
+  behind: readonly string[] = [],
 ) {
   const b = basics()
   const events: string[] = []
@@ -97,6 +177,7 @@ function setUp(
         events.push(`hydrate ${ids.join(",")}`)
       },
       textNow: (id: CardId) => texts[id] ?? "",
+      holds: id => !behind.includes(id),
       destroy: async id => {
         events.push(`destroy ${id}`)
       },
@@ -115,11 +196,28 @@ function setUp(
       events.push(`send ${taken.card.id}: ${taken.text}`)
       return sends.shift() ?? { kind: "appended", id: entryId("e-9") }
     },
+    behind: card => {
+      events.push(`behind ${card.id}`)
+    },
   }
   return { b, events, deps }
 }
 
 describe("drain", () => {
+  test("a top card whose text is behind stops the drain and asks to be drained again; the cards behind it wait", async () => {
+    const { b, events, deps } = setUp(
+      { "c-1": "first", "c-2": "second" },
+      [],
+      undefined,
+      ["c-1"],
+    )
+    queue(b.cards, "c-1", "a")
+    queue(b.cards, "c-2", "b")
+    await drain(deps, LANE)
+    expect(events).toEqual(["hydrate c-1,c-2", "behind c-1"])
+    expect(readCards(b.cards)).toHaveLength(2)
+  })
+
   test("loads every queued text first, then sends in order until one starts a run", async () => {
     const { b, events, deps } = setUp(
       { "c-1": "first", "c-2": "@agent second", "c-3": "third" },
@@ -165,6 +263,7 @@ describe("drain", () => {
           once = true
         },
         textNow: id => deps.texts.textNow(id),
+        holds: () => true,
         destroy: id => deps.texts.destroy(id),
       },
     }

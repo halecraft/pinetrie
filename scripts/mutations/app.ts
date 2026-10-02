@@ -1297,7 +1297,8 @@ export const mutations: readonly Mutation[] = [
     to: "  const unwatchQueues = subscribe(cards, () => void watchQueues)",
     suite: "host",
     scenario: "cards",
-    expect: "a card queued on an idle thread is taken at once",
+    expect:
+      "a card queued on an idle thread is taken at once, with all its text, though its record can reach the host before its text",
   },
   {
     name: "an unqueue writes nothing",
@@ -1318,6 +1319,16 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect:
       "your queued card is drawn above the line, last in its queue, and another writer's edit to it shows",
+  },
+  {
+    name: "a queued card carries no version of its text",
+    file: "packages/client/session-view.ts",
+    from: "      const seen = textVersion(cardText(id))",
+    to: '      const seen = "" && textVersion',
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a card queued on an idle thread is taken at once, with all its text, though its record can reach the host before its text",
   },
   {
     name: "a column's outline does not move as the column scrolls",

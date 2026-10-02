@@ -163,6 +163,11 @@ control), `close` (the host's `Serial` and the offers'), `quiet`, `agent`,
 - **`drain` loads each queued card's text before the take** (`hydrate`),
   and checks again after every wait, so a card queued while texts load is
   loaded too. `textNow` then reads a text with no wait.
+- **The take waits for the text its queuer had** (S72). Kyneta keeps no
+  order between documents, so a card's record can arrive before its text.
+  The record carries the text's version (`seen`); a top card the host's
+  copy does not yet hold is `behind`, and stays on top, and the host drains
+  the lane again once it holds it (`CardPort.whenHolds`, one wait per card).
 - **A taken card is sent through its command.** `bring-up-to-date` runs
   `prepareUpdate` first: clean, the update is written, then the text, if
   any, is sent; conflicted, the resolution run carries the text; nothing

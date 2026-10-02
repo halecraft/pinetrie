@@ -171,8 +171,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "takeTop deletes after a microtask",
     file: "apps/pineta/host/take.ts",
-    from: "  cards.cards.delete(step.card.id)",
-    to: "  queueMicrotask(() => cards.cards.delete(step.card.id))",
+    from: "  cards.cards.delete(card.id)",
+    to: "  queueMicrotask(() => cards.cards.delete(card.id))",
     command: unit,
     expect:
       "reads the top queued card and deletes its record before it returns",
@@ -307,8 +307,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the drain goes on after a run starts",
     file: "apps/pineta/host/take.ts",
-    from: '    if ((await carryOut(deps, lane, taken)) === "ran") return',
-    to: "    await carryOut(deps, lane, taken)",
+    from: '    if ((await carryOut(deps, lane, top.taken)) === "ran") return',
+    to: "    await carryOut(deps, lane, top.taken)",
     command: unit,
     expect: "sends in order until one starts a run",
   },
@@ -776,6 +776,14 @@ export const mutations: readonly Mutation[] = [
     to: "        null ??",
     command: unit,
     expect: "a taken card in an archived root is refused",
+  },
+  {
+    name: "the take ignores whether the host holds the text",
+    file: "apps/pineta/host/take.ts",
+    from: '  if (!texts.holds(card.id, card.place.seen)) return { kind: "behind", card }',
+    to: '  if (false) return { kind: "behind", card }',
+    command: unit,
+    expect: "a top card whose text the host does not yet hold is behind",
   },
   {
     name: "a malformed lane is silent at startup",
