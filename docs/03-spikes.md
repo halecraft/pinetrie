@@ -356,6 +356,26 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S76 — A card's place with one owner, and what a card's document costs ✅ PASS
+
+`findings/S76-a-place-with-one-owner.md`. Places written only by the host,
+through handoffs it applies or refuses, and an inventory per person that
+only that person's tabs hold and write: the first handoff to arrive wins,
+the loser is told where the card went, and each tab's repair of its
+inventory from the host's places converges. A client that writes the
+host's places document diverges for good. A card's own Yjs document costs
+about 17 KB in an Exchange, and Kyneta's `destroy` frees none of it.
+
+### S75 — Where an inventory card's place lives, and undoing moves ✅ PASS
+
+`findings/S75-inventory-places-and-moves.md`. An inventory card's place is
+fields on its record in the cards document: a document per person put one
+card in two inventories under concurrent takes. Every move writes the whole
+place, or concurrent moves mix two places' fields. Two tabs can fill one
+slot, so a read settles it. A second Kyneta stack for moves keeps them apart
+from text; its steps name the cards they moved. An undo can report `true`
+and change nothing.
+
 ### S69 — The take/stop race over the host's exchange ✅ PASS
 
 `findings/S69-the-take-stop-race.md`. A take that reads the top queued card

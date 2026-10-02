@@ -184,6 +184,17 @@ takes it; the take reads and deletes the card in one synchronous step, so an
 unqueue it has not seen loses and its client says "already sent" (S69).
 `pineta.outbox` is gone.
 
+**ADR-0059 — a card's place has one owner at a time** (accepted, for step
+4; not built yet). A place does not merge (S75), so the host writes every
+place in its session (`places`, `json`) and settles moves as handoffs, in
+arrival order, telling the loser where the card went. A tab draws its move
+at once, until its copy of `places` reaches the `rev` the host's reply
+carries (a revision watermark), whichever arrives first. Your inventory is a
+Yjs document of slots that only your tabs hold and write; the host records
+only that a card is in it, and each tab repairs its slots from that (S76).
+Texts stay CRDTs. Queue and unqueue become handoffs too, and the cards
+document goes.
+
 **ADR-0055 — a command acts on a card, and is named last.** A card's
 `command` is how it is sent; the host carries it out when it takes the card.
 The first is "bring up to date": the project's work comes into the thread's

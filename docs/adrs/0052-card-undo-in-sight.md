@@ -3,6 +3,9 @@
 **Status:** Accepted. Evidence: S64 and its addenda. Amends ADR-0048
 (*Undo is Kyneta's*: "Cmd+Z in a card undoes through the same stack", and
 "the stack is per tab"). Implementation: `PLAN-2026-10-01-card-undo-scope`.
+Amended by ADR-0059: a move between owners is undone by the reverse
+handoff, which the host refuses if the card has moved since; your
+inventory's own moves by Kyneta's undo on your inventory document.
 
 **Context.** ADR-0048 gave each browser tab one undo stack over every card,
 and Cmd+Z in any card's box undid the tab's last step. That step can be
@@ -30,10 +33,10 @@ hid the second case.
   else leaves the redo alone (S64, addendum 3).
 - **A sent card's steps act on nothing.** Each client destroys its copy once
   the host lets go of it (S64), so a step on it no longer stands. A send is
-  final (ADR-0048), and a discard is too until the drawer.
+  final (ADR-0048), and a discard is too until the inventory.
 - **Moves get one history per tab** (ADR-0048, step 4: take, put, queue,
-  stop, the drawer). Undoing a move first brings its place into view
-  (switching tabs, opening a column or the drawer), then undoes it there.
+  unqueue, the inventory). Undoing a move first brings its place into view
+  (switching tabs, opening a column or the inventory), then undoes it there.
   How is for step 4's plan.
 
 **Consequences.**

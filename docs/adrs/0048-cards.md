@@ -11,15 +11,22 @@ ADR-0024 (no `editing` presence); its second part, queued cards and the
 take/unqueue race, implemented by `PLAN-2026-10-01-queued-cards`: it
 supersedes ADR-0026 (queued notes become queued cards), with ADR-0055, and
 amends ADR-0020 (nothing waits in `pineta.outbox`, which is gone). Probe 2
-is answered by S69. A later step would amend ADR-0046 (a fixed line about
+is answered by S69, and probes 1 and 4, for the inventory, by S75 and S76. A later step would amend ADR-0046 (a fixed line about
 pinned cards in the prompt). Amended in place (2026-10-02): a queued card is
-*unqueued*, not stopped; "stop" is a run's word (ADR-0056). They also replace the
-inventory in `PLAN-2026-09-27-fold`, and Phases 2–7 of
+*unqueued*, not stopped; "stop" is a run's word (ADR-0056). Amended in
+place (2026-10-02, with Duane): the drawer is the *inventory*, a floating
+panel that snaps left, centre or right; take is Ctrl+Shift+I and put
+Ctrl+Shift+O; it crosses sessions, a page per session. They also replace the
+fold plan's private inventory (`PLAN-2026-09-27-fold`), and Phases 2–7 of
 `PLAN-2026-09-29-branch-prefill-and-composers`. Amended by ADR-0052: Cmd+Z
 in a card undoes only that card's steps, never the tab's last step
 wherever it is, and undoing a move first shows where it acts. Who contributed to a card is
 a projection of its history (step 6); step 1's attribution from the text's
-operations is provisional until then.
+operations is provisional until then. Amended by ADR-0059: a card's place
+has one owner at a time, the session's host or a person's inventory; the
+host writes places, and moves between owners are handoffs it applies or
+refuses; the inventory is a document of slots that only its person's tabs
+write; the cards document goes.
 
 **Context.**
 
@@ -80,10 +87,10 @@ happens to it and who sees it.
 | the tree | sent: it is a message now | everyone, and the agent |
 | above the line, at a thread's end | queued: the agent takes these in order | everyone, and the agent once taken |
 | below the line, at a thread's end | drafting: only people move these | everyone |
-| your drawer | yours, going nowhere | you |
+| your inventory | yours, going nowhere | you |
 
 **Visibility comes in three nested rings, and position says which:** your
-drawer is yours; below the line is the team's; above the line, pinned cards,
+inventory is yours; below the line is the team's; above the line, pinned cards,
 messages and queued cards, is the team's and the agent's. Moving a card up
 widens who sees it, and moving it down narrows it. There is no setting for
 who reads a card: a thought only for the team goes below the line.
@@ -135,8 +142,8 @@ who reads a card: a thought only for the team goes below the line.
    taking the top queued card.
 2. Its place decides what happens to it.
 3. **Two verbs move cards: take and put.** Take moves the focused card into
-   your drawer; put moves the drawer's selected card to where you are focused.
-   You move, and the card rides in your bag, as in a game's inventory.
+   your inventory; put moves the inventory's selected card to where you are focused.
+   You move, and the card rides in your bag, as in a game.
 4. **Taking from the past copies.** Taking a message, or a selection in one,
    makes a new card with its text. The message loses nothing.
 5. **In place, a card has its own actions:** send (Enter, as today), queue,
@@ -147,18 +154,33 @@ who reads a card: a thought only for the team goes below the line.
 
 *Input.* Each input is a way of making the same moves, so each has full
 fidelity by construction.
-- **Keyboard:** take and put, each on one modifier chord (plain letters would
-  clash with typing). Put onto a column lands below the line, since that
-  commits nothing. The profile lists the keys.
-- **Drag:** take and put in one gesture. Dropping on the drawer takes;
+- **Keyboard:** take is Ctrl+Shift+I (in) and put Ctrl+Shift+O (out); plain
+  letters would clash with typing. On a Mac, Ctrl is not Cmd, so neither
+  clashes with the browser; elsewhere Ctrl+Shift+I opens developer tools and
+  Ctrl+Shift+O bookmarks, and whether a page can claim them is for step 4's
+  plan to measure. Put onto a column lands below the line, since that
+  commits nothing. The profile lists the keys. The rest of the keys (opening
+  the inventory, selecting a slot from anywhere) wait for a redesign of the
+  key system.
+- **Drag:** take and put in one gesture. Dropping on the inventory takes;
   dragging out of it puts. Holding a card over a root tab opens that tab, so a
   card can cross tabs.
 - **Clipboard:** copy makes a new card where it is pasted; cut moves it.
 - A test holds the fidelity: every place a drag can drop on is reachable by
   put, and every place put reaches accepts a drop.
 
-*The drawer* is a panel that slides out from the right, beside the columns, so
-it stays open while you work in them.
+*The inventory* is a game's inventory: a panel floating over the columns,
+centred by default, and open while you work in them, since nothing pauses.
+- **It covers the middle of the screen, not its edges.** Cards are dropped
+  near the top (the tab bar, pinned cards, later a board) and the bottom
+  (queued cards, the line, the composer) of every column; the middle holds
+  messages, which are read and taken from, not dropped on.
+- **It snaps left, centre or right.** Dragged by its frame, it settles at
+  the nearest, so it is always somewhere you can predict. The choice is the
+  device's (`localStorage`), not the session's.
+- **A move shows where it went:** a taken card flies into its slot, and a
+  put one flies out to where it lands. Taking while the inventory is closed
+  shows it briefly, the card landing, then closes it.
 - **A fixed 3 × 6 grid.** A slot is an address, the same on every device ("my
   plan is top-left"); a small screen scales the grid, not the addresses.
 - **Cards keep their slots, gaps included.** Take fills the selected slot if
@@ -167,16 +189,21 @@ it stays open while you work in them.
 - **A slot shows its card's first line**, its author's colour and its marks;
   selecting it shows the whole card beside the grid.
 - **Keys:** the first nine slots are labelled `1`–`9`; arrow keys and `hjkl`
-  move through the grid while the drawer has focus; a chord (such as
+  move through the grid while the inventory has focus; a chord (such as
   Alt+1–9) selects a slot from anywhere.
-- **Full means full:** take is refused with "drawer full". The whole drawer
-  fits in one look, and the limit asks you to tidy. A second page can come if
+- **Full means full:** take is refused with "inventory full". The whole inventory
+  fits in one look, and the limit asks you to tidy. More room can come if
   18 proves too few.
 - **Nothing arrives by itself:** no sections, no headers, nothing sorted for
   you. Change shows as marks on cards.
 - **It is yours on every tab and device**, stored under you (the person,
   ADR-0037), and shown only to you. That is not a security claim; it is your
   bag.
+- **It crosses sessions, a page per session.** A session shows its own
+  page, and other sessions' pages are not shown by default. A page is
+  stored with its session, on its host, under you. Step 4 builds this
+  session's page; reaching the others waits for a client that reaches
+  several hosts.
 - **It is the fold plan's inventory.** Fold drops a card standing for a branch
   at a thread end, with the same put.
 
@@ -190,7 +217,7 @@ it stays open while you work in them.
   does not change. From step 6, who contributed is a projection of the
   card's history (below), and it replaces this for the heading, a sent
   message's "with", and marks.
-- **Anyone can move a card in a shared place.** Only your drawer is yours
+- **Anyone can move a card in a shared place.** Only your inventory is yours
   alone, so nobody is locked out because you put something somewhere.
 - **A trace** stays where your card was when someone else moved it: "Bea sent
   this →", "Bea queued this", "Carl took this". It leads to the card, and only
@@ -208,7 +235,7 @@ it stays open while you work in them.
   Traces at one spot collapse into one ("3 cards moved by Bea").
 - **Each card keeps its history:** created by, typed in by, moved, queued,
   unqueued, taken, sent. That is its provenance, reached from the card and
-  from a trace. Someone taking your card into their drawer is recorded there,
+  from a trace. Someone taking your card into their inventory is recorded there,
   not notified.
 - **Who contributed to a card is a projection of its history**: each edit,
   a deletion as much as typing, and each undo and redo, by its author. A
@@ -225,10 +252,10 @@ it stays open while you work in them.
   they are there.
 - **A fresh column** (an unsent branch, a new tab) has no thread until its
   first message is sent, so its cards have no shared place and nobody else
-  sees them. Closing one that holds a card with text asks **keep in drawer**
+  sees them. Closing one that holds a card with text asks **keep in inventory**
   (the default) or **discard** (undoable). One with nothing typed closes
   silently, as today. To leave it for a minute, switch tabs: that now keeps
-  everything. Until the drawer exists, closing asks only **discard**, which
+  everything. Until the inventory exists, closing asks only **discard**, which
   is final: an undone discard would bring back a card no column shows.
 
 *Marks.* A root tab is marked when it holds an unsent card of yours with
@@ -279,11 +306,11 @@ multiplayer-sound: it reverses my operations as they now stand among everyone
 else's, which a stack of naive inverses does not.
 - **Text, inside a card:** your keystrokes, never a collaborator's. A
   collaborator's text typed inside yours survives your undo.
-- **Place:** take, put, queue, unqueue, discard, and moves in the drawer. A
+- **Place:** take, put, queue, unqueue, discard, and moves in the inventory. A
   place is restored only while it still holds what your step wrote: if Bea
   moved the card after you, your undo leaves her move alone.
 - **One gesture is one step**, across every document it wrote: a take that
-  changes a card's place and your drawer is undone at once. Typing joins the
+  changes a card's place and your inventory is undone at once. Typing joins the
   step before it while you keep typing in one place.
 - **Cmd+Z** in a card undoes through the same stack (`useText`'s `undo`
   option), and so does Cmd+Z elsewhere on the page, for moves. *Amended by
@@ -302,7 +329,9 @@ and there is no retention period to choose. Undo reaches as far back as the
 history kept; compaction (S24) is the limit. Sending is the one step undo
 cannot cross, and it is already the one the design calls final.
 
-*Storage: Kyneta, written by clients.* **Clients write cards directly. The host
+*Storage: Kyneta, written by clients.* (*Amended by ADR-0059: texts and
+inventories are written by clients; places only by the host, through
+handoffs. S75 found that a place does not merge.*) **Clients write cards directly. The host
 acts only at the boundary with pi**, sending a card and taking a queued one,
 where the card becomes a message in the immutable tree.
 - Kyneta's undo covers only operations a client made itself, so cards written
@@ -311,7 +340,7 @@ where the card becomes a message in the immutable tree.
   `packages/schema/index.ts`), with CRDTs where people type together. Cards
   are where people type and move things together, so they live in CRDT
   documents: one per session for the shared places (each card's place, owner,
-  placer, marks, history); one per person for the drawer; and each card's text
+  placer, marks, history); one per person for the inventory; and each card's text
   in its own Yjs document (`TextDoc`, `packages/schema/text.ts`, shared with
   notes). Step 1 built the first and the third (`CardsDoc`,
   `packages/schema/card.ts`). Clients write a card whole once, and only its
@@ -343,7 +372,8 @@ and a pinned card can quote one.
   lives on its thread, in a document, and outlives any column.
 - Pineta's host gets smaller where cards are concerned: no commands, codec
   fields or handlers for composing, drafting, cancelling or reordering. The
-  host's work is the boundary, and the policy's invariants.
+  host's work is the boundary, and the policy's invariants. (*Amended by
+  ADR-0059: the host takes handoffs.*)
 - The model's view stays reproducible: it reads messages and pinned cards,
   and what it read of the cards is an entry in the tree.
 - The prompt gains one fixed line (amending ADR-0046's block), and each
@@ -355,7 +385,8 @@ and a pinned card can quote one.
   stack's scope and wraps each gesture.
 - Cards' places need a CRDT document, not `json`: Kyneta's undo over a
   plain document is a strict one-writer stack, and a write by anyone else
-  ends it.
+  ends it. (*Amended by ADR-0059: places are the host's `json`, and a
+  move is undone by the reverse handoff.*)
 - The order of work follows what hurts most (switching root tabs, then coming
   back the next day, then an agent finishing elsewhere):
   1. the drafting card that survives a tab switch, a reload and a host
@@ -363,12 +394,12 @@ and a pinned card can quote one.
   2. marks for your unsent cards on root tabs and columns;
   3. notes become cards: notes in the tree removed, queued notes become queued
      cards, the take/unqueue race;
-  4. the drawer: grid, take and put, drag, keys;
+  4. the inventory: grid, take and put, drag, keys;
   5. several cards per place, and pinned cards read by the agent;
   6. traces and card history, and who contributed, projected from it (for
      marks, a card's heading and a sent message's "with");
   7. queue control: staging, reordering, unqueues;
-  8. later: reminders (drawer cards that light up when due and reach your `@`
+  8. later: reminders (inventory cards that light up when due and reach your `@`
      inbox, separate from the queue), conditions on queued cards (ADR-0026),
      the agent suggesting next steps as drafting cards, and a summary of what
      happened while you were away.
@@ -414,8 +445,10 @@ build Pineta links (`/kyneta/workspace/pineta`, bookmark `needed-by-pineta`):
 
 *Probes before a plan*, each recorded in `docs/findings/`. S58 answered 3, and 4
 for the drafting card; S69 answered 2, and 1 for a queue's order (a field
-on each card, not a list per thread); 1 and 5 wait for the steps that need
-them:
+on each card, not a list per thread); S75 and S76 answered 1, and 4 for
+moves (a place does not merge: a place in a session is the host's, moved
+by handoffs it applies or refuses, and your inventory is a document only
+your tabs write; a new ADR will say so); 5 waits for step 5:
 1. **Places as a CRDT:** a movable tree (Loro) or a place field per card. Two
    people move one card at once, and a card moves while being typed in.
    Which converges to something a person would accept?
@@ -434,9 +467,12 @@ them:
    measuring that the prompt cache holds when a card changes between runs.
    How a branch's context gathers the pinned cards inherited at its fork.
 
-*Still open:* the take and put chords; whether the drawer pushes the columns
-over or covers the rightmost; whether a person-wide activity log is wanted
-beyond each card's history; whether the drawer crosses sessions.
+*Still open:* whether a person-wide activity log is wanted beyond each
+card's history; how a client reaches other sessions' pages, since each
+session has its own host and store (`.pineta/pineta.db`) and a browser
+reaches one host; and how a card moves between pages, since its text is a
+document on its session's host (a copy, then a delete, and an undo across
+two hosts).
 
 **Alternatives rejected.**
 
@@ -461,10 +497,16 @@ beyond each card's history; whether the drawer crosses sessions.
   second.
 - **A lift-and-move keyboard mode, or a "move to…" picker.** Take and put move
   you instead of the card, with the keys you already use to get around.
-- **A list, or a free canvas, for the drawer.** A list has no addresses; a
+- **A drawer sliding out from the side.** Dragging to and from it is easy,
+  but it covers or pushes aside a whole column, top and bottom, where cards
+  are dropped. A panel rising from the bottom, as in many games, covers
+  every composer.
+- **An inventory placed anywhere by dragging.** Snapping to three places
+  keeps it predictable, and needs no position kept per screen size.
+- **A list, or a free canvas, for the inventory.** A list has no addresses; a
   canvas is hard to use from the keyboard and grows messy. A fixed grid gives
   addresses and works with every input.
-- **Returning an unqueued card to its sender's drawer.** It would move by
+- **Returning an unqueued card to its sender's inventory.** It would move by
   itself, out of the place everyone saw it in.
 - **Undo as our own stack of inverse commands.** Unsound with other people
   editing, and a retention rule for discarded cards would be needed. Kyneta's

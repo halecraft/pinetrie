@@ -1291,7 +1291,7 @@ so it never lights the tab (`elsewhere`).
   ones holding text, the layout, the lanes and the index. A drafting card is
   placed by `cardEnd` and `rootOf`; a fresh card by `tabOfColumn`, so one
   typed in another browser tab or device, whose layout this one lacks, marks
-  nothing until the drawer (step 4) collects it.
+  nothing until the inventory (step 4) collects it.
 - **The marks read text, not records:** a record outlives its text (an
   emptied card stays until sent or swept). `holdsText` is `needsCard` with
   the one blank prefill, `AGENT_PREFILL`, so a bare `@agent ` is nothing,

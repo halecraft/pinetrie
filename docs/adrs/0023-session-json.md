@@ -3,6 +3,9 @@
 **Status:** Accepted. Evidence: S24, S25. Amends ADR-0008, ADR-0016, ADR-0022.
 Amended by ADR-0048: clients write cards, the cards document and each card's
 text, directly; the host writes pi's tree, and a card only to spend it.
+Amended by ADR-0059: the host writes cards' places again (`places`, `json`),
+through handoffs clients ask for; clients write cards' texts and their own
+inventories.
 
 **Context.** The session document was on Loro, a CRDT: every replica could write
 it and merge. None does. The host alone writes the session document (pi's

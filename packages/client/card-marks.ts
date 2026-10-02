@@ -96,7 +96,7 @@ export function cardMarks(input: {
       }
       case "fresh": {
         // A column this browser tab's layout lacks was typed elsewhere: the
-        // drawer (step 4) will collect it.
+        // inventory (step 4) will collect it.
         const tab = tabOfColumn(input.layout, card.place.column)
         if (tab?.kind === "new") newTabs.add(tab.key)
         if (tab?.kind === "root") roots.add(tab.root)
