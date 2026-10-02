@@ -81,6 +81,11 @@
       /* A run of uneventful messages: a capsule, its length and fill inline. */
       .rail-stretch { position: absolute; width: 8px; padding: 0; border: 1.5px solid; border-radius: 4px;
         box-sizing: border-box; }
+      /* What a column shows (ADR-0058): an outline in its colour around the
+         dots in view, under them; its place, colours and fill are inline. */
+      .rail-view { position: absolute; width: 14px; box-sizing: border-box; border: 1.5px solid;
+        border-radius: 7px; pointer-events: none; }
+      .rail-anchor { position: absolute; }
       /* Others here (ADR-0024): the ring is inline style; several share a count. */
       .here-count { position: absolute; top: -9px; left: 7px; font-size: 9px; line-height: 1;
         color: #ddd; pointer-events: none; }

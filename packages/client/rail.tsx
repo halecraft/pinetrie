@@ -19,12 +19,22 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
-import { type ComponentProps, type CSSProperties, useMemo } from "react"
+import {
+  type ComponentProps,
+  type CSSProperties,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from "react"
 import { askWords, workWords } from "./ask-words.ts"
 import { CardPip } from "./card-pip.tsx"
 import { nameFor } from "./presence.tsx"
 import {
+  type Band,
   pickAt,
+  railBands,
   railItems,
   railKeep,
   type StretchFill,
@@ -33,6 +43,7 @@ import {
 } from "./rail-view.ts"
 import type { SessionClient } from "./session-view.ts"
 import { useReadingAt } from "./use-presence.ts"
+import { railScroll, type ViewportStore } from "./viewport.ts"
 
 const PALETTE = [
   "#9ecbff",
@@ -84,6 +95,7 @@ export function Rail({
   yours,
   nameOf,
   digests,
+  viewports,
 }: {
   /** The tree the items were compacted from: a long ask's capsule names its ask. */
   index: TreeIndex
@@ -104,6 +116,8 @@ export function Rail({
   yours: { readonly ends: ReadonlySet<string>; readonly color: string }
   /** A writer's name, for a capsule's label. */
   nameOf: (writer: WriterId) => string
+  /** Each mounted column's view, outlined (ADR-0058); none, no outlines. */
+  viewports?: ViewportStore
 }) {
   // Every message, a stretch's included, to the item that draws it.
   const itemOf = new Map(items.flatMap(it => it.ids.map(id => [id, it])))
@@ -140,6 +154,9 @@ export function Rail({
             )
           })}
         </svg>
+        {viewports !== undefined && (
+          <RailViewport itemOf={itemOf} store={viewports} />
+        )}
         {/* Dots and capsules are buttons over the drawing, so they are
           reachable by keyboard and read as controls. */}
         {railItems(items, { open, yours }).map(([it, marks]) =>
@@ -171,6 +188,111 @@ export function Rail({
         )}
       </div>
     </nav>
+  )
+}
+
+/** An outline's width: a dot's, and a little room either side. */
+const OUTLINE = 14
+/** An outline's least height, in slots: a few messages of a capsule still show. */
+const OUTLINE_MIN = 0.75
+
+/** A band at least `OUTLINE_MIN` tall, grown about its middle. */
+const atLeast = (b: Band): Band => {
+  const grow = Math.max(0, OUTLINE_MIN - (b.bottom - b.top)) / 2
+  return { ...b, top: b.top - grow, bottom: b.bottom + grow }
+}
+
+/**
+ * What each column shows, outlined on the rail in its colour (`railBands`,
+ * ADR-0058), under the dots. It reads the columns' views itself, so a scroll
+ * redraws the outlines alone. The rail follows the column moved last: it
+ * scrolls when that column's outline leaves its view (`railScroll`), unless
+ * the reader has just scrolled the rail.
+ */
+function RailViewport({
+  itemOf,
+  store,
+}: {
+  itemOf: ReadonlyMap<string, RailItem>
+  store: ViewportStore
+}) {
+  const views = useSyncExternalStore(store.subscribe, store.get)
+  const outlines = [...views.columns].flatMap(([key, v]) =>
+    railBands(itemOf, v.ids, v.first, v.last).map(
+      (b, n) =>
+        ({ key, n, color: trackColor(v.track), ...atLeast(b) }) as const,
+    ),
+  )
+  const anchor = useRef<HTMLSpanElement>(null)
+  // The rail's own scroll: where it last put it, and when the reader last
+  // moved it. While the pointer is over the rail, the reader is reading it.
+  const set = useRef<number | null>(null)
+  const reader = useRef(Number.NEGATIVE_INFINITY)
+  const over = useRef(false)
+  useEffect(() => {
+    const rail = anchor.current?.closest<HTMLElement>(".rail")
+    if (rail === null || rail === undefined) return
+    const scrolled = () => {
+      if (set.current === null || Math.abs(rail.scrollTop - set.current) > 1)
+        reader.current = performance.now()
+    }
+    const enter = () => {
+      over.current = true
+    }
+    const leave = () => {
+      over.current = false
+      reader.current = performance.now()
+    }
+    rail.addEventListener("scroll", scrolled, { passive: true })
+    rail.addEventListener("pointerenter", enter)
+    rail.addEventListener("pointerleave", leave)
+    return () => {
+      rail.removeEventListener("scroll", scrolled)
+      rail.removeEventListener("pointerenter", enter)
+      rail.removeEventListener("pointerleave", leave)
+    }
+  }, [])
+  const followed = outlines.filter(o => o.key === views.moved)
+  // Only when a column's view moves: a redraw of the rail for anything else
+  // leaves its scroll where the reader put it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the views change
+  useLayoutEffect(() => {
+    const tree = anchor.current?.parentElement
+    const rail = tree?.closest<HTMLElement>(".rail")
+    if (tree === null || tree === undefined) return
+    if (rail === null || rail === undefined) return
+    const [first] = followed
+    if (first === undefined) return
+    const band = {
+      top: tree.offsetTop + y(first.top),
+      bottom: tree.offsetTop + Math.max(...followed.map(o => y(o.bottom))),
+    }
+    const since = over.current ? 0 : performance.now() - reader.current
+    const to = railScroll(band, rail, since)
+    if (to === null) return
+    rail.scrollTop = to
+    set.current = rail.scrollTop
+  }, [views])
+  return (
+    <>
+      <span aria-hidden className="rail-anchor" ref={anchor} />
+      {outlines.map(o => (
+        <span
+          aria-hidden
+          className="rail-view"
+          data-key={o.key}
+          data-track={o.track}
+          key={`${o.key}-${o.n}`}
+          style={{
+            left: x(o.track) - OUTLINE / 2,
+            top: y(o.top),
+            height: (o.bottom - o.top) * ROW,
+            borderColor: o.color,
+            background: `color-mix(in srgb, ${o.color} 10%, transparent)`,
+          }}
+        />
+      ))}
+    </>
   )
 }
 

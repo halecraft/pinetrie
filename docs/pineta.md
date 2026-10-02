@@ -444,6 +444,12 @@ turn's revision records. Stop records who pressed it (`pineta.stop`). With
 `{ "digests": { "enabled": true } }`, a model writes each ask a short
 summary (`pineta.digest`, the `ask-digest` skill), which no agent reads.
 
+**The rail outlines what each column shows** (ADR-0058), in the column's
+colour, and scrolls to keep the outline of the column you move in view. A
+column of a tab shown again comes back where you left it, by message: the
+same measurement (`packages/client/viewport.ts`). Spots last the page's
+life; keeping them for a person across devices is the next step.
+
 **Steps 1–5 are done** (ADR-0018). Now continue thickening (`docs/04-roadmap.md`), each step
 independently shippable:
 

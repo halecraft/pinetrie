@@ -224,8 +224,9 @@ give the roots and each tab's signals.
   intent: `planIntent` turns its plan into effects, and `perform` carries
   them out.
 - **Columns of other tabs are unmounted.** Alignment forgets their keys, so a
-  tab shown again aligns its columns as if opened, left to right, the first
-  at its end (Layout, below). Each keeps what it knew of its end
+  tab shown again places its columns as if opened, left to right: each at
+  the spot it was left (A column's view, below), else aligned, the first at
+  its end (Layout, below). Each keeps what it knew of its end
   (`SeenEnd`, Following a column's end), and each tool row what it decided
   (`RowMemory`, Tools and live work).
 - **The Archive tab** is `archive.tsx` over `archiveIndex`
@@ -686,6 +687,47 @@ and dropped: forks far apart could not be seen together
   the column opens at its end. Level with it would be off screen, behind a
   spacer taller than the view. A fork point above the view is still met, by
   scrolling alone. So a spacer is never taller than the view it lines up with.
+
+## A column's view (`viewport.ts`, `use-viewport.ts`, ADR-0058)
+
+Each column measures which of its messages are in view, and the same span
+serves the rail's outline and the column's spot.
+
+- **`useViewport` measures once a frame at most**, on the body's scroll and
+  the body's and content's resizes, as `useAskBar` does: every
+  `.msg[data-entry]`'s box, then `visibleSpan`, two binary searches. A
+  fold's line is no message: a view's top in it is at 1 of the message
+  above, and the span covers the folded messages between. It writes the
+  `ViewportStore` only when `sameSpan` says the span moved.
+- **Only `RailViewport` reads the store** (`rail.tsx`, with
+  `useSyncExternalStore`), so a scroll redraws the outlines alone, not a
+  column and not the rail's dots. `railBands` turns a column's ids and
+  edges into one band per track; a capsule is sliced as `pickAt` reads it.
+  An outline is at least `OUTLINE_MIN` slots tall, or a few messages of a
+  long capsule would be a sliver.
+- **The rail follows `moved`**, the column whose view changed last, in a
+  layout effect that runs only when the views change: a redraw for
+  presence or a new message leaves the rail's scroll alone. `railScroll`
+  holds while the pointer is over the rail and for `RAIL_HOLD_MS` after
+  the reader scrolls it or the pointer leaves. The rail's own scroll is told
+  from the reader's by the `scrollTop` it last set.
+- **A spot is saved in `seen.leave`**, with `SeenEnd`, from the latest
+  span, not a measurement then: React runs layout effects' cleanups while
+  the tree is being taken apart. `keepSpot` keeps one per column, by the
+  ids it shows (`ColumnView.nodes`), which no other column of its tab
+  shows, so a branch's spot never replaces its parent's.
+- **`placeOnReturn` runs in the alignment effect, before `alignOnOpen`**,
+  and `settle`s the column as alignment does. It gives up, and alignment
+  places the column, when the spot's message is not drawn (in a closed
+  fold) or the content fits the view: only alignment sets the spacer that
+  lines a short branch up with its fork point.
+- **The Archive preview keeps no spot** (`spots={undefined}`): it shows a
+  root's newest path, and its spot, saved as you go back to the tab, would
+  replace the tab's columns' own. Its column still measures, and its rail
+  draws its outline.
+- **Selectors:** `.rail-view[data-key][data-track]`, one per band, keyed by
+  its column. The browser suite tests "around a dot" over every outline of
+  a column: a column's view can lie on two tracks.
 
 ## Moving columns (`reorder.ts`, `use-column-drag.ts`)
 

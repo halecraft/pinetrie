@@ -120,3 +120,58 @@ export function railItems<I extends { readonly ids: readonly string[] }>(
     ] as const
   })
 }
+
+/** What `railBands` reads of a rail item: where it is drawn, and its messages. */
+export interface BandItem {
+  readonly slot: number
+  readonly span: number
+  readonly track: number
+  readonly ids: readonly string[]
+}
+
+/** A part of a column's view on the rail, in slots: a dot's centre is its slot. */
+export interface Band {
+  readonly track: number
+  readonly top: number
+  readonly bottom: number
+}
+
+/**
+ * Where a column's view lies on the rail (ADR-0058): `ids`, the messages from
+ * the view's top edge to its bottom edge, `first` and `last` how far into the
+ * first and the last the edges are. A dot is drawn whole; a capsule gives
+ * each of its messages an equal slice of its length, as `pickAt` reads it, so
+ * the edges cut it where they are. Messages in a row on one track make one
+ * band, whatever other tracks draw beside them. Messages the rail does not
+ * draw are left out.
+ */
+export function railBands(
+  itemOf: ReadonlyMap<string, BandItem>,
+  ids: readonly string[],
+  first: number,
+  last: number,
+): readonly Band[] {
+  const bands: Band[] = []
+  for (const [n, id] of ids.entries()) {
+    const item = itemOf.get(id)
+    if (item === undefined) continue
+    const top = item.slot - 0.5
+    let from = top
+    let to = top + item.span
+    if (item.ids.length > 1) {
+      const k = item.ids.indexOf(id)
+      const slice = item.span / item.ids.length
+      from = top + slice * (k + (n === 0 ? first : 0))
+      to = top + slice * (k + (n === ids.length - 1 ? last : 1))
+    }
+    const at = bands.at(-1)
+    if (at !== undefined && at.track === item.track)
+      bands[bands.length - 1] = {
+        track: at.track,
+        top: Math.min(at.top, from),
+        bottom: Math.max(at.bottom, to),
+      }
+    else bands.push({ track: item.track, top: from, bottom: to })
+  }
+  return bands
+}

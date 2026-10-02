@@ -93,6 +93,13 @@ import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { useReveal } from "./use-reveal.ts"
 import { useStable } from "./use-stable.ts"
+import {
+  placeAt,
+  type Spot,
+  spotFor,
+  spotStore,
+  viewportStore,
+} from "./viewport.ts"
 
 /** What `App` keeps on this device and tab, built by `main.tsx`. */
 export interface AppStores {
@@ -121,7 +128,47 @@ function alignOnOpen(strip: HTMLElement, key: string, forkFrom: string | null) {
   )
     return
   place(strip, column, body, forkFrom)
-  body.dispatchEvent(new Event(PLACED))
+  settle(body)
+}
+
+/**
+ * Tell a column it was placed, so it follows its end only if it was placed
+ * there (`follow.ts`). Every placement on mounting ends with it.
+ */
+const settle = (body: HTMLElement) => body.dispatchEvent(new Event(PLACED))
+
+/**
+ * Bring a column shown again back to where it was left (`placeAt`,
+ * `viewport.ts`), then tell it it was placed. False when its spot's message
+ * is not drawn, or its content fits its view: alignment places it then.
+ */
+function placeOnReturn(
+  strip: HTMLElement,
+  key: string,
+  spot: Spot,
+  lastId: string | undefined,
+): boolean {
+  const body = strip.querySelector<HTMLElement>(
+    `.column[data-key="${key}"] .column-body`,
+  )
+  const message = body?.querySelector<HTMLElement>(
+    `.msg[data-entry="${spot.id}"]`,
+  )
+  if (body === null || body === undefined) return false
+  if (message === null || message === undefined) return false
+  const at = message.getBoundingClientRect()
+  const top = at.top - body.getBoundingClientRect().top + body.scrollTop
+  const to = placeAt(spot, {
+    top,
+    bottom: top + at.height,
+    scrollHeight: body.scrollHeight,
+    clientHeight: body.clientHeight,
+    lastId,
+  })
+  if (to === null) return false
+  body.scrollTop = to
+  settle(body)
+  return true
 }
 
 /** Measure the column and its fork point, then scroll it or grow its spacer as `placement` says. */
@@ -429,6 +476,10 @@ export function App({
   // callback, after this effect: unplaced, a column's parent would be
   // measured at its top, and a fork point far down it would need a spacer
   // taller than the screen.
+  //
+  // A column shown again with a spot (where it was left, ADR-0058) goes back
+  // there instead.
+  const [spots] = useState(() => spotStore())
   const aligned = useRef(new Set<string>())
   useLayoutEffect(() => {
     const el = strip.current
@@ -439,9 +490,17 @@ export function App({
     for (const [i, column] of columns.entries()) {
       if (aligned.current.has(column.key)) continue
       aligned.current.add(column.key)
-      alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)
+      const ids = views[i]?.nodes.map(n => n.id) ?? []
+      const spot = spotFor(spots.load(), ids)
+      if (
+        spot === undefined ||
+        !placeOnReturn(el, column.key, spot, ids.at(-1))
+      )
+        alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)
     }
-  }, [columns, views])
+  }, [columns, views, spots])
+  // Every mounted column's view, which the rail outlines (ADR-0058).
+  const [viewports] = useState(() => viewportStore())
 
   // What each column knew of its end when it was unmounted (`SeenEnd`), so a
   // column of a tab shown again shows ↓ new below for what arrived meanwhile.
@@ -516,6 +575,8 @@ export function App({
     stops,
     live,
     left: stores.left,
+    spots,
+    viewports,
     digests,
     colorOf,
     cards,
@@ -640,6 +701,7 @@ export function App({
                     open={shown}
                     rows={rail}
                     session={session}
+                    viewports={viewports}
                     yours={yours}
                   />
                 ) : (
@@ -763,6 +825,7 @@ function Preview({
         open={path}
         rows={rail}
         session={shared.session}
+        viewports={shared.viewports}
         yours={yours}
       />
       <div className="preview-strip" ref={previewStrip}>
@@ -780,6 +843,8 @@ function Preview({
           readOnly={readOnly}
           showsPresence={false}
           shown={path}
+          // A glance: where it is left is not where the root's tab was.
+          spots={undefined}
           track={track ?? PENDING_TRACK}
           view={view}
         />

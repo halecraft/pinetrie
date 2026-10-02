@@ -2009,6 +2009,178 @@ async function run(check: Checks["check"]): Promise<void> {
               `${before} before, arrived ${arrived}, offered ${offered}, gap after ${Math.round(gap)}px; ${kinds.join(",")}; ${where.join(" ")}`,
             )
           }
+          // Where a column was left, and the rail's outline of what it shows
+          // (ADR-0058). Column 0 is long: 30 messages and more.
+          {
+            const body0 = `${col(0)} .column-body`
+            const key0 = (await lp.getAttribute(col(0), "data-key")) ?? ""
+            const tip0 =
+              (await lp
+                .locator(`${col(0)} .msg[data-entry]`)
+                .last()
+                .getAttribute("data-entry")) ?? ""
+            // Away from the rail, which holds still under the pointer.
+            await lp.mouse.move(600, 10)
+            await lp.waitForTimeout(1_600)
+            const scrollTo = (to: "top" | "end" | "middle") =>
+              lp.$eval(
+                body0,
+                (b, at) => {
+                  const end = b.scrollHeight - b.clientHeight
+                  b.scrollTop = at === "top" ? 0 : at === "end" ? end : end / 2
+                },
+                to,
+              )
+            // Whether an outline of column 0 is around a dot's centre: one per
+            // track its view is on.
+            const around = (entry: string) =>
+              lp.evaluate(
+                ([key, id]) => {
+                  const d = document.querySelector(
+                    `.rail-dot[data-entry="${id}"]`,
+                  )
+                  if (d === null) return false
+                  const b = d.getBoundingClientRect()
+                  const y = b.top + b.height / 2
+                  const x = b.left + b.width / 2
+                  return [
+                    ...document.querySelectorAll(
+                      `.rail-view[data-key="${key}"]`,
+                    ),
+                  ].some(o => {
+                    const a = o.getBoundingClientRect()
+                    return (
+                      a.top <= y && y <= a.bottom && a.left <= x && x <= a.right
+                    )
+                  })
+                },
+                [key0, entry] as const,
+              )
+            await scrollTo("top")
+            await twoFrames(lp)
+            const atTop = [await around(ids[0] ?? ""), await around(tip0)]
+            await scrollTo("end")
+            await twoFrames(lp)
+            const atEnd = [await around(ids[0] ?? ""), await around(tip0)]
+            check(
+              "the rail outlines what a column shows: its first message at its top, its end at its end",
+              atTop[0] === true &&
+                atTop[1] === false &&
+                atEnd[0] === false &&
+                atEnd[1] === true,
+              `at the top: first ${atTop[0]}, end ${atTop[1]}; at the end: first ${atEnd[0]}, end ${atEnd[1]}`,
+            )
+
+            // The rail, shorter than its tree, keeps the outline in view.
+            const short = await lp.addStyleTag({
+              content: ".rail { max-height: 72px }",
+            })
+            const railAt = () =>
+              lp.evaluate(key => {
+                const rail = document.querySelector(".rail")
+                const o = document.querySelector(
+                  `.rail-view[data-key="${key}"]`,
+                )
+                if (rail === null || o === null) return null
+                const r = rail.getBoundingClientRect()
+                const b = o.getBoundingClientRect()
+                return {
+                  scrollTop: rail.scrollTop,
+                  scrolls: rail.scrollHeight > rail.clientHeight,
+                  inView: b.bottom > r.top && b.top < r.bottom,
+                }
+              }, key0)
+            await scrollTo("top")
+            await twoFrames(lp)
+            await scrollTo("end")
+            await twoFrames(lp)
+            const followed = await railAt()
+            check(
+              "the rail scrolls to keep a column's outline in view",
+              followed?.scrolls === true &&
+                followed.scrollTop > 0 &&
+                followed.inView,
+              JSON.stringify(followed),
+            )
+            // Under the pointer, the rail is the reader's: it holds still.
+            const rail = await lp.$(".rail")
+            const box = await rail?.boundingBox()
+            if (box !== undefined && box !== null)
+              await lp.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+            await scrollTo("top")
+            await twoFrames(lp)
+            const held = await railAt()
+            check(
+              "the rail holds still while the pointer is over it",
+              followed !== null &&
+                held !== null &&
+                held.scrollTop === followed.scrollTop &&
+                !held.inView,
+              `${JSON.stringify(held)} after ${JSON.stringify(followed)}`,
+            )
+            await lp.mouse.move(600, 10)
+            await short.evaluate(n => n.parentNode?.removeChild(n))
+
+            // Left halfway up, and shown again: the same message at the same
+            // height.
+            await scrollTo("middle")
+            await twoFrames(lp)
+            const where = () =>
+              lp.$eval(
+                body0,
+                (b, keep) => {
+                  const top = b.getBoundingClientRect().top
+                  const msgs = [
+                    ...b.querySelectorAll<HTMLElement>(".msg[data-entry]"),
+                  ]
+                  const m =
+                    keep === null
+                      ? msgs.find(n => n.getBoundingClientRect().bottom > top)
+                      : msgs.find(n => n.dataset.entry === keep)
+                  return m === undefined
+                    ? null
+                    : {
+                        id: m.dataset.entry ?? "",
+                        offset: m.getBoundingClientRect().top - top,
+                        gap: b.scrollHeight - b.scrollTop - b.clientHeight,
+                      }
+                },
+                null as string | null,
+              )
+            const left = await where()
+            await lp.click("#tabs .tab-archive")
+            await lp.waitForSelector(
+              '#tabs .tab-archive[aria-selected="true"]',
+              {
+                timeout: 15_000,
+              },
+            )
+            await lp.click(tabSel(longRoot))
+            await lp.waitForSelector(`${col(0)} .msg`, { timeout: 15_000 })
+            await twoFrames(lp)
+            const back =
+              left === null
+                ? null
+                : await lp.$eval(
+                    body0,
+                    (b, id) => {
+                      const m = b.querySelector(`.msg[data-entry="${id}"]`)
+                      return m === null
+                        ? null
+                        : m.getBoundingClientRect().top -
+                            b.getBoundingClientRect().top
+                    },
+                    left.id,
+                  )
+            check(
+              "a column shown again is where its reader left it",
+              left !== null &&
+                left.gap > 100 &&
+                back !== null &&
+                Math.abs(back - left.offset) <= 2,
+              `left ${left?.id ?? "?"} at ${Math.round(left?.offset ?? 0)}px, ${Math.round(left?.gap ?? 0)}px above the end; back at ${back === null ? "?" : Math.round(back)}px`,
+            )
+          }
           // The Archive tab reports no thread: Lee leaves no presence behind.
           await lp.click("#tabs .tab-archive")
           await page

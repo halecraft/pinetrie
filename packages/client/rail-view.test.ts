@@ -1,7 +1,9 @@
 import { laneNameForThread } from "@pineta/core"
 import { expect, test } from "vitest"
 import {
+  type BandItem,
   pickAt,
+  railBands,
   railItems,
   railKeep,
   stretchFill,
@@ -61,5 +63,31 @@ test("railItems: a dot at a thread end holding your card carries your colour", (
   expect(marks).toEqual([
     { open: false, yours: "#f0f" },
     { open: true, yours: null },
+  ])
+})
+
+test("railBands: dots whole, a capsule cut where the view's edges are, one band per track", () => {
+  const itemOf = new Map<string, BandItem>()
+  const add = (item: BandItem) => {
+    for (const id of item.ids) itemOf.set(id, item)
+  }
+  add({ slot: 0, span: 1, track: 0, ids: ["r"] })
+  // Ten messages in a capsule three slots long.
+  const run = Array.from({ length: 10 }, (_, i) => `s${i}`)
+  add({ slot: 1, span: 3, track: 0, ids: run })
+  add({ slot: 4, span: 1, track: 0, ids: ["t"] })
+  add({ slot: 5, span: 1, track: 1, ids: ["b"] })
+  // From halfway into s2 to a quarter into s7: within the capsule alone.
+  expect(railBands(itemOf, run.slice(2, 8), 0.5, 0.25)).toEqual([
+    { track: 0, top: 0.5 + 0.3 * 2.5, bottom: 0.5 + 0.3 * 7.25 },
+  ])
+  // A dot is whole, wherever the edges are in it.
+  expect(railBands(itemOf, ["r"], 0.9, 0.1)).toEqual([
+    { track: 0, top: -0.5, bottom: 0.5 },
+  ])
+  // Onto a branch's track: a band of its own. An id the rail lacks is skipped.
+  expect(railBands(itemOf, ["s9", "t", "nope", "b"], 0, 1)).toEqual([
+    { track: 0, top: 0.5 + 0.3 * 9, bottom: 4.5 },
+    { track: 1, top: 4.5, bottom: 5.5 },
   ])
 })

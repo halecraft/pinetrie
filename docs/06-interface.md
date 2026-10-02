@@ -190,7 +190,11 @@ so it is the one behind the menu. What each does is under "Starting" below.
   branch is still in the rail. A root tab's only column has no close, since
   the tab would show that path again; a new tab's closes the new tab. The
   cards at a thread's end stay with the thread.
-- Each column's composer sits at its foot. The rail scrolls on its own.
+- Each column's composer sits at its foot. The rail scrolls on its own, and
+  follows the column you move (below).
+- **A column shown again is where you left it** (ADR-0058): the same message
+  at the same height, or its end if you were following it. If its thread
+  grew meanwhile, it comes back at its old end, with ↓ new below.
 - **Above the composer, a work strip says what became of the agent's files**
   (ADR-0040): an agent on its own copy shows its offer in plain words ("2
   files ready"), with **take** and its bookmark, which a press copies; one
@@ -288,6 +292,11 @@ the tree.
   is where it is read.
 - **Activity shows in the rail**: a pulsing dot where the agent is replying, a
   mark where a branch has messages you have not read.
+- **The rail outlines what each column shows** (ADR-0058): a rounded outline
+  in the column's colour around the dots in its view, cut where its view's
+  edges fall in a capsule. It moves as the column scrolls, and the rail
+  scrolls to keep the outline of the column you move in view, except while
+  your pointer is over the rail.
 
 The rail is E; the column is T. Seeing both at once is the product.
 

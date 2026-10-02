@@ -6,7 +6,8 @@ finished tool's output open). Implementation: `PLAN-2026-09-30-column-end`.
 Amended by ADR-0051: a row whose result has an image opens capped too, and
 draws the image in place of its text. Amended by ADR-0054: a row keeps what
 it decided across an unmount, and `data-revealed` marks a row the work
-opened. Evidence for that amendment: S67.
+opened. Evidence for that amendment: S67. Amended by ADR-0058: a column
+also keeps where it was left, by message, and comes back there.
 
 **Context.** ADR-0044 kept a following column from getting shorter while its
 agent works: a shrink is taken up by a floor below the content. But a tool's

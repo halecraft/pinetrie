@@ -58,8 +58,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new column is not aligned with its fork point",
     file: "packages/client/app.tsx",
-    from: "      alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)",
-    to: "      void i",
+    from: "        alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)",
+    to: "        void i",
     suite: "browser",
     scenario: "page",
     expect: "it opened with its first message level with the fork point",
@@ -67,8 +67,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the first column is placed after its branches are aligned",
     file: "packages/client/app.tsx",
-    from: "      alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)",
-    to: "      if (i > 0) alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)",
+    from: "      const spot = spotFor(spots.load(), ids)",
+    to: "      if (i === 0) continue\n      const spot = spotFor(spots.load(), ids)",
     suite: "browser",
     scenario: "page",
     expect:
@@ -410,10 +410,10 @@ export const mutations: readonly Mutation[] = [
       "a small scroll up holds the column still while the reply is written, and ↓ new below is the way back",
   },
   {
-    name: "alignment does not settle the follow",
+    name: "a placement on mounting does not settle the follow",
     file: "packages/client/app.tsx",
-    from: "  body.dispatchEvent(new Event(PLACED))\n",
-    to: "",
+    from: "const settle = (body: HTMLElement) => body.dispatchEvent(new Event(PLACED))",
+    to: "const settle = (body: HTMLElement) => void body",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1318,5 +1318,42 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect:
       "your queued card is drawn above the line, last in its queue, and another writer's edit to it shows",
+  },
+  {
+    name: "a column's outline does not move as the column scrolls",
+    file: "packages/client/use-viewport.ts",
+    from: '    el.addEventListener("scroll", schedule, { passive: true })',
+    to: "    void schedule",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the rail outlines what a column shows: its first message at its top, its end at its end",
+  },
+  {
+    name: "the rail does not follow a column's outline",
+    file: "packages/client/rail.tsx",
+    from: "    rail.scrollTop = to\n",
+    to: "    void to\n",
+    suite: "browser",
+    scenario: "page",
+    expect: "the rail scrolls to keep a column's outline in view",
+  },
+  {
+    name: "the rail follows a column's outline under the pointer",
+    file: "packages/client/rail.tsx",
+    from: "    const since = over.current ? 0 : performance.now() - reader.current",
+    to: "    const since = performance.now() - reader.current",
+    suite: "browser",
+    scenario: "page",
+    expect: "the rail holds still while the pointer is over it",
+  },
+  {
+    name: "a column leaving keeps no spot",
+    file: "packages/client/column.tsx",
+    from: "      p.spots?.save(\n",
+    to: "      p.spots?.load(\n",
+    suite: "browser",
+    scenario: "page",
+    expect: "a column shown again is where its reader left it",
   },
 ]

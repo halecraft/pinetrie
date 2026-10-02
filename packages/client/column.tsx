@@ -41,6 +41,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -88,6 +89,13 @@ import { useAskBar } from "./use-ask-bar.ts"
 import { PLACED, useFollow } from "./use-follow.ts"
 import { useSeenBy } from "./use-presence.ts"
 import { useStable } from "./use-stable.ts"
+import { useViewport } from "./use-viewport.ts"
+import {
+  keepSpot,
+  type SpotStore,
+  spotOf,
+  type ViewportStore,
+} from "./viewport.ts"
 
 export interface ColumnProps {
   session: SessionClient
@@ -163,6 +171,10 @@ export interface ColumnProps {
   digests: ReadonlyMap<string, DigestRecord>
   /** Where this device last left each thread (ADR-0056); none in a preview. */
   left?: DeviceState<Left>
+  /** Every mounted column's view, which the rail outlines (ADR-0058). */
+  viewports?: ViewportStore
+  /** Where columns were left, by message (ADR-0058). */
+  spots?: SpotStore
 }
 
 export function Column(p: ColumnProps) {
@@ -240,9 +252,17 @@ export function Column(p: ColumnProps) {
     document.addEventListener("visibilitychange", back)
     return () => document.removeEventListener("visibilitychange", back)
   }, [readLeft])
-  // Leaving, the column remembers its end, and a column bound to a lane at
-  // its end leaves the device a mark there: written only then, so watching
-  // writes nothing.
+  // Which of its messages are in view, for the rail, and for its spot.
+  const ids = useMemo(() => view.nodes.map(n => n.id), [view.nodes])
+  const span = useViewport(body, content, {
+    key: p.column.key,
+    track: p.track,
+    ids,
+    store: p.viewports,
+  })
+  // Leaving, the column remembers its end and its spot, and a column bound
+  // to a lane at its end leaves the device a mark there: written only then,
+  // so watching writes nothing.
   const leave = useStable(
     (left: {
       readonly unseen: boolean
@@ -256,6 +276,13 @@ export function Column(p: ColumnProps) {
       })
       if (left.following && leftLane !== null && view.tipId !== null)
         p.left?.save(new Map([[leftLane, view.tipId]]))
+      p.spots?.save(
+        keepSpot(
+          p.spots.load(),
+          ids,
+          spotOf(span.current, left.following, ids.at(-1)),
+        ),
+      )
     },
   )
   // While they do, the column does not get shorter at its end (S35).
