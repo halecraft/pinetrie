@@ -159,6 +159,26 @@ export const mutations: readonly Mutation[] = [
       "offerStart: the base's commit, and the history of each taken source",
   },
   {
+    name: "a source taken below the base still starts the offer",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: " ~ ::present(${input.base.source})) & description",
+    to: ") & description",
+    command: unit,
+    expect:
+      "an offer after a catch-up starts at the line it merged, not at what you took below it",
+  },
+  {
+    name: "a WIP lane holds its copy",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: " ~ ::present(${input.base.source})) & description",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: " ~ ::present(${input.base.start})) & description",
+    command: unit,
+    expect: "takenRevset: taken sources above the commit the base holds",
+  },
+  {
     name: "a take may move the line backwards",
     file: "packages/lanes/plan.ts",
     from: '      "move",\n      input.destination,',

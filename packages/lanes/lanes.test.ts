@@ -1140,6 +1140,46 @@ describe("a lane's repo, with jj", () => {
     expect(await commitsOf(ops, "divergent()")).toEqual([])
   }, 60_000)
 
+  test("an offer after a catch-up starts at the line it merged, not at what you took below it (S51 item 3, S81)", async () => {
+    const {
+      laneDir,
+      yoursDir,
+      yoursJj,
+      ops,
+      line,
+      edit,
+      offer,
+      take,
+      turn,
+      update,
+      lineNow,
+      base,
+    } = await turnRig("caught-up")
+    await take(await offer(base))
+    const t1 = await laneTipIn(ops, LANE)
+    if (t1 === null) throw new Error("no tip")
+    // You change the line you took, then the lane catches up with it: the
+    // merge conflicts, and the lane keeps your text.
+    await yoursJj(["new", line.onto])
+    await edit(yoursDir, "a.txt", "a, then yours\n")
+    await yoursJj(["commit", "-m", "yours: a.txt"])
+    await yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
+    await update({ "a.txt": "a, then yours\n" })
+    await edit(laneDir, "c.txt", "c\n")
+    await turn()
+    // The taken source is below the line the lane merged: the offer starts
+    // there alone, and holds only what came after.
+    const after = await offer([t1])
+    expect([after.conflicted, after.files]).toEqual([false, ["c.txt"]])
+    const tip = await laneTipIn(ops, LANE)
+    if (tip === null) throw new Error("no tip")
+    const b = await laneBase(ops, tip, line)
+    if (b === null) throw new Error("no base")
+    expect(await startOfOffer(ops, { tip, base: b, line })).toEqual([
+      await lineNow(),
+    ])
+  }, 60_000)
+
   test("a lane's ref deleted and imported: the history under the line is kept (S78)", async () => {
     const { yoursDir, yoursJj, ops, edit, offer, take, base } =
       await turnRig("refgone")

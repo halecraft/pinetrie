@@ -151,7 +151,7 @@ export function createOfferState(input: {
     const base = await laneBase(ops, tip, line)
     if (base === null) return null
     const state =
-      base.base.kind === "wip" && base.source !== null
+      base.base.kind === "wip"
         ? wipState(await wipFacts(ops, line, base.base.bookmark, base.source))
         : "ok"
     const target =

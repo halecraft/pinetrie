@@ -347,10 +347,21 @@ containers, disks and the helper.
   (`laneBase`); for a lane with none, from before the line, the newest line
   commit in the tip's history. The sources are the lane commits that taken
   offers' `Pineta-Source` trailers name, in `::<onto>` and in `::<wip>`
-  for a lane on a WIP (`takenSources`, `description(regex:…)`), each
-  `present()`: one never fetched here names nothing you have. A squash of
-  two taken offers keeps both trailer paragraphs, and `trailerValues` reads
-  every one; jj's `trailers` template reads only the last (S77 item 6).
+  for a lane on a WIP, minus `::present(<base source>)` (`takenRevset`,
+  read by `takenSources`), each `present()`: one never fetched here names
+  nothing you have. A squash of two taken offers keeps both trailer
+  paragraphs, and `trailerValues` reads every one; jj's `trailers` template
+  reads only the last (S77 item 6).
+- **A source taken below the base's source is not part of the start**
+  (S81). `LaneBase.source` is the commit of yours the lane merged whole:
+  the one its `Pineta-Base` names (the WIP's commit, never the copy, which
+  descends from no taken commit), else `start`. An offer keeps the diff from
+  its start's merge to the tip, so a start the target holds as another
+  commit is subtracted from the target. A taken commit and a later catch-up
+  are both heads, and their merge conflicts wherever the line changed the
+  taken lines since: an offer conflicted where its lane had nothing left to
+  resolve. `present()` around the base's source keeps a commit lost to
+  `jj util gc` from failing every refresh; it then excludes nothing.
 - **Every revision of an offer carries the host's trailers and its ledger**
   (`offerMessage`, marginalia): `Pineta-Thread`, `Pineta-Lane`,
   `Pineta-Entry`, then `Pineta-Source: <tip>` and `Pineta-Start`, in one
@@ -374,7 +385,8 @@ containers, disks and the helper.
 - **`startOfOffer` is the one path to a start.** The host's refresh, its
   `squash` and `refresh` actions and `stackSpan` all use it: a start from
   another rule would read as a moved start to `planRefresh`, and a split
-  would build on it.
+  would build on it. The exclusion above is inside it: sources read any
+  other way bring S81's conflicted start back.
 - **An offer follows its lane in place** (`planFollowOffer`, S49): `rebase -s`
   back onto the start, `restore --from <tip>`, `rebase -s` onto the target.
   Restoring where it sits would give it the tip's tree, dropping your work

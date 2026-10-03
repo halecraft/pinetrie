@@ -55,6 +55,7 @@ import {
   SPEC_LABEL,
   shellWord,
   specHashOf,
+  takenRevset,
   walkToHost,
   withoutPinetaHeads,
 } from "./index.ts"
@@ -533,6 +534,29 @@ describe("offers (ADR-0038)", () => {
         sources: [commitId("t1"), commitId("t2")],
       }),
     ).toBe("heads(::c1 & (c2 | ::(present(t1) | present(t2))))")
+  })
+  test("takenRevset: taken sources above the commit the base holds, never a WIP's copy (S81)", () => {
+    const taken = 'description(regex:"(?m)^Pineta-Source: ")'
+    expect(
+      takenRevset({
+        line: DEFAULT_LINE,
+        base: { base: { kind: "line" }, start: C1, source: C1 },
+      }),
+    ).toBe(`(::(present("pineta-onto")) ~ ::present(c1)) & ${taken}`)
+    // A WIP lane starts at its copy, which holds no taken commit: what it
+    // holds is the WIP's commit the copy was made from.
+    expect(
+      takenRevset({
+        line: DEFAULT_LINE,
+        base: {
+          base: { kind: "wip", bookmark: "wip/a" },
+          start: C1,
+          source: C2,
+        },
+      }),
+    ).toBe(
+      `(::(present("pineta-onto") | present("wip/a")) ~ ::present(c2)) & ${taken}`,
+    )
   })
   test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {
     const n = (i: number) => nonceRevset("N", i)

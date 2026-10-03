@@ -9,6 +9,9 @@ Amended by ADR-0061: the line is "the project" in every word the page
 shows, its bookmark in titles; and "update my files", a rebase of your
 work onto the line you ask for after a preview, is the one act that moves
 your `@`.
+Amended in place (S81, `PLAN-2026-10-02-offer-start-after-catch-up`): a
+source taken at or below the commit the lane's base names is superseded by
+it, so an offer after a catch-up starts there alone.
 
 **Context.**
 
@@ -187,7 +190,9 @@ is by commit id, which every rewrite of yours changes.
   Your own commits need nothing: they are found by ancestry. What a lane's
   offer starts from is then one revset over the repo: the lane's newest
   `Pineta-Base` commit, and the lane commits that `Pineta-Source` trailers
-  in `::<onto>` and `::<the WIP>` name. `pineta.have` records go. The
+  in `::<onto>` and `::<the WIP>` name, except those below the commit the
+  `Pineta-Base` names: the lane merged that commit, so it holds them
+  already (S81). `pineta.have` records go. The
   `pineta.offer` record becomes a cache for the page, rebuilt from the repo
   on every trigger; a lost write costs nothing.
 - **Authorship comes from jj's operation log.** Every host operation carries
@@ -230,10 +235,11 @@ work on the immutable line.
 - A thread has one base for its life, chosen once and rarely: the line by
   default. "Bring up to date" has one meaning, named on its button, and a
   WIP thread's header says which WIP.
-- Copies of your `@` in lanes go, and with them S51's newest-copy rule and
-  `pineta.have`. The one copy left is a WIP's, whose offer needs no record of
-  what you have: it is the lane's work since the copy. The start rules
-  shrink to ancestry plus trailers.
+- Copies of your `@` in lanes go, and with them `pineta.have`. S51's rule
+  stays, carried by the base instead of a copy: a catch-up merges a commit
+  that holds what was taken below it (S81). The one copy left is a WIP's,
+  whose offer needs no record of what you have: it is the lane's work since
+  the copy. The start rules shrink to ancestry plus trailers.
 - Trailers appear in taken commits' messages. Correctness is chosen over a
   quieter log. Stripping them by hand changes what Pineta believes, which is
   explicit intent.

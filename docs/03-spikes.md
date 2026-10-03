@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S81 — An offer conflicted where its lane had resolved a catch-up ✅ PASS
+
+`findings/S81-offer-start-after-a-catch-up.md`. A source taken, then
+changed on the line, then merged back by the lane's catch-up, was a second
+head of the offer's start; the offer's rebase subtracted it from a line that
+already held it. Taken sources are now read only above the commit the lane's
+`Pineta-Base` names, which holds them: S51 item 3, carried by the base where
+it was carried by a copy.
+
 ### S80 — "Update my files": which rebase, a preview, and conflicts ✅ PASS
 
 `findings/S80-update-my-files.md`. `jj rebase -b @ -d <onto>` moves your

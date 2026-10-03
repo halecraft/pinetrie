@@ -19,6 +19,7 @@ import {
   NO_EDITOR,
   type ProjectRecord,
   type SnapshotId,
+  type ThreadBase,
   type ThreadName,
   TRAILERS,
   WORKSPACE_ROOT,
@@ -399,6 +400,23 @@ export interface LineConfig {
 export const DEFAULT_LINE: LineConfig = {
   onto: "pineta-onto",
   wipPrefix: "wip/",
+}
+
+/** A lane's base, read from its history in your repo (`laneBase`, ADR-0060). */
+export interface LaneBase {
+  readonly base: ThreadBase
+  /**
+   * Where the lane's own work begins: the line commit its base names, or the
+   * WIP's copy; for a lane with no `Pineta-Base`, the newest line commit in
+   * its history.
+   */
+  readonly start: CommitId
+  /**
+   * The commit of yours the lane holds whole since its base: the one its
+   * `Pineta-Base` names (the WIP's, for a WIP, never the copy); for a lane
+   * with none, `start`.
+   */
+  readonly source: CommitId
 }
 
 /**
@@ -1120,10 +1138,11 @@ export const hostOp = (root: string, ...args: string[]): LaneStep =>
  * Where an offer starts, as a revset (ADR-0060): the newest ancestors of the
  * lane's tip you already have. That is the commit the lane's base names
  * (`start`: the line's commit, or the WIP's copy), and every lane commit a
- * taken offer's `Pineta-Source` names, with their history: a parent lane's
- * work taken after this lane forked, or a branch of this lane taken whole.
- * Each source is `present()`: one not fetched here names nothing you have.
- * Several heads start the offer from their merge.
+ * taken offer's `Pineta-Source` names above what the base holds
+ * (`takenRevset`), with their history: a parent lane's work taken after this
+ * lane forked, or a branch of this lane taken whole. Each source is
+ * `present()`: one not fetched here names nothing you have. Several heads
+ * start the offer from their merge.
  */
 export function offerStart(input: {
   readonly tip: CommitId
@@ -1133,6 +1152,27 @@ export function offerStart(input: {
   const sources = input.sources.map(c => `present(${c})`).join(" | ")
   const had = sources === "" ? input.start : `${input.start} | ::(${sources})`
   return `heads(::${input.tip} & (${had}))`
+}
+
+/**
+ * The commits whose `Pineta-Source` trailers `offerStart` reads: those in
+ * `::<onto>`, and in `::<wip>` for a lane on a WIP, but not in the history
+ * of the base's `source` (S81). The lane merged that commit, so it holds
+ * what was taken below it. An offer keeps the diff from the merge of its
+ * start to the tip, so a source the target holds as another commit would be
+ * subtracted from the target, and conflict where the line changed it since.
+ * The source is `present()`: a commit gone from your repo excludes nothing.
+ */
+export function takenRevset(input: {
+  readonly line: LineConfig
+  readonly base: LaneBase
+}): string {
+  const { base } = input.base
+  const heads = [
+    `present(${revsetName(input.line.onto)})`,
+    ...(base.kind === "wip" ? [`present(${revsetName(base.bookmark)})`] : []),
+  ].join(" | ")
+  return `(::(${heads}) ~ ::present(${input.base.source})) & description(regex:"(?m)^${TRAILERS.source}: ")`
 }
 
 /** One version of a commit in `jj evolog`: who made it, and from what. */

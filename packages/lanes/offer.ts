@@ -17,7 +17,6 @@ import {
   type OfferRevision,
   offerLedger,
   type RevisionFacts,
-  type ThreadBase,
   type ThreadName,
   TRAILERS,
   trailerValues,
@@ -26,12 +25,14 @@ import { newestBase } from "./merge.ts"
 import {
   EVOLOG_ENTRY,
   type EvologEntry,
+  type LaneBase,
   type LineConfig,
   laneTipName,
   offerBookmark,
   offerStart,
   parseEvolog,
   revsetName,
+  takenRevset,
   walkToHost,
 } from "./plan.ts"
 import { commitsOf } from "./revisions.ts"
@@ -52,23 +53,10 @@ export async function laneTipIn(
   return tip ?? null
 }
 
-/** A lane's base, read from its history in your repo (ADR-0060). */
-export interface LaneBase {
-  readonly base: ThreadBase
-  /**
-   * Where the lane's own work begins: the line commit its base names, or the
-   * WIP's copy; for a lane with no `Pineta-Base`, the newest line commit in
-   * its history.
-   */
-  readonly start: CommitId
-  /** The commit its `Pineta-Base` names (the WIP's, for a WIP); null with none. */
-  readonly source: CommitId | null
-}
-
 /**
  * A lane's base, from the newest `Pineta-Base` in the history of its tip in
- * your repo; a lane with none (one from before the line) is on the line.
- * Null when no line commit is in its history either.
+ * your repo; a lane with none (one from before the line) is on the line,
+ * from the newest line commit in its history. Null when there is none.
  */
 export async function laneBase(
   jj: Runner,
@@ -83,7 +71,7 @@ export async function laneBase(
     )
     return start === undefined
       ? null
-      : { base: { kind: "line" }, start, source: null }
+      : { base: { kind: "line" }, start, source: start }
   }
   return newest.bookmark === line.onto
     ? { base: { kind: "line" }, start: newest.commit, source: newest.commit }
@@ -96,24 +84,20 @@ export async function laneBase(
 
 /**
  * The lane commits taken offers name, from their `Pineta-Source` trailers in
- * `::onto`, and in `::<wip>` for a lane on a WIP: what you already have of
- * lanes. Read from every paragraph of each message (S77 item 6).
+ * `takenRevset`'s commits: what you have of lanes that the lane's base does
+ * not already hold. Read from every paragraph of each message (S77 item 6).
  */
 export async function takenSources(
   jj: Runner,
   line: LineConfig,
-  base: ThreadBase,
+  base: LaneBase,
 ): Promise<CommitId[]> {
-  const heads = [
-    `present(${revsetName(line.onto)})`,
-    ...(base.kind === "wip" ? [`present(${revsetName(base.bookmark)})`] : []),
-  ].join(" | ")
   const ran = await jj([
     "log",
     "--ignore-working-copy",
     "--no-graph",
     "-r",
-    `::(${heads}) & description(regex:"(?m)^${TRAILERS.source}: ")`,
+    takenRevset({ line, base }),
     "-T",
     'description ++ "\\n"',
   ])
@@ -123,8 +107,9 @@ export async function takenSources(
 
 /**
  * Where an offer starts, as commits: the lane's base and the taken offers'
- * sources (read), then `offerStart`'s revset (read). The host's every start
- * comes from here, so an offer is built, followed and split from one start.
+ * sources above what the base holds (read), then `offerStart`'s revset
+ * (read). The host's every start comes from here, so an offer is built,
+ * followed and split from one start.
  */
 export async function startOfOffer(
   jj: Runner,
@@ -134,7 +119,7 @@ export async function startOfOffer(
     readonly line: LineConfig
   },
 ): Promise<CommitId[]> {
-  const sources = await takenSources(jj, input.line, input.base.base)
+  const sources = await takenSources(jj, input.line, input.base)
   return commitsOf(
     jj,
     offerStart({ tip: input.tip, start: input.base.start, sources }),
