@@ -94,11 +94,21 @@ changes Pineta can keep this note true. You can skip them.
 
 ## The environment
 
-- Pineta's default image is Debian with Node 24, pnpm, git, jj, curl, and
-  Chromium's headless shell in `$PLAYWRIGHT_BROWSERS_PATH`. A project with
-  its own `pineta.Containerfile` runs that image instead, with only what it
-  installs. <!-- packages/lanes/image/Containerfile PLAYWRIGHT_BROWSERS_PATH -->
+- Pineta's default image is Debian with Node 24, pnpm, git, jj, curl,
+  python3, and Chromium's headless shell in `$PLAYWRIGHT_BROWSERS_PATH`. A
+  project with its own `pineta.Containerfile` runs that image instead, with
+  only what it installs. <!-- packages/lanes/image/Containerfile PLAYWRIGHT_BROWSERS_PATH -->
+  <!-- packages/lanes/image/Containerfile python3 -->
   <!-- packages/lanes/image.ts projectContainerfile -->
+- Whatever the image, `jj`, `rg`, `fd` and `sd` are in `/pineta-runtime/bin`,
+  last on your `PATH`: static builds Pineta brings, so an image's own
+  version of one comes first. <!-- packages/core/index.ts RUNTIME_PROGRAMS -->
+  <!-- packages/lanes/plan.ts RUNTIME_BIN -->
+- Besides `read`, `write`, `edit` and `bash`, you have `grep` and `find`
+  tools, which run that `rg` and `fd` in the lane. They skip what
+  `.gitignore` ignores, such as `node_modules` or a shared `.plans`, unless
+  you name that directory as their `path`. <!-- packages/pi/search.ts grepTool -->
+  <!-- packages/pi/search.ts findTool -->
 - A lane has 4 GiB of memory. <!-- apps/pineta/host/work/setup.ts LANE_MEMORY -->
 - There is no container runtime (`container`, `docker`) and no `gh`.
 - There is no model key: pi's `auth.json` is not in the lane.
@@ -123,10 +133,12 @@ changes Pineta can keep this note true. You can skip them.
   copy of the WIP it started from. A note tells you what changed. What they
   want done with it comes after, as their message.
   <!-- packages/lanes/merge.ts mergeBase -->
-- If the merge conflicts, a Pineta message asks you to resolve it. Only
-  then do you have `ask_for_guidance`: use it when the two sides meant
-  different things. <!-- packages/marginalia/land.ts LAND_TYPE -->
+- If the merge conflicts, a Pineta message asks you to resolve it. Then
+  use `ask_for_guidance` when the two sides meant different things. You
+  always have the tool, but outside such a resolution it only answers that
+  there is nothing to ask. <!-- packages/marginalia/land.ts LAND_TYPE -->
   <!-- packages/pi/lanes.ts GUIDANCE_TOOL -->
+  <!-- packages/pi/lanes.ts NOT_LANDING -->
 
 ## When the lane can't do something
 

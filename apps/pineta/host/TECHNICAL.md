@@ -335,7 +335,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 | module | owns |
 |---|---|
-| `setup.ts` | `Setup`: the project, lane configs and shared directories, the browser check, the images and runtime (`ready`), `specOf`, the granted host paths (read once, lazily: the agent exists only after lane work), and the base snapshot's refreshes |
+| `setup.ts` | `Setup`: the project, lane configs and shared directories, the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (read once, lazily: the agent exists only after lane work), and the base snapshot's refreshes |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
 | `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`), `beforeRun`, `runEnded` |
 | `fetch.ts` | a lane's history into your repo, each lane's fetches on a `Serial` of its own |

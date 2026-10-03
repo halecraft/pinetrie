@@ -17,7 +17,7 @@
  * The environment methods a lane forwards: those whose arguments and result
  * are data. `openTextLineReader` returns an object with methods, and
  * `cleanup` is the host's own, so neither crosses. pi's four tools use eight
- * of these (S43 item 1).
+ * of these (S43 item 1), and the search tools `exec` alone.
  */
 export const ENV_METHODS = [
   "absolutePath",

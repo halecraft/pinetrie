@@ -1039,7 +1039,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **A tool call is a row under the agent's message** (`ToolRow` in
   `message.tsx`): its label (`toolLabel`), ✓, ✗ or …, and its result folded in
   a `<details>`, cut at 20,000 characters for display. A label shows a command's first line, at
-  most 120 characters. A cut label is shown uncut in its place while the row
+  most 120 characters; a `grep` or `find` label shows its pattern and the
+  path it searches (`subjectOf`, core). A cut label is shown uncut in its place while the row
   is open (`.tool-label-whole`, from `wholeToolLabel`): CSS on `[open]`
   swaps the two, so the command is never drawn twice and no state is kept.
   The live row is the committed row, so a running command, once its row

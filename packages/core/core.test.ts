@@ -29,6 +29,7 @@ import {
   projectTranscript,
   rootIdFor,
   sameKey,
+  shellWord,
   THE_AGENT,
   TRAILERS,
   trailerValues,
@@ -70,6 +71,11 @@ describe("who a principal is (ADR-0037)", () => {
   test("an unnamed writer's label is the part before the @", () => {
     expect(emailLocalPart(writerId("ada.l@x.io"))).toBe("ada.l")
   })
+})
+
+test("shellWord: one word, whatever it holds", () => {
+  expect(shellWord("abc/d.e")).toBe("abc/d.e")
+  expect(shellWord('it\'s "x"')).toBe(`'it'\\''s "x"'`)
 })
 
 test("latestTip: the newest tip by id, independent of input order", () => {

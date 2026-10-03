@@ -79,8 +79,11 @@ export interface Setup {
   readonly root: string | null
   readonly paths: DiskPaths | null
   readonly lanes: PreparedLanes | null
-  /** Whether a lane's image has Pineta's browser (ADR-0041). */
-  readonly browser: boolean
+  /**
+   * Whether lanes run Pineta's default image, with its browser (ADR-0041) and
+   * python3 (ADR-0064): the project has no `pineta.Containerfile`.
+   */
+  readonly defaultImage: boolean
   /** The images, runtime and grants; null when lanes have no copies here. */
   readonly ready: Promise<Ready> | null
   /**
@@ -152,8 +155,8 @@ export async function startSetup(input: {
   const lanes =
     root === null ? null : await prepareLanes(root, input.userConfig, log)
   // Read at startup, as `prepareImages` reads it, so a lane's prompt says
-  // whether its image has a browser before the images are ready.
-  const browser =
+  // what its image has before the images are ready.
+  const defaultImage =
     root !== null &&
     (await stat(projectContainerfile(root)).then(
       () => false,
@@ -255,7 +258,7 @@ export async function startSetup(input: {
     root,
     paths,
     lanes,
-    browser,
+    defaultImage,
     ready,
     hostPaths,
     specOf,

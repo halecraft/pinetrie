@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S88 — rg, fd and sd for every lane, and how they behave as tools ✅ PASS
+
+`findings/S88-lane-search-programs.md`. Static musl builds of ripgrep
+15.2.0, fd 10.5.0 and sd 1.1.0 run on any Linux image; Debian's link glibc.
+rg exits 1 when nothing matches and fd exits 0 with no output; fd matches a
+glob against the basename unless `--full-path`; both skip gitignored paths
+unless the path is named. pi's `ensureTool` finds or downloads rg and fd for
+the host. Basis of ADR-0064.
+
 ### S83 — An update's sides in one `jj log`, and a fetch by id ✅ PASS
 
 `findings/S83-jj-update-reads.md`. `self.diff("<fileset>").files()` in a

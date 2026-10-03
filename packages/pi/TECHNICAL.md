@@ -42,6 +42,7 @@ interfaces, plus `appendToTree`, `writeValues`, `complete` and `stats`.
 |---|---|
 | `thread-lanes.ts` | each thread's pi lane, held, and its handle (`ThreadLanes`) |
 | `tools.ts` | the tools registered, and which a lane's runs may call (`activeToolNames`, `toolsChanged`) |
+| `search.ts` | the `grep` and `find` tools: rg and fd through the lane's `env` (ADR-0064) |
 | `lanes.ts` | where a lane's tools work (`toolContextOf`), and what it is told (`systemPromptFor`, `laneGuidelines`) |
 | `stream.ts` | pi's events as `StreamEvent`s (`streamEventOf`) |
 | `commands.ts` | the commands pi loaded, and a command's file as the model reads it (`CommandFiles`) |
@@ -50,7 +51,8 @@ interfaces, plus `appendToTree`, `writeValues`, `complete` and `stats`.
 
 The decisions in them are pure and tested without a harness:
 `activeToolNames`, `toolsChanged`, `toolContextOf`, `streamEventOf`,
-`expandCommand` and `skillOf`.
+`expandCommand`, `skillOf`, and the search tools' `grepArgs`, `findArgs`,
+`searchOutcome` and `searchText`.
 
 ## `storage.ts` — our implementation of pi's `Storage` port
 
@@ -266,7 +268,8 @@ the model was given.
 Loading runs every package's factory, so side effects happen (`pi-subagents`
 logs a warning). `pickModel` is the pure choice: an override's fields win over
 the settings' defaults. With tools (`CreateAgentOptions.tools`), pi-agent-core's
-`read`, `write`, `edit` and `bash` run in each lane's own directory (below).
+`read`, `write`, `edit` and `bash`, and Pineta's `grep` and `find`, run in
+each lane's own directory (below).
 Settings, context files and skills load from `tools.project`. The system prompt
 is pi's `buildSystemPrompt`, with the loader's context files (the repo's
 `AGENTS.md`) and skills: the section layout `pi-anthropic-auth` shapes. Its
@@ -288,15 +291,21 @@ item 18, and in `lanes.test.ts` against the harness.
 - **`LaneAccess`** is Pineta's type, so no pi type crosses the boundary. It
   is either `direct` (a directory on the host, and a promise its tools wait
   for) or `lane` (a lane of its own: its `LaneFacts`, the host paths of the
-  skills it can read, and a `gate()` that settles with its channel).
+  skills it can read, where the runtime's programs are, and a `gate()` that
+  settles with its channel).
   `LaneFacts` is everything the lane's prompt says about it: its directory,
   `/workspace`, its shared directories relative to it (ADR-0035), its offer's
-  bookmark, its grants, whether its image has a browser, Pineta's mount and
-  the note's path. The host builds every name in it: the rules for them are
+  bookmark, its grants, whether it runs the default image (`defaultImage`:
+  a browser and python3), Pineta's mount and the note's path. The host builds every name in it: the rules for them are
   in `@pineta/lanes`, which this package does not declare.
 - **The tool context** is one type, `ToolContext` in `lanes.ts`: `env`,
-  `dir`, and `lane`, which is null for a lane that works directly. pi builds
-  both the tools and the system prompt from it.
+  `programs`, `dir`, and `lane`, which is null for a lane that works
+  directly. pi builds both the tools and the system prompt from it.
+  `programs` says where the search tools find rg and fd, in `env`'s file
+  system: the runtime's `bin/` for a lane of its own (`LaneAccess.programs`,
+  from the host's `RUNTIME_BIN`), `hostProgram` for one that works
+  directly. A tool never runs a bare program name, so no lane runs whatever
+  its `PATH` happens to hold.
 - **A lane working directly** gets pi's `NodeExecutionEnv` in its directory
   (`directEnv`). Every method first awaits `ready`, and `shellEnv` sets
   `JJ_EDITOR`, `VISUAL` and `EDITOR` to `false`.
@@ -305,7 +314,8 @@ item 18, and in `lanes.test.ts` against the harness.
   - The helper (`lane-helper.ts`) serves pi's own `NodeExecutionEnv` in the
     container, so pi's tools run there unchanged. They use 8 of its methods:
     `absolutePath`, `canonicalPath`, `exists`, `fileInfo`, `readTextFile`,
-    `readBinaryFile`, `writeFile`, `exec` (S43 item 1).
+    `readBinaryFile`, `writeFile`, `exec` (S43 item 1). The search tools use
+    `exec` alone.
   - The context's abort sends `{ abort }`.
   - `exec`'s `onUpdate` receives each update.
   - Methods whose results are not data are refused with `not_supported`, not
@@ -336,7 +346,7 @@ item 18, and in `lanes.test.ts` against the harness.
 - **The system prompt** names the lane's directory. For a lane of its own it
   adds a block of guidelines, `laneGuidelines(facts)` in `lanes.ts`
   (ADR-0046): what holds in every lane, filled in with the lane's own
-  values, in about 230 tokens. The model is sent the conversation as stored:
+  values, in about 260 tokens. The model is sent the conversation as stored:
   nothing is rewritten.
   - **Guidelines, not a section of its own.** pi joins its sections into one
     string, and a provider may rebuild that string by its tags:
@@ -402,6 +412,42 @@ item 18, and in `lanes.test.ts` against the harness.
   `Agent.skill(name)` reads the file at call time, without its frontmatter,
   and hashes it. The scripted and named model choices load no resources, so
   it falls back to the file in `skills/`.
+
+### The search tools (`search.ts`, ADR-0064, S88)
+
+- **Why not pi's.** pi-coding-agent's `grep` and `find` spawn rg and fd on
+  the host (`child_process`) and read files back with `node:fs`, so in a lane
+  of its own they would search the Mac. Ours run one `env.exec`, which goes
+  through the lane's channel like `bash`.
+- **pi's rule goes with them.** pi adds "Use bash for file operations like
+  ls, rg, find" when `selectedTools` names `bash` and none of `grep`, `find`,
+  `ls`. Both tools are in `assembleTools`'s `files`, which is
+  `selectedTools`, so the rule is gone for every lane.
+- **One call:** look up the program (`ToolContext.programs`), plan the
+  arguments (`grepArgs`, `findArgs`) and one command (`shellCommand`, from
+  core's `shellWord`), run it, read the run (`searchOutcome`), word it
+  (`searchText`). No pipe: it would hide rg's exit status, and `pipefail` is
+  not in every image's `sh`.
+- **Exit codes differ.** rg exits 1 when nothing matches; fd exits 0 with no
+  output. Anything else is a failure, thrown with what the program printed,
+  which is stdout and stderr mixed, as `exec` gives them.
+- **`limit` counts lines**, through the capture: `retain: "head"` keeps the
+  first `limit` lines and rg runs to its end. grep's `limit` includes context
+  lines, unlike pi's, which counts matches. find asks fd for `limit + 1`
+  results, so a cut capture means there were more.
+- **Gitignored paths are skipped**, a shared `.plans` included, unless named
+  as `path`. With no `path`, neither program is given one, so paths print
+  without a leading `./`.
+- **On the host,** `hostProgram` asks pi's `ensureTool`: the program in pi's
+  bin directory, else on `PATH` (fd also as `fdfind`), else downloaded into
+  that directory, unless `PI_OFFLINE` is set. A found path is remembered
+  (`rememberedProgram`), since pi's lookup runs `spawnSync` on every call; a
+  miss is asked again. No suite calls it: a direct lane in a suite scripts no
+  search.
+- **The tests** cover the plans and words purely (`search.test.ts`), and a
+  stand-in rg run through the real helper (`lanes.test.ts`), which shows the
+  head capture and the absolute path crossing the channel. The real programs
+  run in `e2e:lanes`' `images` scenario, on Alpine.
 
 ### Commands: your skills and prompts (`commands.ts`, ADR-0036)
 
@@ -525,7 +571,8 @@ a counter.
 Reaches pi entry points that are absent from its `exports` map, by relative path
 into `node_modules`: `createAgentHarness`, `addUsage`/`emptyUsage`,
 `ModelRuntime`, and, for the person's pi setup, `SettingsManager`,
-`DefaultResourceLoader` and `buildSystemPrompt`. For commands:
+`DefaultResourceLoader` and `buildSystemPrompt`. For the search tools in a
+lane that works directly: `ensureTool`. For commands:
 `loadSkillsFromDir`, `loadPromptTemplates`, `substituteArgs`
 and `parseCommandArgs`. For images (ADR-0042):
 `detectSupportedImageMimeType`, `resizeImage` and `formatDimensionNote`. Those paths are depth-sensitive: they broke when this

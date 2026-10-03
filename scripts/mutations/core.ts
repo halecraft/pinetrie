@@ -573,4 +573,22 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "never a last word",
   },
+  {
+    name: "a shell word keeps its quotes unescaped",
+    file: core,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  /^[A-Za-z0-9_./:=@+-]+$/.test(s) ? s : `'${s.replaceAll(\"'\", `'\\\\''`)}'`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "  /^[A-Za-z0-9_./:=@+-]+$/.test(s) ? s : `'${s}'`",
+    command: unit,
+    expect: "shellWord: one word, whatever it holds",
+  },
+  {
+    name: "grep and find rows show no pattern",
+    file: "packages/core/tools.ts",
+    from: '    ["grep", searched],\n    ["find", searched],\n',
+    to: "",
+    command: unit,
+    expect: "toolLabel names what the call touches",
+  },
 ]

@@ -148,23 +148,33 @@ containers, disks and the helper.
   `/pineta-runtime/node/ld-linux-aarch64.so.1 --library-path … node …`. The
   runtime is copied out of Pineta's default image into
   `.pineta/runtime/<image tag>/`: Node, the libraries `ldd` lists for it,
-  glibc's loader, and a static jj. So the helper runs on any image, musl or
-  glibc, with or without Node (S44). Only `bin/` (jj) goes on a lane's
-  `PATH`, after the image's own; Pineta's Node needs its loader.
+  glibc's loader, and in `bin/` static builds of core's `RUNTIME_PROGRAMS`
+  (jj, rg, fd, sd). So the helper runs on any image, musl or glibc, with or
+  without Node (S44), and every lane has those programs (ADR-0064). Only
+  `bin/` (`RUNTIME_BIN`) goes on a lane's `PATH`, after the image's own;
+  Pineta's Node needs its loader.
+- **The runtime's programs are static release builds**, pinned by `ARG`
+  defaults in the default Containerfile (S88). Debian's rg and fd link glibc,
+  and would not run on a musl image. `EXTRACT` copies each program in the
+  list and fails naming one the image lacks, so the host stops at startup.
+  `ensureRuntime` keeps a runtime only when its `bin/` holds every program
+  (`runtimeComplete`), not only jj. sd 1.1.0 reports itself as 1.0.0.
 - **A project image must still supply** a POSIX `sh` (pi's `bash` falls back
   to `sh -c`) and git 2.41 or later. Git launches its own helper programs, so
   it cannot be carried in from outside the image. `checkImage` refuses an
   image without them, naming what it lacks.
-- **Pineta's default image carries Chromium's headless shell** and its
-  libraries, in `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright` (ADR-0041). Its
+- **Pineta's default image carries python3**, and **Chromium's headless
+  shell** and its libraries, in `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`
+  (ADR-0041). Its
   build is pinned by `PLAYWRIGHT_VERSION`: `prepareImages` takes it from the
   host, which resolves the app's `@playwright/test`, so a Playwright upgrade
   builds the image again. The image's `ENV` reaches an agent's commands, so
   `chromium.launch()` finds the browser with nothing set. A project image
-  gets no such argument and no browser.
-- **Whether a lane has the browser is known at startup**, before the images
-  are built: the project has no `projectContainerfile(root)`. The host reads
-  it once, as `prepareImages` does, and tells each lane's agent (ADR-0046).
+  gets no such argument, no browser and no python3 unless it installs them.
+- **Whether a lane runs the default image is known at startup**, before the
+  images are built: the project has no `projectContainerfile(root)`. The
+  host reads it once, as `prepareImages` does, and tells each lane's agent
+  (`defaultImage`, ADR-0046): the browser and python3.
 
 ## Containers
 
@@ -469,6 +479,8 @@ containers, disks and the helper.
 - **`plan.test.ts`**: the planners, and `walkToHost` over parsed evologs.
 - **`lane.test.ts`**: the queue, and that each file a lane is pointed at
   inside Pineta's mount (`HELPER`, `LANE_NOTE`) exists in the install.
+- **`runtime.test.ts`**: `runtimeComplete`, and that `EXTRACT` copies every
+  program in `RUNTIME_PROGRAMS`.
 - **`lanes.test.ts`**: the executor, and a lane's whole life against jj and
   git, in throwaway repos on the host, with no container. It covers the base,
   a turn, a bundle fetch into your repo as a remote bookmark, an update with a
@@ -488,8 +500,10 @@ containers, disks and the helper.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
   with a repo in a fork's `/tmp` for the config's scope, an agent's own
   `jj commit` reaching its offer and a branch, and the contract
-  test. The `main` section alone takes about 2.5 minutes on the Mac. Its `images` section also launches Chromium,
-  through Pineta's Playwright, on the default image. Its `commands` section
+  test. The `main` section alone takes about 2.5 minutes on the Mac. Its `images` section also runs
+  the runtime's rg, fd and sd and the `grep` and `find` tools on Alpine, and
+  launches Chromium, through Pineta's Playwright, and python3 on the default
+  image. Its `commands` section
   reads skill files at `/mnt/host`, and checks what a real lane's prompt
   tells it about itself and that the note it names is there (ADR-0046). It
   has five scenarios (`apps/pineta/e2e/lanes/`), `main`, `images`,
@@ -501,7 +515,8 @@ containers, disks and the helper.
   its check is in, and stops at that check. Each on `plan.ts` proves a fact
   about a real lane that a unit test cannot: the journal, `sync`, a
   read-only mount, a shared mount seen both ways, the git ignore variables,
-  jj's config scope, an agent's own commit, the image's browser.
+  jj's config scope, an agent's own commit, the image's browser and python3,
+  the runtime's rg.
   `planContainer`'s and `planStartFrom`'s rules are unit mutations. These
   are all that `e2e:lanes` proves by mutation: the host's lane work and offers
   are proven by unit tests (`apps/pineta/host/TECHNICAL.md`).

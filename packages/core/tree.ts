@@ -113,7 +113,7 @@ export interface ToolCallView {
   readonly label: string
   /** `label` uncut, when it is cut (`wholeToolLabel`). */
   readonly wholeLabel?: string
-  /** What it touched, whole: a path or a command (`subjectOf`). */
+  /** What it touched, whole: a path, a command, or a search's pattern and path (`subjectOf`). */
   readonly subject?: string
   /** Its result, when the result is on the same path. */
   readonly result?: ToolResultView

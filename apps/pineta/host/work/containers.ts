@@ -12,6 +12,7 @@ import {
   planDisk,
   planStart,
   planStartFrom,
+  RUNTIME_BIN,
   removeContainer,
   snapshotExists,
   specHashOf,
@@ -142,11 +143,12 @@ export function createContainers(deps: {
             env: grants.env,
             mounts: grants.mounts.map(m => m.target),
           },
-          browser: setup.browser,
+          defaultImage: setup.defaultImage,
           install: PINETA_MOUNT,
           note: LANE_NOTE,
         },
         hostPaths: setup.hostPaths(),
+        programs: RUNTIME_BIN,
         gate: async () => {
           await handle.queue.idle()
           return (await handle.link()).channel

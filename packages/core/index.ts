@@ -709,6 +709,18 @@ export const WORKSPACE_ROOT = "/workspace"
 export const HOST_WORKING_COPY = "/mnt/host-working-copy"
 
 /**
+ * The programs the lane runtime carries into every lane of its own, on its
+ * `PATH` whatever the image (ADR-0064). Each must be a static build in
+ * Pineta's default image, which the runtime is copied out of.
+ */
+export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd"] as const
+export type RuntimeProgram = (typeof RUNTIME_PROGRAMS)[number]
+
+/** `s` as one POSIX shell word. */
+export const shellWord = (s: string): string =>
+  /^[A-Za-z0-9_./:=@+-]+$/.test(s) ? s : `'${s.replaceAll("'", `'\\''`)}'`
+
+/**
  * Where every lane of its own sees host paths it is granted: `HOST_MOUNT` and
  * then the host path (ADR-0036). One rule, so no granted path can shadow a
  * directory of the image's.

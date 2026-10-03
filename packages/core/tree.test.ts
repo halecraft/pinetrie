@@ -814,6 +814,11 @@ describe("toolLabel and tailEdit", () => {
       "bash pnpm test",
     )
     expect(toolLabel("mystery", { x: 1 })).toBe("mystery")
+    expect(toolLabel("constructor", { path: "a" })).toBe("constructor")
+    expect(toolLabel("grep", { pattern: "TODO", path: "src" })).toBe(
+      "grep TODO src",
+    )
+    expect(toolLabel("find", { pattern: "*.ts" })).toBe("find *.ts")
   })
 
   test("wholeToolLabel is the label uncut, and nothing when it is not cut", () => {

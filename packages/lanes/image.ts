@@ -19,7 +19,8 @@ const DEFAULT_CONTAINERFILE = path.join(
 )
 /**
  * A project's own image, when this file exists: its lanes then run it instead
- * of Pineta's default image, which carries the browser (ADR-0041).
+ * of Pineta's default image, which carries the browser (ADR-0041) and
+ * python3 (ADR-0064).
  */
 export const projectContainerfile = (root: string): string =>
   path.join(root, "pineta.Containerfile")

@@ -3,6 +3,9 @@
 **Status:** Accepted. Implementation: `PLAN-2026-09-30-lane-orientation`.
 Amends ADR-0034 (what a lane's prompt says; the port proxy it describes is
 not built).
+**Amended by ADR-0064:** every lane of its own is also told to search with
+the `grep` and `find` tools and that rg, fd and sd are on `PATH`; the
+browser fact is `defaultImage`, and its line names python3 too.
 
 **Context.** An agent in a lane of its own (ADR-0034) was told two things: its
 copy is at `/workspace`, and your working copy is at `/mnt/host-working-copy`,

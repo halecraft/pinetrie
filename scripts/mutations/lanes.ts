@@ -665,4 +665,31 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "an update in jj, end to end",
   },
+  {
+    name: "a runtime with jj alone is taken as complete",
+    file: "packages/lanes/runtime.ts",
+    from: "  RUNTIME_PROGRAMS.every(p => binEntries.includes(p))",
+    to: '  binEntries.includes("jj")',
+    command: unit,
+    expect: "runtimeComplete: every program, not only jj",
+  },
+  {
+    name: "the lane runtime leaves rg behind",
+    file: "packages/core/index.ts",
+    from: 'export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd"] as const',
+    to: 'export const RUNTIME_PROGRAMS = ["jj", "fd", "sd"] as const',
+    suite: "lanes",
+    scenario: "images",
+    expect:
+      "on Alpine, Pineta's rg, fd and sd run, and grep and find find the files",
+  },
+  {
+    name: "the default image has no python3",
+    file: "packages/lanes/image/Containerfile",
+    from: "curl procps python3 \\",
+    to: "curl procps \\",
+    suite: "lanes",
+    scenario: "images",
+    expect: "the default image has python3",
+  },
 ]

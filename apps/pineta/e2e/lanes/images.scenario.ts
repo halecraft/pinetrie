@@ -1,5 +1,5 @@
 // e2e/lanes/images — project images with no Node, and with no git, and the
-// default image's browser.
+// default image's browser and python3.
 
 import { ROOT } from "@pineta/core"
 import { PINETA_MOUNT } from "@pineta/lanes"
@@ -14,9 +14,10 @@ export const scenario: Scenario = {
   run: ({ check }) => imagesSection(check),
 }
 
-// ── 9. Any image with sh and git: Pineta brings Node and jj ──────────────
-// Alpine has musl and no Node; the helper runs on the lane runtime's Node,
-// through its own loader. An image with no git cannot host a lane.
+// ── 9. Any image with sh and git: Pineta brings Node and its programs ────
+// Alpine has musl, no Node and no rg, fd or sd; the helper runs on the lane
+// runtime's Node, through its own loader, and the search tools on the
+// runtime's static rg and fd. An image with no git cannot host a lane.
 
 async function imagesSection(check: Checks["check"]): Promise<void> {
   const alpine = await imageHost(
@@ -33,11 +34,17 @@ async function imagesSection(check: Checks["check"]): Promise<void> {
           edits: [{ oldText: "made", newText: "edited" }],
         },
       },
+      { tool: "write", args: { path: "sub/deep/x.txt", content: "deep\n" } },
+      {
+        tool: "grep",
+        args: { pattern: "secret", glob: "*.txt", context: 1 },
+      },
+      { tool: "find", args: { pattern: "sub/**/*.txt" } },
       {
         tool: "bash",
         args: {
           command:
-            "cat made.txt; command -v node || echo no node; ls /lib/ld-musl* >/dev/null && echo musl",
+            "rg --version | head -1; fd --version; sd --version; cat made.txt; command -v node || echo no node; ls /lib/ld-musl* >/dev/null && echo musl",
         },
       },
       { text: "done" },
@@ -51,6 +58,13 @@ async function imagesSection(check: Checks["check"]): Promise<void> {
         ran.at(-1)?.includes("no node") === true &&
         ran.at(-1)?.includes("musl") === true,
       `${JSON.stringify(ran.at(-1))}`,
+    )
+    check(
+      "on Alpine, Pineta's rg, fd and sd run, and grep and find find the files",
+      ran.some(r => r.startsWith("notes.txt:1:the secret word")) &&
+        ran.some(r => r.trim() === "sub/deep/x.txt") &&
+        /ripgrep \d[\s\S]*fd \d[\s\S]*sd \d/.test(ran.at(-1) ?? ""),
+      `${JSON.stringify(ran.slice(-3))}`.slice(0, 200),
     )
     const recorded = [...rootRecordsOf(alpine.host, readRevisions).values()]
     check(
@@ -86,6 +100,7 @@ async function imagesSection(check: Checks["check"]): Promise<void> {
   })
   try {
     pineta.script.use([
+      { tool: "bash", args: { command: `python3 -c 'print("PY" + "THON")'` } },
       {
         tool: "bash",
         args: {
@@ -99,6 +114,11 @@ async function imagesSection(check: Checks["check"]): Promise<void> {
     check(
       "on the default image, Pineta's Playwright launches Chromium",
       launched.includes("LAUNCHED"),
+      `${launched.slice(0, 90)}`,
+    )
+    check(
+      "the default image has python3",
+      launched.includes("PYTHON"),
       `${launched.slice(0, 90)}`,
     )
   } finally {

@@ -2,6 +2,7 @@ import {
   BASE_SNAPSHOT,
   commitId,
   laneNameForThread,
+  shellWord,
   snapshotId,
   type ThreadName,
 } from "@pineta/core"
@@ -54,7 +55,6 @@ import {
   planTakeOffer,
   planTurnCommit,
   SPEC_LABEL,
-  shellWord,
   specHashOf,
   takenRevset,
   walkToHost,
@@ -711,11 +711,6 @@ test("fetchById: skipped when every commit is on the disk, else onto branches", 
   expect(step.argv[2]).toBe(
     `{ git cat-file -e c1^{commit} && git cat-file -e c2^{commit}; } 2>/dev/null || { git fetch -q /mnt/host-working-copy +c1:${FETCHED_REF}/0 +c2:${FETCHED_REF}/1 && jj --ignore-working-copy git import --quiet; }`,
   )
-})
-
-test("shellWord: one word, whatever it holds", () => {
-  expect(shellWord("abc/d.e")).toBe("abc/d.e")
-  expect(shellWord('it\'s "x"')).toBe(`'it'\\''s "x"'`)
 })
 
 const argvs = (steps: readonly LaneStep[]) =>

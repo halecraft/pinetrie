@@ -11,6 +11,8 @@ revisions, its fork-point rule, landing, working directly, and your working
 copy being yours.
 **Amended by ADR-0060:** the base snapshot is the integration line's
 commit, and work reaches your repo by a forward bookmark move.
+**Amended by ADR-0064:** the lane runtime carries rg, fd and sd beside
+jj, and the agent's `grep` and `find` tools run them.
 
 **Context.** ADR-0032 gave each lane a jj workspace on the host and made a
 branch's inherited history read as if it had always worked there, by

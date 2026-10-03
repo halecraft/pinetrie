@@ -12,12 +12,16 @@ import type { BannerAnswer, BannerAsk } from "@pineta/marginalia"
 import { BANNER_TOOL, bannerTool } from "./banner.ts"
 import { readImageProcessor } from "./images.ts"
 import { GUIDANCE_TOOL, guidanceTool, type LaneHooks } from "./lanes.ts"
+import { findTool, grepTool } from "./search.ts"
 
 /**
- * Every tool the harness registers, and the names of pi-agent-core's file
- * tools among them. Each lane uses the file tools in its own directory
- * (`toolContextOf`, in `lanes.ts`). `read` fits an image and stores it
- * before pi writes the result, so the session keeps a reference (ADR-0051).
+ * Every tool the harness registers, and the names of the file tools among
+ * them: pi-agent-core's `read`, `write`, `edit` and `bash`, and our `grep` and
+ * `find` (ADR-0064). Each lane uses the file tools in its own directory
+ * (`toolContextOf`, in `lanes.ts`). They are also pi's `selectedTools`, and
+ * naming `grep` or `find` there drops pi's rule to search with bash. `read`
+ * fits an image and stores it before pi writes the result, so the session
+ * keeps a reference (ADR-0051).
  */
 export function assembleTools(input: {
   readonly hooks: LaneHooks
@@ -36,6 +40,8 @@ export function assembleTools(input: {
     createWriteTool(),
     createEditTool(),
     createBashTool(),
+    grepTool(),
+    findTool(),
   ]
   return {
     registered: [

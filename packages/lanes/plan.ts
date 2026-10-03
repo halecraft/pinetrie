@@ -21,6 +21,7 @@ import {
   NO_EDITOR,
   type ProjectRecord,
   type SnapshotId,
+  shellWord,
   type ThreadName,
   TRAILERS,
   WORKSPACE_ROOT,
@@ -28,8 +29,13 @@ import {
 
 /** Pineta's own install, read-only: the helper's code and pi's. */
 export const PINETA_MOUNT = "/pineta"
-/** Pineta's lane runtime, read-only: Node and its libraries, and jj (S44). */
+/**
+ * Pineta's lane runtime, read-only: Node and its libraries (S44), and in
+ * `bin/` the static programs core's `RUNTIME_PROGRAMS` lists.
+ */
 export const RUNTIME_MOUNT = "/pineta-runtime"
+/** The runtime's programs, as a lane sees them: on its `PATH`, last. */
+export const RUNTIME_BIN = `${RUNTIME_MOUNT}/bin`
 /** The lane's own jj config, on its disk so that forks inherit it (S42 item 4). */
 export const LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pineta-lane`
 export const LANE_JJ_CONFIG = `${LANE_CONFIG_DIR}/jj.toml`
@@ -297,9 +303,9 @@ function runArgs(
     ...setEnv("GIT_CONFIG_KEY_0", "core.excludesFile"),
     ...setEnv("GIT_CONFIG_VALUE_0", `${IGNORE_MOUNT}/${IGNORE_FILE}`),
     ...Object.entries(NO_EDITOR).flatMap(([k, v]) => setEnv(k, v)),
-    // Last, so the image's own programs win: the runtime brings jj for an
-    // image that has none, and never Node.
-    ...setEnv("PATH", `${spec.imagePath}:${RUNTIME_MOUNT}/bin`),
+    // Last, so the image's own programs win: the runtime brings its
+    // programs for an image that has none, and never Node.
+    ...setEnv("PATH", `${spec.imagePath}:${RUNTIME_BIN}`),
     "-w",
     WORKSPACE_ROOT,
     spec.image,
@@ -739,10 +745,6 @@ export type LaneStep =
       readonly stdoutTo?: string
     }
   | { readonly in: "host"; readonly argv: readonly string[] }
-
-/** `s` as one POSIX shell word. */
-export const shellWord = (s: string): string =>
-  /^[A-Za-z0-9_./:=@+-]+$/.test(s) ? s : `'${s.replaceAll("'", `'\\''`)}'`
 
 const inLane = (...argv: string[]): LaneStep => ({ in: "lane", argv })
 const onHost = (...argv: string[]): LaneStep => ({ in: "host", argv })

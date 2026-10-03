@@ -20,11 +20,13 @@ import {
   hostPathInLane,
   type LaneName,
   NO_EDITOR,
+  type RuntimeProgram,
 } from "@pineta/core"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
-import { buildSystemPrompt } from "./deep.ts"
+import { buildSystemPrompt, ensureTool } from "./deep.ts"
 import { type LaneChannel, laneEnv } from "./lane-env.ts"
+import { FIND_TOOL, GREP_TOOL } from "./search.ts"
 
 /** How a lane's tools reach its files, as the host resolves it. */
 export type LaneAccess =
@@ -47,6 +49,8 @@ export type LaneAccess =
        * (ADR-0036): the roots of the skills this lane can read.
        */
       readonly hostPaths: readonly string[]
+      /** Where the lane runtime's programs are in the lane (`RUNTIME_BIN`). */
+      readonly programs: string
       readonly gate: () => Promise<LaneChannel>
     }
 
@@ -73,13 +77,31 @@ export interface LaneFacts {
     /** Where each granted read-only mount is, in the lane. */
     readonly mounts: readonly string[]
   }
-  /** The image carries Chromium's headless shell: Pineta's default image does (ADR-0041). */
-  readonly browser: boolean
+  /**
+   * The lane runs Pineta's default image, which carries Chromium's headless
+   * shell (ADR-0041) and python3 (ADR-0064). A project's own image may carry
+   * neither.
+   */
+  readonly defaultImage: boolean
   /** Pineta's install, mounted read-only in the lane. */
   readonly install: string
   /** The lane note's path in the lane. */
   readonly note: string
 }
+
+/**
+ * What each program the runtime carries for `bash` is preferred over. Keyed
+ * by `RuntimeProgram`, so a program added to the runtime fails to type-check
+ * until it says what it replaces.
+ */
+const PREFERRED_OVER: Readonly<Record<Exclude<RuntimeProgram, "jj">, string>> =
+  { rg: "grep", fd: "find", sd: "sed" }
+
+/** `a`, `a and b`, `a, b and c`. */
+const listed = (words: readonly string[]): string =>
+  words.length < 2
+    ? (words[0] ?? "")
+    : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`
 
 /**
  * The block a lane of its own is told, one guideline per line (ADR-0046).
@@ -107,8 +129,11 @@ export function laneGuidelines(facts: LaneFacts): string[] {
         `${dir}/${p} is shared live with the person and other threads, never committed.`,
     ),
     `No container runtime, model keys or credentials${allowed.length === 0 ? "" : ` except ${allowed.join(", ")}`}. The internet works; the person's localhost does not.`,
-    ...(facts.browser
-      ? ["Chromium's headless shell is installed ($PLAYWRIGHT_BROWSERS_PATH)."]
+    `Search with the ${GREP_TOOL} and ${FIND_TOOL} tools. In bash, ${listed(Object.keys(PREFERRED_OVER))} are on PATH: prefer them to ${listed(Object.values(PREFERRED_OVER))}.`,
+    ...(facts.defaultImage
+      ? [
+          "Chromium's headless shell is installed ($PLAYWRIGHT_BROWSERS_PATH), and so is python3.",
+        ]
       : []),
     `More about the lane, when you need it: ${facts.note}`,
   ]
@@ -164,6 +189,8 @@ export function directEnv(dir: string, ready: Promise<void>): NodeExecutionEnv {
  */
 export interface ToolContext {
   readonly env: ExecutionEnv
+  /** Where a search tool finds the program it runs, in `env`'s file system. */
+  readonly programs: ProgramPath
   readonly dir: string
   readonly lane: {
     readonly facts: LaneFacts
@@ -171,17 +198,56 @@ export interface ToolContext {
   } | null
 }
 
+/** A program the search tools run: one the lane runtime carries. */
+export type SearchProgram = Extract<RuntimeProgram, "rg" | "fd">
+
+/**
+ * Where `program` is in the file system the tools run in: a path, or a name
+ * the shell finds on `PATH`. Null when the host has none and could not fetch
+ * it.
+ */
+export type ProgramPath = (program: SearchProgram) => Promise<string | null>
+
+/**
+ * `lookup`, remembered per program once it finds one. A null is asked again
+ * on the next call, so a download that failed can succeed later.
+ */
+export function rememberedProgram(
+  lookup: (program: SearchProgram) => Promise<string | null>,
+): ProgramPath {
+  const found = new Map<SearchProgram, string>()
+  return async program => {
+    const known = found.get(program)
+    if (known !== undefined) return known
+    const path = await lookup(program)
+    if (path !== null) found.set(program, path)
+    return path
+  }
+}
+
+/**
+ * The host's own rg and fd, for a lane that works directly: in pi's bin
+ * directory, else on `PATH`, else downloaded into that directory by pi
+ * (`PI_OFFLINE` stops that). Remembered, since pi's lookup runs `spawnSync <program> --version`
+ * on every call and blocks the host's event loop meanwhile.
+ */
+export const hostProgram: ProgramPath = rememberedProgram(
+  async program => (await ensureTool(program)) ?? null,
+)
+
 /** Where a lane's tools work, and what its prompt says about it. */
 export function toolContextOf(access: LaneAccess): ToolContext {
   if (access.kind === "direct")
     return {
       env: directEnv(access.dir, access.ready),
+      programs: hostProgram,
       dir: access.dir,
       lane: null,
     }
-  const { facts, hostPaths } = access
+  const { facts, hostPaths, programs } = access
   return {
     env: laneEnv(facts.dir, access.gate),
+    programs: async program => `${programs}/${program}`,
     dir: facts.dir,
     lane: { facts, hostPaths },
   }

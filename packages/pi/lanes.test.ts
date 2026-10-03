@@ -28,19 +28,23 @@ import {
   laneContext,
   laneGuidelines,
   NOT_LANDING,
+  rememberedProgram,
+  type SearchProgram,
+  systemPromptFor,
   toolContextOf,
 } from "./lanes.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
+import { assembleTools } from "./tools.ts"
 
 // ── what a lane of its own is told (ADR-0046) ────────────────────────────
 
-/** A lane's facts with nothing granted, no shared directory and no browser. */
+/** A lane's facts with nothing granted, no shared directory, on a project's own image. */
 const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   dir: "/workspace",
   shared: [],
   grants: { ssh: false, env: [], mounts: [] },
-  browser: false,
+  defaultImage: false,
   install: "/pineta",
   note: "/pineta/packages/pi/lane.md",
   ...over,
@@ -60,12 +64,59 @@ test("toolContextOf: a direct lane is no lane; a lane of its own carries its fac
     kind: "lane",
     facts: facts(),
     hostPaths: ["/skills"],
+    programs: "/pineta-runtime/bin",
     gate: () => new Promise(() => {}),
   })
   expect({ dir: own.dir, lane: own.lane }).toEqual({
     dir: "/workspace",
     lane: { facts: facts(), hostPaths: ["/skills"] },
   })
+})
+
+test("toolContextOf: a lane of its own runs the runtime's programs by path", async () => {
+  const own = toolContextOf({
+    kind: "lane",
+    facts: facts(),
+    hostPaths: [],
+    programs: "/pineta-runtime/bin",
+    gate: () => new Promise(() => {}),
+  })
+  expect(await own.programs("rg")).toBe("/pineta-runtime/bin/rg")
+  expect(await own.programs("fd")).toBe("/pineta-runtime/bin/fd")
+})
+
+test("rememberedProgram: a found path is asked once; a null is asked again", async () => {
+  const asked: SearchProgram[] = []
+  const answers: (string | null)[] = [null, "/bin/rg"]
+  const programs = rememberedProgram(async program => {
+    asked.push(program)
+    const next = answers.shift()
+    if (next === undefined) throw new Error("asked a third time")
+    return next
+  })
+  expect(await programs("rg")).toBe(null)
+  expect(await programs("rg")).toBe("/bin/rg")
+  expect(await programs("rg")).toBe("/bin/rg")
+  expect(asked).toEqual(["rg", "rg"])
+})
+
+test("the prompt no longer tells the model to search with bash", () => {
+  const { files } = assembleTools({
+    hooks: { turnDone: async () => {}, askedForGuidance: () => false },
+    blobs: undefined,
+    bannerAsks: undefined,
+  })
+  const prompt = systemPromptFor(
+    { contextFiles: [], skills: [] },
+    files,
+  )(toolContextOf({ kind: "direct", dir: "/repo", ready: Promise.resolve() }))
+  expect(prompt).not.toContain("file operations like ls, rg, find")
+  // pi's rule as it is without our tools, so the check above can fail.
+  const without = systemPromptFor({ contextFiles: [], skills: [] }, [
+    "read",
+    "bash",
+  ])(toolContextOf({ kind: "direct", dir: "/repo", ready: Promise.resolve() }))
+  expect(without).toContain("file operations like ls, rg, find")
 })
 
 describe("ask_for_guidance", () => {
@@ -133,11 +184,19 @@ describe("laneGuidelines", () => {
     ).toContain("or credentials except $CI. ")
   })
 
-  test("names the browser only on an image that has one", () => {
+  test("names the browser and python3 only on the default image", () => {
     expect(text(facts())).not.toContain("Chromium")
-    expect(text(facts({ browser: true }))).toContain(
-      "Chromium's headless shell is installed",
-    )
+    expect(text(facts())).not.toContain("python3")
+    const told = text(facts({ defaultImage: true }))
+    expect(told).toContain("Chromium's headless shell is installed")
+    expect(told).toContain("and so is python3")
+  })
+
+  test("names the runtime's programs for bash, on any image", () => {
+    for (const told of [text(facts()), text(facts({ defaultImage: true }))])
+      expect(told).toContain(
+        "Search with the grep and find tools. In bash, rg, fd and sd are on PATH: prefer them to grep, find and sed.",
+      )
   })
 
   test("every source lane.md names is a file that still has its symbol", () => {
@@ -159,7 +218,7 @@ describe("laneGuidelines", () => {
     const lines = laneGuidelines(
       facts({
         shared: [".plans", "notes"],
-        browser: true,
+        defaultImage: true,
         grants: { ssh: true, env: ["A"], mounts: ["/m"] },
       }),
     )
@@ -310,6 +369,7 @@ describe("lanes in a harness", () => {
       kind: "lane",
       facts: facts({ dir, shared: [".plans"] }),
       hostPaths: [],
+      programs: path.join(dir, "bin"),
       gate: async () => channel,
     })
     script.use([
@@ -333,6 +393,48 @@ describe("lanes in a harness", () => {
       expect(rules).toContain(`- ${line}`)
     expect(rules).toContain(`${dir}/.plans is shared live with the person`)
     expect(rules).toContain("when you need it: /pineta/packages/pi/lane.md")
+    channel.close()
+    await channel.closed
+    await agent.close()
+  })
+
+  test("grep runs the lane's own rg by path, through its helper, keeping the first lines", async () => {
+    const dir = path.join(root, "search")
+    const { chmod, mkdir } = await import("node:fs/promises")
+    await mkdir(path.join(dir, "bin"), { recursive: true })
+    // A stand-in rg: its arguments, then 299 matches, 300 lines in all.
+    await writeFile(
+      path.join(dir, "bin", "rg"),
+      '#!/bin/sh\necho "args $*"\ni=1; while [ $i -lt 300 ]; do echo "f.txt:$i: hit"; i=$((i+1)); done\n',
+    )
+    await chmod(path.join(dir, "bin", "rg"), 0o755)
+    const channel: LaneChannel = openChannel([
+      "env",
+      `PINETA_WORKSPACE_ROOT=${dir}`,
+      process.execPath,
+      path.join(import.meta.dirname, "lane-helper.ts"),
+    ])
+    const { agent, script, newLane, texts } = await setUp(new Map())
+    const lane = await newLane({
+      kind: "lane",
+      facts: facts({ dir }),
+      hostPaths: [],
+      programs: path.join(dir, "bin"),
+      gate: async () => channel,
+    })
+    script.use([
+      { tool: "grep", args: { pattern: "it's", glob: "*.txt" } },
+      { text: "done" },
+    ])
+    await agent.lane(lane).run(prompt("search"))
+    const found =
+      texts()
+        .map(t => messageText(t.message as never))
+        .find(t => t.startsWith("args ")) ?? ""
+    expect(found).toContain("-g *.txt -- it's")
+    expect(found).toContain("f.txt:199: hit")
+    expect(found).not.toContain("f.txt:200: hit")
+    expect(found).toContain("[limit of 200 lines reached")
     channel.close()
     await channel.closed
     await agent.close()
