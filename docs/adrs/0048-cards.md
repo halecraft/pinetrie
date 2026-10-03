@@ -11,7 +11,8 @@ ADR-0024 (no `editing` presence); its second part, queued cards and the
 take/unqueue race, implemented by `PLAN-2026-10-01-queued-cards`: it
 supersedes ADR-0026 (queued notes become queued cards), with ADR-0055, and
 amends ADR-0020 (nothing waits in `pineta.outbox`, which is gone). Probe 2
-is answered by S69, and probes 1 and 4, for the inventory, by S75 and S76. A later step would amend ADR-0046 (a fixed line about
+is answered by S69, probes 1 and 4, for the inventory, by S75 and S76,
+and probe 5 by S92. A later step would amend ADR-0046 (a fixed line about
 pinned cards in the prompt). Amended in place (2026-10-02): a queued card is
 *unqueued*, not stopped; "stop" is a run's word (ADR-0056). Amended in
 place (2026-10-02, with Duane): the drawer is the *inventory*, a floating
@@ -465,7 +466,9 @@ for the drafting card; S69 answered 2, and 1 for a queue's order (a field
 on each card, not a list per thread); S75 and S76 answered 1, and 4 for
 moves (a place does not merge: a place in a session is the host's, moved
 by handoffs it applies or refuses, and your inventory is a document only
-your tabs write; a new ADR will say so); 5 waits for step 5:
+your tabs write; a new ADR will say so); S92 answered 5 (the cards entry
+goes in with the prompt, `prompt([cards, message])`, and the system prompt
+and pi's system messages both lose the cache on an edit):
 1. **Places as a CRDT:** a movable tree (Loro) or a place field per card. Two
    people move one card at once, and a card moves while being typed in.
    Which converges to something a person would accept?
