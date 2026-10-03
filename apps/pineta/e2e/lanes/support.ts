@@ -20,19 +20,18 @@ import {
   ROOT,
 } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
-import {
-  readLaneRecords,
-  readLanes,
-  readPlaces,
-  readTreeIndex,
-} from "@pineta/reads"
-import { readEntries, rowMessage } from "@pineta/schema"
+import { readLaneRecords, readPlaces } from "@pineta/reads"
+import { rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import {
   committedProject,
+  entriesOf,
   idleNow,
   join,
+  lanesOf,
+  rootAt,
   setUpLine,
+  treeOf,
   waitFor,
 } from "../harness.ts"
 
@@ -60,7 +59,12 @@ export function bringUpToDate(
       id,
       owner: session.writer,
       placer: session.writer,
-      place: { kind: "drafting", at: where, lane },
+      place: {
+        kind: "drafting",
+        root: rootAt(session, where),
+        at: where,
+        lane,
+      },
       command: "bring-up-to-date",
       unsent: null,
     },
@@ -175,28 +179,28 @@ export async function sectionHost(input: {
     `u${Math.random().toString(36).slice(2, 10)}`,
     `section-${process.pid}`,
   )
-  await setUpLine(host.doc, user)
+  await setUpLine(host.session, user)
   const idle = async () => {
     await waitFor(() => idleNow(host), 300_000)
     await host.quiet()
   }
   /** The lane whose thread holds the message with `text`. */
   const laneWith = (text: string) => {
-    const index = readTreeIndex(host.doc)
+    const index = treeOf(host)
     const id =
       Object.values(index.entries).find(
         e => projectTranscript(index, e.id).at(-1)?.text === text,
       )?.id ?? null
-    return readLanes(host.doc, index, readPlaces(host.places)).find(
+    return lanesOf(host, index, readPlaces(host.places)).find(
       l => id !== null && ancestry(index, l.tip).path.includes(id),
     )
   }
   /** Every tool result's text in the thread holding `text`, oldest first. */
   const results = async (text: string) => {
     await idle()
-    const index = readTreeIndex(host.doc)
+    const index = treeOf(host)
     const onPath = new Set(ancestry(index, laneWith(text)?.tip ?? null).path)
-    return Object.values(readEntries(host.doc))
+    return Object.values(entriesOf(host))
       .filter(r => onPath.has(entryId(r.id)))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
       .map(r => rowMessage(r) as { role?: string })
@@ -207,7 +211,7 @@ export async function sectionHost(input: {
     await user.close().catch(() => {})
     await host.shutdown().catch(() => {})
     // Kept for a restart: the lanes' containers too, as a host leaves them.
-    if (!keep) cleanUp(host.doc, dir)
+    if (!keep) cleanUp(host.session, dir)
   }
   return { dir, script, host, user, idle, laneWith, results, close }
 }

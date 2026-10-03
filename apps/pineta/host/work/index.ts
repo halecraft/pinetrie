@@ -75,12 +75,12 @@ export async function startLaneWork(input: {
   readonly lineCommands: boolean
 }): Promise<LaneWork> {
   const { basics } = input
-  const { doc } = basics
+  const { session } = basics
   /** Work nobody awaits, until it settles: what `quiet` waits for. */
   const serial = createSerial()
   const setup = await startSetup({ ...input, basics, serial })
   const { root, paths } = setup
-  const registry = createRegistry({ doc, root })
+  const registry = createRegistry({ session, root })
   /** Each lane's offer in your repo (ADR-0038); none without lanes of their own. */
   const offers: Offers | null =
     root === null
@@ -91,7 +91,7 @@ export async function startLaneWork(input: {
           lineCommands: input.lineCommands,
           basics,
           agent: input.agent,
-          running: lane => readRunning(doc, lane),
+          running: lane => readRunning(basics.live, lane),
           taken: () => setup.refreshBaseSoon(),
         })
   const containers = createContainers({

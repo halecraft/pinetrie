@@ -26,8 +26,9 @@ const MarkSchema = Type.Object({
 })
 
 /** Each entry's mark, at the entry's id. */
-export const MARK: RecordSpec<MarkRecord, EntryId> = {
+export const MARK: RecordSpec<MarkRecord, EntryId, "root"> = {
   namespace: "pineta.mark",
+  home: "root",
   keyOf: r => r.entry,
   encode: ({ entry, ...contents }) => contents,
   decode: (contents, key) =>

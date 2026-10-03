@@ -46,7 +46,13 @@ const prune = (
   l: Layout,
   archive: ReadonlyMap<EntryId, ArchiveRecord> = new Map(),
   i = index,
-) => layoutReducer(l, { kind: "prune", index: i, archive })
+) =>
+  layoutReducer(l, {
+    kind: "prune",
+    index: i,
+    archive,
+    known: new Set(i.roots),
+  })
 const R2: ActiveTab = { kind: "root", root: entryId("5-r2") }
 const forget = (l: Layout, archive: ReadonlyMap<EntryId, ArchiveRecord>) =>
   resolve(l, index, archive)

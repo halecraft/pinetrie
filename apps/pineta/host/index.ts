@@ -26,23 +26,32 @@ import { Control } from "@pineta/protocol/line"
 import {
   CONTROL_TOPIC,
   HOST_PRINCIPAL,
+  LIVE_DOC_ID,
   PLACES_DOC_ID,
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
 import { writersPolicy } from "@pineta/protocol/writers"
-import { readRunning } from "@pineta/reads"
 import {
+  readArchive,
+  readRoots,
+  readRunning,
+  readThreadName,
+} from "@pineta/reads"
+import {
+  asSessionDoc,
   cardDocId,
   InventoryDoc,
+  LiveDoc,
+  type LiveDocHandle,
   PlacesDoc,
   type PlacesDocHandle,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
   presenceDoc,
-  SessionDoc,
   type SessionDocHandle,
+  StorageDoc,
   TextDoc,
 } from "@pineta/schema"
 import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
@@ -53,8 +62,10 @@ import { startCards } from "./cards.ts"
 import { createCommands } from "./commands/index.ts"
 import { startControl } from "./control.ts"
 import { createDigests } from "./digests.ts"
+import { createDirectory, type Directory } from "./directory.ts"
+import { type HostDocuments, hostDocuments, planLoads } from "./docs.ts"
 import { hotReload as pauseHotReload } from "./hot-reload.ts"
-import { compactSession, sweepBlobs } from "./housekeeping.ts"
+import { compactAfter, sweepBlobs } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { lineDocPrefix } from "./lines.ts"
 import { createNames } from "./names.ts"
@@ -138,7 +149,12 @@ export interface RunningHost {
   readonly port: number
   readonly httpUrl: string
   readonly wsUrl: string
-  readonly doc: SessionDocHandle
+  /** The session's records, as the host holds them: for the suites to read. */
+  readonly session: SessionDocHandle
+  /** Every document, each root's among them (`docs.ts`): for the suites. */
+  readonly docs: HostDocuments
+  /** What is streaming now, as the host holds it: for the suites to read. */
+  readonly live: LiveDocHandle
   readonly presence: PresenceDocHandle
   /**
    * Where every card is, as the host holds it (ADR-0059): for the suites to
@@ -208,11 +224,13 @@ export async function startHost({
     // ADR-0059): without this, a document the host never opened itself would
     // be neither stored nor relayed (S58). The host never writes an inventory.
     resolve: docId => {
-      switch (resolveDoc(docId)) {
+      switch (resolveDoc(docId, root => readRoots(session).has(root))) {
         case "text":
           return Interpret(TextDoc)
         case "inventory":
           return Interpret(InventoryDoc)
+        case "root":
+          return Interpret(StorageDoc)
         case "reject":
           return Reject()
         case undefined:
@@ -221,8 +239,12 @@ export async function startHost({
     },
   })
 
-  // The session document is BOTH pi's storage and the thing we replicate.
-  const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
+  // The session's records, the directory of roots among them (ADR-0063).
+  // Each root's document is opened through `docs`, below.
+  const session = asSessionDoc(exchange.get(SESSION_DOC_ID, StorageDoc))
+  // The host is every document's authority: no peer is upstream of it. So
+  // Kyneta loads a root it let go again when a client asks for it (S86).
+  exchange.register({ name: "pineta.authority", authority: "self" })
   // Clients may write presence and cards' texts (host/policy.ts); only the
   // host the session and the places, and only its person an inventory
   // (`writersPolicy`, registered on every client too).
@@ -232,17 +254,40 @@ export async function startHost({
   const presence = exchange.get(PRESENCE_DOC_ID, presenceDoc(presenceDecay))
   // Where every card is, which only the host writes (ADR-0059).
   const places: PlacesDocHandle = exchange.get(PLACES_DOC_ID, PlacesDoc)
+  // What is streaming now (ADR-0063), which only the host writes.
+  const live: LiveDocHandle = exchange.get(LIVE_DOC_ID, LiveDoc)
   // A stored session loads asynchronously; pi must see it before it starts.
   // Only storage is awaited: the host is the authority, with no peer upstream.
-  await whenHydrated(doc)
+  await whenHydrated(session)
   await whenHydrated(places)
-  const basics: Basics = { doc, places, log, newId, now: Date.now }
+  await whenHydrated(live)
+  // Each root's document as it is first opened is followed by the directory,
+  // made below with the serial executor; this is the one late read of it.
+  let directory: Directory | undefined
+  // The agent, made below, holds a harness over each root it has used.
+  let created: Agent | undefined
+  const docs = hostDocuments({
+    exchange,
+    session,
+    live,
+    places,
+    opened: (root, doc) => directory?.watch(root, doc),
+    releasing: async root => created?.release(root),
+  })
+  const basics: Basics = {
+    session,
+    live,
+    docs,
+    places,
+    log,
+    newId,
+    now: Date.now,
+  }
 
   // --- where lanes work (ADR-0032, ADR-0034) --------------------------------
   // Lane work is made before the agent, which is made with lane work's
   // `access` and `hooks`, so lane work reads the agent lazily. This is the
   // one lazy read: every module made after the agent is given the agent.
-  let created: Agent | undefined
   const theAgent = (): Agent => {
     if (created === undefined) throw new Error("the agent is not created yet")
     return created
@@ -254,6 +299,11 @@ export async function startHost({
     .then(t => JSON.parse(t) as unknown)
     .catch(() => null)
   const serial = createSerial(failed(basics, "step"))
+  directory = createDirectory({ basics, serial, agent: theAgent })
+  // The roots that are not archived, opened before anything reads one: every
+  // lane that could be running is in one of them (`planLoads`).
+  const roots = planLoads(readRoots(session), readArchive(session))
+  for (const root of roots) await docs.root(root)
   // Each thread's column banner, when the user config turns banners on. Made
   // before the agent, whose `set_banner` asks it, so it reads the agent
   // lazily, as lane work does.
@@ -292,7 +342,7 @@ export async function startHost({
   // --- pi stack ------------------------------------------------------------
   const commandRenames = decodeCommandRenames(userJson)
   const agent = await createAgent({
-    doc,
+    documents: docs,
     replicaId: newId(),
     model,
     commandRenames,
@@ -310,11 +360,17 @@ export async function startHost({
               // when due.
               turnDone: async (lane, tip) => {
                 await work.hooks.turnDone(lane, tip)
-                void digests?.step(tip, digestFailed(lane))
+                const root = docs.rootOfLane(lane)
+                if (root !== null)
+                  void digests?.step(root, tip, digestFailed(lane))
               },
             },
           },
     onStream: streamInto(basics),
+    onPrefixChange: lane =>
+      log(
+        `[host] ${readThreadName(session, lane)}: the model's prompt or tools changed`,
+      ),
     ...(bannerConfig === null || banners === null
       ? {}
       : { banners: { config: bannerConfig, request: banners.request } }),
@@ -330,10 +386,14 @@ export async function startHost({
   )
 
   // --- the shell -----------------------------------------------------------
-  const hotReload = pauseHotReload({ doc, project: () => work.project })
+  const hotReload = pauseHotReload({
+    session,
+    live,
+    project: () => work.project,
+  })
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
-  const cardPort = startCards({ exchange, store, doc })
+  const cardPort = startCards({ exchange, store, session })
   const runs = createRuns({ basics, agent, work })
   const commands = createCommands({
     basics,
@@ -371,7 +431,9 @@ export async function startHost({
     basics,
     serial,
     drain,
-    compact: () => compactSession(exchange),
+    rootOf: docs.rootOfLane,
+    compact: roots => compactAfter(exchange, roots),
+    beforeCompact: () => directory?.flush() ?? Promise.resolve(),
     sweep: () =>
       sweepBlobs({ basics, blobs, grace: blobGraceMs, texts: cardPort.texts }),
   })
@@ -383,7 +445,9 @@ export async function startHost({
     hotReload.runEnded()
     void settle([lane])
     banners?.due(lane).catch(failed(basics, "banner"))
-    if (prompt !== null) void digests?.ended(prompt, digestFailed(lane))
+    const root = docs.rootOfLane(lane)
+    if (prompt !== null && root !== null)
+      void digests?.ended(root, prompt, digestFailed(lane))
   })
   // A card queued on a lane that is not running is taken at once (ADR-0059):
   // the move that queued it asks for a drain. A lane's drain is queued once
@@ -391,7 +455,7 @@ export async function startHost({
   // what that one missed.
   const draining = new Set<LaneName>()
   const queueDrain = (lane: LaneName) => {
-    if (draining.has(lane) || readRunning(doc, lane)) return
+    if (draining.has(lane) || readRunning(live, lane)) return
     draining.add(lane)
     void serial.run(async () => {
       draining.delete(lane)
@@ -412,6 +476,7 @@ export async function startHost({
 
   await recover({
     basics,
+    roots,
     agent,
     work,
     serial,
@@ -444,7 +509,9 @@ export async function startHost({
     port: server.port,
     httpUrl: server.httpUrl,
     wsUrl: server.wsUrl,
-    doc,
+    session,
+    docs,
+    live,
     presence,
     places,
     cardText: (id: CardId) => exchange.get(cardDocId(id), TextDoc).text(),

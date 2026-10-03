@@ -1,20 +1,19 @@
 import { laneNameForThread } from "@pineta/core"
 import type { Agent } from "@pineta/pi"
-import { writeLaneTip } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { applyWrites, basics, record, writesOf } from "./fakes.ts"
+import { applyWrites, basics, putLane, record, writesOf } from "./fakes.ts"
 import { createNames } from "./names.ts"
 
 test("two ensures called together write each lane's name once, and no two lanes get one name", async () => {
   const b = basics()
   const lanes = [laneNameForThread("a"), laneNameForThread("b")]
-  for (const lane of lanes) writeLaneTip(b.doc, lane, null)
+  for (const lane of lanes) putLane(b, lane)
   const agent = record<Pick<Agent, "writeValues">>({
     // Written a moment later, as the agent's storage does: a second plan made
     // meanwhile would not see it.
     writeValues: async writes => {
       await new Promise(done => setTimeout(done, 5))
-      applyWrites(b.doc, writes)
+      applyWrites(b, writes)
     },
   })
   const named: string[] = []
@@ -37,11 +36,11 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
   const b = basics()
   const lane = laneNameForThread("a")
   const reserved = laneNameForThread("r")
-  writeLaneTip(b.doc, lane, null)
+  putLane(b, lane)
   const agent = record<Pick<Agent, "writeValues">>({
     writeValues: async writes => {
       await new Promise(done => setTimeout(done, 5))
-      applyWrites(b.doc, writes)
+      applyWrites(b, writes)
     },
   })
   const named: string[] = []
@@ -65,6 +64,6 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
   expect(named.sort()).toEqual([lane, reserved].sort())
   // A lane pi holds, not yet named, is no thread to come.
   const other = laneNameForThread("b")
-  writeLaneTip(b.doc, other, null)
+  putLane(b, other)
   expect(await names.reserve(other)).toBe("held")
 })

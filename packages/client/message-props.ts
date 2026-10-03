@@ -2,7 +2,7 @@
 // props is compared: `React.memo`'s rule for `Message` (`sameProps`), kept pure.
 
 import type { BranchSummary, SpineNode, WriterId } from "@pineta/core"
-import type { SessionDocHandle } from "@pineta/schema"
+import type { LiveDocHandle } from "@pineta/schema"
 import type { LaneJoin } from "./column-view.ts"
 import type { MessageAct, MessageTools } from "./message-tools.ts"
 import { type PropRule, sameProps } from "./same-props.ts"
@@ -18,7 +18,7 @@ export interface MessageProps {
    */
   streams: Readonly<Record<string, string>>
   /** Where a running call's output is read. */
-  doc: SessionDocHandle
+  live: LiveDocHandle
   /** Each tool row's state, by call id, across unmounts. */
   rows: ScreenMemory<RowMemory>
   /** Current display names, by writer. */
@@ -44,7 +44,7 @@ export interface MessageProps {
 const MESSAGE_PROPS = {
   node: "value",
   streams: "value",
-  doc: "identity",
+  live: "identity",
   rows: "identity",
   tools: "value",
   join: "value",

@@ -1,13 +1,17 @@
-// core/roots — each root's tree, as the tabs, the header and the Archive tab
-// see it (ADR-0029, ADR-0030). Pure.
+// core/roots — each root's tree, summarized (ADR-0029, ADR-0030). Pure. The
+// host writes a root's summary into its directory record (`readRootRecord`
+// in @pineta/reads), which the tabs, the header and the Archive tab read
+// (ADR-0063).
 //
 // A root is found by walking up (`rootOf`), and a thread started at the root
 // is rooted at its first message (S30), so a root's id is its tab's key.
 
 import type { EntryId, WriterId } from "./index.ts"
 import {
+  firstLine,
   isBusy,
   type LaneView,
+  messageText,
   projectRail,
   rootOf,
   type TreeIndex,
@@ -79,3 +83,12 @@ export function idTime(id: string): number | null {
   const m = UUIDV7.exec(id)
   return m === null ? null : Number.parseInt(`${m[1]}${m[2]}`, 16)
 }
+
+/** A root whose first message has no text, or no message yet, is called this. */
+export const NO_TEXT = "(no text)"
+
+/** A root's first message's first line: its label while it has no title. */
+export const firstLineOf = (index: TreeIndex, first: EntryId | null): string =>
+  (first === null
+    ? ""
+    : firstLine(messageText(index.entries[first]?.message), 40)) || NO_TEXT

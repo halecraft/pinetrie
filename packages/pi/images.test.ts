@@ -13,10 +13,11 @@ import {
   writerId,
 } from "@pineta/core"
 import { encodeChat } from "@pineta/marginalia"
-import { newSessionDoc } from "@pineta/schema"
+import { newRootDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"
 import { prepareImage, readImageProcessor, sha256Of } from "./images.ts"
+import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
 
 /** A 40×30 red PNG, 98 bytes. */
@@ -107,11 +108,11 @@ test("SVG, BMP and text are not images; a truncated PNG is unreadable", async ()
 })
 
 test("the model reads a chat's text, then its image's bytes, from the store", async () => {
-  const doc = newSessionDoc()
+  const doc = newRootDoc()
   const script = scriptedModel()
   const sha = createHash("sha256").update(RED).digest("hex") as Sha256
   const agent = await createAgent({
-    doc,
+    documents: oneRoot(doc),
     replicaId: "test",
     model: { kind: "scripted", script },
     tools: null,
@@ -132,7 +133,10 @@ test("the model reads a chat's text, then its image's bytes, from the store", as
       },
     },
   ])
-  const made = await agent.createThreadLane(ROOT, laneNameForThread(newId()))
+  const made = await agent.createThreadLane(
+    { root: ONE_ROOT, at: ROOT },
+    laneNameForThread(newId()),
+  )
   if (made.kind !== "created") throw new Error("no lane")
   const text = `what colour? ![red](/blob/${sha})`
   await agent.lane(made.lane).run(

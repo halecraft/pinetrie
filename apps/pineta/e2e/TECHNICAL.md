@@ -70,6 +70,18 @@ They share `checks.ts` (recording a check, and stopping at one),
   "Views decide, intents act"), and the browser check for it is deleted. Keep
   the actions a later step depends on, and the waits that let it start.
 
+## Reading a session of roots (ADR-0063)
+
+- **`held(x)` is what a host or a client holds**: the session's document,
+  `pineta:live` and the roots it has open. `treeOf`, `entriesOf`,
+  `rootRecordsOf`, `lanesOf`, `laneNamesOf`, `tipIn` and `entryMessageIn`
+  read across them, as one.
+- **A scenario's client holds every root** (`holdEvery`, in `join`), and its
+  `chat` and `mark` wait until it holds the root of the entry they name: a
+  page holds only its tabs' roots, and writes only where it reads.
+- **A card's place at an entry names its root** (`rootAt`), from the host or
+  a client.
+
 ## Gotchas
 
 - **An idle wait checks the queue as well as the runs** (`idleNow`): a

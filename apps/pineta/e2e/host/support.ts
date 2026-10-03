@@ -13,9 +13,9 @@ import {
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
 import { CONTROL_TOPIC, SESSION_DOC_ID } from "@pineta/protocol/messages"
-import { readTreeIndex } from "@pineta/reads"
-import type { SessionDocHandle } from "@pineta/schema"
+import type { StorageDocHandle } from "@pineta/schema"
 import { lineDocPrefix } from "../../host/lines.ts"
+import { treeOf } from "../harness.ts"
 
 export const sleep = (ms: number): Promise<void> =>
   new Promise(r => setTimeout(r, ms))
@@ -92,7 +92,7 @@ export const slowToLoad = (store: Store, docId: string, ms: number): Store => {
   })
 }
 /** A session's size as it stands: what a compacted store should hold. */
-export const sessionBytes = (doc: SessionDocHandle): number =>
+export const sessionBytes = (doc: StorageDocHandle): number =>
   JSON.stringify({
     entries: doc.entries(),
     usageRows: doc.usageRows(),
@@ -100,8 +100,11 @@ export const sessionBytes = (doc: SessionDocHandle): number =>
     lists: doc.lists(),
   }).length
 /** In `doc`, the id of the message whose text is exactly `text`. */
-export const idOfIn = (doc: SessionDocHandle, text: string): EntryId | null => {
-  const index = readTreeIndex(doc)
+export const idOfIn = (
+  x: Parameters<typeof treeOf>[0],
+  text: string,
+): EntryId | null => {
+  const index = treeOf(x)
   return (
     Object.values(index.entries).find(
       e => projectTranscript(index, e.id).at(-1)?.text === text,

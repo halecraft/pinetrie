@@ -25,7 +25,7 @@ import { Avatars } from "./presence.tsx"
 import { planTitle, renameKey } from "./root-label.ts"
 import type { SessionClient } from "./session-view.ts"
 import { dropsWords, renameIntent, type TabsView } from "./tabs-view.ts"
-import { useReadingAt } from "./use-presence.ts"
+import { useReadingAt, useReadingRoots } from "./use-presence.ts"
 
 /** Left and Right move focus between tabs. */
 function moveFocus(e: KeyboardEvent<HTMLElement>) {
@@ -313,10 +313,14 @@ function Readers(p: {
   colorOf: (writer: WriterId) => string
 }) {
   const reading = useReadingAt(p.session.presence, p.session.writer)
+  const reportedRoots = useReadingRoots(p.session.presence)
   const { index, order, root } = p
   const writers = useMemo(
-    () => readersByRoot(peopleHere(reading, index, order)).get(root) ?? [],
-    [reading, index, order, root],
+    () =>
+      readersByRoot(peopleHere(reading, index, order, reportedRoots)).get(
+        root,
+      ) ?? [],
+    [reading, index, order, root, reportedRoots],
   )
   return <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={writers} />
 }

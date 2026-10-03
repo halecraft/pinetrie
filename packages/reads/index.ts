@@ -1,5 +1,10 @@
-// reads — what the session document says, read once, for the host and the
+// reads — what the session's documents say, read once, for the host and the
 // client alike.
+//
+// Each read takes the documents it reads (ADR-0063): a root's (`RootDocHandle`:
+// its entries, pi's values for its lanes, the records keyed by its entries),
+// the session's (`SessionDocHandle`: the records read across roots), or
+// `pineta:live`. A read of several takes a `RootView`.
 //
 // The composer promises "send" or "queue" from the same facts the host then
 // decides from. If the two read those facts separately, the promise holds only
@@ -24,6 +29,7 @@ import {
   type EntryId,
   type EntryLike,
   entryId,
+  firstLineOf,
   indexTree,
   type LandingRecord,
   type LaneName,
@@ -32,16 +38,21 @@ import {
   type LineRecord,
   type MarkRecord,
   messageImages,
+  messageText,
   nearestRevision,
   type OfferRecord,
   type PlanMode,
   type Position,
   type ProjectRecord,
+  parseMentions,
   promptOf,
   type RevisionRecord,
+  type RootId,
+  type RootRecord,
   type SeatRecord,
   type Sha256,
   type StopRecord,
+  summarizeRoots,
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
@@ -59,6 +70,7 @@ import {
   type DigestRecord,
   decodeCard,
   decodeChat,
+  type Home,
   LANDING,
   LANE,
   LINE,
@@ -74,14 +86,17 @@ import {
   queuedOn,
   REVISION,
   type RecordSpec,
+  ROOT,
   recordsOf,
   renderableMessage,
   SEAT,
   STOP,
 } from "@pineta/marginalia"
 import {
+  type LiveDocHandle,
   type PlacesDocHandle,
   type PresenceDocHandle,
+  type RootDocHandle,
   readActiveRun,
   readEntries,
   readLaneNames,
@@ -138,7 +153,7 @@ function renderableEntries(
  * unchanged row gives the same entry, frozen.
  */
 export const readRenderableEntries = (
-  doc: SessionDocHandle,
+  doc: RootDocHandle,
 ): Record<EntryId, EntryLike> => renderableEntries(readEntries(doc))
 
 /**
@@ -146,7 +161,7 @@ export const readRenderableEntries = (
  * change that touches no entry returns the same index. Every caller shares it,
  * so none may sort or change its lists in place.
  */
-export function readTreeIndex(doc: SessionDocHandle): TreeIndex {
+export function readTreeIndex(doc: RootDocHandle): TreeIndex {
   const rows = readEntries(doc)
   const known = indexOfEntries.get(rows)
   if (known !== undefined) return known
@@ -155,9 +170,70 @@ export function readTreeIndex(doc: SessionDocHandle): TreeIndex {
   return index
 }
 
-/** Whether a lane is running now: the session records its active run. */
-export const readRunning = (doc: SessionDocHandle, lane: LaneName): boolean =>
-  readActiveRun(doc, lane) !== undefined
+/** The index of several roots' entries at once, as the last call built it. */
+let heldIndex: {
+  readonly rows: readonly Readonly<Record<string, StoredEntryRow>>[]
+  readonly index: TreeIndex
+} | null = null
+
+/**
+ * The tree of every root in `docs`, one index over all their entries: what a
+ * page reads of the roots its tabs hold (ADR-0063). The same index while no
+ * root's entries change, as `readTreeIndex` gives one root's.
+ */
+export function readHeldIndex(docs: readonly RootDocHandle[]): TreeIndex {
+  if (docs.length === 1 && docs[0] !== undefined) return readTreeIndex(docs[0])
+  const rows = docs.map(readEntries)
+  if (
+    heldIndex !== null &&
+    heldIndex.rows.length === rows.length &&
+    heldIndex.rows.every((r, i) => r === rows[i])
+  )
+    return heldIndex.index
+  const entries: Record<EntryId, EntryLike> = {}
+  for (const r of rows) Object.assign(entries, renderableEntries(r))
+  const index = indexTree(entries)
+  heldIndex = { rows, index }
+  return index
+}
+
+/** Each root's records `read` gives, as one map: roots never share a key. */
+export function readHeld<K, V>(
+  docs: readonly RootDocHandle[],
+  read: (doc: RootDocHandle) => ReadonlyMap<K, V>,
+): ReadonlyMap<K, V> {
+  if (docs.length === 1 && docs[0] !== undefined) return read(docs[0])
+  return new Map(docs.flatMap(doc => [...read(doc)]))
+}
+
+/** Whether a lane is running now: `pineta:live` records its active run. */
+export const readRunning = (live: LiveDocHandle, lane: LaneName): boolean =>
+  readActiveRun(live, lane) !== undefined
+
+/**
+ * A root's documents, for a read of several (ADR-0063): the root's own, for
+ * its lanes and their tips; the session's, for the lanes' records; and
+ * `pineta:live`, for which of them run.
+ */
+export interface RootView {
+  readonly root: RootId
+  readonly doc: RootDocHandle
+  readonly session: SessionDocHandle
+  readonly live: LiveDocHandle
+}
+
+/**
+ * The prompt of the lane's latest run, and its role (`chat`, `land`,
+ * `stack`…): what the run is. Null for a lane with no run on its tip's path.
+ */
+export function readLatestPrompt(
+  doc: RootDocHandle,
+  lane: LaneName,
+): { readonly id: EntryId; readonly role: string | undefined } | null {
+  const index = readTreeIndex(doc)
+  const id = promptOf(index, readLaneTip(doc, lane))
+  return id === null ? null : { id, role: index.entries[id]?.message?.role }
+}
 
 /**
  * Who asked the run that wrote `tip`: the writer of its prompt
@@ -177,13 +253,14 @@ function askerOf(index: TreeIndex, tip: EntryId | null): WriterId | undefined {
  * record (`readPlaces`).
  */
 export function readLanes(
-  doc: SessionDocHandle,
+  view: Pick<RootView, "doc" | "live">,
   index: TreeIndex,
   cards: readonly CardRecord[],
 ): readonly LaneView[] {
+  const { doc, live } = view
   return readLaneNames(doc).map(name => {
     const tip = readLaneTip(doc, name)
-    const running = readRunning(doc, name)
+    const running = readRunning(live, name)
     const queue = queuedOn(cards, name)
     const asking = running ? askerOf(index, tip) : queue[0]?.place.by
     return {
@@ -197,52 +274,103 @@ export function readLanes(
   })
 }
 
-/** One lane's view, or undefined for a lane the document does not hold. */
+/** One lane's view, or undefined for a lane the root does not hold. */
 export const readLane = (
-  doc: SessionDocHandle,
+  view: Pick<RootView, "doc" | "live">,
   lane: LaneName,
   cards: readonly CardRecord[],
 ): LaneView | undefined =>
-  readLanes(doc, readTreeIndex(doc), cards).find(l => l.name === lane)
+  readLanes(view, readTreeIndex(view.doc), cards).find(l => l.name === lane)
 
-/** Every lane the agent is replying on. */
-export function readAgentActivity(doc: SessionDocHandle): readonly AgentRun[] {
+/** Every lane the agent is replying on, in this root. */
+export function readAgentActivity(
+  view: Pick<RootView, "doc" | "live">,
+): readonly AgentRun[] {
+  const { doc, live } = view
   return agentActivity(
     readLaneNames(doc)
-      .filter(lane => readRunning(doc, lane))
+      .filter(lane => readRunning(live, lane))
       .map(lane => ({ lane, tip: readLaneTip(doc, lane) })),
   )
 }
 
+/** The document a record's home names (ADR-0063). */
+export type HomeDoc<H extends Home> = H extends "root"
+  ? RootDocHandle
+  : SessionDocHandle
+
 /**
- * Every record `spec` describes, by its address (ADR-0062). Each named
- * reader below is this, for one record.
+ * Every record `spec` describes, by its address (ADR-0062), from the
+ * document its home names. Each named reader below is this, for one record.
  */
-export const readRecords = <R, K extends string>(
-  doc: SessionDocHandle,
-  spec: RecordSpec<R, K>,
+export const readRecords = <R, K extends string, H extends Home>(
+  doc: HomeDoc<H>,
+  spec: RecordSpec<R, K, H>,
 ): ReadonlyMap<K, R> => recordsOf(spec, readValues(doc, spec.namespace))
 
-/** Each writer's display name (`pineta.participant`). */
-export const readParticipantNames = (
+/** Every root's directory record (`pineta.root`, ADR-0063), by its id. */
+export const readRoots = (
   doc: SessionDocHandle,
-): ReadonlyMap<WriterId, string> =>
-  new Map(
+): ReadonlyMap<RootId, RootRecord> => readRecords(doc, ROOT)
+
+/** Every lane the agent is replying on, in any root, and the root it is in. */
+export function readRunningLanes(
+  session: SessionDocHandle,
+  live: LiveDocHandle,
+): readonly { readonly lane: LaneName; readonly root: RootId }[] {
+  return [...readLaneRecords(session).values()]
+    .filter(r => readRunning(live, r.lane))
+    .map(r => ({ lane: r.lane, root: r.root }))
+}
+
+const lastNames = new WeakMap<SessionDocHandle, ReadonlyMap<WriterId, string>>()
+
+/**
+ * Each writer's display name (`pineta.participant`). The same map while the
+ * names are the same: every message compares it by identity, and the
+ * session's other records, the directory's among them, change far more often
+ * (ADR-0063).
+ */
+export function readParticipantNames(
+  doc: SessionDocHandle,
+): ReadonlyMap<WriterId, string> {
+  const now = new Map(
     [...readRecords(doc, PARTICIPANT).values()].map(r => [r.writer, r.name]),
   )
+  const before = lastNames.get(doc)
+  if (
+    before !== undefined &&
+    before.size === now.size &&
+    [...now].every(([w, name]) => before.get(w) === name)
+  )
+    return before
+  lastNames.set(doc, now)
+  return now
+}
 
 /**
  * Every participant's display name, guests included: the list a mention
- * resolves against (`address`), and the names the screen shows.
+ * resolves against (`address`), and the names the screen shows. A writer is
+ * found in `index`, else in any root's directory record, so one who wrote
+ * only in a root not loaded still counts (ADR-0063).
  */
-export function readParticipants(
+export const readParticipants = (
   doc: SessionDocHandle,
   index: TreeIndex,
+): readonly string[] =>
+  participantsIn(readParticipantNames(doc), index, readRoots(doc))
+
+/** `readParticipants` over what a reader already holds. Pure. */
+export function participantsIn(
+  names: ReadonlyMap<WriterId, string>,
+  index: TreeIndex,
+  directory: ReadonlyMap<RootId, RootRecord>,
 ): readonly string[] {
   const writers = Object.values(index.entries).flatMap(e =>
     e.message?.writer === undefined ? [] : [e.message.writer],
   )
-  return participants(readParticipantNames(doc), writers)
+  for (const root of directory.values()) writers.push(...root.writers)
+  return participants(names, writers)
 }
 
 /**
@@ -285,6 +413,38 @@ function presenceField(
 
 /** One entry per open column: its writer, and the thread end it follows. */
 export const readReading = presenceField(doc => doc.reading())
+const lastReadingRoots = new WeakMap<
+  PresenceDocHandle,
+  ReadonlyMap<EntryId, EntryId>
+>()
+
+/**
+ * Each followed thread end's root entry (ADR-0063), from the column that
+ * reports it: what a window that does not hold the root opens it by. The
+ * same map while its pairs are the same, as `presenceField`'s are.
+ */
+export function readReadingRoots(
+  doc: PresenceDocHandle,
+): ReadonlyMap<EntryId, EntryId> {
+  const reading = doc.reading()
+  const roots = doc.readingRoot()
+  const now = new Map<EntryId, EntryId>()
+  for (const [key, end] of Object.entries(reading)) {
+    const root = roots[key]
+    if (end !== null && root !== null && root !== undefined)
+      now.set(entryId(end), entryId(root))
+  }
+  const before = lastReadingRoots.get(doc)
+  if (
+    before !== undefined &&
+    before.size === now.size &&
+    [...now].every(([end, root]) => before.get(end) === root)
+  )
+    return before
+  lastReadingRoots.set(doc, now)
+  return now
+}
+
 /** One entry per seat typing: its writer, and the thread end. */
 export const readTyping = presenceField(doc => doc.typing())
 
@@ -328,17 +488,17 @@ export const readArchive = (
 
 /** Every entry's mark (`pineta.mark`, ADR-0045), keyed by entry: a root's titles its tab. */
 export const readMarks = (
-  doc: SessionDocHandle,
+  doc: RootDocHandle,
 ): ReadonlyMap<EntryId, MarkRecord> => readRecords(doc, MARK)
 
 /** Each ask's digest (`pineta.digest`, ADR-0056), by its prompt. */
 export const readDigests = (
-  doc: SessionDocHandle,
+  doc: RootDocHandle,
 ): ReadonlyMap<EntryId, DigestRecord> => readRecords(doc, DIGEST)
 
 /** Who stopped each ask (`pineta.stop`, ADR-0056), by its prompt. */
 export const readStops = (
-  doc: SessionDocHandle,
+  doc: RootDocHandle,
 ): ReadonlyMap<EntryId, StopRecord> => readRecords(doc, STOP)
 
 // ── where lanes work (ADR-0032, ADR-0033) ─────────────────────────────────
@@ -350,7 +510,7 @@ export const readLaneRecords = (
 
 /** Every revision record (`pineta.revision`), by the entry it is at. */
 export const readRevisions = (
-  doc: SessionDocHandle,
+  doc: RootDocHandle,
 ): ReadonlyMap<EntryId, RevisionRecord> => readRecords(doc, REVISION)
 
 /** Every resolution's record (`pineta.landing`), oldest first. */
@@ -409,7 +569,7 @@ export const readCommands = (
  * of their own now works directly, so it is not.
  */
 export function worksOwn(
-  doc: SessionDocHandle,
+  view: Pick<RootView, "doc" | "session">,
   index: TreeIndex,
   send: {
     readonly lane: ThreadLane
@@ -421,11 +581,13 @@ export function worksOwn(
     readonly work: WorkSetting | null
   },
 ): boolean {
-  if (readProject(doc)?.kind !== "lanes") return false
+  if (readProject(view.session)?.kind !== "lanes") return false
   if (send.lane.kind === "lane" && send.mode !== "branch")
-    return readLaneRecords(doc).get(send.lane.name)?.work.kind === "own"
+    return (
+      readLaneRecords(view.session).get(send.lane.name)?.work?.kind === "own"
+    )
   return (
-    workAt(doc, index, send.mode === "branch" ? send.at : send.end, send.work)
+    workAt(view, index, send.mode === "branch" ? send.at : send.end, send.work)
       .work?.kind === "own"
   )
 }
@@ -436,17 +598,17 @@ export function worksOwn(
  * The composer shows this, and the host creates the lane by it.
  */
 export function workAt(
-  doc: SessionDocHandle,
+  view: Pick<RootView, "doc" | "session">,
   index: TreeIndex,
   at: Position,
   choice: WorkSetting | null,
 ): { readonly work: WorkSetting | null; readonly above: Above } {
-  const above = nearestRevision(index, readRevisions(doc), at)
+  const above = nearestRevision(index, readRevisions(view.doc), at)
   const work = workFor({
     choice,
     above: above.lane,
-    lanes: readLaneRecords(doc),
-    project: readProject(doc),
+    lanes: readLaneRecords(view.session),
+    project: readProject(view.session),
   })
   return { work, above }
 }
@@ -478,16 +640,65 @@ export function referencedBlobs(facts: {
   return shas
 }
 
-/** `referencedBlobs` over the session as it stands, and every card's text. */
+/**
+ * Every image something still shows (`referencedBlobs`): each root's, from
+ * its directory record, so no root is opened to sweep; every card's text;
+ * and every banner.
+ */
 export const readReferencedBlobs = (
-  doc: SessionDocHandle,
+  session: SessionDocHandle,
   texts: Iterable<string>,
-): ReadonlySet<Sha256> =>
-  referencedBlobs({
-    messages: Object.values(readEntries(doc)).map(rowMessage),
-    texts,
-    banners: readBanners(doc).values(),
+): ReadonlySet<Sha256> => {
+  const shas = new Set(
+    referencedBlobs({
+      messages: [],
+      texts,
+      banners: readBanners(session).values(),
+    }),
+  )
+  for (const root of readRoots(session).values())
+    for (const sha of root.images) shas.add(sha)
+  return shas
+}
+
+/**
+ * A root's directory record, read from its document (ADR-0063): its first
+ * message and that message's first line, its title, its messages, newest
+ * entry and writers (`summarizeRoots`), its chats that name someone, and
+ * every image it shows. What the host writes as `pineta.root`.
+ */
+export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
+  const index = readTreeIndex(doc)
+  const summary = summarizeRoots(index)[0]
+  const entry = summary?.root ?? null
+  const first = summary?.first ?? null
+  const mentions = Object.values(index.entries).flatMap(e => {
+    const m = e.message
+    if (m?.role !== "chat" || m.writer === undefined) return []
+    const text = messageText(m)
+    return parseMentions(text).length === 0
+      ? []
+      : [{ id: e.id, by: m.writer, text }]
   })
+  return {
+    root,
+    entry,
+    first,
+    firstLine: firstLineOf(index, first),
+    title: entry === null ? null : (readMarks(doc).get(entry)?.title ?? null),
+    messages: summary?.messages ?? 0,
+    newest: summary?.newest ?? null,
+    writers: summary?.writers ?? [],
+    mentions: mentions.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+    images: [
+      ...referencedBlobs({
+        messages: Object.values(readEntries(doc)).map(rowMessage),
+        texts: [],
+        banners: [],
+      }),
+    ].sort(),
+  }
+}
 
 /**
  * The blobs to delete: those nothing shows and nobody has stored or touched

@@ -10,26 +10,26 @@ import {
   laneNameForThread,
   projectSpine,
   ROOT,
+  rootDocId,
   runId,
 } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import { SESSION_DOC_ID } from "@pineta/protocol/messages"
-import {
-  readLanes,
-  readParticipantNames,
-  readPlaces,
-  readStops,
-  readTreeIndex,
-} from "@pineta/reads"
+import { readParticipantNames, readPlaces, readStops } from "@pineta/reads"
 import { beginRun, readStreams } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,
+  entriesOf,
   idleNow,
   join,
+  lanesOf,
   noQueued,
+  rootAt,
+  rootRecordsOf,
+  treeOf,
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
@@ -77,12 +77,12 @@ async function run(check: Checks["check"]): Promise<void> {
       })
     let th = await open(() => {})
     const tidle = () => waitFor(() => idleNow(th), 60_000)
-    const ttree = () => readTreeIndex(th.doc)
-    const tlane = () => readLanes(th.doc, ttree(), readPlaces(th.places))[0]
+    const ttree = () => treeOf(th)
+    const tlane = () => lanesOf(th, ttree(), readPlaces(th.places))[0]
     // Every open stream at each change of the host's document.
     const watched: ReturnType<typeof readStreams>[] = []
     const watch = () =>
-      subscribe(th.doc, () => watched.push([...readStreams(th.doc)]))
+      subscribe(th.live, () => watched.push([...readStreams(th.live)]))
     let unwatch = watch()
     const u = await join(th, "uma", "tools")
     await u.setName("Uma")
@@ -156,15 +156,22 @@ async function run(check: Checks["check"]): Promise<void> {
         result.includes(lastLive.slice(-300)),
       `${toolTexts.length} updates), matching its result`,
     )
-    // The run's end compacted the session (ADR-0023): the store holds the
-    // document as it stands, not the run's edits. Whole-value streams are guarded
-    // by `planStream`'s unit test, since compaction would hide them here.
+    // The run's end compacted its root's document (ADR-0023, ADR-0063): the
+    // store holds the document as it stands, not the run's edits. Whole-value
+    // streams are guarded by `planStream`'s unit test, since compaction would
+    // hide them here.
     await th.quiet()
-    const compacted = await storedRecords(stored, SESSION_DOC_ID)
+    const ranIn = l3 === undefined ? null : th.docs.rootOfLane(l3.name)
+    const ranDoc = ranIn === null ? null : th.docs.view(ranIn)?.doc
+    const compacted =
+      ranIn === null
+        ? { records: Number.POSITIVE_INFINITY, bytes: 0 }
+        : await storedRecords(stored, rootDocId(ranIn))
+    const rootBytes = ranDoc == null ? 0 : sessionBytes(ranDoc)
     check(
       "after the run, the store holds the compacted session",
-      compacted.records <= 3 && compacted.bytes <= 2 * sessionBytes(th.doc),
-      `${compacted.records} records, ${Math.round(compacted.bytes / 1024)} KB for a ${Math.round(sessionBytes(th.doc) / 1024)} KB session (${Math.round(printed / 1024)} KB printed)`,
+      compacted.records <= 3 && compacted.bytes <= 2 * rootBytes,
+      `${compacted.records} records, ${Math.round(compacted.bytes / 1024)} KB for a ${Math.round(rootBytes / 1024)} KB root (${Math.round(printed / 1024)} KB printed)`,
     )
 
     // 4. Two assistant messages in one run: two reply streams, one at a time.
@@ -189,7 +196,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const t0 = Date.now()
     await u.chat("sleep", at(l5?.tip ?? null), { lane: l5?.name })
     await waitFor(
-      () => readStreams(th.doc).some(s => s.kind === "tool"),
+      () => readStreams(th.live).some(s => s.kind === "tool"),
       10_000,
     )
     const waiting = await bob.chat("@Uma noted", at(tlane()?.tip ?? null), {
@@ -213,12 +220,13 @@ async function run(check: Checks["check"]): Promise<void> {
     await u.stop(laneNameForThread("no-such-lane"))
     // Who stopped it is recorded under the ask (ADR-0056): pi's entries say
     // only that the run was aborted. Stopping it again, idle, records nothing.
-    const sleepAsk = idOfIn(th.doc, "sleep")
-    const stop = sleepAsk === null ? undefined : readStops(th.doc).get(sleepAsk)
+    const sleepAsk = idOfIn(th, "sleep")
+    const stop =
+      sleepAsk === null ? undefined : rootRecordsOf(th, readStops).get(sleepAsk)
     check(
       "the stop is recorded under its ask, naming who stopped it",
-      stop?.by === u.writer && readStops(th.doc).size === 1,
-      `${stop?.by ?? "none"}, ${readStops(th.doc).size} recorded`,
+      stop?.by === u.writer && rootRecordsOf(th, readStops).size === 1,
+      `${stop?.by ?? "none"}, ${rootRecordsOf(th, readStops).size} recorded`,
     )
 
     // 6. Restart over the same store: everything is there, and a card queued
@@ -226,16 +234,16 @@ async function run(check: Checks["check"]): Promise<void> {
     // end will. The run is the document's record alone, which a stopping
     // host leaves and a starting one clears (`clearStreams`).
     const before = {
-      entries: Object.keys(th.doc.entries()).length,
-      lanes: readLanes(th.doc, ttree(), readPlaces(th.places)).map(
+      entries: Object.keys(entriesOf(th)).length,
+      lanes: lanesOf(th, ttree(), readPlaces(th.places)).map(
         l => `${l.name}@${l.tip}`,
       ),
-      names: [...readParticipantNames(th.doc).values()].sort(),
+      names: [...readParticipantNames(th.session).values()].sort(),
     }
     const l6 = tlane()
     const heldText = "@Bob queued across a restart"
     if (l6 !== undefined && l6.tip !== null) {
-      beginRun(th.doc, l6.name, runId("r-held"))
+      beginRun(th.live, l6.name, runId("r-held"))
       const held = cardId(crypto.randomUUID())
       const where = at(l6.tip)
       u.createCard(
@@ -243,7 +251,12 @@ async function run(check: Checks["check"]): Promise<void> {
           id: held,
           owner: u.writer,
           placer: u.writer,
-          place: { kind: "drafting", at: where, lane: l6.name },
+          place: {
+            kind: "drafting",
+            root: rootAt(u, where),
+            at: where,
+            lane: l6.name,
+          },
           command: null,
           unsent: null,
         },
@@ -287,20 +300,20 @@ async function run(check: Checks["check"]): Promise<void> {
       `${linesAfter.length} stored`,
     )
     unwatch = watch()
-    await waitFor(() => idOfIn(th.doc, heldText) !== null, 15_000)
+    await waitFor(() => idOfIn(th, heldText) !== null, 15_000)
     await th.quiet()
     const afterRestart = await storedRecords(stored, SESSION_DOC_ID)
     check(
       "a starting host compacts the session it opened",
-      beforeRestart.records > 3 && afterRestart.records <= 3,
+      beforeRestart.records > 2 && afterRestart.records <= 2,
       `${beforeRestart.records} records -> ${afterRestart.records}`,
     )
     const after = {
-      entries: Object.keys(th.doc.entries()).length - 1,
-      lanes: readLanes(th.doc, ttree(), readPlaces(th.places)).map(
+      entries: Object.keys(entriesOf(th)).length - 1,
+      lanes: lanesOf(th, ttree(), readPlaces(th.places)).map(
         l => `${l.name}@${l.tip}`,
       ),
-      names: [...readParticipantNames(th.doc).values()].sort(),
+      names: [...readParticipantNames(th.session).values()].sort(),
     }
     check(
       "after a restart the session is all there, and the queued card was taken",

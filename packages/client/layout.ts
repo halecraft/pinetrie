@@ -90,11 +90,13 @@ export type LayoutAction =
   | { readonly kind: "reopen"; readonly closed: ClosedColumn }
   /** Store what `resolveLayout` draws for these facts. */
   | ({ readonly kind: "resolve" } & LayoutFacts)
-  /** Once, after the document settles: the roots it lacks go, and `active` is chosen. */
+  /** Once, after the documents settle: the roots the directory lacks go, and `active` is chosen. */
   | {
       readonly kind: "prune"
       readonly index: TreeIndex
       readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
+      /** Every root the directory names, by its root entry (ADR-0063). */
+      readonly known: ReadonlySet<EntryId>
     }
 
 /** The document facts a layout follows: one moment's, read together. */
@@ -299,7 +301,7 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
     case "resolve":
       return resolveLayout(state, action)
     case "prune":
-      return pruneLayout(state, action.index, action.archive)
+      return pruneLayout(state, action.index, action.archive, action.known)
   }
 }
 
@@ -329,7 +331,12 @@ function syncLayout(
   let changed = false
   const roots = new Map<EntryId, readonly Column[]>()
   for (const [root, columns] of state.roots) {
-    const next = columnsReducer(columns, { kind: "sync", index, lanes })
+    // A root this tab does not hold is in no index (ADR-0063): its columns
+    // wait, as stored, until it is held.
+    const next =
+      index.entries[root] === undefined
+        ? columns
+        : columnsReducer(columns, { kind: "sync", index, lanes })
     if (next !== columns) changed = true
     roots.set(root, next)
   }
@@ -357,8 +364,10 @@ function syncLayout(
 }
 
 /**
- * Once the document has settled: roots it lacks go, archived roots leave your
- * tabs, and the tab to show is chosen. A tab you were on that is gone or
+ * Once the documents have settled: roots the directory lacks go (`known`),
+ * anchors a held root lacks go, archived roots leave your tabs, and the tab
+ * to show is chosen. A root's columns are pruned only where this tab holds
+ * it: another's anchors are in no index. A tab you were on that is gone or
  * archived gives way to your last open tab, else Archive; with nothing stored,
  * that is Archive, since nothing opens a tab by itself (ADR-0030).
  */
@@ -366,16 +375,18 @@ function pruneLayout(
   state: Layout,
   index: TreeIndex,
   archive: ReadonlyMap<EntryId, ArchiveRecord>,
+  knownRoots: ReadonlySet<EntryId>,
 ): Layout {
   let roots = state.roots
   for (const [root, columns] of state.roots) {
-    const next =
-      index.entries[root] === undefined
-        ? []
+    const next = !knownRoots.has(root)
+      ? []
+      : index.entries[root] === undefined
+        ? columns
         : columnsReducer(columns, { kind: "prune", index })
     if (next !== columns) roots = withRoot(roots, root, next)
   }
-  const known = state.open.filter(r => index.entries[r] !== undefined)
+  const known = state.open.filter(r => knownRoots.has(r))
   // An archived root you are on stays only until you leave it, and a reload
   // leaves it (ADR-0029).
   const open = withoutArchived(known, archive, null)

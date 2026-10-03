@@ -8,18 +8,15 @@ import { activeToolNames, toolsChanged } from "./tools.ts"
 const files = ["read", "write", "edit", "bash"]
 
 describe("activeToolNames", () => {
-  test("the file tools always; set_banner with banners; guidance when asked", () => {
-    expect(activeToolNames({ files, banners: false, guidance: false })).toEqual(
-      files,
-    )
-    expect(activeToolNames({ files, banners: true, guidance: false })).toEqual([
+  test("the file tools and ask_for_guidance always; set_banner with banners", () => {
+    expect(activeToolNames({ files, banners: false })).toEqual([
       ...files,
-      BANNER_TOOL,
-    ])
-    expect(activeToolNames({ files, banners: true, guidance: true })).toEqual([
-      ...files,
-      BANNER_TOOL,
       GUIDANCE_TOOL,
+    ])
+    expect(activeToolNames({ files, banners: true })).toEqual([
+      ...files,
+      GUIDANCE_TOOL,
+      BANNER_TOOL,
     ])
   })
 })

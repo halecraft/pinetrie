@@ -3,11 +3,21 @@
 
 import type { LaneName } from "@pineta/core"
 import { readThreadName } from "@pineta/reads"
-import type { PlacesDocHandle, SessionDocHandle } from "@pineta/schema"
+import type {
+  LiveDocHandle,
+  PlacesDocHandle,
+  SessionDocHandle,
+} from "@pineta/schema"
+import type { HostDocuments } from "./docs.ts"
 import { SerialClosed } from "./queue.ts"
 
 export interface Basics {
-  readonly doc: SessionDocHandle
+  /** The session's records, the directory of roots among them (ADR-0063). */
+  readonly session: SessionDocHandle
+  /** What is streaming now (ADR-0063): which lanes run, and their streams. */
+  readonly live: LiveDocHandle
+  /** Every document, each root's among them (`docs.ts`). */
+  readonly docs: HostDocuments
   /**
    * Where every card is (ADR-0059): what is queued for each lane. Written
    * only through `applyPlaceStep` (`places.ts`).
@@ -27,7 +37,7 @@ export const messageOf = (error: unknown): string =>
  * `Serial` refused is not logged: shutdown refuses them on purpose.
  */
 export function failed(
-  basics: Pick<Basics, "doc" | "log">,
+  basics: Pick<Basics, "session" | "log">,
   what: string,
   lane?: LaneName,
 ): (error: unknown) => void {
@@ -36,7 +46,7 @@ export function failed(
     basics.log(
       lane === undefined
         ? `[host] ${what} failed: ${messageOf(error)}`
-        : `[host] ${readThreadName(basics.doc, lane)}: ${what} failed: ${messageOf(error)}`,
+        : `[host] ${readThreadName(basics.session, lane)}: ${what} failed: ${messageOf(error)}`,
     )
   }
 }

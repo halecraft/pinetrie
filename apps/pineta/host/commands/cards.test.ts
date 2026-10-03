@@ -4,6 +4,7 @@ import {
   cardId,
   entryId,
   laneNameForThread,
+  rootIdFor,
   runId,
   writerId,
 } from "@pineta/core"
@@ -15,16 +16,24 @@ import { applyPlaceStep } from "../places.ts"
 import { takeTop } from "../take.ts"
 import { createCardCommands } from "./cards.ts"
 
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const LANE = laneNameForThread("0123456789abcdef")
 const E1 = entryId("e-1")
 const C1 = cardId("c-1")
-const drafting = { kind: "drafting", at: atEntry(E1), lane: LANE } as const
+const drafting = {
+  kind: "drafting",
+  root: TEST_ROOT,
+  at: atEntry(E1),
+  lane: LANE,
+} as const
 /** Texts the host holds whole. */
 const held = { textNow: () => "x", holds: () => true }
 const queuedKey = {
   kind: "queued",
+  root: TEST_ROOT,
   at: atEntry(E1),
   lane: LANE,
   seen: "",
@@ -32,8 +41,8 @@ const queuedKey = {
 
 function setUp() {
   const b = basics()
-  writeEntry(b.doc, row(E1, null))
-  writeLaneTip(b.doc, LANE, E1)
+  writeEntry(b.root, row(E1, null))
+  writeLaneTip(b.root, LANE, E1)
   const cards = record<{ destroy: (id: string) => Promise<void> }>({
     destroy: async () => {},
   })
@@ -135,6 +144,7 @@ describe("moves on the host's Serial: the take and an unqueue in either order (A
 describe("a chat from a card that found its lane busy", () => {
   const chat = {
     text: "@bob look",
+    root: TEST_ROOT,
     at: atEntry(E1),
     mode: "reply",
     lane: LANE,
@@ -149,7 +159,7 @@ describe("a chat from a card that found its lane busy", () => {
   test("its card is queued behind the others in the same step, and answered queued with the rev", async () => {
     const { b, drains, commands, put } = setUp()
     put()
-    beginRun(b.doc, LANE, runId("r-1"))
+    beginRun(b.live, LANE, runId("r-1"))
     const done = await commands.queueBusy(ADA, chat)
     expect(done).toEqual({ outcome: { kind: "queued" }, rev: 2 })
     expect(readPlaces(b.places)[0]?.place).toMatchObject({
@@ -163,7 +173,7 @@ describe("a chat from a card that found its lane busy", () => {
 
   test("a card the host does not hold stays a busy answer", async () => {
     const { b, commands } = setUp()
-    beginRun(b.doc, LANE, runId("r-1"))
+    beginRun(b.live, LANE, runId("r-1"))
     expect(await commands.queueBusy(ADA, chat)).toBeNull()
   })
 })
@@ -182,6 +192,7 @@ test("setCommand: the command set, its place and placer kept", async () => {
 
 const sentChat = {
   text: "hi",
+  root: TEST_ROOT,
   at: atEntry(E1),
   mode: "reply",
   lane: null,
@@ -213,7 +224,7 @@ test("spend: a fresh column's first send leaves its other cards drafting at the 
   put({ id: C3, place: { kind: "fresh", column: "other" } })
   const sent = entryId("e-2")
   writeEntry(
-    b.doc,
+    b.root,
     row(sent, E1, { role: "user", content: "hi", sendId: "s-1" }),
   )
   const rev = await commands.spend(C1, { sendId: "s-1", chat: sentChat })
@@ -222,7 +233,12 @@ test("spend: a fresh column's first send leaves its other cards drafting at the 
     expect.objectContaining({
       id: C2,
       placer: BEA,
-      place: { kind: "drafting", at: atEntry(sent), lane: null },
+      place: {
+        kind: "drafting",
+        root: TEST_ROOT,
+        at: atEntry(sent),
+        lane: null,
+      },
     }),
     expect.objectContaining({
       id: C3,

@@ -63,7 +63,7 @@ export function createSplits(deps: {
   readonly fetchLane: Fetches["fetchLane"]
 }): Splits {
   const { basics, root, registry, offers } = deps
-  const { doc, log } = basics
+  const { session, docs, log } = basics
   return {
     async prepareSplit(lane, by) {
       if (!registry.isOwn(lane) || root === null || offers === null)
@@ -82,7 +82,11 @@ export function createSplits(deps: {
     },
 
     async splitEnded(lane, prompt) {
-      const stored = readEntryMessage(doc, prompt)
+      const doc = await docs.laneDoc(lane)
+      const stored =
+        doc === null
+          ? { present: false as const }
+          : readEntryMessage(doc, prompt)
       const details = stored.present ? decodeStack(stored.message) : undefined
       if (
         !registry.isOwn(lane) ||
@@ -112,7 +116,9 @@ export function createSplits(deps: {
           { start: details.start, tip: details.tip },
         )
         if (refused !== null)
-          log(`[host] ${readThreadName(doc, lane)}: stack refused: ${refused}`)
+          log(
+            `[host] ${readThreadName(session, lane)}: stack refused: ${refused}`,
+          )
         return refused
       } catch (error) {
         return messageOf(error)

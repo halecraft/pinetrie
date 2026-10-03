@@ -28,16 +28,18 @@ import {
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
+  type RootView,
+  readLaneRecords,
   readLanes,
   readParticipantNames,
   readParticipants,
   readPlaces,
+  readRoots,
   readThreadName,
   readTreeIndex,
   workAt,
   worksOwn,
 } from "@pineta/reads"
-import { readLaneNames } from "@pineta/schema"
 import type { Basics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { Runs } from "../runs.ts"
@@ -66,6 +68,8 @@ export interface ChatDeps {
 
 /** What `executeChat` needs besides the decision: the facts the send was planned from. */
 export interface ChatContext {
+  /** The root's documents the send was planned from. */
+  readonly view: RootView
   readonly index: TreeIndex
   readonly writer: WriterId
   /** Where the send asked a new lane to work, if anywhere. */
@@ -94,11 +98,25 @@ export async function sendChat(
   chat: Chat,
 ): Promise<Outcome> {
   const { agent, work, blobs, cards } = deps
-  const { doc, newId } = deps.basics
+  const { docs, session, live, newId } = deps.basics
 
+  // A thread at the root starts a root (ADR-0063), under the id its tab
+  // minted: one the session already holds is another's.
+  if (chat.at.kind === "root" && readRoots(session).has(chat.root))
+    return {
+      kind: "refused",
+      code: ERR.ROOT_TAKEN,
+      message: "that root's id is taken",
+    }
   // gather
-  const index = readTreeIndex(doc)
-  const names = readParticipantNames(doc)
+  const view: RootView = {
+    root: chat.root,
+    doc: await docs.root(chat.root),
+    session,
+    live,
+  }
+  const index = readTreeIndex(view.doc)
+  const names = readParticipantNames(session)
   const nameOf = (w: WriterId) => displayName(w, names.get(w))
   const contributors =
     chat.card === null
@@ -108,7 +126,7 @@ export async function sendChat(
   // plan (pure)
   const thread = threadOf(
     index,
-    readLanes(doc, index, readPlaces(deps.basics.places)),
+    readLanes(view, index, readPlaces(deps.basics.places)),
     {
       at: chat.at,
       mode: chat.mode,
@@ -131,7 +149,7 @@ export async function sendChat(
   // A thread that works, or will work, in its own copy is sent paths as
   // its lane sees them: your working copy's (ADR-0034), and a command's
   // files (ADR-0036).
-  const own = worksOwn(doc, index, {
+  const own = worksOwn(view, index, {
     lane: thread.lane,
     end: thread.end,
     mode: chat.mode,
@@ -173,20 +191,21 @@ export async function sendChat(
     at: chat.at,
     thread,
     mentions: chat.mentions,
-    participants: readParticipants(doc, index),
+    participants: readParticipants(session, index),
     asksAgent: chat.asksAgent,
     sendId,
     // The ids a lane this creates may take (ADR-0057): the column's, unless
     // pi holds it, else a new one.
     newLane: {
       reserved: chat.reserved,
-      held: new Set(readLaneNames(doc)),
+      held: new Set(readLaneRecords(session).keys()),
       spare: laneNameForThread(newId()),
     },
     contributors,
   })
 
   const sent = await executeChat(deps, planned, {
+    view,
     index,
     writer,
     work: chat.work,
@@ -206,8 +225,9 @@ export async function executeChat(
   context: ChatContext,
 ): Promise<Outcome> {
   const { agent, work } = deps
-  const { doc, log, now } = deps.basics
-  const { index, writer } = context
+  const { log, now } = deps.basics
+  const { view, index, writer } = context
+  const { root } = view
   const message = (details: ChatDetails) => encodeChat(details, now())
   switch (planned.kind) {
     case "refused":
@@ -218,7 +238,10 @@ export async function executeChat(
     case "appendToLane": {
       const appended =
         planned.kind === "appendToTree"
-          ? await agent.appendToTree(message(planned.details), planned.parent)
+          ? await agent.appendToTree(message(planned.details), {
+              root,
+              at: planned.parent,
+            })
           : await agent.lane(planned.lane).append(message(planned.details))
       if (appended.kind === "refused") {
         return {
@@ -240,7 +263,7 @@ export async function executeChat(
     case "createAndRun": {
       // Where the new lane works: the send's choice, else the lane above,
       // else the project's default (ADR-0032).
-      const { work: setting } = workAt(doc, index, planned.at, context.work)
+      const { work: setting } = workAt(view, index, planned.at, context.work)
       const bad = await work.checkDirectory(setting)
       if (bad !== null)
         return {
@@ -248,7 +271,12 @@ export async function executeChat(
           code: bad,
           message: "there is no such directory to work in",
         }
-      const begin = await work.checkBegin(setting, planned.at, context.base)
+      const begin = await work.checkBegin(
+        view,
+        setting,
+        planned.at,
+        context.base,
+      )
       if (begin !== null)
         return {
           kind: "refused",
@@ -258,7 +286,10 @@ export async function executeChat(
               ? "set up the line first: a new thread's lane starts from it"
               : `${context.base ?? "that"} is no WIP bookmark above the line`,
         }
-      const created = await agent.createThreadLane(planned.at, planned.lane)
+      const created = await agent.createThreadLane(
+        { root, at: planned.at },
+        planned.lane,
+      )
       if (created.kind === "refused") {
         return {
           kind: "refused",
@@ -267,6 +298,7 @@ export async function executeChat(
         }
       }
       await work.prepareLane(
+        view,
         created.lane,
         setting,
         planned.at,
@@ -274,7 +306,7 @@ export async function executeChat(
         context.base,
       )
       log(
-        `[host] ${writer.slice(-8)} starts ${readThreadName(doc, created.lane)}`,
+        `[host] ${writer.slice(-8)} starts ${readThreadName(view.session, created.lane)}`,
       )
       return {
         kind: "started",

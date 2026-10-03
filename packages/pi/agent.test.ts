@@ -8,9 +8,12 @@
 import {
   ERR,
   entryId,
+  type LaneName,
   laneNameForThread,
   NOBODY,
   ROOT,
+  type RootId,
+  rootIdFor,
   type ThreadName,
   type ValueWrite,
   writerId,
@@ -18,18 +21,25 @@ import {
 import {
   deleteRecord,
   encodeChat,
+  LANE,
   MARK,
   NAME,
+  recordsOf,
   setRecord,
 } from "@pineta/marginalia"
 import {
+  newRootDoc,
   newSessionDoc,
+  type RootDocHandle,
+  readEntries,
   readLaneNames,
   readValues,
+  rowMessage,
   type SessionDocHandle,
 } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"
+import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
 import { laneErrCode } from "./thread-lanes.ts"
 
@@ -59,31 +69,37 @@ describe("laneErrCode", () => {
 })
 
 describe("createThreadLane (ADR-0057)", () => {
-  const over = (doc: SessionDocHandle) =>
+  const over = (doc: RootDocHandle) =>
     createAgent({
-      doc,
+      documents: oneRoot(doc),
       replicaId: "test",
       model: { kind: "scripted", script: scriptedModel() },
       tools: null,
     })
 
   test("creates the lane under the id it is given, and refuses one pi holds", async () => {
-    const doc = newSessionDoc()
+    const doc = newRootDoc()
     const agent = await over(doc)
     const lane = laneNameForThread(newId())
-    expect(await agent.createThreadLane(ROOT, lane)).toEqual({
+    expect(
+      await agent.createThreadLane({ root: ONE_ROOT, at: ROOT }, lane),
+    ).toEqual({
       kind: "created",
       lane,
     })
     // `harness.lane` would return the lane it holds, ignoring where to create.
-    expect(await agent.createThreadLane(ROOT, lane)).toEqual({
+    expect(
+      await agent.createThreadLane({ root: ONE_ROOT, at: ROOT }, lane),
+    ).toEqual({
       kind: "refused",
       code: ERR.LANE_TAKEN,
     })
     await agent.close()
     // A later process holds it only in the document.
     const later = await over(doc)
-    expect(await later.createThreadLane(ROOT, lane)).toEqual({
+    expect(
+      await later.createThreadLane({ root: ONE_ROOT, at: ROOT }, lane),
+    ).toEqual({
       kind: "refused",
       code: ERR.LANE_TAKEN,
     })
@@ -92,7 +108,7 @@ describe("createThreadLane (ADR-0057)", () => {
   })
 
   test("a lane that does not exist refuses every write as unknown", async () => {
-    const agent = await over(newSessionDoc())
+    const agent = await over(newRootDoc())
     const lane = agent.lane(laneNameForThread(newId()))
     const unknown = { kind: "refused", code: ERR.UNKNOWN_TARGET }
     const message = encodeChat(
@@ -113,9 +129,9 @@ describe("createThreadLane (ADR-0057)", () => {
 })
 
 describe("writeValues (ADR-0062)", () => {
-  const over = (doc: SessionDocHandle) =>
+  const over = (doc: RootDocHandle, session = newSessionDoc()) =>
     createAgent({
-      doc,
+      documents: oneRoot(doc, session),
       replicaId: "test",
       model: { kind: "scripted", script: scriptedModel() },
       tools: null,
@@ -124,24 +140,28 @@ describe("writeValues (ADR-0062)", () => {
   const entry = entryId("e-1")
   const mark = { entry, title: "Plans", by: writerId("ada"), at: 1 }
 
-  test("writes sets and deletes in one call, where the readers find them", async () => {
-    const doc = newSessionDoc()
-    const agent = await over(doc)
+  test("writes sets and deletes in one call, each in the document its target names (ADR-0063)", async () => {
+    const doc = newRootDoc()
+    const session = newSessionDoc()
+    const agent = await over(doc, session)
     await agent.writeValues([
-      setRecord(MARK, mark),
+      setRecord(MARK, mark, ONE_ROOT),
       setRecord(NAME, { lane, name: "amber-fox" as ThreadName, at: 1 }),
     ])
     expect(readValues(doc, "pineta.mark")).toEqual([
       { key: entry, value: { title: "Plans", by: writerId("ada"), at: 1 } },
     ])
-    await agent.writeValues([deleteRecord(MARK, entry)])
+    expect(readValues(session, "pineta.mark")).toEqual([])
+    expect(readValues(session, "pineta.name")).toHaveLength(1)
+    expect(readValues(doc, "pineta.name")).toEqual([])
+    await agent.writeValues([deleteRecord(MARK, entry, ONE_ROOT)])
     expect(readValues(doc, "pineta.mark")).toEqual([])
-    expect(readValues(doc, "pineta.name")).toHaveLength(1)
+    expect(readValues(session, "pineta.name")).toHaveLength(1)
     await agent.close()
   })
 
   test("refuses a namespace that is not the host's, and writes nothing", async () => {
-    const doc = newSessionDoc()
+    const doc = newRootDoc()
     const agent = await over(doc)
     const theirs = {
       kind: "set",
@@ -150,10 +170,131 @@ describe("writeValues (ADR-0062)", () => {
       value: null,
     } as unknown as ValueWrite
     await expect(
-      agent.writeValues([setRecord(MARK, mark), theirs]),
+      agent.writeValues([setRecord(MARK, mark, ONE_ROOT), theirs]),
     ).rejects.toThrow("not the host's")
     expect(readValues(doc, "pineta.mark")).toEqual([])
     expect(readLaneNames(doc)).toEqual([])
+    await agent.close()
+  })
+})
+
+describe("a pi session per root (ADR-0063)", () => {
+  const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+  const chat = (text: string) =>
+    encodeChat(
+      {
+        author: writerId("ada@x.io"),
+        authorName: "Ada",
+        text,
+        compels: NOBODY,
+        sendId: newId(),
+      },
+      1,
+    )
+  /** One session, two roots; each lane's record names its root. */
+  const documents = (
+    session: SessionDocHandle,
+    roots: Map<RootId, RootDocHandle>,
+  ) => ({
+    session,
+    root: async (id: RootId) => {
+      const known = roots.get(id)
+      if (known === undefined) throw new Error(`no root ${id}`)
+      return known
+    },
+    rootOfLane: (lane: LaneName) =>
+      recordsOf(LANE, readValues(session, LANE.namespace)).get(lane)?.root ??
+      null,
+  })
+
+  test("each root's lane writes in its own document, and a later agent finds each by its record", async () => {
+    const session = newSessionDoc()
+    const roots = new Map([
+      [ONE_ROOT, newRootDoc()],
+      [OTHER, newRootDoc()],
+    ])
+    const script = scriptedModel({ answer: { text: "ok" } })
+    const first = await createAgent({
+      documents: documents(session, roots),
+      replicaId: "first",
+      model: { kind: "scripted", script },
+      tools: null,
+    })
+    const lanes = [laneNameForThread(newId()), laneNameForThread(newId())]
+    for (const [i, root] of [ONE_ROOT, OTHER].entries()) {
+      const lane = lanes[i]
+      if (lane === undefined) throw new Error("no lane")
+      expect(await first.createThreadLane({ root, at: ROOT }, lane)).toEqual({
+        kind: "created",
+        lane,
+      })
+      await first.writeValues([
+        setRecord(LANE, {
+          lane,
+          root,
+          work: null,
+          by: writerId("ada@x.io"),
+          createdAt: 1,
+        }),
+      ])
+      expect(await first.lane(lane).run(chat(`in ${root}`))).toEqual({
+        kind: "ok",
+      })
+    }
+    await first.close()
+    const texts = (root: RootId) =>
+      Object.values(readEntries(roots.get(root) ?? newRootDoc()))
+        .map(rowMessage)
+        .map(m => (m as { content?: unknown }).content)
+        .filter(c => typeof c === "string")
+    expect(texts(ONE_ROOT).join()).toContain(`in ${ONE_ROOT}`)
+    expect(texts(ONE_ROOT).join()).not.toContain(`in ${OTHER}`)
+    expect(texts(OTHER).join()).toContain(`in ${OTHER}`)
+    // A later process: each lane is found in its root, by its record.
+    const second = await createAgent({
+      documents: documents(session, roots),
+      replicaId: "second",
+      model: { kind: "scripted", script },
+      tools: null,
+    })
+    for (const lane of lanes)
+      expect(await second.lane(lane).run(chat("again"))).toEqual({ kind: "ok" })
+    expect(await second.interrupted([ONE_ROOT, OTHER])).toEqual([])
+    await second.close()
+  })
+
+  test("a released root's harness is closed, and the next call opens its document again", async () => {
+    const session = newSessionDoc()
+    const roots = new Map([[ONE_ROOT, newRootDoc()]])
+    const opened: RootId[] = []
+    const docs = documents(session, roots)
+    const agent = await createAgent({
+      documents: {
+        ...docs,
+        root: id => {
+          opened.push(id)
+          return docs.root(id)
+        },
+      },
+      replicaId: "release",
+      model: { kind: "scripted", script: scriptedModel() },
+      tools: null,
+    })
+    const at = { root: ONE_ROOT, at: ROOT }
+    await agent.appendToTree(chat("one"), at)
+    await agent.appendToTree(chat("two"), at)
+    expect(opened).toEqual([ONE_ROOT])
+    // The host lets the document go, and opens a fresh one for it later.
+    await agent.release(ONE_ROOT)
+    roots.set(ONE_ROOT, newRootDoc())
+    expect(await agent.appendToTree(chat("three"), at)).toMatchObject({
+      kind: "appended",
+    })
+    expect(opened).toEqual([ONE_ROOT, ONE_ROOT])
+    expect(
+      Object.keys(readEntries(roots.get(ONE_ROOT) ?? newRootDoc())),
+    ).toHaveLength(1)
+    await agent.release(OTHER)
     await agent.close()
   })
 })

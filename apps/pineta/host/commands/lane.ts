@@ -43,14 +43,27 @@ export async function handleStop(
   by: WriterId,
 ): Promise<Outcome> {
   const { agent } = deps
-  const { doc, places, now } = deps.basics
+  const { docs, live, places, now } = deps.basics
+  // The lane's root's document (ADR-0063); a lane no root holds is unknown.
+  const root = docs.rootOfLane(lane)
+  if (root === null)
+    return {
+      kind: "refused",
+      code: ERR.UNKNOWN_TARGET,
+      message: "no such lane to stop",
+    }
+  const doc = await docs.root(root)
   const index = readTreeIndex(doc)
-  const planned = planStop(readLanes(doc, index, readPlaces(places)), lane, {
-    index,
-    stops: readStops(doc),
-    by,
-    now: now(),
-  })
+  const planned = planStop(
+    readLanes({ doc, live }, index, readPlaces(places)),
+    lane,
+    {
+      index,
+      stops: readStops(doc),
+      by,
+      now: now(),
+    },
+  )
   if (planned.kind === "unknown")
     return {
       kind: "refused",
@@ -59,7 +72,7 @@ export async function handleStop(
     }
   if (planned.kind === "abort") {
     if (planned.record !== null)
-      await agent.writeValues([setRecord(STOP, planned.record)])
+      await agent.writeValues([setRecord(STOP, planned.record, root)])
     await agent.lane(lane).abort()
   }
   return { kind: "stopped" }
@@ -85,8 +98,16 @@ export async function actOnOffer(
       message: "this host has no lanes of their own",
     }
   if (action === "split") {
-    const { doc, places } = deps.basics
-    const view = readLane(doc, lane, readPlaces(places))
+    const { docs, live, places } = deps.basics
+    const root = docs.rootOfLane(lane)
+    const view =
+      root === null
+        ? undefined
+        : readLane(
+            { doc: await docs.root(root), live },
+            lane,
+            readPlaces(places),
+          )
     if (view === undefined || isBusy(view))
       return {
         kind: "refused",

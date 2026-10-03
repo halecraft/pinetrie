@@ -1,6 +1,6 @@
 // host/settle — what happens between runs, as one serial step.
 
-import type { LaneName } from "@pineta/core"
+import type { LaneName, RootId } from "@pineta/core"
 import { type Basics, failed } from "./basics.ts"
 import type { Serial } from "./queue.ts"
 
@@ -15,23 +15,38 @@ import type { Serial } from "./queue.ts"
  * session still compacts.
  */
 export function createSettle(input: {
-  readonly basics: Pick<Basics, "doc" | "log">
+  readonly basics: Pick<Basics, "session" | "log">
   readonly serial: Serial
   readonly drain: (lane: LaneName) => Promise<void>
-  readonly compact: () => Promise<void>
+  /** The root a lane works in: its document is compacted with the session's. */
+  readonly rootOf: (lane: LaneName) => RootId | null
+  readonly compact: (roots: ReadonlySet<RootId>) => Promise<void>
+  /** Before compacting: what must be written first (the directory's refreshes). */
+  readonly beforeCompact: () => Promise<void>
   readonly sweep: () => Promise<void>
 }): (lanes: readonly LaneName[]) => Promise<void> {
   const { basics, serial } = input
   let compactionQueued = false
+  // The roots the queued compaction covers: those of every settle it absorbed.
+  let roots = new Set<RootId>()
   return lanes => {
     const compact = !compactionQueued
     compactionQueued = true
+    for (const lane of lanes) {
+      const root = input.rootOf(lane)
+      if (root !== null) roots.add(root)
+    }
     return serial.run(async () => {
       for (const lane of lanes)
         await input.drain(lane).catch(failed(basics, "draining", lane))
       if (!compact) return
       compactionQueued = false
-      await input.compact().catch(failed(basics, "compaction"))
+      const covered = roots
+      roots = new Set()
+      await input
+        .beforeCompact()
+        .then(() => input.compact(covered))
+        .catch(failed(basics, "compaction"))
       await input.sweep().catch(failed(basics, "deleting unreferenced images"))
     })
   }

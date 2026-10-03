@@ -246,7 +246,32 @@ Precedent: **jj has both** — an operation log (undo, cross-machine concurrency
 *and* a commit DAG with explicit parents. It deliberately does not derive
 branches from the op log. Our mapping is exact. (ADR-0008)
 
+### Documents (ADR-0063)
+
+```
+pineta:session   StorageDoc, no entries   session-wide host records:
+                                          the directory of roots (pineta.root),
+                                          every lane's record (pineta.lane),
+                                          the archive, names, offers, banners
+root:<RootId>    StorageDoc, one a root   that root's pi storage (entries,
+                                          values, lists) and the records keyed
+                                          by its entries (revision, mark, stop)
+pineta:live      LiveDoc                  streams and active runs: compacted
+                                          at every run's end, needed by no
+                                          restarted host
+pineta:places    the cards' places        (ADR-0059)
+presence         ephemeral                who reads which thread, in which root
+```
+
+The host holds the session, `live`, the places and every root not archived.
+A client holds the session, `live`, the places and only the roots its tabs
+show; it reads every other root through its directory record. pi runs one
+session and one harness per document.
+
 ### Document shape (entries: settled by S7; rest sketch)
+
+The shape of a `StorageDoc`: a root's document has all of it, the session's
+no entries.
 
 - **entries** — `Schema.record(Schema.struct.json({...}))`: a dynamic-key map
   keyed by UUIDv7, values opaque immutable blobs. **Not** `Schema.list` (not
@@ -255,8 +280,9 @@ branches from the op log. Our mapping is exact. (ADR-0008)
   **Not** `Schema.set` (rejected at runtime by the Loro backend this ran on
   then: `'set-op' is not yet supported`). `record` also gives O(1)
   `getEntries(ids)`, which is exactly pi's `Storage` access pattern.
-  Since ADR-0023 the document is authoritative JSON (`json.bind`), written by
-  the host alone and compacted between runs.
+  Since ADR-0023 each document is authoritative JSON (`json.bind`), written by
+  the host alone and compacted between runs: since ADR-0063, only the
+  documents a run touched.
 
   > **Load-bearing invariant (ADR-0009): entry ids must be unique.** A Loro map
   > is a per-key LWW register; grow-only-set semantics emerge *only* because
@@ -275,7 +301,7 @@ branches from the op log. Our mapping is exact. (ADR-0008)
   > pointer. `pi.op.*` is keyed by `operationId` and presumptively uncontended
   > (assumed, not verified).
 - **lists** — grow-only list + tombstones. Carries `pi.pending.assistant_frame`.
-- **pending assistant text** — durable **`Schema.text()`**, written with
+- **pending assistant text** — in `pineta:live` since ADR-0063; durable **`Schema.text()`**, written with
   `insert(at, delta)` and cleared on commit (ADR-0014). Ships only the inserted
   characters. **Do not use `Schema.string()` for anything that accumulates** —
   it is a whole-value LWW register, so appending to it is O(n²) **on every

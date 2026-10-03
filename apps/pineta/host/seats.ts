@@ -22,12 +22,12 @@ export function startSeats(input: {
   readonly exchange: {
     readonly peers: Pick<Exchange["peers"], "current" | "subscribe">
   }
-  readonly basics: Pick<Basics, "doc" | "now">
+  readonly basics: Pick<Basics, "session" | "now">
   readonly serial: Serial
   readonly agent: Pick<Agent, "writeValues">
 }): { stop(): void } {
   const { exchange, serial, agent } = input
-  const { doc, now } = input.basics
+  const { session: doc, now } = input.basics
   const step = () =>
     serial.run(async () => {
       // gather

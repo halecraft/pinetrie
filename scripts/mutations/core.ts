@@ -9,6 +9,15 @@ const core = "packages/core/index.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a chat at the root may name any root",
+    file: "packages/protocol/codec.ts",
+    from: "        ? parseNewRoot(rootText)\n",
+    to: "        ? (isRootId(rootText) ? rootText : undefined)\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect:
+      "decode: a chat names its root (ADR-0063): a new one, minted, at the root; one it is in, at an entry",
+  },
+  {
     name: "every inventory is one place",
     file: core,
     from: '      return b.kind === "inventory" && a.holder === b.holder',
@@ -197,10 +206,26 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a client may write the session",
     file: "packages/protocol/writers.ts",
-    from: "  if (docId === SESSION_DOC_ID || docId === PLACES_DOC_ID)",
-    to: "  if (docId === PLACES_DOC_ID)",
+    from: "  docId === SESSION_DOC_ID ||\n",
+    to: "",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
-    expect: "mayWrite: the session and the places are the host's",
+    expect: "mayWrite: the session, the places and now are the host's",
+  },
+  {
+    name: "a client may write what streams",
+    file: "packages/protocol/writers.ts",
+    from: "  docId === LIVE_DOC_ID ||\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "mayWrite: the session, the places and now are the host's",
+  },
+  {
+    name: "a client may write a root",
+    file: "packages/protocol/writers.ts",
+    from: "  docId === LIVE_DOC_ID ||\n  rootOfDocId(docId) !== undefined",
+    to: "  docId === LIVE_DOC_ID",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "mayWrite: the session, the places and now are the host's",
   },
   {
     name: "anyone writes anyone's inventory",
@@ -208,7 +233,7 @@ export const mutations: readonly Mutation[] = [
     from: "  return principal === HOST_PRINCIPAL || holds",
     to: "  return true",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
-    expect: "mayWrite: the session and the places are the host's",
+    expect: "mayWrite: the session, the places and now are the host's",
   },
   {
     name: "the host may not relay an inventory",
@@ -216,13 +241,13 @@ export const mutations: readonly Mutation[] = [
     from: "  return principal === HOST_PRINCIPAL || holds",
     to: "  return holds",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
-    expect: "mayWrite: the session and the places are the host's",
+    expect: "mayWrite: the session, the places and now are the host's",
   },
   {
     name: "the wire drops an inventory's holder",
     file: "packages/protocol/codec.ts",
-    from: "  return JSON.stringify({ kind, at, lane, column, seen, holder })",
-    to: "  return JSON.stringify({ kind, at, lane, column, seen })",
+    from: "  return JSON.stringify({ kind, root, at, lane, column, seen, holder })",
+    to: "  return JSON.stringify({ kind, root, at, lane, column, seen })",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect: "encodeIntent -> decodeCommand round-trips every intent",
   },

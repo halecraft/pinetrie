@@ -251,10 +251,19 @@ export const mutations: readonly Mutation[] = [
     expect: "refuses while the agent works in the root",
   },
   {
+    name: "an archived root's records are found by no entry",
+    file: "packages/marginalia/archive.ts",
+    from: '  const record = entry === null ? undefined : archive.get(entry)\n  return record?.state === "archived" ? record : null',
+    to: "  const record = entry === null ? undefined : archive.get(entry)\n  return record ?? null",
+    command: unit,
+    expect:
+      "an archived root refuses; a restored one, an unknown one and none do not",
+  },
+  {
     name: "a restored root stays read-only",
     file: archive,
-    from: '  return record?.state === "archived" ? record : null',
-    to: "  return record ?? null",
+    from: '  const record = root === null ? undefined : archive.get(root)\n  return record?.state === "archived" ? record : null',
+    to: "  const record = root === null ? undefined : archive.get(root)\n  return record ?? null",
     command: unit,
     expect: "a restored root, a root with no record",
   },
@@ -466,10 +475,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a mark writes nowhere, so an archived root takes it",
     file: "packages/marginalia/archive.ts",
-    from: '    case "mark":\n      return intent.entry',
+    from: '    case "mark":\n      return intent.root',
     to: '    case "mark":\n      return null',
     command: unit,
-    expect: "a mark: its entry",
+    expect: "a mark: its root",
   },
   {
     name: "a taken offer's commit is read",
@@ -668,8 +677,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "planUnsent writes queued",
     file: "packages/marginalia/card.ts",
-    from: '    place: { kind: "drafting", at: card.place.at, lane: card.place.lane },',
-    to: "    place: card.place,",
+    from: "      root: card.place.root,\n      at: card.place.at,\n      lane: card.place.lane,\n    },\n    unsent: reason,",
+    to: "      root: card.place.root,\n      at: card.place.at,\n      lane: card.place.lane,\n    } && card.place,\n    unsent: reason,",
     command: unit,
     expect: "planUnsent: the whole record, drafting where it was queued",
   },
@@ -888,8 +897,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move into an inventory writes in a root",
     file: archive,
-    from: '        to.kind === "inventory" ||',
-    to: "",
+    from: '      return to === null || to.kind === "fresh" || to.kind === "inventory"',
+    to: '      return to === null || to.kind === "fresh"',
     command: unit,
     expect: "a move into an inventory",
   },
@@ -912,8 +921,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "setRecord keys by namespace",
     file: "packages/marginalia/records.ts",
-    from: "  key: spec.keyOf(record),",
-    to: "  key: spec.namespace,",
+    from: "    key: spec.keyOf(record),\n    value: spec.encode(record),\n  }\n}",
+    to: "    key: spec.namespace,\n    value: spec.encode(record),\n  }\n}",
     command: unit,
     expect: "reads back whole from what is stored, at its address",
   },

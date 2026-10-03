@@ -3,7 +3,15 @@ import { STOP, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { basics, fakeLane, methods, putValue, record, row } from "../fakes.ts"
+import {
+  basics,
+  fakeLane,
+  methods,
+  putValue,
+  ROOT_ID,
+  record,
+  row,
+} from "../fakes.ts"
 import { handleStop } from "./lane.ts"
 
 const ada = writerId("ada@example.com")
@@ -13,13 +21,13 @@ const bea = writerId("bea@example.com")
 function running() {
   const b = basics()
   const lane = laneNameForThread("0123456789abcdef")
-  writeEntry(b.doc, row(entryId("e-1"), null))
+  writeEntry(b.root, row(entryId("e-1"), null))
   writeEntry(
-    b.doc,
+    b.root,
     row(entryId("e-2"), "e-1", { role: "assistant", content: "working" }),
   )
-  writeLaneTip(b.doc, lane, entryId("e-2"))
-  beginRun(b.doc, lane, runId("r-1"))
+  writeLaneTip(b.root, lane, entryId("e-2"))
+  beginRun(b.live, lane, runId("r-1"))
   const handle = fakeLane(lane, { abort: async () => {} })
   const agent = record<Pick<Agent, "lane" | "writeValues">>({
     lane: () => handle.lane,
@@ -36,7 +44,15 @@ test("stopping a running lane records who stopped its ask, then aborts its run",
   expect(agent.calls).toEqual([
     {
       method: "writeValues",
-      args: [[setRecord(STOP, { prompt: entryId("e-1"), by: ada, at: 1_000 })]],
+      args: [
+        [
+          setRecord(
+            STOP,
+            { prompt: entryId("e-1"), by: ada, at: 1_000 },
+            ROOT_ID,
+          ),
+        ],
+      ],
     },
     { method: "lane", args: [lane] },
   ])
@@ -45,7 +61,10 @@ test("stopping a running lane records who stopped its ask, then aborts its run",
 
 test("a second stop of the same ask records nothing more", async () => {
   const { b, lane, handle, agent } = running()
-  putValue(b.doc, setRecord(STOP, { prompt: entryId("e-1"), by: bea, at: 1 }))
+  putValue(
+    b,
+    setRecord(STOP, { prompt: entryId("e-1"), by: bea, at: 1 }, ROOT_ID),
+  )
   await handleStop({ basics: b, agent: agent.port }, lane, ada)
   expect(methods(agent.calls)).toEqual(["lane"])
   expect(methods(handle.calls)).toEqual(["abort"])

@@ -7,7 +7,6 @@ import {
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import type { CardMarks } from "./card-marks.ts"
-import { tree } from "./fixtures.ts"
 import {
   type ActiveTab,
   initialLayout,
@@ -109,8 +108,7 @@ describe("tabsView", () => {
     expect(dropsWords([])).toBe(null)
   })
 
-  test("offeredByRoot: each open offer's thread, under the root its tip is in", () => {
-    const index = tree({ r1: null, a: "r1", r2: null })
+  test("offeredByRoot: each open offer's named thread, under its root", () => {
     const lane = (n: string) => n as LaneName
     const names = new Map([
       [lane("l1"), "amber-fox" as ThreadName],
@@ -118,11 +116,10 @@ describe("tabsView", () => {
     ])
     expect(
       offeredByRoot(
-        index,
         [
-          { lane: lane("l1"), tip: entryId("a") },
-          { lane: lane("l2"), tip: entryId("r1") },
-          { lane: lane("l3"), tip: entryId("r2") },
+          { lane: lane("l1"), root: entryId("r1") },
+          { lane: lane("l2"), root: entryId("r1") },
+          { lane: lane("l3"), root: entryId("r2") },
         ],
         names,
       ),

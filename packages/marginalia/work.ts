@@ -24,6 +24,7 @@ import {
   type ForkStart,
   HOST_WORKING_COPY,
   isLaneName,
+  isRootId,
   isSha256,
   type LandingRecord,
   type LaneBase,
@@ -62,7 +63,8 @@ const WorkSettingSchema = Type.Union([
 ])
 
 const LaneRecordSchema = Type.Object({
-  work: WorkSettingSchema,
+  root: Type.String({ minLength: 1 }),
+  work: Type.Union([WorkSettingSchema, Type.Null()]),
   by: Type.String(),
   createdAt: Type.Number(),
 })
@@ -191,23 +193,33 @@ const BaseRecordSchema = Type.Object({
   ]),
 })
 
-/** Each lane's setting: its own copy, or a directory. */
-export const LANE: RecordSpec<LaneRecord, LaneName> = {
+/**
+ * Each lane's record, written as the lane is created: the root it works in
+ * (ADR-0063), and its setting, its own copy or a directory, or null for none.
+ */
+export const LANE: RecordSpec<LaneRecord, LaneName, "session"> = {
   namespace: "pineta.lane",
+  home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(LaneRecordSchema, contents, laneKey(key), (r, lane) => ({
-      lane,
-      work: r.work,
-      by: r.by as WriterId,
-      createdAt: r.createdAt,
-    })),
+    decodeAt(LaneRecordSchema, contents, laneKey(key), (r, lane) =>
+      isRootId(r.root)
+        ? {
+            lane,
+            root: r.root,
+            work: r.work,
+            by: r.by as WriterId,
+            createdAt: r.createdAt,
+          }
+        : undefined,
+    ),
 }
 
 /** The commit and disk at an entry, and its turn's paths, at the entry. */
-export const REVISION: RecordSpec<RevisionRecord, EntryId> = {
+export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
   namespace: "pineta.revision",
+  home: "root",
   keyOf: r => r.entry,
   encode: ({ entry, ...contents }) => ({
     ...contents,
@@ -231,8 +243,9 @@ export const REVISION: RecordSpec<RevisionRecord, EntryId> = {
 }
 
 /** How each resolution ended, at its own id. */
-export const LANDING: RecordSpec<LandingRecord, string> = {
+export const LANDING: RecordSpec<LandingRecord, string, "session"> = {
   namespace: "pineta.landing",
+  home: "session",
   keyOf: r => r.id,
   encode: ({ id, ...contents }) => contents,
   decode: (contents, key) =>
@@ -251,8 +264,9 @@ export const LANDING: RecordSpec<LandingRecord, string> = {
 }
 
 /** Each lane's offer in your repo, at the lane. */
-export const OFFER: RecordSpec<OfferRecord, LaneName> = {
+export const OFFER: RecordSpec<OfferRecord, LaneName, "session"> = {
   namespace: "pineta.offer",
+  home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => ({
     ...contents,
@@ -281,8 +295,9 @@ export const OFFER: RecordSpec<OfferRecord, LaneName> = {
 }
 
 /** The integration line, at its one key. */
-export const LINE: RecordSpec<LineRecord, typeof LINE_KEY> = {
+export const LINE: RecordSpec<LineRecord, typeof LINE_KEY, "session"> = {
   namespace: "pineta.line",
+  home: "session",
   keyOf: () => LINE_KEY,
   encode: r => ({
     ...r,
@@ -314,8 +329,9 @@ export const LINE: RecordSpec<LineRecord, typeof LINE_KEY> = {
 }
 
 /** Each lane's base, as its history says it, at the lane. */
-export const BASE: RecordSpec<BaseRecord, LaneName> = {
+export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
   namespace: "pineta.base",
+  home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => ({
     ...contents,
@@ -331,8 +347,9 @@ export const BASE: RecordSpec<BaseRecord, LaneName> = {
 }
 
 /** Each thread's name, `word-word`, at its lane (ADR-0039). */
-export const NAME: RecordSpec<NameRecord, LaneName> = {
+export const NAME: RecordSpec<NameRecord, LaneName, "session"> = {
   namespace: "pineta.name",
+  home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
@@ -344,8 +361,9 @@ export const NAME: RecordSpec<NameRecord, LaneName> = {
 }
 
 /** Each thread's column banner, the image's hash, at its lane. */
-export const BANNER: RecordSpec<BannerRecord, LaneName> = {
+export const BANNER: RecordSpec<BannerRecord, LaneName, "session"> = {
   namespace: "pineta.banner",
+  home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
@@ -355,13 +373,20 @@ export const BANNER: RecordSpec<BannerRecord, LaneName> = {
 }
 
 /** What the host found where it runs, at its one key. */
-export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY> = {
-  namespace: "pineta.project",
-  keyOf: () => PROJECT_KEY,
-  encode: r => ({ ...r }),
-  decode: (contents, key) =>
-    decodeAt(ProjectRecordSchema, contents, fixedKey(PROJECT_KEY, key), r => r),
-}
+export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
+  {
+    namespace: "pineta.project",
+    home: "session",
+    keyOf: () => PROJECT_KEY,
+    encode: r => ({ ...r }),
+    decode: (contents, key) =>
+      decodeAt(
+        ProjectRecordSchema,
+        contents,
+        fixedKey(PROJECT_KEY, key),
+        r => r,
+      ),
+  }
 
 /** The commands the host's pi loaded, as people see them (ADR-0036). */
 export interface CommandsRecord {
@@ -369,8 +394,13 @@ export interface CommandsRecord {
 }
 
 /** What the host's pi loaded, at its one key. */
-export const COMMANDS: RecordSpec<CommandsRecord, typeof COMMANDS_KEY> = {
+export const COMMANDS: RecordSpec<
+  CommandsRecord,
+  typeof COMMANDS_KEY,
+  "session"
+> = {
   namespace: "pineta.commands",
+  home: "session",
   keyOf: () => COMMANDS_KEY,
   encode: r => ({ commands: r.commands.map(c => ({ ...c })) }),
   decode: (contents, key) =>

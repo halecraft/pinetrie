@@ -5,11 +5,10 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { cardId, type ImageRef, type LaneName, ROOT } from "@pineta/core"
 import { scriptedModel, sha256Of } from "@pineta/pi"
-import { readLaneNames } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { idleNow, join, waitFor } from "../harness.ts"
+import { idleNow, join, laneNamesOf, rootAt, waitFor } from "../harness.ts"
 import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -95,7 +94,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 4. A card queued for its lane carries its images when it is taken.
     const green = await upload(GREEN_PNG)
-    const replyId = idOfIn(ih.doc, "a red one")
+    const replyId = idOfIn(ih, "a red one")
     const paused = script.pause("hold on")
     script.use([{ text: "held" }, { text: "a green one" }])
     await iu.chat("@agent hold on", at(replyId), {
@@ -103,14 +102,19 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     await waitFor(() => paused.reached, 10_000)
     const queuedText = `@agent and this? ![green](/blob/${green.sha256})`
-    const lane = readLaneNames(ih.doc)[0] as LaneName | undefined
+    const lane = laneNamesOf(ih)[0] as LaneName | undefined
     const queued = cardId(crypto.randomUUID())
     iu.createCard(
       {
         id: queued,
         owner: iu.writer,
         placer: iu.writer,
-        place: { kind: "drafting", at: at(replyId), lane: lane ?? null },
+        place: {
+          kind: "drafting",
+          root: rootAt(iu, at(replyId)),
+          at: at(replyId),
+          lane: lane ?? null,
+        },
         command: null,
         unsent: null,
       },
@@ -124,11 +128,9 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 5. An image the host does not store refuses the send.
     const missing = "9".repeat(64)
-    await iu.chat(
-      `![gone](/blob/${missing})`,
-      at(idOfIn(ih.doc, "a green one")),
-      { mode: "reply" },
-    )
+    await iu.chat(`![gone](/blob/${missing})`, at(idOfIn(ih, "a green one")), {
+      mode: "reply",
+    })
 
     // 6. No image bytes in the session's records, compacted.
     await ih.quiet()
@@ -148,7 +150,8 @@ async function run(check: Checks["check"]): Promise<void> {
         placer: iu.writer,
         place: {
           kind: "drafting",
-          at: at(idOfIn(ih.doc, "a green one")),
+          root: rootAt(iu, at(idOfIn(ih, "a green one"))),
+          at: at(idOfIn(ih, "a green one")),
           lane: null,
         },
         command: null,
@@ -165,7 +168,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await sleep(GRACE_MS + 200)
     const iv = await join(ih, "ivy", "images")
     script.use([{ text: "swept" }])
-    await iv.chat("@agent anything", at(idOfIn(ih.doc, "a green one")), {
+    await iv.chat("@agent anything", at(idOfIn(ih, "a green one")), {
       mode: "reply",
     })
     await iidle()
@@ -179,7 +182,7 @@ async function run(check: Checks["check"]): Promise<void> {
         },
       },
     ])
-    await iv.chat("@agent and the first one?", at(idOfIn(ih.doc, "swept")), {
+    await iv.chat("@agent and the first one?", at(idOfIn(ih, "swept")), {
       mode: "reply",
     })
     await iidle()

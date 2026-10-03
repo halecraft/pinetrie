@@ -20,6 +20,7 @@
 // Kyneta's default.
 
 import { type Policy, routeLine } from "@kyneta/exchange"
+import { type RootId, rootOfDocId } from "@pineta/core"
 import { PRESENCE_DOC_ID } from "@pineta/protocol/messages"
 import { holdsInventory, writerOfInventoryDoc } from "@pineta/protocol/writers"
 import { cardIdOfDoc } from "@pineta/schema"
@@ -28,13 +29,19 @@ const isUndo = (docId: string): boolean => docId.startsWith("undo:")
 
 /**
  * What the host makes of a document a client announces and the host does not
- * hold: a card's text, a person's inventory, or a tab's undo stack to reject.
- * Undefined leaves it to Kyneta's default. Without this, a document the host
- * never opened itself would be neither stored nor relayed (S58). Pure.
+ * hold: a card's text, a person's inventory, a root's document the directory
+ * names, which the host loads from its store (an archived root, ADR-0063),
+ * or a tab's undo stack or an unknown root to reject: only the host makes
+ * roots. Undefined leaves it to Kyneta's default. Without this, a document
+ * the host never opened itself would be neither stored nor relayed (S58).
+ * Pure.
  */
 export function resolveDoc(
   docId: string,
-): "text" | "inventory" | "reject" | undefined {
+  known: (root: RootId) => boolean,
+): "text" | "inventory" | "root" | "reject" | undefined {
+  const root = rootOfDocId(docId)
+  if (root !== undefined) return known(root) ? "root" : "reject"
   if (cardIdOfDoc(docId) !== undefined) return "text"
   if (writerOfInventoryDoc(docId) !== undefined) return "inventory"
   if (isUndo(docId)) return "reject"

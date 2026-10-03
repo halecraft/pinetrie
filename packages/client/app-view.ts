@@ -9,11 +9,14 @@ import {
   type ArchiveRecord,
   type EntryId,
   type LaneName,
+  type LaneRecord,
   type LaneView,
   type OfferRecord,
   PENDING_TRACK,
   projectRail,
   type RailRow,
+  type RootId,
+  type RootRecord,
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
@@ -71,13 +74,32 @@ export interface AppViewInput {
   readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly offers: ReadonlyMap<LaneName, OfferRecord>
+  /** The lanes of the roots this tab holds. */
   readonly lanes: readonly LaneView[]
+  /** Every lane's root entry (`laneRootsOf`), held or not. */
+  readonly laneRoots: ReadonlyMap<LaneName, EntryId>
 }
 
-/** An open offer, for the header: its lane, and the tip it leads to. */
+/** Every lane's root entry: its `LaneRecord`'s root, through the directory (ADR-0063). */
+export const laneRootsOf = (
+  records: ReadonlyMap<LaneName, LaneRecord>,
+  directory: ReadonlyMap<RootId, RootRecord>,
+): ReadonlyMap<LaneName, EntryId> =>
+  new Map(
+    [...records.values()].flatMap(r => {
+      const entry = directory.get(r.root)?.entry ?? null
+      return entry === null ? [] : [[r.lane, entry] as const]
+    }),
+  )
+
+/**
+ * An open offer, for the header: its lane, its root entry, and where it
+ * opens: its lane's tip, or its root entry in a root this tab does not hold.
+ */
 export interface OpenOffer {
   readonly lane: LaneName
-  readonly tip: EntryId
+  readonly root: EntryId
+  readonly end: EntryId
 }
 
 export function appView(input: AppViewInput): {
@@ -118,10 +140,18 @@ function workspaceOf(input: AppViewInput): Workspace {
   }
 }
 
+/**
+ * The offers not taken, each in a root with an entry. A lane this tab holds
+ * opens at its tip, and one with none yet is left out; any other lane opens
+ * at its root entry (ADR-0063).
+ */
 const openOffers = (input: AppViewInput): readonly OpenOffer[] =>
   [...input.offers.values()].flatMap(o => {
-    const tip = input.lanes.find(l => l.name === o.lane)?.tip
-    return o.taken === null && tip != null ? [{ lane: o.lane, tip }] : []
+    const root = input.laneRoots.get(o.lane)
+    if (o.taken !== null || root === undefined) return []
+    const held = input.lanes.find(l => l.name === o.lane)
+    if (held === undefined) return [{ lane: o.lane, root, end: root }]
+    return held.tip === null ? [] : [{ lane: o.lane, root, end: held.tip }]
   })
 
 /** The rows the tab's rail draws: its own root's only, and none off a root. */

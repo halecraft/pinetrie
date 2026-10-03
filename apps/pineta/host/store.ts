@@ -2,10 +2,12 @@
 //
 // Kyneta's exchange store (`@kyneta/sqlite-store`) over Node's built-in
 // `node:sqlite`, so there is no native dependency (S22). It holds every
-// document the host serves, one append-only record stream per document: today
-// the one `SessionDoc`, which is also pi's storage. It is not a pi session
-// file. A later change to the document's root schema cannot open an existing
-// store: migrate it, or start a new file. The host's images are in the same
+// document the host serves, one append-only record stream per document: the
+// session's records, `pineta:live`, the places, and one `StorageDoc` per root,
+// which is that root's pi storage (ADR-0063). It is not a pi session file. A
+// document whose root schema drops a field still opens (S86); any other
+// change to it cannot open an existing store: migrate it
+// (`scripts/split-session.ts` did), or start a new file. The host's images are in the same
 // file, in `pineta_blobs` (`blobs.ts`, ADR-0042), on the same connection.
 //
 // The store owns its file (S47). Kyneta's SQLite store issues the same seat on

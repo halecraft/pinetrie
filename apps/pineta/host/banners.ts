@@ -34,14 +34,14 @@ type BannerAgent = Pick<
 >
 
 export function createBanners(deps: {
-  readonly basics: Pick<Basics, "doc" | "log" | "now">
+  readonly basics: Pick<Basics, "session" | "log" | "now">
   readonly serial: Serial
   readonly blobs: Pick<BlobStore, "put" | "ref">
   /** Read lazily: the agent is made with `request` as its tool's port. */
   readonly agent: () => BannerAgent
 }): Banners {
   const { basics, serial, blobs } = deps
-  const { doc, log } = basics
+  const { session: doc, log } = basics
   // Lanes whose banner is being made: a run's end does not start a second.
   const generating = new Set<LaneName>()
 

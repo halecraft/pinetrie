@@ -6,6 +6,8 @@ import {
   cardId,
   type LaneName,
   laneNameForThread,
+  type RootId,
+  rootIdFor,
 } from "@pineta/core"
 
 /** A uuidv7: 48 bits of milliseconds, the version, the variant, randomness. */
@@ -26,3 +28,9 @@ export const newCardId = (): CardId => cardId(newUuidv7())
  * (ADR-0057). The host accepts only this shape (`parseNewLane`).
  */
 export const newLaneName = (): LaneName => laneNameForThread(newUuidv7())
+
+/**
+ * A new root's id, minted by the tab whose first message starts it
+ * (ADR-0063). The host accepts only this shape (`parseNewRoot`).
+ */
+export const newRootId = (): RootId => rootIdFor(newUuidv7())

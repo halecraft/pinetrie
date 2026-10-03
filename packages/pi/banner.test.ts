@@ -20,10 +20,10 @@ import {
   encodeChat,
 } from "@pineta/marginalia"
 import {
-  newSessionDoc,
+  newRootDoc,
+  type RootDocHandle,
   readEntries,
   rowMessage,
-  type SessionDocHandle,
 } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"
@@ -33,6 +33,7 @@ import {
   drawnOf,
   parseBannerArgs,
 } from "./banner.ts"
+import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import {
   SCRIPTED_IMAGE_PNG,
   type ScriptedModel,
@@ -113,18 +114,18 @@ describe("banners in a harness", () => {
 
   /** An agent over `doc`, with banners when `asks` is given. */
   const agentOver = (
-    doc: SessionDocHandle,
+    doc: RootDocHandle,
     script: ScriptedModel,
     asks?: { lane: LaneName; ask: BannerAsk }[],
   ) =>
     createAgent({
-      doc,
+      documents: oneRoot(doc),
       replicaId: "test",
       model: { kind: "scripted", script },
       tools: {
         project: root,
         access: () => ({ kind: "direct", dir: root, ready: Promise.resolve() }),
-        hooks: { turnDone: async () => {}, askedForGuidance() {} },
+        hooks: { turnDone: async () => {}, askedForGuidance: () => false },
       },
       ...(asks === undefined
         ? {}
@@ -139,18 +140,21 @@ describe("banners in a harness", () => {
           }),
     })
 
-  const toolResults = (doc: SessionDocHandle) =>
+  const toolResults = (doc: RootDocHandle) =>
     Object.values(readEntries(doc))
       .map(rowMessage)
       .filter(m => (m as { role?: string }).role === "toolResult")
       .map(m => messageText(m as never))
 
   test("the tool sends the calling thread's ask, and tells the agent the answer", async () => {
-    const doc = newSessionDoc()
+    const doc = newRootDoc()
     const script = scriptedModel()
     const asks: { lane: LaneName; ask: BannerAsk }[] = []
     const agent = await agentOver(doc, script, asks)
-    const made = await agent.createThreadLane(ROOT, laneNameForThread(newId()))
+    const made = await agent.createThreadLane(
+      { root: ONE_ROOT, at: ROOT },
+      laneNameForThread(newId()),
+    )
     if (made.kind !== "created") throw new Error("no lane")
     script.use([
       { tool: BANNER_TOOL, args: { direction: "at dusk" } },
@@ -167,51 +171,54 @@ describe("banners in a harness", () => {
     await agent.close()
   })
 
-  test("a lane stored before banners were on gets the tool at its next run's end", async () => {
-    const doc = newSessionDoc()
+  test("a lane stored before banners were on is given the tool when it is first held", async () => {
+    const doc = newRootDoc()
+    // pi stores a new lane's tools: then banners were off.
     const before = await agentOver(doc, scriptedModel())
-    const made = await before.createThreadLane(ROOT, laneNameForThread(newId()))
+    const made = await before.createThreadLane(
+      { root: ONE_ROOT, at: ROOT },
+      laneNameForThread(newId()),
+    )
     if (made.kind !== "created") throw new Error("no lane")
-    // A landing stores the lane's tools: then banners were off.
-    await before.lane(made.lane).withGuidance(true)
-    await before.lane(made.lane).withGuidance(false)
     await before.close()
     const script = scriptedModel()
     const asks: { lane: LaneName; ask: BannerAsk }[] = []
     const after = await agentOver(doc, script, asks)
-    await after.lane(made.lane).withGuidance(false)
     script.use([{ tool: BANNER_TOOL, args: {} }, { text: "done" }])
     await after.lane(made.lane).run(prompt("a banner, please"))
     expect(asks.map(a => a.lane)).toEqual([made.lane])
     await after.close()
   })
 
-  test("a lane stored while banners were on still runs once they are off, and its call says so", async () => {
-    const doc = newSessionDoc()
+  test("a lane stored while banners were on still runs once they are off, and asks for none", async () => {
+    const doc = newRootDoc()
     const before = await agentOver(doc, scriptedModel(), [])
-    const made = await before.createThreadLane(ROOT, laneNameForThread(newId()))
+    const made = await before.createThreadLane(
+      { root: ONE_ROOT, at: ROOT },
+      laneNameForThread(newId()),
+    )
     if (made.kind !== "created") throw new Error("no lane")
-    await before.lane(made.lane).withGuidance(true)
-    await before.lane(made.lane).withGuidance(false)
     await before.close()
     const script = scriptedModel()
     const after = await agentOver(doc, script)
     script.use([{ tool: BANNER_TOOL, args: {} }, { text: "no banner" }])
     const ran = await after.lane(made.lane).run(prompt("a banner, please"))
     expect(ran).toEqual({ kind: "ok" })
-    expect(toolResults(doc).join("\n")).toContain("Banners are off")
+    expect(toolResults(doc).join("\n")).not.toContain(
+      "A new banner is being made",
+    )
     await after.close()
   })
 
   test("a scripted model draws its fixed image; with banners off, nothing", async () => {
-    const on = await agentOver(newSessionDoc(), scriptedModel(), [])
+    const on = await agentOver(newRootDoc(), scriptedModel(), [])
     expect(await on.canDrawBanners()).toBe(true)
     expect(await on.drawBanner("a zebra")).toMatchObject({
       kind: "drawn",
       image: { mimeType: "image/png", width: 4, height: 4 },
     })
     await on.close()
-    const off = await agentOver(newSessionDoc(), scriptedModel())
+    const off = await agentOver(newRootDoc(), scriptedModel())
     expect(await off.canDrawBanners()).toBe(false)
     expect(await off.drawBanner("a zebra")).toMatchObject({
       kind: "failed",

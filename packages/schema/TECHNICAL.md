@@ -75,6 +75,18 @@ this during implementation; it is not hypothetical.
 bookkeeping for its `Storage` port, not Pineta's domain model, and nothing of
 ours traverses them. The asymmetry with `entries` is deliberate.
 
+## `pineta:live`: what is streaming now (ADR-0063)
+
+`LiveDoc` holds `streams`, `streamText` and `activeRuns`, apart from pi's
+storage. No restarted host needs them (`clearStreams`), and they churn with
+every token and tool update, so compacting them at a run's end rewrites only
+what is running. Every stream and run function below takes a
+`LiveDocHandle`. A reply's `under` is still compared with the lane's tip,
+read from pi's storage: the commit that moves the tip writes the entry with
+it, so the handover (ADR-0044) needs no change across the two documents.
+Dropping these root fields from the session's schema needed no migration:
+a store written with them opens under the schema without them (S86).
+
 ## `activeRuns`: one stream per lane
 
 `activeRuns: Schema.record(Schema.string())` maps a lane name to the run it is
@@ -138,7 +150,9 @@ pi.
 wins per field. Its records are flat, and every key starts with its seat's
 `seatKey`, `${writer}:${seat}` (ADR-0037): `reading` is keyed
 `readingKey(seatKey, columnKey)` (every column of the tab a person is on
-reports its thread's end), `typing` and `editing` by `seatKey`. A person on
+reports its thread's end), and so is `readingRoot` (the root entry of that
+thread, ADR-0063, for a window that does not hold the root); `typing` and
+`editing` are keyed by `seatKey`. A person on
 two tabs is two seats, so one tab never overwrites or clears another's.
 `writerOfKey` takes the writer from before the first colon: a writer holds
 none (`normalizeEmail`), a seat is hex, and a column key holds none. The
@@ -241,13 +255,40 @@ repairs it from the host's record (`planSlots`, `packages/client`).
   for an id `inventoryDocId` makes, so a hand-written `inventory:ada@x`
   names nobody.
 
+## A document per root (ADR-0063)
+
+A session is a document per root, the session's own, and `pineta:live`. The
+root and the session share one schema, `StorageDoc`, pi's storage, so
+`KynetaStorage` and pi's `setValue` serve both unchanged.
+
+| document | id | holds |
+|---|---|---|
+| a root's | `root:<RootId>` (`rootDocId`, core) | its entries, usage rows, pi's values and lists for its lanes, checkpoints, and the host records keyed by its entries (revision, mark, stop, digest) |
+| the session's | `pineta:session` | the records read across roots: the directory (`pineta.root`), every lane's record (`pineta.lane`, naming its root), names, offers, banners, bases, landings, the archive, seats, participants and the singletons. No entries |
+| what streams | `pineta:live` (`LiveDoc`) | streams, their text, active runs |
+
+- **Brands keep the two storage documents apart.** `RootDocHandle` and
+  `SessionDocHandle` are `StorageDocHandle` with a phantom brand, so a read
+  of a root's records cannot be handed the session's document, though both
+  have one shape. `asRootDoc` and `asSessionDoc` are the only casts, where a
+  document is opened; `newRootDoc` and `newSessionDoc` make one for a test.
+  The readers below take a `RootDocHandle`: a root's entries and lanes.
+- **A root's id is a `RootId`, not its root entry's** (`r-<uuidv7>`): Start
+  Agent creates a lane at the root before pi writes the first entry. The
+  directory record maps one to the other.
+- **Every document is compacted alone.** A run's end compacts the roots its
+  lanes ran in, the session, `pineta:live` and the places
+  (`planCompaction`, `apps/pineta/host/housekeeping.ts`). The largest root
+  in the session that motivated this took 182 ms (S84).
+
 ## Persistence
 
 The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`
 over `node:sqlite`, `.pineta/pineta.db` by default. It holds every document the
-host serves, one append-only record stream per document: the `SessionDoc`,
-which is also pi's storage, each live card's text, the
-places document, and each connected client's command Line. A tab's undo stack
+host serves, one append-only record stream per document: each root's
+`StorageDoc`, which is also pi's storage, the session's, `pineta:live`, each
+live card's text, the places document, and each connected client's command
+Line. A tab's undo stack
 is never stored here: the host rejects it (`resolveDoc`). It is not a pi session file.
 
 - **The store owns its file** (S47, `apps/pineta/host/store.ts`): exclusive
@@ -268,15 +309,17 @@ is never stored here: the host rejects it (`resolveDoc`). It is not a pi session
 **A root schema change cannot open an existing store**: Kyneta refuses a schema
 that cannot read what is stored. Migrate (root fields are migratable, S17), or
 move the file aside. A Loro store from before ADR-0023 cannot be opened at all.
+A store from before ADR-0063, the session as one document, is carried over
+once by `scripts/split-session.ts` (ADR-0063's runbook).
 
 ## Authoritative JSON, compacted (ADR-0023)
 
-`SessionDoc` is `json.bind`: plain JSON, serialized writes, one writer (the
+`StorageDoc` is `json.bind`: plain JSON, serialized writes, one writer (the
 host). No replica writes it, so it needs no CRDT merging, and the browser loads
 no Loro and no wasm. Its in-memory op log grows with every edit until
 compacted (S25), so the host compacts it between runs (`apps/pineta/host/settle.ts`:
-after a run ends, and at startup): the store's records become the document as it stands,
-and the log is trimmed. What is lost is the history of edits to transient
+after a run ends, and at startup), each root's alone (ADR-0063): the store's
+records become the document as it stands, and the log is trimmed. What is lost is the history of edits to transient
 state: streams and cleared values. The tree is explicit and
 immutable, so no conversation is lost. A client behind the compacted point
 receives the whole document once.

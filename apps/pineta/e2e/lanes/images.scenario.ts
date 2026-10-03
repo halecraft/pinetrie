@@ -5,7 +5,7 @@ import { ROOT } from "@pineta/core"
 import { PINETA_MOUNT } from "@pineta/lanes"
 import { readRevisions } from "@pineta/reads"
 import type { Checks } from "../checks.ts"
-import { containerProblem } from "../harness.ts"
+import { containerProblem, rootRecordsOf } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 import { imageHost, START_AGENT, sectionHost } from "./support.ts"
 
@@ -52,7 +52,7 @@ async function imagesSection(check: Checks["check"]): Promise<void> {
         ran.at(-1)?.includes("musl") === true,
       `${JSON.stringify(ran.at(-1))}`,
     )
-    const recorded = [...readRevisions(alpine.host.doc).values()]
+    const recorded = [...rootRecordsOf(alpine.host, readRevisions).values()]
     check(
       "and its turn is committed and snapshotted",
       recorded.some(r => r.commit !== null && r.snapshot !== null),

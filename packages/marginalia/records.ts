@@ -7,11 +7,26 @@
 // the client read records whole. A value written before this kept its key in
 // its contents too; `decode` sets the key after the contents, so the address
 // wins over that copy.
+//
+// A record lives in one document, its `home` (ADR-0063): the session's, for
+// what is read across roots, or a root's, for what is keyed by its entries.
+// The home is in the spec's type, so a root-homed write cannot be built
+// without its root, and a session-homed one cannot be given one.
 
-import type { HostNamespace, ValueWrite } from "@pineta/core"
+import {
+  type HostNamespace,
+  type RootId,
+  SESSION_TARGET,
+  type Target,
+  type ValueWrite,
+} from "@pineta/core"
 
-export interface RecordSpec<R, K extends string> {
+/** Which document a record lives in (ADR-0063). */
+export type Home = "session" | "root"
+
+export interface RecordSpec<R, K extends string, H extends Home = Home> {
   readonly namespace: HostNamespace
+  readonly home: H
   /** The address a write goes to. */
   readonly keyOf: (record: R) => K
   /** The plain JSON contents stored, without the key. */
@@ -23,24 +38,57 @@ export interface RecordSpec<R, K extends string> {
   readonly decode: (contents: unknown, key: string) => R | undefined
 }
 
-export const setRecord = <R, K extends string>(
+type SetWrite = Extract<ValueWrite, { kind: "set" }>
+type DeleteWrite = Extract<ValueWrite, { kind: "delete" }>
+
+/** Where a write goes: the session, or the root the overloads below demand. */
+const targetOf = (root: RootId | undefined): Target =>
+  root === undefined ? SESSION_TARGET : { kind: "root", root }
+
+export function setRecord<R, K extends string>(
+  spec: RecordSpec<R, K, "session">,
+  record: NoInfer<R>,
+): SetWrite
+export function setRecord<R, K extends string>(
+  spec: RecordSpec<R, K, "root">,
+  record: NoInfer<R>,
+  root: RootId,
+): SetWrite
+export function setRecord<R, K extends string>(
   spec: RecordSpec<R, K>,
   record: NoInfer<R>,
-): Extract<ValueWrite, { kind: "set" }> => ({
-  kind: "set",
-  namespace: spec.namespace,
-  key: spec.keyOf(record),
-  value: spec.encode(record),
-})
+  root?: RootId,
+): SetWrite {
+  return {
+    kind: "set",
+    target: targetOf(root),
+    namespace: spec.namespace,
+    key: spec.keyOf(record),
+    value: spec.encode(record),
+  }
+}
 
-export const deleteRecord = <R, K extends string>(
+export function deleteRecord<R, K extends string>(
+  spec: RecordSpec<R, K, "session">,
+  key: K,
+): DeleteWrite
+export function deleteRecord<R, K extends string>(
+  spec: RecordSpec<R, K, "root">,
+  key: K,
+  root: RootId,
+): DeleteWrite
+export function deleteRecord<R, K extends string>(
   spec: RecordSpec<R, K>,
   key: K,
-): Extract<ValueWrite, { kind: "delete" }> => ({
-  kind: "delete",
-  namespace: spec.namespace,
-  key,
-})
+  root?: RootId,
+): DeleteWrite {
+  return {
+    kind: "delete",
+    target: targetOf(root),
+    namespace: spec.namespace,
+    key,
+  }
+}
 
 /** Stored values -> each decoded record, by its address; malformed ones dropped. */
 export function recordsOf<R, K extends string>(
@@ -85,9 +133,31 @@ const recordChanged = <R, K extends string>(
   stored === undefined || !sameJson(spec.encode(record), spec.encode(stored))
 
 /** The write that stores `record`, if it changed (`recordChanged`); else none. */
-export const setIfChanged = <R, K extends string>(
+export function setIfChanged<R, K extends string>(
+  spec: RecordSpec<R, K, "session">,
+  record: NoInfer<R>,
+  stored: NoInfer<R> | undefined,
+): readonly ValueWrite[]
+export function setIfChanged<R, K extends string>(
+  spec: RecordSpec<R, K, "root">,
+  record: NoInfer<R>,
+  stored: NoInfer<R> | undefined,
+  root: RootId,
+): readonly ValueWrite[]
+export function setIfChanged<R, K extends string>(
   spec: RecordSpec<R, K>,
   record: NoInfer<R>,
   stored: NoInfer<R> | undefined,
-): readonly ValueWrite[] =>
-  recordChanged(spec, record, stored) ? [setRecord(spec, record)] : []
+  root?: RootId,
+): readonly ValueWrite[] {
+  if (!recordChanged(spec, record, stored)) return []
+  return [
+    {
+      kind: "set",
+      target: targetOf(root),
+      namespace: spec.namespace,
+      key: spec.keyOf(record),
+      value: spec.encode(record),
+    },
+  ]
+}

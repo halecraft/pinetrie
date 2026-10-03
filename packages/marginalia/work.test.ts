@@ -7,6 +7,7 @@ import {
   type LaneBase,
   laneNameForThread,
   type RevisionRecord,
+  rootIdFor,
   snapshotId,
   writerId,
 } from "@pineta/core"
@@ -41,6 +42,7 @@ const C2 = commitId("c2")
 describe("records: one spec each, total decoders", () => {
   const lane = {
     lane: LANE,
+    root: rootIdFor("test-root"),
     work: { kind: "own" as const },
     by: ADA,
     createdAt: 1,
@@ -72,7 +74,7 @@ describe("records: one spec each, total decoders", () => {
       LANE,
       lane,
     ])
-    const r = setRecord(REVISION, revision)
+    const r = setRecord(REVISION, revision, rootIdFor("test-root"))
     expect([r.key, REVISION.decode(r.value, r.key)]).toEqual(["e1", revision])
     const g = setRecord(LANDING, landing)
     expect([g.key, LANDING.decode(g.value, g.key)]).toEqual(["l1", landing])

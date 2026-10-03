@@ -58,9 +58,9 @@ export interface CardPort {
 export function startCards(input: {
   readonly exchange: Pick<Exchange, "get" | "destroy">
   readonly store: Pick<Store, "listDocIds">
-  readonly doc: SessionDocHandle
+  readonly session: SessionDocHandle
 }): CardPort {
-  const { exchange, store, doc } = input
+  const { exchange, store, session } = input
   /** A text as stored: loaded first, so what it holds is all of it. */
   const text = async (docId: string) => {
     const t = exchange.get(docId, TextDoc)
@@ -81,7 +81,10 @@ export function startCards(input: {
   }
   return {
     async writers(id) {
-      return writersOf(textClients(await text(cardDocId(id))), readSeats(doc))
+      return writersOf(
+        textClients(await text(cardDocId(id))),
+        readSeats(session),
+      )
     },
     destroy: id => destroyDocs([cardDocId(id)]),
     async hydrate(ids) {

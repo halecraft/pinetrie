@@ -24,6 +24,7 @@ import {
   type ProjectRecord,
   promptOf,
   type RevisionRecord,
+  type RootId,
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
@@ -422,7 +423,7 @@ function workStrip(f: ColumnFacts): WorkStrip {
   if (!f.writable || lane.kind !== "lane" || project === null) return NO_STRIP
   const record = work.lanes.get(lane.name)
   if (record === undefined) return NO_STRIP
-  if (record.work.kind === "direct") {
+  if (record.work?.kind === "direct") {
     const dir = record.work.dir
     return {
       kind: "direct",
@@ -635,15 +636,18 @@ export function joinWords(join: LaneJoin): string {
 
 /**
  * Where a column takes a card (ADR-0048): a fresh column's own key, else
- * drafting at its end with its lane. The composer creates its card here, and
- * a put or a drop lands here. None at the root: a column there has no end yet.
+ * drafting at its end with its lane, in `root`, the root its end is in
+ * (ADR-0063). The composer creates its card here, and a put or a drop lands
+ * here. None at the root, nor where the root is not known: a column there
+ * has no end yet.
  */
 export function composerPlace(
   column: Pick<Column, "key" | "fresh" | "lane">,
   at: Position,
+  root: RootId | undefined,
 ): CardPlace | null {
   if (column.fresh !== undefined) return { kind: "fresh", column: column.key }
-  return at.kind === "entry"
-    ? { kind: "drafting", at, lane: column.lane ?? null }
+  return at.kind === "entry" && root !== undefined
+    ? { kind: "drafting", root, at, lane: column.lane ?? null }
     : null
 }

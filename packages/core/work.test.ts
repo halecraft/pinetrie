@@ -17,6 +17,7 @@ import {
   promptOf,
   type RevisionRecord,
   ROOT,
+  rootIdFor,
   snapshotId,
   turnEntry,
   workFor,
@@ -149,6 +150,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
 describe("workFor: the choice, then the lane above, then the project's default", () => {
   const record = (lane: LaneName, work: LaneRecord["work"]): LaneRecord => ({
     lane,
+    root: rootIdFor("test-root"),
     work,
     by: writerId("x"),
     createdAt: 0,

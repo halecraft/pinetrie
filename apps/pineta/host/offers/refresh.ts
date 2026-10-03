@@ -24,7 +24,7 @@ import {
 } from "@pineta/lanes"
 import { offerMessage, planRefresh, wipDescription } from "@pineta/marginalia"
 import { readRevisions, readThreadName, readTreeIndex } from "@pineta/reads"
-import { readLaneTip, type SessionDocHandle } from "@pineta/schema"
+import { type RootDocHandle, readLaneTip } from "@pineta/schema"
 import { executeOffer } from "./execute.ts"
 import { offerRecord, planOfferEffects } from "./plan.ts"
 import type { OfferPlace, OfferState, Placed } from "./state.ts"
@@ -34,10 +34,11 @@ import type { OfferPlace, OfferState, Placed } from "./state.ts"
  * own first message, the first prompt its lane ran (ADR-0039).
  */
 export function wipLine(
-  doc: SessionDocHandle,
+  doc: RootDocHandle | null,
   lane: LaneName,
   name: ThreadName,
 ): string {
+  if (doc === null) return wipDescription(name, "")
   const index = readTreeIndex(doc)
   const tip = readLaneTip(doc, lane)
   const first = firstPromptOf(index, readRevisions(doc), lane, tip)
@@ -72,7 +73,12 @@ export interface Refresh {
 
 export function createRefresh(state: OfferState): Refresh {
   const { root, ops, basics } = state
-  const { doc, log } = basics
+  const { session, docs, log } = basics
+  /** A lane's tip, from its root's document; "" for none. */
+  const tipOf = (lane: LaneName): string => {
+    const doc = docs.docOfLane(lane)
+    return (doc === null ? null : readLaneTip(doc, lane)) ?? ""
+  }
 
   /** The record is the page's; a divergent offer is recorded once repaired. */
   async function record(
@@ -106,7 +112,7 @@ export function createRefresh(state: OfferState): Refresh {
     const at = {
       lane,
       name,
-      entry: readLaneTip(doc, lane) ?? "",
+      entry: tipOf(lane),
       ledger: { source: place.tip, start: place.start },
     }
     await executeOnHost(
@@ -157,7 +163,7 @@ export function createRefresh(state: OfferState): Refresh {
       )
     }
     log(
-      `[host] ${readThreadName(doc, lane)}: your edit and the host's crossed; kept yours`,
+      `[host] ${readThreadName(session, lane)}: your edit and the host's crossed; kept yours`,
     )
     await record(lane, name, place, await readAt(name, place.target))
   }
@@ -173,8 +179,8 @@ export function createRefresh(state: OfferState): Refresh {
     const effects = planOfferEffects(planned, {
       root,
       place,
-      wip: wipLine(doc, lane, name),
-      trailers: { lane, name, entry: readLaneTip(doc, lane) ?? "" },
+      wip: wipLine(docs.docOfLane(lane), lane, name),
+      trailers: { lane, name, entry: tipOf(lane) },
       offer,
     })
     // execute: with no place, `planOfferEffects` plans none of the steps

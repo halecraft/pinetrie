@@ -5,6 +5,32 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/reads"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a root's title is not its mark",
+    file: "packages/reads/index.ts",
+    from: "    title: entry === null ? null : (readMarks(doc).get(entry)?.title ?? null),",
+    to: "    title: null,",
+    command: unit,
+    expect: "a root's title is its root entry's mark",
+  },
+  {
+    name: "a root's images are not recorded",
+    file: "packages/reads/index.ts",
+    from: "        messages: Object.values(readEntries(doc)).map(rowMessage),\n        texts: [],\n        banners: [],",
+    to: "        messages: [],\n        texts: [],\n        banners: [],",
+    command: unit,
+    expect:
+      "its first line, writers, messages and newest, its mentions unresolved, and its images",
+  },
+  {
+    name: "held roots' index is rebuilt each read",
+    file: "packages/reads/index.ts",
+    from: "    heldIndex.rows.every((r, i) => r === rows[i])",
+    to: "    false",
+    command: unit,
+    expect:
+      "readHeldIndex: several roots read as one tree, kept while none changes",
+  },
+  {
     name: "referencedBlobs skips the texts people type",
     file: "packages/reads/index.ts",
     from: "    for (const sha of pastedImages(text)) shas.add(sha)",
@@ -100,5 +126,29 @@ export const mutations: readonly Mutation[] = [
     // tsc names no failing check (`failingChecks`): with typecheck clean,
     // any error is the mutant's.
     command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  {
+    name: "a reported root is the end itself",
+    file: "packages/reads/index.ts",
+    from: "      now.set(entryId(end), entryId(root))",
+    to: "      now.set(entryId(end), entryId(end))",
+    command: unit,
+    expect: "each followed end's root, as its column reported it",
+  },
+  {
+    name: "a writer only in a root not held is no participant",
+    file: "packages/reads/index.ts",
+    from: "  for (const root of directory.values()) writers.push(...root.writers)\n",
+    to: "",
+    command: unit,
+    expect: "readParticipants: a writer only in a root not held still counts",
+  },
+  {
+    name: "the names are a new map on every session write",
+    file: "packages/reads/index.ts",
+    from: "    [...now].every(([w, name]) => before.get(w) === name)",
+    to: "    false",
+    command: unit,
+    expect: "readParticipantNames keeps its map while the names are the same",
   },
 ]

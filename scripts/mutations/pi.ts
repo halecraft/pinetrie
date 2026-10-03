@@ -5,6 +5,24 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "every write goes to the first target's document",
+    file: "packages/pi/agent.ts",
+    from: '    const key = w.target.kind === "session" ? "" : w.target.root',
+    to: '    const key = ""',
+    command: unit,
+    expect:
+      "writes sets and deletes in one call, each in the document its target names (ADR-0063)",
+  },
+  {
+    name: "every lane runs in one root's session",
+    file: "packages/pi/agent.ts",
+    from: "    return root === null ? undefined : ofRoot(root)",
+    to: "    return root === null ? undefined : ofSession()",
+    command: unit,
+    expect:
+      "each root's lane writes in its own document, and a later agent finds each by its record",
+  },
+  {
     name: "checkpoints are stored whole",
     file: "packages/pi/stored-values.ts",
     from: "    namespace === CHECKPOINT_NAMESPACE ? sealCheckpoint(value) : undefined",
@@ -31,8 +49,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a turn is not awaited before the next request",
     file: "packages/pi/agent.ts",
-    from: "      await recordTurn(lane)\n      return undefined",
-    to: "      void recordTurn(lane)\n      return undefined",
+    from: "        await recordTurn(lane)\n        return undefined",
+    to: "        void recordTurn(lane)\n        return undefined",
     command: unit,
     expect: "each turn is recorded before the next request",
   },
@@ -138,18 +156,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "createAgent leaves pi's own conversion",
     file: "packages/pi/agent.ts",
-    from: "      toProviderMessages: messages =>\n        providerMessages(messages, options.blobs ?? NO_BLOBS),",
-    to: "      toProviderMessages: messages => convertToLlm(messages),",
+    from: "        toProviderMessages: messages =>\n          providerMessages(messages, options.blobs ?? NO_BLOBS),",
+    to: "        toProviderMessages: messages => convertToLlm(messages),",
     command: unit,
     expect: "the model reads a chat's text, then its image's bytes",
-  },
-  {
-    name: "a lane stored before banners were on keeps its old tools",
-    file: "packages/pi/thread-lanes.ts",
-    from: "        if (toolsChanged(await lane.getActiveTools(ctx), next))\n          await lane.setActiveTools(next, ctx)",
-    to: "        if (toolsChanged(await lane.getActiveTools(ctx), next) && false)\n          await lane.setActiveTools(next, ctx)",
-    command: unit,
-    expect: "gets the tool at its next run's end",
   },
   {
     name: "set_banner sends no ask",
@@ -374,7 +384,49 @@ export const mutations: readonly Mutation[] = [
     to: "    ...(input.banners ? [] : []),",
     command: unit,
     expect:
-      "the file tools always; set_banner with banners; guidance when asked",
+      "the file tools and ask_for_guidance always; set_banner with banners",
+  },
+  {
+    name: "ask_for_guidance is in a lane's tools only sometimes",
+    file: "packages/pi/tools.ts",
+    from: "    GUIDANCE_TOOL,\n",
+    to: "",
+    command: unit,
+    expect:
+      "the file tools and ask_for_guidance always; set_banner with banners",
+  },
+  {
+    name: "ask_for_guidance says it asked outside a landing",
+    file: "packages/pi/lanes.ts",
+    from: "              : NOT_LANDING,",
+    to: '              : "Asked. Stop here: the person will answer in this thread.",',
+    command: unit,
+    expect: "in a landing, it asks; elsewhere it says there is nothing to ask",
+  },
+  {
+    name: "a lane stored before banners were on keeps its old tools",
+    file: "packages/pi/thread-lanes.ts",
+    from: "    if (tools !== null && toolsChanged(await lane.getActiveTools(CTX), tools))",
+    to: "    if (tools === undefined)",
+    command: unit,
+    expect:
+      "a lane stored before banners were on is given the tool when it is first held",
+  },
+  {
+    name: "a lane's first request counts as a change",
+    file: "packages/pi/prefix.ts",
+    from: "): boolean => previous !== undefined && previous !== next",
+    to: "): boolean => previous !== next",
+    command: unit,
+    expect: "a first request is no change",
+  },
+  {
+    name: "a request's messages count in its prefix",
+    file: "packages/pi/prefix.ts",
+    from: '          Object.entries(payload).filter(([key]) => key !== "messages"),',
+    to: "          Object.entries(payload),",
+    command: unit,
+    expect: "the same prefix with more messages is no change",
   },
   {
     name: "the same tools in another order are rewritten",
@@ -407,5 +459,13 @@ export const mutations: readonly Mutation[] = [
     to: "    return lane === undefined ? f(undefined as never) : f(lane)",
     command: unit,
     expect: "a lane that does not exist refuses every write as unknown",
+  },
+  {
+    name: "a released root keeps its harness",
+    file: "packages/pi/agent.ts",
+    from: "      stacks.delete(root)\n",
+    to: "",
+    command: unit,
+    expect: "a released root's harness is closed",
   },
 ]

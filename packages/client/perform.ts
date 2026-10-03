@@ -38,6 +38,8 @@ export interface AppPorts {
   readonly askRestore: (root: EntryId, direction: Direction) => void
   /** Plan and carry out an intent afresh, after something it waited for. */
   readonly intent: (intent: Intent) => void
+  /** Show an entry once this tab holds it (`openAt`). */
+  readonly openWhenHeld: (entry: EntryId) => void
   /** Scroll to an entry once it is drawn (`useReveal`). */
   readonly reveal: (entry: string) => void
   /** Open an ask's fold (`FoldMemory`). */
@@ -137,6 +139,9 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "reveal":
       ports.reveal(effect.entry)
+      return
+    case "openWhenHeld":
+      ports.openWhenHeld(effect.entry)
       return
     case "pickArchived":
       ports.pickArchived(effect.root)

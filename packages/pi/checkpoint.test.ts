@@ -6,7 +6,7 @@ import {
   StorageBackedSession,
   value,
 } from "@earendil-works/pi-agent-core"
-import { newSessionDoc } from "@pineta/schema"
+import { newRootDoc } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import {
   CHECKPOINT_NAMESPACE,
@@ -45,7 +45,7 @@ describe("sealCheckpoint", () => {
 
 describe("KynetaStorage: a growing checkpoint is stored as text edits", () => {
   test("each write reads back exactly; the record keeps only a shell", async () => {
-    const doc = newSessionDoc()
+    const doc = newRootDoc()
     const session = new StorageBackedSession(
       { id: "t", createdAt: 1, storageVersion: 1 },
       new KynetaStorage({ doc, peerId: "t" }),

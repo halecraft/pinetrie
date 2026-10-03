@@ -1,12 +1,16 @@
-import { laneNameForThread } from "@pineta/core"
+import { laneNameForThread, rootIdFor } from "@pineta/core"
 import { readThreadName } from "@pineta/reads"
 import { expect, test } from "vitest"
 import { basics, deferred } from "./fakes.ts"
 import { createSerial } from "./queue.ts"
 import { createSettle } from "./settle.ts"
 
-test("a settle asked for before the last compaction started drains, and compacts no more", async () => {
+test("a settle asked for before the last compaction started drains, and compacts no more, its lanes' roots among the first's", async () => {
   const [a, b] = [laneNameForThread("a"), laneNameForThread("b")]
+  const roots = new Map([
+    [a, rootIdFor("ra")],
+    [b, rootIdFor("rb")],
+  ])
   const serial = createSerial()
   const done: string[] = []
   const settle = createSettle({
@@ -15,8 +19,10 @@ test("a settle asked for before the last compaction started drains, and compacts
     drain: async lane => {
       done.push(`drain ${lane}`)
     },
-    compact: async () => {
-      done.push("compact")
+    rootOf: lane => roots.get(lane) ?? null,
+    beforeCompact: async () => {},
+    compact: async covered => {
+      done.push(`compact ${[...covered].sort().join(" ")}`)
     },
     sweep: async () => {
       done.push("sweep")
@@ -29,7 +35,12 @@ test("a settle asked for before the last compaction started drains, and compacts
   const second = settle([b])
   gate.resolve()
   await Promise.all([first, second])
-  expect(done).toEqual([`drain ${a}`, "compact", "sweep", `drain ${b}`])
+  expect(done).toEqual([
+    `drain ${a}`,
+    "compact r-ra r-rb",
+    "sweep",
+    `drain ${b}`,
+  ])
 })
 
 test("a failed compaction is logged, and the sweep still runs", async () => {
@@ -39,6 +50,8 @@ test("a failed compaction is logged, and the sweep still runs", async () => {
     basics: b,
     serial: createSerial(),
     drain: async () => {},
+    rootOf: () => null,
+    beforeCompact: async () => {},
     compact: async () => {
       throw new Error("store closed")
     },
@@ -62,6 +75,8 @@ test("a failed drain is logged; the other lanes drain, and the next settle compa
       if (lane === a) throw new Error("append refused")
       done.push(`drain ${lane}`)
     },
+    rootOf: () => null,
+    beforeCompact: async () => {},
     compact: async () => {
       done.push("compact")
     },
@@ -73,6 +88,6 @@ test("a failed drain is logged; the other lanes drain, and the next settle compa
   await settle([])
   expect(done).toEqual([`drain ${b}`, "compact", "sweep", "compact", "sweep"])
   expect(bs.lines).toEqual([
-    `[host] ${readThreadName(bs.doc, a)}: draining failed: append refused`,
+    `[host] ${readThreadName(bs.session, a)}: draining failed: append refused`,
   ])
 })

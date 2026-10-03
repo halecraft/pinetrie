@@ -13,7 +13,7 @@ import {
 } from "@earendil-works/pi-agent-core"
 import { exportSince, merge, version } from "@kyneta/schema"
 import { entryId, laneNameForThread } from "@pineta/core"
-import { newSessionDoc, writeLaneTip } from "@pineta/schema"
+import { newRootDoc, writeLaneTip } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { emptyUsage } from "./deep.ts"
 import { KynetaStorage } from "./storage.ts"
@@ -27,8 +27,8 @@ const message = (id: string, parentId: string | null) =>
   })
 
 test("a replica indexes another's writes from merged changes, parents first", async () => {
-  const docA = newSessionDoc()
-  const docB = newSessionDoc()
+  const docA = newRootDoc()
+  const docB = newRootDoc()
   const a = new KynetaStorage({ doc: docA, peerId: "a" })
   const b = new KynetaStorage({ doc: docB, peerId: "b" })
   const sync = () => {
@@ -90,7 +90,7 @@ test("a replica indexes another's writes from merged changes, parents first", as
 })
 
 test("a value written without a token, as writeLaneTip writes one, stays readable", async () => {
-  const doc = newSessionDoc()
+  const doc = newRootDoc()
   const lane = laneNameForThread("0123456789abcdef")
   writeLaneTip(doc, lane, entryId("e-1"))
   const storage = new KynetaStorage({ doc })

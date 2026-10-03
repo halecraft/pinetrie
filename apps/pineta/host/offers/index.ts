@@ -157,8 +157,14 @@ export function startOffers(input: {
       return serial.run(async () => {
         const read = planOfferRead(
           {
-            offers: readOffers(basics.doc),
-            revisions: readRevisions(basics.doc),
+            offers: readOffers(basics.session),
+            // Every held root's: a range is named by two commits, in one lane.
+            revisions: new Map(
+              basics.docs.loaded().flatMap(root => {
+                const view = basics.docs.view(root)
+                return view === null ? [] : [...readRevisions(view.doc)]
+              }),
+            ),
           },
           ask,
         )

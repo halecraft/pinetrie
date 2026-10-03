@@ -66,19 +66,35 @@ const StoredEntryRowSchema = Schema.struct.json({
  *     nothing of ours traverses them. The asymmetry with `entries` is
  *     deliberate: we type what we reason about.
  *
- * `streams` and `streamText` are what a running turn is writing right now: a
- * reply, or a tool's output, one `Schema.text()` per stream, written as edits
- * and deleted once its entry is written (ADR-0014, `planStream`). NOT `Schema.string()`: a whole-value
- * register is O(n^2) on every substrate, and stores every snapshot (S22).
- * `checkpointText` holds pi's tool-output checkpoints, written the same way by
- * `KynetaStorage`.
+ * `checkpointText` holds pi's tool-output checkpoints' text, one
+ * `Schema.text()` each, written as edits by `KynetaStorage`. What a running
+ * turn writes is in `LiveDoc`, below.
  */
-export const SessionDoc = json.bind(
+export const StorageDoc = json.bind(
   Schema.struct({
     entries: Schema.record(StoredEntryRowSchema),
     usageRows: Schema.record(Schema.any()),
     values: Schema.record(Schema.any()),
     lists: Schema.record(Schema.list(Schema.any())),
+    // pi's `pi.pending.tool_output` checkpoints' text, keyed by physicalKey.
+    checkpointText: Schema.record(Schema.text()),
+  }),
+)
+
+/**
+ * What is streaming now (ADR-0063), replicated host -> client, written only
+ * by the host. No restarted host needs it (`clearStreams`), so it is its own
+ * document: compacting it rewrites only what is running, never the
+ * conversation.
+ *
+ * `streams` and `streamText` are what a running turn is writing right now: a
+ * reply, or a tool's output, one `Schema.text()` per stream, written as edits
+ * and deleted once its entry is written (ADR-0014, `planStream`). NOT
+ * `Schema.string()`: a whole-value register is O(n^2) on every substrate,
+ * and stores every snapshot (S22).
+ */
+export const LiveDoc = json.bind(
+  Schema.struct({
     // One per stream, keyed by a fresh uuidv7 (ADR-0016): which lane, a
     // reply or a tool, the tool's call, and the lane's tip when a reply
     // opened ("" for a tool, or a lane with none). A tool's label is its
@@ -93,8 +109,6 @@ export const SessionDoc = json.bind(
       }),
     ),
     streamText: Schema.record(Schema.text()),
-    // pi's `pi.pending.tool_output` checkpoints' text, keyed by physicalKey.
-    checkpointText: Schema.record(Schema.text()),
     // Which run each lane is streaming, keyed by lane name. A missing key
     // means that lane is idle; nothing is ever set to "" to mean idle. One
     // entry per lane is what lets two writers stream at once.
@@ -102,34 +116,66 @@ export const SessionDoc = json.bind(
   }),
 )
 
-export const newSessionDoc = () => createDoc(SessionDoc)
+export const newLiveDoc = () => createDoc(LiveDoc)
+
+/** A live handle on what is streaming now. */
+export type LiveDocHandle = ReturnType<typeof newLiveDoc>
+
+export const newStorageDoc = () => createDoc(StorageDoc)
 
 /**
- * A live handle on the session document.
+ * A live handle on a document of pi's storage: a root's, or the session's.
  *
  * Derived from the value rather than hand-written, so the doc shape above stays
- * the single source of truth. `exchange.get(id, SessionDoc)` yields this exact
+ * the single source of truth. `exchange.get(id, StorageDoc)` yields this exact
  * type, so host/ and client/ share it without restating anything.
  */
-export type SessionDocHandle = ReturnType<typeof newSessionDoc>
+export type StorageDocHandle = ReturnType<typeof newStorageDoc>
+
+declare const rootDocBrand: unique symbol
+declare const sessionDocBrand: unique symbol
+/**
+ * A root's document (ADR-0063): its entries, pi's values for its lanes, and
+ * the host records keyed by its entries. The same shape as the session's, so
+ * a brand keeps a read of one from being handed the other.
+ */
+export type RootDocHandle = StorageDocHandle & { readonly [rootDocBrand]: true }
+/**
+ * The session's document (ADR-0063): the records read across roots, the
+ * directory among them. It holds no entries.
+ */
+export type SessionDocHandle = StorageDocHandle & {
+  readonly [sessionDocBrand]: true
+}
+
+/** A storage document opened as a root's (`rootDocId`). */
+export const asRootDoc = (doc: StorageDocHandle): RootDocHandle =>
+  doc as RootDocHandle
+/** A storage document opened as the session's (`SESSION_DOC_ID`). */
+export const asSessionDoc = (doc: StorageDocHandle): SessionDocHandle =>
+  doc as SessionDocHandle
+
+export const newRootDoc = (): RootDocHandle => asRootDoc(newStorageDoc())
+export const newSessionDoc = (): SessionDocHandle =>
+  asSessionDoc(newStorageDoc())
 
 // --- runs and streams (ADR-0014, S22, S55) --------------------------------
 
 /** Mark a lane as running `run`. Its streams open as it writes. */
 export function beginRun(
-  doc: SessionDocHandle,
+  live: LiveDocHandle,
   lane: LaneName,
   run: RunId,
 ): void {
-  batch(doc, d => d.activeRuns.set(lane, run))
+  batch(live, d => d.activeRuns.set(lane, run))
 }
 
 /** The run a lane is running, or undefined when the lane is idle. */
 export function readActiveRun(
-  doc: SessionDocHandle,
+  live: LiveDocHandle,
   lane: LaneName,
 ): RunId | undefined {
-  const run = doc.activeRuns.get(lane)
+  const run = live.activeRuns.get(lane)
   return typeof run === "string" ? runId(run) : undefined
 }
 
@@ -138,15 +184,11 @@ export function readActiveRun(
  * "idle" means. Its streams go in the same batch: every entry of the run is
  * already written (S55), and a stopped run's may never come.
  */
-export function endRun(
-  doc: SessionDocHandle,
-  lane: LaneName,
-  run: RunId,
-): void {
+export function endRun(live: LiveDocHandle, lane: LaneName, run: RunId): void {
   const closing = closeStreams(
-    readStreamRecords(doc).filter(s => s.lane === lane),
+    readStreamRecords(live).filter(s => s.lane === lane),
   )
-  batch(doc, d => {
+  batch(live, d => {
     if (d.activeRuns.get(lane) !== run) return
     d.activeRuns.delete(lane)
     applyOps(d, closing)
@@ -287,7 +329,7 @@ export function applyTextEdits(
 }
 
 /** Apply `ops` inside a batch the caller has opened. */
-function applyOps(d: SessionDocHandle, ops: readonly StreamOp[]): void {
+function applyOps(d: LiveDocHandle, ops: readonly StreamOp[]): void {
   for (const op of ops) {
     switch (op.kind) {
       case "open": {
@@ -316,11 +358,11 @@ function applyOps(d: SessionDocHandle, ops: readonly StreamOp[]): void {
 
 /** The one place stream records and their text are written. */
 export function applyStreamOps(
-  doc: SessionDocHandle,
+  live: LiveDocHandle,
   ops: readonly StreamOp[],
 ): void {
   if (ops.length === 0) return
-  batch(doc, d => applyOps(d, ops))
+  batch(live, d => applyOps(d, ops))
 }
 
 /**
@@ -329,9 +371,9 @@ export function applyStreamOps(
  * and it clears them all at startup (`clearStreams`).
  */
 export function readStreamRecords(
-  doc: SessionDocHandle,
+  live: LiveDocHandle,
 ): readonly StreamRecord[] {
-  return Object.entries(doc.streams())
+  return Object.entries(live.streams())
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .flatMap(([id, s]): StreamRecord[] => {
       const lane = s.lane
@@ -350,14 +392,14 @@ export function readStreamRecords(
 }
 
 /** What a stream has written so far; "" once it is gone. */
-export const readStreamText = (doc: SessionDocHandle, id: string): string =>
-  doc.streamText.at(id)?.() ?? ""
+export const readStreamText = (live: LiveDocHandle, id: string): string =>
+  live.streamText.at(id)?.() ?? ""
 
 /** Every stream, with its text. */
-export function readStreams(doc: SessionDocHandle): readonly Stream[] {
-  return readStreamRecords(doc).map(s => ({
+export function readStreams(live: LiveDocHandle): readonly Stream[] {
+  return readStreamRecords(live).map(s => ({
     ...s,
-    text: readStreamText(doc, s.id),
+    text: readStreamText(live, s.id),
   }))
 }
 
@@ -366,13 +408,13 @@ export function readStreams(doc: SessionDocHandle): readonly Stream[] {
  * whose record is gone included), and every running lane's key. A starting
  * host calls this before it drains any lane.
  */
-export function clearStreams(doc: SessionDocHandle): void {
+export function clearStreams(live: LiveDocHandle): void {
   const ids = new Set([
-    ...Object.keys(doc.streams()),
-    ...Object.keys(doc.streamText()),
+    ...Object.keys(live.streams()),
+    ...Object.keys(live.streamText()),
   ])
   const closing = closeStreams([...ids].map(id => ({ id })))
-  batch(doc, d => {
+  batch(live, d => {
     applyOps(d, closing)
     for (const lane of Object.keys(d.activeRuns())) d.activeRuns.delete(lane)
   })
@@ -384,7 +426,7 @@ export function clearStreams(doc: SessionDocHandle): void {
  * One stored entry, derived from the schema rather than restated, so the shape
  * above stays the single source of truth.
  */
-export type StoredEntryRow = ReturnType<SessionDocHandle["entries"]>[string]
+export type StoredEntryRow = ReturnType<StorageDocHandle["entries"]>[string]
 
 /**
  * Write one entry row.
@@ -398,12 +440,12 @@ export type StoredEntryRow = ReturnType<SessionDocHandle["entries"]>[string]
  * silently discarded by the per-key LWW register. Id minting stays with pi's
  * `IdGenerator`.
  */
-export function writeEntry(doc: SessionDocHandle, row: StoredEntryRow): void {
+export function writeEntry(doc: RootDocHandle, row: StoredEntryRow): void {
   doc.entries.set(row.id, row)
 }
 
 export const readEntries = (
-  doc: SessionDocHandle,
+  doc: RootDocHandle,
 ): Record<string, StoredEntryRow> => doc.entries()
 
 /**
@@ -471,7 +513,7 @@ const asStored = (v: unknown): StoredAddress | undefined =>
  * entry, so `readLaneTip` returns null for both. Measured, not assumed: see
  * `packages/pi/TECHNICAL.md`.
  */
-export function hasLaneRecord(doc: SessionDocHandle, lane: LaneName): boolean {
+export function hasLaneRecord(doc: RootDocHandle, lane: LaneName): boolean {
   return doc.values.get(physicalKey(LANE_TIP, lane)) !== undefined
 }
 
@@ -481,7 +523,7 @@ export function hasLaneRecord(doc: SessionDocHandle, lane: LaneName): boolean {
  * it here, so they share the reader's address.
  */
 export function writeLaneTip(
-  doc: SessionDocHandle,
+  doc: RootDocHandle,
   lane: LaneName,
   tip: EntryId | null,
 ): void {
@@ -495,7 +537,7 @@ export function writeLaneTip(
 
 /** A lane's tip entry id, or null if the lane has none (or does not exist). */
 export function readLaneTip(
-  doc: SessionDocHandle,
+  doc: RootDocHandle,
   lane: LaneName,
 ): EntryId | null {
   const value = asStored(doc.values.get(physicalKey(LANE_TIP, lane)))?.value
@@ -508,7 +550,7 @@ export function readLaneTip(
  * each value's own `namespace` and `key` properties, never by splitting the
  * record key.
  */
-export function readStoredLanes(doc: SessionDocHandle): {
+export function readStoredLanes(doc: RootDocHandle): {
   readonly lanes: readonly LaneName[]
   /** Stored lane keys that fail `isLaneName`: never a thread's lane. */
   readonly malformed: readonly string[]
@@ -522,7 +564,7 @@ export function readStoredLanes(doc: SessionDocHandle): {
 }
 
 /** Every thread's lane the document records (`readStoredLanes`). */
-export const readLaneNames = (doc: SessionDocHandle): readonly LaneName[] =>
+export const readLaneNames = (doc: RootDocHandle): readonly LaneName[] =>
   readStoredLanes(doc).lanes
 
 /**
@@ -531,7 +573,7 @@ export const readLaneNames = (doc: SessionDocHandle): readonly LaneName[] =>
  * value's address, which a record's spec reads its key from (ADR-0062).
  */
 export function readValues(
-  doc: SessionDocHandle,
+  doc: StorageDocHandle,
   namespace: string,
 ): { readonly key: string; readonly value: unknown }[] {
   const out: { key: string; value: unknown }[] = []
@@ -550,7 +592,7 @@ export function readValues(
  * host both read through it.
  */
 export function readEntryMessage(
-  doc: SessionDocHandle,
+  doc: RootDocHandle,
   id: string,
 ): { present: false } | { present: true; message: unknown } {
   const row = doc.entries.get(id)

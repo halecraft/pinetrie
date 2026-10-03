@@ -9,7 +9,7 @@ import { scriptedModel } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import { readArchive, readMarks } from "@pineta/reads"
 import type { Checks } from "../checks.ts"
-import { join, waitFor, withHost } from "../harness.ts"
+import { join, rootRecordsOf, waitFor, withHost } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 import { START_CHAT } from "./support.ts"
 
@@ -30,10 +30,10 @@ async function run(check: Checks["check"]): Promise<void> {
 
       const archived = await ada.archive("archive", entryId(r1))
       const seen = await waitFor(
-        () => readArchive(bea.doc).get(r1)?.state === "archived",
+        () => readArchive(bea.session).get(r1)?.state === "archived",
         10_000,
       )
-      const record = readArchive(host.doc).get(r1)
+      const record = readArchive(host.session).get(r1)
       check(
         "a root is archived, by its archiver, and another client sees it",
         archived.kind === "archived" &&
@@ -44,7 +44,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       const titled = await bea.mark(entryId(r2), "Tab names")
-      const mark = readMarks(host.doc).get(r2)
+      const mark = rootRecordsOf(host, readMarks).get(r2)
       check(
         "a root is titled, by its writer",
         titled.kind === "marked" &&

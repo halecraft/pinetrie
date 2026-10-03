@@ -8,9 +8,9 @@ test("a root the agent works in is not archived, and nothing is written", async 
   const b = basics()
   const root = entryId("e-1")
   const lane = laneNameForThread("0123456789abcdef")
-  writeEntry(b.doc, row(root, null))
-  writeLaneTip(b.doc, lane, root)
-  beginRun(b.doc, lane, runId("r-1"))
+  writeEntry(b.root, row(root, null))
+  writeLaneTip(b.root, lane, root)
+  beginRun(b.live, lane, runId("r-1"))
   const agent = record<ArchiveDeps["agent"]>()
   const out = await handleArchive(
     { basics: b, agent: agent.port, work: record<ArchiveDeps["work"]>().port },

@@ -5,6 +5,50 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pineta/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a root's new entry leaves its record behind",
+    file: "apps/pineta/host/directory.ts",
+    from: "      subscribe(doc.entries, changed)\n",
+    to: "",
+    command: unit,
+    expect:
+      "a root's record follows its document: a new entry refreshes it, once per burst (ADR-0063)",
+  },
+  {
+    name: "a compaction writes the directory after it",
+    file: "apps/pineta/host/directory.ts",
+    from: "      for (const root of roots) await write(root)\n",
+    to: "",
+    command: unit,
+    expect:
+      "flush writes a queued refresh in the caller's step, and the queued step then writes nothing",
+  },
+  {
+    name: "a root's record is rewritten unchanged",
+    file: "apps/pineta/host/directory.ts",
+    from: "    if (writes.length > 0) await deps.agent().writeValues(writes)",
+    to: "    await deps.agent().writeValues(setIfChanged(ROOT, record, undefined))",
+    command: unit,
+    expect: "a change the record does not show writes nothing",
+  },
+  {
+    name: "a new root takes an id another holds",
+    file: "apps/pineta/host/commands/chat.ts",
+    from: '  if (chat.at.kind === "root" && readRoots(session).has(chat.root))',
+    to: '  if (chat.at.kind === "root" && readRoots(session).has(chat.root) && false)',
+    command: unit,
+    expect:
+      "a thread at the root under a taken root's id is refused, and nothing is written",
+  },
+  {
+    name: "an archived root is unloaded at startup",
+    file: "apps/pineta/host/docs.ts",
+    from: '    .filter(r => r.entry === null || archive.get(r.entry)?.state !== "archived")',
+    to: '    .filter(r => r.entry === null || archive.get(r.entry)?.state === "archived")',
+    command: unit,
+    expect:
+      "planLoads: every root but the archived ones, a root with no message among them (ADR-0063)",
+  },
+  {
     name: "update my files runs with no preview",
     file: "apps/pineta/host/offers/plan.ts",
     from: "      return record.yours.follow === null",
@@ -226,7 +270,7 @@ export const mutations: readonly Mutation[] = [
     name: "a failure's log loses its thread",
     file: "apps/pineta/host/basics.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "        : `[host] ${readThreadName(basics.doc, lane)}: ${what} failed: ${messageOf(error)}`,",
+    from: "        : `[host] ${readThreadName(basics.session, lane)}: ${what} failed: ${messageOf(error)}`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "        : `[host] ${what} failed: ${messageOf(error)}`,",
     command: unit,
@@ -251,10 +295,46 @@ export const mutations: readonly Mutation[] = [
     expect: "each with the key",
   },
   {
+    name: "what streams is never compacted",
+    file: "apps/pineta/host/housekeeping.ts",
+    from: "  LIVE_DOC_ID,\n]",
+    to: "]",
+    command: unit,
+    expect:
+      "planCompaction: the roots that ran, and the session, the places and what is streaming; no other root",
+  },
+  {
+    name: "a run's end compacts no root",
+    file: "apps/pineta/host/housekeeping.ts",
+    from: "  ...[...roots].sort().map(rootDocId),\n",
+    to: "",
+    command: unit,
+    expect:
+      "planCompaction: the roots that ran, and the session, the places and what is streaming; no other root",
+  },
+  {
+    name: "the image sweep forgets what roots show",
+    file: "packages/reads/index.ts",
+    from: "    for (const sha of root.images) shas.add(sha)\n",
+    to: "",
+    command: unit,
+    expect:
+      "the image sweep keeps what a root's directory record shows, though no root is loaded",
+  },
+  {
+    name: "any run's agent can ask for guidance",
+    file: "apps/pineta/host/work/update.ts",
+    from: '      if (doc === null || readLatestPrompt(doc, lane)?.role !== "land")\n        return false\n',
+    to: "      if (doc === null) return false\n",
+    command: unit,
+    expect:
+      "a landing takes the question; any other run's call asks nothing (S85)",
+  },
+  {
     name: "the lane stops before its streams close",
     file: "apps/pineta/host/runs.ts",
-    from: '  return ["guidanceOff", ...outcome, "endRun", "laneStopped", "ended"]',
-    to: '  return ["guidanceOff", ...outcome, "laneStopped", "endRun", "ended"]',
+    from: '  return [...outcome, "endRun", "laneStopped", "ended"]',
+    to: '  return [...outcome, "laneStopped", "endRun", "ended"]',
     command: unit,
     expect: "endRun comes before laneStopped",
   },
@@ -369,9 +449,9 @@ export const mutations: readonly Mutation[] = [
     name: "startup settles before it resumes",
     file: "apps/pineta/host/startup.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '  for (const lane of planned.resume) {\n    log(\n      `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,\n    )\n    deps.start(lane, { kind: "resume" })\n  }\n  void settle(planned.drain)',
+    from: '  for (const lane of planned.resume) {\n    log(\n      `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,\n    )\n    deps.start(lane, { kind: "resume" })\n  }\n',
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: '  void settle(planned.drain)\n  for (const lane of planned.resume) {\n    log(\n      `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,\n    )\n    deps.start(lane, { kind: "resume" })\n  }',
+    to: '  void settle(planned.drain)\n  for (const lane of planned.resume) {\n    log(\n      `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,\n    )\n    deps.start(lane, { kind: "resume" })\n  }\n',
     command: unit,
     expect: "recover resumes each interrupted lane before it settles",
   },
@@ -484,7 +564,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a cleared title is never removed",
     file: "apps/pineta/host/commands/mark.ts",
-    from: "      await agent.writeValues([deleteRecord(MARK, planned.entry)])\n",
+    from: "      await agent.writeValues([deleteRecord(MARK, planned.entry, root)])\n",
     to: "",
     command: unit,
     expect: "clearing a root's title removes its mark",
@@ -708,7 +788,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fresh column's first send strands its other cards",
     file: "apps/pineta/host/commands/cards.ts",
-    from: "      for (const step of followers(cards, card, sent))\n        applyPlaceStep(places, step)\n",
+    from: "      for (const step of await followers(cards, card, sent))\n        applyPlaceStep(places, step)\n",
     to: "",
     command: unit,
     expect:
@@ -765,8 +845,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new lane ignores the id planChat chose",
     file: "apps/pineta/host/commands/chat.ts",
-    from: "      const created = await agent.createThreadLane(planned.at, planned.lane)",
-    to: "      const created = await agent.createThreadLane(\n        planned.at,\n        laneNameForThread(newId()),\n      )",
+    from: "      const created = await agent.createThreadLane(\n        { root, at: planned.at },\n        planned.lane,\n      )",
+    to: "      const created = await agent.createThreadLane(\n        { root, at: planned.at },\n        laneNameForThread(newId()),\n      )",
     command: unit,
     expect: "a new lane is created under the column's reserved id",
   },
@@ -781,8 +861,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stop is recorded after the abort",
     file: "apps/pineta/host/commands/lane.ts",
-    from: "    if (planned.record !== null)\n      await agent.writeValues([setRecord(STOP, planned.record)])\n    await agent.lane(lane).abort()\n",
-    to: "    await agent.lane(lane).abort()\n    if (planned.record !== null)\n      await agent.writeValues([setRecord(STOP, planned.record)])\n",
+    from: "    if (planned.record !== null)\n      await agent.writeValues([setRecord(STOP, planned.record, root)])\n    await agent.lane(lane).abort()\n",
+    to: "    await agent.lane(lane).abort()\n    if (planned.record !== null)\n      await agent.writeValues([setRecord(STOP, planned.record, root)])\n",
     command: unit,
     expect: "records who stopped its ask, then aborts",
   },
@@ -861,7 +941,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the take skips the archive gate",
     file: "apps/pineta/host/commands/index.ts",
-    from: '        refuseInArchive(doc, places, () =>\n          chat.at.kind === "root" ? null : chat.at.id,\n        ) ??',
+    from: '        refuseInArchive(\n          deps.basics,\n          chat.at.kind === "root" ? null : chat.root,\n        ) ??',
     to: "        null ??",
     command: unit,
     expect: "a taken card in an archived root is refused",
@@ -885,8 +965,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a run's lane and id are swapped",
     file: "apps/pineta/host/runs.ts",
-    from: "          return endRun(doc, lane, id)",
-    to: "          return endRun(doc, id, lane)",
+    from: "          return endRun(live, lane, id)",
+    to: "          return endRun(live, id, lane)",
     // tsc names no failing check (`failingChecks`): with typecheck clean,
     // any error is the mutant's.
     command: ["pnpm", "exec", "tsc", "--noEmit"],

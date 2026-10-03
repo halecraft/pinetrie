@@ -1,4 +1,4 @@
-import { cardId, writerId } from "@pineta/core"
+import { cardId, rootDocId, rootIdFor, writerId } from "@pineta/core"
 import {
   PLACES_DOC_ID,
   PRESENCE_DOC_ID,
@@ -13,6 +13,8 @@ const CARD = cardDocId(cardId("c-1"))
 const UNDO = "undo:seat-a"
 const INVENTORY = inventoryDocId(writerId("ada@x.io"))
 
+const KNOWN = rootIdFor("known")
+
 test("acceptsWrite: presence is each client's; the session and the places are left to who may write them (`writersPolicy`)", () => {
   expect(acceptsWrite(SESSION_DOC_ID)).toBeUndefined()
   expect(acceptsWrite(PLACES_DOC_ID)).toBeUndefined()
@@ -25,10 +27,14 @@ test("acceptsWrite: cards' texts are written by clients; an undo stack is refuse
   expect(acceptsWrite(UNDO)).toBe(false)
 })
 
-test("resolveDoc: a card's text, an inventory, a tab's undo stack, and nothing else", () => {
-  expect(resolveDoc(CARD)).toBe("text")
-  expect(resolveDoc(INVENTORY)).toBe("inventory")
-  expect(resolveDoc(UNDO)).toBe("reject")
+test("resolveDoc: a card's text, an inventory, a known root, a tab's undo stack or an unknown root, and nothing else", () => {
+  const known = (root: string) => root === KNOWN
+  expect(resolveDoc(CARD, known)).toBe("text")
+  expect(resolveDoc(INVENTORY, known)).toBe("inventory")
+  expect(resolveDoc(UNDO, known)).toBe("reject")
+  // Only the host makes roots; one the directory names it loads (ADR-0063).
+  expect(resolveDoc(rootDocId(KNOWN), known)).toBe("root")
+  expect(resolveDoc(rootDocId(rootIdFor("other")), known)).toBe("reject")
   for (const other of [
     SESSION_DOC_ID,
     PLACES_DOC_ID,
@@ -39,7 +45,7 @@ test("resolveDoc: a card's text, an inventory, a tab's undo stack, and nothing e
     "card:",
     "inventory:ada@x.io",
   ])
-    expect(resolveDoc(other)).toBeUndefined()
+    expect(resolveDoc(other, known)).toBeUndefined()
 })
 
 test("a command Line's documents are shared with, and taken from, its two ends only (ADR-0037)", () => {

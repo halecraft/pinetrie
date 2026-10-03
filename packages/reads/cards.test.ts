@@ -3,6 +3,7 @@ import {
   type CardRecord,
   cardId,
   entryId,
+  rootIdFor,
   writerId,
 } from "@pineta/core"
 import { encodeCard } from "@pineta/marginalia"
@@ -10,11 +11,18 @@ import { newPlacesDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { readPlaces, readPlacesRev } from "./index.ts"
 
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+
 const card = (id: string, owner = "p-ada"): CardRecord => ({
   id: cardId(id),
   owner: writerId(owner),
   placer: writerId(owner),
-  place: { kind: "drafting", at: atEntry(entryId("e1")), lane: null },
+  place: {
+    kind: "drafting",
+    root: TEST_ROOT,
+    at: atEntry(entryId("e1")),
+    lane: null,
+  },
   command: null,
   unsent: null,
 })

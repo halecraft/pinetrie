@@ -1,7 +1,7 @@
 // client/use-inbox — the inbox's imperative shell: what you have seen, kept
 // per device and shared by its tabs (ADR-0030). The decisions are `inbox.ts`'s.
 
-import type { TreeIndex } from "@pineta/core"
+import type { RootRecord } from "@pineta/core"
 import { useCallback, useEffect, useState } from "react"
 import {
   type Inbox,
@@ -23,13 +23,14 @@ export interface InboxView {
 
 export function useInbox({
   store,
-  index,
+  roots,
   items,
   shown,
   settled,
 }: {
   readonly store: DeviceState<Inbox>
-  readonly index: TreeIndex
+  /** Every root's directory record, for where a new device starts. */
+  readonly roots: Iterable<RootRecord>
   readonly items: readonly InboxItem[]
   /** The tab you are on: its columns' paths. */
   readonly shown: ReadonlySet<string>
@@ -38,11 +39,11 @@ export function useInbox({
 }): InboxView {
   const [inbox, setInbox] = useState<Inbox | null>(() => store.load() ?? null)
 
-  // With nothing stored, start once the document has settled: from a partial
-  // index, every mention not yet arrived would count as new (S29).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once, at settle, with the index of that render
+  // With nothing stored, start once the session has settled: from a partial
+  // directory, every mention not yet arrived would count as new (S29).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, at settle, with the directory of that render
   useEffect(() => {
-    if (settled && inbox === null) setInbox(store.save(startInbox(index)))
+    if (settled && inbox === null) setInbox(store.save(startInbox(roots)))
   }, [settled])
 
   // Another tab of this device saved: take the merged value. Nothing clears

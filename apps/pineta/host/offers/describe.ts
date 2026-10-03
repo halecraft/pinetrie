@@ -33,7 +33,7 @@ export function describe(
   force: boolean,
 ): Promise<void> {
   const { ops, root, serial } = state
-  const { doc } = state.basics
+  const { docs } = state.basics
   const fail = failed(state.basics, "describing its offer", lane)
   return serial
     .run(async () => {
@@ -52,13 +52,14 @@ export function describe(
     })
     .then(gathered => {
       if (gathered === null) return
-      const tip = readLaneTip(doc, lane)
+      const doc = docs.docOfLane(lane)
+      const tip = doc === null ? null : readLaneTip(doc, lane)
       return requestOutside({
         serial,
         failed: fail,
         request: async () => {
           const messages = transcriptLines(
-            projectTranscript(readTreeIndex(doc), tip),
+            doc === null ? [] : projectTranscript(readTreeIndex(doc), tip),
           )
           const skill = await state.agent().skill("pineta:skill:commit-message")
           return state.agent().complete(

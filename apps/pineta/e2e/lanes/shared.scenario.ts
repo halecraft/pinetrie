@@ -15,7 +15,7 @@ import path from "node:path"
 import { atEntry, entryId, ROOT } from "@pineta/core"
 import { readRevisions } from "@pineta/reads"
 import type { Checks } from "../checks.ts"
-import { containerProblem } from "../harness.ts"
+import { containerProblem, rootRecordsOf } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 import {
   BRANCH,
@@ -87,7 +87,7 @@ async function sharedSection(check: Checks["check"]): Promise<void> {
     const writer = h.laneWith("write a plan")
     const files = (rev: string) =>
       jj(dir, "file", "list", "--ignore-working-copy", "-r", rev)
-    const newest = [...readRevisions(h.host.doc).values()]
+    const newest = [...rootRecordsOf(h.host, readRevisions).values()]
       .filter(r => r.lane === writer?.name && r.snapshot !== null)
       .sort((a, b) => (a.entry < b.entry ? 1 : -1))[0]
     const snapshots = path.join(dir, ".pineta", "snapshots")

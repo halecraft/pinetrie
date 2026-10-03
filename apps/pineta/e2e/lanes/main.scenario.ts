@@ -22,24 +22,27 @@ import { deleteRecord, OFFER } from "@pineta/marginalia"
 import { scriptedModel } from "@pineta/pi"
 import {
   readLandings,
-  readLanes,
   readLine,
   readNames,
   readOffers,
   readPlaces,
   readProject,
   readRevisions,
-  readTreeIndex,
 } from "@pineta/reads"
-import { readEntries, readEntryMessage, rowMessage } from "@pineta/schema"
+import { rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,
   containerProblem,
+  entriesOf,
+  entryMessageIn,
   idleNow,
   join,
+  lanesOf,
+  rootRecordsOf,
   setUpLine,
+  treeOf,
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
@@ -86,7 +89,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
   })
   const wu = await join(wh, "uma", "lanes")
   await wu.setName("Uma")
-  const tree = () => readTreeIndex(wh.doc)
+  const tree = () => treeOf(wh)
   const idle = async () => {
     await waitFor(() => idleNow(wh), 180_000)
     await wh.quiet()
@@ -103,23 +106,23 @@ async function mainSection(check: Checks["check"]): Promise<void> {
   const laneWith = (text: string) => {
     const id = idOf(text)
     const index = tree()
-    return readLanes(wh.doc, index, readPlaces(wh.places)).find(
+    return lanesOf(wh, index, readPlaces(wh.places)).find(
       l => id !== null && ancestry(index, l.tip).path.includes(id),
     )
   }
   const tipOf = (text: string) => laneWith(text)?.tip ?? null
   const laneTip = (lane: LaneName) =>
-    readLanes(wh.doc, tree(), readPlaces(wh.places)).find(l => l.name === lane)
+    lanesOf(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
   /** Every tool result's text in a lane's thread, oldest first. */
   const toolResults = (lane: LaneName | undefined): string[] => {
     if (lane === undefined) return []
     const index = tree()
     const tip =
-      readLanes(wh.doc, index, readPlaces(wh.places)).find(l => l.name === lane)
+      lanesOf(wh, index, readPlaces(wh.places)).find(l => l.name === lane)
         ?.tip ?? null
     const onPath = new Set(ancestry(index, tip).path)
-    return Object.values(readEntries(wh.doc))
+    return Object.values(entriesOf(wh))
       .filter(r => onPath.has(entryId(r.id)))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
       .map(r => rowMessage(r) as { role?: string })
@@ -128,15 +131,15 @@ async function mainSection(check: Checks["check"]): Promise<void> {
   }
 
   try {
-    await waitFor(() => readProject(wh.doc) !== null, 30_000)
+    await waitFor(() => readProject(wh.session) !== null, 30_000)
     check(
       "the host finds container and gives threads lanes of their own",
-      readProject(wh.doc)?.kind === "lanes",
-      `${JSON.stringify(readProject(wh.doc))}`,
+      readProject(wh.session)?.kind === "lanes",
+      `${JSON.stringify(readProject(wh.session))}`,
     )
     // Threads start at the integration line (ADR-0060): set it up at the
     // project's commit, as the header's menu does.
-    await setUpLine(wh.doc, wu)
+    await setUpLine(wh.session, wu)
 
     // ── 1. Two lanes at once: the same file, the same port, their own ──────
     const serve =
@@ -221,7 +224,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     // Lane one's first run committed who.txt; its prompt and that message each
     // have a record with a snapshot, and your repo holds its history as a
     // remote bookmark (ADR-0038).
-    const ofOne = [...readRevisions(wh.doc).values()].filter(
+    const ofOne = [...rootRecordsOf(wh, readRevisions).values()].filter(
       r => r.lane === one?.name,
     )
     const bookmark = (lane: LaneName | undefined) =>
@@ -343,7 +346,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     // The commit the branches forked at, which every one of them inherits.
     const inherited = nearestRevision(
       tree(),
-      readRevisions(wh.doc),
+      rootRecordsOf(wh, readRevisions),
       at(setUp),
     ).commit
     script.use([
@@ -397,7 +400,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     const committerOffer =
       committer === undefined
         ? undefined
-        : readNames(wh.doc).get(committer.name)
+        : readNames(wh.session).get(committer.name)
     const hasMine = () =>
       committerOffer !== undefined &&
       jj(
@@ -487,7 +490,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
 
     // ── 6. Offers: the thread's work as one commit you take (ADR-0038) ────
     const offerOf = () =>
-      two === undefined ? undefined : readOffers(wh.doc).get(two.name)
+      two === undefined ? undefined : readOffers(wh.session).get(two.name)
     const defaultLog = () =>
       jj(
         project,
@@ -522,13 +525,13 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     )
     // Every lane has a name, two words, and no two alike; the offer's
     // bookmark and its message's trailer carry it (ADR-0039).
-    const names = readNames(wh.doc)
+    const names = readNames(wh.session)
     const twoName = two === undefined ? undefined : names.get(two.name)
     const offerBookmarkOf = (lane: LaneName | undefined) =>
       lane === undefined
         ? ""
-        : `pineta-offer/${readNames(wh.doc).get(lane) ?? ""}`
-    const allNamed = readLanes(wh.doc, tree(), readPlaces(wh.places)).every(l =>
+        : `pineta-offer/${readNames(wh.session).get(lane) ?? ""}`
+    const allNamed = lanesOf(wh, tree(), readPlaces(wh.places)).every(l =>
       names.has(l.name),
     )
     check(
@@ -676,9 +679,9 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     const intent = "keep both sides"
     if (two !== undefined)
       bringUpToDate(wu, two.name, laneTip(two.name), intent)
-    await waitFor(() => readLandings(wh.doc).length > 0, 60_000)
+    await waitFor(() => readLandings(wh.session).length > 0, 60_000)
     await idle()
-    const landing = readLandings(wh.doc).at(-1)
+    const landing = readLandings(wh.session).at(-1)
     const landMessage = projectTranscript(tree(), landing?.prompt ?? null).at(
       -1,
     )
@@ -692,7 +695,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     const stored =
       landing === undefined
         ? { present: false as const }
-        : readEntryMessage(wh.doc, landing.prompt)
+        : entryMessageIn(wh, landing.prompt)
     const landPrompt = stored.present
       ? (stored.message as { content?: unknown }).content
       : undefined
@@ -787,10 +790,10 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     writeFileSync(path.join(project, "yours.txt"), "yours\n")
     jj(project, "commit", "-m", "you add yours.txt")
     const previewed = await waitFor(
-      () => (readLine(wh.doc)?.yours.follow ?? null) !== null,
+      () => (readLine(wh.session)?.yours.follow ?? null) !== null,
       30_000,
     )
-    const preview = readLine(wh.doc)?.yours.follow
+    const preview = readLine(wh.session)?.yours.follow
     const updated = await wu.line("follow")
     const followedBy = jj(
       project,
@@ -933,7 +936,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     // the parent's shrinks it to its own, in place; taking a branch that holds
     // all of its parent's withdraws the parent's (ADR-0039).
     const offerFor = (lane: LaneName | undefined) =>
-      lane === undefined ? undefined : readOffers(wh.doc).get(lane)
+      lane === undefined ? undefined : readOffers(wh.session).get(lane)
     const filesOf = (lane: LaneName | undefined) =>
       JSON.stringify(offerFor(lane)?.files)
     const changeOf = (lane: LaneName | undefined) =>
@@ -1027,10 +1030,10 @@ async function mainSection(check: Checks["check"]): Promise<void> {
           rootOf(tree(), r.entry) === rootOne &&
           r.snapshot !== null,
       )
-    const before = inRootOne(readRevisions(wh.doc))
+    const before = inRootOne(rootRecordsOf(wh, readRevisions))
     // The root's open offers, by lane: archiving withdraws them, and
     // restoring builds them again.
-    const offeredInRootOne = [...readOffers(wh.doc).values()]
+    const offeredInRootOne = [...readOffers(wh.session).values()]
       .filter(o => {
         const tip = laneTip(o.lane)
         return (
@@ -1077,7 +1080,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       "archiving a root withdraws its threads' offers: no bookmark in your repo, no record",
       offeredInRootOne.length > 0 &&
         offerBookmarks().length === 0 &&
-        offeredInRootOne.every(lane => !readOffers(wh.doc).has(lane)),
+        offeredInRootOne.every(lane => !readOffers(wh.session).has(lane)),
       `${JSON.stringify({ offered: offeredInRootOne, left: offerBookmarks() })}`,
     )
     if (rootOne !== null) await wu.archive("restore", entryId(rootOne))
@@ -1085,7 +1088,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       () =>
         offeredInRootOne.length > 0 &&
         offerBookmarks().length === offeredInRootOne.length &&
-        offeredInRootOne.every(lane => readOffers(wh.doc).has(lane)),
+        offeredInRootOne.every(lane => readOffers(wh.session).has(lane)),
       30_000,
     )
     check(
@@ -1111,7 +1114,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       sh(
         `container rm -f ${container(two.name)} >/dev/null 2>&1; container volume rm ${container(two.name)} >/dev/null 2>&1; true`,
       )
-      for (const r of readRevisions(wh.doc).values())
+      for (const r of rootRecordsOf(wh, readRevisions).values())
         if (r.lane === two.name && r.snapshot !== null)
           rmSync(path.join(snapshots, `${r.snapshot}.img`), { force: true })
     }
@@ -1132,6 +1135,6 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     rmSync(marker, { force: true })
     await wu.close().catch(() => {})
     await wh.shutdown().catch(() => {})
-    cleanUp(wh.doc, project)
+    cleanUp(wh.session, project)
   }
 }

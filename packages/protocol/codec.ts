@@ -25,6 +25,7 @@ import {
   entryId,
   type Intent,
   isLaneName,
+  isRootId,
   keyOfFields,
   LINE_ACTIONS,
   type LineAction,
@@ -37,6 +38,7 @@ import {
   type Position,
   parseMentions,
   parseNewLane,
+  parseNewRoot,
   parseTitle,
   placeFields,
   type Refusal,
@@ -159,9 +161,20 @@ export function decodeCommand(
     const reservedLane = reserved === "" ? null : parseNewLane(reserved)
     if (reservedLane === undefined) return notNewLane(reserved)
     const base = text(wire?.base)
+    const rootText = text(wire?.root)
+    // A thread at the root starts a root, under the id its tab minted.
+    const root =
+      at.kind === "root"
+        ? parseNewRoot(rootText)
+        : isRootId(rootText)
+          ? rootText
+          : undefined
+    if (root === undefined)
+      return refused(ERR.UNKNOWN_TARGET, `not a root: ${rootText}`)
     return {
       kind: "chat",
       text: body,
+      root,
       at,
       mode,
       lane: isLaneName(lane) ? lane : null,
@@ -234,6 +247,9 @@ export function decodeCommand(
     const entry = text(wire?.targetId)
     if (entry === "")
       return refused(ERR.UNKNOWN_TARGET, "a mark must name its entry")
+    const root = text(wire?.root)
+    if (!isRootId(root))
+      return refused(ERR.UNKNOWN_TARGET, `not a root: ${root}`)
     const title = parseTitle(text(wire?.text))
     switch (title.kind) {
       case "invalid":
@@ -242,9 +258,9 @@ export function decodeCommand(
           `a title is one line of at most ${MAX_TITLE} characters`,
         )
       case "clear":
-        return { kind: "mark", entry: entryId(entry), title: null }
+        return { kind: "mark", root, entry: entryId(entry), title: null }
       case "set":
-        return { kind: "mark", entry: entryId(entry), title: title.title }
+        return { kind: "mark", root, entry: entryId(entry), title: title.title }
     }
   }
   return refused(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
@@ -263,8 +279,8 @@ const isCardCommand = (c: string): c is CardCommand =>
 /** A place's key -> the wire: its flat fields as JSON, `""` for none. */
 export const encodeKey = (key: PlaceKey | null): string => {
   if (key === null) return ""
-  const { kind, at, lane, column, seen, holder } = placeFields(key)
-  return JSON.stringify({ kind, at, lane, column, seen, holder })
+  const { kind, root, at, lane, column, seen, holder } = placeFields(key)
+  return JSON.stringify({ kind, root, at, lane, column, seen, holder })
 }
 
 /**
@@ -286,6 +302,7 @@ export function decodeKey(s: string): PlaceKey | null | undefined {
     typeof v[k] === "string" ? (v[k] as string) : ""
   return keyOfFields({
     kind: field("kind"),
+    root: field("root"),
     at: field("at"),
     lane: field("lane"),
     column: field("column"),
@@ -346,6 +363,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         kind: "chat",
         text: intent.text,
         parentId: positionToWire(intent.at),
+        root: intent.root,
         mode: intent.mode,
         lane: intent.lane ?? "",
         asksAgent: intent.asksAgent,
@@ -370,6 +388,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
       return command({
         id,
         kind: "mark",
+        root: intent.root,
         targetId: intent.entry,
         text: intent.title ?? "",
       })

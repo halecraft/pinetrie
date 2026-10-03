@@ -11,14 +11,42 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { NotAWriterError } from "@kyneta/exchange"
+import { subscribe } from "@kyneta/schema"
 import {
   type ConnectOptions,
   connectSession,
   type SessionClient,
 } from "@pineta/client/session"
+import type {
+  CardRecord,
+  EntryId,
+  LaneName,
+  LaneView,
+  Position,
+  RootId,
+  TreeIndex,
+} from "@pineta/core"
 import { prepareHost } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
-import { readLine, readPlaces } from "@pineta/reads"
+import {
+  readHeld,
+  readHeldIndex,
+  readLanes,
+  readLine,
+  readPlaces,
+  readRoots,
+} from "@pineta/reads"
+import {
+  hasLaneRecord,
+  type LiveDocHandle,
+  type RootDocHandle,
+  readEntries,
+  readEntryMessage,
+  readLaneNames,
+  readLaneTip,
+  type SessionDocHandle,
+  type StoredEntryRow,
+} from "@pineta/schema"
 import {
   type RunningHost,
   type StartHostOptions,
@@ -63,8 +91,8 @@ export const noQueued = (host: Pick<RunningHost, "places">): boolean =>
  * queued under a run is taken only as it ends, so "no run" alone can hold
  * between a run's end and the take.
  */
-export const idleNow = (host: Pick<RunningHost, "doc" | "places">): boolean =>
-  Object.keys(host.doc.activeRuns()).length === 0 && noQueued(host)
+export const idleNow = (host: Pick<RunningHost, "live" | "places">): boolean =>
+  Object.keys(host.live.activeRuns()).length === 0 && noQueued(host)
 
 /**
  * A project for a host with tools: a jj repo, colocated with git, with
@@ -93,20 +121,39 @@ export function committedProject(
  * A person joining `host` over its WebSocket, as `<name>@<scenario>.test`:
  * one domain per scenario, so no two scenarios share a person (ADR-0037).
  */
-export const join = (
+export const join = async (
   host: { readonly wsUrl: string },
   name: string,
   scenario: string,
   options: Partial<
     Omit<ConnectOptions, "url" | "WebSocket" | "principal">
   > = {},
-) =>
-  connectSession({
+): Promise<SessionClient> => {
+  const client = await connectSession({
     url: host.wsUrl,
     WebSocket,
     principal: `${name}@${scenario}.test`,
     ...options,
   })
+  holdEvery(client)
+  // A scenario writes at an entry another client has just made: wait until
+  // this one holds its root, as a page shows only what it holds.
+  const holds = (at: Position) =>
+    at.kind === "root"
+      ? Promise.resolve(0)
+      : waitFor(() => client.rootOf(at.id) !== undefined, 10_000)
+  const { chat, mark } = client
+  return Object.assign(client, {
+    chat: async (...args: Parameters<SessionClient["chat"]>) => {
+      await holds(args[1])
+      return chat(...args)
+    },
+    mark: async (...args: Parameters<SessionClient["mark"]>) => {
+      await holds({ kind: "entry", id: args[0] })
+      return mark(...args)
+    },
+  })
+}
 
 /**
  * Set up the integration line at your `@-`, as the header's menu does
@@ -165,4 +212,117 @@ export async function containerProblem(): Promise<string | null> {
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+}
+
+/**
+ * What a scenario reads of a host or a client (ADR-0063): the session's
+ * documents, and the roots it holds now, read as one.
+ */
+export interface Held {
+  readonly session: SessionDocHandle
+  readonly live: LiveDocHandle
+  readonly roots: readonly RootDocHandle[]
+}
+
+/** The host's held roots, or a client's, with its session and what streams. */
+export function held(
+  x:
+    | Pick<RunningHost, "session" | "live" | "docs">
+    | Pick<SessionClient, "session" | "live" | "roots">,
+): Held {
+  const roots =
+    "docs" in x
+      ? x.docs.loaded().flatMap(root => {
+          const view = x.docs.view(root)
+          return view === null ? [] : [view.doc]
+        })
+      : [...x.roots.current().values()]
+  return { session: x.session, live: x.live, roots }
+}
+
+/** The tree of every root `x` holds, as one index. */
+export const treeOf = (x: Parameters<typeof held>[0]): TreeIndex =>
+  readHeldIndex(held(x).roots)
+
+/** Every stored entry row of every root `x` holds, by id. */
+export const entriesOf = (
+  x: Parameters<typeof held>[0],
+): Readonly<Record<string, StoredEntryRow>> =>
+  Object.assign({}, ...held(x).roots.map(readEntries))
+
+/** A record read from each root `x` holds, as one map. */
+export const rootRecordsOf = <K, V>(
+  x: Parameters<typeof held>[0],
+  read: (doc: RootDocHandle) => ReadonlyMap<K, V>,
+): ReadonlyMap<K, V> => readHeld(held(x).roots, read)
+
+/** Every lane in the roots `x` holds, with its queue from `cards`. */
+export const lanesOf = (
+  x: Parameters<typeof held>[0],
+  index: TreeIndex,
+  cards: readonly CardRecord[],
+): readonly LaneView[] => {
+  const { roots, live } = held(x)
+  return roots.flatMap(doc => readLanes({ doc, live }, index, cards))
+}
+
+/** Every lane name pi holds, in the roots `x` holds. */
+export const laneNamesOf = (
+  x: Parameters<typeof held>[0],
+): readonly LaneName[] => held(x).roots.flatMap(readLaneNames)
+
+/**
+ * A client that holds every root the directory names, as it changes: a
+ * scenario's session reads and writes in any root, as a page holds the roots
+ * of its tabs (ADR-0063).
+ */
+export function holdEvery(client: SessionClient): () => void {
+  const follow = () =>
+    client.holdRoots(new Set(readRoots(client.session).keys()))
+  follow()
+  return subscribe(client.session, follow)
+}
+
+/** A lane's tip, in whichever root `x` holds it. */
+export const tipIn = (
+  x: Parameters<typeof held>[0],
+  lane: LaneName,
+): EntryId | null => {
+  for (const doc of held(x).roots)
+    if (hasLaneRecord(doc, lane)) return readLaneTip(doc, lane)
+  return null
+}
+
+/** An entry's stored message, in whichever root `x` holds it. */
+export const entryMessageIn = (
+  x: Parameters<typeof held>[0],
+  id: string,
+): ReturnType<typeof readEntryMessage> => {
+  for (const doc of held(x).roots) {
+    const found = readEntryMessage(doc, id)
+    if (found.present) return found
+  }
+  return { present: false }
+}
+
+/**
+ * The root a host or a client holds `at` in: where a card drafting there is
+ * (ADR-0063).
+ */
+export function rootAt(
+  x: Pick<RunningHost, "docs"> | Pick<SessionClient, "rootOf">,
+  at: Position,
+): RootId {
+  const id = at.kind === "entry" ? at.id : null
+  const root =
+    id === null
+      ? undefined
+      : "docs" in x
+        ? x.docs
+            .loaded()
+            .find(r => x.docs.view(r)?.doc.entries.get(id) !== undefined)
+        : x.rootOf(id)
+  if (root === undefined)
+    throw new Error(`no root held here has ${JSON.stringify(at)}`)
+  return root
 }

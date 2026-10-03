@@ -12,7 +12,7 @@ import {
   beginRun,
   clearStreams,
   endRun,
-  newSessionDoc,
+  newLiveDoc,
   planStream,
   readStreams,
   type Stream,
@@ -39,7 +39,7 @@ interface Commit {
 function drive(
   steps: readonly (StreamEvent | Commit)[],
   running = true,
-  doc = newSessionDoc(),
+  doc = newLiveDoc(),
 ) {
   const tips = new Map<LaneName, EntryId | null>([
     [L, entryId("p")],
@@ -186,7 +186,7 @@ describe("planStream: replies and tools are streams of edits", () => {
 
 describe("the end of a run", () => {
   test("endRun deletes the lane's streams with its key, and leaves other lanes' alone", () => {
-    const doc = newSessionDoc()
+    const doc = newLiveDoc()
     beginRun(doc, L, runId("r-1"))
     beginRun(doc, M, runId("r-2"))
     drive(

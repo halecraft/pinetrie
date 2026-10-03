@@ -7,6 +7,44 @@ is the layout (which tab you are on, and each root's columns), kept per
 browser tab. What is typed is a card (ADR-0048): a document of its own,
 written by this client, and kept on its thread.
 
+## The roots a tab holds (ADR-0063)
+
+- **A tab holds the roots it shows** (`planHeldRoots`, `held-roots.ts`): the
+  roots of your open tabs, the one you are on, and the Archive tab's
+  preview. `SessionClient.holdRoots` opens what is new and `destroy`s what
+  is not, which leaves the host's copy (S86). A root this client starts is
+  held from its first send until the page asks for it.
+- **It declines every other root.** Kyneta takes in every announced document
+  whose schema a client knows, and every root's is the session's, so a
+  `canShare` policy refuses a `root:` document the client does not want.
+  Kyneta asks it as `get` opens a document, and not again, so `hold`
+  records a root as `wanted` before it calls `get` (S86): a root allowed
+  only after would be opened and never asked for.
+- **Every cross-root fact comes from the directory** (`readRoots`): the tab
+  bar's labels and summaries (`summariesOf`, `firstLinesOf`, `labelsOf`), the
+  Archive tab's rows, `prune`'s known roots, the inbox's mentions, the
+  header's count (`messagesIn`), the participants (`participantsIn`), the
+  roots of the header's runs and offers (`runsHere`, `laneRootsOf`), and the
+  root of a card drafted in a root not held (`cardMarks`'s `rootEntries`).
+  The Archive tab searches labels: a search of every message would hold
+  every root.
+- **A directory write wakes every read of the session's records**:
+  `readValues` reads the whole `values` map. So `readParticipantNames`
+  keeps its map while the names are the same, since every message compares
+  it by identity (the browser suite's "a message in another thread redraws
+  none of this tab's messages").
+- **The held roots read as one tree** (`readHeldIndex`), so every projection
+  below works as it did over one document, for the roots held. A root's
+  columns sync only while it is held; `prune` waits for the stored tabs'
+  roots to settle, and drops only what the directory lacks.
+- **What the header opens may be in a root not held** (`openIn`): one held
+  opens as `openAt`; an archived one is previewed; any other root's tab is
+  shown, which holds it, and `openWhenHeld` shows the entry once the index
+  has it.
+- **A write names its root**: `chat` and `mark` find it from the held
+  document with the entry (`rootOf`), and a send at the root mints one
+  (`newRootId`); a card's place at an entry carries it.
+
 ## Reads go through one index
 
 `readTreeIndex(doc)` (`@pineta/reads`) builds `indexTree` once per change of
@@ -160,9 +198,9 @@ in that order. `tabBar(layout)` is Archive, `open`, then new tabs.
 `summarizeRoots` and `rootWork` (`packages/core/roots.ts`)
 give the roots and each tab's signals.
 
-- **A root's label is `rootLabels`'s** (`root-label.ts`, ADR-0045): its
-  mark's title, else its first line (`firstLines`). `App` builds both maps
-  once per change, and every place that names a root looks one up: the tabs,
+- **A root's label is `labelsOf`'s** (`root-label.ts`, ADR-0045): its
+  title, else its first line (`firstLinesOf`), both from its directory
+  record (ADR-0063). `App` builds both maps once per directory change, and every place that names a root looks one up: the tabs,
   the header, the inbox, and the Archive tab, whose search reads labels, so
   it finds a title without knowing about marks. The first lines are also
   the rename field's placeholder: what clearing a title brings back.
@@ -319,22 +357,26 @@ The header (`header.tsx`) is the rest of the session, from live data; nothing
 in it opens a tab until you choose.
 
 - **People:** `peopleHere` (`here.ts`) groups `readingAt` by
-  person, in `writerOrder`. "Never you" is `readingAt`'s rule, not
+  person, in `writerOrder`. An end's root is found in the index, else in
+  the root its column reported (`readingRoot`, `readReadingRoots`), so a
+  person in a root this tab does not hold is shown, and opens it. "Never you" is `readingAt`'s rule, not
   repeated here. Each avatar (`Avatar`, the same circle the tabs and columns
   draw) is a `Menu` of the threads that person is in.
 - **You** are the last thing in the header: your profile (`profile.tsx`,
   below, under Who you are).
-- **The agent:** `activity` (`readAgentActivity`) is its running lanes; the
-  header adds nothing of its own, and finds each run's root with `rootOf`.
-- **The inbox** (`inbox.ts`, pure): `mentionsOf` is every chat whose mentions
+- **The agent:** `runsHere` is its running lanes in every root: a held
+  lane's run at its tip (`activity`), any other at its root entry, from the
+  lane's record (`running`) and the directory.
+- **The inbox** (`inbox.ts`, pure): `mentionsOf` is every chat, from each
+  root's directory record (`RootRecord.mentions`), whose mentions
   `address` resolves to your display name, never your own; `InboxItem` is one
   (core's `Mention` is a mention parsed from text). What you have seen is
   `{ since, seen }`: every mention at or before `since`, and the ids above it
   in `seen`. Marking compacts: `since` moves past a run of seen mentions, so
   `seen` holds only those above an unseen one.
 - **`useInbox`** is its shell. With nothing stored, it starts at
-  `startInbox(index)` (the newest entry) only after `whenSettled`: from a
-  partial index, old mentions would count as new (S29). A mention on the
+  `startInbox(roots)` (any root's newest entry) only after `whenSettled`:
+  from a partial directory, old mentions would count as new (S29). A mention on the
   paths of the tab you are on is seen (`seenOnScreen`), and the effect writes
   nothing when there is none.
 - **"You" is your email** (ADR-0037). Your other tabs and devices are you, so

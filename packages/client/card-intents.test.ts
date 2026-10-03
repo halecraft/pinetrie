@@ -5,6 +5,7 @@ import {
   cardId,
   entryId,
   indexAsks,
+  rootIdFor,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
@@ -24,6 +25,8 @@ import {
   resolveLayout,
 } from "./layout.ts"
 
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+
 const ADA = writerId("ada@x.io")
 const C1 = cardId("c-1")
 const C2 = cardId("c-2")
@@ -31,7 +34,12 @@ const index = tree({ "1-r1": null, "2-a": "1-r1" })
 const R1 = entryId("1-r1")
 const A = entryId("2-a")
 const inventory = { kind: "inventory", holder: ADA } as const
-const drafting = { kind: "drafting", at: atEntry(A), lane: null } as const
+const drafting = {
+  kind: "drafting",
+  root: TEST_ROOT,
+  at: atEntry(A),
+  lane: null,
+} as const
 const onR1: Layout = resolveLayout(
   layoutReducer(initialLayout(), {
     kind: "show",

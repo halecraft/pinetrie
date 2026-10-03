@@ -75,11 +75,15 @@ export function createTurns(deps: {
   readonly fetchLane: Fetches["fetchLane"]
 }): Turns {
   const { basics, setup, registry, serial } = deps
-  const { doc } = basics
+  const { docs } = basics
   const recording = new Set<Promise<unknown>>()
 
-  const writeRevision = (record: RevisionRecord) =>
-    deps.agent().writeValues([setRecord(REVISION, record)])
+  /** A revision, in the root its lane works in (ADR-0063). */
+  const writeRevision = async (record: RevisionRecord) => {
+    const root = docs.rootOfLane(record.lane)
+    if (root === null) throw new Error(`${record.lane} is in no root`)
+    await deps.agent().writeValues([setRecord(REVISION, record, root)])
+  }
 
   return {
     writeRevision,
@@ -90,6 +94,7 @@ export function createTurns(deps: {
       try {
         const record = registry.recordOf(lane)
         if (record === undefined) return
+        const doc = await docs.root(record.root)
         const index = readTreeIndex(doc)
         const entry = turnEntry(index, tip)
         const isPrompt = promptOf(index, entry) === entry

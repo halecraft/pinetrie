@@ -9,11 +9,12 @@ import {
 import { revisionMessage } from "@pineta/lanes"
 import { encodeChat, encodeUpdate } from "@pineta/marginalia"
 import { readTreeIndex } from "@pineta/reads"
-import { newSessionDoc, writeEntry } from "@pineta/schema"
+import { newRootDoc, writeEntry, writeLaneTip } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
-import { record, row } from "../fakes.ts"
+import { basics, record, row } from "../fakes.ts"
 import {
   applySettle,
+  createUpdates,
   type Prepared,
   planSettle,
   reasonOf,
@@ -25,7 +26,7 @@ const LANE = laneNameForThread("0123456789abcdef")
 
 describe("reasonOf", () => {
   test("a revision's reason is its message, attributed to its author or the agent; else its first line", () => {
-    const doc = newSessionDoc()
+    const doc = newRootDoc()
     const ada = encodeChat(
       {
         author: writerId("ada@example.com"),
@@ -75,7 +76,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
     by: ADA,
     intent: "keep both sides",
     from: lineFrom,
-    index: readTreeIndex(newSessionDoc()),
+    index: readTreeIndex(newRootDoc()),
     now: 7,
   }
   test("clean: the update in the thread, naming its base, and the lane fetched", () => {
@@ -133,7 +134,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
     ).toEqual({ kind: "nothing", fetch: null })
   })
   test("conflicted: each file's reasons are the revisions that touched it, ours attributed; the land message ends with the card's text", () => {
-    const doc = newSessionDoc()
+    const doc = newRootDoc()
     writeEntry(
       doc,
       row("e1", null, {
@@ -281,5 +282,30 @@ describe("withLaneStarted: the lane an update starts", () => {
       prepared: { kind: "refused", reason: "jj failed" },
       calls: ["start", "update", "stop"],
     })
+  })
+})
+
+describe("askedForGuidance", () => {
+  /** Updates over a document whose lane's run was prompted by `role`. */
+  const updatesAt = (role: string) => {
+    const b = basics()
+    writeEntry(b.root, row("p-1", null, { role, content: "go" }))
+    writeLaneTip(b.root, LANE, entryId("p-1"))
+    return createUpdates({
+      basics: b,
+      setup: { root: null, paths: null, lanes: null },
+      registry: record<Parameters<typeof createUpdates>[0]["registry"]>().port,
+      agent: () =>
+        record<ReturnType<Parameters<typeof createUpdates>[0]["agent"]>>().port,
+      containers:
+        record<Parameters<typeof createUpdates>[0]["containers"]>().port,
+      fetchLane: async () => {},
+      writeRevision: async () => {},
+    })
+  }
+
+  test("a landing takes the question; any other run's call asks nothing (S85)", () => {
+    expect(updatesAt("land").askedForGuidance(LANE)).toBe(true)
+    expect(updatesAt("chat").askedForGuidance(LANE)).toBe(false)
   })
 })

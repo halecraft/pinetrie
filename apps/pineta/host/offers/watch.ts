@@ -42,7 +42,7 @@ export function startWatch(
   state: Pick<OfferState, "ops" | "basics" | "serial">,
   on: { line(): void; touch(lane: LaneName): void },
 ): { close(): void } {
-  const { doc } = state.basics
+  const { session: doc } = state.basics
   let last: string | null = null
   /** Lanes by the thread name their offer bookmark carries; read on the queue (S57). */
   const bookmarked = () =>

@@ -38,8 +38,9 @@ const DigestSchema = Type.Object({
 })
 
 /** Each ask's digest, at its prompt's entry id. */
-export const DIGEST: RecordSpec<DigestRecord, EntryId> = {
+export const DIGEST: RecordSpec<DigestRecord, EntryId, "root"> = {
   namespace: "pineta.digest",
+  home: "root",
   keyOf: r => r.prompt,
   encode: ({ prompt, ...contents }) => contents,
   decode: (contents, key) =>

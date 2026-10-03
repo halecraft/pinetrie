@@ -30,7 +30,7 @@ import {
   type WorkFacts,
   workingWords,
 } from "./column-view.ts"
-import { entry, indexOf } from "./fixtures.ts"
+import { entry, indexOf, TEST_ROOT } from "./fixtures.ts"
 
 const A = laneNameForThread("a")
 const B = laneNameForThread("b")
@@ -164,6 +164,7 @@ const laneView = (name: LaneName, tip: string, running = false): LaneView => ({
 const onLane = (view: LaneView): ThreadLane => ({ kind: "lane", ...view })
 const record = (lane: LaneName, work: LaneRecord["work"]): LaneRecord => ({
   lane,
+  root: TEST_ROOT,
   work,
   by: ADA,
   createdAt: 1,

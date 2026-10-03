@@ -5,6 +5,7 @@ import {
   type LaneName,
   laneNameForThread,
   type ProjectRecord,
+  rootIdFor,
   runId,
   writerId,
 } from "@pineta/core"
@@ -18,9 +19,11 @@ import {
 import { readPlaces, readPlacesRev } from "@pineta/reads"
 import { newPlacesDoc, writeLaneTip } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { basics, putValue, record, writesOf } from "./fakes.ts"
+import { basics, putValue, ROOT_ID, record, writesOf } from "./fakes.ts"
 import { createSerial } from "./queue.ts"
 import { recover, type StartupDeps } from "./startup.ts"
+
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const agentPort = (impl: Partial<StartupDeps["agent"]> = {}) =>
   record<StartupDeps["agent"]>({
@@ -34,6 +37,7 @@ const agentPort = (impl: Partial<StartupDeps["agent"]> = {}) =>
 /** What `recover` needs, doing nothing, with `over` in place. */
 const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
   basics: basics(),
+  roots: [ROOT_ID],
   agent: agentPort().port,
   work: record<StartupDeps["work"]>({ project: null }).port,
   ensureNames: async () => {},
@@ -60,6 +64,7 @@ test("recover resumes each interrupted lane before it settles the others, and na
       placer: writerId("ada@x.io"),
       place: {
         kind: "queued",
+        root: TEST_ROOT,
         at: atEntry(entryId("e-1")),
         lane: OTHER,
         order: "a",
@@ -102,11 +107,11 @@ test("recover resumes each interrupted lane before it settles the others, and na
 
 test("recover logs a stored lane whose name is not a thread's, and only such a lane", async () => {
   const b = basics()
-  writeLaneTip(b.doc, laneNameForThread("0123456789abcdef"), null)
+  writeLaneTip(b.root, laneNameForThread("0123456789abcdef"), null)
   await recover(deps({ basics: b }))
   expect(b.lines.filter(l => l.includes("ignoring"))).toEqual([])
 
-  writeLaneTip(b.doc, "main" as LaneName, null)
+  writeLaneTip(b.root, "main" as LaneName, null)
   await recover(deps({ basics: b }))
   expect(b.lines.filter(l => l.includes("ignoring"))).toEqual([
     "[host] ignoring lanes whose names are not a thread's: main",
@@ -136,7 +141,7 @@ test("recover writes the project record only when it changed, in one write", asy
   const fresh = await run(basics())
   expect(fresh.map(c => (c.args[0] as unknown[]).length)).toEqual([2])
   const b = basics()
-  putValue(b.doc, setRecord(PROJECT, project))
+  putValue(b, setRecord(PROJECT, project))
   const again = await run(b)
   expect(writesOf(again).map(w => w.namespace)).toEqual(["pineta.commands"])
 })
@@ -149,7 +154,12 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
       id: cardId(id),
       owner: writerId("ada@x.io"),
       placer: writerId("ada@x.io"),
-      place: { kind: "drafting", at: atEntry(entryId("e-1")), lane: null },
+      place: {
+        kind: "drafting",
+        root: TEST_ROOT,
+        at: atEntry(entryId("e-1")),
+        lane: null,
+      },
       command: null,
       unsent: null,
     })
@@ -157,7 +167,7 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
   placesDoc.cards.set("c-empty", card("c-empty"))
   for (const clientId of [11, 22, 33])
     putValue(
-      b.doc,
+      b,
       setRecord(SEAT, {
         peer: `p-${clientId}`,
         clientId,

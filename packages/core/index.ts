@@ -115,6 +115,43 @@ const NEW_LANE =
 export const parseNewLane = (s: string): LaneName | undefined =>
   NEW_LANE.test(s) ? (s as LaneName) : undefined
 
+declare const rootIdBrand: unique symbol
+/**
+ * A root's document's id (ADR-0063): `r-` and a uuidv7, minted by the tab
+ * whose first message starts the root, as a column mints its lane's id
+ * (ADR-0057). Not the root entry's id: a lane can exist in a root before pi
+ * writes its first entry. The directory (`ROOT`) maps one to the other.
+ */
+export type RootId = string & { readonly [rootIdBrand]: true }
+
+const ROOT_PREFIX = "r-"
+const NEW_ROOT =
+  /^r-[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+/** A new root's id, from a fresh uuidv7. */
+export const rootIdFor = (uuid: string): RootId =>
+  `${ROOT_PREFIX}${uuid}` as RootId
+
+/** Whether text names a root's document: the check wherever a root id is read. */
+export const isRootId = (s: string): s is RootId =>
+  s.startsWith(ROOT_PREFIX) && s.length > ROOT_PREFIX.length
+
+/** A new root's id as a client makes it, `r-` and a lowercase uuidv7; undefined for anything else. */
+export const parseNewRoot = (s: string): RootId | undefined =>
+  NEW_ROOT.test(s) ? (s as RootId) : undefined
+
+const ROOT_DOC_PREFIX = "root:"
+
+/** The id of a root's document, which holds its pi storage (ADR-0063). */
+export const rootDocId = (root: RootId): string => `${ROOT_DOC_PREFIX}${root}`
+
+/** A document id -> the root it is, or undefined for any other document. */
+export function rootOfDocId(docId: string): RootId | undefined {
+  if (!docId.startsWith(ROOT_DOC_PREFIX)) return undefined
+  const root = docId.slice(ROOT_DOC_PREFIX.length)
+  return isRootId(root) ? root : undefined
+}
+
 declare const entryIdBrand: unique symbol
 declare const runIdBrand: unique symbol
 /**
@@ -158,6 +195,16 @@ export type Position =
 
 export const ROOT: Position = { kind: "root" }
 export const atEntry = (id: EntryId): Position => ({ kind: "entry", id })
+
+/**
+ * A position in a given root (ADR-0063): what a command or a card's place
+ * carries where it points into the tree, so the host knows the document
+ * without looking the entry up.
+ */
+export interface Spot {
+  readonly root: RootId
+  readonly at: Position
+}
 export const samePosition = (a: Position, b: Position): boolean =>
   a.kind === "root" ? b.kind === "root" : b.kind === "entry" && a.id === b.id
 
@@ -200,6 +247,8 @@ export const ERR = {
   INVALID_TITLE: "invalid_title",
   /** A new thread's lane id that names a lane pi already holds (ADR-0057). */
   LANE_TAKEN: "lane_taken",
+  /** A new root's id that names a root the session already holds (ADR-0063). */
+  ROOT_TAKEN: "root_taken",
   /**
    * A command that acts on the repo as its owner (set up the line, land your
    * work) from a host that admits others: it has an invite key (ADR-0060).
@@ -237,19 +286,32 @@ export const refused = (code: ErrCode, message: string): Refusal => ({
 export type HostNamespace = `pineta.${string}`
 
 /**
- * One write to a pi value at its address, as the host decides it and pi's
- * session carries it out (ADR-0062). Built by marginalia's `setRecord` and
- * `deleteRecord`.
+ * Which document a host record is written to (ADR-0063): the session's, or a
+ * root's.
+ */
+export type Target =
+  | { readonly kind: "session" }
+  | { readonly kind: "root"; readonly root: RootId }
+
+export const SESSION_TARGET: Target = { kind: "session" }
+
+/**
+ * One write to a pi value at its address, in its document, as the host
+ * decides it and pi's session carries it out (ADR-0062). Built by
+ * marginalia's `setRecord` and `deleteRecord`, which take the target from
+ * the record's home.
  */
 export type ValueWrite =
   | {
       readonly kind: "set"
+      readonly target: Target
       readonly namespace: HostNamespace
       readonly key: string
       readonly value: unknown
     }
   | {
       readonly kind: "delete"
+      readonly target: Target
       readonly namespace: HostNamespace
       readonly key: string
     }
@@ -286,6 +348,11 @@ export type Intent =
   | {
       readonly kind: "chat"
       readonly text: string
+      /**
+       * The root it is written in (ADR-0063), with `at` a `Spot`: a new one
+       * the sender's tab minted for a thread at the root.
+       */
+      readonly root: RootId
       readonly at: Position
       readonly mode: ChatMode
       /** The lane the sender's column is bound to: its thread, named. */
@@ -330,6 +397,8 @@ export type Intent =
   /** Title an entry, or clear its title with null (ADR-0045). */
   | {
       readonly kind: "mark"
+      /** The root the entry is in (ADR-0063). */
+      readonly root: RootId
       readonly entry: EntryId
       readonly title: string | null
     }
@@ -390,6 +459,39 @@ export interface ArchiveRecord {
   readonly by: WriterId
   /** When it last changed, in ms since the epoch. */
   readonly at: number
+}
+
+// --- the directory of roots (ADR-0063) --------------------------------------
+
+/**
+ * A root as the tabs, the Archive tab, the inbox and the header see it,
+ * without its document: a host-written `pineta.root` value in the session,
+ * keyed by the root's id, refreshed whenever the root's document changes.
+ */
+export interface RootRecord {
+  readonly root: RootId
+  /** Its root entry (S30), the tab's key; null before its first message. */
+  readonly entry: EntryId | null
+  /** Its first message, as the rail finds it (`RootSummary.first`). */
+  readonly first: EntryId | null
+  /** That message's first line: the label while it has no title. */
+  readonly firstLine: string
+  /** Its root entry's mark (ADR-0045), or null. */
+  readonly title: string | null
+  /** Its messages: the rail's rows. */
+  readonly messages: number
+  /** Its newest message: last activity, since ids are uuidv7. */
+  readonly newest: EntryId | null
+  /** Everyone who wrote a chat in it, in order of first message. */
+  readonly writers: readonly WriterId[]
+  /** Its chats that name someone (`@`), for the inbox to resolve. */
+  readonly mentions: readonly {
+    readonly id: EntryId
+    readonly by: WriterId
+    readonly text: string
+  }[]
+  /** Every image it shows (`referencedBlobs`), for the image sweep. */
+  readonly images: readonly Sha256[]
 }
 
 // --- marks (ADR-0045) --------------------------------------------------------
@@ -664,7 +766,10 @@ export type WorkSetting =
  */
 export interface LaneRecord {
   readonly lane: LaneName
-  readonly work: WorkSetting
+  /** The root the lane works in (ADR-0063). */
+  readonly root: RootId
+  /** Its own copy, or a directory; null for a lane with no work of its own. */
+  readonly work: WorkSetting | null
   readonly by: WriterId
   readonly createdAt: number
 }
@@ -971,11 +1076,15 @@ export const CARD_COMMANDS: readonly CardCommand[] = [
 export type CardPlace =
   | {
       readonly kind: "drafting"
+      /** The root its thread is in (ADR-0063), with `at` a `Spot`. */
+      readonly root: RootId
       readonly at: Position
       readonly lane: LaneName | null
     }
   | {
       readonly kind: "queued"
+      /** Its lane's root (ADR-0063), with `at` a `Spot`. */
+      readonly root: RootId
       /** Where it was queued: an unqueue puts it back here. */
       readonly at: Position
       readonly lane: LaneName
@@ -1024,6 +1133,7 @@ export function keyOf(place: CardPlace): PlaceKey {
     case "queued":
       return {
         kind: "queued",
+        root: place.root,
         at: place.at,
         lane: place.lane,
         seen: place.seen,
@@ -1087,6 +1197,8 @@ export type MoveRefusal =
  */
 export interface PlaceFields {
   readonly kind: string
+  /** A drafting or queued card's root (ADR-0063); "" for any other. */
+  readonly root: string
   readonly at: string
   readonly lane: string
   readonly column: string
@@ -1104,6 +1216,7 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
     case "drafting":
       return {
         kind: "drafting",
+        root: place.root,
         at: entryOrEmpty(place.at),
         lane: place.lane ?? "",
         column: "",
@@ -1115,6 +1228,7 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
     case "queued":
       return {
         kind: "queued",
+        root: place.root,
         at: entryOrEmpty(place.at),
         lane: place.lane,
         column: "",
@@ -1126,6 +1240,7 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
     case "fresh":
       return {
         kind: "fresh",
+        root: "",
         at: "",
         lane: "",
         column: place.column,
@@ -1137,6 +1252,7 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
     case "inventory":
       return {
         kind: "inventory",
+        root: "",
         at: "",
         lane: "",
         column: "",
@@ -1165,18 +1281,24 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
         ? undefined
         : { kind: "inventory", holder: f.holder as WriterId }
     case "drafting":
-      return f.at === ""
+      return f.at === "" || !isRootId(f.root)
         ? undefined
         : {
             kind: "drafting",
+            root: f.root,
             at: atEntry(entryId(f.at)),
             lane: isLaneName(f.lane) ? f.lane : null,
           }
     case "queued":
-      return f.at === "" || !isLaneName(f.lane) || f.order === "" || f.by === ""
+      return f.at === "" ||
+        !isRootId(f.root) ||
+        !isLaneName(f.lane) ||
+        f.order === "" ||
+        f.by === ""
         ? undefined
         : {
             kind: "queued",
+            root: f.root,
             at: atEntry(entryId(f.at)),
             lane: f.lane,
             order: f.order,
@@ -1195,10 +1317,11 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
  */
 export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
   if (f.kind !== "queued") return placeOfFields(f)
-  return f.at === "" || !isLaneName(f.lane)
+  return f.at === "" || !isRootId(f.root) || !isLaneName(f.lane)
     ? undefined
     : {
         kind: "queued",
+        root: f.root,
         at: atEntry(entryId(f.at)),
         lane: f.lane,
         seen: f.seen,

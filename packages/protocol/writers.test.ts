@@ -1,7 +1,8 @@
-import { writerId } from "@pineta/core"
+import { rootDocId, rootIdFor, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
 import {
   HOST_PRINCIPAL,
+  LIVE_DOC_ID,
   PLACES_DOC_ID,
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
@@ -22,8 +23,13 @@ test("an inventory's document names its writer, and nothing else names one", () 
     expect(writerOfInventoryDoc(other)).toBeUndefined()
 })
 
-test("mayWrite: the session and the places are the host's; an inventory its person's, relayed by the host", () => {
-  for (const doc of [SESSION_DOC_ID, PLACES_DOC_ID]) {
+test("mayWrite: the session, the places and now are the host's; an inventory its person's, relayed by the host", () => {
+  for (const doc of [
+    SESSION_DOC_ID,
+    PLACES_DOC_ID,
+    LIVE_DOC_ID,
+    rootDocId(rootIdFor("01a0ffd2-4e7a-71c8-a970-306fa07d7f09")),
+  ]) {
     expect(mayWrite(doc, HOST_PRINCIPAL)).toBe(true)
     expect(mayWrite(doc, "ada@x.io")).toBe(false)
   }

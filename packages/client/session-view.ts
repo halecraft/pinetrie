@@ -13,7 +13,6 @@ import {
 import type { UndoTarget } from "@kyneta/react"
 import { batch, type CommitOptions, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
-
 import {
   type ArchiveAction,
   type CardCommand,
@@ -21,6 +20,7 @@ import {
   type CardRecord,
   type ChatMode,
   type EntryId,
+  ERR,
   type Intent,
   keyOf,
   type LaneName,
@@ -29,6 +29,10 @@ import {
   type OfferAction,
   type Position,
   parseMentions,
+  type RootId,
+  rootDocId,
+  rootIdFor,
+  rootOfDocId,
   type WorkSetting,
   type WriterId,
   writerOfPrincipal,
@@ -42,26 +46,32 @@ import {
 import { Control } from "@pineta/protocol/line"
 import {
   HOST_PRINCIPAL,
+  LIVE_DOC_ID,
   PLACES_DOC_ID,
   PRESENCE_DOC_ID,
   type Reply,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
 import { inventoryDocId, writersPolicy } from "@pineta/protocol/writers"
-import { readPlaces, readPlacesRev } from "@pineta/reads"
+import { readLaneRecords, readPlaces, readPlacesRev } from "@pineta/reads"
 import {
+  asRootDoc,
+  asSessionDoc,
   cardDocId,
   cardIdOfDoc,
   InventoryDoc,
+  LiveDoc,
+  type LiveDocHandle,
   PlacesDoc,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
   presenceDoc,
+  type RootDocHandle,
   readingKey,
   readSlots,
-  SessionDoc,
   type SessionDocHandle,
+  StorageDoc,
   seatKey,
   TextDoc,
   type TextDocHandle,
@@ -85,6 +95,7 @@ import {
   withPending,
 } from "./card-moves.ts"
 import { hostLetGo, spentCards } from "./card-state.ts"
+import { newRootId } from "./ids.ts"
 import {
   type HeldSince,
   heldBy,
@@ -137,7 +148,23 @@ export interface SessionClient {
    * than opening a second one, and so Node callers read the same document.
    */
   readonly exchange: Exchange
-  readonly doc: SessionDocHandle
+  /** The session's records, the directory of roots among them (ADR-0063). */
+  readonly session: SessionDocHandle
+  /** What is streaming now (ADR-0063): which lanes run, and their streams. */
+  readonly live: LiveDocHandle
+  /**
+   * The roots' documents this client holds (ADR-0063): those it was asked to
+   * hold (`holdRoots`), and a root it has just started, until then.
+   */
+  readonly roots: Readable<ReadonlyMap<RootId, RootDocHandle>>
+  /**
+   * Hold exactly `roots`' documents, and a root this client just started:
+   * opened if new, and every other let go (`destroy`), which leaves the
+   * host's copy (S86).
+   */
+  holdRoots(roots: ReadonlySet<RootId>): void
+  /** The root a held document has `entry` in, or undefined. */
+  rootOf(entry: EntryId): RootId | undefined
   /** Who is here (ADR-0024). Write only through the methods below. */
   readonly presence: PresenceDocHandle
   /**
@@ -156,8 +183,11 @@ export interface SessionClient {
    * closes (ADR-0048). Each undo and redo says what it did (`Undone`).
    */
   undoFor(id: CardId): CardUndo
-  /** This window's column `columnKey` follows the thread ending at `end`. */
-  setReading(columnKey: string, end: string): void
+  /**
+   * This window's column `columnKey` follows the thread ending at `end`,
+   * in the root whose root entry is `root` (null: not yet known).
+   */
+  setReading(columnKey: string, end: string, root: string | null): void
   /** The column closed: its entry is deleted, not left to decay. */
   clearReading(columnKey: string): void
   /** This window is typing in the composer at `end`. Silence decays it. */
@@ -324,7 +354,63 @@ export async function connectSession(
     "the host did not introduce itself",
   )
 
-  const doc = exchange.get(SESSION_DOC_ID, SessionDoc)
+  const session = asSessionDoc(exchange.get(SESSION_DOC_ID, StorageDoc))
+  const live = exchange.get(LIVE_DOC_ID, LiveDoc)
+  // The roots' documents this tab holds: only those, since Kyneta takes in
+  // every announced document whose schema a client knows, and every root's
+  // is the session's (S86). `minted` holds a root this client just started
+  // until the page asks for it.
+  const asked = new Set<RootId>()
+  const minted = new Set<RootId>()
+  const roots = snapshotStore<ReadonlyMap<RootId, RootDocHandle>>(new Map())
+  // What `hold` is about to hold. Kyneta asks `canShare` as `get` opens a
+  // document, to announce it and ask the host for it: a root not yet wanted
+  // then is never asked for (S86).
+  let wanted: ReadonlySet<RootId> = new Set()
+  exchange.register({
+    name: "pineta.roots",
+    canShare: (docId: string) => {
+      const root = rootOfDocId(docId)
+      return root === undefined ? undefined : wanted.has(root)
+    },
+  })
+  /** A queue's root: its lane's (`LANE`), else its entry's. */
+  const rootOfQueue = (lane: LaneName, at: Position): RootId =>
+    readLaneRecords(session).get(lane)?.root ??
+    (at.kind === "entry" ? rootOfEntry(at.id) : undefined) ??
+    rootIdFor("")
+  /** Open what `asked` and `minted` name, and let go of the rest. */
+  const hold = () => {
+    for (const root of minted) if (asked.has(root)) minted.delete(root)
+    const want = new Set([...asked, ...minted])
+    const now = roots.current()
+    if (want.size === now.size && [...want].every(r => now.has(r))) return
+    wanted = want
+    const next = new Map<RootId, RootDocHandle>()
+    for (const root of want)
+      next.set(
+        root,
+        now.get(root) ?? asRootDoc(exchange.get(rootDocId(root), StorageDoc)),
+      )
+    roots.set(next)
+    for (const root of now.keys())
+      if (!want.has(root)) void exchange.destroy(rootDocId(root))
+  }
+  /** Where `at` is: a held root's entry, or a root this client starts now. */
+  const spotRoot = (at: Position): RootId | undefined => {
+    if (at.kind === "root") {
+      const root = newRootId()
+      minted.add(root)
+      hold()
+      return root
+    }
+    return rootOfEntry(at.id)
+  }
+  const rootOfEntry = (entry: EntryId): RootId | undefined => {
+    for (const [root, doc] of roots.current())
+      if (doc.entries.get(entry) !== undefined) return root
+    return undefined
+  }
   // Never written here: `cards` is how the page reads it (ADR-0059).
   const places = exchange.get(PLACES_DOC_ID, PlacesDoc)
   // Each card document this client opens is watched until the host destroys
@@ -443,7 +529,7 @@ export async function connectSession(
     }
   })()
 
-  const unsubscribe = subscribe(doc, () => options.onChange?.())
+  const unsubscribe = subscribe(session, () => options.onChange?.())
   const unsubscribePlaces = subscribe(places, () => {
     records = readPlaces(places)
     dispatch({ kind: "changed", rev: readPlacesRev(places) })
@@ -558,25 +644,48 @@ export async function connectSession(
         redo: options => undo.redo({ ...options, docs }),
       }
     },
-    setReading(columnKey, end) {
-      batch(presence, d => d.reading.set(readingKey(mine, columnKey), end))
+    setReading(columnKey, end, root) {
+      const key = readingKey(mine, columnKey)
+      batch(presence, d => {
+        d.reading.set(key, end)
+        d.readingRoot.set(key, root)
+      })
     },
     clearReading(columnKey) {
       const key = readingKey(mine, columnKey)
       if (presence.reading()[key] !== undefined)
-        batch(presence, d => d.reading.delete(key))
+        batch(presence, d => {
+          d.reading.delete(key)
+          d.readingRoot.delete(key)
+        })
     },
     setTyping(end) {
       batch(presence, d => d.typing.set(mine, end))
     },
     exchange,
-    doc,
+    session,
+    live,
+    roots: { current: roots.current, subscribe: roots.subscribe },
+    holdRoots(want) {
+      asked.clear()
+      for (const root of want) asked.add(root)
+      hold()
+    },
+    rootOf: rootOfEntry,
     chat(text, at, how = {}) {
       const id = how.id ?? crypto.randomUUID()
       const card = how.card === undefined ? undefined : cardNow(how.card)
+      const root = spotRoot(at)
+      if (root === undefined)
+        return Promise.resolve({
+          kind: "refused",
+          code: ERR.UNKNOWN_TARGET,
+          message: "that message is in no root this tab holds",
+        })
       const intent: Intent = {
         kind: "chat",
         text,
+        root,
         at,
         mode: how.mode ?? "reply",
         lane: how.lane ?? null,
@@ -672,7 +781,7 @@ export async function connectSession(
         {
           card: id,
           from: keyOf(card.place),
-          to: { kind: "queued", at, lane, seen },
+          to: { kind: "queued", root: rootOfQueue(lane, at), at, lane, seen },
         },
         { ...how, queuedBy: null, draft: null },
       )
@@ -684,7 +793,12 @@ export async function connectSession(
         {
           card: id,
           from: keyOf(card.place),
-          to: { kind: "drafting", at: card.place.at, lane: card.place.lane },
+          to: {
+            kind: "drafting",
+            root: card.place.root,
+            at: card.place.at,
+            lane: card.place.lane,
+          },
         },
         { ...how, queuedBy: queued.by, draft: null },
       )
@@ -708,7 +822,14 @@ export async function connectSession(
       return send({ kind: "archive", action, root })
     },
     mark(entry, title) {
-      return send({ kind: "mark", entry, title })
+      const root = rootOfEntry(entry)
+      if (root === undefined)
+        return Promise.resolve({
+          kind: "refused",
+          code: ERR.UNKNOWN_TARGET,
+          message: "that message is in no root this tab holds",
+        })
+      return send({ kind: "mark", root, entry, title })
     },
     replies,
     async close() {

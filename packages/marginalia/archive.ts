@@ -11,8 +11,11 @@ import {
   type EntryId,
   ERR,
   type Intent,
+  type LaneName,
   type LaneView,
   type Refusal,
+  type RootId,
+  type RootRecord,
   refused,
   rootOf,
   rootWork,
@@ -30,8 +33,9 @@ const ArchiveSchema = Type.Object({
 })
 
 /** Each root's archive record, at the root's entry id. */
-export const ARCHIVE: RecordSpec<ArchiveRecord, EntryId> = {
+export const ARCHIVE: RecordSpec<ArchiveRecord, EntryId, "session"> = {
   namespace: "pineta.archive",
+  home: "session",
   keyOf: r => r.root,
   encode: ({ root, ...contents }) => contents,
   decode: (contents, key) =>
@@ -86,34 +90,31 @@ export function planArchive(input: {
 }
 
 /**
- * The entry a command writes at, or null when it writes in no root: a new
- * thread at the root, a name, a stop, an archive action, a reservation, a
- * card's command, or a card's move into a fresh column or an inventory, or
- * its removal.
+ * The root a command writes in (ADR-0063), or null when it writes in none:
+ * a new thread at the root, a name, a stop, an archive action, a
+ * reservation, a card's command, or a card's move into a fresh column or an
+ * inventory, or its removal. An offer acts in its lane's root.
  */
-export function writesAt(
+export function writesIn(
   intent: Intent,
-  lanes: readonly LaneView[],
-): EntryId | null {
+  rootOfLane: (lane: LaneName) => RootId | null,
+): RootId | null {
   switch (intent.kind) {
     case "chat":
-      return intent.at.kind === "root" ? null : intent.at.id
+      return intent.at.kind === "root" ? null : intent.root
     // An offer acts at its lane's tip: an archived root's lanes offer no
     // work out.
     case "offer":
-      return lanes.find(l => l.name === intent.lane)?.tip ?? null
+      return rootOfLane(intent.lane)
     case "mark":
-      return intent.entry
-    // A move into a thread writes at its end; a fresh column has no root yet,
-    // and an inventory is in none.
+      return intent.root
+    // A move into a thread writes in its root; a fresh column has no root
+    // yet, and an inventory is in none.
     case "move": {
       const to = intent.move.to
-      return to === null ||
-        to.kind === "fresh" ||
-        to.kind === "inventory" ||
-        to.at.kind === "root"
+      return to === null || to.kind === "fresh" || to.kind === "inventory"
         ? null
-        : to.at.id
+        : to.root
     }
     case "name":
     case "stop":
@@ -125,6 +126,17 @@ export function writesAt(
     case "set-command":
       return null
   }
+}
+
+/** The record that makes `root` read-only, or null. */
+export function archivedIn(
+  root: RootId | null,
+  roots: ReadonlyMap<RootId, RootRecord>,
+  archive: ReadonlyMap<EntryId, ArchiveRecord>,
+): ArchiveRecord | null {
+  const entry = root === null ? null : (roots.get(root)?.entry ?? null)
+  const record = entry === null ? undefined : archive.get(entry)
+  return record?.state === "archived" ? record : null
 }
 
 /** The record that makes `at` read-only, or null. */

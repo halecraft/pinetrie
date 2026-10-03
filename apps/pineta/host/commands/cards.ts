@@ -51,15 +51,15 @@ export const settled = (
 ): Settled => ({ outcome, rev })
 
 export interface CardCommandDeps {
-  readonly basics: Pick<Basics, "doc" | "places">
+  readonly basics: Pick<Basics, "docs" | "live" | "places">
   readonly cards: Pick<CardPort, "destroy">
   /** Queue a drain of the lane on the host's `Serial`, not awaited. */
   readonly drain: (lane: LaneName) => void
 }
 
 export function createCardCommands(deps: CardCommandDeps) {
-  const { doc, places } = deps.basics
-  const running = (lane: LaneName) => readRunning(doc, lane)
+  const { docs, live, places } = deps.basics
+  const running = (lane: LaneName) => readRunning(deps.basics.live, lane)
 
   /**
    * Carry out a step: a write, or a removal whose text then goes (record
@@ -91,19 +91,27 @@ export function createCardCommands(deps: CardCommandDeps) {
    * that message, by the send's id, on the column's lane, or the lane its send
    * reserved once pi holds it, else none.
    */
-  function followers(
+  async function followers(
     cards: readonly CardRecord[],
     card: CardId,
     sent: { readonly sendId: string; readonly chat: Chat },
   ) {
+    const { root } = sent.chat
+    const doc = await docs.root(root)
     const index = readTreeIndex(doc)
     const at = index.bySend.get(sent.sendId)
     if (at === undefined) return []
     const { lane, reserved } = sent.chat
     const held =
       reserved !== null &&
-      readLanes(doc, index, cards).some(l => l.name === reserved)
-    return planFreshFollow(cards, card, at, lane ?? (held ? reserved : null))
+      readLanes({ doc, live }, index, cards).some(l => l.name === reserved)
+    return planFreshFollow(
+      cards,
+      card,
+      root,
+      at,
+      lane ?? (held ? reserved : null),
+    )
   }
 
   return {
@@ -133,7 +141,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       sent: { readonly sendId: string; readonly chat: Chat },
     ): Promise<number> {
       const cards = readPlaces(places)
-      for (const step of followers(cards, card, sent))
+      for (const step of await followers(cards, card, sent))
         applyPlaceStep(places, step)
       const rev = cards.some(c => c.id === card)
         ? applyPlaceStep(places, { kind: "remove", id: card })
@@ -151,9 +159,10 @@ export function createCardCommands(deps: CardCommandDeps) {
       writer: WriterId,
       chat: Chat & { card: SentCard },
     ): Promise<Settled | null> {
+      const doc = await docs.root(chat.root)
       const index = readTreeIndex(doc)
       const cards = readPlaces(places)
-      const thread = threadOf(index, readLanes(doc, index, cards), {
+      const thread = threadOf(index, readLanes({ doc, live }, index, cards), {
         at: chat.at,
         mode: chat.mode,
         lane: chat.lane,
@@ -173,6 +182,7 @@ export function createCardCommands(deps: CardCommandDeps) {
           from: keyOf(now.place),
           to: {
             kind: "queued",
+            root: chat.root,
             at: chat.at,
             lane: thread.lane.name,
             seen: chat.card.seen,

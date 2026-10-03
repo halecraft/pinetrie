@@ -20,12 +20,10 @@ import {
 import { scriptedModel } from "@pineta/pi"
 import {
   readLaneRecords,
-  readLanes,
   readNames,
   readOffers,
   readPlaces,
   readProject,
-  readTreeIndex,
 } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
@@ -33,7 +31,9 @@ import {
   committedProject,
   idleNow,
   join,
+  lanesOf,
   setUpLine,
+  treeOf,
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
@@ -92,7 +92,7 @@ async function run(
         }
         const idle = () => waitFor(() => idleNow(askHost))
         const askId = (text: string) => {
-          const index = readTreeIndex(askHost.doc)
+          const index = treeOf(askHost)
           return (
             Object.values(index.entries).find(
               e => messageText(e.message) === text,
@@ -286,9 +286,9 @@ async function run(
         await visibility("hidden")
         const bo = await join(askHost, "bo", "asks")
         script.use([{ text: "Back to you." }])
-        const lane = readLanes(
-          askHost.doc,
-          readTreeIndex(askHost.doc),
+        const lane = lanesOf(
+          askHost,
+          treeOf(askHost),
           readPlaces(askHost.places),
         )[0]
         await bo.chat(
@@ -335,6 +335,10 @@ async function run(
             () => true,
             () => false,
           )
+        // The root's document arrives after the stored layout is drawn (ADR-0063).
+        await ap
+          .waitForSelector(`${col(0)} .ask-line`, { timeout: 15_000 })
+          .catch(() => null)
         const lines = await ap.locator(`${col(0)} .ask-line`).count()
         check(
           "a column's density is kept across a reload, and outline draws each ask as a line",
@@ -367,12 +371,12 @@ async function run(
       })
       // Lanes have containers of their own only where `container` runs; the
       // host's project record says so, with its reason where they do not.
-      const project = readProject(toolHost.doc)
+      const project = readProject(toolHost.session)
       const noContainers = project?.kind === "direct" ? project.reason : null
       // A new thread of its own starts at the integration line (ADR-0060).
       if (noContainers === null) {
         const owner = await join(toolHost, "owner", "tools")
-        await setUpLine(toolHost.doc, owner)
+        await setUpLine(toolHost.session, owner)
         await owner.close()
       }
       const tp = await browser.newPage()
@@ -1241,7 +1245,7 @@ async function run(
         check(
           "the column's header names the thread, its star shown with no banner",
           threadName !== null &&
-            [...readNames(toolHost.doc).values()].includes(
+            [...readNames(toolHost.session).values()].includes(
               threadName as ThreadName,
             ) &&
             nameText === `✦ ${threadName}` &&
@@ -1286,7 +1290,7 @@ async function run(
           // would read the new one mid-check.
           await waitFor(
             () =>
-              [...readOffers(toolHost.doc).values()].some(
+              [...readOffers(toolHost.session).values()].some(
                 o => o.taken === null && o.described,
               ),
             15_000,
@@ -1657,7 +1661,7 @@ async function run(
           await starter.chat("@agent a long one elsewhere", ROOT, {
             mode: "branch",
           })
-          const newRoot = readTreeIndex(toolHost.doc).roots.at(-1) ?? ""
+          const newRoot = treeOf(toolHost).roots.at(-1) ?? ""
           await appears("#top .here-agent.running .here-count")
           await tp.textContent("#top .here-agent .here-count").catch(() => "")
 
@@ -1689,7 +1693,7 @@ async function run(
         ])
         await say("read notes, again and again")
         await toolIdle()
-        const loopIndex = readTreeIndex(toolHost.doc)
+        const loopIndex = treeOf(toolHost)
         const loopRows = projectRail(
           loopIndex,
           loopIndex.roots.at(-1) ?? entryId(""),
@@ -1766,7 +1770,7 @@ async function run(
             `${col(0)} .msg[data-entry="${aside ?? "none"}"]`,
             { timeout: 15_000 },
           )
-          const rows = projectRail(readTreeIndex(toolHost.doc), railRoot)
+          const rows = projectRail(treeOf(toolHost), railRoot)
           const firstLater = rows.find(
             r => r.parentId === trunk && r.track === 0,
           )
@@ -1880,7 +1884,7 @@ async function run(
         await tp.close().catch(() => {})
         await toolHost.shutdown().catch(() => {})
         // Its threads' agents worked in containers: remove them, and their disks.
-        for (const lane of readLaneRecords(toolHost.doc).keys())
+        for (const lane of readLaneRecords(toolHost.session).keys())
           for (const args of [
             ["rm", "-f", `pineta-${lane}`],
             ["volume", "rm", `pineta-${lane}`],

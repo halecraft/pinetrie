@@ -36,7 +36,7 @@ type BannerAgent = Pick<
 function setUp(agent: Partial<BannerAgent> = {}, named = true) {
   const b = basics()
   if (named)
-    putValue(b.doc, setRecord(NAME_RECORD, { lane: LANE, name: NAME, at: 1 }))
+    putValue(b, setRecord(NAME_RECORD, { lane: LANE, name: NAME, at: 1 }))
   const serial = createSerial()
   const blobs = memoryBlobs(() => 1_000)
   const fake = record<BannerAgent>({
@@ -47,7 +47,7 @@ function setUp(agent: Partial<BannerAgent> = {}, named = true) {
       hash: "h",
     }),
     drawBanner: async () => DRAWN,
-    writeValues: async writes => applyWrites(b.doc, writes),
+    writeValues: async writes => applyWrites(b, writes),
     ...agent,
   })
   const banners = createBanners({
@@ -88,7 +88,7 @@ describe("a thread due one", () => {
     ])
     expect(draws(fake.calls)).toEqual([["A clear zebra."]])
     expect(blobs.ref(SHA)).toBeDefined()
-    expect(readBanners(b.doc).get(LANE)).toEqual({
+    expect(readBanners(b.session).get(LANE)).toEqual({
       lane: LANE,
       sha: SHA,
       at: 1_000,
@@ -105,7 +105,7 @@ describe("a thread due one", () => {
     await serial.idle()
     expect(draws(fake.calls)).toHaveLength(2)
     expect(b.lines.join("\n")).toContain("attempt 1: 502: busy")
-    expect(readBanners(b.doc).get(LANE)?.sha).toBe(SHA)
+    expect(readBanners(b.session).get(LANE)?.sha).toBe(SHA)
   })
 
   test("every attempt failing writes nothing", async () => {
@@ -115,7 +115,7 @@ describe("a thread due one", () => {
     await banners.due(LANE)
     await serial.idle()
     expect(draws(fake.calls)).toHaveLength(3)
-    expect(readBanners(b.doc).size).toBe(0)
+    expect(readBanners(b.session).size).toBe(0)
   })
 
   test("with no key, nothing is asked of any model", async () => {
@@ -171,7 +171,7 @@ describe("a thread due one", () => {
     })
     drawing.resolve(DRAWN)
     await serial.idle()
-    expect(readBanners(b.doc).get(LANE)?.sha).toBe(pasted)
+    expect(readBanners(b.session).get(LANE)?.sha).toBe(pasted)
   })
 })
 
@@ -187,7 +187,7 @@ describe("set_banner", () => {
     expect(await banners.request(LANE, ask({ image: pasted }))).toEqual({
       kind: "set",
     })
-    expect(readBanners(b.doc).get(LANE)?.sha).toBe(pasted)
+    expect(readBanners(b.session).get(LANE)?.sha).toBe(pasted)
     expect(
       await banners.request(LANE, ask({ image: "f".repeat(64) as Sha256 })),
     ).toEqual({ kind: "refused", reason: "not_stored" })
@@ -202,6 +202,6 @@ describe("set_banner", () => {
     expect(draws(fake.calls)[0]?.[0]).toBe(
       "A clear zebra.\n\nAbove all, the person asks for: at dusk",
     )
-    expect(readBanners(b.doc).get(LANE)?.sha).toBe(SHA)
+    expect(readBanners(b.session).get(LANE)?.sha).toBe(SHA)
   })
 })

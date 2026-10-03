@@ -10,8 +10,23 @@
 // of its writers, though it never writes one (ADR-0059).
 
 import type { Policy } from "@kyneta/exchange"
-import { type WriterId, writerOfPrincipal } from "@pineta/core"
-import { HOST_PRINCIPAL, PLACES_DOC_ID, SESSION_DOC_ID } from "./messages.ts"
+import { rootOfDocId, type WriterId, writerOfPrincipal } from "@pineta/core"
+import {
+  HOST_PRINCIPAL,
+  LIVE_DOC_ID,
+  PLACES_DOC_ID,
+  SESSION_DOC_ID,
+} from "./messages.ts"
+
+/**
+ * Whether only the host writes `docId`: the session, the places, what is
+ * streaming, and every root's document (ADR-0023, ADR-0059, ADR-0063).
+ */
+export const isHostDoc = (docId: string): boolean =>
+  docId === SESSION_DOC_ID ||
+  docId === PLACES_DOC_ID ||
+  docId === LIVE_DOC_ID ||
+  rootOfDocId(docId) !== undefined
 
 const INVENTORY_PREFIX = "inventory:"
 
@@ -50,16 +65,15 @@ export function holdsInventory(
 
 /**
  * Whether the peer whose principal is `principal` may write `docId`;
- * undefined leaves it to the other policies. The session and the places are
- * the host's (ADR-0023, ADR-0059); an inventory is its person's, relayed by
- * the host. Pure.
+ * undefined leaves it to the other policies. The session, the places and
+ * `pineta:live` are the host's (`isHostDoc`); an inventory is its person's,
+ * relayed by the host. Pure.
  */
 export function mayWrite(
   docId: string,
   principal: string | undefined,
 ): boolean | undefined {
-  if (docId === SESSION_DOC_ID || docId === PLACES_DOC_ID)
-    return principal === HOST_PRINCIPAL
+  if (isHostDoc(docId)) return principal === HOST_PRINCIPAL
   const holds = holdsInventory(docId, principal)
   if (holds === undefined) return undefined
   return principal === HOST_PRINCIPAL || holds

@@ -20,6 +20,23 @@ package must never require changing stored data.
 
 # Records (`records.ts`, ADR-0062)
 
+**Each spec names its home** (ADR-0063), `RecordSpec<R, K, H>` with `H`
+`"session"` or `"root"`: a record read across roots lives in the session's
+document, one keyed by a root's entries in that root's. `setRecord`,
+`deleteRecord` and `setIfChanged` take the root exactly when the home is
+`"root"` (overloads), and put the `Target` in the `ValueWrite`, so a write
+cannot reach the wrong document and needs no guard at run time.
+`records.test.ts` lists every spec's home.
+
+- **`ROOT`** (`roots.ts`): a root's directory record, keyed by its `RootId`:
+  its root entry, first line, title, counts, writers, the chats that name
+  someone, and its images. The host writes it from `readRootRecord`.
+- **`LANE`** is written for every lane as it is created, naming its root;
+  `work` is null for a lane with no work of its own.
+- **The archive gate** reads the root a command writes in (`writesIn`) and
+  that root's record by its root entry (`archivedIn`): a command carries its
+  root, so no root's document is opened to check.
+
 Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
 `encode` and `decode`, exported beside its type (`MARK` in `mark.ts`,
 `OFFER` in `work.ts`). Everything else goes through the spec:

@@ -22,13 +22,7 @@ const map = (set?: Record<string, unknown>, del?: string[]) => ({
 
 describe("dirtyFrom: only pi's fields are re-indexed", () => {
   test("a field pi does not own is ignored, whatever it is called", () => {
-    for (const field of [
-      "streams",
-      "streamText",
-      "activeRuns",
-      "checkpointText",
-      "addedLater",
-    ])
+    for (const field of ["checkpointText", "addedLater"])
       expect(dirtyFrom(at(field), map({ x: 1 }))).toEqual({ kind: "none" })
   })
   test("a change with no field replaces the document: everything", () => {

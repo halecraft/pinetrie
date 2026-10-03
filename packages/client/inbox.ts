@@ -1,7 +1,8 @@
 // client/inbox — the messages that mention you, and which you have seen
 // (ADR-0030). Pure.
 //
-// The items are derived from the tree; only what you have seen is stored, per
+// The items are derived from each root's directory record, so a mention in a
+// root this tab does not hold is in the inbox too (ADR-0063); only what you have seen is stored, per
 // device (`use-inbox.ts`). `since` is a watermark: every mention at or before
 // it is seen, and `seen` holds the ids of later ones you have seen. Entry ids
 // are uuidv7, so id order is creation order (S9).
@@ -9,10 +10,8 @@
 import {
   address,
   type EntryId,
-  messageText,
   parseMentions,
-  rootOf,
-  type TreeIndex,
+  type RootRecord,
   type WriterId,
 } from "@pineta/core"
 import { type Static, Type } from "typebox"
@@ -29,30 +28,29 @@ export interface InboxItem {
 /**
  * Every chat that names you, newest first: its mentions resolve (`address`)
  * to your display name. Your own messages never mention you. Only chats
- * count: `address` decides who a person's message is for (ADR-0021).
+ * count, as `RootRecord.mentions` holds only chats: `address` decides who
+ * a person's message is for (ADR-0021).
  */
 export function mentionsOf(input: {
-  readonly index: TreeIndex
+  /** Every root's directory record. */
+  readonly roots: Iterable<RootRecord>
   readonly me: WriterId
   /** Your display name as shown (`displayName`, the guest label included). */
   readonly myName: string
   readonly participants: readonly string[]
 }): readonly InboxItem[] {
   const out: InboxItem[] = []
-  for (const entry of Object.values(input.index.entries)) {
-    const { id } = entry
-    const m = entry.message
-    if (m?.role !== "chat" || m.writer === undefined || m.writer === input.me)
-      continue
-    const text = messageText(m)
-    const { people } = address({
-      mentions: parseMentions(text),
-      participants: input.participants,
-      agentByDefault: false,
-    })
-    if (!people.includes(input.myName)) continue
-    const root = rootOf(input.index, id)
-    if (root !== null) out.push({ id, root, by: m.writer, text })
+  for (const { entry: root, mentions } of input.roots) {
+    if (root === null) continue
+    for (const { id, by, text } of mentions) {
+      if (by === input.me) continue
+      const { people } = address({
+        mentions: parseMentions(text),
+        participants: input.participants,
+        agentByDefault: false,
+      })
+      if (people.includes(input.myName)) out.push({ id, root, by, text })
+    }
   }
   return out.sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
 }
@@ -65,9 +63,10 @@ export interface Inbox {
 }
 
 /** A device with nothing stored: everything so far is seen, so it starts with no backlog. */
-export function startInbox(index: TreeIndex): Inbox {
+export function startInbox(roots: Iterable<RootRecord>): Inbox {
   let since = ""
-  for (const id of Object.keys(index.entries)) if (id > since) since = id
+  for (const { newest } of roots)
+    if (newest !== null && newest > since) since = newest
   return { since, seen: [] }
 }
 

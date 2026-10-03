@@ -37,8 +37,8 @@ async function run(check: Checks["check"]): Promise<void> {
       join(ph, name, "presence", { presenceDecay: decay })
     const ada = await joinHere("ada")
     const bea = await joinHere("bea")
-    ada.setReading("c1", "e-one")
-    ada.setReading("c2", "e-two")
+    ada.setReading("c1", "e-one", null)
+    ada.setReading("c2", "e-two", null)
     ada.setTyping("e-two")
     const seen = await waitFor(
       () => readReading(bea.presence).length === 2,
@@ -66,7 +66,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await sleep(20)
     ada.clearReading("c2")
     const closed = await waitFor(() => {
-      ada.setReading("c1", "e-one")
+      ada.setReading("c1", "e-one", null)
       return (
         !Object.keys(bea.presence.reading()).some(
           k => k.startsWith(`${ada.writer}:`) && k.endsWith(":c2"),
@@ -78,12 +78,14 @@ async function run(check: Checks["check"]): Promise<void> {
     // Clients may not write the session (`writersPolicy`, on every peer): the
     // write throws before it is made.
     const refused = refusedWrite(() =>
-      batch(bea.doc, d => d.values.set("forged", { value: "bea is the host" })),
+      batch(bea.session, d =>
+        d.values.set("forged", { value: "bea is the host" }),
+      ),
     )
     await sleep(500)
     check(
       "a client cannot write the session: its write is refused before it is made, and the host's copy is unchanged",
-      refused && ph.doc.values.get("forged") === undefined,
+      refused && ph.session.values.get("forged") === undefined,
       `refused ${refused}`,
     )
     await bea.close()

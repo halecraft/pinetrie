@@ -12,12 +12,19 @@ import type { Reply } from "@pineta/protocol/messages"
 import { readPlaces } from "@pineta/reads"
 import { writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { basics, putValue, record, row } from "../fakes.ts"
+import {
+  basics,
+  putValue,
+  ROOT_ID,
+  record,
+  row,
+  writeDirectory,
+} from "../fakes.ts"
 import { applyPlaceStep } from "../places.ts"
 import { type CommandDeps, createCommands } from "./index.ts"
 
 const ALICE = writerId("alice@example.com")
-const ROOT_ID = entryId("e-1")
+const ROOT_ENTRY = entryId("e-1")
 const HELD = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
 const NEW = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a3067862240")
 
@@ -28,7 +35,8 @@ function setUp() {
     destroy: async () => {},
   })
   const drains: string[] = []
-  writeEntry(b.doc, row(ROOT_ID, null))
+  writeEntry(b.root, row(ROOT_ENTRY, null))
+  writeDirectory(b)
   const agent = record<CommandDeps["agent"]>({
     appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
   })
@@ -53,7 +61,8 @@ function setUp() {
       id,
       kind: "chat",
       text: "hello",
-      parentId: ROOT_ID,
+      parentId: ROOT_ENTRY,
+      root: ROOT_ID,
       mode: "reply",
       lane: "",
       asksAgent: false,
@@ -64,8 +73,13 @@ function setUp() {
 test("a chat in an archived root is refused, and the agent is never called", async () => {
   const { b, agent, commands, replies, sender, chat } = setUp()
   putValue(
-    b.doc,
-    setRecord(ARCHIVE, { root: ROOT_ID, state: "archived", by: ALICE, at: 1 }),
+    b,
+    setRecord(ARCHIVE, {
+      root: ROOT_ENTRY,
+      state: "archived",
+      by: ALICE,
+      at: 1,
+    }),
   )
   await commands.handle(sender, ALICE, chat("c-1"))
   expect(replies[0]).toMatchObject({ id: "c-1", outcome: "refused" })
@@ -91,7 +105,12 @@ test("a chat command spends its card once written, record then text, answering w
         id: cardId(id),
         owner: ALICE,
         placer: ALICE,
-        place: { kind: "drafting", at: atEntry(ROOT_ID), lane: null },
+        place: {
+          kind: "drafting",
+          root: ROOT_ID,
+          at: atEntry(ROOT_ENTRY),
+          lane: null,
+        },
         command: null,
         unsent: null,
       },
@@ -116,12 +135,18 @@ test("a chat command spends its card once written, record then text, answering w
 test("a taken card in an archived root is refused, and the agent is never called", async () => {
   const { b, agent, commands } = setUp()
   putValue(
-    b.doc,
-    setRecord(ARCHIVE, { root: ROOT_ID, state: "archived", by: ALICE, at: 1 }),
+    b,
+    setRecord(ARCHIVE, {
+      root: ROOT_ENTRY,
+      state: "archived",
+      by: ALICE,
+      at: 1,
+    }),
   )
   const out = await commands.sendTaken(ALICE, "s-1", {
     text: "from the queue",
-    at: atEntry(ROOT_ID),
+    root: ROOT_ID,
+    at: atEntry(ROOT_ENTRY),
     mode: "queue",
     lane: null,
     asksAgent: false,

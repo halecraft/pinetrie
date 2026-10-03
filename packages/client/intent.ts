@@ -145,6 +145,11 @@ export type Intent =
     }
   /** Show entry `entry`, wherever it is (`planOpen`). */
   | { readonly kind: "openAt"; readonly entry: EntryId }
+  /**
+   * Show entry `entry` of the root whose root entry is `root`, which this
+   * tab may not hold (ADR-0063): what the header and the inbox open.
+   */
+  | { readonly kind: "openIn"; readonly entry: EntryId; readonly root: EntryId }
   | { readonly kind: "signOut" }
   /** Take `card` into your inventory: by key, wherever it is. */
   | { readonly kind: "take"; readonly card: CardId }
@@ -256,6 +261,8 @@ export type Effect =
       readonly action: OfferAction
       readonly to: string | null
     }
+  /** Once this tab holds entry `entry`, show it (`openAt`). */
+  | { readonly kind: "openWhenHeld"; readonly entry: EntryId }
   /** Scroll to entry `entry` once it is drawn (`useReveal`). */
   | { readonly kind: "reveal"; readonly entry: EntryId }
   /** Open ask `ask`'s fold, so what is revealed in it is drawn (ADR-0056). */
@@ -343,6 +350,8 @@ export function planIntent(
       return [{ kind: "mark", root: intent.root, title: intent.title }]
     case "openAt":
       return planOpenAt(intent.entry, state, fresh)
+    case "openIn":
+      return planOpenIn(intent.entry, intent.root, state, fresh)
     case "signOut":
       return [{ kind: "forgetIdentity" }, { kind: "reload" }]
     case "take":
@@ -495,19 +504,32 @@ function planColumn(
       return onColumn({ kind: "reserve", key: act.key, lane: act.lane })
     case "queue": {
       const now = state.cards.cards.find(c => c.id === act.card)
-      const to = {
-        kind: "queued",
-        at: act.at,
-        lane: act.lane,
-        seen: "",
-      } as const
+      // Its root is the one it drafts in: a card is queued from its thread.
+      const root =
+        now?.place.kind === "drafting" || now?.place.kind === "queued"
+          ? now.place.root
+          : undefined
       return [
         {
           kind: "queueCard",
           card: act.card,
           lane: act.lane,
           at: act.at,
-          how: columnMove(key, now === undefined ? null : { card: now, to }),
+          how: columnMove(
+            key,
+            now === undefined || root === undefined
+              ? null
+              : {
+                  card: now,
+                  to: {
+                    kind: "queued",
+                    root,
+                    at: act.at,
+                    lane: act.lane,
+                    seen: "",
+                  },
+                },
+          ),
         },
       ]
     }
@@ -524,7 +546,12 @@ function planColumn(
             now?.place.kind === "queued"
               ? {
                   card: now,
-                  to: { kind: "drafting", at: now.place.at, lane: act.lane },
+                  to: {
+                    kind: "drafting",
+                    root: now.place.root,
+                    at: now.place.at,
+                    lane: act.lane,
+                  },
                 }
               : null,
           ),
@@ -554,6 +581,28 @@ function planColumn(
     case "offer":
       return [{ kind: "offer", lane: act.lane, action: act.action, to: act.to }]
   }
+}
+
+/**
+ * Show `entry`, in the root whose root entry is `root` (ADR-0063). One this
+ * tab holds opens as `planOpenAt`. Else an archived root is previewed, and
+ * any other root's tab is shown, which holds it, and the entry is shown once
+ * it has arrived.
+ */
+export function planOpenIn(
+  entry: EntryId,
+  root: EntryId,
+  state: IntentState,
+  fresh: string,
+): readonly Effect[] {
+  if (state.index.entries[entry] !== undefined)
+    return planOpenAt(entry, state, fresh)
+  if (state.archive.get(root)?.state === "archived")
+    return [
+      { kind: "pickArchived", root },
+      layout({ kind: "show", tab: { kind: "archive" } }),
+    ]
+  return [showRoot(root), { kind: "openWhenHeld", entry }]
 }
 
 /** A column opened with `key` takes focus; nothing opened, nothing armed. */

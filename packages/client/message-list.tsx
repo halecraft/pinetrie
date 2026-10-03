@@ -25,7 +25,7 @@ function MessageListView(p: MessageListProps) {
     if (i === undefined || node === undefined) return null
     return (
       <Message
-        doc={p.doc}
+        live={p.live}
         rows={p.rows}
         streams={callStreams(node.toolCalls, p.tools)}
         closedBranches={node.branches.filter(b => !p.shown.has(b.rootId))}

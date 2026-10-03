@@ -28,7 +28,7 @@ import {
   wipFacts,
 } from "@pineta/lanes"
 import {
-  archivedAt,
+  archivedIn,
   BASE,
   deleteRecord,
   OFFER,
@@ -42,9 +42,8 @@ import {
   readBases,
   readNames,
   readOffers,
-  readTreeIndex,
+  readRoots,
 } from "@pineta/reads"
-import { readLaneTip } from "@pineta/schema"
 import type { Basics } from "../basics.ts"
 import { createSerial, type Serial } from "../queue.ts"
 
@@ -134,7 +133,7 @@ export function createOfferState(input: {
   readonly taken: () => void
 }): OfferState {
   const { root, basics, line } = input
-  const { doc } = basics
+  const { session: doc, docs } = basics
   const ops = hostOps(root)
   const nameOf = (lane: LaneName) => readNames(doc).get(lane)
   const commitOf = async (bookmark: string) =>
@@ -191,11 +190,8 @@ export function createOfferState(input: {
       const name = nameOf(lane)
       if (name === undefined) return null
       const archived =
-        archivedAt(
-          readTreeIndex(doc),
-          readArchive(doc),
-          readLaneTip(doc, lane),
-        ) !== null
+        archivedIn(docs.rootOfLane(lane), readRoots(doc), readArchive(doc)) !==
+        null
       if (archived) {
         const target = `present(${revsetName(line.onto)})`
         const offer = await readOffer(ops, { name, target })

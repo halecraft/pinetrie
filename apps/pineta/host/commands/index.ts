@@ -1,13 +1,13 @@
 // host/commands — one command from one writer: decoded, checked against the
 // archive, and routed to its module.
 
-import { type EntryId, ERR, type LaneView, type WriterId } from "@pineta/core"
+import { ERR, type RootId, type WriterId } from "@pineta/core"
 import {
-  archivedAt,
+  archivedIn,
   displayName,
   PARTICIPANT,
   setRecord,
-  writesAt,
+  writesIn,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import {
@@ -16,15 +16,8 @@ import {
   type Outcome,
   type WireCommand,
 } from "@pineta/protocol/codec"
-import {
-  readArchive,
-  readLanes,
-  readParticipantNames,
-  readPlaces,
-  readTreeIndex,
-} from "@pineta/reads"
-import type { PlacesDocHandle, SessionDocHandle } from "@pineta/schema"
-import { failed, messageOf } from "../basics.ts"
+import { readArchive, readParticipantNames, readRoots } from "@pineta/reads"
+import { type Basics, failed, messageOf } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"
 import { type ArchiveDeps, handleArchive } from "./archive.ts"
@@ -75,7 +68,7 @@ export interface Commands {
 
 export function createCommands(deps: CommandDeps): Commands {
   const { agent } = deps
-  const { doc, places, newId } = deps.basics
+  const { newId } = deps.basics
   const cardCommands = createCardCommands(deps)
 
   async function handle(
@@ -110,8 +103,9 @@ export function createCommands(deps: CommandDeps): Commands {
 
     const intent = decodeCommand(wire)
     if (intent.kind === "refused") return settled(intent)
-    const archived = refuseInArchive(doc, places, lanes =>
-      writesAt(intent, lanes),
+    const archived = refuseInArchive(
+      deps.basics,
+      writesIn(intent, deps.basics.docs.rootOfLane),
     )
     if (archived !== null) return settled(archived)
     switch (intent.kind) {
@@ -171,8 +165,9 @@ export function createCommands(deps: CommandDeps): Commands {
     handle,
     async sendTaken(writer, sendId, chat) {
       return (
-        refuseInArchive(doc, places, () =>
-          chat.at.kind === "root" ? null : chat.at.id,
+        refuseInArchive(
+          deps.basics,
+          chat.at.kind === "root" ? null : chat.root,
         ) ?? (await sendChat(deps, writer, sendId, chat))
       )
     },
@@ -182,22 +177,20 @@ export function createCommands(deps: CommandDeps): Commands {
 /**
  * A command that would write in an archived root is refused, naming who
  * archived it (ADR-0029). `sendChat`'s only callers are this dispatcher and
- * `sendTaken`, both behind it, so it needs no check of its own. `writes` is
- * the entry the command writes at, from the lanes; read only when something
- * is archived. Null when the command may go on.
+ * `sendTaken`, both behind it, so it needs no check of its own. `root` is
+ * the root the command writes in (`writesIn`), which names it, so no root's
+ * document is opened to check. Null when the command may go on.
  */
 function refuseInArchive(
-  doc: SessionDocHandle,
-  places: PlacesDocHandle,
-  writes: (lanes: readonly LaneView[]) => EntryId | null,
+  basics: Pick<Basics, "session">,
+  root: RootId | null,
 ): Outcome | null {
-  const archive = readArchive(doc)
+  const { session } = basics
+  const archive = readArchive(session)
   if (archive.size === 0) return null
-  const index = readTreeIndex(doc)
-  const at = writes(readLanes(doc, index, readPlaces(places)))
-  const record = archivedAt(index, archive, at)
+  const record = archivedIn(root, readRoots(session), archive)
   if (record === null) return null
-  const names = readParticipantNames(doc)
+  const names = readParticipantNames(session)
   return {
     kind: "refused",
     code: ERR.ARCHIVED,

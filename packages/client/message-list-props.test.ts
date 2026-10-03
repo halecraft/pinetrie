@@ -30,7 +30,7 @@ const shared = {
   tools: new Map(),
   rows: screenMemory<RowMemory>(),
   nameOf: new Map(),
-  doc: {} as MessageListProps["doc"],
+  live: {} as MessageListProps["live"],
   onAct: () => {},
   asks: { askOf: new Map(), work: new Map(), last: new Map() },
   stops: new Map(),

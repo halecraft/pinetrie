@@ -4,18 +4,22 @@ import {
   cardId,
   entryId,
   laneNameForThread,
+  rootIdFor,
   runId,
   writerId,
 } from "@pineta/core"
 import {
   beginRun,
-  newSessionDoc,
+  newLiveDoc,
+  newRootDoc,
   type StoredEntryRow,
   writeEntry,
   writeLaneTip,
 } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { readLanes, readTreeIndex } from "./index.ts"
+
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const row = (id: string, parentId: string | null): StoredEntryRow => ({
   id,
@@ -27,7 +31,7 @@ const row = (id: string, parentId: string | null): StoredEntryRow => ({
 })
 
 test("readTreeIndex keeps the index, and each unchanged entry, until entries change", () => {
-  const doc = newSessionDoc()
+  const doc = newRootDoc()
   writeEntry(doc, row("e1", null))
   writeEntry(doc, row("e2", "e1"))
   const before = readTreeIndex(doc)
@@ -45,7 +49,9 @@ test("readTreeIndex keeps the index, and each unchanged entry, until entries cha
 })
 
 test("readLanes: a lane's queued cards are what waits; askedBy is who queued the first, lastWaiting the last", () => {
-  const doc = newSessionDoc()
+  const doc = newRootDoc()
+  const live = newLiveDoc()
+  const view = { doc, live }
   const lane = laneNameForThread("0123456789abcdef")
   writeEntry(doc, row("e1", null))
   writeLaneTip(doc, lane, entryId("e1"))
@@ -55,6 +61,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     placer: writerId("ada@x.io"),
     place: {
       kind: "queued",
+      root: TEST_ROOT,
       at: atEntry(entryId("e1")),
       lane,
       order,
@@ -68,7 +75,12 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     id: cardId("c-0"),
     owner: writerId("cy@x.io"),
     placer: writerId("cy@x.io"),
-    place: { kind: "drafting", at: atEntry(entryId("e1")), lane },
+    place: {
+      kind: "drafting",
+      root: TEST_ROOT,
+      at: atEntry(entryId("e1")),
+      lane,
+    },
     command: null,
     unsent: null,
   }
@@ -77,20 +89,20 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     queued("c-1", "a", "ada@x.io"),
     drafting,
   ]
-  const view = readLanes(doc, readTreeIndex(doc), cards).find(
+  const found = readLanes(view, readTreeIndex(doc), cards).find(
     l => l.name === lane,
   )
-  expect(view).toMatchObject({
+  expect(found).toMatchObject({
     running: false,
     waiting: 2,
     askedBy: writerId("ada@x.io"),
     lastWaiting: writerId("bea@x.io"),
   })
-  expect(readLanes(doc, readTreeIndex(doc), [])[0]).toMatchObject({
+  expect(readLanes(view, readTreeIndex(doc), [])[0]).toMatchObject({
     waiting: 0,
     askedBy: null,
     lastWaiting: null,
   })
-  beginRun(doc, lane, runId("r-1"))
-  expect(readLanes(doc, readTreeIndex(doc), cards)[0]?.running).toBe(true)
+  beginRun(live, lane, runId("r-1"))
+  expect(readLanes(view, readTreeIndex(doc), cards)[0]?.running).toBe(true)
 })

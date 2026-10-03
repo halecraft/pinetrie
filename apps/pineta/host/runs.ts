@@ -7,7 +7,6 @@
 import {
   type EntryId,
   type LaneName,
-  promptOf,
   type RunId,
   runId,
   type StreamEvent,
@@ -15,13 +14,12 @@ import {
 import {
   CHAT_TYPE,
   type ChatMessage,
-  LAND_TYPE,
   type LandMessage,
   type StackMessage,
   settleRun,
 } from "@pineta/marginalia"
-import type { Agent, ThreadLaneHandle } from "@pineta/pi"
-import { readTreeIndex } from "@pineta/reads"
+import type { Agent } from "@pineta/pi"
+import { readLatestPrompt } from "@pineta/reads"
 import {
   applyStreamOps,
   beginRun,
@@ -56,7 +54,6 @@ export interface Runs {
 
 /** One step of a run's end, in the order `planRunEnd` returns them. */
 export type RunEndStep =
-  | "guidanceOff"
   | "landingEnded"
   | "splitEnded"
   | "endRun"
@@ -72,25 +69,28 @@ export type RunEndStep =
 export function planRunEnd(role: string | undefined): readonly RunEndStep[] {
   const outcome: readonly RunEndStep[] =
     role === "land" ? ["landingEnded"] : role === "stack" ? ["splitEnded"] : []
-  return ["guidanceOff", ...outcome, "endRun", "laneStopped", "ended"]
+  return [...outcome, "endRun", "laneStopped", "ended"]
 }
 
 /**
- * The agent's `onStream`: gather the lane's streams and tip from the
- * document, plan, execute. The document records what each lane is running
- * and streaming; a second copy here would be two sources of truth.
+ * The agent's `onStream`: gather the lane's streams from `pineta:live` and
+ * its tip from its root's document, plan, execute. A lane runs only in a
+ * root the host holds. The documents record what each
+ * lane is running and streaming; a second copy here would be two sources of
+ * truth.
  */
 export const streamInto =
-  (basics: Pick<Basics, "doc" | "newId">) =>
+  (basics: Pick<Basics, "docs" | "live" | "newId">) =>
   (event: StreamEvent): void => {
-    const { doc, newId } = basics
+    const { docs, live, newId } = basics
+    const doc = docs.docOfLane(event.lane)
     applyStreamOps(
-      doc,
+      live,
       planStream({
         event,
-        streams: readStreams(doc),
-        tip: readLaneTip(doc, event.lane),
-        running: readActiveRun(doc, event.lane) !== undefined,
+        streams: readStreams(live),
+        tip: doc === null ? null : readLaneTip(doc, event.lane),
+        running: readActiveRun(live, event.lane) !== undefined,
         newId,
       }),
     )
@@ -105,34 +105,20 @@ export function createRuns(deps: {
   >
 }): Runs {
   const { basics, agent, work } = deps
-  const { doc, log } = basics
+  const { docs, live, log } = basics
   let ended: (lane: LaneName, prompt: EntryId | null) => void = () => {}
-
-  /** The prompt of the lane's latest run, and its role: `land` and `stack` end specially. */
-  function latestPrompt(
-    lane: LaneName,
-  ): { readonly id: EntryId; readonly role: string | undefined } | null {
-    const index = readTreeIndex(doc)
-    const id = promptOf(index, readLaneTip(doc, lane))
-    return id === null ? null : { id, role: index.entries[id]?.message?.role }
-  }
 
   /**
    * Carry out `planRunEnd`. The steps before `endRun` may fail, and a failure
    * is logged; `endRun` and every step after it always run.
    */
-  async function end(
-    lane: LaneName,
-    id: RunId,
-    handle: ThreadLaneHandle,
-  ): Promise<void> {
-    const prompt = latestPrompt(lane)
+  async function end(lane: LaneName, id: RunId): Promise<void> {
+    const doc = docs.docOfLane(lane)
+    const prompt = doc === null ? null : readLatestPrompt(doc, lane)
     const steps = planRunEnd(prompt?.role)
     const cut = steps.indexOf("endRun")
     const carry = async (step: RunEndStep) => {
       switch (step) {
-        case "guidanceOff":
-          return handle.withGuidance(false)
         case "landingEnded":
           if (prompt !== null) await work.landingEnded(lane, prompt.id)
           return
@@ -140,7 +126,7 @@ export function createRuns(deps: {
           if (prompt !== null) await work.splitEnded(lane, prompt.id)
           return
         case "endRun":
-          return endRun(doc, lane, id)
+          return endRun(live, lane, id)
         case "laneStopped":
           work.runEnded(lane)
           log(`[host] run ${id.slice(-8)} done`)
@@ -160,17 +146,11 @@ export function createRuns(deps: {
   return {
     start(lane, start) {
       const id = runId(basics.newId())
-      beginRun(doc, lane, id)
+      beginRun(live, lane, id)
       const handle = agent.lane(lane)
       void (async () => {
         try {
           work.beforeRun(lane)
-          // `ask_for_guidance` is on exactly while the prompt is a land message.
-          await handle.withGuidance(
-            start.kind === "prompt"
-              ? start.message.customType === LAND_TYPE
-              : latestPrompt(lane)?.role === "land",
-          )
           const ran =
             start.kind === "prompt"
               ? await handle.run(start.message)
@@ -188,7 +168,7 @@ export function createRuns(deps: {
         } catch (error) {
           failed(basics, "run")(error)
         } finally {
-          await end(lane, id, handle)
+          await end(lane, id)
         }
       })()
       return id

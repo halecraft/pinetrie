@@ -12,6 +12,8 @@ export const SESSION_DOC_ID = "pineta:session"
 export const PRESENCE_DOC_ID = "pineta:presence"
 /** Where every card is (ADR-0059): written only by the host, through handoffs. */
 export const PLACES_DOC_ID = "pineta:places"
+/** What is streaming now (ADR-0063): written only by the host, and compacted at every run's end. */
+export const LIVE_DOC_ID = "pineta:live"
 
 /**
  * The host's principal. Kyneta issues each peer its id (its seat), so a client
@@ -83,6 +85,11 @@ export interface Command {
    * root. Only `codec.ts` interprets this; nothing past it sees `""`.
    */
   readonly parentId: string
+  /**
+   * `chat` and `mark`: the root it writes in (ADR-0063); for a chat at the
+   * root, a new root's id the sender's tab minted. `""` otherwise.
+   */
+  readonly root: string
   /**
    * `chat`: `reply` or `branch`; `archive` and `offer`: the action;
    * `set-command`: the command; `""` otherwise.
@@ -184,6 +191,7 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   kind: "chat",
   text: "",
   parentId: "",
+  root: "",
   mode: "",
   lane: "",
   asksAgent: false,

@@ -24,8 +24,9 @@ const SeatSchema = Type.Object({
  * operations carry it and Yjs derives it from the peer (`seatOf`, in
  * `@pineta/schema`), which this package cannot.
  */
-export const SEAT: RecordSpec<SeatRecord, string> = {
+export const SEAT: RecordSpec<SeatRecord, string, "session"> = {
   namespace: "pineta.seat",
+  home: "session",
   keyOf: s => s.peer,
   encode: ({ peer, ...contents }) => contents,
   decode: (contents, key) =>

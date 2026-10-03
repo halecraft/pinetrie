@@ -12,6 +12,7 @@ import {
   type CardRecord,
   type EntryId,
   type LaneView,
+  type RootId,
   rootOf,
   type TreeIndex,
   type WriterId,
@@ -79,6 +80,11 @@ export function cardMarks(input: {
   readonly archived: ReadonlySet<EntryId>
   readonly lanes: readonly LaneView[]
   readonly index: TreeIndex
+  /**
+   * Each root's root entry, by its id, from the directory: a drafting card
+   * in a root this tab does not hold is marked by its place's root (ADR-0063).
+   */
+  readonly rootEntries: ReadonlyMap<RootId, EntryId>
 }): CardMarks {
   const roots = new Set<EntryId>()
   const newTabs = new Set<string>()
@@ -88,9 +94,12 @@ export function cardMarks(input: {
     switch (card.place.kind) {
       case "drafting": {
         const end = cardEnd(card, input.lanes, input.index)
-        const root = end === null ? null : rootOf(input.index, end)
-        if (end === null || root === null) break
-        ends.add(end)
+        const root =
+          (end === null ? null : rootOf(input.index, end)) ??
+          input.rootEntries.get(card.place.root) ??
+          null
+        if (root === null) break
+        if (end !== null) ends.add(end)
         roots.add(root)
         break
       }

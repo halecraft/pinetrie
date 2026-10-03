@@ -1,7 +1,8 @@
-// pi/agent — the pi stack over the session document, and the facade the host
-// sees. Only this package may import pi (ADR-0003, enforced by module
-// resolution): everything pi-shaped is converted to Pineta's shapes here or
-// in the modules `createAgent` wires, so the host never sees a pi type.
+// pi/agent — the pi stack over the session's documents, a pi session and a
+// harness per document (ADR-0063), and the facade the host sees. Only this
+// package may import pi (ADR-0003, enforced by module resolution):
+// everything pi-shaped is converted to Pineta's shapes here or in the
+// modules `createAgent` wires, so the host never sees a pi type.
 
 import path from "node:path"
 import {
@@ -17,11 +18,14 @@ import {
 import { insertEntry } from "@earendil-works/pi-agent-core/harness/session"
 import {
   type BlobStore,
+  ERR,
   entryId,
   isLaneName,
   type LaneName,
-  type Position,
+  type RootId,
+  type Spot,
   type StreamEvent,
+  type Target,
   type ValueWrite,
 } from "@pineta/core"
 import {
@@ -33,7 +37,13 @@ import {
   labelCommands,
   withChatImages,
 } from "@pineta/marginalia"
-import { readLaneTip, type SessionDocHandle } from "@pineta/schema"
+import {
+  asRootDoc,
+  type RootDocHandle,
+  readLaneTip,
+  type SessionDocHandle,
+  type StorageDocHandle,
+} from "@pineta/schema"
 import { type Banners, banners } from "./banner.ts"
 import { type CommandFiles, commandFiles } from "./commands.ts"
 import {
@@ -51,10 +61,14 @@ import {
   type ToolContext,
   toolContextOf,
 } from "./lanes.ts"
+import { prefixChange, prefixOf } from "./prefix.ts"
 import { KynetaStorage } from "./storage.ts"
 import { STREAM_SOURCES, streamEventOf } from "./stream.ts"
 import {
   type AppendOutcome,
+  type CreateOutcome,
+  type LaneRefusal,
+  type ThreadLaneHandle,
   type ThreadLanes,
   threadLanes,
   toPi,
@@ -64,6 +78,26 @@ import { activeToolNames, assembleTools } from "./tools.ts"
 const CTX = BACKGROUND_CONTEXT
 
 const NO_BLOBS: Pick<BlobStore, "get"> = { get: () => undefined }
+
+/** A lane no root holds: every write to it is refused. */
+const UNKNOWN_LANE: LaneRefusal = { kind: "refused", code: ERR.UNKNOWN_TARGET }
+
+/**
+ * Writes grouped by the document they go to, in the order each target first
+ * appears. Pure.
+ */
+export function byTarget(
+  writes: readonly ValueWrite[],
+): readonly (readonly [Target, readonly ValueWrite[]])[] {
+  const groups = new Map<string, [Target, ValueWrite[]]>()
+  for (const w of writes) {
+    const key = w.target.kind === "session" ? "" : w.target.root
+    const group = groups.get(key)
+    if (group === undefined) groups.set(key, [w.target, [w]])
+    else group[1].push(w)
+  }
+  return [...groups.values()]
+}
 
 /** A host write as pi's: set or delete the value at its address. */
 const toPiWrite = (w: ValueWrite) =>
@@ -80,8 +114,21 @@ export const newId = (): string => uuidv7()
  */
 const SKILLS_DIR = path.join(import.meta.dirname, "skills")
 
+/**
+ * The documents pi's sessions are over (ADR-0063), as the host opens them:
+ * the session's, for the host's session-wide records, and each root's, a pi
+ * session of its own.
+ */
+export interface AgentDocuments {
+  readonly session: SessionDocHandle
+  /** A root's document, held and loaded: opened if it is not. */
+  root(root: RootId): Promise<RootDocHandle>
+  /** The root a lane works in, from its record; null for a lane no root holds. */
+  rootOfLane(lane: LaneName): RootId | null
+}
+
 export interface CreateAgentOptions {
-  readonly doc: SessionDocHandle
+  readonly documents: AgentDocuments
   /**
    * This PROCESS's replica id, used by storage for write tokens. It is not a
    * writer's identity: writers are people, identified by the transport.
@@ -101,6 +148,11 @@ export interface CreateAgentOptions {
   } | null
   /** What a running turn writes, in Pineta's own words, per lane. */
   readonly onStream?: (event: StreamEvent) => void
+  /**
+   * A lane's request starts otherwise than its last one did: its earlier
+   * thinking is dropped, and its prompt cached again (`prefix.ts`, S85).
+   */
+  readonly onPrefixChange?: (lane: LaneName) => void
   /**
    * pi's agent directory. With a scripted or named model, skills and prompts
    * load only when this is given: a suite's fixture, never the person's own.
@@ -154,29 +206,53 @@ function providerMessages(
   return convertToLlm(withChatImages(messages, found))
 }
 
+/** The pi stack over one document: its storage, session, harness and lanes. */
+interface OverDoc {
+  readonly session: StorageBackedSession
+  readonly harness: Harness
+  readonly lanes: ThreadLanes
+  readonly close: () => Promise<void>
+}
+
+type Harness = Awaited<ReturnType<typeof createAgentHarness>>["harness"]
+
 /**
  * The narrow facade the host sees. Every member is a string, our own shape, or a
  * promise of one, so "no pi type crosses this boundary" is a checked property
  * of the signature. There is no way to move a lane, and none to READ a tip:
  * readers use the document, so observing a lane can never create one.
  */
-export interface Agent extends ThreadLanes, CommandFiles, Banners {
+export interface Agent extends CommandFiles, Banners {
   readonly modelLabel: string
   /**
-   * Append at exactly `parent`, with no lane: a conversation thread (S21 Q1).
+   * Create a thread's lane at `spot`, in its root, named `lane` (the host
+   * decides the id, ADR-0057). Refused `lane_taken` for an id pi holds.
+   */
+  createThreadLane(spot: Spot, lane: LaneName): Promise<CreateOutcome>
+  /** A thread's lane, in the root its record names. */
+  lane(name: LaneName): ThreadLaneHandle
+  /** Lanes pi holds an operation open on, in `roots`: a crash interrupted them. */
+  interrupted(roots: readonly RootId[]): Promise<readonly LaneName[]>
+  /**
+   * Append at exactly `spot`, with no lane: a conversation thread (S21 Q1).
    * The host's serial executor guarantees nothing was written there since it
    * planned, so no re-read is needed here.
    */
-  appendToTree(message: ChatMessage, parent: Position): Promise<AppendOutcome>
+  appendToTree(message: ChatMessage, spot: Spot): Promise<AppendOutcome>
   /**
-   * Write the host's records (ADR-0062), in one commit. A value can be
-   * written while a lane runs: it does not go through the lane (S70). Throws,
-   * writing nothing, for a namespace that is not the host's.
+   * Write the host's records (ADR-0062): each document's writes in one
+   * commit, by their target (ADR-0063). A value can be written while a lane
+   * runs: it does not go through the lane (S70). Throws, writing nothing, for
+   * a namespace that is not the host's.
    */
   writeValues(writes: readonly ValueWrite[]): Promise<void>
+  /**
+   * Close and forget `root`'s harness, before the host lets its document
+   * go (ADR-0063). The next call that needs the root opens it again.
+   */
+  release(root: RootId): Promise<void>
   /** pi's agent directory: settings, packages, and `auth.json`. Never mounted into a lane. */
   agentDir(): string
-  stats(): Promise<{ messageCount: number }>
   /**
    * One request outside every thread, with no tools and no session
    * (`complete` in `config.ts`). Null when it fails.
@@ -189,22 +265,13 @@ export interface Agent extends ThreadLanes, CommandFiles, Banners {
 }
 
 /**
- * Build the pi stack over a caller-supplied Kyneta document, and return a
- * narrow facade.
+ * Build the pi stack over the session's documents, and return a narrow
+ * facade. One model setup, tool list and system prompt serve every
+ * document's harness; a document's own is made the first time it is asked
+ * for, and lives as long as the agent.
  */
 export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
-  const { doc, replicaId, tools } = options
-
-  const storage = new KynetaStorage({
-    doc,
-    peerId: replicaId,
-    ...(options.blobs === undefined ? {} : { blobs: options.blobs }),
-  })
-  const session = new StorageBackedSession(
-    { id: `pineta-${replicaId}`, createdAt: Date.now(), storageVersion: 1 },
-    storage,
-    {},
-  )
+  const { documents, replicaId, tools } = options
 
   const project = tools?.project ?? process.cwd()
   const setup = await setUpModel(options.model, {
@@ -223,73 +290,164 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
           blobs: options.blobs,
           bannerAsks,
         })
-  const activeTools = (guidance: boolean): string[] =>
-    activeToolNames({
-      files: assembled.files,
-      banners: bannerAsks !== undefined,
-      guidance,
-    })
+  // An agent with no tools registers none, so its lanes may call none.
+  const activeTools =
+    tools === null
+      ? []
+      : activeToolNames({
+          files: assembled.files,
+          banners: bannerAsks !== undefined,
+        })
   // A call with no lane named (none should run tools) works in the project.
   const accessFor = (lane: LaneName | undefined): LaneAccess =>
     tools === null || lane === undefined
       ? { kind: "direct", dir: project, ready: Promise.resolve() }
       : tools.access(lane)
+  const systemPrompt = systemPromptFor(setup, assembled.files)
+  // Each lane's last request's prefix, in memory: a restart starts fresh.
+  const prefixes = new Map<string, string>()
 
-  const { harness } = await createAgentHarness(
-    {
-      session,
-      models: setup.models,
-      model: resolved,
-      tools: [...assembled.registered] as never[],
-      activeToolNames: activeTools(false),
-      toolContext: (context: typeof CTX): ToolContext =>
-        toolContextOf(accessFor(laneOf(context))),
-      systemPrompt: systemPromptFor(setup, assembled.files),
-      toProviderMessages: messages =>
-        providerMessages(messages, options.blobs ?? NO_BLOBS),
-      // Pineta's queued cards mean pi's own queue is never used; should it be, it
-      // answers one message at a time rather than batching them (S20).
-      followUpMode: "one-at-a-time",
-    },
-    CTX,
-  )
-
-  /** The lane's last turn, recorded at its tip as the document has it. */
+  /** The lane's last turn, recorded at its tip as its root's document has it. */
   async function recordTurn(lane: LaneName): Promise<void> {
     if (tools === null) return
-    const tip = readLaneTip(doc, lane)
+    const root = documents.rootOfLane(lane)
+    if (root === null) return
+    const tip = readLaneTip(await documents.root(root), lane)
     if (tip !== null) await tools.hooks.turnDone(lane, tip)
   }
 
-  if (tools !== null) {
-    // A turn's files, recorded before the next request: every tool of the
-    // turn has finished, and pi awaits this, so no write races the commit.
-    // `recordTurn` reads the tip from the document: asking the lane here,
-    // inside its own drive, could wait on itself.
-    harness.hooks.on("before_request", async event => {
-      const lane = event.lane
-      if (event.step !== "assistant" || !isLaneName(lane)) return undefined
-      await recordTurn(lane)
+  /** The pi stack over `doc`: a session, a harness and its lanes. */
+  async function overDoc(doc: StorageDocHandle, id: string): Promise<OverDoc> {
+    const storage = new KynetaStorage({
+      doc,
+      peerId: replicaId,
+      ...(options.blobs === undefined ? {} : { blobs: options.blobs }),
+    })
+    const session = new StorageBackedSession(
+      {
+        id: `pineta-${replicaId}-${id}`,
+        createdAt: Date.now(),
+        storageVersion: 1,
+      },
+      storage,
+      {},
+    )
+    const { harness } = await createAgentHarness(
+      {
+        session,
+        models: setup.models,
+        model: resolved,
+        tools: [...assembled.registered] as never[],
+        activeToolNames: activeTools,
+        toolContext: (context: typeof CTX): ToolContext =>
+          toolContextOf(accessFor(laneOf(context))),
+        systemPrompt,
+        toProviderMessages: messages =>
+          providerMessages(messages, options.blobs ?? NO_BLOBS),
+        // Pineta's queued cards mean pi's own queue is never used; should it
+        // be, it answers one message at a time rather than batching (S20).
+        followUpMode: "one-at-a-time",
+      },
+      CTX,
+    )
+    if (tools !== null) {
+      // A turn's files, recorded before the next request: every tool of the
+      // turn has finished, and pi awaits this, so no write races the commit.
+      // `recordTurn` reads the tip from the document: asking the lane here,
+      // inside its own drive, could wait on itself.
+      harness.hooks.on("before_request", async event => {
+        const lane = event.lane
+        if (event.step !== "assistant" || !isLaneName(lane)) return undefined
+        await recordTurn(lane)
+        return undefined
+      })
+    }
+    harness.hooks.on("before_payload", async event => {
+      const next = prefixOf(event.payload)
+      if (
+        prefixChange(prefixes.get(event.lane), next) &&
+        isLaneName(event.lane)
+      )
+        options.onPrefixChange?.(event.lane)
+      prefixes.set(event.lane, next)
       return undefined
     })
+    const offs = STREAM_SOURCES.map(type =>
+      harness.events.on(type, event => {
+        const stream = streamEventOf(event)
+        if (stream !== null) options.onStream?.(stream)
+      }),
+    )
+    const lanes = threadLanes({
+      harness,
+      doc: asRootDoc(doc),
+      recordTurn,
+      activeTools: tools === null ? null : activeTools,
+    })
+    return {
+      session,
+      harness,
+      lanes,
+      async close() {
+        for (const off of offs) off()
+        await harness.close(CTX)
+      },
+    }
   }
 
-  const offs = STREAM_SOURCES.map(type =>
-    harness.events.on(type, event => {
-      const stream = streamEventOf(event)
-      if (stream !== null) options.onStream?.(stream)
-    }),
-  )
+  // Each document's stack, made once: the promise is held, so two callers
+  // asking at once share one harness.
+  const stacks = new Map<string, Promise<OverDoc>>()
+  const stackOf = (key: string, open: () => Promise<StorageDocHandle>) => {
+    const held = stacks.get(key)
+    if (held !== undefined) return held
+    const made = open().then(doc => overDoc(doc, key))
+    stacks.set(key, made)
+    return made
+  }
+  const ofSession = () => stackOf("session", async () => documents.session)
+  const ofRoot = (root: RootId) => stackOf(root, () => documents.root(root))
+  const ofTarget = (target: Target) =>
+    target.kind === "session" ? ofSession() : ofRoot(target.root)
 
-  const lanes = threadLanes({
-    harness,
-    doc,
-    recordTurn,
-    activeTools: tools === null ? null : activeTools,
-  })
+  /** A lane's stack, in the root its record names; undefined for none. */
+  async function ofLane(name: LaneName): Promise<OverDoc | undefined> {
+    const root = documents.rootOfLane(name)
+    return root === null ? undefined : ofRoot(root)
+  }
+
+  /** A handle whose every call finds the lane's root when it is made. */
+  function laneHandle(name: LaneName): ThreadLaneHandle {
+    const on = async <T>(
+      f: (h: ThreadLaneHandle) => Promise<T>,
+      none: T,
+    ): Promise<T> => {
+      const stack = await ofLane(name)
+      return stack === undefined ? none : f(stack.lanes.lane(name))
+    }
+    return {
+      name,
+      append: message => on(h => h.append(message), UNKNOWN_LANE),
+      run: message => on(h => h.run(message), UNKNOWN_LANE),
+      resume: () => on(h => h.resume(), UNKNOWN_LANE),
+      abort: () => on(h => h.abort(), undefined),
+    }
+  }
 
   return {
-    ...lanes,
+    lane: laneHandle,
+
+    async createThreadLane(spot, lane) {
+      return (await ofRoot(spot.root)).lanes.createThreadLane(spot.at, lane)
+    },
+
+    async interrupted(roots) {
+      const out: LaneName[] = []
+      for (const root of roots)
+        out.push(...(await (await ofRoot(root)).lanes.interrupted()))
+      return out
+    },
+
     ...commandFiles(
       labelCommands(setup.commands, options.commandRenames ?? {}),
     ),
@@ -298,7 +456,8 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
 
     complete: request => complete(setup, request),
 
-    async appendToTree(message, parent) {
+    async appendToTree(message, spot) {
+      const { session } = await ofRoot(spot.root)
       const id = session.idGenerator.next()
       await session.mutate(
         m =>
@@ -306,7 +465,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
             [
               insertEntry({
                 id,
-                parentId: toPi(parent),
+                parentId: toPi(spot.at),
                 type: "message",
                 message,
               }),
@@ -325,20 +484,25 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         throw new Error(
           `writeValues: ${foreign.namespace} is not the host's to write`,
         )
-      await session.mutate(m => m.commit(writes.map(toPiWrite), CTX), CTX)
+      for (const [target, group] of byTarget(writes)) {
+        const { session } = await ofTarget(target)
+        await session.mutate(m => m.commit(group.map(toPiWrite), CTX), CTX)
+      }
+    },
+
+    async release(root) {
+      const stack = stacks.get(root)
+      if (stack === undefined) return
+      stacks.delete(root)
+      await (await stack).close()
     },
 
     agentDir() {
       return options.agentDir ?? DEFAULT_AGENT_DIR
     },
 
-    async stats() {
-      return session.getStats(CTX)
-    },
-
     async close() {
-      for (const off of offs) off()
-      await harness.close(CTX)
+      for (const stack of stacks.values()) await (await stack).close()
     },
   }
 }

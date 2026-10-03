@@ -9,6 +9,7 @@ import {
   NOBODY,
   parseMentions,
   type Responder,
+  rootIdFor,
   type Sha256,
   THE_AGENT,
   type ThreadLane,
@@ -447,6 +448,7 @@ describe("settling and starting up", () => {
     placer: ALICE,
     place: {
       kind: "queued" as const,
+      root: rootIdFor("test-root"),
       at: atEntry(E1),
       lane,
       order: "a",

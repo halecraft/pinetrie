@@ -11,14 +11,16 @@ wires them.
 | module | owns |
 |---|---|
 | `index.ts` | `startHost`: the store, the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents, lane work and the agent, then the wiring below |
-| `basics.ts` | `Basics` (doc, places, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
+| `basics.ts` | `Basics` (the session, `pineta:live`, the documents, the places, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
 | `places.ts` | `applyPlaceStep`: the one writer of the places document (ADR-0059), which raises its `rev` with every write |
 | `queue.ts` | `createSerial`: the one serial executor, which a shutdown closes |
 | `shutdown.ts` | the order a host stops in (`planShutdown`) |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), and the agent's `onStream` (`streamInto`) |
 | `take.ts` | taking a lane's queued cards (ADR-0048): `takeTop`, and `drain`, which sends each through its command (ADR-0055) |
 | `settle.ts` | what happens between runs: drain, then compact and sweep |
-| `housekeeping.ts` | compacting the session and the places, and deleting images nothing shows |
+| `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pineta:live`), and deleting images nothing shows |
+| `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for; `planLoads` |
+| `directory.ts` | each root's directory record, refreshed as its document changes |
 | `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the take, and the texts of given cards gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`) |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
@@ -35,7 +37,7 @@ wires them.
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
 | `digests.ts` | each ask's digest (ADR-0056), when the user config turns them on |
 | `outside.ts` | `requestOutside`: a model request outside the serial executor, its answer written inside it |
-| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue`, `applyWrites`, `writesOf`, `basics` |
+| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue` and `applyWrites` (each write to the document its target names), `writesOf`, `basics` (one root, `ROOT_ID`, in `fakeDocuments`), `putLane`, `writeDirectory` |
 
 ## One serial executor
 
@@ -73,9 +75,10 @@ wires them.
 
 ## A run's end
 
-`planRunEnd(role)` returns the order, and `runs.ts` carries it out:
-`guidanceOff`, then a resolution's `landingEnded` or a split's
-`splitEnded`, then `endRun`, `laneStopped`, `ended`.
+`planRunEnd(role)` returns the order, and `runs.ts` carries it out: a
+resolution's `landingEnded` or a split's `splitEnded`, then `endRun`,
+`laneStopped`, `ended`. A run touches no tools: every lane's list is the
+same for every run (`packages/pi/TECHNICAL.md`, S85).
 
 - **`endRun` comes before `laneStopped` and `ended`.** It closes the lane's
   streams (ADR-0044: a stream stays open past its message's end) and clears
@@ -95,17 +98,49 @@ wires them.
   before any step queued after it reads the lane. pi reports no prompt id,
   and the lookup gives the same answer as pi's own end tip (S71).
 
+## The session's documents (`docs.ts`, `directory.ts`, ADR-0063)
+
+- **`Basics.docs` is the one port for documents** (`HostDocuments`): the
+  session's, `pineta:live`, the places, a root's by its `RootId` (opened and
+  hydrated if it is not), a loaded root's `RootView`, a lane's root from its
+  `LANE` record, and `unload`. A synchronous step plans from `view` and
+  `docOfLane`, which answer only for a loaded root; an async one asks
+  `root` or `laneDoc`.
+- **A starting host opens the roots `planLoads` names**: every root in the
+  directory that is not archived, before `recover`. A busy root cannot be
+  archived, so these hold every lane a crash could have interrupted.
+  Archiving `unload`s a root (`work/archive.ts`); restoring opens it.
+  `unload` first has pi close its harness over the root (`releasing`,
+  `Agent.release`): a harness kept would write to the closed document, and
+  every later command in the root, the restored one included, would fail
+  with "This document was unloaded, and is closed".
+- **The host is every document's authority** (`{ authority: "self" }`), so
+  Kyneta loads a root it let go again when a client asks for it (S86).
+  `resolveDoc` interprets a `root:` id the directory names, as an archived
+  root a client previews, and rejects any other: only the host makes roots.
+- **The directory follows each root's document** (`directory.ts`): a change
+  to its entries or values queues one `refreshRoot` step, absorbed by one
+  already queued, which writes `readRootRecord` with `setIfChanged`. A
+  settle's compaction first flushes queued refreshes in its own step
+  (`beforeCompact`), so the records it compacts are current and nothing
+  writes after it.
+- **A command names its root** (`Command.root`, ADR-0063): a chat or a mark
+  writes in it, and a chat at the root starts it, under the id the sender's
+  tab minted, refused `root_taken` when the directory holds it already.
+
 ## Startup
 
 `recover` runs, in order: `clearStreams` (no stream survives a process), a
-log of the stored lane names that fail `isLaneName` (`readStoredLanes`: no
-reader is given them, so the log is where one shows; it never throws, and
-nothing is deleted), `ensureNames` (ADR-0039), `planStartup` over the queued cards and `interrupted()`,
-each interrupted lane resumed before anything waiting for it (S36 item 18),
-`settle` for the other lanes with cards queued, the project and commands
-records that changed in one write (`setIfChanged`), and the sweep of what
-no one will type in again: empty cards, card documents with no record, and
-seat records no stored text names, all of them in one write (`sweepTexts`).
+log of the stored lane names, in the roots opened, that fail `isLaneName`
+(`readStoredLanes`: no reader is given them, so the log is where one shows;
+it never throws, and nothing is deleted), `ensureNames` (ADR-0039),
+`planStartup` over the queued cards and `interrupted(roots)`, each
+interrupted lane resumed before anything waiting for it (S36 item 18), the
+project and commands records that changed in one write (`setIfChanged`),
+the sweep of what no one will type in again: empty cards, card documents
+with no record, and seat records no stored text names, all of them in one
+write (`sweepTexts`), and last `settle` for the lanes with cards queued:
+its compaction then holds every write above.
 
 - **Commands are taken only after `recover`.** `Control.listen` is made
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,

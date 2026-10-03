@@ -9,18 +9,22 @@ import { yourCard } from "@pineta/marginalia"
 import { scriptedModel } from "@pineta/pi"
 import { PLACES_DOC_ID } from "@pineta/protocol/messages"
 import { inventoryDocId } from "@pineta/protocol/writers"
-import { readLanes, readPlaces, readSeats, readTreeIndex } from "@pineta/reads"
-import {
-  cardDocId,
-  InventoryDoc,
-  PlacesDoc,
-  readLaneNames,
-  readLaneTip,
-} from "@pineta/schema"
+import { readPlaces, readSeats } from "@pineta/reads"
+import { cardDocId, InventoryDoc, PlacesDoc } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { idleNow, join, refusedWrite, waitFor } from "../harness.ts"
+import {
+  idleNow,
+  join,
+  laneNamesOf,
+  lanesOf,
+  refusedWrite,
+  rootAt,
+  tipIn,
+  treeOf,
+  waitFor,
+} from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { at, LATE_LOAD_MS, START_AGENT, sleep, slowToLoad } from "./support.ts"
@@ -48,13 +52,18 @@ async function run(check: Checks["check"]): Promise<void> {
     const bea = await join(ch, "bea", "cards")
     await Promise.all([ada.setName("Ada"), bea.setName("Bea")])
     const tipOf = () => {
-      const l = readLaneNames(ch.doc)[0]
-      return l === undefined ? null : readLaneTip(ch.doc, l)
+      const l = laneNamesOf(ch)[0]
+      return l === undefined ? null : tipIn(ch, l)
     }
     const cIdle = () => waitFor(() => idleNow(ch), 30_000)
     const onHost = (id: CardId) => readPlaces(ch.places).find(c => c.id === id)
     const drafting = (end: string | null) =>
-      ({ kind: "drafting", at: at(end), lane: null }) as const
+      ({
+        kind: "drafting",
+        root: rootAt(ch, at(end)),
+        at: at(end),
+        lane: null,
+      }) as const
     const newCard = (
       who: SessionClient,
       end: string | null,
@@ -99,12 +108,12 @@ async function run(check: Checks["check"]): Promise<void> {
     await bea.chat("@Ada two", at(tipOf()), { mode: "reply" })
     await cIdle()
     const grown = tipOf()
-    const idx = readTreeIndex(ch.doc)
+    const idx = treeOf(ch)
     const found = yourCard(
       ada.writer,
       { kind: "end", end: grown ?? entryId("") },
       ada.cards.current(),
-      readLanes(ch.doc, idx, readPlaces(ch.places)),
+      lanesOf(ch, idx, readPlaces(ch.places)),
       idx,
     )
     check(
@@ -178,7 +187,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // 4. The busy lane's queue (ADR-0048, ADR-0059). Bea sends Ada's card
     // there: the host queues it in the same step, as Bea's. Ada edits it while
     // it waits; Ada queues another and unqueues it.
-    const lane = (readLaneNames(ch.doc)[0] ?? "") as LaneName
+    const lane = (laneNamesOf(ch)[0] ?? "") as LaneName
     const c3 = newCard(ada, busyEnd, "@Ada the plan")
     await waitFor(
       () =>
@@ -204,7 +213,7 @@ async function run(check: Checks["check"]): Promise<void> {
     longOne.resume()
     await cIdle()
     await ch.quiet()
-    const index3 = readTreeIndex(ch.doc)
+    const index3 = treeOf(ch)
     const sent3 = Object.values(index3.entries).find(
       e =>
         e.message?.role === "chat" &&
@@ -238,7 +247,7 @@ async function run(check: Checks["check"]): Promise<void> {
     ada.queueCard(c6, { lane, at: at(idleEnd) })
     const taken = await waitFor(
       () =>
-        Object.values(readTreeIndex(ch.doc).entries).some(
+        Object.values(treeOf(ch).entries).some(
           e =>
             e.message?.role === "chat" &&
             e.message.content === "@Bea while it is quiet",
@@ -266,7 +275,7 @@ async function run(check: Checks["check"]): Promise<void> {
       5_000,
     )
     await ch.quiet()
-    const sent7 = Object.values(readTreeIndex(ch.doc).entries).some(
+    const sent7 = Object.values(treeOf(ch).entries).some(
       e => e.message?.role === "chat" && e.message.content === "@Bea too quick",
     )
     check(
@@ -285,6 +294,7 @@ async function run(check: Checks["check"]): Promise<void> {
       mallory.exchange.get(PLACES_DOC_ID, PlacesDoc).cards.set(forged, {
         owner: mallory.writer,
         kind: "fresh",
+        root: "",
         at: "",
         lane: "",
         column: "forged",
@@ -399,7 +409,7 @@ async function run(check: Checks["check"]): Promise<void> {
       card: c4,
     })
     await ch.quiet()
-    const index4 = readTreeIndex(ch.doc)
+    const index4 = treeOf(ch)
     const wrote4 = index4.bySend.get(SEND4)
     const msg4 = wrote4 === undefined ? undefined : index4.entries[wrote4]
     check(
@@ -423,7 +433,7 @@ async function run(check: Checks["check"]): Promise<void> {
         ch.cardText(keep) === "kept across a restart" &&
         ch.cardText(orphan) === "no record" &&
         onHost(empty) !== undefined &&
-        readSeats(ch.doc).some(s => s.writer === zed.writer),
+        readSeats(ch.session).some(s => s.writer === zed.writer),
       5_000,
     )
     await Promise.all([bea.close(), zed.close()])

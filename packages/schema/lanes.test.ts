@@ -1,7 +1,7 @@
 import { entryId, laneNameForThread } from "@pineta/core"
 import { expect, test } from "vitest"
 import {
-  newSessionDoc,
+  newRootDoc,
   physicalKey,
   readLaneNames,
   readLaneTip,
@@ -10,7 +10,7 @@ import {
 } from "./index.ts"
 
 test("readStoredLanes gives a thread's lanes, and sets aside a stored name that is not one", () => {
-  const doc = newSessionDoc()
+  const doc = newRootDoc()
   const lane = laneNameForThread("0123456789abcdef")
   writeLaneTip(doc, lane, entryId("e-1"))
   doc.values.set(physicalKey("pi.branch.tip", "main"), {

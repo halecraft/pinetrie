@@ -1,4 +1,10 @@
-import { atEntry, entryId, laneNameForThread, writerId } from "@pineta/core"
+import {
+  atEntry,
+  entryId,
+  laneNameForThread,
+  rootIdFor,
+  writerId,
+} from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import { composerPlace } from "./column-view.ts"
 import {
@@ -8,6 +14,8 @@ import {
   placeOfTarget,
   targetOfElement,
 } from "./put-target.ts"
+
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ME = writerId("ada@x.io")
 /** An element carrying `attrs`, as the page spreads them. */
@@ -19,8 +27,8 @@ const E1 = atEntry(entryId("e-1"))
 
 describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   const store = composerPlacesStore()
-  const thread = composerPlace({ key: "k-thread", lane: LANE }, E1)
-  const fresh = composerPlace({ key: "k-fresh", fresh: {} }, E1)
+  const thread = composerPlace({ key: "k-thread", lane: LANE }, E1, TEST_ROOT)
+  const fresh = composerPlace({ key: "k-fresh", fresh: {} }, E1, TEST_ROOT)
   store.set("k-thread", thread)
   store.set("k-fresh", fresh)
   const targets: PutTarget[] = [
@@ -43,6 +51,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
     expect(at(targets[0] as PutTarget)).toEqual({
       kind: "drafting",
+      root: TEST_ROOT,
       at: E1,
       lane: LANE,
     })
@@ -63,20 +72,25 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   })
 })
 
-test("composerPlace: drafting at the end with the lane; fresh by key; none at the root", () => {
-  expect(composerPlace({ key: "k", lane: LANE }, E1)).toEqual({
+test("composerPlace: drafting at the end with the lane, in its root; fresh by key; none at the root, nor in no root", () => {
+  expect(composerPlace({ key: "k", lane: LANE }, E1, TEST_ROOT)).toEqual({
     kind: "drafting",
+    root: TEST_ROOT,
     at: E1,
     lane: LANE,
   })
-  expect(composerPlace({ key: "k" }, E1)).toEqual({
+  expect(composerPlace({ key: "k" }, E1, TEST_ROOT)).toEqual({
     kind: "drafting",
+    root: TEST_ROOT,
     at: E1,
     lane: null,
   })
-  expect(composerPlace({ key: "k", fresh: {} }, { kind: "root" })).toEqual({
+  expect(
+    composerPlace({ key: "k", fresh: {} }, { kind: "root" }, undefined),
+  ).toEqual({
     kind: "fresh",
     column: "k",
   })
-  expect(composerPlace({ key: "k" }, { kind: "root" })).toBeNull()
+  expect(composerPlace({ key: "k" }, { kind: "root" }, undefined)).toBeNull()
+  expect(composerPlace({ key: "k" }, E1, undefined)).toBeNull()
 })

@@ -23,7 +23,15 @@ import {
 import { readTreeIndex } from "@pineta/reads"
 import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
-import { basics, methods, putValue, record, row } from "../fakes.ts"
+import {
+  basics,
+  methods,
+  putValue,
+  ROOT_ID,
+  record,
+  row,
+  writeDirectory,
+} from "../fakes.ts"
 import {
   type Chat,
   type ChatDeps,
@@ -69,12 +77,13 @@ function setUp(
     },
   }
   const context = {
-    index: readTreeIndex(b.doc),
+    view: { root: ROOT_ID, doc: b.root, session: b.session, live: b.live },
+    index: readTreeIndex(b.root),
     writer: ALICE,
     work: null,
     base: null,
   }
-  return { agent, work, started, deps, context }
+  return { b, agent, work, started, deps, context }
 }
 
 describe("executeChat", () => {
@@ -99,7 +108,7 @@ describe("executeChat", () => {
     )
     expect(out).toEqual({ kind: "started", runId: "r-1" })
     expect(agent.calls.map(c => [c.method, ...c.args])).toEqual([
-      ["createThreadLane", ROOT, LANE],
+      ["createThreadLane", { root: ROOT_ID, at: ROOT }, LANE],
     ])
     expect(methods(work.calls)).toEqual([
       "checkDirectory",
@@ -135,6 +144,7 @@ describe("sendChat", () => {
   const SHA = "a".repeat(64) as Sha256
   const chat = (text: string, asksAgent = false): Chat => ({
     text,
+    root: ROOT_ID,
     at: { kind: "entry", id: E1 },
     mode: "reply",
     lane: null,
@@ -147,8 +157,8 @@ describe("sendChat", () => {
   })
   function setUp(project: ProjectRecord | null = null) {
     const b = basics()
-    writeEntry(b.doc, row(E1, null))
-    if (project !== null) putValue(b.doc, setRecord(PROJECT, project))
+    writeEntry(b.root, row(E1, null))
+    if (project !== null) putValue(b, setRecord(PROJECT, project))
     const cards = record<ChatDeps["cards"]>({
       writers: async () => [ALICE, BEA],
     })
@@ -180,8 +190,20 @@ describe("sendChat", () => {
         return runId("r-1")
       },
     }
-    return { agent, cards, started, deps }
+    return { b, agent, cards, started, deps }
   }
+
+  test("a thread at the root under a taken root's id is refused, and nothing is written", async () => {
+    const { b, agent, started, deps } = setUp()
+    writeDirectory(b)
+    const out = await sendChat(deps, ALICE, "s-1", {
+      ...chat("do it", true),
+      at: ROOT,
+      mode: "branch",
+    })
+    expect(out).toMatchObject({ kind: "refused", code: ERR.ROOT_TAKEN })
+    expect([agent.calls, started]).toEqual([[], []])
+  })
 
   test("a Start Agent column's message, naming nobody, starts a run", async () => {
     const { started, deps } = setUp()
@@ -222,12 +244,13 @@ describe("sendChat", () => {
   })
 
   test("a conflict names who holds the thread, as a writer", async () => {
-    const { deps } = setUp()
+    const { b, deps } = setUp()
     const out = await executeChat(
       deps,
       { kind: "conflict", by: BEA },
       {
-        index: readTreeIndex(deps.basics.doc),
+        view: { root: ROOT_ID, doc: b.root, session: b.session, live: b.live },
+        index: readTreeIndex(b.root),
         writer: ALICE,
         work: null,
         base: null,
@@ -290,13 +313,10 @@ describe("sendChat", () => {
   })
 
   test("a busy lane is answered busy, and nothing is written", async () => {
-    const { agent, deps } = setUp()
-    writeLaneTip(deps.basics.doc, LANE, E1)
-    beginRun(deps.basics.doc, LANE, runId("r-0"))
-    putValue(
-      deps.basics.doc,
-      setRecord(PARTICIPANT, { writer: BEA, name: "Bea" }),
-    )
+    const { b, agent, deps } = setUp()
+    writeLaneTip(b.root, LANE, E1)
+    beginRun(b.live, LANE, runId("r-0"))
+    putValue(b, setRecord(PARTICIPANT, { writer: BEA, name: "Bea" }))
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("@bea when it is done"),
       lane: LANE,

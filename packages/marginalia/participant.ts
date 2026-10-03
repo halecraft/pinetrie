@@ -20,8 +20,9 @@ export interface ParticipantRecord {
  * Each writer's name, at the writer's id. The contents are the name alone.
  * Total: contents that are not a string are malformed.
  */
-export const PARTICIPANT: RecordSpec<ParticipantRecord, WriterId> = {
+export const PARTICIPANT: RecordSpec<ParticipantRecord, WriterId, "session"> = {
   namespace: "pineta.participant",
+  home: "session",
   keyOf: r => r.writer,
   encode: r => r.name,
   decode: (contents, key) =>

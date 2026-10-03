@@ -36,6 +36,7 @@ const input = (over: Partial<AppViewInput>): AppViewInput => ({
   nameOf,
   offers: new Map(),
   lanes: [],
+  laneRoots: new Map(),
   ...over,
 })
 const workspace = (over: Partial<AppViewInput>) =>
@@ -97,10 +98,11 @@ test("readOnlyWords offers Restore for an archived root, Open for any other", ()
   )
 })
 
-test("the header's offers are the open ones whose lane has a tip", () => {
+test("the header's offers are the open ones: a held lane's at its tip, if it has one; another's at its root (ADR-0063)", () => {
   const A = laneNameForThread("a")
   const B = laneNameForThread("b")
   const C = laneNameForThread("c")
+  const D = laneNameForThread("d")
   const offer = (lane: LaneName, taken: string | null) =>
     ({ lane, taken }) as unknown as OfferRecord
   const lane = (name: LaneName, tip: string | null) =>
@@ -111,11 +113,21 @@ test("the header's offers are the open ones whose lane has a tip", () => {
         [A, offer(A, null)],
         [B, offer(B, "taken")],
         [C, offer(C, null)],
+        [D, offer(D, null)],
       ]),
       lanes: [lane(A, "t1"), lane(B, "t2"), lane(C, null)],
+      laneRoots: new Map([
+        [A, entryId("r1")],
+        [B, entryId("r1")],
+        [C, entryId("r1")],
+        [D, entryId("r2")],
+      ]),
     }),
   )
-  expect(offers).toEqual([{ lane: A, tip: "t1" }])
+  expect(offers).toEqual([
+    { lane: A, root: "r1", end: "t1" },
+    { lane: D, root: "r2", end: "r2" },
+  ])
 })
 
 test("a tab's rail draws its own root's tree only", () => {

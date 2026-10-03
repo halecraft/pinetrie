@@ -33,8 +33,8 @@ import {
   yourCard,
 } from "@pineta/marginalia"
 import {
+  type LiveDocHandle,
   readStreamText,
-  type SessionDocHandle,
   type StreamRecord,
 } from "@pineta/schema"
 import {
@@ -476,6 +476,8 @@ export function Column(p: ColumnProps) {
     if (button !== "update" && button !== "resolve" && button !== "continue")
       return act({ kind: "offer", lane: lane.name, action: button, to: null })
     if (at.kind !== "entry") return
+    const root = p.session.rootOf(at.id)
+    if (root === undefined) return
     act({
       kind: "bringUpToDate",
       command: button === "continue" ? "continue-on-line" : "bring-up-to-date",
@@ -484,7 +486,7 @@ export function Column(p: ColumnProps) {
       create: {
         id: newCardId(),
         owner: p.session.writer,
-        place: { kind: "drafting", at, lane: lane.name },
+        place: { kind: "drafting", root, at, lane: lane.name },
         placer: p.session.writer,
         command: null,
         unsent: null,
@@ -514,7 +516,12 @@ export function Column(p: ColumnProps) {
         ? []
         : draftingAt(threadEnd, p.cards, p.lanes, index)
   ).filter(c => c.id !== shownBelow)
-  const place = composerPlace(p.column, at) ?? undefined
+  const place =
+    composerPlace(
+      p.column,
+      at,
+      at.kind === "entry" ? p.session.rootOf(at.id) : undefined,
+    ) ?? undefined
   // A put lands where this composer would create a card. A column that can
   // be written publishes it; one leaving takes it back.
   const { composers } = p
@@ -721,7 +728,7 @@ export function Column(p: ColumnProps) {
                 view.nodes.map(n => n.id),
               )}
               stops={p.stops}
-              doc={p.session.doc}
+              live={p.session.live}
               shown={p.shown}
               tools={p.live.tools}
               view={view}
@@ -731,7 +738,7 @@ export function Column(p: ColumnProps) {
               const reply = p.live.replies.get(l)
               return (
                 reply !== undefined && (
-                  <Reply doc={p.session.doc} key={reply.id} stream={reply} />
+                  <Reply doc={p.session.live} key={reply.id} stream={reply} />
                 )
               )
             })}
@@ -842,7 +849,7 @@ export function Column(p: ColumnProps) {
             usedDirs: [
               ...new Set(
                 [...p.work.lanes.values()].flatMap(r =>
-                  r.work.kind === "direct" ? [r.work.dir] : [],
+                  r.work?.kind === "direct" ? [r.work.dir] : [],
                 ),
               ),
             ],
@@ -918,17 +925,11 @@ function SeenBy(p: {
  * wraps the same when its entry replaces it. It reads its own text, so a delta
  * re-renders only this, not the column above it.
  */
-function Reply({
-  doc,
-  stream,
-}: {
-  doc: SessionDocHandle
-  stream: StreamRecord
-}) {
+function Reply({ doc, stream }: { doc: LiveDocHandle; stream: StreamRecord }) {
   const text = useSelector(
     doc,
     useCallback(
-      (d: SessionDocHandle) => readStreamText(d, stream.id),
+      (d: LiveDocHandle) => readStreamText(d, stream.id),
       [stream.id],
     ),
   )

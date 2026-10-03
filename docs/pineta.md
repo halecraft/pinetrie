@@ -93,8 +93,8 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 1478/1478 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 908 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 1523/1523 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 942 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
 | end-to-end | `pnpm run e2e` | 12 scenarios, 40 checks, on the scripted model (S67) |
 | with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
@@ -274,6 +274,20 @@ builds `ValueWrite`s with `setRecord` and `deleteRecord`, and pi's
 `writeValues` carries them in one commit, refusing any namespace outside
 `pineta.`. The address holds a record's key and the contents never repeat
 it; old values with a copy still decode. A seat is keyed by its peer.
+
+**ADR-0063 — a root is a document; what is streaming is another** (built).
+The one session document had grown to 124 M characters, and each run's end
+rewrote all of it (S84). Now each root is its own document, `root:<RootId>`,
+holding its pi storage and the records keyed by its entries;
+`pineta:session` holds the session-wide records, among them the directory of
+roots (`pineta.root`), which is the one cross-root read; and `pineta:live`
+holds streams and active runs. A record's spec names its home, and a command
+or a place that points at an entry carries its root (`Spot`). A tab holds
+only the roots it shows, and declines the rest; the host holds every root
+not archived. A run's end compacts only what it touched. The Archive tab
+searches labels. An existing store is carried over once by
+`scripts/split-session.ts`. With it, a lane's tools and prompt stay put
+across runs, so a landing no longer drops the model's thinking (S85).
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
@@ -542,8 +556,9 @@ context.**
 - **A client's command Line is stored and never compacted.** Each Line document
   grows about 1 KB per command, and the host cannot compact the half a client
   writes. Line's pruning should compact it: to file upstream.
-- **While a tool runs, its output is in the session document twice:** the live
-  stream, and pi's checkpoint (its crash recovery). So clients receive it twice.
+- **While a tool runs, its output is stored twice:** the live stream in
+  `pineta:live`, and pi's checkpoint (its crash recovery) in its root's
+  document. So a client holding that root receives it twice.
   Compaction clears both when the run ends, so it costs bandwidth during a run,
   not storage. One text would do if pi's `tool_update` carried the checkpoint's
   key (`operationId`/`invocationId`): an upstream request to pi, low priority.

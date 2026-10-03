@@ -7,10 +7,18 @@
 
 import { subscribe } from "@kyneta/schema"
 import { type EntryId, projectTranscript, ROOT } from "@pineta/core"
-import { readLanes, readPlaces, readTreeIndex } from "@pineta/reads"
+import { readPlaces } from "@pineta/reads"
 import { readStreams } from "@pineta/schema"
 import type { Checks } from "../checks.ts"
-import { idleNow, join, suiteModel, waitFor, withHost } from "../harness.ts"
+import {
+  idleNow,
+  join,
+  lanesOf,
+  suiteModel,
+  treeOf,
+  waitFor,
+  withHost,
+} from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 import { at, START_AGENT, START_CHAT } from "./support.ts"
 
@@ -23,7 +31,7 @@ async function run(check: Checks["check"]): Promise<void> {
   await withHost(
     { model: { kind: "scripted", script }, log: () => {} },
     async host => {
-      const tree = () => readTreeIndex(host.doc)
+      const tree = () => treeOf(host)
       const idle = () => waitFor(() => idleNow(host), 60_000)
       /** The path to `tip`, as "role:text" (chat as "Name:text"). */
       const shape = (tip: EntryId | null) =>
@@ -34,15 +42,15 @@ async function run(check: Checks["check"]): Promise<void> {
       // Every reply stream's text at each change of the host's document, so
       // growth is seen however many changes a client's sync folds together.
       const samples: string[] = []
-      const unsample = subscribe(host.doc, () => {
-        for (const s of readStreams(host.doc))
+      const unsample = subscribe(host.live, () => {
+        for (const s of readStreams(host.live))
           if (s.kind === "reply") samples.push(s.text)
       })
       const client = await join(host, "e2e-client", "chat")
       await client.chat("hello", ROOT, START_AGENT)
       await idle()
       unsample()
-      const lane = readLanes(host.doc, tree(), readPlaces(host.places))[0]
+      const lane = lanesOf(host, tree(), readPlaces(host.places))[0]
       const first = shape(lane?.tip ?? null)
       check(
         "the thread reads the message, then the agent's reply",
@@ -74,11 +82,10 @@ async function run(check: Checks["check"]): Promise<void> {
         at(one.kind === "appended" ? one.id : null),
       )
       await idle()
-      const asked = readLanes(host.doc, tree(), readPlaces(host.places)).find(
-        l =>
-          projectTranscript(tree(), l.tip).some(m =>
-            m.text.includes("who told us"),
-          ),
+      const asked = lanesOf(host, tree(), readPlaces(host.places)).find(l =>
+        projectTranscript(tree(), l.tip).some(m =>
+          m.text.includes("who told us"),
+        ),
       )
       const given =
         projectTranscript(tree(), asked?.tip ?? null).at(-1)?.text ?? ""

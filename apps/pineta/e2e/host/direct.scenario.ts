@@ -5,15 +5,17 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { ancestry, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
-import {
-  readLaneRecords,
-  readLanes,
-  readPlaces,
-  readTreeIndex,
-} from "@pineta/reads"
+import { readLaneRecords, readPlaces } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, idleNow, join, waitFor } from "../harness.ts"
+import {
+  committedProject,
+  idleNow,
+  join,
+  lanesOf,
+  treeOf,
+  waitFor,
+} from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { at, BRANCH, idOfIn, START_AGENT } from "./support.ts"
@@ -43,9 +45,9 @@ async function run(check: Checks["check"]): Promise<void> {
     await du.setName("Uma")
     const didle = () => waitFor(() => idleNow(dh), 60_000)
     const laneWith = (text: string) => {
-      const id = idOfIn(dh.doc, text)
-      const index = readTreeIndex(dh.doc)
-      return readLanes(dh.doc, index, readPlaces(dh.places)).find(
+      const id = idOfIn(dh, text)
+      const index = treeOf(dh)
+      return lanesOf(dh, index, readPlaces(dh.places)).find(
         l => id !== null && ancestry(index, l.tip).path.includes(id),
       )
     }
@@ -65,7 +67,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await du.chat("@agent and below", at(direct?.tip ?? null), BRANCH)
     await didle()
     const below = laneWith("@agent and below")
-    const records = readLaneRecords(dh.doc)
+    const records = readLaneRecords(dh.session)
     check(
       "a lane working directly writes in its directory, and a branch below inherits it",
       direct !== undefined &&

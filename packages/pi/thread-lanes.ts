@@ -1,6 +1,7 @@
-// pi/thread-lanes — each thread's pi lane (ADR-0020), held for the life of
-// the process, behind handles that speak only Pineta's types. A lane is
-// never moved, and its tip is never read here: readers use the document.
+// pi/thread-lanes — each thread's pi lane (ADR-0020) in one root's document,
+// held while that root's harness is (`Agent.release` closes it), behind
+// handles that speak only Pineta's types. A lane is never moved, and its tip
+// is never read here: readers use the document.
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core"
 import {
@@ -19,8 +20,8 @@ import type {
 } from "@pineta/marginalia"
 import {
   hasLaneRecord,
+  type RootDocHandle,
   readLaneNames,
-  type SessionDocHandle,
 } from "@pineta/schema"
 import type { createAgentHarness } from "./deep.ts"
 import { laneContext } from "./lanes.ts"
@@ -114,8 +115,6 @@ export interface ThreadLaneHandle {
   run(message: ChatMessage | LandMessage | StackMessage): Promise<WriteOutcome>
   /** Resume the operation a crash interrupted, in the lane's own directory. */
   resume(): Promise<WriteOutcome>
-  /** Turn `ask_for_guidance` on or off for this lane's runs. */
-  withGuidance(on: boolean): Promise<void>
   /**
    * End the lane's running turn. A tool running is aborted, and its result
    * recorded as aborted (S22); the lane then takes its next message.
@@ -137,11 +136,12 @@ export interface ThreadLanes {
 
 export function threadLanes(input: {
   readonly harness: Harness
-  readonly doc: SessionDocHandle
+  /** The root's document the harness is over: its lanes' records are there. */
+  readonly doc: RootDocHandle
   /** Record the lane's last turn: awaited after each run. */
   readonly recordTurn: (lane: LaneName) => Promise<void>
-  /** The tools a lane's runs may call; null when the agent has no tools. */
-  readonly activeTools: ((guidance: boolean) => string[]) | null
+  /** The tools every lane's runs may call; null when the agent has no tools. */
+  readonly activeTools: readonly string[] | null
 }): ThreadLanes {
   const { harness, doc } = input
   const held = new Map<LaneName, PiLane>()
@@ -149,12 +149,17 @@ export function threadLanes(input: {
   /**
    * A thread's pi lane: held, or restored after a restart. Checked against the
    * document first, because `harness.lane(name)` would CREATE a missing lane.
+   * A restored lane stored with another tool list is given the current one,
+   * once: a new lane takes it from the harness's seed.
    */
   async function existing(name: LaneName): Promise<PiLane | undefined> {
     const cached = held.get(name)
     if (cached !== undefined) return cached
     if (!hasLaneRecord(doc, name)) return undefined
     const lane = await harness.lane(name, CTX)
+    const tools = input.activeTools
+    if (tools !== null && toolsChanged(await lane.getActiveTools(CTX), tools))
+      await lane.setActiveTools([...tools], CTX)
     held.set(name, lane)
     return lane
   }
@@ -191,13 +196,6 @@ export function threadLanes(input: {
       // pi records a tool call the crash interrupted as interrupted, never
       // running it again; the run then continues in the lane's directory.
       resume: () => turn(lane => lane.resume(ctx)),
-      async withGuidance(on) {
-        const lane = await existing(name)
-        if (lane === undefined || input.activeTools === null) return
-        const next = input.activeTools(on)
-        if (toolsChanged(await lane.getActiveTools(ctx), next))
-          await lane.setActiveTools(next, ctx)
-      },
       async abort() {
         const lane = await existing(name)
         if (lane !== undefined) await lane.abort(ctx)

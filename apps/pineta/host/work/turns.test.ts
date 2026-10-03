@@ -1,12 +1,12 @@
 import { entryId, toolLabel } from "@pineta/core"
 import { readTreeIndex } from "@pineta/reads"
-import { newSessionDoc, writeEntry } from "@pineta/schema"
+import { newRootDoc, writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { row } from "../fakes.ts"
 import { titleOf } from "./turns.ts"
 
 test("a turn's title is its message's first line, else its first tool's label, else turn", () => {
-  const doc = newSessionDoc()
+  const doc = newRootDoc()
   const call = {
     type: "toolCall",
     name: "bash",

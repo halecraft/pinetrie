@@ -62,6 +62,7 @@ export function takeTop(
 /** A taken card's text as its queuer's message, in the queue's own mode. */
 export const takenChat = (taken: Taken): Chat => ({
   text: taken.text,
+  root: taken.card.place.root,
   at: taken.card.place.at,
   mode: "queue",
   lane: taken.card.place.lane,
@@ -74,7 +75,7 @@ export const takenChat = (taken: Taken): Chat => ({
 })
 
 export interface TakeDeps {
-  readonly basics: Pick<Basics, "doc" | "places" | "log">
+  readonly basics: Pick<Basics, "session" | "live" | "places" | "log">
   readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds" | "destroy">
   readonly work: Pick<LaneWork, "prepareUpdate">
   readonly start: Runs["start"]
@@ -93,7 +94,7 @@ export interface TakeDeps {
  * a card on an idle lane each drain again.
  */
 export async function drain(deps: TakeDeps, lane: LaneName): Promise<void> {
-  const { doc, places } = deps.basics
+  const { places } = deps.basics
   const loaded = new Set<CardId>()
   for (;;) {
     const loading = queuedOn(readPlaces(places), lane)
@@ -105,7 +106,12 @@ export async function drain(deps: TakeDeps, lane: LaneName): Promise<void> {
       continue
     }
     // No await between the check above and the take.
-    const top = takeTop(places, lane, readRunning(doc, lane), deps.texts)
+    const top = takeTop(
+      places,
+      lane,
+      readRunning(deps.basics.live, lane),
+      deps.texts,
+    )
     if (top.kind === "idle") return
     // The queue waits for its top card: those behind it keep their turn.
     if (top.kind === "behind") return deps.behind(top.card)
@@ -183,9 +189,9 @@ async function carryOut(
 
 /** Write a card the host could not send back below the line, whole, saying why. */
 function unsent(deps: TakeDeps, card: QueuedCard, reason: string): void {
-  const { doc, places, log } = deps.basics
+  const { session, places, log } = deps.basics
   applyPlaceStep(places, planUnsent(card, reason))
   log(
-    `[host] ${readThreadName(doc, card.place.lane)}: a queued card was not sent: ${reason}`,
+    `[host] ${readThreadName(session, card.place.lane)}: a queued card was not sent: ${reason}`,
   )
 }

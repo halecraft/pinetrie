@@ -26,6 +26,7 @@ import {
   type Position,
   placeFields,
   placeOfFields,
+  type RootId,
   sameKey,
   type TreeIndex,
   threadOf,
@@ -41,6 +42,7 @@ import { decodeWith } from "./decode.ts"
 const StoredCard = Type.Object({
   owner: Type.String({ minLength: 1 }),
   kind: Type.String(),
+  root: Type.String(),
   at: Type.String(),
   lane: Type.String(),
   column: Type.String(),
@@ -57,6 +59,7 @@ const StoredCard = Type.Object({
 export interface StoredCardFields {
   readonly owner: string
   readonly kind: string
+  readonly root: string
   readonly at: string
   readonly lane: string
   readonly column: string
@@ -266,7 +269,12 @@ export const planUnsent = (card: QueuedCard, reason: string): PlaceStep => ({
   kind: "write",
   record: {
     ...card,
-    place: { kind: "drafting", at: card.place.at, lane: card.place.lane },
+    place: {
+      kind: "drafting",
+      root: card.place.root,
+      at: card.place.at,
+      lane: card.place.lane,
+    },
     unsent: reason,
   },
 })
@@ -394,6 +402,7 @@ export function planMove(
 export function planFreshFollow(
   cards: readonly CardRecord[],
   sent: CardId,
+  root: RootId,
   at: EntryId,
   lane: LaneName | null,
 ): readonly PlaceStep[] {
@@ -408,7 +417,10 @@ export function planFreshFollow(
     )
     .map(c => ({
       kind: "write",
-      record: { ...c, place: { kind: "drafting", at: atEntry(at), lane } },
+      record: {
+        ...c,
+        place: { kind: "drafting", root, at: atEntry(at), lane },
+      },
     }))
 }
 

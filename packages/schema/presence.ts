@@ -42,6 +42,12 @@ export const presenceSchema = (d: PresenceDecay) =>
   Schema.struct({
     /** Keyed `${writer}:${columnKey}`: the end of the thread that column follows. */
     reading: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
+    /**
+     * Keyed as `reading`: the root entry of the thread that column follows
+     * (ADR-0063), so a window that does not hold that root can still name it
+     * and open it.
+     */
+    readingRoot: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
     /** Keyed by writer: the thread end whose composer they are typing in. */
     typing: Schema.record(Schema.string().nullable().decay(d.typingMs)),
   })
@@ -53,7 +59,7 @@ export const PresenceDoc = presenceDoc()
 
 export const newPresenceDoc = () => createDoc(PresenceDoc)
 
-/** A live handle on the presence document, derived as `SessionDocHandle` is. */
+/** A live handle on the presence document, derived as `StorageDocHandle` is. */
 export type PresenceDocHandle = ReturnType<typeof newPresenceDoc>
 
 /**

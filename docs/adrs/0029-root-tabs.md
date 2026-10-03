@@ -3,7 +3,8 @@
 **Status:** Accepted. Implemented by `PLAN-2026-09-27-root-tabs`. Evidence:
 S30, S31. Amended by ADR-0030: the tab bar is each person's, and a
 tab closes for you; and by ADR-0045: a root's label is its mark's title,
-else its first message's first line. Amends ADR-0027 (a stored layout holds a
+else its first message's first line; and by ADR-0063: the archive record is
+keyed by the root's `RootId`, and the Archive tab searches labels only. Amends ADR-0027 (a stored layout holds a
 tab and columns per root), ADR-0028 (marks stay inside a root; focus is
 withdrawn), ADR-0021 (where Start Chat and Start Agent live) and ADR-0024
 (which columns report presence).

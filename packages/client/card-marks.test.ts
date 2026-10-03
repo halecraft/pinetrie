@@ -6,6 +6,7 @@ import {
   type EntryId,
   type EntryLike,
   entryId,
+  rootIdFor,
   type TreeIndex,
   writerId,
 } from "@pineta/core"
@@ -13,6 +14,10 @@ import { describe, expect, test } from "vitest"
 import { cardMarks, holdsText, ownCards, withFilled } from "./card-marks.ts"
 import { entry, indexOf } from "./fixtures.ts"
 import { initialLayout, type Layout, tabOfColumn } from "./layout.ts"
+
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+/** A root this tab does not hold: its root entry is f1. */
+const FAR_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000f")
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
@@ -26,7 +31,12 @@ const drafting = (id: string, at: string, owner = ADA): CardRecord => ({
   id: cardId(id),
   owner,
   placer: owner,
-  place: { kind: "drafting", at: atEntry(entryId(at)), lane: null },
+  place: {
+    kind: "drafting",
+    root: TEST_ROOT,
+    at: atEntry(entryId(at)),
+    lane: null,
+  },
   command: null,
   unsent: null,
 })
@@ -66,6 +76,7 @@ const marks = (
     archived: over.archived ?? new Set(),
     lanes: [],
     index: over.index ?? tree(),
+    rootEntries: new Map([[FAR_ROOT, entryId("f1")]]),
   })
 const sets = (m: ReturnType<typeof marks>) => ({
   roots: [...m.roots],
@@ -109,6 +120,14 @@ describe("cardMarks", () => {
       ends: ["e2"],
       elsewhere: false,
     })
+  })
+
+  test("a drafting card in a root this tab does not hold marks that root, from the directory (ADR-0063)", () => {
+    const far = drafting("c", "f2")
+    const card = { ...far, place: { ...far.place, root: FAR_ROOT } }
+    const m = marks([card])
+    expect([...m.roots]).toEqual(["f1"])
+    expect(m.elsewhere).toBe(true)
   })
 
   test("it follows its thread as the thread grows", () => {

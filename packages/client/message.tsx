@@ -4,7 +4,7 @@
 
 import { useSelector } from "@kyneta/react"
 import type { ToolCallView, TranscriptMessage } from "@pineta/core"
-import { readStreamText, type SessionDocHandle } from "@pineta/schema"
+import { type LiveDocHandle, readStreamText } from "@pineta/schema"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
 import { TAKE, TAKE_COPY } from "./card-words.ts"
@@ -99,7 +99,7 @@ function MessageView(p: MessageProps) {
         {node.toolCalls?.map(call => (
           <ToolRow
             call={call}
-            doc={p.doc}
+            doc={p.live}
             key={call.id}
             rows={p.rows}
             stream={p.streams[call.id]}
@@ -281,7 +281,7 @@ function ToolRow({
 }: {
   call: ToolCallView
   stream: string | undefined
-  doc: SessionDocHandle
+  doc: LiveDocHandle
   rows: ScreenMemory<RowMemory>
 }) {
   const status = callStatus(call.result)
@@ -380,14 +380,14 @@ function ToolOutput({
   stream,
   result,
 }: {
-  doc: SessionDocHandle
+  doc: LiveDocHandle
   stream: string | undefined
   result: string | undefined
 }) {
   const streamed = useSelector(
     doc,
     useCallback(
-      (d: SessionDocHandle) =>
+      (d: LiveDocHandle) =>
         stream === undefined ? "" : readStreamText(d, stream),
       [stream],
     ),

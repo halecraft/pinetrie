@@ -1,5 +1,5 @@
 import { entryId, projectColumns } from "@pineta/core"
-import { newSessionDoc } from "@pineta/schema"
+import { newLiveDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { entry, indexOf } from "./fixtures.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
@@ -24,7 +24,7 @@ const props = (
   return {
     node,
     streams: {},
-    doc: DOC,
+    live: LIVE,
     rows: ROWS,
     nameOf: NAMES,
     tools: messageTools(node, {
@@ -41,7 +41,7 @@ const props = (
   }
 }
 const NAMES = new Map()
-const DOC = newSessionDoc()
+const LIVE = newLiveDoc()
 const ACT = () => {}
 
 test("props rebuilt from an unchanged message draw the same", () => {

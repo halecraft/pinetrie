@@ -13,7 +13,7 @@ import type {
   WriterId,
 } from "@pineta/core"
 import type { DigestRecord } from "@pineta/marginalia"
-import type { SessionDocHandle } from "@pineta/schema"
+import type { LiveDocHandle } from "@pineta/schema"
 import type { FoldMemory } from "./ask-fold.ts"
 import type { Density } from "./ask-words.ts"
 import type { LaneJoin } from "./column-view.ts"
@@ -41,7 +41,7 @@ export interface MessageListProps {
   rows: ScreenMemory<RowMemory>
   nameOf: ReadonlyMap<WriterId, string>
   /** Where a running call's output is read. */
-  doc: SessionDocHandle
+  live: LiveDocHandle
   onAct: (act: MessageAct) => void
   /** Every ask (`indexAsks`), from the same moment as `index`. */
   asks: AskIndex
@@ -80,7 +80,7 @@ export interface MessageListProps {
  * value would spend part of what skipping saves. `lane` and `joins` are
  * rebuilt on every render of the column, so they are compared by value. The
  * rest keep their identity while unchanged: memos in `App`, the facts,
- * `useSelector`'s names, `useStable`'s handler, the session's document, the
+ * `useSelector`'s names, `useStable`'s handler, the live document, the
  * row and fold memories made once in `App`. A fold's choice is read by its
  * own ask (`AskWork`), so opening one does not rebuild the list.
  */
@@ -95,7 +95,7 @@ const MESSAGE_LIST_PROPS = {
   tools: "identity",
   rows: "identity",
   nameOf: "identity",
-  doc: "identity",
+  live: "identity",
   onAct: "identity",
   asks: "identity",
   landmarks: "value",

@@ -4,10 +4,16 @@ import path from "node:path"
 import { ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import { readCommands } from "@pineta/reads"
-import { readEntries, rowMessage } from "@pineta/schema"
+import { rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, idleNow, join, waitFor } from "../harness.ts"
+import {
+  committedProject,
+  entriesOf,
+  idleNow,
+  join,
+  waitFor,
+} from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { START_CHAT } from "./support.ts"
@@ -36,13 +42,13 @@ async function run(check: Checks["check"]): Promise<void> {
     const cu = await join(ch, "uma", "containers")
     await cu.setName("Uma")
     const cidle = () => waitFor(() => idleNow(ch), 60_000)
-    await waitFor(() => readCommands(ch.doc).length > 0, 10_000)
+    await waitFor(() => readCommands(ch.session).length > 0, 10_000)
     check(
       "the host lists every command its pi loaded, each under its package",
-      readCommands(ch.doc)
+      readCommands(ch.session)
         .map(c => c.name)
         .includes("fixture:skill:hello") &&
-        readCommands(ch.doc)
+        readCommands(ch.session)
           .map(c => c.name)
           .includes("pi-other:skill:hello"),
     )
@@ -65,7 +71,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     await cidle()
     const hello = path.join(fixtures, "fixture-pkg", "skills", "hello")
-    const typed = Object.values(readEntries(ch.doc))
+    const typed = Object.values(entriesOf(ch))
       .map(
         r =>
           rowMessage(r) as {

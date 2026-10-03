@@ -1,4 +1,10 @@
-import { type EntryLike, entryId, indexAsks, indexTree } from "@pineta/core"
+import {
+  type EntryLike,
+  entryId,
+  indexAsks,
+  indexTree,
+  rootIdFor,
+} from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   DIGEST,
@@ -64,7 +70,10 @@ test("the record round-trips; a malformed one is dropped", () => {
   expect(DIGEST.decode(structuredClone(DIGEST.encode(r)), P)).toEqual(r)
   expect(DIGEST.decode({ text: 1 }, P)).toBeUndefined()
   expect([
-    ...recordsOf(DIGEST, [setRecord(DIGEST, r), { key: "p-2", value: null }]),
+    ...recordsOf(DIGEST, [
+      setRecord(DIGEST, r, rootIdFor("test-root")),
+      { key: "p-2", value: null },
+    ]),
   ]).toEqual([[P, r]])
 })
 

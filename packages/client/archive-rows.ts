@@ -3,14 +3,11 @@
 // Only the Archive tab reads these, so they live here rather than in
 // `@pineta/reads`, which keeps what the host decides from.
 
-import {
-  type ArchiveRecord,
-  type EntryId,
-  messageText,
-  projectRail,
-  type RootSummary,
-  type TreeIndex,
-  type WriterId,
+import type {
+  ArchiveRecord,
+  EntryId,
+  RootSummary,
+  WriterId,
 } from "@pineta/core"
 
 export type ArchiveFilter = "all" | "archived" | "open" | "mine"
@@ -31,29 +28,25 @@ export interface ArchiveRow {
 /**
  * The rows `filter` and `query` keep, newest activity first. "mine" is the
  * roots `me` wrote a chat in. The search is case-insensitive, over each
- * root's label (`rootLabels`, so a title is found) and each message's text as
- * the columns draw it.
+ * root's label (`labelsOf`, so a title is found): a search of every message
+ * would hold every root's document (ADR-0063).
  */
 export function archiveIndex(input: {
   readonly roots: readonly RootSummary[]
-  /** Each root's label, by root (`rootLabels`). */
+  /** Each root's label, by root (`labelsOf`). */
   readonly labels: ReadonlyMap<EntryId, string>
   readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
-  readonly index: TreeIndex
   readonly filter: ArchiveFilter
   readonly query: string
   readonly me: WriterId
   /** Roots holding an unsent card of yours (`CardMarks.roots`). */
   readonly cardRoots: ReadonlySet<EntryId>
 }): readonly ArchiveRow[] {
-  const { index, archive } = input
+  const { archive } = input
   const needle = input.query.trim().toLowerCase()
   const matches = (root: EntryId): boolean =>
     needle === "" ||
-    (input.labels.get(root) ?? "").toLowerCase().includes(needle) ||
-    projectRail(index, root).some(r =>
-      messageText(index.entries[r.id]?.message).toLowerCase().includes(needle),
-    )
+    (input.labels.get(root) ?? "").toLowerCase().includes(needle)
   const keep = (s: RootSummary): boolean => {
     const archived = archive.get(s.root)?.state === "archived"
     switch (input.filter) {

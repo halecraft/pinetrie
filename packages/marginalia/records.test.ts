@@ -6,6 +6,7 @@ import {
   entryId,
   laneNameForThread,
   type OfferRecord,
+  rootIdFor,
   type Sha256,
   snapshotId,
   type ThreadName,
@@ -29,6 +30,7 @@ import {
   PROJECT,
   REVISION,
   type RecordSpec,
+  ROOT,
   recordsOf,
   SEAT,
   STOP,
@@ -71,6 +73,14 @@ const sample = <R, K extends string>(
   keyField: (keyof R & string) | null,
 ): Sample => [name, spec as RecordSpec<unknown, string>, record, keyField]
 
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+
+/** A record's write to the document its home names: the test's root for a root's. */
+const writeOf = (spec: RecordSpec<unknown, string>, record: unknown) =>
+  spec.home === "root"
+    ? setRecord(spec as RecordSpec<unknown, string, "root">, record, TEST_ROOT)
+    : setRecord(spec as RecordSpec<unknown, string, "session">, record)
+
 const SAMPLES: readonly Sample[] = [
   sample(
     "archive",
@@ -96,7 +106,7 @@ const SAMPLES: readonly Sample[] = [
   sample(
     "lane",
     LANE,
-    { lane: L, work: { kind: "own" }, by: ADA, createdAt: 1 },
+    { lane: L, root: TEST_ROOT, work: { kind: "own" }, by: ADA, createdAt: 1 },
     "lane",
   ),
   sample(
@@ -157,11 +167,28 @@ const SAMPLES: readonly Sample[] = [
     null,
   ),
   sample("commands", COMMANDS, { commands: [] }, null),
+  sample(
+    "root",
+    ROOT,
+    {
+      root: TEST_ROOT,
+      entry: E,
+      first: E,
+      firstLine: "Plans",
+      title: null,
+      messages: 1,
+      newest: E,
+      writers: [ADA],
+      mentions: [{ id: E, by: ADA, text: "@bea look" }],
+      images: [],
+    },
+    "root",
+  ),
 ]
 
 describe.each(SAMPLES)("%s", (_, spec, record, keyField) => {
   test("reads back whole from what is stored, at its address", () => {
-    const write = setRecord(spec, record)
+    const write = writeOf(spec, record)
     expect(write.key).toBe(spec.keyOf(record))
     const stored = JSON.parse(JSON.stringify(write))
     expect(recordsOf(spec, [stored]).get(write.key)).toEqual(record)
@@ -169,14 +196,14 @@ describe.each(SAMPLES)("%s", (_, spec, record, keyField) => {
 
   test("its stored contents never repeat its key", () => {
     if (keyField === null) return
-    const contents = setRecord(spec, record).value
+    const contents = writeOf(spec, record).value
     expect(
       typeof contents === "object" && contents !== null && keyField in contents,
     ).toBe(false)
   })
 
   test("a value stored with its key in its contents too still reads, and the address wins", () => {
-    const write = setRecord(spec, record)
+    const write = writeOf(spec, record)
     // Only records stored as objects held their key: a name is a string.
     if (keyField === null || typeof write.value !== "object") return
     const old = {
@@ -192,9 +219,47 @@ test("a record keyed by lane does not read at an address that is no lane", () =>
   expect(recordsOf(OFFER, [{ ...write, key: "main" }]).size).toBe(0)
 })
 
+test("each record lives where it is read (ADR-0063): across roots in the session, by entry in its root", () => {
+  const homes = Object.fromEntries(
+    SAMPLES.map(([name, spec]) => [name, spec.home]),
+  )
+  expect(homes).toEqual({
+    archive: "session",
+    mark: "root",
+    stop: "root",
+    digest: "root",
+    seat: "session",
+    participant: "session",
+    lane: "session",
+    revision: "root",
+    landing: "session",
+    offer: "session",
+    line: "session",
+    base: "session",
+    name: "session",
+    banner: "session",
+    project: "session",
+    commands: "session",
+    root: "session",
+  })
+})
+
+test("a write goes to the document its home names", () => {
+  expect(setRecord(OFFER, offer).target).toEqual({ kind: "session" })
+  expect(
+    setRecord(MARK, { entry: E, title: "Plans", by: ADA, at: 1 }, TEST_ROOT)
+      .target,
+  ).toEqual({ kind: "root", root: TEST_ROOT })
+  // @ts-expect-error a root's record names its root
+  setRecord(MARK, { entry: E, title: "Plans", by: ADA, at: 1 })
+  // @ts-expect-error a session's record names none
+  setRecord(OFFER, offer, TEST_ROOT)
+})
+
 test("deleteRecord names the spec's namespace and the key", () => {
-  expect(deleteRecord(MARK, E)).toEqual({
+  expect(deleteRecord(MARK, E, TEST_ROOT)).toEqual({
     kind: "delete",
+    target: { kind: "root", root: TEST_ROOT },
     namespace: "pineta.mark",
     key: E,
   })

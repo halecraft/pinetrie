@@ -24,7 +24,7 @@ export interface Line {
 
 export function createLine(state: OfferState): Line {
   const { ops, root, basics } = state
-  const { doc } = basics
+  const { session: doc } = basics
   const git: Runner = args => hostRunner(root)(["git", ...args])
 
   async function record() {

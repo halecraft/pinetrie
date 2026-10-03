@@ -144,8 +144,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host does not wait for its stored session",
     file: "apps/pineta/host/index.ts",
-    from: "  await whenHydrated(doc)",
-    to: "  void whenHydrated",
+    from: "  await whenHydrated(session)",
+    to: "  void whenHydrated(session)",
     suite: "host",
     scenario: "tools",
     expect:
@@ -383,8 +383,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "restored columns are pruned before the document settles",
     file: "packages/client/app.tsx",
-    from: '    if (settled) dispatch({ kind: "prune", index, archive })',
-    to: '    dispatch({ kind: "prune", index, archive })',
+    from: '    if (settled)\n      dispatch({ kind: "prune", index, archive, known: new Set(labels.keys()) })',
+    to: '    dispatch({ kind: "prune", index, archive, known: new Set(labels.keys()) })',
     suite: "browser",
     scenario: "page",
     // Pruned before the document arrives, a reload drops the tabs and columns
@@ -853,8 +853,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "App re-reads its facts on every render",
     file: "packages/client/app.tsx",
-    from: "  } = useSelector(doc, readSessionFacts)",
-    to: "  } = useSelector(doc, d => readSessionFacts(d))",
+    from: "  } = useSelector(heldView, readSessionFacts)",
+    to: "  } = useSelector(heldView, v => readSessionFacts(v))",
     suite: "browser",
     scenario: "page",
     expect: "another window's card redraws the column and none of its messages",
@@ -1075,8 +1075,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column's reading is never written",
     file: "packages/client/session-view.ts",
-    from: "      batch(presence, d => d.reading.set(readingKey(mine, columnKey), end))",
-    to: "      void readingKey(mine, columnKey)",
+    from: "        d.reading.set(key, end)\n",
+    to: "",
     suite: "host",
     scenario: "presence",
     expect: "each open column is reported, and another client sees them",
@@ -1084,8 +1084,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a closed column's reading is left to decay",
     file: "packages/client/session-view.ts",
-    from: "        batch(presence, d => d.reading.delete(key))",
-    to: "        void key",
+    from: "          d.reading.delete(key)\n",
+    to: "",
     suite: "host",
     scenario: "presence",
     expect: "a closed column's entry is deleted from others' view",
@@ -1103,8 +1103,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the agent writes into another document",
     file: "apps/pineta/host/index.ts",
-    from: "    doc,\n    replicaId: newId(),",
-    to: '    doc: exchange.get("elsewhere", SessionDoc),\n    replicaId: newId(),',
+    from: "    documents: docs,\n    replicaId: newId(),",
+    to: "    documents: { ...docs, root: async () => newRootDoc() },\n    replicaId: newId(),",
     suite: "host",
     scenario: "chat",
     expect: "the thread reads the message, then the agent's reply",
@@ -1411,8 +1411,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "anyone may write the places",
     file: "packages/protocol/writers.ts",
-    from: "    return principal === HOST_PRINCIPAL\n",
-    to: "    return undefined\n",
+    from: "  if (isHostDoc(docId)) return principal === HOST_PRINCIPAL\n",
+    to: "  if (isHostDoc(docId)) return undefined\n",
     suite: "host",
     scenario: "cards",
     expect:
@@ -1432,8 +1432,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the wire carries no holder",
     file: "packages/protocol/codec.ts",
-    from: "  return JSON.stringify({ kind, at, lane, column, seen, holder })",
-    to: "  return JSON.stringify({ kind, at, lane, column, seen })",
+    from: "  return JSON.stringify({ kind, root, at, lane, column, seen, holder })",
+    to: "  return JSON.stringify({ kind, root, at, lane, column, seen })",
     suite: "host",
     scenario: "cards",
     expect: "a move out of someone else's inventory is refused, as not theirs",
@@ -1503,5 +1503,14 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect: "a reload keeps your inventory's cards in their slots",
+  },
+  {
+    name: "a root is shared only once it is held",
+    file: "packages/client/session-view.ts",
+    from: "      return root === undefined ? undefined : wanted.has(root)",
+    to: "      return root === undefined ? undefined : roots.current().has(root)",
+    suite: "browser",
+    scenario: "images",
+    expect: "another window draws it too",
   },
 ]

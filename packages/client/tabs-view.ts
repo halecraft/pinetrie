@@ -2,14 +2,7 @@
 // decided. PURE: `TabBar` (`tabs.tsx`) draws it, and each click sends the
 // intent it names.
 
-import {
-  type EntryId,
-  type LaneName,
-  type MarkRecord,
-  rootOf,
-  type ThreadName,
-  type TreeIndex,
-} from "@pineta/core"
+import type { EntryId, LaneName, MarkRecord, ThreadName } from "@pineta/core"
 import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
 import { type ActiveTab, type Layout, sameTab, tabBar } from "./layout.ts"
@@ -47,7 +40,7 @@ export type TabView =
   | (TabCommon & {
       readonly kind: "root"
       readonly root: EntryId
-      /** Its title, else its first message's first line (`rootLabels`). */
+      /** Its title, else its first message's first line (`labelsOf`). */
       readonly label: string
       /** Its first line: the rename field's placeholder. */
       readonly line: string
@@ -71,9 +64,9 @@ export interface TabsView {
 export interface TabsViewInput {
   readonly layout: Layout
   readonly active: ActiveTab
-  /** Each root's label (`rootLabels`). */
+  /** Each root's label (`labelsOf`). */
   readonly labels: ReadonlyMap<EntryId, string>
-  /** Each root's first line (`firstLines`). */
+  /** Each root's first line (`firstLinesOf`). */
   readonly lines: ReadonlyMap<EntryId, string>
   readonly marks: ReadonlyMap<EntryId, MarkRecord>
   /** Roots in state `archived`. */
@@ -148,18 +141,16 @@ function tabView(tab: ActiveTab, input: TabsViewInput): TabView {
 
 /**
  * The threads with an open offer, by their root: what archiving that root
- * withdraws. `offers` are the open offers with a tip (`appView`'s).
+ * withdraws. `offers` are the open offers (`appView`'s).
  */
 export function offeredByRoot(
-  index: TreeIndex,
-  offers: readonly { readonly lane: LaneName; readonly tip: EntryId }[],
+  offers: readonly { readonly lane: LaneName; readonly root: EntryId }[],
   names: ReadonlyMap<LaneName, ThreadName>,
 ): ReadonlyMap<EntryId, readonly ThreadName[]> {
   const byRoot = new Map<EntryId, ThreadName[]>()
-  for (const { lane, tip } of offers) {
-    const root = rootOf(index, tip)
+  for (const { lane, root } of offers) {
     const name = names.get(lane)
-    if (root === null || name === undefined) continue
+    if (name === undefined) continue
     byRoot.set(root, [...(byRoot.get(root) ?? []), name])
   }
   return byRoot

@@ -30,9 +30,13 @@ import {
   projectColumns,
   projectRail,
   rootWork,
-  summarizeRoots,
 } from "@pineta/core"
-import { readLanes, readParticipantNames, readTreeIndex } from "@pineta/reads"
+import {
+  participantsIn,
+  readHeldIndex,
+  readParticipantNames,
+  readRoots,
+} from "@pineta/reads"
 import {
   type ComponentProps,
   useCallback,
@@ -45,7 +49,13 @@ import {
   useSyncExternalStore,
 } from "react"
 import { placement } from "./align.ts"
-import { appView, type ReadOnly, readOnlyWords, tabRail } from "./app-view.ts"
+import {
+  appView,
+  laneRootsOf,
+  type ReadOnly,
+  readOnlyWords,
+  tabRail,
+} from "./app-view.ts"
 import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { foldMemory } from "./ask-fold.ts"
@@ -56,6 +66,8 @@ import { Column, type ColumnProps } from "./column.tsx"
 import { type Column as ColumnSpec, isPinned } from "./columns.ts"
 import type { SeenEnd } from "./follow.ts"
 import { Header } from "./header.tsx"
+import { planHeldRoots } from "./held-roots.ts"
+import { runsHere } from "./here.ts"
 import { type Identity, reconcileName } from "./identity.ts"
 import { type Inbox, mentionsOf } from "./inbox.ts"
 import {
@@ -82,7 +94,7 @@ import type { Direction } from "./move-undo.ts"
 import { type AppPorts, perform } from "./perform.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { planReading, typingDue } from "./presence-report.ts"
-import { readSessionFacts } from "./projection.ts"
+import { type HeldView, readHeldLanes, readSessionFacts } from "./projection.ts"
 import {
   CARD_MIME,
   composerPlacesStore,
@@ -91,7 +103,13 @@ import {
 } from "./put-target.ts"
 import { EmptyRail, LiveRail } from "./rail.tsx"
 import { columnLandmarks } from "./rail-view.ts"
-import { firstLines, NO_TEXT, rootLabels } from "./root-label.ts"
+import {
+  firstLinesOf,
+  labelsOf,
+  messagesIn,
+  NO_TEXT,
+  summariesOf,
+} from "./root-label.ts"
 import { screenMemory } from "./screen-memory.ts"
 import type { SessionClient } from "./session-view.ts"
 import type { DeviceState, TabState } from "./tab-state.ts"
@@ -245,18 +263,35 @@ export function App({
   session: SessionClient
   stores: AppStores
 }) {
-  const doc = session.doc
+  const doc = session.session
   const status = useDocStatus(doc)
+  // The roots this tab holds (ADR-0063): the roots of your open tabs, the one
+  // you are on and the Archive tab's preview, set by the effect below. Every
+  // read of the tree reads them as one.
+  const roots = useSyncExternalStore(
+    session.roots.subscribe,
+    session.roots.current,
+  )
+  const heldView = useMemo(
+    () => ({
+      session: session.session,
+      live: session.live,
+      roots: [...roots.values()],
+    }),
+    [session, roots],
+  )
+  // The directory of every root (ADR-0063): what the tabs, the Archive tab
+  // and the inbox read of a root without holding it.
+  const directory = useSelector(doc, readRoots)
   // Every read is `useSelector` over a named read, never an inline
   // `useTracked` thunk: a new thunk re-runs, so an inline one would read the
   // document again on every render, whatever caused it, and give every value
   // below a new identity.
   const {
     index,
-    count,
     activity,
+    running,
     live,
-    participants,
     seats,
     archive,
     marks,
@@ -264,7 +299,7 @@ export function App({
     asks,
     stops,
     digests,
-  } = useSelector(doc, readSessionFacts)
+  } = useSelector(heldView, readSessionFacts)
   // Every card's record (ADR-0059): the host's places, with this tab's moves
   // drawn over them until its copy holds them. An unchanged card keeps its
   // record object (`readPlaces`).
@@ -275,9 +310,9 @@ export function App({
   // Each lane, with its queue from the cards (ADR-0048): read again on every
   // change to the session, as a run's start or end is one, and to the cards.
   const lanes = useSelector(
-    doc,
+    heldView,
     useCallback(
-      (d: typeof doc) => readLanes(d, readTreeIndex(d), cards),
+      (v: HeldView) => readHeldLanes(v, readHeldIndex(v.roots), cards),
       [cards],
     ),
   )
@@ -287,9 +322,36 @@ export function App({
 
   // Each root, for the Archive tab and its label: its title, else its first
   // line (ADR-0045). Which roots have tabs is yours (`layout.open`, ADR-0030).
-  const summaries = useMemo(() => summarizeRoots(index), [index])
-  const lines = useMemo(() => firstLines(summaries, index), [summaries, index])
-  const labels = useMemo(() => rootLabels(lines, marks), [lines, marks])
+  const summaries = useMemo(() => summariesOf(directory), [directory])
+  const lines = useMemo(() => firstLinesOf(directory), [directory])
+  const labels = useMemo(() => labelsOf(directory), [directory])
+  // Who a mention can name: the names, and every writer held or in the
+  // directory, so one who wrote only in a root not held counts.
+  const participants = useMemo(
+    () => participantsIn(nameOf, index, directory),
+    [nameOf, index, directory],
+  )
+  // Every root's messages, from the directory: the session's size, held or not.
+  const count = useMemo(() => messagesIn(directory), [directory])
+  // The agent's runs and each lane's root, in every root, held or not
+  // (ADR-0063): what the header lists.
+  const runs = useMemo(
+    () => runsHere({ activity, running, directory, index }),
+    [activity, running, directory, index],
+  )
+  const rootEntries = useMemo(
+    () =>
+      new Map(
+        [...directory.values()].flatMap(r =>
+          r.entry === null ? [] : [[r.root, r.entry] as const],
+        ),
+      ),
+    [directory],
+  )
+  const laneRoots = useMemo(
+    () => laneRootsOf(workFacts.lanes, directory),
+    [workFacts.lanes, directory],
+  )
   const work = useMemo(() => rootWork(index, lanes), [index, lanes])
   // A root with no message has no summary, so it has no label in `labels`.
   const labelOf = (root: EntryId): string => labels.get(root) ?? NO_TEXT
@@ -319,19 +381,42 @@ export function App({
   // settled, and the tab to show is chosen then: before, missing means not
   // yet arrived. `"populated"` comes with the first data, so it cannot tell
   // (S29).
+  // The roots your stored tabs name are held, and settled, first: their
+  // anchors are in no index before (ADR-0063).
   const [settled, setSettled] = useState(false)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, with the stored layout of that render
   useEffect(() => {
-    let live = true
-    void whenSettled(doc).then(() => {
-      if (live) setSettled(true)
+    let alive = true
+    void whenSettled(doc).then(async () => {
+      session.holdRoots(
+        planHeldRoots({
+          layout: stored,
+          preview: null,
+          directory: readRoots(doc),
+        }),
+      )
+      await Promise.all(
+        [...session.roots.current().values()].map(r => whenSettled(r)),
+      )
+      if (alive) setSettled(true)
     })
     return () => {
-      live = false
+      alive = false
     }
-  }, [doc])
+  }, [doc, session])
+  // The Archive tab's pick: its preview is a root this tab holds.
+  const [archivePick, setArchivePick] = useState<EntryId | null>(null)
+  // What this tab holds follows your tabs, once the stored ones are settled.
+  useEffect(() => {
+    if (settled)
+      session.holdRoots(
+        planHeldRoots({ layout, preview: archivePick, directory }),
+      )
+  }, [settled, session, layout, archivePick, directory])
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, at settle, with the index of that render
   useEffect(() => {
-    if (settled) dispatch({ kind: "prune", index, archive })
+    if (settled)
+      dispatch({ kind: "prune", index, archive, known: new Set(labels.keys()) })
   }, [settled])
 
   const active = layout.active
@@ -399,8 +484,9 @@ export function App({
         archived: archivedRoots,
         lanes,
         index,
+        rootEntries,
       }),
-    [mine, filled, layout, archivedRoots, lanes, index],
+    [mine, filled, layout, archivedRoots, lanes, index, rootEntries],
   )
   const yours = useMemo(
     () => ({ ends: unsent.ends, color: colorOf(session.writer) }),
@@ -424,23 +510,28 @@ export function App({
   // Each part that shows presence reads it (`use-presence.ts`).
   //
   // Each column of the tab you are on reports its thread end (ADR-0024,
-  // ADR-0029; `planReading`). While the page is visible the entries are
-  // refreshed, so they outlive their decay.
+  // ADR-0029; `planReading`), and its root, so a window that does not hold
+  // that root can name it (ADR-0063). While the page is visible the entries
+  // are refreshed, so they outlive their decay.
   const reported = useRef(new Map<string, string | null>())
+  const reportedRoot = useRef<EntryId | null>(null)
+  const readingRoot = active?.kind === "root" ? active.root : null
   useEffect(() => {
     const now = new Map(
       columns.map((c, i) => [c.key, views[i]?.tipId ?? null] as const),
     )
     const writes = planReading(reported.current, now)
-    for (const [key, end] of writes.set) session.setReading(key, end)
+    for (const [key, end] of writes.set)
+      session.setReading(key, end, readingRoot)
     for (const key of writes.clear) session.clearReading(key)
     reported.current = now
-  }, [columns, views, session])
+    reportedRoot.current = readingRoot
+  }, [columns, views, session, readingRoot])
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState !== "visible") return
       for (const [key, end] of reported.current)
-        if (end !== null) session.setReading(key, end)
+        if (end !== null) session.setReading(key, end, reportedRoot.current)
     }
     const timer = setInterval(refresh, PRESENCE_REFRESH_MS)
     document.addEventListener("visibilitychange", refresh)
@@ -472,28 +563,38 @@ export function App({
         nameOf,
         offers: workFacts.offers,
         lanes,
+        laneRoots,
       }),
-    [active, columns, colors.track, archive, nameOf, workFacts.offers, lanes],
+    [
+      active,
+      columns,
+      colors.track,
+      archive,
+      nameOf,
+      workFacts.offers,
+      lanes,
+      laneRoots,
+    ],
   )
   const offered = useMemo(
-    () => offeredByRoot(index, view.offers, workFacts.names),
-    [index, view.offers, workFacts.names],
+    () => offeredByRoot(view.offers, workFacts.names),
+    [view.offers, workFacts.names],
   )
 
   // Your inbox: the messages that mention you, and which you have seen.
   const mentions = useMemo(
     () =>
       mentionsOf({
-        index,
+        roots: directory.values(),
         me: session.writer,
         myName: nameFor(nameOf, session.writer),
         participants,
       }),
-    [index, session.writer, nameOf, participants],
+    [directory, session.writer, nameOf, participants],
   )
   const inbox = useInbox({
     store: stores.inbox,
-    index,
+    roots: directory.values(),
     items: mentions,
     shown,
     settled,
@@ -554,7 +655,6 @@ export function App({
   // The Archive tab's own state: never stored.
   const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("all")
   const [archiveQuery, setArchiveQuery] = useState("")
-  const [archivePick, setArchivePick] = useState<EntryId | null>(null)
 
   // Your inventory (ADR-0048 step 4): this tab's moves and your slots, the
   // panel's selection, whether it is open (never stored), and its dock
@@ -609,10 +709,13 @@ export function App({
   // An opened fold draws in its own ask (`AskWork`): a render of `App`
   // runs `useReveal`'s wait once it has.
   const [, setOpened] = useState(0)
+  // An entry to show once this tab holds its root (`openIn`, ADR-0063).
+  const [whenHeld, setWhenHeld] = useState<EntryId | null>(null)
   const ports: AppPorts = {
     dispatch,
     session,
     reveal,
+    openWhenHeld: setWhenHeld,
     openFold: ask => {
       folds.set(ask, "open")
       setOpened(n => n + 1)
@@ -662,6 +765,11 @@ export function App({
       ),
     ),
   )
+  useEffect(() => {
+    if (whenHeld === null || index.entries[whenHeld] === undefined) return
+    setWhenHeld(null)
+    onIntent({ kind: "openAt", entry: whenHeld })
+  }, [whenHeld, index, onIntent])
   // The keys (`keyAct`): decided there, from where focus is; nothing here.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -756,6 +864,8 @@ export function App({
     }
   }, [onIntent, layout.open])
   const openAt = (entry: EntryId) => onIntent({ kind: "openAt", entry })
+  const openIn = (entry: EntryId, root: EntryId) =>
+    onIntent({ kind: "openIn", entry, root })
   const dragColumn = useColumnDrag(strip, (from, to) =>
     onIntent({
       kind: "column",
@@ -821,7 +931,7 @@ export function App({
         <div className="header-left">
           <h1>pineta</h1>
           <div className="meta">
-            entries <span id="count">{count}</span> ·{" "}
+            messages <span id="count">{count}</span> ·{" "}
             <span id="status">
               {status === "pending" ? "syncing…" : "connected"}
             </span>
@@ -845,10 +955,10 @@ export function App({
             rename: session.setName,
             signOut: () => onIntent({ kind: "signOut" }),
           }}
-          onOpen={openAt}
+          onOpen={openIn}
           order={order}
           session={session}
-          runs={activity}
+          runs={runs}
         />
         <button
           aria-pressed={inventoryOpen}
@@ -944,7 +1054,6 @@ export function App({
                   roots: summaries,
                   labels,
                   archive,
-                  index,
                   filter: archiveFilter,
                   query: archiveQuery,
                   me: session.writer,

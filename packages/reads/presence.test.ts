@@ -1,7 +1,7 @@
 import { writerId } from "@pineta/core"
 import { newPresenceDoc, readingKey, seatKey } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { readReading, readTyping } from "./index.ts"
+import { readReading, readReadingRoots, readTyping } from "./index.ts"
 
 test("each presence read names each seat's person, a person with two seats twice (ADR-0037)", () => {
   const ada = writerId("ada@x.io")
@@ -40,4 +40,19 @@ test("a presence read keeps its array while its entries are the same, and not af
   const moved = readReading(doc)
   expect(moved).not.toBe(first)
   expect(moved).toEqual([[writerId("ada@x.io"), "e2"]])
+})
+
+test("each followed end's root, as its column reported it; the same map while unchanged (ADR-0063)", () => {
+  const ada = seatKey(writerId("ada@x.io"), "s1")
+  const doc = newPresenceDoc()
+  doc.reading.set(readingKey(ada, "c1"), "e1")
+  doc.readingRoot.set(readingKey(ada, "c1"), "r1")
+  doc.reading.set(readingKey(ada, "c2"), "e2")
+  doc.readingRoot.set(readingKey(ada, "c2"), null)
+  const first = readReadingRoots(doc)
+  expect([...first]).toEqual([["e1", "r1"]])
+  doc.readingRoot.set(readingKey(ada, "c1"), "r1")
+  expect(readReadingRoots(doc)).toBe(first)
+  doc.readingRoot.set(readingKey(ada, "c1"), "r9")
+  expect([...readReadingRoots(doc)]).toEqual([["e1", "r9"]])
 })

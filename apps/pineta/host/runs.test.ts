@@ -35,14 +35,12 @@ describe("planRunEnd", () => {
 
   test("a land prompt adds landingEnded, a stack prompt splitEnded, both before endRun", () => {
     expect(planRunEnd("land")).toEqual([
-      "guidanceOff",
       "landingEnded",
       "endRun",
       "laneStopped",
       "ended",
     ])
     expect(planRunEnd("stack")).toEqual([
-      "guidanceOff",
       "splitEnded",
       "endRun",
       "laneStopped",
@@ -52,14 +50,17 @@ describe("planRunEnd", () => {
   })
 })
 
-function setUp(lane = fakeLane(LANE)) {
+function setUp(
+  lane = fakeLane(LANE),
+  landingEnded: LaneWork["landingEnded"] = async () => {},
+) {
   const b = basics()
   const work = record<
     Pick<LaneWork, "beforeRun" | "runEnded" | "landingEnded" | "splitEnded">
   >({
     beforeRun: () => {},
     runEnded: () => {},
-    landingEnded: async () => {},
+    landingEnded,
     splitEnded: async () => null,
   })
   const agent = record<Pick<Agent, "lane">>({ lane: () => lane.lane })
@@ -72,8 +73,8 @@ function setUp(lane = fakeLane(LANE)) {
   }>()
   runs.onEnded((l, prompt) =>
     ended.resolve({
-      running: readActiveRun(b.doc, l) !== undefined,
-      open: readStreams(b.doc).filter(s => s.lane === l).length,
+      running: readActiveRun(b.live, l) !== undefined,
+      open: readStreams(b.live).filter(s => s.lane === l).length,
       work: methods(work.calls),
       prompt,
     }),
@@ -86,7 +87,7 @@ describe("a run's end", () => {
     const { b, lane, runs, ended } = setUp()
     runs.start(LANE, { kind: "prompt", message: chat })
     streamInto(b)({ kind: "text", lane: LANE, delta: "hello" })
-    expect(readStreams(b.doc).filter(s => s.lane === LANE)).toHaveLength(1)
+    expect(readStreams(b.live).filter(s => s.lane === LANE)).toHaveLength(1)
     lane.finish({ kind: "ok" })
     expect(await ended).toEqual({
       running: false,
@@ -100,26 +101,28 @@ describe("a run's end", () => {
     const { b, lane, runs, ended } = setUp()
     runs.start(LANE, { kind: "prompt", message: chat })
     writeEntry(
-      b.doc,
+      b.root,
       row(entryId("p-1"), null, { role: "chat", content: "hi" }),
     )
     writeEntry(
-      b.doc,
+      b.root,
       row(entryId("a-1"), "p-1", { role: "assistant", content: "hello" }),
     )
-    writeLaneTip(b.doc, LANE, entryId("a-1"))
+    writeLaneTip(b.root, LANE, entryId("a-1"))
     lane.finish({ kind: "ok" })
     expect((await ended).prompt).toBe("p-1")
   })
 
   test("a failing step before endRun is logged, and endRun and ended still run", async () => {
-    const lane = fakeLane(LANE, {
-      withGuidance: async on => {
-        if (!on) throw new Error("pi is gone")
-      },
+    const { b, lane, runs, ended } = setUp(fakeLane(LANE), async () => {
+      throw new Error("pi is gone")
     })
-    const { b, runs, ended } = setUp(lane)
     runs.start(LANE, { kind: "prompt", message: chat })
+    writeEntry(
+      b.root,
+      row(entryId("p-1"), null, { role: "land", content: "land" }),
+    )
+    writeLaneTip(b.root, LANE, entryId("p-1"))
     lane.finish({ kind: "ok" })
     expect((await ended).running).toBe(false)
     expect(b.lines).toContain("[host] run end failed: pi is gone")

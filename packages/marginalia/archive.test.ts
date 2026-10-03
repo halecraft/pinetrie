@@ -10,11 +10,22 @@ import {
   type LaneView,
   laneNameForThread,
   ROOT,
+  type RootId,
+  type RootRecord,
+  rootIdFor,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { ARCHIVE, archivedAt, planArchive, writesAt } from "./archive.ts"
+import {
+  ARCHIVE,
+  archivedAt,
+  archivedIn,
+  planArchive,
+  writesIn,
+} from "./archive.ts"
 import { recordsOf, setRecord } from "./records.ts"
+
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
@@ -136,8 +147,12 @@ describe("planArchive", () => {
   })
 })
 
-describe("writesAt: the entry a command writes at", () => {
-  const at = (intent: Intent) => writesAt(intent, [])
+const OTHER_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+const LANE_X = laneNameForThread("x")
+
+describe("writesIn: the root a command writes in (ADR-0063)", () => {
+  const at = (intent: Intent) =>
+    writesIn(intent, lane => (lane === LANE_X ? OTHER_ROOT : null))
   const chat = (p: Intent & { kind: "chat" }) => p
   test.each([
     [
@@ -145,6 +160,7 @@ describe("writesAt: the entry a command writes at", () => {
       chat({
         kind: "chat",
         text: "x",
+        root: TEST_ROOT,
         at: atEntry(entryId("a")),
         mode: "reply",
         lane: null,
@@ -155,13 +171,14 @@ describe("writesAt: the entry a command writes at", () => {
         reserved: null,
         base: null,
       }),
-      "a",
+      TEST_ROOT,
     ],
     [
       "a chat at the root",
       chat({
         kind: "chat",
         text: "x",
+        root: OTHER_ROOT,
         at: ROOT,
         mode: "branch",
         lane: null,
@@ -183,21 +200,36 @@ describe("writesAt: the entry a command writes at", () => {
       null,
     ],
     [
-      "a mark: its entry",
-      { kind: "mark", entry: entryId("b"), title: "Tab names" },
-      "b",
+      "a mark: its root",
+      {
+        kind: "mark",
+        root: TEST_ROOT,
+        entry: entryId("b"),
+        title: "Tab names",
+      },
+      TEST_ROOT,
     ],
     [
-      "a move into a thread: its entry",
+      "an offer: its lane's root",
+      { kind: "offer", lane: LANE_X, action: "refresh", to: null },
+      OTHER_ROOT,
+    ],
+    [
+      "a move into a thread: its root",
       {
         kind: "move",
         move: {
           card: cardId("c"),
           from: null,
-          to: { kind: "drafting", at: atEntry(entryId("b")), lane: null },
+          to: {
+            kind: "drafting",
+            root: TEST_ROOT,
+            at: atEntry(entryId("b")),
+            lane: null,
+          },
         },
       },
-      "b",
+      TEST_ROOT,
     ],
     [
       "a move into an inventory",
@@ -205,13 +237,18 @@ describe("writesAt: the entry a command writes at", () => {
         kind: "move",
         move: {
           card: cardId("c"),
-          from: { kind: "drafting", at: atEntry(entryId("b")), lane: null },
+          from: {
+            kind: "drafting",
+            root: TEST_ROOT,
+            at: atEntry(entryId("b")),
+            lane: null,
+          },
           to: { kind: "inventory", holder: writerId("ada@x.io") },
         },
       },
       null,
     ],
-  ] satisfies [string, Intent, string | null][])("%s", (_, intent, want) => {
+  ] satisfies [string, Intent, RootId | null][])("%s", (_, intent, want) => {
     expect(at(intent)).toBe(want)
   })
 })
@@ -232,5 +269,34 @@ describe("archivedAt", () => {
   })
   test("an orphan's tree is judged by the orphan's record", () => {
     expect(archivedAt(index, archive, entryId("d"))).toEqual(record("o"))
+  })
+})
+
+describe("archivedIn: a root's archive record, found by its root entry", () => {
+  const archive = new Map([
+    [entryId("r1"), record("r1")],
+    [entryId("r2"), record("r2", "restored")],
+  ])
+  const dir = (root: RootId, entry: string): [RootId, RootRecord] => [
+    root,
+    {
+      root,
+      entry: entryId(entry),
+      first: entryId(entry),
+      firstLine: entry,
+      title: null,
+      messages: 1,
+      newest: entryId(entry),
+      writers: [],
+      mentions: [],
+      images: [],
+    },
+  ]
+  const roots = new Map([dir(TEST_ROOT, "r1"), dir(OTHER_ROOT, "r2")])
+  test("an archived root refuses; a restored one, an unknown one and none do not", () => {
+    expect(archivedIn(TEST_ROOT, roots, archive)).toEqual(record("r1"))
+    expect(archivedIn(OTHER_ROOT, roots, archive)).toBeNull()
+    expect(archivedIn(rootIdFor("gone"), roots, archive)).toBeNull()
+    expect(archivedIn(null, roots, archive)).toBeNull()
   })
 })

@@ -19,14 +19,21 @@ import {
   type Pending,
   withPending,
 } from "./card-moves.ts"
+import { TEST_ROOT } from "./fixtures.ts"
 
 const ME = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const LANE = laneNameForThread("x")
 const C1 = cardId("c-1")
 const at = atEntry(entryId("e-1"))
-const drafting = { kind: "drafting", at, lane: LANE } as const
-const queuedKey = { kind: "queued", at, lane: LANE, seen: "" } as const
+const drafting = { kind: "drafting", root: TEST_ROOT, at, lane: LANE } as const
+const queuedKey = {
+  kind: "queued",
+  root: TEST_ROOT,
+  at,
+  lane: LANE,
+  seen: "",
+} as const
 
 const card = (over: Partial<CardRecord> = {}): CardRecord => ({
   id: C1,

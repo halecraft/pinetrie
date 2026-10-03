@@ -48,22 +48,23 @@ export function assembleTools(input: {
 }
 
 /**
- * What a lane's runs may call: the file tools, `set_banner` when banners
- * are on, and `ask_for_guidance` during a landing. pi stores the list in a
- * lane's configuration once it is set, and fails a run whose list names a
- * tool not registered, so `assembleTools` registers every tool whatever the
- * setting, and `withGuidance` sets this whole list: a lane stored before
- * banners were turned on or off gets the current one at its next run's end.
+ * What a lane's runs may call: the file tools, `ask_for_guidance`, and
+ * `set_banner` when banners are on. One list for every run, a landing's
+ * included: a list that changed between runs would change every request's
+ * prefix, and Anthropic then drops the lane's earlier thinking (S85). pi
+ * stores the list in a lane's configuration, and fails a run whose list
+ * names a tool not registered, so `assembleTools` registers every tool
+ * whatever the setting, and a lane stored with another list is given this
+ * one when it is first held (`threadLanes`).
  */
 export function activeToolNames(input: {
   readonly files: readonly string[]
   readonly banners: boolean
-  readonly guidance: boolean
 }): string[] {
   return [
     ...input.files,
+    GUIDANCE_TOOL,
     ...(input.banners ? [BANNER_TOOL] : []),
-    ...(input.guidance ? [GUIDANCE_TOOL] : []),
   ]
 }
 

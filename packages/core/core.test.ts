@@ -27,6 +27,7 @@ import {
   placeFields,
   placeOfFields,
   projectTranscript,
+  rootIdFor,
   sameKey,
   THE_AGENT,
   TRAILERS,
@@ -35,6 +36,8 @@ import {
   writerOfPrincipal,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
+
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 describe("who a principal is (ADR-0037)", () => {
   test("an email is trimmed and lower-cased", () => {
@@ -331,9 +334,15 @@ test("offerLedger reads the newest paragraph that names a source; none without o
 describe("a card's place as flat fields (ADR-0059)", () => {
   const ADA = writerId("ada@example.com")
   const places: CardPlace[] = [
-    { kind: "drafting", at: atEntry(entryId("e-1")), lane: null },
+    {
+      kind: "drafting",
+      root: TEST_ROOT,
+      at: atEntry(entryId("e-1")),
+      lane: null,
+    },
     {
       kind: "queued",
+      root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
       lane: laneNameForThread("x"),
       order: "a",

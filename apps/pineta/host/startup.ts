@@ -1,6 +1,6 @@
 // host/startup — what a starting host does before it accepts a command.
 
-import type { LaneName } from "@pineta/core"
+import type { LaneName, RootId } from "@pineta/core"
 import {
   COMMANDS,
   COMMANDS_KEY,
@@ -29,7 +29,9 @@ import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
 export interface StartupDeps {
-  readonly basics: Pick<Basics, "doc" | "places" | "log">
+  readonly basics: Pick<Basics, "session" | "docs" | "live" | "places" | "log">
+  /** The roots this host opened at its start (`planLoads`): every lane that could be running. */
+  readonly roots: readonly RootId[]
   readonly agent: Pick<
     Agent,
     "commands" | "interrupted" | "refusedCommands" | "writeValues"
@@ -47,17 +49,19 @@ export interface StartupDeps {
  * In order: no stream survives a process, so clear them; log the stored lane
  * names that are not a thread's, which no reader is given; name every lane
  * that has none (ADR-0039); resume each lane a crash interrupted, in its own
- * directory, and settle the others with cards queued for them
- * (`planStartup`); write what the host found and the commands its pi
- * loaded, those that changed in one write, after the startup compaction; and
- * sweep what no one will type in again (`sweepTexts`).
- * Nothing else runs yet, so clearing the streams needs no serial step.
+ * directory (`planStartup`); write what the host found and the commands its
+ * pi loaded, those that changed in one write; sweep what no one will type in
+ * again (`sweepTexts`); and last, settle the lanes with cards queued, whose
+ * compaction then holds every write above. Nothing else runs yet, so
+ * clearing the streams needs no serial step.
  */
 export async function recover(deps: StartupDeps): Promise<void> {
   const { agent, work, serial, settle } = deps
-  const { doc, places, log } = deps.basics
-  clearStreams(doc)
-  const { malformed } = readStoredLanes(doc)
+  const { session: doc, docs, live, places, log } = deps.basics
+  clearStreams(live)
+  const malformed: string[] = []
+  for (const root of deps.roots)
+    malformed.push(...readStoredLanes(await docs.root(root)).malformed)
   if (malformed.length > 0)
     log(
       `[host] ignoring lanes whose names are not a thread's: ${malformed.join(", ")}`,
@@ -65,7 +69,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
   await deps.ensureNames()
   const planned = planStartup({
     cards: readPlaces(places),
-    interrupted: await agent.interrupted(),
+    interrupted: await agent.interrupted(deps.roots),
   })
   for (const lane of planned.resume) {
     log(
@@ -73,7 +77,6 @@ export async function recover(deps: StartupDeps): Promise<void> {
     )
     deps.start(lane, { kind: "resume" })
   }
-  void settle(planned.drain)
   const changed = [
     ...(work.project === null
       ? []
@@ -91,10 +94,12 @@ export async function recover(deps: StartupDeps): Promise<void> {
       readRecords(doc, COMMANDS).get(COMMANDS_KEY),
     ),
   ]
-  if (changed.length > 0) void serial.run(() => agent.writeValues(changed))
+  if (changed.length > 0) await serial.run(() => agent.writeValues(changed))
   for (const r of agent.refusedCommands())
     log(`[host] command ${r.name} is refused: ${r.reason}`)
   await sweepTexts(deps)
+  // Last, so the startup compaction it ends with holds every write above.
+  void settle(planned.drain)
 }
 
 /**
@@ -105,7 +110,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
  */
 async function sweepTexts(deps: StartupDeps): Promise<void> {
   const { agent, cards } = deps
-  const { doc, places, log } = deps.basics
+  const { session: doc, places, log } = deps.basics
   // gather
   const texts = await cards.texts(readPlaces(places).map(c => c.id))
   const stored = await cards.stored()

@@ -9,6 +9,7 @@ import {
 import type { Outcome } from "@pineta/protocol/codec"
 import { expect, test, vi } from "vitest"
 import type { MoveAnswer, MoveHow } from "./card-moves.ts"
+import { TEST_ROOT } from "./fixtures.ts"
 import type { Effect } from "./intent.ts"
 import { type AppPorts, perform } from "./perform.ts"
 
@@ -42,6 +43,7 @@ const ports = () => {
     askRestore: vi.fn(),
     intent: vi.fn(),
     reveal: vi.fn(),
+    openWhenHeld: vi.fn(),
     openFold: vi.fn(),
     pickArchived: vi.fn(),
     arm: vi.fn(),
@@ -66,7 +68,7 @@ const card: CardRecord = {
   id: cardId("c"),
   owner: ada,
   placer: ada,
-  place: { kind: "drafting", at, lane },
+  place: { kind: "drafting", root: TEST_ROOT, at, lane },
   command: "bring-up-to-date",
   unsent: null,
 }
@@ -101,6 +103,11 @@ test.each<Row>([
   {
     effect: { kind: "reveal", entry: entryId("e") },
     port: p => p.reveal,
+    args: ["e"],
+  },
+  {
+    effect: { kind: "openWhenHeld", entry: entryId("e") },
+    port: p => p.openWhenHeld,
     args: ["e"],
   },
   {

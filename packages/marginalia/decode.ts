@@ -8,7 +8,9 @@ import {
   type EntryId,
   entryId,
   isLaneName,
+  isRootId,
   type LaneName,
+  type RootId,
   type WriterId,
 } from "@pineta/core"
 import type { Static, TSchema } from "typebox"
@@ -57,6 +59,9 @@ export const writerKey = (key: string): WriterId | undefined =>
 
 export const laneKey = (key: string): LaneName | undefined =>
   isLaneName(key) ? key : undefined
+
+export const rootKey = (key: string): RootId | undefined =>
+  isRootId(key) ? key : undefined
 
 /** A singleton's address: only `expected` names it. */
 export const fixedKey = <K extends string>(

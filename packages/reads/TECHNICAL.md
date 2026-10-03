@@ -2,6 +2,25 @@
 
 What the session document says, read once, by the host and the client alike.
 
+## Which document a read takes (ADR-0063)
+
+- **A root's reads take its `RootDocHandle`**: `readTreeIndex`,
+  `readRenderableEntries`, `readLatestPrompt`, `readRevisions`, `readMarks`,
+  `readStops`, `readDigests`, and `readRootRecord`, the root's directory
+  record as the host writes it.
+- **The session's reads take its `SessionDocHandle`**: every record read
+  across roots (`readLaneRecords`, `readNames`, `readOffers`, `readArchive`,
+  `readRoots`, the singletons…), `readRunningLanes` with `pineta:live`, and
+  `readReferencedBlobs`, which takes each root's images from its directory
+  record, so no root is opened to sweep.
+- **A read of several takes a `RootView`** (`{ root, doc, session, live }`):
+  `workAt` and `worksOwn`. `readLanes` and `readAgentActivity` take its
+  `doc` and `live`.
+- **`readRecords(doc, spec)` takes the document the spec's home names**
+  (`HomeDoc<H>`), so a session record cannot be read from a root.
+- **A page reads several roots as one** (`readHeldIndex`, `readHeld`): one
+  index over the entries of the roots it holds, kept while none changes.
+
 ## Why it exists
 
 The composer promises *send* or *queue*, and *agent will reply*, from the
@@ -15,7 +34,8 @@ functions.
 
 Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes` (and `readLane`, one
-of them), `readRunning`,
+of them), `readRunning`, `readLatestPrompt` (what a lane's run is: a
+run's end and `ask_for_guidance` both decide by it),
 `readParticipantNames`, `readParticipants`, `readReading`, `readTyping`,
 `readAgentActivity`, `readSeats`, `readPlaces` and `readPlacesRev` (ADR-0059),
 `readArchive`, `readMarks` (ADR-0045), `readStops` and `readDigests`
@@ -94,6 +114,9 @@ Kyneta has let go.
   each keeps its last array while the entries are the same: the page's
   refresh writes the same values again, and Kyneta's record is then a new
   object (S59).
+  `readReadingRoots` (each end's reported root, ADR-0063) keeps its map the
+  same way, and so does `readParticipantNames`, which reads the session's
+  whole `values` and so wakes on every directory write.
 - **Build a `Record<EntryId, …>` from each entry's own `id`.** `Object.entries`
   and `Object.keys` give back `string`, which cannot index it (TS7053), so
   `renderableEntries` walks `Object.values` and keys by `entry.id`.

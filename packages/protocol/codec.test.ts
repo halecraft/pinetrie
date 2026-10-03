@@ -12,6 +12,7 @@ import {
   entryId,
   laneNameForThread,
   ROOT,
+  rootIdFor,
   runId,
   THE_AGENT,
   writerId,
@@ -29,6 +30,9 @@ import {
 } from "./codec.ts"
 import { OUTCOME_KINDS, reply } from "./messages.ts"
 
+const TEST_ROOT = rootIdFor("test-root")
+const NEW_ROOT = rootIdFor("01a0f9eb-86e1-77ad-a822-2a3067862240")
+
 const NEW_LANE = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
 
 const refusalCode = (x: ReturnType<typeof decodeCommand>) =>
@@ -39,6 +43,7 @@ test('decode: parentId "" is the root, where only a branch starts a thread', () 
     kind: "chat",
     text: "hi",
     parentId: "",
+    root: NEW_ROOT,
     mode: "branch",
   })
   assert.equal(branch.kind === "chat" ? branch.at.kind : "", "root")
@@ -48,6 +53,15 @@ test('decode: parentId "" is the root, where only a branch starts a thread', () 
     ),
     ERR.NO_ANCHOR,
   )
+})
+
+test("decode: a chat names its root (ADR-0063): a new one, minted, at the root; one it is in, at an entry", () => {
+  const at = (parentId: string, root: string) =>
+    decodeCommand({ kind: "chat", text: "hi", parentId, root, mode: "branch" })
+  assert.equal(at("", NEW_ROOT).kind, "chat")
+  assert.equal(refusalCode(at("", TEST_ROOT)), ERR.UNKNOWN_TARGET)
+  assert.equal(at("e-1", TEST_ROOT).kind, "chat")
+  assert.equal(refusalCode(at("e-1", "")), ERR.UNKNOWN_TARGET)
 })
 
 test("decode: queue is the host's own mode, never a client's (ADR-0048)", () => {
@@ -121,6 +135,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "chat",
       text: "hi @agent",
+      root: NEW_ROOT,
       at: ROOT,
       mode: "branch",
       lane: null,
@@ -134,6 +149,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "chat",
       text: "hi @bob",
+      root: TEST_ROOT,
       at: atEntry(entryId("e-5")),
       mode: "reply",
       lane: laneNameForThread("abc"),
@@ -147,6 +163,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "chat",
       text: "aside",
+      root: TEST_ROOT,
       at: atEntry(entryId("e-3")),
       mode: "branch",
       lane: null,
@@ -161,8 +178,13 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "stop", lane: laneNameForThread("abc") },
     { kind: "archive", action: "archive", root: entryId("e-1") },
     { kind: "archive", action: "restore", root: entryId("e-1") },
-    { kind: "mark", entry: entryId("e-1"), title: "Tab names" },
-    { kind: "mark", entry: entryId("e-1"), title: null },
+    {
+      kind: "mark",
+      root: TEST_ROOT,
+      entry: entryId("e-1"),
+      title: "Tab names",
+    },
+    { kind: "mark", root: TEST_ROOT, entry: entryId("e-1"), title: null },
     { kind: "offer", lane: laneNameForThread("abc"), action: "take", to: null },
     {
       kind: "offer",
@@ -193,11 +215,13 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         card: cardId("c-7"),
         from: {
           kind: "drafting",
+          root: TEST_ROOT,
           at: atEntry(entryId("e-5")),
           lane: laneNameForThread("abc"),
         },
         to: {
           kind: "queued",
+          root: TEST_ROOT,
           at: atEntry(entryId("e-5")),
           lane: laneNameForThread("abc"),
           seen: "v-2",
@@ -208,7 +232,12 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       kind: "move",
       move: {
         card: cardId("c-7"),
-        from: { kind: "drafting", at: atEntry(entryId("e-5")), lane: null },
+        from: {
+          kind: "drafting",
+          root: TEST_ROOT,
+          at: atEntry(entryId("e-5")),
+          lane: null,
+        },
         to: null,
       },
     },
@@ -330,6 +359,7 @@ test("decode: a chat's card is its id and its text's version, or none", () => {
       kind: "chat",
       text: "hi",
       mode: "branch",
+      root: NEW_ROOT,
       cardId,
       seen: "v",
     })
@@ -357,17 +387,33 @@ test("an archive action must be known, and name its root", () => {
 
 test("a mark names its entry; its title is trimmed, blank clears, and a line break or 81 characters is refused", () => {
   assert.deepEqual(
-    decodeCommand({ kind: "mark", targetId: "e-1", text: "  Tab names " }),
-    { kind: "mark", entry: entryId("e-1"), title: "Tab names" },
+    decodeCommand({
+      kind: "mark",
+      root: TEST_ROOT,
+      targetId: "e-1",
+      text: "  Tab names ",
+    }),
+    {
+      kind: "mark",
+      root: TEST_ROOT,
+      entry: entryId("e-1"),
+      title: "Tab names",
+    },
   )
-  assert.deepEqual(decodeCommand({ kind: "mark", targetId: "e-1", text: "" }), {
-    kind: "mark",
-    entry: entryId("e-1"),
-    title: null,
-  })
+  assert.deepEqual(
+    decodeCommand({ kind: "mark", root: TEST_ROOT, targetId: "e-1", text: "" }),
+    {
+      kind: "mark",
+      root: TEST_ROOT,
+      entry: entryId("e-1"),
+      title: null,
+    },
+  )
   for (const text of ["two\nlines", "x".repeat(81)])
     assert.equal(
-      refusalCode(decodeCommand({ kind: "mark", targetId: "e-1", text })),
+      refusalCode(
+        decodeCommand({ kind: "mark", root: TEST_ROOT, targetId: "e-1", text }),
+      ),
       ERR.INVALID_TITLE,
     )
   assert.equal(
@@ -382,6 +428,7 @@ test("working directly needs a directory; an unknown work kind is refused", () =
     kind: "chat",
     text: "go",
     parentId: "",
+    root: NEW_ROOT,
     mode: "branch",
   }
   assert.equal(
@@ -397,7 +444,13 @@ test("working directly needs a directory; an unknown work kind is refused", () =
 
 test("decode: a reserved lane is a new thread's id, t- and a uuidv7, or none (ADR-0057)", () => {
   const chat = (reserved: string) =>
-    decodeCommand({ kind: "chat", text: "hi", mode: "branch", reserved })
+    decodeCommand({
+      kind: "chat",
+      text: "hi",
+      mode: "branch",
+      root: NEW_ROOT,
+      reserved,
+    })
   const reserve = (lane: string) => decodeCommand({ kind: "reserve", lane })
   const none = chat("")
   assert.equal(none.kind === "chat" ? none.reserved : "refused", null)

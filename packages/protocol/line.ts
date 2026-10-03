@@ -21,6 +21,8 @@ const Command = Schema.struct({
   text: Schema.string(),
   /** Where the sender was reading, or "" for the root (schemas are total). */
   parentId: Schema.string(),
+  /** A chat's or a mark's root, or "" for other kinds (ADR-0063). */
+  root: Schema.string(),
   /** A chat's mode, or "" for other kinds. */
   mode: Schema.string(),
   lane: Schema.string(),

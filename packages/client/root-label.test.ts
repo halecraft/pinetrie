@@ -1,39 +1,62 @@
-import {
-  entryId,
-  type MarkRecord,
-  summarizeRoots,
-  writerId,
-} from "@pineta/core"
+import { entryId, type RootRecord, rootIdFor, writerId } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { entry, indexOf } from "./fixtures.ts"
-import { firstLines, planTitle, renameKey, rootLabels } from "./root-label.ts"
+import {
+  firstLinesOf,
+  labelsOf,
+  messagesIn,
+  planTitle,
+  renameKey,
+  summariesOf,
+} from "./root-label.ts"
 
-const chat = (id: string, text: string) =>
-  entry(id, null, {
-    role: "chat",
-    content: text,
-    author: "Ada",
-    writer: writerId("p-ada"),
-  })
-const index = indexOf([
-  chat("r1", "I'd like to start talking about a change\nwith you"),
-  chat("r2", "Plan the release"),
-])
-const mark: MarkRecord = {
-  entry: entryId("r1"),
-  title: "Tab names",
-  by: writerId("p-ada"),
-  at: 1,
-}
+const record = (
+  n: string,
+  firstLine: string,
+  title: string | null,
+): RootRecord => ({
+  root: rootIdFor(n),
+  entry: entryId(`e-${n}`),
+  first: entryId(`e-${n}`),
+  firstLine,
+  title,
+  messages: 2,
+  newest: entryId(`f-${n}`),
+  writers: [writerId("p-ada")],
+  mentions: [],
+  images: [],
+})
+const directory = new Map(
+  [
+    record("1", "I'd like to start talking about a change", "Tab names"),
+    record("2", "Plan the release", null),
+    { ...record("3", "", null), entry: null, first: null, messages: 0 },
+  ].map(r => [r.root, r] as const),
+)
 
-describe("rootLabels", () => {
-  test("a titled root is called by its title, another by its first line", () => {
-    const lines = firstLines(summarizeRoots(index), index)
-    const labels = rootLabels(lines, new Map([[entryId("r1"), mark]]))
-    expect(labels.get(entryId("r1"))).toBe("Tab names")
-    expect(labels.get(entryId("r2"))).toBe("Plan the release")
-    expect(lines.get(entryId("r1"))).toBe(
+describe("labels and summaries, from the directory (ADR-0063)", () => {
+  test("a titled root is called by its title, another by its first line; a root with no message by neither", () => {
+    const labels = labelsOf(directory)
+    expect(labels.get(entryId("e-1"))).toBe("Tab names")
+    expect(labels.get(entryId("e-2"))).toBe("Plan the release")
+    expect(labels.size).toBe(2)
+    expect(firstLinesOf(directory).get(entryId("e-1"))).toBe(
       "I'd like to start talking about a change",
+    )
+  })
+
+  test("the session's messages: every root's, held or not", () => {
+    expect(messagesIn(directory)).toBe(4)
+  })
+
+  test("summaries: each root with a message, by its root entry", () => {
+    expect(summariesOf(directory)).toEqual(
+      ["1", "2"].map(n => ({
+        root: entryId(`e-${n}`),
+        first: entryId(`e-${n}`),
+        messages: 2,
+        newest: entryId(`f-${n}`),
+        writers: [writerId("p-ada")],
+      })),
     )
   })
 })

@@ -38,9 +38,9 @@ import { batch, subscribe } from "@kyneta/schema"
 import { type BlobStore, type ImageRef, tailEdit } from "@pineta/core"
 import {
   applyTextEdits,
-  newSessionDoc,
+  newStorageDoc,
   physicalKey,
-  type SessionDocHandle,
+  type StorageDocHandle,
   type StoredValueRecord,
   valuePrefix,
 } from "@pineta/schema"
@@ -80,7 +80,7 @@ const makeToken = (peer: string): string =>
   `${peer}-${(tokenCounter++).toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
 /** Store one planned operation. The only code that writes the document on commit. */
-function writeOp(d: SessionDocHandle, op: DocOp): void {
+function writeOp(d: StorageDocHandle, op: DocOp): void {
   switch (op.kind) {
     case "entry":
       d.entries.set(op.row.id, op.row)
@@ -121,7 +121,7 @@ function writeOp(d: SessionDocHandle, op: DocOp): void {
 }
 
 export interface KynetaStorageOptions {
-  readonly doc?: SessionDocHandle
+  readonly doc?: StorageDocHandle
   readonly peerId?: string
   readonly now?: () => number
   /**
@@ -137,7 +137,7 @@ export interface KynetaStorageOptions {
  * conformance suite runs.
  */
 export class KynetaStorage implements Storage {
-  readonly #doc: SessionDocHandle
+  readonly #doc: StorageDocHandle
   readonly #blobs: Pick<BlobStore, "get" | "ref"> | undefined
   readonly #now: () => number
   readonly #peer: string
@@ -152,7 +152,7 @@ export class KynetaStorage implements Storage {
   constructor(options: KynetaStorageOptions = {}) {
     this.#now = options.now ?? Date.now
     this.#peer = options.peerId ?? "p"
-    this.#doc = options.doc ?? newSessionDoc()
+    this.#doc = options.doc ?? newStorageDoc()
     this.#blobs = options.blobs
 
     // Only state no writer on this replica made (`replay: true`: a merge, a

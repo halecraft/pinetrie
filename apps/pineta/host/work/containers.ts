@@ -7,7 +7,6 @@ import {
   executeOrThrow,
   LANE_NOTE,
   NO_GRANTS,
-  offerBookmark,
   PINETA_MOUNT,
   planContainer,
   planDisk,
@@ -20,7 +19,7 @@ import {
   volumeExists,
 } from "@pineta/lanes"
 import type { LaneAccess } from "@pineta/pi"
-import { readNames, readRevisions, readThreadName } from "@pineta/reads"
+import { readRevisions, readThreadName } from "@pineta/reads"
 import { type Basics, failed, messageOf } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"
 import type { Serial } from "../queue.ts"
@@ -58,11 +57,13 @@ export function createContainers(deps: {
   readonly dir: string | null
 }): Containers {
   const { basics, setup, registry, serial, offers } = deps
-  const { doc, log } = basics
+  const { session, docs, log } = basics
 
   /** The newest snapshot of `lane`'s own records whose file is still there. */
   async function newestSnapshot(lane: LaneName): Promise<SnapshotId | null> {
     if (setup.paths === null) return null
+    const doc = await docs.laneDoc(lane)
+    if (doc === null) return null
     const own = [...readRevisions(doc).values()]
       .filter(r => r.lane === lane && r.snapshot !== null)
       .sort((a, b) => (a.entry < b.entry ? 1 : -1))
@@ -115,7 +116,7 @@ export function createContainers(deps: {
   return {
     access(lane) {
       const record = registry.recordOf(lane)
-      if (record?.work.kind === "direct")
+      if (record?.work?.kind === "direct")
         return {
           kind: "direct",
           dir: record.work.dir,
@@ -130,14 +131,12 @@ export function createContainers(deps: {
           ready: Promise.resolve(),
         }
       const handle = registry.handleOf(lane)
-      const name = readNames(doc).get(lane)
       const grants = setup.lanes?.config.grants ?? NO_GRANTS
       return {
         kind: "lane",
         facts: {
           dir: WORKSPACE_ROOT,
           shared: setup.lanes?.shared.map(d => d.path) ?? [],
-          offer: name === undefined ? null : offerBookmark(name),
           grants: {
             ssh: grants.ssh,
             env: grants.env,
@@ -164,7 +163,7 @@ export function createContainers(deps: {
           .enqueue(() => startContainer(lane), { fatal: true })
           .catch(error =>
             log(
-              `[host] ${readThreadName(doc, lane)} cannot start: ${messageOf(error)}`,
+              `[host] ${readThreadName(session, lane)} cannot start: ${messageOf(error)}`,
             ),
           ),
       )

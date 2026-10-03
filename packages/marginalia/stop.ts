@@ -14,8 +14,9 @@ const StopSchema = Type.Object({
 })
 
 /** Each ask's stop, at its prompt's entry id. */
-export const STOP: RecordSpec<StopRecord, EntryId> = {
+export const STOP: RecordSpec<StopRecord, EntryId, "root"> = {
   namespace: "pineta.stop",
+  home: "root",
   keyOf: r => r.prompt,
   encode: ({ prompt, ...contents }) => contents,
   decode: (contents, key) =>

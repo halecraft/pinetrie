@@ -6,6 +6,7 @@ import {
   ERR,
   entryId,
   laneNameForThread,
+  rootIdFor,
   runId,
   writerId,
 } from "@pineta/core"
@@ -24,6 +25,8 @@ import {
   takenChat,
   takeTop,
 } from "./take.ts"
+
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const LANE = laneNameForThread("0123456789abcdef")
 const ADA = writerId("ada@x.io")
@@ -44,6 +47,7 @@ const queue = (
       placer: ADA,
       place: {
         kind: "queued",
+        root: TEST_ROOT,
         at: atEntry(E1),
         lane: LANE,
         order,
@@ -257,7 +261,7 @@ describe("drain", () => {
   test("takes nothing while the lane runs", async () => {
     const { b, events, deps } = setUp({ "c-1": "first" }, [])
     queue(b.places, "c-1", "a")
-    beginRun(b.doc, LANE, runId("r-0"))
+    beginRun(b.live, LANE, runId("r-0"))
     await drain(deps, LANE)
     expect(events).toEqual(["hydrate c-1"])
     expect(readPlaces(b.places)).toHaveLength(1)
@@ -308,7 +312,12 @@ describe("drain", () => {
     expect(readPlaces(b.places)).toEqual([
       expect.objectContaining({
         id: "c-1",
-        place: { kind: "drafting", at: atEntry(E1), lane: LANE },
+        place: {
+          kind: "drafting",
+          root: TEST_ROOT,
+          at: atEntry(E1),
+          lane: LANE,
+        },
         unsent: "no such image",
       }),
     ])
@@ -337,7 +346,12 @@ describe("drain", () => {
     expect(readPlaces(b.places)).toEqual([
       expect.objectContaining({
         id: "c-1",
-        place: { kind: "drafting", at: atEntry(E1), lane: LANE },
+        place: {
+          kind: "drafting",
+          root: TEST_ROOT,
+          at: atEntry(E1),
+          lane: LANE,
+        },
         unsent: "the host failed: store closed",
       }),
     ])
@@ -422,7 +436,12 @@ describe("drain: bring up to date (ADR-0055)", () => {
         id: "c-1",
         command: CMD,
         unsent: "the lane has no copy of its own",
-        place: { kind: "drafting", at: atEntry(E1), lane: LANE },
+        place: {
+          kind: "drafting",
+          root: TEST_ROOT,
+          at: atEntry(E1),
+          lane: LANE,
+        },
       }),
     ])
     expect(events).toContain("send c-2: next")

@@ -8,6 +8,7 @@ import {
   entryId,
   indexAsks,
   laneNameForThread,
+  rootIdFor,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
@@ -29,6 +30,8 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
+
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 // r1 -> a -> b, with a branch a -> c; and r2 -> d.
 const index = tree({
@@ -294,6 +297,45 @@ describe("planIntent", () => {
       ).toBe(false)
     })
 
+    test("openIn: an entry this tab holds opens as openAt does; another root's tab is shown, and the entry once it arrives (ADR-0063)", () => {
+      expect(
+        plan({ kind: "openIn", entry: entryId("3-b"), root: entryId("1-r1") }),
+      ).toEqual(plan({ kind: "openAt", entry: entryId("3-b") }))
+      expect(
+        plan({
+          kind: "openIn",
+          entry: entryId("9-far"),
+          root: entryId("8-r9"),
+        }),
+      ).toEqual([
+        {
+          kind: "layout",
+          action: { kind: "show", tab: { kind: "root", root: "8-r9" } },
+        },
+        { kind: "openWhenHeld", entry: "9-far" },
+      ])
+      const archive = new Map<EntryId, ArchiveRecord>([
+        [
+          entryId("8-r9"),
+          {
+            root: entryId("8-r9"),
+            state: "archived",
+            by: writerId("a@x.test"),
+            at: 1,
+          },
+        ],
+      ])
+      expect(
+        plan(
+          { kind: "openIn", entry: entryId("9-far"), root: entryId("8-r9") },
+          at(onRoot("1-r1"), archive),
+        ),
+      ).toEqual([
+        { kind: "pickArchived", root: "8-r9" },
+        { kind: "layout", action: { kind: "show", tab: { kind: "archive" } } },
+      ])
+    })
+
     test("a message's closed branch opens as openAt does; no entry, nothing", () => {
       const fromColumn = column({ kind: "openAt", entry: entryId("3-b") })
       expect(plan(fromColumn)).toEqual(
@@ -315,7 +357,7 @@ describe("planIntent", () => {
       id: cardId("c-new"),
       owner: ada,
       placer: ada,
-      place: { kind: "drafting", at: where, lane },
+      place: { kind: "drafting", root: TEST_ROOT, at: where, lane },
       command: null,
       unsent: null,
     }

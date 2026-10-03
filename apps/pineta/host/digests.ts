@@ -9,7 +9,7 @@
 // append, and by a run's final digest the drain queued before it may have
 // moved it to the next ask. So this module takes no lane.
 
-import { type EntryId, indexAsks, promptOf } from "@pineta/core"
+import { type EntryId, indexAsks, promptOf, type RootId } from "@pineta/core"
 import {
   DIGEST,
   digestRequest,
@@ -33,16 +33,16 @@ type Failed = (error: unknown) => void
 
 /** A failure goes to `failed`, never to the caller. */
 export interface Digests {
-  /** A turn is done at `at`: a live digest of its ask, when due. */
-  step(at: EntryId, failed: Failed): Promise<void>
-  /** A run that `prompt` started has ended: its ask's final digest. */
-  ended(prompt: EntryId, failed: Failed): Promise<void>
+  /** A turn is done at `at`, in `root`: a live digest of its ask, when due. */
+  step(root: RootId, at: EntryId, failed: Failed): Promise<void>
+  /** A run that `prompt` started, in `root`, has ended: its ask's final digest. */
+  ended(root: RootId, prompt: EntryId, failed: Failed): Promise<void>
 }
 
 type DigestAgent = Pick<Agent, "complete" | "skill" | "writeValues">
 
 export function createDigests(deps: {
-  readonly basics: Pick<Basics, "doc" | "log" | "now">
+  readonly basics: Pick<Basics, "docs" | "log" | "now">
   readonly serial: Serial
   /** Who is reading which thread (ADR-0024): a live digest waits for a reader. */
   readonly presence: PresenceDocHandle
@@ -50,14 +50,19 @@ export function createDigests(deps: {
   readonly agent: () => DigestAgent
 }): Digests {
   const { basics, serial, presence } = deps
-  const { doc } = basics
   // Asks a request is out for.
   const asking = new Set<EntryId>()
 
   /** One step: gather, decide with `planDigest`, and ask outside the queue. */
-  const consider = (at: EntryId, ended: boolean, failed: Failed) =>
+  const consider = (
+    root: RootId,
+    at: EntryId,
+    ended: boolean,
+    failed: Failed,
+  ) =>
     serial
       .run(async () => {
+        const doc = await basics.docs.root(root)
         const index = readTreeIndex(doc)
         const ask = promptOf(index, at)
         if (ask === null) return
@@ -102,21 +107,22 @@ export function createDigests(deps: {
           },
           settle: async text => {
             if (!digestStillWanted(readDigests(doc).get(ask), { final })) return
-            await deps.agent().writeValues([
-              setRecord(DIGEST, {
-                prompt: ask,
-                text,
-                at: basics.now(),
-                final,
-              }),
-            ])
+            await deps
+              .agent()
+              .writeValues([
+                setRecord(
+                  DIGEST,
+                  { prompt: ask, text, at: basics.now(), final },
+                  root,
+                ),
+              ])
           },
         })
       })
       .catch(failed)
 
   return {
-    step: (at, failed) => consider(at, false, failed),
-    ended: (prompt, failed) => consider(prompt, true, failed),
+    step: (root, at, failed) => consider(root, at, false, failed),
+    ended: (root, prompt, failed) => consider(root, prompt, true, failed),
   }
 }

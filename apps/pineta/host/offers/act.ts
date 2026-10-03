@@ -26,7 +26,7 @@ export function act(
   to: string | null = null,
 ): Promise<ErrCode | null> {
   const { ops, root, basics, line } = state
-  const { doc, log } = basics
+  const { session, docs, log } = basics
   // Tracked, and logged on failure, by `requestOutside`.
   const describeLater = () => void describe(state, refresh, lane, false)
   return state.serial.run(async () => {
@@ -102,7 +102,7 @@ export function act(
             state.agent().writeValues([setRecord(OFFER, record)]),
           taken: () => {
             log(
-              `[host] ${readThreadName(doc, lane)}: offer taken by ${by} as ${(planned.taken.taken ?? "").slice(0, 8)}`,
+              `[host] ${readThreadName(session, lane)}: offer taken by ${by} as ${(planned.taken.taken ?? "").slice(0, 8)}`,
             )
             state.taken()
           },
@@ -113,7 +113,10 @@ export function act(
     }
     // squash and refresh: the offer rebuilt from the lane's tip, as one.
     await refresh.rebuild(lane, name, at, changesOf(offer), [
-      { commit: place.tip, description: wipLine(doc, lane, name) },
+      {
+        commit: place.tip,
+        description: wipLine(docs.docOfLane(lane), lane, name),
+      },
     ])
     describeLater()
     return null

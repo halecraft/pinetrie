@@ -6,11 +6,17 @@ import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { type ImageRef, projectTranscript, ROOT } from "@pineta/core"
-import { readBanners, readTreeIndex } from "@pineta/reads"
-import { readLaneNames, readLaneTip } from "@pineta/schema"
+import { readBanners } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { idleNow, join, waitFor } from "../harness.ts"
+import {
+  idleNow,
+  join,
+  laneNamesOf,
+  tipIn,
+  treeOf,
+  waitFor,
+} from "../harness.ts"
 import { imageSize, RED_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -42,10 +48,10 @@ async function run(check: Checks["check"]): Promise<void> {
   const asker = await join(live, "asker", "live")
   await asker.chat(PROMPT, ROOT, START_AGENT)
   await waitFor(() => idleNow(live), 120_000)
-  const [lane] = readLaneNames(live.doc)
+  const [lane] = laneNamesOf(live)
   const last = projectTranscript(
-    readTreeIndex(live.doc),
-    lane === undefined ? null : readLaneTip(live.doc, lane),
+    treeOf(live),
+    lane === undefined ? null : tipIn(live, lane),
   ).at(-1)
   console.log(`  model said: ${JSON.stringify(last?.text)}`)
   check(
@@ -66,10 +72,10 @@ async function run(check: Checks["check"]): Promise<void> {
   )
   await waitFor(() => idleNow(live), 120_000)
   // A Start Agent message begins a thread of its own: its lane is the new one.
-  const imageLane = readLaneNames(live.doc).find(l => l !== lane)
+  const imageLane = laneNamesOf(live).find(l => l !== lane)
   const seenBy = projectTranscript(
-    readTreeIndex(live.doc),
-    imageLane === undefined ? null : readLaneTip(live.doc, imageLane),
+    treeOf(live),
+    imageLane === undefined ? null : tipIn(live, imageLane),
   ).at(-1)
   console.log(`  model said of the image: ${JSON.stringify(seenBy?.text)}`)
   check(
@@ -102,9 +108,9 @@ async function run(check: Checks["check"]): Promise<void> {
     START_AGENT,
   )
   await waitFor(() => idleNow(drawing), 120_000)
-  await waitFor(() => readBanners(drawing.doc).size > 0, 120_000)
+  await waitFor(() => readBanners(drawing.session).size > 0, 120_000)
   await drawing.quiet()
-  const [banner] = readBanners(drawing.doc).values()
+  const [banner] = readBanners(drawing.session).values()
   const served =
     banner === undefined
       ? null

@@ -1,9 +1,17 @@
-import { entryId, writerId } from "@pineta/core"
+import {
+  entryId,
+  laneNameForThread,
+  type RootId,
+  type RootRecord,
+  rootIdFor,
+  writerId,
+} from "@pineta/core"
 import { expect, test } from "vitest"
 import { tree } from "./fixtures.ts"
 import {
   peopleHere,
   readersByRoot,
+  runsHere,
   toggleOpenMenu,
   withOpenMenus,
 } from "./here.ts"
@@ -19,7 +27,7 @@ test("peopleHere groups each person's columns, in order, and drops an end not ar
     [entryId("3-r2"), [BEA]],
     [entryId("9-missing"), [ADA]],
   ])
-  expect(peopleHere(readingAt, index, [CY, BEA])).toEqual([
+  expect(peopleHere(readingAt, index, [CY, BEA], new Map())).toEqual([
     { writer: CY, threads: [{ end: "2-a", root: "1-r1" }] },
     {
       writer: BEA,
@@ -31,6 +39,18 @@ test("peopleHere groups each person's columns, in order, and drops an end not ar
   ])
 })
 
+test("peopleHere names the root its reader reported for an end in a root not held (ADR-0063)", () => {
+  const readingAt = new Map([[entryId("8-far"), [BEA]]])
+  expect(
+    peopleHere(
+      readingAt,
+      index,
+      [BEA],
+      new Map([[entryId("8-far"), entryId("7-r3")]]),
+    ),
+  ).toEqual([{ writer: BEA, threads: [{ end: "8-far", root: "7-r3" }] }])
+})
+
 test("readersByRoot turns people around: each root with its readers, each once", () => {
   const people = peopleHere(
     new Map([
@@ -40,6 +60,7 @@ test("readersByRoot turns people around: each root with its readers, each once",
     ]),
     index,
     [BEA, CY],
+    new Map(),
   )
   expect([...readersByRoot(people)]).toEqual([
     ["1-r1", [BEA, CY]],
@@ -86,4 +107,32 @@ test("toggleOpenMenu records an opening and forgets a closing, the same map when
   expect([...opened]).toEqual([[BEA, 1]])
   expect(toggleOpenMenu(opened, BEA, 1, true)).toBe(opened)
   expect([...toggleOpenMenu(opened, BEA, 1, false)]).toEqual([])
+})
+
+test("runsHere: each held run at its tip, then each other running lane at its root's entry (ADR-0063)", () => {
+  const held = laneNameForThread("held")
+  const far = laneNameForThread("far")
+  const fresh = laneNameForThread("fresh")
+  const farRoot = rootIdFor("far")
+  const freshRoot = rootIdFor("fresh")
+  const record = (root: RootId, entry: string | null) =>
+    ({ root, entry: entry === null ? null : entryId(entry) }) as RootRecord
+  expect(
+    runsHere({
+      activity: [{ lane: held, tip: entryId("2-a") }],
+      running: [
+        { lane: held, root: rootIdFor("r1") },
+        { lane: far, root: farRoot },
+        { lane: fresh, root: freshRoot },
+      ],
+      directory: new Map([
+        [farRoot, record(farRoot, "8-r9")],
+        [freshRoot, record(freshRoot, null)],
+      ]),
+      index,
+    }),
+  ).toEqual([
+    { lane: held, root: "1-r1", end: "2-a" },
+    { lane: far, root: "8-r9", end: "8-r9" },
+  ])
 })

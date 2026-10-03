@@ -52,8 +52,10 @@ export type LaneAccess =
 
 /**
  * What a lane of its own is told about itself (ADR-0046). The host builds
- * every name in it: `offerBookmark`, `PINETA_MOUNT` and `LANE_NOTE` are in
- * `@pineta/lanes`, which this package does not declare.
+ * every name in it: `PINETA_MOUNT` and `LANE_NOTE` are in `@pineta/lanes`,
+ * which this package does not declare. Nothing here changes while the lane
+ * lives: a change would alter every request's prefix, and Anthropic then
+ * drops the lane's earlier thinking (S85).
  */
 export interface LaneFacts {
   /** `WORKSPACE_ROOT` in a container; the helper's own directory in tests. */
@@ -63,8 +65,6 @@ export interface LaneFacts {
    * relative to `dir` (ADR-0035).
    */
   readonly shared: readonly string[]
-  /** The offer's bookmark in the person's repo; null while the thread has no name. */
-  readonly offer: string | null
   /** What `pineta.json` lets into the lane (ADR-0034). */
   readonly grants: {
     readonly ssh: boolean
@@ -88,7 +88,7 @@ export interface LaneFacts {
  * pi drops a guideline equal to an earlier one, so no two lines may be equal.
  */
 export function laneGuidelines(facts: LaneFacts): string[] {
-  const { dir, offer, grants } = facts
+  const { dir, grants } = facts
   const allowed = [
     ...(grants.ssh ? ["your ssh agent"] : []),
     ...grants.env.map(name => `$${name}`),
@@ -99,7 +99,7 @@ export function laneGuidelines(facts: LaneFacts): string[] {
   return [
     `You work in a Pineta lane: a Linux container where you are root, in your own jj repo at ${dir}.`,
     "Pineta commits your changes after each message, so you need not commit. Don't rewrite earlier revisions. Your work so far: `jj log -r 'immutable_heads()..'`.",
-    `The person gets your work as one commit${offer === null ? "" : `, \`${offer}\``}, and never sees your files live.`,
+    "The person gets your work as one commit, and never sees your files live.",
     `Only ${dir} lasts. Background processes end with each run, and nothing outside ${dir} reaches a branch.`,
     `${HOST_WORKING_COPY} is the person's working copy, read-only. ${facts.install} is Pineta's install, not your project.`,
     ...facts.shared.map(
@@ -121,8 +121,11 @@ export interface LaneHooks {
    * prompt.
    */
   turnDone(lane: LaneName, tip: EntryId): Promise<void>
-  /** `ask_for_guidance` was called: the landing needs the person. */
-  askedForGuidance(lane: LaneName, question: string): void
+  /**
+   * `ask_for_guidance` was called. True when the lane's run is a landing,
+   * which then needs the person; false when it is not, and nothing is asked.
+   */
+  askedForGuidance(lane: LaneName, question: string): boolean
 }
 
 type Context = Parameters<typeof withContextValue>[2]
@@ -231,13 +234,17 @@ export const systemPromptFor =
 
 export const GUIDANCE_TOOL = "ask_for_guidance"
 
+/** What `ask_for_guidance` answers outside a landing. */
+export const NOT_LANDING = "No landing is in progress: there is nothing to ask."
+
 /**
- * The tool a landing run can stop with (ADR-0033). The host turns it on only
- * while the lane's run is a landing; calling it makes the landing "needs you",
- * whatever the files say.
+ * The tool a landing run can stop with (ADR-0033): calling it makes the
+ * landing "needs you", whatever the files say. Every lane has it, so a lane's
+ * tool list never changes between runs (S85); outside a landing it answers
+ * that there is nothing to ask.
  */
 export function guidanceTool(
-  onAsk: (lane: LaneName, question: string) => void,
+  onAsk: (lane: LaneName, question: string) => boolean,
 ) {
   return {
     name: GUIDANCE_TOOL,
@@ -258,12 +265,14 @@ export function guidanceTool(
       context: Context,
     ) {
       const lane = laneOf(context)
-      if (lane !== undefined) onAsk(lane, params.question)
+      const asked = lane !== undefined && onAsk(lane, params.question)
       return {
         content: [
           {
             type: "text" as const,
-            text: "Asked. Stop here: the person will answer in this thread.",
+            text: asked
+              ? "Asked. Stop here: the person will answer in this thread."
+              : NOT_LANDING,
           },
         ],
         details: undefined,

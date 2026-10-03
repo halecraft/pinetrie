@@ -1,6 +1,7 @@
 // pi — the single pi boundary. Re-exports OUR shapes; no pi type crosses.
 export {
   type Agent,
+  type AgentDocuments,
   type CreateAgentOptions,
   createAgent,
   newId,

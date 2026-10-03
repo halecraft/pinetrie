@@ -40,7 +40,6 @@ const rows = (filter: ArchiveFilter, query = "", me = ADA) =>
     roots,
     labels: new Map([[entryId("3-r3"), "Palette work"]]),
     archive: new Map([[entryId("2-r2"), archived]]),
-    index,
     filter,
     query,
     me,
@@ -72,12 +71,9 @@ describe("archiveIndex", () => {
     expect(ids(rows("mine"))).toEqual(["1-r1"])
     expect(ids(rows("mine", "", BEA))).toEqual(["1-r1", "3-r3", "2-r2"])
   })
-  test("search is case-insensitive over any message in the root", () => {
-    expect(ids(rows("all", "FRIDAY"))).toEqual(["1-r1"])
-    expect(ids(rows("all", " sqlite "))).toEqual(["2-r2"])
+  test("search is case-insensitive over each root's label, not its messages (ADR-0063)", () => {
+    expect(ids(rows("all", " PALETTE "))).toEqual(["3-r3"])
+    expect(ids(rows("all", "friday"))).toEqual([])
     expect(ids(rows("all", "nothing like this"))).toEqual([])
-  })
-  test("search finds a root by its label, which no message holds", () => {
-    expect(ids(rows("all", "palette"))).toEqual(["3-r3"])
   })
 })

@@ -6,11 +6,19 @@ import path from "node:path"
 import { subscribe } from "@kyneta/schema"
 import { projectSpine, ROOT } from "@pineta/core"
 import { scriptedModel, sha256Of } from "@pineta/pi"
-import { readLanes, readPlaces, readTreeIndex } from "@pineta/reads"
+import { readPlaces } from "@pineta/reads"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, idleNow, join, waitFor } from "../harness.ts"
+import {
+  committedProject,
+  held,
+  idleNow,
+  join,
+  lanesOf,
+  treeOf,
+  waitFor,
+} from "../harness.ts"
 import { RED_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -45,10 +53,10 @@ async function run(check: Checks["check"]): Promise<void> {
     let th = await start()
     const tidle = () => waitFor(() => idleNow(th), 30_000)
     const readCall = () => {
-      const tree = readTreeIndex(th.doc)
+      const tree = treeOf(th)
       const spine = projectSpine(
         tree,
-        readLanes(th.doc, tree, readPlaces(th.places))[0]?.tip ?? null,
+        lanesOf(th, tree, readPlaces(th.places))[0]?.tip ?? null,
       ).spine
       return spine
         .flatMap(n => n.toolCalls ?? [])
@@ -60,10 +68,28 @@ async function run(check: Checks["check"]): Promise<void> {
     // pi's pending entries, as each change of the document leaves them: a
     // compaction after the run rewrites the history they were in (S59).
     const pendings: string[] = []
-    const unwatch = subscribe(th.doc, () => {
-      for (const [key, v] of Object.entries(th.doc.values()))
-        if (key.includes("pi.pending.entry")) pendings.push(JSON.stringify(v))
-    })
+    // Each root's document, followed as the host opens it: a run is in
+    // its root's (ADR-0063), which a start makes, and starting a run is a
+    // change to what streams, which comes first.
+    const watching = new Map<object, () => void>()
+    const watchRoots = () => {
+      for (const doc of held(th).roots) {
+        if (watching.has(doc)) continue
+        watching.set(
+          doc,
+          subscribe(doc, () => {
+            for (const [key, v] of Object.entries(doc.values()))
+              if (key.includes("pi.pending.entry"))
+                pendings.push(JSON.stringify(v))
+          }),
+        )
+      }
+    }
+    const offLive = subscribe(th.live, watchRoots)
+    const unwatch = () => {
+      offLive()
+      for (const off of watching.values()) off()
+    }
 
     // 1. A read of a PNG: its result holds a reference, and the model the image.
     script.use([
@@ -103,11 +129,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await sleep(GRACE_MS + 200)
     const tv = await join(th, "tia", "tool-images")
     script.use([{ text: "still red" }])
-    const tip = readLanes(
-      th.doc,
-      readTreeIndex(th.doc),
-      readPlaces(th.places),
-    )[0]
+    const tip = lanesOf(th, treeOf(th), readPlaces(th.places))[0]
     await tv.chat("@agent and now?", at(tip?.tip ?? null), {
       lane: tip?.name,
     })

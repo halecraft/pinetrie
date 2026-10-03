@@ -45,12 +45,12 @@ export interface LaneRegistry {
 }
 
 export function createRegistry(input: {
-  readonly doc: SessionDocHandle
+  readonly session: SessionDocHandle
   /** The project root when lanes have their own copies, else null. */
   readonly root: string | null
 }): LaneRegistry {
   const handles = new Map<LaneName, LaneHandle<LaneChannel>>()
-  const recordOf = (lane: LaneName) => readLaneRecords(input.doc).get(lane)
+  const recordOf = (lane: LaneName) => readLaneRecords(input.session).get(lane)
   function handleOf(lane: LaneName): LaneHandle<LaneChannel> {
     let handle = handles.get(lane)
     if (handle === undefined) {
@@ -63,7 +63,7 @@ export function createRegistry(input: {
     handleOf,
     laneJjOf: lane => laneJj(handleOf(lane).runners.lane),
     recordOf,
-    isOwn: lane => input.root !== null && recordOf(lane)?.work.kind === "own",
+    isOwn: lane => input.root !== null && recordOf(lane)?.work?.kind === "own",
     async forget(lane) {
       const handle = handles.get(lane)
       handles.delete(lane)

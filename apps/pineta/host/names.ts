@@ -12,7 +12,6 @@ import {
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readLaneRecords, readNames } from "@pineta/reads"
-import { readLaneNames } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 import { createSerial } from "./queue.ts"
 
@@ -29,11 +28,11 @@ export interface Names {
  * name is written: what makes a new thread's banner.
  */
 export function createNames(deps: {
-  readonly basics: Pick<Basics, "doc" | "now">
+  readonly basics: Pick<Basics, "session" | "now">
   readonly agent: Pick<Agent, "writeValues">
   readonly onNamed: (lane: LaneName) => void
 }): Names {
-  const { doc, now } = deps.basics
+  const { session, now } = deps.basics
   const serial = createSerial()
   const write = async (record: NameRecord) => {
     await deps.agent.writeValues([setRecord(NAME, record)])
@@ -42,13 +41,15 @@ export function createNames(deps: {
   return {
     ensure: () =>
       serial.run(async () => {
-        const records = readLaneRecords(doc)
+        // Every lane has a record from its creation (ADR-0063), in whichever
+        // root it works.
+        const records = readLaneRecords(session)
         const planned = planNames(
-          readLaneNames(doc).map(lane => ({
-            lane,
-            createdAt: records.get(lane)?.createdAt ?? 0,
+          [...records.values()].map(r => ({
+            lane: r.lane,
+            createdAt: r.createdAt,
           })),
-          readNames(doc),
+          readNames(session),
           now(),
         )
         for (const record of planned) await write(record)
@@ -57,8 +58,8 @@ export function createNames(deps: {
       serial.run(async () => {
         const plan = planReserve(
           lane,
-          new Set(readLaneNames(doc)),
-          readNames(doc),
+          new Set(readLaneRecords(session).keys()),
+          readNames(session),
           now(),
         )
         if (plan.kind === "name") await write(plan.record)

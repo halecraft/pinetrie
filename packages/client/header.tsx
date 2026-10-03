@@ -7,22 +7,21 @@
 // live data has gone stays until you close its menu (`Popover`'s `gone`).
 
 import {
-  type AgentRun,
   type EntryId,
   firstLine,
-  type LaneName,
   type LineRecord,
   messageText,
   type ProjectRecord,
-  rootOf,
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
 import { useMemo, useState } from "react"
+import type { OpenOffer } from "./app-view.ts"
 import { AGENT_MARK } from "./column-view.ts"
 import {
   type OpenMenus,
   peopleHere,
+  type RunHere,
   toggleOpenMenu,
   withOpenMenus,
 } from "./here.ts"
@@ -39,7 +38,7 @@ import { Avatar, nameFor } from "./presence.tsx"
 import { type Me, Profile } from "./profile.tsx"
 import type { SessionClient } from "./session-view.ts"
 import type { InboxView } from "./use-inbox.ts"
-import { useReadingAt } from "./use-presence.ts"
+import { useReadingAt, useReadingRoots } from "./use-presence.ts"
 
 export function Header({
   session,
@@ -62,8 +61,8 @@ export function Header({
   session: SessionClient
   /** Everyone, in the order every window agrees on (`writerOrder`). */
   order: readonly WriterId[]
-  /** The agent's running lanes (`readAgentActivity`). */
-  runs: readonly AgentRun[]
+  /** The agent's running lanes, in any root (`runsHere`). */
+  runs: readonly RunHere[]
   index: TreeIndex
   labelOf: (root: EntryId) => string
   nameOf: ReadonlyMap<WriterId, string>
@@ -71,7 +70,7 @@ export function Header({
   mentions: readonly InboxItem[]
   inbox: InboxView
   /** Threads with an offer open in your repo, at their lane's tip (ADR-0038). */
-  offers: readonly { readonly lane: LaneName; readonly tip: EntryId }[]
+  offers: readonly OpenOffer[]
   /** The integration line (ADR-0060), as the host last read it. */
   line: LineRecord | null
   /** Where the host runs: "resolve with the agent" works in its root. */
@@ -79,7 +78,7 @@ export function Header({
   /** Each lane's name: a thread's row leads with it (ADR-0039). */
   names: ReadonlyMap<string, string>
   /** Open an entry as your tab (`planOpen`). */
-  onOpen: (id: EntryId) => void
+  onOpen: (id: EntryId, root: EntryId) => void
   /** Where the project menu's "resolve with the agent" goes. */
   onIntent: (intent: Intent) => void
   me: Me
@@ -108,7 +107,7 @@ export function Header({
         </span>
       </>
     ),
-    onChoose: () => onOpen(end),
+    onChoose: () => onOpen(end, root),
   })
   return (
     <div className="header-right">
@@ -131,12 +130,7 @@ export function Header({
                 ? "The agent is working in"
                 : "The agent has finished",
               items: runs.map(r =>
-                thread(
-                  r.lane,
-                  r.tip,
-                  rootOf(index, r.tip) ?? r.tip,
-                  names.get(r.lane),
-                ),
+                thread(r.lane, r.end, r.root, names.get(r.lane)),
               ),
             },
           ]}
@@ -165,12 +159,7 @@ export function Header({
               ? "Work ready to add to the project"
               : "Nothing left to add to the project.",
             items: offers.map(o =>
-              thread(
-                o.lane,
-                o.tip,
-                rootOf(index, o.tip) ?? o.tip,
-                names.get(o.lane),
-              ),
+              thread(o.lane, o.end, o.root, names.get(o.lane)),
             ),
           },
         ]}
@@ -237,9 +226,10 @@ function People({
 }) {
   const [openMenus, setOpenMenus] = useState<OpenMenus>(new Map())
   const reading = useReadingAt(session.presence, session.writer)
+  const reportedRoots = useReadingRoots(session.presence)
   const people = useMemo(
-    () => peopleHere(reading, index, order),
-    [reading, index, order],
+    () => peopleHere(reading, index, order, reportedRoots),
+    [reading, index, order, reportedRoots],
   )
   return withOpenMenus(people, openMenus).map(({ person: p, gone }, at) => (
     <Menu
@@ -278,7 +268,7 @@ function InboxMenu({
   inbox: InboxView
   labelOf: (root: EntryId) => string
   nameOf: ReadonlyMap<WriterId, string>
-  onOpen: (id: EntryId) => void
+  onOpen: (id: EntryId, root: EntryId) => void
 }) {
   const [onlyUnseen, setOnlyUnseen] = useState(false)
   const listed = onlyUnseen
@@ -315,7 +305,7 @@ function InboxMenu({
     ),
     onChoose: () => {
       inbox.markSeen(m.id)
-      onOpen(m.id)
+      onOpen(m.id, m.root)
     },
   }))
   return (

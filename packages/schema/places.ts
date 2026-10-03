@@ -26,6 +26,8 @@ const StoredCard = Schema.struct.json({
   owner: Schema.string(),
   /** `drafting`, `queued`, `fresh` or `inventory`: the place's kind (`CardPlace`). */
   kind: Schema.string(),
+  /** A drafting or queued card's root (ADR-0063). */
+  root: Schema.string(),
   /** A drafting or queued card's entry. */
   at: Schema.string(),
   /** A drafting or queued card's lane. */

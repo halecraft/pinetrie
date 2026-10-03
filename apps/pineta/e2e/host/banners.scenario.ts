@@ -5,16 +5,19 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { type ImageRef, messageText, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
-import {
-  readBanners,
-  readLanes,
-  readPlaces,
-  readTreeIndex,
-} from "@pineta/reads"
-import { readEntries, rowMessage } from "@pineta/schema"
+import { readBanners, readPlaces } from "@pineta/reads"
+import { rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, idleNow, join, waitFor } from "../harness.ts"
+import {
+  committedProject,
+  entriesOf,
+  idleNow,
+  join,
+  lanesOf,
+  treeOf,
+  waitFor,
+} from "../harness.ts"
 import { RED_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -58,25 +61,20 @@ async function run(check: Checks["check"]): Promise<void> {
     await bu.chat("@agent plan the parser", ROOT, START_AGENT)
     await waitFor(() => planning.reached, 10_000)
     const bannerOfFirst = () => {
-      const [first] = readLanes(
-        bh.doc,
-        readTreeIndex(bh.doc),
-        readPlaces(bh.places),
-      )
+      const [first] = lanesOf(bh, treeOf(bh), readPlaces(bh.places))
       return first === undefined
         ? undefined
-        : readBanners(bh.doc).get(first.name)
+        : readBanners(bh.session).get(first.name)
     }
     const madeEarly =
       (await waitFor(() => bannerOfFirst() !== undefined, 10_000)) >= 0
     planning.resume()
     await bidle()
-    const [lane] = readLanes(
-      bh.doc,
-      readTreeIndex(bh.doc),
-      readPlaces(bh.places),
-    ).map(l => l.name)
-    const made = lane === undefined ? undefined : readBanners(bh.doc).get(lane)
+    const [lane] = lanesOf(bh, treeOf(bh), readPlaces(bh.places)).map(
+      l => l.name,
+    )
+    const made =
+      lane === undefined ? undefined : readBanners(bh.session).get(lane)
     check(
       "a new thread's banner is made as it is named, before its first run ends, stored and served as an image",
       madeEarly &&
@@ -86,7 +84,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 2. The sweep keeps a banner nothing else shows.
     await sleep(GRACE_MS + 200)
-    const reply = idOfIn(bh.doc, "noted")
+    const reply = idOfIn(bh, "noted")
     await bu.chat("@agent and the lexer", at(reply), { mode: "reply" })
     await bidle()
 
@@ -106,21 +104,22 @@ async function run(check: Checks["check"]): Promise<void> {
     ])
     await bu.chat(
       `@agent use this as the banner ![red](/blob/${red.sha256})`,
-      at(idOfIn(bh.doc, "noted")),
+      at(idOfIn(bh, "noted")),
       { mode: "reply" },
     )
     await bidle()
-    const toolSaid = Object.values(readEntries(bh.doc))
+    const toolSaid = Object.values(entriesOf(bh))
       .map(rowMessage)
       .filter(m => (m as { role?: string }).role === "toolResult")
       .map(m => messageText(m as never))
-    const now = lane === undefined ? undefined : readBanners(bh.doc).get(lane)
+    const now =
+      lane === undefined ? undefined : readBanners(bh.session).get(lane)
     check(
       "set_banner sets a pasted image as the thread's banner, and tells the agent",
       now?.sha === red.sha256 && toolSaid.includes("The banner is set."),
     )
     await sleep(GRACE_MS + 200)
-    await bu.chat("@agent thanks", at(idOfIn(bh.doc, "set it")), {
+    await bu.chat("@agent thanks", at(idOfIn(bh, "set it")), {
       mode: "reply",
     })
     await bidle()

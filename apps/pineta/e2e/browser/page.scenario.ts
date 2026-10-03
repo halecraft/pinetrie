@@ -16,18 +16,27 @@ import {
   writerId,
 } from "@pineta/core"
 import {
-  readLanes,
   readMarks,
   readNames,
   readParticipantNames,
   readPlaces,
-  readTreeIndex,
+  readRoots,
   readTyping,
 } from "@pineta/reads"
 import type { Page } from "@playwright/test"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { idleNow, join, suiteModel, waitFor } from "../harness.ts"
+import {
+  entriesOf,
+  idleNow,
+  join,
+  lanesOf,
+  rootAt,
+  rootRecordsOf,
+  suiteModel,
+  treeOf,
+  waitFor,
+} from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
@@ -56,6 +65,16 @@ async function run(check: Checks["check"]): Promise<void> {
       log: (m: string) => console.log("    [host]", m),
     })
     console.log(`  host              : ${host.httpUrl}\n`)
+    /**
+     * The page's message count reaches the host's directory's: it has every
+     * root's record, held or not (ADR-0063).
+     */
+    const countIsHosts = (p: Page) =>
+      waitFor(async () => {
+        let n = 0
+        for (const r of readRoots(host.session).values()) n += r.messages
+        return (await p.textContent("#count").catch(() => null)) === String(n)
+      }, 15_000)
 
     // An explicit context: a page from `browser.newPage()` owns its context, and
     // Playwright refuses a second tab in it, which the column checks open. It may
@@ -215,7 +234,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
       // ── names, and the promise before the first message ─────────────────────
       await waitFor(
-        () => readParticipantNames(host.doc).get(ME) === "Ada",
+        () => readParticipantNames(host.session).get(ME) === "Ada",
         15_000,
       )
       await page.waitForSelector("#tabs .add-agent", { timeout: 15_000 })
@@ -248,15 +267,15 @@ async function run(check: Checks["check"]): Promise<void> {
       // the model says is `e2e:live`'s to check.
       await idle()
       {
-        const [lane, ...others] = readLanes(
-          host.doc,
-          readTreeIndex(host.doc),
+        const [lane, ...others] = lanesOf(
+          host,
+          treeOf(host),
           readPlaces(host.places),
         )
         const laneName =
           lane === undefined || others.length > 0
             ? null
-            : readNames(host.doc).get(lane.name)
+            : readNames(host.session).get(lane.name)
         const nameAfter = await page.getAttribute(
           `${col(0)} .column-head .agent-name`,
           "data-thread",
@@ -708,8 +727,11 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
       // Bea queues a card behind her run, as her client does when she sends.
-      await waitFor(() => Object.keys(host.doc.activeRuns()).length > 0, 15_000)
-      const beaLane = Object.keys(host.doc.activeRuns())[0] as
+      await waitFor(
+        () => Object.keys(host.live.activeRuns()).length > 0,
+        15_000,
+      )
+      const beaLane = Object.keys(host.live.activeRuns())[0] as
         | LaneName
         | undefined
       const beaEnd = atEntry(entryId(await tipOf0()))
@@ -719,7 +741,12 @@ async function run(check: Checks["check"]): Promise<void> {
           id: again,
           owner: other.writer,
           placer: other.writer,
-          place: { kind: "drafting", at: beaEnd, lane: beaLane ?? null },
+          place: {
+            kind: "drafting",
+            root: rootAt(other, beaEnd),
+            at: beaEnd,
+            lane: beaLane ?? null,
+          },
           command: null,
           unsent: null,
         },
@@ -817,7 +844,7 @@ async function run(check: Checks["check"]): Promise<void> {
         { timeout: 15_000 },
       )
       const forAdaId =
-        Object.values(host.doc.entries()).find(e =>
+        Object.values(entriesOf(host)).find(e =>
           JSON.stringify(e).includes("just a note"),
         )?.id ?? ""
       const pulse = script.pause("say exactly: PULSE")
@@ -966,7 +993,7 @@ async function run(check: Checks["check"]): Promise<void> {
       check("a rename on another device is kept on this one", followed >= 0)
 
       // ── ＋ agent: a new tab, an agent thread at the root, and stepping down ──
-      const firstRoot = readTreeIndex(host.doc).roots[0] ?? ""
+      const firstRoot = treeOf(host).roots[0] ?? ""
       // A new tab holds one column, so the thread's columns count from 0.
       const before = 0
       await page.click("#tabs .add-agent")
@@ -1087,7 +1114,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const askedId = entryId(
         (await page.getAttribute(person, "data-entry")) ?? "",
       )
-      const parentId = readTreeIndex(host.doc).parentOf(askedId) ?? ""
+      const parentId = treeOf(host).parentOf(askedId) ?? ""
       await page.hover(person)
       await page.click(`${person} > .tools > .edit`)
       const editCol = col(before + 1)
@@ -1103,8 +1130,8 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.fill(`${editCol} .composer .input`, "say exactly: DOWN-2B")
       await page.click(`${editCol} .composer .send`)
       await shows("say exactly: DOWN-2B", editCol)
-      const edited = [...readTreeIndex(host.doc).bySend.values()]
-        .map(id => readTreeIndex(host.doc).entries[id])
+      const edited = [...treeOf(host).bySend.values()]
+        .map(id => treeOf(host).entries[id])
         .find(e => e?.message?.content === "say exactly: DOWN-2B")
       check(
         "edit sends again beside the original: a branch at its parent, starting with its text",
@@ -1129,7 +1156,7 @@ async function run(check: Checks["check"]): Promise<void> {
         timeout: 15_000,
       })
       await page.click(`${col(0)} .close`)
-      const agentRoot = readTreeIndex(host.doc).roots.at(-1) ?? ""
+      const agentRoot = treeOf(host).roots.at(-1) ?? ""
       await page.click(`#tabs .tab[data-root="${agentRoot}"]`)
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 2,
@@ -1138,7 +1165,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       // ── your tabs, the header and the inbox (ADR-0029, ADR-0030) ───────────
-      const downRoot = readTreeIndex(host.doc).roots.at(-1) ?? ""
+      const downRoot = treeOf(host).roots.at(-1) ?? ""
       const tabSel = (root: string) => `#tabs .tab[data-root="${root}"]`
       const selectedRoot = (p: Page) =>
         p
@@ -1147,7 +1174,7 @@ async function run(check: Checks["check"]): Promise<void> {
           )
           .catch(() => null)
       const messagesIn = (root: string) =>
-        projectRail(readTreeIndex(host.doc), entryId(root)).length
+        projectRail(treeOf(host), entryId(root)).length
       // 1. Which tree a tab's rail draws is `tabRail`'s, proven by its unit test.
       await page.click(tabSel(firstRoot))
       await page
@@ -1165,11 +1192,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await api.setName("Bea")
       const third = await api.chat("a third thread", ROOT, { mode: "branch" })
       const thirdRoot = third.kind === "appended" ? third.id : entryId("")
-      await page.waitForFunction(
-        n => document.getElementById("count")?.textContent === n,
-        String(Object.keys(host.doc.entries()).length),
-        { timeout: 15_000 },
-      )
+      await countIsHosts(page)
       check(
         "a root another writer starts opens no tab, and the page stays where it is",
         thirdRoot !== "" &&
@@ -1228,7 +1251,7 @@ async function run(check: Checks["check"]): Promise<void> {
         ms.at(-1)?.getAttribute("data-entry"),
       )
       await componentRenders(page)
-      if (onPath != null) api.setReading("presence-check", onPath)
+      if (onPath != null) api.setReading("presence-check", onPath, null)
       const beaHere = `${col(0)} .column-head .avatar[data-writer="${api.writer}"]`
       const beaShown = await page
         .waitForSelector(beaHere, { timeout: 15_000 })
@@ -1251,13 +1274,8 @@ async function run(check: Checks["check"]): Promise<void> {
         .catch(() => null)
       // A message in a thread this tab does not show redraws none of its messages.
       await componentRenders(page)
-      const beforeElsewhere = Object.keys(host.doc.entries()).length
       await api.chat("meanwhile, elsewhere", atEntry(entryId(thirdRoot)))
-      await page.waitForFunction(
-        n => document.getElementById("count")?.textContent === n,
-        String(beforeElsewhere + 1),
-        { timeout: 15_000 },
-      )
+      await countIsHosts(page)
       const elsewhere = (await componentRenders(page)).filter(
         r => r.name === "MessageView",
       )
@@ -1459,7 +1477,7 @@ async function run(check: Checks["check"]): Promise<void> {
           )
         await tb.fill(".archive-search", "")
         await tb.click(tabSel(firstRoot))
-        const setAt = readMarks(host.doc).get(thirdRoot)?.at
+        const setAt = rootRecordsOf(host, readMarks).get(thirdRoot)?.at
         await rename("not this", "Escape")
         // Long enough for a rename sent by mistake to come back.
         await waitFor(() => false, 1_000)
@@ -1467,7 +1485,7 @@ async function run(check: Checks["check"]): Promise<void> {
           "Escape leaves a tab's title as it was, and sends nothing",
           (await labelIs(page, thirdRoot, TITLE)) &&
             (await page.locator(".tab-title-input").count()) === 0 &&
-            readMarks(host.doc).get(thirdRoot)?.at === setAt,
+            rootRecordsOf(host, readMarks).get(thirdRoot)?.at === setAt,
         )
         await rename("", "Enter")
 
@@ -2384,12 +2402,18 @@ async function run(check: Checks["check"]): Promise<void> {
         await waitFor(() => idleNow(host))
         // A's replica has everything the host has, and has drawn it, before the
         // cards below look for the column's last message in A's window.
-        const total = String(Object.keys(host.doc.entries()).length)
-        await page.waitForFunction(
-          n => document.getElementById("count")?.textContent === n,
-          total,
-          { timeout: 15_000 },
-        )
+        await countIsHosts(page)
+        const shownRoot = await page
+          .$eval('#tabs .tab[aria-selected="true"]', n =>
+            n.getAttribute("data-root"),
+          )
+          .catch(() => null)
+        const newest = [...readRoots(host.session).values()].find(
+          r => r.entry === shownRoot,
+        )?.newest
+        await page
+          .waitForSelector(`.msg[data-entry="${newest}"]`, { timeout: 15_000 })
+          .catch(() => null)
 
         // Cards (ADR-0048): what you type is a card on its thread, shown to
         // everyone at that end, and kept across tab switches.

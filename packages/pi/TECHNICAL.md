@@ -11,8 +11,31 @@ app every spelling fails with `ERR_MODULE_NOT_FOUND`. See
 
 ## Where the facade lives
 
-`createAgent` (`agent.ts`) builds the session and the harness, and wires the
-parts below into the `Agent` the host sees. `Agent` is the sum of their
+`createAgent` (`agent.ts`) builds the pi stack over the session's documents,
+and wires the parts below into the `Agent` the host sees.
+
+### A pi session per document (ADR-0063)
+
+The host gives `createAgent` its `AgentDocuments`: the session's document, a
+root's by its `RootId`, and the root a lane works in (its `LANE` record).
+
+- **One model setup, tool list, system prompt and hook set serve every
+  document.** A `KynetaStorage`, `StorageBackedSession` and harness are made
+  per document the first time it is asked for, and held until the host
+  releases its root (`release`, before it unloads the document) or the agent
+  closes. The next call in a released root opens its document again.
+  The promise is held, so two callers asking at once share one harness. S84
+  measured one at about 0.35 ms and 49 KB.
+- **Routing.** `createThreadLane(spot, lane)` and `appendToTree(message,
+  spot)` act in `spot.root`'s session. `lane(name)` returns a handle whose
+  every call finds the lane's root when it is made: a lane is created, then
+  its record written, then it runs. `interrupted(roots)` asks the roots the
+  host opened. `recordTurn` reads the tip from the lane's root.
+- **`writeValues` groups writes by their `target`** (`byTarget`), and commits
+  each group to its document's session: the session's harness serves only
+  this. The foreign-namespace guard runs before any group is written.
+- **Roots never wait on one another**: pi serializes commits per session.
+- `one-root.ts` is the documents of a session with one root, for tests. `Agent` is the sum of their
 interfaces, plus `appendToTree`, `writeValues`, `complete` and `stats`.
 
 | module | its one job |
@@ -99,7 +122,7 @@ tip is therefore always its thread's end, and `threadOf` finds a thread's
 lane from its end with no stored mapping.
 
 The facade has no way to move a lane: `ThreadLaneHandle` offers `append`,
-`run`, `resume`, `withGuidance` and `abort`, none of which navigates. Nor is
+`run`, `resume` and `abort`, none of which navigates. Nor is
 there a way to READ a tip through the agent: readers use the document, so
 observing a lane can never create one. A missing lane refuses every write
 `unknown_target` (`onLane`, `thread-lanes.ts`).
@@ -342,19 +365,33 @@ item 18, and in `lanes.test.ts` against the harness.
   interrupted, never running it again, and the rest of the run uses the
   directory in `resume`'s `Context`. `lanes.test.ts` reproduces the crash with
   two agents over one document.
-- **`ask_for_guidance`** is registered for every lane but inactive:
-  `ThreadLaneHandle.withGuidance(on)` sets the lane's whole list with pi's
-  `lane.setActiveTools`, which pi stores in the lane's configuration. The host
-  turns it on exactly while the run's prompt is a land message, and off at
-  every run's end, so a crash cannot leave it on for a later run.
+- **A lane's tool list and system prompt never change between its runs**
+  (S85). Anthropic drops an earlier thinking block when anything before it
+  in the request changed since it was written, and pi asks it to
+  (`drop_block`): a changed tool list or prompt costs the lane its earlier
+  reasoning, and its cache from the top.
+  - **`ask_for_guidance` is active in every lane** (`activeToolNames`,
+    `tools.ts`). Its `onAsk` says whether a landing took the question; the
+    host answers from the lane's latest prompt (`readLatestPrompt`). Outside
+    a landing the tool answers `NOT_LANDING`.
+  - **The list is set once, where a lane is held** (`existing()` in
+    `thread-lanes.ts`). A new lane takes the harness's seed. A restored lane
+    stored with another list (banners turned on or off since) is given the
+    current one with pi's `lane.setActiveTools`, which pi stores in the
+    lane's configuration.
+  - **The guidelines name nothing that changes**, the offer's bookmark among
+    them: it changes when a thread is named. `lane.md` says how it is named.
+  - **A change is logged.** A `before_payload` hook hashes each request
+    without its messages (`prefixOf`, `prefix.ts`), and calls
+    `onPrefixChange(lane)` when it differs from the lane's last request
+    (`prefixChange`). The host logs it.
 - **`set_banner`** (`banner.ts`, ADR-0050) is registered whenever the host
-  has tools, and active when `createAgent` is given `banners`. pi keeps a
-  stored list as it is, and fails a run whose list names a tool not
-  registered: a lane stored while banners were on still names it after they
-  are turned off, and its call answers that banners are off. `withGuidance`
-  sets the whole list (`activeToolNames`, `tools.ts`), never a toggle, so a lane stored
-  before a change gets the current list at its next run's end. The tool reads its arguments (`parseBannerArgs`: an image that names
-  no pasted image is refused, not ignored) and hands the ask to the host.
+  has tools, and active when `createAgent` is given `banners`. pi fails a
+  run whose stored list names a tool not registered, so every tool is
+  registered whatever the setting. A call while banners are off answers
+  that they are off. The tool reads its arguments (`parseBannerArgs`: an
+  image that names no pasted image is refused, not ignored) and hands the
+  ask to the host.
 - **Pineta's own skills** are in `skills/`, loaded after yours and the repo's
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `offer-stack`

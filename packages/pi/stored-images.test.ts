@@ -9,7 +9,7 @@ import {
   setValue,
 } from "@earendil-works/pi-agent-core"
 import type { BlobStore, ImageRef, Sha256, StoredImage } from "@pineta/core"
-import { newSessionDoc } from "@pineta/schema"
+import { newRootDoc } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { sha256Of } from "./images.ts"
 import { KynetaStorage } from "./storage.ts"
@@ -132,7 +132,7 @@ describe("splitImages / rejoinImages", () => {
 
 describe("KynetaStorage: a tool's image is a reference in the session", () => {
   const setUp = (blobs: Pick<BlobStore, "get" | "put" | "ref"> | undefined) => {
-    const doc = newSessionDoc()
+    const doc = newRootDoc()
     const storage = new KynetaStorage({
       doc,
       peerId: "t",

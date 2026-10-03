@@ -31,7 +31,7 @@ import {
   setRecord,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
-import { readRevisions, readTreeIndex } from "@pineta/reads"
+import { type RootView, readRevisions, readTreeIndex } from "@pineta/reads"
 import { type Basics, failed } from "../basics.ts"
 import type { Serial } from "../queue.ts"
 import { lockHashAt } from "./disk.ts"
@@ -74,12 +74,17 @@ export interface NewLanes {
    * neither.
    */
   checkBegin(
+    view: RootView,
     work: WorkSetting | null,
     at: Position,
     base: string | null,
   ): Promise<ErrCode | null>
-  /** Record a new lane, name it, and, for its own copy, queue its fork. */
+  /**
+   * Record a new lane in its root (ADR-0063), whatever its work, name it,
+   * and, for its own copy, queue its fork.
+   */
   prepareLane(
+    view: RootView,
     lane: LaneName,
     work: WorkSetting | null,
     at: Position,
@@ -99,7 +104,6 @@ export function createNewLanes(deps: {
   readonly pendingRecords: Turns["pendingRecords"]
 }): NewLanes {
   const { basics, setup, registry, serial } = deps
-  const { doc } = basics
 
   const line = setup.lanes?.line ?? DEFAULT_LINE
 
@@ -138,22 +142,27 @@ export function createNewLanes(deps: {
   return {
     checkDirectory,
 
-    async checkBegin(work, at, base) {
+    async checkBegin(view, work, at, base) {
       const { root } = setup
       if (work?.kind !== "own" || root === null) return null
+      const { doc } = view
       const above = nearestRevision(readTreeIndex(doc), readRevisions(doc), at)
       if (above.commit !== null) return null
       const begin = await beginAt(root, base)
       return typeof begin === "string" ? begin : null
     },
 
-    async prepareLane(lane, work, at, by, base) {
-      if (work !== null)
-        await deps
-          .agent()
-          .writeValues([
-            setRecord(LANE, { lane, work, by, createdAt: basics.now() }),
-          ])
+    async prepareLane(view, lane, work, at, by, base) {
+      const { doc } = view
+      await deps.agent().writeValues([
+        setRecord(LANE, {
+          lane,
+          root: view.root,
+          work,
+          by,
+          createdAt: basics.now(),
+        }),
+      ])
       await deps.ensureNames()
       if (work === null) return
       const { root, paths, ready } = setup

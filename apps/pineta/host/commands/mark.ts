@@ -8,7 +8,7 @@ import { readMarks, readTreeIndex } from "@pineta/reads"
 import type { Basics } from "../basics.ts"
 
 export interface MarkDeps {
-  readonly basics: Pick<Basics, "doc" | "now">
+  readonly basics: Pick<Basics, "docs" | "now">
   readonly agent: Pick<Agent, "writeValues">
 }
 
@@ -18,8 +18,10 @@ export async function handleMark(
   intent: Extract<Intent, { kind: "mark" }>,
 ): Promise<Outcome> {
   const { agent } = deps
-  const { doc, now } = deps.basics
-  // gather
+  const { docs, now } = deps.basics
+  const { root } = intent
+  // gather: the entry's root's document (ADR-0063)
+  const doc = await docs.root(root)
   const index = readTreeIndex(doc)
   // plan (pure)
   const planned = planMark({
@@ -35,10 +37,10 @@ export async function handleMark(
     case "refused":
       return planned
     case "write":
-      await agent.writeValues([setRecord(MARK, planned.record)])
+      await agent.writeValues([setRecord(MARK, planned.record, root)])
       break
     case "remove":
-      await agent.writeValues([deleteRecord(MARK, planned.entry)])
+      await agent.writeValues([deleteRecord(MARK, planned.entry, root)])
       break
     case "unchanged":
       break

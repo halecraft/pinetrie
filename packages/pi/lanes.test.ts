@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core"
 import {
   type EntryId,
   type LaneName,
@@ -16,16 +17,20 @@ import {
   writerId,
 } from "@pineta/core"
 import { encodeChat } from "@pineta/marginalia"
-import { newSessionDoc, readEntries, rowMessage } from "@pineta/schema"
+import { newRootDoc, readEntries, rowMessage } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"
 import { type LaneChannel, openChannel } from "./lane-env.ts"
 import {
+  guidanceTool,
   type LaneAccess,
   type LaneFacts,
+  laneContext,
   laneGuidelines,
+  NOT_LANDING,
   toolContextOf,
 } from "./lanes.ts"
+import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
 
 // ── what a lane of its own is told (ADR-0046) ────────────────────────────
@@ -34,7 +39,6 @@ import { scriptedModel } from "./scripted.ts"
 const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   dir: "/workspace",
   shared: [],
-  offer: "pineta-offer/quiet-otter",
   grants: { ssh: false, env: [], mounts: [] },
   browser: false,
   install: "/pineta",
@@ -64,13 +68,29 @@ test("toolContextOf: a direct lane is no lane; a lane of its own carries its fac
   })
 })
 
+describe("ask_for_guidance", () => {
+  const ask = (taken: boolean) =>
+    guidanceTool(() => taken).execute(
+      "call-1",
+      { question: "which?" },
+      undefined,
+      undefined,
+      undefined,
+      laneContext(laneNameForThread("0123456789abcdef"), BACKGROUND_CONTEXT),
+    )
+
+  test("in a landing, it asks; elsewhere it says there is nothing to ask", async () => {
+    expect((await ask(true)).content[0]?.text).toContain("Asked. Stop here")
+    expect((await ask(false)).content[0]?.text).toBe(NOT_LANDING)
+  })
+})
+
 describe("laneGuidelines", () => {
   const text = (f: LaneFacts) => laneGuidelines(f).join("\n")
 
-  test("names the lane's directory, offer, install and note as given", () => {
+  test("names the lane's directory, install and note as given", () => {
     const told = text(facts())
     expect(told).toContain("your own jj repo at /workspace")
-    expect(told).toContain("one commit, `pineta-offer/quiet-otter`,")
     expect(told).toContain("/pineta is Pineta's install, not your project")
     expect(told).toContain("when you need it: /pineta/packages/pi/lane.md")
     expect(told).toContain(
@@ -78,8 +98,8 @@ describe("laneGuidelines", () => {
     )
   })
 
-  test("with no name yet, the offer has no bookmark to give", () => {
-    const told = text(facts({ offer: null }))
+  test("names no bookmark, which changes when the thread is named (S85)", () => {
+    const told = text(facts())
     expect(told).toContain("your work as one commit, and never sees")
     expect(told).not.toContain("pineta-offer")
   })
@@ -176,10 +196,10 @@ describe("lanes in a harness", () => {
     wheres: Map<LaneName, LaneAccess>,
     turns: string[] = [],
   ) {
-    const doc = newSessionDoc()
+    const doc = newRootDoc()
     const script = scriptedModel()
     const agent = await createAgent({
-      doc,
+      documents: oneRoot(doc),
       replicaId: "test",
       model: { kind: "scripted", script },
       tools: {
@@ -195,13 +215,13 @@ describe("lanes in a harness", () => {
             await new Promise(r => setTimeout(r, 20))
             turns.push("end")
           },
-          askedForGuidance() {},
+          askedForGuidance: () => false,
         },
       },
     })
     const newLane = async (where: LaneAccess) => {
       const made = await agent.createThreadLane(
-        ROOT,
+        { root: ONE_ROOT, at: ROOT },
         laneNameForThread(newId()),
       )
       if (made.kind !== "created") throw new Error("no lane")
@@ -311,7 +331,6 @@ describe("lanes in a harness", () => {
     const rules = /<rules>\n([\s\S]*?)\n<\/rules>/.exec(told)?.[1] ?? ""
     for (const line of laneGuidelines(facts({ dir, shared: [".plans"] })))
       expect(rules).toContain(`- ${line}`)
-    expect(rules).toContain("one commit, `pineta-offer/quiet-otter`,")
     expect(rules).toContain(`${dir}/.plans is shared live with the person`)
     expect(rules).toContain("when you need it: /pineta/packages/pi/lane.md")
     channel.close()
@@ -356,16 +375,16 @@ describe("lanes in a harness", () => {
     const wheres = new Map([[lane, where(after)]])
     const script = scriptedModel()
     const second = await createAgent({
-      doc: first.doc,
+      documents: oneRoot(first.doc),
       replicaId: "after",
       model: { kind: "scripted", script },
       tools: {
         project: root,
         access: l => wheres.get(l) ?? where(root),
-        hooks: { turnDone: async () => {}, askedForGuidance() {} },
+        hooks: { turnDone: async () => {}, askedForGuidance: () => false },
       },
     })
-    expect(await second.interrupted()).toEqual([lane])
+    expect(await second.interrupted([ONE_ROOT])).toEqual([lane])
     expect(await second.lane(lane).run(prompt("again"))).toMatchObject({
       kind: "refused",
     })
@@ -377,7 +396,7 @@ describe("lanes in a harness", () => {
       .map(t => messageText(t.message as never))
     expect(results.some(r => r.includes("interrupted"))).toBe(true)
     expect(results.some(r => r.trim() === after)).toBe(true)
-    expect(await second.interrupted()).toEqual([])
+    expect(await second.interrupted([ONE_ROOT])).toEqual([])
     await second.close()
   })
 

@@ -8,6 +8,7 @@ import {
   indexTree,
   type LaneView,
   laneNameForThread,
+  rootIdFor,
   type TreeIndex,
   writerId,
 } from "@pineta/core"
@@ -31,6 +32,8 @@ import {
   queuedOn,
   yourCard,
 } from "./card.ts"
+
+const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
@@ -57,7 +60,7 @@ const card = (over: Partial<CardRecord> = {}): CardRecord => ({
   id: cardId("c-1"),
   owner: ADA,
   placer: ADA,
-  place: { kind: "drafting", at: atEntry(E2), lane: null },
+  place: { kind: "drafting", root: TEST_ROOT, at: atEntry(E2), lane: null },
   command: null,
   unsent: null,
   ...over,
@@ -65,7 +68,15 @@ const card = (over: Partial<CardRecord> = {}): CardRecord => ({
 const LANE = laneNameForThread("x")
 const queued = (id: string, order: string, lane = LANE): QueuedCard => ({
   ...card({ id: cardId(id) }),
-  place: { kind: "queued", at: atEntry(E2), lane, order, by: BEA, seen: "" },
+  place: {
+    kind: "queued",
+    root: TEST_ROOT,
+    at: atEntry(E2),
+    lane,
+    order,
+    by: BEA,
+    seen: "",
+  },
 })
 const laneAt = (tip: string): LaneView[] => [
   {
@@ -100,7 +111,9 @@ describe("where a card sits", () => {
 
   test("cardEnd: a lane card follows its lane after a conversation forks at the lane's old tip", () => {
     const lane = laneNameForThread("x")
-    const onLane = card({ place: { kind: "drafting", at: atEntry(E2), lane } })
+    const onLane = card({
+      place: { kind: "drafting", root: TEST_ROOT, at: atEntry(E2), lane },
+    })
     const forked = tree(entry("e3", "e2"), entry("g1", "e2"))
     expect(cardEnd(onLane, laneAt("e3"), forked)).toBe("e3")
   })
@@ -112,7 +125,12 @@ describe("where a card sits", () => {
     expect(
       cardEnd(
         card({
-          place: { kind: "drafting", at: atEntry(entryId("x")), lane: null },
+          place: {
+            kind: "drafting",
+            root: TEST_ROOT,
+            at: atEntry(entryId("x")),
+            lane: null,
+          },
         }),
         [],
         tree(),
@@ -124,7 +142,7 @@ describe("where a card sits", () => {
     const beas = card({ id: cardId("c-2"), owner: BEA })
     const sibling = card({
       id: cardId("c-3"),
-      place: { kind: "drafting", at: atEntry(F1), lane: null },
+      place: { kind: "drafting", root: TEST_ROOT, at: atEntry(F1), lane: null },
     })
     expect(
       draftingAt(entryId("e2"), [card(), beas, sibling], [], tree()),
@@ -223,7 +241,12 @@ describe("the queue", () => {
       kind: "write",
       record: {
         ...q,
-        place: { kind: "drafting", at: atEntry(E2), lane: LANE },
+        place: {
+          kind: "drafting",
+          root: TEST_ROOT,
+          at: atEntry(E2),
+          lane: LANE,
+        },
         unsent: "no such image",
       },
     })
@@ -232,9 +255,15 @@ describe("the queue", () => {
 
 describe("handoffs (ADR-0059)", () => {
   const C1 = cardId("c-1")
-  const drafting = { kind: "drafting", at: atEntry(E2), lane: LANE } as const
+  const drafting = {
+    kind: "drafting",
+    root: TEST_ROOT,
+    at: atEntry(E2),
+    lane: LANE,
+  } as const
   const queuedKey = {
     kind: "queued",
+    root: TEST_ROOT,
     at: atEntry(E2),
     lane: LANE,
     seen: "",
@@ -434,18 +463,25 @@ describe("handoffs (ADR-0059)", () => {
       place: { kind: "fresh", column: "j" },
     })
     expect(
-      planFreshFollow([sent, other, elsewhere], sent.id, E2, LANE),
+      planFreshFollow([sent, other, elsewhere], sent.id, TEST_ROOT, E2, LANE),
     ).toEqual([
       {
         kind: "write",
         record: {
           ...other,
-          place: { kind: "drafting", at: atEntry(E2), lane: LANE },
+          place: {
+            kind: "drafting",
+            root: TEST_ROOT,
+            at: atEntry(E2),
+            lane: LANE,
+          },
         },
       },
     ])
     const draft = card({ place: drafting })
-    expect(planFreshFollow([draft, other], draft.id, E2, LANE)).toEqual([])
+    expect(
+      planFreshFollow([draft, other], draft.id, TEST_ROOT, E2, LANE),
+    ).toEqual([])
   })
 
   test("planMoveCommand: the lane to drain when the card ends queued on a lane not running", () => {
@@ -507,7 +543,9 @@ describe("storage", () => {
     const lane = laneNameForThread("x")
     for (const c of [
       card(),
-      card({ place: { kind: "drafting", at: atEntry(E2), lane } }),
+      card({
+        place: { kind: "drafting", root: TEST_ROOT, at: atEntry(E2), lane },
+      }),
       card({ place: { kind: "fresh", column: "k-1" } }),
       card({ place: { kind: "inventory", holder: BEA } }),
       queued("c-2", "k"),
@@ -546,6 +584,7 @@ describe("storage", () => {
     const stored = { ...encodeCard(card()), at: "e2", lane: "main" }
     expect(decodeCard("c", stored)?.place).toEqual({
       kind: "drafting",
+      root: TEST_ROOT,
       at: atEntry(E2),
       lane: null,
     })

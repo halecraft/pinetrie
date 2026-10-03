@@ -3,43 +3,69 @@
 
 import {
   type EntryId,
-  firstLine,
-  type MarkRecord,
-  messageText,
+  NO_TEXT,
   parseTitle,
+  type RootId,
+  type RootRecord,
   type RootSummary,
-  type TreeIndex,
 } from "@pineta/core"
 
-/** A root whose first message has no text, or no message yet, is called this. */
-export const NO_TEXT = "(no text)"
+export { NO_TEXT }
 
-/** Every root's first message's first line: its label while it has no title. */
-export function firstLines(
-  summaries: readonly RootSummary[],
-  index: TreeIndex,
-): ReadonlyMap<EntryId, string> {
-  return new Map(
-    summaries.map(s => [
-      s.root,
-      firstLine(messageText(index.entries[s.first]?.message), 40) || NO_TEXT,
-    ]),
+/** The directory's roots that have a message, by their root entry. */
+const withEntries = (directory: ReadonlyMap<RootId, RootRecord>) =>
+  [...directory.values()].flatMap(r =>
+    r.entry === null ? [] : [{ ...r, entry: r.entry }],
   )
+
+/** Every root's messages, summed from the directory (ADR-0063). */
+export const messagesIn = (
+  directory: ReadonlyMap<RootId, RootRecord>,
+): number => {
+  let n = 0
+  for (const r of directory.values()) n += r.messages
+  return n
 }
 
 /**
- * Every root's label: its mark's title, else its first line. `App` builds it
- * once per change, and the tabs, the header, the inbox and the Archive tab
- * look labels up in it.
+ * Every root with a message, ascending by its root entry, as the tabs and
+ * the Archive tab read it: from the directory (ADR-0063), not the tree, so a
+ * root no tab holds is there too.
  */
-export function rootLabels(
-  lines: ReadonlyMap<EntryId, string>,
-  marks: ReadonlyMap<EntryId, MarkRecord>,
-): ReadonlyMap<EntryId, string> {
-  return new Map(
-    [...lines].map(([root, line]) => [root, marks.get(root)?.title ?? line]),
-  )
-}
+export const summariesOf = (
+  directory: ReadonlyMap<RootId, RootRecord>,
+): readonly RootSummary[] =>
+  withEntries(directory)
+    .flatMap(r =>
+      r.first === null
+        ? []
+        : [
+            {
+              root: r.entry,
+              first: r.first,
+              messages: r.messages,
+              newest: r.newest ?? r.first,
+              writers: r.writers,
+            },
+          ],
+    )
+    .sort((a, b) => (a.root < b.root ? -1 : a.root > b.root ? 1 : 0))
+
+/** Every root's first message's first line, by its root entry: its label while it has no title. */
+export const firstLinesOf = (
+  directory: ReadonlyMap<RootId, RootRecord>,
+): ReadonlyMap<EntryId, string> =>
+  new Map(withEntries(directory).map(r => [r.entry, r.firstLine]))
+
+/**
+ * Every root's label, by its root entry: its title, else its first line.
+ * `App` builds it once per change, and the tabs, the header, the inbox and
+ * the Archive tab look labels up in it.
+ */
+export const labelsOf = (
+  directory: ReadonlyMap<RootId, RootRecord>,
+): ReadonlyMap<EntryId, string> =>
+  new Map(withEntries(directory).map(r => [r.entry, r.title ?? r.firstLine]))
 
 export type TitlePlan =
   | { readonly kind: "refuse" }

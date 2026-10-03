@@ -54,7 +54,7 @@ async function commandsSection(check: Checks["check"]): Promise<void> {
     // What the lane is told about itself (ADR-0046), in a real container.
     const lane = h.laneWith("read it")?.name
     const name =
-      lane === undefined ? undefined : readNames(h.host.doc).get(lane)
+      lane === undefined ? undefined : readNames(h.host.session).get(lane)
     check(
       "a lane of its own is told it is in a lane, its offer, and its browser",
       name !== undefined &&

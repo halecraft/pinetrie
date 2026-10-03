@@ -10,6 +10,7 @@ import {
   type EntryId,
   ERR,
   firstLine,
+  indexTree,
   type LaneName,
   messageText,
   snapshotId,
@@ -49,7 +50,7 @@ import {
   wipState,
 } from "@pineta/marginalia"
 import type { Agent, ThreadLaneHandle } from "@pineta/pi"
-import { readTreeIndex } from "@pineta/reads"
+import { readLatestPrompt, readTreeIndex } from "@pineta/reads"
 import { readEntryMessage, readLaneTip } from "@pineta/schema"
 import { type Basics, failed, messageOf } from "../basics.ts"
 import type { Containers } from "./containers.ts"
@@ -260,8 +261,12 @@ export interface Updates {
   ): Promise<Prepared>
   /** A resolution run ended: its outcome, from the repository. */
   landingEnded(lane: LaneName, prompt: EntryId): Promise<void>
-  /** pi's hook: the resolution run's agent asked for guidance. */
-  askedForGuidance(lane: LaneName): void
+  /**
+   * pi's hook: the lane's agent asked for guidance. Taken only while the
+   * lane's run is a resolution, its prompt a land message; every lane has
+   * the tool (S85), so another run's call is answered that nothing is asked.
+   */
+  askedForGuidance(lane: LaneName): boolean
 }
 
 export function createUpdates(deps: {
@@ -274,7 +279,7 @@ export function createUpdates(deps: {
   readonly writeRevision: Turns["writeRevision"]
 }): Updates {
   const { basics, setup, registry, containers } = deps
-  const { doc } = basics
+  const { docs } = basics
   const line = setup.lanes?.line ?? DEFAULT_LINE
   /** Resolution runs whose agent called `ask_for_guidance`. */
   const asked = new Set<LaneName>()
@@ -305,8 +310,10 @@ export function createUpdates(deps: {
 
   /** Anything edited in the lane since its last run, committed as a turn. */
   async function commitEdits(lane: LaneName, jj: Runner): Promise<void> {
-    const tip = readLaneTip(doc, lane)
-    if (tip === null) return
+    // The lane's own root's document (ADR-0063).
+    const doc = await docs.laneDoc(lane)
+    const tip = doc === null ? null : readLaneTip(doc, lane)
+    if (doc === null || tip === null) return
     await commitTurn(jj, {
       title: "edits between runs",
       entry: turnEntry(readTreeIndex(doc), tip),
@@ -369,7 +376,11 @@ export function createUpdates(deps: {
 
   return {
     askedForGuidance(lane) {
+      const doc = docs.docOfLane(lane)
+      if (doc === null || readLatestPrompt(doc, lane)?.role !== "land")
+        return false
       asked.add(lane)
+      return true
     },
 
     async prepareUpdate(lane, by, intent, toLine) {
@@ -395,12 +406,13 @@ export function createUpdates(deps: {
                   landing: basics.newId(),
                 }
               : merged
+          const doc = await docs.laneDoc(lane)
           const settle = planSettle(facts, {
             lane,
             by,
             intent,
             from,
-            index: readTreeIndex(doc),
+            index: doc === null ? indexTree({}) : readTreeIndex(doc),
             now: basics.now(),
           })
           return applySettle(
@@ -416,7 +428,11 @@ export function createUpdates(deps: {
     },
 
     async landingEnded(lane, prompt) {
-      const stored = readEntryMessage(doc, prompt)
+      const doc = await docs.laneDoc(lane)
+      const stored =
+        doc === null
+          ? { present: false as const }
+          : readEntryMessage(doc, prompt)
       const details = stored.present ? decodeLand(stored.message) : undefined
       const wasAsked = asked.delete(lane)
       if (!registry.isOwn(lane) || setup.root === null || details === undefined)
