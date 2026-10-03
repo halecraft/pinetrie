@@ -338,4 +338,9 @@ lane name, a user id. See `docs/findings/S18-nested-values.md`. The rule is ADR-
 into one key with a NUL is ours, mirroring pi's reference storage. The key is
 an identity, never parsed: readers use each stored value's own `namespace` and
 `key` properties. `physicalKey` is the single definition, used by the writer in
-`packages/pi` and by point lookups here.
+`packages/pi` and by point lookups here. `valuePrefix` is the one other
+function that depends on the format: the NUL ends the namespace, so a key
+prefix within one namespace is a physical-key prefix (`scanValues`). The
+record itself is `StoredValueRecord`, defined here because it is Pineta's
+format, not pi's: `KynetaStorage` writes it with a `wid` per write, and
+`writeLaneTip` writes one without.

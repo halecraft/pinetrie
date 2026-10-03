@@ -1,37 +1,14 @@
 // pi/storage — our implementation of pi's `Storage` port, over a Kyneta doc.
 //
-// Promoted from sandbox/s1-seq/kyneta-storage-seq.mjs, which passes pi's own
-// 21-case conformance suite. Changes from the spike are confined to wiring:
-//   - pi is imported by package specifier (the install is symlinked into
-//     node_modules) instead of an absolute filesystem path;
-//   - the document shape lives in schema/, so this file no longer defines it;
-//   - the caller supplies the doc, because the host replicates that same doc.
-// The seq logic below is unchanged.
+// `seq` is a replica-local arrival index, never stored (ADR-0013;
+// `arrivals.ts`). Two paths index the document: a local commit indexes its own
+// writes with pi's seqs, and a replayed change (hydration, or a merge from
+// another replica) marks keys dirty, which the next read indexes. Both end in
+// `ArrivalIndex.apply`.
 //
-// THE DESIGN, in one sentence (ADR-0013):
-//   `seq` is no longer stored in the shared CRDT. It is a REPLICA-LOCAL
-//   ARRIVAL INDEX, derived from the document, assigned in the order this
-//   replica first OBSERVES each item.
-//
-// Why arrival order and not causal order (the crux of S1):
-//   pi's `findEntries` turns a cursor into `fromSeq: cursor.seq + 1`
-//   (session.js:242). That is arithmetic on a dense integer line. Any order
-//   that can INSERT BETWEEN two already-issued positions breaks pagination:
-//   a late-arriving entry that sorts earlier shifts every later entry up by
-//   one, so `cursor.seq + 1` re-reads an entry already returned.
-//   Arrival order cannot insert in the middle: a newly observed item always
-//   gets a position at the END. Cursors are therefore stable by construction.
-//
-// Invariant maintained: seq is a TOPOLOGICAL LINEAR EXTENSION of the parent
-// DAG (a parent always has a lower seq than its children). `scanBranch`
-// filters its parent-walk with seq comparisons, so this is load-bearing.
-//
-// Nothing about seq is replicated. Per-item identity in the shared doc is
-// coordination-free:
-//     entries    -> id   (uuidv7, ADR-0009)
-//     usage rows -> id
-//     values     -> wid  (unique token per write, peer-tagged)
-//     list elems -> eid  (unique token per append, peer-tagged)
+// This file is the shell: it reads the document, calls the pure planners
+// (`dirty.ts`, `arrivals.ts`, `commit.ts`, `queries.ts`), writes their plans,
+// and keeps the commit queue and close state.
 
 import type {
   CommitResult,
@@ -57,287 +34,91 @@ import {
   validateCommittedWrites,
   value,
 } from "@earendil-works/pi-agent-core"
-// `Usage` is pi-ai's type; pi-agent-core re-uses it but does not re-export it.
-import type { Usage } from "@earendil-works/pi-ai"
-import { batch, type Segment, subscribe } from "@kyneta/schema"
-import {
-  type BlobStore,
-  type ImageRef,
-  orderNewEntries,
-  tailEdit,
-} from "@pineta/core"
+import { batch, subscribe } from "@kyneta/schema"
+import { type BlobStore, type ImageRef, tailEdit } from "@pineta/core"
 import {
   applyTextEdits,
   newSessionDoc,
   physicalKey,
   type SessionDocHandle,
-  type StoredEntryRow,
+  type StoredValueRecord,
+  valuePrefix,
 } from "@pineta/schema"
+import { ArrivalIndex, type Observed, planArrivals } from "./arrivals.ts"
 import {
-  CHECKPOINT_NAMESPACE,
-  sealCheckpoint,
-  unsealCheckpoint,
-} from "./checkpoint.ts"
-import { addUsage, emptyUsage } from "./deep.ts"
+  type CommittedWrite,
+  type DocOp,
+  imagesOf,
+  planCommit,
+  type StoredUsageRow,
+} from "./commit.ts"
+import {
+  CLEAN,
+  EVERYTHING,
+  isClean,
+  join,
+  type Scope,
+  scopeOf,
+} from "./dirty.ts"
 import { sha256Of } from "./images.ts"
 import {
-  type BlobOf,
-  inlineImages,
-  PENDING_ENTRY_NAMESPACE,
-  pendingImages,
-  type RefOf,
-  rejoinImages,
-  rejoinPendingEntry,
-  splitImages,
-  splitPendingEntry,
-} from "./stored-images.ts"
-
-// pi orders value keys by Unicode CODE POINT, not UTF-16 code unit.
-function compareKeys(left: string, right: string): number {
-  const l = Array.from(left, c => c.codePointAt(0) ?? 0)
-  const r = Array.from(right, c => c.codePointAt(0) ?? 0)
-  const n = Math.min(l.length, r.length)
-  for (let i = 0; i < n; i++) {
-    const d = (l[i] ?? 0) - (r[i] ?? 0)
-    if (d !== 0) return d
-  }
-  return l.length - r.length
-}
-
-/**
- * The coordinate of a changefeed path segment, when it is a string key.
- *
- * `coord()` is the documented accessor — Kyneta's `Segment` interface states it
- * is the one to use for "identity `key`, schema/position walks" and that it is
- * total and never throws, unlike `resolve()`. The pre-TypeScript code read
- * `seg.key`, an implementation detail that exists on the runtime object but is
- * NOT on the published interface. That would have failed silently if Kyneta
- * ever stopped materialising the field: `field` becomes `undefined`, every
- * change falls into the catch-all branch, and reconcile degrades from O(delta)
- * to O(document) on every remote change — slow, not wrong, so nothing would
- * have alerted us. The type checker caught it.
- */
-const asKey = (segment: Segment | undefined): string | undefined => {
-  if (segment === undefined) return undefined
-  const coord = segment.coord()
-  return typeof coord === "string" ? coord : undefined
-}
-
-/** Narrow a changefeed op to the map set/delete shape we act on. */
-function asMapChange(
-  change: unknown,
-): { set?: Record<string, unknown>; delete?: string[] } | undefined {
-  if (change === null || typeof change !== "object") return undefined
-  const c = change as { type?: unknown; set?: unknown; delete?: unknown }
-  if (c.type !== "map") return undefined
-  return {
-    set:
-      c.set !== null && typeof c.set === "object"
-        ? (c.set as Record<string, unknown>)
-        : undefined,
-    delete: Array.isArray(c.delete) ? (c.delete as string[]) : undefined,
-  }
-}
-
-/** What a replayed change leaves to re-index: pi's four fields, by key. */
-export type Dirty =
-  | { readonly kind: "none" }
-  | { readonly kind: "all" }
-  | { readonly kind: "usage" }
-  | {
-      readonly kind: "entries" | "values" | "lists"
-      readonly keys: readonly string[] | "all"
-    }
-
-/**
- * Which of pi's indexes a replayed change can invalidate. Pure.
- *
- * Only pi's four fields back its `Storage` port, so only they are re-indexed;
- * every other root field (streams, runs, checkpoint text, and any added later)
- * is ignored. A change with no field replaces the whole document. The keys a
- * map change sets or deletes are re-indexed alone; a change of another shape
- * re-indexes the whole field. Kyneta's change union is broad, so only the
- * leading path segment and a map's keys are read. The ignore list this replaced
- * had to name every non-pi field, so a field it missed re-indexed everything.
- */
-export function dirtyFrom(
-  segments: readonly Segment[],
-  change: unknown,
-): Dirty {
-  const field = asKey(segments[0])
-  if (field === undefined) return { kind: "all" }
-  if (field === "usageRows") return { kind: "usage" }
-  if (field !== "entries" && field !== "values" && field !== "lists")
-    return { kind: "none" }
-  // A write inside one list (`lists[key]…`) names its key in the path.
-  const inList = field === "lists" ? asKey(segments[1]) : undefined
-  if (inList !== undefined) return { kind: "lists", keys: [inList] }
-  const ch = asMapChange(change)
-  // Entries are only ever added (ADR-0004), so a change that sets none of them
-  // is unexpected, and re-indexes them all. Values and lists are re-indexed by
-  // the keys set or deleted.
-  if (field === "entries")
-    return ch?.set === undefined
-      ? { kind: "entries", keys: "all" }
-      : { kind: "entries", keys: Object.keys(ch.set) }
-  if (ch === undefined || (ch.set === undefined && ch.delete === undefined))
-    return { kind: field, keys: "all" }
-  return {
-    kind: field,
-    keys: [...Object.keys(ch.set ?? {}), ...(ch.delete ?? [])],
-  }
-}
+  boundsAfter,
+  compareKeys,
+  type Located,
+  limitOf,
+  rowMatches,
+  selectBranch,
+  structureOf,
+  walkBranch,
+} from "./queries.ts"
+import type { BlobOf, RefOf } from "./stored-images.ts"
+import { fromStoredRow } from "./stored-row.ts"
+import { decodeValue, type StoredListElement } from "./stored-values.ts"
 
 let tokenCounter = 0
 const makeToken = (peer: string): string =>
   `${peer}-${(tokenCounter++).toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
-/**
- * What we put in the doc's `values` record. The doc stores `Schema.any()`, so
- * the substrate cannot describe this — but WE own the shape, so it is written
- * down here rather than spread as inline casts. `wid` is the write token whose
- * change signals a newer write won the LWW race (ADR-0013 arrival indexing).
- */
-interface StoredValueRecord {
-  namespace: string
-  key: string
-  value: unknown
-  wid: string
-  /**
-   * A tool-output checkpoint stored in two parts: `value` is its shell, and its
-   * text is in `checkpointText` under the same physical key (S22).
-   */
-  sealed?: true
-}
-
-/** One element of a stored list. `eid` is the per-append identity token. */
-interface StoredListElement {
-  eid: string
-  value: unknown
-}
-
-/**
- * pi's `Entry` minus `seq`. An IN-MEMORY shape, not the stored one.
- * `StoredEntryRow` is what sits in the document (ADR-0015).
- */
-/**
- * `Omit` over a union collapses it to the keys common to every member, which
- * for pi's `Entry` discards `message`, `summary`, `fromId` and the rest. The
- * conditional distributes over the union instead, so each variant keeps its
- * own fields. Distribution needs a naked type parameter, hence the helper.
- */
-type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
-  ? Omit<T, K>
-  : never
-
-export type EntryWithoutSeq = DistributiveOmit<Entry, "seq">
-
-/**
- * The columns `StoredEntryRow` hoists out of the entry. Listed once, so the
- * split and the rejoin cannot disagree about which keys are columns.
- */
-const HOISTED = ["id", "parentId", "type", "timestamp", "fromId"] as const
-
-/**
- * Keys `payload` must never carry: the hoisted columns, plus `seq`.
- *
- * `seq` needs naming here even though the write path already strips it. The
- * columns are typed, so an undeclared key cannot reach them \u2014 but `payload` is
- * `Schema.any()`, and a `seq` that got in there WOULD persist and replicate,
- * which is precisely what ADR-0013 forbids. The typed schema makes the rule
- * structural for the columns only; this list is what makes it hold for the
- * payload. A test asserts both halves.
- */
-const NEVER_IN_PAYLOAD: readonly string[] = [...HOISTED, "seq"]
-
-/**
- * Entry -> the row we persist (ADR-0015).
- *
- * `payload` carries the variant data and ONLY that. Putting the whole entry in
- * it would give `parentId` two homes, and nothing would keep them equal:
- * `#reconcile` orders arrivals from the column while a renderer could read the
- * blob. A round-trip test cannot detect that, because rejoining from either
- * copy yields the same entry. The guard is the disjointness case in
- * `storage.test.ts`.
- *
- * A message's image parts whose blob `refOf` finds are stored as references,
- * without their bytes (ADR-0051).
- */
-export function toStoredRow(
-  entry: EntryWithoutSeq,
-  refOf: RefOf,
-): StoredEntryRow {
-  const payload: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(entry)) {
-    if (NEVER_IN_PAYLOAD.includes(k)) continue
-    payload[k] = k === "message" ? splitImages(v, refOf) : v
-  }
-  return {
-    id: entry.id,
-    parentId: entry.parentId,
-    type: entry.type,
-    timestamp: entry.timestamp,
-    // `fromId` exists only on `branch_summary`, so the discriminant narrows it
-    // rather than a cast. If pi ever renames or drops that variant, this
-    // comparison stops type-checking, which is the warning we want.
-    // Absent and null are different facts: the column records null and
-    // `fromStoredRow` restores absence.
-    fromId: entry.type === "branch_summary" ? entry.fromId : null,
-    payload,
+/** Store one planned operation. The only code that writes the document on commit. */
+function writeOp(d: SessionDocHandle, op: DocOp): void {
+  switch (op.kind) {
+    case "entry":
+      d.entries.set(op.row.id, op.row)
+      return
+    case "usage":
+      d.usageRows.set(op.row.id, op.row)
+      return
+    case "value": {
+      d.values.set(op.pkey, op.record)
+      if (op.text === undefined) {
+        if (d.checkpointText.has(op.pkey)) d.checkpointText.delete(op.pkey)
+        return
+      }
+      // A checkpoint's text is written as edits to its own text, so each
+      // write stores what changed, not the whole view again.
+      if (!d.checkpointText.has(op.pkey)) d.checkpointText.set(op.pkey, "")
+      const text = d.checkpointText.at(op.pkey)
+      if (text !== undefined) applyTextEdits(text, tailEdit(text(), op.text))
+      return
+    }
+    case "element": {
+      if (!d.lists.has(op.pkey)) d.lists.set(op.pkey, [])
+      const list = d.lists.at(op.pkey)
+      if (list === undefined)
+        throw new Error(`list vanished mid-commit: ${op.pkey}`)
+      list.push(op.element)
+      return
+    }
+    case "delete":
+      if (op.field === "lists") {
+        d.lists.delete(op.pkey)
+        return
+      }
+      d.values.delete(op.pkey)
+      if (d.checkpointText.has(op.pkey)) d.checkpointText.delete(op.pkey)
+      return
   }
 }
-
-/**
- * Row -> pi's `Entry`, identical to what pi wrote.
- *
- * `seq` is supplied by the caller rather than read from the row: it is a
- * replica-local arrival index (ADR-0013) and never lives in the document.
- * Passing it here keeps the pairing with `toStoredRow` visible in the type.
- *
- * The return needs a double cast, because a union member cannot be built from
- * a dynamic object. What that cast actually trusts is narrower than it looks:
- *
- *   - the COLUMNS are typed by the Kyneta schema, and a row from a peer on a
- *     different build materializes missing fields as schema defaults rather
- *     than as garbage (measured in S17/P1c), so they are well-formed.
- *   - the WRITE path is checked by pi's own `validateCommittedWrites`.
- *   - a reference in `payload` is rejoined with the bytes `blobOf` reads, or
- *     with a line saying the blob is gone (`rejoinImages`).
- *   - `payload` is unchecked, and is not checkable here. pi ships no schema
- *     for `Entry` \u2014 its typebox use is for tool parameters \u2014 so validating it
- *     would mean hand-writing a copy of pi's shape in this repository, which
- *     is the coupling ADR-0015 exists to avoid.
- *
- * So the residual is provenance for `payload`, which is ADR-0015's open
- * question, not a defect in this function.
- */
-export function fromStoredRow(
-  row: StoredEntryRow,
-  seq: number,
-  blobOf: BlobOf,
-): Entry {
-  const payload = row.payload as Record<string, unknown>
-  const rebuilt: Record<string, unknown> = {
-    ...payload,
-    ...("message" in payload
-      ? { message: rejoinImages(payload.message, blobOf) }
-      : {}),
-    id: row.id,
-    parentId: row.parentId,
-    type: row.type,
-    timestamp: row.timestamp,
-    seq,
-  }
-  // Restore absence: a message entry never carried `fromId` at all.
-  if (row.fromId !== null) rebuilt.fromId = row.fromId
-  return rebuilt as unknown as Entry
-}
-
-/** A commit's writes, each with its seq. */
-type Prepared = ReturnType<typeof prepareStorageCommit>
-
-/** A usage row as stored: pi's `UsageRow` minus the never-stored `seq`. */
-type StoredUsageRow = Omit<UsageRow, "seq">
 
 export interface KynetaStorageOptions {
   readonly doc?: SessionDocHandle
@@ -351,40 +132,22 @@ export interface KynetaStorageOptions {
 }
 
 /**
- * `implements Storage` is the point of this annotation: pi's own interface now
- * checks all eleven methods at compile time. The 21-case conformance suite
- * proves the behaviour; this proves the shape, and catches a signature drift on
- * a pi upgrade before the suite is even run.
+ * `implements Storage` makes pi's interface check all eleven methods at
+ * compile time, so a signature drift on a pi upgrade fails before the
+ * conformance suite runs.
  */
 export class KynetaStorage implements Storage {
-  #doc: SessionDocHandle
-  #blobs: Pick<BlobStore, "get" | "ref"> | undefined
-  #now: () => number
-  #peer: string
+  readonly #doc: SessionDocHandle
+  readonly #blobs: Pick<BlobStore, "get" | "ref"> | undefined
+  readonly #now: () => number
+  readonly #peer: string
+  readonly #index = new ArrivalIndex()
+  readonly #unsubscribe: () => void
+  /** A caller's doc may already hold state, so everything starts dirty. */
+  #scope: Scope = EVERYTHING
   #commitQueue: Promise<unknown> = Promise.resolve()
   #state: "open" | "closing" | "closed" = "open"
   #closePromise: Promise<void> | undefined
-  #unsubscribe: (() => void) | undefined
-
-  // ---- the derived local index (NOT replicated) --------------------------
-  #seq = 0 // last assigned seq; next is #seq + 1
-  #entrySeq = new Map<string, number>() // id -> seq
-  #entryOrder: string[] = [] // ids, ascending seq (append-only)
-  #usageSeq = new Map<string, number>() // id -> seq
-  #usageOrder: string[] = []
-  #valueSeq = new Map<string, { wid: string; seq: number }>()
-  #listSeq = new Map<string, Map<string, number>>() // pkey -> eid -> seq
-  #messageCount = 0
-  #usageTotal: Usage = emptyUsage()
-
-  // dirty scopes collected from the changefeed
-  #dirtyEntryKeys = new Set<string>()
-  #dirtyEntriesAll = false
-  #dirtyUsage = false
-  #dirtyValueKeys = new Set<string>()
-  #dirtyValuesAll = false
-  #dirtyListKeys = new Set<string>()
-  #dirtyListsAll = false
 
   constructor(options: KynetaStorageOptions = {}) {
     this.#now = options.now ?? Date.now
@@ -393,216 +156,76 @@ export class KynetaStorage implements Storage {
     this.#blobs = options.blobs
 
     // Only state no writer on this replica made (`replay: true`: a merge, a
-    // reset) needs reconciling. Local commits (`replay: false`) index
-    // themselves inline.
+    // reset) needs reconciling. Local commits index themselves.
     this.#unsubscribe = subscribe(this.#doc, cs => {
       if (cs.replay !== true) return
-      for (const op of cs.changes) {
-        const dirty = dirtyFrom(op.path?.segments ?? [], op.change)
-        switch (dirty.kind) {
-          case "none":
-            break
-          case "all":
-            this.#dirtyEntriesAll = true
-            this.#dirtyUsage = true
-            this.#dirtyValuesAll = true
-            this.#dirtyListsAll = true
-            break
-          case "entries":
-            if (dirty.keys === "all") this.#dirtyEntriesAll = true
-            else for (const k of dirty.keys) this.#dirtyEntryKeys.add(k)
-            break
-          case "usage":
-            this.#dirtyUsage = true
-            break
-          case "values":
-            if (dirty.keys === "all") this.#dirtyValuesAll = true
-            else for (const k of dirty.keys) this.#dirtyValueKeys.add(k)
-            break
-          case "lists":
-            if (dirty.keys === "all") this.#dirtyListsAll = true
-            else for (const k of dirty.keys) this.#dirtyListKeys.add(k)
-            break
-        }
-      }
+      this.#scope = join(this.#scope, scopeOf(cs.changes))
     })
-
-    // A doc supplied by the caller may already hold state (rehydration).
-    this.#dirtyEntriesAll = true
-    this.#dirtyUsage = true
-    this.#dirtyValuesAll = true
-    this.#dirtyListsAll = true
   }
 
-  get doc(): SessionDocHandle {
-    return this.#doc
-  }
-
-  /** Test seam: the local index, for assertions. Reconciles first, so it
-   *  reports exactly what the next read would see. */
-  get index(): {
-    lastSeq: number
-    entrySeq: Map<string, number>
-    entryOrder: string[]
-    allSeqs: number[]
-  } {
-    if (this.#state === "open") this.#reconcile()
-    const allSeqs = [
-      ...this.#entrySeq.values(),
-      ...this.#usageSeq.values(),
-      ...[...this.#valueSeq.values()].map(v => v.seq),
-      ...[...this.#listSeq.values()].flatMap(m => [...m.values()]),
-    ]
-    return {
-      lastSeq: this.#seq,
-      entrySeq: new Map(this.#entrySeq),
-      entryOrder: [...this.#entryOrder],
-      allSeqs,
-    }
-  }
-
-  // ---- reconciliation: give newly OBSERVED items the next local seqs -----
-  #nextSeq(): number {
-    this.#seq += 1
-    return this.#seq
-  }
+  // ---- reconciliation: give newly observed items the next local seqs -----
 
   #reconcile(): void {
-    if (
-      !this.#dirtyEntriesAll &&
-      this.#dirtyEntryKeys.size === 0 &&
-      !this.#dirtyUsage &&
-      !this.#dirtyValuesAll &&
-      !this.#dirtyListsAll &&
-      this.#dirtyValueKeys.size === 0 &&
-      this.#dirtyListKeys.size === 0
-    ) {
-      return
+    if (isClean(this.#scope)) return
+    const observed = this.#observe(this.#scope)
+    const { batch: arrived, cycle } = planArrivals(observed, this.#index)
+    this.#index.apply(arrived)
+    this.#scope = CLEAN
+    if (cycle.length > 0)
+      throw new Error(`Entries on a parent cycle: ${cycle.join(",")}`)
+  }
+
+  /**
+   * The document, read for the scope's keys. For a whole field of values or
+   * lists, the keys the index holds are read too, so a deletion is seen.
+   */
+  #observe(scope: Scope): Observed {
+    const doc = this.#doc
+    const index = this.#index
+    const keysOf = (
+      keys: ReadonlySet<string> | "all",
+      all: () => Iterable<string>,
+    ): Iterable<string> => (keys === "all" ? new Set(all()) : keys)
+
+    const entries = new Map<string, { parentId: string | null; type: string }>()
+    for (const id of keysOf(scope.entries, () => Object.keys(doc.entries()))) {
+      const row = doc.entries.get(id)
+      if (row !== undefined && row !== null)
+        entries.set(id, { parentId: row.parentId, type: row.type })
     }
 
-    // --- entries: topological (parents first), uuidv7 order as tiebreak ---
-    // Candidate ids come from the CHANGEFEED, so the cost is O(delta), not
-    // O(document). The full scan only runs on rehydration.
-    for (let attempt = 0; attempt < 2; attempt++) {
-      let entryCandidates: string[] | undefined
-      if (this.#dirtyEntriesAll) {
-        this.#dirtyEntriesAll = false
-        this.#dirtyEntryKeys.clear()
-        entryCandidates = Object.keys(this.#doc.entries())
-      } else if (this.#dirtyEntryKeys.size > 0) {
-        entryCandidates = [...this.#dirtyEntryKeys]
-        this.#dirtyEntryKeys = new Set()
-      }
-      if (entryCandidates !== undefined) {
-        const fresh = entryCandidates.filter(id => !this.#entrySeq.has(id))
-        if (fresh.length > 0) {
-          const rec = new Map<string, StoredEntryRow | undefined>()
-          for (const id of fresh) rec.set(id, this.#readEntryRaw(id))
-
-          // The ordering itself is a pure calculation in @pineta/core, where
-          // it is property-tested for permutation invariance. This shell only
-          // assigns the seqs it hands back.
-          const { ordered, unresolved } = orderNewEntries(
-            fresh,
-            id => rec.get(id)?.parentId,
-          )
-          for (const id of ordered) {
-            this.#entrySeq.set(id, this.#nextSeq())
-            this.#entryOrder.push(id)
-            if (rec.get(id)?.type === "message") this.#messageCount += 1
-          }
-
-          if (unresolved.length > 0) {
-            // A parent edge in neither the document nor this delta. Causal
-            // delivery should make this impossible; fall back to a full scan
-            // IN THIS SAME PASS rather than silently dropping entries.
-            if (attempt === 1) {
-              throw new Error(
-                `Unresolvable entry parents during reconcile: ${unresolved.join(",")}`,
-              )
-            }
-            this.#dirtyEntriesAll = true
-            continue
-          }
-        }
-      }
-      break
+    const usage = new Map<string, StoredUsageRow["usage"]>()
+    for (const id of keysOf(scope.usageRows, () =>
+      Object.keys(doc.usageRows()),
+    )) {
+      const row = doc.usageRows.get(id) as StoredUsageRow | undefined
+      if (row !== undefined) usage.set(id, row.usage)
     }
 
-    // --- usage rows ---
-    if (this.#dirtyUsage) {
-      this.#dirtyUsage = false
-      const all = this.#doc.usageRows() as Record<string, StoredUsageRow>
-      const fresh = Object.keys(all).filter(id => !this.#usageSeq.has(id))
-      fresh.sort()
-      for (const id of fresh) {
-        const row = all[id]
-        if (row === undefined) continue
-        this.#usageSeq.set(id, this.#nextSeq())
-        this.#usageOrder.push(id)
-        this.#usageTotal = addUsage(this.#usageTotal, row.usage)
-      }
+    const values = new Map<string, { wid: string | undefined } | undefined>()
+    for (const pkey of keysOf(scope.values, () => [
+      ...Object.keys(doc.values()),
+      ...index.valueKeys(),
+    ])) {
+      const record = this.#record(pkey)
+      values.set(pkey, record === undefined ? undefined : { wid: record.wid })
     }
 
-    // --- values: a changed `wid` means a newer write won the LWW race ---
-    let valueKeys: Set<string> | undefined
-    if (this.#dirtyValuesAll) {
-      this.#dirtyValuesAll = false
-      this.#dirtyValueKeys.clear()
-      valueKeys = new Set([
-        ...Object.keys(this.#doc.values()),
-        ...this.#valueSeq.keys(),
-      ])
-    } else if (this.#dirtyValueKeys.size > 0) {
-      valueKeys = this.#dirtyValueKeys
-      this.#dirtyValueKeys = new Set()
-    }
-    if (valueKeys !== undefined) {
-      const sorted = [...valueKeys].sort()
-      for (const pkey of sorted) {
-        const stored = this.#readValueRaw(pkey)
-        if (stored === undefined) {
-          this.#valueSeq.delete(pkey)
-          continue
-        }
-        const known = this.#valueSeq.get(pkey)
-        if (known === undefined || known.wid !== stored.wid) {
-          this.#valueSeq.set(pkey, { wid: stored.wid, seq: this.#nextSeq() })
-        }
-      }
+    const lists = new Map<string, readonly string[] | undefined>()
+    for (const pkey of keysOf(scope.lists, () => [
+      ...Object.keys(doc.lists()),
+      ...index.listKeys(),
+    ])) {
+      const list = doc.lists.at(pkey)
+      lists.set(
+        pkey,
+        list === undefined
+          ? undefined
+          : (list() as readonly StoredListElement[]).map(e => e.eid),
+      )
     }
 
-    // --- list elements ---
-    let listKeys: Set<string> | undefined
-    if (this.#dirtyListsAll) {
-      this.#dirtyListsAll = false
-      this.#dirtyListKeys.clear()
-      listKeys = new Set([
-        ...Object.keys(this.#doc.lists()),
-        ...this.#listSeq.keys(),
-      ])
-    } else if (this.#dirtyListKeys.size > 0) {
-      listKeys = this.#dirtyListKeys
-      this.#dirtyListKeys = new Set()
-    }
-    if (listKeys !== undefined) {
-      const sorted = [...listKeys].sort()
-      for (const pkey of sorted) {
-        const ref = this.#doc.lists.at(pkey)
-        if (ref === undefined) {
-          this.#listSeq.delete(pkey)
-          continue
-        }
-        let known = this.#listSeq.get(pkey)
-        if (known === undefined) {
-          known = new Map()
-          this.#listSeq.set(pkey, known)
-        }
-        for (const el of ref() as readonly StoredListElement[]) {
-          if (!known.has(el.eid)) known.set(el.eid, this.#nextSeq())
-        }
-      }
-    }
+    return { entries, usage, values, lists }
   }
 
   #assertOpen(): void {
@@ -614,81 +237,60 @@ export class KynetaStorage implements Storage {
     this.#reconcile()
   }
 
-  /**
-   * `entries` is a TYPED row now (ADR-0015), so this reader hands the row back
-   * as-is and `fromStoredRow` rebuilds pi's entry from it. `values` is still
-   * `Schema.any()`, so `#readValueRaw` below is the remaining place where an
-   * untyped record has to be re-typed.
-   */
-  #readEntryRaw(id: string): StoredEntryRow | undefined {
-    return this.#doc.entries.get(id) ?? undefined
-  }
-
-  #readValueRaw(pkey: string): StoredValueRecord | undefined {
+  #record(pkey: string): StoredValueRecord | undefined {
     return this.#doc.values.get(pkey) as StoredValueRecord | undefined
-  }
-
-  /** A stored record's value as pi wrote it: a sealed checkpoint rejoined. */
-  #valueOf(raw: StoredValueRecord, pkey: string): unknown {
-    if (raw.sealed === true)
-      return unsealCheckpoint(
-        raw.value,
-        this.#doc.checkpointText.at(pkey)?.() ?? "",
-      )
-    return raw.namespace === PENDING_ENTRY_NAMESPACE
-      ? rejoinPendingEntry(raw.value, this.#blobOf)
-      : raw.value
   }
 
   /** A blob's bytes, for the rejoin: none without a store. */
   #blobOf: BlobOf = sha => this.#blobs?.get(sha)
 
+  #located = (id: string): Located | undefined => {
+    const row = this.#doc.entries.get(id)
+    const seq = this.#index.entries.seqOf(id)
+    return row === undefined || row === null || seq === undefined
+      ? undefined
+      : { row, seq }
+  }
+
+  #entry = ({ row, seq }: Located): Entry =>
+    fromStoredRow(row, seq, this.#blobOf)
+
+  /** The rows a branch scan returns. Only these are rebuilt into entries. */
+  #branch(query: StorageBranchScan): Located[] {
+    this.#read()
+    return selectBranch(walkBranch(query.start, this.#located), query)
+  }
+
+  #stored<T>(pkey: string): StoredValue<T> | undefined {
+    const record = this.#record(pkey)
+    const seq = this.#index.valueAt(pkey)?.seq
+    if (record === undefined || seq === undefined) return undefined
+    return {
+      address: value<T>(record.namespace, record.key),
+      value: decodeValue(
+        record,
+        () => this.#doc.checkpointText.at(pkey)?.() ?? "",
+        this.#blobOf,
+      ) as T,
+      seq,
+    }
+  }
+
   /**
-   * The stored image of each inline image in `writes`, by its base64: the
-   * lookups the split needs, read before the batch. `read` stores its images
-   * before pi writes them (S59), so each is found by the hash of its bytes.
+   * The stored image of each inline image in `writes`, by its base64. `read`
+   * stores its images before pi writes them (S59), so each is found by the
+   * hash of its bytes.
    */
-  #imageRefs(writes: Prepared["writes"]): ReadonlyMap<string, ImageRef> {
+  #refOf(writes: readonly CommittedWrite[]): RefOf {
     const blobs = this.#blobs
     const refs = new Map<string, ImageRef>()
-    if (blobs === undefined) return refs
-    for (const write of writes) {
-      const images =
-        write.kind === "entry" && write.type === "message"
-          ? inlineImages(write.message)
-          : write.kind === "value" &&
-              write.op !== "delete" &&
-              write.namespace === PENDING_ENTRY_NAMESPACE
-            ? pendingImages(write.value)
-            : []
-      for (const data of images) {
+    if (blobs !== undefined)
+      for (const data of writes.flatMap(imagesOf)) {
         if (refs.has(data)) continue
         const ref = blobs.ref(sha256Of(Buffer.from(data, "base64")))
         if (ref !== undefined) refs.set(data, ref)
       }
-    }
-    return refs
-  }
-
-  #entry(id: string): Entry | undefined {
-    const raw = this.#readEntryRaw(id)
-    if (raw === undefined) return undefined
-    const seq = this.#entrySeq.get(id)
-    if (seq === undefined) return undefined
-    return fromStoredRow(raw, seq, this.#blobOf)
-  }
-
-  #storedValue<T>(namespace: string, key: string): StoredValue<T> | undefined {
-    const pkey = physicalKey(namespace, key)
-    const raw = this.#readValueRaw(pkey)
-    if (raw === undefined) return undefined
-    const seq = this.#valueSeq.get(pkey)?.seq
-    if (seq === undefined) return undefined
-    return {
-      address: value<T>(raw.namespace, raw.key),
-      value: this.#valueOf(raw, pkey) as T,
-      seq,
-    }
+    return data => refs.get(data)
   }
 
   // --- commit -------------------------------------------------------------
@@ -704,136 +306,23 @@ export class KynetaStorage implements Storage {
 
   #applyCommit(writes: Write[]): CommitResult {
     this.#reconcile() // never allocate a seq below an already-observed one
-    const firstSeq = this.#seq + 1
+    const firstSeq = this.#index.lastSeq + 1
     const prepared = prepareStorageCommit(writes, firstSeq, this.#now())
-
     validateCommittedWrites(prepared.writes, firstSeq, {
       hasEntryOrUsageId: id =>
         this.#doc.entries.has(id) || this.#doc.usageRows.has(id),
       hasEntryId: id => this.#doc.entries.has(id),
     })
-
-    // Stage index mutations; apply only after the substrate batch succeeds.
-    const stagedEntries: Array<[string, number]> = []
-    const stagedUsage: Array<[string, number]> = []
-    const stagedValues: Array<[string, { wid: string; seq: number } | null]> =
-      []
-    const stagedLists: Array<[string, { eid: string; seq: number } | null]> = []
-    let messageDelta = 0
-    let usageTotal = this.#usageTotal
-    const refs = this.#imageRefs(prepared.writes)
-    const refOf: RefOf = data => refs.get(data)
-
-    batch(this.#doc, d => {
-      for (const write of prepared.writes) {
-        switch (write.kind) {
-          case "entry": {
-            const { kind: _k, seq: _s, ...entry } = write
-            d.entries.set(entry.id, toStoredRow(entry, refOf))
-            stagedEntries.push([entry.id, write.seq])
-            if (entry.type === "message") messageDelta += 1
-            break
-          }
-          case "usage": {
-            const { kind: _k, seq: _s, ...row } = write
-            d.usageRows.set(row.id, row)
-            stagedUsage.push([row.id, write.seq])
-            usageTotal = addUsage(usageTotal, row.usage)
-            break
-          }
-          case "value": {
-            const pkey = physicalKey(write.namespace, write.key)
-            if (write.op === "delete") {
-              d.values.delete(pkey)
-              if (d.checkpointText.has(pkey)) d.checkpointText.delete(pkey)
-              stagedValues.push([pkey, null])
-            } else {
-              const wid = makeToken(this.#peer)
-              // A checkpoint's text is written as edits to its own text, so
-              // each write stores what changed, not the whole view again.
-              const sealed =
-                write.namespace === CHECKPOINT_NAMESPACE
-                  ? sealCheckpoint(write.value)
-                  : undefined
-              const stored =
-                write.namespace === PENDING_ENTRY_NAMESPACE
-                  ? splitPendingEntry(write.value, refOf)
-                  : write.value
-              d.values.set(pkey, {
-                namespace: write.namespace,
-                key: write.key,
-                value: sealed === undefined ? stored : sealed.shell,
-                wid,
-                ...(sealed === undefined ? {} : { sealed: true }),
-              })
-              if (sealed !== undefined) {
-                if (!d.checkpointText.has(pkey)) d.checkpointText.set(pkey, "")
-                const text = d.checkpointText.at(pkey)
-                if (text !== undefined)
-                  applyTextEdits(text, tailEdit(text(), sealed.text))
-              } else if (d.checkpointText.has(pkey))
-                d.checkpointText.delete(pkey)
-              stagedValues.push([pkey, { wid, seq: write.seq }])
-            }
-            break
-          }
-          case "list": {
-            const pkey = physicalKey(write.namespace, write.key)
-            if (write.op === "delete") {
-              d.lists.delete(pkey)
-              stagedLists.push([pkey, null])
-            } else {
-              if (!d.lists.has(pkey)) d.lists.set(pkey, [])
-              const eid = makeToken(this.#peer)
-              const listRef = d.lists.at(pkey)
-              if (listRef === undefined) {
-                throw new Error(`list vanished mid-commit: ${pkey}`)
-              }
-              listRef.push({ eid, value: write.value })
-              stagedLists.push([pkey, { eid, seq: write.seq }])
-            }
-            break
-          }
-        }
-      }
+    const plan = planCommit(prepared.writes, {
+      refOf: this.#refOf(prepared.writes),
+      token: () => makeToken(this.#peer),
     })
-
-    for (const [id, seq] of stagedEntries) {
-      this.#entrySeq.set(id, seq)
-      this.#entryOrder.push(id)
-    }
-    for (const [id, seq] of stagedUsage) {
-      this.#usageSeq.set(id, seq)
-      this.#usageOrder.push(id)
-    }
-    for (const [pkey, v] of stagedValues) {
-      if (v === null) this.#valueSeq.delete(pkey)
-      else this.#valueSeq.set(pkey, v)
-    }
-    for (const [pkey, v] of stagedLists) {
-      if (v === null) this.#listSeq.delete(pkey)
-      else {
-        let bucket = this.#listSeq.get(pkey)
-        if (bucket === undefined) {
-          bucket = new Map<string, number>()
-          this.#listSeq.set(pkey, bucket)
-        }
-        bucket.set(v.eid, v.seq)
-      }
-    }
-    this.#messageCount += messageDelta
-    this.#usageTotal = usageTotal
-    this.#seq = Math.max(this.#seq, prepared.writes.at(-1)?.seq ?? this.#seq)
-
-    // Our own writes echo through the changefeed without `replay`, so nothing
-    // was marked dirty; but be explicit rather than rely on that.
-    this.#dirtyUsage = false
-
-    return { ...prepared.result, stats: this.#stats() }
-  }
-
-  #stats(): SessionStats {
-    return { messageCount: this.#messageCount, usage: this.#usageTotal }
+    batch(this.#doc, d => {
+      for (const op of plan.ops) writeOp(d, op)
+    })
+    // After the batch, so a write that throws leaves the index as it was.
+    this.#index.apply(plan.batch)
+    return { ...prepared.result, stats: this.#index.stats() }
   }
 
   // --- queries ------------------------------------------------------------
@@ -844,8 +333,8 @@ export class KynetaStorage implements Storage {
     this.#read()
     const found = new Map<string, Entry>()
     for (const id of ids) {
-      const entry = this.#entry(id)
-      if (entry !== undefined) found.set(id, entry)
+      const located = this.#located(id)
+      if (located !== undefined) found.set(id, this.#entry(located))
     }
     return found
   }
@@ -855,7 +344,7 @@ export class KynetaStorage implements Storage {
     _context: Context,
   ): Promise<StoredValue<T> | undefined> {
     this.#read()
-    return this.#storedValue<T>(address.namespace, address.key)
+    return this.#stored<T>(physicalKey(address.namespace, address.key))
   }
 
   async scanValues<T>(
@@ -863,19 +352,14 @@ export class KynetaStorage implements Storage {
     _context: Context,
   ): Promise<StoredValue<T>[]> {
     this.#read()
-    const out: StoredValue<T>[] = []
-    for (const [pkey, meta] of this.#valueSeq) {
-      const raw = this.#readValueRaw(pkey)
-      if (raw === undefined) continue
-      if (raw.namespace !== prefix.namespace || !raw.key.startsWith(prefix.key))
-        continue
-      out.push({
-        address: value<T>(raw.namespace, raw.key),
-        value: this.#valueOf(raw, pkey) as T,
-        seq: meta.seq,
-      })
-    }
-    return out.sort((a, b) => compareKeys(a.address.key, b.address.key))
+    const under = valuePrefix(prefix.namespace, prefix.key)
+    return this.#index
+      .valueKeys()
+      .filter(pkey => pkey.startsWith(under))
+      .map(pkey => this.#stored<T>(pkey))
+      .filter(stored => stored !== undefined)
+      .toArray()
+      .sort((a, b) => compareKeys(a.address.key, b.address.key))
   }
 
   async readList<T>(
@@ -886,143 +370,67 @@ export class KynetaStorage implements Storage {
     this.#read()
     const resolved = resolveListReadOptions(options)
     const pkey = physicalKey(address.namespace, address.key)
-    const ref = this.#doc.lists.at(pkey)
-    if (ref === undefined) return []
-    const seqs = this.#listSeq.get(pkey) ?? new Map<string, number>()
-    const elements = (ref() as readonly StoredListElement[])
-      .map(e => ({ seq: seqs.get(e.eid), value: e.value as T }))
-      .filter((e): e is ListElement<T> => e.seq !== undefined)
-      .sort((a, b) => a.seq - b.seq)
-    const cursor = resolved.cursor
-    const filtered = elements.filter(e =>
-      cursor === undefined
-        ? true
-        : resolved.order === "asc"
-          ? e.seq > cursor.seq
-          : e.seq < cursor.seq,
+    const line = this.#index.list(pkey)
+    const stored = this.#doc.lists.at(pkey)
+    if (line === undefined || stored === undefined) return []
+    const values = new Map(
+      (stored() as readonly StoredListElement[]).map(e => [e.eid, e.value]),
     )
-    const ordered =
-      resolved.order === "asc" ? filtered : [...filtered].reverse()
-    return ordered.slice(0, resolved.limit)
+    return line
+      .walk(
+        resolved.order,
+        boundsAfter(resolved.order === "asc", resolved.cursor),
+      )
+      .filter(([eid]) => values.has(eid))
+      .map(([eid, seq]) => ({ seq, value: values.get(eid) as T }))
+      .take(resolved.limit)
+      .toArray()
   }
 
   async scanBranch(
     query: StorageBranchScan,
     _context: Context,
   ): Promise<Entry[]> {
-    this.#read()
-    const start = this.#entry(query.start)
-    if (start === undefined)
-      throw new Error(`Unknown branch start: ${query.start}`)
-
-    const path: Entry[] = []
-    let entry: Entry | undefined = start
-    while (entry !== undefined) {
-      path.push(entry)
-      if (entry.parentId === null) break
-      entry = this.#entry(entry.parentId)
-      if (entry === undefined) throw new Error("Corrupt branch: missing parent")
-    }
-    if (query.order === "oldestFirst") path.reverse()
-
-    const stopped: Entry[] = []
-    for (const candidate of path) {
-      stopped.push(candidate)
-      if (
-        candidate.id === query.stopAtId ||
-        candidate.type === query.stopAtType
-      )
-        break
-    }
-
-    const filtered = stopped
-      .filter(c => query.type === undefined || c.type === query.type)
-      .filter(
-        c =>
-          query.customType === undefined || c.customType === query.customType,
-      )
-      .filter(c => {
-        const cursor = query.cursor
-        if (cursor === undefined) return true
-        return query.order === "oldestFirst"
-          ? c.seq > cursor.seq
-          : c.seq < cursor.seq
-      })
-    return query.limit === undefined
-      ? filtered
-      : filtered.slice(0, Math.max(0, query.limit))
+    return this.#branch(query).map(this.#entry)
   }
 
   async scanBranchStructure(
     query: StorageBranchScan,
-    context: Context,
+    _context: Context,
   ): Promise<EntryStructure[]> {
-    return (await this.scanBranch(query, context)).map(entry => ({
-      id: entry.id,
-      parentId: entry.parentId,
-      seq: entry.seq,
-      timestamp: entry.timestamp,
-      type: entry.type,
-      ...(entry.customType === undefined
-        ? {}
-        : { customType: entry.customType }),
-    }))
+    return this.#branch(query).map(structureOf)
   }
 
   async scanEntries(query: EntryScan, _context: Context): Promise<Entry[]> {
     this.#read()
-    const limit =
-      query.limit === undefined
-        ? Number.POSITIVE_INFINITY
-        : Math.max(0, Math.trunc(query.limit))
-    const order = this.#entryOrder // ascending seq by construction
-    const out: Entry[] = []
-    const descending = query.order === "desc"
-    let index = descending ? order.length - 1 : 0
-    while (index >= 0 && index < order.length && out.length < limit) {
-      const id = order[index]
-      index += descending ? -1 : 1
-      if (id === undefined) continue
-      const seq = this.#entrySeq.get(id)
-      if (seq === undefined) continue
-      if (query.fromSeq !== undefined && seq < query.fromSeq) continue
-      if (query.toSeq !== undefined && seq > query.toSeq) continue
-      const raw = this.#readEntryRaw(id)
-      if (raw === undefined) continue
-      if (query.type !== undefined && raw.type !== query.type) continue
-      // `customType` lives in the payload: it is pi's variant data, not one of
-      // the columns Pineta reasons about.
-      if (
-        query.customType !== undefined &&
-        (raw.payload as { customType?: string }).customType !== query.customType
+    return this.#index.entries
+      .walk(query.order ?? "asc", { from: query.fromSeq, to: query.toSeq })
+      .map(([id]) => this.#located(id))
+      .filter(
+        (located): located is Located =>
+          located !== undefined && rowMatches(located.row, query),
       )
-        continue
-      out.push(fromStoredRow(raw, seq, this.#blobOf))
-    }
-    return out
+      .take(limitOf(query.limit))
+      .map(located => this.#entry(located))
+      .toArray()
   }
 
   async scanUsage(query: UsageScan, _context: Context): Promise<UsageRow[]> {
     this.#read()
-    const rows: UsageRow[] = []
-    for (const id of this.#usageOrder) {
-      const seq = this.#usageSeq.get(id)
-      if (seq === undefined) continue
-      if (query.fromSeq !== undefined && seq < query.fromSeq) continue
-      if (query.toSeq !== undefined && seq > query.toSeq) continue
-      const raw = this.#doc.usageRows.get(id) as StoredUsageRow | undefined
-      if (raw === undefined) continue
-      rows.push({ ...raw, seq })
-    }
-    if (query.order === "desc") rows.reverse()
-    return query.limit === undefined
-      ? rows
-      : rows.slice(0, Math.max(0, query.limit))
+    return this.#index.usage
+      .walk(query.order ?? "asc", { from: query.fromSeq, to: query.toSeq })
+      .map(([id, seq]) => {
+        const row = this.#doc.usageRows.get(id) as StoredUsageRow | undefined
+        return row === undefined ? undefined : { ...row, seq }
+      })
+      .filter(row => row !== undefined)
+      .take(limitOf(query.limit))
+      .toArray()
   }
 
   async getStats(_context: Context): Promise<SessionStats> {
     this.#read()
-    return this.#stats()
+    return this.#index.stats()
   }
 
   close(_context: Context): Promise<void> {
@@ -1030,7 +438,7 @@ export class KynetaStorage implements Storage {
     this.#state = "closing"
     this.#closePromise = this.#commitQueue.then(() => {
       this.#state = "closed"
-      this.#unsubscribe?.()
+      this.#unsubscribe()
     })
     return this.#closePromise
   }

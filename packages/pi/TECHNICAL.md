@@ -11,10 +11,23 @@ app every spelling fails with `ERR_MODULE_NOT_FOUND`. See
 
 ## `storage.ts` — our implementation of pi's `Storage` port
 
+`storage.ts` is the shell: it reads the document, calls pure planners, writes
+their plans, and keeps the commit queue and close state. The rules are in
+pure modules, each with its own test:
+
+| module | holds |
+|---|---|
+| `stored-row.ts` | `toStoredRow` / `fromStoredRow`, `rowCustomType` |
+| `stored-values.ts` | `encodeValue` / `decodeValue` by namespace: checkpoints, pending entries, the rest as they are |
+| `dirty.ts` | `dirtyFrom`, and `Scope`: what a replay leaves to re-index |
+| `arrivals.ts` | `ArrivalLine`, `ArrivalIndex`, `planArrivals`: the local `seq` |
+| `commit.ts` | `planCommit`: a commit's writes as document operations and arrivals |
+| `queries.ts` | pi's read rules over rows: branch walk, stop-at, cursor, key order |
+
 ### The split and the rejoin (ADR-0015)
 
-pi hands us an `Entry`. The document stores a typed row. Two pure functions do
-the conversion, and they are the functional core of this module:
+pi hands us an `Entry`. The document stores a typed row. Two pure functions in
+`stored-row.ts` do the conversion:
 
 ```
 toStoredRow(entry, refOf)          Entry minus seq  ->  StoredEntryRow
@@ -25,10 +38,10 @@ Four rules hold them together:
 
 1. **`payload` carries variant data and only that.** `NEVER_IN_PAYLOAD` lists
    the hoisted columns plus `seq`. Duplicating a column into `payload` would
-   give `parentId` two homes with nothing keeping them equal — `#reconcile`
+   give `parentId` two homes with nothing keeping them equal — `planArrivals`
    orders arrivals from the column while a renderer might read the blob. A
    round-trip test **cannot** see this, because rejoining from either copy
-   yields the same entry. The disjointness test in `storage.test.ts` is the
+   yields the same entry. The disjointness test in `stored-row.test.ts` is the
    only guard.
 2. **`seq` is passed to `fromStoredRow`, never read from the row.** It is a
    replica-local arrival index (ADR-0013) and never lives in the document.
@@ -42,14 +55,15 @@ Four rules hold them together:
    `rejoinImages` restores `{type, data, mimeType}`, so pi reads what it
    wrote. The same pair runs on `pi.pending.entry` values, pi's copy of a
    message before its entry, since a deleted value stays in the history until
-   compaction (S59). `#applyCommit` gathers the lookups before its batch: the
-   SHA-256 of each part's bytes, and `blobs.ref`. A part the store lacks stays
+   compaction (S59); `stored-values.ts` decides which namespaces. Before its
+   batch, `#applyCommit` gathers the lookups for the images `imagesOf` finds:
+   the SHA-256 of each part's bytes, and `blobs.ref`. A part the store lacks stays
    inline, which is every part without `KynetaStorageOptions.blobs`, as
    conformance runs. A blob gone from the store rejoins as "[image <sha256>
    is no longer stored]". There is no cache: pi rejoins each entry on a
    branch about twice a model request, at 0.65 ms for a 2 MB image (S59).
 
-`storage.test.ts` is co-located here on purpose: `toStoredRow` takes pi's
+These tests are co-located here on purpose: `toStoredRow` takes pi's
 `Entry`, so a test under `test/` would import a pi type across the boundary
 ADR-0003 exists to hold. `vitest.config.mjs` includes `packages/*/*.test.ts`
 for this reason.
@@ -384,6 +398,11 @@ ignore, which had to name every non-pi field: one it missed (after `activeRunId`
 became `activeRuns`) made a replayed change to it re-index everything. That cost
 only work, never correctness, and never touched the host's own stream writes.
 
+`scopeOf` folds a changeset's changes into one `Scope`. Kyneta's `merge` names
+the keys it sets and deletes (`["usageRows"] {type:"map", set:{u1:…}}`,
+`["lists","l"] {type:"sequence"}`), so a merged usage row is re-indexed alone,
+as an entry is. The replay test in `storage.test.ts` relies on this.
+
 ### Values
 
 `setArchive`, `setMark`, `setStop`, `setDigest` and `setWorkRecord` write
@@ -397,22 +416,44 @@ generic value path, so conformance covers the storage shape. `setWorkRecord` tak
 
 ### `seq` is derived, not stored
 
-`#reconcile` assigns arrival order. The ordering itself is
-`orderNewEntries` in `@pineta/core` — pure, and property-tested there for
-permutation invariance. This shell only assigns the seqs it returns.
+`planArrivals` (`arrivals.ts`) assigns arrival order. Entries are ordered by
+`orderNewEntries` in `@pineta/core`, which is pure and property-tested there for
+permutation invariance. Its `unresolved` ids are a parent cycle and the entries
+below one: a parent outside the batch never blocks a child, whether or not it
+exists. `#reconcile` sequences the rest and throws once, naming the cycle.
 
-### Deferred: a pure `planCommit`
+Entries, usage rows and each list are an `ArrivalLine`: ids in ascending seq.
+Seqs only ever append above the last, so a `fromSeq`/`toSeq` range or pi's
+exclusive cursor (`boundsAfter`) is a contiguous slice, found by binary search,
+and `readList` does not sort.
 
-`#applyCommit` is already close to gather → plan → execute. `#reconcile`
-gathers, pi's `prepareStorageCommit` plans, `validateCommittedWrites` checks,
-and staged index arrays are applied only after the substrate batch succeeds —
-that staging pattern is good and worth keeping.
+Two assumptions to know:
 
-What remains interleaved is the `switch` inside `batch`, which decides *what to
-stage* while performing *the write*. A pure
-`planCommit(writes) -> { docOps, indexOps }` would separate them. Deliberately
-not done as part of ADR-0015: the row shaping was the right-sized extraction
-and holds the subtle logic.
+- **Parents before children rests on causal delivery.** A child whose parent
+  has not arrived is sequenced anyway, and the parent later gets a higher seq.
+  Kyneta delivers causally, so this does not happen; a check would make a
+  document with partial history fail on every read.
+- **A value record may have no `wid`.** `writeLaneTip` (fixtures, tests) writes
+  `{ namespace, key, value }`. Present and holding a token are separate facts:
+  such a record is indexed once and keeps its seq.
+
+### Commit and reconcile: plan, then apply
+
+Both paths end in `ArrivalIndex.apply(batch)`, the only code that changes the
+index, its counts and its last seq. `#reconcile` gathers (`#observe`, the
+document for the scope's keys), plans (`planArrivals`) and applies.
+`#applyCommit` gathers the image lookups, plans with `planCommit`, writes the
+operations in one `batch` (`writeOp`), and applies after the batch, so a write
+that throws leaves the index as it was.
+
+`Batch.through` is the last seq the batch used. pi gives a delete a seq, and a
+delete records nothing, so a commit ending in a delete would otherwise leave
+the next commit reusing that seq.
+
+The execute step reads in two places on purpose: `tailEdit(text(), …)` diffs
+against the live checkpoint text inside the batch, and `token()` makes each
+`wid` and `eid`. `planCommit` takes `token` as an argument, so a test gives it
+a counter.
 
 ### `deep.ts`
 

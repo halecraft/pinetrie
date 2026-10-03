@@ -1365,12 +1365,9 @@ export interface EntryOrdering {
   /** Ids in the order they should receive their arrival seq. */
   readonly ordered: readonly string[]
   /**
-   * Candidates whose parent edge could not be satisfied from the already-
-   * sequenced set or from this batch — a cycle, or an edge pointing outside
-   * both. Returned rather than thrown so the caller can decide: the storage
-   * adapter retries once with a full scan before giving up, because causal
-   * delivery should make this impossible and a silent drop would be worse
-   * than either.
+   * Candidates on a parent cycle, or below one. A parent outside the batch
+   * never blocks a candidate, whether or not it exists. Returned rather than
+   * thrown, so the caller decides what a cycle means.
    */
   readonly unresolved: readonly string[]
 }
@@ -1385,9 +1382,8 @@ export interface EntryOrdering {
  * the same delta in different orders must assign the same sequence, or stable
  * cursors silently skip entries.
  *
- * `parentOf` returns `null`/`undefined` for a root, for an entry absent from
- * the document, or for a parent already sequenced — all of which make the
- * candidate immediately ready.
+ * A candidate is ready at once when `parentOf` returns `null` or `undefined`,
+ * or a parent that is not itself a candidate.
  */
 export function orderNewEntries(
   candidates: Iterable<string>,

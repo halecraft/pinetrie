@@ -12,13 +12,13 @@ import type { BlobStore, ImageRef, Sha256, StoredImage } from "@pineta/core"
 import { newSessionDoc } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { sha256Of } from "./images.ts"
+import { KynetaStorage } from "./storage.ts"
+import { rejoinImages, splitImages } from "./stored-images.ts"
 import {
   type EntryWithoutSeq,
   fromStoredRow,
-  KynetaStorage,
   toStoredRow,
-} from "./storage.ts"
-import { rejoinImages, splitImages } from "./stored-images.ts"
+} from "./stored-row.ts"
 
 /** A 40×30 red PNG, 98 bytes. */
 const RED = Buffer.from(
@@ -178,4 +178,38 @@ describe("KynetaStorage: a tool's image is a reference in the session", () => {
       expect(JSON.stringify(doc.entries())).toContain(RED_DATA)
     }
   })
+})
+
+test("a branch scan rejoins only the entries it returns, and its structure none", async () => {
+  const blobs = mapBlobs()
+  blobs.put(RED_IMAGE)
+  let reads = 0
+  const storage = new KynetaStorage({
+    peerId: "t",
+    blobs: {
+      ...blobs,
+      get: sha => {
+        reads++
+        return blobs.get(sha)
+      },
+    },
+  })
+  await storage.commit(
+    [
+      insertEntry(readResult("e1")),
+      insertEntry({
+        id: "e2",
+        parentId: "e1",
+        type: "custom",
+        customType: "note",
+        data: 1,
+      }),
+    ],
+    BACKGROUND_CONTEXT,
+  )
+  await storage.scanBranchStructure({ start: "e2" }, BACKGROUND_CONTEXT)
+  await storage.scanBranch({ start: "e2", type: "custom" }, BACKGROUND_CONTEXT)
+  expect(reads).toBe(0)
+  await storage.scanBranch({ start: "e2" }, BACKGROUND_CONTEXT)
+  expect(reads).toBe(1)
 })

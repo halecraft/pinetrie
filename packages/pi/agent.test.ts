@@ -1,7 +1,7 @@
 // The facade over pi's lanes: its error mapping, and creating a lane under
 // the id the host gives.
 //
-// Co-located inside packages/pi for the same reason as storage.test.ts: both
+// Co-located inside packages/pi for the same reason as stored-row.test.ts: both
 // concern pi's behaviour, and a test under test/ would reach across the
 // boundary ADR-0003 holds.
 

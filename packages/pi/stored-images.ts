@@ -11,9 +11,6 @@ import {
   storedImage,
 } from "@pineta/core"
 
-/** The namespace of pi's `pendingEntry` values: a message before its entry. */
-export const PENDING_ENTRY_NAMESPACE = "pi.pending.entry"
-
 /** A blob's bytes, as the rejoin reads them. */
 export type BlobOf = (
   sha: Sha256,

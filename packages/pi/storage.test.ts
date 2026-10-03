@@ -1,144 +1,125 @@
-// ADR-0015's split and rejoin, stated as tests.
-//
-// Co-located INSIDE packages/pi on purpose. `toStoredRow` takes pi's `Entry`,
-// so a test in `test/` would have to import a pi type across the boundary that
-// ADR-0003 exists to hold. Here the test is inside the boundary, and nothing
-// pi-shaped escapes.
-//
-// The round-trip cases below are NOT sufficient on their own. A `payload` that
-// duplicates the hoisted columns round-trips perfectly, because rejoining from
-// either copy yields the same entry. Only the disjointness case sees that, so
-// it comes first.
-
-import { findSeqKeys } from "@pineta/core"
-import { describe, expect, test } from "vitest"
+// `KynetaStorage`'s shell: a replica's index rebuilt from another's writes,
+// and the edges of its seqs and value keys that pi's conformance suite does
+// not reach.
 import {
-  type EntryWithoutSeq,
-  fromStoredRow as rejoinWith,
-  toStoredRow as splitWith,
-} from "./storage.ts"
+  appendList,
+  BACKGROUND_CONTEXT as ctx,
+  deleteValue,
+  insertEntry,
+  insertUsage,
+  list,
+  setValue,
+  value,
+} from "@earendil-works/pi-agent-core"
+import { exportSince, merge, version } from "@kyneta/schema"
+import { entryId, laneNameForThread } from "@pineta/core"
+import { newSessionDoc, writeLaneTip } from "@pineta/schema"
+import { expect, test } from "vitest"
+import { emptyUsage } from "./deep.ts"
+import { KynetaStorage } from "./storage.ts"
 
-// An entry without images, stored where no blob is known.
-const toStoredRow = (entry: EntryWithoutSeq) =>
-  splitWith(entry, () => undefined)
-const fromStoredRow = (row: ReturnType<typeof toStoredRow>, seq: number) =>
-  rejoinWith(row, seq, () => undefined)
-
-const HOISTED = ["id", "parentId", "type", "timestamp", "fromId"]
-
-const message: EntryWithoutSeq = {
-  id: "e2",
-  parentId: "e1",
-  type: "message" as const,
-  timestamp: 1000,
-  message: {
-    role: "user",
-    content: [{ type: "text", text: "hi" }],
-    timestamp: 1000,
-  },
-}
-
-const branchSummary: EntryWithoutSeq = {
-  id: "e3",
-  parentId: "e1",
-  type: "branch_summary" as const,
-  timestamp: 1001,
-  fromId: "e9",
-  summary: "explored the fold",
-  fromHook: false,
-}
-
-const compaction: EntryWithoutSeq = {
-  id: "e4",
-  parentId: "e3",
-  type: "compaction" as const,
-  timestamp: 1002,
-  summary: "squashed",
-  retainedTail: [],
-  tokensBefore: 42,
-  fromHook: true,
-}
-
-const custom: EntryWithoutSeq = {
-  id: "e5",
-  parentId: null,
-  type: "custom" as const,
-  timestamp: 1003,
-  customType: "note",
-  data: { k: 1 },
-}
-
-describe("toStoredRow / fromStoredRow", () => {
-  test("payload excludes every hoisted column", () => {
-    // Two homes for parentId means two writers to one fact, and nothing keeps
-    // them equal: #reconcile orders from the column, a renderer could read the
-    // blob. The round-trip cases cannot detect this.
-    for (const entry of [message, branchSummary, compaction, custom]) {
-      const keys = Object.keys(
-        toStoredRow(entry).payload as Record<string, unknown>,
-      )
-      expect(keys.filter(k => HOISTED.includes(k))).toEqual([])
-    }
+const message = (id: string, parentId: string | null) =>
+  insertEntry({
+    id,
+    parentId,
+    type: "message",
+    message: { role: "user", content: id, timestamp: 1 },
   })
 
-  test("fromId: preserved on branch_summary, ABSENT on the others", () => {
-    // The guaranteed null-vs-absent case: every message entry hits it, because
-    // the column must hold null where pi carried no key at all.
-    const back = fromStoredRow(toStoredRow(branchSummary), 1)
-    expect(back).toHaveProperty("fromId", "e9")
+test("a replica indexes another's writes from merged changes, parents first", async () => {
+  const docA = newSessionDoc()
+  const docB = newSessionDoc()
+  const a = new KynetaStorage({ doc: docA, peerId: "a" })
+  const b = new KynetaStorage({ doc: docB, peerId: "b" })
+  const sync = () => {
+    const delta = exportSince(docA, version(docB))
+    if (delta !== null) merge(docB, delta)
+  }
+  const usage = { ...emptyUsage(), input: 5 }
 
-    for (const entry of [message, compaction, custom]) {
-      const rebuilt = fromStoredRow(toStoredRow(entry), 1)
-      expect(Object.hasOwn(rebuilt, "fromId")).toBe(false)
-    }
-  })
+  await a.commit(
+    [
+      message("z1", null),
+      message("m2", "z1"),
+      insertUsage({ id: "u1", usage, adjustment: false }),
+      setValue(value("ns", "k1"), 1),
+      setValue(value("ns", "k2"), 2),
+      appendList(list("ns", "l"), "x"),
+    ],
+    ctx,
+  )
+  sync()
+  await b.getStats(ctx)
+  await a.commit(
+    [
+      message("a3", "m2"),
+      insertUsage({ id: "u2", usage, adjustment: false }),
+      setValue(value("ns", "k1"), 10),
+      deleteValue(value("ns", "k2")),
+      appendList(list("ns", "l"), "y"),
+    ],
+    ctx,
+  )
+  sync()
 
-  test("round-trips all four pi entry types", () => {
-    for (const entry of [message, branchSummary, compaction, custom]) {
-      const back = fromStoredRow(toStoredRow(entry), 7)
-      expect(back).toEqual({ ...entry, seq: 7 })
-    }
+  const read = async (s: KynetaStorage) => ({
+    entries: (await s.scanEntries({}, ctx)).map(({ seq: _, ...e }) => e),
+    usage: (await s.scanUsage({ order: "desc" }, ctx)).map(
+      ({ seq: _, ...u }) => u,
+    ),
+    stats: await s.getStats(ctx),
+    values: (await s.scanValues(value("ns", ""), ctx)).map(v => [
+      v.address.key,
+      v.value,
+    ]),
+    list: (await s.readList(list("ns", "l"), undefined, ctx)).map(e => e.value),
   })
+  const fromB = await read(b)
+  expect(fromB).toEqual(await read(a))
+  expect(fromB.values).toEqual([["k1", 10]])
+  expect(fromB.stats.messageCount).toBe(3)
 
-  test("an absent optional stays absent, not null", () => {
-    const back = fromStoredRow(toStoredRow(message), 1)
-    expect(Object.hasOwn(back, "terminate")).toBe(false)
-    expect(Object.hasOwn(back, "details")).toBe(false)
-    expect(Object.hasOwn(back, "usage")).toBe(false)
-  })
+  const seqs = new Map((await b.scanEntries({}, ctx)).map(e => [e.id, e.seq]))
+  for (const [child, parent] of [
+    ["m2", "z1"],
+    ["a3", "m2"],
+  ] as const)
+    expect(seqs.get(parent) ?? Number.NaN).toBeLessThan(
+      seqs.get(child) ?? Number.NaN,
+    )
+})
 
-  test("parentId: null survives as null, not absent", () => {
-    // null and absent are different facts; a nullable schema treats null as a
-    // legitimate value, so neither may be collapsed into the other.
-    const back = fromStoredRow(toStoredRow(custom), 1) as {
-      parentId: string | null
-    }
-    expect(Object.hasOwn(back, "parentId")).toBe(true)
-    expect(back.parentId).toBeNull()
-  })
+test("a value written without a token, as writeLaneTip writes one, stays readable", async () => {
+  const doc = newSessionDoc()
+  const lane = laneNameForThread("0123456789abcdef")
+  writeLaneTip(doc, lane, entryId("e-1"))
+  const storage = new KynetaStorage({ doc })
+  const tip = value("pi.branch.tip", lane)
+  expect((await storage.getValue(tip, ctx))?.value).toBe("e-1")
+  await storage.commit([setValue(value("ns", "k"), 1)], ctx)
+  expect((await storage.getValue(tip, ctx))?.value).toBe("e-1")
+})
 
-  test("no seq reaches the row (ADR-0013, now structural)", () => {
-    const withSeq = { ...message, seq: 99 }
-    expect(findSeqKeys(toStoredRow(withSeq))).toEqual([])
-  })
+test("a commit ending in a delete still uses up that delete's seq", async () => {
+  const storage = new KynetaStorage()
+  const first = await storage.commit(
+    [setValue(value("ns", "k"), 1), deleteValue(value("ns", "k"))],
+    ctx,
+  )
+  expect(first.seqs).toEqual([1, 2])
+  const second = await storage.commit([setValue(value("ns", "k"), 2)], ctx)
+  expect(second.firstSeq).toBe(3)
+})
 
-  test("an unknown future entry type passes through intact", () => {
-    // `type` is an unconstrained string precisely so a new pi EntryType needs
-    // no schema change here.
-    // The ONLY cast in this file, and it is the point of the test: pi has no
-    // such entry type today, so the fixture cannot satisfy `EntryWithoutSeq`.
-    // Every other fixture is typed, so a change to pi's `Entry` breaks this
-    // file at compile time rather than passing while covering nothing.
-    const future = {
-      id: "e6",
-      parentId: "e5",
-      type: "not_yet_invented",
-      timestamp: 1004,
-      somethingNew: { deep: [1, 2, 3] },
-    }
-    expect(fromStoredRow(toStoredRow(future as never), 3)).toEqual({
-      ...future,
-      seq: 3,
-    })
-  })
+test("scanValues keeps to its namespace: a prefix of `a` is not one of `ab`", async () => {
+  const storage = new KynetaStorage()
+  await storage.commit(
+    [setValue(value("a", "x"), 1), setValue(value("ab", "x"), 2)],
+    ctx,
+  )
+  expect(
+    (await storage.scanValues(value("a", ""), ctx)).map(
+      v => v.address.namespace,
+    ),
+  ).toEqual(["a"])
 })

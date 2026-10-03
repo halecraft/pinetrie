@@ -39,7 +39,7 @@ import {
  *     `Schema.struct` already protects Line messages on the wire.
  *
  * `payload` is pi's variant data and ONLY that. It must never carry a copy of
- * a column above. See `toStoredRow` in `packages/pi/storage.ts`.
+ * a column above. See `toStoredRow` in `packages/pi/stored-row.ts`.
  */
 const StoredEntryRowSchema = Schema.struct.json({
   id: Schema.string(),
@@ -416,12 +416,40 @@ export const readEntries = (
  * separator pi's own in-memory storage uses; it cannot appear in a namespace,
  * and it sorts first, so one namespace's keys are adjacent.
  *
- * The key is an IDENTITY, not a format to read back. It is built here and
- * nowhere else, and never parsed: every stored value also carries its
- * `namespace` and `key` as properties, and readers use those.
+ * The key is an IDENTITY, not a format to read back. It is built here, and
+ * matched by prefix only in `valuePrefix`, and never parsed: every stored
+ * value also carries its `namespace` and `key` as properties, and readers use
+ * those.
  */
 export const physicalKey = (namespace: string, key: string): string =>
   `${namespace}\u0000${key}`
+
+/**
+ * The physical-key prefix shared by every value in `namespace` whose key
+ * starts with `keyPrefix`. The NUL ends the namespace, so namespace `a` does
+ * not match `ab`.
+ */
+export const valuePrefix = (namespace: string, keyPrefix: string): string =>
+  physicalKey(namespace, keyPrefix)
+
+/**
+ * One of pi's values as the document stores it, under
+ * `physicalKey(namespace, key)`. `values` is `Schema.any()`, so this type is
+ * what the writers and readers agree on.
+ */
+export interface StoredValueRecord {
+  readonly namespace: string
+  readonly key: string
+  readonly value: unknown
+  /**
+   * A token unique to the write. A changed `wid` tells a replica that a newer
+   * write won the register (ADR-0013). Absent on a record written outside
+   * `KynetaStorage`, as `writeLaneTip` writes one.
+   */
+  readonly wid?: string
+  /** A checkpoint's shell: its text is in `checkpointText` under the same key (S22). */
+  readonly sealed?: true
+}
 
 /** pi's namespace for lane tips, keyed by lane name (a thread's, ADR-0020). pi's name. */
 const LANE_TIP = "pi.branch.tip"
@@ -457,11 +485,12 @@ export function writeLaneTip(
   lane: LaneName,
   tip: EntryId | null,
 ): void {
-  doc.values.set(physicalKey(LANE_TIP, lane), {
+  const record: StoredValueRecord = {
     namespace: LANE_TIP,
     key: lane,
     value: tip,
-  })
+  }
+  doc.values.set(physicalKey(LANE_TIP, lane), record)
 }
 
 /** A lane's tip entry id, or null if the lane has none (or does not exist). */
