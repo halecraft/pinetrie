@@ -3,16 +3,14 @@
 // A text's operations carry their seat's Yjs `clientID`, which says who wrote
 // them only to a peer that knows the seat's principal. A client's only peer is
 // the host, and the host forgets a seat once it leaves. So the host writes a
-// `pineta.seat` value per seat when it connects, keyed by `clientID`, and
+// `pineta.seat` value per seat when it connects, keyed by its peer, and
 // anyone derives a text's writers from its `clientID`s (`writersOf`) whenever
 // they need them. Nobody stores a contributors list.
 
 import type { SeatRecord, WriterId } from "@pineta/core"
 import { Type } from "typebox"
-import { decodeAll, decodeWith } from "./decode.ts"
-
-/** pi value namespace for seat records. The key is the seat's `clientID`. */
-export const SEAT_NAMESPACE = "pineta.seat"
+import { decodeAt, textKey } from "./decode.ts"
+import type { RecordSpec } from "./records.ts"
 
 const SeatSchema = Type.Object({
   clientId: Type.Number(),
@@ -20,17 +18,24 @@ const SeatSchema = Type.Object({
   at: Type.Number(),
 })
 
-/** A seat record -> the plain value stored in pi. */
-export const encodeSeat = (s: SeatRecord) => ({ ...s })
-
-export const decodeSeat = (value: unknown): SeatRecord | undefined =>
-  decodeWith(SeatSchema, value, s => ({ ...s, writer: s.writer as WriterId }))
-
-/** Stored `pineta.seat` values -> the records, in the order the host first saw them. */
-export const seatRecords = (
-  values: Iterable<{ readonly value: unknown }>,
-): readonly SeatRecord[] =>
-  decodeAll(values, decodeSeat).sort((a, b) => a.at - b.at)
+/**
+ * Each seat, at its Kyneta peer id: the seat's identity, as presence's
+ * `seatKey` has it. The `clientID` is in the contents, since a text's
+ * operations carry it and Yjs derives it from the peer (`seatOf`, in
+ * `@pineta/schema`), which this package cannot.
+ */
+export const SEAT: RecordSpec<SeatRecord, string> = {
+  namespace: "pineta.seat",
+  keyOf: s => s.peer,
+  encode: ({ peer, ...contents }) => contents,
+  decode: (contents, key) =>
+    decodeAt(SeatSchema, contents, textKey(key), (s, peer) => ({
+      peer,
+      clientId: s.clientId,
+      writer: s.writer as WriterId,
+      at: s.at,
+    })),
+}
 
 /**
  * The connected seats with no record yet, to write. `connected` is each seat
@@ -38,6 +43,7 @@ export const seatRecords = (
  */
 export function planSeats(
   connected: readonly {
+    readonly peer: string
     readonly clientId: number
     readonly writer: WriterId
   }[],
@@ -73,7 +79,7 @@ export function writersOf(
 export function planSeatSweep(
   seats: readonly SeatRecord[],
   clientIdsInTexts: Iterable<number>,
-): number[] {
+): SeatRecord[] {
   const named = new Set(clientIdsInTexts)
-  return seats.filter(s => !named.has(s.clientId)).map(s => s.clientId)
+  return seats.filter(s => !named.has(s.clientId))
 }

@@ -7,7 +7,6 @@
 import {
   type EntryId,
   ERR,
-  entryId,
   type MarkRecord,
   type Refusal,
   refused,
@@ -15,35 +14,29 @@ import {
   type WriterId,
 } from "@pineta/core"
 import { Type } from "typebox"
-import { decodeAll, decodeWith } from "./decode.ts"
-
-/** pi value namespace for marks. The key is the entry's id. */
-export const MARK_NAMESPACE = "pineta.mark"
+import { decodeAt, entryKey } from "./decode.ts"
+import type { RecordSpec } from "./records.ts"
 
 // The shape only: the host is the session's one writer, and stores only
 // titles `parseTitle` accepted, so the title rule is not repeated here.
 const MarkSchema = Type.Object({
-  entry: Type.String({ minLength: 1 }),
   title: Type.String({ minLength: 1 }),
   by: Type.String(),
   at: Type.Number(),
 })
 
-/** A mark -> the plain value stored in pi. */
-export const encodeMark = (r: MarkRecord) => ({ ...r })
-
-export const decodeMark = (value: unknown): MarkRecord | undefined =>
-  decodeWith(MarkSchema, value, r => ({
-    ...r,
-    entry: entryId(r.entry),
-    by: r.by as WriterId,
-  }))
-
-/** Stored `pineta.mark` values -> each entry's mark. */
-export function markRecords(
-  values: Iterable<{ readonly value: unknown }>,
-): ReadonlyMap<EntryId, MarkRecord> {
-  return new Map(decodeAll(values, decodeMark).map(r => [r.entry, r]))
+/** Each entry's mark, at the entry's id. */
+export const MARK: RecordSpec<MarkRecord, EntryId> = {
+  namespace: "pineta.mark",
+  keyOf: r => r.entry,
+  encode: ({ entry, ...contents }) => contents,
+  decode: (contents, key) =>
+    decodeAt(MarkSchema, contents, entryKey(key), (r, entry) => ({
+      entry,
+      title: r.title,
+      by: r.by as WriterId,
+      at: r.at,
+    })),
 }
 
 export type MarkPlan =

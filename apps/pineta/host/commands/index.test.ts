@@ -6,7 +6,7 @@ import {
   laneNameForThread,
   writerId,
 } from "@pineta/core"
-import { ARCHIVE_NAMESPACE, encodeArchive } from "@pineta/marginalia"
+import { ARCHIVE, setRecord } from "@pineta/marginalia"
 import type { WireCommand } from "@pineta/protocol/codec"
 import type { Reply } from "@pineta/protocol/messages"
 import { readPlaces } from "@pineta/reads"
@@ -63,16 +63,10 @@ function setUp() {
 
 test("a chat in an archived root is refused, and the agent is never called", async () => {
   const { b, agent, commands, replies, sender, chat } = setUp()
-  putValue(b.doc, {
-    namespace: ARCHIVE_NAMESPACE,
-    key: ROOT_ID,
-    value: encodeArchive({
-      root: ROOT_ID,
-      state: "archived",
-      by: ALICE,
-      at: 1,
-    }),
-  })
+  putValue(
+    b.doc,
+    setRecord(ARCHIVE, { root: ROOT_ID, state: "archived", by: ALICE, at: 1 }),
+  )
   await commands.handle(sender, ALICE, chat("c-1"))
   expect(replies[0]).toMatchObject({ id: "c-1", outcome: "refused" })
   expect(replies[0]?.errorMessage).toMatch(/^archived by /)
@@ -121,16 +115,10 @@ test("a chat command spends its card once written, record then text, answering w
 
 test("a taken card in an archived root is refused, and the agent is never called", async () => {
   const { b, agent, commands } = setUp()
-  putValue(b.doc, {
-    namespace: ARCHIVE_NAMESPACE,
-    key: ROOT_ID,
-    value: encodeArchive({
-      root: ROOT_ID,
-      state: "archived",
-      by: ALICE,
-      at: 1,
-    }),
-  })
+  putValue(
+    b.doc,
+    setRecord(ARCHIVE, { root: ROOT_ID, state: "archived", by: ALICE, at: 1 }),
+  )
   const out = await commands.sendTaken(ALICE, "s-1", {
     text: "from the queue",
     at: atEntry(ROOT_ID),
@@ -156,7 +144,7 @@ test("a seat whose principal names nobody is refused whatever it sends", async (
 
 test("a command that throws is answered failed, and logged", async () => {
   const { b, commands, replies, sender } = setUp()
-  // The agent port has no `setParticipantName`, so `record` throws.
+  // The agent port has no `writeValues`, so `record` throws.
   await commands.handle(sender, ALICE, {
     id: "c-4",
     kind: "name",
@@ -166,11 +154,11 @@ test("a command that throws is answered failed, and logged", async () => {
     expect.objectContaining({
       id: "c-4",
       outcome: "failed",
-      errorMessage: "setParticipantName is not in this port",
+      errorMessage: "writeValues is not in this port",
     }),
   ])
   expect(b.lines).toEqual([
-    "[host] a name command failed: setParticipantName is not in this port",
+    "[host] a name command failed: writeValues is not in this port",
   ])
 })
 

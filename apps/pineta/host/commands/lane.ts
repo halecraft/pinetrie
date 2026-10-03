@@ -11,6 +11,7 @@ import {
   planStop,
   type WriterId,
 } from "@pineta/core"
+import { STOP, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
@@ -26,7 +27,7 @@ import type { LaneWork } from "../work/index.ts"
 
 export interface LaneDeps {
   readonly basics: Basics
-  readonly agent: Pick<Agent, "lane" | "setStop">
+  readonly agent: Pick<Agent, "lane" | "writeValues">
   readonly work: Pick<LaneWork, "offers" | "prepareSplit">
   readonly start: Runs["start"]
 }
@@ -58,7 +59,7 @@ export async function handleStop(
     }
   if (planned.kind === "abort") {
     if (planned.record !== null)
-      await agent.setStop(planned.record.prompt, planned.record.value)
+      await agent.writeValues([setRecord(STOP, planned.record)])
     await agent.lane(lane).abort()
   }
   return { kind: "stopped" }

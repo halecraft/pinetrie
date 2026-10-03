@@ -1,16 +1,18 @@
 import { type EntryLike, entryId, indexAsks, indexTree } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
+  DIGEST,
   DIGEST_EVERY,
-  decodeDigest,
   decodeDigestConfig,
   digestDue,
-  digestRecords,
   digestRequest,
   digestStillWanted,
-  encodeDigest,
   planDigest,
+  recordsOf,
+  setRecord,
 } from "./index.ts"
+
+const P = entryId("p-1")
 
 describe("digestDue", () => {
   const base = {
@@ -20,7 +22,12 @@ describe("digestDue", () => {
     reading: true,
     now: 100_000,
   }
-  const live = { text: "x", at: 100_000 - DIGEST_EVERY, final: false }
+  const live = {
+    prompt: P,
+    text: "x",
+    at: 100_000 - DIGEST_EVERY,
+    final: false,
+  }
   test.each<[string, Partial<Parameters<typeof digestDue>[0]>, boolean]>([
     ["while it runs and someone reads it, the first", {}, true],
     ["no one reading it, none", { reading: false }, false],
@@ -43,7 +50,7 @@ describe("digestDue", () => {
 })
 
 test("digestStillWanted: a live digest that comes back after the final one is dropped", () => {
-  const final = { text: "done", at: 1, final: true }
+  const final = { prompt: P, text: "done", at: 1, final: true }
   expect(digestStillWanted(final, { final: false })).toBe(false)
   expect(digestStillWanted(final, { final: true })).toBe(true)
   expect(digestStillWanted(undefined, { final: false })).toBe(true)
@@ -53,15 +60,12 @@ test("digestStillWanted: a live digest that comes back after the final one is dr
 })
 
 test("the record round-trips; a malformed one is dropped", () => {
-  const r = { text: "Fixing the rail.", at: 3, final: false }
-  expect(decodeDigest(structuredClone(encodeDigest(r)))).toEqual(r)
-  expect(decodeDigest({ text: 1 })).toBeUndefined()
+  const r = { prompt: P, text: "Fixing the rail.", at: 3, final: false }
+  expect(DIGEST.decode(structuredClone(DIGEST.encode(r)), P)).toEqual(r)
+  expect(DIGEST.decode({ text: 1 }, P)).toBeUndefined()
   expect([
-    ...digestRecords([
-      { key: "p1", value: encodeDigest(r) },
-      { key: "p2", value: null },
-    ]),
-  ]).toEqual([["p1", r]])
+    ...recordsOf(DIGEST, [setRecord(DIGEST, r), { key: "p-2", value: null }]),
+  ]).toEqual([[P, r]])
 })
 
 test("decodeDigestConfig: on only when enabled is true", () => {
@@ -149,7 +153,9 @@ describe("planDigest", () => {
   test("no work, or not due, is no plan", () => {
     expect(plan("p-3")).toBeNull()
     expect(
-      plan("p-1", { stored: { text: "done", at: 0, final: true } }),
+      plan("p-1", {
+        stored: { prompt: P, text: "done", at: 0, final: true },
+      }),
     ).toBeNull()
   })
 })

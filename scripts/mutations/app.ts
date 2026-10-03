@@ -57,7 +57,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a banner is asked for wide, not square",
-    file: "packages/pi/agent.ts",
+    file: "packages/pi/banner.ts",
     from: "              image_config: bannerImageConfig(imageModel.id),",
     to: `              image_config: { aspect_ratio: "21:9" },`,
     suite: "live",
@@ -958,9 +958,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "read is built without its image processor",
-    file: "packages/pi/agent.ts",
-    from: "              : { imageProcessor: readImageProcessor(blobs) },",
-    to: "              : {},",
+    file: "packages/pi/tools.ts",
+    from: "        : { imageProcessor: readImageProcessor(input.blobs) },",
+    to: "        : {},",
     suite: "host",
     scenario: "tool-images",
     expect:
@@ -988,8 +988,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host writes no seat records",
     file: "apps/pineta/host/seats.ts",
-    from: "        await agent.setSeat(seat)",
-    to: "        void seat",
+    from: "      await agent.writeValues(seats.map(seat => setRecord(SEAT, seat)))",
+    to: "      void seats",
     suite: "host",
     scenario: "cards",
     expect:
@@ -1130,9 +1130,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a skill's body is never given",
-    file: "packages/pi/agent.ts",
-    from: "              body: stripFrontmatter(text).trim(),",
-    to: '              body: "",',
+    file: "packages/pi/commands.ts",
+    from: "          body: withoutFrontmatter(text),",
+    to: '          body: "",',
     suite: "host",
     scenario: "commands",
     expect:
@@ -1140,9 +1140,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a prompt's arguments are never substituted",
-    file: "packages/pi/agent.ts",
-    from: "          : substituteArgs(stripFrontmatter(text), parseCommandArgs(args))",
-    to: "          : stripFrontmatter(text)",
+    file: "packages/pi/commands.ts",
+    from: "      : substituteArgs(withoutFrontmatter(text), parseCommandArgs(args))",
+    to: "      : withoutFrontmatter(text)",
     suite: "host",
     scenario: "commands",
     expect: "a prompt command gives the model its template, with its arguments",
@@ -1207,7 +1207,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a running command's output is never sent",
-    file: "packages/pi/agent.ts",
+    file: "packages/pi/stream.ts",
     from: "        text: firstText(event.partialResult),",
     to: '        text: "",',
     suite: "host",
@@ -1216,7 +1216,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "stop aborts nothing in pi",
-    file: "packages/pi/agent.ts",
+    file: "packages/pi/thread-lanes.ts",
     from: "        if (lane !== undefined) await lane.abort(ctx)",
     to: "        void ctx",
     suite: "host",

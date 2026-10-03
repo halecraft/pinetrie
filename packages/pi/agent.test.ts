@@ -1,19 +1,37 @@
-// The facade over pi's lanes: its error mapping, and creating a lane under
-// the id the host gives.
+// The facade over pi's lanes: its error mapping, creating a lane under the
+// id the host gives, and the host's value writes.
 //
 // Co-located inside packages/pi for the same reason as stored-row.test.ts: both
 // concern pi's behaviour, and a test under test/ would reach across the
 // boundary ADR-0003 holds.
 
-import { ERR, laneNameForThread, ROOT } from "@pineta/core"
+import {
+  ERR,
+  entryId,
+  laneNameForThread,
+  NOBODY,
+  ROOT,
+  type ThreadName,
+  type ValueWrite,
+  writerId,
+} from "@pineta/core"
+import {
+  deleteRecord,
+  encodeChat,
+  MARK,
+  NAME,
+  setRecord,
+} from "@pineta/marginalia"
 import {
   newSessionDoc,
   readLaneNames,
+  readValues,
   type SessionDocHandle,
 } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
-import { createAgent, laneErrCode, newId } from "./agent.ts"
+import { createAgent, newId } from "./agent.ts"
 import { scriptedModel } from "./scripted.ts"
+import { laneErrCode } from "./thread-lanes.ts"
 
 describe("laneErrCode", () => {
   test("maps pi's refusals onto our codes", () => {
@@ -71,5 +89,71 @@ describe("createThreadLane (ADR-0057)", () => {
     })
     expect(readLaneNames(doc)).toEqual([lane])
     await later.close()
+  })
+
+  test("a lane that does not exist refuses every write as unknown", async () => {
+    const agent = await over(newSessionDoc())
+    const lane = agent.lane(laneNameForThread(newId()))
+    const unknown = { kind: "refused", code: ERR.UNKNOWN_TARGET }
+    const message = encodeChat(
+      {
+        author: writerId("ada"),
+        authorName: "Ada",
+        text: "hi",
+        compels: NOBODY,
+        sendId: "s",
+      },
+      0,
+    )
+    expect(await lane.append(message)).toEqual(unknown)
+    expect(await lane.run(message)).toEqual(unknown)
+    expect(await lane.resume()).toEqual(unknown)
+    await agent.close()
+  })
+})
+
+describe("writeValues (ADR-0062)", () => {
+  const over = (doc: SessionDocHandle) =>
+    createAgent({
+      doc,
+      replicaId: "test",
+      model: { kind: "scripted", script: scriptedModel() },
+      tools: null,
+    })
+  const lane = laneNameForThread("0190a0a0-0000-7000-8000-000000000001")
+  const entry = entryId("e-1")
+  const mark = { entry, title: "Plans", by: writerId("ada"), at: 1 }
+
+  test("writes sets and deletes in one call, where the readers find them", async () => {
+    const doc = newSessionDoc()
+    const agent = await over(doc)
+    await agent.writeValues([
+      setRecord(MARK, mark),
+      setRecord(NAME, { lane, name: "amber-fox" as ThreadName, at: 1 }),
+    ])
+    expect(readValues(doc, "pineta.mark")).toEqual([
+      { key: entry, value: { title: "Plans", by: writerId("ada"), at: 1 } },
+    ])
+    await agent.writeValues([deleteRecord(MARK, entry)])
+    expect(readValues(doc, "pineta.mark")).toEqual([])
+    expect(readValues(doc, "pineta.name")).toHaveLength(1)
+    await agent.close()
+  })
+
+  test("refuses a namespace that is not the host's, and writes nothing", async () => {
+    const doc = newSessionDoc()
+    const agent = await over(doc)
+    const theirs = {
+      kind: "set",
+      namespace: "pi.branch.tip",
+      key: lane,
+      value: null,
+    } as unknown as ValueWrite
+    await expect(
+      agent.writeValues([setRecord(MARK, mark), theirs]),
+    ).rejects.toThrow("not the host's")
+    expect(readValues(doc, "pineta.mark")).toEqual([])
+    expect(readLaneNames(doc)).toEqual([])
+    await agent.close()
   })
 })

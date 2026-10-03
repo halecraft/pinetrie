@@ -1,17 +1,12 @@
 import { type SeatRecord, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
-import {
-  decodeSeat,
-  encodeSeat,
-  planSeatSweep,
-  planSeats,
-  seatRecords,
-  writersOf,
-} from "./seat.ts"
+import { recordsOf, setRecord } from "./records.ts"
+import { planSeatSweep, planSeats, SEAT, writersOf } from "./seat.ts"
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const seat = (clientId: number, writer = ADA, at = clientId): SeatRecord => ({
+  peer: `p-${clientId}`,
   clientId,
   writer,
   at,
@@ -21,13 +16,13 @@ test("planSeats: only the connected seats not stored yet", () => {
   expect(
     planSeats(
       [
-        { clientId: 1, writer: ADA },
-        { clientId: 2, writer: BEA },
+        { peer: "p-1", clientId: 1, writer: ADA },
+        { peer: "p-2", clientId: 2, writer: BEA },
       ],
       [seat(1)],
       50,
     ),
-  ).toEqual([{ clientId: 2, writer: BEA, at: 50 }])
+  ).toEqual([{ peer: "p-2", clientId: 2, writer: BEA, at: 50 }])
 })
 
 test("writersOf: each person once, in the order their seats were first seen; unknown ids are nobody", () => {
@@ -37,19 +32,26 @@ test("writersOf: each person once, in the order their seats were first seen; unk
 })
 
 test("planSeatSweep: a seat no text names goes", () => {
-  expect(planSeatSweep([seat(1), seat(2), seat(3)], [3, 1, 42])).toEqual([2])
+  expect(planSeatSweep([seat(1), seat(2), seat(3)], [3, 1, 42])).toEqual([
+    seat(2),
+  ])
 })
 
-test("a seat round-trips; a malformed one is dropped; records sort by first seen", () => {
-  expect(decodeSeat(JSON.parse(JSON.stringify(encodeSeat(seat(7)))))).toEqual(
+test("a seat round-trips at its peer; a malformed one is dropped", () => {
+  const w = setRecord(SEAT, seat(7))
+  expect(w.key).toBe("p-7")
+  expect(SEAT.decode(JSON.parse(JSON.stringify(w.value)), w.key)).toEqual(
     seat(7),
   )
-  expect(decodeSeat({ clientId: "7", writer: "x", at: 1 })).toBeUndefined()
   expect(
-    seatRecords([
-      { value: seat(2, ADA, 20) },
-      { value: "junk" },
-      { value: seat(1, BEA, 10) },
-    ]).map(s => s.clientId),
-  ).toEqual([1, 2])
+    SEAT.decode({ clientId: "7", writer: "x", at: 1 }, "p-7"),
+  ).toBeUndefined()
+  expect([
+    ...recordsOf(SEAT, [w, { key: "p-8", value: "junk" }]).values(),
+  ]).toEqual([seat(7)])
+})
+
+test("a seat stored under its clientId reads with that address as its peer, where a delete finds it", () => {
+  const old = { key: "7", value: { clientId: 7, writer: ADA, at: 7 } }
+  expect(recordsOf(SEAT, [old]).get("7")).toEqual({ ...seat(7), peer: "7" })
 })

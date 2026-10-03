@@ -125,7 +125,12 @@ describe("askView", () => {
         asks: indexAsks(stopped),
         ask: entryId("1-p"),
         runningAsk: null,
-        stops: new Map([[entryId("1-p"), { by: writerId("bea"), at: 1 }]]),
+        stops: new Map([
+          [
+            entryId("1-p"),
+            { prompt: entryId("1-p"), by: writerId("bea"), at: 1 },
+          ],
+        ]),
         revisions: noRevisions,
         digests: new Map(),
         releasedPath: null,

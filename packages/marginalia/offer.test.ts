@@ -18,19 +18,18 @@ import {
   acceptStack,
   answerDiff,
   answerReview,
+  BASE as BASE_RECORD,
   baseMoved,
-  decodeBaseRecord,
-  decodeLineRecord,
-  decodeOfferRecord,
   decodeStack,
   decodeUpdate,
   describeRequest,
   describeWanted,
   diffUrl,
   encodeUpdate,
-  encodeWorkRecord,
   isWipLine,
+  LINE,
   MAX_DIFF_BYTES,
+  OFFER,
   OFFER_WIRE,
   offerMoved,
   offerView,
@@ -41,6 +40,7 @@ import {
   type RefreshFacts,
   renderableMessage,
   reviewUrl,
+  setRecord,
   takeDestinations,
   wipDescription,
   withLedger,
@@ -493,10 +493,10 @@ describe("the commit message", () => {
 
 describe("records", () => {
   test("an offer, the line and a base round-trip (ADR-0060)", () => {
-    const o = encodeWorkRecord({ kind: "offer", record: offer })
+    const o = setRecord(OFFER, offer)
     expect([o.namespace, o.key]).toEqual(["pineta.offer", LANE])
-    expect(decodeOfferRecord(structuredClone(o.value))).toEqual(offer)
-    expect(decodeOfferRecord({ ...offer, size: 0 })).toBeUndefined()
+    expect(OFFER.decode(structuredClone(o.value), LANE)).toEqual(offer)
+    expect(OFFER.decode({ ...offer, size: 0 }, LANE)).toBeUndefined()
     const line = {
       onto: "pineta-onto",
       wipPrefix: "wip/",
@@ -512,22 +512,22 @@ describe("records", () => {
       },
       commands: true,
     }
-    const l = encodeWorkRecord({ kind: "line", record: line })
+    const l = setRecord(LINE, line)
     expect([l.namespace, l.key]).toEqual(["pineta.line", "line"])
-    expect(decodeLineRecord(structuredClone(l.value))).toEqual(line)
+    expect(LINE.decode(structuredClone(l.value), "line")).toEqual(line)
     const base = {
       lane: LANE,
       base: { kind: "wip", bookmark: "wip/x" },
       start: COPY,
       state: "ok",
     } as const
-    const b = encodeWorkRecord({ kind: "base", record: base })
+    const b = setRecord(BASE_RECORD, base)
     expect([b.namespace, b.key]).toEqual(["pineta.base", LANE])
-    expect(decodeBaseRecord(structuredClone(b.value))).toEqual(base)
+    expect(BASE_RECORD.decode(structuredClone(b.value), LANE)).toEqual(base)
   })
   test("an offer stored before its commits were kept does not decode", () => {
     const { commits: _, ...before } = offer
-    expect(decodeOfferRecord(before)).toBeUndefined()
+    expect(OFFER.decode(before, LANE)).toBeUndefined()
   })
 })
 

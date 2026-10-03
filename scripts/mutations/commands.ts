@@ -40,11 +40,11 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a host record is written though unchanged",
-    file: "packages/marginalia/work.ts",
-    from: "  JSON.stringify(encodeWorkRecord(record).value) !== JSON.stringify(stored)",
+    file: "packages/marginalia/records.ts",
+    from: "  stored === undefined || !sameJson(spec.encode(record), spec.encode(stored))",
     to: "  true",
     command: vitest("packages/marginalia"),
-    expect: "recordChanged: an unchanged host record is not written again",
+    expect: "an unchanged host record is not written again",
   },
   {
     name: "your home directory is mounted into lanes",

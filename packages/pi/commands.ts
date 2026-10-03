@@ -1,5 +1,5 @@
 // pi/commands — every skill and prompt template pi loaded, as commands to be
-// labelled (ADR-0036).
+// labelled (ADR-0036), and a command's file as the model reads it.
 //
 // pi keeps the first skill or template of each name and drops the rest,
 // with a `collision` diagnostic naming the loser's file. A command is named
@@ -9,12 +9,21 @@
 
 import { readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import type { GatheredCommand } from "@pineta/marginalia"
+import { type CommandRef, hostPathInLane } from "@pineta/core"
+import {
+  type CommandSource,
+  expandSkill,
+  type GatheredCommand,
+  resolveCommand,
+} from "@pineta/marginalia"
 import {
   type DefaultResourceLoader,
   loadPromptTemplates,
   loadSkillsFromDir,
+  parseCommandArgs,
+  substituteArgs,
 } from "./deep.ts"
+import { sha256Of } from "./images.ts"
 
 type Loader = InstanceType<typeof DefaultResourceLoader>
 type Skill = ReturnType<Loader["getSkills"]>["skills"][number]
@@ -206,4 +215,104 @@ export async function gatherCommands(
   for (const t of prompts.prompts) await template(t, false)
   for (const t of lostTemplates) if (t !== null) await template(t, true)
   return out
+}
+
+/**
+ * A skill file's instructions: its text after the frontmatter block. Never
+ * parses the frontmatter, so a file whose YAML is broken still reads.
+ */
+export function withoutFrontmatter(text: string): string {
+  const match = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/.exec(text)
+  return (match === null ? text : text.slice(match[0].length)).trim()
+}
+
+const hashOf = (text: string): string =>
+  sha256Of(new TextEncoder().encode(text))
+
+/** A skill file's text -> its instructions, as the host reads it, and its hash. */
+export const skillOf = (file: string, text: string) => ({
+  path: file,
+  content: withoutFrontmatter(text),
+  hash: hashOf(text),
+})
+
+/**
+ * A command's text as the model reads it: a skill's block (pi's format), or
+ * a template with its arguments. `inLane`: the thread works in its own copy,
+ * so a skill's paths are the lane's (`/mnt/host`).
+ */
+export function expandCommand(
+  command: CommandSource,
+  text: string,
+  args: string,
+  inLane: boolean,
+): CommandRef {
+  const where = (p: string) => (inLane ? hostPathInLane(p) : p)
+  // pi's name for it: the last part of the qualified name.
+  const name = command.name.split(":").at(-1) ?? command.name
+  const expanded =
+    command.kind === "skill"
+      ? expandSkill({
+          name,
+          file: where(command.file),
+          dir: where(command.dir),
+          body: withoutFrontmatter(text),
+          args,
+        })
+      : substituteArgs(withoutFrontmatter(text), parseCommandArgs(args))
+  return {
+    name: command.name,
+    kind: command.kind,
+    file: command.file,
+    hash: hashOf(text),
+    expanded,
+  }
+}
+
+export interface CommandFiles {
+  /** Every command pi loaded, labelled by package (ADR-0036). */
+  commands(): readonly CommandSource[]
+  /** Commands refused for their labels, with why. */
+  refusedCommands(): readonly {
+    readonly name: string
+    readonly reason: string
+  }[]
+  /**
+   * A skill by its qualified name, e.g. `pineta:skill:resolve-conflicts`,
+   * read now. Null if no command has that name, or its file is unreadable.
+   */
+  skill(name: string): Promise<ReturnType<typeof skillOf> | null>
+  /** `expandCommand` over the command's file as it is now; null if unreadable. */
+  expand(
+    command: CommandSource,
+    args: string,
+    inLane: boolean,
+  ): Promise<CommandRef | null>
+}
+
+const readText = (file: string): Promise<string | null> =>
+  readFile(file, "utf8").catch(() => null)
+
+/** The labelled commands, and each one's file read when it is asked for. */
+export function commandFiles(labelled: {
+  readonly commands: readonly CommandSource[]
+  readonly refused: readonly {
+    readonly name: string
+    readonly reason: string
+  }[]
+}): CommandFiles {
+  return {
+    commands: () => labelled.commands,
+    refusedCommands: () => labelled.refused,
+    async skill(name) {
+      const file = resolveCommand(name, labelled.commands)?.file
+      if (file === undefined) return null
+      const text = await readText(file)
+      return text === null ? null : skillOf(file, text)
+    },
+    async expand(command, args, inLane) {
+      const text = await readText(command.file)
+      return text === null ? null : expandCommand(command, text, args, inLane)
+    },
+  }
 }

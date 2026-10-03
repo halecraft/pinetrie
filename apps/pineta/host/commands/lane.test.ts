@@ -1,5 +1,5 @@
 import { entryId, laneNameForThread, runId, writerId } from "@pineta/core"
-import { encodeStop, STOP_NAMESPACE } from "@pineta/marginalia"
+import { STOP, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
 import { expect, test } from "vitest"
@@ -21,9 +21,9 @@ function running() {
   writeLaneTip(b.doc, lane, entryId("e-2"))
   beginRun(b.doc, lane, runId("r-1"))
   const handle = fakeLane(lane, { abort: async () => {} })
-  const agent = record<Pick<Agent, "lane" | "setStop">>({
+  const agent = record<Pick<Agent, "lane" | "writeValues">>({
     lane: () => handle.lane,
-    setStop: async () => {},
+    writeValues: async () => {},
   })
   return { b, lane, handle, agent }
 }
@@ -34,7 +34,10 @@ test("stopping a running lane records who stopped its ask, then aborts its run",
     { kind: "stopped" },
   )
   expect(agent.calls).toEqual([
-    { method: "setStop", args: ["e-1", { by: ada, at: 1_000 }] },
+    {
+      method: "writeValues",
+      args: [[setRecord(STOP, { prompt: entryId("e-1"), by: ada, at: 1_000 })]],
+    },
     { method: "lane", args: [lane] },
   ])
   expect(methods(handle.calls)).toEqual(["abort"])
@@ -42,11 +45,7 @@ test("stopping a running lane records who stopped its ask, then aborts its run",
 
 test("a second stop of the same ask records nothing more", async () => {
   const { b, lane, handle, agent } = running()
-  putValue(b.doc, {
-    namespace: STOP_NAMESPACE,
-    key: "e-1",
-    value: encodeStop({ by: bea, at: 1 }),
-  })
+  putValue(b.doc, setRecord(STOP, { prompt: entryId("e-1"), by: bea, at: 1 }))
   await handleStop({ basics: b, agent: agent.port }, lane, ada)
   expect(methods(agent.calls)).toEqual(["lane"])
   expect(methods(handle.calls)).toEqual(["abort"])

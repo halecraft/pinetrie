@@ -9,7 +9,7 @@ import {
   revsetName,
   yourEditsIn,
 } from "@pineta/lanes"
-import { takeDestinations } from "@pineta/marginalia"
+import { OFFER, setRecord, takeDestinations } from "@pineta/marginalia"
 import { readThreadName } from "@pineta/reads"
 import { describe } from "./describe.ts"
 import { executeTake } from "./execute.ts"
@@ -99,7 +99,7 @@ export function act(
         {
           run: executeOnHost,
           writeTaken: record =>
-            state.agent().setWorkRecord({ kind: "offer", record }),
+            state.agent().writeValues([setRecord(OFFER, record)]),
           taken: () => {
             log(
               `[host] ${readThreadName(doc, lane)}: offer taken by ${by} as ${(planned.taken.taken ?? "").slice(0, 8)}`,

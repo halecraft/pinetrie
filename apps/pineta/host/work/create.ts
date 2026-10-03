@@ -23,7 +23,13 @@ import {
   removeLane,
   revsetName,
 } from "@pineta/lanes"
-import { type ForkBegin, forkPoint, planBegin } from "@pineta/marginalia"
+import {
+  type ForkBegin,
+  forkPoint,
+  LANE,
+  planBegin,
+  setRecord,
+} from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readRevisions, readTreeIndex } from "@pineta/reads"
 import { type Basics, failed } from "../basics.ts"
@@ -143,10 +149,11 @@ export function createNewLanes(deps: {
 
     async prepareLane(lane, work, at, by, base) {
       if (work !== null)
-        await deps.agent().setWorkRecord({
-          kind: "lane",
-          record: { lane, work, by, createdAt: basics.now() },
-        })
+        await deps
+          .agent()
+          .writeValues([
+            setRecord(LANE, { lane, work, by, createdAt: basics.now() }),
+          ])
       await deps.ensureNames()
       if (work === null) return
       const { root, paths, ready } = setup

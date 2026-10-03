@@ -102,11 +102,10 @@ log of the stored lane names that fail `isLaneName` (`readStoredLanes`: no
 reader is given them, so the log is where one shows; it never throws, and
 nothing is deleted), `ensureNames` (ADR-0039), `planStartup` over the queued cards and `interrupted()`,
 each interrupted lane resumed before anything waiting for it (S36 item 18),
-`settle` for the other lanes with cards queued, the values an older host
-left in `pineta.outbox` deleted and each one's text logged, the project and commands
-records written only when changed, and the sweep of what no one will type in
-again: empty cards, card documents with no record, and seat records no stored
-text names (`sweepTexts`).
+`settle` for the other lanes with cards queued, the project and commands
+records that changed in one write (`setIfChanged`), and the sweep of what
+no one will type in again: empty cards, card documents with no record, and
+seat records no stored text names, all of them in one write (`sweepTexts`).
 
 - **Commands are taken only after `recover`.** `Control.listen` is made
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
@@ -404,9 +403,13 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   takes, and a real `newSessionDoc()`. A method the test did not give throws,
   naming itself, so a module that touches an undeclared port fails at once.
   `fakeLane` holds a run open until the test finishes it. `row` and
-  `writeEntry` put entries in the document, `putValue` a pi value (a work
-  record, an archive record, a participant's name), and `writeLaneTip` a lane's tip; a running lane is
-  `beginRun`. Both of those are `@pineta/schema`'s.
+  `writeEntry` put entries in the document, `putValue` a host record
+  (`putValue(doc, setRecord(MARK, mark))`), and `writeLaneTip` a lane's tip; a
+  running lane is `beginRun`. Both of those are `@pineta/schema`'s.
+- **A port's writes are values.** Every record goes through one
+  `writeValues` (ADR-0062), so a test asserts what was written:
+  `expect(writesOf(agent.calls)).toEqual([deleteRecord(MARK, entry)])`.
+  `applyWrites` is a fake `writeValues` that applies them to the document.
 - **Admission is two pure plans**, `planRequest` and `planUpgrade`
   (`routes.ts`): every admission rule is a unit test there, and `http.ts`
   only carries them out.

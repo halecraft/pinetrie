@@ -10,7 +10,6 @@ import {
   type ArchiveRecord,
   type EntryId,
   ERR,
-  entryId,
   type Intent,
   type LaneView,
   type Refusal,
@@ -21,33 +20,27 @@ import {
   type WriterId,
 } from "@pineta/core"
 import { Type } from "typebox"
-import { decodeAll, decodeWith } from "./decode.ts"
-
-/** pi value namespace for archive records. The key is the root's entry id. */
-export const ARCHIVE_NAMESPACE = "pineta.archive"
+import { decodeAt, entryKey } from "./decode.ts"
+import type { RecordSpec } from "./records.ts"
 
 const ArchiveSchema = Type.Object({
-  root: Type.String({ minLength: 1 }),
   state: Type.Union([Type.Literal("archived"), Type.Literal("restored")]),
   by: Type.String(),
   at: Type.Number(),
 })
 
-/** An archive record -> the plain value stored in pi. */
-export const encodeArchive = (r: ArchiveRecord) => ({ ...r })
-
-export const decodeArchive = (value: unknown): ArchiveRecord | undefined =>
-  decodeWith(ArchiveSchema, value, r => ({
-    ...r,
-    root: entryId(r.root),
-    by: r.by as WriterId,
-  }))
-
-/** Stored `pineta.archive` values -> each root's record. */
-export function archiveRecords(
-  values: Iterable<{ readonly value: unknown }>,
-): ReadonlyMap<EntryId, ArchiveRecord> {
-  return new Map(decodeAll(values, decodeArchive).map(r => [r.root, r]))
+/** Each root's archive record, at the root's entry id. */
+export const ARCHIVE: RecordSpec<ArchiveRecord, EntryId> = {
+  namespace: "pineta.archive",
+  keyOf: r => r.root,
+  encode: ({ root, ...contents }) => contents,
+  decode: (contents, key) =>
+    decodeAt(ArchiveSchema, contents, entryKey(key), (r, root) => ({
+      root,
+      state: r.state,
+      by: r.by as WriterId,
+      at: r.at,
+    })),
 }
 
 export type ArchivePlan =

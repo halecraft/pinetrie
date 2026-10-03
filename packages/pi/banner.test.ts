@@ -26,8 +26,13 @@ import {
   type SessionDocHandle,
 } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
-import { createAgent, drawnOf, newId } from "./agent.ts"
-import { BANNER_TOOL, bannerImageConfig, parseBannerArgs } from "./banner.ts"
+import { createAgent, newId } from "./agent.ts"
+import {
+  BANNER_TOOL,
+  bannerImageConfig,
+  drawnOf,
+  parseBannerArgs,
+} from "./banner.ts"
 import {
   SCRIPTED_IMAGE_PNG,
   type ScriptedModel,

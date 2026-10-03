@@ -12,22 +12,21 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   type ConflictFile,
-  decodeAll,
-  decodeLandingRecord,
-  decodeLaneRecord,
-  decodeProjectRecord,
-  decodeRevisionRecord,
-  encodeWorkRecord,
   forkPoint,
   LAND_TYPE,
+  LANDING,
+  LANE as LANE_RECORD,
   landingOutcome,
+  PROJECT,
   planBegin,
   planResolution,
   planRetention,
   planTurnRecord,
   planUpdateFrom,
-  recordChanged,
+  REVISION,
+  recordsOf,
   renderableMessage,
+  setRecord,
   showHostWorkingCopy,
   wipState,
 } from "./index.ts"
@@ -37,7 +36,7 @@ const ADA = writerId("ada")
 const C1 = commitId("c1")
 const C2 = commitId("c2")
 
-describe("records: one encoder, total decoders", () => {
+describe("records: one spec each, total decoders", () => {
   const lane = {
     lane: LANE,
     work: { kind: "own" as const },
@@ -65,48 +64,46 @@ describe("records: one encoder, total decoders", () => {
     rootDefault: "own" as const,
   }
   test("each record round-trips, keyed as its reader expects", () => {
-    const l = encodeWorkRecord({ kind: "lane", record: lane })
-    expect([l.namespace, l.key, decodeLaneRecord(l.value)]).toEqual([
+    const l = setRecord(LANE_RECORD, lane)
+    expect([l.namespace, l.key, LANE_RECORD.decode(l.value, l.key)]).toEqual([
       "pineta.lane",
       LANE,
       lane,
     ])
-    const r = encodeWorkRecord({ kind: "revision", record: revision })
-    expect([r.key, decodeRevisionRecord(r.value)]).toEqual(["e1", revision])
-    const g = encodeWorkRecord({ kind: "landing", record: landing })
-    expect([g.key, decodeLandingRecord(g.value)]).toEqual(["l1", landing])
-    const p = encodeWorkRecord({ kind: "project", record: project })
-    expect(decodeProjectRecord(p.value)).toEqual(project)
+    const r = setRecord(REVISION, revision)
+    expect([r.key, REVISION.decode(r.value, r.key)]).toEqual(["e1", revision])
+    const g = setRecord(LANDING, landing)
+    expect([g.key, LANDING.decode(g.value, g.key)]).toEqual(["l1", landing])
+    const p = setRecord(PROJECT, project)
+    expect(PROJECT.decode(p.value, p.key)).toEqual(project)
   })
   test("a direct lane's prompt records no commit and no disk, and that decodes", () => {
     expect(
-      decodeRevisionRecord({ ...revision, commit: null, snapshot: null }),
+      REVISION.decode({ ...revision, commit: null, snapshot: null }, "e1"),
     ).toEqual({ ...revision, commit: null, snapshot: null })
   })
   test("a record from before lane containers has no snapshot key: it decodes as none", () => {
     const { snapshot: _, ...old } = revision
-    expect(decodeRevisionRecord(old)).toEqual({ ...old, snapshot: null })
+    expect(REVISION.decode(old, "e1")).toEqual({ ...old, snapshot: null })
   })
   test("a project record from before lane containers is dropped, and rewritten at start", () => {
     expect(
-      decodeProjectRecord({
-        kind: "workspaces",
-        root: "/p",
-        rootDefault: "own",
-      }),
+      PROJECT.decode(
+        { kind: "workspaces", root: "/p", rootDefault: "own" },
+        "project",
+      ),
     ).toBeUndefined()
   })
   test("malformed values are dropped, never thrown", () => {
-    expect(
-      decodeAll(
-        [
-          { value: { ...lane, work: { kind: "direct" } } },
-          { value: 3 },
-          { value: lane },
-        ],
-        decodeLaneRecord,
-      ),
-    ).toEqual([lane])
+    const other = laneNameForThread("other")
+    expect([
+      ...recordsOf(LANE_RECORD, [
+        { key: other, value: { ...lane, work: { kind: "direct" } } },
+        { key: "main", value: lane },
+        { key: other, value: 3 },
+        { key: LANE, value: lane },
+      ]).values(),
+    ]).toEqual([lane])
   })
 })
 
@@ -456,28 +453,4 @@ describe("planResolution: the land message", () => {
       "✓ catching up: no conflicts",
     )
   })
-})
-
-test("recordChanged: an unchanged host record is not written again", () => {
-  const record = {
-    kind: "commands" as const,
-    record: {
-      commands: [
-        {
-          name: "a:skill:b",
-          kind: "skill" as const,
-          description: "d",
-          argumentHint: null,
-        },
-      ],
-    },
-  }
-  const stored = encodeWorkRecord(record).value
-  expect(recordChanged(record, structuredClone(stored))).toBe(false)
-  expect(recordChanged(record, undefined)).toBe(true)
-  expect(
-    recordChanged(record, {
-      commands: [{ ...record.record.commands[0], description: "e" }],
-    }),
-  ).toBe(true)
 })

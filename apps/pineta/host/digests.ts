@@ -11,10 +11,12 @@
 
 import { type EntryId, indexAsks, promptOf } from "@pineta/core"
 import {
+  DIGEST,
   digestRequest,
   digestStillWanted,
   planDigest,
   readsAsk,
+  setRecord,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readDigests, readReading, readTreeIndex } from "@pineta/reads"
@@ -37,7 +39,7 @@ export interface Digests {
   ended(prompt: EntryId, failed: Failed): Promise<void>
 }
 
-type DigestAgent = Pick<Agent, "complete" | "skill" | "setDigest">
+type DigestAgent = Pick<Agent, "complete" | "skill" | "writeValues">
 
 export function createDigests(deps: {
   readonly basics: Pick<Basics, "doc" | "log" | "now">
@@ -100,7 +102,14 @@ export function createDigests(deps: {
           },
           settle: async text => {
             if (!digestStillWanted(readDigests(doc).get(ask), { final })) return
-            await deps.agent().setDigest(ask, { text, at: basics.now(), final })
+            await deps.agent().writeValues([
+              setRecord(DIGEST, {
+                prompt: ask,
+                text,
+                at: basics.now(),
+                final,
+              }),
+            ])
           },
         })
       })

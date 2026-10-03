@@ -3,37 +3,25 @@
 // prompt as it asks pi to abort (`planStop`, in core). The first press is the
 // one recorded: `planStop` writes no second.
 
-import {
-  type EntryId,
-  entryId,
-  type StopRecord,
-  type WriterId,
-} from "@pineta/core"
+import type { EntryId, StopRecord, WriterId } from "@pineta/core"
 import { Type } from "typebox"
-import { decodeWith } from "./decode.ts"
-
-/** pi value namespace for stops. The key is the ask's prompt. */
-export const STOP_NAMESPACE = "pineta.stop"
+import { decodeAt, entryKey } from "./decode.ts"
+import type { RecordSpec } from "./records.ts"
 
 const StopSchema = Type.Object({
   by: Type.String({ minLength: 1 }),
   at: Type.Number(),
 })
 
-/** A stop -> the plain value stored in pi. */
-export const encodeStop = (r: StopRecord) => ({ ...r })
-
-export const decodeStop = (value: unknown): StopRecord | undefined =>
-  decodeWith(StopSchema, value, r => ({ by: r.by as WriterId, at: r.at }))
-
-/** Stored `pineta.stop` values -> each ask's stop, by its prompt. */
-export function stopRecords(
-  values: Iterable<{ readonly key: string; readonly value: unknown }>,
-): ReadonlyMap<EntryId, StopRecord> {
-  const out = new Map<EntryId, StopRecord>()
-  for (const { key, value } of values) {
-    const r = decodeStop(value)
-    if (r !== undefined) out.set(entryId(key), r)
-  }
-  return out
+/** Each ask's stop, at its prompt's entry id. */
+export const STOP: RecordSpec<StopRecord, EntryId> = {
+  namespace: "pineta.stop",
+  keyOf: r => r.prompt,
+  encode: ({ prompt, ...contents }) => contents,
+  decode: (contents, key) =>
+    decodeAt(StopSchema, contents, entryKey(key), (r, prompt) => ({
+      prompt,
+      by: r.by as WriterId,
+      at: r.at,
+    })),
 }

@@ -1,5 +1,6 @@
 // pi/lanes — where each lane's tools work, as pi sees it (ADR-0032,
-// ADR-0034), and what a lane of its own is told about itself (ADR-0046).
+// ADR-0034), and what a lane is told: its system prompt, and for a lane of
+// its own, a block about itself (ADR-0046).
 //
 // One harness serves every lane, but pi resolves the tools' context from the
 // run's `Context` only: `toolContext` is a function of it. So every call that
@@ -7,6 +8,7 @@
 // the rest comes from the host's `access(lane)`: one source for where a lane
 // works (S36 item 18). pi's hooks see the lane's name directly.
 
+import type { ExecutionEnv } from "@earendil-works/pi-agent-core"
 import {
   createContextKey,
   withContextValue,
@@ -15,11 +17,14 @@ import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/node
 import {
   type EntryId,
   HOST_WORKING_COPY,
+  hostPathInLane,
   type LaneName,
   NO_EDITOR,
 } from "@pineta/core"
 import { Type } from "typebox"
-import type { LaneChannel } from "./lane-env.ts"
+import type { ModelSetup } from "./config.ts"
+import { buildSystemPrompt } from "./deep.ts"
+import { type LaneChannel, laneEnv } from "./lane-env.ts"
 
 /** How a lane's tools reach its files, as the host resolves it. */
 export type LaneAccess =
@@ -149,6 +154,80 @@ export function directEnv(dir: string, ready: Promise<void>): NodeExecutionEnv {
     },
   })
 }
+
+/**
+ * What pi builds a request's tools and system prompt from. `lane` is null for
+ * a lane that works directly: it gets no block, and every skill at its own path.
+ */
+export interface ToolContext {
+  readonly env: ExecutionEnv
+  readonly dir: string
+  readonly lane: {
+    readonly facts: LaneFacts
+    readonly hostPaths: readonly string[]
+  } | null
+}
+
+/** Where a lane's tools work, and what its prompt says about it. */
+export function toolContextOf(access: LaneAccess): ToolContext {
+  if (access.kind === "direct")
+    return {
+      env: directEnv(access.dir, access.ready),
+      dir: access.dir,
+      lane: null,
+    }
+  const { facts, hostPaths } = access
+  return {
+    env: laneEnv(facts.dir, access.gate),
+    dir: facts.dir,
+    lane: { facts, hostPaths },
+  }
+}
+
+/**
+ * The skills a lane of its own can read, at the paths it reads them: those
+ * under a host path it has mounted, at `/mnt/host` and their path (ADR-0036).
+ */
+function skillsInLane<S extends { filePath: string; baseDir: string }>(
+  skills: readonly S[] | undefined,
+  hostPaths: readonly string[],
+): S[] {
+  const mounted = (p: string) =>
+    hostPaths.some(r => p === r || p.startsWith(`${r}/`))
+  return (skills ?? [])
+    .filter(s => mounted(s.filePath))
+    .map(s => ({
+      ...s,
+      filePath: hostPathInLane(s.filePath),
+      baseDir: hostPathInLane(s.baseDir),
+    }))
+}
+
+/**
+ * pi's own prompt, with the repo's context files and the person's skills, so
+ * an extension that shapes pi's prompt sections finds them (S23). It names
+ * the lane's directory, and does not wait for its setup. A lane of its own
+ * is told about itself (`laneGuidelines`), and sees its skills at the paths
+ * it can read them (`skillsInLane`).
+ */
+export const systemPromptFor =
+  (
+    setup: Pick<ModelSetup, "contextFiles" | "skills">,
+    selectedTools: readonly string[],
+  ) =>
+  (toolContext: ToolContext): string =>
+    buildSystemPrompt({
+      cwd: toolContext.dir,
+      selectedTools: [...selectedTools],
+      contextFiles: setup.contextFiles,
+      skills:
+        toolContext.lane === null
+          ? setup.skills
+          : skillsInLane(setup.skills, toolContext.lane.hostPaths),
+      ...(toolContext.lane === null
+        ? {}
+        : { promptGuidelines: laneGuidelines(toolContext.lane.facts) }),
+    })
 
 export const GUIDANCE_TOOL = "ask_for_guidance"
 

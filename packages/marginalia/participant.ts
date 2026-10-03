@@ -1,27 +1,34 @@
 // participant — who is in a session, and what each is called.
 //
 // A session is its participants (ADR-0021). A name is a label, never an
-// identity: `pineta.participant` values keyed by writer id. Everyone who has
-// written is a participant, named or not, so everyone shown on screen can be
-// mentioned.
+// identity: a `pineta.participant` value is a name, keyed by writer id.
+// Everyone who has written is a participant, named or not, so everyone shown
+// on screen can be mentioned.
 
 import { emailLocalPart, type WriterId } from "@pineta/core"
+import { Type } from "typebox"
+import { decodeAt, writerKey } from "./decode.ts"
+import type { RecordSpec } from "./records.ts"
 
-/** pi value namespace for display names. The key is the writer's id. */
-export const PARTICIPANT_NAMESPACE = "pineta.participant"
+/** A writer's display name. */
+export interface ParticipantRecord {
+  readonly writer: WriterId
+  readonly name: string
+}
 
 /**
- * Stored `pineta.participant` values -> each writer's name. Total: a value that
- * is not a string is skipped, like any malformed stored value.
+ * Each writer's name, at the writer's id. The contents are the name alone.
+ * Total: contents that are not a string are malformed.
  */
-export function participantNames(
-  values: Iterable<{ readonly key: string; readonly value: unknown }>,
-): ReadonlyMap<WriterId, string> {
-  const out = new Map<WriterId, string>()
-  for (const { key, value } of values) {
-    if (typeof value === "string") out.set(key as WriterId, value)
-  }
-  return out
+export const PARTICIPANT: RecordSpec<ParticipantRecord, WriterId> = {
+  namespace: "pineta.participant",
+  keyOf: r => r.writer,
+  encode: r => r.name,
+  decode: (contents, key) =>
+    decodeAt(Type.String(), contents, writerKey(key), (name, writer) => ({
+      writer,
+      name,
+    })),
 }
 
 /**

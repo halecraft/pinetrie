@@ -3,7 +3,7 @@
 // and values in a document as the host would. Production code never imports
 // it.
 
-import type { LaneName } from "@pineta/core"
+import type { LaneName, ValueWrite } from "@pineta/core"
 import type { ThreadLaneHandle, WriteOutcome } from "@pineta/pi"
 import {
   newPlacesDoc,
@@ -11,6 +11,7 @@ import {
   physicalKey,
   type SessionDocHandle,
   type StoredEntryRow,
+  type StoredValueRecord,
 } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 
@@ -104,20 +105,31 @@ export const row = (
   payload: { message },
 })
 
-/**
- * One pi value, as pi stores it: `encodeWorkRecord`'s result, or an archive
- * record with its namespace and key.
- */
+/** One pi value, as pi stores it: a `set` write, as `setRecord` makes one. */
 export function putValue(
   doc: SessionDocHandle,
-  stored: {
-    readonly namespace: string
-    readonly key: string
-    readonly value: unknown
-  },
+  write: Extract<ValueWrite, { kind: "set" }>,
 ): void {
-  doc.values.set(physicalKey(stored.namespace, stored.key), stored)
+  const { namespace, key, value } = write
+  const record: StoredValueRecord = { namespace, key, value }
+  doc.values.set(physicalKey(namespace, key), record)
 }
+
+/** `writes` applied to `doc`, as pi's session would: a fake `writeValues`. */
+export function applyWrites(
+  doc: SessionDocHandle,
+  writes: readonly ValueWrite[],
+): void {
+  for (const w of writes)
+    if (w.kind === "set") putValue(doc, w)
+    else doc.values.delete(physicalKey(w.namespace, w.key))
+}
+
+/** Every write a port's `writeValues` calls were given, in order. */
+export const writesOf = (calls: readonly Call[]): ValueWrite[] =>
+  calls.flatMap(c =>
+    c.method === "writeValues" ? (c.args[0] as ValueWrite[]) : [],
+  )
 
 /** A fresh document, ids from a counter, a fixed clock, and the log's lines. */
 export function basics(

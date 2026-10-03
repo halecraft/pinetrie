@@ -2,11 +2,12 @@ import { laneNameForThread, type ThreadName } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   ADJECTIVES,
-  encodeWorkRecord,
+  NAME,
   NOUNS,
-  nameRecords,
   planNames,
   planReserve,
+  recordsOf,
+  setRecord,
   threadNameFor,
 } from "./index.ts"
 
@@ -102,13 +103,12 @@ describe("planReserve (ADR-0057)", () => {
 })
 
 test("a name record round-trips by lane; a malformed name is dropped", () => {
-  const e = encodeWorkRecord({
-    kind: "name",
-    record: { lane: A, name: "amber-fox" as ThreadName, at: 1 },
-  })
+  const e = setRecord(NAME, { lane: A, name: "amber-fox" as ThreadName, at: 1 })
   expect([e.namespace, e.key]).toEqual(["pineta.name", A])
-  expect(nameRecords([{ value: e.value }]).get(A)).toBe("amber-fox")
+  expect(recordsOf(NAME, [e]).get(A)?.name).toBe("amber-fox")
   expect(
-    nameRecords([{ value: { lane: B, name: "Amber Fox", at: 1 } }]).size,
+    recordsOf(NAME, [{ key: B, value: { name: "Amber Fox", at: 1 } }]).size,
   ).toBe(0)
+  // A name keyed by what is no lane is dropped.
+  expect(recordsOf(NAME, [{ ...e, key: "main" }]).size).toBe(0)
 })

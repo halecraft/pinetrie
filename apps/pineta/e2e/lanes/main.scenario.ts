@@ -18,6 +18,7 @@ import {
   rootOf,
 } from "@pineta/core"
 import { DEFAULT_LINE, hostOps, laneBase, startOfOffer } from "@pineta/lanes"
+import { deleteRecord, OFFER } from "@pineta/marginalia"
 import { scriptedModel } from "@pineta/pi"
 import {
   readLandings,
@@ -646,7 +647,8 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     // jj operation of yours, writes it again from the repo, and the offer
     // is the same commit, not built anew.
     const lostAt = offerNow()
-    if (two !== undefined) await wh.agent.removeOffer(two.name)
+    if (two !== undefined)
+      await wh.agent.writeValues([deleteRecord(OFFER, two.name)])
     jj(project, "bookmark", "create", "e2e-poke", "-r", "@-")
     const rewritten = await waitFor(
       () => JSON.stringify(offerOf()?.commits) === JSON.stringify([lostAt]),

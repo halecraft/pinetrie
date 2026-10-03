@@ -16,8 +16,9 @@ import {
   CHAT_TYPE,
   type ChatDetails,
   type ChatMessage,
-  encodeWorkRecord,
-  PARTICIPANT_NAMESPACE,
+  PARTICIPANT,
+  PROJECT,
+  setRecord,
 } from "@pineta/marginalia"
 import { readTreeIndex } from "@pineta/reads"
 import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
@@ -147,8 +148,7 @@ describe("sendChat", () => {
   function setUp(project: ProjectRecord | null = null) {
     const b = basics()
     writeEntry(b.doc, row(E1, null))
-    if (project !== null)
-      putValue(b.doc, encodeWorkRecord({ kind: "project", record: project }))
+    if (project !== null) putValue(b.doc, setRecord(PROJECT, project))
     const cards = record<ChatDeps["cards"]>({
       writers: async () => [ALICE, BEA],
     })
@@ -293,11 +293,10 @@ describe("sendChat", () => {
     const { agent, deps } = setUp()
     writeLaneTip(deps.basics.doc, LANE, E1)
     beginRun(deps.basics.doc, LANE, runId("r-0"))
-    putValue(deps.basics.doc, {
-      namespace: PARTICIPANT_NAMESPACE,
-      key: BEA,
-      value: "Bea",
-    })
+    putValue(
+      deps.basics.doc,
+      setRecord(PARTICIPANT, { writer: BEA, name: "Bea" }),
+    )
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("@bea when it is done"),
       lane: LANE,

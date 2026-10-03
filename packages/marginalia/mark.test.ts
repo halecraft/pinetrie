@@ -7,7 +7,8 @@ import {
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { decodeMark, encodeMark, markRecords, planMark } from "./mark.ts"
+import { MARK, planMark } from "./mark.ts"
+import { recordsOf } from "./records.ts"
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
@@ -45,11 +46,14 @@ const plan = (
 describe("the record", () => {
   test("round-trips, and a value with no title or no entry is dropped", () => {
     const r = mark("r1", "Tab names")
-    expect(decodeMark(encodeMark(r))).toEqual(r)
-    expect(decodeMark({ ...r, title: "" })).toBeUndefined()
-    expect(decodeMark({ ...r, entry: "" })).toBeUndefined()
+    expect(MARK.decode(MARK.encode(r), r.entry)).toEqual(r)
+    expect(MARK.decode({ ...r, title: "" }, r.entry)).toBeUndefined()
+    expect(MARK.decode(r, "")).toBeUndefined()
     expect(
-      markRecords([{ value: r }, { value: { nope: 1 } }]).get(entryId("r1")),
+      recordsOf(MARK, [
+        { key: r.entry, value: r },
+        { key: "r2", value: { nope: 1 } },
+      ]).get(entryId("r1")),
     ).toEqual(r)
   })
 })

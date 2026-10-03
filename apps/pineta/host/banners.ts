@@ -5,6 +5,7 @@
 import type { BlobStore, LaneName, Sha256, StoredImage } from "@pineta/core"
 import {
   answerOf,
+  BANNER,
   BANNER_ATTEMPTS,
   type BannerAnswer,
   type BannerAsk,
@@ -12,6 +13,7 @@ import {
   bannerPrompt,
   bannerStillWanted,
   planAsk,
+  setRecord,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readBanners, readNames } from "@pineta/reads"
@@ -28,7 +30,7 @@ export interface Banners {
 
 type BannerAgent = Pick<
   Agent,
-  "canDrawBanners" | "drawBanner" | "skill" | "setWorkRecord"
+  "canDrawBanners" | "drawBanner" | "skill" | "writeValues"
 >
 
 export function createBanners(deps: {
@@ -44,10 +46,9 @@ export function createBanners(deps: {
   const generating = new Set<LaneName>()
 
   const write = (lane: LaneName, sha: Sha256) =>
-    deps.agent().setWorkRecord({
-      kind: "banner",
-      record: { lane, sha, at: basics.now() },
-    })
+    deps
+      .agent()
+      .writeValues([setRecord(BANNER, { lane, sha, at: basics.now() })])
 
   const failedFor = (lane: LaneName) => (why: string) =>
     log(`[host] no banner for ${readNames(doc).get(lane) ?? lane}: ${why}`)

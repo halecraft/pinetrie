@@ -1,7 +1,7 @@
 // host/commands/mark — a root's title (ADR-0045): gather, `planMark`, execute.
 
 import type { Intent, WriterId } from "@pineta/core"
-import { planMark } from "@pineta/marginalia"
+import { deleteRecord, MARK, planMark, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import { readMarks, readTreeIndex } from "@pineta/reads"
@@ -9,7 +9,7 @@ import type { Basics } from "../basics.ts"
 
 export interface MarkDeps {
   readonly basics: Pick<Basics, "doc" | "now">
-  readonly agent: Pick<Agent, "setMark" | "removeMark">
+  readonly agent: Pick<Agent, "writeValues">
 }
 
 export async function handleMark(
@@ -35,10 +35,10 @@ export async function handleMark(
     case "refused":
       return planned
     case "write":
-      await agent.setMark(planned.record)
+      await agent.writeValues([setRecord(MARK, planned.record)])
       break
     case "remove":
-      await agent.removeMark(planned.entry)
+      await agent.writeValues([deleteRecord(MARK, planned.entry)])
       break
     case "unchanged":
       break

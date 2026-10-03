@@ -262,7 +262,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "unmoved", code: "full", place: null, by: null },
     { kind: "refused", code: ERR.ARCHIVED, message: "archived by Bea" },
     { kind: "refused", code: ERR.ROOT_BUSY, message: "busy" },
-    { kind: "failed", message: "setParticipantName is not in this port" },
+    { kind: "failed", message: "writeValues is not in this port" },
   ]
   for (const outcome of outcomes) {
     assert.deepEqual(decodeReply(encodeOutcome("c-1", outcome)), outcome)

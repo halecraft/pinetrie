@@ -28,17 +28,23 @@ export type TextDocHandle =
   typeof TextDoc extends BoundSchema<infer S, infer N> ? DocRef<S, N> : never
 
 /**
- * A seat's Yjs `clientID` and the person behind it, or null for a seat whose
- * principal is no email: the host's among them. The one place a seat becomes
+ * A seat's peer, its Yjs `clientID` and the person behind it, or null for a
+ * seat whose principal is no email: the host's among them. The one place a seat becomes
  * a person; the host's seat records (`pineta.seat`) come from it, and a
  * card's writers from those.
  */
 export const seatOf = (
   peerId: string,
   principal: string,
-): { readonly clientId: number; readonly writer: WriterId } | null => {
+): {
+  readonly peer: string
+  readonly clientId: number
+  readonly writer: WriterId
+} | null => {
   const writer = writerOfPrincipal(principal)
-  return writer === undefined ? null : { clientId: yjsClientId(peerId), writer }
+  return writer === undefined
+    ? null
+    : { peer: peerId, clientId: yjsClientId(peerId), writer }
 }
 
 /**

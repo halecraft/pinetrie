@@ -50,45 +50,34 @@ import {
   workFor,
 } from "@pineta/core"
 import {
-  ARCHIVE_NAMESPACE,
-  archiveRecords,
-  BANNER_NAMESPACE,
-  BASE_NAMESPACE,
-  bannerRecords,
-  baseRecords,
-  COMMANDS_NAMESPACE,
-  commandsRecord,
-  DIGEST_NAMESPACE,
+  ARCHIVE,
+  BANNER,
+  BASE,
+  COMMANDS,
+  COMMANDS_KEY,
+  DIGEST,
   type DigestRecord,
   decodeCard,
   decodeChat,
-  digestRecords,
-  LANDING_NAMESPACE,
-  LANE_NAMESPACE,
-  LINE_NAMESPACE,
-  landingRecords,
-  laneRecords,
-  lineRecord,
-  MARK_NAMESPACE,
-  markRecords,
-  NAME_NAMESPACE,
-  nameRecords,
-  OFFER_NAMESPACE,
-  offerRecords,
-  PARTICIPANT_NAMESPACE,
-  PROJECT_NAMESPACE,
-  participantNames,
+  LANDING,
+  LANE,
+  LINE,
+  LINE_KEY,
+  MARK,
+  NAME,
+  OFFER,
+  PARTICIPANT,
+  PROJECT,
+  PROJECT_KEY,
   participants,
   pastedImages,
-  projectRecord,
   queuedOn,
-  REVISION_NAMESPACE,
+  REVISION,
+  type RecordSpec,
+  recordsOf,
   renderableMessage,
-  revisionRecords,
-  SEAT_NAMESPACE,
-  STOP_NAMESPACE,
-  seatRecords,
-  stopRecords,
+  SEAT,
+  STOP,
 } from "@pineta/marginalia"
 import {
   type PlacesDocHandle,
@@ -225,11 +214,22 @@ export function readAgentActivity(doc: SessionDocHandle): readonly AgentRun[] {
   )
 }
 
+/**
+ * Every record `spec` describes, by its address (ADR-0062). Each named
+ * reader below is this, for one record.
+ */
+export const readRecords = <R, K extends string>(
+  doc: SessionDocHandle,
+  spec: RecordSpec<R, K>,
+): ReadonlyMap<K, R> => recordsOf(spec, readValues(doc, spec.namespace))
+
 /** Each writer's display name (`pineta.participant`). */
 export const readParticipantNames = (
   doc: SessionDocHandle,
 ): ReadonlyMap<WriterId, string> =>
-  participantNames(readValues(doc, PARTICIPANT_NAMESPACE))
+  new Map(
+    [...readRecords(doc, PARTICIPANT).values()].map(r => [r.writer, r.name]),
+  )
 
 /**
  * Every participant's display name, guests included: the list a mention
@@ -290,7 +290,7 @@ export const readTyping = presenceField(doc => doc.typing())
 
 /** Every seat the host has seen (`pineta.seat`), first seen first. */
 export const readSeats = (doc: SessionDocHandle): readonly SeatRecord[] =>
-  seatRecords(readValues(doc, SEAT_NAMESPACE))
+  [...readRecords(doc, SEAT).values()].sort((a, b) => a.at - b.at)
 
 // Each stored card row as last decoded. Kyneta gives an unchanged `json`
 // row the same object across writes, so an unchanged card keeps its record
@@ -324,72 +324,65 @@ export const readPlacesRev = (places: PlacesDocHandle): number => places.rev()
 /** Every root's archive record (`pineta.archive`, ADR-0029), keyed by root. */
 export const readArchive = (
   doc: SessionDocHandle,
-): ReadonlyMap<EntryId, ArchiveRecord> =>
-  archiveRecords(readValues(doc, ARCHIVE_NAMESPACE))
+): ReadonlyMap<EntryId, ArchiveRecord> => readRecords(doc, ARCHIVE)
 
 /** Every entry's mark (`pineta.mark`, ADR-0045), keyed by entry: a root's titles its tab. */
 export const readMarks = (
   doc: SessionDocHandle,
-): ReadonlyMap<EntryId, MarkRecord> =>
-  markRecords(readValues(doc, MARK_NAMESPACE))
+): ReadonlyMap<EntryId, MarkRecord> => readRecords(doc, MARK)
 
 /** Each ask's digest (`pineta.digest`, ADR-0056), by its prompt. */
 export const readDigests = (
   doc: SessionDocHandle,
-): ReadonlyMap<EntryId, DigestRecord> =>
-  digestRecords(readValues(doc, DIGEST_NAMESPACE))
+): ReadonlyMap<EntryId, DigestRecord> => readRecords(doc, DIGEST)
 
 /** Who stopped each ask (`pineta.stop`, ADR-0056), by its prompt. */
 export const readStops = (
   doc: SessionDocHandle,
-): ReadonlyMap<EntryId, StopRecord> =>
-  stopRecords(readValues(doc, STOP_NAMESPACE))
+): ReadonlyMap<EntryId, StopRecord> => readRecords(doc, STOP)
 
 // ── where lanes work (ADR-0032, ADR-0033) ─────────────────────────────────
 
 /** Every lane's record (`pineta.lane`): where it works, by lane. */
 export const readLaneRecords = (
   doc: SessionDocHandle,
-): ReadonlyMap<LaneName, LaneRecord> =>
-  laneRecords(readValues(doc, LANE_NAMESPACE))
+): ReadonlyMap<LaneName, LaneRecord> => readRecords(doc, LANE)
 
 /** Every revision record (`pineta.revision`), by the entry it is at. */
 export const readRevisions = (
   doc: SessionDocHandle,
-): ReadonlyMap<EntryId, RevisionRecord> =>
-  revisionRecords(readValues(doc, REVISION_NAMESPACE))
+): ReadonlyMap<EntryId, RevisionRecord> => readRecords(doc, REVISION)
 
 /** Every resolution's record (`pineta.landing`), oldest first. */
 export const readLandings = (doc: SessionDocHandle): readonly LandingRecord[] =>
-  landingRecords(readValues(doc, LANDING_NAMESPACE))
+  [...readRecords(doc, LANDING).values()].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  )
 
 /** Each lane's offer in your repo (ADR-0038), by lane. */
 export const readOffers = (
   doc: SessionDocHandle,
-): ReadonlyMap<LaneName, OfferRecord> =>
-  offerRecords(readValues(doc, OFFER_NAMESPACE))
+): ReadonlyMap<LaneName, OfferRecord> => readRecords(doc, OFFER)
 
 /** The integration line as the host last read it (ADR-0060); null before it wrote one. */
 export const readLine = (doc: SessionDocHandle): LineRecord | null =>
-  lineRecord(readValues(doc, LINE_NAMESPACE))
+  readRecords(doc, LINE).get(LINE_KEY) ?? null
 
 /** Each lane's base as its history says it (ADR-0060), by lane. */
 export const readBases = (
   doc: SessionDocHandle,
-): ReadonlyMap<LaneName, BaseRecord> =>
-  baseRecords(readValues(doc, BASE_NAMESPACE))
+): ReadonlyMap<LaneName, BaseRecord> => readRecords(doc, BASE)
 
 /** Each lane's name (`pineta.name`, ADR-0039), by lane. */
 export const readNames = (
   doc: SessionDocHandle,
 ): ReadonlyMap<LaneName, ThreadName> =>
-  nameRecords(readValues(doc, NAME_NAMESPACE))
+  new Map([...readRecords(doc, NAME).values()].map(r => [r.lane, r.name]))
 
 /** Each thread's banner (`pineta.banner`), by lane. */
 export const readBanners = (
   doc: SessionDocHandle,
-): ReadonlyMap<LaneName, BannerRecord> =>
-  bannerRecords(readValues(doc, BANNER_NAMESPACE))
+): ReadonlyMap<LaneName, BannerRecord> => readRecords(doc, BANNER)
 
 /**
  * A lane as people read it: its name, or, before the host has named it, the
@@ -400,13 +393,13 @@ export const readThreadName = (doc: SessionDocHandle, lane: LaneName): string =>
 
 /** What the host found where it runs (`pineta.project`); null with no tools. */
 export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>
-  projectRecord(readValues(doc, PROJECT_NAMESPACE))
+  readRecords(doc, PROJECT).get(PROJECT_KEY) ?? null
 
 /** The commands the host's pi loaded (ADR-0036); none before a host wrote them. */
 export const readCommands = (
   doc: SessionDocHandle,
 ): readonly CommandSummary[] =>
-  commandsRecord(readValues(doc, COMMANDS_NAMESPACE))
+  readRecords(doc, COMMANDS).get(COMMANDS_KEY)?.commands ?? []
 
 /**
  * Whether a send's thread works, or will work, in its own copy: its lane is

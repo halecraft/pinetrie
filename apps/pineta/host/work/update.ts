@@ -45,10 +45,12 @@ import {
   type ConflictFile,
   decodeLand,
   encodeUpdate,
+  LANDING,
   type LandMessage,
   landingOutcome,
   planResolution,
   planUpdateFrom,
+  setRecord,
   type UpdateDetails,
   type UpdateFrom,
   wipState,
@@ -408,9 +410,8 @@ export function createUpdates(deps: {
         const left = await registry
           .handleOf(lane)
           .queue.enqueue(() => conflictsIn(jj))
-        await deps.agent().setWorkRecord({
-          kind: "landing",
-          record: {
+        await deps.agent().writeValues([
+          setRecord(LANDING, {
             id: details.landing,
             lane,
             prompt,
@@ -420,8 +421,8 @@ export function createUpdates(deps: {
             }),
             by: details.by,
             at: basics.now(),
-          },
-        })
+          }),
+        ])
       } catch (error) {
         failed(basics, "the resolution's outcome", lane)(error)
       }

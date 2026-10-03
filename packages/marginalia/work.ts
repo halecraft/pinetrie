@@ -2,9 +2,8 @@
 // offers, the integration line and threads' bases, and lanes' names
 // (ADR-0032 to ADR-0034, ADR-0038, ADR-0039, ADR-0060), and threads' banners.
 //
-// Host-written records, each a pi value under a `pineta.` namespace.
-// `encodeWorkRecord` is the one place their namespaces and keys are chosen;
-// each has a total decoder. How a resolution ended
+// Host-written records, each a `RecordSpec` (`records.ts`, ADR-0062) under a
+// `pineta.` namespace. How a resolution ended
 // (`landingOutcome`), what a turn records (`planTurnRecord`), where a fork
 // starts (`forkPoint`) and which snapshots go (`planRetention`) are pure,
 // over what the host gathers. An offer's own decisions are in `offer.ts`.
@@ -40,26 +39,13 @@ import {
   type WriterId,
 } from "@pineta/core"
 import { Type } from "typebox"
-import { decodeAll, decodeWith } from "./decode.ts"
+import { decodeAt, entryKey, fixedKey, laneKey, textKey } from "./decode.ts"
+import type { RecordSpec } from "./records.ts"
 
-export const LANE_NAMESPACE = "pineta.lane"
-export const REVISION_NAMESPACE = "pineta.revision"
-export const LANDING_NAMESPACE = "pineta.landing"
-export const OFFER_NAMESPACE = "pineta.offer"
-/**
- * Where ADR-0038 kept the commits you had of lanes; ADR-0060's trailers
- * replace them. A starting host deletes what an older one left there.
- */
-export const LEGACY_HAVE_NAMESPACE = "pineta.have"
-export const LINE_NAMESPACE = "pineta.line"
-export const BASE_NAMESPACE = "pineta.base"
-const LINE_KEY = "line"
-export const NAME_NAMESPACE = "pineta.name"
-export const BANNER_NAMESPACE = "pineta.banner"
-export const PROJECT_NAMESPACE = "pineta.project"
+/** The one `pineta.line` value's key: a host follows one line. */
+export const LINE_KEY = "line"
 /** The one `pineta.project` value's key: a host has one project. */
 export const PROJECT_KEY = "project"
-export const COMMANDS_NAMESPACE = "pineta.commands"
 /** The one `pineta.commands` value's key: what the host's pi loaded. */
 export const COMMANDS_KEY = "commands"
 
@@ -72,14 +58,12 @@ const WorkSettingSchema = Type.Union([
 ])
 
 const LaneRecordSchema = Type.Object({
-  lane: Type.String({ minLength: 1 }),
   work: WorkSettingSchema,
   by: Type.String(),
   createdAt: Type.Number(),
 })
 
 const RevisionRecordSchema = Type.Object({
-  entry: Type.String({ minLength: 1 }),
   lane: Type.String({ minLength: 1 }),
   commit: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
   // Absent in records written before lane containers.
@@ -115,7 +99,6 @@ const CommandsRecordSchema = Type.Object({
 })
 
 const LandingRecordSchema = Type.Object({
-  id: Type.String({ minLength: 1 }),
   lane: Type.String({ minLength: 1 }),
   prompt: Type.String({ minLength: 1 }),
   state: Type.Union([Type.Literal("resolved"), Type.Literal("needs_you")]),
@@ -126,7 +109,6 @@ const LandingRecordSchema = Type.Object({
 const Commit = Type.String({ minLength: 1 })
 
 const OfferRecordSchema = Type.Object({
-  lane: Type.String({ minLength: 1 }),
   size: Type.Integer({ minimum: 1 }),
   stale: Type.Boolean(),
   files: Type.Array(Type.String()),
@@ -141,13 +123,11 @@ const OfferRecordSchema = Type.Object({
 })
 
 const BannerRecordSchema = Type.Object({
-  lane: Type.String({ minLength: 1 }),
   sha: Type.String({ pattern: "^[0-9a-f]{64}$" }),
   at: Type.Number(),
 })
 
 const NameRecordSchema = Type.Object({
-  lane: Type.String({ minLength: 1 }),
   name: Type.String({ pattern: "^[a-z]+-[a-z]+$" }),
   at: Type.Number(),
 })
@@ -192,7 +172,6 @@ const LineRecordSchema = Type.Object({
 })
 
 const BaseRecordSchema = Type.Object({
-  lane: Type.String({ minLength: 1 }),
   base: Type.Union([
     Type.Object({ kind: Type.Literal("line") }),
     Type.Object({
@@ -208,286 +187,196 @@ const BaseRecordSchema = Type.Object({
   ]),
 })
 
-export const decodeLineRecord = (value: unknown): LineRecord | undefined =>
-  decodeWith(LineRecordSchema, value, r => ({
+/** Each lane's setting: its own copy, or a directory. */
+export const LANE: RecordSpec<LaneRecord, LaneName> = {
+  namespace: "pineta.lane",
+  keyOf: r => r.lane,
+  encode: ({ lane, ...contents }) => contents,
+  decode: (contents, key) =>
+    decodeAt(LaneRecordSchema, contents, laneKey(key), (r, lane) => ({
+      lane,
+      work: r.work,
+      by: r.by as WriterId,
+      createdAt: r.createdAt,
+    })),
+}
+
+/** The commit and disk at an entry, and its turn's paths, at the entry. */
+export const REVISION: RecordSpec<RevisionRecord, EntryId> = {
+  namespace: "pineta.revision",
+  keyOf: r => r.entry,
+  encode: ({ entry, ...contents }) => ({
+    ...contents,
+    paths: [...contents.paths],
+  }),
+  decode: (contents, key) =>
+    decodeAt(RevisionRecordSchema, contents, entryKey(key), (r, entry) =>
+      isLaneName(r.lane)
+        ? {
+            entry,
+            lane: r.lane,
+            commit: r.commit === null ? null : commitId(r.commit),
+            snapshot:
+              r.snapshot === undefined || r.snapshot === null
+                ? null
+                : snapshotId(r.snapshot),
+            paths: r.paths ?? [],
+          }
+        : undefined,
+    ),
+}
+
+/** How each resolution ended, at its own id. */
+export const LANDING: RecordSpec<LandingRecord, string> = {
+  namespace: "pineta.landing",
+  keyOf: r => r.id,
+  encode: ({ id, ...contents }) => contents,
+  decode: (contents, key) =>
+    decodeAt(LandingRecordSchema, contents, textKey(key), (r, id) =>
+      isLaneName(r.lane)
+        ? {
+            id,
+            lane: r.lane,
+            prompt: entryId(r.prompt),
+            state: r.state,
+            by: r.by as WriterId,
+            at: r.at,
+          }
+        : undefined,
+    ),
+}
+
+/** Each lane's offer in your repo, at the lane. */
+export const OFFER: RecordSpec<OfferRecord, LaneName> = {
+  namespace: "pineta.offer",
+  keyOf: r => r.lane,
+  encode: ({ lane, ...contents }) => ({
+    ...contents,
+    files: [...contents.files],
+    conflicts: [...contents.conflicts],
+    yourEdits: [...contents.yourEdits],
+    commits: [...contents.commits],
+  }),
+  // Field by field: an older record has a `host` key, what the host once
+  // kept for itself, which a spread would carry along.
+  decode: (contents, key) =>
+    decodeAt(OfferRecordSchema, contents, laneKey(key), (r, lane) => ({
+      lane,
+      size: r.size,
+      stale: r.stale,
+      files: r.files,
+      conflicts: r.conflicts,
+      yourEdits: r.yourEdits,
+      described: r.described,
+      edited: r.edited,
+      bookmark: r.bookmark,
+      taken: r.taken,
+      commits: r.commits.map(commitId),
+      at: r.at,
+    })),
+}
+
+/** The integration line, at its one key. */
+export const LINE: RecordSpec<LineRecord, typeof LINE_KEY> = {
+  namespace: "pineta.line",
+  keyOf: () => LINE_KEY,
+  encode: r => ({
     ...r,
-    commit: r.commit === null ? null : commitId(r.commit),
-    wips: r.wips.map(w => ({ ...w, commit: commitId(w.commit) })),
-  }))
+    heads: { ...r.heads },
+    log: { ...r.log },
+    wips: r.wips.map(w => ({ ...w })),
+    yours: {
+      ...r.yours,
+      follow:
+        r.yours.follow === null
+          ? null
+          : {
+              ...r.yours.follow,
+              files: [...r.yours.follow.files],
+              conflicts: [...r.yours.follow.conflicts],
+            },
+      conflicts: {
+        ...r.yours.conflicts,
+        files: [...r.yours.conflicts.files],
+      },
+    },
+  }),
+  decode: (contents, key) =>
+    decodeAt(LineRecordSchema, contents, fixedKey(LINE_KEY, key), r => ({
+      ...r,
+      commit: r.commit === null ? null : commitId(r.commit),
+      wips: r.wips.map(w => ({ ...w, commit: commitId(w.commit) })),
+    })),
+}
 
-export const decodeBaseRecord = (value: unknown): BaseRecord | undefined =>
-  decodeWith(BaseRecordSchema, value, r =>
-    isLaneName(r.lane)
-      ? { ...r, lane: r.lane, start: commitId(r.start) }
-      : undefined,
-  )
+/** Each lane's base, as its history says it, at the lane. */
+export const BASE: RecordSpec<BaseRecord, LaneName> = {
+  namespace: "pineta.base",
+  keyOf: r => r.lane,
+  encode: ({ lane, ...contents }) => ({
+    ...contents,
+    base: { ...contents.base },
+  }),
+  decode: (contents, key) =>
+    decodeAt(BaseRecordSchema, contents, laneKey(key), (r, lane) => ({
+      lane,
+      base: r.base,
+      start: commitId(r.start),
+      state: r.state,
+    })),
+}
 
-export const decodeLaneRecord = (value: unknown): LaneRecord | undefined =>
-  decodeWith(LaneRecordSchema, value, r =>
-    isLaneName(r.lane)
-      ? {
-          lane: r.lane,
-          work: r.work,
-          by: r.by as WriterId,
-          createdAt: r.createdAt,
-        }
-      : undefined,
-  )
+/** Each thread's name, `word-word`, at its lane (ADR-0039). */
+export const NAME: RecordSpec<NameRecord, LaneName> = {
+  namespace: "pineta.name",
+  keyOf: r => r.lane,
+  encode: ({ lane, ...contents }) => contents,
+  decode: (contents, key) =>
+    decodeAt(NameRecordSchema, contents, laneKey(key), (r, lane) => ({
+      lane,
+      name: r.name as ThreadName,
+      at: r.at,
+    })),
+}
 
-export const decodeRevisionRecord = (
-  value: unknown,
-): RevisionRecord | undefined =>
-  decodeWith(RevisionRecordSchema, value, r =>
-    isLaneName(r.lane)
-      ? {
-          entry: entryId(r.entry),
-          lane: r.lane,
-          commit: r.commit === null ? null : commitId(r.commit),
-          snapshot:
-            r.snapshot === undefined || r.snapshot === null
-              ? null
-              : snapshotId(r.snapshot),
-          paths: r.paths ?? [],
-        }
-      : undefined,
-  )
+/** Each thread's column banner, the image's hash, at its lane. */
+export const BANNER: RecordSpec<BannerRecord, LaneName> = {
+  namespace: "pineta.banner",
+  keyOf: r => r.lane,
+  encode: ({ lane, ...contents }) => contents,
+  decode: (contents, key) =>
+    decodeAt(BannerRecordSchema, contents, laneKey(key), (r, lane) =>
+      isSha256(r.sha) ? { lane, sha: r.sha, at: r.at } : undefined,
+    ),
+}
 
-export const decodeProjectRecord = (
-  value: unknown,
-): ProjectRecord | undefined => decodeWith(ProjectRecordSchema, value, r => r)
-
-export const decodeLandingRecord = (
-  value: unknown,
-): LandingRecord | undefined =>
-  decodeWith(LandingRecordSchema, value, r =>
-    isLaneName(r.lane)
-      ? {
-          ...r,
-          lane: r.lane,
-          prompt: entryId(r.prompt),
-          by: r.by as WriterId,
-        }
-      : undefined,
-  )
-
-export const decodeOfferRecord = (value: unknown): OfferRecord | undefined =>
-  decodeWith(OfferRecordSchema, value, r =>
-    isLaneName(r.lane)
-      ? {
-          // Field by field: an older record has a `host` key, what the host
-          // once kept for itself, which a spread would carry along.
-          lane: r.lane,
-          size: r.size,
-          stale: r.stale,
-          files: r.files,
-          conflicts: r.conflicts,
-          yourEdits: r.yourEdits,
-          described: r.described,
-          edited: r.edited,
-          bookmark: r.bookmark,
-          taken: r.taken,
-          commits: r.commits.map(commitId),
-          at: r.at,
-        }
-      : undefined,
-  )
-
-export const decodeNameRecord = (value: unknown): NameRecord | undefined =>
-  decodeWith(NameRecordSchema, value, r =>
-    isLaneName(r.lane)
-      ? { lane: r.lane, name: r.name as ThreadName, at: r.at }
-      : undefined,
-  )
-
-export const decodeBannerRecord = (value: unknown): BannerRecord | undefined =>
-  decodeWith(BannerRecordSchema, value, r =>
-    isSha256(r.sha) && isLaneName(r.lane)
-      ? { lane: r.lane, sha: r.sha, at: r.at }
-      : undefined,
-  )
+/** What the host found where it runs, at its one key. */
+export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY> = {
+  namespace: "pineta.project",
+  keyOf: () => PROJECT_KEY,
+  encode: r => ({ ...r }),
+  decode: (contents, key) =>
+    decodeAt(ProjectRecordSchema, contents, fixedKey(PROJECT_KEY, key), r => r),
+}
 
 /** The commands the host's pi loaded, as people see them (ADR-0036). */
 export interface CommandsRecord {
   readonly commands: readonly CommandSummary[]
 }
 
-export const decodeCommandsRecord = (
-  value: unknown,
-): CommandsRecord | undefined => decodeWith(CommandsRecordSchema, value, r => r)
-
-/** Any of the host's records, tagged: what the host writes through one method. */
-export type WorkRecord =
-  | { readonly kind: "lane"; readonly record: LaneRecord }
-  | { readonly kind: "revision"; readonly record: RevisionRecord }
-  | { readonly kind: "landing"; readonly record: LandingRecord }
-  | { readonly kind: "offer"; readonly record: OfferRecord }
-  | { readonly kind: "line"; readonly record: LineRecord }
-  | { readonly kind: "base"; readonly record: BaseRecord }
-  | { readonly kind: "name"; readonly record: NameRecord }
-  | { readonly kind: "banner"; readonly record: BannerRecord }
-  | { readonly kind: "project"; readonly record: ProjectRecord }
-  | { readonly kind: "commands"; readonly record: CommandsRecord }
-
-/** A record -> where it is stored and the plain value stored there. */
-export function encodeWorkRecord(r: WorkRecord): {
-  readonly namespace: string
-  readonly key: string
-  readonly value: unknown
-} {
-  switch (r.kind) {
-    case "lane":
-      return {
-        namespace: LANE_NAMESPACE,
-        key: r.record.lane,
-        value: { ...r.record },
-      }
-    case "revision":
-      return {
-        namespace: REVISION_NAMESPACE,
-        key: r.record.entry,
-        value: { ...r.record, paths: [...r.record.paths] },
-      }
-    case "landing":
-      return {
-        namespace: LANDING_NAMESPACE,
-        key: r.record.id,
-        value: { ...r.record },
-      }
-    case "offer":
-      return {
-        namespace: OFFER_NAMESPACE,
-        key: r.record.lane,
-        value: {
-          ...r.record,
-          files: [...r.record.files],
-          conflicts: [...r.record.conflicts],
-          yourEdits: [...r.record.yourEdits],
-          commits: [...r.record.commits],
-        },
-      }
-    case "line":
-      return {
-        namespace: LINE_NAMESPACE,
-        key: LINE_KEY,
-        value: {
-          ...r.record,
-          heads: { ...r.record.heads },
-          log: { ...r.record.log },
-          wips: r.record.wips.map(w => ({ ...w })),
-          yours: {
-            ...r.record.yours,
-            follow:
-              r.record.yours.follow === null
-                ? null
-                : {
-                    ...r.record.yours.follow,
-                    files: [...r.record.yours.follow.files],
-                    conflicts: [...r.record.yours.follow.conflicts],
-                  },
-            conflicts: {
-              ...r.record.yours.conflicts,
-              files: [...r.record.yours.conflicts.files],
-            },
-          },
-        },
-      }
-    case "base":
-      return {
-        namespace: BASE_NAMESPACE,
-        key: r.record.lane,
-        value: { ...r.record, base: { ...r.record.base } },
-      }
-    case "name":
-      return {
-        namespace: NAME_NAMESPACE,
-        key: r.record.lane,
-        value: { ...r.record },
-      }
-    case "banner":
-      return {
-        namespace: BANNER_NAMESPACE,
-        key: r.record.lane,
-        value: { ...r.record },
-      }
-    case "project":
-      return {
-        namespace: PROJECT_NAMESPACE,
-        key: PROJECT_KEY,
-        value: { ...r.record },
-      }
-    case "commands":
-      return {
-        namespace: COMMANDS_NAMESPACE,
-        key: COMMANDS_KEY,
-        value: { commands: r.record.commands.map(c => ({ ...c })) },
-      }
-  }
+/** What the host's pi loaded, at its one key. */
+export const COMMANDS: RecordSpec<CommandsRecord, typeof COMMANDS_KEY> = {
+  namespace: "pineta.commands",
+  keyOf: () => COMMANDS_KEY,
+  encode: r => ({ commands: r.commands.map(c => ({ ...c })) }),
+  decode: (contents, key) =>
+    decodeAt(
+      CommandsRecordSchema,
+      contents,
+      fixedKey(COMMANDS_KEY, key),
+      r => r,
+    ),
 }
-
-/**
- * Whether a host-written record's value differs from what is stored: the
- * host writes a record at start only when it changed. A write compacted with
- * no client connected moves the document's base past what a new client
- * reports, so an unchanged record must not be written.
- */
-export const recordChanged = (record: WorkRecord, stored: unknown): boolean =>
-  JSON.stringify(encodeWorkRecord(record).value) !== JSON.stringify(stored)
-
-type Stored = Iterable<{ readonly value: unknown }>
-
-/** Stored `pineta.lane` values -> each lane's record, by lane. */
-export const laneRecords = (
-  values: Stored,
-): ReadonlyMap<LaneName, LaneRecord> =>
-  new Map(decodeAll(values, decodeLaneRecord).map(r => [r.lane, r]))
-
-/** Stored `pineta.revision` values -> each record, by the entry it is at. */
-export const revisionRecords = (
-  values: Stored,
-): ReadonlyMap<EntryId, RevisionRecord> =>
-  new Map(decodeAll(values, decodeRevisionRecord).map(r => [r.entry, r]))
-
-/** Stored `pineta.landing` values -> every landing, oldest first (ids are uuidv7). */
-export const landingRecords = (values: Stored): readonly LandingRecord[] =>
-  decodeAll(values, decodeLandingRecord).sort((a, b) =>
-    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
-  )
-
-/** Stored `pineta.offer` values -> each lane's offer, by lane. */
-export const offerRecords = (
-  values: Stored,
-): ReadonlyMap<LaneName, OfferRecord> =>
-  new Map(decodeAll(values, decodeOfferRecord).map(r => [r.lane, r]))
-
-/** Stored `pineta.name` values -> each lane's name, by lane (ADR-0039). */
-export const nameRecords = (
-  values: Stored,
-): ReadonlyMap<LaneName, ThreadName> =>
-  new Map(decodeAll(values, decodeNameRecord).map(r => [r.lane, r.name]))
-
-/** Stored `pineta.banner` values -> each thread's banner, by lane. */
-export const bannerRecords = (
-  values: Stored,
-): ReadonlyMap<LaneName, BannerRecord> =>
-  new Map(decodeAll(values, decodeBannerRecord).map(r => [r.lane, r]))
-
-/** The stored `pineta.line` value, or null before a host wrote one. */
-export const lineRecord = (values: Stored): LineRecord | null =>
-  decodeAll(values, decodeLineRecord)[0] ?? null
-
-/** Stored `pineta.base` values -> each lane's base, by lane. */
-export const baseRecords = (
-  values: Stored,
-): ReadonlyMap<LaneName, BaseRecord> =>
-  new Map(decodeAll(values, decodeBaseRecord).map(r => [r.lane, r]))
-
-/** The stored `pineta.commands` value's commands; none before a host wrote one. */
-export const commandsRecord = (values: Stored): readonly CommandSummary[] =>
-  decodeAll(values, decodeCommandsRecord)[0]?.commands ?? []
-
-/** The stored `pineta.project` value, or null before a host with tools wrote one. */
-export const projectRecord = (values: Stored): ProjectRecord | null =>
-  decodeAll(values, decodeProjectRecord)[0] ?? null
 
 // ── resolutions ─────────────────────────────────────────────────────────
 

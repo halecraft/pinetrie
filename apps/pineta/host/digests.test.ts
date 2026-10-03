@@ -1,5 +1,5 @@
 import { entryId, laneNameForThread, runId, writerId } from "@pineta/core"
-import { DIGEST_NAMESPACE, encodeDigest } from "@pineta/marginalia"
+import { DIGEST, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import {
   beginRun,
@@ -12,7 +12,7 @@ import {
 } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { createDigests } from "./digests.ts"
-import { basics, methods, putValue, record, row } from "./fakes.ts"
+import { basics, methods, putValue, record, row, writesOf } from "./fakes.ts"
 import { createSerial } from "./queue.ts"
 
 const lane = laneNameForThread("0123456789abcdef")
@@ -20,6 +20,14 @@ const lane = laneNameForThread("0123456789abcdef")
 const failed = (error: unknown) => {
   throw error
 }
+
+/** The final digest of Ada's ask, `e-1`, as the host writes it. */
+const FINAL = setRecord(DIGEST, {
+  prompt: entryId("e-1"),
+  text: "Fixed the rail.",
+  at: 1_000,
+  final: true,
+})
 
 /** A lane running Ada's ask \`e-1\`, its agent at \`e-2\`. */
 function running(answer: string | null = "Fixing the rail.") {
@@ -32,10 +40,10 @@ function running(answer: string | null = "Fixing the rail.") {
   writeLaneTip(b.doc, lane, entryId("e-2"))
   beginRun(b.doc, lane, runId("r-1"))
   const presence = newPresenceDoc()
-  const agent = record<Pick<Agent, "complete" | "skill" | "setDigest">>({
+  const agent = record<Pick<Agent, "complete" | "skill" | "writeValues">>({
     skill: async () => ({ path: "SKILL.md", content: "Summarize.", hash: "h" }),
     complete: async () => answer,
-    setDigest: async () => {},
+    writeValues: async () => {},
   })
   const serial = createSerial()
   const digests = createDigests({
@@ -60,10 +68,14 @@ test("a live digest waits for someone to read the thread", async () => {
   read()
   await digests.step(entryId("e-2"), failed)
   await serial.idle()
-  expect(methods(agent.calls)).toEqual(["skill", "complete", "setDigest"])
-  expect(agent.calls.at(-1)?.args).toEqual([
-    "e-1",
-    { text: "Fixing the rail.", at: 1_000, final: false },
+  expect(methods(agent.calls)).toEqual(["skill", "complete", "writeValues"])
+  expect(writesOf(agent.calls)).toEqual([
+    setRecord(DIGEST, {
+      prompt: entryId("e-1"),
+      text: "Fixing the rail.",
+      at: 1_000,
+      final: false,
+    }),
   ])
 })
 
@@ -71,15 +83,8 @@ test("at the run's end, the final digest, read or not; once written, no more", a
   const { b, agent, serial, digests } = running("Fixed the rail.")
   await digests.ended(entryId("e-1"), failed)
   await serial.idle()
-  expect(agent.calls.at(-1)?.args).toEqual([
-    "e-1",
-    { text: "Fixed the rail.", at: 1_000, final: true },
-  ])
-  putValue(b.doc, {
-    namespace: DIGEST_NAMESPACE,
-    key: "e-1",
-    value: encodeDigest({ text: "Fixed the rail.", at: 1_000, final: true }),
-  })
+  expect(agent.calls.at(-1)?.args).toEqual([[FINAL]])
+  putValue(b.doc, FINAL)
   const before = agent.calls.length
   await digests.ended(entryId("e-1"), failed)
   await serial.idle()
@@ -99,11 +104,15 @@ test("a live digest that comes back after the final one is dropped", async () =>
   read()
   await digests.step(entryId("e-2"), failed)
   // The final one is written while the live one is out.
-  putValue(b.doc, {
-    namespace: DIGEST_NAMESPACE,
-    key: "e-1",
-    value: encodeDigest({ text: "done", at: 1, final: true }),
-  })
+  putValue(
+    b.doc,
+    setRecord(DIGEST, {
+      prompt: entryId("e-1"),
+      text: "done",
+      at: 1,
+      final: true,
+    }),
+  )
   late.resolve("still working")
   await serial.idle()
   expect(methods(agent.calls)).toEqual(["skill", "complete"])
@@ -137,10 +146,7 @@ test.each([
   if (next) beginRun(b.doc, lane, runId("r-2"))
   await digests.ended(entryId("e-1"), failed)
   await serial.idle()
-  const written = agent.calls.filter(c => c.method === "setDigest")
-  expect(written.map(c => c.args)).toEqual([
-    ["e-1", { text: "Fixed the rail.", at: 1_000, final: true }],
-  ])
+  expect(writesOf(agent.calls)).toEqual([FINAL])
   const asked = agent.calls.find(c => c.method === "complete")?.args[0] as {
     user: string
   }

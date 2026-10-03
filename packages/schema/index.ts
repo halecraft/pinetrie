@@ -527,7 +527,8 @@ export const readLaneNames = (doc: SessionDocHandle): readonly LaneName[] =>
 
 /**
  * Every value in `namespace`, read from each value's own `namespace` and `key`
- * properties. Never parses a record key: the key is an identity (ADR-0016).
+ * properties, never by parsing the physical key (ADR-0016). Each `key` is the
+ * value's address, which a record's spec reads its key from (ADR-0062).
  */
 export function readValues(
   doc: SessionDocHandle,

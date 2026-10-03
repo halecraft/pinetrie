@@ -268,6 +268,13 @@ your work onto the line, as you, after a preview from `git merge-tree`
 (S80); what conflicts, "resolve with the agent" hands to a thread in your
 files.
 
+**ADR-0062 — each host record is one spec** (built). A `RecordSpec` in
+marginalia names a record's namespace, key, encoding and decoding; the host
+builds `ValueWrite`s with `setRecord` and `deleteRecord`, and pi's
+`writeValues` carries them in one commit, refusing any namespace outside
+`pineta.`. The address holds a record's key and the contents never repeat
+it; old values with a copy still decode. A seat is keyed by its peer.
+
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold

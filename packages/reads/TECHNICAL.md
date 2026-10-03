@@ -48,6 +48,13 @@ pass for every one, not only those it holds (the host gathers them all
 through its card port). `planSweep` decides which
 stored images to delete from it.
 
+**Each record reader is `readRecords(doc, SPEC)`** (ADR-0062): the
+record's values decoded by its marginalia spec and keyed by their address.
+A reader keeps its own name and return type, and shapes the map only where
+its readers want something else: `readSeats` and `readLandings` sort,
+`readNames` and `readParticipantNames` give the name alone, and the
+singletons (`readLine`, `readProject`, `readCommands`) take their one key.
+
 It declares core, schema and marginalia only (`workspace.test.ts`), so it runs
 in the host and in the browser alike: no pi, no transport.
 

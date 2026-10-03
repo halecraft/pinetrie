@@ -273,7 +273,7 @@ export async function startHost({
   // banner is drawn from its name, so it starts as the name is written.
   const names = createNames({
     basics,
-    agent: { setWorkRecord: record => theAgent().setWorkRecord(record) },
+    agent: { writeValues: writes => theAgent().writeValues(writes) },
     onNamed: lane => {
       banners?.due(lane).catch(failed(basics, "banner"))
     },

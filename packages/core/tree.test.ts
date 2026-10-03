@@ -756,11 +756,13 @@ describe("planStop", () => {
   test("a running lane is aborted, and its ask's stop recorded under its prompt", () => {
     expect(planStop([lane(true)], s, facts())).toEqual({
       kind: "abort",
-      record: { prompt: "1-p", value: { by: ada, at: 7 } },
+      record: { prompt: "1-p", by: ada, at: 7 },
     })
   })
   test("the first stop recorded is kept: a second press records nothing", () => {
-    const first = new Map([[entryId("1-p"), { by: writerId("bea"), at: 1 }]])
+    const first = new Map([
+      [entryId("1-p"), { prompt: entryId("1-p"), by: writerId("bea"), at: 1 }],
+    ])
     expect(planStop([lane(true)], s, facts(first))).toEqual({
       kind: "abort",
       record: null,

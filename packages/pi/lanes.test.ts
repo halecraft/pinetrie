@@ -18,15 +18,15 @@ import {
 import { encodeChat } from "@pineta/marginalia"
 import { newSessionDoc, readEntries, rowMessage } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
-import { createAgent, newId, withoutFrontmatter } from "./agent.ts"
+import { createAgent, newId } from "./agent.ts"
 import { type LaneChannel, openChannel } from "./lane-env.ts"
-import { type LaneAccess, type LaneFacts, laneGuidelines } from "./lanes.ts"
+import {
+  type LaneAccess,
+  type LaneFacts,
+  laneGuidelines,
+  toolContextOf,
+} from "./lanes.ts"
 import { scriptedModel } from "./scripted.ts"
-
-test("withoutFrontmatter: a skill's instructions, not its header", () => {
-  expect(withoutFrontmatter("---\nname: x\n---\n\n# Do\nit\n")).toBe("# Do\nit")
-  expect(withoutFrontmatter("# plain\n")).toBe("# plain")
-})
 
 // ── what a lane of its own is told (ADR-0046) ────────────────────────────
 
@@ -40,6 +40,28 @@ const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   install: "/pineta",
   note: "/pineta/packages/pi/lane.md",
   ...over,
+})
+
+test("toolContextOf: a direct lane is no lane; a lane of its own carries its facts", () => {
+  const direct = toolContextOf({
+    kind: "direct",
+    dir: "/repo",
+    ready: Promise.resolve(),
+  })
+  expect({ dir: direct.dir, lane: direct.lane }).toEqual({
+    dir: "/repo",
+    lane: null,
+  })
+  const own = toolContextOf({
+    kind: "lane",
+    facts: facts(),
+    hostPaths: ["/skills"],
+    gate: () => new Promise(() => {}),
+  })
+  expect({ dir: own.dir, lane: own.lane }).toEqual({
+    dir: "/workspace",
+    lane: { facts: facts(), hostPaths: ["/skills"] },
+  })
 })
 
 describe("laneGuidelines", () => {

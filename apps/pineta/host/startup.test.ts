@@ -2,25 +2,23 @@ import {
   atEntry,
   cardId,
   entryId,
+  type LaneName,
   laneNameForThread,
+  type ProjectRecord,
   runId,
   writerId,
 } from "@pineta/core"
 import {
+  deleteRecord,
   encodeCard,
-  encodeSeat,
-  LEGACY_OUTBOX_NAMESPACE,
-  SEAT_NAMESPACE,
+  PROJECT,
+  SEAT,
+  setRecord,
 } from "@pineta/marginalia"
 import { readPlaces, readPlacesRev } from "@pineta/reads"
-import {
-  newPlacesDoc,
-  physicalKey,
-  readValues,
-  writeLaneTip,
-} from "@pineta/schema"
+import { newPlacesDoc, writeLaneTip } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { basics, putValue, record } from "./fakes.ts"
+import { basics, putValue, record, writesOf } from "./fakes.ts"
 import { createSerial } from "./queue.ts"
 import { recover, type StartupDeps } from "./startup.ts"
 
@@ -29,8 +27,7 @@ const agentPort = (impl: Partial<StartupDeps["agent"]> = {}) =>
     interrupted: async () => [],
     commands: () => [],
     refusedCommands: () => [],
-    setWorkRecord: async () => {},
-    removeSeat: async () => {},
+    writeValues: async () => {},
     ...impl,
   })
 
@@ -109,28 +106,39 @@ test("recover logs a stored lane whose name is not a thread's, and only such a l
   await recover(deps({ basics: b }))
   expect(b.lines.filter(l => l.includes("ignoring"))).toEqual([])
 
-  putValue(b.doc, { namespace: "pi.branch.tip", key: "main", value: null })
+  writeLaneTip(b.doc, "main" as LaneName, null)
   await recover(deps({ basics: b }))
   expect(b.lines.filter(l => l.includes("ignoring"))).toEqual([
     "[host] ignoring lanes whose names are not a thread's: main",
   ])
 })
 
-test("recover deletes what an older host held in its outbox, logging each one's text", async () => {
+test("recover writes the project record only when it changed, in one write", async () => {
+  const project: ProjectRecord = {
+    kind: "lanes",
+    root: "/repo",
+    rootDefault: "own",
+  }
+  const run = async (b: ReturnType<typeof basics>) => {
+    const agent = agentPort()
+    await recover(
+      deps({
+        basics: b,
+        agent: agent.port,
+        work: record<StartupDeps["work"]>({ project }).port,
+      }),
+    )
+    await new Promise(r => setTimeout(r, 0))
+    return agent.calls.filter(
+      c => c.method === "writeValues" && (c.args[0] as unknown[]).length > 0,
+    )
+  }
+  const fresh = await run(basics())
+  expect(fresh.map(c => (c.args[0] as unknown[]).length)).toEqual([2])
   const b = basics()
-  putValue(b.doc, {
-    namespace: LEGACY_OUTBOX_NAMESPACE,
-    key: "h-1",
-    value: { id: "h-1", details: { text: "run the tests" } },
-  })
-  const agent = agentPort({
-    removeHeld: async key => {
-      b.doc.values.delete(physicalKey(LEGACY_OUTBOX_NAMESPACE, key))
-    },
-  })
-  await recover(deps({ basics: b, agent: agent.port }))
-  expect(readValues(b.doc, LEGACY_OUTBOX_NAMESPACE)).toEqual([])
-  expect(b.lines.some(l => l.includes("run the tests"))).toBe(true)
+  putValue(b.doc, setRecord(PROJECT, project))
+  const again = await run(b)
+  expect(writesOf(again).map(w => w.namespace)).toEqual(["pineta.commands"])
 })
 
 test("recover sweeps empty cards, texts no record names, and seats no text names (ADR-0048)", async () => {
@@ -147,16 +155,16 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
     })
   placesDoc.cards.set("c-full", card("c-full"))
   placesDoc.cards.set("c-empty", card("c-empty"))
-  for (const clientId of [11, 22])
-    putValue(b.doc, {
-      namespace: SEAT_NAMESPACE,
-      key: String(clientId),
-      value: encodeSeat({
+  for (const clientId of [11, 22, 33])
+    putValue(
+      b.doc,
+      setRecord(SEAT, {
+        peer: `p-${clientId}`,
         clientId,
         writer: writerId("ada@x.io"),
         at: clientId,
       }),
-    })
+    )
   const agent = agentPort()
   const cards = record<StartupDeps["cards"]>({
     texts: async () => [
@@ -173,7 +181,11 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
     "card:c-empty",
     "card:c-gone",
   ])
+  // Both stale seats in one write, each by its peer.
   expect(
-    agent.calls.filter(c => c.method === "removeSeat").map(c => c.args[0]),
-  ).toEqual([22])
+    agent.calls
+      .filter(c => c.method === "writeValues")
+      .map(c => c.args[0])
+      .filter(ws => (ws as { kind: string }[]).some(w => w.kind === "delete")),
+  ).toEqual([[deleteRecord(SEAT, "p-22"), deleteRecord(SEAT, "p-33")]])
 })

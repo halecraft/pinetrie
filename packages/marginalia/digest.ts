@@ -6,12 +6,12 @@
 import {
   type AskIndex,
   type EntryId,
-  entryId,
   projectTranscript,
   type TreeIndex,
 } from "@pineta/core"
 import { Type } from "typebox"
-import { decodeWith } from "./decode.ts"
+import { decodeAt, entryKey } from "./decode.ts"
+import type { RecordSpec } from "./records.ts"
 import {
   fitNewest,
   LEFT_OUT_NOTE,
@@ -20,11 +20,10 @@ import {
   transcriptLines,
 } from "./request.ts"
 
-/** pi value namespace for digests. The key is the ask's prompt. */
-export const DIGEST_NAMESPACE = "pineta.digest"
-
 /** An ask's digest: replaced whole on each write, so a value, not a text (ADR-0014). */
 export interface DigestRecord {
+  /** The ask's prompt: the digest's key. */
+  readonly prompt: EntryId
   readonly text: string
   /** When it was written, in ms since the epoch. */
   readonly at: number
@@ -38,22 +37,18 @@ const DigestSchema = Type.Object({
   final: Type.Boolean(),
 })
 
-/** A digest -> the plain value stored in pi. */
-export const encodeDigest = (r: DigestRecord) => ({ ...r })
-
-export const decodeDigest = (value: unknown): DigestRecord | undefined =>
-  decodeWith(DigestSchema, value, r => r)
-
-/** Stored `pineta.digest` values -> each ask's digest, by its prompt. */
-export function digestRecords(
-  values: Iterable<{ readonly key: string; readonly value: unknown }>,
-): ReadonlyMap<EntryId, DigestRecord> {
-  const out = new Map<EntryId, DigestRecord>()
-  for (const { key, value } of values) {
-    const r = decodeDigest(value)
-    if (r !== undefined) out.set(entryId(key), r)
-  }
-  return out
+/** Each ask's digest, at its prompt's entry id. */
+export const DIGEST: RecordSpec<DigestRecord, EntryId> = {
+  namespace: "pineta.digest",
+  keyOf: r => r.prompt,
+  encode: ({ prompt, ...contents }) => contents,
+  decode: (contents, key) =>
+    decodeAt(DigestSchema, contents, entryKey(key), (r, prompt) => ({
+      prompt,
+      text: r.text,
+      at: r.at,
+      final: r.final,
+    })),
 }
 
 // ── the setting ───────────────────────────────────────────────────────────

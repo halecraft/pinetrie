@@ -2,7 +2,7 @@
 // (ADR-0029): gather, `planArchive`, write one value.
 
 import type { Intent, WriterId } from "@pineta/core"
-import { planArchive } from "@pineta/marginalia"
+import { ARCHIVE, planArchive, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
@@ -16,7 +16,7 @@ import type { LaneWork } from "../work/index.ts"
 
 export interface ArchiveDeps {
   readonly basics: Pick<Basics, "doc" | "places" | "now">
-  readonly agent: Pick<Agent, "setArchive">
+  readonly agent: Pick<Agent, "writeValues">
   readonly work: Pick<LaneWork, "archived" | "restored">
 }
 
@@ -42,7 +42,7 @@ export async function handleArchive(
   // execute
   if (planned.kind === "refused") return planned
   if (planned.kind === "write") {
-    await agent.setArchive(planned.record)
+    await agent.writeValues([setRecord(ARCHIVE, planned.record)])
     // Its lanes follow: their disks deleted, or their bookmarks back.
     if (intent.action === "archive") await work.archived(intent.root)
     else await work.restored(intent.root)

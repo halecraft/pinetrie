@@ -3,19 +3,53 @@
 What people write in the margins of the agent's work. Each shape
 is stored in pi's extension slots and typed here, by Pineta, which is its single
 authority. Every module decodes through `decodeWith` (`decode.ts`), which is
-total: a malformed value is dropped, never thrown. `decodeAll` does it for a
-namespace's stored values.
+total: a malformed value is dropped, never thrown. `recordsOf` does it for a
+namespace's stored values (`records.ts`, below).
 
 A decoder brands the ids it reads, and its `build` may refuse a value too.
-**Every lane is checked with `isLaneName`** in `build` (as
-`decodeBannerRecord` checks `isSha256`), and a value whose lane fails is
-dropped. That is what keeps a malformed lane out of the host's writes: the
-outbox drains each held item's lane through `agent.lane`, which finds any
-lane pi holds (S71). A card is the exception (`card.ts`, below).
+**Every lane is checked with `isLaneName`**: on a record's address for a
+record keyed by lane (`laneKey`), and in `build` for a lane in its
+contents (as `BANNER` checks `isSha256`). A value whose lane fails is
+dropped. That is what keeps a malformed lane out of the host's writes:
+`agent.lane` finds any lane pi holds (S71). A card is the exception
+(`card.ts`, below).
 
 Namespaces are stored data and name the owner, `pineta.`, following pi's own
 `pi.` convention. They deliberately do not follow the package name: renaming a
 package must never require changing stored data.
+
+# Records (`records.ts`, ADR-0062)
+
+Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
+`encode` and `decode`, exported beside its type (`MARK` in `mark.ts`,
+`OFFER` in `work.ts`). Everything else goes through the spec:
+`setRecord` and `deleteRecord` build the `ValueWrite`s the host hands
+`Agent.writeValues`; `recordsOf` decodes a namespace's values, which
+`readRecords` in `@pineta/reads` reads from the document; `setIfChanged`
+writes only a record that changed.
+
+- **The address holds the key; the contents never repeat it.** `encode`
+  leaves the key field out (`entry`, `root`, `lane`, `id`, `prompt`,
+  `peer`, `writer`), and `decode(contents, key)` reads the address with a
+  key reader (`entryKey`, `laneKey`, `textKey`, `writerKey`, or `fixedKey`
+  for a singleton, in `decode.ts`) and sets the field from it: `decodeAt`
+  drops the record when the reader finds no key. So a write and a read cannot disagree on a key, and
+  `StopRecord`, `DigestRecord` and `SeatRecord` carry their key in memory
+  though their contents never held it.
+- **A value written before ADR-0062 still decodes.** Ten records kept their
+  key in their contents too. typebox's `Value.Check` accepts the extra
+  property, and `decode` sets the key after the contents, so the address
+  wins over the old copy. A record `setIfChanged` finds unchanged is never
+  rewritten, so such a copy can stay; nothing reads it.
+- **`setIfChanged` ignores key order.** It compares `encode` of both sides
+  with every object's keys sorted: a decoder may build fields in another
+  order than the planner that made the new record (`OFFER` rebuilds field
+  by field), and comparing `JSON.stringify` strings would then rewrite an
+  unchanged record on every check. The host writes only a changed record: a
+  write compacted with no client connected moves the document's base past
+  what a new client reports.
+- **The singletons** (`LINE`, `PROJECT`, `COMMANDS`) have one fixed key
+  (`LINE_KEY`, `PROJECT_KEY`, `COMMANDS_KEY`), and `decode` refuses any other.
 
 # Chat (`chat.ts`)
 
@@ -115,7 +149,7 @@ are the only code that builds or reads the shape.
   expansion, so the model reads what the command meant when it was sent. `planChat` makes a command compel
   the agent, and refuses an unknown one (`ERR.UNKNOWN_COMMAND`).
 - **`pineta.commands`** is a host-written record of every command's summary,
-  for the composer's completion. `recordChanged` is how the host writes a
+  for the composer's completion. `setIfChanged` is how the host writes a
   record at start only when it changed.
 
 # Runs and startup (`chat.ts`, `startup.ts`)
@@ -127,9 +161,7 @@ are the only code that builds or reads the shape.
   crash interrupted, whose run's end then drains it, and drains every other
   lane with cards queued for it, since no run's end will. What does not
   survive a process (runs and streams) is cleared first, by `clearStreams`
-  in `@pineta/schema`. Values an older host left in `pineta.outbox`
-  (`LEGACY_OUTBOX_NAMESPACE`) are discarded, each with its text for the
-  log: nothing shows them.
+  in `@pineta/schema`.
 
 # Cards (`card.ts`, ADR-0048, ADR-0059)
 
@@ -198,8 +230,10 @@ which are swept.
 
 Who wrote in a text is in its operations: each carries its seat's Yjs
 `clientID`. Only the host knows which person a seat is, and only while it is
-connected (ADR-0037), so it writes a `pineta.seat` value per seat, keyed by
-`clientID`, as the seat connects.
+connected (ADR-0037), so it writes a `pineta.seat` value per seat as the
+seat connects (`SEAT`). It is keyed by the seat's Kyneta peer, the seat's
+identity as presence's `seatKey` has it. The `clientID` is in the
+contents: Yjs derives it from the peer, which this package cannot.
 
 - **`planSeats`**: the connected seats with no record yet. The connected seats
   come mapped by `seatOf` (`@pineta/schema`), which needs Kyneta's
@@ -210,7 +244,9 @@ connected (ADR-0037), so it writes a `pineta.seat` value per seat, keyed by
   Bea". The model reads only the sender's name.
 - **`planSeatSweep`**: seat records no stored text names. A store-less client
   is a new seat on every load, so without it the records would grow with every
-  visit.
+  visit. It returns the records, and the host deletes each by its `peer`.
+  A seat stored under its `clientID` before ADR-0062 reads with that text as
+  its `peer`, which is its address, so the delete finds it.
 
 # The archive (`archive.ts`, ADR-0029)
 
@@ -296,9 +332,7 @@ it.
 
 # Where lanes work (`work.ts`, ADR-0032 to ADR-0034, ADR-0038, ADR-0039, ADR-0060)
 
-Host-written records, each with a total decoder. `encodeWorkRecord` is
-the one place their namespaces and keys are chosen, and the agent writes them
-through one `setWorkRecord`:
+Host-written records, each a `RecordSpec` (above) with a total decoder:
 
 | record | namespace | key | written |
 |---|---|---|---|
@@ -335,8 +369,6 @@ through one `setWorkRecord`:
     host rewrites it at start.
 - **`pineta.line` and `pineta.base` are caches** (ADR-0060): the repo is
   the ledger, and the host rewrites each from it. A lost one costs a read.
-  The old `pineta.have` namespace (`LEGACY_HAVE_NAMESPACE`) is only
-  deleted, at startup.
 - **`forkPoint`** is where a new lane of its own starts: the nearest snapshot
   above it, else the base snapshot; and the nearest commit, else the
   thread's base (`planBegin`): the line's commit, or a WIP's copy on the line
@@ -523,8 +555,9 @@ surprising resolution can be traced to the policy that produced it.
 
 # Participants (`participant.ts`)
 
-A session is its participants (ADR-0021). `pineta.participant` values are names
-keyed by writer id, which is `w-<email>` (ADR-0037); `displayName` gives an
+A session is its participants (ADR-0021). A `pineta.participant` value is a
+name, a bare string, keyed by writer id (`PARTICIPANT`, read as
+`ParticipantRecord { writer, name }`), which is `w-<email>` (ADR-0037); `displayName` gives an
 unnamed writer their email's part before the `@`, which the screen shows and
 a mention reaches (`normalizeEmail` requires a letter or digit there); `participants` lists every named writer and every writer in
 the tree, sorted, which is what a mention resolves against.

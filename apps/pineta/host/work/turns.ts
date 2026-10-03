@@ -15,7 +15,7 @@ import {
   turnEntry,
 } from "@pineta/core"
 import { bookmarkOf, changedPaths, commitTurn } from "@pineta/lanes"
-import { planTurnRecord } from "@pineta/marginalia"
+import { planTurnRecord, REVISION, setRecord } from "@pineta/marginalia"
 import type { Agent, LaneHooks } from "@pineta/pi"
 import { readTreeIndex } from "@pineta/reads"
 import { type Basics, failed } from "../basics.ts"
@@ -79,7 +79,7 @@ export function createTurns(deps: {
   const recording = new Set<Promise<unknown>>()
 
   const writeRevision = (record: RevisionRecord) =>
-    deps.agent().setWorkRecord({ kind: "revision", record })
+    deps.agent().writeValues([setRecord(REVISION, record)])
 
   return {
     writeRevision,

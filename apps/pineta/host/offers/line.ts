@@ -10,7 +10,7 @@ import {
   lineFacts,
   type Runner,
 } from "@pineta/lanes"
-import { recordChanged } from "@pineta/marginalia"
+import { LINE, setIfChanged } from "@pineta/marginalia"
 import { readLine } from "@pineta/reads"
 import { planLineAction, planLineRecord } from "./plan.ts"
 import type { OfferState } from "./state.ts"
@@ -33,12 +33,9 @@ export function createLine(state: OfferState): Line {
       state.line,
       state.lineCommands,
     )
-    const stored = readLine(doc)
-    if (
-      stored === null ||
-      recordChanged({ kind: "line", record: next }, stored)
-    )
-      await state.agent().setWorkRecord({ kind: "line", record: next })
+    await state
+      .agent()
+      .writeValues(setIfChanged(LINE, next, readLine(doc) ?? undefined))
     return next
   }
 

@@ -1,11 +1,20 @@
 // pi/banner — `set_banner`, the tool that sets a thread's column banner when
 // the person asks, and the arguments it takes. The host decides and writes
-// (`planAsk`); this only reads the call. Also what a banner's image request
-// adds for OpenRouter (`bannerImageConfig`).
+// (`planAsk`); this only reads the call. Also drawing a banner's image
+// (`banners`, ADR-0050, ADR-0053), and what its request adds for OpenRouter
+// (`bannerImageConfig`).
 
-import { blobOfUrl, isSha256, type LaneName, type Sha256 } from "@pineta/core"
-import type { BannerAnswer, BannerAsk } from "@pineta/marginalia"
+import {
+  blobOfUrl,
+  isSha256,
+  type LaneName,
+  type Sha256,
+  type StoredImage,
+} from "@pineta/core"
+import type { BannerAnswer, BannerAsk, BannerConfig } from "@pineta/marginalia"
 import { Type } from "typebox"
+import type { ImagesSetup } from "./config.ts"
+import { prepareImage } from "./images.ts"
 import { laneOf } from "./lanes.ts"
 
 export const BANNER_TOOL = "set_banner"
@@ -73,7 +82,7 @@ export function bannerAnswerText(answer: BannerAnswer): string {
  * The tool. `request` is the host's, and answers once the ask is planned,
  * not once an image is made; undefined when banners are off. It is
  * registered either way, since a lane's stored tool list may still name it
- * (see `activeTools` in `agent.ts`).
+ * (`activeToolNames`, in `tools.ts`).
  */
 export function bannerTool(
   request:
@@ -119,6 +128,88 @@ export function bannerTool(
       return {
         content: [{ type: "text" as const, text }],
         details: undefined,
+      }
+    },
+  }
+}
+
+/**
+ * A banner's image, fitted as an upload is (`prepareImage`), or why there is
+ * none.
+ */
+export type Drawn =
+  | { readonly kind: "drawn"; readonly image: StoredImage }
+  | { readonly kind: "failed"; readonly reason: string }
+
+/** A model's image, as base64, fitted as an upload is, or why it is not one. */
+export async function drawnOf(data: string): Promise<Drawn> {
+  const prepared = await prepareImage(
+    new Uint8Array(Buffer.from(data, "base64")),
+  )
+  return prepared.ok
+    ? { kind: "drawn", image: prepared.image }
+    : { kind: "failed", reason: prepared.reason }
+}
+
+/** How long one image request may take: S60 measured about 9 s. */
+const DRAW_TIMEOUT_MS = 120_000
+
+export interface Banners {
+  /**
+   * Whether a banner can be drawn: banners are enabled, their model is
+   * known, and there is a key for its provider. Asked first, so a host with
+   * no key spends nothing.
+   */
+  canDrawBanners(): Promise<boolean>
+  /**
+   * One square banner image from `prompt`, fitted as an upload is. Never
+   * rejects: a failure, banners being off or bytes that are not an image
+   * included, is `failed` and why.
+   */
+  drawBanner(prompt: string): Promise<Drawn>
+}
+
+/** Banners drawn with `config`'s image model; with no config, none is drawn. */
+export function banners(
+  images: ImagesSetup,
+  config: BannerConfig | undefined,
+): Banners {
+  const imageModel =
+    config === undefined
+      ? undefined
+      : images.model(config.provider, config.model)
+  return {
+    async canDrawBanners() {
+      if (imageModel === undefined) return false
+      return (await images.apiKey(imageModel.provider)) !== undefined
+    },
+
+    async drawBanner(prompt) {
+      const failed = (reason: string): Drawn => ({ kind: "failed", reason })
+      if (imageModel === undefined) return failed("no banner model")
+      try {
+        const apiKey = await images.apiKey(imageModel.provider)
+        if (apiKey === undefined)
+          return failed(`no key for ${imageModel.provider}`)
+        const reply = await images.models.generateImages(
+          imageModel,
+          { input: [{ type: "text", text: prompt }] },
+          {
+            apiKey,
+            timeoutMs: DRAW_TIMEOUT_MS,
+            onPayload: payload => ({
+              ...(payload as object),
+              image_config: bannerImageConfig(imageModel.id),
+            }),
+          },
+        )
+        const image = reply.output.find(o => o.type === "image")
+        if (reply.stopReason !== "stop")
+          return failed(reply.errorMessage ?? reply.stopReason)
+        if (image?.type !== "image") return failed("the reply held no image")
+        return await drawnOf(image.data)
+      } catch (error) {
+        return failed(error instanceof Error ? error.message : String(error))
       }
     },
   }

@@ -276,3 +276,29 @@ function found(
     throw new Error(`model not found: ${named.provider}/${named.model}`)
   return model
 }
+
+/**
+ * One request outside every thread, on `describeModel`: an offer's commit
+ * message (ADR-0038) or an ask's digest (ADR-0056). No tools, no session,
+ * so nothing enters the tree or a lane's context. Null when it fails.
+ */
+export async function complete(
+  setup: Pick<ModelSetup, "models" | "describeModel">,
+  request: { readonly system: string; readonly user: string },
+): Promise<string | null> {
+  try {
+    const reply = await setup.models.completeSimple(setup.describeModel, {
+      systemPrompt: request.system,
+      messages: [
+        { role: "user", content: request.user, timestamp: Date.now() },
+      ],
+    })
+    const text = reply.content
+      .flatMap(p => (p.type === "text" ? [p.text] : []))
+      .join("")
+      .trim()
+    return reply.stopReason === "error" || text === "" ? null : text
+  } catch {
+    return null
+  }
+}

@@ -6,16 +6,16 @@ import {
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
+  BANNER,
   type BannerAsk,
   bannerDue,
   bannerPrompt,
-  bannerRecords,
   bannerStillWanted,
   DEFAULT_BANNER,
   decodeBannerConfig,
-  decodeBannerRecord,
-  encodeWorkRecord,
   planAsk,
+  recordsOf,
+  setRecord,
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
@@ -123,11 +123,11 @@ describe("bannerPrompt", () => {
 })
 
 test("a banner record round-trips, keyed by lane", () => {
-  const e = encodeWorkRecord({ kind: "banner", record: banner })
+  const e = setRecord(BANNER, banner)
   expect([e.namespace, e.key]).toEqual(["pineta.banner", LANE])
-  expect(decodeBannerRecord(structuredClone(e.value))).toEqual(banner)
-  expect(decodeBannerRecord({ ...banner, sha: "nope" })).toBeUndefined()
+  expect(BANNER.decode(structuredClone(e.value), LANE)).toEqual(banner)
+  expect(BANNER.decode({ sha: "nope", at: 1 }, LANE)).toBeUndefined()
   // Written when a banner had a crop: still shown.
-  expect(decodeBannerRecord({ ...banner, focus: "center" })).toEqual(banner)
-  expect(bannerRecords([{ value: e.value }]).get(LANE)).toEqual(banner)
+  expect(BANNER.decode({ ...banner, focus: "center" }, LANE)).toEqual(banner)
+  expect(recordsOf(BANNER, [e]).get(LANE)).toEqual(banner)
 })

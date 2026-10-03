@@ -9,6 +9,26 @@ app every spelling fails with `ERR_MODULE_NOT_FOUND`. See
 `index.ts` re-exports our shapes only. No pi type crosses the boundary
 (ADR-0003).
 
+## Where the facade lives
+
+`createAgent` (`agent.ts`) builds the session and the harness, and wires the
+parts below into the `Agent` the host sees. `Agent` is the sum of their
+interfaces, plus `appendToTree`, `writeValues`, `complete` and `stats`.
+
+| module | its one job |
+|---|---|
+| `thread-lanes.ts` | each thread's pi lane, held, and its handle (`ThreadLanes`) |
+| `tools.ts` | the tools registered, and which a lane's runs may call (`activeToolNames`, `toolsChanged`) |
+| `lanes.ts` | where a lane's tools work (`toolContextOf`), and what it is told (`systemPromptFor`, `laneGuidelines`) |
+| `stream.ts` | pi's events as `StreamEvent`s (`streamEventOf`) |
+| `commands.ts` | the commands pi loaded, and a command's file as the model reads it (`CommandFiles`) |
+| `banner.ts` | `set_banner`, and drawing a banner (`Banners`) |
+| `config.ts` | the model, its setup, and `complete` |
+
+The decisions in them are pure and tested without a harness:
+`activeToolNames`, `toolsChanged`, `toolContextOf`, `streamEventOf`,
+`expandCommand` and `skillOf`.
+
 ## `storage.ts` — our implementation of pi's `Storage` port
 
 `storage.ts` is the shell: it reads the document, calls pure planners, writes
@@ -78,9 +98,11 @@ a message records its writer (`details.author`, from the transport). A lane's
 tip is therefore always its thread's end, and `threadOf` finds a thread's
 lane from its end with no stored mapping.
 
-The facade has no way to move a lane: `ThreadLaneHandle` offers only `append`
-and `run`. Nor is there a way to READ a tip through the agent: readers use the
-document, so observing a lane can never create one.
+The facade has no way to move a lane: `ThreadLaneHandle` offers `append`,
+`run`, `resume`, `withGuidance` and `abort`, none of which navigates. Nor is
+there a way to READ a tip through the agent: readers use the document, so
+observing a lane can never create one. A missing lane refuses every write
+`unknown_target` (`onLane`, `thread-lanes.ts`).
 
 Four facts from pi's source and the probes shape it:
 
@@ -120,8 +142,7 @@ the alternative a second host would need: read the thread's end inside
   inside the agent's turn, as a prompt the agent answers, or after the reply
   while a queued question is never answered (S21 Q3). A message for a busy
   lane is a queued card instead (ADR-0048), which the host takes when the
-  lane is idle; see `apps/pineta/host/TECHNICAL.md`. `Agent.removeHeld`
-  deletes what an older host left in `pineta.outbox`.
+  lane is idle; see `apps/pineta/host/TECHNICAL.md`.
 - **A pi run can only start with `prompt`**, so a compelled chat is passed to
   `ThreadLaneHandle.run` as the prompt itself: a pi `CustomMessage`, which pi's
   default `convertToLlm` sends as a `user` message with its `content`.
@@ -139,7 +160,9 @@ the lane is `LaneBusy` until resumed (below).
 
 `createAgent` takes one `onStream(event: StreamEvent)`. `StreamEvent` is
 declared in `@pineta/core`, so pi's events never leave this package. Every pi
-`HarnessEvent` carries `lane`, so concurrent threads stay apart.
+`HarnessEvent` carries `lane`, so concurrent threads stay apart. The mapping
+is `streamEventOf` (`stream.ts`), which drops an event on a lane that is
+not a thread's.
 
 | pi's event | `StreamEvent` |
 |---|---|
@@ -248,7 +271,7 @@ item 18, and in `lanes.test.ts` against the harness.
   bookmark, its grants, whether its image has a browser, Pineta's mount and
   the note's path. The host builds every name in it: the rules for them are
   in `@pineta/lanes`, which this package does not declare.
-- **The tool context** is one type, `ToolContext` in `agent.ts`: `env`,
+- **The tool context** is one type, `ToolContext` in `lanes.ts`: `env`,
   `dir`, and `lane`, which is null for a lane that works directly. pi builds
   both the tools and the system prompt from it.
 - **A lane working directly** gets pi's `NodeExecutionEnv` in its directory
@@ -329,7 +352,7 @@ item 18, and in `lanes.test.ts` against the harness.
   stored list as it is, and fails a run whose list names a tool not
   registered: a lane stored while banners were on still names it after they
   are turned off, and its call answers that banners are off. `withGuidance`
-  sets the whole list (`activeTools`), never a toggle, so a lane stored
+  sets the whole list (`activeToolNames`, `tools.ts`), never a toggle, so a lane stored
   before a change gets the current list at its next run's end. The tool reads its arguments (`parseBannerArgs`: an image that names
   no pasted image is refused, not ignored) and hands the ask to the host.
 - **Pineta's own skills** are in `skills/`, loaded after yours and the repo's
@@ -361,7 +384,10 @@ item 18, and in `lanes.test.ts` against the harness.
   the list, `refusedCommands()` what clashed, and `skill(name)` takes a
   qualified name: a conflicted update asks for
   `pineta:skill:resolve-conflicts`.
-- **`expand(command, args, inLane)`** reads the file now and hashes it:
+- **`expand(command, args, inLane)`** reads the file now, then runs the pure
+  `expandCommand`, which hashes it. `skill(name)` reads, then runs `skillOf`.
+  Both strip frontmatter with `withoutFrontmatter`, which never parses it: a
+  file whose YAML broke after pi loaded it still expands.
   - a skill becomes pi's block through marginalia's `expandSkill`, which
     copies the format of `_expandSkillCommand` in pi-coding-agent's
     `dist/core/agent-session.js`. That method is private to pi's session, so
@@ -405,14 +431,16 @@ as an entry is. The replay test in `storage.test.ts` relies on this.
 
 ### Values
 
-`setArchive`, `setMark`, `setStop`, `setDigest` and `setWorkRecord` write
-`pineta.archive`, `pineta.mark`, `pineta.stop`, `pineta.digest` and the
-work records through `Session.setValue` (ADR-0029, ADR-0045, ADR-0056,
-ADR-0032): every setter's body is one `put`. A value can be written while a
-lane runs (S70): it does not go through the lane. `removeMark` and
-`removeOffer` delete theirs with `Session.deleteValue`. They use the
-generic value path, so conformance covers the storage shape. `setWorkRecord` takes its namespace and key from
-`encodeWorkRecord`, in marginalia.
+`writeValues(writes)` writes the host's records (ADR-0062): the
+`ValueWrite`s marginalia's `setRecord` and `deleteRecord` build, in one
+`session.mutate` commit of pi's `setValue` and `deleteValue` writes. That is
+the path `Session.setValue` takes for one write, so conformance covers the
+storage shape. A value can be written while a lane runs (S70): it does not
+go through the lane. A write to a namespace outside `pineta.` throws before
+anything is written: pi's own values (a lane's tip, a checkpoint) are never
+the host's, and type stripping does not check `HostNamespace`. This package
+imports no record namespace or encoder: what a record is lives in
+marginalia.
 
 ### `seq` is derived, not stored
 
@@ -461,8 +489,8 @@ Reaches pi entry points that are absent from its `exports` map, by relative path
 into `node_modules`: `createAgentHarness`, `addUsage`/`emptyUsage`,
 `ModelRuntime`, and, for the person's pi setup, `SettingsManager`,
 `DefaultResourceLoader` and `buildSystemPrompt`. For commands:
-`loadSkillsFromDir`, `loadPromptTemplates`, `substituteArgs`,
-`parseCommandArgs` and `stripFrontmatter`. For images (ADR-0042):
+`loadSkillsFromDir`, `loadPromptTemplates`, `substituteArgs`
+and `parseCommandArgs`. For images (ADR-0042):
 `detectSupportedImageMimeType`, `resizeImage` and `formatDimensionNote`. Those paths are depth-sensitive: they broke when this
 package moved under `packages/`. If they break again, the failure is
 `ERR_MODULE_NOT_FOUND` at import time, not a type error.

@@ -13,14 +13,8 @@ import {
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import {
-  archivedAt,
-  archiveRecords,
-  decodeArchive,
-  encodeArchive,
-  planArchive,
-  writesAt,
-} from "./archive.ts"
+import { ARCHIVE, archivedAt, planArchive, writesAt } from "./archive.ts"
+import { recordsOf, setRecord } from "./records.ts"
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
@@ -78,18 +72,19 @@ const plan = (
 describe("the record", () => {
   test("round-trips, and a malformed value is dropped", () => {
     const r = record("r1")
-    expect(decodeArchive(encodeArchive(r))).toEqual(r)
+    const contents = ARCHIVE.encode(r) as object
+    expect(ARCHIVE.decode(contents, r.root)).toEqual(r)
     expect(
-      decodeArchive({ ...encodeArchive(r), state: "gone" }),
+      ARCHIVE.decode({ ...contents, state: "gone" }, r.root),
     ).toBeUndefined()
-    expect(decodeArchive({ ...encodeArchive(r), root: "" })).toBeUndefined()
-    expect(decodeArchive("r1")).toBeUndefined()
+    expect(ARCHIVE.decode(contents, "")).toBeUndefined()
+    expect(ARCHIVE.decode("r1", r.root)).toBeUndefined()
   })
   test("records are keyed by their root; a bad one is skipped", () => {
-    const map = archiveRecords([
-      { value: encodeArchive(record("r1")) },
-      { value: { nope: true } },
-      { value: encodeArchive(record("r2", "restored")) },
+    const map = recordsOf(ARCHIVE, [
+      setRecord(ARCHIVE, record("r1")),
+      { key: "r3", value: { nope: true } },
+      setRecord(ARCHIVE, record("r2", "restored")),
     ])
     expect([...map.keys()]).toEqual(["r1", "r2"])
   })

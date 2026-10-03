@@ -3,8 +3,7 @@
 // agent is asked into, which it reads with every speaker named. Which thread
 // a message joins, who it is for, and when a lane is busy are decided by
 // pure functions and unit-tested (`@pineta/marginalia`'s `chat.test.ts`,
-// `@pineta/core`, the host's `commands/chat.test.ts`, `outbox.test.ts`,
-// `queue.test.ts`).
+// `@pineta/core`, the host's `commands/chat.test.ts`, `queue.test.ts`).
 
 import { subscribe } from "@kyneta/schema"
 import { type EntryId, projectTranscript, ROOT } from "@pineta/core"

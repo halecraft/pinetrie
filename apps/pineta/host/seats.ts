@@ -6,7 +6,7 @@
 // names a text's writers from its `clientID`s, after the seat has gone.
 
 import type { Exchange } from "@kyneta/exchange"
-import { planSeats } from "@pineta/marginalia"
+import { planSeats, SEAT, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readSeats } from "@pineta/reads"
 import { seatOf } from "@pineta/schema"
@@ -24,7 +24,7 @@ export function startSeats(input: {
   }
   readonly basics: Pick<Basics, "doc" | "now">
   readonly serial: Serial
-  readonly agent: Pick<Agent, "setSeat">
+  readonly agent: Pick<Agent, "writeValues">
 }): { stop(): void } {
   const { exchange, serial, agent } = input
   const { doc, now } = input.basics
@@ -36,8 +36,8 @@ export function startSeats(input: {
         return seat === null ? [] : [seat]
       })
       // plan, then execute
-      for (const seat of planSeats(connected, readSeats(doc), now()))
-        await agent.setSeat(seat)
+      const seats = planSeats(connected, readSeats(doc), now())
+      await agent.writeValues(seats.map(seat => setRecord(SEAT, seat)))
     })
   void step()
   const stop = exchange.peers.subscribe(() => void step())

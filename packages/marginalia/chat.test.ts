@@ -464,32 +464,14 @@ describe("settling and starting up", () => {
     const plan = planStartup({
       cards: [queuedOn(LANE1, "c-1"), queuedOn(LANE1, "c-2")],
       interrupted: [],
-      outbox: [],
     })
-    expect(plan).toEqual({ resume: [], drain: [LANE1], discard: [] })
+    expect(plan).toEqual({ resume: [], drain: [LANE1] })
   })
   test("planStartup: an interrupted lane is resumed, and not drained", () => {
     const plan = planStartup({
       cards: [queuedOn(LANE1, "c-1"), queuedOn(LANE2, "c-2")],
       interrupted: [LANE1],
-      outbox: [],
     })
     expect(plan).toMatchObject({ resume: [LANE1], drain: [LANE2] })
-  })
-  test("planStartup: an old outbox's values are discarded, each with its text", () => {
-    const plan = planStartup({
-      cards: [],
-      interrupted: [],
-      outbox: [
-        { key: "h-1", value: { id: "h-1", details: { text: "hello" } } },
-        { key: "h-2", value: { kind: "update", id: "h-2" } },
-        { key: "h-3", value: 7 },
-      ],
-    })
-    expect(plan.discard).toEqual([
-      { key: "h-1", text: "hello" },
-      { key: "h-2", text: "(an update from your work)" },
-      { key: "h-3", text: "(unreadable)" },
-    ])
   })
 })

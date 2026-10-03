@@ -46,8 +46,6 @@ type SkillsModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/skills.js")
 type PromptTemplatesModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/prompt-templates.js")
-type FrontmatterModule =
-  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/frontmatter.js")
 type MimeModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/mime.js")
 type ImageResizeModule =
@@ -82,9 +80,6 @@ const skills = (await deep(
 const promptTemplates = (await deep(
   "@earendil-works/pi-coding-agent/dist/core/prompt-templates.js",
 )) as PromptTemplatesModule
-const frontmatter = (await deep(
-  "@earendil-works/pi-coding-agent/dist/utils/frontmatter.js",
-)) as FrontmatterModule
 const mime = (await deep(
   "@earendil-works/pi-coding-agent/dist/utils/mime.js",
 )) as MimeModule
@@ -100,7 +95,6 @@ export const {
   parseCommandArgs,
   substituteArgs,
 } = promptTemplates
-export const { stripFrontmatter } = frontmatter
 export const { detectSupportedImageMimeType } = mime
 export const { resizeImage, formatDimensionNote } = imageResize
 export const { SettingsManager } = settings

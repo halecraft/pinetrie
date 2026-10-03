@@ -1,15 +1,22 @@
 import { laneNameForThread, type Sha256, type ThreadName } from "@pineta/core"
 import {
   type BannerAsk,
-  encodeWorkRecord,
-  type WorkRecord,
+  NAME as NAME_RECORD,
+  setRecord,
 } from "@pineta/marginalia"
 import { type Agent, type Drawn, sha256Of } from "@pineta/pi"
 import { readBanners } from "@pineta/reads"
 import { describe, expect, test } from "vitest"
 import { createBanners } from "./banners.ts"
 import { memoryBlobs } from "./blobs.ts"
-import { basics, deferred, methods, putValue, record } from "./fakes.ts"
+import {
+  applyWrites,
+  basics,
+  deferred,
+  methods,
+  putValue,
+  record,
+} from "./fakes.ts"
 import { createSerial } from "./queue.ts"
 
 const LANE = laneNameForThread("1")
@@ -23,19 +30,13 @@ const DRAWN: Drawn = {
 
 type BannerAgent = Pick<
   Agent,
-  "canDrawBanners" | "drawBanner" | "skill" | "setWorkRecord"
+  "canDrawBanners" | "drawBanner" | "skill" | "writeValues"
 >
 
 function setUp(agent: Partial<BannerAgent> = {}, named = true) {
   const b = basics()
   if (named)
-    putValue(
-      b.doc,
-      encodeWorkRecord({
-        kind: "name",
-        record: { lane: LANE, name: NAME, at: 1 },
-      }),
-    )
+    putValue(b.doc, setRecord(NAME_RECORD, { lane: LANE, name: NAME, at: 1 }))
   const serial = createSerial()
   const blobs = memoryBlobs(() => 1_000)
   const fake = record<BannerAgent>({
@@ -46,8 +47,7 @@ function setUp(agent: Partial<BannerAgent> = {}, named = true) {
       hash: "h",
     }),
     drawBanner: async () => DRAWN,
-    setWorkRecord: async (r: WorkRecord) =>
-      putValue(b.doc, encodeWorkRecord(r)),
+    writeValues: async writes => applyWrites(b.doc, writes),
     ...agent,
   })
   const banners = createBanners({
@@ -84,7 +84,7 @@ describe("a thread due one", () => {
       "canDrawBanners",
       "skill",
       "drawBanner",
-      "setWorkRecord",
+      "writeValues",
     ])
     expect(draws(fake.calls)).toEqual([["A clear zebra."]])
     expect(blobs.ref(SHA)).toBeDefined()

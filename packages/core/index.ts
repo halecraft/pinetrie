@@ -233,6 +233,27 @@ export const refused = (code: ErrCode, message: string): Refusal => ({
   message,
 })
 
+/** A namespace of the host's own records. pi's are `pi.`, and never the host's to write. */
+export type HostNamespace = `pineta.${string}`
+
+/**
+ * One write to a pi value at its address, as the host decides it and pi's
+ * session carries it out (ADR-0062). Built by marginalia's `setRecord` and
+ * `deleteRecord`.
+ */
+export type ValueWrite =
+  | {
+      readonly kind: "set"
+      readonly namespace: HostNamespace
+      readonly key: string
+      readonly value: unknown
+    }
+  | {
+      readonly kind: "delete"
+      readonly namespace: HostNamespace
+      readonly key: string
+    }
+
 /**
  * How a client's message means to join the tree.
  *
@@ -392,6 +413,7 @@ export interface MarkRecord {
  * ask's prompt. pi's entries say a run was aborted, never by whom (S70).
  */
 export interface StopRecord {
+  readonly prompt: EntryId
   readonly by: WriterId
   /** When Stop was pressed, in ms since the epoch. */
   readonly at: number
@@ -1162,11 +1184,13 @@ export interface CardRecord {
 }
 
 /**
- * A seat the host has seen: the Yjs `clientID` its operations carry, and the
- * person it is (ADR-0037). A host-written `pineta.seat` value, so anyone can
- * name who wrote in a text after the seat has gone.
+ * A seat the host has seen: its Kyneta peer, the Yjs `clientID` its
+ * operations carry, and the person it is (ADR-0037). A host-written
+ * `pineta.seat` value keyed by the peer, so anyone can name who wrote in a
+ * text after the seat has gone.
  */
 export interface SeatRecord {
+  readonly peer: string
   readonly clientId: number
   readonly writer: WriterId
   /** When the host first saw it, which orders contributors. */

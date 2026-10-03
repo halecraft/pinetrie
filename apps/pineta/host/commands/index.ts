@@ -2,7 +2,13 @@
 // archive, and routed to its module.
 
 import { type EntryId, ERR, type LaneView, type WriterId } from "@pineta/core"
-import { archivedAt, displayName, writesAt } from "@pineta/marginalia"
+import {
+  archivedAt,
+  displayName,
+  PARTICIPANT,
+  setRecord,
+  writesAt,
+} from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import {
   decodeCommand,
@@ -38,7 +44,7 @@ export interface CommandDeps {
     ArchiveDeps["agent"] &
     MarkDeps["agent"] &
     LaneDeps["agent"] &
-    Pick<Agent, "setParticipantName">
+    Pick<Agent, "writeValues">
   readonly work: ChatDeps["work"] & ArchiveDeps["work"] & LaneDeps["work"]
   readonly blobs: ChatDeps["blobs"]
   readonly cards: ChatDeps["cards"] & CardCommandDeps["cards"]
@@ -132,7 +138,9 @@ export function createCommands(deps: CommandDeps): Commands {
       case "set-command":
         return cardCommands.setCommand(intent.card, intent.command)
       case "name":
-        await agent.setParticipantName(writer, intent.name)
+        await agent.writeValues([
+          setRecord(PARTICIPANT, { writer, name: intent.name }),
+        ])
         return settled({ kind: "named" })
       case "stop":
         return settled(await handleStop(deps, intent.lane, writer))

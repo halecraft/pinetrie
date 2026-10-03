@@ -78,7 +78,10 @@ describe("askOutcome and lastWord, over S70's endings", () => {
     const p = entryId("1-p")
     return {
       outcome: (stop?: { by: ReturnType<typeof writerId>; at: number }) =>
-        askOutcome(index, asks, p, { running: false, stop }),
+        askOutcome(index, asks, p, {
+          running: false,
+          stop: stop === undefined ? undefined : { prompt: p, ...stop },
+        }),
       word: lastWord(index, asks, p),
     }
   }

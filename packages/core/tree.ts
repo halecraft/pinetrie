@@ -1131,11 +1131,8 @@ export function threadOf(
 export type StopPlan =
   | {
       readonly kind: "abort"
-      /** Who stopped the ask, to record under its prompt; null when it is recorded already. */
-      readonly record: {
-        readonly prompt: EntryId
-        readonly value: StopRecord
-      } | null
+      /** Who stopped the ask; null when it is recorded already. */
+      readonly record: StopRecord | null
     }
   | { readonly kind: "idle" }
   | { readonly kind: "unknown" }
@@ -1165,7 +1162,7 @@ export function planStop(
     record:
       prompt === null || facts.stops.has(prompt)
         ? null
-        : { prompt, value: { by: facts.by, at: facts.now } },
+        : { prompt, by: facts.by, at: facts.now },
   }
 }
 

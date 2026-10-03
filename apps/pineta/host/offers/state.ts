@@ -29,8 +29,11 @@ import {
 } from "@pineta/lanes"
 import {
   archivedAt,
+  BASE,
+  deleteRecord,
+  OFFER,
   type RefreshFacts,
-  recordChanged,
+  setIfChanged,
   wipState,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
@@ -138,10 +141,9 @@ export function createOfferState(input: {
     (await commitsOf(ops, `present(${revsetName(bookmark)})`))[0] ?? null
 
   async function writeBase(record: BaseRecord) {
-    const next = { kind: "base" as const, record }
-    const stored = readBases(doc).get(record.lane)
-    if (stored !== undefined && !recordChanged(next, stored)) return
-    await input.agent().setWorkRecord(next)
+    await input
+      .agent()
+      .writeValues(setIfChanged(BASE, record, readBases(doc).get(record.lane)))
   }
 
   async function placeOf(lane: LaneName): Promise<OfferPlace | null> {
@@ -177,13 +179,15 @@ export function createOfferState(input: {
     taken: input.taken,
     nameOf,
     async write(record) {
-      const next = { kind: "offer" as const, record }
-      const stored = readOffers(doc).get(record.lane)
-      if (stored !== undefined && !recordChanged(next, stored)) return
-      await input.agent().setWorkRecord(next)
+      await input
+        .agent()
+        .writeValues(
+          setIfChanged(OFFER, record, readOffers(doc).get(record.lane)),
+        )
     },
     async remove(lane) {
-      if (readOffers(doc).has(lane)) await input.agent().removeOffer(lane)
+      if (readOffers(doc).has(lane))
+        await input.agent().writeValues([deleteRecord(OFFER, lane)])
     },
     placeOf,
     async refreshNow(lane) {

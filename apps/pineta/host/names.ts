@@ -3,7 +3,13 @@
 // column reserves before its lane exists (ADR-0057).
 
 import type { LaneName, NameRecord } from "@pineta/core"
-import { planNames, planReserve, type ReservePlan } from "@pineta/marginalia"
+import {
+  NAME,
+  planNames,
+  planReserve,
+  type ReservePlan,
+  setRecord,
+} from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readLaneRecords, readNames } from "@pineta/reads"
 import { readLaneNames } from "@pineta/schema"
@@ -24,13 +30,13 @@ export interface Names {
  */
 export function createNames(deps: {
   readonly basics: Pick<Basics, "doc" | "now">
-  readonly agent: Pick<Agent, "setWorkRecord">
+  readonly agent: Pick<Agent, "writeValues">
   readonly onNamed: (lane: LaneName) => void
 }): Names {
   const { doc, now } = deps.basics
   const serial = createSerial()
   const write = async (record: NameRecord) => {
-    await deps.agent.setWorkRecord({ kind: "name", record })
+    await deps.agent.writeValues([setRecord(NAME, record)])
     deps.onNamed(record.lane)
   }
   return {
