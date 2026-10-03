@@ -48,7 +48,7 @@ async function run(check: Checks["check"]): Promise<void> {
       log: () => {},
     })
     const bu = await join(bh, "bea", "banners")
-    await bu.setName("Bea")
+    await bu.request({ kind: "name", name: "Bea" })
     const bidle = async () => {
       await waitFor(() => idleNow(bh), 60_000)
       await bh.quiet()

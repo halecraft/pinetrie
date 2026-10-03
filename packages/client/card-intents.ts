@@ -13,17 +13,23 @@ import {
   type CardId,
   type CardRecord,
   keyOf,
+  type LaneName,
   type Move,
   type MoveDirection,
+  moveOf,
   type PlaceKey,
+  type Position,
+  queueRoot,
   type RootId,
   sameKey,
+  type WriterId,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
-  type ActedAt,
   AT_INVENTORY,
+  atColumn,
   type MoveAnswer,
+  type MoveHow,
   type Refusal,
 } from "./card-moves.ts"
 import type { CardFacts, Effect, IntentState } from "./intent.ts"
@@ -31,15 +37,39 @@ import { firstEmpty, type Slots } from "./inventory.ts"
 import { type PutTarget, placeOfTarget } from "./put-target.ts"
 import { revealOf } from "./reveal.ts"
 
-const at = (key: string): ActedAt => ({ kind: "column", key })
+/** A move to send; `fly`: whether its card animates to where it lands. */
+export const moveCard = (
+  move: Move,
+  how: MoveHow,
+  fly: boolean,
+  queuedBy: WriterId | null = null,
+): Effect => ({ kind: "moveCard", move, how, queuedBy, fly })
+
+/**
+ * `card` queued on `to.lane` from `to.at`, in its lane's root (`queueRoot`);
+ * null for a card that can take no root. Its text's version is left empty:
+ * the session reads it as it sends (S96).
+ */
+export function queueMove(
+  card: CardRecord,
+  to: { readonly lane: LaneName; readonly at: Position },
+  facts: Pick<CardFacts, "laneRecords">,
+): Move | null {
+  const root = queueRoot(to.lane, card, facts.laneRecords)
+  return root === undefined
+    ? null
+    : moveOf(card, { kind: "queued", root, at: to.at, lane: to.lane, seen: "" })
+}
 
 const slotOf = (slots: Slots, card: CardId): number | null => {
   const found = Object.entries(slots).find(([, c]) => c === card)
   return found === undefined ? null : Number(found[0])
 }
 
-const cardOf = (facts: CardFacts, card: CardId): CardRecord | undefined =>
-  facts.cards.find(c => c.id === card)
+export const cardOf = (
+  facts: Pick<CardFacts, "cards">,
+  card: CardId,
+): CardRecord | undefined => facts.cards.find(c => c.id === card)
 
 /** A take refused before it is sent: your inventory is full, as the host would say. */
 const full = (card: CardId): Refusal => ({
@@ -52,15 +82,14 @@ const full = (card: CardId): Refusal => ({
 
 /** A handoff into your inventory, at `slot`. */
 const takeInto = (card: CardRecord, slot: number, me: CardFacts["me"]) =>
-  ({
-    kind: "moveCard",
-    move: {
-      card: card.id,
-      from: keyOf(card.place),
-      to: { kind: "inventory", holder: me },
+  moveCard(
+    moveOf(card, { kind: "inventory", holder: me }),
+    {
+      actedAt: AT_INVENTORY,
+      slot,
     },
-    how: { actedAt: AT_INVENTORY, slot },
-  }) as const satisfies Effect
+    true,
+  )
 
 /**
  * Take `card` into your inventory: the selected slot if it is empty, else
@@ -138,10 +167,8 @@ export function planPut(
   const to = placeOfTarget(target, facts.composers, facts.me)
   const from = keyOf(now.place)
   if (to === null || sameKey(from, to)) return []
-  const move: Move = { card, from, to }
-  return [
-    { kind: "moveCard", move, how: { actedAt: at(target.key), slot: null } },
-  ]
+  const move = moveOf(now, to)
+  return [moveCard(move, { actedAt: atColumn(target.key), slot: null }, true)]
 }
 
 /** Remove a card from your inventory: final, so not recorded. */
@@ -152,11 +179,7 @@ export function planRemove(
   const now = cardOf(state.cards, card)
   if (now?.place.kind !== "inventory") return []
   return [
-    {
-      kind: "discardCard",
-      card,
-      how: { actedAt: AT_INVENTORY, slot: null },
-    },
+    moveCard(moveOf(now, null), { actedAt: AT_INVENTORY, slot: null }, false),
   ]
 }
 
@@ -179,14 +202,10 @@ export function planKeep(
     if (now === undefined) return []
     const slot = firstEmpty(slots, facts.selected)
     if (slot !== null) slots[String(slot)] = now.id
-    const move: Move = {
-      card: now.id,
-      from: keyOf(now.place),
-      to: { kind: "inventory", holder: facts.me },
-    }
+    const move = moveOf(now, { kind: "inventory", holder: facts.me })
     return [{ move, slot }]
   })
-  return [{ kind: "keep", moves, actedAt: at(key), close }]
+  return [{ kind: "keep", moves, actedAt: atColumn(key), close }]
 }
 
 /** After a keep's answer: the column closes only if the keep was accepted. */

@@ -8,7 +8,14 @@ import { scriptedModel, sha256Of } from "@pineta/pi"
 import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { idleNow, join, laneNamesOf, rootAt, waitFor } from "../harness.ts"
+import {
+  idleNow,
+  join,
+  laneNamesOf,
+  queueCard,
+  rootAt,
+  waitFor,
+} from "../harness.ts"
 import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -71,7 +78,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 3. A message shows it; the model reads it after the text.
     const iu = await join(ih, "ivy", "images")
-    await iu.setName("Ivy")
+    await iu.request({ kind: "name", name: "Ivy" })
     const iidle = () => waitFor(() => idleNow(ih), 30_000)
     let seen: readonly string[] = []
     script.use([
@@ -107,8 +114,6 @@ async function run(check: Checks["check"]): Promise<void> {
     iu.createCard(
       {
         id: queued,
-        owner: iu.writer,
-        placer: iu.writer,
         place: {
           kind: "drafting",
           root: rootAt(iu, at(replyId)),
@@ -120,7 +125,8 @@ async function run(check: Checks["check"]): Promise<void> {
       },
       queuedText,
     )
-    if (lane !== undefined) iu.queueCard(queued, { lane, at: at(replyId) })
+    if (lane !== undefined)
+      void queueCard(iu, queued, { lane, at: at(replyId) })
     await waitFor(() => ih.cardText(queued) === queuedText, 5_000)
 
     paused.resume()
@@ -146,8 +152,6 @@ async function run(check: Checks["check"]): Promise<void> {
     iu.createCard(
       {
         id: drafted,
-        owner: iu.writer,
-        placer: iu.writer,
         place: {
           kind: "drafting",
           root: rootAt(iu, at(idOfIn(ih, "a green one"))),

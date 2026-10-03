@@ -37,6 +37,9 @@ export type ActedAt =
 
 export const AT_INVENTORY: ActedAt = { kind: "inventory" }
 
+/** Column `key`, where a move was made. */
+export const atColumn = (key: string): ActedAt => ({ kind: "column", key })
+
 export const sameActedAt = (a: ActedAt, b: ActedAt): boolean =>
   a.kind === "column"
     ? b.kind === "column" && a.key === b.key
@@ -51,7 +54,7 @@ export interface MoveHow {
 
 /** A move made in column `key` that takes no slot. */
 export const IN_COLUMN = (key: string): MoveHow => ({
-  actedAt: { kind: "column", key },
+  actedAt: atColumn(key),
   slot: null,
 })
 
@@ -203,12 +206,58 @@ export function movesStep(state: MovesState, event: MovesEvent): MovesState {
   }
 }
 
+/** The card a pending move moves. */
+export const cardOfPending = (p: Pending): CardId =>
+  p.kind === "create" ? p.draft.id : p.move.card
+
+/** A move sent as `id`, unanswered; with `draft`, a creation drawn as that record. */
+export function pendingOf(
+  id: string,
+  move: Move,
+  how: MoveHow,
+  draft: CardRecord | null,
+): Pending {
+  const sent = {
+    id,
+    answer: { state: "sent" },
+    slot: how.slot,
+    actedAt: how.actedAt,
+  } as const
+  return draft === null
+    ? { ...sent, kind: "move", move }
+    : { ...sent, kind: "create", draft }
+}
+
+/**
+ * The slot an accepted move writes: one into your inventory, at the slot
+ * its take chose. Null for any other move, or answer.
+ */
+export function slotOnAccept(
+  p: Pending,
+  answer: MoveAnswer,
+): { readonly card: CardId; readonly slot: number } | null {
+  const into = p.kind === "create" ? p.draft.place : p.move.to
+  return answer.kind === "accepted" &&
+    into?.kind === "inventory" &&
+    p.slot !== null
+    ? { card: cardOfPending(p), slot: p.slot }
+    : null
+}
+
+/**
+ * `move` with its queue's text version as this client has it: the host takes
+ * a queued card only once it holds that much (S96). Any other move is
+ * returned as it is.
+ */
+export const stampSeen = (move: Move, seen: string): Move =>
+  move.to?.kind === "queued" ? { ...move, to: { ...move.to, seen } } : move
+
 /** The slot each take this tab has in flight chose, by card. */
 export function intentsOf(state: MovesState): Intents {
   const intents = new Map<CardId, number>()
   for (const p of state.pending) {
     if (p.slot === null || !drawn(p, state.rev)) continue
-    intents.set(p.kind === "create" ? p.draft.id : p.move.card, p.slot)
+    intents.set(cardOfPending(p), p.slot)
   }
   return intents
 }
@@ -247,6 +296,48 @@ export function withPending(
   return [...cards.values()].sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
   )
+}
+
+/**
+ * The host's records, this tab's moves, and the cards drawn from the two
+ * (`withPending`): changed in one step, so whoever hears one change reads
+ * the other already changed with it.
+ */
+export interface LocalState {
+  readonly records: readonly CardRecord[]
+  readonly moves: MovesState
+  readonly cards: readonly CardRecord[]
+}
+
+export type LocalEvent =
+  | MovesEvent
+  /** The copy of the places changed: its records, and its `rev`. */
+  | {
+      readonly kind: "records"
+      readonly records: readonly CardRecord[]
+      readonly rev: number
+    }
+
+/** No records, no moves. */
+export const NO_LOCAL: LocalState = { records: [], moves: NO_MOVES, cards: [] }
+
+/**
+ * The state after `event`. It is `state` itself when nothing changed, and
+ * `cards` keeps its identity while the drawn cards do, so a reader redraws
+ * only for a change it reads.
+ */
+export function localStep(
+  state: LocalState,
+  event: LocalEvent,
+  me: WriterId,
+): LocalState {
+  const records = event.kind === "records" ? event.records : state.records
+  const moves = movesStep(
+    state.moves,
+    event.kind === "records" ? { kind: "changed", rev: event.rev } : event,
+  )
+  if (records === state.records && moves === state.moves) return state
+  return { records, moves, cards: withPending(records, moves, me) }
 }
 
 /**

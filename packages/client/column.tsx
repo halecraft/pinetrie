@@ -90,7 +90,8 @@ import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import { ReviewPane } from "./review-pane.tsx"
 import type { ScreenMemory } from "./screen-memory.ts"
-import type { ColumnHow, SessionClient } from "./session-view.ts"
+import type { ColumnHow } from "./send.ts"
+import type { SessionClient } from "./session-view.ts"
 import type { DeviceState } from "./tab-state.ts"
 import type { RowMemory } from "./tool-row.ts"
 import { useAskBar } from "./use-ask-bar.ts"
@@ -338,9 +339,11 @@ export function Column(p: ColumnProps) {
   // card before (S69), a move someone else made first (ADR-0059), a put the
   // host would not take, or a keep without room.
   const refused = useSyncExternalStore(
-    p.session.refusals.subscribe,
-    p.session.refusals.current,
-  ).filter(r => r.actedAt.kind === "column" && r.actedAt.key === p.column.key)
+    p.session.moves.subscribe,
+    p.session.moves.current,
+  ).refusals.filter(
+    r => r.actedAt.kind === "column" && r.actedAt.key === p.column.key,
+  )
   const reader = { me: p.session.writer, nameOf: p.nameOf }
   // Whether this column's next send would create a lane: the composer's to
   // decide, as it is typed.
@@ -406,7 +409,8 @@ export function Column(p: ColumnProps) {
   const carryOut = useStable((step: ReserveStep) => {
     if (step.kind === "mint")
       act({ kind: "reserve", key: p.column.key, lane: newLaneName() })
-    else if (step.kind === "ask") void p.session.reserve(step.lane)
+    else if (step.kind === "ask")
+      void p.session.request({ kind: "reserve", lane: step.lane })
   })
   const reserve = shows.reserve
   const reserving = reserve.kind === "ask" ? reserve.lane : reserve.kind
@@ -841,7 +845,9 @@ export function Column(p: ColumnProps) {
         {writable && running && (
           <button
             className="stop"
-            onClick={() => void p.session.stop(lane.name)}
+            onClick={() =>
+              void p.session.request({ kind: "stop", lane: lane.name })
+            }
             title="end the agent's turn here; cards queued are then taken"
             type="button"
           >

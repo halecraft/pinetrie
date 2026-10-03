@@ -738,6 +738,7 @@ export function App({
           cards: {
             cards,
             lanes,
+            laneRecords: workFacts.lanes,
             me: session.writer,
             slots,
             selected,
@@ -941,7 +942,7 @@ export function App({
           me={{
             writer: session.writer,
             email: session.principal,
-            rename: session.setName,
+            rename: name => session.request({ kind: "name", name }),
             signOut: () => onIntent({ kind: "signOut" }),
           }}
           onOpen={openIn}

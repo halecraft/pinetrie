@@ -5,11 +5,13 @@ import {
   inventoryView,
   NO_INTENTS,
   planSlots,
+  repairStep,
   type Slots,
   STEADY_MS,
   settleSlots,
   steadiness,
   stepSlot,
+  swapWrites,
   takeWrites,
 } from "./inventory.ts"
 
@@ -150,6 +152,27 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
       set: { "6": A },
       clear: ["2"],
     })
+  })
+
+  test("a swap writes the cards it is given, clearing a slot given none", () => {
+    expect(swapWrites(2, 5, [B, A])).toEqual({
+      set: { "2": B, "5": A },
+      clear: [],
+    })
+    expect(swapWrites(2, 5, [null, A])).toEqual({
+      set: { "5": A },
+      clear: ["2"],
+    })
+  })
+
+  test("the repair writes nothing until a card is steady, and says when to look again", () => {
+    const input = { held: [A], stored: {}, intents: NO_INTENTS }
+    const first = repairStep(new Map(), { ...input, now: 1_000 })
+    expect(first.writes).toEqual({ set: {}, clear: [] })
+    expect(first.wake).toBe(1_000 + STEADY_MS)
+    const then = repairStep(first.memory, { ...input, now: 1_000 + STEADY_MS })
+    expect(then.writes).toEqual({ set: { "0": A }, clear: [] })
+    expect(then.wake).toBeNull()
   })
 })
 

@@ -74,6 +74,7 @@ const ME = writerId("ada@x.io")
 const NO_CARDS: CardFacts = {
   cards: [],
   lanes: [],
+  laneRecords: new Map(),
   me: ME,
   slots: {},
   selected: 0,
@@ -171,15 +172,33 @@ describe("planIntent", () => {
 
   test("closing a column discards its card first; a new tab's closes the tab", () => {
     const close = column({ kind: "close", discard: [cardId("c")] }, 1)
+    const place = {
+      kind: "fresh",
+      column: "col-k",
+      root: TEST_ROOT,
+      at: atEntry(entryId("2-a")),
+    } as const
+    const held: CardRecord = {
+      id: cardId("c"),
+      owner: ME,
+      placer: ME,
+      place,
+      command: null,
+      unsent: null,
+    }
+    const holding = { ...NO_CARDS, cards: [held] }
+    const R1 = at(onRoot("1-r1"), undefined, undefined, holding)
     const discard = {
-      kind: "discardCard",
-      card: "c",
+      kind: "moveCard",
+      move: { card: "c", from: place, to: null },
       how: {
         actedAt: { kind: "column", key: "col-k" },
         slot: null,
       },
+      queuedBy: null,
+      fly: false,
     }
-    expect(plan(close)).toEqual([
+    expect(plan(close, R1)).toEqual([
       discard,
       {
         kind: "layout",
@@ -190,7 +209,7 @@ describe("planIntent", () => {
         },
       },
     ])
-    expect(plan(close, at(onNewTab))).toEqual([
+    expect(plan(close, at(onNewTab, undefined, undefined, holding))).toEqual([
       discard,
       { kind: "layout", action: { kind: "closeNewTab", key: "t" } },
     ])
@@ -369,22 +388,95 @@ describe("planIntent", () => {
     }
     const here = { kind: "column", key: "col-k" } as const
     const inColumn = { actedAt: here, slot: null }
-    test("queue, unqueue and a command are one write each, on any tab, said in the column", () => {
-      for (const state of [R1, at(onNewTab)]) {
-        expect(
-          plan(column({ kind: "queue", card: c, lane, at: where }), state),
-        ).toEqual([
-          { kind: "queueCard", card: c, lane, at: where, how: inColumn },
+    const OTHER_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
+    const laneRecords = new Map([
+      [lane, { lane, root: OTHER_ROOT, work: null, by: ada, createdAt: 0 }],
+    ])
+    const drafting = {
+      kind: "drafting",
+      root: TEST_ROOT,
+      at: where,
+      lane,
+    } as const
+    const queuedPlace = {
+      kind: "queued",
+      root: TEST_ROOT,
+      at: where,
+      lane,
+      order: "a",
+      by: ada,
+      seen: "v",
+    } as const
+    const withCard = (place: CardRecord["place"], records = laneRecords) =>
+      ({
+        ...NO_CARDS,
+        cards: [{ ...fresh, id: c, place }],
+        laneRecords: records,
+      }) satisfies CardFacts
+    test("a queue is one move, into its lane's root, said in the column; with no root, or no card, nothing", () => {
+      const queue = column({ kind: "queue", card: c, lane, at: where })
+      for (const layout of [onRoot("1-r1"), onNewTab]) {
+        const state = at(layout, undefined, undefined, withCard(drafting))
+        const move = {
+          card: c,
+          from: drafting,
+          to: { kind: "queued", root: OTHER_ROOT, at: where, lane, seen: "" },
+        }
+        expect(plan(queue, state)).toEqual([
+          {
+            kind: "moveCard",
+            move,
+            how: inColumn,
+            queuedBy: null,
+            fly: false,
+          },
         ])
-        expect(
-          plan(column({ kind: "unqueue", card: c, lane, by: ada }), state),
-        ).toEqual([
-          { kind: "unqueueCard", card: c, lane, by: ada, how: inColumn },
-        ])
-        expect(
-          plan(column({ kind: "setCommand", card: c, command: null }), state),
-        ).toEqual([{ kind: "setCommand", card: c, command: null }])
       }
+      const fresh = withCard(
+        { kind: "fresh", column: "f", root: TEST_ROOT, at: where },
+        new Map(),
+      )
+      expect(plan(queue, at(onNewTab, undefined, undefined, fresh))).toEqual([])
+      expect(plan(queue)).toEqual([])
+    })
+    test("an unqueue puts the card back where it was queued, saying who queued it; a card not queued, nothing", () => {
+      const unqueue = column({ kind: "unqueue", card: c, lane, by: ada })
+      const state = at(
+        onRoot("1-r1"),
+        undefined,
+        undefined,
+        withCard(queuedPlace),
+      )
+      const move = {
+        card: c,
+        from: { kind: "queued", root: TEST_ROOT, at: where, lane, seen: "v" },
+        to: drafting,
+      }
+      expect(plan(unqueue, state)).toEqual([
+        {
+          kind: "moveCard",
+          move,
+          how: inColumn,
+          queuedBy: ada,
+          fly: false,
+        },
+      ])
+      expect(
+        plan(
+          unqueue,
+          at(onRoot("1-r1"), undefined, undefined, withCard(drafting)),
+        ),
+      ).toEqual([])
+    })
+    test("a command is one write", () => {
+      expect(
+        plan(column({ kind: "setCommand", card: c, command: null })),
+      ).toEqual([
+        {
+          kind: "request",
+          intent: { kind: "set-command", card: c, command: null },
+        },
+      ])
     })
     test("catching up makes a card with the command and no text, and queues it at once; nothing takes focus", () => {
       expect(
@@ -405,11 +497,15 @@ describe("planIntent", () => {
           how: inColumn,
         },
         {
-          kind: "queueCard",
-          card: fresh.id,
-          lane,
-          at: where,
+          kind: "moveCard",
+          move: {
+            card: fresh.id,
+            from: fresh.place,
+            to: { kind: "queued", root: TEST_ROOT, at: where, lane, seen: "" },
+          },
           how: inColumn,
+          queuedBy: null,
+          fly: false,
         },
       ])
     })
@@ -445,7 +541,12 @@ describe("planIntent", () => {
 
   test("archive, restore and rename are one write each", () => {
     const root = entryId("1-r1")
-    expect(plan({ kind: "archive", root })).toEqual([{ kind: "archive", root }])
+    expect(plan({ kind: "archive", root })).toEqual([
+      {
+        kind: "request",
+        intent: { kind: "archive", action: "archive", root },
+      },
+    ])
     expect(plan({ kind: "restore", root })).toEqual([{ kind: "restore", root }])
     expect(plan({ kind: "rename", root, title: "T" })).toEqual([
       { kind: "mark", root, title: "T" },
@@ -466,7 +567,7 @@ test("a restore shows its root only once it is restored", () => {
 test("reconcileName's step: the session learns a name, or this device does", () => {
   const identity = { email: "a@x.test", name: "Ada" }
   expect(nameEffects({ kind: "send", name: "Ada" })).toEqual([
-    { kind: "setName", name: "Ada" },
+    { kind: "request", intent: { kind: "name", name: "Ada" } },
   ])
   expect(nameEffects({ kind: "store", identity })).toEqual([
     { kind: "storeIdentity", identity },

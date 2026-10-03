@@ -17,6 +17,7 @@ import {
   type LaneName,
   type Move,
   type MoveDirection,
+  moveOf,
   type RootId,
   type SentCard,
   threadOf,
@@ -231,17 +232,13 @@ export function createCardCommands(deps: CardCommandDeps) {
       const { step, drain } = planMoveCommand(
         cards,
         [
-          {
-            card: chat.card.id,
-            from: keyOf(now.place),
-            to: {
-              kind: "queued",
-              root: chat.root,
-              at: chat.at,
-              lane: thread.lane.name,
-              seen: chat.card.seen,
-            },
-          },
+          moveOf(now, {
+            kind: "queued",
+            root: chat.root,
+            at: chat.at,
+            lane: thread.lane.name,
+            seen: chat.card.seen,
+          }),
         ],
         writer,
         running,

@@ -17,20 +17,25 @@ import {
   connectSession,
   type SessionClient,
 } from "@pineta/client/session"
-import type {
-  CardRecord,
-  EntryId,
-  LaneName,
-  LaneView,
-  Position,
-  RootId,
-  TreeIndex,
+import {
+  type CardId,
+  type CardRecord,
+  draftingOf,
+  type EntryId,
+  type LaneName,
+  type LaneView,
+  moveOf,
+  type Position,
+  queueRoot,
+  type RootId,
+  type TreeIndex,
 } from "@pineta/core"
 import { prepareHost } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
 import {
   readHeld,
   readHeldIndex,
+  readLaneRecords,
   readLanes,
   readLine,
   readPlaces,
@@ -270,6 +275,45 @@ export const lanesOf = (
 export const laneNamesOf = (
   x: Parameters<typeof held>[0],
 ): readonly LaneName[] => held(x).roots.flatMap(readLaneNames)
+
+/** `id` as `client` draws it now; a scenario that names a card expects it there. */
+function drawnCard(client: SessionClient, id: CardId): CardRecord {
+  const card = client.cards.current().find(c => c.id === id)
+  if (card === undefined)
+    throw new Error(`${client.writer} draws no card ${id}`)
+  return card
+}
+
+/**
+ * Queue `id` on `lane` from `at`, as a column's queue does: in its lane's
+ * root (`queueRoot`), with its text's version as `client` has it (S96).
+ */
+export function queueCard(
+  client: SessionClient,
+  id: CardId,
+  to: { readonly lane: LaneName; readonly at: Position },
+): ReturnType<SessionClient["moveCard"]> {
+  const card = drawnCard(client, id)
+  const root = queueRoot(to.lane, card, readLaneRecords(client.session))
+  if (root === undefined) throw new Error(`no root to queue ${id} in`)
+  return client.moveCard(
+    moveOf(card, { kind: "queued", root, at: to.at, lane: to.lane, seen: "" }),
+  )
+}
+
+/** Take queued card `id` back below the line, as a column's unqueue does. */
+export function unqueueCard(
+  client: SessionClient,
+  id: CardId,
+): ReturnType<SessionClient["moveCard"]> {
+  const card = drawnCard(client, id)
+  if (card.place.kind !== "queued") throw new Error(`${id} is not queued`)
+  return client.moveCard(
+    moveOf(card, draftingOf(card.place)),
+    undefined,
+    card.place.by,
+  )
+}
 
 /**
  * A client that holds every root the directory names, as it changes: a

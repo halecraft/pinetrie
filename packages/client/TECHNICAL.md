@@ -13,11 +13,13 @@ written by this client, and kept on its thread.
   roots of your open tabs, the one you are on, and the Archive tab's
   preview. `SessionClient.holdRoots` opens what is new and `destroy`s what
   is not, which leaves the host's copy (S86). A root this client starts is
-  held from its first send until the page asks for it.
+  held from its first send until the page asks for it, and after that only
+  while the page does. `planHold` (`held-roots.ts`, pure) decides what
+  opens and goes; `rootDocs` (`root-docs.ts`) carries it out.
 - **It declines every other root.** Kyneta takes in every announced document
   whose schema a client knows, and every root's is the session's, so a
   `canShare` policy refuses a `root:` document the client does not want.
-  Kyneta asks it as `get` opens a document, and not again, so `hold`
+  Kyneta asks it as `get` opens a document, and not again, so `rootDocs`
   records a root as `wanted` before it calls `get` (S86): a root allowed
   only after would be opened and never asked for.
 - **Every cross-root fact comes from the directory** (`readRoots`): the tab
@@ -43,7 +45,10 @@ written by this client, and kept on its thread.
   has it.
 - **A write names its root**: `chat` and `mark` find it from the held
   document with the entry (`rootOf`), and a send at the root mints one
-  (`newRootId`); a card's place at an entry carries it.
+  (`newRootId`); a card's place at an entry carries it. A queued card
+  takes its lane's root (`queueRoot`, in core), since the host takes it
+  into a chat in `place.root`; only a lane with no record yet falls back to
+  the card's own root.
 
 ## Reads go through one index
 
@@ -176,7 +181,12 @@ function is proven by a unit test in a second.
 - **`perform` carries the effects out** (`perform.ts`), one port call each,
   through `AppPorts`: the reducer's `dispatch`, the session's writes,
   `reveal`, the Archive tab's pick, focus, the identity store and
-  `reload`.
+  `reload`. A request the session does not track is one `request` effect
+  carrying the `HostRequest` itself, so a new kind of request adds no effect
+  and no case. What the session tracks keeps a method of its own: a chat
+  and a move (`moves`), an offer action and a line action (`acting`), and a
+  mark, whose root it finds. Whether a move animates is the plan's too
+  (`moveCard`'s `fly`).
 - **`appView` decides; it does not project.** The projections
   (`projectColumns`, `pathIds`, `branchColors`, `cardMarks`) stay in `App`'s
   own `useMemo`s, and their results come in. One tree rebuilt each render
@@ -1033,15 +1043,15 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   queued key, and so does a chat sent from a card (`SentCard`), which the
   host queues when the lane is busy: the host takes the card only once it
   holds that much of the text, since the request can reach it first (S96).
-- **Queue, unqueue and a command are requests to the host, outside the undo
-  stack** (`SessionClient.queueCard`, `unqueueCard`, `setCommand`): a card's
-  box undoes only its text (ADR-0052). A queue and an unqueue are moves, so
-  the host records them in the root's history of your moves, and the page
-  undoes them, not a box (ADR-0066).
-  An unqueue the host's take got to first is refused `gone` (S69, ADR-0059);
-  `SessionClient.refusals` holds it, read by the column through
-  `useSyncExternalStore`, until your next send, queue or unqueue in its
-  lane, and the column says "already sent".
+- **Queue, unqueue and a command are requests to the host, outside the
+  card's own undo** (`moveCard`, and `request` with `set-command`): a
+  card's box undoes only its text (ADR-0052). A queue and an unqueue are
+  moves, so the host records them in the root's history of your moves, and
+  the page undoes them, not a box (ADR-0066). An unqueue the host's take got
+  to first is refused `gone` (S69, ADR-0059); `session.moves` holds the
+  refusal, read by the column through `useSyncExternalStore`, until your
+  next send, queue or unqueue in its lane, and the column says "already
+  sent".
 - **A card the host could not send** carries `unsent` until it is queued
   again; its editor's status says it (`cardStatus`).
 
@@ -1336,6 +1346,34 @@ pipeline keeps the tree a pure function, testable without a DOM.
   colour, class `initial`. `Avatar` is an `Initial` with class `avatar`,
   which means a person shown here (Gotchas).
 
+## The session's parts (`session-view.ts`)
+
+`connectSession` connects, builds its parts, and subscribes them to each
+other. Each part is a small shell with nothing in it specific to the browser
+or to Node, so the e2e suites run the same code the page does. Its decisions
+are pure functions beside it.
+
+| part | owns | decides with |
+|---|---|---|
+| `rootDocs` (`root-docs.ts`) | the roots held, the `pineta.roots` policy | `planHold` |
+| `cardTexts` (`card-texts.ts`) | each card's text, and the copies to destroy | `hostLetGo`, `spentCards` |
+| one `snapshotStore<LocalState>` | the host's records, this tab's moves, the cards drawn | `localStep` |
+| `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `takeWrites`, `swapWrites` |
+| `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
+| `hostLine` (`host-line.ts`) | the requests waiting for their replies | `encodeIntent`, `decodeReply` |
+
+- **Order matters to Kyneta.** `writersPolicy` is registered before the
+  transport is ready, and `rootDocs` registers its `canShare` policy before
+  any root's `get` (S86). The inventory repairs only once the host's copy
+  has reached this one (`readyFor`).
+- **A request waiting when the host leaves, or when the client closes, is
+  answered `failed`** (`settleAll`): a client does not reconnect, so it
+  would otherwise wait for good. Failed, not refused: the host may have
+  acted on it.
+- **`close` lets go of each part on its own**, so one that throws stops no
+  other; the last clears this seat's typing. Then it shuts the Exchange
+  down.
+
 ## Drafting cards (ADR-0048)
 
 What you type is a card: a record in the places document, which only the
@@ -1345,12 +1383,20 @@ snapshot store; it never holds the places document itself. `connectSession`
 registers `writersPolicy` (`@pineta/protocol/writers`), so a write to the
 places, the session or someone else's inventory throws before it is made.
 
-- **Every move is a request to the host** (`session-view.ts`): creating a
-  card (its text in one undo step, then a `move` from nowhere, then its
-  command), queueing, unqueueing, discarding, and setting a command. The host
-  applies each in arrival order or refuses it.
+- **Every move is a request to the host**: creating a card (its text in one
+  undo step, then a `move` from nowhere, then its command), queueing,
+  unqueueing, discarding, and setting a command. The host applies each in
+  arrival order or refuses it.
+- **A move is planned once.** `planIntent` builds each `Move` with core's
+  `moveOf` (an unqueue's target is `draftingOf`, a queue's root
+  `queueRoot`), from the cards as drawn. `SessionClient.moveCard` changes
+  it in one way only: a move into a queue gets its text's version as this
+  client has it as it is sent (`stampSeen`, S96).
 - **The tab's moves are one pure reducer** (`card-moves.ts`, `movesStep`):
-  sent, answered, the copy changed, the host left. `withPending` draws each
+  sent, answered, the copy changed, the host left. `localStep` holds it
+  with the host's records and the cards drawn from the two, in one store, so
+  a change to the places moves the `rev` and the drawn cards together and
+  tells each listener once. `withPending` draws each
   move the copy does not yet hold over the host's records, so a move shows
   at once. An accepted move stays drawn until the copy's `rev` reaches the
   one its reply carried: the reply and the change to the places reach the tab
@@ -1427,8 +1473,8 @@ places, the session or someone else's inventory throws before it is made.
   by word.
 - **A card the host spent is destroyed on every client holding it** (S64),
   so no step on it stands, and no undo or redo in its box can write into it.
-  The host's `dismiss` leaves a receiver's copy, so `connectSession`
-  watches each card document `cardText` opens, the client's one opener of
+  The host's `dismiss` leaves a receiver's copy, so `cardTexts`
+  (`card-texts.ts`) watches each card document `cardText` opens, the client's one opener of
   them: `hostLetGo` says the host left it while connected, and `spentCards`
   destroys the copy once the record is gone too. The two arrive in either
   order, and a copy whose record is live is never destroyed: a render could
@@ -1490,7 +1536,8 @@ state, never stored.
 - **Two layers.** The host's records say which cards are in your inventory
   (`CardPlace` `inventory`, `heldBy`); your inventory document
   (`inventory:<you>`, `InventoryDoc`) says which slot holds each. The
-  session opens it and repairs it on every change (`planSlots`).
+  session opens it and repairs it on every change (`inventory-slots.ts`,
+  `repairStep`: `steadiness`, then `planSlots`).
 - **`settleSlots` is the one slot rule** (`inventory.ts`): the panel draws
   it (`inventoryView`), the repair writes towards it, and a take lands by the
   same `firstEmpty`: the selected slot if empty, else the first empty.
@@ -1501,8 +1548,8 @@ state, never stored.
   not, for `STEADY_MS`, and looks again then. It reads the host's records,
   not the drawn ones, so a put in flight keeps its slot until accepted.
   It writes nothing when nothing differs.
-- **A take's slot is written at the answer** (`tracked` in
-  `session-view.ts`, `takeWrites`), before the answer is recorded: if the
+- **A take's slot is written at the answer** (`slotOnAccept`, then
+  `takeWrites`), before the answer is recorded: if the
   places reached the tab first, the answer drops the pending move at once,
   and a repair in between would place the card in the first empty slot.
   Until then the pending move's `slot` is an intent: drawn there, and left
@@ -1617,8 +1664,8 @@ the email is the only thing Pineta chooses.
 - **Not you? Sign in as someone else**, in the profile, clears the stored
   identity and reloads. Every tab subscribes to it, and reloads when another
   clears it or stores another email, so no tab goes on as the old person.
-- **Presence is per seat** (`seatKey(writer, exchange.peerId)`, as `mine` in
-  `session-view.ts`), so your tabs never overwrite or clear each other's;
+- **Presence is per seat** (`seatKey(writer, exchange.peerId)`, in
+  `presence-seat.ts`), so your tabs never overwrite or clear each other's;
   `core/presence.ts` shows each person once, and never you.
 - **The host is found by principal** (`HOST_PRINCIPAL`, `whenPeer`), since
   its seat is Kyneta's to issue: a Line is addressed by seat.

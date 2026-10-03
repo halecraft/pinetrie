@@ -27,6 +27,7 @@ import {
   join,
   lanesOf,
   noQueued,
+  queueCard,
   rootAt,
   rootRecordsOf,
   treeOf,
@@ -85,7 +86,7 @@ async function run(check: Checks["check"]): Promise<void> {
       subscribe(th.live, () => watched.push([...readStreams(th.live)]))
     let unwatch = watch()
     const u = await join(th, "uma", "tools")
-    await u.setName("Uma")
+    await u.request({ kind: "name", name: "Uma" })
 
     // 1. Read a file, then answer.
     script.use([
@@ -187,7 +188,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // 5. Stop ends a running command; a message for the busy thread is
     // answered busy, and nothing is written.
     const bob = await join(th, "bob", "tools")
-    await bob.setName("Bob")
+    await bob.request({ kind: "name", name: "Bob" })
     script.use([
       { tool: "bash", args: { command: "sleep 5; echo late" } },
       { text: "after" },
@@ -202,7 +203,10 @@ async function run(check: Checks["check"]): Promise<void> {
     const waiting = await bob.chat("@Uma noted", at(tlane()?.tip ?? null), {
       lane: l5?.name,
     })
-    const stopped = l5 === undefined ? undefined : await u.stop(l5.name)
+    const stopped =
+      l5 === undefined
+        ? undefined
+        : await u.request({ kind: "stop", lane: l5.name })
     await tidle()
     const aborted = projectSpine(ttree(), tlane()?.tip ?? null)
       .spine.flatMap(n => n.toolCalls ?? [])
@@ -216,8 +220,8 @@ async function run(check: Checks["check"]): Promise<void> {
         Date.now() - t0 < 4_000,
       `${aborted?.result?.text.slice(-20) ?? "none"}`,
     )
-    if (l5 !== undefined) await u.stop(l5.name)
-    await u.stop(laneNameForThread("no-such-lane"))
+    if (l5 !== undefined) await u.request({ kind: "stop", lane: l5.name })
+    await u.request({ kind: "stop", lane: laneNameForThread("no-such-lane") })
     // Who stopped it is recorded under the ask (ADR-0056): pi's entries say
     // only that the run was aborted. Stopping it again, idle, records nothing.
     const sleepAsk = idOfIn(th, "sleep")
@@ -249,8 +253,6 @@ async function run(check: Checks["check"]): Promise<void> {
       u.createCard(
         {
           id: held,
-          owner: u.writer,
-          placer: u.writer,
           place: {
             kind: "drafting",
             root: rootAt(u, where),
@@ -262,7 +264,7 @@ async function run(check: Checks["check"]): Promise<void> {
         },
         heldText,
       )
-      u.queueCard(held, { lane: l6.name, at: where })
+      void queueCard(u, held, { lane: l6.name, at: where })
       await waitFor(
         () =>
           th.cardText(held) === heldText &&
@@ -274,7 +276,7 @@ async function run(check: Checks["check"]): Promise<void> {
     }
     // Written after the last compaction, so the store the next host opens holds
     // more than the compacted session: its startup must compact again.
-    await u.setName("Uma, again")
+    await u.request({ kind: "name", name: "Uma, again" })
     unwatch()
     // Bob leaves; Uma is still connected when the host stops.
     const bobSeat = bob.exchange.peerId

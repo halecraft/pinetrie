@@ -9,6 +9,27 @@ export interface SnapshotStore<T> {
   subscribe(listener: () => void): () => void
 }
 
+/** A value to read, and a way to hear it change: `useSyncExternalStore`'s shape. */
+export type Readable<T> = Pick<SnapshotStore<T>, "current" | "subscribe">
+
+/** `store`, for reading only. */
+export const readable = <T>(store: Readable<T>): Readable<T> => ({
+  current: store.current,
+  subscribe: store.subscribe,
+})
+
+/**
+ * One field of a store's value, read as its own value. `pick` must read, not
+ * compute: a new value each call would never be the same snapshot.
+ */
+export const select = <T, F>(
+  store: Readable<T>,
+  pick: (value: T) => F,
+): Readable<F> => ({
+  current: () => pick(store.current()),
+  subscribe: store.subscribe,
+})
+
 /** A store holding `initial`. */
 export function snapshotStore<T>(initial: T): SnapshotStore<T> {
   let value = initial

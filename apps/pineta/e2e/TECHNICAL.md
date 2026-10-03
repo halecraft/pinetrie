@@ -86,6 +86,14 @@ They share `checks.ts` (recording a check, and stopping at one),
   page holds only its tabs' roots, and writes only where it reads.
 - **A card's place at an entry names its root** (`rootAt`), from the host or
   a client.
+- **A scenario queues and unqueues through the harness** (`queueCard`,
+  `unqueueCard`), as a column's plan does: each finds the card as its client
+  draws it, builds the move with core's `moveOf` (into its lane's root,
+  `queueRoot`), and sends it with `moveCard`. Each throws if the card is not
+  where it expects. An offer action and a line action are `client.offer`
+  and `client.line`, which the session tracks (`acting`); anything else
+  that moves no card is `client.request({ kind, … })`, one of core's
+  `Intent`s.
 
 ## Gotchas
 

@@ -6,33 +6,39 @@
 // under its position, as `LayoutAction` nests `ColumnAction` under a root, and
 // a message's acts (`MessageAct`) are among them.
 
-import type {
-  ArchiveRecord,
-  AskIndex,
-  CardCommand,
-  CardId,
-  CardRecord,
-  EntryId,
-  LaneName,
-  LaneView,
-  Move,
-  MoveDirection,
-  OfferAction,
-  Position,
-  RootId,
-  TreeIndex,
-  WriterId,
+import {
+  type ArchiveRecord,
+  type AskIndex,
+  type CardCommand,
+  type CardId,
+  type CardRecord,
+  draftingOf,
+  type EntryId,
+  type LaneName,
+  type LaneRecord,
+  type LaneView,
+  type Move,
+  type MoveDirection,
+  moveOf,
+  type OfferAction,
+  type Position,
+  type RootId,
+  type TreeIndex,
+  type WriterId,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
 import type { Density } from "./ask-words.ts"
 import {
   afterUndo,
+  cardOf,
+  moveCard,
   planKeep,
   planPut,
   planRemove,
   planTake,
   planTakeCopy,
   planUndoMove,
+  queueMove,
 } from "./card-intents.ts"
 import {
   type ActedAt,
@@ -51,6 +57,7 @@ import {
 } from "./layout.ts"
 import type { MessageAct } from "./message-tools.ts"
 import type { ComposerPlaces, PutTarget } from "./put-target.ts"
+import type { HostRequest } from "./session-view.ts"
 
 /** What a reader asks of one column. A message's acts are among them. */
 export type ColumnAct =
@@ -172,7 +179,8 @@ export type Intent =
 
 export type Effect =
   | { readonly kind: "layout"; readonly action: LayoutAction }
-  | { readonly kind: "archive"; readonly root: EntryId }
+  /** Ask the host for something that moves no card (`HostRequest`). */
+  | { readonly kind: "request"; readonly intent: HostRequest }
   | { readonly kind: "restore"; readonly root: EntryId }
   | {
       readonly kind: "mark"
@@ -180,32 +188,21 @@ export type Effect =
       readonly title: string | null
     }
   | {
-      readonly kind: "discardCard"
-      readonly card: CardId
-      readonly how: MoveHow
-    }
-  | {
       readonly kind: "createCard"
       readonly card: CardRecord
       readonly text: string
       readonly how: MoveHow
     }
+  /** A move (ADR-0059): a take, a put, a queue, an unqueue, a discard. */
   | {
-      readonly kind: "queueCard"
-      readonly card: CardId
-      readonly lane: LaneName
-      readonly at: Position
+      readonly kind: "moveCard"
+      readonly move: Move
       readonly how: MoveHow
+      /** Who queued the card, for an unqueue: a refusal names them. */
+      readonly queuedBy: WriterId | null
+      /** Whether the card animates to where it lands (`ports.fly`). */
+      readonly fly: boolean
     }
-  | {
-      readonly kind: "unqueueCard"
-      readonly card: CardId
-      readonly lane: LaneName
-      readonly by: WriterId
-      readonly how: MoveHow
-    }
-  /** A handoff: a take or a put (ADR-0059). */
-  | { readonly kind: "moveCard"; readonly move: Move; readonly how: MoveHow }
   /** Swap two slots of your inventory, as one step of this tab's swaps. */
   | { readonly kind: "swapSlots"; readonly a: number; readonly b: number }
   /**
@@ -235,11 +232,7 @@ export type Effect =
   /** Open the inventory; `brief`: only for a take's flight, if it was closed. */
   | { readonly kind: "showInventory"; readonly brief: boolean }
   | { readonly kind: "select"; readonly slot: number }
-  | {
-      readonly kind: "setCommand"
-      readonly card: CardId
-      readonly command: CardCommand | null
-    }
+  /** An offer action, which the session tracks (`acting`). */
   | {
       readonly kind: "offer"
       readonly lane: LaneName
@@ -256,7 +249,6 @@ export type Effect =
   | { readonly kind: "pickArchived"; readonly root: EntryId }
   /** The column keyed `key` takes focus when it mounts (`claimFocus`). */
   | { readonly kind: "armFocus"; readonly key: string }
-  | { readonly kind: "setName"; readonly name: string }
   | { readonly kind: "storeIdentity"; readonly identity: Identity }
   | { readonly kind: "forgetIdentity" }
   | { readonly kind: "reload" }
@@ -283,6 +275,8 @@ export interface CardFacts {
   /** Every card as drawn. */
   readonly cards: readonly CardRecord[]
   readonly lanes: readonly LaneView[]
+  /** Every lane's record: a queue takes its lane's root (`queueRoot`). */
+  readonly laneRecords: ReadonlyMap<LaneName, LaneRecord>
   readonly me: WriterId
   /** Your inventory's slots as drawn (`settleSlots`). */
   readonly slots: Slots
@@ -342,7 +336,12 @@ export function planIntent(
       }
       return []
     case "archive":
-      return [{ kind: "archive", root: intent.root }]
+      return [
+        {
+          kind: "request",
+          intent: { kind: "archive", action: "archive", root: intent.root },
+        },
+      ]
     case "restore":
       return [{ kind: "restore", root: intent.root }]
     case "rename":
@@ -472,11 +471,12 @@ function planColumn(
         }),
       )
     case "close": {
-      const discard: readonly Effect[] = act.discard.map(card => ({
-        kind: "discardCard",
-        card,
-        how: IN_COLUMN(key),
-      }))
+      const discard = act.discard.flatMap(id => {
+        const now = cardOf(state.cards, id)
+        return now === undefined
+          ? []
+          : [moveCard(moveOf(now, null), IN_COLUMN(key), false)]
+      })
       return [...discard, ...closing()]
     }
     case "keep":
@@ -493,29 +493,27 @@ function planColumn(
       return onColumn({ kind: "sent", key: act.key, sendId: act.sendId })
     case "reserve":
       return onColumn({ kind: "reserve", key: act.key, lane: act.lane })
-    case "queue":
-      return [
-        {
-          kind: "queueCard",
-          card: act.card,
-          lane: act.lane,
-          at: act.at,
-          how: IN_COLUMN(key),
-        },
-      ]
-    case "unqueue":
-      return [
-        {
-          kind: "unqueueCard",
-          card: act.card,
-          lane: act.lane,
-          by: act.by,
-          how: IN_COLUMN(key),
-        },
-      ]
+    case "queue": {
+      const now = cardOf(state.cards, act.card)
+      const move = now === undefined ? null : queueMove(now, act, state.cards)
+      return move === null ? [] : [moveCard(move, IN_COLUMN(key), false)]
+    }
+    case "unqueue": {
+      // If the host took the card first, the refusal says it was sent.
+      const now = cardOf(state.cards, act.card)
+      if (now?.place.kind !== "queued") return []
+      const move = moveOf(now, draftingOf(now.place))
+      return [moveCard(move, IN_COLUMN(key), false, act.by)]
+    }
     case "setCommand":
-      return [{ kind: "setCommand", card: act.card, command: act.command }]
-    case "bringUpToDate":
+      return [
+        {
+          kind: "request",
+          intent: { kind: "set-command", card: act.card, command: act.command },
+        },
+      ]
+    case "bringUpToDate": {
+      const queued = queueMove(act.create, act, state.cards)
       // Made, then queued: the host sets the command before the queue's
       // move, so the drain that move starts takes it with its command.
       return [
@@ -525,14 +523,9 @@ function planColumn(
           text: "",
           how: IN_COLUMN(key),
         },
-        {
-          kind: "queueCard",
-          card: act.create.id,
-          lane: act.lane,
-          at: act.at,
-          how: IN_COLUMN(key),
-        },
+        ...(queued === null ? [] : [moveCard(queued, IN_COLUMN(key), false)]),
       ]
+    }
     case "offer":
       return [{ kind: "offer", lane: act.lane, action: act.action, to: act.to }]
   }
@@ -586,7 +579,7 @@ export function nameEffects(step: NameStep | null): readonly Effect[] {
   if (step === null) return []
   switch (step.kind) {
     case "send":
-      return [{ kind: "setName", name: step.name }]
+      return [{ kind: "request", intent: { kind: "name", name: step.name } }]
     case "store":
       return [{ kind: "storeIdentity", identity: step.identity }]
   }

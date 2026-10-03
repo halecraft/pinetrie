@@ -42,7 +42,7 @@ async function run(check: Checks["check"]): Promise<void> {
       log: () => {},
     })
     const du = await join(dh, "uma", "direct")
-    await du.setName("Uma")
+    await du.request({ kind: "name", name: "Uma" })
     const didle = () => waitFor(() => idleNow(dh), 60_000)
     const laneWith = (text: string) => {
       const id = idOfIn(dh, text)

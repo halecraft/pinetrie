@@ -6,7 +6,10 @@ import {
   address,
   atEntry,
   type CardPlace,
+  type CardRecord,
+  cardId,
   commitId,
+  draftingOf,
   emailLocalPart,
   entryId,
   findSeqKeys,
@@ -14,9 +17,11 @@ import {
   indexTree,
   keyOf,
   keyOfFields,
+  type LaneRecord,
   laneNameForThread,
   latestTip,
   messageText,
+  moveOf,
   NOBODY,
   normalizeEmail,
   normalizeName,
@@ -27,6 +32,7 @@ import {
   placeFields,
   placeOfFields,
   projectTranscript,
+  queueRoot,
   ROOT,
   rootIdFor,
   sameKey,
@@ -429,5 +435,63 @@ describe("a card's place as flat fields (ADR-0059)", () => {
         { kind: "fresh", column: "k", root: TEST_ROOT, at: ROOT },
       ),
     ).toBe(false)
+  })
+
+  test("sameKey leaves out a queue's root and text version", () => {
+    const queued = keyOf(places[1] as CardPlace)
+    expect(
+      queued.kind === "queued" &&
+        sameKey(queued, { ...queued, seen: "", root: rootIdFor("other") }),
+    ).toBe(true)
+  })
+})
+
+describe("moves, built once (ADR-0059)", () => {
+  const ADA = writerId("ada@example.com")
+  const LANE = laneNameForThread("x")
+  const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
+  const at = atEntry(entryId("e-1"))
+  const card = (place: CardPlace): CardRecord => ({
+    id: cardId("c-1"),
+    owner: ADA,
+    place,
+    placer: ADA,
+    command: null,
+    unsent: null,
+  })
+  const drafting = card({ kind: "drafting", root: TEST_ROOT, at, lane: LANE })
+  const lanes = (
+    root: typeof TEST_ROOT,
+  ): ReadonlyMap<typeof LANE, LaneRecord> =>
+    new Map([[LANE, { lane: LANE, root, work: null, by: ADA, createdAt: 0 }]])
+
+  test("a move goes from where the card is", () => {
+    expect(moveOf(drafting, null)).toEqual({
+      card: cardId("c-1"),
+      from: { kind: "drafting", root: TEST_ROOT, at, lane: LANE },
+      to: null,
+    })
+  })
+
+  test("an unqueue puts a card back where it was queued, in its root", () => {
+    expect(
+      draftingOf({
+        kind: "queued",
+        root: OTHER,
+        at,
+        lane: LANE,
+        order: "a",
+        by: ADA,
+        seen: "v",
+      }),
+    ).toEqual({ kind: "drafting", root: OTHER, at, lane: LANE })
+  })
+
+  test("a queued card's root is its lane's, else its own; a card at no thread has none", () => {
+    expect(queueRoot(LANE, drafting, lanes(OTHER))).toBe(OTHER)
+    expect(queueRoot(LANE, drafting, new Map())).toBe(TEST_ROOT)
+    expect(
+      queueRoot(LANE, card({ kind: "inventory", holder: ADA }), new Map()),
+    ).toBeUndefined()
   })
 })

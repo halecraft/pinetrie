@@ -62,6 +62,7 @@ import {
   uploadImage,
 } from "./paste.ts"
 import { CARD_MIME } from "./put-target.ts"
+import type { ColumnHow } from "./send.ts"
 import {
   baseChoices,
   type ComposerMode,
@@ -76,7 +77,7 @@ import {
   whereChoices,
   whereWords,
 } from "./send.ts"
-import type { ColumnHow, SessionClient } from "./session-view.ts"
+import type { SessionClient } from "./session-view.ts"
 
 /**
  * Bind a box to a card's text, its undo reaching only that card's steps
@@ -268,9 +269,7 @@ export function CardEditor(p: {
           session.createCard(
             {
               id: next.state.card,
-              owner: session.writer,
               place: p.place,
-              placer: session.writer,
               command: null,
               unsent: null,
             },

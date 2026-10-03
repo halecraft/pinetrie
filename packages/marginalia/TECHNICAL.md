@@ -206,7 +206,11 @@ which are swept.
   accepted only if the card is still where its sender saw it, its `PlaceKey`
   (`sameKey`, over its kind, `at` and lane, or an inventory's holder). A
   key leaves out a queue's order and queuer, so a reorder does not make
-  someone else's unqueue fail. No `from` creates the card, its sender its
+  someone else's unqueue fail. It leaves out a queue's `seen` and `root`
+  too. Every move, on
+  the host and on a client, is built by core's `moveOf` (from where the
+  card is); an unqueue's target is `draftingOf`, and a queue's root
+  `queueRoot`, its lane's. No `from` creates the card, its sender its
   owner; no `to` removes it, and only a fresh column's card, or one in the
   sender's own inventory, can be removed. Queueing puts it after the lane's
   last card, queued by the sender, and clears why it was not sent before;

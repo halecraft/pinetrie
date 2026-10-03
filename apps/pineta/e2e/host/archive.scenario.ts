@@ -28,7 +28,11 @@ async function run(check: Checks["check"]): Promise<void> {
       const r1 = appended(await ada.chat("first root", ROOT, START_CHAT))
       const r2 = appended(await ada.chat("second root", ROOT, START_CHAT))
 
-      const archived = await ada.archive("archive", entryId(r1))
+      const archived = await ada.request({
+        kind: "archive",
+        action: "archive",
+        root: entryId(r1),
+      })
       const seen = await waitFor(
         () => readArchive(bea.session).get(r1)?.state === "archived",
         10_000,

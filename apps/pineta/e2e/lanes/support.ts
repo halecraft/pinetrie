@@ -29,6 +29,7 @@ import {
   idleNow,
   join,
   lanesOf,
+  queueCard,
   rootAt,
   setUpLine,
   treeOf,
@@ -57,8 +58,6 @@ export function bringUpToDate(
   session.createCard(
     {
       id,
-      owner: session.writer,
-      placer: session.writer,
       place: {
         kind: "drafting",
         root: rootAt(session, where),
@@ -70,7 +69,7 @@ export function bringUpToDate(
     },
     text,
   )
-  session.queueCard(id, { lane, at: where })
+  void queueCard(session, id, { lane, at: where })
   return id
 }
 

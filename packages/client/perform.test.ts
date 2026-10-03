@@ -20,21 +20,16 @@ const ports = () => {
   return {
     dispatch: vi.fn(),
     session: {
-      archive: vi.fn(async (): Promise<Outcome> => answer),
+      request: vi.fn(async (): Promise<Outcome> => answer),
+      offer: vi.fn(async (): Promise<Outcome> => answer),
       mark: vi.fn(async () => answer),
-      discardCard: vi.fn(),
-      setName: vi.fn(async () => answer),
       createCard: vi.fn(async () => accepted),
-      queueCard: vi.fn(),
-      unqueueCard: vi.fn(),
       moveCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
       moveCards: vi.fn(async (): Promise<MoveAnswer> => accepted),
       undoMoves: vi.fn(async (): Promise<Outcome> => ({ kind: "nothing" })),
       swapSlots: vi.fn(),
       undoSwap: vi.fn(async () => {}),
       refuse: vi.fn(),
-      setCommand: vi.fn(),
-      offer: vi.fn(async () => answer),
     },
     inventory: { show: vi.fn(), select: vi.fn() },
     fly: vi.fn(),
@@ -83,19 +78,19 @@ test.each<Row>([
     args: [show],
   },
   {
-    effect: { kind: "archive", root },
-    port: p => p.session.archive,
-    args: ["archive", root],
+    effect: { kind: "request", intent: { kind: "name", name: "Ada" } },
+    port: p => p.session.request,
+    args: [{ kind: "name", name: "Ada" }],
+  },
+  {
+    effect: { kind: "offer", lane, action: "take", to: "wip/x" },
+    port: p => p.session.offer,
+    args: [lane, "take", "wip/x"],
   },
   {
     effect: { kind: "mark", root, title: "T" },
     port: p => p.session.mark,
     args: [root, "T"],
-  },
-  {
-    effect: { kind: "discardCard", card: cardId("c"), how },
-    port: p => p.session.discardCard,
-    args: ["c", how],
   },
   {
     effect: { kind: "reveal", entry: entryId("e") },
@@ -119,11 +114,6 @@ test.each<Row>([
   },
   { effect: { kind: "armFocus", key: "k" }, port: p => p.arm, args: ["k"] },
   {
-    effect: { kind: "setName", name: "Ada" },
-    port: p => p.session.setName,
-    args: ["Ada"],
-  },
-  {
     effect: { kind: "storeIdentity", identity },
     port: p => p.identity.save,
     args: [identity],
@@ -136,22 +126,12 @@ test.each<Row>([
     args: [card, "t", how],
   },
   {
-    effect: { kind: "queueCard", card: cardId("c"), lane, at, how },
-    port: p => p.session.queueCard,
-    args: ["c", { lane, at }, how],
-  },
-  {
-    effect: { kind: "unqueueCard", card: cardId("c"), lane, by: ada, how },
-    port: p => p.session.unqueueCard,
-    args: ["c", { lane, by: ada }, how],
-  },
-  {
-    effect: { kind: "moveCard", move, how },
+    effect: { kind: "moveCard", move, how, queuedBy: ada, fly: false },
     port: p => p.session.moveCard,
-    args: [move, how],
+    args: [move, how, ada],
   },
   {
-    effect: { kind: "moveCard", move, how },
+    effect: { kind: "moveCard", move, how, queuedBy: null, fly: true },
     port: p => p.fly,
     args: ["c"],
   },
@@ -179,16 +159,6 @@ test.each<Row>([
     effect: { kind: "select", slot: 4 },
     port: p => p.inventory.select,
     args: [4],
-  },
-  {
-    effect: { kind: "setCommand", card: cardId("c"), command: null },
-    port: p => p.session.setCommand,
-    args: ["c", null],
-  },
-  {
-    effect: { kind: "offer", lane, action: "take", to: "wip/x" },
-    port: p => p.session.offer,
-    args: [lane, "take", "wip/x"],
   },
 ])("the $effect.kind effect is one port call", ({ effect, port, args }) => {
   const p = ports()
@@ -231,11 +201,22 @@ test("an undo of moves plans what its answer shows, afresh", async () => {
 test("a restore, once answered restored, shows its root", async () => {
   const p = ports()
   perform([{ kind: "restore", root }], p)
-  expect(p.session.archive).toHaveBeenCalledWith("restore", root)
+  expect(p.session.request).toHaveBeenCalledWith({
+    kind: "archive",
+    action: "restore",
+    root,
+  })
   await vi.waitFor(() =>
     expect(p.dispatch).toHaveBeenCalledWith({
       kind: "show",
       tab: { kind: "root", root },
     }),
   )
+})
+
+test("a move flies only when its plan says so", () => {
+  const p = ports()
+  perform([{ kind: "moveCard", move, how, queuedBy: null, fly: false }], p)
+  expect(p.fly).not.toHaveBeenCalled()
+  expect(p.session.moveCard).toHaveBeenCalledOnce()
 })

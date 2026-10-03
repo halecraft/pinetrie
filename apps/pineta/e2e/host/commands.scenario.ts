@@ -40,7 +40,7 @@ async function run(check: Checks["check"]): Promise<void> {
       log: () => {},
     })
     const cu = await join(ch, "uma", "containers")
-    await cu.setName("Uma")
+    await cu.request({ kind: "name", name: "Uma" })
     const cidle = () => waitFor(() => idleNow(ch), 60_000)
     await waitFor(() => readCommands(ch.session).length > 0, 10_000)
     check(

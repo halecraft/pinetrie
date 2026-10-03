@@ -1,5 +1,7 @@
 import {
   type Address,
+  atEntry,
+  cardId,
   ERR,
   entryId,
   laneNameForThread,
@@ -11,8 +13,10 @@ import {
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
+import { TEST_ROOT } from "./fixtures.ts"
 import {
   type ComposerMode,
+  chatIntent,
   failedWords,
   lineWords,
   placeholderWords,
@@ -475,5 +479,38 @@ describe("where a new lane works: the chip and its menu", () => {
     ).toBe(
       "a lane of its own, cloned from pineta-onto; its work comes back as pineta-offer/<thread>",
     )
+  })
+})
+
+test("a chat fills in what its column left out, and carries its column's reservation", () => {
+  const at = atEntry(entryId("e-1"))
+  const lane = laneNameForThread("x")
+  expect(chatIntent("hi @bea", at, {}, TEST_ROOT, null)).toMatchObject({
+    kind: "chat",
+    root: TEST_ROOT,
+    mode: "reply",
+    lane: null,
+    asksAgent: false,
+    work: null,
+    card: null,
+    reserved: null,
+    base: null,
+  })
+  const card = { id: cardId("c-1"), seen: "v" }
+  expect(
+    chatIntent(
+      "go",
+      at,
+      { mode: "branch", lane, asksAgent: true, reserved: lane, base: "wip" },
+      TEST_ROOT,
+      card,
+    ),
+  ).toMatchObject({
+    mode: "branch",
+    lane,
+    asksAgent: true,
+    card,
+    reserved: lane,
+    base: "wip",
   })
 })

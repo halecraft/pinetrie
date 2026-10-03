@@ -997,7 +997,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a client keeps its copy of a spent card",
-    file: "packages/client/session-view.ts",
+    file: "packages/client/card-texts.ts",
     from: "      void exchange.destroy(cardDocId(id))",
     to: "      void cardDocId(id)",
     suite: "host",
@@ -1074,7 +1074,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column's reading is never written",
-    file: "packages/client/session-view.ts",
+    file: "packages/client/presence-seat.ts",
     from: "        d.reading.set(key, end)\n",
     to: "",
     suite: "host",
@@ -1083,7 +1083,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a closed column's reading is left to decay",
-    file: "packages/client/session-view.ts",
+    file: "packages/client/presence-seat.ts",
     from: "          d.reading.delete(key)\n",
     to: "",
     suite: "host",
@@ -1226,18 +1226,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column never asks the host to name its reservation",
     file: "packages/client/column.tsx",
-    from: '    else if (step.kind === "ask") void p.session.reserve(step.lane)',
-    to: '    else if (step.kind === "ask") void step.lane',
-    suite: "browser",
-    scenario: "page",
-    expect:
-      "a new agent is named before anything is typed, and its lane keeps that name",
-  },
-  {
-    name: "a send leaves out its column's reservation",
-    file: "packages/client/session-view.ts",
-    from: "        reserved: how.reserved ?? null,",
-    to: "        reserved: null,",
+    from: '      void p.session.request({ kind: "reserve", lane: step.lane })',
+    to: "      void step.lane",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1314,8 +1304,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an unqueue is never sent",
     file: "packages/client/session-view.ts",
-    from: '      if (card === undefined || card.place.kind !== "queued") return',
-    to: "      if (card !== undefined) return",
+    from: "      return sendMove(move, how, queuedBy, null)",
+    to: '      return move.from?.kind === "queued" ? Promise.resolve({ kind: "refused", refusal: null }) : sendMove(move, how, queuedBy, null)',
     suite: "host",
     scenario: "cards",
     expect:
@@ -1334,8 +1324,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queued card carries no version of its text",
     file: "packages/client/session-view.ts",
-    from: "      const seen = textVersion(cardText(id))",
-    to: '      const seen = "" && textVersion',
+    from: "        ? stampSeen(planned, textVersion(texts.text(planned.card)))",
+    to: '        ? stampSeen(planned, "")',
     suite: "host",
     scenario: "cards",
     expect:
@@ -1508,7 +1498,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a root is shared only once it is held",
-    file: "packages/client/session-view.ts",
+    file: "packages/client/root-docs.ts",
     from: "      return root === undefined ? undefined : wanted.has(root)",
     to: "      return root === undefined ? undefined : roots.current().has(root)",
     suite: "browser",
@@ -1548,8 +1538,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a swap is written outside this tab's swaps",
     file: "packages/client/session-view.ts",
-    from: "      swaps.gesture(() => writeSlots({ set, clear }))",
-    to: "      writeSlots({ set, clear })",
+    from: "      swaps.gesture(() =>\n        inventory.write(",
+    to: "      void swaps, ((f: () => void) => f())(() =>\n        inventory.write(",
     suite: "browser",
     scenario: "page",
     expect: "with the panel focused, the undo key swaps back",

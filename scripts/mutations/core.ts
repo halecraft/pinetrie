@@ -592,6 +592,30 @@ export const mutations: readonly Mutation[] = [
     expect: "never a last word",
   },
   {
+    name: "a move goes from nowhere",
+    file: core,
+    from: "  from: keyOf(card.place),",
+    to: "  from: null,",
+    command: unit,
+    expect: "a move goes from where the card is",
+  },
+  {
+    name: "an unqueue loses its root",
+    file: core,
+    from: '  kind: "drafting",\n  root: place.root,',
+    to: '  kind: "drafting",\n  root: place.root.slice(1) as RootId,',
+    command: unit,
+    expect: "an unqueue puts a card back where it was queued, in its root",
+  },
+  {
+    name: "a queue takes its card's root over its lane's",
+    file: core,
+    from: "  return lanes.get(lane)?.root ?? own",
+    to: "  return own ?? lanes.get(lane)?.root",
+    command: unit,
+    expect: "a queued card's root is its lane's, else its own",
+  },
+  {
     name: "a shell word keeps its quotes unescaped",
     file: core,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text

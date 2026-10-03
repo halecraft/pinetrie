@@ -71,6 +71,7 @@ const card = (id: typeof C1, place: CardPlace): CardRecord => ({
 const facts = (over: Partial<CardFacts> = {}): CardFacts => ({
   cards: [],
   lanes: [],
+  laneRecords: new Map(),
   me: ADA,
   slots: {},
   selected: 0,
@@ -108,6 +109,8 @@ describe("take (ADR-0048 step 4)", () => {
         kind: "moveCard",
         move,
         how: { actedAt: { kind: "inventory" }, slot: 4 },
+        queuedBy: null,
+        fly: true,
       },
     ])
     const taken = plan(
@@ -171,6 +174,8 @@ describe("put", () => {
         kind: "moveCard",
         move,
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
+        queuedBy: null,
+        fly: true,
       },
     ])
   })

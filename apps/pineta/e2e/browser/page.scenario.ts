@@ -31,6 +31,7 @@ import {
   idleNow,
   join,
   lanesOf,
+  queueCard,
   rootAt,
   rootRecordsOf,
   suiteModel,
@@ -351,7 +352,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )) ?? ""
       const atReply = `${col(0)} .msg[data-entry="${replyId}"]`
       const other = await join(host, "other", "browser")
-      await other.setName("Bea")
+      await other.request({ kind: "name", name: "Bea" })
       // A fork on purpose, at the agent's reply: `branch`. A branch starts as a
       // conversation, so it is appended with no run.
       await other.chat("an aside", atEntry(entryId(replyId)), {
@@ -739,8 +740,6 @@ async function run(check: Checks["check"]): Promise<void> {
       other.createCard(
         {
           id: again,
-          owner: other.writer,
-          placer: other.writer,
           place: {
             kind: "drafting",
             root: rootAt(other, beaEnd),
@@ -753,7 +752,7 @@ async function run(check: Checks["check"]): Promise<void> {
         "@agent Bea again",
       )
       if (beaLane !== undefined)
-        other.queueCard(again, { lane: beaLane, at: beaEnd })
+        void queueCard(other, again, { lane: beaLane, at: beaEnd })
       // Hers is queued first: a mutant that draws no queued card fails at
       // the check below, not here.
       await waitFor(
@@ -977,14 +976,14 @@ async function run(check: Checks["check"]): Promise<void> {
       // The page's person, from another device: its rename reaches this one's
       // storage too. Set back, so the checks below see "Ada Lovelace".
       const adaElsewhere = await join(host, "ada", "browser")
-      await adaElsewhere.setName("Ada L")
+      await adaElsewhere.request({ kind: "name", name: "Ada L" })
       const followed = await waitFor(
         async () =>
           (await shownName(page)) === "Ada L" &&
           (await storedName(page)) === "Ada L",
         15_000,
       )
-      await adaElsewhere.setName("Ada Lovelace")
+      await adaElsewhere.request({ kind: "name", name: "Ada Lovelace" })
       await waitFor(
         async () => (await shownName(page)) === "Ada Lovelace",
         15_000,
@@ -1189,7 +1188,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
       // 2. A root someone else starts opens no tab here (ADR-0030).
       const api = await join(host, "tabs", "browser")
-      await api.setName("Bea")
+      await api.request({ kind: "name", name: "Bea" })
       const third = await api.chat("a third thread", ROOT, { mode: "branch" })
       const thirdRoot = third.kind === "appended" ? third.id : entryId("")
       await countIsHosts(page)
@@ -3016,7 +3015,11 @@ async function run(check: Checks["check"]): Promise<void> {
         "a reload keeps the tab you were on",
         (await selectedRoot(page)) === downRoot,
       )
-      await api.archive("archive", entryId(downRoot))
+      await api.request({
+        kind: "archive",
+        action: "archive",
+        root: entryId(downRoot),
+      })
       await page.reload({ waitUntil: "domcontentloaded" })
       await page
         .waitForFunction(

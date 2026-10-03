@@ -89,7 +89,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     },
   })
   const wu = await join(wh, "uma", "lanes")
-  await wu.setName("Uma")
+  await wu.request({ kind: "name", name: "Uma" })
   const tree = () => treeOf(wh)
   const idle = async () => {
     await waitFor(() => idleNow(wh), 180_000)
@@ -474,7 +474,8 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         inLaneQuiet(atOnce.name, "ps -eo args").includes("sleep 78.2"),
       60_000,
     )
-    if (atOnce !== undefined) await wu.stop(atOnce.name)
+    if (atOnce !== undefined)
+      await wu.request({ kind: "stop", lane: atOnce.name })
     await idle()
     const left =
       atOnce === undefined
@@ -1070,7 +1071,12 @@ async function mainSection(check: Checks["check"]): Promise<void> {
             "commit_id",
           ) !== "",
       )
-    if (rootOne !== null) await wu.archive("archive", entryId(rootOne))
+    if (rootOne !== null)
+      await wu.request({
+        kind: "archive",
+        action: "archive",
+        root: entryId(rootOne),
+      })
     await wh.quiet()
     const kept = before.filter(r =>
       existsSync(path.join(snapshots, `${r.snapshot}.img`)),
@@ -1096,7 +1102,12 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         offeredInRootOne.every(lane => !readOffers(wh.session).has(lane)),
       `${JSON.stringify({ offered: offeredInRootOne, left: offerBookmarks() })}`,
     )
-    if (rootOne !== null) await wu.archive("restore", entryId(rootOne))
+    if (rootOne !== null)
+      await wu.request({
+        kind: "archive",
+        action: "restore",
+        root: entryId(rootOne),
+      })
     const rebuilt = await waitFor(
       () =>
         offeredInRootOne.length > 0 &&

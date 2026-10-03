@@ -19,10 +19,12 @@ import {
   join,
   laneNamesOf,
   lanesOf,
+  queueCard,
   refusedWrite,
   rootAt,
   tipIn,
   treeOf,
+  unqueueCard,
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
@@ -50,7 +52,10 @@ async function run(check: Checks["check"]): Promise<void> {
     let ch = await open()
     const ada = await join(ch, "ada", "cards")
     const bea = await join(ch, "bea", "cards")
-    await Promise.all([ada.setName("Ada"), bea.setName("Bea")])
+    await Promise.all([
+      ada.request({ kind: "name", name: "Ada" }),
+      bea.request({ kind: "name", name: "Bea" }),
+    ])
     const tipOf = () => {
       const l = laneNamesOf(ch)[0]
       return l === undefined ? null : tipIn(ch, l)
@@ -73,8 +78,6 @@ async function run(check: Checks["check"]): Promise<void> {
       who.createCard(
         {
           id,
-          owner: who.writer,
-          placer: who.writer,
           place: drafting(end),
           command: null,
           unsent: null,
@@ -201,9 +204,9 @@ async function run(check: Checks["check"]): Promise<void> {
     ada.cardText(c3).text.insert(13, " is ready")
     const c5 = newCard(ada, busyEnd, "@Bea never mind")
     await waitFor(() => ch.cardText(c5) === "@Bea never mind", 5_000)
-    ada.queueCard(c5, { lane, at: at(busyEnd) })
+    void queueCard(ada, c5, { lane, at: at(busyEnd) })
     await waitFor(() => onHost(c5)?.place.kind === "queued", 5_000)
-    ada.unqueueCard(c5, { lane, by: ada.writer })
+    void unqueueCard(ada, c5)
     await waitFor(
       () =>
         onHost(c5)?.place.kind === "drafting" &&
@@ -244,7 +247,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // record can reach the host before its text (S96), and the take waits.
     const idleEnd = tipOf()
     const c6 = newCard(ada, idleEnd, "@Bea while it is quiet")
-    ada.queueCard(c6, { lane, at: at(idleEnd) })
+    void queueCard(ada, c6, { lane, at: at(idleEnd) })
     const taken = await waitFor(
       () =>
         Object.values(treeOf(ch).entries).some(
@@ -267,11 +270,13 @@ async function run(check: Checks["check"]): Promise<void> {
     const quickEnd = tipOf()
     const c7 = newCard(ada, quickEnd, "@Bea too quick")
     await waitFor(() => ch.cardText(c7) === "@Bea too quick", 5_000)
-    ada.queueCard(c7, { lane, at: at(quickEnd) })
-    ada.unqueueCard(c7, { lane, by: ada.writer })
+    void queueCard(ada, c7, { lane, at: at(quickEnd) })
+    void unqueueCard(ada, c7)
     const told = await waitFor(
       () =>
-        ada.refusals.current().some(r => r.card === c7 && r.code === "gone"),
+        ada.moves
+          .current()
+          .refusals.some(r => r.card === c7 && r.code === "gone"),
       5_000,
     )
     await ch.quiet()
@@ -425,8 +430,6 @@ async function run(check: Checks["check"]): Promise<void> {
       void ada.createCard(
         {
           id,
-          owner: ada.writer,
-          placer: ada.writer,
           place: keeping,
           command: null,
           unsent: null,
@@ -487,8 +490,6 @@ async function run(check: Checks["check"]): Promise<void> {
           ada.createCard(
             {
               id: cardId(crypto.randomUUID()),
-              owner: ada.writer,
-              placer: ada.writer,
               place: mine,
               command: null,
               unsent: null,

@@ -18,8 +18,8 @@ import type { Pending, Prefill } from "./columns.ts"
 import type { ColumnAct, Intent } from "./intent.ts"
 import { nameFor } from "./presence.tsx"
 import { dropProps } from "./put-target.ts"
-import type { Reader } from "./send.ts"
-import type { ColumnHow, SessionClient } from "./session-view.ts"
+import type { ColumnHow, Reader } from "./send.ts"
+import type { SessionClient } from "./session-view.ts"
 import { useTypingAt } from "./use-presence.ts"
 
 /**

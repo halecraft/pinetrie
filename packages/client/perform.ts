@@ -12,21 +12,16 @@ export interface AppPorts {
   readonly dispatch: (action: LayoutAction) => void
   readonly session: Pick<
     SessionClient,
-    | "archive"
+    | "request"
+    | "offer"
     | "mark"
-    | "discardCard"
-    | "setName"
     | "createCard"
-    | "queueCard"
-    | "unqueueCard"
     | "moveCard"
     | "moveCards"
     | "undoMoves"
     | "swapSlots"
     | "undoSwap"
     | "refuse"
-    | "setCommand"
-    | "offer"
   >
   /** The inventory panel: opened (briefly, for a take's flight), and its selection. */
   readonly inventory: {
@@ -63,40 +58,26 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "layout":
       ports.dispatch(effect.action)
       return
-    case "archive":
-      void ports.session.archive("archive", effect.root)
+    case "request":
+      void ports.session.request(effect.intent)
+      return
+    case "offer":
+      void ports.session.offer(effect.lane, effect.action, effect.to)
       return
     case "restore":
       void ports.session
-        .archive("restore", effect.root)
+        .request({ kind: "archive", action: "restore", root: effect.root })
         .then(outcome => perform(afterRestore(outcome, effect.root), ports))
       return
     case "mark":
       void ports.session.mark(effect.root, effect.title)
       return
-    case "discardCard":
-      ports.session.discardCard(effect.card, effect.how)
-      return
     case "createCard":
       void ports.session.createCard(effect.card, effect.text, effect.how)
       return
-    case "queueCard":
-      ports.session.queueCard(
-        effect.card,
-        { lane: effect.lane, at: effect.at },
-        effect.how,
-      )
-      return
-    case "unqueueCard":
-      ports.session.unqueueCard(
-        effect.card,
-        { lane: effect.lane, by: effect.by },
-        effect.how,
-      )
-      return
     case "moveCard":
-      ports.fly(effect.move.card)
-      void ports.session.moveCard(effect.move, effect.how)
+      if (effect.fly) ports.fly(effect.move.card)
+      void ports.session.moveCard(effect.move, effect.how, effect.queuedBy)
       return
     case "swapSlots":
       ports.session.swapSlots(effect.a, effect.b)
@@ -124,12 +105,6 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "select":
       ports.inventory.select(effect.slot)
       return
-    case "setCommand":
-      ports.session.setCommand(effect.card, effect.command)
-      return
-    case "offer":
-      void ports.session.offer(effect.lane, effect.action, effect.to)
-      return
     case "openFold":
       ports.openFold(effect.ask)
       return
@@ -144,9 +119,6 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "armFocus":
       ports.arm(effect.key)
-      return
-    case "setName":
-      void ports.session.setName(effect.name)
       return
     case "storeIdentity":
       ports.identity.save(effect.identity)

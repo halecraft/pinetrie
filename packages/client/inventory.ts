@@ -20,6 +20,12 @@ import {
 /** Slot index ("0"–"17", reading order) to card. */
 export type Slots = Readonly<Record<string, CardId>>
 
+/** What to write to the slots: cards into slots, and slots to clear. */
+export interface SlotWrites {
+  readonly set: Readonly<Record<string, CardId>>
+  readonly clear: readonly string[]
+}
+
 /** Card to the slot this tab's take in flight chose for it. */
 export type Intents = ReadonlyMap<CardId, number>
 
@@ -103,10 +109,7 @@ export function planSlots(
   slots: Slots,
   intents: Intents,
   steady: (card: CardId) => boolean,
-): {
-  readonly set: Readonly<Record<string, CardId>>
-  readonly clear: readonly string[]
-} {
+): SlotWrites {
   const settled = settleSlots(held, slots, intents)
   const chosen = new Set([...intents.values()].map(String))
   const isHeld = new Set(held)
@@ -177,14 +180,59 @@ export function takeWrites(
   slots: Slots,
   card: CardId,
   slot: number,
-): {
-  readonly set: Readonly<Record<string, CardId>>
-  readonly clear: readonly string[]
-} {
+): SlotWrites {
   const clear = Object.entries(slots)
     .filter(([s, c]) => c === card && s !== String(slot))
     .map(([s]) => s)
   return { set: { [String(slot)]: card }, clear }
+}
+
+/**
+ * The slots a swap writes: `cards[0]` into `a` and `cards[1]` into `b`, a
+ * null one clearing its slot. It reads no slots, so it writes exactly what
+ * the swap's history entry records.
+ */
+export function swapWrites(
+  a: number,
+  b: number,
+  cards: readonly [CardId | null, CardId | null],
+): SlotWrites {
+  const set: Record<string, CardId> = {}
+  const clear: string[] = []
+  for (const [slot, card] of [
+    [a, cards[0]],
+    [b, cards[1]],
+  ] as const)
+    if (card === null) clear.push(String(slot))
+    else set[String(slot)] = card
+  return { set, clear }
+}
+
+/**
+ * One repair at `now`: which cards are steady (`steadiness`), the writes
+ * that settle the slots for them (`planSlots`), the memory to keep, and
+ * when to repair again (null: every card is steady).
+ */
+export function repairStep(
+  memory: HeldSince,
+  input: {
+    readonly held: readonly CardId[]
+    readonly stored: Slots
+    readonly intents: Intents
+    readonly now: number
+  },
+): {
+  readonly memory: HeldSince
+  readonly wake: number | null
+  readonly writes: SlotWrites
+} {
+  const { held, stored, intents, now } = input
+  const step = steadiness(memory, held, stored, now)
+  return {
+    memory: step.memory,
+    wake: step.wake,
+    writes: planSlots(held, stored, intents, step.steady),
+  }
 }
 
 /** The cards the host says are in `me`'s inventory. */

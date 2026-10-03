@@ -11,11 +11,16 @@ import {
   type ActedAt,
   answerOf,
   intentsOf,
+  type LocalState,
+  localStep,
   type MovesEvent,
   type MovesState,
   movesStep,
   NO_MOVES,
   type Pending,
+  pendingOf,
+  slotOnAccept,
+  stampSeen,
   withPending,
 } from "./card-moves.ts"
 import { TEST_ROOT } from "./fixtures.ts"
@@ -318,5 +323,56 @@ describe("intentsOf", () => {
     expect(intentsOf(run([accepted("m-1", 5), changed(5)], s))).toEqual(
       new Map([[cardId("c-2"), 7]]),
     )
+  })
+})
+
+describe("a move's decisions, before and after it is sent", () => {
+  const inventory = { kind: "inventory", holder: ME } as const
+  const take = pendingOf(
+    "m-1",
+    { card: C1, from: drafting, to: inventory },
+    { actedAt: { kind: "inventory" }, slot: 4 },
+    null,
+  )
+
+  test("an accepted take writes its slot; refused, or with no slot, nothing", () => {
+    const yes = { kind: "accepted", rev: 2 } as const
+    expect(slotOnAccept(take, yes)).toEqual({ card: C1, slot: 4 })
+    expect(slotOnAccept(take, { kind: "refused", refusal: null })).toBeNull()
+    expect(slotOnAccept({ ...take, slot: null }, yes)).toBeNull()
+    expect(slotOnAccept(queueIt, yes)).toBeNull()
+  })
+
+  test("a queue carries the text's version as sent; any other move is left alone", () => {
+    const move = { card: C1, from: drafting, to: queuedKey }
+    expect(stampSeen(move, "v9").to).toEqual({ ...queuedKey, seen: "v9" })
+    const out = { card: C1, from: drafting, to: null }
+    expect(stampSeen(out, "v9")).toBe(out)
+  })
+})
+
+describe("records, moves and cards, in one step", () => {
+  const host = [card()]
+  const start: LocalState = { records: host, moves: NO_MOVES, cards: host }
+
+  test("new records move the rev and the drawn cards together", () => {
+    const sentState = localStep(start, sent(queueIt), ME)
+    expect(placeOf(sentState.cards)).toBe("queued")
+    const queued = [card({ place: { ...queuedKey, order: "a", by: ME } })]
+    const after = localStep(
+      localStep(sentState, accepted("m-1", 3), ME),
+      { kind: "records", records: queued, rev: 3 },
+      ME,
+    )
+    expect(after.moves.rev).toBe(3)
+    expect(after.moves.pending).toEqual([])
+    expect(after.cards).toBe(queued)
+  })
+
+  test("a step that changes nothing gives the same state", () => {
+    expect(localStep(start, { kind: "hostLeft" }, ME)).toBe(start)
+    expect(
+      localStep(start, { kind: "records", records: host, rev: 0 }, ME),
+    ).toBe(start)
   })
 })

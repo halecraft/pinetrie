@@ -70,7 +70,10 @@ async function run(check: Checks["check"]): Promise<void> {
       // prompt.
       const alice = await join(host, "alice", "chat")
       const bob = await join(host, "bob", "chat")
-      await Promise.all([alice.setName("Alice"), bob.setName("Bob")])
+      await Promise.all([
+        alice.request({ kind: "name", name: "Alice" }),
+        bob.request({ kind: "name", name: "Bob" }),
+      ])
       const plum = await alice.chat("the secret word is PLUM", ROOT, START_CHAT)
       const one = await bob.chat(
         "one",

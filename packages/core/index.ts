@@ -1318,6 +1318,40 @@ export interface Move {
   readonly to: PlaceKey | null
 }
 
+/** `card`'s move from where it is now to `to`; `to` null removes it. */
+export const moveOf = (card: CardRecord, to: PlaceKey | null): Move => ({
+  card: card.id,
+  from: keyOf(card.place),
+  to,
+})
+
+/** Where an unqueue puts a queued card back: drafting where it was queued. */
+export const draftingOf = (
+  place: Extract<CardPlace, { kind: "queued" }>,
+): PlaceKey => ({
+  kind: "drafting",
+  root: place.root,
+  at: place.at,
+  lane: place.lane,
+})
+
+/**
+ * The root a card queued on `lane` takes: its lane's, since the host takes
+ * it into a chat there (ADR-0063); else, for a lane with no record yet, the
+ * root the card drafts or queues in. Undefined for a card at no thread.
+ */
+export function queueRoot(
+  lane: LaneName,
+  card: CardRecord,
+  lanes: ReadonlyMap<LaneName, LaneRecord>,
+): RootId | undefined {
+  const own =
+    card.place.kind === "drafting" || card.place.kind === "queued"
+      ? card.place.root
+      : undefined
+  return lanes.get(lane)?.root ?? own
+}
+
 /** Why the host refused a move (ADR-0059). */
 export type MoveRefusal =
   /** The card is no longer where the sender saw it. */
