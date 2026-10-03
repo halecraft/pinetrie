@@ -35,7 +35,7 @@ wires them.
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
 | `digests.ts` | each ask's digest (ADR-0056), when the user config turns them on |
 | `outside.ts` | `requestOutside`: a model request outside the serial executor, its answer written inside it |
-| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue`, `basics` |
+| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue`, `applyWrites`, `writesOf`, `basics` |
 
 ## One serial executor
 

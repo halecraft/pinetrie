@@ -93,8 +93,8 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 1401/1401 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 889 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 1463/1463 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 895 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
 | end-to-end | `pnpm run e2e` | 12 scenarios, 40 checks, on the scripted model (S67) |
 | with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
