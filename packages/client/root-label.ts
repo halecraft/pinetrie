@@ -18,14 +18,29 @@ const withEntries = (directory: ReadonlyMap<RootId, RootRecord>) =>
     r.entry === null ? [] : [{ ...r, entry: r.entry }],
   )
 
-/** Every root's messages, summed from the directory (ADR-0063). */
-export const messagesIn = (
-  directory: ReadonlyMap<RootId, RootRecord>,
-): number => {
-  let n = 0
-  for (const r of directory.values()) n += r.messages
-  return n
+/** The header's count: messages in the roots this tab holds, of every root's. */
+export interface MessageCount {
+  readonly held: number
+  readonly total: number
 }
+
+/** Summed from the directory (ADR-0063), so a root not held counts in `total`. */
+export const messageCount = (
+  directory: ReadonlyMap<RootId, RootRecord>,
+  held: ReadonlySet<RootId>,
+): MessageCount => {
+  let total = 0
+  let inHeld = 0
+  for (const r of directory.values()) {
+    total += r.messages
+    if (held.has(r.root)) inHeld += r.messages
+  }
+  return { held: inHeld, total }
+}
+
+/** The header count's tooltip. */
+export const messageCountTitle = ({ held, total }: MessageCount): string =>
+  `${held} in the threads this tab has loaded, of ${total} in the session`
 
 /**
  * Every root with a message, ascending by its root entry, as the tabs and

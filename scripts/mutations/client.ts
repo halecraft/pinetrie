@@ -1157,6 +1157,14 @@ export const mutations: readonly Mutation[] = [
     expect: "a titled root is called by its title",
   },
   {
+    name: "the header counts every root as held",
+    file: "packages/client/root-label.ts",
+    from: "    if (held.has(r.root)) inHeld += r.messages",
+    to: "    inHeld += r.messages",
+    command: unit,
+    expect: "the header's count: the held roots' messages, of every root's",
+  },
+  {
     name: "the Archive search ignores labels",
     file: "packages/client/archive-rows.ts",
     from: '    (input.labels.get(root) ?? "").toLowerCase().includes(needle)',

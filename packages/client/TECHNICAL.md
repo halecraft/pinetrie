@@ -23,7 +23,7 @@ written by this client, and kept on its thread.
 - **Every cross-root fact comes from the directory** (`readRoots`): the tab
   bar's labels and summaries (`summariesOf`, `firstLinesOf`, `labelsOf`), the
   Archive tab's rows, `prune`'s known roots, the inbox's mentions, the
-  header's count (`messagesIn`), the participants (`participantsIn`), the
+  header's count (`messageCount`: the held roots' messages, of every root's), the participants (`participantsIn`), the
   roots of the header's runs and offers (`runsHere`, `laneRootsOf`), and the
   root of a card drafted in a root not held (`cardMarks`'s `rootEntries`).
   The Archive tab searches labels: a search of every message would hold

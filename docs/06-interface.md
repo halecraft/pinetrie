@@ -56,6 +56,10 @@ This document fixes the design before any code. It draws E and T directly.
 Your tabs are your view; the header shows what is happening in the rest of
 the session, from live data only, as a document editor shows the people in it.
 
+- **Messages, M of N** (under the title): M is the messages in the threads
+  this browser tab has loaded (your open tabs, and the Archive tab's
+  preview), N every thread's, archived or not. Opening or closing a tab
+  moves M; archiving a thread moves neither, unless its tab was open.
 - **People here:** an avatar per person with a live presence entry, in their
   colour. Hovering names them and the thread they are in; a click opens that
   thread as your tab, with a column on their path. You are never shown among

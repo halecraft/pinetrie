@@ -106,7 +106,8 @@ import { columnLandmarks } from "./rail-view.ts"
 import {
   firstLinesOf,
   labelsOf,
-  messagesIn,
+  messageCount,
+  messageCountTitle,
   NO_TEXT,
   summariesOf,
 } from "./root-label.ts"
@@ -331,8 +332,12 @@ export function App({
     () => participantsIn(nameOf, index, directory),
     [nameOf, index, directory],
   )
-  // Every root's messages, from the directory: the session's size, held or not.
-  const count = useMemo(() => messagesIn(directory), [directory])
+  // The messages in the roots this tab holds, of every root's: both from the
+  // directory, so a held root still arriving counts as it will.
+  const count = useMemo(
+    () => messageCount(directory, new Set(roots.keys())),
+    [directory, roots],
+  )
   // The agent's runs and each lane's root, in every root, held or not
   // (ADR-0063): what the header lists.
   const rootEntries = useMemo(() => rootEntriesOf(directory), [directory])
@@ -923,7 +928,11 @@ export function App({
         <div className="header-left">
           <h1>pineta</h1>
           <div className="meta">
-            messages <span id="count">{count}</span> ·{" "}
+            <span title={messageCountTitle(count)}>
+              messages <span id="held">{count.held}</span> of{" "}
+              <span id="count">{count.total}</span>
+            </span>{" "}
+            ·{" "}
             <span id="status">
               {status === "pending" ? "syncing…" : "connected"}
             </span>

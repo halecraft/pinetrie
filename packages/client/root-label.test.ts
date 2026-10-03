@@ -3,7 +3,8 @@ import { describe, expect, test } from "vitest"
 import {
   firstLinesOf,
   labelsOf,
-  messagesIn,
+  messageCount,
+  messageCountTitle,
   planTitle,
   renameKey,
   summariesOf,
@@ -44,8 +45,21 @@ describe("labels and summaries, from the directory (ADR-0063)", () => {
     )
   })
 
-  test("the session's messages: every root's, held or not", () => {
-    expect(messagesIn(directory)).toBe(4)
+  test("the header's count: the held roots' messages, of every root's", () => {
+    expect(messageCount(directory, new Set())).toEqual({ held: 0, total: 4 })
+    expect(messageCount(directory, new Set([rootIdFor("2")]))).toEqual({
+      held: 2,
+      total: 4,
+    })
+  })
+
+  test.each([
+    [
+      { held: 2, total: 4 },
+      "2 in the threads this tab has loaded, of 4 in the session",
+    ],
+  ])("messageCountTitle(%o)", (count, words) => {
+    expect(messageCountTitle(count)).toBe(words)
   })
 
   test("summaries: each root with a message, by its root entry", () => {
