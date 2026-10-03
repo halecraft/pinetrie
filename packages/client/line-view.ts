@@ -3,8 +3,9 @@
 // (`lineView`) and worded in one function (`lineWords`).
 
 import type { LineAction, LineRecord, ProjectRecord } from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
+import type { LineActing } from "./acting.ts"
 import type { Intent } from "./intent.ts"
+import { outcomeWords } from "./outcome-words.ts"
 
 /**
  * What the project's menu may offer: a `line` command, or "resolve with the
@@ -189,17 +190,25 @@ export function lineWords(view: LineView): LineWords {
   }
 }
 
+/** What a line command in flight says, until the host answers. */
+const LINE_SENDING: Record<LineAction, string> = {
+  setup: "setting up the project…",
+  land: "adding your work to the project…",
+  follow: "updating your files…",
+}
+
 /**
- * What the project's menu says after one of its commands: why it was
- * refused, or that it failed (the host may have done part of it); nothing
- * once it was carried out, since the record then says how things stand.
+ * What the project's menu says of your last command there: what it is doing
+ * until the host answers, then why it was refused or that it failed
+ * (`outcomeWords`); nothing once it was carried out, since the record then
+ * says how things stand.
  */
-export const lineOutcomeWords = (outcome: Outcome): string | null =>
-  outcome.kind === "refused"
-    ? `not done: ${outcome.message}`
-    : outcome.kind === "failed"
-      ? `it failed, and may be part done: ${outcome.message}`
-      : null
+export const lineNote = (acting: LineActing | null): string | null =>
+  acting === null
+    ? null
+    : acting.kind === "sent"
+      ? LINE_SENDING[acting.action]
+      : outcomeWords(acting)
 
 /**
  * "Resolve with the agent" (ADR-0061): a new agent tab whose thread works in

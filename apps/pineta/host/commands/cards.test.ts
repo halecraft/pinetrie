@@ -68,7 +68,7 @@ function setUp() {
   return { b, cards, drains, commands, put }
 }
 
-describe("moves on the host's Serial: the take and an unqueue in either order (ADR-0059)", () => {
+describe("moves on the documents' keeper: the take and an unqueue in either order (ADR-0059)", () => {
   test("a queue on an idle lane asks for its drain, and answers with the rev of its write", async () => {
     const { b, drains, commands, put } = setUp()
     put()

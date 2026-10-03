@@ -3,11 +3,13 @@
 // what the tabs, the Archive tab, the inbox and the image sweep read of a
 // root follows it without any of them opening it.
 //
-// A change queues one refresh per root on the host's `Serial`; changes
-// before it starts are absorbed by it. The refresh gathers the root's
-// document (`readRootRecord`), and writes only a record that changed
-// (`setIfChanged`), so a change to anything the record does not show writes
-// nothing.
+// A change queues one refresh per root, the documents' keeper's `once`
+// (`root:<id>`): changes before it starts are absorbed by it. The refresh
+// gathers the root's document (`readRootRecord`), and writes only a record
+// that changed (`setIfChanged`), so a change to anything the record does not
+// show writes nothing. A compaction is the keeper's `later`, so it runs after
+// every refresh queued before it starts, and the records it compacts are
+// current.
 
 import { subscribe } from "@kyneta/schema"
 import type { RootId } from "@pineta/core"
@@ -15,30 +17,22 @@ import { ROOT, setIfChanged } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readRootRecord, readRoots } from "@pineta/reads"
 import type { RootDocHandle } from "@pineta/schema"
-import { type Basics, failed } from "./basics.ts"
-import type { Serial } from "./queue.ts"
+import { type Basics, failed, type HostKeeper } from "./basics.ts"
 
 export interface Directory {
   /** Follow `root`'s document: called once, as the host opens it. */
   watch(root: RootId, doc: RootDocHandle): void
-  /** Refresh `root`'s record, as one step queued on the host's `Serial`. */
+  /** Refresh `root`'s record: one `once` step per root on the keeper. */
   refresh(root: RootId): Promise<void>
-  /**
-   * Write every queued refresh now, inside the caller's step: a compaction
-   * calls this first, so the records it compacts are current, and no refresh
-   * behind it writes again.
-   */
-  flush(): Promise<void>
 }
 
 export function createDirectory(deps: {
   readonly basics: Pick<Basics, "session" | "docs" | "log">
-  readonly serial: Serial
+  readonly keeper: HostKeeper
   /** Read lazily: the agent is made after the documents are opened. */
   readonly agent: () => Pick<Agent, "writeValues">
 }): Directory {
-  const { basics, serial } = deps
-  const queued = new Set<RootId>()
+  const { basics, keeper } = deps
 
   async function write(root: RootId): Promise<void> {
     const view = basics.docs.view(root)
@@ -52,17 +46,11 @@ export function createDirectory(deps: {
     if (writes.length > 0) await deps.agent().writeValues(writes)
   }
 
-  const refresh = (root: RootId): Promise<void> => {
-    if (queued.has(root)) return Promise.resolve()
-    queued.add(root)
-    return serial
-      .run(async () => {
-        // Flushed already, by a compaction's step.
-        if (!queued.delete(root)) return
-        await write(root)
-      })
-      .catch(failed(basics, "refreshing a root's record"))
-  }
+  // A failure is logged inside the step, once, however many changes it covered.
+  const refresh = (root: RootId): Promise<void> =>
+    keeper.once(`root:${root}`, () =>
+      write(root).catch(failed(basics, "refreshing a root's record")),
+    )
 
   return {
     watch(root, doc) {
@@ -71,10 +59,5 @@ export function createDirectory(deps: {
       subscribe(doc.values, changed)
     },
     refresh,
-    async flush() {
-      const roots = [...queued]
-      queued.clear()
-      for (const root of roots) await write(root)
-    },
   }
 }

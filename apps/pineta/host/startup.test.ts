@@ -9,6 +9,7 @@ import {
   runId,
   writerId,
 } from "@pineta/core"
+import { createKeeper } from "@pineta/keeper"
 import {
   deleteRecord,
   encodeCard,
@@ -20,7 +21,6 @@ import { readPlaces, readPlacesRev } from "@pineta/reads"
 import { newPlacesDoc, writeLaneTip } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { basics, putValue, ROOT_ID, record, writesOf } from "./fakes.ts"
-import { createSerial } from "./queue.ts"
 import { recover, type StartupDeps } from "./startup.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -41,7 +41,7 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
   agent: agentPort().port,
   work: record<StartupDeps["work"]>({ project: null }).port,
   ensureNames: async () => {},
-  serial: createSerial(),
+  keeper: createKeeper(),
   start: () => runId("r-1"),
   settle: async () => {},
   cards: record<StartupDeps["cards"]>({

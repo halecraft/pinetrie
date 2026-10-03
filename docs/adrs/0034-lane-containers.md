@@ -3,7 +3,8 @@
 **Status:** Accepted. Implemented by `PLAN-2026-09-28-lane-containers`.
 Evidence: S38, S39, S40, S41, S42, S43, S44. **Amended by ADR-0038
 (proposed):** work reaches your repo as an offer, and a lane's history as
-remote bookmarks. **Amended by ADR-0046:** a lane's agent is told what
+remote bookmarks. **Amended by ADR-0065:** a lane's bundle is imported into
+your repo by its owner, as the host's operation. **Amended by ADR-0046:** a lane's agent is told what
 holds in every lane, and no port proxy is built. Amends ADR-0032:
 replaces its jj workspace per lane, the rewrite of the history the model is
 sent, the refusal of other lanes' paths, and dependency setup. Keeps its turn

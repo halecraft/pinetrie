@@ -13,11 +13,10 @@ wires them.
 | `index.ts` | `startHost`: the store, the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents, lane work and the agent, then the wiring below |
 | `basics.ts` | `Basics` (the session, `pineta:live`, the documents, the places, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
 | `places.ts` | `applyPlaceStep`: the one writer of the places document (ADR-0059), which raises its `rev` with every write |
-| `queue.ts` | `createSerial`: the one serial executor, which a shutdown closes |
 | `shutdown.ts` | the order a host stops in (`planShutdown`) |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), and the agent's `onStream` (`streamInto`) |
 | `take.ts` | taking a lane's queued cards (ADR-0048): `takeTop`, and `drain`, which sends each through its command (ADR-0055) |
-| `settle.ts` | what happens between runs: drain, then compact and sweep |
+| `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
 | `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pineta:live`), and deleting images nothing shows |
 | `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for; `planLoads` |
 | `directory.ts` | each root's directory record, refreshed as its document changes |
@@ -25,52 +24,65 @@ wires them.
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`) |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
-| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, offer), `cards` (a move, a command, a busy chat's card queued, a sent card spent: ADR-0059); `index.ts` decodes, checks the archive, routes, and sends a taken card behind the same check (`sendTaken`) |
+| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, offer), `cards` (a move, a command, a busy chat's card queued, a sent card spent: ADR-0059); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a taken card behind the same check (`sendTaken`) |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
 | `hot-reload.ts` | Vite's hot updates, held while a direct lane in the project runs |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the image store, the SQLite store |
 | `work/` | lane containers and disks (§ Lane work) |
-| `offers/` | each lane's offer in your repo (§ Offers) |
+| `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers) |
 | `names.ts` | every thread's name (ADR-0039): `ensure` for the lanes pi holds, `reserve` for a lane id a column reserved before its lane exists (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
 | `digests.ts` | each ask's digest (ADR-0056), when the user config turns them on |
-| `outside.ts` | `requestOutside`: a model request outside the serial executor, its answer written inside it |
+| `outside.ts` | `requestOutside`: a model request outside a keeper, its answer written in a step of its own |
 | `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue` and `applyWrites` (each write to the document its target names), `writesOf`, `basics` (one root, `ROOT_ID`, in `fakeDocuments`), `putLane`, `writeDirectory` |
 
-## One serial executor
+## The documents' keeper
 
-- **Every command and drain step is a step on one `Serial`**
-  (`queue.ts`). A step gathers, plans and executes with nothing in between,
-  so its plan is still true when it is carried out: with one host, this is
-  what makes "a late message goes after" and "a busy lane holds" hold. A run
-  is started inside a step and continues outside it, so one long run never
-  blocks another thread's commands.
-- **A failed step never stops the steps behind it.** The tail swallows the
-  failure and reports it (`[host] step failed: …`); the step's own caller
-  still gets the rejection. `@pineta/lanes`' `createQueue` is the opposite: a
-  fatal failure breaks it until `reset`, which a lane's disk needs and a host
-  step must not have.
-- **Voiding `serial.run`'s promise is safe; awaiting it in a voided function
-  is not.** The tail's `.catch` is attached to the very promise `run`
-  returns, so a voided one is handled. An `await` of it inside an async
-  function whose own promise is voided throws there, and that function's
-  promise rejects unhandled, which ends the process. So the command loop
-  (`control.ts`) voids each step: an await there would end a seat's
-  commands at the first one that throws.
-- **A failed drain is logged against its lane** (`settle.ts`), and the
-  settle still drains the other lanes, compacts and sweeps. A throw there
-  would also leave `compactionQueued` set, and no later settle would compact.
-- **A closed `Serial` refuses new steps and finishes the ones it holds.**
-  `run` then rejects with `SerialClosed`, already handled, so voiding it is
-  still safe, and `failed()` logs nothing for it: a refusal during shutdown
-  is expected. A step refused then is lost without harm: a queued card stays
-  queued for the next host, and a refresh or a description runs again at the
-  next trigger.
-- **`RunningHost.quiet()`** is `serial.idle()`, then lane work's `quiet()`,
-  then `exchange.flush()`. The suites await it before they check, so any
-  background promise must be a `serial.run` or `serial.track`, or `quiet`
+- **Every command but your repo's is a step on one keeper**, and so is every
+  drain (`@pineta/keeper`, `packages/keeper/TECHNICAL.md`, keyed by
+  `HostKey` in `basics.ts`). Where a command runs is decided, pure, by
+  `placeOfCommand` (`commands/index.ts`, ADR-0065): an offer action but a
+  split, and a `line` command, go straight to the owner of your repo after
+  the archive gate (a synchronous read), and hold no other command; an
+  archive is three parts (`commands/archive.ts`): its record on the keeper,
+  its teardown (containers, refs through the owner, snapshots) off it,
+  tracked, and its unload on the keeper again, the reply after all three.
+  Between the record and the unload, the gate refuses any write into the
+  root. A split stays one keeper step: it reads the lane and starts a run. A
+  step
+  gathers, plans and executes with nothing in between, so its plan is still
+  true when it is carried out: with one host, this is what makes "a late
+  message goes after" and "a busy lane holds" hold. A run is started inside
+  a step and continues outside it, so one long run never blocks another
+  thread's commands.
+- **What merges by key:** a lane's drain is `once` (`drain:<lane>`), queued
+  by a card's move (`queueDrain`, `index.ts`) and by a settle alike, so one
+  waiting drain covers both, and keeps its place among the commands. A
+  root's directory record is `once` (`root:<id>`). The compaction is
+  `later` ("compact"): it starts only when no command, drain or refresh
+  waits.
+- **A failed step never stops the steps behind it,** and is logged
+  (`[host] step failed: …`); its caller still gets the rejection. A step
+  that waited or ran over a second is logged too (`onSlow`).
+- **One seat's commands run in the order sent, by a chain, not by timing**
+  (`control.ts`). Each is queued on the keeper only once the one before it
+  has replied, so what that one queued is ahead of it: a queue's drain runs
+  before an unqueue sent right behind it (the host suite's `cards`
+  scenario). Different seats' commands go in the order they arrive. The
+  chain is never awaited in the loop, and catches each step's failure, so a
+  command that throws neither ends its seat's commands nor rejects unhandled
+  (`packages/keeper/TECHNICAL.md`, on voiding).
+- **A failed drain is logged against its lane** (`settle.ts`), inside its
+  step, and the settle still drains the other lanes, compacts and sweeps.
+- **A closed keeper refuses new steps and finishes the ones it holds**, and
+  `failed()` logs nothing for its `KeeperClosed`. A step refused then is lost
+  without harm: a queued card stays queued for the next host, and a refresh
+  or a description runs again at the next trigger.
+- **`RunningHost.quiet()`** is the keeper's `idle()`, then lane work's
+  `quiet()`, then `exchange.flush()`. The suites await it before they check,
+  so any background promise must be a keeper step or `track`ed, or `quiet`
   resolves early and the suites turn flaky rather than failing.
 
 ## A run's end
@@ -119,11 +131,12 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   `resolveDoc` interprets a `root:` id the directory names, as an archived
   root a client previews, and rejects any other: only the host makes roots.
 - **The directory follows each root's document** (`directory.ts`): a change
-  to its entries or values queues one `refreshRoot` step, absorbed by one
-  already queued, which writes `readRootRecord` with `setIfChanged`. A
-  settle's compaction first flushes queued refreshes in its own step
-  (`beforeCompact`), so the records it compacts are current and nothing
-  writes after it.
+  to its entries or values queues one refresh, the keeper's `once`
+  (`root:<id>`), absorbed by one already queued, which writes
+  `readRootRecord` with `setIfChanged`. A settle's compaction is `later`, so
+  it runs after every refresh queued before it starts, and the records it
+  compacts are current. A write after a compaction only lands in the next
+  one's log.
 - **A command names its root** (`Command.root`, ADR-0063): a chat or a mark
   writes in it, and a chat at the root starts it, under the id the sender's
   tab minted, refused `root_taken` when the directory holds it already.
@@ -140,7 +153,8 @@ project and commands records that changed in one write (`setIfChanged`),
 the sweep of what no one will type in again: empty cards, card documents
 with no record, and seat records no stored text names, all of them in one
 write (`sweepTexts`), and last `settle` for the lanes with cards queued:
-its compaction then holds every write above.
+its compaction is `later`, so it runs after every write above, and after
+any refresh they queued.
 
 - **Commands are taken only after `recover`.** `Control.listen` is made
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
@@ -150,18 +164,19 @@ its compaction then holds every write above.
   banners are made first and read the agent lazily (`theAgent()`), because
   the agent is made with lane work's `access` and `hooks` and banners'
   `request`. Those are the only lazy reads: every module made after the
-  agent is given the agent. The `Serial` is made before them, for banners.
+  agent is given the agent. The documents' keeper is made before them, for banners.
 
 ## Shutdown
 
 `planShutdown` (`shutdown.ts`) returns the order, and `shutdown()` carries
-it out, each step in its own `try`: `intake` (seats, control), `close` (the host's `Serial` and the offers'), `quiet`, `agent`,
+it out, each step in its own `try`: `intake` (seats, control), `close` (the documents' keeper and the owner of your repo, which stops its watch), `quiet`, `agent`,
 `work` (the containers), `exchange`, `server`.
 
 - **The queues close before `quiet`.** `quiet` waits only for what is queued
-  when it looks. A step started after it (an offer refresh from the 2 s poll
-  or a lane's fetch, a drain from a command) writes to a closing agent and
-  document: its jj steps land and its record is lost (S73).
+  when it looks. A step started after it (an offer refresh marked by an
+  observed move or a lane's fetch, a drain from a command) writes to a
+  closing agent and document: its jj steps land and its record is lost
+  (S73). A watch event after `close` finds the owner closed.
 - **Closing the agent ends running runs.** pi's harness seals every lane, so
   a run's `run` rejects and `runs.ts`' `end` runs its steps: a refresh and a
   `settle`. The closed queues refuse them.
@@ -202,7 +217,7 @@ it out, each step in its own `try`: `intake` (seats, control), `close` (the host
   `rev`; a refusal answers `unmoved` with its code, where the card is now,
   who put it there, and the current `rev`. A move that leaves a card queued
   on a lane that is not running queues the lane's drain, a voided
-  `serial.run` behind the move's own step.
+  `keeper.once` (`drain:<lane>`) behind the move's own step.
 - **Your inventory is a client's document the host only keeps**
   (ADR-0059). `resolveDoc` interprets `inventory:<writer>` as
   `InventoryDoc`; the policy shares it only with the peers whose principal
@@ -226,7 +241,7 @@ it out, each step in its own `try`: `intake` (seats, control), `close` (the host
 
 - **The take is one synchronous step** (`takeTop`): read that the card is
   queued and on top, read its text, remove its record (raising `rev`). A
-  move and a drain are steps on one `Serial`, so an unqueue lands before the
+  move and a drain are steps on one keeper, so an unqueue lands before the
   take or after it, never between: before, the card is not taken; after, the
   unqueue is refused `gone`, and its client says "already sent" (S69).
 - **`drain` loads each queued card's text before the take** (`hydrate`),
@@ -251,8 +266,9 @@ it out, each step in its own `try`: `intake` (seats, control), `close` (the host
   the host failed: the take has deleted its record, so nothing else would.
 - **Three things drain a lane:** a run's end (`settle`), startup
   (`recover`), and a move that leaves a card queued on it while it is not
-  running (`queueDrain` in `index.ts`). A lane's drain is queued once until
-  its step starts; a move while it runs queues one more, which finds what the
+  running (`queueDrain` in `index.ts`). All three are the keeper's `once`
+  (`drain:<lane>`): queued once until its step starts, the same step for
+  all three; a move while it runs queues one more, which finds what the
   running one missed, or nothing. `runs.start` marks a lane
   running at once (`beginRun`), so a drain behind a started run takes
   nothing.
@@ -275,9 +291,9 @@ it out, each step in its own `try`: `intake` (seats, control), `close` (the host
 
 A model request takes seconds, and no command may wait on it. Banners,
 commit messages and digests ask with `requestOutside`: the request runs
-outside the serial executor, tracked so `quiet` waits for it, and its
-answer is written in a step of its own, after that step decides it is still
-wanted (`bannerStillWanted`, the offer's checks, `digestStillWanted`). A
+outside the documents' keeper, tracked so `quiet` waits for it, and its
+answer is written in a step of its own (a keeper step, or for a commit
+message an owner command), after that step decides it is still wanted (`bannerStillWanted`, the offer's checks, `digestStillWanted`). A
 failure is logged, never thrown. With `held`, a key is in a set while the
 request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
@@ -302,9 +318,9 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 ## Banners (`banners.ts`, ADR-0050, ADR-0053)
 
-- **A decision is one `Serial` step**: gather the lane's banner, whether one
+- **A decision is one keeper step**: gather the lane's banner, whether one
   is being made and whether a blob is stored; `bannerDue` or `planAsk`;
-  write a pasted image. A new image is a `serial.track`ed task: the image takes seconds,
+  write a pasted image. A new image is a `keeper.track`ed task: the image takes seconds,
   outside the queue, then the write is a step of its own, only while
   `bannerStillWanted`. A missing `column-banner` skill is logged.
 - **A thread is due one as it is named** (`createNames`' `onNamed`): as a
@@ -335,33 +351,38 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 | module | owns |
 |---|---|
-| `setup.ts` | `Setup`: the project, lane configs and shared directories, the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (read once, lazily: the agent exists only after lane work), and the base snapshot's refreshes |
+| `setup.ts` | `Setup`: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once the line's names are read, before anything else reads your repo), the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (read once, lazily: the agent exists only after lane work), and the base snapshot's refreshes |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
 | `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`), `beforeRun`, `runEnded` |
-| `fetch.ts` | a lane's history into your repo, each lane's fetches on a `Serial` of its own |
+| `fetch.ts` | a lane's history into your repo: the bundle on the lane's queue, the import an owner command (`importLane`) |
 | `turns.ts` | pi's `turnDone`: the turn's revision, snapshot and fetch; the turn records still being written (`pendingRecords`) |
 | `create.ts` | a new lane: `checkDirectory`, its record and name, its fork (`forkFacts` waits for `pendingRecords`) |
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`), and a resolution's outcome, with the guidance flag pi's hook sets |
 | `split.ts` | a split's prompt, and its end (`finishSplit`) |
-| `archive.ts` | a root archived or restored |
+| `archive.ts` | an archive's or a restore's teardown (`planArchive`'s), off the documents' keeper |
 | `disk.ts` | the snapshot on a lane's queue, and the lockfile's hash |
 
 - **State lives where it changes.** What startup found is `Setup`'s, fixed
   after it. Each lane's handle is the registry's. Each coordination set is
   owned by the module that writes it, behind a function: `turns`' pending
-  records, `update`'s guidance flag, `fetch`'s queues.
+  records, `update`'s guidance flag.
 - **One `turns` and one `updates`.** `index.ts` makes each once and builds
   pi's `hooks` from them, so a fork waits on the records this `turnDone`
   adds, and `landingEnded` reads the flag this `askedForGuidance` sets. A
   second instance would have its own set, and the fork would wait on the
   empty one.
 - **The queues a lane's work crosses:** its own `LaneQueue` (the start, a
-  fork, each turn's commit and snapshot, the bundle, the stop and trim); its
-  fetch `Serial` (your repo's fetch, which tools never wait on); the base
-  snapshot's `Serial`; and the offers' queue for your repo.
+  fork, each turn's commit and snapshot, the bundle, the stop and trim); the
+  owner of your repo, for the import (a command, queued as the bundle is
+  made, so a lane's imports keep their order: the fetch forces its ref, and
+  an older bundle imported after a newer one would move it back); and the
+  base snapshot's keeper. Every read of your repo from lane work (an
+  update's line and WIP, a new lane's begin and lockfile, the base
+  snapshot's line, a split's stack) is a pinned read (`owner.read`), which
+  waits on no queue.
 - **An update is one step on the lane's `LaneQueue`** (`updateOnQueue`):
   the lane's base from its own history, the line and the WIP from your
-  repo, `planUpdateFrom`, the edits committed and `mergeUpdate`, so nothing
+  repo (pinned), `planUpdateFrom`, the edits committed and `mergeUpdate`, so nothing
   changes the lane between what is read and what is merged. Then
   `planSettle`, pure, decides what the thread gets, the land message
   included, and `applySettle` writes it. `Settle.fetch` alone decides
@@ -373,27 +394,48 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   comes to, unless a resolution runs: that run's end stops it. A split
   reads its skill before `beforeRun`, so nothing between the lane's start
   and its run can fail.
-- **A lane's `LaneQueue` breaks on a fatal failure and the host's `Serial`s
+- **A lane's `LaneQueue` breaks on a fatal failure and the host's keepers
   do not.** A failed start or fork must stop the lane's tools, which wait on
   its queue; a failed host step must not stop the steps behind it.
 
 ## Offers (`offers/`)
 
-- **One `Serial` for your repo, in `OfferState`,** carries every offer
-  operation, take and read, so no two interleave. A read waits there too,
-  since a jj read can write (S57).
+- **Every offer step runs on the owner of your repo** (`@pineta/repo`,
+  `packages/repo/TECHNICAL.md`, ADR-0065). An offer action, a `line`
+  command, a split's span and its end, and moving lanes' refs are owner
+  commands; a refresh is upkeep, `later("refresh:<lane>")`, and the line's
+  record `later("line")`. So a command waits for at most the one step
+  running, however many refreshes are marked, and a lane marked many times
+  before its refresh starts refreshes once.
+- **What marks a lane** (`planMarks`, pure, from the owner's `onMoved`): a
+  move of the line or a WIP, or the first observation (`all`), marks the
+  line's record, every named lane and every open record; your `@` alone
+  (`yours`, jjui and your editor) marks no lane: one `later("shared")` step
+  rewrites each open record's `yourEdits` (its files that `@` changes) and
+  the line's record from the shared facts; a lane's
+  ref (a fetch's import) marks that lane; an offer bookmark the lane its
+  thread names. A run's end marks its lane, then describes it. A refresh
+  that wrote is observed, and refreshes the lanes it moved once more: that
+  one reads, plans `none`, and writes nothing, so it ends there. The record
+  is only a hint of where to look: it is how an offer you abandoned by hand
+  is built again. A bookmark of yours that no offer depends on moves
+  nothing.
+- **Reads are pinned and never queued:** a page's review or diff
+  (`Offers.read`), a description's gather, and lane work's reads of your
+  repo run at the head the owner last observed (`owner.read`). A take
+  gathers in its own command, unpinned, so it acts on the repo as it is.
 - **Each step carries out a pure plan** (`offers/plan.ts`): `planRefresh`
   (marginalia) picks the branch, `planOfferEffects` says what it runs and
   writes, `offerRecord` builds the record, and `planTake` a take.
   `execute.ts` carries them out over ports (`executeOffer`, `executeTake`).
   So the offers' rules are tested as values, and what a plan makes the host
-  write is tested over `record<T>()`; `packages/lanes/lanes.test.ts` proves
+  write is tested over `record<T>()`; `packages/repo/repo.test.ts` proves
   the jj steps themselves against real jj.
 - `refresh.ts` builds and records, and carries out a refresh; `describe.ts`
-  gathers on the queue (the offer, its diff, your recent messages), asks the
-  model outside it, and writes inside it; `act.ts`,
-  `stack.ts` and `watch.ts` (`planPoll`) are the actions, a split's stack
-  and your jj operations.
+  gathers by a pinned read (the offer, its diff, your recent messages), asks
+  the model outside the owner, one request per lane at a time
+  (`describing`), and writes in an owner command; `act.ts` and `stack.ts`
+  are the actions and a split's stack.
 - **The host decides an offer only from your repo** (ADR-0060), and the
   archive. A refresh gathers with `refreshNow`: for a thread whose root is
   archived, only its offer, read against the line; else `offerNow`'s facts
@@ -404,7 +446,10 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   lane's newest `Pineta-Base`, its target the line's commit or the WIP's,
   its start `startOfOffer`) and the offer itself (`readOffer`). Refresh,
   take, squash, describe and a split's replacement all plan from it.
-  `placeOf` writes the lane's `pineta.base` cache as it reads it.
+  **`placeOf` reads, and writes nothing:** the lane's `pineta.base` cache
+  is among the writes `planOfferEffects` and `planTake` plan
+  (`baseWrites`, `setIfChanged`), so a gather can run pinned, outside the
+  owner's queue. A WIP gone without landing writes only its base record.
   `OfferState` has no record reader: `write` compares with the stored
   record only to skip a write that changes nothing.
 - **A record is written from the repo after each step** (`executeOffer`):
@@ -413,10 +458,16 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   `forget` remove it, and `OfferState.remove` skips a record that is not
   there. A refresh with no place (an archived thread) plans only those two;
   the ports that need a place reject if reached without one.
-- **A root archived or restored moves its lanes' refs on the offers'
-  queue** (`Offers.moveLanes`, called by `work/archive.ts`), then touches
+- **A root archived or restored moves its lanes' refs in an owner
+  command** (`Offers.moveLanes`, called by `work/archive.ts`), then marks
   each lane: an archived thread's offer is withdrawn, a restored one's built
   again (ADR-0061).
+- **A take names the offer it was shown** (`OfferSeen`, ADR-0065): the
+  ledger its record carried, and whether it conflicted, which the page's
+  session client reads from the record as it sends (`offerSeen`). `planTake`
+  refuses `offer_changed` when the ledger now differs (its source, or its
+  start as a set), or the offer conflicts now and did not then. A rebase
+  onto a moved target and your edit keep the ledger, and are taken.
 - **A take names its destination** (`planTake`): one of
   `takeDestinations`, and refused (`bad_destination`) unless the bookmark is
   at or below the offer's bottom's parent, read in the same step. jj's
@@ -427,22 +478,13 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   `@-`, as you; `follow` rebases your work onto the line, as you
   (`planFollow`, ADR-0061), only while the record it plans from has a
   preview (`yours.follow`): the one you were shown. The record's preview
-  runs `git merge-tree` on your repo (a `git` runner beside `ops`). Only a host that admits no one else takes it
+  runs `git merge-tree` on your repo (the step's `git`). Only a host that admits no one else takes it
   (`lineCommands`: no invite key), since all three act on the repo as its owner;
   Kyneta does not say which connection a seat came over. Others are refused
   `not_yours`.
-- **A new jj operation refreshes the line's record** and touches each lane
-  whose offer bookmark is in your repo, and each whose record is open
-  (`planPoll`), so a land or a take moves every offer on the line. The
-  record is only a hint of where to look: it is how an offer you abandoned
-  by hand is built again. The first poll does the same, so a host that just
-  started writes each offer's record from the repo.
-- **`Offers.stop()`** closes the poll and the offers' `Serial`; it is the
-  `close` step of a shutdown. `touch`, `runEnded`, `act` and `stackEnded`
-  need no check of their own: each goes through the closed queue.
-- **A model request gathers on the queue first; only the request is
-  outside** (`requestOutside`): a jj read can write (S57), so `describe`
-  reads your repo in a `serial.run` before it asks.
+- **Shutdown closes the owner** (`LaneWork.owner`, the `close` step): it
+  refuses every step from then on and stops its watch; `quiet` waits for
+  what it holds (`LaneWork.quiet`).
 
 ## Testing the shell
 

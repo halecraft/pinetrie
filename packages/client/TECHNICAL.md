@@ -657,6 +657,26 @@ became of its files (`strip`).
   core's `ThreadBase`, never a bookmark string, and the line's bookmark
   goes only in titles: `offerWords`' button titles ("moves pineta-onto
   forward to pineta-offer/amber-fox"), `behindMark`'s, `baseChoices`'.
+- **A take names the offer this tab shows** (ADR-0065): `SessionClient.offer`
+  reads the lane's record from its session document as it sends, the one
+  the strip was drawn from, and sends `offerSeen` of it (its ledger, and
+  whether it conflicted). The host refuses the take `offer_changed` when the
+  offer now brings other work.
+- **Your offer and line commands are tracked per tab** (`acting.ts`).
+  `SessionClient.offer` and `.line` go through `sendActing`, which marks
+  the command `sent` in the session's `acting` store at once and records
+  the answer when it comes; `nextActing` decides. A refusal or failure
+  stays until your next command on that lane (or the line); an answer that
+  carried it out (`taken`, `offered`, a split's `started`, `line-moved`)
+  clears it, since the record then says how things stand. Each send has an
+  id, so the answer to a send since replaced changes nothing. The page's
+  `offer` effect (`perform.ts`) only calls the session. `columnView` takes
+  the lane's entry as `ColumnFacts.acting`: the strip's `waiting` disables
+  its buttons and menu rows while it is `sent`, and `offerWords` words it
+  as the strip's `note` (`.offer-note`, `role="status"`, `data-acting`
+  `sent` or `said`). A take in flight names its destination by
+  `baseName`; a refusal or failure is `outcomeWords`, shared with the
+  project menu.
 - **`offerView` (`@pineta/marginalia`) decides an offer; `offerWords`
   words it**: its line and each button's label and title, by state. An
   offer that conflicts says so even when it is `edited` (S73), and its take
@@ -687,8 +707,11 @@ became of its files (`strip`).
   has conflicts, "update my files" only with a preview, "add my work to the
   project (N commits)". The first is no `line` command: `resolveIntent`
   opens a new agent tab whose `Prefill` carries its text and its work
-  setting (your files), which the editor starts its choice from. A refused
-  or failed command is said at the top of the notes (`lineOutcomeWords`).
+  setting (your files), which the editor starts its choice from. Your last
+  command is said at the top of the notes (`lineNote`), from the session's
+  `acting` store, not the menu's state, so it outlives the menu closing:
+  what it is doing while out (its actions are disabled), then a refusal or
+  failure (`outcomeWords`).
   A host that admits others offers none, and says to use jj on its machine.
 - **The header's clicks are `openAt` intents** (`planOpen`), which reveal
   the entry in whichever column shows it. A column's lane may have

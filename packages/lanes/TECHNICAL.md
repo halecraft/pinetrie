@@ -1,11 +1,15 @@
 # `@pineta/lanes`: technical notes
 
-This package covers a lane's Linux container on its own disk, and the jj and
-git run in it and in your repo (ADR-0032 to ADR-0034, ADR-0038). It is the one
-package that runs `container`, `jj`, `git` and `cp`. It declares only
-`@pineta/core` (`workspace.test.ts`), and the client may not depend on it. It
-never imports pi (ADR-0003): the channel into a lane is `packages/pi`'s, and
-the host hands it in as an `OpenLink`.
+This package covers a lane's Linux container and its disk, and jj and git in
+it (ADR-0032 to ADR-0034). Your repo is `@pineta/repo`'s
+(`packages/repo/TECHNICAL.md`), which builds on this package: what a lane
+also runs, through a `Runner` it is given, is here (`laneBase`,
+`REVISION_READ`, `commitsOf`), and so are the names both sides use
+(`bookmarkName`, `laneTipName`, `offerBookmark`, `DEFAULT_LINE`). This
+package never imports `@pineta/repo`. It declares only `@pineta/core`
+(`workspace.test.ts`), and the client may not depend on it. It never imports
+pi (ADR-0003): the channel into a lane is `packages/pi`'s, and the host hands
+it in as an `OpenLink`.
 
 The evidence is in `docs/findings/`: S36 for the jj rules, S39 to S44 for
 containers, disks and the helper.
@@ -13,19 +17,21 @@ containers, disks and the helper.
 ## Where things are
 
 - `plan.ts`: every decision, pure. It covers the container's arguments,
-  grants, link mounts, fork, turn, fetch and base steps, the images and
-  their tags (`planImages`), what the host finds at startup, and every jj
-  step on an offer in your repo.
+  grants, link mounts, fork, turn, bundle and base steps, the images and
+  their tags (`planImages`), and what the host finds at startup.
 - `execute.ts`: runs a list of `LaneStep`s in order, on the host or in the
   lane.
 - `run.ts`, `bookmarks.ts`, `revisions.ts`, `merge.ts`: jj and git as
-  `Runner`s, and the jj logic over them. `offer.ts`: the reads an offer's
-  decisions are made from.
-- `host.ts`: startup facts, lane configs and shared directories.
+  `Runner`s, and the jj logic over them.
+- `host.ts`: startup facts, lane configs and shared directories. Its reads
+  of your repo (`jjIn`, git from its root) are the one exception to "only
+  `@pineta/repo` runs jj on your repo": they only read, at startup, before
+  anything else runs. Its one write there is a file, `.git/info/exclude`.
 - `image.ts`, `runtime.ts`: the image and the lane runtime. `image.ts`
   gathers what `planImages` needs and builds what it plans.
 - `disk.ts`: snapshots, deletion, trim. `lane.ts`: the container, the queue,
-  and the handle. `base.ts`: the base snapshot.
+  and the handle. `base.ts`: the base snapshot, and a lane's base as its
+  history names it (`laneBase`), read from the lane's repo or yours.
 
 ## Disks and snapshots
 
@@ -72,7 +78,7 @@ containers, disks and the helper.
 - **`jj new` runs first in a fork** (`planForkSetup`). A clone carries its
   parent's working-copy change. Without `jj new`, the fork's first turn reuses
   that change's id, and your repo sees a divergent change (S42 item 2).
-  `lanes.test.ts` forks a lane's repo and checks that your repo has no
+  `repo.test.ts` (`@pineta/repo`) forks a lane's repo and checks that your repo has no
   `divergent()`. Its mutation drops `jj new`.
 - **Inherited history is immutable in the fork.** Its config is a file on its
   own disk (`JJ_CONFIG=/workspace/.pineta-lane/jj.toml`), so forks of forks
@@ -105,9 +111,10 @@ containers, disks and the helper.
   It fetches every commit it names when the disk lacks any, and git skips a
   wanted commit the disk already holds, so naming one of the lane's own is
   harmless, though a caller names only what the lane may lack (S83).
-- **By bundle, into your repo** (`planFetch`): `git bundle create -` in the
-  lane, written to a host file through the channel as bytes, then
-  `git -C <root> fetch <file> +refs/heads/pineta/<lane>:refs/remotes/pineta-<lane>/tip`.
+- **By bundle, into your repo** (`planBundle` here, `planImport` in
+  `@pineta/repo`): `git bundle create -` in the lane, written to a host file
+  through the channel as bytes, then, in your repo, `git fetch <file>
+  +refs/heads/pineta/<lane>:refs/remotes/pineta-<lane>/tip`.
   The bundle excludes what your repo has (`^<have>`). A bundle of the whole
   history is 1.1 MB and 253 ms on Pineta's repo, against 8 KB and 29 ms for
   one commit (S43 item 8).
@@ -115,17 +122,13 @@ containers, disks and the helper.
   (ADR-0038). jj imports a ref under `refs/remotes/` with no git remote
   configured, keeps its commits out of your default log, and treats them,
   and their ancestors, as immutable with its builtin config (S48 items 11 and
-  19). `laneRefSteps` is the one writer of the ref besides the fetch:
-  archiving deletes it, restoring writes it back. In the lane's own repo the
-  bookmark stays a local `pineta/<lane>`; `laneTipIn` reads the one in yours,
-  `bookmarkOf` the lane's.
-- **Pineta used to keep lane bookmarks local in your repo**, made immutable by
-  a line in your repo's `immutable_heads()`. `planRetire` undoes that at
-  startup, in S48 item 21's order: each `pineta/<lane>` becomes its remote
-  bookmark, then the local bookmarks go, then the line. Deleting first would
-  leave the lanes' commits in your default log.
+  19). `laneRefSteps` (`@pineta/repo`) is the one writer of the ref besides
+  the fetch: archiving deletes it, restoring writes it back. In the lane's
+  own repo the bookmark stays a local `pineta/<lane>`; `laneTipIn`
+  (`@pineta/repo`) reads the one in yours, `bookmarkOf` the lane's.
 - **Every fetch into a colocated repo ends with
-  `jj --ignore-working-copy git import`.** A jj command run with
+  `jj --ignore-working-copy git import`**, in your repo as the host
+  (`planImport`). A jj command run with
   `--ignore-working-copy` imports no git refs. A plain `jj git import`
   snapshots the working copy as well, recording your uncommitted edits into
   `@`: 107 ms against 12–47 ms (S44 item 8).
@@ -262,25 +265,24 @@ containers, disks and the helper.
   the queue's tail, so a snapshot cannot overlap the next turn's writes. A
   failed start or fork (`fatal`) breaks the gate, so tools fail with its
   error, until the lane is started again.
-- **Your repo's fetch is on a second queue per lane,** in the host, which
-  tools never wait on. Each fetch then refreshes the lane's offer, on the
-  host's one queue for your repo (`host/offers/`).
+- **The bundle is made on the lane's queue; the owner of your repo imports
+  it** (`@pineta/repo`'s `importLane`, a command), which tools never wait
+  on. The owner observes the import, and the moved ref marks the lane's
+  offer for a refresh (`host/offers/`).
 
 ## Running jj and git (`run.ts`)
 
-- **Every jj command takes `-R <root>`**: `hostJj(root)` on the host,
-  `laneJj(runner)` with `-R /workspace` in a lane. A jj command run from the
-  wrong directory acts on whatever repo surrounds it (S36 item 28).
+- **Every jj command takes `-R <root>`**: `laneJj(runner)` with `-R
+  /workspace` in a lane, and `@pineta/repo`'s runners on your repo. A jj
+  command run from the wrong directory acts on whatever repo surrounds it
+  (S36 item 28). `jjIn` alone runs from a directory: to ask where a repo is,
+  and for the startup reads above.
 - **A path argument is read from the process's directory, not `-R`'s.** Name
   files with the `root:"…"` fileset, as `revisionsIn` and `conflictContent`
   do.
 - **One bookmark in a revset is `bookmarkRevset(name)`**: `bookmarks(exact:…)`
   with the name quoted (`revsetName`), so a name is never parsed as a
   revset.
-- **A read can write.** With divergent operation heads, any jj command that
-  loads the repo reconciles them, writing an operation and rebasing
-  descendants (S57). So the host's reads of your repo run on its queue for
-  your repo (`host/offers/`), with its writes.
 - **The host's trailers** (`Pineta-Thread`, `Pineta-Lane`, `Pineta-Entry`)
   are core's `TRAILERS`: `revisionMessage` and `entryOfMessage` here, and
   marginalia's `withTrailers` and `withoutTrailers`, read the one constant.
@@ -339,7 +341,7 @@ containers, disks and the helper.
   points (S83).
 - **The merge is committed at once,** even with nothing to resolve.
   Otherwise an empty merge stays the lane's working copy, which every snapshot
-  rewrites. A mutation shows `lanes.test.ts` fails without it.
+  rewrites. A mutation shows `repo.test.ts` fails without it.
 - **Conflicts** are read with `jj file list -T 'if(conflict, path ++ "\n")'`,
   and a conflicted file's content with `jj file show`: the host cannot read a
   lane's disk.
@@ -347,156 +349,18 @@ containers, disks and the helper.
   `--name-only` prints paths from the process's directory, which in a lane
   is not the repo's.
 
-## Offers in your repo (`offer.ts`, `plan.ts`, ADR-0038, ADR-0039)
-
-- **An offer's bookmark is `pineta-offer/<name>`**, the thread's two-word
-  name (`offerBookmark`). Every step finds the offer by it: one built under
-  another name is not found, and a new one is built.
-
-- **Every host command on your repo carries `--ignore-working-copy` and
-  `--config operation.username=pineta-host`** (`hostOps`, `hostOp`): it never
-  snapshots your working copy, and the evolog says which commits the host
-  made (S48 items 1 and 8). Updating your files (`planFollow`: `jj rebase -b
-  @ -d <onto>`) is one exception, since it changes your files; landing your work is the other: it moves the
-  line to your commits, your act, so it runs as you (`hostJj`, `planLand`).
-- **The line is immutable** (`immutableHeads`, written to the repo's config
-  only by the `line` command's setup): `present(<onto>)`, and the offers on
-  it, joined to the repo's own definition. `present()`, or a repo without
-  the bookmark fails every jj command (S77 item 3). The host's rewrites of an
-  offer pass `--ignore-immutable` (`hostRewrite`); a bookmark move rewrites
-  no commit and needs none (S77 item 7). An immutable head is out of jj's
-  default log, so setup adds the offers to the repo's `revsets.log` too
-  (`logRevset`), or jj and jjui would not show them (S77 item 8).
-- **An offer is built by nonce, never by a commit id kept between steps**
-  (`planOffer`): `jj new` has no template, so each commit is named by a
-  unique description (`nonceRevset`) until its last step describes it
-  (S48 item 18). A step given an old commit id acts on a hidden commit and
-  forks the change (S48 item 2).
-- **A single offer is a stack of one**: `planOffer` makes one commit per
-  source, each with that source's files restored, on the one before; the
-  first on the start (a merge when the start names several heads), then all
-  rebased onto the target. A stack's sources are the agent's revisions.
-- **Where an offer starts is read from the repo** (`startOfOffer`,
-  `offerStart`, ADR-0060): `heads(::tip & (<base start> | ::(<sources>)))`.
-  The base start is the commit the lane's newest `Pineta-Base` names
-  (`laneBase`); for a lane with none, from before the line, the newest line
-  commit in the tip's history. The sources are the lane commits that taken
-  offers' `Pineta-Source` trailers name, in `::<onto>` and in `::<wip>`
-  for a lane on a WIP, minus `::present(<base source>)` (`takenRevset`,
-  read by `takenSources`), each `present()`: one never fetched here names
-  nothing you have. A squash of two taken offers keeps both trailer
-  paragraphs, and `trailerValues` reads every one; jj's `trailers` template
-  reads only the last (S77 item 6).
-- **A source taken below the base's source is not part of the start**
-  (S81). `LaneBase.source` is the commit of yours the lane merged whole:
-  the one its `Pineta-Base` names (the WIP's commit, never the copy, which
-  descends from no taken commit), else `start`. An offer keeps the diff from
-  its start's merge to the tip, so a start the target holds as another
-  commit is subtracted from the target. A taken commit and a later catch-up
-  are both heads, and their merge conflicts wherever the line changed the
-  taken lines since: an offer conflicted where its lane had nothing left to
-  resolve. `present()` around the base's source keeps a commit lost to
-  `jj util gc` from failing every refresh; it then excludes nothing.
-- **Every revision of an offer carries the host's trailers and its ledger**
-  (`offerMessage`, marginalia): `Pineta-Thread`, `Pineta-Lane`,
-  `Pineta-Entry`, then `Pineta-Source: <tip>` and `Pineta-Start`, in one
-  paragraph, on its WIP line and kept through a description. The source is
-  the lane tip the whole offer holds, a stack's revisions included: taken,
-  it says you have that tip.
-- **`lineFacts` previews updating your files** (`yours.follow`, S80):
-  `git merge-tree --write-tree --name-only --merge-base=<fork point> <onto>
-  <@>` exits 1 on conflicts and prints the merged tree, the conflicting
-  paths, a blank line, then its messages; the tree against `@`'s names the
-  files that change. It writes only a tree object. It reads `@` as last
-  snapshotted: the host never snapshots your files. Null when nothing is
-  behind, or `@` shares no commit with the line but the root. `-b @`
-  moves every head on your work, which the preview counts: `-r` would
-  strip them of the commits under them. `yours.conflicts` counts your
-  conflicted commits above the line, and lists `@`'s conflicted files.
-- **`changesNoFile`** says whether a lane's work since its start changes
-  no file: one `jj diff -r '(<start>)..<tip>' --name-only`, which diffs a
-  range from its roots' parents, merged for several, to its tip. jj refuses
-  a range with gaps; that reads as a change, so the offer is built.
-- **`startOfOffer` is the one path to a start.** The host's refresh, its
-  `squash` and `refresh` actions and `stackSpan` all use it: a start from
-  another rule would read as a moved start to `planRefresh`, and a split
-  would build on it. The exclusion above is inside it: sources read any
-  other way bring S81's conflicted start back.
-- **An offer follows its lane in place** (`planFollowOffer`, S49): `rebase -s`
-  back onto the start, `restore --from <tip>`, `rebase -s` onto the target.
-  Restoring where it sits would give it the tip's tree, dropping your work
-  under it. The change id and bookmark stay, and jj records no operation for
-  a restore that changes nothing. `planOffer` and the follow both end with
-  `planRefreshOffer`'s rebase.
-- **A take is a forward bookmark move** (`planTakeOffer`, ADR-0060): `jj
-  bookmark move <destination> --to <top>` as the host, then the offer's
-  bookmark deleted. Never `--allow-backwards`: jj refuses a move that is
-  not forward, so a stale take fails rather than drops commits (S77 item 1).
-  It never rebases and never touches your `@`.
-- **`readOffer` reads an offer from your repo alone** (`OfferInRepo`,
-  ADR-0060): nothing the host remembers is needed, so a lost record costs
-  nothing. Its revisions (`offerRevisions`) are what is under the bookmark,
-  not already under the target, and carries the thread's trailer:
-  `(::<bookmark> ~ ::<target>) & (description(regex:"(?m)^Pineta-Thread:
-  <name>$") | <bookmark>)`. A taken offer below carries the same trailer, but
-  is under the target; your commits carry none. The bookmark's own commit
-  is always the top. A conflicted bookmark, or a change id naming two
-  commits, reads as divergent, with only the change ids. Every read after
-  the first names commits (S48 item 2). It returns facts; `planRefresh`,
-  `offerEdited` and `offerMoved` (marginalia) decide what they mean.
-- **Every revision's evolog is read, back to the host's newest version**
-  (`evologOf`, one `jj evolog -T EVOLOG_ENTRY`; `walkToHost`, pure),
-  through each version's predecessor of the same change. Each version an
-  operation not the host's made on the way is checked with `sameAs` (the
-  description and `jj interdiff`) against the one before it. A rebase jj
-  made because you reworded a commit below is your operation (S48 item 7),
-  and changes nothing, so it is not an edit. The newest entry is usually
-  the host's, so the walk usually stops at once.
-- **A review reads by commit id** (ADR-0047): `revisionRead` runs
-  `jj log -r <commit> -T REVISION_READ` and returns the parsed JSON,
-  unchecked (the host decodes it), and `fileDiff` runs `jj diff --git -r
-  <commit> -- root-file:"<path>"`. `REVISION_READ` prints `RevisionReview`'s
-  wire shape, `json()` quoting every string (S57). A rename reads by its
-  new path, with `{old => new}` as its display path; a binary file reads as
-  0 and 0. The diff's path is `root-file:`: a bare path is read from the
-  process's directory, and `root:` matches every file under a directory of
-  that name. A commit id names one commit, so neither resolves a change id
-  or meets a divergent one.
-- **A range reads in two commands** (ADR-0056, S70): `jj diff --from --to
-  -T RANGE_FILES` gives each file's path, display path and status, one JSON
-  object a line, since a `TreeDiffEntry` has no line counts; `jj diff
-  --from --to --git` gives the counts, one `diff --git` section per file in
-  the same order (`gitDiffCounts`). The two must list as many files, or the
-  read fails. A range has no description. `fileDiff` reads a range with
-  `--from --to`. A commit stays readable by id after it is abandoned, so a
-  lane's revisions can be read after a take or a split.
-- **`hostCommitIn`** splits a divergent revision's commits by the user of
-  each one's newest evolog operation (`evologOf` with a limit of 1,
-  `isHostUser`): the host's is abandoned, yours kept.
-
 ## Tests
 
-- **`plan.test.ts`**: the planners, and `walkToHost` over parsed evologs.
+- **`plan.test.ts`**: the planners. Your repo's are `@pineta/repo`'s.
 - **`lane.test.ts`**: the queue, and that each file a lane is pointed at
   inside Pineta's mount (`HELPER`, `LANE_NOTE`) exists in the install.
 - **`runtime.test.ts`**: `runtimeComplete`, and that `EXTRACT` copies every
   program in `RUNTIME_PROGRAMS`.
-- **`lanes.test.ts`**: the executor, and a lane's whole life against jj and
-  git, in throwaway repos on the host, with no container. It covers the base,
-  a turn, a bundle fetch into your repo as a remote bookmark, an update with a
-  conflict, forks from a turn and from a copy of your `@`, checked for
-  divergence and immutability, and a repo beside a fork that the fork's
-  config leaves alone; a commit the agent makes itself, with jj and with
-  git, reaching the offer and a branch at its turn, and an update merging
-  on it, while a stack's commits are never adopted; an offer built, refreshed, left, rewritten by the host with its record
-  lost (S73), repaired, taken under your edits and beside them, the next offer, and a stack; an
-  offer following a moved tip, your conflicting commit and a moved start,
-  each checked against a fresh build; an offer after you committed your
-  edits differently, after a taken branch that holds the lane's tip, from a
-  branch whose parent was taken after the fork (S72), and from a lane after
-  a branch of it was taken before its update (S51, S72); a review of an offer's commit (its
-  description, a rename, names with a space and a quote, and one file's
-  diff, never a directory's); and retiring a repo from before offers.
+- **`lanes.test.ts`**: the executor, the trailers' round trip, and
+  `changedPaths` against git. A lane's whole life against jj and git, in
+  throwaway repos, is `packages/repo/repo.test.ts`: every such test fetches
+  into your repo, so it needs `@pineta/repo`, which this package may not
+  import.
 - **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
   with a repo in a fork's `/tmp` for the config's scope, an agent's own
   `jj commit` reaching its offer and a branch, and the contract
@@ -511,7 +375,7 @@ containers, disks and the helper.
   Without `container`, each reports SKIP with the host's own reason.
   Its hosts pass their own `userConfig`, so the person's own lane config
   never applies. Each
-  suite-level mutation in `scripts/mutations/lanes.ts` runs only the scenario
+  suite-level mutation in `scripts/mutations/lanes.ts` and `repo.ts` runs only the scenario
   its check is in, and stops at that check. Each on `plan.ts` proves a fact
   about a real lane that a unit test cannot: the journal, `sync`, a
   read-only mount, a shared mount seen both ways, the git ignore variables,

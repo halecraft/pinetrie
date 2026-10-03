@@ -2,6 +2,7 @@ import {
   type ArchiveRecord,
   atEntry,
   cardId,
+  commitId,
   type EntryLike,
   ERR,
   entryId,
@@ -9,10 +10,12 @@ import {
   indexTree,
   type LaneView,
   laneNameForThread,
+  type RevisionRecord,
   ROOT,
   type RootId,
   type RootRecord,
   rootIdFor,
+  snapshotId,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
@@ -77,6 +80,8 @@ const plan = (
     index,
     lanes: [],
     archive: new Map(),
+    own: [],
+    revisions: new Map(),
     ...over,
   })
 
@@ -106,6 +111,8 @@ describe("planArchive", () => {
     expect(plan()).toEqual({
       kind: "write",
       record: { root: "r1", state: "archived", by: ADA, at: 5 },
+      teardown: { forget: [], refs: [], snapshots: [] },
+      unload: true,
     })
   })
   test("refuses an entry that is not a root", () => {
@@ -136,6 +143,67 @@ describe("planArchive", () => {
         archive: new Map([[entryId("r1"), record("r1")]]),
       }),
     ).toMatchObject({ kind: "write", record: { state: "restored" } })
+  })
+  describe("what follows the record, off the documents' keeper (ADR-0065)", () => {
+    const [A, B] = [laneNameForThread("la"), laneNameForThread("lb")]
+    const revision = (
+      entry: string,
+      lane: typeof A,
+      commit: string | null,
+      snapshot: string | null,
+    ): RevisionRecord => ({
+      entry: entryId(entry),
+      lane,
+      commit: commit === null ? null : commitId(commit),
+      snapshot: snapshot === null ? null : snapshotId(snapshot),
+      paths: [],
+    })
+    const revisions = new Map([
+      [entryId("a"), revision("a", A, "c-a", "s-a1")],
+      [entryId("b"), revision("b", A, null, "s-a2")],
+      [entryId("c"), revision("c", B, "c-c", "s-c")],
+    ])
+    test("archive: its lanes forgotten, their refs deleted, every snapshot but each lane's newest, then unloaded", () => {
+      expect(
+        plan({
+          own: [
+            { lane: A, tip: entryId("b") },
+            { lane: B, tip: null },
+          ],
+          revisions,
+        }),
+      ).toMatchObject({
+        teardown: {
+          forget: [A, B],
+          refs: [
+            { lane: A, commit: null },
+            { lane: B, commit: null },
+          ],
+          snapshots: ["s-a1"],
+        },
+        unload: true,
+      })
+    })
+    test("restore: each lane's ref back at its tip's nearest revision; none without a tip; nothing forgotten or deleted, nor unloaded", () => {
+      expect(
+        plan({
+          action: "restore",
+          archive: new Map([[entryId("r1"), record("r1")]]),
+          own: [
+            { lane: A, tip: entryId("b") },
+            { lane: B, tip: null },
+          ],
+          revisions,
+        }),
+      ).toMatchObject({
+        teardown: {
+          forget: [],
+          refs: [{ lane: A, commit: "c-a" }],
+          snapshots: [],
+        },
+        unload: false,
+      })
+    })
   })
   test("the state it already has is unchanged", () => {
     expect(plan({ archive: new Map([[entryId("r1"), record("r1")]]) })).toEqual(
@@ -211,7 +279,7 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
     ],
     [
       "an offer: its lane's root",
-      { kind: "offer", lane: LANE_X, action: "refresh", to: null },
+      { kind: "offer", lane: LANE_X, action: "refresh", to: null, seen: null },
       OTHER_ROOT,
     ],
     [

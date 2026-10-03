@@ -5,6 +5,9 @@ S74, S77, S78. Implemented by `PLAN-2026-10-02-integration-line`. Amends ADR-003
 an offer sits and starts, what a take does, what you already have, and
 where a root thread starts: the line, not your `@`), ADR-0032 (where a
 lane starts) and ADR-0034 (how work moves into your repo).
+**Amended by ADR-0065:** a take names the offer it was shown (its ledger,
+and whether it conflicted), and is refused `offer_changed` when the offer now
+brings other work or newly conflicts.
 Amended by ADR-0061: the line is "the project" in every word the page
 shows, its bookmark in titles; and "update my files", a rebase of your
 work onto the line you ask for after a preview, is the one act that moves

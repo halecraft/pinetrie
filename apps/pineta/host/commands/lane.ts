@@ -4,10 +4,10 @@
 import {
   ERR,
   type ErrCode,
+  type Intent,
   isBusy,
   type LaneName,
   type LineAction,
-  type OfferAction,
   planStop,
   type WriterId,
 } from "@pineta/core"
@@ -84,11 +84,10 @@ export async function handleStop(
  */
 export async function actOnOffer(
   deps: LaneDeps,
-  lane: LaneName,
-  action: OfferAction,
+  intent: Extract<Intent, { kind: "offer" }>,
   by: WriterId,
-  to: string | null = null,
 ): Promise<Outcome> {
+  const { lane, action, to, seen } = intent
   const { work } = deps
   const offers = work.offers
   if (offers === null)
@@ -122,7 +121,7 @@ export async function actOnOffer(
       runId: deps.start(lane, { kind: "prompt", message }),
     }
   }
-  const refused = await offers.act(lane, action, by, to)
+  const refused = await offers.act(lane, action, by, to, seen)
   if (refused !== null)
     return { kind: "refused", code: refused, message: offerRefusal(refused) }
   return action === "take" ? { kind: "taken" } : { kind: "offered" }
@@ -130,9 +129,14 @@ export async function actOnOffer(
 
 /** Why an offer action was refused, worded once. */
 export function offerRefusal(code: ErrCode): string {
-  return code === ERR.BAD_DESTINATION
-    ? "the offer cannot be taken there now: a conflicted offer goes only into a WIP, and the destination must sit below it"
-    : "this thread has no offer in your repo"
+  switch (code) {
+    case ERR.BAD_DESTINATION:
+      return "the offer cannot be taken there now: a conflicted offer goes only into a WIP, and the destination must sit below it"
+    case ERR.OFFER_CHANGED:
+      return "the offer changed since you looked at it: review it again"
+    default:
+      return "this thread has no offer in your repo"
+  }
 }
 
 /** Why a `line` command was refused, worded once (ADR-0060). */

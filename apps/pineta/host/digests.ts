@@ -10,6 +10,7 @@
 // moved it to the next ask. So this module takes no lane.
 
 import { type EntryId, indexAsks, promptOf, type RootId } from "@pineta/core"
+import type { Keeper } from "@pineta/keeper"
 import {
   DIGEST,
   digestRequest,
@@ -23,7 +24,6 @@ import { readDigests, readReading, readTreeIndex } from "@pineta/reads"
 import type { PresenceDocHandle } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 import { requestOutside } from "./outside.ts"
-import type { Serial } from "./queue.ts"
 
 /** A digest request's size: the skill aside, the ask, its newest work, the last digest. */
 const DIGEST_BUDGET = 12_000
@@ -43,13 +43,13 @@ type DigestAgent = Pick<Agent, "complete" | "skill" | "writeValues">
 
 export function createDigests(deps: {
   readonly basics: Pick<Basics, "docs" | "log" | "now">
-  readonly serial: Serial
+  readonly keeper: Keeper
   /** Who is reading which thread (ADR-0024): a live digest waits for a reader. */
   readonly presence: PresenceDocHandle
   /** Read lazily: the agent is made after this. */
   readonly agent: () => DigestAgent
 }): Digests {
-  const { basics, serial, presence } = deps
+  const { basics, keeper, presence } = deps
   // Asks a request is out for.
   const asking = new Set<EntryId>()
 
@@ -60,7 +60,7 @@ export function createDigests(deps: {
     ended: boolean,
     failed: Failed,
   ) =>
-    serial
+    keeper
       .run(async () => {
         const doc = await basics.docs.root(root)
         const index = readTreeIndex(doc)
@@ -86,7 +86,7 @@ export function createDigests(deps: {
         if (plan === null) return
         const { final } = plan
         void requestOutside({
-          serial,
+          keeper,
           held: { set: asking, key: ask },
           failed,
           request: async () => {

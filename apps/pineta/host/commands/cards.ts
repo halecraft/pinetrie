@@ -1,7 +1,7 @@
 // host/commands/cards — the commands that move cards (ADR-0059): a move, a
 // card's command, a busy chat's card queued, and a sent card spent.
 //
-// Each runs inside one step of the host's `Serial`, as every command does, so
+// Each runs inside one step of the documents' keeper, as every command does, so
 // it is ordered with the take and with every other move: gather the places,
 // plan purely, then write through `applyPlaceStep`. Every answer that wrote
 // the places document, or refused a move, carries its `rev`: a client draws
@@ -53,7 +53,7 @@ export const settled = (
 export interface CardCommandDeps {
   readonly basics: Pick<Basics, "docs" | "live" | "places">
   readonly cards: Pick<CardPort, "destroy">
-  /** Queue a drain of the lane on the host's `Serial`, not awaited. */
+  /** Queue a drain of the lane on the documents' keeper, not awaited. */
   readonly drain: (lane: LaneName) => void
 }
 

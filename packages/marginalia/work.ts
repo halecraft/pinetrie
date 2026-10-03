@@ -125,6 +125,16 @@ const OfferRecordSchema = Type.Object({
   bookmark: Type.String({ minLength: 1 }),
   taken: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
   commits: Type.Array(Commit),
+  // Absent from a record written before it (ADR-0065): read as null.
+  ledger: Type.Optional(
+    Type.Union([
+      Type.Object({
+        source: Commit,
+        start: Type.Array(Commit, { minItems: 1 }),
+      }),
+      Type.Null(),
+    ]),
+  ),
   at: Type.Number(),
 })
 
@@ -274,6 +284,10 @@ export const OFFER: RecordSpec<OfferRecord, LaneName, "session"> = {
     conflicts: [...contents.conflicts],
     yourEdits: [...contents.yourEdits],
     commits: [...contents.commits],
+    ledger:
+      contents.ledger === null
+        ? null
+        : { source: contents.ledger.source, start: [...contents.ledger.start] },
   }),
   // Field by field: an older record has a `host` key, what the host once
   // kept for itself, which a spread would carry along.
@@ -290,6 +304,13 @@ export const OFFER: RecordSpec<OfferRecord, LaneName, "session"> = {
       bookmark: r.bookmark,
       taken: r.taken,
       commits: r.commits.map(commitId),
+      ledger:
+        r.ledger === undefined || r.ledger === null
+          ? null
+          : {
+              source: commitId(r.ledger.source),
+              start: r.ledger.start.map(commitId),
+            },
       at: r.at,
     })),
 }

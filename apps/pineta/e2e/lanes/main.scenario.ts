@@ -17,7 +17,7 @@ import {
   ROOT,
   rootOf,
 } from "@pineta/core"
-import { DEFAULT_LINE, hostOps, laneBase, startOfOffer } from "@pineta/lanes"
+import { DEFAULT_LINE, laneBase, type Runner, run } from "@pineta/lanes"
 import { deleteRecord, OFFER } from "@pineta/marginalia"
 import { scriptedModel } from "@pineta/pi"
 import {
@@ -29,6 +29,7 @@ import {
   readProject,
   readRevisions,
 } from "@pineta/reads"
+import { startOfOffer } from "@pineta/repo"
 import { rowMessage } from "@pineta/schema"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
@@ -647,18 +648,20 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       `${JSON.stringify({ before: commitsBefore, commits: offerOf()?.commits, now: offerNow(), by: newestBy(), edited: offerOf()?.edited })}`,
     )
     // The record is the page's cache (ADR-0060): lost, the next trigger, a
-    // jj operation of yours, writes it again from the repo, and the offer
-    // is the same commit, not built anew.
+    // jj operation of yours that the offers depend on (a WIP bookmark, so
+    // everything is refreshed, ADR-0065), writes it again from the repo, and
+    // the offer is the same commit, not built anew.
     const lostAt = offerNow()
     if (two !== undefined)
       await wh.agent.writeValues([deleteRecord(OFFER, two.name)])
-    jj(project, "bookmark", "create", "e2e-poke", "-r", "@-")
+    const poke = `${DEFAULT_LINE.wipPrefix}e2e-poke`
+    jj(project, "bookmark", "create", poke, "-r", "@-")
     const rewritten = await waitFor(
       () => JSON.stringify(offerOf()?.commits) === JSON.stringify([lostAt]),
       30_000,
     )
     await wh.quiet()
-    jj(project, "bookmark", "delete", "e2e-poke")
+    jj(project, "bookmark", "delete", poke)
     check(
       "a lost record changes nothing: the next trigger writes it again, and the offer keeps its change id",
       rewritten >= 0 && offerNow() === lostAt && offerChange() === firstChange,
@@ -860,12 +863,15 @@ async function mainSection(check: Checks["check"]): Promise<void> {
           )
     // Where the host starts the offer, as it computes it.
     const tipCommit = commitId(laneTipCommit)
-    const base = await laneBase(hostOps(project), tipCommit, DEFAULT_LINE)
+    // Your own reads, as you would run them: never snapshotting your files.
+    const yours: Runner = args =>
+      run("jj", ["-R", project, "--ignore-working-copy", ...args])
+    const base = await laneBase(yours, tipCommit, DEFAULT_LINE)
     const start =
       base === null
         ? ""
         : (
-            await startOfOffer(hostOps(project), {
+            await startOfOffer(yours, {
               tip: tipCommit,
               base,
               line: DEFAULT_LINE,
@@ -900,7 +906,14 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     // A new root thread starts at the line: what you landed, not what you
     // committed and have not landed, nor your working copy (ADR-0060).
     writeFileSync(path.join(project, "unlanded.txt"), "not landed\n")
+    const aheadBefore = readLine(wh.session)?.yours.ahead ?? 0
     jj(project, "commit", "-m", "you add unlanded.txt")
+    // The host has seen your commit (its line record counts it), so its
+    // reads, pinned to the head it observed, have it too (ADR-0065).
+    await waitFor(
+      () => (readLine(wh.session)?.yours.ahead ?? 0) > aheadBefore,
+      10_000,
+    )
     writeFileSync(path.join(project, "unsaved.txt"), "not committed\n")
     script.use([
       {

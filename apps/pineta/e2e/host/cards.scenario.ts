@@ -262,7 +262,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await ch.quiet()
 
     // 4c. An unqueue sent right behind a queue on an idle thread: the queue's
-    // step queued the drain, so the take is on the host's `Serial` first, and
+    // step queued the drain, so the take is on the documents' keeper first, and
     // the unqueue is refused as gone (ADR-0059). Ada's client says it was sent.
     const quickEnd = tipOf()
     const c7 = newCard(ada, quickEnd, "@Bea too quick")

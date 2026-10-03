@@ -277,6 +277,14 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   `rootWork` lists the root: a lane with its tip there runs, or has messages
   waiting. `ROOT_BUSY_REASON` is the one wording, which the tab's menu shows
   too. The state it already has is `unchanged`, and answered the same.
+- **An archive or restore is planned whole, in three parts** (ADR-0065):
+  the record, written on the documents' keeper; the `teardown`, carried out
+  off it (lanes to forget and remove, their refs in your repo, null on
+  archive and each tip's nearest revision's commit on restore, and
+  `planRetention`'s snapshots); and `unload`, for an archive, on the keeper
+  again. The host passes its lanes of their own (`own`, empty on a host
+  without them) and the root's revision records, so no part decides
+  anything when it runs.
 - **The gate keys on the entry a command writes at.** `writesAt` names it for
   every intent (a chat's `at`, a mark's entry), or null for one that writes in no root (a new root, a name, a
   stop, an archive action, a reservation). `archivedAt` maps that entry to its root's

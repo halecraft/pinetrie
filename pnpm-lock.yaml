@@ -53,6 +53,9 @@ importers:
       '@pineta/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@pineta/keeper':
+        specifier: workspace:*
+        version: link:../../packages/keeper
       '@pineta/lanes':
         specifier: workspace:*
         version: link:../../packages/lanes
@@ -68,6 +71,9 @@ importers:
       '@pineta/reads':
         specifier: workspace:*
         version: link:../../packages/reads
+      '@pineta/repo':
+        specifier: workspace:*
+        version: link:../../packages/repo
       '@pineta/schema':
         specifier: workspace:*
         version: link:../../packages/schema
@@ -172,6 +178,8 @@ importers:
 
   packages/core: {}
 
+  packages/keeper: {}
+
   packages/lanes:
     dependencies:
       '@pineta/core':
@@ -246,6 +254,18 @@ importers:
       '@pineta/schema':
         specifier: workspace:*
         version: link:../schema
+
+  packages/repo:
+    dependencies:
+      '@pineta/core':
+        specifier: workspace:*
+        version: link:../core
+      '@pineta/keeper':
+        specifier: workspace:*
+        version: link:../keeper
+      '@pineta/lanes':
+        specifier: workspace:*
+        version: link:../lanes
 
   packages/schema:
     dependencies:

@@ -1,12 +1,7 @@
 import { commitId, type LineRecord, laneNameForThread } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import { baseWords } from "./column-view.ts"
-import {
-  lineOutcomeWords,
-  lineView,
-  lineWords,
-  resolveIntent,
-} from "./line-view.ts"
+import { lineNote, lineView, lineWords, resolveIntent } from "./line-view.ts"
 import { baseChoices } from "./send.ts"
 
 const record = (over: Partial<LineRecord> = {}): LineRecord => ({
@@ -200,18 +195,35 @@ describe("update my files, and resolving what conflicts (ADR-0061)", () => {
     })
     expect(resolveIntent(null, facts)).toBe(null)
   })
-  test("lineOutcomeWords: a refusal or a failure is said; a move is not", () => {
-    expect(
-      lineOutcomeWords({
-        kind: "refused",
-        code: "refused",
-        message: "nothing to take",
-      }),
-    ).toBe("not done: nothing to take")
-    expect(lineOutcomeWords({ kind: "failed", message: "jj said no" })).toBe(
+  test.each([
+    ["nothing", null, null],
+    [
+      "a setup out",
+      { kind: "sent", id: "s", action: "setup", to: null },
+      "setting up the project…",
+    ],
+    [
+      "a land out",
+      { kind: "sent", id: "s", action: "land", to: null },
+      "adding your work to the project…",
+    ],
+    [
+      "a follow out",
+      { kind: "sent", id: "s", action: "follow", to: null },
+      "updating your files…",
+    ],
+    [
+      "a refusal",
+      { kind: "refused", action: "land", message: "nothing to take" },
+      "not done: nothing to take",
+    ],
+    [
+      "a failure",
+      { kind: "failed", action: "follow", message: "jj said no" },
       "it failed, and may be part done: jj said no",
-    )
-    expect(lineOutcomeWords({ kind: "line-moved" })).toBe(null)
+    ],
+  ] as const)("lineNote: %s", (_, acting, note) => {
+    expect(lineNote(acting)).toBe(note)
   })
 })
 

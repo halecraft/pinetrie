@@ -164,7 +164,7 @@ export interface TouchedRevision {
 /**
  * The revisions in `range` that touched any of `files`, oldest first, each
  * with the ones of `files` it touched: one `jj log`, a JSON object per line,
- * as `REVISION_READ` (`offer.ts`). Its paths are from the repo's root (S83).
+ * as `REVISION_READ` (`revisions.ts`). Its paths are from the repo's root (S83).
  */
 export async function revisionsIn(
   jj: Runner,

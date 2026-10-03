@@ -15,6 +15,7 @@ import {
 import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
 import type { BlobStore, CardId, LaneName } from "@pineta/core"
+import { createKeeper } from "@pineta/keeper"
 import { userConfigFile } from "@pineta/lanes"
 import {
   decodeBannerConfig,
@@ -56,7 +57,7 @@ import {
 } from "@pineta/schema"
 import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
 import { createBanners } from "./banners.ts"
-import { type Basics, failed } from "./basics.ts"
+import { type Basics, failed, type HostKeeper, type HostKey } from "./basics.ts"
 import { memoryBlobs } from "./blobs.ts"
 import { startCards } from "./cards.ts"
 import { createCommands } from "./commands/index.ts"
@@ -75,7 +76,6 @@ import { startHttp } from "./http.ts"
 import { lineDocPrefix } from "./lines.ts"
 import { createNames } from "./names.ts"
 import { hostPolicy, resolveDoc } from "./policy.ts"
-import { createSerial } from "./queue.ts"
 import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
 import { createSettle } from "./settle.ts"
@@ -267,7 +267,7 @@ export async function startHost({
   await whenHydrated(places)
   await whenHydrated(live)
   // Each root's document as it is first opened is followed by the directory,
-  // made below with the serial executor; this is the one late read of it.
+  // made below with the documents' keeper; this is the one late read of it.
   let directory: Directory | undefined
   // The agent, made below, holds a harness over each root it has used.
   let created: Agent | undefined
@@ -303,8 +303,14 @@ export async function startHost({
   const userJson = await readFile(userConfig, "utf8")
     .then(t => JSON.parse(t) as unknown)
     .catch(() => null)
-  const serial = createSerial(failed(basics, "step"))
-  directory = createDirectory({ basics, serial, agent: theAgent })
+  const keeper: HostKeeper = createKeeper<HostKey>({
+    onError: failed(basics, "step"),
+    onSlow: s =>
+      log(
+        `[host] a step${s.key === null ? "" : ` (${s.key})`} waited ${Math.round(s.waited)} ms and ran ${Math.round(s.ran)} ms`,
+      ),
+  })
+  directory = createDirectory({ basics, keeper, agent: theAgent })
   // The roots that are not archived, opened before anything reads one: every
   // lane that could be running is in one of them (`planLoads`).
   const directoryNow = readRoots(session)
@@ -318,11 +324,11 @@ export async function startHost({
   const banners =
     bannerConfig === null
       ? null
-      : createBanners({ basics, serial, blobs, agent: theAgent })
+      : createBanners({ basics, keeper, blobs, agent: theAgent })
   // Each ask's digest, when the user config turns digests on (ADR-0056).
   // Made before the agent, which it reads lazily, as banners do.
   const digests = decodeDigestConfig(userJson)
-    ? createDigests({ basics, serial, presence, agent: theAgent })
+    ? createDigests({ basics, keeper, presence, agent: theAgent })
     : null
   const digestFailed = (lane: LaneName) =>
     failed(basics, "summarizing its ask", lane)
@@ -411,6 +417,7 @@ export async function startHost({
     start: runs.start,
     names,
     drain: lane => queueDrain(lane),
+    keeper,
   })
   // Cards whose text the host is waiting for, each once (`behind`).
   const awaiting = new Set<CardId>()
@@ -436,11 +443,10 @@ export async function startHost({
     )
   const settle = createSettle({
     basics,
-    serial,
+    keeper,
     drain,
     rootOf: docs.rootOfLane,
     compact: roots => compactAfter(exchange, roots),
-    beforeCompact: () => directory?.flush() ?? Promise.resolve(),
     sweep: () =>
       sweepBlobs({ basics, blobs, grace: blobGraceMs, texts: cardPort.texts }),
   })
@@ -457,17 +463,13 @@ export async function startHost({
       void digests?.ended(root, prompt, digestFailed(lane))
   })
   // A card queued on a lane that is not running is taken at once (ADR-0059):
-  // the move that queued it asks for a drain. A lane's drain is queued once
-  // until its step starts: a move while it runs queues one more, which finds
-  // what that one missed.
-  const draining = new Set<LaneName>()
+  // the move that queued it asks for a drain. A lane's drain is the keeper's
+  // `once`: queued once until its step starts, and a move while it runs
+  // queues one more, which finds what that one missed. It keeps its place
+  // among the commands, so a late message still goes after the queued cards.
   const queueDrain = (lane: LaneName) => {
-    if (draining.has(lane) || readRunning(live, lane)) return
-    draining.add(lane)
-    void serial.run(async () => {
-      draining.delete(lane)
-      await drain(lane)
-    })
+    if (readRunning(live, lane)) return
+    void keeper.once(`drain:${lane}`, () => drain(lane))
   }
 
   /**
@@ -475,7 +477,7 @@ export async function startHost({
    * them), no lane's queue has work, and every write has reached the store.
    */
   async function quiet(): Promise<void> {
-    await serial.idle()
+    await keeper.idle()
     // Lanes' own queues: snapshots, fetches, stops and trims after a run.
     await work.quiet()
     await exchange.flush()
@@ -486,17 +488,16 @@ export async function startHost({
     roots,
     agent,
     work,
-    serial,
+    keeper,
     start: runs.start,
     settle,
     cards: cardPort,
     ensureNames: names.ensure,
   })
-  const seats = startSeats({ exchange, basics, serial, agent })
+  const seats = startSeats({ exchange, basics, keeper, agent })
   const control = startControl({
     exchange,
     listener,
-    serial,
     handle: commands.handle,
   })
 
@@ -534,8 +535,8 @@ export async function startHost({
             control.stop()
             return
           case "close":
-            serial.close()
-            work.offers?.stop()
+            keeper.close()
+            work.owner?.close()
             return
           case "quiet":
             // Queued steps, a compaction among them, finish their writes.

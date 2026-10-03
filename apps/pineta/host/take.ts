@@ -37,7 +37,7 @@ export type TakeTop =
 /**
  * Take a lane's top queued card: read that it is queued and on top, read its
  * text, and remove its record. Synchronous: an unqueue is a step on the same
- * `Serial` as the drain, so it runs before the take or after it, never
+ * keeper as the drain, so it runs before the take or after it, never
  * between, and one after it is refused as gone. Idle when the lane runs or
  * nothing is queued. A card whose text the host does not yet hold as its
  * queuer had it is `behind`, and stays: Kyneta keeps no order between

@@ -1,0 +1,225 @@
+import { mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
+import { NO_EDITOR } from "@pineta/core"
+import { DEFAULT_LINE, run } from "@pineta/lanes"
+import { afterAll, beforeAll, describe, expect, test } from "vitest"
+import {
+  headsDir,
+  host,
+  type Moved,
+  type RepoOwner,
+  startRepoOwner,
+} from "./index.ts"
+import { operationGone, runnerFor } from "./run.ts"
+
+let top = ""
+beforeAll(async () => {
+  top = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-owner-")))
+  process.env.JJ_USER = "Probe"
+  process.env.JJ_EMAIL = "probe@example.com"
+})
+afterAll(async () => {
+  await rm(top, { recursive: true, force: true })
+})
+
+/** A repo with one commit and the line on it, and jj in it as you. */
+async function repo(name: string) {
+  const dir = path.join(top, name)
+  await run("mkdir", ["-p", dir])
+  await run("jj", ["git", "init", "--colocate", dir])
+  const jj = (...args: string[]) =>
+    run("jj", ["-R", dir, ...args], { env: NO_EDITOR })
+  await writeFile(path.join(dir, "a.txt"), "a\n")
+  await jj("commit", "-m", "base")
+  await jj("bookmark", "create", DEFAULT_LINE.onto, "-r", "@-")
+  const heads = async () =>
+    (await readdir(await headsDir(dir))).filter(h => /^[0-9a-f]+$/.test(h))
+  return { dir, jj, heads }
+}
+
+/** An owner on `dir`, with what it reports and which steps it ran. */
+function own(dir: string, backstopMs = 60_000) {
+  const steps: (string | null)[] = []
+  const moves: Moved[] = []
+  const owner = startRepoOwner({
+    root: dir,
+    line: DEFAULT_LINE,
+    slowMs: -1,
+    onSlow: s => steps.push(s.key),
+    backstopMs,
+  })
+  owner.onMoved(m => moves.push(m))
+  return { owner, steps, moves }
+}
+
+const waitFor = async (pred: () => boolean, ms = 5_000) => {
+  const t0 = Date.now()
+  while (!pred() && Date.now() - t0 < ms)
+    await new Promise(r => setTimeout(r, 10))
+  return pred()
+}
+
+test("a read at an operation your repo no longer holds is told apart from any other failure", async () => {
+  const { dir } = await repo("gone")
+  const at = (op: string) =>
+    runnerFor(dir, { at: op })(["log", "--no-graph", "-r", "@"])
+  expect(operationGone(await at("deadbeef"))).toBe(true)
+  expect(
+    operationGone(
+      await runnerFor(dir, "host")(["log", "--no-graph", "-r", "nonesuch"]),
+    ),
+  ).toBe(false)
+})
+
+describe("the owner of your repo", () => {
+  const close = (o: RepoOwner) => o.close()
+
+  test("the first observation reports everything", async () => {
+    const { dir } = await repo("first")
+    const { owner, moves } = own(dir)
+    await owner.idle()
+    expect(moves[0]?.all).toBe(true)
+    close(owner)
+  })
+
+  test("a command queued behind a slow later step starts as soon as it ends, before the upkeep behind it", async () => {
+    const { dir } = await repo("order")
+    const { owner } = own(dir)
+    await owner.idle()
+    const order: string[] = []
+    const held = Promise.withResolvers<void>()
+    void owner.later("line", async () => {
+      await held.promise
+      order.push("line")
+    })
+    await new Promise(r => setTimeout(r, 5))
+    void owner.later("shared", async () => void order.push("shared"))
+    void owner.command(async () => void order.push("command"))
+    held.resolve()
+    await owner.idle()
+    expect(order).toEqual(["line", "command", "shared"])
+    close(owner)
+  })
+
+  test("a write by the owner moves only what it moved; a step that only read queues no observation", async () => {
+    const { dir } = await repo("own-write")
+    const { owner, steps, moves } = own(dir)
+    await owner.idle()
+    const observed = () => steps.filter(k => k === "observe").length
+    const before = observed()
+    await owner.command(async ops => {
+      await ops.jj(["log", "--no-graph", "-r", "@"])
+    })
+    await owner.idle()
+    expect(observed()).toBe(before)
+    await owner.command(ops =>
+      ops.execute([
+        host("bookmark", "create", "pineta-offer/amber-fox", "-r", "@-"),
+      ]),
+    )
+    await owner.idle()
+    expect(moves.at(-1)).toEqual({
+      all: false,
+      yours: false,
+      lanes: new Set(),
+      offers: new Set(["amber-fox"]),
+    })
+    // A read after the command is pinned to what it wrote.
+    const read = await owner.read(ops =>
+      ops.jj([
+        "log",
+        "--no-graph",
+        "-r",
+        "pineta-offer/amber-fox",
+        "-T",
+        "commit_id",
+      ]),
+    )
+    expect(read.ok).toBe(true)
+    close(owner)
+  })
+
+  test("a read inside a step, after its write, sees the write: what a record written then names is readable", async () => {
+    const { dir } = await repo("in-step")
+    const { owner } = own(dir)
+    await owner.idle()
+    const seen = await owner.command(async ops => {
+      await ops.execute([
+        host("bookmark", "create", "pineta-offer/x", "-r", "@-"),
+      ])
+      return owner.read(r =>
+        r.jj(["log", "--no-graph", "-r", "pineta-offer/x", "-T", "commit_id"]),
+      )
+    })
+    expect(seen.ok).toBe(true)
+    close(owner)
+  })
+
+  test("the shared facts are read once per operation: a second lane's step at the same head reads none again; a write reads them anew", async () => {
+    const { dir } = await repo("shared")
+    const { owner } = own(dir)
+    await owner.idle()
+    const first = await owner.command(ops => ops.shared())
+    const again = await owner.command(ops => ops.shared())
+    expect(again).toBe(first)
+    const afterWrite = await owner.command(async ops => {
+      await ops.execute([host("bookmark", "create", "wip/x", "-r", "@-")])
+      return ops.shared()
+    })
+    expect(afterWrite).not.toBe(first)
+    expect(afterWrite.op).not.toBe(first.op)
+    close(owner)
+  })
+
+  test("your jj describe is observed through the watch, with no timer", async () => {
+    const { dir, jj } = await repo("watched")
+    const { owner, moves } = own(dir, 10 * 60_000)
+    await owner.idle()
+    const count = moves.length
+    await jj("describe", "-m", "yours")
+    expect(await waitFor(() => moves.length > count)).toBe(true)
+    expect(moves.at(-1)).toMatchObject({ all: false, yours: true })
+    close(owner)
+  })
+
+  test("a pinned read with two heads leaves two; the observation merges them and names the result", async () => {
+    const { dir, jj, heads } = await repo("divergent")
+    const { owner } = own(dir, 10 * 60_000)
+    await owner.idle()
+    const old = (await jj("op", "log", "--no-graph", "-n", "1", "-T", "id"))
+      .stdout
+    await jj("--ignore-working-copy", "describe", "-m", "x")
+    await jj("--ignore-working-copy", "--at-op", old, "describe", "-m", "y")
+    expect(await heads()).toHaveLength(2)
+    owner.close()
+    // A second owner, on the divergent repo, before it observes: reads are
+    // pinned to the head it observed, so it must observe first.
+    const second = own(dir, 10 * 60_000)
+    await second.owner.idle()
+    expect(await heads()).toHaveLength(1)
+    const seen = await second.owner.read(
+      async ops =>
+        (
+          await ops.jj([
+            "op",
+            "log",
+            "--no-graph",
+            "-n",
+            "1",
+            "-T",
+            "description",
+          ])
+        ).stdout,
+    )
+    expect(seen).toContain("reconcile divergent operations")
+    // Divergent again: the pinned read leaves both heads.
+    const now = (await jj("op", "log", "--no-graph", "-n", "1", "-T", "id"))
+      .stdout
+    await jj("--ignore-working-copy", "describe", "-m", "z")
+    await jj("--ignore-working-copy", "--at-op", now, "describe", "-m", "w")
+    await second.owner.read(ops => ops.jj(["log", "--no-graph", "-r", "@"]))
+    expect(await heads()).toHaveLength(2)
+    second.owner.close()
+  })
+})

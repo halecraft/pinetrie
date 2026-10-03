@@ -200,6 +200,10 @@
       .work .offer-bookmark { font-family: ui-monospace, monospace; font-size: .7rem; color: #6f7784;
         user-select: text; }
       .work button.offer-bookmark:hover { color: #aab; }
+      /* Your last offer command: in flight, or why it was not done. */
+      .work .offer-note { font-size: .75rem; color: #8b93a1; }
+      .work .offer-note[data-acting="said"] { color: #e8c07a; }
+      .work button:disabled { opacity: .5; cursor: progress; }
 
       /* The review of a column's offer (ADR-0047): a file list (for more than one
          file), and one scroll of every file's diff, each file's head pinned

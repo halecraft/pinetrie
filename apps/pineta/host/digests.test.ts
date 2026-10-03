@@ -1,4 +1,5 @@
 import { entryId, laneNameForThread, runId, writerId } from "@pineta/core"
+import { createKeeper } from "@pineta/keeper"
 import { DIGEST, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import {
@@ -21,7 +22,6 @@ import {
   row,
   writesOf,
 } from "./fakes.ts"
-import { createSerial } from "./queue.ts"
 
 const lane = laneNameForThread("0123456789abcdef")
 /** A failure in a test is the test's failure. */
@@ -57,10 +57,10 @@ function running(answer: string | null = "Fixing the rail.") {
     complete: async () => answer,
     writeValues: async () => {},
   })
-  const serial = createSerial()
+  const keeper = createKeeper()
   const digests = createDigests({
     basics: b,
-    serial,
+    keeper,
     presence,
     agent: () => agent.port,
   })
@@ -69,17 +69,17 @@ function running(answer: string | null = "Fixing the rail.") {
       readingKey(seatKey(writerId("ada@example.com"), "s1"), "c1"),
       "e-2",
     )
-  return { b, agent, serial, digests, read }
+  return { b, agent, keeper, digests, read }
 }
 
 test("a live digest waits for someone to read the thread", async () => {
-  const { agent, serial, digests, read } = running()
+  const { agent, keeper, digests, read } = running()
   await digests.step(ROOT_ID, entryId("e-2"), failed)
-  await serial.idle()
+  await keeper.idle()
   expect(methods(agent.calls)).toEqual([])
   read()
   await digests.step(ROOT_ID, entryId("e-2"), failed)
-  await serial.idle()
+  await keeper.idle()
   expect(methods(agent.calls)).toEqual(["skill", "complete", "writeValues"])
   expect(writesOf(agent.calls)).toEqual([
     setRecord(
@@ -96,20 +96,20 @@ test("a live digest waits for someone to read the thread", async () => {
 })
 
 test("at the run's end, the final digest, read or not; once written, no more", async () => {
-  const { b, agent, serial, digests } = running("Fixed the rail.")
+  const { b, agent, keeper, digests } = running("Fixed the rail.")
   await digests.ended(ROOT_ID, entryId("e-1"), failed)
-  await serial.idle()
+  await keeper.idle()
   expect(agent.calls.at(-1)?.args).toEqual([[FINAL]])
   putValue(b, FINAL)
   const before = agent.calls.length
   await digests.ended(ROOT_ID, entryId("e-1"), failed)
-  await serial.idle()
+  await keeper.idle()
   expect(agent.calls.length).toBe(before)
 })
 
 test("a live digest that comes back after the final one is dropped", async () => {
   const late = Promise.withResolvers<string | null>()
-  const { b, agent, serial, digests, read } = running()
+  const { b, agent, keeper, digests, read } = running()
   const complete = agent.port.complete
   Object.assign(agent.port, {
     complete: (r: Parameters<typeof complete>[0]) => {
@@ -134,7 +134,7 @@ test("a live digest that comes back after the final one is dropped", async () =>
     ),
   )
   late.resolve("still working")
-  await serial.idle()
+  await keeper.idle()
   expect(methods(agent.calls)).toEqual(["skill", "complete"])
 })
 
@@ -159,13 +159,13 @@ test.each([
   tip,
   next,
 }) => {
-  const { b, agent, serial, digests } = running("Fixed the rail.")
+  const { b, agent, keeper, digests } = running("Fixed the rail.")
   endRun(b.live, lane, runId("r-1"))
   for (const r of rows) writeEntry(b.root, r)
   writeLaneTip(b.root, lane, tip)
   if (next) beginRun(b.live, lane, runId("r-2"))
   await digests.ended(ROOT_ID, entryId("e-1"), failed)
-  await serial.idle()
+  await keeper.idle()
   expect(writesOf(agent.calls)).toEqual([FINAL])
   const asked = agent.calls.find(c => c.method === "complete")?.args[0] as {
     user: string

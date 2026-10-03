@@ -1,16 +1,19 @@
 import { writerId } from "@pineta/core"
+import { createKeeper } from "@pineta/keeper"
 import type { WireCommand } from "@pineta/protocol/codec"
 import { expect, test } from "vitest"
 import { type ControlListener, startControl } from "./control.ts"
-import { createSerial } from "./queue.ts"
 
 type OnReceive = Parameters<ControlListener["onReceive"]>[0]
 type Handle = Parameters<typeof startControl>[0]["handle"]
 
-/** Seat `seat-1`, connected as Ada, sends a `name` command per id to `handle`. */
-async function seatSends(handle: Handle, ids: readonly string[]) {
+/** Control over seats `seat-1` (Ada) and `seat-2` (Bea), and a way to have one send. */
+function seats(handle: Handle) {
   let receive: OnReceive | undefined
-  const peers = new Map([["seat-1", { principal: "ada@example.com" }]])
+  const peers = new Map([
+    ["seat-1", { principal: "ada@example.com" }],
+    ["seat-2", { principal: "bea@example.com" }],
+  ])
   startControl({
     exchange: {
       peers: {
@@ -25,18 +28,25 @@ async function seatSends(handle: Handle, ids: readonly string[]) {
         return () => {}
       },
     },
-    serial: createSerial(() => {}),
     handle,
   })
-  const commands = (async function* () {
-    for (const id of ids) yield { id, kind: "name", text: "Ada" } as WireCommand
-  })()
-  receive?.(
-    { peer: "seat-1" } as never,
-    commands as never,
-    { destroy: () => {} } as never,
-  )
-  await new Promise(r => setTimeout(r, 10))
+  return (seat: string, ids: readonly string[]) => {
+    const commands = (async function* () {
+      for (const id of ids)
+        yield { id, kind: "name", text: "Ada" } as WireCommand
+    })()
+    receive?.(
+      { peer: seat } as never,
+      commands as never,
+      { destroy: () => {} } as never,
+    )
+  }
+}
+
+/** Seat `seat-1`, connected as Ada, sends a `name` command per id to `handle`. */
+async function seatSends(handle: Handle, ids: readonly string[]) {
+  seats(handle)("seat-1", ids)
+  await new Promise(r => setTimeout(r, 30))
 }
 
 test("a command's writer is the principal its seat connected as, never the seat", async () => {
@@ -48,6 +58,44 @@ test("a command's writer is the principal its seat connected as, never the seat"
     ["c-1"],
   )
   expect(seen).toEqual([writerId("ada@example.com")])
+})
+
+test("a seat's second command is queued only after its first replied, so a drain the first queued runs before the second", async () => {
+  const order: string[] = []
+  const keeper = createKeeper({ onError: () => {} })
+  // As `handle` runs a documents command: one step on the keeper.
+  await seatSends(
+    (_sender, _writer, wire) =>
+      keeper.run(async () => {
+        order.push(wire.id as string)
+        if (wire.id !== "c-1") return
+        // Some gathering first, so the seat's next command has long arrived.
+        await new Promise(r => setTimeout(r, 2))
+        void keeper.run(async () => void order.push("drain"))
+      }),
+    ["c-1", "c-2"],
+  )
+  expect(order).toEqual(["c-1", "drain", "c-2"])
+})
+
+test("one seat's command held open holds no other seat's", async () => {
+  const done: string[] = []
+  const held = Promise.withResolvers<void>()
+  const send = seats(async (_sender, writer, wire) => {
+    if (wire.id === "take") await held.promise
+    done.push(`${writer} ${wire.id}`)
+  })
+  send("seat-1", ["take", "after"])
+  send("seat-2", ["chat"])
+  await new Promise(r => setTimeout(r, 20))
+  expect(done).toEqual(["w-bea@example.com chat"])
+  held.resolve()
+  await new Promise(r => setTimeout(r, 20))
+  expect(done).toEqual([
+    "w-bea@example.com chat",
+    "w-ada@example.com take",
+    "w-ada@example.com after",
+  ])
 })
 
 test("a failed command does not end its seat's commands", async () => {

@@ -1,0 +1,14 @@
+{
+  "name": "@pineta/repo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@pineta/core": "workspace:*",
+    "@pineta/keeper": "workspace:*",
+    "@pineta/lanes": "workspace:*"
+  }
+}

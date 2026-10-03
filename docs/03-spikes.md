@@ -356,6 +356,17 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S89 — Where a take waits, and what a refresh costs ✅ PASS
+
+`findings/S89-waits-on-your-repo.md`. On a clone of Pineta's repo, with
+six offers and one thread working, a take waited 13–18 s in the offers'
+queue (52–59 deep), and another person's chat waited as long behind it on
+the host's `Serial`. The host's own writes and imports fed the poll
+without you. About half the refreshes were duplicates, and about half the
+poll ticks overlapped an earlier one. A refresh that wrote nothing ran 18
+jj processes. After ADR-0065, on the same scenario: a take 0.44 s, the chat 0.01 s, and
+a refresh that wrote nothing 3 jj processes.
+
 ### S88 — rg, fd and sd for every lane, and how they behave as tools ✅ PASS
 
 `findings/S88-lane-search-programs.md`. Static musl builds of ripgrep

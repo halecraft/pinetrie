@@ -1,5 +1,9 @@
 // lanes/host — what the host finds at startup, gathered, then planned by
-// `planRoot` and `planHost` (ADR-0034).
+// `planRoot`, `planHost` and `planShared` (ADR-0034, ADR-0035).
+//
+// These are the one exception to "only `@pineta/repo` runs jj on your repo":
+// they only read it (`jjIn`, git from its root), at startup, before anything
+// else runs. Their one write is a file, `.git/info/exclude` (`planExclude`).
 //
 // Only jj can say where a jj repo is: a secondary workspace's `.jj/repo` is a
 // file, and from a jj workspace nested in another repo, git names the outer
@@ -18,8 +22,7 @@ import {
 } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
-import { commitId, type ProjectRecord } from "@pineta/core"
-import { executeOnHost } from "./execute.ts"
+import type { ProjectRecord } from "@pineta/core"
 import {
   type DiskPaths,
   decodeLaneConfig,
@@ -31,21 +34,20 @@ import {
   laneIgnores,
   planExclude,
   planHost,
-  planRetire,
   planRoot,
   planShared,
   type RootFacts,
   type SharedDir,
   sharedCandidates,
 } from "./plan.ts"
-import { describeFailure, hostGit, hostJj, jjIn, lines, run } from "./run.ts"
+import { jjIn, lines, run } from "./run.ts"
 
 /** Gather what jj, then git, say from `dir`. */
 async function gatherRoot(dir: string): Promise<RootFacts> {
   const root = await jjIn(dir, ["workspace", "root", "--ignore-working-copy"])
   if (root.ok)
     return { dir, jjRoot: root.stdout.trim(), gitTop: null, home: homedir() }
-  const top = await hostGit(dir)(["rev-parse", "--show-toplevel"])
+  const top = await run("git", ["rev-parse", "--show-toplevel"], { cwd: dir })
   return {
     dir,
     jjRoot: null,
@@ -147,18 +149,6 @@ export async function prepareHost(dir: string): Promise<{
       project: { kind: "direct", root: project.root, reason: excluded },
       paths: null,
     }
-  try {
-    await retireLaneBookmarks(project.root)
-  } catch (error) {
-    return {
-      project: {
-        kind: "direct",
-        root: project.root,
-        reason: error instanceof Error ? error.message : String(error),
-      },
-      paths: null,
-    }
-  }
   return { project, paths: diskPaths(app, project.root) }
 }
 
@@ -171,7 +161,9 @@ async function excludeInYours(
   root: string,
   lines: readonly string[],
 ): Promise<string | null> {
-  const where = await hostGit(root)(["rev-parse", "--git-path", "info/exclude"])
+  const where = await run("git", ["rev-parse", "--git-path", "info/exclude"], {
+    cwd: root,
+  })
   if (!where.ok)
     return "the repo has no git directory beside it to exclude .pineta/ in"
   const file = path.resolve(root, where.stdout.trim())
@@ -226,8 +218,8 @@ export async function prepareShared(
   }[]
 }> {
   const { candidates } = sharedCandidates(entries)
-  const jj = hostJj(root)
-  const git = hostGit(root)
+  const jj = (args: readonly string[]) => jjIn(root, args)
+  const git = (args: readonly string[]) => run("git", args, { cwd: root })
   const exists = new Set<string>()
   const tracked = new Set<string>()
   const ignored = new Set<string>()
@@ -269,43 +261,6 @@ export async function prepareShared(
     shared: planned.shared.map(p => ({ path: p, source: path.join(root, p) })),
     refused: planned.refused,
   }
-}
-
-/**
- * Retire what Pineta wrote into your repo before ADR-0038: its local
- * `pineta/*` bookmarks, moved to remote bookmarks first, and its line in
- * `immutable_heads()` (`planRetire`). `jj config get` returns the effective
- * value, jj's built-in default included.
- */
-export async function retireLaneBookmarks(root: string): Promise<void> {
-  const jj = hostJj(root)
-  const heads = await jj([
-    "config",
-    "get",
-    'revset-aliases."immutable_heads()"',
-  ])
-  const listed = await jj([
-    "bookmark",
-    "list",
-    "--ignore-working-copy",
-    "-T",
-    'if(!remote && normal_target, name ++ " " ++ normal_target.commit_id() ++ "\n")',
-    "glob:pineta/*",
-  ])
-  if (!listed.ok) throw new Error(describeFailure("jj bookmark list", listed))
-  const bookmarks = lines(listed.stdout).flatMap(line => {
-    const [name, commit] = line.split(" ")
-    return name === undefined || commit === undefined
-      ? []
-      : [{ name, commit: commitId(commit) }]
-  })
-  await executeOnHost(
-    planRetire({
-      root,
-      bookmarks,
-      heads: heads.ok ? heads.stdout : "",
-    }),
-  )
 }
 
 /** Every `node_modules` directory up to three levels down, never inside another. */

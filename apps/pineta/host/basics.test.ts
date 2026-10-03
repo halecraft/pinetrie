@@ -1,8 +1,8 @@
 import { laneNameForThread } from "@pineta/core"
+import { KeeperClosed } from "@pineta/keeper"
 import { expect, test } from "vitest"
 import { failed, messageOf } from "./basics.ts"
 import { basics } from "./fakes.ts"
-import { SerialClosed } from "./queue.ts"
 
 test("failed logs the host's line, with the thread when it names a lane", () => {
   const b = basics()
@@ -15,9 +15,9 @@ test("failed logs the host's line, with the thread when it names a lane", () => 
   ])
 })
 
-test("failed logs nothing for a step a closed serial refused", () => {
+test("failed logs nothing for a step a closed keeper refused", () => {
   const b = basics()
-  failed(b, "refreshing its offer")(new SerialClosed())
+  failed(b, "refreshing its offer")(new KeeperClosed())
   expect(b.lines).toEqual([])
 })
 

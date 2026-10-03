@@ -39,9 +39,11 @@ import {
   offerView,
   type TakeDestination,
 } from "@pineta/marginalia"
+import type { OfferActing } from "./acting.ts"
 import { commandWords } from "./card-words.ts"
 import type { Column } from "./columns.ts"
 import { speakerLabel } from "./names.ts"
+import { outcomeWords } from "./outcome-words.ts"
 import { whereWords } from "./send.ts"
 
 /** The agent's mark, wherever the agent or a lane of it is named. */
@@ -161,6 +163,8 @@ export interface LaneJoin {
 /** An offer's words: its line, and a label for each button and menu row. */
 export interface OfferWords {
   readonly line: string
+  /** Your last offer command here: in flight, refused or failed; null for none. */
+  readonly note: string | null
   readonly buttons: readonly LabelledButton[]
   readonly menu: readonly LabelledButton[]
 }
@@ -194,6 +198,8 @@ export type WorkStrip =
       readonly kind: "offer"
       readonly state: OfferView["state"]
       readonly words: OfferWords
+      /** Your offer command here is out: the buttons wait for its answer. */
+      readonly waiting: boolean
       readonly bookmark: string | null
       readonly review: ReviewTarget | null
       /** Where `take` and `take-line` go (ADR-0060). */
@@ -224,6 +230,8 @@ export interface ColumnFacts {
   readonly work: WorkFacts
   /** A card bringing the thread up to date is queued on its lane (ADR-0055). */
   readonly catchingUp: boolean
+  /** Your last offer command on the column's lane (`acting.ts`); null for none. */
+  readonly acting: OfferActing | null
 }
 
 export interface ColumnShows {
@@ -460,7 +468,8 @@ function workStrip(f: ColumnFacts): WorkStrip {
   return {
     kind: "offer",
     state: view.state,
-    words: offerWords(view),
+    words: offerWords(view, f.acting),
+    waiting: f.acting?.kind === "sent",
     bookmark: view.facts.bookmark,
     destinations: view.destinations,
     review:
@@ -512,8 +521,35 @@ const destinationBase = (d: TakeDestination) =>
     ? ({ kind: "line" } as const)
     : ({ kind: "wip", bookmark: d.bookmark } as const)
 
+/** What an offer command in flight says, until the host answers. */
+const SENDING: Record<Exclude<OfferActing["action"], "take">, string> = {
+  split: "splitting into a stack…",
+  squash: "squashing to one…",
+  describe: "rewriting the description…",
+  refresh: "refreshing…",
+}
+
+/**
+ * Your last offer command, worded: a take in flight names where it adds
+ * ("adding to the project…"), the rest their own words; a refusal or a
+ * failure as every command's (`outcomeWords`).
+ */
+function actingWords(
+  acting: OfferActing | null,
+  destinations: OfferView["destinations"],
+): string | null {
+  if (acting === null) return null
+  if (acting.kind !== "sent") return outcomeWords(acting)
+  if (acting.action !== "take") return SENDING[acting.action]
+  const to = destinations.find(d => d.bookmark === acting.to) ?? destinations[0]
+  return `adding to ${baseName(to === undefined ? { kind: "line" } : destinationBase(to))}…`
+}
+
 /** Every word an offer shows: its line, and its buttons' labels by state. */
-export function offerWords(view: OfferView): OfferWords {
+export function offerWords(
+  view: OfferView,
+  acting: OfferActing | null,
+): OfferWords {
   const { state, facts } = view
   const files = count(facts.files, "file", "files")
   const yours = facts.touchesYourEdits ? " · touches files you're editing" : ""
@@ -618,6 +654,7 @@ export function offerWords(view: OfferView): OfferWords {
   }
   return {
     line,
+    note: actingWords(acting, view.destinations),
     buttons: view.buttons.map(labelled),
     menu: view.menu.map(labelled),
   }

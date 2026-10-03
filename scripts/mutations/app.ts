@@ -233,7 +233,7 @@ export const mutations: readonly Mutation[] = [
     name: "a run's end does not compact",
     file: "apps/pineta/host/index.ts",
     from: "    void settle([lane])",
-    to: "    void serial.run(() => drain(lane))",
+    to: "    void keeper.run(() => drain(lane))",
     suite: "host",
     scenario: "tools",
     expect: "after the run, the store holds the compacted session",
@@ -242,7 +242,7 @@ export const mutations: readonly Mutation[] = [
     name: "startup does not compact",
     file: "apps/pineta/host/index.ts",
     from: "    settle,\n    cards: cardPort,\n    ensureNames: names.ensure,\n  })",
-    to: "    settle: lanes =>\n      serial.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    ensureNames: names.ensure,\n  })",
+    to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    ensureNames: names.ensure,\n  })",
     suite: "host",
     scenario: "tools",
     expect: "a starting host compacts the session it opened",
@@ -1401,8 +1401,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the drain waits behind a move that came after the queue",
     file: "apps/pineta/host/index.ts",
-    from: "    void serial.run(async () => {\n      draining.delete(lane)\n      await drain(lane)\n    })",
-    to: "    setTimeout(\n      () =>\n        void serial.run(async () => {\n          draining.delete(lane)\n          await drain(lane)\n        }),\n      300,\n    )",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    void keeper.once(`drain:${lane}`, () => drain(lane))",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "    setTimeout(() => void keeper.once(`drain:${lane}`, () => drain(lane)), 300)",
     suite: "host",
     scenario: "cards",
     expect:

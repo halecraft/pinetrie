@@ -4,7 +4,6 @@ import {
   laneNameForThread,
   shellWord,
   snapshotId,
-  type ThreadName,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
@@ -15,28 +14,19 @@ import {
   fetchById,
   forkConfig,
   imageRefusal,
-  immutableHeads,
   isBookmarkName,
   type LaneSpec,
   type LaneStep,
   laneIgnores,
-  laneRefSteps,
   lineConfig,
-  logRevset,
   mountArgs,
   NO_GRANTS,
-  nonceRevset,
-  offerStart,
-  PINETA_HEADS,
   parseBase,
-  parseEvolog,
   planBaseRefresh,
   planBundle,
   planContainer,
   planDisk,
   planExclude,
-  planFetch,
-  planFollowOffer,
   planFork,
   planForkSetup,
   planHost,
@@ -45,24 +35,17 @@ import {
   planLinks,
   planMerge,
   planMounts,
-  planOffer,
-  planRetire,
   planRoot,
   planRun,
   planShared,
   planSnapshot,
   planStartFrom,
-  planTakeOffer,
   planTurnCommit,
   SPEC_LABEL,
   specHashOf,
-  takenRevset,
-  walkToHost,
-  withoutPinetaHeads,
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
-const NAME = "amber-fox" as ThreadName
 const C1 = commitId("c1")
 const C2 = commitId("c2")
 const HOME = "/Users/ada"
@@ -290,30 +273,6 @@ describe("lineConfig: the project's names win, and a bad one falls back", () => 
   })
 })
 
-describe("logRevset: the offers added to your log (S77 item 8)", () => {
-  test("added to jj's default when the repo defines none, and idempotent", () => {
-    const once = logRevset(null)
-    expect(once).toBe('builtin_log() | bookmarks(glob:"pineta-offer/*")')
-    expect(logRevset(once)).toBe(once)
-    expect(logRevset("@ | trunk()")).toBe(
-      '@ | trunk() | bookmarks(glob:"pineta-offer/*")',
-    )
-  })
-})
-
-describe("immutableHeads: the line and its offers added to yours", () => {
-  test("added to jj's builtin when the repo defines none, with present()", () => {
-    expect(immutableHeads(DEFAULT_LINE, null)).toBe(
-      'builtin_immutable_heads() | present("pineta-onto") | (bookmarks(glob:"pineta-offer/*") & children(present("pineta-onto")))',
-    )
-  })
-  test("joined to your own definition, and idempotent", () => {
-    const once = immutableHeads(DEFAULT_LINE, "trunk() | tags()")
-    expect(once.startsWith("trunk() | tags() | ")).toBe(true)
-    expect(immutableHeads(DEFAULT_LINE, once)).toBe(once)
-  })
-})
-
 describe("decodeLaneConfig: grants, the install and shared directories, total", () => {
   const empty = (pnpm: boolean) => decodeLaneConfig(undefined, "/p", pnpm)
   test("nothing, or anything malformed, grants and shares nothing", () => {
@@ -448,18 +407,6 @@ test("planLinks: the directory beside the project that a link leaves for, mounte
 })
 
 describe("immutable heads", () => {
-  test("withoutPinetaHeads: removes Pineta's line, keeps yours, unsets when only the builtin is left", () => {
-    expect(
-      withoutPinetaHeads(`builtin_immutable_heads() | ${PINETA_HEADS}`),
-    ).toBe("")
-    expect(
-      withoutPinetaHeads(
-        `builtin_immutable_heads() | tags() | ${PINETA_HEADS}`,
-      ),
-    ).toBe("builtin_immutable_heads() | tags()")
-    expect(withoutPinetaHeads(`(trunk()) | ${PINETA_HEADS}`)).toBe("trunk()")
-    expect(withoutPinetaHeads("builtin_immutable_heads()")).toBeNull()
-  })
   test("forkConfig: jj's own heads and the fork point, in its repo only", () => {
     expect(forkConfig("/workspace", [C1, C2])).toBe(
       '[[--scope]]\n--when.repositories = ["/workspace"]\n[--scope.revset-aliases]\n"immutable_heads()" = "builtin_immutable_heads() | c1 | c2"\n',
@@ -559,151 +506,6 @@ test("baseMessage and parseBase round-trip a Pineta-Base", () => {
   expect(parseBase("nope")).toBeNull()
 })
 
-describe("offers (ADR-0038)", () => {
-  const root = "/y"
-  const op = (...args: string[]) =>
-    `host: jj -R /y --ignore-working-copy --config operation.username=pineta-host ${args.join(" ")}`
-  /** A rewrite of an offer, which may be immutable on the line (ADR-0060). */
-  const rw = (...args: string[]) => op("--ignore-immutable", ...args)
-  test("offerStart: the base's commit, and the history of each taken source (ADR-0060)", () => {
-    expect(offerStart({ tip: C1, start: C2, sources: [] })).toBe(
-      "heads(::c1 & (c2))",
-    )
-    expect(
-      offerStart({
-        tip: C1,
-        start: C2,
-        sources: [commitId("t1"), commitId("t2")],
-      }),
-    ).toBe("heads(::c1 & (c2 | ::(present(t1) | present(t2))))")
-  })
-  test("takenRevset: taken sources above the commit the base holds, never a WIP's copy (S81)", () => {
-    const taken = 'description(regex:"(?m)^Pineta-Source: ")'
-    expect(
-      takenRevset({
-        line: DEFAULT_LINE,
-        base: { base: { kind: "line" }, start: C1, source: C1 },
-      }),
-    ).toBe(`(::(present("pineta-onto")) ~ ::present(c1)) & ${taken}`)
-    // A WIP lane starts at its copy, which holds no taken commit: what it
-    // holds is the WIP's commit the copy was made from.
-    expect(
-      takenRevset({
-        line: DEFAULT_LINE,
-        base: {
-          base: { kind: "wip", bookmark: "wip/a" },
-          start: C1,
-          source: C2,
-        },
-      }),
-    ).toBe(
-      `(::(present("pineta-onto") | present("wip/a")) ~ ::present(c2)) & ${taken}`,
-    )
-  })
-  test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {
-    const n = (i: number) => nonceRevset("N", i)
-    expect(
-      argvs(
-        planOffer({
-          root,
-          name: NAME,
-          start: [C1, C2],
-          sources: [
-            { commit: commitId("s1"), description: "one" },
-            { commit: commitId("s2"), description: "two" },
-          ],
-          target: "@-",
-          nonce: "N",
-        }),
-      ),
-    ).toEqual([
-      op("new", "--no-edit", "c1", "c2", "-m", "N-0"),
-      rw("restore", "--from", "s1", "--into", n(0)),
-      op("new", "--no-edit", n(0), "-m", "N-1"),
-      rw("restore", "--from", "s2", "--into", n(1)),
-      rw("rebase", "-s", n(0), "-o", "@-"),
-      op(
-        "bookmark",
-        "set",
-        "--allow-backwards",
-        "pineta-offer/amber-fox",
-        "-r",
-        n(1),
-      ),
-      rw("describe", "-r", n(0), "-m", "one"),
-      rw("describe", "-r", n(1), "-m", "two"),
-    ])
-  })
-  test("planFollowOffer: back onto the start, the tip restored, onto the target; described only when asked", () => {
-    const follow = (description: string | null) =>
-      argvs(
-        planFollowOffer({
-          root,
-          change: "ch",
-          start: [C1, C2],
-          tip: commitId("t2"),
-          target: "@-",
-          description,
-        }),
-      )
-    expect(follow(null)).toEqual([
-      rw("rebase", "-s", "ch", "-o", "c1", "-o", "c2"),
-      rw("restore", "--from", "t2", "--into", "ch"),
-      rw("rebase", "-s", "ch", "-o", "@-"),
-    ])
-    expect(follow("WIP (amber-fox): x").at(-1)).toBe(
-      rw("describe", "-r", "ch", "-m", "WIP (amber-fox): x"),
-    )
-  })
-  test("planTakeOffer: the destination moved forward to the top, as the host, never with --allow-backwards (ADR-0060)", () => {
-    expect(
-      argvs(
-        planTakeOffer({
-          root,
-          bookmark: "pineta-offer/amber-fox",
-          top: "t",
-          destination: "pineta-onto",
-        }),
-      ),
-    ).toEqual([
-      op("bookmark", "move", "pineta-onto", "--to", "t"),
-      op("bookmark", "delete", "pineta-offer/amber-fox"),
-    ])
-  })
-  test("planRetire: moved to remote bookmarks first, then deleted, then the line (S48 item 21)", () => {
-    expect(
-      argvs(
-        planRetire({
-          root,
-          bookmarks: [{ name: `pineta/${LANE}`, commit: C1 }],
-          heads: `builtin_immutable_heads() | ${PINETA_HEADS}`,
-        }),
-      ),
-    ).toEqual([
-      `host: git -C /y update-ref refs/remotes/pineta-${LANE}/tip c1`,
-      "host: jj -R /y --ignore-working-copy git import",
-      op("bookmark", "delete", "glob:pineta/*"),
-      'host: jj -R /y config unset --repo revset-aliases."immutable_heads()"',
-    ])
-    expect(planRetire({ root, bookmarks: [], heads: "trunk()" })).toEqual([])
-  })
-  test("laneRefSteps: update or delete, then one import", () => {
-    expect(
-      argvs(
-        laneRefSteps(root, [
-          { lane: LANE, commit: C1 },
-          { lane: LANE, commit: null },
-        ]),
-      ),
-    ).toEqual([
-      `host: git -C /y update-ref refs/remotes/pineta-${LANE}/tip c1`,
-      `host: git -C /y update-ref -d refs/remotes/pineta-${LANE}/tip`,
-      "host: jj -R /y --ignore-working-copy git import",
-    ])
-    expect(laneRefSteps(root, [])).toEqual([])
-  })
-})
-
 test("fetchById: skipped when every commit is on the disk, else onto branches", () => {
   const step = fetchById([C1, C2])
   expect(step.in).toBe("lane")
@@ -760,34 +562,14 @@ test("planSnapshot: sync comes before the clone", () => {
   ])
 })
 
-test("planFetch: the lane's bundle to a host file, then your repo fetches it as the lane's remote bookmark", () => {
-  const fetch = planFetch({
-    lane: LANE,
-    have: [C1],
-    root: "/p",
-    bundle: "/tmp/b.bundle",
-  })
-  expect(fetch[0]).toEqual({
-    in: "lane",
-    argv: planBundle(LANE, [C1]),
-    stdoutTo: "/tmp/b.bundle",
-  })
-  expect(argvs(fetch.slice(1))).toEqual([
-    `host: git -C /p fetch -q /tmp/b.bundle +refs/heads/pineta/${LANE}:refs/remotes/pineta-${LANE}/tip`,
-    "host: jj -R /p --ignore-working-copy git import",
-    "host: rm -f /tmp/b.bundle",
-  ])
-})
-
 test("planBundle: the lane's bookmark, excluding what your repo has", () => {
-  expect(planBundle(LANE, [C1])).toEqual([
-    "git",
-    "bundle",
-    "create",
-    "-",
-    `refs/heads/pineta/${LANE}`,
-    "^c1",
-  ])
+  expect(
+    planBundle({ bookmark: `pineta/${LANE}`, have: [C1], to: "/tmp/b" }),
+  ).toEqual({
+    in: "lane",
+    argv: ["git", "bundle", "create", "-", `refs/heads/pineta/${LANE}`, "^c1"],
+    stdoutTo: "/tmp/b",
+  })
 })
 
 describe("planBaseRefresh: the base snapshot at your @-", () => {
@@ -986,57 +768,5 @@ describe("planTurnCommit: the turn's revision (S56)", () => {
   })
   test("nothing, when the lane has no bookmark", () => {
     expect(planTurnCommit({ ...at, bookmark: null })).toEqual({ kind: "none" })
-  })
-})
-
-describe("walkToHost", () => {
-  // One line per version, newest first, as `jj evolog -T EVOLOG_ENTRY` prints them.
-  const evolog = (...rows: readonly (readonly [string, string, string])[]) =>
-    parseEvolog(
-      rows
-        .map(([commit, user, pred]) =>
-          [commit, "kchange", user, pred === "" ? "" : `${pred}:kchange`].join(
-            "\t",
-          ),
-        )
-        .join("\n"),
-    )
-  const HOST = "pineta-host@mac"
-  const id = commitId
-  test("a revision the host made last: reached at once, none of yours", () => {
-    const entries = evolog(["c2", HOST, "c1"], ["c1", "you@mac", ""])
-    expect(walkToHost(entries, id("c2"))).toEqual({ reached: true, yours: [] })
-  })
-  test("your versions since the host's newest are listed, each with the one before it", () => {
-    const entries = evolog(
-      ["c4", "you@mac", "c3"],
-      ["c3", "you@mac", "c2"],
-      ["c2", HOST, "c1"],
-      ["c1", "you@mac", ""],
-    )
-    expect(walkToHost(entries, id("c4"))).toEqual({
-      reached: true,
-      yours: [
-        { from: id("c3"), to: id("c4") },
-        { from: id("c2"), to: id("c3") },
-      ],
-    })
-  })
-  test("a revision the host never made is not reached", () => {
-    const entries = evolog(["c2", "you@mac", "c1"], ["c1", "you@mac", ""])
-    expect(walkToHost(entries, id("c2")).reached).toBe(false)
-  })
-  test("of a squash's predecessors, only its own change's is followed", () => {
-    const entries = parseEvolog(
-      [
-        "c2\tkchange\tyou@mac\tcx:kother,c1:kchange",
-        "cx\tkother\tpineta-host@mac\t",
-        "c1\tkchange\tpineta-host@mac\t",
-      ].join("\n"),
-    )
-    expect(walkToHost(entries, id("c2"))).toEqual({
-      reached: true,
-      yours: [{ from: id("c1"), to: id("c2") }],
-    })
   })
 })

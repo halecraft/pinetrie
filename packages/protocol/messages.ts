@@ -42,7 +42,8 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     clears its title.
  *   - `offer` acts on that lane's offer in your repo; `mode` names the
  *     action: `take`, `split`, `squash`, `describe` or `refresh`. A take
- *     names its destination bookmark in `targetId`, `""` for the default.
+ *     names its destination bookmark in `targetId`, `""` for the default,
+ *     and what it was shown in `seen`.
  *   - `line` sets up the integration line (`mode` `setup`) or lands your
  *     work on it (`land`), ADR-0060.
  *   - `reserve` asks the host to name the thread whose lane will be `lane`,
@@ -112,7 +113,11 @@ export interface Command {
   readonly targetId: string
   /** `chat`: the card its text was sent from, or `""` (ADR-0048); `move`, `set-command`: the card. */
   readonly cardId: string
-  /** `chat`: the card's text version as the sender had it (S72), or `""`. */
+  /**
+   * `chat`: the card's text version as the sender had it (S72), or `""`.
+   * `offer` `take`: what the take was shown (`OfferSeen`, ADR-0065), as JSON;
+   * a take without it is refused.
+   */
   readonly seen: string
   /** `move`: where the sender saw the card, an encoded key, or `""` to create it. */
   readonly from: string

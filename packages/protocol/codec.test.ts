@@ -8,6 +8,7 @@ import assert from "node:assert/strict"
 import {
   atEntry,
   cardId,
+  commitId,
   ERR,
   entryId,
   laneNameForThread,
@@ -28,12 +29,17 @@ import {
   type Outcome,
   revOfReply,
 } from "./codec.ts"
-import { OUTCOME_KINDS, reply } from "./messages.ts"
+import { EMPTY_COMMAND, OUTCOME_KINDS, reply } from "./messages.ts"
 
 const TEST_ROOT = rootIdFor("test-root")
 const NEW_ROOT = rootIdFor("01a0f9eb-86e1-77ad-a822-2a3067862240")
 
 const NEW_LANE = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
+/** What a take was shown: a ledger, conflicting. */
+const SEEN = {
+  ledger: { source: commitId("a1"), start: [commitId("b2"), commitId("c3")] },
+  conflicted: true,
+}
 
 const refusalCode = (x: ReturnType<typeof decodeCommand>) =>
   x.kind === "refused" ? x.code : `not refused: ${x.kind}`
@@ -185,18 +191,26 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       title: "Tab names",
     },
     { kind: "mark", root: TEST_ROOT, entry: entryId("e-1"), title: null },
-    { kind: "offer", lane: laneNameForThread("abc"), action: "take", to: null },
+    {
+      kind: "offer",
+      lane: laneNameForThread("abc"),
+      action: "take",
+      to: null,
+      seen: { ledger: null, conflicted: false },
+    },
     {
       kind: "offer",
       lane: laneNameForThread("abc"),
       action: "take",
       to: "wip/search",
+      seen: SEEN,
     },
     {
       kind: "offer",
       lane: laneNameForThread("abc"),
       action: "split",
       to: null,
+      seen: null,
     },
     { kind: "line", action: "setup" },
     { kind: "line", action: "land" },
@@ -255,6 +269,33 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
   for (const intent of intents) {
     assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
   }
+})
+
+test("a take that does not say which offer it was shown, well formed, is refused", () => {
+  const take = (seen: string) =>
+    decodeCommand({
+      ...EMPTY_COMMAND,
+      kind: "offer",
+      lane: laneNameForThread("abc"),
+      mode: "take",
+      seen,
+    })
+  for (const bad of [
+    "",
+    "nonsense",
+    "{}",
+    '{"ledger":null}',
+    '{"ledger":{"source":"a1","start":[]},"conflicted":false}',
+    '{"ledger":{"source":"not a commit","start":["a1"]},"conflicted":false}',
+  ])
+    assert.equal((take(bad) as { kind: string }).kind, "refused", bad)
+  assert.deepEqual(take(JSON.stringify(SEEN)), {
+    kind: "offer",
+    lane: laneNameForThread("abc"),
+    action: "take",
+    to: null,
+    seen: SEEN,
+  })
 })
 
 test("encodeOutcome -> decodeReply round-trips every outcome", () => {

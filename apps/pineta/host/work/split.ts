@@ -5,13 +5,13 @@ import type { CommitId, EntryId, LaneName, WriterId } from "@pineta/core"
 import {
   bookmarkOf,
   commitsOf,
-  hostOps,
   laneStackName,
   stackBookmark,
 } from "@pineta/lanes"
 import { decodeStack, planStack, type StackMessage } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readThreadName } from "@pineta/reads"
+import type { RepoOwner } from "@pineta/repo"
 import { readEntryMessage } from "@pineta/schema"
 import { type Basics, messageOf } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"
@@ -54,19 +54,19 @@ export interface Splits {
 
 export function createSplits(deps: {
   readonly basics: Basics
-  /** The project root when lanes have their own copies, else null. */
-  readonly root: string | null
+  /** The owner of your repo when lanes have their own copies, else null. */
+  readonly owner: RepoOwner | null
   readonly registry: LaneRegistry
   readonly offers: Offers | null
   readonly agent: () => Agent
   readonly beforeRun: Containers["beforeRun"]
   readonly fetchLane: Fetches["fetchLane"]
 }): Splits {
-  const { basics, root, registry, offers } = deps
+  const { basics, owner, registry, offers } = deps
   const { session, docs, log } = basics
   return {
     async prepareSplit(lane, by) {
-      if (!registry.isOwn(lane) || root === null || offers === null)
+      if (!registry.isOwn(lane) || owner === null || offers === null)
         return { refused: "the lane has no copy of its own" }
       const span = await offers.stackSpan(lane)
       if (span === null) return { refused: "the lane has nothing to offer" }
@@ -90,7 +90,7 @@ export function createSplits(deps: {
       const details = stored.present ? decodeStack(stored.message) : undefined
       if (
         !registry.isOwn(lane) ||
-        root === null ||
+        owner === null ||
         details === undefined ||
         offers === null
       )
@@ -99,10 +99,12 @@ export function createSplits(deps: {
         const refused = await finishSplit(
           {
             fetchLane: deps.fetchLane,
-            stackTop: async l =>
-              (
-                await commitsOf(hostOps(root), `present(${laneStackName(l)})`)
-              )[0] ?? null,
+            stackTop: l =>
+              owner.read(
+                async ({ jj }) =>
+                  (await commitsOf(jj, `present(${laneStackName(l)})`))[0] ??
+                  null,
+              ),
             stackEnded: (l, stack) => offers.stackEnded(l, stack),
             backToTip: async l => {
               const jj = registry.laneJjOf(l)

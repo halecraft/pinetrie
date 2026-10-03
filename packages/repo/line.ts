@@ -1,14 +1,18 @@
-// lanes/line — the integration line in your repo (ADR-0060): what it is now,
+// repo/line — the integration line in your repo (ADR-0060): what it is now,
 // read as values for the host to plan from, and what updating your files
 // from it would do (ADR-0061, S80). Reads only; the host's steps that set it
 // up, move it and rebase your work onto it are `planLineSetup`, `planLand`
 // and `planFollow` (`plan.ts`).
 
 import { type CommitId, commitId, type LaneBase } from "@pineta/core"
+import {
+  commitsOf,
+  type LineConfig,
+  lines,
+  type Runner,
+  revsetName,
+} from "@pineta/lanes"
 import { changeOf } from "./offer.ts"
-import { type LineConfig, revsetName } from "./plan.ts"
-import { commitsOf } from "./revisions.ts"
-import { lines, type Runner } from "./run.ts"
 
 /** What the host reads of the line, each time it looks. */
 export interface LineFacts {

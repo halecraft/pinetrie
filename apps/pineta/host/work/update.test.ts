@@ -293,7 +293,7 @@ describe("askedForGuidance", () => {
     writeLaneTip(b.root, LANE, entryId("p-1"))
     return createUpdates({
       basics: b,
-      setup: { root: null, paths: null, lanes: null },
+      setup: { root: null, owner: null, paths: null, lanes: null },
       registry: record<Parameters<typeof createUpdates>[0]["registry"]>().port,
       agent: () =>
         record<ReturnType<Parameters<typeof createUpdates>[0]["agent"]>>().port,

@@ -90,6 +90,18 @@ test("lanes declares only core: it runs container, jj and git, never pi or the d
   assert.deepEqual(deps(read("packages/lanes")), ["@pineta/core"])
 })
 
+test("repo declares only core, keeper and lanes: it runs jj and git on your repo, never pi or the document", () => {
+  assert.deepEqual(deps(read("packages/repo")).sort(), [
+    "@pineta/core",
+    "@pineta/keeper",
+    "@pineta/lanes",
+  ])
+})
+
+test("keeper declares nothing", () => {
+  assert.deepEqual(allDeps(read("packages/keeper")), [])
+})
+
 test("the client declares no server package and no app", () => {
   const client = deps(read("packages/client"))
   for (const forbidden of [
@@ -98,6 +110,7 @@ test("the client declares no server package and no app", () => {
     "@pineta/app",
     "@pineta/pi",
     "@pineta/lanes",
+    "@pineta/repo",
   ]) {
     assert.ok(
       !client.includes(forbidden),

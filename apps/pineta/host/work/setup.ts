@@ -7,6 +7,7 @@ import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import path from "node:path"
 import type { LaneName, ProjectRecord } from "@pineta/core"
+import { createKeeper, type Keeper } from "@pineta/keeper"
 import {
   BASE_LANE,
   checkImage,
@@ -16,8 +17,8 @@ import {
   decodeLaneConfig,
   ensureRuntime,
   gatherLinks,
-  hostJj,
   imagePath,
+  jjIn,
   type LaneSpec,
   laneContainer,
   laneIgnoreDir,
@@ -38,8 +39,8 @@ import {
   revsetName,
 } from "@pineta/lanes"
 import type { Agent } from "@pineta/pi"
+import { type RepoOwner, startRepoOwner } from "@pineta/repo"
 import { type Basics, failed, messageOf } from "../basics.ts"
-import { createSerial, type Serial } from "../queue.ts"
 import { lockHashAt } from "./disk.ts"
 import { openLink } from "./registry.ts"
 
@@ -77,6 +78,8 @@ export interface Setup {
   readonly project: ProjectRecord | null
   /** The project root when lanes have their own copies, else null. */
   readonly root: string | null
+  /** The one writer of your repo (ADR-0065); null when lanes have no copies here. */
+  readonly owner: RepoOwner | null
   readonly paths: DiskPaths | null
   readonly lanes: PreparedLanes | null
   /**
@@ -116,9 +119,9 @@ export async function startSetup(input: {
   readonly userConfig: { readonly file: string; readonly json: unknown }
   readonly agent: () => Agent
   /** Work nobody awaits: `quiet` waits for it. */
-  readonly serial: Serial
+  readonly keeper: Keeper
 }): Promise<Setup> {
-  const { basics, serial } = input
+  const { basics, keeper } = input
   const { log } = basics
   const found =
     input.dir === null
@@ -154,6 +157,20 @@ export async function startSetup(input: {
   // Before the rest, since a run's prompt names the shared directories.
   const lanes =
     root === null ? null : await prepareLanes(root, input.userConfig, log)
+  // Made here, from the project root and the line's names, before anything
+  // else reads your repo: the reads below, lane work's and the offers'.
+  const owner =
+    root === null
+      ? null
+      : startRepoOwner({
+          root,
+          line: lanes?.line ?? DEFAULT_LINE,
+          onError: failed(basics, "your repo"),
+          onSlow: s =>
+            log(
+              `[host] your repo: a step${s.key === null ? "" : ` (${s.key})`} waited ${Math.round(s.waited)} ms and ran ${Math.round(s.ran)} ms`,
+            ),
+        })
   // Read at startup, as `prepareImages` reads it, so a lane's prompt says
   // what its image has before the images are ready.
   const defaultImage =
@@ -208,15 +225,20 @@ export async function startSetup(input: {
    * from the line, or from a WIP's copy on it. Nothing to do before the line
    * is set up.
    */
-  async function refreshBaseNow(at: string, disk: DiskPaths, r: Ready) {
-    const jj = hostJj(at)
+  async function refreshBaseNow(disk: DiskPaths, r: Ready) {
+    if (owner === null) return
     const onto = revsetName((lanes?.line ?? DEFAULT_LINE).onto)
-    const yours = await commitsOf(jj, `present(${onto})`)
-    const [line] = yours
-    if (line === undefined) return
     const install = lanes?.config.install ?? null
-    const lock =
-      install === null ? null : await lockHashAt(jj, line, install.lockfile)
+    const read = await owner.read(async ({ jj }) => {
+      const yours = await commitsOf(jj, `present(${onto})`)
+      const [line] = yours
+      if (line === undefined) return null
+      const lock =
+        install === null ? null : await lockHashAt(jj, line, install.lockfile)
+      return { yours, line, lock }
+    })
+    if (read === null) return
+    const { yours, line, lock } = read
     const made = await refreshBase({
       paths: disk,
       // Nothing in the base should see a shared directory.
@@ -235,20 +257,20 @@ export async function startSetup(input: {
   const ready: Promise<Ready> | null =
     root === null || paths === null
       ? null
-      : serial.track(prepare(root, paths, refreshBaseNow, log))
+      : keeper.track(prepare(root, paths, refreshBaseNow, log))
   ready?.catch(error =>
     log(`[host] lanes of their own cannot start: ${messageOf(error)}`),
   )
 
   /** The base snapshot's refreshes, one at a time. */
-  const base = createSerial()
+  const base = createKeeper()
   async function baseAtLine(): Promise<void> {
-    if (ready === null || root === null || paths === null) return
-    const [at, disk] = [root, paths]
-    await base.run(async () => refreshBaseNow(at, disk, await ready))
+    if (ready === null || paths === null) return
+    const disk = paths
+    await base.run(async () => refreshBaseNow(disk, await ready))
   }
   function refreshBaseSoon(): void {
-    void serial.track(
+    void keeper.track(
       baseAtLine().catch(failed(basics, "refreshing the base snapshot")),
     )
   }
@@ -256,6 +278,7 @@ export async function startSetup(input: {
   return {
     project,
     root,
+    owner,
     paths,
     lanes,
     defaultImage,
@@ -310,7 +333,7 @@ async function prepareLanes(
 async function prepare(
   at: string,
   disk: DiskPaths,
-  refreshBaseNow: (at: string, disk: DiskPaths, r: Ready) => Promise<void>,
+  refreshBaseNow: (disk: DiskPaths, r: Ready) => Promise<void>,
   log: (m: string) => void,
 ): Promise<Ready> {
   const images = await prepareImages(at, playwrightVersion(), log)
@@ -320,9 +343,9 @@ async function prepare(
     path.join(at, ".pineta", "runtime"),
     images.runtimeFrom,
   )
-  const jj = hostJj(at)
+  // Your jj config, not your repo: asked from its root, as startup asks.
   const config = async (key: string, fallback: string) => {
-    const ran = await jj(["config", "get", key])
+    const ran = await jjIn(at, ["config", "get", key])
     return ran.ok && ran.stdout.trim() !== "" ? ran.stdout.trim() : fallback
   }
   const result: Ready = {
@@ -336,7 +359,7 @@ async function prepare(
       email: await config("user.email", "agent@pineta.invalid"),
     },
   }
-  await refreshBaseNow(at, disk, result)
+  await refreshBaseNow(disk, result)
   log("[host] lanes of their own are ready")
   return result
 }

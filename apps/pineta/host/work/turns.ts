@@ -14,12 +14,12 @@ import {
   toolLabel,
   turnEntry,
 } from "@pineta/core"
+import type { Keeper } from "@pineta/keeper"
 import { bookmarkOf, changedPaths, commitTurn } from "@pineta/lanes"
 import { planTurnRecord, REVISION, setRecord } from "@pineta/marginalia"
 import type { Agent, LaneHooks } from "@pineta/pi"
 import { readTreeIndex } from "@pineta/reads"
 import { type Basics, failed } from "../basics.ts"
-import type { Serial } from "../queue.ts"
 import { snapshotOnQueue } from "./disk.ts"
 import type { Fetches } from "./fetch.ts"
 import type { LaneRegistry } from "./registry.ts"
@@ -70,11 +70,11 @@ export function createTurns(deps: {
   readonly setup: Pick<Setup, "paths">
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
-  readonly serial: Serial
+  readonly keeper: Keeper
   readonly agent: () => Agent
   readonly fetchLane: Fetches["fetchLane"]
 }): Turns {
-  const { basics, setup, registry, serial } = deps
+  const { basics, setup, registry, keeper } = deps
   const { docs } = basics
   const recording = new Set<Promise<unknown>>()
 
@@ -153,7 +153,7 @@ export function createTurns(deps: {
         if (planned === null) return
         // The snapshot is queued and not awaited: the next tool call waits
         // for it, the next request does not.
-        const recorded = serial.track(
+        const recorded = keeper.track(
           snapshotOnQueue(handle, paths, entry)
             .catch(error => {
               failed(basics, "the turn's snapshot", lane)(error)

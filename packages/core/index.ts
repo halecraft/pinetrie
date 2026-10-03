@@ -262,6 +262,11 @@ export const ERR = {
   BAD_BASE: "bad_base",
   /** Bringing a thread up to date with a WIP bookmark that is gone (ADR-0060). */
   BASE_GONE: "base_gone",
+  /**
+   * A take of an offer that now brings other work than the one it was shown
+   * (another ledger), or now conflicts where it did not (ADR-0065).
+   */
+  OFFER_CHANGED: "offer_changed",
 } as const
 
 export type ErrCode = (typeof ERR)[keyof typeof ERR]
@@ -404,13 +409,15 @@ export type Intent =
     }
   /**
    * Act on a lane's offer in your repo (ADR-0038). A take names its
-   * destination bookmark, null for the default (ADR-0060).
+   * destination bookmark, null for the default (ADR-0060), and what it was
+   * shown (`seen`, ADR-0065); every other action, null.
    */
   | {
       readonly kind: "offer"
       readonly lane: LaneName
       readonly action: OfferAction
       readonly to: string | null
+      readonly seen: OfferSeen | null
     }
   /** Set up the integration line, or land your work on it (ADR-0060). */
   | { readonly kind: "line"; readonly action: LineAction }
@@ -564,7 +571,7 @@ export const HOST_OPERATOR = "pineta-host"
 
 /**
  * What a revision's evolog says since the host's newest version of it
- * (`readOffer` in `@pineta/lanes` reads it, `revisionEdited` in
+ * (`readOffer` in `@pineta/repo` reads it, `revisionEdited` in
  * `@pineta/marginalia` decides from it): whether the walk back reached a
  * version the host made, and whether a version an operation not the host's
  * made on the way changed it. Read from the repo, never from a record the
@@ -592,7 +599,17 @@ export interface OfferLedger {
 }
 
 /**
- * An offer as your repo holds it now (`readOffer` in `@pineta/lanes`): all
+ * What a take was shown (ADR-0065): the offer's ledger, and whether it
+ * conflicted. A take whose offer now brings other work, or newly conflicts,
+ * is refused (`OFFER_CHANGED`).
+ */
+export interface OfferSeen {
+  readonly ledger: OfferLedger | null
+  readonly conflicted: boolean
+}
+
+/**
+ * An offer as your repo holds it now (`readOffer` in `@pineta/repo`): all
  * the host decides an offer from. Facts only; what they mean is decided in
  * `@pineta/marginalia` (`planRefresh`, `offerEdited`, `offerMoved`,
  * `isWipLine`). A divergent offer is only its change ids: the repair needs
@@ -875,6 +892,13 @@ export interface OfferRecord {
    * edits.
    */
   readonly commits: readonly CommitId[]
+  /**
+   * What it brings, as its top's message says (`offerLedger`): the lane tip
+   * it holds and where it starts. A take names it (`OfferSeen`, ADR-0065).
+   * Null for an offer whose message carries none, and for a record written
+   * before the field, until the owner's first observation writes it again.
+   */
+  readonly ledger: OfferLedger | null
   readonly at: number
 }
 

@@ -25,7 +25,7 @@
 // so they never carry it.
 
 import { execFile } from "node:child_process"
-import { HOST_OPERATOR, NO_EDITOR, WORKSPACE_ROOT } from "@pineta/core"
+import { NO_EDITOR, WORKSPACE_ROOT } from "@pineta/core"
 
 export interface Ran<Out = string> {
   readonly ok: boolean
@@ -100,37 +100,8 @@ export const hostBytesRunner =
       new Uint8Array(),
     )
 
-const JJ_FLAGS = ["--no-pager", "--color=never"] as const
-
-/** jj on the repo at `root`, as a runner of jj's arguments. */
-export const hostJj =
-  (root: string): Runner =>
-  args =>
-    run("jj", ["-R", root, ...JJ_FLAGS, ...args], { env: NO_EDITOR })
-
-/**
- * jj on your repo as the host acts on it while you work: never snapshotting
- * your working copy, and every operation marked as the host's, so the evolog
- * says which commits it made (S48 items 1 and 8). Run from the repo's root,
- * so paths it prints are the repo's. A command that must update your files,
- * a take, runs through `hostJj` instead.
- */
-export const hostOps =
-  (root: string): Runner =>
-  args =>
-    run(
-      "jj",
-      [
-        "-R",
-        root,
-        ...JJ_FLAGS,
-        "--ignore-working-copy",
-        "--config",
-        `operation.username=${HOST_OPERATOR}`,
-        ...args,
-      ],
-      { cwd: root, env: NO_EDITOR },
-    )
+/** Every jj command's flags: no pager, and output for a program. */
+export const JJ_FLAGS = ["--no-pager", "--color=never"] as const
 
 /** jj in a lane, over the lane's runner: always on `/workspace`. */
 export const laneJj =
@@ -138,13 +109,10 @@ export const laneJj =
   args =>
     lane(["jj", "-R", WORKSPACE_ROOT, ...JJ_FLAGS, ...args])
 
-/** git from `dir` on the host, as a runner of git's arguments. */
-export const hostGit =
-  (dir: string): Runner =>
-  args =>
-    run("git", args, { cwd: dir })
-
-/** jj from `dir`, with no `-R`: only for asking where a repo is. */
+/**
+ * jj from `dir`, with no `-R`: for asking where a repo is, and for the
+ * startup reads of your repo before `@pineta/repo`'s runners exist.
+ */
 export const jjIn = (dir: string, args: readonly string[]): Promise<Ran> =>
   run("jj", [...JJ_FLAGS, ...args], { cwd: dir, env: NO_EDITOR })
 

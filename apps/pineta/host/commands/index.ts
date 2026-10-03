@@ -1,7 +1,9 @@
 // host/commands — one command from one writer: decoded, checked against the
-// archive, and routed to its module.
+// archive, and routed to its module, in the place it runs
+// (`placeOfCommand`, ADR-0065): a step on the documents' keeper, straight
+// through to the owner of your repo, or an archive's three parts.
 
-import { ERR, type RootId, type WriterId } from "@pineta/core"
+import { ERR, type Intent, type RootId, type WriterId } from "@pineta/core"
 import {
   archivedIn,
   displayName,
@@ -17,7 +19,7 @@ import {
   type WireCommand,
 } from "@pineta/protocol/codec"
 import { readArchive, readParticipantNames, readRoots } from "@pineta/reads"
-import { type Basics, failed, messageOf } from "../basics.ts"
+import { type Basics, failed, type HostKeeper, messageOf } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"
 import { type ArchiveDeps, handleArchive } from "./archive.ts"
@@ -44,6 +46,30 @@ export interface CommandDeps {
   readonly start: ChatDeps["start"]
   readonly names: Pick<Names, "reserve">
   readonly drain: CardCommandDeps["drain"]
+  /** The documents' keeper: a `documents` command is one step on it. */
+  readonly keeper: Pick<HostKeeper, "run" | "track">
+}
+
+/**
+ * Where a command runs (ADR-0065). An offer action (but a split) and a
+ * `line` command act on your repo only: they go straight to its owner, and
+ * hold no other command. An archive is three parts (`handleArchive`).
+ * Everything else, a split among them (it reads the lane's state and starts
+ * a run), is one step on the documents' keeper.
+ */
+export function placeOfCommand(
+  intent: Intent,
+): "documents" | "repo" | "archive" {
+  switch (intent.kind) {
+    case "offer":
+      return intent.action === "split" ? "documents" : "repo"
+    case "line":
+      return "repo"
+    case "archive":
+      return "archive"
+    default:
+      return "documents"
+  }
 }
 
 export interface Commands {
@@ -103,6 +129,22 @@ export function createCommands(deps: CommandDeps): Commands {
 
     const intent = decodeCommand(wire)
     if (intent.kind === "refused") return settled(intent)
+    switch (placeOfCommand(intent)) {
+      case "documents":
+        return deps.keeper.run(() => carry(writer, intent, id))
+      case "repo":
+      case "archive":
+        // The archive gate is a synchronous read, so it needs no keeper.
+        return carry(writer, intent, id)
+    }
+  }
+
+  /** Check one decoded command against the archive, and carry it out. */
+  async function carry(
+    writer: WriterId,
+    intent: Intent,
+    id: string,
+  ): Promise<Settled> {
     const archived = refuseInArchive(
       deps.basics,
       writesIn(intent, deps.basics.docs.rootOfLane),
@@ -143,9 +185,7 @@ export function createCommands(deps: CommandDeps): Commands {
       case "mark":
         return settled(await handleMark(deps, writer, intent))
       case "offer":
-        return settled(
-          await actOnOffer(deps, intent.lane, intent.action, writer, intent.to),
-        )
+        return settled(await actOnOffer(deps, intent, writer))
       case "line":
         return settled(await actOnLine(deps, intent.action))
       case "reserve":

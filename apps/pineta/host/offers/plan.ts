@@ -3,10 +3,11 @@
 // `planRefresh` (marginalia) decides which branch a refresh takes. What each
 // branch then runs on your repo, and what it writes, is decided here, so the
 // executors in `refresh.ts` and `act.ts` only carry it out. It lives in the
-// host because it joins marginalia's plans and `@pineta/lanes`' step
-// planners, and `@pineta/lanes` declares only `@pineta/core`.
+// host because it joins marginalia's plans and `@pineta/repo`'s step
+// planners, and neither package knows the other.
 
 import {
+  type BaseRecord,
   type CommitId,
   ERR,
   type ErrCode,
@@ -14,17 +15,30 @@ import {
   type LineAction,
   type LineRecord,
   type OfferInRepo,
+  type OfferLedger,
   type OfferRecord,
+  type OfferSeen,
   type ThreadName,
+  type ValueWrite,
 } from "@pineta/core"
+import { type LineConfig, offerBookmark } from "@pineta/lanes"
+import {
+  BASE,
+  isWipLine,
+  type OfferNow,
+  offerEdited,
+  offerMessage,
+  offerMoved,
+  type RefreshPlan,
+  setIfChanged,
+  type TakeDestination,
+} from "@pineta/marginalia"
 import {
   immutableHeads,
-  type LaneStep,
-  type LineConfig,
   type LineFacts,
   logRevset,
+  type Moved,
   type OfferSource,
-  offerBookmark,
   planAbandonOffer,
   planFollow,
   planFollowOffer,
@@ -32,16 +46,8 @@ import {
   planLineSetup,
   planRefreshOffer,
   planTakeOffer,
-} from "@pineta/lanes"
-import {
-  isWipLine,
-  type OfferNow,
-  offerEdited,
-  offerMessage,
-  offerMoved,
-  type RefreshPlan,
-  type TakeDestination,
-} from "@pineta/marginalia"
+  type RepoStep,
+} from "@pineta/repo"
 
 /** Each revision's change id, bottom first: what jj steps on it name. */
 export const changesOf = (offer: OfferInRepo): readonly string[] =>
@@ -64,7 +70,8 @@ export function offerRecord(input: {
     readonly tip: CommitId
     readonly start: readonly CommitId[]
   }
-  readonly yourEdits: readonly string[]
+  /** Files `@` changes (`SharedFacts.editing`): its files among them are your edits. */
+  readonly editing: ReadonlySet<string>
   readonly now: number
 }): OfferRecord {
   const { offer } = input
@@ -75,19 +82,35 @@ export function offerRecord(input: {
     stale: size > 1 && offerMoved(offer.ledger, input.place),
     files: offer.files,
     conflicts: offer.conflicts,
-    yourEdits: input.yourEdits,
+    yourEdits: offer.files.filter(f => input.editing.has(f)),
     described: !isWipLine(input.name, offer.firstLine),
     edited: offerEdited(offer),
     bookmark: offerBookmark(input.name),
     taken: null,
     commits: offer.revisions.map(r => r.commit),
+    ledger: offer.ledger,
     at: input.now,
   }
 }
 
+/**
+ * The lane's base as the repo says it now, and the `pineta.base` record the
+ * page has: a refresh or a take writes the first when it differs (ADR-0060).
+ * The gather reads it and writes nothing.
+ */
+export interface BaseNow {
+  readonly next: BaseRecord
+  readonly stored: BaseRecord | undefined
+}
+
+/** The writes that bring the page's base record up to the repo's; none for no base. */
+export const baseWrites = (base: BaseNow | null): readonly ValueWrite[] =>
+  base === null ? [] : setIfChanged(BASE, base.next, base.stored)
+
 /** What a refresh was planned from, besides `planRefresh`'s answer. */
 export interface RefreshContext {
-  readonly root: string
+  /** The lane's base record; null for an archived thread, which has no place. */
+  readonly base: BaseNow | null
   /**
    * The lane's tip, where an offer starts and where it sits; null for an
    * archived thread, which `planRefresh` only withdraws or forgets.
@@ -110,8 +133,10 @@ export interface RefreshContext {
 }
 
 export interface OfferEffects {
+  /** Document writes first: the lane's base record, when it changed. */
+  readonly writes: readonly ValueWrite[]
   /** The jj steps to run on your repo, in order. */
-  readonly steps: readonly LaneStep[]
+  readonly steps: readonly RepoStep[]
   /** What to do after them. */
   readonly after:
     | { readonly kind: "nothing" }
@@ -126,13 +151,13 @@ export interface OfferEffects {
   readonly built: boolean
 }
 
-const NOTHING: OfferEffects = {
+const NOTHING: Omit<OfferEffects, "writes"> = {
   steps: [],
   after: { kind: "nothing" },
   built: false,
 }
 
-const REMOVE: OfferEffects = {
+const REMOVE: Omit<OfferEffects, "writes"> = {
   steps: [],
   after: { kind: "remove" },
   built: false,
@@ -146,6 +171,13 @@ export function planOfferEffects(
   plan: RefreshPlan,
   c: RefreshContext,
 ): OfferEffects {
+  return { writes: baseWrites(c.base), ...effectsOf(plan, c) }
+}
+
+function effectsOf(
+  plan: RefreshPlan,
+  c: RefreshContext,
+): Omit<OfferEffects, "writes"> {
   if (plan === "forget") return REMOVE
   const { place } = c
   if (plan === "build")
@@ -164,7 +196,7 @@ export function planOfferEffects(
   const [bottom] = changes
   if (bottom === undefined) return NOTHING
   if (plan === "withdraw")
-    return { ...REMOVE, steps: planAbandonOffer(c.root, changes) }
+    return { ...REMOVE, steps: planAbandonOffer(changes) }
   if (place === null) return NOTHING
   const record = { kind: "record" } as const
   switch (plan) {
@@ -177,7 +209,6 @@ export function planOfferEffects(
       // and start (ADR-0060).
       return {
         steps: planFollowOffer({
-          root: c.root,
           change: bottom,
           start: place.start,
           tip: place.tip,
@@ -192,7 +223,7 @@ export function planOfferEffects(
       }
     case "refresh":
       return {
-        steps: planRefreshOffer(c.root, bottom, place.target),
+        steps: planRefreshOffer(bottom, place.target),
         after: record,
         built: false,
       }
@@ -200,6 +231,24 @@ export function planOfferEffects(
       return { steps: [], after: { kind: "repair", changes }, built: false }
   }
 }
+
+/** Two ledgers name the same work: the same source, and the same start as a set. */
+const sameLedger = (a: OfferLedger | null, b: OfferLedger | null): boolean =>
+  a === null || b === null
+    ? a === b
+    : a.source === b.source &&
+      a.start.length === b.start.length &&
+      a.start.every(c => b.start.includes(c))
+
+/**
+ * Whether the offer is not the one a take was shown (ADR-0065): it brings
+ * other work (another ledger), or it conflicts now and did not then. A
+ * rebase onto a moved target keeps the ledger, and so does your edit: both
+ * are taken.
+ */
+export const offerChanged = (offer: OfferNow, seen: OfferSeen): boolean =>
+  !sameLedger(offer.ledger, seen.ledger) ||
+  (offer.conflicts.length > 0 && !seen.conflicted)
 
 /**
  * A take (ADR-0060), decided from the offer read in its own step: the
@@ -209,7 +258,9 @@ export function planOfferEffects(
  * have of the lane is the offer's own `Pineta-Source`, which the take keeps.
  */
 export function planTake(input: {
-  readonly root: string
+  readonly base: BaseNow
+  /** What the take was shown (ADR-0065). */
+  readonly seen: OfferSeen
   readonly offer: OfferNow
   /** Its record now (`offerRecord`), which the take marks taken. */
   readonly record: OfferRecord
@@ -221,13 +272,17 @@ export function planTake(input: {
 }):
   | {
       readonly kind: "take"
-      readonly steps: readonly LaneStep[]
+      /** The lane's base record, when it changed: written before the steps. */
+      readonly writes: readonly ValueWrite[]
+      readonly steps: readonly RepoStep[]
       readonly taken: OfferRecord
     }
   | { readonly kind: "refused"; readonly code: ErrCode } {
   const { record, now } = input
   const top = input.offer.revisions.at(-1)?.change
   if (top === undefined) return { kind: "refused", code: ERR.NO_OFFER }
+  if (offerChanged(input.offer, input.seen))
+    return { kind: "refused", code: ERR.OFFER_CHANGED }
   const destination =
     input.to === null
       ? input.destinations[0]
@@ -236,8 +291,8 @@ export function planTake(input: {
     return { kind: "refused", code: ERR.BAD_DESTINATION }
   return {
     kind: "take",
+    writes: baseWrites(input.base),
     steps: planTakeOffer({
-      root: input.root,
       bookmark: record.bookmark,
       top,
       destination: destination.bookmark,
@@ -280,10 +335,9 @@ export function planLineRecord(
 export function planLineAction(
   action: LineAction,
   record: LineRecord,
-  root: string,
 ):
   | { readonly kind: "refused"; readonly code: ErrCode }
-  | { readonly kind: "steps"; readonly steps: readonly LaneStep[] } {
+  | { readonly kind: "steps"; readonly steps: readonly RepoStep[] } {
   if (!record.commands) return { kind: "refused", code: ERR.NOT_YOURS }
   switch (action) {
     case "setup":
@@ -292,7 +346,6 @@ export function planLineAction(
         : {
             kind: "steps",
             steps: planLineSetup({
-              root,
               onto: record.onto,
               heads: record.heads.proposed,
               log: record.log.proposed,
@@ -302,12 +355,46 @@ export function planLineAction(
       if (record.commit === null) return { kind: "refused", code: ERR.NO_LINE }
       return record.yours.ahead === null || record.yours.ahead === 0
         ? { kind: "refused", code: ERR.REFUSED }
-        : { kind: "steps", steps: planLand({ root, onto: record.onto }) }
+        : { kind: "steps", steps: planLand({ onto: record.onto }) }
     case "follow":
       // Only with a preview: it is what you were shown before you chose it.
       if (record.commit === null) return { kind: "refused", code: ERR.NO_LINE }
       return record.yours.follow === null
         ? { kind: "refused", code: ERR.REFUSED }
-        : { kind: "steps", steps: planFollow({ root, onto: record.onto }) }
+        : { kind: "steps", steps: planFollow({ onto: record.onto }) }
   }
+}
+
+/**
+ * What a move the owner observed marks for a refresh (ADR-0065): the line's
+ * record, and each lane whose offer it may change. Everything, the line, a
+ * WIP or the first observation (`all`), marks every named lane and every
+ * open record. `@` alone (`yours`) marks no lane: it changes only each
+ * record's `yourEdits` and the line's preview, which one shared read
+ * rewrites (`shared`). A lane's ref marks that lane, and an offer bookmark
+ * the lane its thread names.
+ */
+export function planMarks(input: {
+  readonly moved: Moved
+  readonly names: ReadonlyMap<LaneName, ThreadName>
+  /** Lanes with an open offer record: how an offer you abandoned is built again. */
+  readonly open: readonly LaneName[]
+}): {
+  readonly line: boolean
+  /** Rewrite what `@` changes: each open record's `yourEdits`, and the line's record. */
+  readonly shared: boolean
+  readonly lanes: readonly LaneName[]
+} {
+  const { moved } = input
+  const every = moved.all
+  const byName = new Map([...input.names].map(([lane, name]) => [name, lane]))
+  const lanes = new Set<LaneName>([
+    ...(every ? [...input.names.keys(), ...input.open] : []),
+    ...moved.lanes,
+    ...[...moved.offers].flatMap(name => {
+      const lane = byName.get(name)
+      return lane === undefined ? [] : [lane]
+    }),
+  ])
+  return { line: every, shared: !every && moved.yours, lanes: [...lanes] }
 }

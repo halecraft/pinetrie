@@ -37,7 +37,7 @@ const offer = (commit: string): Extract<OfferInRepo, { kind: "offer" }> => ({
 const BEFORE = offer("b0")
 const AFTER = offer("a1")
 const context: RefreshContext = {
-  root: "/repo",
+  base: null,
   place: { tip: commitId("22222222"), start: [TIP], target: "@-" },
   wip: "WIP (amber-fox): fix it",
   trailers: { lane: LANE, name: NAME, entry: "e1" },
@@ -46,6 +46,7 @@ const context: RefreshContext = {
 
 const ports = () =>
   record<OfferPorts>({
+    write: async () => {},
     run: async () => {},
     build: async () => {},
     read: async () => AFTER,
@@ -80,16 +81,20 @@ describe("executeOffer", () => {
   })
 })
 
-test("a take runs its steps, marks the offer taken, then the base snapshot follows the line", async () => {
+test("a take writes the lane's base record, runs its steps, marks the offer taken, then the base snapshot follows the line", async () => {
   const planned = planTake({
-    root: "/repo",
+    seen: { ledger: BEFORE.ledger, conflicted: false },
+    base: {
+      next: { lane: LANE, base: { kind: "line" }, start: TIP, state: "ok" },
+      stored: undefined,
+    },
     offer: BEFORE,
     record: offerRecord({
       lane: LANE,
       name: NAME,
       offer: BEFORE,
       place: { tip: TIP, start: [TIP] },
-      yourEdits: [],
+      editing: new Set(),
       now: 1,
     }),
     destinations: [
@@ -101,11 +106,13 @@ test("a take runs its steps, marks the offer taken, then the base snapshot follo
   })
   if (planned.kind !== "take") throw new Error("no take")
   const p = record<Parameters<typeof executeTake>[0]>({
+    write: async () => {},
     run: async () => {},
     writeTaken: async () => {},
     taken: () => {},
   })
   await executeTake(p.port, planned)
-  expect(methods(p.calls)).toEqual(["run", "writeTaken", "taken"])
-  expect(p.calls[1]?.args[0]).toEqual(planned.taken)
+  expect(methods(p.calls)).toEqual(["write", "run", "writeTaken", "taken"])
+  expect(p.calls[0]?.args[0]).toEqual(planned.writes)
+  expect(p.calls[2]?.args[0]).toEqual(planned.taken)
 })

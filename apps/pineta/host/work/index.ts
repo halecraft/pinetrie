@@ -6,15 +6,17 @@
 // document, in jj, or on a lane's disk is held here: what startup found
 // (`Setup`), each lane's handle (`LaneRegistry`), and each coordination set in
 // the module that writes it (`turns`' pending records, `update`'s guidance
-// flag, `fetch`'s queues). Offers are `host/offers/`'s.
+// flag). Your repo is its owner's (`Setup.owner`, `@pineta/repo`); offers are
+// `host/offers/`'s.
 
 import type { ProjectRecord } from "@pineta/core"
+import { createKeeper } from "@pineta/keeper"
 import { DEFAULT_LINE } from "@pineta/lanes"
 import type { Agent, LaneHooks } from "@pineta/pi"
 import { readRunning } from "@pineta/reads"
+import type { RepoOwner } from "@pineta/repo"
 import type { Basics } from "../basics.ts"
 import { type Offers, startOffers } from "../offers/index.ts"
-import { createSerial } from "../queue.ts"
 import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes } from "./create.ts"
@@ -42,9 +44,12 @@ export type LaneWork = Pick<
     readonly hooks: LaneHooks
     /** Each lane's offer in your repo; null with no lanes of their own. */
     readonly offers: Offers | null
+    /** The one writer of your repo (ADR-0065); null with no lanes of their own. Shutdown closes it. */
+    readonly owner: RepoOwner | null
     /**
      * Settles when every lane's queued steps, fetches and the base snapshot's
-     * refresh have, including records they write when they finish.
+     * refresh have, and the owner of your repo has nothing queued, including
+     * records they write when they finish.
      */
     quiet(): Promise<void>
   }
@@ -77,16 +82,16 @@ export async function startLaneWork(input: {
   const { basics } = input
   const { session } = basics
   /** Work nobody awaits, until it settles: what `quiet` waits for. */
-  const serial = createSerial()
-  const setup = await startSetup({ ...input, basics, serial })
-  const { root, paths } = setup
+  const keeper = createKeeper()
+  const setup = await startSetup({ ...input, basics, keeper })
+  const { root, owner, paths } = setup
   const registry = createRegistry({ session, root })
   /** Each lane's offer in your repo (ADR-0038); none without lanes of their own. */
   const offers: Offers | null =
-    root === null
+    owner === null
       ? null
       : startOffers({
-          root,
+          owner,
           line: setup.lanes?.line ?? DEFAULT_LINE,
           lineCommands: input.lineCommands,
           basics,
@@ -98,23 +103,22 @@ export async function startLaneWork(input: {
     basics,
     setup,
     registry,
-    serial,
+    keeper,
     offers,
     dir: input.dir,
   })
   const { fetchLane } = createFetches({
     basics,
-    root,
+    owner,
     registry,
-    serial,
-    offers,
+    keeper,
     startContainer: containers.startContainer,
   })
   const turns = createTurns({
     basics,
     setup,
     registry,
-    serial,
+    keeper,
     agent: input.agent,
     fetchLane,
   })
@@ -122,7 +126,7 @@ export async function startLaneWork(input: {
     basics,
     setup,
     registry,
-    serial,
+    keeper,
     agent: input.agent,
     ensureNames: input.ensureNames,
     pendingRecords: turns.pendingRecords,
@@ -138,14 +142,14 @@ export async function startLaneWork(input: {
   })
   const splits = createSplits({
     basics,
-    root,
+    owner,
     registry,
     offers,
     agent: input.agent,
     beforeRun: containers.beforeRun,
     fetchLane,
   })
-  const archive = createArchive({ basics, offers, paths, registry, serial })
+  const archive = createArchive({ basics, offers, paths, registry, keeper })
 
   return {
     project: setup.project,
@@ -166,11 +170,11 @@ export async function startLaneWork(input: {
     prepareSplit: splits.prepareSplit,
     splitEnded: splits.splitEnded,
     offers,
-    archived: archive.archived,
-    restored: archive.restored,
+    owner,
+    teardown: archive.teardown,
     async quiet() {
-      await serial.idle()
-      await offers?.quiet()
+      await keeper.idle()
+      await owner?.idle()
     },
     close: containers.close,
   }

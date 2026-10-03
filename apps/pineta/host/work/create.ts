@@ -14,11 +14,10 @@ import {
   type WorkSetting,
   type WriterId,
 } from "@pineta/core"
+import type { Keeper } from "@pineta/keeper"
 import {
-  beginFacts,
   DEFAULT_LINE,
   executeOrThrow,
-  hostJj,
   planFork,
   removeLane,
   revsetName,
@@ -32,8 +31,8 @@ import {
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { type RootView, readRevisions, readTreeIndex } from "@pineta/reads"
+import { beginFacts, type RepoOwner } from "@pineta/repo"
 import { type Basics, failed } from "../basics.ts"
-import type { Serial } from "../queue.ts"
 import { lockHashAt } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
@@ -98,12 +97,12 @@ export function createNewLanes(deps: {
   readonly setup: Setup
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
-  readonly serial: Serial
+  readonly keeper: Keeper
   readonly agent: () => Agent
   readonly ensureNames: () => Promise<void>
   readonly pendingRecords: Turns["pendingRecords"]
 }): NewLanes {
-  const { basics, setup, registry, serial } = deps
+  const { basics, setup, registry, keeper } = deps
 
   const line = setup.lanes?.line ?? DEFAULT_LINE
 
@@ -113,29 +112,30 @@ export function createNewLanes(deps: {
    * needs its own.
    */
   async function installIfLockMoved(
-    at: string,
+    owner: RepoOwner,
     start: ForkStart,
   ): Promise<string | null> {
     const install = setup.lanes?.config.install ?? null
     if (install === null || start.kind !== "wip") return null
-    const jj = hostJj(at)
-    return (await lockHashAt(jj, start.commit, install.lockfile)) ===
+    return owner.read(async ({ jj }) =>
+      (await lockHashAt(jj, start.commit, install.lockfile)) ===
       (await lockHashAt(
         jj,
         `present(${revsetName(line.onto)})`,
         install.lockfile,
       ))
-      ? null
-      : install.command
+        ? null
+        : install.command,
+    )
   }
 
-  /** Where agent work begins for `base`, read from your repo now. */
-  async function beginAt(root: string, base: string | null) {
+  /** Where agent work begins for `base`, read from your repo at the head its owner last observed. */
+  async function beginAt(owner: RepoOwner, base: string | null) {
     return planBegin({
       base,
       onto: line.onto,
       wipPrefix: line.wipPrefix,
-      facts: await beginFacts(hostJj(root), line, base),
+      facts: await owner.read(({ jj }) => beginFacts(jj, line, base)),
     })
   }
 
@@ -143,12 +143,12 @@ export function createNewLanes(deps: {
     checkDirectory,
 
     async checkBegin(view, work, at, base) {
-      const { root } = setup
-      if (work?.kind !== "own" || root === null) return null
+      const { owner } = setup
+      if (work?.kind !== "own" || owner === null) return null
       const { doc } = view
       const above = nearestRevision(readTreeIndex(doc), readRevisions(doc), at)
       if (above.commit !== null) return null
-      const begin = await beginAt(root, base)
+      const begin = await beginAt(owner, base)
       return typeof begin === "string" ? begin : null
     },
 
@@ -165,11 +165,11 @@ export function createNewLanes(deps: {
       ])
       await deps.ensureNames()
       if (work === null) return
-      const { root, paths, ready } = setup
-      if (work.kind !== "own" || root === null || paths === null) return
-      const [at0, disk] = [root, paths]
+      const { owner, paths, ready } = setup
+      if (work.kind !== "own" || owner === null || paths === null) return
+      const disk = paths
       const handle = registry.handleOf(lane)
-      void serial.track(
+      void keeper.track(
         handle.queue
           .enqueue(
             async () => {
@@ -179,7 +179,7 @@ export function createNewLanes(deps: {
                 pendingRecords: deps.pendingRecords,
                 nearest: () =>
                   nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
-                begin: () => beginAt(at0, base),
+                begin: () => beginAt(owner, base),
               })
               if (typeof facts === "string")
                 throw new Error(`the lane cannot begin: ${facts}`)
@@ -192,7 +192,7 @@ export function createNewLanes(deps: {
                   paths: disk,
                   spec: setup.specOf(lane, r),
                   env: process.env,
-                  install: await installIfLockMoved(at0, point.start),
+                  install: await installIfLockMoved(owner, point.start),
                 }),
                 handle.runners,
               )

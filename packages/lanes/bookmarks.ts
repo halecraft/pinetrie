@@ -2,8 +2,9 @@
 //
 // The bookmark moves with every revision (`commitTurn`, `mergeBase`). In your
 // repo a lane's history is not a bookmark of yours but a remote bookmark,
-// `tip@pineta-<lane>` (`laneTipIn`, `laneRefSteps`), which jj keeps out of
-// your default log and immutable (ADR-0038, S48 item 11).
+// `tip@pineta-<lane>` (`@pineta/repo`'s `laneTipIn` and `laneRefSteps`),
+// which jj keeps out of your default log and immutable (ADR-0038, S48 item
+// 11).
 
 import { type CommitId, commitId, type LaneName } from "@pineta/core"
 import { bookmarkName, bookmarkRevset } from "./plan.ts"

@@ -1,4 +1,5 @@
 import { laneNameForThread, type Sha256, type ThreadName } from "@pineta/core"
+import { createKeeper } from "@pineta/keeper"
 import {
   type BannerAsk,
   NAME as NAME_RECORD,
@@ -17,7 +18,6 @@ import {
   putValue,
   record,
 } from "./fakes.ts"
-import { createSerial } from "./queue.ts"
 
 const LANE = laneNameForThread("1")
 const NAME = "clear-zebra" as ThreadName
@@ -37,7 +37,7 @@ function setUp(agent: Partial<BannerAgent> = {}, named = true) {
   const b = basics()
   if (named)
     putValue(b, setRecord(NAME_RECORD, { lane: LANE, name: NAME, at: 1 }))
-  const serial = createSerial()
+  const keeper = createKeeper()
   const blobs = memoryBlobs(() => 1_000)
   const fake = record<BannerAgent>({
     canDrawBanners: async () => true,
@@ -52,11 +52,11 @@ function setUp(agent: Partial<BannerAgent> = {}, named = true) {
   })
   const banners = createBanners({
     basics: b,
-    serial,
+    keeper,
     blobs,
     agent: () => fake.port,
   })
-  return { b, serial, blobs, fake, banners }
+  return { b, keeper, blobs, fake, banners }
 }
 
 const ask = (a: Partial<BannerAsk>): BannerAsk => ({
@@ -72,14 +72,14 @@ const draws = (
 describe("a thread due one", () => {
   test("a thread with none gets one: the skill filled from its name, drawn, stored", async () => {
     // Drawn a timer tick later, as a real model is: `idle` must wait for it.
-    const { serial, blobs, fake, banners, b } = setUp({
+    const { keeper, blobs, fake, banners, b } = setUp({
       drawBanner: async (): Promise<Drawn> => {
         await new Promise(r => setTimeout(r, 5))
         return DRAWN
       },
     })
     await banners.due(LANE)
-    await serial.idle()
+    await keeper.idle()
     expect(methods(fake.calls)).toEqual([
       "canDrawBanners",
       "skill",
@@ -97,66 +97,66 @@ describe("a thread due one", () => {
 
   test("a failed attempt is logged, and the next tries again", async () => {
     let n = 0
-    const { serial, fake, banners, b } = setUp({
+    const { keeper, fake, banners, b } = setUp({
       drawBanner: async (): Promise<Drawn> =>
         ++n === 1 ? { kind: "failed", reason: "502: busy" } : DRAWN,
     })
     await banners.due(LANE)
-    await serial.idle()
+    await keeper.idle()
     expect(draws(fake.calls)).toHaveLength(2)
     expect(b.lines.join("\n")).toContain("attempt 1: 502: busy")
     expect(readBanners(b.session).get(LANE)?.sha).toBe(SHA)
   })
 
   test("every attempt failing writes nothing", async () => {
-    const { serial, fake, banners, b } = setUp({
+    const { keeper, fake, banners, b } = setUp({
       drawBanner: async (): Promise<Drawn> => ({ kind: "failed", reason: "x" }),
     })
     await banners.due(LANE)
-    await serial.idle()
+    await keeper.idle()
     expect(draws(fake.calls)).toHaveLength(3)
     expect(readBanners(b.session).size).toBe(0)
   })
 
   test("with no key, nothing is asked of any model", async () => {
-    const { serial, fake, banners } = setUp({
+    const { keeper, fake, banners } = setUp({
       canDrawBanners: async () => false,
     })
     await banners.due(LANE)
-    await serial.idle()
+    await keeper.idle()
     expect(methods(fake.calls)).toEqual(["canDrawBanners"])
   })
 
   test("with no name yet, or no skill, it is logged, and nothing is drawn", async () => {
-    const { serial, fake, banners, b } = setUp({}, false)
+    const { keeper, fake, banners, b } = setUp({}, false)
     await banners.due(LANE)
-    await serial.idle()
+    await keeper.idle()
     expect(methods(fake.calls)).toEqual([])
     expect(b.lines.join("\n")).toContain("the thread has no name yet")
     const unskilled = setUp({ skill: async () => null })
     await unskilled.banners.due(LANE)
-    await unskilled.serial.idle()
+    await unskilled.keeper.idle()
     expect(draws(unskilled.fake.calls)).toEqual([])
     expect(unskilled.b.lines.join("\n")).toContain("no column-banner skill")
   })
 
   test("a thread with a banner, or one being made, gets no other", async () => {
     const drawing = deferred<Drawn>()
-    const { serial, fake, banners } = setUp({
+    const { keeper, fake, banners } = setUp({
       drawBanner: () => drawing.promise,
     })
     await banners.due(LANE)
     await banners.due(LANE)
     drawing.resolve(DRAWN)
-    await serial.idle()
+    await keeper.idle()
     await banners.due(LANE)
-    await serial.idle()
+    await keeper.idle()
     expect(draws(fake.calls)).toHaveLength(1)
   })
 
   test("a banner the person set meanwhile is kept", async () => {
     const drawing = deferred<Drawn>()
-    const { serial, blobs, banners, b } = setUp({
+    const { keeper, blobs, banners, b } = setUp({
       drawBanner: () => drawing.promise,
     })
     const pasted = blobs.put({
@@ -170,7 +170,7 @@ describe("a thread due one", () => {
       kind: "set",
     })
     drawing.resolve(DRAWN)
-    await serial.idle()
+    await keeper.idle()
     expect(readBanners(b.session).get(LANE)?.sha).toBe(pasted)
   })
 })
@@ -194,11 +194,11 @@ describe("set_banner", () => {
   })
 
   test("words are answered at once, and the banner follows", async () => {
-    const { serial, fake, banners, b } = setUp()
+    const { keeper, fake, banners, b } = setUp()
     expect(await banners.request(LANE, ask({ direction: "at dusk" }))).toEqual({
       kind: "requested",
     })
-    await serial.idle()
+    await keeper.idle()
     expect(draws(fake.calls)[0]?.[0]).toBe(
       "A clear zebra.\n\nAbove all, the person asks for: at dusk",
     )

@@ -591,4 +591,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "toolLabel names what the call touches",
   },
+  {
+    name: "a take need not say what it was shown",
+    file: "packages/protocol/codec.ts",
+    from: "    const seen = offerSeenFromWire(text(wire?.seen))\n",
+    to: "    const seen = offerSeenFromWire(text(wire?.seen)) ?? { ledger: null, conflicted: false }\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect:
+      "a take that does not say which offer it was shown, well formed, is refused",
+  },
 ]

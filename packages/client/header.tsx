@@ -15,7 +15,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
-import { useMemo, useState } from "react"
+import { useMemo, useState, useSyncExternalStore } from "react"
 import type { OpenOffer } from "./app-view.ts"
 import { AGENT_MARK } from "./column-view.ts"
 import {
@@ -27,12 +27,7 @@ import {
 } from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
 import type { Intent } from "./intent.ts"
-import {
-  lineOutcomeWords,
-  lineView,
-  lineWords,
-  resolveIntent,
-} from "./line-view.ts"
+import { lineNote, lineView, lineWords, resolveIntent } from "./line-view.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, nameFor } from "./presence.tsx"
 import { type Me, Profile } from "./profile.tsx"
@@ -351,14 +346,19 @@ function LineMenu({
 }: {
   line: LineRecord | null
   project: ProjectRecord | null
-  session: Pick<SessionClient, "line">
+  session: Pick<SessionClient, "line" | "acting">
   onIntent: (intent: Intent) => void
 }) {
   const view = lineView(line)
   const words = lineWords(view)
   const resolve = resolveIntent(project, view.facts)
-  // What the last command here said, until the next.
-  const [said, setSaid] = useState<string | null>(null)
+  // Your last command here, kept by the session until your next.
+  const acting = useSyncExternalStore(
+    session.acting.subscribe,
+    session.acting.current,
+  ).line
+  const said = lineNote(acting)
+  const waiting = acting?.kind === "sent"
   const actions = words.actions.flatMap(({ action, label }): MenuItem[] => {
     const item = (onChoose: () => void): MenuItem[] => [
       {
@@ -366,14 +366,11 @@ function LineMenu({
         className: "line-action",
         data: { action },
         label,
+        disabled: waiting,
         onChoose,
       },
     ]
-    if (action !== "resolve")
-      return item(() => {
-        setSaid(null)
-        void session.line(action).then(o => setSaid(lineOutcomeWords(o)))
-      })
+    if (action !== "resolve") return item(() => void session.line(action))
     return resolve === null ? [] : item(() => onIntent(resolve))
   })
   return (

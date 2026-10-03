@@ -1,30 +1,27 @@
-// host/offers — each lane's offer in your repo, as the host keeps it
-// (ADR-0038, ADR-0039).
+// host/offers — each lane's offer in your repo (ADR-0038, ADR-0039), on the
+// owner of your repo (`@pineta/repo`, ADR-0065).
 //
-// Every operation runs on `OfferState`'s one queue for your repo, so no two
-// interleave: a trigger gathers (`refreshNow`: where the offer sits and
-// starts, and the offer as your repo holds it), plans (`planRefresh`, then
-// `planOfferEffects`), and executes planned jj steps, then writes the
-// `pineta.offer` record, the page's cache, from the repo. The host decides
-// nothing from a record (ADR-0060). Triggers: a lane's fetch, a run's end, an offer action, and your
-// own jj operations (`watch.ts`), and a root archived or restored
-// (`moveLanes`). The queue also carries the reads a page asks for (`read`,
-// ADR-0047): a jj read can write (S57).
+// A refresh is upkeep, at most one queued per lane (`later("refresh:…")`):
+// gather (`refreshNow`: where the offer sits and starts, and the offer as
+// your repo holds it), plan (`planRefresh`, then `planOfferEffects`), and
+// execute planned jj steps, then write the `pineta.offer` record, the page's
+// cache, from the repo. The host decides nothing from a record (ADR-0060).
+// What marks a lane: a move the owner observes (`planMarks`: the lane's ref
+// after a fetch, its offer bookmark, the line, a WIP, your `@`), a run's end,
+// and a root archived or restored (`moveLanes`). Commands (an offer action, a
+// `line` command, a split's span and end) are owner commands, ahead of every
+// refresh waiting. The reads a page asks for (`read`, ADR-0047) are pinned
+// reads, which wait on nothing.
 
 import type {
   CommitId,
   ErrCode,
   LaneName,
   LineAction,
+  OfferSeen,
   WriterId,
 } from "@pineta/core"
-import {
-  executeOnHost,
-  fileDiff,
-  type LineConfig,
-  laneRefSteps,
-  revisionRead,
-} from "@pineta/lanes"
+import type { LineConfig } from "@pineta/lanes"
 import {
   answerDiff,
   answerReview,
@@ -33,19 +30,23 @@ import {
   planOfferRead,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
-import { readOffers, readRevisions } from "@pineta/reads"
+import { readNames, readOffers, readRevisions } from "@pineta/reads"
+import {
+  fileDiff,
+  laneRefSteps,
+  type RepoOwner,
+  revisionRead,
+} from "@pineta/repo"
 import { type Basics, failed } from "../basics.ts"
 import { act } from "./act.ts"
 import { describe } from "./describe.ts"
 import { createLine } from "./line.ts"
+import { planMarks } from "./plan.ts"
 import { createRefresh } from "./refresh.ts"
 import { stackEnded, stackSpan } from "./stack.ts"
 import { createOfferState } from "./state.ts"
-import { startWatch } from "./watch.ts"
 
 export interface Offers {
-  /** Something changed for `lane`: its fetch finished, or you ran jj. */
-  touch(lane: LaneName): void
   /**
    * Set lanes' history in your repo, or delete it with a null commit (a root
    * archived or restored, ADR-0029), then refresh each lane's offer: an
@@ -57,14 +58,18 @@ export interface Offers {
       readonly commit: CommitId | null
     }[],
   ): Promise<void>
-  /** A run on `lane` ended: refresh its offer, then describe it if it changed. */
+  /** A run on `lane` ended: refresh its offer, then describe it if it is still a WIP. */
   runEnded(lane: LaneName): void
-  /** An offer action other than a split; a take names its destination, null for the default. */
+  /**
+   * An offer action other than a split; a take names its destination, null
+   * for the default, and what it was shown (ADR-0065).
+   */
   act(
     lane: LaneName,
     action: "take" | "squash" | "describe" | "refresh",
     by: WriterId,
     to?: string | null,
+    seen?: OfferSeen | null,
   ): Promise<ErrCode | null>
   /** Where a split's stack starts and ends: the offer's start and the lane's tip. */
   stackSpan(
@@ -85,22 +90,16 @@ export interface Offers {
   /**
    * A review or a diff a page asked for, of a commit an open offer holds now
    * or a range one lane's turns recorded (ADR-0056):
-   * gathered, planned (`planOfferRead`) and read on the queue for your repo.
+   * gathered, planned (`planOfferRead`), and read pinned to the head the
+   * owner last observed, waiting on no write.
    */
   read(ask: OfferAsk): Promise<OfferAnswer>
   /** A `line` command (ADR-0060): null when carried out, else why not. */
   line(action: LineAction): Promise<ErrCode | null>
-  /** Settles when no offer work is queued or running. */
-  quiet(): Promise<void>
-  /**
-   * Shutdown: stop polling your repo, and refuse every offer step from now
-   * on. `quiet` still waits for the steps already queued.
-   */
-  stop(): void
 }
 
 export function startOffers(input: {
-  readonly root: string
+  readonly owner: RepoOwner
   /** The integration line's names (ADR-0060). */
   readonly line: LineConfig
   /** Whether this host takes `line` commands: it admits no one else. */
@@ -113,75 +112,112 @@ export function startOffers(input: {
   readonly taken: () => void
 }): Offers {
   const state = createOfferState(input)
-  const { serial, basics } = state
+  const { owner, basics } = state
   const refresh = createRefresh(state)
 
-  function touch(lane: LaneName): void {
-    void serial
-      .run(async () => {
-        const outcome = await refresh.refresh(lane)
-        // Tracked, and logged on failure, by `requestOutside`.
-        if (outcome === "built" && !state.running(lane))
-          void describe(state, refresh, lane, false)
+  /**
+   * Refresh `lane`'s offer as upkeep, once however often it is marked
+   * before it starts; resolves with whether it built.
+   */
+  function mark(lane: LaneName): Promise<boolean> {
+    let built = false
+    return owner
+      .later(`refresh:${lane}`, async ops => {
+        built = (await refresh.refresh(ops, lane)) === "built"
       })
-      .catch(failed(basics, "refreshing its offer", lane))
+      .then(
+        () => built,
+        error => {
+          failed(basics, "refreshing its offer", lane)(error)
+          return false
+        },
+      )
   }
+  /** A refresh, then its description when it built and the lane is idle. */
+  const touch = (lane: LaneName) =>
+    void mark(lane).then(built => {
+      // Tracked, and logged on failure, by `describe`.
+      if (built && !state.running(lane))
+        void describe(state, refresh, lane, false)
+    })
 
   const line = createLine(state)
-  const watch = startWatch(state, {
-    line: () => void line.refresh().catch(failed(basics, "reading the line")),
-    touch,
+  const markLine = () =>
+    void line.refresh().catch(failed(basics, "reading the line"))
+  /**
+   * Only `@` moved (jjui, an editor): one shared read rewrites each open
+   * record's `yourEdits` and the line's record, with no lane's jj
+   * (ADR-0065).
+   */
+  const markShared = () =>
+    void owner
+      .later("shared", async ops => {
+        const { editing } = await ops.shared()
+        await line.record(ops)
+        for (const record of readOffers(basics.session).values())
+          if (record.taken === null)
+            await state.write({
+              ...record,
+              yourEdits: record.files.filter(f => editing.has(f)),
+            })
+      })
+      .catch(failed(basics, "reading what you are editing"))
+  owner.onMoved(moved => {
+    const planned = planMarks({
+      moved,
+      names: readNames(basics.session),
+      open: [...readOffers(basics.session).values()]
+        .filter(o => o.taken === null)
+        .map(o => o.lane),
+    })
+    if (planned.line) markLine()
+    if (planned.shared) markShared()
+    for (const lane of planned.lanes) touch(lane)
   })
 
   return {
-    touch,
     async moveLanes(updates) {
-      await serial.run(() => executeOnHost(laneRefSteps(state.root, updates)))
+      await owner.command(ops => ops.execute(laneRefSteps(updates)))
       for (const { lane } of updates) touch(lane)
     },
     runEnded(lane) {
-      void serial
-        .track(
-          serial
-            .run(() => refresh.refresh(lane))
-            .then(() => describe(state, refresh, lane, false)),
-        )
-        .catch(failed(basics, "refreshing its offer", lane))
+      // Described whether or not this refresh built: one built while the
+      // lane ran was not described then.
+      void owner.track(
+        mark(lane).then(() => describe(state, refresh, lane, false)),
+      )
     },
-    act: (lane, action, by, to = null) =>
-      act(state, refresh, lane, action, by, to),
+    act: (lane, action, by, to = null, seen = null) =>
+      act(state, refresh, lane, action, by, to, seen),
     line: action => line.act(action),
     stackSpan: lane => stackSpan(state, lane),
     stackEnded: (lane, stack) => stackEnded(state, refresh, lane, stack),
-    read(ask) {
-      return serial.run(async () => {
-        const read = planOfferRead(
-          {
-            offers: readOffers(basics.session),
-            // Every held root's: a range is named by two commits, in one lane.
-            revisions: new Map(
-              basics.docs.loaded().flatMap(root => {
-                const view = basics.docs.view(root)
-                return view === null ? [] : [...readRevisions(view.doc)]
-              }),
-            ),
-          },
-          ask,
-        )
-        switch (read.kind) {
-          case "refused":
-            return read
-          case "review":
-            return answerReview(await revisionRead(state.ops, read.span))
-          case "diff":
-            return answerDiff(await fileDiff(state.ops, read.span, read.path))
-        }
-      })
-    },
-    quiet: () => serial.idle(),
-    stop() {
-      watch.close()
-      serial.close()
+    async read(ask) {
+      const read = planOfferRead(
+        {
+          offers: readOffers(basics.session),
+          // Every held root's: a range is named by two commits, in one lane.
+          revisions: new Map(
+            basics.docs.loaded().flatMap(root => {
+              const view = basics.docs.view(root)
+              return view === null ? [] : [...readRevisions(view.doc)]
+            }),
+          ),
+        },
+        ask,
+      )
+      switch (read.kind) {
+        case "refused":
+          return read
+        case "review":
+          return answerReview(
+            await owner.read(ops => revisionRead(ops.jj, read.span)),
+          )
+        case "diff":
+          return answerDiff(
+            await owner.read(ops => fileDiff(ops.jj, read.span, read.path)),
+          )
+      }
     },
   }
 }

@@ -8,23 +8,28 @@
 import {
   type ArchiveAction,
   type ArchiveRecord,
+  type CommitId,
   type EntryId,
   ERR,
   type Intent,
   type LaneName,
   type LaneView,
+  nearestRevision,
   type Refusal,
+  type RevisionRecord,
   type RootId,
   type RootRecord,
   refused,
   rootOf,
   rootWork,
+  type SnapshotId,
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
 import { Type } from "typebox"
 import { decodeAt, entryKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
+import { planRetention } from "./work.ts"
 
 const ArchiveSchema = Type.Object({
   state: Type.Union([Type.Literal("archived"), Type.Literal("restored")]),
@@ -47,11 +52,34 @@ export const ARCHIVE: RecordSpec<ArchiveRecord, EntryId, "session"> = {
     })),
 }
 
+/**
+ * What an archive or restore does off the documents' keeper, after its record
+ * is written (ADR-0065): lanes to forget and remove (their containers and
+ * disks), their refs in your repo moved (null deletes, archive), and
+ * snapshots to delete. Empty on a host without lanes of their own.
+ */
+export interface ArchiveTeardown {
+  readonly forget: readonly LaneName[]
+  readonly refs: readonly {
+    readonly lane: LaneName
+    readonly commit: CommitId | null
+  }[]
+  readonly snapshots: readonly SnapshotId[]
+}
+
 export type ArchivePlan =
   | Refusal
   /** Already in that state: nothing is written, and the outcome is the same. */
   | { readonly kind: "unchanged" }
-  | { readonly kind: "write"; readonly record: ArchiveRecord }
+  | {
+      readonly kind: "write"
+      /** On the documents' keeper: from then on, the archive gate refuses writes into the root. */
+      readonly record: ArchiveRecord
+      /** Off the keeper, after the record. */
+      readonly teardown: ArchiveTeardown
+      /** On the keeper again, after the teardown: archive only. */
+      readonly unload: boolean
+    }
 
 /** Why a root cannot be archived now, as the tab's menu and the host both say it. */
 export const ROOT_BUSY_REASON = {
@@ -72,6 +100,16 @@ export function planArchive(input: {
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
   readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
+  /**
+   * The root's lanes of their own, by their records, with each one's tip in
+   * the root's document; empty on a host without lanes of their own.
+   */
+  readonly own: readonly {
+    readonly lane: LaneName
+    readonly tip: EntryId | null
+  }[]
+  /** The root's revision records: what its lanes' turns recorded. */
+  readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
 }): ArchivePlan {
   const { action, root, index } = input
   // A root is always a message (S30), so being a root is enough.
@@ -86,6 +124,44 @@ export function planArchive(input: {
   return {
     kind: "write",
     record: { root, state, by: input.by, at: input.now },
+    teardown: planTeardown(action, input),
+    unload: action === "archive",
+  }
+}
+
+/**
+ * Archive: every own lane forgotten, its ref deleted, and every snapshot but
+ * each lane's newest (`planRetention`). Restore: each lane's ref back at its
+ * tip's nearest revision (`nearestRevision`), none for a lane with no tip or
+ * no revision yet.
+ */
+function planTeardown(
+  action: ArchiveAction,
+  input: Pick<Parameters<typeof planArchive>[0], "index" | "own" | "revisions">,
+): ArchiveTeardown {
+  const lanes = input.own.map(o => o.lane)
+  if (action === "archive") {
+    const inRoot = new Set<string>(lanes)
+    return {
+      forget: lanes,
+      refs: lanes.map(lane => ({ lane, commit: null })),
+      snapshots: planRetention({
+        records: [...input.revisions.values()].filter(r => inRoot.has(r.lane)),
+        archived: true,
+      }),
+    }
+  }
+  return {
+    forget: [],
+    refs: input.own.flatMap(({ lane, tip }) => {
+      if (tip === null) return []
+      const { commit } = nearestRevision(input.index, input.revisions, {
+        kind: "entry",
+        id: tip,
+      })
+      return commit === null ? [] : [{ lane, commit }]
+    }),
+    snapshots: [],
   }
 }
 

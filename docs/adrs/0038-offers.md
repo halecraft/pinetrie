@@ -26,6 +26,9 @@ integration line, or a WIP bookmark), and starts where the lane's
 `Pineta-Base` and taken offers' `Pineta-Source` trailers say; a take is a
 forward bookmark move, never a rebase under your `@`; `pineta.have` and
 copies of your `@` are gone, and a root thread starts at the line.
+**Amended by ADR-0065:** an offer is refreshed when the owner of your repo
+observes a move it depends on (the watched heads), not on a 2 s poll; a
+refresh is keyed upkeep, and every write to your repo is the owner's.
 Amended by ADR-0061: archiving a root withdraws its threads' offers, and a
 refresh that finds no offer and none to build removes its record.
 

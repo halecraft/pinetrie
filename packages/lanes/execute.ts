@@ -5,7 +5,6 @@ import type { LaneStep } from "./plan.ts"
 import {
   type BytesRunner,
   describeFailure,
-  hostRunner,
   type Ran,
   type Runner,
 } from "./run.ts"
@@ -55,21 +54,3 @@ export async function executeOrThrow(
       describeFailure(`${done.step.in}: ${done.step.argv.join(" ")}`, done.ran),
     )
 }
-
-const noLane: Runner = async argv => ({
-  ok: false,
-  code: -1,
-  stdout: "",
-  stderr: `a host-only plan has a lane step: ${argv.join(" ")}`,
-})
-
-/** `executeOrThrow` for a plan of host steps only: your repo, never a lane. */
-export const executeOnHost = (steps: readonly LaneStep[]): Promise<void> =>
-  executeOrThrow(steps, {
-    host: hostRunner(),
-    lane: noLane,
-    laneBytes: async argv => ({
-      ...(await noLane(argv)),
-      stdout: new Uint8Array(),
-    }),
-  })

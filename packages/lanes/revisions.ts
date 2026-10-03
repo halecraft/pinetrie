@@ -169,3 +169,15 @@ export async function changedPaths(
   if (!ran.ok) throw new Error(describeFailure("git diff --name-only", ran))
   return ran.stdout.split("\0").filter(p => p !== "")
 }
+
+/**
+ * A revision's description and per-file stats, printed as the JSON of
+ * `RevisionReview` (`@pineta/core`): `json()` quotes every string (S57). A
+ * change to it bumps `OFFER_WIRE` (`@pineta/marginalia`).
+ */
+export const REVISION_READ =
+  '"{\\"description\\":" ++ json(description) ++ ",\\"files\\":[" ++ ' +
+  'self.diff().stat().files().map(|f| "{\\"path\\":" ++ json(f.path()) ++ ' +
+  '",\\"shown\\":" ++ json(f.display_diff_path()) ++ ",\\"change\\":" ++ json(f.status()) ++ ' +
+  '",\\"added\\":" ++ f.lines_added() ++ ",\\"removed\\":" ++ f.lines_removed() ++ "}").join(",") ++ ' +
+  '"]}"'

@@ -19,7 +19,6 @@ import {
   type WriterId,
 } from "@pineta/core"
 import {
-  beginFacts,
   bookmarkName,
   bookmarkOf,
   bookmarkRevset,
@@ -27,14 +26,12 @@ import {
   conflictsIn,
   DEFAULT_LINE,
   entryOfMessage,
-  hostJj,
   laneBase,
   type Merged,
   mergeUpdate,
   planMerge,
   type Runner,
   type TouchedRevision,
-  wipFacts,
 } from "@pineta/lanes"
 import {
   decodeLand,
@@ -51,6 +48,7 @@ import {
 } from "@pineta/marginalia"
 import type { Agent, ThreadLaneHandle } from "@pineta/pi"
 import { readLatestPrompt, readTreeIndex } from "@pineta/reads"
+import { beginFacts, type RepoOwner, wipFacts } from "@pineta/repo"
 import { readEntryMessage, readLaneTip } from "@pineta/schema"
 import { type Basics, failed, messageOf } from "../basics.ts"
 import type { Containers } from "./containers.ts"
@@ -271,7 +269,7 @@ export interface Updates {
 
 export function createUpdates(deps: {
   readonly basics: Basics
-  readonly setup: Pick<Setup, "root" | "paths" | "lanes">
+  readonly setup: Pick<Setup, "root" | "owner" | "paths" | "lanes">
   readonly registry: LaneRegistry
   readonly agent: () => Agent
   readonly containers: Pick<Containers, "beforeRun" | "runEnded">
@@ -325,13 +323,12 @@ export function createUpdates(deps: {
   /**
    * One step on the lane's queue, so nothing changes the lane between what
    * is read and what is merged: the lane's base from its own history, the
-   * line and the WIP from your repo, the plan, and, unless it is refused or
+   * line and the WIP from your repo (a pinned read), the plan, and, unless it is refused or
    * has nothing to merge, the edits committed and the base merged.
    */
-  const updateOnQueue = (lane: LaneName, root: string, toLine: boolean) => {
+  const updateOnQueue = (lane: LaneName, owner: RepoOwner, toLine: boolean) => {
     const handle = registry.handleOf(lane)
     const jj = registry.laneJjOf(lane)
-    const yours = hostJj(root)
     return handle.queue.enqueue(
       async (): Promise<
         | Prepared
@@ -346,12 +343,15 @@ export function createUpdates(deps: {
           bookmarkRevset(bookmarkName(lane)),
           line,
         )
-        const state = wipState(await wipFacts(yours, line, base))
-        const begin = await beginFacts(
-          yours,
-          line,
-          base?.base.kind === "wip" ? base.base.bookmark : null,
-        )
+        // Your repo, pinned to the head its owner last observed.
+        const { state, begin } = await owner.read(async ({ jj: yours }) => ({
+          state: wipState(await wipFacts(yours, line, base)),
+          begin: await beginFacts(
+            yours,
+            line,
+            base?.base.kind === "wip" ? base.base.bookmark : null,
+          ),
+        }))
         const from = planUpdateFrom({
           onto: line.onto,
           base,
@@ -384,8 +384,8 @@ export function createUpdates(deps: {
     },
 
     async prepareUpdate(lane, by, intent, toLine) {
-      const { root } = setup
-      if (!registry.isOwn(lane) || root === null)
+      const { owner } = setup
+      if (!registry.isOwn(lane) || owner === null)
         return refused("the lane has no copy of its own")
       return withLaneStarted(
         {
@@ -393,7 +393,7 @@ export function createUpdates(deps: {
           runEnded: () => containers.runEnded(lane),
         },
         async () => {
-          const done = await updateOnQueue(lane, root, toLine)
+          const done = await updateOnQueue(lane, owner, toLine)
           if (done.kind !== "merged") return done
           const { from, merged } = done
           const facts: SettleFacts =

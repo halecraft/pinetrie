@@ -19,11 +19,13 @@
     "@kyneta/websocket-transport": "link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket",
     "@pineta/client": "workspace:*",
     "@pineta/core": "workspace:*",
+    "@pineta/keeper": "workspace:*",
     "@pineta/lanes": "workspace:*",
     "@pineta/marginalia": "workspace:*",
     "@pineta/pi": "workspace:*",
     "@pineta/protocol": "workspace:*",
     "@pineta/reads": "workspace:*",
+    "@pineta/repo": "workspace:*",
     "@pineta/schema": "workspace:*",
     "vite": "7.1.11",
     "ws": "^8.18.0"

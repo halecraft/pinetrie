@@ -3,6 +3,7 @@
 // column reserves before its lane exists (ADR-0057).
 
 import type { LaneName, NameRecord } from "@pineta/core"
+import { createKeeper } from "@pineta/keeper"
 import {
   NAME,
   planNames,
@@ -13,7 +14,6 @@ import {
 import type { Agent } from "@pineta/pi"
 import { readLaneRecords, readNames } from "@pineta/reads"
 import type { Basics } from "./basics.ts"
-import { createSerial } from "./queue.ts"
 
 export interface Names {
   /** Name every lane pi holds that has none: at start, and for a new lane. */
@@ -33,14 +33,14 @@ export function createNames(deps: {
   readonly onNamed: (lane: LaneName) => void
 }): Names {
   const { session, now } = deps.basics
-  const serial = createSerial()
+  const keeper = createKeeper()
   const write = async (record: NameRecord) => {
     await deps.agent.writeValues([setRecord(NAME, record)])
     deps.onNamed(record.lane)
   }
   return {
     ensure: () =>
-      serial.run(async () => {
+      keeper.run(async () => {
         // Every lane has a record from its creation (ADR-0063), in whichever
         // root it works.
         const records = readLaneRecords(session)
@@ -55,7 +55,7 @@ export function createNames(deps: {
         for (const record of planned) await write(record)
       }),
     reserve: lane =>
-      serial.run(async () => {
+      keeper.run(async () => {
         const plan = planReserve(
           lane,
           new Set(readLaneRecords(session).keys()),

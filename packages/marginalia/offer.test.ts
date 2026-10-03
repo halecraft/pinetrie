@@ -32,6 +32,7 @@ import {
   OFFER,
   OFFER_WIRE,
   offerMoved,
+  offerSeen,
   offerView,
   parseOfferPath,
   planOfferRead,
@@ -67,8 +68,19 @@ const offer: OfferRecord = {
   bookmark: "pineta-offer/t-1",
   taken: null,
   commits: [commitId("w1")],
+  ledger: null,
   at: 10,
 }
+
+test("offerSeen: what a take was shown is the record's ledger and whether it conflicted; no record shows none", () => {
+  const ledger = { source: TIP, start: [BASE] }
+  expect(offerSeen({ ...offer, ledger, conflicts: ["a.txt"] })).toEqual({
+    ledger,
+    conflicted: true,
+  })
+  expect(offerSeen(offer)).toEqual({ ledger: null, conflicted: false })
+  expect(offerSeen(undefined)).toEqual({ ledger: null, conflicted: false })
+})
 
 describe("offerView: ADR-0038's table", () => {
   const view = (

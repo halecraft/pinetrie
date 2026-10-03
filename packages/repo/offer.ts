@@ -1,12 +1,14 @@
-// lanes/offer — what the host reads of an offer in your repo (ADR-0038).
+// repo/offer — what the host reads of an offer in your repo (ADR-0038).
 //
-// Reads only, each a query over `hostOps` returning values: the facts a
-// trigger plans from (`readOffer`, `startOfOffer`, `laneTipIn`), your edits
-// (`yourEditsIn`), what a review shows of a commit (`revisionRead`,
-// `fileDiff`), and which of a divergent revision's commits the host made
-// (`hostCommitIn`, from `evologOf`). What the host then does is planned in `plan.ts`
-// (`planOffer`, `planTakeOffer`, `planRepair`) and decided in
-// `@pineta/marginalia`'s `offer.ts`.
+// Reads only, each a query over jj on your repo (a step's, or a pinned read's)
+// returning values: the facts a trigger plans from (`readOffer`,
+// `startOfOffer`, `laneTipIn`; a lane on the line reads them in one `jj log`,
+// `lane-read.ts`), what a review shows of a commit (`revisionRead`,
+// `fileDiff`), and which of a divergent revision's commits
+// the host made (`hostCommitIn`, from `evologOf`). What the host then does is
+// planned in `plan.ts` (`planOffer`, `planTakeOffer`, `planRepair`) and
+// decided in `@pineta/marginalia`'s `offer.ts`. A lane's base is read by
+// `@pineta/lanes`' `laneBase`, since a lane reads it too.
 
 import {
   type CommitId,
@@ -22,22 +24,25 @@ import {
   TRAILERS,
   trailerValues,
 } from "@pineta/core"
-import { newestBase } from "./merge.ts"
 import {
   bookmarkRevset,
-  EVOLOG_ENTRY,
-  type EvologEntry,
+  commitsOf,
+  describeFailure,
   type LineConfig,
   laneTipName,
+  lines,
   offerBookmark,
+  REVISION_READ,
+  type Runner,
+} from "@pineta/lanes"
+import {
+  EVOLOG_ENTRY,
+  type EvologEntry,
   offerStart,
   parseEvolog,
-  revsetName,
   takenRevset,
   walkToHost,
 } from "./plan.ts"
-import { commitsOf } from "./revisions.ts"
-import { describeFailure, lines, type Runner } from "./run.ts"
 
 async function query(jj: Runner, args: readonly string[]): Promise<string> {
   const ran = await jj(args)
@@ -52,37 +57,6 @@ export async function laneTipIn(
 ): Promise<CommitId | null> {
   const [tip] = await commitsOf(jj, `present(${laneTipName(lane)})`)
   return tip ?? null
-}
-
-/**
- * A lane's base, from the newest `Pineta-Base` in the history of `tip`, a
- * revset: the lane's tip in your repo, or its bookmark in its own repo. A
- * lane with none (one from before the line) is on the line, from the newest
- * line commit in its history; null when there is none. In the lane's own
- * repo such a lane is always null: that repo has no line bookmark.
- */
-export async function laneBase(
-  jj: Runner,
-  tip: string,
-  line: LineConfig,
-): Promise<LaneBase | null> {
-  const newest = await newestBase(jj, tip)
-  if (newest === null) {
-    const [start] = await commitsOf(
-      jj,
-      `latest(heads(::(${tip}) & ::present(${revsetName(line.onto)})))`,
-    )
-    return start === undefined
-      ? null
-      : { base: { kind: "line" }, start, source: start }
-  }
-  return newest.bookmark === line.onto
-    ? { base: { kind: "line" }, start: newest.commit, source: newest.commit }
-    : {
-        base: { kind: "wip", bookmark: newest.bookmark },
-        start: newest.at,
-        source: newest.commit,
-      }
 }
 
 /**
@@ -189,7 +163,10 @@ export async function evologOf(
  * walked back to it (`walkToHost`), then each version of yours on the way
  * against the one before it (`sameAs`).
  */
-async function sinceHost(jj: Runner, commit: CommitId): Promise<RevisionFacts> {
+export async function sinceHost(
+  jj: Runner,
+  commit: CommitId,
+): Promise<RevisionFacts> {
   const walk = walkToHost(await evologOf(jj, commit), commit)
   let yoursChanged = false
   for (const v of walk.yours) {
@@ -318,46 +295,6 @@ export async function readOffer(
     conflicts,
   }
 }
-
-/** The thread names whose offer bookmark is in your repo. */
-export async function offerNames(jj: Runner): Promise<ThreadName[]> {
-  const prefix = offerBookmark("" as ThreadName)
-  const ran = await jj([
-    "log",
-    "--no-graph",
-    "-r",
-    `bookmarks(glob:${revsetName(`${prefix}*`)})`,
-    "-T",
-    'local_bookmarks.map(|b| b.name()).join("\\n") ++ "\\n"',
-  ])
-  if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  return lines(ran.stdout)
-    .filter(b => b.startsWith(prefix))
-    .map(b => b.slice(prefix.length) as ThreadName)
-}
-
-/** Of `files`, those you are editing: changed in `@` as jj last saw it. */
-export async function yourEditsIn(
-  jj: Runner,
-  files: readonly string[],
-): Promise<string[]> {
-  const yours = new Set(
-    lines(await query(jj, ["diff", "-r", "@", "--name-only"])),
-  )
-  return files.filter(f => yours.has(f))
-}
-
-/**
- * A revision's description and per-file stats, printed as the JSON of
- * `RevisionReview` (`@pineta/core`): `json()` quotes every string (S57). A
- * change to it bumps `OFFER_WIRE` (`@pineta/marginalia`).
- */
-export const REVISION_READ =
-  '"{\\"description\\":" ++ json(description) ++ ",\\"files\\":[" ++ ' +
-  'self.diff().stat().files().map(|f| "{\\"path\\":" ++ json(f.path()) ++ ' +
-  '",\\"shown\\":" ++ json(f.display_diff_path()) ++ ",\\"change\\":" ++ json(f.status()) ++ ' +
-  '",\\"added\\":" ++ f.lines_added() ++ ",\\"removed\\":" ++ f.lines_removed() ++ "}").join(",") ++ ' +
-  '"]}"'
 
 /**
  * A range's files, each as one JSON object per line: a `TreeDiffEntry` has

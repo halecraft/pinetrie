@@ -118,7 +118,9 @@ packages/pi/           @pineta/pi           THE pi boundary
 packages/protocol/     @pineta/protocol     the wire contract and its codec
 packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: chat, cards
 packages/reads/        @pineta/reads        document reads shared by host and client
-packages/lanes/        @pineta/lanes        lane containers, disks, and jj/git (ADR-0032–0034, 0038)
+packages/lanes/        @pineta/lanes        a lane's container and disk, and jj and git in it (ADR-0032–0034)
+packages/keeper/       @pineta/keeper       declares NOTHING; one step at a time on a resource
+packages/repo/         @pineta/repo         your repo: offers, the line, lanes' refs (ADR-0038, 0060)
 packages/client/       @pineta/client       browser UI; owns its Vite build
 (root)                                      development tooling only
 ```
@@ -294,6 +296,17 @@ runtime carries static rg, fd and sd beside jj, into every lane whatever its
 image (S88). The agent's `grep` and `find` are Pineta's own, run through the
 lane's `env`, so pi's "use bash … rg" rule is gone; a direct lane uses pi's
 `ensureTool`. The default image also has python3.
+
+**ADR-0065 — one owner for your repo** (built). Takes waited 13–18 s behind
+a queue of duplicate refreshes fed by a self-overlapping poll, and held
+everyone's chats (S89). Now `@pineta/repo`'s owner is the one writer of your
+repo: commands before keyed upkeep (`@pineta/keeper`), reads pinned to the
+head it last observed (S87), its heads watched instead of polled, shared
+facts read once per operation and one `jj log` per lane. A take names the
+offer it was shown (`offer_changed`), one person's commands keep their order
+by a chain, offer commands and an archive's teardown hold no other command,
+and the strip shows a command in flight and why it was refused. A take now
+answers in under half a second, a chat beside it at once.
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries

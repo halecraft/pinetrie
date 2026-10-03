@@ -2,6 +2,7 @@
 // stopped and trimmed after it (ADR-0034), and where its tools run.
 
 import { type LaneName, type SnapshotId, WORKSPACE_ROOT } from "@pineta/core"
+import type { Keeper } from "@pineta/keeper"
 import {
   containerFacts,
   executeOrThrow,
@@ -23,7 +24,6 @@ import type { LaneAccess } from "@pineta/pi"
 import { readRevisions, readThreadName } from "@pineta/reads"
 import { type Basics, failed, messageOf } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"
-import type { Serial } from "../queue.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 
@@ -52,12 +52,12 @@ export function createContainers(deps: {
   readonly setup: Setup
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
-  readonly serial: Serial
+  readonly keeper: Keeper
   readonly offers: Offers | null
   /** The directory the host runs from, or null with no tools. */
   readonly dir: string | null
 }): Containers {
-  const { basics, setup, registry, serial, offers } = deps
+  const { basics, setup, registry, keeper, offers } = deps
   const { session, docs, log } = basics
 
   /** The newest snapshot of `lane`'s own records whose file is still there. */
@@ -160,7 +160,7 @@ export function createContainers(deps: {
       if (!registry.isOwn(lane)) return
       const handle = registry.handleOf(lane)
       handle.queue.reset()
-      void serial.track(
+      void keeper.track(
         handle.queue
           .enqueue(() => startContainer(lane), { fatal: true })
           .catch(error =>
@@ -176,7 +176,7 @@ export function createContainers(deps: {
       if (!registry.isOwn(lane) || ready === null) return
       offers?.runEnded(lane)
       const handle = registry.handleOf(lane)
-      void serial.track(
+      void keeper.track(
         handle.queue
           .enqueue(async () => {
             await handle.stop()

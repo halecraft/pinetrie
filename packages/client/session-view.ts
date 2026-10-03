@@ -37,6 +37,7 @@ import {
   type WriterId,
   writerOfPrincipal,
 } from "@pineta/core"
+import { offerSeen } from "@pineta/marginalia"
 import {
   decodeReply,
   encodeIntent,
@@ -53,7 +54,12 @@ import {
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
 import { inventoryDocId, writersPolicy } from "@pineta/protocol/writers"
-import { readLaneRecords, readPlaces, readPlacesRev } from "@pineta/reads"
+import {
+  readLaneRecords,
+  readOffers,
+  readPlaces,
+  readPlacesRev,
+} from "@pineta/reads"
 import {
   asRootDoc,
   asSessionDoc,
@@ -77,6 +83,7 @@ import {
   type TextDocHandle,
   textVersion,
 } from "@pineta/schema"
+import { type ActingState, NO_ACTING, sendActing } from "./acting.ts"
 import {
   answerOf,
   type HistoryEntry,
@@ -277,15 +284,20 @@ export interface SessionClient {
   archive(action: ArchiveAction, root: EntryId): Promise<Outcome>
   /** Title the entry `entry`, or clear its title with null (ADR-0045). */
   mark(entry: EntryId, title: string | null): Promise<Outcome>
-  /** Act on a lane's offer in your repo: take it, split it, and so on. */
-  /** An offer action; a take names its destination bookmark, null for the default. */
+  /**
+   * An offer action on a lane's offer in your repo; a take names its
+   * destination bookmark, null for the default, and the offer as this tab's
+   * record shows it (`offerSeen`). Tracked in `acting`.
+   */
   offer(
     lane: LaneName,
     action: OfferAction,
     to?: string | null,
   ): Promise<Outcome>
-  /** Set up the integration line, or land your work on it (ADR-0060). */
+  /** Set up the integration line, or land your work on it (ADR-0060). Tracked in `acting`. */
   line(action: LineAction): Promise<Outcome>
+  /** Your offer and line commands out now, or refused or failed (`acting.ts`). */
+  readonly acting: Readable<ActingState>
   /** Every reply as it arrived on the wire, for wire-level checks. */
   readonly replies: readonly Reply[]
   close(): Promise<void>
@@ -430,6 +442,7 @@ export async function connectSession(
   // host's records with those moves drawn over them (card-moves.ts).
   let records = readPlaces(places)
   const moves = snapshotStore(NO_MOVES)
+  const acting = snapshotStore<ActingState>(NO_ACTING)
   const cards = snapshotStore(withPending(records, NO_MOVES, me))
   const redraw = () => cards.set(withPending(records, moves.current(), me))
   // Your inventory's slots (ADR-0059): written by this person's tabs only,
@@ -813,11 +826,20 @@ export async function connectSession(
     moves: { current: moves.current, subscribe: moves.subscribe },
     slots: { current: slots.current, subscribe: slots.subscribe },
     offer(lane, action, to = null) {
-      return send({ kind: "offer", lane, action, to })
+      // A take names the offer this tab shows now: its record, as the strip
+      // drew it (ADR-0065).
+      const seen =
+        action === "take" ? offerSeen(readOffers(session).get(lane)) : null
+      return sendActing(acting, { kind: "offer", lane, action, to }, () =>
+        send({ kind: "offer", lane, action, to, seen }),
+      )
     },
     line(action) {
-      return send({ kind: "line", action })
+      return sendActing(acting, { kind: "line", action }, () =>
+        send({ kind: "line", action }),
+      )
     },
+    acting: { current: acting.current, subscribe: acting.subscribe },
     archive(action, root) {
       return send({ kind: "archive", action, root })
     },

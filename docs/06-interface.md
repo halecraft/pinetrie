@@ -82,7 +82,11 @@ the session, from live data only, as a document editor shows the people in it.
   which moves the line forward to your `@-`; and, when your files have
   conflicts, **resolve with the agent**, which opens a new agent tab working
   in your files, its box holding the `resolve-conflicts` skill and the
-  files, for you to send. A command refused or failed says why there. With
+  files, for you to send. While a command is out the menu says what it is
+  doing ("setting up the project…", "adding your work to the project…",
+  "updating your files…") and offers nothing else; refused, it says "not
+  done:" and why; failed, "it failed, and may be part done:" and why. That
+  stays, menu closed or open, until your next command there. With
   no commit in common with the project, it says to rebase in jj. A host
   that admits others offers none of these, and says to use jj on its
   machine.
@@ -231,7 +235,18 @@ so it is the one behind the menu. What each does is under "Starting" below.
   project", or "add to wip/search" for a thread on a WIP, whose menu also
   offers "add to the project, with your 2 commits beneath it"; its title
   names the bookmark it moves. A take moves that bookmark forward to the
-  offer and never touches your working copy. An offer that conflicts is
+  offer and never touches your working copy. From the click to the host's
+  answer the strip says what your command is doing ("adding to the
+  project…", "adding to wip/search…", "squashing to one…", "splitting into
+  a stack…", "rewriting the description…", "refreshing…"), and its buttons
+  wait. A command refused or failed says so there, as the project menu does
+  ("not done: …", "it failed, and may be part done: …"), until your next
+  one on that thread; one carried out says nothing, as the offer then shows
+  it. A take adds the offer the strip showed: if it now brings other work
+  (the lane moved on), or conflicts where it did not, it is not done ("not
+  done: the offer changed since you looked at it: review it again"), and
+  the strip shows the new offer. A rebase onto a moved project, or your own
+  edit of the offer, is still the offer you saw, and is added. An offer that conflicts is
   never added to the project; its button is **resolve in the thread**. One
   working directly says "edits your files directly", and warns while
   another agent works in the same directory. Its **⋯** menu holds **catch

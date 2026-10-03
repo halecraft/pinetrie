@@ -6,12 +6,12 @@
 // names a text's writers from its `clientID`s, after the seat has gone.
 
 import type { Exchange } from "@kyneta/exchange"
+import type { Keeper } from "@pineta/keeper"
 import { planSeats, SEAT, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readSeats } from "@pineta/reads"
 import { seatOf } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
-import type { Serial } from "./queue.ts"
 
 /**
  * Write each connected seat's record, now and on every change to the peers.
@@ -23,13 +23,13 @@ export function startSeats(input: {
     readonly peers: Pick<Exchange["peers"], "current" | "subscribe">
   }
   readonly basics: Pick<Basics, "session" | "now">
-  readonly serial: Serial
+  readonly keeper: Keeper
   readonly agent: Pick<Agent, "writeValues">
 }): { stop(): void } {
-  const { exchange, serial, agent } = input
+  const { exchange, keeper, agent } = input
   const { session: doc, now } = input.basics
   const step = () =>
-    serial.run(async () => {
+    keeper.run(async () => {
       // gather
       const connected = [...exchange.peers.current.values()].flatMap(p => {
         const seat = seatOf(p.peerId, p.principal)

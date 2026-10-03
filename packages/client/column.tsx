@@ -380,7 +380,14 @@ export function Column(p: ColumnProps) {
   const threadBase = effectiveBase(
     lane.kind === "lane" ? (p.work.bases.get(lane.name) ?? null) : null,
   )
+  // Your last offer command on this lane: in flight, refused or failed.
+  const acting = useSyncExternalStore(
+    p.session.acting.subscribe,
+    p.session.acting.current,
+  )
   const shows = columnView({
+    acting:
+      lane.kind === "lane" ? (acting.offers.get(lane.name) ?? null) : null,
     mountedBanner,
     catchingUp: queued.some(c => c.command !== null),
     index,
@@ -1128,10 +1135,20 @@ function WorkStripView({
         </button>
       )}
       {strip.bookmark !== null && <Bookmark name={strip.bookmark} />}
+      {words.note !== null && (
+        <span
+          className="offer-note"
+          data-acting={strip.waiting ? "sent" : "said"}
+          role="status"
+        >
+          {words.note}
+        </span>
+      )}
       <span className="work-space" />
       {words.buttons.map(({ button, label, title }) => (
         <button
           className={`offer-${button}`}
+          disabled={strip.waiting}
           key={button}
           onClick={() => act(button)}
           title={title}
@@ -1150,6 +1167,7 @@ function WorkStripView({
                 key: button,
                 label,
                 className: `offer-${button}`,
+                disabled: strip.waiting,
                 ...(title === undefined ? {} : { title }),
                 onChoose: () => act(button),
               })),

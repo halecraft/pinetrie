@@ -19,6 +19,7 @@ import {
 } from "@pineta/core"
 import { offerView } from "@pineta/marginalia"
 import { describe, expect, test } from "vitest"
+import type { OfferActing } from "./acting.ts"
 import {
   behindMark,
   type ColumnFacts,
@@ -195,6 +196,7 @@ const facts = (
     writable: true,
     nameOf: new Map([[ADA, "Ada"]]),
     catchingUp: false,
+    acting: null,
     lanes: [],
     work: work(),
     ...over,
@@ -390,7 +392,27 @@ describe("columnView: the work strip", () => {
       kind: "offer",
       state: "nothing",
       bookmark: null,
+      waiting: false,
     })
+  })
+  test("your offer command waits while it is out, and not once answered", () => {
+    const sent = {
+      kind: "sent",
+      id: "s1",
+      action: "take",
+      to: null,
+    } as const
+    expect(columnView(own({ acting: sent })).strip).toMatchObject({
+      waiting: true,
+      words: { note: "adding to the project…" },
+    })
+    expect(
+      columnView(
+        own({
+          acting: { kind: "refused", action: "take", message: "no" },
+        }),
+      ).strip,
+    ).toMatchObject({ waiting: false, words: { note: "not done: no" } })
   })
   test("an open offer with files can be reviewed, in every state; a taken or empty one cannot", () => {
     const open: OfferRecord = {
@@ -405,6 +427,7 @@ describe("columnView: the work strip", () => {
       bookmark: "pineta-offer/copper-owl",
       taken: null,
       commits: [commitId("c1")],
+      ledger: null,
       at: 1,
     }
     const strip = (offer: OfferRecord, running = false) =>
@@ -511,6 +534,7 @@ describe("offerWords", () => {
     bookmark: "pineta-offer/amber-fox",
     taken: null,
     commits: [commitId("w")],
+    ledger: null,
     at: 10,
   }
   const LINE_BASE = { base: { kind: "line" }, state: "ok" } as const
@@ -519,6 +543,7 @@ describe("offerWords", () => {
     activity: "idle" | "turn" | "resolution" = "idle",
     base: Parameters<typeof offerView>[0]["base"] = LINE_BASE,
     catching: { behind?: boolean; catchingUp?: boolean } = {},
+    acting: OfferActing | null = null,
   ) =>
     offerWords(
       offerView({
@@ -531,6 +556,7 @@ describe("offerWords", () => {
         behind: catching.behind ?? false,
         catchingUp: catching.catchingUp ?? false,
       }),
+      acting,
     )
   const WIP_BASE = {
     base: { kind: "wip", bookmark: "wip/search" },
@@ -652,6 +678,39 @@ describe("offerWords", () => {
       "catch up with wip/search",
       "add to the project, with your 2 commits beneath it",
     ])
+  })
+  const sent = (
+    action: OfferActing["action"],
+    to: string | null = null,
+  ): OfferActing => ({ kind: "sent", id: "s1", action, to })
+  test.each([
+    ["nothing out", LINE_BASE, null, null],
+    ["a take to the line", LINE_BASE, sent("take"), "adding to the project…"],
+    ["a take to its WIP", WIP_BASE, sent("take"), "adding to wip/search…"],
+    [
+      "a take from a WIP to the line",
+      WIP_BASE,
+      sent("take", "pineta-onto"),
+      "adding to the project…",
+    ],
+    ["a split", LINE_BASE, sent("split"), "splitting into a stack…"],
+    ["a squash", LINE_BASE, sent("squash"), "squashing to one…"],
+    ["a describe", LINE_BASE, sent("describe"), "rewriting the description…"],
+    ["a refresh", LINE_BASE, sent("refresh"), "refreshing…"],
+    [
+      "a refusal",
+      LINE_BASE,
+      { kind: "refused", action: "take", message: "nothing to take" },
+      "not done: nothing to take",
+    ],
+    [
+      "a failure",
+      LINE_BASE,
+      { kind: "failed", action: "squash", message: "jj said no" },
+      "it failed, and may be part done: jj said no",
+    ],
+  ] as const)("your last command: %s", (_, base, acting, note) => {
+    expect(words(offer, "idle", base, {}, acting).note).toBe(note)
   })
   test("a WIP gone without landing offers no take, and continuing from the project", () => {
     const w = words(offer, "idle", { ...WIP_BASE, state: "gone" })

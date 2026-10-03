@@ -6,6 +6,9 @@
 // the only install; no lane ever installs. It is made and refreshed in a
 // scratch lane, then snapshotted back as `base.img` as a turn is, so a fork
 // never reads it half-written. `base.json` beside it says what it holds.
+//
+// Also a lane's base as its history names it (`laneBase`), read the same way
+// from the lane's own repo and from yours.
 
 import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
@@ -13,21 +16,27 @@ import {
   BASE_SNAPSHOT,
   type CommitId,
   commitId,
+  type LaneBase,
   laneNameForThread,
 } from "@pineta/core"
 import { snapshotExists } from "./disk.ts"
 import { executeOrThrow } from "./execute.ts"
 import { laneHandle, type OpenLink, removeLane } from "./lane.ts"
+import { newestBase } from "./merge.ts"
 import {
   type BaseFacts,
   type DiskPaths,
   type Install,
   type LaneSpec,
+  type LineConfig,
   laneContainer,
   planBaseRefresh,
   planDisk,
   planSnapshot,
+  revsetName,
 } from "./plan.ts"
+import { commitsOf } from "./revisions.ts"
+import type { Runner } from "./run.ts"
 
 /** The scratch lane a base is made in; never a thread's. */
 export const BASE_LANE = laneNameForThread("base-scratch")
@@ -104,4 +113,35 @@ export async function refreshBase<C>(input: {
     await handle.stop().catch(() => {})
     await removeLane(container)
   }
+}
+
+/**
+ * A lane's base, from the newest `Pineta-Base` in the history of `tip`, a
+ * revset: the lane's tip in your repo, or its bookmark in its own repo. A
+ * lane with none (one from before the line) is on the line, from the newest
+ * line commit in its history; null when there is none. In the lane's own
+ * repo such a lane is always null: that repo has no line bookmark.
+ */
+export async function laneBase(
+  jj: Runner,
+  tip: string,
+  line: LineConfig,
+): Promise<LaneBase | null> {
+  const newest = await newestBase(jj, tip)
+  if (newest === null) {
+    const [start] = await commitsOf(
+      jj,
+      `latest(heads(::(${tip}) & ::present(${revsetName(line.onto)})))`,
+    )
+    return start === undefined
+      ? null
+      : { base: { kind: "line" }, start, source: start }
+  }
+  return newest.bookmark === line.onto
+    ? { base: { kind: "line" }, start: newest.commit, source: newest.commit }
+    : {
+        base: { kind: "wip", bookmark: newest.bookmark },
+        start: newest.at,
+        source: newest.commit,
+      }
 }

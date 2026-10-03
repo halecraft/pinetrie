@@ -8,7 +8,7 @@
 // `withTrailers`, `wipDescription`), and the review's wire: its URLs, what a
 // request may read and how it is answered (`planOfferRead`, `answerReview`,
 // `answerDiff`). The jj steps that carry them out, and where an offer starts
-// (`startOfOffer`), are in `@pineta/lanes`.
+// (`startOfOffer`), are in `@pineta/repo`.
 
 import {
   type BaseRecord,
@@ -22,6 +22,7 @@ import {
   type OfferInRepo,
   type OfferLedger,
   type OfferRecord,
+  type OfferSeen,
   type RevisionFacts,
   type RevisionRecord,
   type RevisionReview,
@@ -589,9 +590,9 @@ export const decodeRevisionReview = (
 ): RevisionReview | undefined => decodeWith(RevisionReviewSchema, value, r => r)
 
 /**
- * The version of what `/offer/` answers: `REVISION_READ` and the range read
- * (`@pineta/lanes`), `decodeRevisionReview`, `fileDiff`'s flags, and the
- * URLs' spans. Every answer is cached as immutable under a URL holding it,
+ * The version of what `/offer/` answers: `REVISION_READ` (`@pineta/lanes`)
+ * and the range read (`@pineta/repo`), `decodeRevisionReview`, `fileDiff`'s
+ * flags, and the URLs' spans. Every answer is cached as immutable under a URL holding it,
  * so a change to any of them bumps it, or pages keep the old shape.
  */
 export const OFFER_WIRE = 2
@@ -746,3 +747,13 @@ export function answerDiff(text: string | null): OfferAnswer {
     return { kind: "refused", status: 413, reason: "too large to show here" }
   return { kind: "diff", text }
 }
+
+/**
+ * What a take was shown (ADR-0065), from the record the page drew: the
+ * offer's ledger, and whether it conflicted. With no record, it was shown no
+ * offer.
+ */
+export const offerSeen = (record: OfferRecord | undefined): OfferSeen => ({
+  ledger: record?.ledger ?? null,
+  conflicted: (record?.conflicts.length ?? 0) > 0,
+})

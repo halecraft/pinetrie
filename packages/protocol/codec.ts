@@ -18,7 +18,9 @@ import {
   type CardCommand,
   CHAT_MODES,
   type ChatMode,
+  type CommitId,
   cardId,
+  commitId,
   type EntryId,
   ERR,
   type ErrCode,
@@ -34,6 +36,7 @@ import {
   normalizeName,
   OFFER_ACTIONS,
   type OfferAction,
+  type OfferSeen,
   type PlaceKey,
   type Position,
   parseMentions,
@@ -230,9 +233,13 @@ export function decodeCommand(
       return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
     const action = text(wire?.mode)
     const to = text(wire?.targetId)
-    return isOfferAction(action)
-      ? { kind, lane, action, to: action === "take" && to !== "" ? to : null }
-      : refused(ERR.UNKNOWN_KIND, `unknown offer action: ${action}`)
+    if (!isOfferAction(action))
+      return refused(ERR.UNKNOWN_KIND, `unknown offer action: ${action}`)
+    if (action !== "take") return { kind, lane, action, to: null, seen: null }
+    const seen = offerSeenFromWire(text(wire?.seen))
+    return seen === null
+      ? refused(ERR.REFUSED, "a take must say which offer it was shown")
+      : { kind, lane, action, to: to === "" ? null : to, seen }
   }
   if (kind === "archive") {
     const action = text(wire?.mode)
@@ -268,6 +275,38 @@ export function decodeCommand(
 
 const notNewLane = (lane: string): Refusal =>
   refused(ERR.UNKNOWN_TARGET, `not a new thread's lane: ${lane}`)
+
+/** What a take was shown, as the wire carries it in `seen`: JSON. */
+export const offerSeenToWire = (seen: OfferSeen | null): string =>
+  seen === null ? "" : JSON.stringify(seen)
+
+const isCommit = (v: unknown): v is string =>
+  typeof v === "string" && /^[0-9a-f]+$/.test(v)
+
+/** The wire's `seen` for a take -> what it was shown; null when malformed. */
+function offerSeenFromWire(wire: string): OfferSeen | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(wire)
+  } catch {
+    return null
+  }
+  if (typeof parsed !== "object" || parsed === null) return null
+  const { ledger, conflicted } = parsed as Record<string, unknown>
+  if (typeof conflicted !== "boolean") return null
+  if (ledger === null) return { ledger: null, conflicted }
+  if (typeof ledger !== "object" || ledger === undefined) return null
+  const { source, start } = ledger as Record<string, unknown>
+  if (
+    !isCommit(source) ||
+    !Array.isArray(start) ||
+    start.length === 0 ||
+    !start.every(isCommit)
+  )
+    return null
+  const commits: CommitId[] = start.map(commitId)
+  return { ledger: { source: commitId(source), start: commits }, conflicted }
+}
 
 /** A chat's card on the wire, with its text's version: `""` is none. */
 const cardFromWire = (id: string, seen: string): SentCard | null =>
@@ -399,6 +438,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         lane: intent.lane,
         mode: intent.action,
         targetId: intent.to ?? "",
+        seen: offerSeenToWire(intent.seen),
       })
     case "line":
       return command({ id, kind: "line", mode: intent.action })

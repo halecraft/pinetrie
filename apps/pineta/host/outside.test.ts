@@ -1,15 +1,15 @@
+import { createKeeper } from "@pineta/keeper"
 import { expect, test } from "vitest"
 import { requestOutside } from "./outside.ts"
-import { createSerial } from "./queue.ts"
 
 test("requestOutside: holds its key while out, settles inside the queue, and logs a failure, leaving the set empty", async () => {
-  const serial = createSerial()
+  const keeper = createKeeper()
   const set = new Set<string>()
   const settled: string[] = []
   const failures: unknown[] = []
   const answer = Promise.withResolvers<string>()
   const done = requestOutside({
-    serial,
+    keeper,
     held: { set, key: "a" },
     request: () => answer.promise,
     settle: async a => {
@@ -23,7 +23,7 @@ test("requestOutside: holds its key while out, settles inside the queue, and log
   expect([settled, set.size]).toEqual([["written"], 0])
 
   await requestOutside({
-    serial,
+    keeper,
     held: { set, key: "b" },
     request: async () => {
       throw new Error("no key")
@@ -34,7 +34,7 @@ test("requestOutside: holds its key while out, settles inside the queue, and log
   expect([failures.length, set.size]).toEqual([1, 0])
 
   await requestOutside({
-    serial,
+    keeper,
     request: async () => null,
     settle: async a => {
       settled.push(String(a))
@@ -42,5 +42,5 @@ test("requestOutside: holds its key while out, settles inside the queue, and log
     failed: e => failures.push(e),
   })
   expect(settled).toEqual(["written"])
-  await serial.idle()
+  await keeper.idle()
 })

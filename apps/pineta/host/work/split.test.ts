@@ -1,5 +1,6 @@
 import { commitId, laneNameForThread, writerId } from "@pineta/core"
 import type { Agent } from "@pineta/pi"
+import type { RepoOwner } from "@pineta/repo"
 import { expect, test } from "vitest"
 import { basics, record } from "../fakes.ts"
 import type { Offers } from "../offers/index.ts"
@@ -51,7 +52,7 @@ test("a split whose skill read fails starts no container", async () => {
   })
   const splits = createSplits({
     basics: basics(),
-    root: "/project",
+    owner: record<RepoOwner>({}).port,
     registry: record<LaneRegistry>({ isOwn: () => true }).port,
     offers: record<Offers>({
       stackSpan: async () => ({

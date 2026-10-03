@@ -55,6 +55,7 @@ const offer: OfferRecord = {
   bookmark: "pineta-offer/x",
   taken: null,
   commits: [C],
+  ledger: null,
   at: 1,
 }
 
@@ -121,7 +122,12 @@ const SAMPLES: readonly Sample[] = [
     { id: "g-1", lane: L, prompt: E, state: "resolved", by: ADA, at: 1 },
     "id",
   ),
-  sample("offer", OFFER, offer, "lane"),
+  sample(
+    "offer",
+    OFFER,
+    { ...offer, ledger: { source: C, start: [commitId("c0")] } },
+    "lane",
+  ),
   sample(
     "line",
     LINE,
@@ -212,6 +218,13 @@ describe.each(SAMPLES)("%s", (_, spec, record, keyField) => {
     }
     expect(recordsOf(spec, [old]).get(write.key)).toEqual(record)
   })
+})
+
+test("an offer record with no ledger reads back with none, and so does one written before the field (ADR-0065)", () => {
+  const stored = OFFER.encode(offer) as Record<string, unknown>
+  expect(OFFER.decode(stored, L)).toEqual(offer)
+  const { ledger: _, ...before } = stored
+  expect(OFFER.decode(before, L)).toEqual(offer)
 })
 
 test("a record keyed by lane does not read at an address that is no lane", () => {

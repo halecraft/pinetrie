@@ -3,16 +3,20 @@ import {
   cardId,
   ERR,
   entryId,
+  type Intent,
   laneNameForThread,
   writerId,
 } from "@pineta/core"
+import { createKeeper } from "@pineta/keeper"
 import { ARCHIVE, setRecord } from "@pineta/marginalia"
 import type { WireCommand } from "@pineta/protocol/codec"
 import type { Reply } from "@pineta/protocol/messages"
 import { readPlaces } from "@pineta/reads"
 import { writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
+import type { HostKey } from "../basics.ts"
 import {
+  applyWrites,
   basics,
   putValue,
   ROOT_ID,
@@ -20,16 +24,21 @@ import {
   row,
   writeDirectory,
 } from "../fakes.ts"
+import type { Offers } from "../offers/index.ts"
 import { applyPlaceStep } from "../places.ts"
-import { type CommandDeps, createCommands } from "./index.ts"
+import { type CommandDeps, createCommands, placeOfCommand } from "./index.ts"
 
 const ALICE = writerId("alice@example.com")
 const ROOT_ENTRY = entryId("e-1")
 const HELD = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
 const NEW = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a3067862240")
 
-function setUp() {
+function setUp(
+  work: Partial<CommandDeps["work"]> = {},
+  { writes = true }: { readonly writes?: boolean } = {},
+) {
   const b = basics()
+  const keeper = createKeeper<HostKey>()
   const cards = record<CommandDeps["cards"]>({
     writers: async () => [],
     destroy: async () => {},
@@ -39,11 +48,12 @@ function setUp() {
   writeDirectory(b)
   const agent = record<CommandDeps["agent"]>({
     appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
+    ...(writes ? { writeValues: async w => applyWrites(b, w) } : {}),
   })
   const commands = createCommands({
     basics: b,
     agent: agent.port,
-    work: record<CommandDeps["work"]>().port,
+    work: record<CommandDeps["work"]>(work).port,
     blobs: record<CommandDeps["blobs"]>({ ref: () => undefined }).port,
     cards: cards.port,
     start: () => {
@@ -53,6 +63,7 @@ function setUp() {
       reserve: async lane => (lane === HELD ? "held" : "name"),
     }).port,
     drain: lane => void drains.push(lane),
+    keeper,
   })
   const replies: Reply[] = []
   const sender = { send: (r: Reply) => void replies.push(r) }
@@ -67,8 +78,76 @@ function setUp() {
       lane: "",
       asksAgent: false,
     }) satisfies WireCommand
-  return { b, agent, cards, commands, replies, sender, chat, drains }
+  return { b, keeper, agent, cards, commands, replies, sender, chat, drains }
 }
+
+test.each([
+  ["a take", { kind: "offer", action: "take" }, "repo"],
+  ["a squash", { kind: "offer", action: "squash" }, "repo"],
+  [
+    "a split, which starts a run",
+    { kind: "offer", action: "split" },
+    "documents",
+  ],
+  ["a line command", { kind: "line", action: "land" }, "repo"],
+  ["an archive", { kind: "archive", action: "archive" }, "archive"],
+  ["a chat", { kind: "chat" }, "documents"],
+  ["a move", { kind: "move" }, "documents"],
+  ["a stop", { kind: "stop" }, "documents"],
+] as const)("placeOfCommand: %s runs on %s", (_, intent, place) => {
+  expect(placeOfCommand(intent as Intent)).toBe(place)
+})
+
+test("a chat completes while a take is held open on your repo's owner", async () => {
+  const held = Promise.withResolvers<null>()
+  const { commands, replies, sender, chat } = setUp({
+    offers: record<NonNullable<Offers>>({ act: () => held.promise }).port,
+  })
+  const take = commands.handle(sender, ALICE, {
+    id: "t-1",
+    kind: "offer",
+    lane: HELD,
+    mode: "take",
+    seen: JSON.stringify({ ledger: null, conflicted: false }),
+  })
+  await commands.handle(sender, ALICE, chat("c-1"))
+  expect(replies.map(r => r.id)).toEqual(["c-1"])
+  held.resolve(null)
+  await take
+  expect(replies.map(r => [r.id, r.outcome])).toEqual([
+    ["c-1", "appended"],
+    ["t-1", "taken"],
+  ])
+})
+
+test("an archive holds the keeper only for its record and its unload: a command waits on neither its teardown, and one into the root is refused meanwhile; its reply comes after it all", async () => {
+  const teardown = Promise.withResolvers<void>()
+  const { b, commands, replies, sender, chat } = setUp({
+    offers: null,
+    teardown: () => teardown.promise,
+  })
+  const archive = commands.handle(sender, ALICE, {
+    id: "a-1",
+    kind: "archive",
+    mode: "archive",
+    targetId: ROOT_ENTRY,
+  })
+  await new Promise(r => setTimeout(r, 5))
+  await commands.handle(sender, ALICE, {
+    id: "n-1",
+    kind: "name",
+    text: "Alice",
+  })
+  await commands.handle(sender, ALICE, chat("c-1"))
+  expect(replies.map(r => [r.id, r.outcome])).toEqual([
+    ["n-1", "named"],
+    ["c-1", "refused"],
+  ])
+  teardown.resolve()
+  await archive
+  expect(replies.at(-1)).toMatchObject({ id: "a-1", outcome: "archived" })
+  expect(b.docs.loaded()).not.toContain(ROOT_ID)
+})
 
 test("a chat in an archived root is refused, and the agent is never called", async () => {
   const { b, agent, commands, replies, sender, chat } = setUp()
@@ -168,7 +247,7 @@ test("a seat whose principal names nobody is refused whatever it sends", async (
 })
 
 test("a command that throws is answered failed, and logged", async () => {
-  const { b, commands, replies, sender } = setUp()
+  const { b, commands, replies, sender } = setUp({}, { writes: false })
   // The agent port has no `writeValues`, so `record` throws.
   await commands.handle(sender, ALICE, {
     id: "c-4",

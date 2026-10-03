@@ -3,6 +3,7 @@
 // `set_banner`. `bannerDue` and `planAsk` decide; this carries them out.
 
 import type { BlobStore, LaneName, Sha256, StoredImage } from "@pineta/core"
+import type { Keeper } from "@pineta/keeper"
 import {
   answerOf,
   BANNER,
@@ -19,7 +20,6 @@ import type { Agent } from "@pineta/pi"
 import { readBanners, readNames } from "@pineta/reads"
 import type { Basics } from "./basics.ts"
 import { requestOutside } from "./outside.ts"
-import type { Serial } from "./queue.ts"
 
 export interface Banners {
   /** A lane was named, or its run ended: make its banner if it has none. */
@@ -35,12 +35,12 @@ type BannerAgent = Pick<
 
 export function createBanners(deps: {
   readonly basics: Pick<Basics, "session" | "log" | "now">
-  readonly serial: Serial
+  readonly keeper: Keeper
   readonly blobs: Pick<BlobStore, "put" | "ref">
   /** Read lazily: the agent is made with `request` as its tool's port. */
   readonly agent: () => BannerAgent
 }): Banners {
-  const { basics, serial, blobs } = deps
+  const { basics, keeper, blobs } = deps
   const { session: doc, log } = basics
   // Lanes whose banner is being made: a run's end does not start a second.
   const generating = new Set<LaneName>()
@@ -54,13 +54,13 @@ export function createBanners(deps: {
     log(`[host] no banner for ${readNames(doc).get(lane) ?? lane}: ${why}`)
 
   /**
-   * A new image, outside the serial (it takes seconds); then, inside it, the
+   * A new image, outside the keeper (it takes seconds); then, inside it, the
    * write, only if still wanted (`requestOutside`). A failure is logged, and
    * the thread's next run's end tries again.
    */
   const start = (lane: LaneName, direction: string | null, asked: boolean) =>
     void requestOutside({
-      serial,
+      keeper,
       held: { set: generating, key: lane },
       request: () => generate(lane, direction),
       settle: async image => {
@@ -109,12 +109,12 @@ export function createBanners(deps: {
 
   return {
     due: lane =>
-      serial.run(async () => {
+      keeper.run(async () => {
         const due = bannerDue(readBanners(doc).get(lane), generating.has(lane))
         if (due) start(lane, null, false)
       }),
     request: (lane, ask) =>
-      serial.run(async () => {
+      keeper.run(async () => {
         const plan = planAsk(ask, sha => blobs.ref(sha) !== undefined)
         if (plan.kind === "write") await write(lane, plan.sha)
         if (plan.kind === "generate") start(lane, plan.direction, true)

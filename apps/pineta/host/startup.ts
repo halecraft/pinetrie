@@ -1,6 +1,7 @@
 // host/startup — what a starting host does before it accepts a command.
 
 import type { LaneName, RootId } from "@pineta/core"
+import type { Keeper } from "@pineta/keeper"
 import {
   COMMANDS,
   COMMANDS_KEY,
@@ -24,7 +25,6 @@ import { cardIdOfDoc, clearStreams, readStoredLanes } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import { applyPlaceStep } from "./places.ts"
-import type { Serial } from "./queue.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -39,7 +39,7 @@ export interface StartupDeps {
   readonly work: Pick<LaneWork, "project">
   /** Name every lane that has none (ADR-0039). */
   readonly ensureNames: () => Promise<void>
-  readonly serial: Serial
+  readonly keeper: Keeper
   readonly start: Runs["start"]
   readonly settle: (lanes: readonly LaneName[]) => Promise<void>
   readonly cards: Pick<CardPort, "texts" | "stored" | "destroyDocs">
@@ -53,10 +53,10 @@ export interface StartupDeps {
  * pi loaded, those that changed in one write; sweep what no one will type in
  * again (`sweepTexts`); and last, settle the lanes with cards queued, whose
  * compaction then holds every write above. Nothing else runs yet, so
- * clearing the streams needs no serial step.
+ * clearing the streams needs no keeper step.
  */
 export async function recover(deps: StartupDeps): Promise<void> {
-  const { agent, work, serial, settle } = deps
+  const { agent, work, keeper, settle } = deps
   const { session: doc, docs, live, places, log } = deps.basics
   clearStreams(live)
   const malformed: string[] = []
@@ -94,7 +94,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
       readRecords(doc, COMMANDS).get(COMMANDS_KEY),
     ),
   ]
-  if (changed.length > 0) await serial.run(() => agent.writeValues(changed))
+  if (changed.length > 0) await keeper.run(() => agent.writeValues(changed))
   for (const r of agent.refusedCommands())
     log(`[host] command ${r.name} is refused: ${r.reason}`)
   await sweepTexts(deps)

@@ -10,7 +10,6 @@ import { type WriterId, writerOfPrincipal } from "@pineta/core"
 import type { WireCommand } from "@pineta/protocol/codec"
 import type { Control } from "@pineta/protocol/line"
 import { departedSeats } from "./lines.ts"
-import type { Serial } from "./queue.ts"
 
 export type ControlListener = ReturnType<typeof Control.listen>
 export type ControlSender = Parameters<
@@ -18,8 +17,12 @@ export type ControlSender = Parameters<
 >[0]
 
 /**
- * Run each command from each seat in a serial step; a failed step does not end
- * its seat's commands. A departed seat's Line goes.
+ * Hand each command from each seat to `handle`, which runs it where it runs
+ * (`placeOfCommand`): one seat's in the order sent, each handed over only
+ * once the one before it has replied, so what that one queued (a drain, say)
+ * is ahead of it. Different seats' commands go in the order they arrive, and
+ * an offer command of one never holds another's chat. A failed command does
+ * not end its seat's commands. A departed seat's Line goes.
  */
 export function startControl(input: {
   /** Only the peers: who each seat is, and when one leaves. */
@@ -27,24 +30,27 @@ export function startControl(input: {
     readonly peers: Pick<Exchange["peers"], "get" | "current" | "subscribe">
   }
   readonly listener: Pick<ControlListener, "onReceive">
-  readonly serial: Serial
   readonly handle: (
     sender: ControlSender,
     writer: WriterId | undefined,
     wire: WireCommand,
   ) => Promise<void>
 }): { stop(): void } {
-  const { exchange, listener, serial } = input
+  const { exchange, listener } = input
   const lines = new Map<string, { destroy(): void }>()
   listener.onReceive((sender, receiver, manager) => {
     lines.set(sender.peer, manager)
     const writer = writerOfPrincipal(exchange.peers.get(sender.peer)?.principal)
     void (async () => {
-      // Not awaited: the serial reports a failed step, and an await here would
-      // throw out of this loop, end the seat's commands, and reject unhandled.
-      // The steps still join the serial in arrival order.
+      // The seat's chain: never awaited here, so reading goes on while a
+      // command runs. `handle` answers a failed command and logs it; one that
+      // throws all the same is caught on the chain, so it neither ends the
+      // seat's commands nor rejects unhandled.
+      let previous: Promise<void> = Promise.resolve()
       for await (const cmd of receiver)
-        void serial.run(() => input.handle(sender, writer, cmd))
+        previous = previous
+          .then(() => input.handle(sender, writer, cmd))
+          .catch(() => {})
     })()
   })
   // A seat that has left never returns, so its Line goes (host/lines.ts).

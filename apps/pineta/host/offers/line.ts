@@ -1,52 +1,50 @@
 // host/offers/line — the integration line in your repo (ADR-0060): its
-// record, read whenever your repo's operation head moves, and the `line`
-// commands. Gather (`lineFacts`), plan (`planLineRecord`, `planLineAction`),
-// execute, each in one step on the offers' queue.
+// record, read whenever the owner observes a move that changes it, and the
+// `line` commands. Gather (the shared facts' `lineFacts`), plan (`planLineRecord`,
+// `planLineAction`), execute, each in one step on the owner: the record as
+// upkeep (`later("line")`), a command as a command.
 
-import type { ErrCode, LineAction } from "@pineta/core"
-import {
-  executeOnHost,
-  hostRunner,
-  lineFacts,
-  type Runner,
-} from "@pineta/lanes"
+import type { ErrCode, LineAction, LineRecord } from "@pineta/core"
 import { LINE, setIfChanged } from "@pineta/marginalia"
 import { readLine } from "@pineta/reads"
+import type { RepoOps } from "@pineta/repo"
 import { planLineAction, planLineRecord } from "./plan.ts"
 import type { OfferState } from "./state.ts"
 
 export interface Line {
-  /** Read the line and write its record when it changed. On the queue. */
+  /** Read the line and write its record when it changed, as upkeep. */
   refresh(): Promise<void>
+  /** The line's record, from the step's shared facts, written when it changed. */
+  record(ops: RepoOps): Promise<LineRecord>
   /** A `line` command; null when carried out, else why not. */
   act(action: LineAction): Promise<ErrCode | null>
 }
 
 export function createLine(state: OfferState): Line {
-  const { ops, root, basics } = state
+  const { owner, basics } = state
   const { session: doc } = basics
-  const git: Runner = args => hostRunner(root)(["git", ...args])
 
-  async function record() {
+  async function record(ops: RepoOps) {
     const next = planLineRecord(
-      await lineFacts(ops, git, state.line),
+      (await ops.shared()).line,
       state.line,
       state.lineCommands,
     )
-    await state
-      .agent()
-      .writeValues(setIfChanged(LINE, next, readLine(doc) ?? undefined))
+    await state.writeValues(
+      setIfChanged(LINE, next, readLine(doc) ?? undefined),
+    )
     return next
   }
 
   return {
-    refresh: () => state.serial.run(async () => void (await record())),
+    refresh: () => owner.later("line", async ops => void (await record(ops))),
+    record,
     act: action =>
-      state.serial.run(async () => {
-        const planned = planLineAction(action, await record(), root)
+      owner.command(async ops => {
+        const planned = planLineAction(action, await record(ops))
         if (planned.kind === "refused") return planned.code
-        await executeOnHost(planned.steps)
-        await record()
+        await ops.execute(planned.steps)
+        await record(ops)
         state.taken()
         return null
       }),

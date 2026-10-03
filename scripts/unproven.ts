@@ -91,7 +91,7 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
   "lanes/commands": [
     "in a lane of its own, an expanded skill names its files at /mnt/host",
     "the system prompt lists the skills the model may use at /mnt/host",
-    "a lane of its own is told it is in a lane, its offer, and its browser",
+    "a lane of its own is told it is in a lane, and of its browser",
     "the lane reads the skill's references and runs its scripts there",
     "pi's agent directory is never mounted",
   ],
