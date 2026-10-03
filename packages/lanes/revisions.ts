@@ -109,12 +109,39 @@ export async function commitTurn(
     await setBookmark(jj, input.lane, plan.commit)
     return plan.commit
   }
-  const commit = await jj(["commit", "-m", revisionMessage(input)])
+  return commitToBookmark(jj, input.lane, revisionMessage(input))
+}
+
+/**
+ * Commit the lane's working copy, described `message`, and move the lane's
+ * bookmark to the commit. Returns it.
+ */
+export async function commitToBookmark(
+  jj: Runner,
+  lane: LaneName,
+  message: string,
+): Promise<CommitId> {
+  const commit = await jj(["commit", "-m", message])
   if (!commit.ok) throw new Error(describeFailure("jj commit", commit))
   const [id] = await commitsOf(jj, "@-")
   if (id === undefined) throw new Error("jj commit made no parent to read")
-  await setBookmark(jj, input.lane, id)
+  await setBookmark(jj, lane, id)
   return id
+}
+
+/** The first line of each description in `revset`, in jj's order; empty ones dropped. */
+export async function titlesOf(jj: Runner, revset: string): Promise<string[]> {
+  const ran = await jj([
+    "log",
+    "--ignore-working-copy",
+    "--no-graph",
+    "-r",
+    revset,
+    "-T",
+    'description.first_line() ++ "\\n"',
+  ])
+  if (!ran.ok) throw new Error(describeFailure(`jj log -r ${revset}`, ran))
+  return lines(ran.stdout)
 }
 
 /**

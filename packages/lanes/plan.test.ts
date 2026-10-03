@@ -42,6 +42,7 @@ import {
   planHostMounts,
   planImages,
   planLinks,
+  planMerge,
   planMounts,
   planOffer,
   planRetire,
@@ -501,6 +502,7 @@ test("planForkSetup: a WIP's copy on the line commit under it, never the WIP's o
       "pnpm i",
     ),
   )
+  expect(steps[0]).toBe(`lane: ${fetchById([W, C1]).argv.join(" ")}`)
   expect(steps.slice(1, 4)).toEqual([
     "lane: jj new c1",
     "lane: jj restore --from w1",
@@ -508,6 +510,46 @@ test("planForkSetup: a WIP's copy on the line commit under it, never the WIP's o
   ])
   expect(steps.some(s => s.includes("jj new w1"))).toBe(false)
   expect(steps.at(-1)).toBe("lane: sh -c pnpm i")
+})
+
+describe("planMerge: an update's steps (ADR-0060)", () => {
+  const W = commitId("w1")
+  const COPY = commitId("copy1")
+  test("the line's merge names its base, and lists what came in since the lane", () => {
+    expect(
+      planMerge({ kind: "line", onto: "pineta-onto", commit: C1, mark: true }),
+    ).toEqual({
+      steps: [fetchById([C1])],
+      source: C1,
+      message: baseMessage("update: pineta-onto", {
+        bookmark: "pineta-onto",
+        commit: C1,
+      }),
+      mark: true,
+      came: { from: null, to: C1 },
+    })
+  })
+  test("a WIP's copy fetches only the WIP's commit, and is made on the lane's last copy", () => {
+    const plan = planMerge({
+      kind: "wip",
+      bookmark: "wip/x",
+      commit: W,
+      under: C2,
+      on: COPY,
+    })
+    expect(argvs(plan.steps)).toEqual([
+      `lane: ${fetchById([W]).argv.join(" ")}`,
+      "lane: jj new copy1",
+      "lane: jj restore --from w1",
+      `lane: jj commit -m ${baseMessage("copy of wip/x", { bookmark: "wip/x", commit: W })}`,
+    ])
+    expect(plan).toMatchObject({
+      source: "copy",
+      message: "update: wip/x",
+      mark: false,
+      came: { from: C2, to: W },
+    })
+  })
 })
 
 test("baseMessage and parseBase round-trip a Pineta-Base", () => {

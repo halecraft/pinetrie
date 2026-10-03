@@ -1,7 +1,10 @@
-import { commitId, laneNameForThread } from "@pineta/core"
+import { commitId, laneNameForThread, writerId } from "@pineta/core"
+import type { Agent } from "@pineta/pi"
 import { expect, test } from "vitest"
-import { record } from "../fakes.ts"
-import { finishSplit } from "./split.ts"
+import { basics, record } from "../fakes.ts"
+import type { Offers } from "../offers/index.ts"
+import type { LaneRegistry } from "./registry.ts"
+import { createSplits, finishSplit } from "./split.ts"
 
 test("a split's end fetches the stack before stackEnded, then moves the lane back to its own tip", async () => {
   const lane = laneNameForThread("0123456789abcdef")
@@ -36,4 +39,34 @@ test("a split's end fetches the stack before stackEnded, then moves the lane bac
     `ended ${top}`,
     "back",
   ])
+})
+
+test("a split whose skill read fails starts no container", async () => {
+  const lane = laneNameForThread("0123456789abcdef")
+  const started: string[] = []
+  const agent = record<Agent>({
+    skill: async () => {
+      throw new Error("no skill")
+    },
+  })
+  const splits = createSplits({
+    basics: basics(),
+    root: "/project",
+    registry: record<LaneRegistry>({ isOwn: () => true }).port,
+    offers: record<Offers>({
+      stackSpan: async () => ({
+        start: [commitId("aaaa0000")],
+        tip: commitId("bbbb0000"),
+      }),
+    }).port,
+    agent: () => agent.port,
+    beforeRun: l => {
+      started.push(l)
+    },
+    fetchLane: async () => {},
+  })
+  await expect(
+    splits.prepareSplit(lane, writerId("ada@example.com")),
+  ).rejects.toThrow("no skill")
+  expect(started).toEqual([])
 })

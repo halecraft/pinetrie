@@ -411,7 +411,8 @@ describe("drain: bring up to date (ADR-0055)", () => {
 
   test("refused: back below the line with its command, saying why, and the next card is taken", async () => {
     const { b, events, deps } = setUp({ "c-1": "x", "c-2": "next" }, [], {
-      refused: "the lane has no copy of its own",
+      kind: "refused",
+      reason: "the lane has no copy of its own",
     })
     queue(b.places, "c-1", "a", CMD)
     queue(b.places, "c-2", "b")

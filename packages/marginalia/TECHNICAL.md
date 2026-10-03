@@ -381,9 +381,15 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
 - **`wipState`** says what became of a WIP base: `ok`, `landed` (its
   bookmark in the line's history, or, with the bookmark gone, the lane's
   copy's source there: a squash or a rebase onto the line) or `gone` (S77
-  item 2). **`planUpdateFrom`** then says what bringing a thread up to date
-  merges: always its base, the line once a WIP landed, and refused
-  (`base_gone`) for a gone WIP until "continue on the line".
+  item 2); with no facts, a base on the line, `ok`. **`planUpdateFrom`**
+  then says what bringing a thread up to date merges, from the lane's
+  `LaneBase`: the base the thread follows by `effectiveBase`, the rule the
+  page's button words itself from, so the button names what is merged. A
+  WIP's copy is made `on` the lane's previous copy (`LaneBase.start`);
+  nothing when the lane already holds the WIP's commit. The line once a WIP
+  landed; refused (`base_gone`) for a gone WIP until "continue on the
+  line", which `mark`s the move even with nothing to merge; refused
+  (`no_line`) with no line. Only those two codes (`UpdateRefusal`).
 - **`takeDestinations`** lists where a take may move a bookmark, the
   default first: the thread's WIP, then the line, with how many of the WIP's
   commits land along. A conflicted offer never lands on the line: the line
@@ -404,7 +410,8 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   card's text, whole, under its own heading (ADR-0055).
 - **`landingOutcome`** is resolved only when the agent did not ask for
   guidance and jj finds no conflicts: the agent can always stop, and can never
-  claim a success the repository contradicts (ADR-0033).
+  claim a success the repository contradicts (ADR-0033). `landingRecord`
+  is the record a resolution's end writes, with that outcome.
 
 # Offers (`offer.ts`, ADR-0038)
 

@@ -102,6 +102,9 @@ containers, disks and the helper.
   descendants. On the base disk the working-copy commit is one of them, so
   the working copy goes stale: `planBaseRefresh` runs `jj workspace
   update-stale` before `jj new`, which does nothing when it is fresh (S74).
+  It fetches every commit it names when the disk lacks any, and git skips a
+  wanted commit the disk already holds, so naming one of the lane's own is
+  harmless, though a caller names only what the lane may lack (S83).
 - **By bundle, into your repo** (`planFetch`): `git bundle create -` in the
   lane, written to a host file through the channel as bytes, then
   `git -C <root> fetch <file> +refs/heads/pineta/<lane>:refs/remotes/pineta-<lane>/tip`.
@@ -259,8 +262,11 @@ containers, disks and the helper.
   `laneJj(runner)` with `-R /workspace` in a lane. A jj command run from the
   wrong directory acts on whatever repo surrounds it (S36 item 28).
 - **A path argument is read from the process's directory, not `-R`'s.** Name
-  files with the `root:"…"` fileset, as `sideHistory` and `conflictContent`
+  files with the `root:"…"` fileset, as `revisionsIn` and `conflictContent`
   do.
+- **One bookmark in a revset is `bookmarkRevset(name)`**: `bookmarks(exact:…)`
+  with the name quoted (`revsetName`), so a name is never parsed as a
+  revset.
 - **A read can write.** With divergent operation heads, any jj command that
   loads the repo reconciles them, writing an operation and rebasing
   descendants (S57). So the host's reads of your repo run on its queue for
@@ -293,6 +299,9 @@ containers, disks and the helper.
   prompt's `newest`). The ancestry query (`isAncestor`) runs only when `@`
   is empty and its one parent is not the bookmark: most turns change
   nothing, and cost no extra command.
+- **`commitToBookmark`** is the one tail of every commit the host makes in
+  a lane: `jj commit`, read `@-`, move the lane's bookmark. `commitTurn`,
+  `mergeBase` and the mark of a move to the line all end with it.
 - **`changedPaths`** is a turn's paths, from the bookmark before it to its
   commit, made or adopted, which its revision records (ADR-0056): read with
   git, from the root, with `-z`, since git quotes a path with non-ASCII
@@ -300,8 +309,24 @@ containers, disks and the helper.
 - **An update merges the thread's base** (`mergeBase`, ADR-0060): the
   line's commit, or a fresh copy of the WIP (`planWipCopy`) made on the
   lane's previous copy, so conflicts the lane already resolved do not come
-  back. The merge carries `Pineta-Base`, and `newestBase` reads the newest
-  one in a lane's history: its base, and where its offers start.
+  back. The line's merge carries `Pineta-Base`, a WIP's copy its own, and
+  `newestBase` reads the newest one in a lane's history: its base, and
+  where its offers start. `laneBase` reads it in the lane's own repo too
+  (`bookmarkRevset`), where a lane with none is null: that repo has no
+  line bookmark to find a start on.
+- **`mergeUpdate` is an update's whole run in a lane** after its edits,
+  on the lane's queue: `planMerge`'s steps (a fetch of the line's commit,
+  or of the WIP's commit and its copy), the merge, a mark naming the line
+  when a thread moves there with nothing to merge, then what the merge left:
+  its files and the titles of what came in (`titlesOf`, one log), or each
+  conflicted file's content and the revisions on each side that touched
+  them. A WIP's copy fetches only the WIP's commit: its parent is the
+  lane's own.
+- **`revisionsIn` reads a side of a merge in one `jj log`**: the range's
+  revisions that touched any of the files, each with those it touched, from
+  `self.diff("<fileset>").files()` as JSON per line (S83). A side needs no
+  `fork_point`: `fork_point(a | b)..b` is `a..b`, even with several fork
+  points (S83).
 - **The merge is committed at once,** even with nothing to resolve.
   Otherwise an empty merge stays the lane's working copy, which every snapshot
   rewrites. A mutation shows `lanes.test.ts` fails without it.

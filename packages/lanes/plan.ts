@@ -8,6 +8,7 @@
 import { createHash } from "node:crypto"
 import path from "node:path"
 import {
+  type BaseMerge,
   type CommitId,
   commitId,
   type ForkStart,
@@ -15,11 +16,11 @@ import {
   HOST_WORKING_COPY,
   hostPathInLane,
   isLaneName,
+  type LaneBase,
   type LaneName,
   NO_EDITOR,
   type ProjectRecord,
   type SnapshotId,
-  type ThreadBase,
   type ThreadName,
   TRAILERS,
   WORKSPACE_ROOT,
@@ -39,6 +40,10 @@ const DISK_SIZE = "64G"
 
 /** The bookmark that holds a lane's newest revision, in the lane's own repo. */
 export const bookmarkName = (lane: LaneName): string => `pineta/${lane}`
+
+/** The revset of one bookmark, its name quoted so it is never parsed as a revset. */
+export const bookmarkRevset = (name: string): string =>
+  `bookmarks(exact:${revsetName(name)})`
 
 /**
  * A lane's history in your repo: a remote bookmark, `tip@pineta-<lane>`,
@@ -400,23 +405,6 @@ export interface LineConfig {
 export const DEFAULT_LINE: LineConfig = {
   onto: "pineta-onto",
   wipPrefix: "wip/",
-}
-
-/** A lane's base, read from its history in your repo (`laneBase`, ADR-0060). */
-export interface LaneBase {
-  readonly base: ThreadBase
-  /**
-   * Where the lane's own work begins: the line commit its base names, or the
-   * WIP's copy; for a lane with no `Pineta-Base`, the newest line commit in
-   * its history.
-   */
-  readonly start: CommitId
-  /**
-   * The commit of yours the lane holds whole since its base: the one its
-   * `Pineta-Base` names (the WIP's, for a WIP, never the copy); for a lane
-   * with none, `start`.
-   */
-  readonly source: CommitId
 }
 
 /**
@@ -862,18 +850,16 @@ export const planLineStart = (onto: string, commit: CommitId): LaneStep[] => [
 ]
 
 /**
- * The lane steps that make a copy of a WIP (ADR-0060): a commit on the line
- * commit under it, with the WIP's files and a change id of its own, left as
- * `@-`. Never the WIP's own commits: the lane's tip, immutable in your repo,
- * would make them immutable (S48 item 11).
+ * The lane steps that make a copy of a WIP (ADR-0060): a commit on `on`
+ * with the WIP's files and a change id of its own, left as `@-`. Never the
+ * WIP's own commits: the lane's tip, immutable in your repo, would make them
+ * immutable (S48 item 11). Fetches nothing: the lane must hold both commits.
  */
-export const planWipCopy = (wip: {
-  readonly bookmark: string
-  readonly commit: CommitId
-  readonly under: CommitId
-}): LaneStep[] => [
-  fetchById([wip.commit, wip.under]),
-  inLane("jj", "new", wip.under),
+export const planWipCopy = (
+  wip: { readonly bookmark: string; readonly commit: CommitId },
+  on: CommitId,
+): LaneStep[] => [
+  inLane("jj", "new", on),
   inLane("jj", "restore", "--from", wip.commit),
   inLane(
     "jj",
@@ -885,6 +871,51 @@ export const planWipCopy = (wip: {
     }),
   ),
 ]
+
+/** What an update runs in a lane before its merge, and what it merges (`mergeUpdate`). */
+export interface MergePlan {
+  /**
+   * A fetch of the line's commit; or a fetch of the WIP's commit and its copy
+   * on the lane's previous copy, left as `@-`.
+   */
+  readonly steps: readonly LaneStep[]
+  /** The commit to merge, or the copy the steps leave as `@-`. */
+  readonly source: CommitId | "copy"
+  /** The line's names the base (`Pineta-Base`); a WIP's copy names its own. */
+  readonly message: string
+  /** With nothing to merge, a commit still names the line (`BaseMerge`). */
+  readonly mark: boolean
+  /**
+   * The commits whose titles the update lists, `<from>..<to>`; `from` null is
+   * the lane before the merge.
+   */
+  readonly came: { readonly from: CommitId | null; readonly to: CommitId }
+}
+
+/**
+ * An update's steps (ADR-0060). A WIP's copy fetches only the WIP's commit:
+ * the copy's parent is the lane's own.
+ */
+export function planMerge(from: BaseMerge): MergePlan {
+  if (from.kind === "line")
+    return {
+      steps: [fetchById([from.commit])],
+      source: from.commit,
+      message: baseMessage(`update: ${from.onto}`, {
+        bookmark: from.onto,
+        commit: from.commit,
+      }),
+      mark: from.mark,
+      came: { from: null, to: from.commit },
+    }
+  return {
+    steps: [fetchById([from.commit]), ...planWipCopy(from, from.on)],
+    source: "copy",
+    message: `update: ${from.bookmark}`,
+    mark: false,
+    came: { from: from.under, to: from.commit },
+  }
+}
 
 /**
  * The lane steps that make a disk a fork: a change of its own, before
@@ -905,7 +936,10 @@ export function planForkSetup(
     start.kind === "line"
       ? planLineStart(start.onto, start.commit)
       : start.kind === "wip"
-        ? planWipCopy(start)
+        ? [
+            fetchById([start.commit, start.under]),
+            ...planWipCopy(start, start.under),
+          ]
         : [
             fetchById(start.commits),
             inLane("jj", "new", ...start.commits),

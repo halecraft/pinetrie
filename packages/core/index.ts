@@ -575,6 +575,23 @@ export type ThreadBase =
   | { readonly kind: "line" }
   | { readonly kind: "wip"; readonly bookmark: string }
 
+/** A lane's base, read from its history (`@pineta/lanes`' `laneBase`, ADR-0060). */
+export interface LaneBase {
+  readonly base: ThreadBase
+  /**
+   * Where the lane's own work begins: the line commit its base names, or the
+   * WIP's copy; for a lane with no `Pineta-Base`, the newest line commit in
+   * its history.
+   */
+  readonly start: CommitId
+  /**
+   * The commit of yours the lane holds whole since its base: the one its
+   * `Pineta-Base` names (the WIP's, for a WIP, never the copy); for a lane
+   * with none, `start`.
+   */
+  readonly source: CommitId
+}
+
 declare const commitIdBrand: unique symbol
 /**
  * A jj commit id, full hex. A revision a lane builds on is immutable, so its
@@ -801,6 +818,32 @@ export type ForkStart =
       readonly commit: CommitId
       /** The line commit under the WIP: the copy's parent. */
       readonly under: CommitId
+    }
+
+/**
+ * What bringing a thread up to date merges into its lane (ADR-0060): the
+ * line's commit, or a fresh copy of a WIP.
+ */
+export type BaseMerge =
+  | {
+      readonly kind: "line"
+      readonly onto: string
+      readonly commit: CommitId
+      /** The thread moves to the line: with nothing to merge, a commit still names it. */
+      readonly mark: boolean
+    }
+  | {
+      readonly kind: "wip"
+      readonly bookmark: string
+      /** The WIP's commit: whose files the copy holds. */
+      readonly commit: CommitId
+      /** The line commit under the WIP: where the commits that came in start. */
+      readonly under: CommitId
+      /**
+       * The lane's previous copy (`LaneBase.start`): the new copy's parent,
+       * so conflicts the lane already resolved do not come back.
+       */
+      readonly on: CommitId
     }
 
 declare const threadNameBrand: unique symbol

@@ -12,6 +12,7 @@ import {
   type Above,
   BASE_SNAPSHOT,
   type BannerRecord,
+  type BaseMerge,
   type BaseRecord,
   type CommandSummary,
   type CommitId,
@@ -25,6 +26,7 @@ import {
   isLaneName,
   isSha256,
   type LandingRecord,
+  type LaneBase,
   type LaneName,
   type LaneRecord,
   type LineRecord,
@@ -40,6 +42,8 @@ import {
 } from "@pineta/core"
 import { Type } from "typebox"
 import { decodeAt, entryKey, fixedKey, laneKey, textKey } from "./decode.ts"
+import type { LandDetails } from "./land.ts"
+import { effectiveBase } from "./offer.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pineta.line` value's key: a host follows one line. */
@@ -390,6 +394,24 @@ export const landingOutcome = (input: {
 }): "resolved" | "needs_you" =>
   input.askedForGuidance || input.conflictsLeft > 0 ? "needs_you" : "resolved"
 
+/** The record of a resolution run that ended in `lane`, from its land message. */
+export const landingRecord = (input: {
+  readonly details: Pick<LandDetails, "landing" | "by">
+  readonly lane: LaneName
+  /** The land message that started it. */
+  readonly prompt: EntryId
+  readonly askedForGuidance: boolean
+  readonly conflictsLeft: number
+  readonly now: number
+}): LandingRecord => ({
+  id: input.details.landing,
+  lane: input.lane,
+  prompt: input.prompt,
+  state: landingOutcome(input),
+  by: input.details.by,
+  at: input.now,
+})
+
 // ── turns and forks ────────────────────────────────────────────────────────
 
 /**
@@ -465,56 +487,57 @@ export function planBegin(input: {
   return { kind: "wip", bookmark: base, ...facts.wip }
 }
 
-/** What an update merges into a lane (ADR-0060). */
+/** What an update merges into a lane (ADR-0060), or nothing. */
 export type UpdateFrom =
-  | { readonly kind: "line"; readonly onto: string; readonly commit: CommitId }
-  | {
-      readonly kind: "wip"
-      readonly bookmark: string
-      readonly commit: CommitId
-      readonly under: CommitId
-    }
-  /** The base already holds nothing the lane lacks. */
+  | BaseMerge
+  /** The WIP already holds nothing the lane lacks. */
   | { readonly kind: "nothing" }
 
+/** Why an update is refused: no line, or a WIP gone without landing. */
+export type UpdateRefusal = typeof ERR.NO_LINE | typeof ERR.BASE_GONE
+
 /**
- * What bringing a thread up to date merges (ADR-0060): always its base. A
- * lane whose newest `Pineta-Base` names a WIP merges a fresh copy of it,
- * unless that copy is of the WIP's commit now; one on the line, or with none
- * (a lane from before the line), merges the line's commit. A WIP that landed
- * hands the thread to the line; one gone without landing refuses
- * (`base_gone`), until `toLine` ("continue on the line") moves it there.
- * With no line, refused (`no_line`). Pure.
+ * What bringing a thread up to date merges (ADR-0060): the base the thread
+ * follows (`effectiveBase`), so the button that names it names what is
+ * merged. A WIP thread merges a fresh copy of its WIP, on the lane's
+ * previous copy, unless the lane's base already names the WIP's commit now. A
+ * line thread, a lane with no base, and a landed WIP merge the line's commit.
+ * A WIP gone without landing refuses (`base_gone`) until `toLine` ("continue
+ * on the line") moves the thread to the line, marking the move even when
+ * nothing is merged. With no line, refused (`no_line`). Pure.
  */
 export function planUpdateFrom(input: {
   readonly onto: string
-  /** The lane's newest `Pineta-Base`, or null. */
-  readonly newest: {
-    readonly bookmark: string
-    readonly commit: CommitId
-  } | null
+  /** The lane's base, from its own history; null for a lane with none, on the line. */
+  readonly base: LaneBase | null
+  /** `wipState` of a WIP base; "ok" for the line. */
+  readonly state: BaseRecord["state"]
   /** "continue on the line": the thread moves to the line, whatever its base. */
   readonly toLine: boolean
   readonly line: CommitId | null
-  /** For a WIP base: its state, and its commit and the line commit under it now. */
-  readonly wip: {
-    readonly state: "ok" | "landed" | "gone"
-    readonly now: { readonly commit: CommitId; readonly under: CommitId } | null
+  /** For a WIP base: its commit now and the line commit under it (`beginFacts`). */
+  readonly wipNow: {
+    readonly commit: CommitId
+    readonly under: CommitId
   } | null
-}): UpdateFrom | ErrCode {
-  const { newest, wip } = input
+}): UpdateFrom | UpdateRefusal {
+  const { base, state, wipNow } = input
   if (input.line === null) return ERR.NO_LINE
-  const onWip =
-    !input.toLine &&
-    newest !== null &&
-    newest.bookmark !== input.onto &&
-    wip !== null &&
-    wip.state !== "landed"
-  if (!onWip) return { kind: "line", onto: input.onto, commit: input.line }
-  if (wip.state === "gone" || wip.now === null) return ERR.BASE_GONE
-  return wip.now.commit === newest.commit
+  if (!input.toLine && state === "gone") return ERR.BASE_GONE
+  const followed: ThreadBase = input.toLine
+    ? { kind: "line" }
+    : effectiveBase({ base: base?.base ?? { kind: "line" }, state })
+  if (followed.kind === "line")
+    return {
+      kind: "line",
+      onto: input.onto,
+      commit: input.line,
+      mark: input.toLine && base?.base.kind === "wip",
+    }
+  if (base === null || wipNow === null) return ERR.BASE_GONE
+  return wipNow.commit === base.source
     ? { kind: "nothing" }
-    : { kind: "wip", bookmark: newest.bookmark, ...wip.now }
+    : { kind: "wip", bookmark: followed.bookmark, ...wipNow, on: base.start }
 }
 
 /**
@@ -530,16 +553,20 @@ export const baseName = (base: ThreadBase): string =>
  * line (moved there, or squashed into the line, which keeps the bookmark and
  * drops the WIP's change, S77 item 2), or, with the bookmark gone, when the
  * commit the lane's `Pineta-Base` names, or its change, is on the line.
- * Gone when the bookmark is gone and the WIP did not land; else ok. Pure.
+ * Gone when the bookmark is gone and the WIP did not land; else ok. No
+ * facts, a base on the line, is ok. Pure.
  */
-export function wipState(facts: {
-  /** Where the WIP bookmark points now; null when it is gone. */
-  readonly bookmark: CommitId | null
-  /** The bookmark's commit is in the line's history. */
-  readonly bookmarkInLine: boolean
-  /** The commit `Pineta-Base` names, or its change, is in the line's history. */
-  readonly sourceInLine: boolean
-}): "ok" | "landed" | "gone" {
+export function wipState(
+  facts: {
+    /** Where the WIP bookmark points now; null when it is gone. */
+    readonly bookmark: CommitId | null
+    /** The bookmark's commit is in the line's history. */
+    readonly bookmarkInLine: boolean
+    /** The commit `Pineta-Base` names, or its change, is in the line's history. */
+    readonly sourceInLine: boolean
+  } | null,
+): BaseRecord["state"] {
+  if (facts === null) return "ok"
   if (facts.bookmark !== null) return facts.bookmarkInLine ? "landed" : "ok"
   return facts.sourceInLine ? "landed" : "gone"
 }

@@ -9,6 +9,7 @@
 import type {
   BaseRecord,
   CommitId,
+  LaneBase,
   LaneName,
   OfferInRepo,
   OfferRecord,
@@ -18,7 +19,6 @@ import {
   changesNoFile,
   commitsOf,
   hostOps,
-  type LaneBase,
   type LineConfig,
   laneBase,
   laneTipIn,
@@ -152,10 +152,7 @@ export function createOfferState(input: {
     if (tip === null) return null
     const base = await laneBase(ops, tip, line)
     if (base === null) return null
-    const state =
-      base.base.kind === "wip"
-        ? wipState(await wipFacts(ops, line, base.base.bookmark, base.source))
-        : "ok"
+    const state = wipState(await wipFacts(ops, line, base))
     const target =
       base.base.kind === "wip" && state === "ok"
         ? await commitOf(base.base.bookmark)

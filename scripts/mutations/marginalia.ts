@@ -130,8 +130,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a landed WIP's thread stays on the WIP",
     file: "packages/marginalia/work.ts",
-    from: '    wip.state !== "landed"',
-    to: "    true",
+    from: '    : effectiveBase({ base: base?.base ?? { kind: "line" }, state })',
+    to: '    : effectiveBase({ base: base?.base ?? { kind: "line" }, state: "ok" })',
     command: unit,
     expect:
       "a line thread, a lane with no base, and a landed WIP merge the line",
@@ -932,5 +932,37 @@ export const mutations: readonly Mutation[] = [
     to: "  JSON.stringify(a) === JSON.stringify(b)",
     command: unit,
     expect: "the same record with its keys in another order is unchanged",
+  },
+  {
+    name: "a WIP's copy is made on the WIP's own commit",
+    file: "packages/marginalia/work.ts",
+    from: '    : { kind: "wip", bookmark: followed.bookmark, ...wipNow, on: base.start }',
+    to: '    : { kind: "wip", bookmark: followed.bookmark, ...wipNow, on: base.source }',
+    command: unit,
+    expect: "a WIP's copy is made on the lane's last copy",
+  },
+  {
+    name: "a move to the line is never marked",
+    file: "packages/marginalia/work.ts",
+    from: '      mark: input.toLine && base?.base.kind === "wip",',
+    to: "      mark: false,",
+    command: unit,
+    expect: "continue on the line marks a move from a WIP",
+  },
+  {
+    name: "a line base is gone",
+    file: "packages/marginalia/work.ts",
+    from: '  if (facts === null) return "ok"',
+    to: '  if (facts === null) return "gone"',
+    command: unit,
+    expect: "a line base, with no WIP facts, is ok",
+  },
+  {
+    name: "a resolution's record names its landing as its prompt",
+    file: "packages/marginalia/work.ts",
+    from: "  prompt: input.prompt,",
+    to: "  prompt: input.details.landing,",
+    command: unit,
+    expect: "a resolution's record names its prompt",
   },
 ]

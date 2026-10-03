@@ -8,6 +8,7 @@ import path from "node:path"
 import type { CommitId, LaneName } from "@pineta/core"
 import {
   bookmarkOf,
+  bookmarkRevset,
   commitsOf,
   containerFacts,
   executeOrThrow,
@@ -85,7 +86,7 @@ export function createFetches(deps: {
           const bookmark = stack
             ? await commitsOf(
                 jj,
-                `present(bookmarks(exact:"${stackBookmark(lane)}"))`,
+                `present(${bookmarkRevset(stackBookmark(lane))})`,
               ).then(c => c[0] ?? null)
             : await bookmarkOf(jj, lane)
           if (bookmark === null) return null

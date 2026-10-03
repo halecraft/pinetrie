@@ -2,7 +2,7 @@
 // (ADR-0038): a one-shot model request outside the thread.
 
 import { type LaneName, projectTranscript } from "@pineta/core"
-import { executeOnHost, lines, planDescribe } from "@pineta/lanes"
+import { executeOnHost, planDescribe, titlesOf } from "@pineta/lanes"
 import {
   describeRequest,
   describeWanted,
@@ -47,18 +47,7 @@ export function describe(
       const diff = (
         await ops(["diff", "-r", revision.commit, "--git"]).catch(() => null)
       )?.stdout
-      const recent = lines(
-        (
-          await ops([
-            "log",
-            "--no-graph",
-            "-r",
-            "ancestors(@-, 20)",
-            "-T",
-            'description.first_line() ++ "\\n"',
-          ])
-        ).stdout,
-      )
+      const recent = await titlesOf(ops, "ancestors(@-, 20)").catch(() => [])
       return { commit: revision.commit, diff: diff ?? "", recent }
     })
     .then(gathered => {

@@ -70,8 +70,9 @@ export function createSplits(deps: {
         return { refused: "the lane has no copy of its own" }
       const span = await offers.stackSpan(lane)
       if (span === null) return { refused: "the lane has nothing to offer" }
-      deps.beforeRun(lane)
       const skill = await deps.agent().skill("pineta:skill:offer-stack")
+      // Last: nothing between the lane's start and its run can fail.
+      deps.beforeRun(lane)
       return planStack({
         skill,
         bookmark: stackBookmark(lane),

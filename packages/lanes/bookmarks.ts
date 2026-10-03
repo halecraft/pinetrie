@@ -6,7 +6,7 @@
 // your default log and immutable (ADR-0038, S48 item 11).
 
 import { type CommitId, commitId, type LaneName } from "@pineta/core"
-import { bookmarkName } from "./plan.ts"
+import { bookmarkName, bookmarkRevset } from "./plan.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
 
 /** The commit a lane's bookmark points at, or null. */
@@ -19,7 +19,7 @@ export async function bookmarkOf(
     "--ignore-working-copy",
     "--no-graph",
     "-r",
-    `present(bookmarks(exact:"${bookmarkName(lane)}"))`,
+    `present(${bookmarkRevset(bookmarkName(lane))})`,
     "-T",
     'commit_id ++ "\\n"',
   ])

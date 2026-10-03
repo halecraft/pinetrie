@@ -306,7 +306,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 | `fetch.ts` | a lane's history into your repo, each lane's fetches on a `Serial` of its own |
 | `turns.ts` | pi's `turnDone`: the turn's revision, snapshot and fetch; the turn records still being written (`pendingRecords`) |
 | `create.ts` | a new lane: `checkDirectory`, its record and name, its fork (`forkFacts` waits for `pendingRecords`) |
-| `update.ts` | an update (`applyClean` for a clean one), and a resolution's outcome, with the guidance flag pi's hook sets |
+| `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`), and a resolution's outcome, with the guidance flag pi's hook sets |
 | `split.ts` | a split's prompt, and its end (`finishSplit`) |
 | `archive.ts` | a root archived or restored |
 | `disk.ts` | the snapshot on a lane's queue, and the lockfile's hash |
@@ -324,6 +324,20 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   fork, each turn's commit and snapshot, the bundle, the stop and trim); its
   fetch `Serial` (your repo's fetch, which tools never wait on); the base
   snapshot's `Serial`; and the offers' queue for your repo.
+- **An update is one step on the lane's `LaneQueue`** (`updateOnQueue`):
+  the lane's base from its own history, the line and the WIP from your
+  repo, `planUpdateFrom`, the edits committed and `mergeUpdate`, so nothing
+  changes the lane between what is read and what is merged. Then
+  `planSettle`, pure, decides what the thread gets, the land message
+  included, and `applySettle` writes it. `Settle.fetch` alone decides
+  what is fetched: a clean merge, and a move to the line with nothing to
+  merge, whose mark your repo would otherwise learn of only at a later
+  fetch. Its list is `fetchLane`'s `have`: commits your repo may hold,
+  which the bundle leaves out.
+- **An update stops the lane it started** (`withLaneStarted`), whatever it
+  comes to, unless a resolution runs: that run's end stops it. A split
+  reads its skill before `beforeRun`, so nothing between the lane's start
+  and its run can fail.
 - **A lane's `LaneQueue` breaks on a fatal failure and the host's `Serial`s
   do not.** A failed start or fork must stop the lane's tools, which wait on
   its queue; a failed host step must not stop the steps behind it.
@@ -398,7 +412,8 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 ## Testing the shell
 
 - **Test a decision as a value** where the shell has one: `planRunEnd`,
-  `planInvites`, `draftSent`, the responses, and marginalia's `planStartup`.
+  `planInvites`, `draftSent`, the responses, `planSettle`, and marginalia's
+  `planStartup`.
 - **Otherwise, drive a module with `record<T>()`** for exactly the port it
   takes, and a real `newSessionDoc()`. A method the test did not give throws,
   naming itself, so a module that touches an undeclared port fails at once.

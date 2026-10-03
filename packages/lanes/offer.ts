@@ -12,6 +12,7 @@ import {
   type CommitId,
   commitId,
   type DiffSpan,
+  type LaneBase,
   type LaneName,
   type OfferInRepo,
   type OfferRevision,
@@ -23,9 +24,9 @@ import {
 } from "@pineta/core"
 import { newestBase } from "./merge.ts"
 import {
+  bookmarkRevset,
   EVOLOG_ENTRY,
   type EvologEntry,
-  type LaneBase,
   type LineConfig,
   laneTipName,
   offerBookmark,
@@ -54,20 +55,22 @@ export async function laneTipIn(
 }
 
 /**
- * A lane's base, from the newest `Pineta-Base` in the history of its tip in
- * your repo; a lane with none (one from before the line) is on the line,
- * from the newest line commit in its history. Null when there is none.
+ * A lane's base, from the newest `Pineta-Base` in the history of `tip`, a
+ * revset: the lane's tip in your repo, or its bookmark in its own repo. A
+ * lane with none (one from before the line) is on the line, from the newest
+ * line commit in its history; null when there is none. In the lane's own
+ * repo such a lane is always null: that repo has no line bookmark.
  */
 export async function laneBase(
   jj: Runner,
-  tip: CommitId,
+  tip: string,
   line: LineConfig,
 ): Promise<LaneBase | null> {
   const newest = await newestBase(jj, tip)
   if (newest === null) {
     const [start] = await commitsOf(
       jj,
-      `latest(heads(::${tip} & ::present(${revsetName(line.onto)})))`,
+      `latest(heads(::(${tip}) & ::present(${revsetName(line.onto)})))`,
     )
     return start === undefined
       ? null
@@ -208,7 +211,7 @@ export async function offerRevisions(
   jj: Runner,
   input: { readonly name: ThreadName; readonly target: string },
 ): Promise<{ readonly commit: CommitId; readonly change: string }[]> {
-  const bookmark = `bookmarks(exact:${revsetName(offerBookmark(input.name))})`
+  const bookmark = bookmarkRevset(offerBookmark(input.name))
   const thread = `description(regex:"(?m)^${TRAILERS.thread}: ${input.name}$")`
   const ran = await jj([
     "log",
@@ -242,7 +245,7 @@ export async function readOffer(
 ): Promise<OfferInRepo | null> {
   const heads = await commitsOf(
     jj,
-    `present(bookmarks(exact:${revsetName(offerBookmark(input.name))}))`,
+    `present(${bookmarkRevset(offerBookmark(input.name))})`,
   )
   const found = await offerRevisions(jj, input)
   const [top] = heads

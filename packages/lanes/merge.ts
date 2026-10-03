@@ -1,26 +1,57 @@
 // lanes/merge — a thread's base merged into its lane (ADR-0033, ADR-0060).
 //
-// The lane merges the line's commit, or a fresh copy of its WIP, into itself,
-// in its own repo: jj records conflicts in the merge rather than failing (S36
-// item 11), and the agent resolves them there, never in your repo. The merge
-// is committed at once, so it is a revision even when it merged cleanly: an
-// empty merge would stay the working copy, which every snapshot rewrites.
-// The lane's work comes back to you as its offer, never by this merge.
+// The lane merges the line's commit, or a fresh copy of its WIP (`planMerge`),
+// into itself, in its own repo: jj records conflicts in the merge rather than
+// failing (S36 item 11), and the agent resolves them there, never in your
+// repo. The merge is committed at once, so it is a revision even when it
+// merged cleanly: an empty merge would stay the working copy, which every
+// snapshot rewrites. The lane's work comes back to you as its offer, never by
+// this merge.
 
 import { type CommitId, type LaneName, TRAILERS } from "@pineta/core"
-import { setBookmark } from "./bookmarks.ts"
-import { bookmarkName, parseBase } from "./plan.ts"
-import { commitsOf } from "./revisions.ts"
+import { executeOrThrow, type Runners } from "./execute.ts"
+import {
+  bookmarkName,
+  bookmarkRevset,
+  type MergePlan,
+  parseBase,
+} from "./plan.ts"
+import {
+  changedPaths,
+  commitsOf,
+  commitToBookmark,
+  titlesOf,
+} from "./revisions.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
 
-const union = (ids: readonly CommitId[]) => ids.join(" | ")
+/** The lane's bookmark's commit; throws when it has none. */
+async function laneHead(jj: Runner, lane: LaneName): Promise<CommitId> {
+  const [ours] = await commitsOf(jj, bookmarkRevset(bookmarkName(lane)))
+  if (ours === undefined) throw new Error(`lane ${lane} has no bookmark`)
+  return ours
+}
 
 /**
- * Merge `from` (the line's commit, or a WIP's copy, `planWipCopy`) into the
- * lane at its bookmark, described `message`, and commit the merge. `jj` is
- * the lane's, and must already hold `from`. Returns the lane's revision
- * before the merge (`ours`), and the merge, or null when `from` is already
- * in the lane: there is nothing to merge.
+ * A new commit on `parents`, described `message`, committed at once, with
+ * the lane's bookmark moved to it. Returns it.
+ */
+async function commitOn(
+  jj: Runner,
+  lane: LaneName,
+  parents: readonly CommitId[],
+  message: string,
+): Promise<CommitId> {
+  const made = await jj(["new", ...parents, "-m", message])
+  if (!made.ok) throw new Error(describeFailure("jj new", made))
+  return commitToBookmark(jj, lane, message)
+}
+
+/**
+ * Merge `from` (the line's commit, or a WIP's copy) into the lane at its
+ * bookmark, described `message`, and commit the merge. `jj` is the lane's,
+ * and must already hold `from`. Returns the lane's revision before the merge
+ * (`ours`), and the merge, or null when `from` is already in the lane: there
+ * is nothing to merge.
  */
 export async function mergeBase(
   jj: Runner,
@@ -28,18 +59,10 @@ export async function mergeBase(
   from: CommitId,
   message: string,
 ): Promise<{ readonly ours: CommitId; readonly merge: CommitId | null }> {
-  const [ours] = await commitsOf(jj, `bookmarks(exact:"${bookmarkName(lane)}")`)
-  if (ours === undefined) throw new Error(`lane ${lane} has no bookmark`)
+  const ours = await laneHead(jj, lane)
   const missing = await commitsOf(jj, `${from} ~ ::${ours}`)
   if (missing.length === 0) return { ours, merge: null }
-  const made = await jj(["new", ours, from, "-m", message])
-  if (!made.ok) throw new Error(describeFailure("jj new", made))
-  const commit = await jj(["commit", "-m", message])
-  if (!commit.ok) throw new Error(describeFailure("jj commit", commit))
-  const [merge] = await commitsOf(jj, "@-")
-  if (merge === undefined) throw new Error("the merge left no parent to read")
-  await setBookmark(jj, lane, merge)
-  return { ours, merge }
+  return { ours, merge: await commitOn(jj, lane, [ours, from], message) }
 }
 
 /**
@@ -47,21 +70,12 @@ export async function mergeBase(
  * moved to the line when the line has nothing the lane lacks still needs its
  * newest `Pineta-Base` to say so (ADR-0060). Returns it.
  */
-export async function markBase(
+async function markBase(
   jj: Runner,
   lane: LaneName,
   message: string,
 ): Promise<CommitId> {
-  const [ours] = await commitsOf(jj, `bookmarks(exact:"${bookmarkName(lane)}")`)
-  if (ours === undefined) throw new Error(`lane ${lane} has no bookmark`)
-  const made = await jj(["new", ours, "-m", message])
-  if (!made.ok) throw new Error(describeFailure("jj new", made))
-  const commit = await jj(["commit", "-m", message])
-  if (!commit.ok) throw new Error(describeFailure("jj commit", commit))
-  const [mark] = await commitsOf(jj, "@-")
-  if (mark === undefined) throw new Error("the mark left no parent to read")
-  await setBookmark(jj, lane, mark)
-  return mark
+  return commitOn(jj, lane, [await laneHead(jj, lane)], message)
 }
 
 /**
@@ -141,33 +155,115 @@ export async function conflictContent(
   return ran.ok ? ran.stdout : ""
 }
 
-const SEPARATOR = "\n@@pineta-revision@@\n"
+/** A revision on one side of a merge, and the files it touched of those asked about. */
+export interface TouchedRevision {
+  readonly description: string
+  readonly paths: readonly string[]
+}
 
 /**
- * The descriptions of the revisions on one side of a merge that touched
- * `file`, oldest first: from where the two sides forked to `side`.
+ * The revisions in `range` that touched any of `files`, oldest first, each
+ * with the ones of `files` it touched: one `jj log`, a JSON object per line,
+ * as `REVISION_READ` (`offer.ts`). Its paths are from the repo's root (S83).
  */
-export async function sideHistory(
+export async function revisionsIn(
   jj: Runner,
-  sides: { readonly ours: CommitId; readonly theirs: readonly CommitId[] },
-  side: readonly CommitId[],
-  file: string,
-): Promise<string[]> {
-  const fork = `fork_point(${sides.ours} | ${union(sides.theirs)})`
+  range: string,
+  files: readonly string[],
+): Promise<TouchedRevision[]> {
+  if (files.length === 0) return []
+  const fileset = files.map(f => `root:${JSON.stringify(f)}`).join(" | ")
   const ran = await jj([
     "log",
     "--ignore-working-copy",
     "--no-graph",
     "--reversed",
     "-r",
-    `${fork}..(${union(side)})`,
+    range,
     "-T",
-    `description ++ ${JSON.stringify(SEPARATOR)}`,
-    `root:${JSON.stringify(file)}`,
+    `"{\\"description\\":" ++ json(description) ++ ",\\"paths\\":[" ++ self.diff(${JSON.stringify(fileset)}).files().map(|f| json(f.path())).join(",") ++ "]}\\n"`,
+    fileset,
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  return ran.stdout
-    .split(SEPARATOR)
-    .map(d => d.trim())
-    .filter(d => d !== "")
+  return lines(ran.stdout).map(line => JSON.parse(line) as TouchedRevision)
+}
+
+/** What an update found in the lane after its merge (`mergeUpdate`). */
+export type Merged =
+  /**
+   * Nothing to merge. `mark` is the commit naming the line, when the plan
+   * asked for one, made on `ours`.
+   */
+  | {
+      readonly kind: "nothing"
+      readonly ours: CommitId
+      readonly mark: CommitId | null
+    }
+  | {
+      readonly kind: "clean"
+      /** The commit merged: the line's, or the WIP's copy. */
+      readonly from: CommitId
+      /** The lane's revision before the merge. */
+      readonly ours: CommitId
+      readonly merge: CommitId
+      /** The files the merge changed under the lane. */
+      readonly files: readonly string[]
+      /** The titles of the commits that came in (`MergePlan.came`). */
+      readonly commits: readonly string[]
+    }
+  | {
+      readonly kind: "conflicted"
+      readonly from: CommitId
+      /** Each conflicted file, with jj's markers. */
+      readonly contents: readonly {
+        readonly path: string
+        readonly content: string
+      }[]
+      /** The revisions on each side that touched any conflicted file, oldest first. */
+      readonly ours: readonly TouchedRevision[]
+      readonly theirs: readonly TouchedRevision[]
+    }
+
+/**
+ * An update in a lane, after its edits are committed (ADR-0060): `plan`'s
+ * steps, the merge, a mark when the plan asks and nothing merged, then what
+ * the merge left. The caller runs it on the lane's queue.
+ */
+export async function mergeUpdate(
+  jj: Runner,
+  runners: Runners,
+  lane: LaneName,
+  plan: MergePlan,
+): Promise<Merged> {
+  await executeOrThrow(plan.steps, runners)
+  const [from] =
+    plan.source === "copy" ? await commitsOf(jj, "@-") : [plan.source]
+  if (from === undefined) throw new Error("the WIP's copy is missing")
+  const { ours, merge } = await mergeBase(jj, lane, from, plan.message)
+  if (merge === null)
+    return {
+      kind: "nothing",
+      ours,
+      mark: plan.mark ? await markBase(jj, lane, plan.message) : null,
+    }
+  const conflicted = await conflictsIn(jj)
+  if (conflicted.length === 0)
+    return {
+      kind: "clean",
+      from,
+      ours,
+      merge,
+      files: await changedPaths(runners.lane, ours, merge),
+      commits: await titlesOf(jj, `${plan.came.from ?? ours}..${plan.came.to}`),
+    }
+  const contents: { path: string; content: string }[] = []
+  for (const path of conflicted)
+    contents.push({ path, content: await conflictContent(jj, path) })
+  return {
+    kind: "conflicted",
+    from,
+    contents,
+    ours: await revisionsIn(jj, `${from}..${ours}`, conflicted),
+    theirs: await revisionsIn(jj, `${ours}..${from}`, conflicted),
+  }
 }

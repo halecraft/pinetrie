@@ -356,6 +356,15 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S83 — An update's sides in one `jj log`, and a fetch by id ✅ PASS
+
+`findings/S83-jj-update-reads.md`. `self.diff("<fileset>").files()` in a
+`jj log` template, with the same fileset as its paths, names which of
+several files each revision touched, from the repo's root, as JSON per line.
+`fork_point(a | b)..b` is `a..b`, even with several fork points. And
+`git fetch` skips a wanted commit the repo already holds, so `fetchById`
+naming one of the lane's own commits never failed.
+
 ### S82 — Kyneta undo stacks on the host, one per seat ✅ PASS
 
 `findings/S82-host-undo-stacks.md`. One stack per seat over a places

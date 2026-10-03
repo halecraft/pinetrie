@@ -272,8 +272,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an update's merge is left uncommitted",
     file: "packages/lanes/merge.ts",
-    from: '  const made = await jj(["new", ours, from, "-m", message])\n  if (!made.ok) throw new Error(describeFailure("jj new", made))\n  const commit = await jj(["commit", "-m", message])',
-    to: '  const made = await jj(["new", ours, from, "-m", message])\n  if (!made.ok) throw new Error(describeFailure("jj new", made))\n  const commit = await jj(["log", "-r", "@"])',
+    from: "  return commitToBookmark(jj, lane, message)",
+    to: '  return (await commitsOf(jj, "@"))[0] as CommitId',
     command: unit,
     expect: "the whole life of a lane",
   },
@@ -462,7 +462,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fork's copy is a child of your @ itself",
     file: plan,
-    from: '  inLane("jj", "new", wip.under),',
+    from: '  inLane("jj", "new", on),',
     to: '  inLane("jj", "new", wip.commit),',
     command: unit,
     expect: "planForkSetup: a WIP's copy on the line commit under it",
@@ -595,8 +595,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the resolution is not told what the card asked",
     file: "apps/pineta/host/work/update.ts",
-    from: "              by,\n            },\n            intent,",
-    to: '              by,\n            },\n            intent: "",',
+    from: "          intent: ctx.intent,",
+    to: '          intent: "",',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -605,8 +605,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a clean update refuses the card's text",
     file: "apps/pineta/host/work/update.ts",
-    from: '          return { kind: "clean" }',
-    to: '          return { refused: "clean" }',
+    from: '    case "clean":\n      return { kind: "clean" }',
+    to: '    case "clean":\n      return { kind: "refused", reason: "clean" }',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -629,5 +629,40 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect: "a review reads an offer's commit",
+  },
+  {
+    name: "a WIP's copy fetches the lane's own copy too",
+    file: plan,
+    from: "    steps: [fetchById([from.commit]), ...planWipCopy(from, from.on)],",
+    to: "    steps: [fetchById([from.commit, from.on]), ...planWipCopy(from, from.on)],",
+    command: unit,
+    expect: "a WIP's copy fetches only the WIP's commit",
+  },
+  {
+    name: "the line's merge names no base",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "      message: baseMessage(`update: ${from.onto}`, {",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "      message: ((title: string, _: unknown) => title)(`update: ${from.onto}`, {",
+    command: unit,
+    expect: "the line's merge names its base",
+  },
+  {
+    name: "a revision lists every file it touched",
+    file: "packages/lanes/merge.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "self.diff(${JSON.stringify(fileset)})",
+    to: "self.diff()",
+    command: unit,
+    expect: "an update in jj, end to end",
+  },
+  {
+    name: "an update lists whole descriptions",
+    file: "packages/lanes/revisions.ts",
+    from: "    'description.first_line() ++ \"\\\\n\"',",
+    to: "    'description ++ \"\\\\n\"',",
+    command: unit,
+    expect: "an update in jj, end to end",
   },
 ]

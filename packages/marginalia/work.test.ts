@@ -4,6 +4,7 @@ import {
   ERR,
   entryId,
   type LandingRecord,
+  type LaneBase,
   laneNameForThread,
   type RevisionRecord,
   snapshotId,
@@ -17,6 +18,7 @@ import {
   LANDING,
   LANE as LANE_RECORD,
   landingOutcome,
+  landingRecord,
   PROJECT,
   planBegin,
   planResolution,
@@ -118,6 +120,26 @@ describe("landing", () => {
     expect(landingOutcome({ askedForGuidance: false, conflictsLeft: 2 })).toBe(
       "needs_you",
     )
+  })
+  test("a resolution's record names its prompt, its landing, how it ended and who asked", () => {
+    const ada = writerId("ada@example.com")
+    expect(
+      landingRecord({
+        details: { landing: "l-1", by: ada },
+        lane: laneNameForThread("0123456789abcdef"),
+        prompt: entryId("e-7"),
+        askedForGuidance: false,
+        conflictsLeft: 1,
+        now: 5,
+      }),
+    ).toEqual({
+      id: "l-1",
+      lane: laneNameForThread("0123456789abcdef"),
+      prompt: entryId("e-7"),
+      state: "needs_you",
+      by: ada,
+      at: 5,
+    })
   })
 })
 
@@ -282,42 +304,65 @@ describe("wipState: landed, gone, or ok (ADR-0060, S77 item 2)", () => {
   ] as const)("%s: %s", (_, facts, state) => {
     expect(wipState(facts)).toBe(state)
   })
+  test("a line base, with no WIP facts, is ok", () => {
+    expect(wipState(null)).toBe("ok")
+  })
 })
 
-describe("planUpdateFrom: always the thread's base (ADR-0060)", () => {
+describe("planUpdateFrom: always the base the thread follows (ADR-0060)", () => {
   const L = commitId("l1")
   const W = commitId("w1")
+  const COPY = commitId("c1")
+  const wipBase: LaneBase = {
+    base: { kind: "wip", bookmark: "wip/x" },
+    start: COPY,
+    source: W,
+  }
+  const lineBase: LaneBase = { base: { kind: "line" }, start: L, source: L }
   const now = { commit: commitId("w2"), under: commitId("l0") }
   const from = (over: Partial<Parameters<typeof planUpdateFrom>[0]> = {}) =>
     planUpdateFrom({
       onto: "pineta-onto",
-      newest: { bookmark: "wip/x", commit: W },
+      base: wipBase,
+      state: "ok",
       toLine: false,
       line: L,
-      wip: { state: "ok", now },
+      wipNow: now,
       ...over,
     })
-  test("a WIP thread merges a fresh copy of its WIP; nothing when it has not moved", () => {
-    expect(from()).toEqual({ kind: "wip", bookmark: "wip/x", ...now })
-    expect(from({ wip: { state: "ok", now: { ...now, commit: W } } })).toEqual({
-      kind: "nothing",
-    })
+  const line = (mark: boolean) => ({
+    kind: "line",
+    onto: "pineta-onto",
+    commit: L,
+    mark,
   })
-  test("a line thread, a lane with no base, and a landed WIP merge the line", () => {
-    const line = { kind: "line", onto: "pineta-onto", commit: L }
-    expect(from({ newest: { bookmark: "pineta-onto", commit: L } })).toEqual(
-      line,
+  test("a WIP thread merges a fresh copy of its WIP; nothing when it has not moved", () => {
+    expect(from()).toMatchObject({ kind: "wip", bookmark: "wip/x", ...now })
+    expect(from({ wipNow: { ...now, commit: W } })).toEqual({ kind: "nothing" })
+  })
+  test("a WIP's copy is made on the lane's last copy", () => {
+    expect(from()).toEqual({ kind: "wip", bookmark: "wip/x", ...now, on: COPY })
+  })
+  test("a line thread, a lane with no base, and a landed WIP merge the line, marking no move", () => {
+    expect(from({ base: lineBase, wipNow: null })).toEqual(line(false))
+    expect(from({ base: null, wipNow: null })).toEqual(line(false))
+    expect(from({ state: "landed", wipNow: null })).toEqual(line(false))
+  })
+  test("continue on the line marks a move from a WIP, and from no other base", () => {
+    expect(from({ toLine: true })).toEqual(line(true))
+    expect(from({ toLine: true, state: "landed" })).toEqual(line(true))
+    expect(from({ toLine: true, base: lineBase, wipNow: null })).toEqual(
+      line(false),
     )
-    expect(from({ newest: null, wip: null })).toEqual(line)
-    expect(from({ wip: { state: "landed", now: null } })).toEqual(line)
+    expect(from({ toLine: true, base: null, wipNow: null })).toEqual(
+      line(false),
+    )
   })
   test("a gone WIP refuses until continued on the line; no line refuses", () => {
-    expect(from({ wip: { state: "gone", now: null } })).toBe(ERR.BASE_GONE)
-    expect(from({ wip: { state: "gone", now: null }, toLine: true })).toEqual({
-      kind: "line",
-      onto: "pineta-onto",
-      commit: L,
-    })
+    expect(from({ state: "gone", wipNow: null })).toBe(ERR.BASE_GONE)
+    expect(from({ state: "gone", wipNow: null, toLine: true })).toEqual(
+      line(true),
+    )
     expect(from({ line: null })).toBe(ERR.NO_LINE)
   })
 })

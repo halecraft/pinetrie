@@ -14,6 +14,7 @@ import {
   commitId,
   type EntryId,
   entryId,
+  firstLine,
   type LaneName,
   laneNameForThread,
   NO_EDITOR,
@@ -23,7 +24,9 @@ import {
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import {
   baseMessage,
+  bookmarkName,
   bookmarkOf,
+  bookmarkRevset,
   changedPaths,
   changeOf,
   changesNoFile,
@@ -54,6 +57,7 @@ import {
   lines,
   logRevset,
   mergeBase,
+  mergeUpdate,
   newestBase,
   type OfferSource,
   offerBookmark,
@@ -66,6 +70,7 @@ import {
   planFollowOffer,
   planForkSetup,
   planLineSetup,
+  planMerge,
   planOffer,
   planRepair,
   planTakeOffer,
@@ -76,11 +81,12 @@ import {
   retireLaneBookmarks,
   revisionMessage,
   revisionRead,
+  revisionsIn,
   revsetName,
   run,
-  sideHistory,
   stackBookmark,
   startOfOffer,
+  type TouchedRevision,
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
@@ -335,7 +341,10 @@ describe("a lane's repo, with jj", () => {
     // An update: a copy of the WIP made in the lane, on the line commit
     // under it, merged; the line conflicts.
     const wip1 = await wipNow()
-    await inLane(laneDir, planWipCopy(wip1))
+    await inLane(laneDir, [
+      fetchById([wip1.commit, wip1.under]),
+      ...planWipCopy(wip1, wip1.under),
+    ])
     const [copy] = await commitsOf(laneJj, "@-")
     if (copy === undefined) throw new Error("no copy")
     expect(
@@ -352,15 +361,14 @@ describe("a lane's repo, with jj", () => {
     expect(merge).not.toBeNull()
     expect(await conflictsIn(laneJj)).toEqual(["shared.txt"])
     expect(await conflictContent(laneJj, "shared.txt")).toContain("<<<<<<<")
-    const sides = { ours, theirs: [copy] }
     expect(
-      (await sideHistory(laneJj, sides, [ours], "shared.txt")).map(
-        entryOfMessage,
+      (await revisionsIn(laneJj, `${copy}..${ours}`, ["shared.txt"])).map(r =>
+        entryOfMessage(r.description),
       ),
     ).toEqual(["e-1"])
     expect(
-      (await sideHistory(laneJj, sides, [copy], "shared.txt")).map(
-        d => d.split("\n")[0],
+      (await revisionsIn(laneJj, `${ours}..${copy}`, ["shared.txt"])).map(
+        r => r.description.split("\n")[0],
       ),
     ).toEqual(["copy of wip/x"])
 
@@ -390,7 +398,11 @@ describe("a lane's repo, with jj", () => {
     await yoursJj(["bookmark", "move", "wip/x", "--to", "@-"])
     // The next copy sits on the last one: the merge brings in only what
     // the WIP changed since, not the line two the lane already resolved.
-    await inLane(laneDir, planWipCopy({ ...(await wipNow()), under: copy }))
+    const wip2 = await wipNow()
+    await inLane(laneDir, [
+      fetchById([wip2.commit]),
+      ...planWipCopy(wip2, copy),
+    ])
     const [cleanCopy] = await commitsOf(laneJj, "@-")
     if (cleanCopy === undefined) throw new Error("no copy")
     const updated = await mergeBase(laneJj, LANE, cleanCopy, "update: wip/x")
@@ -539,6 +551,180 @@ describe("a lane's repo, with jj", () => {
       )
       expect(await readFile(path.join(forkDir, "b.txt"), "utf8")).toBe("b\n")
     }, 60_000)
+
+  test("an update in jj, end to end (ADR-0060): clean, conflicted, nothing, a move to the line, and a WIP's copies", async () => {
+    const {
+      yoursDir,
+      laneDir,
+      yoursJj,
+      laneJj,
+      line,
+      edit,
+      setUpLine,
+      lineNow,
+    } = await offerRig("update")
+    const dirs = { "/mnt/host-working-copy": yoursDir, "/workspace": laneDir }
+    // The lane's runners as a lane has them: its root and your working copy
+    // where the steps name them.
+    const runners = {
+      host: hostRunner(),
+      lane: (args: readonly string[]) =>
+        hostRunner(laneDir)(
+          onHost([{ in: "lane", argv: args }], dirs)[0]?.argv ?? args,
+        ),
+      laneBytes: hostBytesRunner(laneDir),
+    }
+    const lineMerge = async (mark = false) =>
+      planMerge({
+        kind: "line",
+        onto: line.onto,
+        commit: await lineNow(),
+        mark,
+      })
+    const yours = async (file: string, text: string, title: string) => {
+      await edit(yoursDir, file, text)
+      await yoursJj(["commit", "-m", title])
+    }
+    const moveLine = () =>
+      yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
+    const titled = (revisions: readonly TouchedRevision[]) =>
+      revisions.map(r => ({
+        title: firstLine(r.description, 200),
+        paths: r.paths,
+      }))
+    const baseOfLane = () =>
+      laneBase(laneJj, bookmarkRevset(bookmarkName(LANE)), line)
+
+    await edit(yoursDir, "a.txt", "a\n")
+    await edit(yoursDir, "b.txt", "b\n")
+    await yours("c.txt", "c\n", "your base")
+    await setUpLine()
+    const [base] = await commitsOf(yoursJj, "@-")
+    if (base === undefined) throw new Error("no base")
+    await executeOrThrow(
+      planBaseRefresh({ base: null, yours: [base], lock: null, install: null }),
+      runners,
+    )
+    await executeOrThrow(
+      planForkSetup(LANE, { kind: "commits", commits: [base] }),
+      runners,
+    )
+    // A lane from before the line has no `Pineta-Base`; its own repo has no
+    // line bookmark to find a start on.
+    expect(await baseOfLane()).toBeNull()
+
+    // (a) Clean: the lane changed b.txt, you changed a.txt and c.txt.
+    await edit(laneDir, "b.txt", "b (lane)\n")
+    await turnOn(laneJj, { ...TURN, entry: entryId("e-1") })
+    await yours("a.txt", "a (yours)\n", "yours one")
+    await yours("c.txt", "c (yours)\n", "yours two\n\nwith a body")
+    await moveLine()
+    const line1 = await lineNow()
+    const clean = await mergeUpdate(laneJj, runners, LANE, await lineMerge())
+    expect(clean).toMatchObject({
+      kind: "clean",
+      from: line1,
+      commits: ["yours two", "yours one"],
+    })
+    if (clean.kind !== "clean") throw new Error("not clean")
+    expect([...clean.files].sort()).toEqual(["a.txt", "c.txt"])
+    expect(await baseOfLane()).toEqual({
+      base: { kind: "line" },
+      start: line1,
+      source: line1,
+    })
+
+    // (b) Conflicted, on two files: each revision with only the conflicted
+    // files it touched.
+    await edit(laneDir, "a.txt", "a (lane)\n")
+    await turnOn(laneJj, { ...TURN, title: "lane a", entry: entryId("e-2") })
+    await edit(laneDir, "b.txt", "b (lane, again)\n")
+    await turnOn(laneJj, { ...TURN, title: "lane b", entry: entryId("e-3") })
+    await yours("a.txt", "a (yours, again)\n", "yours a")
+    await edit(yoursDir, "c.txt", "c (yours, again)\n")
+    await yours("b.txt", "b (yours)\n", "yours b and c")
+    await moveLine()
+    const conflicted = await mergeUpdate(
+      laneJj,
+      runners,
+      LANE,
+      await lineMerge(),
+    )
+    if (conflicted.kind !== "conflicted") throw new Error("not conflicted")
+    expect(conflicted.contents.map(c => c.path)).toEqual(["a.txt", "b.txt"])
+    expect(conflicted.contents.every(c => c.content.includes("<<<<<<<"))).toBe(
+      true,
+    )
+    expect(titled(conflicted.ours)).toEqual([
+      { title: "a turn", paths: ["b.txt"] },
+      { title: "lane a", paths: ["a.txt"] },
+      { title: "lane b", paths: ["b.txt"] },
+    ])
+    expect(titled(conflicted.theirs)).toEqual([
+      { title: "yours a", paths: ["a.txt"] },
+      { title: "yours b and c", paths: ["b.txt"] },
+    ])
+
+    // (c) Nothing to merge: no mark, unless the thread moves to the line.
+    await edit(laneDir, "a.txt", "a (both)\n")
+    await edit(laneDir, "b.txt", "b (both)\n")
+    await turnOn(laneJj, { ...TURN, title: "resolved", entry: entryId("e-4") })
+    const ours = await bookmarkOf(laneJj, LANE)
+    expect(await mergeUpdate(laneJj, runners, LANE, await lineMerge())).toEqual(
+      { kind: "nothing", ours, mark: null },
+    )
+    const moved = await mergeUpdate(
+      laneJj,
+      runners,
+      LANE,
+      await lineMerge(true),
+    )
+    if (moved.kind !== "nothing" || moved.mark === null)
+      throw new Error("no mark")
+    expect(await bookmarkOf(laneJj, LANE)).toBe(moved.mark)
+    expect(
+      await newestBase(laneJj, bookmarkRevset(bookmarkName(LANE))),
+    ).toEqual({
+      at: moved.mark,
+      bookmark: line.onto,
+      commit: await lineNow(),
+    })
+
+    // (d) A WIP's copy, then the next on it: a commit only the lane has.
+    const line2 = await lineNow()
+    await yoursJj(["new", line2])
+    await yours("w.txt", "w1\n", "wip one")
+    await yoursJj(["bookmark", "create", "wip/x", "-r", "@-"])
+    const [w1] = await commitsOf(yoursJj, "@-")
+    if (w1 === undefined) throw new Error("no wip")
+    const wipMerge = (commit: CommitId, on: CommitId) =>
+      planMerge({ kind: "wip", bookmark: "wip/x", commit, under: line2, on })
+    const first = await mergeUpdate(laneJj, runners, LANE, wipMerge(w1, line2))
+    expect(first).toMatchObject({
+      kind: "clean",
+      files: ["w.txt"],
+      commits: ["wip one"],
+    })
+    if (first.kind !== "clean") throw new Error("not clean")
+    await yours("w.txt", "w2\n", "wip two")
+    await yoursJj(["bookmark", "move", "wip/x", "--to", "@-"])
+    const [w2] = await commitsOf(yoursJj, "@-")
+    if (w2 === undefined) throw new Error("no wip")
+    expect(await commitsOf(yoursJj, `present(${first.from})`)).toEqual([])
+    const next = await mergeUpdate(
+      laneJj,
+      runners,
+      LANE,
+      wipMerge(w2, first.from),
+    )
+    expect(next).toMatchObject({
+      kind: "clean",
+      files: ["w.txt"],
+      commits: ["wip two", "wip one"],
+    })
+    if (next.kind !== "clean") throw new Error("not clean")
+    expect(await commitsOf(laneJj, `${next.from}-`)).toEqual([first.from])
+  }, 60_000)
 
   test("an update merges on an adopted commit; a stack's commits are never adopted", async () => {
     const { laneDir, yoursJj, yoursDir, laneJj, inLane, edit, base, lineNow } =

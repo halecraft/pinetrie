@@ -139,8 +139,8 @@ async function carryOut(
       )
       .catch(hostFailed)
     if (prepared === null) return "next"
-    if ("refused" in prepared) {
-      unsent(deps, card, prepared.refused)
+    if (prepared.kind === "refused") {
+      unsent(deps, card, prepared.reason)
       return "next"
     }
     if (prepared.kind === "conflicted") {

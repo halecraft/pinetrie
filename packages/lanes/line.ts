@@ -4,7 +4,7 @@
 // up, move it and rebase your work onto it are `planLineSetup`, `planLand`
 // and `planFollow` (`plan.ts`).
 
-import { type CommitId, commitId } from "@pineta/core"
+import { type CommitId, commitId, type LaneBase } from "@pineta/core"
 import { changeOf } from "./offer.ts"
 import { type LineConfig, revsetName } from "./plan.ts"
 import { commitsOf } from "./revisions.ts"
@@ -221,17 +221,23 @@ export async function beginFacts(
   }
 }
 
-/** What `wipState` decides from: where a WIP bookmark is, against the line. */
+/**
+ * What `wipState` decides from: where a lane's WIP bookmark is, against the
+ * line, and whether the commit its base names is there. Null for a base on
+ * the line, or none.
+ */
 export async function wipFacts(
   jj: Runner,
   line: LineConfig,
-  bookmark: string,
-  source: CommitId,
+  base: LaneBase | null,
 ): Promise<{
   readonly bookmark: CommitId | null
   readonly bookmarkInLine: boolean
   readonly sourceInLine: boolean
-}> {
+} | null> {
+  if (base?.base.kind !== "wip") return null
+  const { source } = base
+  const { bookmark } = base.base
   const onto = `::present(${revsetName(line.onto)})`
   const [target] = await commitsOf(jj, `present(${revsetName(bookmark)})`)
   const inLine = async (revset: string) =>
