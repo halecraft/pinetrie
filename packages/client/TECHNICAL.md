@@ -252,6 +252,12 @@ give the roots and each tab's signals.
 - **New tabs** are fresh columns at the root (`anchor: null`), local until
   their first send. `sync` moves one whose message is written to
   `roots[rootOf(anchor)]`, keeping its key, and keeps it active.
+- **A new tab mints its root's id as it opens** (`fresh.root`, ADR-0066),
+  from the shell, beside its key (`planIntent`'s `newRoot`), as a column
+  reserves its lane's id. Its cards' fresh places name it, the host keeps
+  its moves' history under it, and its first send starts it
+  (`ChatHow.root`). Stored with the layout; one restored without it is
+  given one (`decodeLayout`'s `mintRoot`).
 - **`sync` runs on every root's columns**, not only the active one's: an anchor
   left behind can later follow a newer branch below it (ADR-0027).
 - **The layout drawn is `resolveLayout(stored, facts)`, computed in render**
@@ -1018,7 +1024,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   holds that much of the text, since the request can reach it first (S72).
 - **Queue, unqueue and a command are requests to the host, outside the undo
   stack** (`SessionClient.queueCard`, `unqueueCard`, `setCommand`): a card's
-  box undoes only its text (ADR-0052), and moves wait for step 4's history.
+  box undoes only its text (ADR-0052). A queue and an unqueue are moves, so
+  the host records them in the root's history of your moves, and the page
+  undoes them, not a box (ADR-0066).
   An unqueue the host's take got to first is refused `gone` (S69, ADR-0059);
   `SessionClient.refusals` holds it, read by the column through
   `useSyncExternalStore`, until your next send, queue or unqueue in its
@@ -1486,20 +1494,31 @@ state, never stored.
   and a repair in between would place the card in the first empty slot.
   Until then the pending move's `slot` is an intent: drawn there, and left
   alone by the repair.
-- **The history is in `MovesState`** (`card-moves.ts`). Each sent move says
-  what it does to it (`HistoryStep`): `record` on acceptance, `undo` and
-  `redo` leave their list when sent and go to the other once accepted,
-  `forget` for an undone creation, `none` for a send, a discard, a
-  composer's new card. A refused undo is dropped. A swap is recorded at
-  once (`swapped`), since no host is asked.
-- **`planUndo` decides** (`move-undo.ts`, pure): the reverse handoff, shown
-  first where the card goes back to (the inventory, a thread's end through
-  `openAt`, an open fresh column's tab, or `reopen` of a closed one, kept
-  whole in the entry as `ClosedColumn`), or a swap back while both slots
-  hold what it wrote, or a refusal it can already see. A place in an
-  archived root asks first, in a dialog (`askRestore`); its "restore and
-  undo" restores the root, then plans the undo afresh with that root read
-  as restored.
+- **The history of moves is the host's** (ADR-0066): one per person and
+  root, which the host chooses for each move (`historyOf`). The page keeps
+  none, and names no history when it moves a card. `undoMove` names the
+  root of the tab you are on (`planUndoMove`: its `RootId` from the
+  directory, `IntentState.rootEntries`, or a new tab's `fresh.root`); the
+  Archive tab has none. The session sends `undo-move` and waits for its copy
+  of the places to reach the reply's `rev`.
+- **The answer is planned afresh** (`undoAnswered`, `afterUndo`): each place
+  a card went back to, once, brought into view (`revealOf`, `reveal.ts`):
+  the panel, a thread's end through `openAt`, a fresh column's tab, or a
+  closed fresh column opened again at the end of its root's tab from its
+  place alone (`openFresh`: key, root, branch point). A refusal shows the
+  card where it is now and says who moved it there. An undo shows its place
+  as it acts, not before, and flies nothing: the reply comes after the copy
+  already has the move.
+- **A swap is undone by this tab's own stack** (`swaps` in
+  `session-view.ts`, key `slots` on the tab's undo document, scope your
+  inventory), while the panel has focus (`keyAct`'s `inPanel`).
+  `swapSlots` writes inside its gesture; the repair writes outside any, so
+  an undo of a swap whose slot the repair changed is refused,
+  `slots-changed` (S90). The text stack, on the same document under
+  `cards`, never takes a swap step.
+- **A card an undo puts back in your inventory takes its old slot while the
+  repair has not cleared it** (`steadiness`), else the first empty one: the
+  host knows no slots.
 - **One landing rule** (`put-target.ts`). A put and a drop name a
   `PutTarget`: a column by key, or a slot. A column's place is its
   composer's (`composerPlace`, `column-view.ts`), which each writable
@@ -1511,9 +1530,10 @@ state, never stored.
   inventory, and takes any other into that slot.
 - **Take, put, keep, remove, select and undo are intents** (`intent.ts`,
   `card-intents.ts`), planned from `IntentState.cards` (`CardFacts`: the
-  drawn cards, the lanes, the drawn slots, the selection, the history and
-  the composer places), carried out by `perform`. A keep sends one take per
-  card and closes the column once every one is accepted (`afterKeep`).
+  drawn cards, the lanes, the drawn slots, the selection and the composer
+  places), carried out by `perform`. A keep sends one move of every card
+  (`moveCards`), which the host accepts or refuses whole, `full` among its
+  refusals, and closes the column once accepted (`afterKeep`).
 - **Drag** is HTML drag and drop, not the column drag's pointer events: it
   crosses elements and tabs. A card's drag carries its id under
   `CARD_MIME`; its handle is its take button, or a slot. `App` listens on

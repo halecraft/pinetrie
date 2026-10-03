@@ -1,76 +1,37 @@
 // client/card-intents — what take, put, keep, remove and undo do (ADR-0048
-// step 4, ADR-0052, ADR-0059), as effects. Pure: `planIntent` calls these,
-// and `perform` carries out what they return.
+// step 4, ADR-0052, ADR-0059, ADR-0066), as effects. Pure: `planIntent` calls
+// these, and `perform` carries out what they return.
 //
 // Every input makes the same moves: a key, a button and a drop each become
 // one of these intents. A take lands in the selected slot when it is empty,
 // else the first empty one (`firstEmpty`); a put lands where the target's
 // composer would create a card (`placeOfTarget`). Each move says where it was
-// made, so a refusal is said there, and what it does to the history.
+// made, so a refusal is said there. Which history a move enters is the
+// host's to decide (`historyOf`); an undo names only the root you are on.
 
 import {
   type CardId,
   type CardRecord,
-  type EntryId,
-  INVENTORY_SLOTS,
   keyOf,
   type Move,
+  type MoveDirection,
   type PlaceKey,
+  type RootId,
   sameKey,
 } from "@pineta/core"
+import type { Outcome } from "@pineta/protocol/codec"
 import {
   type ActedAt,
   AT_INVENTORY,
-  type HistoryEntry,
   type MoveAnswer,
-  type MoveHow,
-  NO_STEP,
-  NOT_RECORDED,
   type Refusal,
 } from "./card-moves.ts"
 import type { CardFacts, Effect, IntentState } from "./intent.ts"
-import { planOpenAt } from "./intent.ts"
 import { firstEmpty, type Slots } from "./inventory.ts"
-import {
-  type ClosedColumn,
-  closedColumn,
-  planOpen,
-  tabOfColumn,
-} from "./layout.ts"
-import {
-  type Direction,
-  planUndo,
-  type Shown,
-  type UndoPlan,
-} from "./move-undo.ts"
 import { type PutTarget, placeOfTarget } from "./put-target.ts"
+import { revealOf } from "./reveal.ts"
 
 const at = (key: string): ActedAt => ({ kind: "column", key })
-
-/**
- * A move made in column `key`, recorded as `card`'s move to `to`: a queue or
- * an unqueue. With no card the page holds, it is made all the same, and not
- * recorded.
- */
-export function columnMove(
-  key: string,
-  moved: { readonly card: CardRecord; readonly to: PlaceKey } | null,
-): MoveHow {
-  if (moved === null) return NOT_RECORDED(key)
-  const move: Move = {
-    card: moved.card.id,
-    from: keyOf(moved.card.place),
-    to: moved.to,
-  }
-  return {
-    actedAt: at(key),
-    history: {
-      kind: "record",
-      entry: { kind: "handoff", move, slot: null, column: null },
-    },
-    slot: null,
-  }
-}
 
 const slotOf = (slots: Slots, card: CardId): number | null => {
   const found = Object.entries(slots).find(([, c]) => c === card)
@@ -79,18 +40,6 @@ const slotOf = (slots: Slots, card: CardId): number | null => {
 
 const cardOf = (facts: CardFacts, card: CardId): CardRecord | undefined =>
   facts.cards.find(c => c.id === card)
-
-/** The fresh column at either end of a move, kept whole for an undo. */
-function freshEnd(
-  state: IntentState,
-  from: PlaceKey | null,
-  to: PlaceKey | null,
-): ClosedColumn | null {
-  for (const key of [from, to])
-    if (key?.kind === "fresh")
-      return closedColumn(state.layout, key.column) ?? null
-  return null
-}
 
 /** A take refused before it is sent: your inventory is full, as the host would say. */
 const full = (card: CardId): Refusal => ({
@@ -101,31 +50,17 @@ const full = (card: CardId): Refusal => ({
   fromQueue: false,
 })
 
-/** A handoff into your inventory, at `slot`, recorded. */
-function takeInto(card: CardRecord, slot: number, state: IntentState): Effect {
-  const move: Move = {
-    card: card.id,
-    from: keyOf(card.place),
-    to: { kind: "inventory", holder: state.cards.me },
-  }
-  return {
+/** A handoff into your inventory, at `slot`. */
+const takeInto = (card: CardRecord, slot: number, me: CardFacts["me"]) =>
+  ({
     kind: "moveCard",
-    move,
-    how: {
-      actedAt: AT_INVENTORY,
-      history: {
-        kind: "record",
-        entry: {
-          kind: "handoff",
-          move,
-          slot,
-          column: freshEnd(state, move.from, null),
-        },
-      },
-      slot,
+    move: {
+      card: card.id,
+      from: keyOf(card.place),
+      to: { kind: "inventory", holder: me },
     },
-  }
-}
+    how: { actedAt: AT_INVENTORY, slot },
+  }) as const satisfies Effect
 
 /**
  * Take `card` into your inventory: the selected slot if it is empty, else
@@ -146,10 +81,13 @@ function takeAt(
   const slot = firstEmpty(state.cards.slots, start)
   const show: Effect = { kind: "showInventory", brief: true }
   if (slot === null) return [show, { kind: "refuse", refusal: full(now.id) }]
-  return [show, takeInto(now, slot, state)]
+  return [show, takeInto(now, slot, state.cards.me)]
 }
 
-/** A copy of a message's text, or of a selection in it, as a new card in your inventory. */
+/**
+ * A copy of a message's text, or of a selection in it, as a new card in your
+ * inventory. A creation, so it enters no history: discarding removes it.
+ */
 export function planTakeCopy(
   card: CardId,
   text: string,
@@ -159,7 +97,6 @@ export function planTakeCopy(
   const slot = firstEmpty(facts.slots, facts.selected)
   const show: Effect = { kind: "showInventory", brief: true }
   if (slot === null) return [show, { kind: "refuse", refusal: full(card) }]
-  const to = { kind: "inventory", holder: facts.me } as const
   return [
     show,
     {
@@ -168,24 +105,12 @@ export function planTakeCopy(
         id: card,
         owner: facts.me,
         placer: facts.me,
-        place: to,
+        place: { kind: "inventory", holder: facts.me },
         command: null,
         unsent: null,
       },
       text,
-      how: {
-        actedAt: AT_INVENTORY,
-        history: {
-          kind: "record",
-          entry: {
-            kind: "handoff",
-            move: { card, from: null, to },
-            slot,
-            column: null,
-          },
-        },
-        slot,
-      },
+      how: { actedAt: AT_INVENTORY, slot },
     },
   ]
 }
@@ -208,45 +133,14 @@ export function planPut(
     if (from === null || now.place.kind !== "inventory")
       return takeAt(now, target.slot, state)
     if (from === target.slot) return []
-    const there = facts.slots[String(target.slot)] ?? null
-    const entry: HistoryEntry = {
-      kind: "swap",
-      a: from,
-      b: target.slot,
-      cards: [there, card],
-    }
-    return [
-      {
-        kind: "swapSlots",
-        a: from,
-        b: target.slot,
-        step: { kind: "record", entry },
-      },
-    ]
+    return [{ kind: "swapSlots", a: from, b: target.slot }]
   }
   const to = placeOfTarget(target, facts.composers, facts.me)
   const from = keyOf(now.place)
   if (to === null || sameKey(from, to)) return []
   const move: Move = { card, from, to }
-  const slot = slotOf(facts.slots, card)
   return [
-    {
-      kind: "moveCard",
-      move,
-      how: {
-        actedAt: at(target.key),
-        history: {
-          kind: "record",
-          entry: {
-            kind: "handoff",
-            move,
-            slot,
-            column: freshEnd(state, from, to),
-          },
-        },
-        slot: null,
-      },
-    },
+    { kind: "moveCard", move, how: { actedAt: at(target.key), slot: null } },
   ]
 }
 
@@ -261,15 +155,16 @@ export function planRemove(
     {
       kind: "discardCard",
       card,
-      how: { actedAt: AT_INVENTORY, history: NO_STEP, slot: null },
+      how: { actedAt: AT_INVENTORY, slot: null },
     },
   ]
 }
 
 /**
- * Close fresh column `key`, keeping `cards` in your inventory, one handoff
- * each into successive empty slots from the selected one. Without room for
- * all of them, nothing is sent and the column stays open, saying so.
+ * Close fresh column `key`, keeping `cards` in your inventory: one move the
+ * host accepts or refuses whole (ADR-0066), each card into the next empty
+ * slot from the selected one. Without room for all of them, the host refuses
+ * it `full`, and the column stays open, saying so.
  */
 export function planKeep(
   cards: readonly CardId[],
@@ -279,167 +174,100 @@ export function planKeep(
 ): readonly Effect[] {
   const facts = state.cards
   const slots: Record<string, CardId> = { ...facts.slots }
-  const free = INVENTORY_SLOTS - Object.keys(slots).length
-  const kept = cards.flatMap(id => {
+  const moves = cards.flatMap(id => {
     const now = cardOf(facts, id)
-    return now === undefined ? [] : [now]
-  })
-  if (kept.length > free)
-    return [
-      {
-        kind: "refuse",
-        refusal: {
-          card: null,
-          actedAt: at(key),
-          code: "no-room",
-          need: kept.length,
-          free,
-        },
-      },
-    ]
-  const column = closedColumn(state.layout, key) ?? null
-  const moves = kept.flatMap(now => {
+    if (now === undefined) return []
     const slot = firstEmpty(slots, facts.selected)
-    if (slot === null) return []
-    slots[String(slot)] = now.id
+    if (slot !== null) slots[String(slot)] = now.id
     const move: Move = {
       card: now.id,
       from: keyOf(now.place),
       to: { kind: "inventory", holder: facts.me },
     }
-    return [
-      {
-        move,
-        how: {
-          actedAt: at(key),
-          history: {
-            kind: "record",
-            entry: { kind: "handoff", move, slot, column },
-          },
-          slot,
-        } satisfies MoveHow,
-      },
-    ]
+    return [{ move, slot }]
   })
-  return [{ kind: "keep", moves, close }]
+  return [{ kind: "keep", moves, actedAt: at(key), close }]
 }
 
-/** After a keep's answers: the column closes only if every card was kept. */
+/** After a keep's answer: the column closes only if the keep was accepted. */
 export const afterKeep = (
-  answers: readonly MoveAnswer[],
+  answer: MoveAnswer,
   close: readonly Effect[],
-): readonly Effect[] => (answers.every(a => a.kind === "accepted") ? close : [])
+): readonly Effect[] => (answer.kind === "accepted" ? close : [])
 
-/** Undo or redo your newest move: show where it acts, then act, or say why not. */
-export function planUndoMove(
-  direction: Direction,
-  restored: EntryId | null,
-  state: IntentState,
-  fresh: string,
-): readonly Effect[] {
-  const archive =
-    restored === null
-      ? state.archive
-      : new Map([...state.archive].filter(([root]) => root !== restored))
-  const facts = state.cards
-  const plan = planUndo(direction, facts.history, {
-    cards: facts.cards,
-    slots: facts.slots,
-    layout: state.layout,
-    index: state.index,
-    lanes: facts.lanes,
-    archive,
-    me: facts.me,
-  })
-  return undoEffects(plan, direction, { ...state, archive }, fresh)
+/**
+ * The root an undo of moves acts in: the root of the tab you are on, or the
+ * one a new tab minted as it opened (ADR-0066). None in the Archive tab, or
+ * a root the directory does not name yet.
+ */
+function rootOfTab(state: IntentState): RootId | null {
+  const active = state.layout.active
+  if (active === null || active.kind === "archive") return null
+  if (active.kind === "new")
+    return (
+      state.layout.newTabs.find(c => c.key === active.key)?.fresh?.root ?? null
+    )
+  for (const [root, entry] of state.rootEntries)
+    if (entry === active.root) return root
+  return null
 }
 
-function undoEffects(
-  plan: UndoPlan,
-  direction: Direction,
+/**
+ * Undo or redo your newest move in the tab you are on, which the host does
+ * whole or refuses (ADR-0066); with the inventory panel focused, this tab's
+ * newest swap.
+ */
+export function planUndoMove(
+  direction: MoveDirection,
+  inPanel: boolean,
+  state: IntentState,
+): readonly Effect[] {
+  if (inPanel) return [{ kind: "undoSwap", direction }]
+  const root = rootOfTab(state)
+  return root === null ? [] : [{ kind: "undoMoves", root, direction }]
+}
+
+/**
+ * What the host's answer to an undo of moves brings into view (ADR-0052:
+ * undo shows where it acts): each place a card went back to, once; or,
+ * refused, the card where it is now, saying who moved it.
+ */
+export function afterUndo(
+  outcome: Outcome,
   state: IntentState,
   fresh: string,
 ): readonly Effect[] {
-  switch (plan.kind) {
-    case "none":
-      return []
-    case "ask":
-      return [{ kind: "askRestore", root: plan.root, direction }]
-    case "refused":
+  switch (outcome.kind) {
+    case "undone": {
+      const places: PlaceKey[] = []
+      for (const { place } of outcome.cards)
+        if (place !== null && !places.some(p => sameKey(p, place)))
+          places.push(place)
+      return places.flatMap(place => revealOf(place, state, fresh).effects)
+    }
+    case "unmoved": {
+      const shown =
+        outcome.place === null
+          ? {
+              effects: [{ kind: "showInventory", brief: false }] as const,
+              actedAt: AT_INVENTORY,
+            }
+          : revealOf(outcome.place, state, fresh)
       return [
-        ...showEffects(plan.show, state, fresh),
+        ...shown.effects,
         {
-          kind: "dropEntry",
-          entry: plan.entry,
-          refusal: { ...plan.why, actedAt: actedAtOf(plan.show, state, fresh) },
-        },
-      ]
-    case "swap":
-      return [
-        { kind: "showInventory", brief: false },
-        { kind: "swapSlots", a: plan.a, b: plan.b, step: plan.step },
-      ]
-    case "handoff":
-      return [
-        ...showEffects(plan.show, state, fresh),
-        {
-          kind: "moveCard",
-          move: plan.move,
-          how: {
-            actedAt: actedAtOf(plan.show, state, fresh),
-            history: plan.step,
-            slot: plan.slot,
+          kind: "refuse",
+          refusal: {
+            card: null,
+            actedAt: shown.actedAt,
+            code: outcome.code,
+            by: outcome.by,
+            fromQueue: false,
           },
         },
       ]
-  }
-}
-
-/** Bringing `show` into view. */
-function showEffects(
-  show: Shown,
-  state: IntentState,
-  fresh: string,
-): readonly Effect[] {
-  switch (show.kind) {
-    case "inventory":
-      return [{ kind: "showInventory", brief: false }]
-    case "column": {
-      const tab = tabOfColumn(state.layout, show.key)
-      return tab === undefined
-        ? []
-        : [{ kind: "layout", action: { kind: "show", tab } }]
     }
-    case "reopen":
-      return [
-        { kind: "layout", action: { kind: "reopen", closed: show.closed } },
-      ]
-    case "entry":
-      return planOpenAt(show.entry, state, fresh)
-  }
-}
-
-/** Where a refusal of an undo is said: the place it brought into view. */
-function actedAtOf(show: Shown, state: IntentState, fresh: string): ActedAt {
-  switch (show.kind) {
-    case "inventory":
-      return AT_INVENTORY
-    case "column":
-      return at(show.key)
-    case "reopen":
-      return at(show.closed.column.key)
-    case "entry": {
-      const plan = planOpen(
-        state.layout,
-        state.index,
-        state.archive,
-        show.entry,
-      )
-      return plan?.kind === "scroll"
-        ? at(plan.key)
-        : plan?.kind === "open"
-          ? at(fresh)
-          : AT_INVENTORY
-    }
+    default:
+      return []
   }
 }

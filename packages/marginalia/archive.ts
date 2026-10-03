@@ -166,32 +166,34 @@ function planTeardown(
 }
 
 /**
- * The root a command writes in (ADR-0063), or null when it writes in none:
- * a new thread at the root, a name, a stop, an archive action, a
- * reservation, a card's command, or a card's move into a fresh column or an
- * inventory, or its removal. An offer acts in its lane's root.
+ * The roots a command writes in (ADR-0063), none for a new thread at the
+ * root, a name, a stop, an archive action, a reservation, a card's command,
+ * or a card's move into an inventory, or its removal. An offer acts in its
+ * lane's root; a move in each root its cards go to; an undo of moves in its
+ * root (ADR-0066).
  */
 export function writesIn(
   intent: Intent,
   rootOfLane: (lane: LaneName) => RootId | null,
-): RootId | null {
+): readonly RootId[] {
+  const only = (root: RootId | null): readonly RootId[] =>
+    root === null ? [] : [root]
   switch (intent.kind) {
     case "chat":
-      return intent.at.kind === "root" ? null : intent.root
+      return only(intent.at.kind === "root" ? null : intent.root)
     // An offer acts at its lane's tip: an archived root's lanes offer no
     // work out.
     case "offer":
-      return rootOfLane(intent.lane)
+      return only(rootOfLane(intent.lane))
     case "mark":
-      return intent.root
-    // A move into a thread writes in its root; a fresh column has no root
-    // yet, and an inventory is in none.
-    case "move": {
-      const to = intent.move.to
-      return to === null || to.kind === "fresh" || to.kind === "inventory"
-        ? null
-        : to.root
-    }
+    case "undo-move":
+      return [intent.root]
+    // A move into a thread or a fresh column writes in its root; an
+    // inventory is in none.
+    case "move":
+      return intent.moves.flatMap(({ to }) =>
+        to === null || to.kind === "inventory" ? [] : [to.root],
+      )
     case "name":
     case "stop":
     case "archive":
@@ -200,19 +202,22 @@ export function writesIn(
     case "line":
     // A command acts only when its card is taken, behind the take's own check.
     case "set-command":
-      return null
+      return []
   }
 }
 
-/** The record that makes `root` read-only, or null. */
+/** The record that makes one of the `written` roots read-only, or null. */
 export function archivedIn(
-  root: RootId | null,
+  written: readonly RootId[],
   roots: ReadonlyMap<RootId, RootRecord>,
   archive: ReadonlyMap<EntryId, ArchiveRecord>,
 ): ArchiveRecord | null {
-  const entry = root === null ? null : (roots.get(root)?.entry ?? null)
-  const record = entry === null ? undefined : archive.get(entry)
-  return record?.state === "archived" ? record : null
+  for (const root of written) {
+    const entry = roots.get(root)?.entry ?? null
+    const record = entry === null ? undefined : archive.get(entry)
+    if (record?.state === "archived") return record
+  }
+  return null
 }
 
 /** The record that makes `at` read-only, or null. */

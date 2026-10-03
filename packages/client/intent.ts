@@ -16,15 +16,17 @@ import type {
   LaneName,
   LaneView,
   Move,
+  MoveDirection,
   OfferAction,
   Position,
+  RootId,
   TreeIndex,
   WriterId,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
 import type { Density } from "./ask-words.ts"
 import {
-  columnMove,
+  afterUndo,
   planKeep,
   planPut,
   planRemove,
@@ -33,11 +35,9 @@ import {
   planUndoMove,
 } from "./card-intents.ts"
 import {
-  type HistoryEntry,
-  type HistoryStep,
-  type MoveHistory,
+  type ActedAt,
+  IN_COLUMN,
   type MoveHow,
-  NOT_RECORDED,
   type Refusal,
 } from "./card-moves.ts"
 import type { Pending, Prefill } from "./columns.ts"
@@ -50,7 +50,6 @@ import {
   planOpen,
 } from "./layout.ts"
 import type { MessageAct } from "./message-tools.ts"
-import type { Direction } from "./move-undo.ts"
 import type { ComposerPlaces, PutTarget } from "./put-target.ts"
 
 /** What a reader asks of one column. A message's acts are among them. */
@@ -160,20 +159,16 @@ export type Intent =
   /** Select an inventory slot. */
   | { readonly kind: "selectSlot"; readonly slot: number }
   /**
-   * Undo or redo your newest move, showing its place first. `restored`: a
-   * root just restored for it, read as restored whatever the copy says yet.
+   * Undo or redo your newest move in the tab you are on, or, with the
+   * inventory panel focused, your newest swap (ADR-0066).
    */
   | {
       readonly kind: "undoMove"
-      readonly direction: Direction
-      readonly restored: EntryId | null
+      readonly direction: MoveDirection
+      readonly inPanel: boolean
     }
-  /** The archived-root dialog's "restore and undo". */
-  | {
-      readonly kind: "restoreAndUndo"
-      readonly root: EntryId
-      readonly direction: Direction
-    }
+  /** The host's answer to an undo of moves: bring what it moved into view. */
+  | { readonly kind: "undoAnswered"; readonly outcome: Outcome }
 
 export type Effect =
   | { readonly kind: "layout"; readonly action: LayoutAction }
@@ -209,47 +204,37 @@ export type Effect =
       readonly by: WriterId
       readonly how: MoveHow
     }
-  /** A handoff: a take, a put, an undo's reverse (ADR-0059). */
+  /** A handoff: a take or a put (ADR-0059). */
   | { readonly kind: "moveCard"; readonly move: Move; readonly how: MoveHow }
-  /** Swap two slots of your inventory. */
-  | {
-      readonly kind: "swapSlots"
-      readonly a: number
-      readonly b: number
-      readonly step: HistoryStep
-    }
+  /** Swap two slots of your inventory, as one step of this tab's swaps. */
+  | { readonly kind: "swapSlots"; readonly a: number; readonly b: number }
   /**
-   * Moves into your inventory, all sent at once; once each is answered,
-   * `afterKeep` decides whether `close` runs.
+   * Moves into your inventory, sent as one move the host accepts or refuses
+   * whole (ADR-0066); `afterKeep` decides from its answer whether `close`
+   * runs.
    */
   | {
       readonly kind: "keep"
-      readonly moves: readonly { readonly move: Move; readonly how: MoveHow }[]
+      readonly moves: readonly {
+        readonly move: Move
+        readonly slot: number | null
+      }[]
+      readonly actedAt: ActedAt
       readonly close: readonly Effect[]
     }
-  /** Drop a history entry undo could not act on, saying why. */
+  /** Undo or redo your newest move in `root`, on the host (ADR-0066). */
   | {
-      readonly kind: "dropEntry"
-      readonly entry: HistoryEntry
-      readonly refusal: Refusal
+      readonly kind: "undoMoves"
+      readonly root: RootId
+      readonly direction: MoveDirection
     }
+  /** Undo or redo this tab's newest swap in your inventory. */
+  | { readonly kind: "undoSwap"; readonly direction: MoveDirection }
   /** Keep a refusal made before anything was sent. */
   | { readonly kind: "refuse"; readonly refusal: Refusal }
   /** Open the inventory; `brief`: only for a take's flight, if it was closed. */
   | { readonly kind: "showInventory"; readonly brief: boolean }
   | { readonly kind: "select"; readonly slot: number }
-  /** Ask whether to restore `root` to undo or redo there (the dialog). */
-  | {
-      readonly kind: "askRestore"
-      readonly root: EntryId
-      readonly direction: Direction
-    }
-  /** Restore `root`; once restored, ask for `next`, planned afresh. */
-  | {
-      readonly kind: "restoreThen"
-      readonly root: EntryId
-      readonly next: Intent
-    }
   | {
       readonly kind: "setCommand"
       readonly card: CardId
@@ -286,6 +271,11 @@ export interface IntentState {
   /** Every ask (`indexAsks`): a pick into one's work opens its fold. */
   readonly asks: AskIndex
   readonly cards: CardFacts
+  /**
+   * Each root's root entry, by its id, from the directory (ADR-0063): an
+   * undo names its tab's root, and a fresh column reopens in its root's tab.
+   */
+  readonly rootEntries: ReadonlyMap<RootId, EntryId>
 }
 
 /** What the card intents decide from (ADR-0048 step 4). */
@@ -298,7 +288,6 @@ export interface CardFacts {
   readonly slots: Slots
   /** The selected slot. */
   readonly selected: number
-  readonly history: MoveHistory
   /** Each column's composer place, by key. */
   readonly composers: ComposerPlaces
 }
@@ -310,16 +299,25 @@ const showRoot = (root: EntryId): Effect =>
 /**
  * The effects of `intent`. `fresh` is a new column key from the shell, as
  * `columnsReducer` takes keys in its actions: a column opened with it takes
- * focus, except one `openAt` opens, which only shows an entry.
+ * focus, except one `openAt` opens, which only shows an entry. `newRoot` is
+ * a new root's id from the shell, which a new tab keeps (ADR-0066).
  */
 export function planIntent(
   intent: Intent,
   state: IntentState,
   fresh: string,
+  newRoot: RootId,
 ): readonly Effect[] {
   switch (intent.kind) {
     case "column":
-      return planColumn(intent.position, intent.key, intent.act, state, fresh)
+      return planColumn(
+        intent.position,
+        intent.key,
+        intent.act,
+        state,
+        fresh,
+        newRoot,
+      )
     case "show":
       return [layout({ kind: "show", tab: intent.tab })]
     case "newTab":
@@ -328,6 +326,7 @@ export function planIntent(
         layout({
           kind: "newTab",
           key: fresh,
+          root: newRoot,
           asksAgent: intent.asksAgent,
           ...(intent.prefill === undefined ? {} : { prefill: intent.prefill }),
         }),
@@ -363,19 +362,9 @@ export function planIntent(
     case "selectSlot":
       return [{ kind: "select", slot: intent.slot }]
     case "undoMove":
-      return planUndoMove(intent.direction, intent.restored, state, fresh)
-    case "restoreAndUndo":
-      return [
-        {
-          kind: "restoreThen",
-          root: intent.root,
-          next: {
-            kind: "undoMove",
-            direction: intent.direction,
-            restored: intent.root,
-          },
-        },
-      ]
+      return planUndoMove(intent.direction, intent.inPanel, state)
+    case "undoAnswered":
+      return afterUndo(intent.outcome, state, fresh)
   }
 }
 
@@ -429,6 +418,7 @@ function planColumn(
   act: ColumnAct,
   state: IntentState,
   fresh: string,
+  newRoot: RootId,
 ): readonly Effect[] {
   const active = state.layout.active
   const onRoot = (action: RootColumnAction): readonly Effect[] =>
@@ -455,6 +445,7 @@ function planColumn(
         { kind: "newTab", asksAgent: act.asksAgent, prefill: act.prefill },
         state,
         fresh,
+        newRoot,
       )
     case "branch":
       return opened(
@@ -484,7 +475,7 @@ function planColumn(
       const discard: readonly Effect[] = act.discard.map(card => ({
         kind: "discardCard",
         card,
-        how: NOT_RECORDED(key),
+        how: IN_COLUMN(key),
       }))
       return [...discard, ...closing()]
     }
@@ -502,62 +493,26 @@ function planColumn(
       return onColumn({ kind: "sent", key: act.key, sendId: act.sendId })
     case "reserve":
       return onColumn({ kind: "reserve", key: act.key, lane: act.lane })
-    case "queue": {
-      const now = state.cards.cards.find(c => c.id === act.card)
-      // Its root is the one it drafts in: a card is queued from its thread.
-      const root =
-        now?.place.kind === "drafting" || now?.place.kind === "queued"
-          ? now.place.root
-          : undefined
+    case "queue":
       return [
         {
           kind: "queueCard",
           card: act.card,
           lane: act.lane,
           at: act.at,
-          how: columnMove(
-            key,
-            now === undefined || root === undefined
-              ? null
-              : {
-                  card: now,
-                  to: {
-                    kind: "queued",
-                    root,
-                    at: act.at,
-                    lane: act.lane,
-                    seen: "",
-                  },
-                },
-          ),
+          how: IN_COLUMN(key),
         },
       ]
-    }
-    case "unqueue": {
-      const now = state.cards.cards.find(c => c.id === act.card)
+    case "unqueue":
       return [
         {
           kind: "unqueueCard",
           card: act.card,
           lane: act.lane,
           by: act.by,
-          how: columnMove(
-            key,
-            now?.place.kind === "queued"
-              ? {
-                  card: now,
-                  to: {
-                    kind: "drafting",
-                    root: now.place.root,
-                    at: now.place.at,
-                    lane: act.lane,
-                  },
-                }
-              : null,
-          ),
+          how: IN_COLUMN(key),
         },
       ]
-    }
     case "setCommand":
       return [{ kind: "setCommand", card: act.card, command: act.command }]
     case "bringUpToDate":
@@ -568,14 +523,14 @@ function planColumn(
           kind: "createCard",
           card: { ...act.create, command: act.command },
           text: "",
-          how: NOT_RECORDED(key),
+          how: IN_COLUMN(key),
         },
         {
           kind: "queueCard",
           card: act.create.id,
           lane: act.lane,
           at: act.at,
-          how: NOT_RECORDED(key),
+          how: IN_COLUMN(key),
         },
       ]
     case "offer":

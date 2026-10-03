@@ -20,7 +20,7 @@ export interface Basics {
   readonly docs: HostDocuments
   /**
    * Where every card is (ADR-0059): what is queued for each lane. Written
-   * only through `applyPlaceStep` (`places.ts`).
+   * only through `applyPlaceSteps` (`places.ts`).
    */
   readonly places: PlacesDocHandle
   readonly log: (message: string) => void

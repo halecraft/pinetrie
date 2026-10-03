@@ -239,7 +239,7 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
         reserved: null,
         base: null,
       }),
-      TEST_ROOT,
+      [TEST_ROOT],
     ],
     [
       "a chat at the root",
@@ -257,15 +257,15 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
         reserved: null,
         base: null,
       }),
-      null,
+      [],
     ],
-    ["a name", { kind: "name", name: "Ada" }, null],
-    ["a stop", { kind: "stop", lane: laneNameForThread("x") }, null],
-    ["a reservation", { kind: "reserve", lane: laneNameForThread("x") }, null],
+    ["a name", { kind: "name", name: "Ada" }, []],
+    ["a stop", { kind: "stop", lane: laneNameForThread("x") }, []],
+    ["a reservation", { kind: "reserve", lane: laneNameForThread("x") }, []],
     [
       "an archive action",
       { kind: "archive", action: "archive", root: entryId("r1") },
-      null,
+      [],
     ],
     [
       "a mark: its root",
@@ -275,49 +275,74 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
         entry: entryId("b"),
         title: "Tab names",
       },
-      TEST_ROOT,
+      [TEST_ROOT],
     ],
     [
       "an offer: its lane's root",
       { kind: "offer", lane: LANE_X, action: "refresh", to: null, seen: null },
-      OTHER_ROOT,
+      [OTHER_ROOT],
     ],
     [
       "a move into a thread: its root",
       {
         kind: "move",
-        move: {
-          card: cardId("c"),
-          from: null,
-          to: {
-            kind: "drafting",
-            root: TEST_ROOT,
-            at: atEntry(entryId("b")),
-            lane: null,
+        moves: [
+          {
+            card: cardId("c"),
+            from: null,
+            to: {
+              kind: "drafting",
+              root: TEST_ROOT,
+              at: atEntry(entryId("b")),
+              lane: null,
+            },
           },
-        },
+        ],
       },
-      TEST_ROOT,
+      [TEST_ROOT],
     ],
     [
       "a move into an inventory",
       {
         kind: "move",
-        move: {
-          card: cardId("c"),
-          from: {
-            kind: "drafting",
-            root: TEST_ROOT,
-            at: atEntry(entryId("b")),
-            lane: null,
+        moves: [
+          {
+            card: cardId("c"),
+            from: {
+              kind: "drafting",
+              root: TEST_ROOT,
+              at: atEntry(entryId("b")),
+              lane: null,
+            },
+            to: { kind: "inventory", holder: writerId("ada@x.io") },
           },
-          to: { kind: "inventory", holder: writerId("ada@x.io") },
-        },
+        ],
       },
-      null,
+      [],
     ],
-  ] satisfies [string, Intent, RootId | null][])("%s", (_, intent, want) => {
-    expect(at(intent)).toBe(want)
+    [
+      "a keep's moves into a fresh column of each of two roots: both",
+      {
+        kind: "move",
+        moves: [OTHER_ROOT, TEST_ROOT].map(root => ({
+          card: cardId(root),
+          from: null,
+          to: { kind: "fresh", column: "k", root, at: ROOT },
+        })),
+      },
+      [OTHER_ROOT, TEST_ROOT],
+    ],
+    [
+      "an undo of moves: its root",
+      { kind: "undo-move", root: OTHER_ROOT, direction: "undo" },
+      [OTHER_ROOT],
+    ],
+  ] satisfies [
+    string,
+    Intent,
+    readonly RootId[],
+  ][])("%s", (_, intent, want) => {
+    expect(at(intent)).toEqual(want)
   })
 })
 
@@ -362,9 +387,12 @@ describe("archivedIn: a root's archive record, found by its root entry", () => {
   ]
   const roots = new Map([dir(TEST_ROOT, "r1"), dir(OTHER_ROOT, "r2")])
   test("an archived root refuses; a restored one, an unknown one and none do not", () => {
-    expect(archivedIn(TEST_ROOT, roots, archive)).toEqual(record("r1"))
-    expect(archivedIn(OTHER_ROOT, roots, archive)).toBeNull()
-    expect(archivedIn(rootIdFor("gone"), roots, archive)).toBeNull()
-    expect(archivedIn(null, roots, archive)).toBeNull()
+    expect(archivedIn([TEST_ROOT], roots, archive)).toEqual(record("r1"))
+    expect(archivedIn([OTHER_ROOT, TEST_ROOT], roots, archive)).toEqual(
+      record("r1"),
+    )
+    expect(archivedIn([OTHER_ROOT], roots, archive)).toBeNull()
+    expect(archivedIn([rootIdFor("gone")], roots, archive)).toBeNull()
+    expect(archivedIn([], roots, archive)).toBeNull()
   })
 })

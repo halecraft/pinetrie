@@ -31,7 +31,7 @@ import { type QueuedCard, writersOf } from "@pineta/marginalia"
 import { textClients } from "@pineta/schema"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import type { ReadOnly } from "./app-view.ts"
-import { NOT_RECORDED } from "./card-moves.ts"
+import { IN_COLUMN } from "./card-moves.ts"
 import {
   type EditorEvent,
   type EditorState,
@@ -275,7 +275,7 @@ export function CardEditor(p: {
               unsent: null,
             },
             el.value,
-            NOT_RECORDED(p.how.column),
+            IN_COLUMN(p.how.column),
           )
           break
         }

@@ -418,6 +418,9 @@ export function Column(p: ColumnProps) {
     asksAgent: p.column.asksAgent === true,
     ...(p.column.lane === undefined ? {} : { lane: p.column.lane }),
     ...(reserved === null ? {} : { reserved }),
+    ...(p.column.fresh?.root === undefined
+      ? {}
+      : { root: p.column.fresh.root }),
   }
   // The review of the offer beside the thread (ADR-0047): your choice, kept
   // only while the column is mounted. Reset when the offer goes, so the

@@ -12,6 +12,7 @@ import {
   ERR,
   entryId,
   laneNameForThread,
+  type Move,
   ROOT,
   rootIdFor,
   runId,
@@ -25,6 +26,7 @@ import {
   decodeReply,
   encodeIntent,
   encodeKey,
+  encodeMoves,
   encodeOutcome,
   type Outcome,
   revOfReply,
@@ -217,52 +219,72 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "reserve", lane: NEW_LANE },
     {
       kind: "move",
-      move: {
-        card: cardId("c-7"),
-        from: null,
-        to: { kind: "fresh", column: "k-1" },
-      },
+      moves: [
+        {
+          card: cardId("c-7"),
+          from: null,
+          to: { kind: "fresh", column: "k-1", root: TEST_ROOT, at: ROOT },
+        },
+      ],
     },
     {
       kind: "move",
-      move: {
-        card: cardId("c-7"),
-        from: {
-          kind: "drafting",
-          root: TEST_ROOT,
-          at: atEntry(entryId("e-5")),
-          lane: laneNameForThread("abc"),
+      moves: [
+        {
+          card: cardId("c-7"),
+          from: {
+            kind: "drafting",
+            root: TEST_ROOT,
+            at: atEntry(entryId("e-5")),
+            lane: laneNameForThread("abc"),
+          },
+          to: {
+            kind: "queued",
+            root: TEST_ROOT,
+            at: atEntry(entryId("e-5")),
+            lane: laneNameForThread("abc"),
+            seen: "v-2",
+          },
         },
-        to: {
-          kind: "queued",
-          root: TEST_ROOT,
-          at: atEntry(entryId("e-5")),
-          lane: laneNameForThread("abc"),
-          seen: "v-2",
-        },
-      },
+      ],
     },
     {
       kind: "move",
-      move: {
-        card: cardId("c-7"),
-        from: {
-          kind: "drafting",
-          root: TEST_ROOT,
-          at: atEntry(entryId("e-5")),
-          lane: null,
+      moves: [
+        {
+          card: cardId("c-7"),
+          from: {
+            kind: "drafting",
+            root: TEST_ROOT,
+            at: atEntry(entryId("e-5")),
+            lane: null,
+          },
+          to: null,
         },
-        to: null,
-      },
+      ],
     },
     {
       kind: "move",
-      move: {
-        card: cardId("c-7"),
-        from: { kind: "fresh", column: "k-1" },
-        to: { kind: "inventory", holder: writerId("ada@example.com") },
-      },
+      moves: [
+        {
+          card: cardId("c-7"),
+          from: { kind: "fresh", column: "k-1", root: TEST_ROOT, at: ROOT },
+          to: { kind: "inventory", holder: writerId("ada@example.com") },
+        },
+      ],
     },
+    {
+      kind: "move",
+      moves: ["c-7", "c-8"].map(
+        (id): Move => ({
+          card: cardId(id),
+          from: { kind: "fresh", column: "k-1", root: TEST_ROOT, at: ROOT },
+          to: { kind: "inventory", holder: writerId("ada@example.com") },
+        }),
+      ),
+    },
+    { kind: "undo-move", root: TEST_ROOT, direction: "undo" },
+    { kind: "undo-move", root: TEST_ROOT, direction: "redo" },
     { kind: "set-command", card: cardId("c-7"), command: "bring-up-to-date" },
     { kind: "set-command", card: cardId("c-7"), command: null },
   ] as const
@@ -317,9 +339,20 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "queued" },
     { kind: "moved" },
     {
+      kind: "undone",
+      cards: [
+        {
+          card: cardId("c-1"),
+          place: { kind: "fresh", column: "k-1", root: TEST_ROOT, at: ROOT },
+        },
+        { card: cardId("c-2"), place: null },
+      ],
+    },
+    { kind: "nothing" },
+    {
       kind: "unmoved",
       code: "moved",
-      place: { kind: "fresh", column: "k-1" },
+      place: { kind: "fresh", column: "k-1", root: TEST_ROOT, at: ROOT },
       by: writerId("bea@example.com"),
     },
     { kind: "unmoved", code: "gone", place: null, by: null },
@@ -356,19 +389,44 @@ test('decodeKey: "" is none; anything malformed is undefined', () => {
     '{"kind":"inventory","holder":""}',
   ])
     assert.equal(decodeKey(bad), undefined)
-  assert.deepEqual(decodeKey(encodeKey({ kind: "fresh", column: "k" })), {
+  const fresh = {
     kind: "fresh",
     column: "k",
-  })
+    root: TEST_ROOT,
+    at: ROOT,
+  } as const
+  assert.deepEqual(decodeKey(encodeKey(fresh)), fresh)
+  // A fresh key with no root names no place the host can record.
+  assert.equal(decodeKey('{"kind":"fresh","column":"k"}'), undefined)
 })
 
-test("decode: a move needs its card and a place; set-command a known command", () => {
+test("decode: a move needs its cards, each with a place; set-command a known command; an undo a root and a direction", () => {
+  const fresh = {
+    kind: "fresh",
+    column: "k",
+    root: TEST_ROOT,
+    at: ROOT,
+  } as const
   for (const wire of [
-    { kind: "move", cardId: "", to: encodeKey({ kind: "fresh", column: "k" }) },
-    { kind: "move", cardId: "c-1" },
-    { kind: "move", cardId: "c-1", to: "{" },
+    { kind: "move", moves: encodeMoves([]) },
+    { kind: "move", moves: "{" },
+    { kind: "move", moves: JSON.stringify([{ card: "", to: null }]) },
+    { kind: "move", moves: JSON.stringify([{ card: "c-1" }]) },
+    {
+      kind: "move",
+      moves: JSON.stringify([{ card: "c-1", to: { kind: "x" } }]),
+    },
+    {
+      kind: "move",
+      moves: encodeMoves([
+        { card: cardId("c-1"), from: null, to: fresh },
+        { card: cardId("c-2"), from: null, to: null },
+      ]),
+    },
     { kind: "set-command", cardId: "c-1", mode: "pull" },
     { kind: "set-command", cardId: "" },
+    { kind: "undo-move", root: "", mode: "undo" },
+    { kind: "undo-move", root: TEST_ROOT, mode: "sideways" },
   ])
     assert.equal(decodeCommand(wire).kind, "refused")
 })

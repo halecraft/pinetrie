@@ -253,8 +253,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archived root's records are found by no entry",
     file: "packages/marginalia/archive.ts",
-    from: '  const record = entry === null ? undefined : archive.get(entry)\n  return record?.state === "archived" ? record : null',
-    to: "  const record = entry === null ? undefined : archive.get(entry)\n  return record ?? null",
+    from: '    const record = entry === null ? undefined : archive.get(entry)\n    if (record?.state === "archived") return record',
+    to: "    const record = entry === null ? undefined : archive.get(entry)\n    if (record !== undefined) return record",
     command: unit,
     expect:
       "an archived root refuses; a restored one, an unknown one and none do not",
@@ -475,8 +475,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a mark writes nowhere, so an archived root takes it",
     file: "packages/marginalia/archive.ts",
-    from: '    case "mark":\n      return intent.root',
-    to: '    case "mark":\n      return null',
+    from: '    case "mark":\n    case "undo-move":\n      return [intent.root]',
+    to: '    case "mark":\n      return []\n    case "undo-move":\n      return [intent.root]',
     command: unit,
     expect: "a mark: its root",
   },
@@ -897,8 +897,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move into an inventory writes in a root",
     file: archive,
-    from: '      return to === null || to.kind === "fresh" || to.kind === "inventory"',
-    to: '      return to === null || to.kind === "fresh"',
+    from: '        to === null || to.kind === "inventory" ? [] : [to.root],',
+    to: "        to === null ? [] : [(to as { root: RootId }).root],",
     command: unit,
     expect: "a move into an inventory",
   },
@@ -913,10 +913,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queue move asks for no drain (unit)",
     file: "packages/marginalia/card.ts",
-    from: "  return { step, drain: lane !== null && !running(lane) ? lane : null }",
-    to: "  return { step, drain: null }",
+    from: "  return { step, drain: [...new Set(lanes)].filter(l => !running(l)) }",
+    to: "  return { step, drain: [] }",
     command: unit,
-    expect: "planMoveCommand: the lane to drain",
+    expect: "planMoveCommand: the lanes to drain",
   },
   {
     name: "setRecord keys by namespace",
@@ -973,6 +973,75 @@ export const mutations: readonly Mutation[] = [
     to: "  prompt: input.details.landing,",
     command: unit,
     expect: "a resolution's record names its prompt",
+  },
+  {
+    name: "the places are carried over again at every start",
+    file: "packages/marginalia/card.ts",
+    from: "  if (now.length > 0) return { cards: [], dropped: 0 }\n",
+    to: "",
+    command: unit,
+    expect:
+      "nothing into a document that has cards: it was carried over already",
+  },
+  {
+    name: "a fresh column's cards follow a message in another root",
+    file: "packages/marginalia/card.ts",
+    from: '  if (place?.kind !== "fresh" || place.root !== root) return []',
+    to: '  if (place?.kind !== "fresh") return []',
+    command: unit,
+    expect:
+      "planFreshFollow: the sent card's column's other cards go drafting at the new entry, placer kept; nothing else moves",
+  },
+  {
+    name: "a move's history is the root it leaves",
+    file: "packages/marginalia/card.ts",
+    from: "      rootOfPlace(move.to) ?? (from === undefined ? null : rootOfPlace(from))",
+    to: "      (from === undefined ? null : rootOfPlace(from)) ?? rootOfPlace(move.to)",
+    command: unit,
+    expect: "a drag across roots: the root it went to",
+  },
+  {
+    name: "a creation enters a history",
+    file: "packages/marginalia/card.ts",
+    from: "    if (move.from === null || move.to === null) return null\n",
+    to: "",
+    command: unit,
+    expect: "a creation: none",
+  },
+  {
+    name: "several moves are planned against the cards before any",
+    file: "packages/marginalia/card.ts",
+    from: "    now = afterStep(now, step)\n",
+    to: "",
+    command: unit,
+    expect: "each move planned against the cards the earlier ones left",
+  },
+  {
+    name: "a refused undo names no card",
+    file: "packages/marginalia/card.ts",
+    from: "      const card = cardsOfParts(result.stale, placesId)[0]",
+    to: "      const card = undefined",
+    command: unit,
+    expect:
+      "a refused step names the card that blocked it as it is now, and its placer",
+  },
+  {
+    name: "an archived root's histories are retired at once",
+    file: "packages/marginalia/card.ts",
+    from: "      input.now - record.at >= ARCHIVED_HISTORY_MS",
+    to: "      input.now - record.at >= 0",
+    command: unit,
+    expect:
+      "a root archived 7 days and a second ago is retired; one archived 6 days ago",
+  },
+  {
+    name: "a history in no root is retired after every run",
+    file: "packages/marginalia/card.ts",
+    from: "    if (known === undefined) return input.startup\n",
+    to: "    if (known === undefined) return true\n",
+    command: unit,
+    expect:
+      "a root archived 7 days and a second ago is retired; one archived 6 days ago",
   },
   {
     name: "a take is never shown a conflict",

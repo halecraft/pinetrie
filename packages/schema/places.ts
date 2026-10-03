@@ -3,10 +3,12 @@
 // A card's text is its own `TextDoc` (`card:<id>`), written by clients; its
 // record, here, says where it is and whose it is. A place does not merge
 // (S75), so the host writes this document alone, in arrival order, through
-// handoffs it applies or refuses. It is `json`, like the session: one
-// writer, compacted. A client cannot write it: every peer declares the host
-// its only writer (`writersPolicy`), so a client's write throws before it is
-// made, where it would otherwise fork that client's copy for good (S28, S76).
+// handoffs it applies or refuses. It is Yjs, so the host's undo stacks can
+// undo a move whole or refuse it (ADR-0066, S82). It grows about 25 bytes a
+// move for good: compaction gives none of it back (S90). A client cannot
+// write it: every peer declares the host its only writer (`writersPolicy`),
+// so a client's write throws before it is made, where it would otherwise
+// fork that client's copy for good (S28, S76).
 
 import {
   type BoundSchema,
@@ -15,6 +17,7 @@ import {
   json,
   Schema,
 } from "@kyneta/schema"
+import { yjs } from "@kyneta/yjs-schema"
 import { type CardId, cardId } from "@pineta/core"
 
 /**
@@ -26,9 +29,9 @@ const StoredCard = Schema.struct.json({
   owner: Schema.string(),
   /** `drafting`, `queued`, `fresh` or `inventory`: the place's kind (`CardPlace`). */
   kind: Schema.string(),
-  /** A drafting or queued card's root (ADR-0063). */
+  /** A drafting, queued or fresh card's root (ADR-0063). */
   root: Schema.string(),
-  /** A drafting or queued card's entry. */
+  /** A drafting or queued card's entry; a fresh card's branch point, "" for a new tab. */
   at: Schema.string(),
   /** A drafting or queued card's lane. */
   lane: Schema.string(),
@@ -50,18 +53,26 @@ const StoredCard = Schema.struct.json({
   holder: Schema.string(),
 })
 
-export const PlacesDoc = json.bind(
-  Schema.struct({
-    /**
-     * Raised with every write to `cards`, in the same batch. A reply to a
-     * move carries it, and a client draws its move until its copy reaches
-     * that number (ADR-0059): the reply and this document's change reach the
-     * client separately, in either order.
-     */
-    rev: Schema.number(),
-    cards: Schema.record(StoredCard),
-  }),
-)
+const placesSchema = Schema.struct({
+  /**
+   * Raised after every write to `cards`, in a batch of its own: raised
+   * inside an undo step, it would refuse every whole undo (S82). A reply to
+   * a move carries it, and a client draws its move until its copy reaches
+   * that number (ADR-0059): the reply and this document's change reach the
+   * client separately, in either order.
+   */
+  rev: Schema.number(),
+  cards: Schema.record(StoredCard),
+})
+
+export const PlacesDoc = yjs.bind(placesSchema)
+
+/**
+ * The places as stored before ADR-0066, under `LEGACY_PLACES_DOC_ID`: the
+ * same shape in `json`. Read once by the host's carry-over, which then
+ * destroys it.
+ */
+export const LegacyPlacesDoc = json.bind(placesSchema)
 
 /** The places document, as the Exchange gives it. */
 export type PlacesDocHandle =
@@ -69,6 +80,12 @@ export type PlacesDocHandle =
 
 /** A places document on its own, with no Exchange: for tests. */
 export const newPlacesDoc = (): PlacesDocHandle => createDoc(PlacesDoc)
+
+/** The places document stored before ADR-0066, as the Exchange gives it. */
+export type LegacyPlacesDocHandle =
+  typeof LegacyPlacesDoc extends BoundSchema<infer S, infer N>
+    ? DocRef<S, N>
+    : never
 
 const CARD_PREFIX = "card:"
 

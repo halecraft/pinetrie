@@ -200,32 +200,45 @@ document.
   document (S24); at a card's size its history is small.
 - **Yjs costs the page about 36 kB gzipped.** It is plain JavaScript: no wasm.
 
-## Places (`places.ts`, ADR-0059)
+## Places (`places.ts`, ADR-0059, ADR-0066)
 
-`PlacesDoc` holds every card's record, keyed by card id: `json.bind` of a
-record of flat string rows (`owner`, `kind`, `at`, `lane`, `column`,
-`order`, `by`, `seen`, `command`, `unsent`, `placer`, `holder`, "" for
-none), decoded in
-`@pineta/marginalia` (`decodeCard`), and `rev`. Only the host writes it,
-through `applyPlaceStep` (`apps/pineta/host/places.ts`).
+`PlacesDoc` holds every card's record, keyed by card id: `yjs.bind` of a
+record of flat string rows (`owner`, `kind`, `root`, `at`, `lane`,
+`column`, `order`, `by`, `seen`, `command`, `unsent`, `placer`,
+`holder`, "" for none), decoded in `@pineta/marginalia` (`decodeCard`),
+and `rev`. Its id is `pineta:card-places` (`PLACES_DOC_ID`). Only the host
+writes it, through `applyPlaceSteps` (`apps/pineta/host/places.ts`).
 
-- **A place does not merge** (S75), so it is not a CRDT: one writer, in
-  arrival order, through handoffs the host applies or refuses (ADR-0059).
+- **A place does not merge** (S75): one writer, in arrival order, through
+  handoffs the host applies or refuses (ADR-0059). It is Yjs anyway, so the
+  host's undo stacks can undo a move whole or refuse it (ADR-0066, S82).
+- **It grows about 25 bytes a move, for good** (S90): Kyneta compacts its
+  storage, and gives none of it back, since Yjs keeps every item's id. 250 KB
+  over 10,000 moves, accepted.
+- **A new id, not the old one** (ADR-0066): a store from before holds its
+  `json` places under `pineta:places` (`LEGACY_PLACES_DOC_ID`,
+  `LegacyPlacesDoc`), which the host carries over once at startup and then
+  destroys, so the two schemas never meet under one id.
+- **A fresh row names its root and its branch point** (`root`, `at`, "" at
+  for a new tab), as a drafting one does (ADR-0066). One without a root does
+  not decode.
 - **A client cannot write it.** Every peer registers `writersPolicy`
   (`@pineta/protocol/writers`), Kyneta's `canWrite`, so a client's write
   throws before it is made, and the host refuses the same operations from
   any sender. Made anyway, a write would leave the writer's copy forked for
   good (S28, S76). The client keeps the document private: the page reads
   `SessionClient.cards`.
-- **`rev` is raised with every write, in the same batch.** A reply to a
-  move carries it, and a client draws its move until its copy's `rev`
+- **`rev` is raised after every write, in a batch of its own.** A reply to
+  a move carries it, and a client draws its move until its copy's `rev`
   reaches it (`packages/client/card-moves.ts`). A write that skipped `rev`
   would leave a client drawing a move over a record that had changed.
+  Raised inside an undo step, every later write would change it, and every
+  whole undo of the step would be refused (S82).
 - **A row is one leaf** (`Schema.struct.json`): the host writes a record
   whole. Kyneta gives an unchanged row the same object across writes, which
   `readPlaces` relies on.
-- **Compacted with the session** (`compactSession`), as `json` keeps an op
-  log until it is (S25).
+- **Its storage is compacted after each run** (`planCompaction`); nothing
+  in memory is trimmed (S90).
 - **`newPlacesDoc()`** is one with no Exchange, for tests.
 - **A store from before ADR-0059 holds a `pineta:cards` document** that no
   code opens; delete it by hand. The startup sweep removes the texts no
@@ -287,9 +300,10 @@ The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`
 over `node:sqlite`, `.pineta/pineta.db` by default. It holds every document the
 host serves, one append-only record stream per document: each root's
 `StorageDoc`, which is also pi's storage, the session's, `pineta:live`, each
-live card's text, the places document, and each connected client's command
-Line. A tab's undo stack
-is never stored here: the host rejects it (`resolveDoc`). It is not a pi session file.
+live card's text, the places document, each person's history of moves per
+root (`moves:<writer>:<RootId>`, ADR-0066), and each connected client's
+command Line. A tab's undo stack is never stored here: the host rejects it
+(`resolveDoc`). It is not a pi session file.
 
 - **The store owns its file** (S47, `apps/pineta/host/store.ts`): exclusive
   locking mode, taken when it opens, so a second process is refused, and so

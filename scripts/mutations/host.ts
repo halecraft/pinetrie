@@ -335,8 +335,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "takeTop deletes after a microtask",
     file: "apps/pineta/host/take.ts",
-    from: '  applyPlaceStep(places, { kind: "remove", id: card.id })',
-    to: '  queueMicrotask(() => applyPlaceStep(places, { kind: "remove", id: card.id }))',
+    from: '  applyPlaceSteps(places, [{ kind: "remove", id: card.id }])',
+    to: '  queueMicrotask(() => applyPlaceSteps(places, [{ kind: "remove", id: card.id }]))',
     command: unit,
     expect:
       "reads the top queued card and deletes its record before it returns",
@@ -768,16 +768,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the policy shares a tab's undo stack",
     file: "apps/pineta/host/policy.ts",
-    from: "    isUndo(docId)\n      ? false\n      : (routeLine",
-    to: "    false\n      ? false\n      : (routeLine",
+    from: "    isUndo(docId) || isMoves(docId)\n      ? false\n      : (routeLine",
+    to: "    isMoves(docId)\n      ? false\n      : (routeLine",
     command: unit,
     expect: "a tab's undo stack is shared with no one",
   },
   {
     name: "a fresh column's first send strands its other cards",
     file: "apps/pineta/host/commands/cards.ts",
-    from: "      for (const step of await followers(cards, card, sent))\n        applyPlaceStep(places, step)\n",
-    to: "",
+    from: "      const followed = await followers(cards, card, sent)\n",
+    to: "      const followed: PlaceStep[] = []\n",
     command: unit,
     expect:
       "spend: a fresh column's first send leaves its other cards drafting",
@@ -929,7 +929,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the take skips the archive gate",
     file: "apps/pineta/host/commands/index.ts",
-    from: '        refuseInArchive(\n          deps.basics,\n          chat.at.kind === "root" ? null : chat.root,\n        ) ??',
+    from: '        refuseInArchive(\n          deps.basics,\n          chat.at.kind === "root" ? [] : [chat.root],\n        ) ??',
     to: "        null ??",
     command: unit,
     expect: "a taken card in an archived root is refused",
@@ -962,15 +962,23 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a removal leaves the places document's rev behind",
     file: "apps/pineta/host/places.ts",
-    from: "    d.rev.set(rev)",
-    to: '    if (step.kind === "write") d.rev.set(rev)',
+    from: "  return raiseRev(places)\n}",
+    to: '  return steps.some(s => s.kind === "write") ? raiseRev(places) : places.rev()\n}',
     command: unit,
-    expect: "applyPlaceStep: one rev per write and per removal",
+    expect: "applyPlaceSteps: one rev per batch of writes and removals",
+  },
+  {
+    name: "rev is raised inside the gesture",
+    file: "apps/pineta/host/places.ts",
+    from: "  if (gesture === undefined) write()\n  else gesture(write)\n  return raiseRev(places)\n",
+    to: "  const both = () => (write(), raiseRev(places))\n  return gesture === undefined ? both() : gesture(both)\n",
+    command: unit,
+    expect: "applyPlaceSteps: inside a gesture, rev is raised outside it",
   },
   {
     name: "a refused move names no placer",
     file: "apps/pineta/host/commands/cards.ts",
-    from: "          by: step.now?.placer ?? null,",
+    from: "        by: refusal.now?.placer ?? null,",
     to: "          by: null,",
     command: unit,
     expect: "a move someone else made first",
@@ -978,7 +986,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a busy chat's card is not queued",
     file: "apps/pineta/host/commands/cards.ts",
-    from: '      if (step.kind !== "write") return null',
+    from: '      if (step.kind !== "steps") return null',
     to: "      return null",
     command: unit,
     expect: "its card is queued behind the others",
@@ -986,7 +994,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a removed card keeps its text",
     file: "apps/pineta/host/commands/cards.ts",
-    from: '    if (step.kind === "remove") await deps.cards.destroy(step.id)',
+    from: '      if (s.kind === "remove") await deps.cards.destroy(s.id)',
     to: "",
     command: unit,
     expect: "a removal destroys the text after the record",
@@ -1030,6 +1038,69 @@ export const mutations: readonly Mutation[] = [
     to: '      deps.beforeRun(lane)\n      const skill = await deps.agent().skill("pineta:skill:offer-stack")',
     command: unit,
     expect: "a split whose skill read fails starts no container",
+  },
+  {
+    name: "an undo of moves is not whole",
+    file: "apps/pineta/host/move-history.ts",
+    from: '      return direction === "undo"\n        ? stack.undo({ whole: true })\n        : stack.redo({ whole: true })',
+    to: '      return (direction === "undo" ? stack.undo() : stack.redo()) as never',
+    command: unit,
+    expect:
+      "an undo is refused, and nothing reverted, after someone else moved the card",
+  },
+  {
+    name: "one history of moves for every root",
+    file: "apps/pineta/host/move-history.ts",
+    from: "    const docId = movesDocId(writer, root)\n    const held = stacks.get(docId)",
+    to: "    const docId = movesDocId(writer, root.slice(0, 2) as RootId)\n    const held = stacks.get(docId)",
+    command: unit,
+    expect:
+      "another root's history, and another writer's, are untouched by an undo",
+  },
+  {
+    name: "a retired history is kept in the store",
+    file: "apps/pineta/host/move-history.ts",
+    from: "        await exchange.destroy(docId)\n",
+    to: "",
+    command: unit,
+    expect:
+      "a stored history not loaded is retired by id, and a stack made on it again is empty",
+  },
+  {
+    name: "the policy shares a stack of moves",
+    file: "apps/pineta/host/policy.ts",
+    from: "    isUndo(docId) || isMoves(docId)\n      ? false",
+    to: "    isUndo(docId)\n      ? false",
+    command: unit,
+    expect:
+      "a stack of moves is the host's: shared with no one, taken from no one",
+  },
+  {
+    name: "a writer still seated has their stacks unloaded",
+    file: "apps/pineta/host/seats.ts",
+    from: "): readonly WriterId[] => loaded.filter(w => !connected.includes(w))",
+    to: "): readonly WriterId[] => loaded",
+    command: unit,
+    expect:
+      "idleWriters: the writers with stacks of moves loaded and no seat left",
+  },
+  {
+    name: "a move is recorded in no history",
+    file: "apps/pineta/host/commands/cards.ts",
+    from: "      return carry(step, drain, gesture)",
+    to: "      return carry(step, drain)",
+    command: unit,
+    expect:
+      "a take is one step of the taker's history in the root it left; a creation is in none",
+  },
+  {
+    name: "an undo raises no rev",
+    file: "apps/pineta/host/commands/cards.ts",
+    from: "            raiseRev(places),",
+    to: "            places.rev(),",
+    command: unit,
+    expect:
+      "an undo answers each card it moved and where it is now, with a rev raised after it",
   },
   {
     name: "a starting host counts archived roots as opened",

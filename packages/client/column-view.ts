@@ -672,18 +672,24 @@ export function joinWords(join: LaneJoin): string {
 }
 
 /**
- * Where a column takes a card (ADR-0048): a fresh column's own key, else
- * drafting at its end with its lane, in `root`, the root its end is in
- * (ADR-0063). The composer creates its card here, and a put or a drop lands
- * here. None at the root, nor where the root is not known: a column there
- * has no end yet.
+ * Where a column takes a card (ADR-0048): a fresh column's own key, at its
+ * branch point or a new tab's root, else drafting at its end with its lane.
+ * `root` is the root `at` is in (ADR-0063); a new tab's is the one it
+ * minted (`fresh.root`). The composer creates its card here, and a put or a
+ * drop lands here. None where the root is not known, nor at the root but in
+ * a new tab: a column there has no end yet.
  */
 export function composerPlace(
   column: Pick<Column, "key" | "fresh" | "lane">,
   at: Position,
   root: RootId | undefined,
 ): CardPlace | null {
-  if (column.fresh !== undefined) return { kind: "fresh", column: column.key }
+  if (column.fresh !== undefined) {
+    const its = column.fresh.root ?? root
+    return its === undefined
+      ? null
+      : { kind: "fresh", column: column.key, root: its, at }
+  }
   return at.kind === "entry" && root !== undefined
     ? { kind: "drafting", root, at, lane: column.lane ?? null }
     : null

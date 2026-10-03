@@ -17,8 +17,10 @@ import {
   isLaneName,
   type LaneView,
   parseNewLane,
+  parseNewRoot,
   pathIds,
   projectColumns,
+  type RootId,
   rootOf,
   type TreeIndex,
 } from "@pineta/core"
@@ -59,6 +61,8 @@ export type LayoutAction =
   | {
       readonly kind: "newTab"
       readonly key: string
+      /** Its root, minted with its key (ADR-0066). */
+      readonly root: RootId
       readonly asksAgent: boolean
       /** What its composer starts with. */
       readonly prefill?: Prefill
@@ -82,12 +86,6 @@ export type LayoutAction =
       readonly key: string
       readonly action: Extract<ColumnAction, { kind: "sent" | "reserve" }>
     }
-  /**
-   * Put a closed fresh column back where it was, by its own key, and show its
-   * tab, so a card an undo returns to it is drawn there (ADR-0052: undo
-   * shows where it acts). Nothing when the layout holds the key.
-   */
-  | { readonly kind: "reopen"; readonly closed: ClosedColumn }
   /** Store what `resolveLayout` draws for these facts. */
   | ({ readonly kind: "resolve" } & LayoutFacts)
   /** Once, after the documents settle: the roots the directory lacks go, and `active` is chosen. */
@@ -182,60 +180,8 @@ export function afterClosing(layout: Layout, closed: ActiveTab): ActiveTab {
   return at < 0 || next === undefined ? { kind: "archive" } : next
 }
 
-/**
- * A fresh column a card left, kept whole so an undo can reopen it: its
- * `Column`, and where it was, a root's tab at an index or a new tab of its
- * own.
- */
-export interface ClosedColumn {
-  readonly column: Column
-  readonly tab:
-    | { readonly kind: "root"; readonly root: EntryId; readonly index: number }
-    | { readonly kind: "new" }
-}
-
-/** Column `key` as `ClosedColumn` keeps it, if the layout holds it. */
-export function closedColumn(
-  layout: Layout,
-  key: string,
-): ClosedColumn | undefined {
-  const tab = layout.newTabs.find(c => c.key === key)
-  if (tab !== undefined) return { column: tab, tab: { kind: "new" } }
-  for (const [root, columns] of layout.roots) {
-    const index = columns.findIndex(c => c.key === key)
-    const column = columns[index]
-    if (column !== undefined)
-      return { column, tab: { kind: "root", root, index } }
-  }
-  return undefined
-}
-
-function reopen(state: Layout, { column, tab }: ClosedColumn): Layout {
-  if (tabOfColumn(state, column.key) !== undefined) return state
-  if (tab.kind === "new")
-    return {
-      ...state,
-      active: { kind: "new", key: column.key },
-      newTabs: [...state.newTabs, column],
-    }
-  const before = columnsOf(state, tab.root)
-  const at = Math.min(tab.index, before.length)
-  return {
-    ...state,
-    active: { kind: "root", root: tab.root },
-    open: opened(state.open, tab.root),
-    roots: withRoot(state.roots, tab.root, [
-      ...before.slice(0, at),
-      column,
-      ...before.slice(at),
-    ]),
-  }
-}
-
 export function layoutReducer(state: Layout, action: LayoutAction): Layout {
   switch (action.kind) {
-    case "reopen":
-      return reopen(state, action.closed)
     case "show": {
       // Showing a root is opening it.
       const open =
@@ -255,8 +201,12 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
           {
             key: action.key,
             anchor: null,
-            fresh:
-              action.prefill === undefined ? {} : { prefill: action.prefill },
+            fresh: {
+              root: action.root,
+              ...(action.prefill === undefined
+                ? {}
+                : { prefill: action.prefill }),
+            },
             ...(action.asksAgent ? { asksAgent: true } : {}),
           },
         ],
@@ -503,6 +453,7 @@ const StoredColumn = Type.Object({
   fresh: Type.Optional(
     Type.Object({
       sendId: Type.Optional(Type.String()),
+      root: Type.Optional(Type.String()),
       prefill: Type.Optional(
         Type.Object({
           text: Type.String(),
@@ -551,6 +502,7 @@ const toStored = (c: Column): Stored => ({
     : {
         fresh: {
           ...(c.fresh.sendId === undefined ? {} : { sendId: c.fresh.sendId }),
+          ...(c.fresh.root === undefined ? {} : { root: c.fresh.root }),
           ...(c.fresh.prefill === undefined
             ? {}
             : {
@@ -566,7 +518,12 @@ const toStored = (c: Column): Stored => ({
       }),
 })
 
-const fromStored = (s: Stored): Column => ({
+/**
+ * A stored column. A new tab keeps its root (`newTab`); `mintRoot` gives
+ * one to a new tab stored before it had one, and is null for a root's
+ * columns, whose root is their tab's.
+ */
+const fromStored = (s: Stored, mintRoot: (() => RootId) | null): Column => ({
   key: s.key,
   anchor: s.anchor === null ? null : entryId(s.anchor),
   // Unrecognised, it is left off: `sync` binds the column again once its tip
@@ -580,6 +537,14 @@ const fromStored = (s: Stored): Column => ({
     : {
         fresh: {
           ...(s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId }),
+          ...(mintRoot === null
+            ? {}
+            : {
+                root:
+                  (s.fresh.root === undefined
+                    ? undefined
+                    : parseNewRoot(s.fresh.root)) ?? mintRoot(),
+              }),
           ...(s.fresh.prefill === undefined
             ? {}
             : {
@@ -613,9 +578,13 @@ export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
 
 /**
  * A stored layout, whole or not at all: only this build writes it, so a
- * half-valid one is not worth keeping. Total.
+ * half-valid one is not worth keeping. Total. `mintRoot` mints a root for a
+ * new tab stored without one.
  */
-export const decodeLayout = (raw: unknown): Layout | undefined =>
+export const decodeLayout = (
+  raw: unknown,
+  mintRoot: () => RootId,
+): Layout | undefined =>
   Value.Check(StoredLayout, raw)
     ? {
         active:
@@ -626,9 +595,9 @@ export const decodeLayout = (raw: unknown): Layout | undefined =>
         roots: new Map(
           Object.entries(raw.roots).map(([root, columns]) => [
             entryId(root),
-            columns.map(fromStored),
+            columns.map(c => fromStored(c, null)),
           ]),
         ),
-        newTabs: raw.newTabs.map(fromStored),
+        newTabs: raw.newTabs.map(c => fromStored(c, mintRoot)),
       }
     : undefined

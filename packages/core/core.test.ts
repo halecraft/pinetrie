@@ -27,6 +27,7 @@ import {
   placeFields,
   placeOfFields,
   projectTranscript,
+  ROOT,
   rootIdFor,
   sameKey,
   shellWord,
@@ -355,7 +356,13 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       by: ADA,
       seen: "v",
     },
-    { kind: "fresh", column: "k" },
+    { kind: "fresh", column: "k", root: TEST_ROOT, at: ROOT },
+    {
+      kind: "fresh",
+      column: "k",
+      root: TEST_ROOT,
+      at: atEntry(entryId("e-1")),
+    },
     { kind: "inventory", holder: ADA },
   ]
 
@@ -364,6 +371,16 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       expect(placeOfFields(placeFields(place))).toEqual(place)
       expect(keyOfFields(placeFields(keyOf(place)))).toEqual(keyOf(place))
     }
+  })
+
+  test("a fresh card needs its root", () => {
+    const f = placeFields({
+      kind: "fresh",
+      column: "k",
+      root: TEST_ROOT,
+      at: ROOT,
+    })
+    expect(placeOfFields({ ...f, root: "" })).toBeUndefined()
   })
 
   test("an inventory needs its holder", () => {
@@ -389,7 +406,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(
       sameKey(
         { kind: "inventory", holder: ADA },
-        { kind: "fresh", column: "k" },
+        { kind: "fresh", column: "k", root: TEST_ROOT, at: ROOT },
       ),
     ).toBe(false)
   })

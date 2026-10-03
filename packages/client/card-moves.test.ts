@@ -10,7 +10,6 @@ import { describe, expect, test } from "vitest"
 import {
   type ActedAt,
   answerOf,
-  type HistoryEntry,
   intentsOf,
   type MovesEvent,
   type MovesState,
@@ -51,7 +50,6 @@ const sentAs = {
   answer: { state: "sent" },
   slot: null,
   actedAt: COLUMN,
-  history: { kind: "none" },
 } as const
 
 const run = (events: readonly MovesEvent[], from = NO_MOVES): MovesState =>
@@ -63,7 +61,7 @@ const queueIt: Pending = {
   kind: "move",
   move: { card: C1, from: drafting, to: queuedKey },
 }
-const sent = (p: Pending): MovesEvent => ({ kind: "sent", pending: p })
+const sent = (...p: Pending[]): MovesEvent => ({ kind: "sent", pending: p })
 const accepted = (id: string, rev: number): MovesEvent => ({
   kind: "answered",
   id,
@@ -231,103 +229,78 @@ describe("answerOf", () => {
   })
 })
 
-describe("the tab's history of moves (ADR-0052)", () => {
-  const take: HistoryEntry = {
-    kind: "handoff",
-    move: { card: C1, from: drafting, to: { kind: "inventory", holder: ME } },
-    slot: 3,
-    column: null,
-  }
-  const swap: HistoryEntry = { kind: "swap", a: 0, b: 1, cards: [C1, null] }
-  const moving = (
-    id: string,
-    history: Pending["history"],
-    slot: number | null = null,
-  ): Pending => ({
+describe("a command of several moves: a keep (ADR-0066)", () => {
+  const C2 = cardId("c-2")
+  const inventory = { kind: "inventory", holder: ME } as const
+  const keeping = (card: typeof C1, slot: number): Pending => ({
     ...sentAs,
-    id,
+    id: "k-1",
     kind: "move",
-    move: take.move,
+    move: { card, from: drafting, to: inventory },
     slot,
-    history,
   })
-  const refused = (id: string): MovesEvent => ({
-    kind: "answered",
-    id,
-    answer: { kind: "refused", refusal: null },
+  const both = [keeping(C1, 3), keeping(C2, 4)]
+  const records = [card(), card({ id: C2 })]
+
+  test("every move drawn at once, and every one accepted by the one answer", () => {
+    const s = run([sent(...both)])
+    expect(withPending(records, s, ME).map(c => c.place.kind)).toEqual([
+      "inventory",
+      "inventory",
+    ])
+    const answered = run([accepted("k-1", 7)], s)
+    expect(answered.pending.map(p => p.answer)).toEqual([
+      { state: "accepted", rev: 7 },
+      { state: "accepted", rev: 7 },
+    ])
+    expect(run([changed(7)], answered).pending).toEqual([])
   })
 
-  test("an accepted move is recorded with its slot; a refused one is not; a send never is", () => {
+  test("refused whole: none drawn", () => {
     const s = run([
-      sent(moving("m-1", { kind: "record", entry: take }, 3)),
-      accepted("m-1", 2),
-      sent(moving("m-2", { kind: "record", entry: swap })),
-      refused("m-2"),
-      sent(moving("m-3", { kind: "none" })),
-      accepted("m-3", 3),
+      sent(...both),
+      {
+        kind: "answered",
+        id: "k-1",
+        answer: { kind: "refused", refusal: null },
+      },
     ])
-    expect(s.history).toEqual({ undo: [take], redo: [] })
+    expect(s.pending).toEqual([])
   })
+})
 
-  test("an undo leaves its list when sent, goes to redo when accepted; a new move clears redo", () => {
-    const recorded = run([
-      sent(moving("m-1", { kind: "record", entry: take })),
-      accepted("m-1", 2),
-    ])
-    const undoing = movesStep(
-      recorded,
-      sent(moving("m-2", { kind: "undo", entry: take })),
-    )
-    expect(undoing.history).toEqual({ undo: [], redo: [] })
-    const undone = movesStep(undoing, accepted("m-2", 3))
-    expect(undone.history).toEqual({ undo: [], redo: [take] })
-    const redone = run(
-      [sent(moving("m-3", { kind: "redo", entry: take })), accepted("m-3", 4)],
-      undone,
-    )
-    expect(redone.history).toEqual({ undo: [take], redo: [] })
-    const cleared = run(
-      [
-        sent(moving("m-4", { kind: "undo", entry: take })),
-        accepted("m-4", 5),
-        sent(moving("m-5", { kind: "record", entry: swap })),
-        accepted("m-5", 6),
-      ],
-      redone,
-    )
-    expect(cleared.history).toEqual({ undo: [swap], redo: [] })
-  })
-
-  test("a refused undo is dropped, and so is an entry undo could not act on", () => {
-    const recorded = run([
-      sent(moving("m-1", { kind: "record", entry: take })),
-      accepted("m-1", 2),
-    ])
-    const s = run(
-      [sent(moving("m-2", { kind: "undo", entry: take })), refused("m-2")],
-      recorded,
-    )
-    expect(s.history).toEqual({ undo: [], redo: [] })
-    const refusal = {
+describe("acted with no host to ask", () => {
+  test("a swap forgets the refusals at the inventory, not elsewhere", () => {
+    const atInventory = {
       card: null,
       actedAt: { kind: "inventory" },
       code: "slots-changed",
     } as const
-    const swapped = movesStep(NO_MOVES, {
-      kind: "swapped",
-      step: { kind: "record", entry: swap },
-    })
-    expect(swapped.history.undo).toEqual([swap])
-    const dropped = movesStep(swapped, {
-      kind: "dropped",
-      entry: swap,
-      refusal,
-    })
-    expect(dropped.history.undo).toEqual([])
-    expect(dropped.refusals).toEqual([refusal])
+    const inColumn = {
+      card: C1,
+      actedAt: COLUMN,
+      code: "gone",
+      by: null,
+      fromQueue: false,
+    } as const
+    const s = run([
+      { kind: "refused", refusal: atInventory },
+      { kind: "refused", refusal: inColumn },
+      { kind: "acted", at: { kind: "inventory" } },
+    ])
+    expect(s.refusals).toEqual([inColumn])
   })
+})
 
-  test("intentsOf: each take in flight's slot, a creation's too, until its copy holds it", () => {
+describe("intentsOf", () => {
+  test("each take in flight's slot, a creation's too, until its copy holds it", () => {
+    const take: Pending = {
+      ...sentAs,
+      id: "m-1",
+      kind: "move",
+      move: { card: C1, from: drafting, to: { kind: "inventory", holder: ME } },
+      slot: 3,
+    }
     const create: Pending = {
       ...sentAs,
       id: "m-2",
@@ -335,11 +308,7 @@ describe("the tab's history of moves (ADR-0052)", () => {
       draft: card({ id: cardId("c-2") }),
       slot: 7,
     }
-    const s = run([
-      sent(moving("m-1", { kind: "none" }, 3)),
-      sent(create),
-      sent({ ...queueIt, id: "m-9" }),
-    ])
+    const s = run([sent(take), sent(create), sent({ ...queueIt, id: "m-9" })])
     expect(intentsOf(s)).toEqual(
       new Map([
         [C1, 3],

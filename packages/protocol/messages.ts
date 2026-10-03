@@ -10,8 +10,14 @@ export const CONTROL_TOPIC = "pineta.control"
 export const SESSION_DOC_ID = "pineta:session"
 /** Who is here, and what each person reads and types: ephemeral, never stored (ADR-0024). */
 export const PRESENCE_DOC_ID = "pineta:presence"
-/** Where every card is (ADR-0059): written only by the host, through handoffs. */
-export const PLACES_DOC_ID = "pineta:places"
+/**
+ * Where every card is (ADR-0059): written only by the host, through handoffs.
+ * Yjs (ADR-0066), under a new id so a store's `json` places never meet the
+ * new schema under one id.
+ */
+export const PLACES_DOC_ID = "pineta:card-places"
+/** The places as stored before ADR-0066: carried over once, then destroyed. */
+export const LEGACY_PLACES_DOC_ID = "pineta:places"
 /** What is streaming now (ADR-0063): written only by the host, and compacted at every run's end. */
 export const LIVE_DOC_ID = "pineta:live"
 
@@ -48,9 +54,12 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     work on it (`land`), ADR-0060.
  *   - `reserve` asks the host to name the thread whose lane will be `lane`,
  *     a new id the sender's column made, before the lane exists (ADR-0057).
- *   - `move` hands the card `cardId` from the place `from` to the place
- *     `to` (ADR-0059), each an encoded key, `""` for none: no `from`
- *     creates the card, and no `to` removes it.
+ *   - `move` hands cards from place to place (ADR-0059): `moves` lists
+ *     each card, where its sender saw it and where it goes, each an encoded
+ *     key or null: no `from` creates the card, and no `to` removes it.
+ *     The list is accepted whole or refused (a keep's several cards).
+ *   - `undo-move` undoes (`mode` `undo`) or redoes (`redo`) the sender's
+ *     newest move in the root `root` (ADR-0066).
  *   - `set-command` sets the card `cardId`'s command to `mode`, or
  *     clears it with `""` (ADR-0055).
  */
@@ -65,6 +74,7 @@ export const COMMAND_KINDS = [
   "move",
   "set-command",
   "line",
+  "undo-move",
 ] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -88,12 +98,14 @@ export interface Command {
   readonly parentId: string
   /**
    * `chat` and `mark`: the root it writes in (ADR-0063); for a chat at the
-   * root, a new root's id the sender's tab minted. `""` otherwise.
+   * root, a new root's id the sender's tab minted. `undo-move`: the root
+   * whose history it acts on. `""` otherwise.
    */
   readonly root: string
   /**
    * `chat`: `reply` or `branch`; `archive` and `offer`: the action;
-   * `set-command`: the command; `""` otherwise.
+   * `set-command`: the command; `undo-move`: `undo` or `redo`; `""`
+   * otherwise.
    */
   readonly mode: string
   /** `chat`: the lane the sender's column is bound to, or `""`. */
@@ -119,10 +131,11 @@ export interface Command {
    * a take without it is refused.
    */
   readonly seen: string
-  /** `move`: where the sender saw the card, an encoded key, or `""` to create it. */
-  readonly from: string
-  /** `move`: where it goes, an encoded key, or `""` to remove it. */
-  readonly to: string
+  /**
+   * `move`: a JSON list of `{ card, from, to }`, each place a key's flat
+   * fields or null (`encodeMoves`); `""` otherwise.
+   */
+  readonly moves: string
   /**
    * `chat`: the lane id the sender's column reserved, or `""`: what a lane
    * it creates is called (ADR-0057). Apart from `lane`, which decides where
@@ -157,6 +170,8 @@ export const OUTCOME_KINDS = [
   "moved",
   "queued",
   "unmoved",
+  "undone",
+  "nothing",
   "refused",
   "failed",
 ] as const
@@ -178,6 +193,11 @@ export interface Reply {
   readonly by: string
   /** `unmoved`: why (a `MoveRefusal`), in `errorCode`; and where the card is now, an encoded key, or `""` when it is gone. */
   readonly place: string
+  /**
+   * `undone`: a JSON list of `{ card, place }`, each card the undo moved
+   * and its place now, a key's flat fields or null; `""` otherwise.
+   */
+  readonly cards: string
   /**
    * The places document's `rev` after the command's step, when the step
    * wrote it or refused a move; 0 otherwise (ADR-0059). A client draws its
@@ -207,8 +227,7 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   reserved: "",
   base: "",
   seen: "",
-  from: "",
-  to: "",
+  moves: "",
 })
 
 export const EMPTY_REPLY: Reply = Object.freeze({
@@ -220,6 +239,7 @@ export const EMPTY_REPLY: Reply = Object.freeze({
   entryId: "",
   by: "",
   place: "",
+  cards: "",
   rev: 0,
 })
 

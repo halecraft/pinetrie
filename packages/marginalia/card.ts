@@ -8,6 +8,7 @@
 // next, and which are swept. Who wrote in it is `writersOf` (`seat.ts`).
 
 import {
+  type ArchiveRecord,
   atEntry,
   CARD_COMMANDS,
   type CardCommand,
@@ -22,11 +23,13 @@ import {
   type LaneView,
   type Move,
   type MoveRefusal,
+  movesOfDocId,
   type PlaceKey,
   type Position,
   placeFields,
   placeOfFields,
   type RootId,
+  type RootRecord,
   sameKey,
   type TreeIndex,
   threadOf,
@@ -396,8 +399,8 @@ export function planMove(
  * goes to drafting at `at`, the message the send wrote, on `lane`. The column
  * has become that thread's, and a card left fresh under its key would be
  * drawn nowhere. The host's write, not a person's move, so each card keeps its
- * placer, as `planUnsent` does. Nothing when the sent card was not fresh.
- * Pure.
+ * placer, as `planUnsent` does. Nothing when the sent card was not fresh,
+ * or its column is in another root than the message. Pure.
  */
 export function planFreshFollow(
   cards: readonly CardRecord[],
@@ -407,7 +410,7 @@ export function planFreshFollow(
   lane: LaneName | null,
 ): readonly PlaceStep[] {
   const place = cards.find(c => c.id === sent)?.place
-  if (place?.kind !== "fresh") return []
+  if (place?.kind !== "fresh" || place.root !== root) return []
   return cards
     .filter(
       c =>
@@ -424,22 +427,195 @@ export function planFreshFollow(
     }))
 }
 
+/** What the host makes of several moves: every step, or the first refusal. */
+export type MovesStep =
+  | { readonly kind: "steps"; readonly steps: readonly PlaceStep[] }
+  | Extract<MoveStep, { kind: "refused" }>
+
+/** `cards` as `step` leaves them. */
+const afterStep = (
+  cards: readonly CardRecord[],
+  step: PlaceStep,
+): readonly CardRecord[] =>
+  step.kind === "remove"
+    ? cards.filter(c => c.id !== step.id)
+    : [...cards.filter(c => c.id !== step.record.id), step.record]
+
 /**
- * A move and what follows it: the lane to drain, when the move leaves the
+ * Several moves as one (a keep's cards, ADR-0066): each planned against the
+ * cards as the ones before it left them, and accepted whole, or refused by
+ * the first that is, naming its card. Pure.
+ */
+export function planMoves(
+  cards: readonly CardRecord[],
+  moves: readonly Move[],
+  sender: WriterId,
+): MovesStep {
+  const steps: PlaceStep[] = []
+  let now = cards
+  for (const move of moves) {
+    const step = planMove(now, move, sender)
+    if (step.kind === "refused") return step
+    steps.push(step)
+    now = afterStep(now, step)
+  }
+  return { kind: "steps", steps }
+}
+
+/**
+ * Moves and what follows them: the lanes to drain, where a move leaves its
  * card queued on a lane that is not running. Pure.
  */
 export function planMoveCommand(
   cards: readonly CardRecord[],
-  move: Move,
+  moves: readonly Move[],
   sender: WriterId,
   running: (lane: LaneName) => boolean,
-): { readonly step: MoveStep; readonly drain: LaneName | null } {
-  const step = planMove(cards, move, sender)
-  const lane =
-    step.kind === "write" && step.record.place.kind === "queued"
-      ? step.record.place.lane
-      : null
-  return { step, drain: lane !== null && !running(lane) ? lane : null }
+): { readonly step: MovesStep; readonly drain: readonly LaneName[] } {
+  const step = planMoves(cards, moves, sender)
+  if (step.kind === "refused") return { step, drain: [] }
+  const lanes = step.steps.flatMap(s =>
+    s.kind === "write" && s.record.place.kind === "queued"
+      ? [s.record.place.lane]
+      : [],
+  )
+  return { step, drain: [...new Set(lanes)].filter(l => !running(l)) }
+}
+
+// ── moves' history (ADR-0066) ─────────────────────────────────────────────
+
+/** The root a place is in; null for an inventory. */
+const rootOfPlace = (place: CardPlace | PlaceKey): RootId | null =>
+  place.kind === "inventory" ? null : place.root
+
+/**
+ * The root whose history of the sender's moves `moves` enter, or null for
+ * none (ADR-0066). A creation or a removal enters none: a composer's new
+ * card, a copy, a discard, a send. Otherwise the root the card goes to,
+ * when it goes to one, else the root it leaves, read from its record, since
+ * the host accepts a move only from where the card is. So a take is recorded
+ * where it left, a put where it went, and a drag across roots where it
+ * went. Of several, the first that names a root names the step's. Pure.
+ */
+export function historyOf(
+  moves: readonly Move[],
+  cards: readonly CardRecord[],
+): RootId | null {
+  for (const move of moves) {
+    if (move.from === null || move.to === null) return null
+    const from = cards.find(c => c.id === move.card)?.place
+    const root =
+      rootOfPlace(move.to) ?? (from === undefined ? null : rootOfPlace(from))
+    if (root !== null) return root
+  }
+  return null
+}
+
+/** How long an archived root's histories are kept (ADR-0066). */
+export const ARCHIVED_HISTORY_MS = 7 * 24 * 60 * 60 * 1000
+
+/**
+ * The histories of moves to retire (ADR-0066): those of a root archived
+ * `ARCHIVED_HISTORY_MS` ago or longer; and, at startup only, those of a
+ * root the directory does not name: a new tab that never sent, or a root
+ * gone. After a run's end that second rule would retire the history of a new
+ * tab open now. `stored` is every stored `moves:` document. Pure.
+ */
+export function planHistorySweep(input: {
+  readonly stored: readonly string[]
+  readonly roots: ReadonlyMap<RootId, RootRecord>
+  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
+  readonly now: number
+  readonly startup: boolean
+}): readonly string[] {
+  return input.stored.filter(docId => {
+    const of = movesOfDocId(docId)
+    if (of === undefined) return false
+    const known = input.roots.get(of.root)
+    if (known === undefined) return input.startup
+    const record =
+      known.entry === null ? undefined : input.archive.get(known.entry)
+    return (
+      record?.state === "archived" &&
+      input.now - record.at >= ARCHIVED_HISTORY_MS
+    )
+  })
+}
+
+/** Of an undo step, what Pineta reads: which document each part wrote, and where. */
+export interface StepPart {
+  readonly docId: string
+  readonly footprint: readonly (readonly string[])[]
+}
+
+/** What an undo of moves did, as Kyneta says it with `whole`. */
+export type UndoResult =
+  | { readonly kind: "none" }
+  | {
+      readonly kind: "undone"
+      readonly step: { readonly parts: readonly StepPart[] }
+    }
+  | {
+      readonly kind: "refused"
+      readonly step: { readonly parts: readonly StepPart[] }
+      readonly stale: readonly StepPart[]
+    }
+
+/** What the host answers an undo of moves with. */
+export type UndoAnswer =
+  | { readonly kind: "nothing" }
+  /** Each card it moved, and its place now: null when it removed the card. */
+  | {
+      readonly kind: "undone"
+      readonly cards: readonly {
+        readonly card: CardId
+        readonly place: PlaceKey | null
+      }[]
+    }
+  /** Someone moved one of its cards since: the first such card as it is now. */
+  | Extract<MoveStep, { kind: "refused" }>
+
+/** The cards `parts` wrote in the places document `placesId`, each once. */
+function cardsOfParts(
+  parts: readonly StepPart[],
+  placesId: string,
+): readonly CardId[] {
+  const ids = parts
+    .filter(p => p.docId === placesId)
+    .flatMap(p => p.footprint)
+    .flatMap(path =>
+      path[0] === "cards" && path[1] !== undefined ? [cardId(path[1])] : [],
+    )
+  return [...new Set(ids)]
+}
+
+/**
+ * An undo's answer, from what Kyneta did and the cards after it: the cards
+ * its step wrote (their footprints in the places document) and where each
+ * is now; or, refused, the first card it could not undo as it is now. Pure.
+ */
+export function undoAnswer(
+  result: UndoResult,
+  cards: readonly CardRecord[],
+  placesId: string,
+): UndoAnswer {
+  switch (result.kind) {
+    case "none":
+      return { kind: "nothing" }
+    case "undone":
+      return {
+        kind: "undone",
+        cards: cardsOfParts(result.step.parts, placesId).map(card => {
+          const now = cards.find(c => c.id === card)
+          return { card, place: now === undefined ? null : keyOf(now.place) }
+        }),
+      }
+    case "refused": {
+      const card = cardsOfParts(result.stale, placesId)[0]
+      const now = cards.find(c => c.id === card) ?? null
+      return { kind: "refused", code: now === null ? "gone" : "moved", now }
+    }
+  }
 }
 
 /** Set a card's command, or clear it: its place and placer kept. Pure. */
@@ -452,6 +628,25 @@ export function planSetCommand(
   return now === undefined
     ? { kind: "refused", code: "gone", now: null }
     : { kind: "write", record: { ...now, command } }
+}
+
+/**
+ * Which rows of the places stored before ADR-0066 go into the new document:
+ * none once it has cards, since it was carried over already; else every row
+ * that decodes as a card now. A fresh card stored before ADR-0066 names no
+ * root, which the host cannot find, so it is dropped, and its text is swept
+ * with the others at that start. Pure.
+ */
+export function planPlacesCarryOver(
+  old: Readonly<Record<string, unknown>>,
+  now: readonly CardRecord[],
+): { readonly cards: readonly CardRecord[]; readonly dropped: number } {
+  if (now.length > 0) return { cards: [], dropped: 0 }
+  const cards = Object.entries(old).flatMap(([id, value]) => {
+    const card = decodeCard(id, value)
+    return card === undefined ? [] : [card]
+  })
+  return { cards, dropped: Object.keys(old).length - cards.length }
 }
 
 /**

@@ -1,4 +1,10 @@
-import { cardId, rootDocId, rootIdFor, writerId } from "@pineta/core"
+import {
+  cardId,
+  movesDocId,
+  rootDocId,
+  rootIdFor,
+  writerId,
+} from "@pineta/core"
 import {
   PLACES_DOC_ID,
   PRESENCE_DOC_ID,
@@ -82,4 +88,18 @@ test("an inventory is shared with its person only (ADR-0059)", () => {
     policy.canShare?.(INVENTORY, peer("bea@x.io")),
     policy.canShare?.(INVENTORY, peer("pineta-host")),
   ]).toEqual([true, false, false])
+})
+
+test("a stack of moves is the host's: shared with no one, taken from no one, and rejected when a client announces one (ADR-0066)", () => {
+  const MOVES = movesDocId(writerId("ada@x.io"), KNOWN)
+  const peer = {
+    peerId: "seat-a",
+    principal: "ada@x.io",
+    type: "user",
+  } as const
+  expect([
+    hostPolicy.canShare?.(MOVES, peer),
+    hostPolicy.canAccept?.(MOVES, peer),
+    resolveDoc(MOVES, () => true),
+  ]).toEqual([false, false, "reject"])
 })

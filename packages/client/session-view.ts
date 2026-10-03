@@ -26,6 +26,7 @@ import {
   type LaneName,
   type LineAction,
   type Move,
+  type MoveDirection,
   type OfferAction,
   type Position,
   parseMentions,
@@ -85,9 +86,9 @@ import {
 } from "@pineta/schema"
 import { type ActingState, NO_ACTING, sendActing } from "./acting.ts"
 import {
+  type ActedAt,
+  AT_INVENTORY,
   answerOf,
-  type HistoryEntry,
-  type HistoryStep,
   intentsOf,
   type MoveAnswer,
   type MoveHow,
@@ -95,7 +96,6 @@ import {
   type MovesState,
   movesStep,
   NO_MOVES,
-  NO_STEP,
   OFF_PAGE,
   type Pending,
   type Refusal,
@@ -233,7 +233,7 @@ export interface SessionClient {
   /**
    * Ask the host to queue a card on `lane`, from `at`: after the lane's
    * last queued card, queued by you. A card's box undoes only its text
-   * (ADR-0052); the move is undone from the page, by `how.history`.
+   * (ADR-0052); the move is undone from the page, by the host (ADR-0066).
    */
   queueCard(
     id: CardId,
@@ -250,20 +250,36 @@ export interface SessionClient {
     how?: MoveHow,
   ): void
   /**
-   * Hand a card from one place to another (ADR-0059): a take, a put, or an
-   * undo's reverse. Into your inventory with `how.slot`, the slot is written
-   * once the host accepts, before the answer is recorded, so the repair never
-   * sees the card held without its slot. Resolves with the host's answer.
+   * Hand a card from one place to another (ADR-0059): a take or a put. Into
+   * your inventory with `how.slot`, the slot is written once the host
+   * accepts, before the answer is recorded, so the repair never sees the card
+   * held without its slot. Resolves with the host's answer.
    */
   moveCard(move: Move, how: MoveHow): Promise<MoveAnswer>
   /**
-   * Swap two slots of your inventory, in one write; no host is asked. `step`
-   * records it, or moves its entry, in the history.
+   * Hand several cards at once, as one move the host accepts or refuses
+   * whole (a keep, ADR-0066), each with the slot it takes.
    */
-  swapSlots(a: number, b: number, step: HistoryStep): void
-  /** Drop `entry` from the history, keeping why: undo could not act on it. */
-  dropEntry(entry: HistoryEntry, refusal: Refusal): void
-  /** Keep a refusal made before anything was sent: a keep without room. */
+  moveCards(
+    moves: readonly { readonly move: Move; readonly slot: number | null }[],
+    actedAt: ActedAt,
+  ): Promise<MoveAnswer>
+  /**
+   * Undo or redo your newest move in `root`: the host's history of your
+   * moves there, from any of your tabs (ADR-0066).
+   */
+  undoMoves(root: RootId, direction: MoveDirection): Promise<Outcome>
+  /**
+   * Swap two slots of your inventory, in one write, as one step of this
+   * tab's swaps; no host is asked.
+   */
+  swapSlots(a: number, b: number): void
+  /**
+   * Undo or redo this tab's newest swap, whole or refused: refused, said at
+   * the inventory, when the slots it wrote have changed since (S90).
+   */
+  undoSwap(direction: MoveDirection): Promise<void>
+  /** Keep a refusal: one made before anything was sent, or an undo's. */
   refuse(refusal: Refusal): void
   /** Ask the host to set a card's command, or clear it with null (ADR-0055). */
   setCommand(id: CardId, command: CardCommand | null): void
@@ -272,7 +288,7 @@ export interface SessionClient {
    * where you acted.
    */
   readonly refusals: Readable<readonly Refusal[]>
-  /** This tab's moves: in flight, refused, and its history (`card-moves.ts`). */
+  /** This tab's moves: in flight and refused (`card-moves.ts`). */
   readonly moves: Readable<MovesState>
   /**
    * Your inventory's slots as your document holds them, repaired from the
@@ -320,6 +336,8 @@ export interface ChatHow {
   readonly column?: string
   /** The lane id the column reserved: what a lane this send creates is called (ADR-0057). */
   readonly reserved?: LaneName
+  /** The root a new tab minted as it opened: where its first send starts (ADR-0066). */
+  readonly root?: RootId
   /** The WIP bookmark a lane this send creates starts from; absent, the line (ADR-0060). */
   readonly base?: string
 }
@@ -331,7 +349,7 @@ export type CardUndo = Omit<UndoTarget, "undo" | "redo"> & {
 }
 
 /** What every send from one column carries, whichever card it is sent from. */
-export type ColumnHow = Pick<ChatHow, "lane" | "reserved" | "base"> & {
+export type ColumnHow = Pick<ChatHow, "lane" | "reserved" | "base" | "root"> & {
   readonly asksAgent: boolean
   readonly column: string
 }
@@ -408,10 +426,17 @@ export async function connectSession(
     for (const root of now.keys())
       if (!want.has(root)) void exchange.destroy(rootDocId(root))
   }
-  /** Where `at` is: a held root's entry, or a root this client starts now. */
-  const spotRoot = (at: Position): RootId | undefined => {
+  /**
+   * Where `at` is: a held root's entry, or a root this client starts now:
+   * the one its new tab minted as it opened (`minted`), or, for a send at
+   * the root that names none (a script's), one minted here.
+   */
+  const spotRoot = (
+    at: Position,
+    minting: RootId | undefined,
+  ): RootId | undefined => {
     if (at.kind === "root") {
-      const root = newRootId()
+      const root = minting ?? newRootId()
       minted.add(root)
       hold()
       return root
@@ -523,6 +548,15 @@ export async function connectSession(
     key: "cards",
     scope: id => cardIdOfDoc(id) !== undefined,
   })
+  // This tab's swaps in your inventory, on the same document under their
+  // own key: a text's undo never takes a swap (S90). The repair writes
+  // outside it, so an undo refuses a swap whose slots it changed.
+  const swaps = await createUndoStack({
+    exchange,
+    docId: `undo:${exchange.peerId}`,
+    key: "slots",
+    scope: id => id === inventoryDocId(me),
+  })
   const presence = exchange.get(
     PRESENCE_DOC_ID,
     presenceDoc(options.presenceDecay ?? PRESENCE_DECAY),
@@ -581,35 +615,40 @@ export async function connectSession(
     request(intent, id).then(r => r.outcome)
 
   /**
-   * Send a request that moves a card: drawn at once as `pending`, until this
-   * tab's copy holds what the host did, and answered as the host answers it.
-   * `queuedBy`: who queued the card, when it was queued. An accepted move
-   * into your inventory with a slot writes that slot first.
+   * Send a request that moves cards: each drawn at once as one of `pending`,
+   * which share its id, until this tab's copy holds what the host did, and
+   * answered as the host answers it. `card`: the card a refusal is about;
+   * `queuedBy`: who queued it, when it was queued. An accepted move into
+   * your inventory with a slot writes that slot first.
    */
   function tracked(
     intent: Intent,
-    pending: Pending,
+    pending: readonly Pending[],
     how: { readonly card: CardId; readonly queuedBy: WriterId | null },
   ): Promise<{
     readonly outcome: Outcome
     readonly rev: number | null
     readonly answer: MoveAnswer
   }> {
+    const [first] = pending
+    if (first === undefined) throw new Error("a move with no cards")
     dispatch({ kind: "sent", pending })
-    return request(intent, pending.id).then(({ outcome, rev }) => {
+    return request(intent, first.id).then(({ outcome, rev }) => {
       const answer = answerOf(outcome, rev, {
         ...how,
-        actedAt: pending.actedAt,
+        actedAt: first.actedAt,
       })
-      const into =
-        pending.kind === "create" ? pending.draft.place : pending.move.to
-      if (
-        answer.kind === "accepted" &&
-        into?.kind === "inventory" &&
-        pending.slot !== null
-      )
-        writeSlots(takeWrites(readSlots(inventory), how.card, pending.slot))
-      dispatch({ kind: "answered", id: pending.id, answer })
+      for (const p of pending) {
+        const into = p.kind === "create" ? p.draft.place : p.move.to
+        const card = p.kind === "create" ? p.draft.id : p.move.card
+        if (
+          answer.kind === "accepted" &&
+          into?.kind === "inventory" &&
+          p.slot !== null
+        )
+          writeSlots(takeWrites(readSlots(inventory), card, p.slot))
+      }
+      dispatch({ kind: "answered", id: first.id, answer })
       return { outcome, rev, answer }
     })
   }
@@ -622,24 +661,19 @@ export async function connectSession(
       readonly draft: CardRecord | null
     },
   ): Promise<MoveAnswer> {
-    // A recorded handoff keeps the move as sent: a queue's text version is
-    // read here (S72), after the page planned it.
-    const { history } = how
     const sent = {
       id: crypto.randomUUID(),
       answer: { state: "sent" },
       slot: how.slot,
       actedAt: how.actedAt,
-      history:
-        history.kind === "record" && history.entry.kind === "handoff"
-          ? { ...history, entry: { ...history.entry, move } }
-          : history,
     } as const
     return tracked(
-      { kind: "move", move },
-      how.draft === null
-        ? { ...sent, kind: "move", move }
-        : { ...sent, kind: "create", draft: how.draft },
+      { kind: "move", moves: [move] },
+      [
+        how.draft === null
+          ? { ...sent, kind: "move", move }
+          : { ...sent, kind: "create", draft: how.draft },
+      ],
       { card: move.card, queuedBy: how.queuedBy },
     ).then(r => r.answer)
   }
@@ -688,7 +722,7 @@ export async function connectSession(
     chat(text, at, how = {}) {
       const id = how.id ?? crypto.randomUUID()
       const card = how.card === undefined ? undefined : cardNow(how.card)
-      const root = spotRoot(at)
+      const root = spotRoot(at, how.root)
       if (root === undefined)
         return Promise.resolve({
           kind: "refused",
@@ -720,15 +754,16 @@ export async function connectSession(
           ? request(intent, id)
           : tracked(
               intent,
-              {
-                id,
-                kind: "move",
-                move: { card: card.id, from: keyOf(card.place), to: null },
-                answer: { state: "sent" },
-                slot: null,
-                actedAt: { kind: "column", key: how.column ?? "" },
-                history: NO_STEP,
-              },
+              [
+                {
+                  id,
+                  kind: "move",
+                  move: { card: card.id, from: keyOf(card.place), to: null },
+                  answer: { state: "sent" },
+                  slot: null,
+                  actedAt: { kind: "column", key: how.column ?? "" },
+                },
+              ],
               { card: card.id, queuedBy: null },
             )
       return sent.then(r => r.outcome)
@@ -767,7 +802,42 @@ export async function connectSession(
     moveCard(move, how) {
       return sendMove(move, { ...how, queuedBy: null, draft: null })
     },
-    swapSlots(a, b, step) {
+    moveCards(moves, actedAt) {
+      const [first] = moves
+      if (first === undefined)
+        return Promise.resolve({ kind: "accepted", rev: places.rev() })
+      const id = crypto.randomUUID()
+      return tracked(
+        { kind: "move", moves: moves.map(m => m.move) },
+        moves.map(({ move, slot }) => ({
+          id,
+          answer: { state: "sent" },
+          slot,
+          actedAt,
+          kind: "move",
+          move,
+        })),
+        { card: first.move.card, queuedBy: null },
+      ).then(r => r.answer)
+    },
+    async undoMoves(root, direction) {
+      const { outcome, rev } = await request({
+        kind: "undo-move",
+        root,
+        direction,
+      })
+      // Drawn as the host left it: wait for this tab's copy to hold the undo.
+      if (rev !== null && readPlacesRev(places) < rev)
+        await new Promise<void>(resolve => {
+          const stop = subscribe(places, () => {
+            if (readPlacesRev(places) < rev) return
+            stop()
+            resolve()
+          })
+        })
+      return outcome
+    },
+    swapSlots(a, b) {
       const now = readSlots(inventory)
       const [atA, atB] = [now[String(a)], now[String(b)]]
       const set: Record<string, CardId> = {}
@@ -776,11 +846,19 @@ export async function connectSession(
       else set[String(a)] = atB
       if (atA === undefined) clear.push(String(b))
       else set[String(b)] = atA
-      writeSlots({ set, clear })
-      dispatch({ kind: "swapped", step })
+      swaps.gesture(() => writeSlots({ set, clear }))
+      dispatch({ kind: "acted", at: AT_INVENTORY })
     },
-    dropEntry(entry, refusal) {
-      dispatch({ kind: "dropped", entry, refusal })
+    async undoSwap(direction) {
+      const done =
+        direction === "undo"
+          ? await swaps.undo({ whole: true })
+          : await swaps.redo({ whole: true })
+      if (done.kind === "refused")
+        dispatch({
+          kind: "refused",
+          refusal: { card: null, actedAt: AT_INVENTORY, code: "slots-changed" },
+        })
     },
     refuse(refusal) {
       dispatch({ kind: "refused", refusal })
@@ -865,6 +943,7 @@ export async function connectSession(
         for (const stop of watched.values()) stop()
         watched.clear()
         undo.dispose()
+        swaps.dispose()
       } catch {}
       // This seat's typing goes with it; another seat of the same person
       // keeps its own.

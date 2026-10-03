@@ -322,11 +322,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const ada2 = await join(ch, "ada", "cards")
     const mine = { kind: "inventory", holder: ada.writer } as const
     const into = (slot: number) =>
-      ({
-        actedAt: { kind: "inventory" },
-        history: { kind: "none" },
-        slot,
-      }) as const
+      ({ actedAt: { kind: "inventory" }, slot }) as const
     const taking = newCard(ada, tipOf(), "for later")
     await waitFor(() => onHost(taking) !== undefined, 5_000)
     const took = await ada.moveCard(
@@ -366,21 +362,141 @@ async function run(check: Checks["check"]): Promise<void> {
         onHost(taking)?.place.kind === "inventory",
       JSON.stringify(stolen),
     )
+
+    // 4f. Moves' history (ADR-0066): one per person and root, on the host.
+    // Ada's second session undoes, in this root, the take her first session
+    // made here; her take in another root stays. An undo after Bea moved the
+    // card is refused, naming Bea. A keep of three cards is one move.
+    const here = rootAt(ch, at(tipOf()))
+    const other = await ada.chat("a root of its own", ROOT, { mode: "branch" })
+    const otherEnd = other.kind === "appended" ? other.id : null
+    const takeOf = (card: CardId, end: string | null, slot: number) =>
+      ada.moveCard({ card, from: drafting(end), to: mine }, into(slot))
+    const a1 = newCard(ada, tipOf(), "taken here")
+    const b1 = newCard(ada, otherEnd, "taken there")
+    await waitFor(
+      () => onHost(a1) !== undefined && onHost(b1) !== undefined,
+      5_000,
+    )
+    await takeOf(a1, tipOf(), 4)
+    await takeOf(b1, otherEnd, 5)
+    const undoneHere = await ada2.undoMoves(here, "undo")
+    const a1Back = onHost(a1)?.place.kind === "drafting"
+    const b1Stays = onHost(b1)?.place.kind === "inventory"
+    const parked = {
+      kind: "fresh",
+      column: "k-parked",
+      root: here,
+      at: at(tipOf()),
+    } as const
+    await ada.moveCard(
+      { card: a1, from: drafting(tipOf()), to: parked },
+      { actedAt: { kind: "column", key: "k-parked" }, slot: null },
+    )
+    await waitFor(
+      () =>
+        bea.cards.current().some(c => c.id === a1 && c.place.kind === "fresh"),
+      5_000,
+    )
+    await bea.moveCard(
+      { card: a1, from: parked, to: drafting(tipOf()) },
+      { actedAt: { kind: "column", key: "k" }, slot: null },
+    )
+    const refused = await ada.undoMoves(here, "undo")
+    check(
+      "Ada's second session undoes, in a root, the move her first session made there; her move in another root stays; an undo after Bea moved the card is refused, naming Bea, and changes nothing",
+      undoneHere.kind === "undone" &&
+        a1Back &&
+        b1Stays &&
+        refused.kind === "unmoved" &&
+        refused.by === bea.writer &&
+        onHost(a1)?.placer === bea.writer &&
+        onHost(a1)?.place.kind === "drafting",
+      `${undoneHere.kind}, ${a1Back}, ${b1Stays}; ${JSON.stringify(refused)}`,
+    )
+    const keeping = {
+      kind: "fresh",
+      column: "k-keep",
+      root: here,
+      at: at(tipOf()),
+    } as const
+    const three = ["one", "two", "three"].map(text => {
+      const id = cardId(crypto.randomUUID())
+      void ada.createCard(
+        {
+          id,
+          owner: ada.writer,
+          placer: ada.writer,
+          place: keeping,
+          command: null,
+          unsent: null,
+        },
+        text,
+      )
+      return id
+    })
+    await waitFor(() => three.every(id => onHost(id) !== undefined), 5_000)
+    const [k1, k2, k3] = three as [CardId, CardId, CardId]
+    const keep3 = () =>
+      ada.moveCards(
+        three.map((card, n) => ({
+          move: { card, from: keeping, to: mine },
+          slot: 6 + n,
+        })),
+        { kind: "column", key: "k-keep" },
+      )
+    // Bea moves one first: the keep is refused whole.
+    await waitFor(() => bea.cards.current().some(c => c.id === k3), 5_000)
+    await bea.moveCard(
+      { card: k3, from: keeping, to: drafting(tipOf()) },
+      { actedAt: { kind: "column", key: "k" }, slot: null },
+    )
+    const refusedWhole = await keep3()
+    const noneMoved = [k1, k2].every(id => onHost(id)?.place.kind === "fresh")
+    await bea.moveCard(
+      { card: k3, from: drafting(tipOf()), to: keeping },
+      { actedAt: { kind: "column", key: "k" }, slot: null },
+    )
+    const keptAll = await keep3()
+    const allKept = three.every(id => onHost(id)?.place.kind === "inventory")
+    const keepUndone = await ada.undoMoves(here, "undo")
+    check(
+      "a keep of three cards is one move: refused whole when one has moved, and undone whole",
+      refusedWhole.kind === "refused" &&
+        noneMoved &&
+        keptAll.kind === "accepted" &&
+        allKept &&
+        keepUndone.kind === "undone" &&
+        keepUndone.cards.length === 3 &&
+        three.every(id => onHost(id)?.place.kind === "fresh"),
+      `${refusedWhole.kind}, ${noneMoved}, ${keptAll.kind}, ${allKept}; ${keepUndone.kind}`,
+    )
+    // Ada's last move in this root, to undo after a restart (section 6).
+    const lastMove = newCard(ada, tipOf(), "moved before the restart")
+    await waitFor(() => onHost(lastMove) !== undefined, 5_000)
+    await ada.moveCard(
+      { card: lastMove, from: drafting(tipOf()), to: parked },
+      { actedAt: { kind: "column", key: "k-parked" }, slot: null },
+    )
+
     const filled = await Promise.all(
-      Array.from({ length: 17 }, (_, n) =>
-        ada.createCard(
-          {
-            id: cardId(crypto.randomUUID()),
-            owner: ada.writer,
-            placer: ada.writer,
-            place: mine,
-            command: null,
-            unsent: null,
-          },
-          `held ${n}`,
-          into(n < 3 ? n : n + 1),
+      // Every slot but the take's (3) and the other root's (5).
+      Array.from({ length: 18 }, (_, n) => n)
+        .filter(slot => slot !== 3 && slot !== 5)
+        .map(slot =>
+          ada.createCard(
+            {
+              id: cardId(crypto.randomUUID()),
+              owner: ada.writer,
+              placer: ada.writer,
+              place: mine,
+              command: null,
+              unsent: null,
+            },
+            `held ${slot}`,
+            into(slot),
+          ),
         ),
-      ),
     )
     const nineteenth = newCard(ada, tipOf(), "one too many")
     await waitFor(() => onHost(nineteenth) !== undefined, 5_000)
@@ -452,6 +568,17 @@ async function run(check: Checks["check"]): Promise<void> {
       "a starting host has swept before it returns: no empty card is left for a client to find",
       onHost(empty) === undefined,
     )
+    // Ada's history in that root was kept in the store: her undo undoes her
+    // last move there (ADR-0066, S91).
+    const adaAgain = await join(ch, "ada", "cards")
+    const afterRestart = await adaAgain.undoMoves(here, "undo")
+    check(
+      "after the host restarts, Ada's undo in a root still undoes her last move there",
+      afterRestart.kind === "undone" &&
+        onHost(lastMove)?.place.kind === "drafting",
+      `${JSON.stringify(afterRestart)}; ${onHost(lastMove)?.place.kind}`,
+    )
+    await adaAgain.close()
     const eve = await join(ch, "eve", "cards")
     await ch.quiet()
     await waitFor(

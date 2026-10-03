@@ -16,6 +16,7 @@ import {
   atEntry,
   CARD_COMMANDS,
   type CardCommand,
+  type CardId,
   CHAT_MODES,
   type ChatMode,
   type CommitId,
@@ -32,6 +33,9 @@ import {
   LINE_ACTIONS,
   type LineAction,
   MAX_TITLE,
+  MOVE_DIRECTIONS,
+  type Move,
+  type MoveDirection,
   type MoveRefusal,
   normalizeName,
   OFFER_ACTIONS,
@@ -68,6 +72,10 @@ export type Outcome =
   | { readonly kind: "queued" }
   /** A move or a command on a card was carried out (ADR-0059). */
   | { readonly kind: "moved" }
+  /** An undo or redo of moves moved these cards, each to the place it is now (ADR-0066). */
+  | { readonly kind: "undone"; readonly cards: readonly MovedCard[] }
+  /** An undo or redo found nothing to do. */
+  | { readonly kind: "nothing" }
   /**
    * A move the host refused (ADR-0059): why, where the card is now (null
    * when it is gone), and who put it there.
@@ -105,6 +113,12 @@ export type Outcome =
    * unlike a refusal, it does not say that nothing was written.
    */
   | { readonly kind: "failed"; readonly message: string }
+
+/** A card an undo moved, and its place now: null when the undo removed it. */
+export interface MovedCard {
+  readonly card: CardId
+  readonly place: PlaceKey | null
+}
 
 /**
  * A command as it arrives: untrusted. Every field is `unknown` because this
@@ -196,16 +210,19 @@ export function decodeCommand(
       : refused(ERR.UNKNOWN_KIND, `unknown line action: ${action}`)
   }
   if (kind === "move") {
-    const card = text(wire?.cardId)
-    if (card === "")
-      return refused(ERR.UNKNOWN_TARGET, "a move must name its card")
-    const from = decodeKey(text(wire?.from))
-    const to = decodeKey(text(wire?.to))
-    if (from === undefined || to === undefined)
-      return refused(ERR.UNKNOWN_TARGET, "a move names a malformed place")
-    if (from === null && to === null)
-      return refused(ERR.UNKNOWN_TARGET, "a move must name a place")
-    return { kind: "move", move: { card: cardId(card), from, to } }
+    const moves = decodeMoves(text(wire?.moves))
+    return typeof moves === "string"
+      ? refused(ERR.UNKNOWN_TARGET, moves)
+      : { kind: "move", moves }
+  }
+  if (kind === "undo-move") {
+    const root = text(wire?.root)
+    if (!isRootId(root))
+      return refused(ERR.UNKNOWN_TARGET, `not a root: ${root}`)
+    const direction = text(wire?.mode)
+    return isMoveDirection(direction)
+      ? { kind, root, direction }
+      : refused(ERR.UNKNOWN_KIND, `unknown undo direction: ${direction}`)
   }
   if (kind === "set-command") {
     const card = text(wire?.cardId)
@@ -315,11 +332,24 @@ const cardFromWire = (id: string, seen: string): SentCard | null =>
 const isCardCommand = (c: string): c is CardCommand =>
   (CARD_COMMANDS as readonly string[]).includes(c)
 
-/** A place's key -> the wire: its flat fields as JSON, `""` for none. */
-export const encodeKey = (key: PlaceKey | null): string => {
-  if (key === null) return ""
+/** A place's key as a JSON value: its flat fields, null for none. */
+const keyToJson = (key: PlaceKey | null) => {
+  if (key === null) return null
   const { kind, root, at, lane, column, seen, holder } = placeFields(key)
-  return JSON.stringify({ kind, root, at, lane, column, seen, holder })
+  return { kind, root, at, lane, column, seen, holder }
+}
+
+/** A place's key -> the wire: its flat fields as JSON, `""` for none. */
+export const encodeKey = (key: PlaceKey | null): string =>
+  key === null ? "" : JSON.stringify(keyToJson(key))
+
+/** JSON text -> its value, or undefined when it does not parse. */
+const parsed = (s: string): unknown => {
+  try {
+    return JSON.parse(s)
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -327,15 +357,13 @@ export const encodeKey = (key: PlaceKey | null): string => {
  * malformed. The flat fields are read by core's `keyOfFields`, as the
  * places document's are by `placeOfFields`, so the two cannot drift.
  */
-export function decodeKey(s: string): PlaceKey | null | undefined {
-  if (s === "") return null
-  let value: unknown
-  try {
-    value = JSON.parse(s)
-  } catch {
-    return undefined
-  }
-  if (typeof value !== "object" || value === null) return undefined
+export const decodeKey = (s: string): PlaceKey | null | undefined =>
+  s === "" ? null : keyFromJson(parsed(s))
+
+/** A JSON value -> a place's key: null for null, undefined for anything malformed. */
+function keyFromJson(value: unknown): PlaceKey | null | undefined {
+  if (value === null) return null
+  if (typeof value !== "object" || Array.isArray(value)) return undefined
   const v = value as Record<string, unknown>
   const field = (k: string) =>
     typeof v[k] === "string" ? (v[k] as string) : ""
@@ -351,6 +379,62 @@ export function decodeKey(s: string): PlaceKey | null | undefined {
     holder: field("holder"),
   })
 }
+
+/** Moves -> the wire: a JSON list of `{ card, from, to }`. */
+export const encodeMoves = (moves: readonly Move[]): string =>
+  JSON.stringify(
+    moves.map(m => ({
+      card: m.card,
+      from: keyToJson(m.from),
+      to: keyToJson(m.to),
+    })),
+  )
+
+/**
+ * The wire -> moves, or why they are malformed: an empty list, a move with
+ * no card, a malformed place, or a move from nowhere to nowhere.
+ */
+export function decodeMoves(s: string): readonly Move[] | string {
+  const value = parsed(s)
+  if (!Array.isArray(value) || value.length === 0)
+    return "a move must name its cards"
+  const moves: Move[] = []
+  for (const item of value as unknown[]) {
+    if (typeof item !== "object" || item === null)
+      return "a move must name its card"
+    const m = item as Record<string, unknown>
+    const card = typeof m.card === "string" ? m.card.trim() : ""
+    if (card === "") return "a move must name its card"
+    const from = keyFromJson(m.from ?? null)
+    const to = keyFromJson(m.to ?? null)
+    if (from === undefined || to === undefined)
+      return "a move names a malformed place"
+    if (from === null && to === null) return "a move must name a place"
+    moves.push({ card: cardId(card), from, to })
+  }
+  return moves
+}
+
+/** Cards an undo moved -> the wire: a JSON list of `{ card, place }`. */
+const encodeMovedCards = (cards: readonly MovedCard[]): string =>
+  JSON.stringify(cards.map(c => ({ card: c.card, place: keyToJson(c.place) })))
+
+/** The wire -> cards an undo moved; one malformed is left out. Total. */
+function decodeMovedCards(s: string): readonly MovedCard[] {
+  const value = parsed(s)
+  if (!Array.isArray(value)) return []
+  return (value as unknown[]).flatMap(item => {
+    if (typeof item !== "object" || item === null) return []
+    const c = item as Record<string, unknown>
+    const place = keyFromJson(c.place ?? null)
+    return typeof c.card === "string" && c.card !== "" && place !== undefined
+      ? [{ card: cardId(c.card), place }]
+      : []
+  })
+}
+
+const isMoveDirection = (d: string): d is MoveDirection =>
+  (MOVE_DIRECTIONS as readonly string[]).includes(d)
 
 const MOVE_REFUSALS: readonly MoveRefusal[] = [
   "moved",
@@ -445,12 +529,13 @@ export function encodeIntent(id: string, intent: Intent): Command {
     case "reserve":
       return command({ id, kind: "reserve", lane: intent.lane })
     case "move":
+      return command({ id, kind: "move", moves: encodeMoves(intent.moves) })
+    case "undo-move":
       return command({
         id,
-        kind: "move",
-        cardId: intent.move.card,
-        from: encodeKey(intent.move.from),
-        to: encodeKey(intent.move.to),
+        kind: "undo-move",
+        root: intent.root,
+        mode: intent.direction,
       })
     case "set-command":
       return command({
@@ -506,6 +591,14 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "queued" })
     case "moved":
       return reply({ id, outcome: "moved" })
+    case "undone":
+      return reply({
+        id,
+        outcome: "undone",
+        cards: encodeMovedCards(outcome.cards),
+      })
+    case "nothing":
+      return reply({ id, outcome: "nothing" })
     case "unmoved":
       return reply({
         id,
@@ -562,6 +655,10 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "queued" }
     case "moved":
       return { kind: "moved" }
+    case "undone":
+      return { kind: "undone", cards: decodeMovedCards(wire.cards) }
+    case "nothing":
+      return { kind: "nothing" }
     case "unmoved":
       return {
         kind: "unmoved",

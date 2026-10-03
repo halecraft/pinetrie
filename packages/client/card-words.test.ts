@@ -86,20 +86,6 @@ describe("card words", () => {
       refusalWords(refusal({ code: "full" }), READER),
       "inventory full",
     ],
-    [
-      "refusalWords, a keep without room",
-      refusalWords(
-        {
-          card: null,
-          actedAt: { kind: "inventory" },
-          code: "no-room",
-          need: 3,
-          free: 1,
-        },
-        READER,
-      ),
-      "not kept: needs 3 slots, 1 free",
-    ],
   ])("%s", (_, words, expected) => {
     expect(words).toBe(expected)
   })

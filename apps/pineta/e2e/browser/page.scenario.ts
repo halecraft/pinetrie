@@ -2794,6 +2794,26 @@ async function run(check: Checks["check"]): Promise<void> {
           placeOf(taken)?.kind === "inventory",
         `slot ${inSlot}, line ${firstLine}, emptied ${boxEmptied}, ${placeOf(taken)?.kind}`,
       )
+      // Swap: dropped on an empty slot, the card moves there; with the panel
+      // focused, the undo key swaps it back (ADR-0066, this tab's own stack).
+      const takenSlot =
+        (await page.getAttribute(slotOf(taken), "data-slot")) ?? ""
+      const emptySlot = takenSlot === "9" ? "10" : "9"
+      const slotAt = (n: string) => `.inventory .slot[data-slot="${n}"]`
+      await page.dragAndDrop(slotOf(taken), slotAt(emptySlot))
+      const swapped = await appears(
+        `${slotAt(emptySlot)}[data-card="${taken}"]`,
+      )
+      await page.focus(slotAt(emptySlot))
+      await page.keyboard.press("ControlOrMeta+z")
+      const swappedBack = await appears(
+        `${slotAt(takenSlot)}[data-card="${taken}"]`,
+      )
+      check(
+        "with the panel focused, the undo key swaps back",
+        swapped && swappedBack,
+        `to ${emptySlot}: ${swapped}; back to ${takenSlot}: ${swappedBack}`,
+      )
       // Put: Ctrl+Shift+O puts the selected card in the column last focused.
       const slotIndex = await page.getAttribute(slotOf(taken), "data-slot")
       await page.click(downBox)
@@ -2806,10 +2826,9 @@ async function run(check: Checks["check"]): Promise<void> {
         putBack && placeOf(taken)?.kind === "drafting",
         `${await boxText(downBox)}; ${placeOf(taken)?.kind}`,
       )
-      // Undo, outside a box: the put is undone, and the card is back in its slot.
-      // The page records a move once its answer arrives, just after the host's
-      // write that the check above reads.
-      await waitFor(() => false, 500)
+      // Undo, outside a box: the put is undone, and the card is back in its
+      // slot. The host records a move as it applies it (ADR-0066), so the key
+      // can follow at once.
       await page.evaluate(() =>
         (document.activeElement as HTMLElement | null)?.blur(),
       )
@@ -2834,7 +2853,6 @@ async function run(check: Checks["check"]): Promise<void> {
         `${await boxText(agentBox)}; ${placeOf(taken)?.kind}`,
       )
       // Undone, and removed: what follows starts from no card of this one.
-      await waitFor(() => false, 500)
       await page.evaluate(() =>
         (document.activeElement as HTMLElement | null)?.blur(),
       )

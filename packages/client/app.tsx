@@ -61,7 +61,7 @@ import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { foldMemory } from "./ask-fold.ts"
 import { cardMarks, ownCards } from "./card-marks.ts"
 import { intentsOf } from "./card-moves.ts"
-import { INVENTORY, RESTORE_AND_UNDO, restoreAsk } from "./card-words.ts"
+import { INVENTORY } from "./card-words.ts"
 import { Column, type ColumnProps } from "./column.tsx"
 import { type Column as ColumnSpec, isPinned } from "./columns.ts"
 import type { SeenEnd } from "./follow.ts"
@@ -69,6 +69,7 @@ import { Header } from "./header.tsx"
 import { planHeldRoots, rootEntriesOf } from "./held-roots.ts"
 import { runsHere } from "./here.ts"
 import { type Identity, reconcileName } from "./identity.ts"
+import { newRootId } from "./ids.ts"
 import { type Inbox, mentionsOf } from "./inbox.ts"
 import {
   claimFocus,
@@ -90,7 +91,6 @@ import {
   resolveLayout,
 } from "./layout.ts"
 import type { Left } from "./left.ts"
-import type { Direction } from "./move-undo.ts"
 import { type AppPorts, perform } from "./perform.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { planReading, typingDue } from "./presence-report.ts"
@@ -690,18 +690,6 @@ export function App({
   // The column whose element last held focus: where a put by key lands.
   const lastColumn = useRef<string | null>(null)
   const [lastColumnKey, setLastColumnKey] = useState<string | null>(null)
-  // The archived-root dialog: an undo that would reopen something there.
-  const [asking, setAsking] = useState<{
-    readonly root: EntryId
-    readonly direction: Direction
-  } | null>(null)
-  const askDialog = useRef<HTMLDialogElement>(null)
-  useEffect(() => {
-    const el = askDialog.current
-    if (el === null) return
-    if (asking !== null && !el.open) el.showModal()
-    if (asking === null && el.open) el.close()
-  }, [asking])
 
   // An opened fold draws in its own ask (`AskWork`): a render of `App`
   // runs `useReveal`'s wait once it has.
@@ -733,7 +721,6 @@ export function App({
       select: setSelected,
     },
     fly,
-    askRestore: (root, direction) => setAsking({ root, direction }),
     intent: intent => onIntent(intent),
   }
   /** Carry out `effects`: the one way anything below acts. */
@@ -754,11 +741,12 @@ export function App({
             me: session.writer,
             slots,
             selected,
-            history: moves.history,
             composers: composers.current(),
           },
+          rootEntries,
         },
         crypto.randomUUID(),
+        newRootId(),
       ),
     ),
   )
@@ -987,33 +975,6 @@ export function App({
           slots={slots}
         />
       )}
-      <dialog
-        className="restore-ask"
-        onClose={() => setAsking(null)}
-        ref={askDialog}
-      >
-        {asking !== null && (
-          <form method="dialog">
-            <p>{restoreAsk(labelOf(asking.root))}</p>
-            <button
-              className="restore-and-undo"
-              onClick={() =>
-                onIntent({
-                  kind: "restoreAndUndo",
-                  root: asking.root,
-                  direction: asking.direction,
-                })
-              }
-              type="submit"
-            >
-              {RESTORE_AND_UNDO}
-            </button>{" "}
-            <button className="restore-cancel" type="submit">
-              cancel
-            </button>
-          </form>
-        )}
-      </dialog>
       {active === null || workspace.kind === "connecting" ? (
         <main id="workspace">
           <p className="connecting">connecting…</p>

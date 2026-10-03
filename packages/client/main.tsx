@@ -9,6 +9,7 @@ import { createRoot } from "react-dom/client"
 import { App, type AppStores } from "./app.tsx"
 import { IDENTITY_KEY, type Identity, identityCodec } from "./identity.ts"
 import { askIdentity } from "./identity-form.tsx"
+import { newRootId } from "./ids.ts"
 import { decodeInbox, encodeInbox, type Inbox, mergeInbox } from "./inbox.ts"
 import { DOCK_KEY, type Dock, dockCodec } from "./inventory-dock.ts"
 import { decodeLayout, encodeLayout } from "./layout.ts"
@@ -24,7 +25,10 @@ const stores: AppStores = {
    */
   layout: tabState({
     key: `pineta-columns:${SESSION_DOC_ID}`,
-    codec: { encode: encodeLayout, decode: decodeLayout },
+    codec: {
+      encode: encodeLayout,
+      decode: raw => decodeLayout(raw, newRootId),
+    },
     tab: sessionStorage,
     device: localStorage,
   }),

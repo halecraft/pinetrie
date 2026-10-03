@@ -25,7 +25,7 @@ import {
   writeDirectory,
 } from "../fakes.ts"
 import type { Offers } from "../offers/index.ts"
-import { applyPlaceStep } from "../places.ts"
+import { applyPlaceSteps } from "../places.ts"
 import { type CommandDeps, createCommands, placeOfCommand } from "./index.ts"
 
 const ALICE = writerId("alice@example.com")
@@ -63,6 +63,7 @@ function setUp(
       reserve: async lane => (lane === HELD ? "held" : "name"),
     }).port,
     drain: lane => void drains.push(lane),
+    histories: record<CommandDeps["histories"]>().port,
     keeper,
   })
   const replies: Reply[] = []
@@ -178,22 +179,24 @@ test("the command's id is the send's id", async () => {
 test("a chat command spends its card once written, record then text, answering with its rev; a refused one leaves it", async () => {
   const { b, cards, commands, replies, sender, chat } = setUp()
   for (const id of ["card-1", "card-2"])
-    applyPlaceStep(b.places, {
-      kind: "write",
-      record: {
-        id: cardId(id),
-        owner: ALICE,
-        placer: ALICE,
-        place: {
-          kind: "drafting",
-          root: ROOT_ID,
-          at: atEntry(ROOT_ENTRY),
-          lane: null,
+    applyPlaceSteps(b.places, [
+      {
+        kind: "write",
+        record: {
+          id: cardId(id),
+          owner: ALICE,
+          placer: ALICE,
+          place: {
+            kind: "drafting",
+            root: ROOT_ID,
+            at: atEntry(ROOT_ENTRY),
+            lane: null,
+          },
+          command: null,
+          unsent: null,
         },
-        command: null,
-        unsent: null,
       },
-    })
+    ])
   await commands.handle(sender, ALICE, { ...chat("c-4"), cardId: "card-1" })
   // Refused by `sendChat` itself: an image the host does not store.
   await commands.handle(sender, ALICE, {

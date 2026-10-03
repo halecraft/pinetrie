@@ -356,6 +356,23 @@ answer is to await Loro compaction.
 
 ## Resolved
 
+### S91 — Undo stacks per person and root, stored by the host ✅ PASS
+
+`findings/S91-undo-per-person-and-root.md`. A stack per person and root in
+the host's SQLite store: a person's two tabs share it, another root's and
+another person's moves stay, it survives a restart, it unloads when idle and
+loads on the next undo, and a stored stack is destroyed by id without being
+loaded.
+
+### S90 — Places on Yjs over time, stacks that come and go, and a swap stack ✅ PASS
+
+`findings/S90-places-on-yjs-and-a-swap-stack.md`. Compaction leaves Yjs
+places at its size (247,787 bytes after 10,000 moves), and a stack still
+undoes over it. Stacks made and destroyed per seat leave under 5 KB each. A
+client stack over the inventory undoes a swap whole beside the repair's
+writes, refuses one whose slot the repair changed, and a text stack on the
+same undo document hears none of it.
+
 ### S89 — Where a take waits, and what a refresh costs ✅ PASS
 
 `findings/S89-waits-on-your-repo.md`. On a clone of Pineta's repo, with

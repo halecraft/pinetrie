@@ -33,9 +33,9 @@ cannot reach the wrong document and needs no guard at run time.
   someone, and its images. The host writes it from `readRootRecord`.
 - **`LANE`** is written for every lane as it is created, naming its root;
   `work` is null for a lane with no work of its own.
-- **The archive gate** reads the root a command writes in (`writesIn`) and
-  that root's record by its root entry (`archivedIn`): a command carries its
-  root, so no root's document is opened to check.
+- **The archive gate** reads the roots a command writes in (`writesIn`) and
+  each root's record by its root entry (`archivedIn`): a command carries its
+  roots, so no root's document is opened to check.
 
 Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
 `encode` and `decode`, exported beside its type (`MARK` in `mark.ts`,
@@ -180,7 +180,7 @@ are the only code that builds or reads the shape.
   survive a process (runs and streams) is cleared first, by `clearStreams`
   in `@pineta/schema`.
 
-# Cards (`card.ts`, ADR-0048, ADR-0059)
+# Cards (`card.ts`, ADR-0048, ADR-0059, ADR-0066)
 
 What you type is a card. Its text is a `TextDoc`, written by clients; its
 record is in the places document (`PlacesDoc` in `@pineta/schema`), which
@@ -192,7 +192,8 @@ which are swept.
   `decodeCard`, total). Where a card is goes through core's `placeFields`
   and `placeOfFields`, which the wire's key codec uses too, so the two
   cannot drift. A drafting or queued card's `at` is never the root; a fresh
-  card's `column` is never ""; a queued card has its `lane`, `order` and
+  card's `column` is never "", and it carries its root and its branch
+  point (a `Spot`, ADR-0066), the root for a new tab; a queued card has its `lane`, `order` and
   `by`, and `seen`, its text's version as its queuer had it (S72), which
   the queue's key carries from the client. Every field is required: the
   host writes a record whole. A
@@ -218,13 +219,33 @@ which are swept.
   a take moves its place, not who wrote it.
 - **A fresh column's first send carries its other cards**
   (`planFreshFollow`): each card fresh in the sent card's column goes to
-  drafting at the message the send wrote. The host's write, so it keeps
-  each card's placer, as `planUnsent` does.
+  drafting at the message the send wrote, when that message is in the
+  column's root. The host's write, so it keeps each card's placer, as
+  `planUnsent` does.
 - **The placer is who put the card where it is**: the sender of every
   accepted move. A write the host makes itself keeps it (`planUnsent`,
   `planSetCommand`), so a refusal never names the host.
-- **`planMoveCommand`** is a move and the lane to drain: the one the card
-  ends queued on, when it is not running.
+- **Several moves are one** (`planMoves`): each planned against the cards
+  as the ones before it left them, accepted whole, or refused by the first
+  that is, naming its card. A keep's cards are one command, so it is undone
+  whole too (ADR-0066). `planMoveCommand` is that and the lanes to drain:
+  each one a card ends queued on, when it is not running.
+- **Which history a move enters is `historyOf`'s** (ADR-0066): none for a
+  creation or a removal (a composer's new card, a copy, a discard, a send);
+  else the root the card goes to, when it is in one, else the root it
+  leaves, read from its record, since a move is accepted only from there.
+  Every place in a root names it, so no tree is read. An inventory is in no
+  root.
+- **`undoAnswer`** reads what a whole undo did: the cards its step wrote,
+  from their footprints in the places document (`["cards", <id>]`), each
+  with its place now; or, refused, the first card it could not undo as it is
+  now, `moved` (its placer names who) or `gone`; or `nothing`.
+- **`planHistorySweep`** gives the histories of moves to retire: a root's
+  `ARCHIVED_HISTORY_MS` (7 days) after it was archived, and, at startup
+  only, those of a root the directory does not name. After a run's end that
+  second rule would retire a new tab's history while it is open.
+- **`planPlacesCarryOver`**: the rows of the places stored before ADR-0066
+  that decode now, once, into a document with no cards.
 - **A drafting card is resolved, never stored as an end.** `placeEnd` runs
   `threadOf` from where it started and its column's lane, as a reply from
   there would go, so the card follows its thread as the thread grows.
@@ -285,14 +306,16 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   again. The host passes its lanes of their own (`own`, empty on a host
   without them) and the root's revision records, so no part decides
   anything when it runs.
-- **The gate keys on the entry a command writes at.** `writesAt` names it for
-  every intent (a chat's `at`, a mark's entry), or null for one that writes in no root (a new root, a name, a
-  stop, an archive action, a reservation). `archivedAt` maps that entry to its root's
-  record. One rule, applied by the host before dispatch
-  (`apps/pineta/host/commands/index.ts`); `sendChat` needs no
-  copy, since only the `chat` command calls it. A card's move writes at its
-  target's `at`, so no card moves into an archived root; a command on a
-  card writes nowhere, and the take's own gate stops a card with one.
+- **The gate keys on the roots a command writes in** (ADR-0063). `writesIn`
+  names them for every intent (a chat's root, a mark's, an undo of moves',
+  an offer's lane's, each root a move's cards go to), or none for one that
+  writes in no root (a new root, a name, a stop, an archive action, a
+  reservation, a move into an inventory). `archivedIn` finds an archived
+  one by its root entry. One rule, applied by the host before dispatch
+  (`apps/pineta/host/commands/index.ts`); `sendChat` needs no copy, since
+  only the `chat` command calls it. No card moves into an archived root,
+  a fresh column's included (ADR-0066); a command on a card writes nowhere,
+  and the take's own gate stops a card with one.
 - **Yjs writes are not refused for archiving.** A card's text in an archived
   root stays writable to the host's policy (a refused write cannot be
   recovered from, S28); the composer there is read-only.
@@ -312,8 +335,8 @@ one on any entry, since the rule is the same everywhere.
   is `unchanged` and writes nothing; otherwise `write`, or `remove` for a
   cleared title. The last write wins: nobody types a title together.
 - **Clearing deletes the record.** A stored empty title would read as chosen.
-- **A mark in an archived root is refused by the archive's gate:** `writesAt`
-  names a mark's entry, so `planMark` has no check of its own.
+- **A mark in an archived root is refused by the archive's gate:** `writesIn`
+  names a mark's root, so `planMark` has no check of its own.
 - **The title rule is `parseTitle`'s** (`@pineta/core`): trimmed, empty
   clears, one line of at most `MAX_TITLE`. The codec and the page both
   decide by it. The decoder checks only the shape (a non-empty title): the

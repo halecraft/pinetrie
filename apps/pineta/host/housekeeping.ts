@@ -1,16 +1,30 @@
 // host/housekeeping — what the host does between runs besides draining:
-// compact the session (ADR-0023) and delete images nothing shows (ADR-0042).
+// compact the session (ADR-0023), delete images nothing shows (ADR-0042),
+// and retire histories of moves no one will undo again (ADR-0066).
 
-import type { Exchange } from "@kyneta/exchange"
-import { type BlobStore, type RootId, rootDocId } from "@pineta/core"
+import type { Exchange, Store } from "@kyneta/exchange"
+import {
+  type BlobStore,
+  MOVES_DOC_PREFIX,
+  type RootId,
+  rootDocId,
+} from "@pineta/core"
+import { planHistorySweep } from "@pineta/marginalia"
 import {
   LIVE_DOC_ID,
   PLACES_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
-import { planSweep, readPlaces, readReferencedBlobs } from "@pineta/reads"
+import {
+  planSweep,
+  readArchive,
+  readPlaces,
+  readReferencedBlobs,
+  readRoots,
+} from "@pineta/reads"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
+import type { MoveHistories } from "./move-history.ts"
 
 /**
  * The documents a compaction replaces with what they hold now: `roots`',
@@ -28,8 +42,10 @@ export const planCompaction = (
 
 /**
  * Replace the store's records with each document `planCompaction` names as
- * it stands, which also trims each one's in-memory op log (ADR-0023,
- * ADR-0059, ADR-0063). The host writes them all alone. Only those: each
+ * it stands, which also trims each `json` one's in-memory op log (ADR-0023,
+ * ADR-0059, ADR-0063). The places are Yjs (ADR-0066): their storage is
+ * compacted, and nothing in memory is trimmed (S90). The host writes them
+ * all alone. Only those: each
  * client's
  * command Line is stored too, but half of it is the client's to write, and
  * Kyneta cannot compact a replica of a document another peer writes. Its
@@ -68,4 +84,35 @@ export async function sweepBlobs(input: {
   if (doomed.length === 0) return
   blobs.delete(doomed)
   log(`[host] deleted ${doomed.length} unreferenced image(s)`)
+}
+
+/**
+ * Retire the histories of moves no one will undo again (ADR-0066): gather
+ * the stored `moves:` documents, the directory and the archive, plan
+ * (`planHistorySweep`), then destroy each. `startup` adds those of a root the
+ * directory does not name, which only a starting host can know are dead.
+ */
+export async function sweepHistories(input: {
+  readonly basics: Pick<Basics, "session" | "log" | "now">
+  readonly store: Pick<Store, "listDocIds">
+  readonly histories: Pick<MoveHistories, "retire">
+  readonly startup: boolean
+}): Promise<void> {
+  const { session, log, now } = input.basics
+  // gather
+  const stored: string[] = []
+  for await (const id of input.store.listDocIds(MOVES_DOC_PREFIX))
+    stored.push(id)
+  // plan
+  const retired = planHistorySweep({
+    stored,
+    roots: readRoots(session),
+    archive: readArchive(session),
+    now: now(),
+    startup: input.startup,
+  })
+  // execute
+  if (retired.length === 0) return
+  await input.histories.retire(retired)
+  log(`[host] retired ${retired.length} history(ies) of moves`)
 }

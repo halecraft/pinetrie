@@ -4,17 +4,20 @@ import {
   cardId,
   entryId,
   laneNameForThread,
+  ROOT,
   rootIdFor,
   runId,
   writerId,
 } from "@pineta/core"
+import type { UndoResult } from "@pineta/marginalia"
+import { PLACES_DOC_ID } from "@pineta/protocol/messages"
 import { readPlaces, readPlacesRev } from "@pineta/reads"
 import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { basics, record, row } from "../fakes.ts"
-import { applyPlaceStep } from "../places.ts"
+import { applyPlaceSteps } from "../places.ts"
 import { takeTop } from "../take.ts"
-import { createCardCommands } from "./cards.ts"
+import { type CardCommandDeps, createCardCommands } from "./cards.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
@@ -47,36 +50,54 @@ function setUp() {
     destroy: async () => {},
   })
   const drains: string[] = []
+  // Which history each move was recorded in; an undo answers `undoing`.
+  let undoing: UndoResult = { kind: "none" }
+  const recorded: [string, string][] = []
+  const histories = record<CardCommandDeps["histories"]>({
+    gestureOf: async (writer, root) => write => {
+      recorded.push([writer, root])
+      return write()
+    },
+    step: async () => undoing as never,
+  })
   const commands = createCardCommands({
     basics: b,
     cards: cards.port,
     drain: lane => void drains.push(lane),
+    histories: histories.port,
   })
+  const undoes = (result: UndoResult) => {
+    undoing = result
+  }
   const put = (over: Partial<CardRecord> = {}) =>
-    applyPlaceStep(b.places, {
-      kind: "write",
-      record: {
-        id: C1,
-        owner: ADA,
-        placer: ADA,
-        place: drafting,
-        command: null,
-        unsent: null,
-        ...over,
+    applyPlaceSteps(b.places, [
+      {
+        kind: "write",
+        record: {
+          id: C1,
+          owner: ADA,
+          placer: ADA,
+          place: drafting,
+          command: null,
+          unsent: null,
+          ...over,
+        },
       },
-    })
-  return { b, cards, drains, commands, put }
+    ])
+  return { b, cards, drains, commands, put, histories, undoes, recorded }
 }
 
 describe("moves on the documents' keeper: the take and an unqueue in either order (ADR-0059)", () => {
   test("a queue on an idle lane asks for its drain, and answers with the rev of its write", async () => {
     const { b, drains, commands, put } = setUp()
     put()
-    const done = await commands.move(BEA, {
-      card: C1,
-      from: drafting,
-      to: queuedKey,
-    })
+    const done = await commands.move(BEA, [
+      {
+        card: C1,
+        from: drafting,
+        to: queuedKey,
+      },
+    ])
     expect(done).toEqual({ outcome: { kind: "moved" }, rev: 2 })
     expect(drains).toEqual([LANE])
     expect(readPlaces(b.places)[0]?.place).toMatchObject({
@@ -88,14 +109,16 @@ describe("moves on the documents' keeper: the take and an unqueue in either orde
   test("the take, then an unqueue: answered gone, with the current rev", async () => {
     const { b, commands, put } = setUp()
     put()
-    await commands.move(BEA, { card: C1, from: drafting, to: queuedKey })
+    await commands.move(BEA, [{ card: C1, from: drafting, to: queuedKey }])
     const top = takeTop(b.places, LANE, false, held)
     expect(top.kind === "taken" ? top.taken.card.id : top.kind).toBe(C1)
-    const done = await commands.move(ADA, {
-      card: C1,
-      from: queuedKey,
-      to: drafting,
-    })
+    const done = await commands.move(ADA, [
+      {
+        card: C1,
+        from: queuedKey,
+        to: drafting,
+      },
+    ])
     expect(done).toEqual({
       outcome: { kind: "unmoved", code: "gone", place: null, by: null },
       rev: readPlacesRev(b.places),
@@ -105,19 +128,21 @@ describe("moves on the documents' keeper: the take and an unqueue in either orde
   test("an unqueue, then the take: nothing is taken", async () => {
     const { b, commands, put } = setUp()
     put()
-    await commands.move(BEA, { card: C1, from: drafting, to: queuedKey })
-    await commands.move(ADA, { card: C1, from: queuedKey, to: drafting })
+    await commands.move(BEA, [{ card: C1, from: drafting, to: queuedKey }])
+    await commands.move(ADA, [{ card: C1, from: queuedKey, to: drafting }])
     expect(takeTop(b.places, LANE, false, held).kind).toBe("idle")
   })
 
   test("a move someone else made first: answered moved, naming them", async () => {
     const { commands, put } = setUp()
     put({ place: { ...queuedKey, order: "a", by: BEA }, placer: BEA })
-    const done = await commands.move(ADA, {
-      card: C1,
-      from: drafting,
-      to: queuedKey,
-    })
+    const done = await commands.move(ADA, [
+      {
+        card: C1,
+        from: drafting,
+        to: queuedKey,
+      },
+    ])
     expect(done.outcome).toEqual({
       kind: "unmoved",
       code: "moved",
@@ -128,16 +153,91 @@ describe("moves on the documents' keeper: the take and an unqueue in either orde
 
   test("a removal destroys the text after the record", async () => {
     const { b, cards, commands, put } = setUp()
-    put({ place: { kind: "fresh", column: "k" } })
-    await commands.move(ADA, {
-      card: C1,
-      from: { kind: "fresh", column: "k" },
-      to: null,
+    put({
+      place: { kind: "fresh", column: "k", root: TEST_ROOT, at: ROOT } as const,
     })
+    await commands.move(ADA, [
+      {
+        card: C1,
+        from: {
+          kind: "fresh",
+          column: "k",
+          root: TEST_ROOT,
+          at: ROOT,
+        } as const,
+        to: null,
+      },
+    ])
     expect(readPlaces(b.places)).toEqual([])
     expect(cards.calls.map(c => [c.method, ...c.args])).toEqual([
       ["destroy", C1],
     ])
+  })
+})
+
+describe("moves' history (ADR-0066)", () => {
+  const inventory = { kind: "inventory", holder: ADA } as const
+
+  test("a take is one step of the taker's history in the root it left; a creation is in none", async () => {
+    const { commands, put, recorded } = setUp()
+    put()
+    await commands.move(ADA, [{ card: C1, from: drafting, to: inventory }])
+    await commands.move(ADA, [
+      { card: cardId("c-2"), from: null, to: inventory },
+    ])
+    expect(recorded).toEqual([[ADA, TEST_ROOT]])
+  })
+
+  test("several moves are one, refused whole: nothing written when one has moved", async () => {
+    const { b, commands, put } = setUp()
+    const fresh = {
+      kind: "fresh",
+      column: "k",
+      root: TEST_ROOT,
+      at: ROOT,
+    } as const
+    put({ place: fresh })
+    const before = readPlaces(b.places)
+    const done = await commands.move(ADA, [
+      { card: C1, from: fresh, to: inventory },
+      { card: cardId("c-9"), from: fresh, to: inventory },
+    ])
+    expect(done.outcome).toMatchObject({ kind: "unmoved", code: "gone" })
+    expect(readPlaces(b.places)).toEqual(before)
+  })
+
+  test("an undo answers each card it moved and where it is now, with a rev raised after it", async () => {
+    const { b, commands, put, histories, undoes } = setUp()
+    put()
+    const rev = readPlacesRev(b.places)
+    undoes({
+      kind: "undone",
+      step: { parts: [{ docId: PLACES_DOC_ID, footprint: [["cards", C1]] }] },
+    })
+    const done = await commands.undoMove(ADA, TEST_ROOT, "undo")
+    expect(done).toEqual({
+      outcome: { kind: "undone", cards: [{ card: C1, place: drafting }] },
+      rev: rev + 1,
+    })
+    expect(histories.calls.at(-1)?.args).toEqual([ADA, TEST_ROOT, "undo"])
+  })
+
+  test("a refused undo names who moved the card; one with nothing to undo is nothing", async () => {
+    const { commands, put, undoes } = setUp()
+    put({ placer: BEA })
+    const part = { docId: PLACES_DOC_ID, footprint: [["cards", C1]] }
+    undoes({ kind: "refused", step: { parts: [part] }, stale: [part] })
+    expect((await commands.undoMove(ADA, TEST_ROOT, "undo")).outcome).toEqual({
+      kind: "unmoved",
+      code: "moved",
+      place: drafting,
+      by: BEA,
+    })
+    undoes({ kind: "none" })
+    expect(await commands.undoMove(ADA, TEST_ROOT, "redo")).toEqual({
+      outcome: { kind: "nothing" },
+      rev: null,
+    })
   })
 })
 
@@ -216,12 +316,25 @@ test("spend: the record goes, then its text; a card already gone answers the cur
 
 test("spend: a fresh column's first send leaves its other cards drafting at the new message, in one step", async () => {
   const { b, commands, put } = setUp()
-  const fresh = { kind: "fresh", column: "k" } as const
+  const fresh = {
+    kind: "fresh",
+    column: "k",
+    root: TEST_ROOT,
+    at: ROOT,
+  } as const
   put({ place: fresh })
   const C2 = cardId("c-2")
   const C3 = cardId("c-3")
   put({ id: C2, owner: BEA, placer: BEA, place: fresh })
-  put({ id: C3, place: { kind: "fresh", column: "other" } })
+  put({
+    id: C3,
+    place: {
+      kind: "fresh",
+      column: "other",
+      root: TEST_ROOT,
+      at: ROOT,
+    } as const,
+  })
   const sent = entryId("e-2")
   writeEntry(
     b.root,
@@ -242,7 +355,12 @@ test("spend: a fresh column's first send leaves its other cards drafting at the 
     }),
     expect.objectContaining({
       id: C3,
-      place: { kind: "fresh", column: "other" },
+      place: {
+        kind: "fresh",
+        column: "other",
+        root: TEST_ROOT,
+        at: ROOT,
+      } as const,
     }),
   ])
 })

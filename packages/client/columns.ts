@@ -10,6 +10,7 @@ import {
   followTip,
   type LaneName,
   type LaneView,
+  type RootId,
   type TreeIndex,
   type WorkSetting,
 } from "@pineta/core"
@@ -74,12 +75,15 @@ export interface Column {
    * wrote (`TreeIndex.bySend`): exactly, whatever else appeared meanwhile.
    * `pending` is a first message to send on opening ("branch here" after a
    * conflict), sent by the column's own composer so its outcome shows there.
-   * `prefill` is what its composer starts with.
+   * `prefill` is what its composer starts with. `root` is a new tab's
+   * root, minted as it opens (ADR-0066): its cards and its first send name
+   * it. A branch's root is its tab's.
    */
   readonly fresh?: {
     readonly sendId?: string
     readonly pending?: Pending
     readonly prefill?: Prefill
+    readonly root?: RootId
   }
 }
 

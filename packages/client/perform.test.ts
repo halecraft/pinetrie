@@ -14,11 +14,7 @@ import type { Effect } from "./intent.ts"
 import { type AppPorts, perform } from "./perform.ts"
 
 const accepted: MoveAnswer = { kind: "accepted", rev: 1 }
-const how: MoveHow = {
-  actedAt: { kind: "inventory" },
-  history: { kind: "none" },
-  slot: null,
-}
+const how: MoveHow = { actedAt: { kind: "inventory" }, slot: null }
 const ports = () => {
   const answer = { kind: "restored" } as const
   return {
@@ -32,15 +28,16 @@ const ports = () => {
       queueCard: vi.fn(),
       unqueueCard: vi.fn(),
       moveCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
+      moveCards: vi.fn(async (): Promise<MoveAnswer> => accepted),
+      undoMoves: vi.fn(async (): Promise<Outcome> => ({ kind: "nothing" })),
       swapSlots: vi.fn(),
-      dropEntry: vi.fn(),
+      undoSwap: vi.fn(async () => {}),
       refuse: vi.fn(),
       setCommand: vi.fn(),
       offer: vi.fn(async () => answer),
     },
     inventory: { show: vi.fn(), select: vi.fn() },
     fly: vi.fn(),
-    askRestore: vi.fn(),
     intent: vi.fn(),
     reveal: vi.fn(),
     openWhenHeld: vi.fn(),
@@ -159,9 +156,19 @@ test.each<Row>([
     args: ["c"],
   },
   {
-    effect: { kind: "swapSlots", a: 1, b: 2, step: { kind: "none" } },
+    effect: { kind: "swapSlots", a: 1, b: 2 },
     port: p => p.session.swapSlots,
-    args: [1, 2, { kind: "none" }],
+    args: [1, 2],
+  },
+  {
+    effect: { kind: "undoSwap", direction: "redo" },
+    port: p => p.session.undoSwap,
+    args: ["redo"],
+  },
+  {
+    effect: { kind: "undoMoves", root: TEST_ROOT, direction: "undo" },
+    port: p => p.session.undoMoves,
+    args: [TEST_ROOT, "undo"],
   },
   {
     effect: { kind: "showInventory", brief: true },
@@ -172,11 +179,6 @@ test.each<Row>([
     effect: { kind: "select", slot: 4 },
     port: p => p.inventory.select,
     args: [4],
-  },
-  {
-    effect: { kind: "askRestore", root, direction: "undo" },
-    port: p => p.askRestore,
-    args: [root, "undo"],
   },
   {
     effect: { kind: "setCommand", card: cardId("c"), command: null },
@@ -194,40 +196,36 @@ test.each<Row>([
   expect(port(p)).toHaveBeenCalledExactlyOnceWith(...args)
 })
 
-test("a keep closes its column only once every card is accepted", async () => {
+test("a keep is one move of every card, and closes its column only once accepted", async () => {
   const close = { kind: "layout", action: show } as const
-  const keep: Effect = {
-    kind: "keep",
-    moves: [
-      { move, how },
-      { move: { ...move, card: cardId("d") }, how },
-    ],
-    close: [close],
-  }
+  const moves = [
+    { move, slot: 1 },
+    { move: { ...move, card: cardId("d") }, slot: 2 },
+  ]
+  const actedAt = { kind: "column", key: "f" } as const
+  const keep: Effect = { kind: "keep", moves, actedAt, close: [close] }
   const p = ports()
   perform([keep], p)
+  expect(p.session.moveCards).toHaveBeenCalledExactlyOnceWith(moves, actedAt)
   await vi.waitFor(() => expect(p.dispatch).toHaveBeenCalledWith(show))
   const q = ports()
-  q.session.moveCard.mockImplementationOnce(async () => ({
+  q.session.moveCards.mockImplementationOnce(async () => ({
     kind: "refused",
     refusal: null,
   }))
   perform([keep], q)
-  await vi.waitFor(() => expect(q.session.moveCard).toHaveBeenCalledTimes(2))
   await new Promise(r => setTimeout(r, 0))
   expect(q.dispatch).not.toHaveBeenCalled()
 })
 
-test("restore-then asks for its intent afresh, only once restored", async () => {
-  const next = { kind: "undoMove", direction: "undo", restored: root } as const
+test("an undo of moves plans what its answer shows, afresh", async () => {
   const p = ports()
-  perform([{ kind: "restoreThen", root, next }], p)
-  await vi.waitFor(() => expect(p.intent).toHaveBeenCalledWith(next))
-  const q = ports()
-  q.session.archive.mockImplementationOnce(async () => ({ kind: "marked" }))
-  perform([{ kind: "restoreThen", root, next }], q)
-  await new Promise(r => setTimeout(r, 0))
-  expect(q.intent).not.toHaveBeenCalled()
+  const outcome: Outcome = { kind: "undone", cards: [] }
+  p.session.undoMoves.mockImplementationOnce(async () => outcome)
+  perform([{ kind: "undoMoves", root: TEST_ROOT, direction: "undo" }], p)
+  await vi.waitFor(() =>
+    expect(p.intent).toHaveBeenCalledWith({ kind: "undoAnswered", outcome }),
+  )
 })
 
 test("a restore, once answered restored, shows its root", async () => {

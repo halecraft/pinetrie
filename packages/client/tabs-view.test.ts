@@ -7,6 +7,7 @@ import {
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import type { CardMarks } from "./card-marks.ts"
+import { NEW_ROOT } from "./fixtures.ts"
 import {
   type ActiveTab,
   initialLayout,
@@ -29,7 +30,7 @@ const layout = reduce(
   initialLayout(),
   { kind: "show", tab: R1 },
   { kind: "show", tab: R2 },
-  { kind: "newTab", key: "t", asksAgent: true },
+  { kind: "newTab", key: "t", root: NEW_ROOT, asksAgent: true },
   { kind: "show", tab: R1 },
 )
 const none: CardMarks = {

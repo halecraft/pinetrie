@@ -2,6 +2,7 @@ import {
   atEntry,
   entryId,
   laneNameForThread,
+  ROOT,
   rootIdFor,
   writerId,
 } from "@pineta/core"
@@ -16,6 +17,7 @@ import {
 } from "./put-target.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const NEW_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 
 const ME = writerId("ada@x.io")
 /** An element carrying `attrs`, as the page spreads them. */
@@ -58,6 +60,8 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     expect(at(targets[1] as PutTarget)).toEqual({
       kind: "fresh",
       column: "k-fresh",
+      root: TEST_ROOT,
+      at: E1,
     })
     expect(at(targets[2] as PutTarget)).toEqual({
       kind: "inventory",
@@ -72,7 +76,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   })
 })
 
-test("composerPlace: drafting at the end with the lane, in its root; fresh by key; none at the root, nor in no root", () => {
+test("composerPlace: drafting at the end with the lane, in its root; fresh by key, in its root; none at the root, nor in no root", () => {
   expect(composerPlace({ key: "k", lane: LANE }, E1, TEST_ROOT)).toEqual({
     kind: "drafting",
     root: TEST_ROOT,
@@ -85,12 +89,24 @@ test("composerPlace: drafting at the end with the lane, in its root; fresh by ke
     at: E1,
     lane: null,
   })
-  expect(
-    composerPlace({ key: "k", fresh: {} }, { kind: "root" }, undefined),
-  ).toEqual({
+  // A branch: its tab's root, at its branch point.
+  expect(composerPlace({ key: "k", fresh: {} }, E1, TEST_ROOT)).toEqual({
     kind: "fresh",
     column: "k",
+    root: TEST_ROOT,
+    at: E1,
   })
+  // A new tab: the root it minted as it opened (ADR-0066).
+  expect(
+    composerPlace(
+      { key: "k", fresh: { root: NEW_ROOT } },
+      { kind: "root" },
+      undefined,
+    ),
+  ).toEqual({ kind: "fresh", column: "k", root: NEW_ROOT, at: ROOT })
+  expect(
+    composerPlace({ key: "k", fresh: {} }, { kind: "root" }, undefined),
+  ).toBeNull()
   expect(composerPlace({ key: "k" }, { kind: "root" }, undefined)).toBeNull()
   expect(composerPlace({ key: "k" }, E1, undefined)).toBeNull()
 })

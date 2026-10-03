@@ -6,6 +6,7 @@ import {
   type EntryId,
   type EntryLike,
   entryId,
+  ROOT,
   rootIdFor,
   type TreeIndex,
   writerId,
@@ -44,7 +45,7 @@ const fresh = (id: string, column: string): CardRecord => ({
   id: cardId(id),
   owner: ADA,
   placer: ADA,
-  place: { kind: "fresh", column },
+  place: { kind: "fresh", column, root: TEST_ROOT, at: ROOT },
   command: null,
   unsent: null,
 })

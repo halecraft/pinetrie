@@ -93,13 +93,13 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 1539/1539 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 960 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 1671/1671 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 1025 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 12 scenarios, 40 checks, on the scripted model (S67) |
+| end-to-end | `pnpm run e2e` | 12 scenarios, 43 checks, on the scripted model (S67) |
 | with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
-| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 160 checks; in a lane with no containers, the 6 that need one report SKIP |
-| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 17 host and lanes scenarios ≤ ⌊√1235⌋; 4 browser ≤ ⌊√17⌋ |
+| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 161 checks; in a lane with no containers, the 6 that need one report SKIP |
+| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 17 host and lanes scenarios ≤ ⌊√1671⌋; 4 browser ≤ ⌊√17⌋ |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -179,11 +179,12 @@ the places document, which only the host writes (ADR-0059); the host places
 and moves cards on request, spends one when it is sent, takes queued ones,
 and sweeps empty ones. Everyone at a thread's end sees and can edit its
 cards. Who wrote in one comes from its `clientID`s, through the host's
-`pineta.seat` records. Undo is Kyneta's stack, one per tab, in memory. Built
+`pineta.seat` records. Text undo is Kyneta's stack, one per tab; moves are undone
+by the host's stacks (ADR-0066). Built
 so far: the drafting card (step 1), marks for your unsent cards (step 2),
 step 3: notes removed, and queued cards, and step 4: your inventory, a
 floating 3 × 6 grid you take cards into and put them out of, by key, button
-or drag, with moves you can undo, a closed branch reopened for it. A send
+or drag, with moves you can undo (ADR-0066). A send
 to a busy thread queues your
 card above the line, in the host's step that found the lane busy, where
 anyone can edit it or unqueue it until the host takes it; the take and an
@@ -194,7 +195,7 @@ the take is refused and its client says "already sent" (S69).
 **ADR-0059 — a card's place has one owner at a time.** Built for every
 place there is now (drafting, queued, fresh, and your inventory). A place
 does not merge (S75), so the host writes every
-place in its session (`places`, `json`) and settles moves as handoffs, in
+place in its session (`places`, Yjs since ADR-0066) and settles moves as handoffs, in
 arrival order, telling the loser where the card went. A tab draws its move
 at once, until its copy of `places` reaches the `rev` the host's reply
 carries (a revision watermark), whichever arrives first. Your inventory is a
@@ -307,6 +308,18 @@ offer it was shown (`offer_changed`), one person's commands keep their order
 by a chain, offer commands and an archive's teardown hold no other command,
 and the strip shows a command in flight and why it was refused. A take now
 answers in under half a second, a chat beside it at once.
+
+**ADR-0066 — the host undoes moves, one Kyneta stack per person and root**
+(built). Each person has one history of moves per root, a Kyneta undo stack
+on the host (`moves:<writer>:<RootId>`), kept in its store and shared by
+their tabs. The host decides which root a move enters (`historyOf`): the
+root the card goes to, else the one it leaves; creations and removals enter
+none. Cmd+Z outside a box undoes your newest move in the root you are on,
+whole or refused, naming who moved the card (S82, S91); the page shows each
+place as the undo acts. `places` is on Yjs, and `rev` is raised apart from
+each move. A keep is one move. A new tab mints its `RootId` as it opens. A
+swap in your inventory is undone by the tab's own stack (S90). Histories are
+retired 7 days after their root is archived.
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries

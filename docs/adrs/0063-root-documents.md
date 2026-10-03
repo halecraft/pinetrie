@@ -4,6 +4,9 @@
 Implemented by `PLAN-2026-10-03-root-documents`. Amends ADR-0021 ("a session
 is one document"), ADR-0023 (the session is authoritative JSON, compacted)
 and ADR-0029 (the archive's key, and what the Archive tab searches).
+Amended by ADR-0066: a new tab mints its `RootId` as it opens, not at its
+first send; a fresh card's place carries a `Spot`; `places` is Yjs, not
+`json`.
 
 **Context.** The session was one Kyneta document, `pineta:session`: pi's
 storage for every root ever started, the host's records, and what is

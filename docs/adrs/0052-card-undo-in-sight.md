@@ -8,7 +8,11 @@ handoff, which the host refuses if the card has moved since; your
 inventory's own moves by Kyneta's undo on your inventory document. An undo
 past a card's creation empties its text and keeps its record, which only
 the host writes, so the box stays bound to it and Cmd+Shift+Z there brings
-the text back (*The box remembers its card…* no longer applies).
+the text back (*The box remembers its card…* no longer applies). Amended
+by ADR-0066: each person has one history of moves per root, kept by the
+host and shared by their tabs; Cmd+Z undoes the newest move in the root you
+are on, whole or refused, and the place is brought into view as the undo
+acts, not before; no undo reaches into an archived root.
 
 **Context.** ADR-0048 gave each browser tab one undo stack over every card,
 and Cmd+Z in any card's box undid the tab's last step. That step can be

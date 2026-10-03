@@ -4,10 +4,11 @@ import {
   entryId,
   type LaneView,
   laneNameForThread,
+  rootIdFor,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { tree } from "./fixtures.ts"
+import { NEW_ROOT, tree } from "./fixtures.ts"
 import {
   type ActiveTab,
   columnsOf,
@@ -108,11 +109,12 @@ describe("layoutReducer", () => {
     const opened = layoutReducer(before, {
       kind: "newTab",
       key: "n",
+      root: NEW_ROOT,
       asksAgent: true,
     })
     expect(opened.active).toEqual({ kind: "new", key: "n" })
     expect(opened.newTabs).toEqual([
-      { key: "n", anchor: null, fresh: {}, asksAgent: true },
+      { key: "n", anchor: null, fresh: { root: NEW_ROOT }, asksAgent: true },
     ])
     expect(layoutReducer(opened, { kind: "closeNewTab", key: "n" })).toEqual(
       before,
@@ -124,11 +126,17 @@ describe("layoutReducer", () => {
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
       key: "n",
+      root: NEW_ROOT,
       asksAgent: true,
       prefill,
     })
     expect(opened.newTabs).toEqual([
-      { key: "n", anchor: null, fresh: { prefill }, asksAgent: true },
+      {
+        key: "n",
+        anchor: null,
+        fresh: { root: NEW_ROOT, prefill },
+        asksAgent: true,
+      },
     ])
   })
 
@@ -136,6 +144,7 @@ describe("layoutReducer", () => {
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
       key: "n",
+      root: NEW_ROOT,
       asksAgent: false,
     })
     const sent = layoutReducer(opened, {
@@ -159,6 +168,7 @@ describe("layoutReducer", () => {
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
       key: "n",
+      root: NEW_ROOT,
       asksAgent: true,
     })
     const reserved = layoutReducer(opened, {
@@ -257,6 +267,7 @@ describe("layoutReducer", () => {
     const withNew = layoutReducer(at(initialLayout()), {
       kind: "newTab",
       key: "n",
+      root: NEW_ROOT,
       asksAgent: false,
     })
     expect(
@@ -386,6 +397,7 @@ describe("tabBar", () => {
     const l = layoutReducer(at(at(initialLayout(), R2)), {
       kind: "newTab",
       key: "n",
+      root: NEW_ROOT,
       asksAgent: false,
     })
     expect(tabBar(l)).toEqual([ARCHIVE, R2, R1, { kind: "new", key: "n" }])
@@ -432,7 +444,9 @@ describe("planOpen", () => {
 describe("encodeLayout / decodeLayout", () => {
   const L = laneNameForThread("l")
   const trip = (l: Layout) =>
-    decodeLayout(JSON.parse(JSON.stringify(encodeLayout(l))))
+    decodeLayout(JSON.parse(JSON.stringify(encodeLayout(l))), () =>
+      rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
+    )
 
   test("a round trip keeps the tab, each root's columns and new tabs", () => {
     const l: Layout = {
@@ -448,7 +462,9 @@ describe("encodeLayout / decodeLayout", () => {
           ],
         ],
       ]),
-      newTabs: [{ key: "n", anchor: null, asksAgent: true, fresh: {} }],
+      newTabs: [
+        { key: "n", anchor: null, asksAgent: true, fresh: { root: NEW_ROOT } },
+      ],
     }
     expect(trip(l)).toEqual(l)
     expect(trip(initialLayout())).toEqual(initialLayout())
@@ -472,7 +488,9 @@ describe("encodeLayout / decodeLayout", () => {
     expect(trip(l)).toEqual(l)
     const before = JSON.parse(JSON.stringify(encodeLayout(l)))
     delete before.roots["1-r1"][0].density
-    expect(decodeLayout(before)?.roots.get(entryId("1-r1"))?.[0]).toEqual({
+    expect(
+      decodeLayout(before, () => NEW_ROOT)?.roots.get(entryId("1-r1"))?.[0],
+    ).toEqual({
       key: "a",
       anchor: entryId("1-r1"),
     })
@@ -506,9 +524,9 @@ describe("encodeLayout / decodeLayout", () => {
       },
       newTabs: [],
     }
-    expect(decodeLayout(raw)?.roots.get(entryId("1-r1"))).toEqual([
-      { key: "a", anchor: entryId("1-r1"), fresh: {} },
-    ])
+    expect(
+      decodeLayout(raw, () => NEW_ROOT)?.roots.get(entryId("1-r1")),
+    ).toEqual([{ key: "a", anchor: entryId("1-r1"), fresh: {} }])
   })
 
   test("a prefill, blank or content, and where its agent works, is stored and restored: only pending sends on opening", () => {
@@ -544,7 +562,7 @@ describe("encodeLayout / decodeLayout", () => {
         ],
       ]),
     }
-    expect(decodeLayout(encodeLayout(l))).toEqual(l)
+    expect(decodeLayout(encodeLayout(l), () => NEW_ROOT)).toEqual(l)
   })
 
   test("a layout that is another version, or partly malformed, restores nothing", () => {
@@ -584,21 +602,38 @@ describe("encodeLayout / decodeLayout", () => {
       "layout",
       null,
     ])
-      expect(decodeLayout(raw)).toBeUndefined()
+      expect(decodeLayout(raw, () => NEW_ROOT)).toBeUndefined()
   })
 
   test("a reservation is stored, and one not in the host's shape is left off (ADR-0057)", () => {
     const R = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
     const l: Layout = {
       ...initialLayout(),
-      newTabs: [{ key: "n", anchor: null, reserved: R, fresh: {} }],
+      newTabs: [
+        { key: "n", anchor: null, reserved: R, fresh: { root: NEW_ROOT } },
+      ],
     }
     expect(trip(l)).toEqual(l)
     const raw = {
       ...encodeLayout(l),
       newTabs: [{ key: "n", anchor: null, reserved: "t-x" }],
     }
-    expect(decodeLayout(raw)?.newTabs).toEqual([{ key: "n", anchor: null }])
+    expect(decodeLayout(raw, () => NEW_ROOT)?.newTabs).toEqual([
+      { key: "n", anchor: null },
+    ])
+  })
+
+  test("a new tab keeps its root; one stored without one, or with one not in the host's shape, is given one (ADR-0066)", () => {
+    const minted = rootIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+    const stored = (fresh: object) => ({
+      ...encodeLayout(initialLayout()),
+      newTabs: [{ key: "n", anchor: null, fresh }],
+    })
+    const rootOf = (fresh: object) =>
+      decodeLayout(stored(fresh), () => minted)?.newTabs[0]?.fresh?.root
+    expect(rootOf({ root: NEW_ROOT })).toBe(NEW_ROOT)
+    expect(rootOf({})).toBe(minted)
+    expect(rootOf({ root: "r-x" })).toBe(minted)
   })
 
   test("a lane that is not a lane name is left off, and the column kept", () => {
@@ -609,7 +644,7 @@ describe("encodeLayout / decodeLayout", () => {
       roots: { r: [{ key: "a", anchor: entryId("1-a"), lane: "w-someone" }] },
       newTabs: [],
     }
-    expect(decodeLayout(raw)?.roots.get(entryId("r"))).toEqual([
+    expect(decodeLayout(raw, () => NEW_ROOT)?.roots.get(entryId("r"))).toEqual([
       { key: "a", anchor: entryId("1-a") },
     ])
   })

@@ -52,3 +52,5 @@ export const tree = (
 
 /** The root a test's places and entries are in (ADR-0063). */
 export const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+/** A root a new tab minted as it opened (ADR-0066), in the shape the host accepts. */
+export const NEW_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")

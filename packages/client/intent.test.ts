@@ -12,7 +12,7 @@ import {
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { tree } from "./fixtures.ts"
+import { NEW_ROOT, tree } from "./fixtures.ts"
 import {
   afterRestore,
   type CardFacts,
@@ -54,6 +54,7 @@ const onRoot = (root: string): Layout =>
 const onNewTab: Layout = layoutReducer(initialLayout(), {
   kind: "newTab",
   key: "t",
+  root: NEW_ROOT,
   asksAgent: false,
 })
 const at = (
@@ -67,6 +68,7 @@ const at = (
   archive,
   asks,
   cards,
+  rootEntries: new Map(),
 })
 const ME = writerId("ada@x.io")
 const NO_CARDS: CardFacts = {
@@ -75,12 +77,11 @@ const NO_CARDS: CardFacts = {
   me: ME,
   slots: {},
   selected: 0,
-  history: { undo: [], redo: [] },
   composers: new Map(),
 }
 const R1 = at(onRoot("1-r1"))
 const plan = (intent: Intent, state: IntentState = R1) =>
-  planIntent(intent, state, "k")
+  planIntent(intent, state, "k", NEW_ROOT)
 const column = (
   act: Extract<Intent, { kind: "column" }>["act"],
   position = 0,
@@ -147,7 +148,13 @@ describe("planIntent", () => {
       { kind: "armFocus", key: "k" },
       {
         kind: "layout",
-        action: { kind: "newTab", key: "k", asksAgent: true, prefill },
+        action: {
+          kind: "newTab",
+          key: "k",
+          root: NEW_ROOT,
+          asksAgent: true,
+          prefill,
+        },
       },
     ])
   })
@@ -157,7 +164,7 @@ describe("planIntent", () => {
       { kind: "armFocus", key: "k" },
       {
         kind: "layout",
-        action: { kind: "newTab", key: "k", asksAgent: false },
+        action: { kind: "newTab", key: "k", root: NEW_ROOT, asksAgent: false },
       },
     ])
   })
@@ -169,7 +176,6 @@ describe("planIntent", () => {
       card: "c",
       how: {
         actedAt: { kind: "column", key: "col-k" },
-        history: { kind: "none" },
         slot: null,
       },
     }
@@ -362,18 +368,18 @@ describe("planIntent", () => {
       unsent: null,
     }
     const here = { kind: "column", key: "col-k" } as const
-    const unrecorded = { actedAt: here, history: { kind: "none" }, slot: null }
-    test("queue, unqueue and a command are one write each, on any tab; a card the page holds is recorded", () => {
+    const inColumn = { actedAt: here, slot: null }
+    test("queue, unqueue and a command are one write each, on any tab, said in the column", () => {
       for (const state of [R1, at(onNewTab)]) {
         expect(
           plan(column({ kind: "queue", card: c, lane, at: where }), state),
         ).toEqual([
-          { kind: "queueCard", card: c, lane, at: where, how: unrecorded },
+          { kind: "queueCard", card: c, lane, at: where, how: inColumn },
         ])
         expect(
           plan(column({ kind: "unqueue", card: c, lane, by: ada }), state),
         ).toEqual([
-          { kind: "unqueueCard", card: c, lane, by: ada, how: unrecorded },
+          { kind: "unqueueCard", card: c, lane, by: ada, how: inColumn },
         ])
         expect(
           plan(column({ kind: "setCommand", card: c, command: null }), state),
@@ -396,14 +402,14 @@ describe("planIntent", () => {
           kind: "createCard",
           card: { ...fresh, command: "bring-up-to-date" },
           text: "",
-          how: unrecorded,
+          how: inColumn,
         },
         {
           kind: "queueCard",
           card: fresh.id,
           lane,
           at: where,
-          how: unrecorded,
+          how: inColumn,
         },
       ])
     })

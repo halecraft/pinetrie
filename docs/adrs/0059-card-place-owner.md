@@ -13,7 +13,11 @@ record, set by a request, not in the card's own document. Implemented by
 queued, fresh); the inventory by `PLAN-2026-10-03-inventory`, with three
 more amended in place (2026-10-03, with Duane): you can remove a card from
 your own inventory; a swap is undone by swapping back, not by Kyneta's
-undo; and the repair acts on a card only once it is steady (S79).
+undo; and the repair acts on a card only once it is steady (S79). Amended
+by ADR-0066: a handoff is undone by Kyneta on the host, not by the reverse
+handoff, and a swap by this tab's own stack over the inventory; `places`
+is on Yjs; `rev` is raised in a write of its own after each move; a keep's
+several cards are one command, accepted whole or refused.
 
 **Context.**
 

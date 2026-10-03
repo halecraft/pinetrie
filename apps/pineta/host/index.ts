@@ -71,16 +71,17 @@ import {
   planLoads,
 } from "./docs.ts"
 import { hotReload as pauseHotReload } from "./hot-reload.ts"
-import { compactAfter, sweepBlobs } from "./housekeeping.ts"
+import { compactAfter, sweepBlobs, sweepHistories } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { lineDocPrefix } from "./lines.ts"
+import { createMoveHistories } from "./move-history.ts"
 import { createNames } from "./names.ts"
 import { hostPolicy, resolveDoc } from "./policy.ts"
 import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
 import { createSettle } from "./settle.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
-import { recover } from "./startup.ts"
+import { carryPlacesOver, recover } from "./startup.ts"
 import { openStore } from "./store.ts"
 import { drain as drainQueue, takenChat } from "./take.ts"
 import { startLaneWork } from "./work/index.ts"
@@ -163,7 +164,7 @@ export interface RunningHost {
   readonly presence: PresenceDocHandle
   /**
    * Where every card is, as the host holds it (ADR-0059): for the suites to
-   * read. Only `applyPlaceStep` writes it.
+   * read. Only `applyPlaceSteps` writes it.
    */
   readonly places: PlacesDocHandle
   /** A card's text as the host holds it: for the suites. */
@@ -266,6 +267,9 @@ export async function startHost({
   await whenHydrated(session)
   await whenHydrated(places)
   await whenHydrated(live)
+  await carryPlacesOver({ exchange, store, places, log })
+  // Each person's history of moves, per root (ADR-0066).
+  const histories = createMoveHistories(exchange)
   // Each root's document as it is first opened is followed by the directory,
   // made below with the documents' keeper; this is the one late read of it.
   let directory: Directory | undefined
@@ -277,7 +281,10 @@ export async function startHost({
     live,
     places,
     opened: (root, doc) => directory?.watch(root, doc),
-    releasing: async root => created?.release(root),
+    releasing: async root => {
+      await created?.release(root)
+      await histories.unloadRoot(root)
+    },
   })
   const basics: Basics = {
     session,
@@ -417,6 +424,7 @@ export async function startHost({
     start: runs.start,
     names,
     drain: lane => queueDrain(lane),
+    histories,
     keeper,
   })
   // Cards whose text the host is waiting for, each once (`behind`).
@@ -447,8 +455,15 @@ export async function startHost({
     drain,
     rootOf: docs.rootOfLane,
     compact: roots => compactAfter(exchange, roots),
-    sweep: () =>
-      sweepBlobs({ basics, blobs, grace: blobGraceMs, texts: cardPort.texts }),
+    sweep: async () => {
+      await sweepBlobs({
+        basics,
+        blobs,
+        grace: blobGraceMs,
+        texts: cardPort.texts,
+      })
+      await sweepHistories({ basics, store, histories, startup: false })
+    },
   })
   // A run's end: hot reload may reload the page, then the lane drains and
   // the session compacts. A thread whose banner failed tries again. The
@@ -494,7 +509,8 @@ export async function startHost({
     cards: cardPort,
     ensureNames: names.ensure,
   })
-  const seats = startSeats({ exchange, basics, keeper, agent })
+  await sweepHistories({ basics, store, histories, startup: true })
+  const seats = startSeats({ exchange, basics, keeper, agent, histories })
   const control = startControl({
     exchange,
     listener,
@@ -547,6 +563,8 @@ export async function startHost({
             // A container runs only while its lane runs (ADR-0034).
             return work.close()
           case "exchange":
+            histories.dispose()
+            await exchange.flush()
             return exchange.shutdown()
           case "server":
             return server.close()

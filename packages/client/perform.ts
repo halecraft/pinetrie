@@ -6,7 +6,6 @@ import { afterKeep } from "./card-intents.ts"
 import type { Identity } from "./identity.ts"
 import { afterRestore, type Effect, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
-import type { Direction } from "./move-undo.ts"
 import type { SessionClient } from "./session-view.ts"
 
 export interface AppPorts {
@@ -21,8 +20,10 @@ export interface AppPorts {
     | "queueCard"
     | "unqueueCard"
     | "moveCard"
+    | "moveCards"
+    | "undoMoves"
     | "swapSlots"
-    | "dropEntry"
+    | "undoSwap"
     | "refuse"
     | "setCommand"
     | "offer"
@@ -34,8 +35,6 @@ export interface AppPorts {
   }
   /** Measure a card's box before it moves, so it flies to where it lands. */
   readonly fly: (card: CardId) => void
-  /** Ask, in the dialog, whether to restore `root` to undo there. */
-  readonly askRestore: (root: EntryId, direction: Direction) => void
   /** Plan and carry out an intent afresh, after something it waited for. */
   readonly intent: (intent: Intent) => void
   /** Show an entry once this tab holds it (`openAt`). */
@@ -100,16 +99,21 @@ function performOne(effect: Effect, ports: AppPorts): void {
       void ports.session.moveCard(effect.move, effect.how)
       return
     case "swapSlots":
-      ports.session.swapSlots(effect.a, effect.b, effect.step)
+      ports.session.swapSlots(effect.a, effect.b)
       return
     case "keep":
       for (const { move } of effect.moves) ports.fly(move.card)
-      void Promise.all(
-        effect.moves.map(m => ports.session.moveCard(m.move, m.how)),
-      ).then(answers => perform(afterKeep(answers, effect.close), ports))
+      void ports.session
+        .moveCards(effect.moves, effect.actedAt)
+        .then(answer => perform(afterKeep(answer, effect.close), ports))
       return
-    case "dropEntry":
-      ports.session.dropEntry(effect.entry, effect.refusal)
+    case "undoMoves":
+      void ports.session
+        .undoMoves(effect.root, effect.direction)
+        .then(outcome => ports.intent({ kind: "undoAnswered", outcome }))
+      return
+    case "undoSwap":
+      void ports.session.undoSwap(effect.direction)
       return
     case "refuse":
       ports.session.refuse(effect.refusal)
@@ -119,14 +123,6 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "select":
       ports.inventory.select(effect.slot)
-      return
-    case "askRestore":
-      ports.askRestore(effect.root, effect.direction)
-      return
-    case "restoreThen":
-      void ports.session.archive("restore", effect.root).then(outcome => {
-        if (outcome.kind === "restored") ports.intent(effect.next)
-      })
       return
     case "setCommand":
       ports.session.setCommand(effect.card, effect.command)

@@ -41,9 +41,12 @@ describe("keyAct", () => {
     ).toBeNull()
   })
 
-  test("undo and redo with Meta or Ctrl, only outside a text box", () => {
-    const undo = { kind: "undoMove", direction: "undo", restored: null }
-    const redo = { kind: "undoMove", direction: "redo", restored: null }
+  test("undo and redo with Meta or Ctrl, only outside a text box; in the panel, the panel's", () => {
+    const undo = { kind: "undoMove", direction: "undo", inPanel: false }
+    const redo = { kind: "undoMove", direction: "redo", inPanel: false }
+    expect(
+      keyAct(key("z", { metaKey: true }), focus({ inPanel: true })),
+    ).toEqual({ ...undo, inPanel: true })
     expect(keyAct(key("z", { metaKey: true }), focus())).toEqual(undo)
     expect(keyAct(key("z", { ctrlKey: true }), focus())).toEqual(undo)
     expect(

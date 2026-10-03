@@ -12,19 +12,20 @@ wires them.
 |---|---|
 | `index.ts` | `startHost`: the store, the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents, lane work and the agent, then the wiring below |
 | `basics.ts` | `Basics` (the session, `pineta:live`, the documents, the places, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
-| `places.ts` | `applyPlaceStep`: the one writer of the places document (ADR-0059), which raises its `rev` with every write |
+| `places.ts` | `applyPlaceSteps`: the one writer of the places document (ADR-0059), which writes its records in one batch, in an undo step when given one, then raises its `rev` in a batch of its own (`raiseRev`) |
+| `move-history.ts` | each person's history of moves per root (ADR-0066): `MoveHistories`, a shell over Kyneta's undo stacks |
 | `shutdown.ts` | the order a host stops in (`planShutdown`) |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), and the agent's `onStream` (`streamInto`) |
 | `take.ts` | taking a lane's queued cards (ADR-0048): `takeTop`, and `drain`, which sends each through its command (ADR-0055) |
 | `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
-| `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pineta:live`), and deleting images nothing shows |
+| `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pineta:live`), deleting images nothing shows, and retiring histories of moves (`sweepHistories`) |
 | `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for; `planLoads` |
 | `directory.ts` | each root's directory record, refreshed as its document changes |
 | `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the take, and the texts of given cards gathered for the sweeps; where the shell opens card documents |
-| `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`) |
-| `startup.ts` | `recover`: what a starting host does before it takes a command |
+| `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
+| `startup.ts` | `carryPlacesOver` (the places stored before ADR-0066, once) and `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
-| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, offer), `cards` (a move, a command, a busy chat's card queued, a sent card spent: ADR-0059); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a taken card behind the same check (`sendTaken`) |
+| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, offer), `cards` (a move, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a taken card behind the same check (`sendTaken`) |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
@@ -74,6 +75,10 @@ wires them.
   chain is never awaited in the loop, and catches each step's failure, so a
   command that throws neither ends its seat's commands nor rejects unhandled
   (`packages/keeper/TECHNICAL.md`, on voiding).
+- **An undo of moves holds its step until its revert is written.**
+  Kyneta's `undo()` writes its note to the store and waits for it before it
+  plans and applies the step, so `undo-move` awaits it inside its keeper
+  step: a write to `places` between would race the step's check.
 - **A failed drain is logged against its lane** (`settle.ts`), inside its
   step, and the settle still drains the other lanes, compacts and sweeps.
 - **A closed keeper refuses new steps and finishes the ones it holds**, and
@@ -143,6 +148,14 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 
 ## Startup
 
+Before `recover`, `carryPlacesOver` carries the places stored before
+ADR-0066 (`pineta:places`, `json`) into the Yjs document, once
+(`planPlacesCarryOver`): it writes the rows, flushes, then destroys the old
+document, so a crash at any step leaves it to carry over at the next start.
+A fresh card stored then has no root, and is dropped. After `recover`,
+`sweepHistories` retires the histories of moves no one will undo again (§
+Moves' history).
+
 `recover` runs, in order: `clearStreams` (no stream survives a process), a
 log of the stored lane names, in the roots opened, that fail `isLaneName`
 (`readStoredLanes`: no reader is given them, so the log is where one shows;
@@ -206,18 +219,26 @@ it out, each step in its own `try`: `intake` (seats, control), `close` (the docu
   dispatcher queues the card behind the others in the same step
   (`queueBusy`), so no other send gets between. A chat with no card, or one
   whose card the host does not hold, still answers `busy`.
-- **Every write to the places goes through `applyPlaceStep`** (`places.ts`),
-  which raises `rev` in the same batch. A client draws a move it sent until
-  its copy reaches the `rev` the reply carried (`packages/client/card-moves.ts`),
-  so a write that skipped `rev` would leave a move drawn over a record that
-  had changed.
+- **Every write to the places goes through `applyPlaceSteps`** (`places.ts`):
+  every record in one batch, then `rev` raised in a batch of its own. A
+  client draws a move it sent until its copy reaches the `rev` the reply
+  carried (`packages/client/card-moves.ts`), so a write that skipped `rev`
+  would leave a move drawn over a record that had changed. `rev` stays out
+  of the records' batch because that batch may be an undo step, and a value
+  every later write changes would refuse every whole undo of it (S82).
 - **`move` and `set-command` are handoffs** (`commands/cards.ts`): gather
-  the places and whether the lane runs, plan (`planMoveCommand`,
-  `planSetCommand`), then write. An accepted move answers `moved` with its
-  `rev`; a refusal answers `unmoved` with its code, where the card is now,
-  who put it there, and the current `rev`. A move that leaves a card queued
-  on a lane that is not running queues the lane's drain, a voided
-  `keeper.once` (`drain:<lane>`) behind the move's own step.
+  the places and whether the lane runs, plan (`planMoveCommand` over
+  several moves, `planSetCommand`), then write. A move's list is accepted
+  whole or refused by its first refusal (`planMoves`): a keep's cards are
+  one command. An accepted move answers `moved` with its `rev`; a refusal
+  answers `unmoved` with its code, where the card is now, who put it there,
+  and the current `rev`. A move that leaves a card queued on a lane that is
+  not running queues the lane's drain, a voided `keeper.once`
+  (`drain:<lane>`) behind the move's own step.
+- **`undo-move` undoes or redoes the sender's newest move in a root**
+  (§ Moves' history). It answers `undone` with each card it moved and its
+  place now, `unmoved` (shaped as a refused move) when someone moved a card
+  since, or `nothing`.
 - **Your inventory is a client's document the host only keeps**
   (ADR-0059). `resolveDoc` interprets `inventory:<writer>` as
   `InventoryDoc`; the policy shares it only with the peers whose principal
@@ -236,6 +257,36 @@ it out, each step in its own `try`: `intake` (seats, control), `close` (the docu
   may not write throws before it is made, rather than forking its copy
   (S28, S76). `hostPolicy` keeps what is the host's alone: which peers may
   hold a document, and which writes it takes from presence and cards.
+
+## Moves' history (`move-history.ts`, ADR-0066)
+
+- **One Kyneta undo stack per person and root**, `moves:<writer>:<RootId>`,
+  key `moves`, scope the places document, made on first use and kept in the
+  store. Kyneta undoes only its own runtime's writes, and only the host
+  writes `places`, so the stacks are the host's: `policy.ts` shares them
+  with no one and rejects one a client announces, and `writersPolicy` gives
+  them to the host alone.
+- **Which history a move enters is the host's** (`historyOf`): the root the
+  card goes to, else the one it leaves, read from its record; a creation or
+  a removal enters none. `move` writes inside that stack's `gesture`. The
+  host's own writes (a take, a spend, an unsent card, a fresh column's
+  followers, the sweep) are outside every gesture, so every stack rebases
+  over them, and an undo of a move the host overtook is refused.
+- **Every undo is `whole`.** Without it a step someone else's move broke is
+  skipped and an older one undone out of sight (S82). With it, a card's row
+  (its place and its placer) changed by anyone since refuses the undo.
+- **`rev` is raised after an undo too** (`raiseRev`), apart from the
+  revert, which Kyneta writes itself.
+- **Retired 7 days after their root is archived** (`planHistorySweep`,
+  `ARCHIVED_HISTORY_MS`), at startup and after each run's end; and at
+  startup only, those of a root the directory does not name (a new tab that
+  never sent). The stored ids come from the store's listing by `moves:`;
+  `retire` destroys a stack loaded or not (S91).
+- **Unloaded when nobody can use them:** a person's when their last seat
+  leaves (the seats step, `idleWriters`), a root's when it is archived
+  (`docs.unload`'s `releasing`). The next move loads one again (S91).
+- **Shutdown disposes them, then flushes,** so a stack's open step is
+  stored before the Exchange stops.
 
 ## The queue (`take.ts`, ADR-0048, ADR-0055)
 

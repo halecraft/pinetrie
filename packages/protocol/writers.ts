@@ -10,7 +10,12 @@
 // of its writers, though it never writes one (ADR-0059).
 
 import type { Policy } from "@kyneta/exchange"
-import { rootOfDocId, type WriterId, writerOfPrincipal } from "@pineta/core"
+import {
+  MOVES_DOC_PREFIX,
+  rootOfDocId,
+  type WriterId,
+  writerOfPrincipal,
+} from "@pineta/core"
 import {
   HOST_PRINCIPAL,
   LIVE_DOC_ID,
@@ -20,13 +25,15 @@ import {
 
 /**
  * Whether only the host writes `docId`: the session, the places, what is
- * streaming, and every root's document (ADR-0023, ADR-0059, ADR-0063).
+ * streaming, every root's document, and its stacks of people's moves
+ * (ADR-0023, ADR-0059, ADR-0063, ADR-0066).
  */
 export const isHostDoc = (docId: string): boolean =>
   docId === SESSION_DOC_ID ||
   docId === PLACES_DOC_ID ||
   docId === LIVE_DOC_ID ||
-  rootOfDocId(docId) !== undefined
+  rootOfDocId(docId) !== undefined ||
+  docId.startsWith(MOVES_DOC_PREFIX)
 
 const INVENTORY_PREFIX = "inventory:"
 

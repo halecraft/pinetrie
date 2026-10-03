@@ -21,7 +21,7 @@ const Command = Schema.struct({
   text: Schema.string(),
   /** Where the sender was reading, or "" for the root (schemas are total). */
   parentId: Schema.string(),
-  /** A chat's or a mark's root, or "" for other kinds (ADR-0063). */
+  /** A chat's, a mark's or an undo of moves' root, or "" for other kinds (ADR-0063). */
   root: Schema.string(),
   /** A chat's mode, or "" for other kinds. */
   mode: Schema.string(),
@@ -34,8 +34,7 @@ const Command = Schema.struct({
   reserved: Schema.string(),
   base: Schema.string(),
   seen: Schema.string(),
-  from: Schema.string(),
-  to: Schema.string(),
+  moves: Schema.string(),
 })
 
 const Reply = Schema.struct({
@@ -47,6 +46,7 @@ const Reply = Schema.struct({
   entryId: Schema.string(),
   by: Schema.string(),
   place: Schema.string(),
+  cards: Schema.string(),
   rev: Schema.number(),
 })
 

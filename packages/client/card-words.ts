@@ -53,16 +53,14 @@ export const queuedWords = (by: WriterId, n: number, reader: Reader): string =>
 export const unsentWords = (reason: string): string => `not sent: ${reason}`
 
 /**
- * Something of yours refused (ADR-0059): a move the host refused, an undone
- * swap whose slots changed, a keep without room. Gone from the queue, the
+ * Something of yours refused (ADR-0059): a move or an undo the host
+ * refused, or an undone swap whose slots changed. Gone from the queue, the
  * host had taken the card first (S69), so it was sent as its queuer's
  * message; moved, someone else moved it first.
  */
 export function refusalWords(refusal: Refusal, reader: Reader): string {
   if (refusal.code === "slots-changed")
     return "not undone: those slots have changed since"
-  if (refusal.code === "no-room")
-    return `not kept: needs ${slotWords(refusal.need)}, ${refusal.free} free`
   const { by } = refusal
   switch (refusal.code) {
     case "gone":
@@ -93,8 +91,6 @@ export function refusalWords(refusal: Refusal, reader: Reader): string {
 export const cardStatus = (status: string, unsent: string | null): string =>
   status !== "" || unsent === null ? status : unsentWords(unsent)
 
-const slotWords = (n: number): string => (n === 1 ? "1 slot" : `${n} slots`)
-
 /** The inventory panel's name, and its button in the header. */
 export const INVENTORY = "inventory"
 /** A card's button that takes it into your inventory; its drag handle too. */
@@ -112,13 +108,6 @@ export const REMOVE = "remove"
 /** Closing a fresh column that holds text: the default, and the final choice. */
 export const KEEP_IN_INVENTORY = "keep in inventory"
 export const DISCARD = "discard"
-/** The archived-root dialog's choice. */
-export const RESTORE_AND_UNDO = "restore and undo"
-
-/** The archived-root dialog's question. */
-export const restoreAsk = (label: string): string =>
-  `${label} is archived. Restore it to undo there?`
-
 /** The close ask's question, by how many cards hold text. */
 export const closeAskWords = (n: number): string =>
   n === 1

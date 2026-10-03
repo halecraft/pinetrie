@@ -33,7 +33,10 @@ amended in place (2026-10-03, with Duane): closing a fresh column keeps its
 cards in your inventory by default, and discard stays final (*Closing a
 column*); a fresh column's first send carries its other cards to the new
 message, the host's write (*Physics*, 1); clipboard copy and cut of cards
-wait for the key system's redesign (*Input*).
+wait for the key system's redesign (*Input*). Amended by ADR-0066: moves are
+undone by the host's Kyneta stacks, one per person and root, whole or
+refused (*Undo is Kyneta's* covers moves too, on the host); step 4's
+decision 11, the page's own history of moves, is withdrawn.
 
 **Context.**
 

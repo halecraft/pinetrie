@@ -152,6 +152,32 @@ export function rootOfDocId(docId: string): RootId | undefined {
   return isRootId(root) ? root : undefined
 }
 
+export const MOVES_DOC_PREFIX = "moves:"
+
+/**
+ * The host's undo stack of `writer`'s moves in `root` (ADR-0066): only the
+ * host holds it.
+ */
+export const movesDocId = (writer: WriterId, root: RootId): string =>
+  `${MOVES_DOC_PREFIX}${writer}:${root}`
+
+/**
+ * A document id -> the writer and root whose moves' stack it is, or
+ * undefined for any other document. A root's id holds no `:`.
+ */
+export function movesOfDocId(
+  docId: string,
+): { readonly writer: WriterId; readonly root: RootId } | undefined {
+  if (!docId.startsWith(MOVES_DOC_PREFIX)) return undefined
+  const rest = docId.slice(MOVES_DOC_PREFIX.length)
+  const cut = rest.lastIndexOf(":")
+  if (cut <= 0) return undefined
+  const root = rest.slice(cut + 1)
+  return isRootId(root)
+    ? { writer: rest.slice(0, cut) as WriterId, root }
+    : undefined
+}
+
 declare const entryIdBrand: unique symbol
 declare const runIdBrand: unique symbol
 /**
@@ -421,8 +447,18 @@ export type Intent =
     }
   /** Set up the integration line, or land your work on it (ADR-0060). */
   | { readonly kind: "line"; readonly action: LineAction }
-  /** Move a card, create one, or remove one (ADR-0059). */
-  | { readonly kind: "move"; readonly move: Move }
+  /**
+   * Move cards, create one, or remove one (ADR-0059): one move, or a keep's
+   * several, accepted whole or refused. The host records it in a root's
+   * history of the sender's moves (`historyOf`, ADR-0066).
+   */
+  | { readonly kind: "move"; readonly moves: readonly Move[] }
+  /** Undo or redo the sender's newest move in `root` (ADR-0066). */
+  | {
+      readonly kind: "undo-move"
+      readonly root: RootId
+      readonly direction: MoveDirection
+    }
   /** Set a card's command, or clear it with null (ADR-0055). */
   | {
       readonly kind: "set-command"
@@ -1106,7 +1142,7 @@ export const CARD_COMMANDS: readonly CardCommand[] = [
  * `threadOf` whenever it is needed, so it follows its thread as the thread
  * grows. Queued: above the line, waiting for its thread's lane, until the
  * host takes it or someone unqueues it. Fresh: an unsent branch or new tab,
- * by its column's key. Inventory: in its holder's inventory; which slot holds
+ * by its column's key, in the root it will start or branch in. Inventory: in its holder's inventory; which slot holds
  * it is the holder's own document (`InventoryDoc`), not the host's (ADR-0059).
  */
 export type CardPlace =
@@ -1134,7 +1170,18 @@ export type CardPlace =
        */
       readonly seen: string
     }
-  | { readonly kind: "fresh"; readonly column: string }
+  | {
+      readonly kind: "fresh"
+      readonly column: string
+      /**
+       * The root its column is in (ADR-0063): a branch's tab's root, or the
+       * root a new tab minted as it opened. The host reads a move's history
+       * from it (`historyOf`).
+       */
+      readonly root: RootId
+      /** Where its first send writes: the branch point, or the root for a new tab. */
+      readonly at: Position
+    }
   | { readonly kind: "inventory"; readonly holder: WriterId }
 
 /** How many cards an inventory holds: a fixed grid (ADR-0048). */
@@ -1194,12 +1241,17 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
       return (
         b.kind === "queued" && samePosition(a.at, b.at) && a.lane === b.lane
       )
+    // A column's key names it, wherever it is.
     case "fresh":
       return b.kind === "fresh" && a.column === b.column
     case "inventory":
       return b.kind === "inventory" && a.holder === b.holder
   }
 }
+
+/** Which way an undo of moves goes. */
+export type MoveDirection = "undo" | "redo"
+export const MOVE_DIRECTIONS: readonly MoveDirection[] = ["undo", "redo"]
 
 /**
  * A handoff (ADR-0059): move a card from where its sender saw it to another
@@ -1233,7 +1285,7 @@ export type MoveRefusal =
  */
 export interface PlaceFields {
   readonly kind: string
-  /** A drafting or queued card's root (ADR-0063); "" for any other. */
+  /** A drafting, queued or fresh card's root (ADR-0063); "" for any other. */
   readonly root: string
   readonly at: string
   readonly lane: string
@@ -1276,8 +1328,8 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
     case "fresh":
       return {
         kind: "fresh",
-        root: "",
-        at: "",
+        root: place.root,
+        at: entryOrEmpty(place.at),
         lane: "",
         column: place.column,
         order: "",
@@ -1302,16 +1354,24 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
 
 /**
  * Flat strings -> a place; undefined for one that is malformed. A drafting
- * or queued card's `at` is an entry, never the root, and a fresh card's
- * column is never "", nor an inventory card's holder. A drafting card whose lane is not a thread's keeps its
- * place with no lane: dropped, its text would be swept at the next start,
- * and the lane only says which thread it follows. A queued card needs its
- * lane, its order and who queued it.
+ * or queued card's `at` is an entry, never the root; a fresh card's `at` is
+ * either. Every card in a root needs its `RootId`. A fresh card's column is
+ * never "", nor an inventory card's holder. A drafting card whose lane is
+ * not a thread's keeps its place with no lane: dropped, its text would be
+ * swept at the next start, and the lane only says which thread it follows.
+ * A queued card needs its lane, its order and who queued it.
  */
 export function placeOfFields(f: PlaceFields): CardPlace | undefined {
   switch (f.kind) {
     case "fresh":
-      return f.column === "" ? undefined : { kind: "fresh", column: f.column }
+      return f.column === "" || !isRootId(f.root)
+        ? undefined
+        : {
+            kind: "fresh",
+            column: f.column,
+            root: f.root,
+            at: f.at === "" ? ROOT : atEntry(entryId(f.at)),
+          }
     case "inventory":
       return f.holder === ""
         ? undefined

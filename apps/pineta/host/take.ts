@@ -18,7 +18,7 @@ import type { PlacesDocHandle } from "@pineta/schema"
 import { type Basics, messageOf } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { Chat } from "./commands/chat.ts"
-import { applyPlaceStep } from "./places.ts"
+import { applyPlaceSteps } from "./places.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -55,7 +55,7 @@ export function takeTop(
   const { card } = step
   if (!texts.holds(card.id, card.place.seen)) return { kind: "behind", card }
   const text = texts.textNow(card.id)
-  applyPlaceStep(places, { kind: "remove", id: card.id })
+  applyPlaceSteps(places, [{ kind: "remove", id: card.id }])
   return { kind: "taken", taken: { card, text } }
 }
 
@@ -170,7 +170,7 @@ async function carryOut(
       return sent.kind === "started" ? "ran" : "next"
     case "busy":
       // A run started under the take: the card goes back on top, as it was.
-      applyPlaceStep(deps.basics.places, { kind: "write", record: sending })
+      applyPlaceSteps(deps.basics.places, [{ kind: "write", record: sending }])
       return "ran"
     case "refused":
       unsent(deps, sending, sent.message)
@@ -190,7 +190,7 @@ async function carryOut(
 /** Write a card the host could not send back below the line, whole, saying why. */
 function unsent(deps: TakeDeps, card: QueuedCard, reason: string): void {
   const { session, places, log } = deps.basics
-  applyPlaceStep(places, planUnsent(card, reason))
+  applyPlaceSteps(places, [planUnsent(card, reason)])
   log(
     `[host] ${readThreadName(session, card.place.lane)}: a queued card was not sent: ${reason}`,
   )

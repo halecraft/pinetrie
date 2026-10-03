@@ -46,6 +46,7 @@ export interface CommandDeps {
   readonly start: ChatDeps["start"]
   readonly names: Pick<Names, "reserve">
   readonly drain: CardCommandDeps["drain"]
+  readonly histories: CardCommandDeps["histories"]
   /** The documents' keeper: a `documents` command is one step on it. */
   readonly keeper: Pick<HostKeeper, "run" | "track">
 }
@@ -170,7 +171,9 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(sent)
       }
       case "move":
-        return cardCommands.move(writer, intent.move)
+        return cardCommands.move(writer, intent.moves)
+      case "undo-move":
+        return cardCommands.undoMove(writer, intent.root, intent.direction)
       case "set-command":
         return cardCommands.setCommand(intent.card, intent.command)
       case "name":
@@ -207,7 +210,7 @@ export function createCommands(deps: CommandDeps): Commands {
       return (
         refuseInArchive(
           deps.basics,
-          chat.at.kind === "root" ? null : chat.root,
+          chat.at.kind === "root" ? [] : [chat.root],
         ) ?? (await sendChat(deps, writer, sendId, chat))
       )
     },
@@ -218,17 +221,17 @@ export function createCommands(deps: CommandDeps): Commands {
  * A command that would write in an archived root is refused, naming who
  * archived it (ADR-0029). `sendChat`'s only callers are this dispatcher and
  * `sendTaken`, both behind it, so it needs no check of its own. `root` is
- * the root the command writes in (`writesIn`), which names it, so no root's
- * document is opened to check. Null when the command may go on.
+ * the roots the command writes in (`writesIn`), which names them, so no
+ * root's document is opened to check. Null when the command may go on.
  */
 function refuseInArchive(
   basics: Pick<Basics, "session">,
-  root: RootId | null,
+  roots: readonly RootId[],
 ): Outcome | null {
   const { session } = basics
   const archive = readArchive(session)
   if (archive.size === 0) return null
-  const record = archivedIn(root, readRoots(session), archive)
+  const record = archivedIn(roots, readRoots(session), archive)
   if (record === null) return null
   const names = readParticipantNames(session)
   return {

@@ -569,12 +569,17 @@ The rail is E; the column is T. Seeing both at once is the product.
   composer; where you have one, it is shown above it. **Remove** deletes the
   selected card for good.
 - **Undo a move** with Cmd+Z (Ctrl+Z elsewhere) while no box has focus;
-  Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it. It first shows where the
-  card goes back to, the panel, the thread's column, or a branch you closed
-  since, reopened, then moves it there. In an archived root it asks first
-  whether to restore it. If the card has moved since, it says so where it
-  showed, and that move is dropped from the list. Sends and discards are
-  final. Each tab keeps its own list, which a reload forgets.
+  Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it (ADR-0066). It undoes your
+  newest move in the root you are on, from any of your tabs, after a reload
+  or a restart too. As it acts it shows where the card went back: the
+  panel, the thread's column, or a branch you closed since, opened again at
+  the end of its tab. If anyone moved the card since, it is refused, saying
+  who, and nothing moves. A keep of a branch's cards is undone whole. Sends,
+  discards and copies are final; so is a keep that closed a new tab, whose
+  cards you take back from the panel. An archived root's moves cannot be
+  undone, and are forgotten 7 days after it was archived.
+- **Undo a swap** with the same keys while the panel has focus: this tab's
+  newest swap goes back, unless those slots have changed since.
 - **A refusal is said where you acted**: in the panel for a take, in the
   column you aimed at for a put, and where an undo showed.
 

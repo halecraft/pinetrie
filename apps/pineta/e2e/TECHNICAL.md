@@ -106,10 +106,10 @@ They share `checks.ts` (recording a check, and stopping at one),
   same document opened from their exchange, which keeps its own write.
   The repair waits `STEADY_MS` before placing or clearing (S79), so a check
   that reads slots another session wrote waits that long or more.
-- **A move enters the page's history when its answer arrives**, just after
-  the host's write a check reads from `host.places`. The browser checks wait
-  half a second before pressing an undo key: pressed sooner, it finds
-  nothing to undo.
+- **A person's history of moves is the host's, per root** (ADR-0066), so
+  `join(ch, "ada", …)` again undoes Ada's moves, and after a restart too.
+  An undo key may follow a move at once: the host records it as it applies
+  it.
 
 - **`slowToLoad` delays one document's first `currentMeta`**, by
   `LATE_LOAD_MS` (`host/support.ts`). Kyneta's `#hydrate` reads

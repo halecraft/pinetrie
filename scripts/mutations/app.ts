@@ -1434,8 +1434,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the wire carries no holder",
     file: "packages/protocol/codec.ts",
-    from: "  return JSON.stringify({ kind, root, at, lane, column, seen, holder })",
-    to: "  return JSON.stringify({ kind, root, at, lane, column, seen })",
+    from: "  return { kind, root, at, lane, column, seen, holder }",
+    to: "  return { kind, root, at, lane, column, seen }",
     suite: "host",
     scenario: "cards",
     expect: "a move out of someone else's inventory is refused, as not theirs",
@@ -1472,8 +1472,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the page undoes no move",
     file: "packages/client/app.tsx",
-    from: "            history: moves.history,",
-    to: "            history: { undo: [], redo: [] },",
+    from: "            composers: composers.current(),\n          },\n          rootEntries,",
+    to: "            composers: composers.current(),\n          },\n          rootEntries: new Map(),",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1516,9 +1516,48 @@ export const mutations: readonly Mutation[] = [
     expect: "another window draws it too",
   },
   {
+    name: "a session's undo of moves redoes",
+    file: "packages/client/session-view.ts",
+    from: '        kind: "undo-move",\n        root,\n        direction,',
+    to: '        kind: "undo-move",\n        root,\n        direction: "redo",',
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "Ada's second session undoes, in a root, the move her first session made there; her move in another root stays; an undo after Bea moved the card is refused, naming Bea, and changes nothing",
+  },
+  {
+    name: "a keep sends its first card only",
+    file: "packages/client/session-view.ts",
+    from: '        { kind: "move", moves: moves.map(m => m.move) },',
+    to: '        { kind: "move", moves: moves.slice(0, 1).map(m => m.move) },',
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a keep of three cards is one move: refused whole when one has moved, and undone whole",
+  },
+  {
+    name: "a starting host retires every history of moves",
+    file: "apps/pineta/host/housekeeping.ts",
+    from: "    roots: readRoots(session),",
+    to: "    roots: new Map(),",
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "after the host restarts, Ada's undo in a root still undoes her last move there",
+  },
+  {
+    name: "a swap is written outside this tab's swaps",
+    file: "packages/client/session-view.ts",
+    from: "      swaps.gesture(() => writeSlots({ set, clear }))",
+    to: "      writeSlots({ set, clear })",
+    suite: "browser",
+    scenario: "page",
+    expect: "with the panel focused, the undo key swaps back",
+  },
+  {
     name: "an archived root's harness outlives its document",
     file: "apps/pineta/host/index.ts",
-    from: "    releasing: async root => created?.release(root),\n",
+    from: "      await created?.release(root)\n",
     to: "",
     suite: "browser",
     scenario: "page",

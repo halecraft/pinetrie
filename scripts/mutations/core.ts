@@ -209,7 +209,7 @@ export const mutations: readonly Mutation[] = [
     from: "  docId === SESSION_DOC_ID ||\n",
     to: "",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
-    expect: "mayWrite: the session, the places and now are the host's",
+    expect: "mayWrite: the session, the places, now",
   },
   {
     name: "a client may write what streams",
@@ -217,7 +217,7 @@ export const mutations: readonly Mutation[] = [
     from: "  docId === LIVE_DOC_ID ||\n",
     to: "",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
-    expect: "mayWrite: the session, the places and now are the host's",
+    expect: "mayWrite: the session, the places, now",
   },
   {
     name: "a client may write a root",
@@ -225,7 +225,7 @@ export const mutations: readonly Mutation[] = [
     from: "  docId === LIVE_DOC_ID ||\n  rootOfDocId(docId) !== undefined",
     to: "  docId === LIVE_DOC_ID",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
-    expect: "mayWrite: the session, the places and now are the host's",
+    expect: "mayWrite: the session, the places, now",
   },
   {
     name: "anyone writes anyone's inventory",
@@ -233,7 +233,7 @@ export const mutations: readonly Mutation[] = [
     from: "  return principal === HOST_PRINCIPAL || holds",
     to: "  return true",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
-    expect: "mayWrite: the session, the places and now are the host's",
+    expect: "mayWrite: the session, the places, now",
   },
   {
     name: "the host may not relay an inventory",
@@ -241,13 +241,13 @@ export const mutations: readonly Mutation[] = [
     from: "  return principal === HOST_PRINCIPAL || holds",
     to: "  return holds",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
-    expect: "mayWrite: the session, the places and now are the host's",
+    expect: "mayWrite: the session, the places, now",
   },
   {
     name: "the wire drops an inventory's holder",
     file: "packages/protocol/codec.ts",
-    from: "  return JSON.stringify({ kind, root, at, lane, column, seen, holder })",
-    to: "  return JSON.stringify({ kind, root, at, lane, column, seen })",
+    from: "  return { kind, root, at, lane, column, seen, holder }",
+    to: "  return { kind, root, at, lane, column, seen }",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect: "encodeIntent -> decodeCommand round-trips every intent",
   },

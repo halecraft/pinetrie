@@ -1,5 +1,7 @@
 import {
   atEntry,
+  type CardId,
+  type CardPlace,
   type CardRecord,
   cardId,
   type EntryLike,
@@ -8,6 +10,11 @@ import {
   indexTree,
   type LaneView,
   laneNameForThread,
+  type Move,
+  movesDocId,
+  ROOT,
+  type RootId,
+  type RootRecord,
   rootIdFor,
   type TreeIndex,
   writerId,
@@ -18,18 +25,23 @@ import {
   decodeCard,
   draftingAt,
   encodeCard,
+  historyOf,
   orderAfter,
   ownsPlace,
   placeEnd,
   planCardSweep,
   planFreshFollow,
+  planHistorySweep,
   planMove,
   planMoveCommand,
+  planMoves,
+  planPlacesCarryOver,
   planSetCommand,
   planTake,
   planUnsent,
   type QueuedCard,
   queuedOn,
+  undoAnswer,
   yourCard,
 } from "./card.ts"
 
@@ -66,6 +78,8 @@ const card = (over: Partial<CardRecord> = {}): CardRecord => ({
   ...over,
 })
 const LANE = laneNameForThread("x")
+const freshPlace = (column: string) =>
+  ({ kind: "fresh", column, root: TEST_ROOT, at: ROOT }) as const
 const queued = (id: string, order: string, lane = LANE): QueuedCard => ({
   ...card({ id: cardId(id) }),
   place: {
@@ -119,9 +133,7 @@ describe("where a card sits", () => {
   })
 
   test("cardEnd: null for a fresh card, and for a place that is gone", () => {
-    expect(
-      cardEnd(card({ place: { kind: "fresh", column: "k-1" } }), [], tree()),
-    ).toBeNull()
+    expect(cardEnd(card({ place: freshPlace("k-1") }), [], tree())).toBeNull()
     expect(
       cardEnd(
         card({
@@ -153,7 +165,7 @@ describe("where a card sits", () => {
     const beas = card({ id: cardId("c-2"), owner: BEA })
     const fresh = card({
       id: cardId("c-3"),
-      place: { kind: "fresh", column: "k-1" },
+      place: freshPlace("k-1"),
     })
     const cards = [beas, card(), fresh]
     const at = (where: Parameters<typeof yourCard>[1], me = ADA) =>
@@ -291,7 +303,7 @@ describe("handoffs (ADR-0059)", () => {
     expect(
       planMove([], { card: C1, from: drafting, to: queuedKey }, BEA),
     ).toEqual({ kind: "refused", code: "gone", now: null })
-    const elsewhere = card({ place: { kind: "fresh", column: "k" } })
+    const elsewhere = card({ place: freshPlace("k") })
     expect(
       planMove([elsewhere], { card: C1, from: drafting, to: queuedKey }, BEA),
     ).toEqual({ kind: "refused", code: "moved", now: elsewhere })
@@ -343,13 +355,9 @@ describe("handoffs (ADR-0059)", () => {
   })
 
   test("a removal: a fresh column's card, not a drafting one", () => {
-    const fresh = card({ place: { kind: "fresh", column: "k" } })
+    const fresh = card({ place: freshPlace("k") })
     expect(
-      planMove(
-        [fresh],
-        { card: C1, from: { kind: "fresh", column: "k" }, to: null },
-        ADA,
-      ),
+      planMove([fresh], { card: C1, from: freshPlace("k"), to: null }, ADA),
     ).toEqual({ kind: "remove", id: C1 })
     const c = card({ place: drafting })
     expect(planMove([c], { card: C1, from: drafting, to: null }, ADA)).toEqual({
@@ -445,12 +453,12 @@ describe("handoffs (ADR-0059)", () => {
       expect(ownsPlace(beas, ADA)).toBe(false)
       expect(ownsPlace(drafting, ADA)).toBe(true)
       expect(ownsPlace(queuedKey, ADA)).toBe(true)
-      expect(ownsPlace({ kind: "fresh", column: "k" }, ADA)).toBe(true)
+      expect(ownsPlace(freshPlace("k"), ADA)).toBe(true)
     })
   })
 
   test("planFreshFollow: the sent card's column's other cards go drafting at the new entry, placer kept; nothing else moves", () => {
-    const fresh = { kind: "fresh", column: "k" } as const
+    const fresh = freshPlace("k")
     const sent = card({ place: fresh })
     const other = card({
       id: cardId("c-2"),
@@ -460,7 +468,7 @@ describe("handoffs (ADR-0059)", () => {
     })
     const elsewhere = card({
       id: cardId("c-3"),
-      place: { kind: "fresh", column: "j" },
+      place: freshPlace("j"),
     })
     expect(
       planFreshFollow([sent, other, elsewhere], sent.id, TEST_ROOT, E2, LANE),
@@ -482,17 +490,81 @@ describe("handoffs (ADR-0059)", () => {
     expect(
       planFreshFollow([draft, other], draft.id, TEST_ROOT, E2, LANE),
     ).toEqual([])
+    // A message written in another root than the column's: nothing follows.
+    const elsewhereRoot = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+    expect(
+      planFreshFollow([sent, other], sent.id, elsewhereRoot, E2, LANE),
+    ).toEqual([])
   })
 
-  test("planMoveCommand: the lane to drain when the card ends queued on a lane not running", () => {
+  test("planMoveCommand: the lanes to drain where a card ends queued on a lane not running", () => {
     const c = card({ place: drafting })
     const move = { card: C1, from: drafting, to: queuedKey } as const
-    expect(planMoveCommand([c], move, ADA, () => false).drain).toBe(LANE)
-    expect(planMoveCommand([c], move, ADA, () => true).drain).toBeNull()
+    expect(planMoveCommand([c], [move], ADA, () => false).drain).toEqual([LANE])
+    expect(planMoveCommand([c], [move], ADA, () => true).drain).toEqual([])
     expect(
-      planMoveCommand([c], { ...move, to: drafting }, ADA, () => false).drain,
-    ).toBeNull()
-    expect(planMoveCommand([], move, ADA, () => false).drain).toBeNull()
+      planMoveCommand([c], [{ ...move, to: drafting }], ADA, () => false).drain,
+    ).toEqual([])
+    expect(planMoveCommand([], [move], ADA, () => false).drain).toEqual([])
+  })
+
+  describe("planMoves: several moves, accepted whole or refused (ADR-0066)", () => {
+    const C2 = cardId("c-2")
+    const C3 = cardId("c-3")
+    const inv = { kind: "inventory", holder: ADA } as const
+    const fresh = freshPlace("k")
+    const inFresh = (id: CardId) => card({ id, place: fresh })
+
+    test("two moves, the second refused: nothing written, the refusal naming its card", () => {
+      const moved = card({ id: C2, place: drafting })
+      expect(
+        planMoves(
+          [inFresh(C1), moved],
+          [
+            { card: C1, from: fresh, to: inv },
+            { card: C2, from: fresh, to: inv },
+          ],
+          ADA,
+        ),
+      ).toEqual({ kind: "refused", code: "moved", now: moved })
+    })
+
+    test("takes into an inventory with one free slot: full", () => {
+      const held = Array.from({ length: INVENTORY_SLOTS - 1 }, (_, n) =>
+        card({ id: cardId(`h-${n}`), place: inv }),
+      )
+      const step = planMoves(
+        [...held, inFresh(C1), inFresh(C2)],
+        [
+          { card: C1, from: fresh, to: inv },
+          { card: C2, from: fresh, to: inv },
+        ],
+        ADA,
+      )
+      expect(step).toMatchObject({ kind: "refused", code: "full" })
+    })
+
+    test("each move planned against the cards the earlier ones left", () => {
+      // Created, then moved on: the second sees the first's card.
+      const step = planMoves(
+        [],
+        [
+          { card: C3, from: null, to: fresh },
+          { card: C3, from: fresh, to: inv },
+        ],
+        ADA,
+      )
+      expect(step).toEqual({
+        kind: "steps",
+        steps: [
+          { kind: "write", record: { ...inFresh(C3), command: null } },
+          {
+            kind: "write",
+            record: { ...inFresh(C3), command: null, place: inv },
+          },
+        ],
+      })
+    })
   })
 
   test("planSetCommand: sets it, the place and placer kept; gone when there is no record", () => {
@@ -546,7 +618,7 @@ describe("storage", () => {
       card({
         place: { kind: "drafting", root: TEST_ROOT, at: atEntry(E2), lane },
       }),
-      card({ place: { kind: "fresh", column: "k-1" } }),
+      card({ place: freshPlace("k-1") }),
       card({ place: { kind: "inventory", holder: BEA } }),
       queued("c-2", "k"),
       card({ command: "bring-up-to-date", unsent: "refused" }),
@@ -588,5 +660,219 @@ describe("storage", () => {
       at: atEntry(E2),
       lane: null,
     })
+  })
+})
+
+describe("planPlacesCarryOver (ADR-0066)", () => {
+  const kept = card()
+  const inventory = card({
+    id: cardId("c-2"),
+    place: { kind: "inventory", holder: ADA },
+  })
+  const old = {
+    [kept.id]: encodeCard(kept),
+    [inventory.id]: encodeCard(inventory),
+    // A fresh card as stored before ADR-0066: no root.
+    "c-3": { ...encodeCard(card()), kind: "fresh", root: "", column: "k" },
+  }
+
+  test("every row that decodes now, into an empty document; a rootless fresh row dropped", () => {
+    expect(planPlacesCarryOver(old, [])).toEqual({
+      cards: [kept, inventory],
+      dropped: 1,
+    })
+  })
+
+  test("nothing into a document that has cards: it was carried over already", () => {
+    expect(planPlacesCarryOver(old, [kept])).toEqual({ cards: [], dropped: 0 })
+  })
+})
+
+describe("historyOf: the root a move enters the sender's history in (ADR-0066)", () => {
+  const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+  const C1 = cardId("c-1")
+  const inv = { kind: "inventory", holder: ADA } as const
+  const draftingIn = (root: RootId) =>
+    ({ kind: "drafting", root, at: atEntry(E2), lane: null }) as const
+  const queuedIn = {
+    kind: "queued",
+    root: TEST_ROOT,
+    at: atEntry(E2),
+    lane: LANE,
+    seen: "",
+  } as const
+  const at = (place: CardPlace): CardRecord[] => [card({ place })]
+  test.each<[string, Move[], CardRecord[], RootId | null]>([
+    [
+      "a take: the root it left",
+      [{ card: C1, from: draftingIn(TEST_ROOT), to: inv }],
+      at(draftingIn(TEST_ROOT)),
+      TEST_ROOT,
+    ],
+    [
+      "a put: the root it went to",
+      [{ card: C1, from: inv, to: draftingIn(OTHER) }],
+      at(inv),
+      OTHER,
+    ],
+    [
+      "a drag across roots: the root it went to",
+      [{ card: C1, from: draftingIn(TEST_ROOT), to: draftingIn(OTHER) }],
+      at(draftingIn(TEST_ROOT)),
+      OTHER,
+    ],
+    [
+      "a keep from a fresh column: its root",
+      [{ card: C1, from: freshPlace("k"), to: inv }],
+      at(freshPlace("k")),
+      TEST_ROOT,
+    ],
+    [
+      "a queue: its root",
+      [{ card: C1, from: draftingIn(TEST_ROOT), to: queuedIn }],
+      at(draftingIn(TEST_ROOT)),
+      TEST_ROOT,
+    ],
+    [
+      "an unqueue: its root",
+      [{ card: C1, from: queuedIn, to: draftingIn(TEST_ROOT) }],
+      at({ ...queuedIn, order: "a", by: ADA }),
+      TEST_ROOT,
+    ],
+    [
+      "a creation: none",
+      [{ card: C1, from: null, to: draftingIn(TEST_ROOT) }],
+      [],
+      null,
+    ],
+    [
+      "a removal: none",
+      [{ card: C1, from: freshPlace("k"), to: null }],
+      at(freshPlace("k")),
+      null,
+    ],
+    [
+      "between inventories: none",
+      [{ card: C1, from: inv, to: inv }],
+      at(inv),
+      null,
+    ],
+    // The start is the record's: the host accepts a move only from there.
+    [
+      "a take, its start read from the record",
+      [{ card: C1, from: inv, to: inv }],
+      at(draftingIn(OTHER)),
+      OTHER,
+    ],
+  ])("%s", (_, moves, cards, want) => {
+    expect(historyOf(moves, cards)).toBe(want)
+  })
+})
+
+describe("undoAnswer (ADR-0066)", () => {
+  const PLACES = "places"
+  const part = (...ids: string[]) => ({
+    docId: PLACES,
+    footprint: ids.map(id => ["cards", id]),
+  })
+  const c1 = card()
+  test("an undone step names each card it wrote and where it is now; a removed one has no place", () => {
+    expect(
+      undoAnswer(
+        {
+          kind: "undone",
+          step: {
+            parts: [
+              part("c-1", "c-9"),
+              { docId: "other", footprint: [["cards", "x"]] },
+            ],
+          },
+        },
+        [c1],
+        PLACES,
+      ),
+    ).toEqual({
+      kind: "undone",
+      cards: [
+        { card: c1.id, place: c1.place },
+        { card: cardId("c-9"), place: null },
+      ],
+    })
+  })
+  test("a refused step names the card that blocked it as it is now, and its placer; gone when it has none", () => {
+    const moved = card({ placer: BEA })
+    const refused = (stale: string) =>
+      undoAnswer(
+        {
+          kind: "refused",
+          step: { parts: [part("c-1")] },
+          stale: [part(stale)],
+        },
+        [moved],
+        PLACES,
+      )
+    expect(refused("c-1")).toEqual({
+      kind: "refused",
+      code: "moved",
+      now: moved,
+    })
+    expect(refused("c-9")).toEqual({ kind: "refused", code: "gone", now: null })
+  })
+  test("none is nothing", () => {
+    expect(undoAnswer({ kind: "none" }, [c1], PLACES)).toEqual({
+      kind: "nothing",
+    })
+  })
+})
+
+describe("planHistorySweep (ADR-0066)", () => {
+  const DAY = 24 * 60 * 60 * 1000
+  const NOW = 100 * DAY
+  const rootAt = (root: RootId, entry: string): [RootId, RootRecord] => [
+    root,
+    {
+      root,
+      entry: entryId(entry),
+      first: null,
+      firstLine: "",
+      title: null,
+      messages: 0,
+      newest: null,
+      writers: [],
+      mentions: [],
+      images: [],
+    },
+  ]
+  const R = (n: string) => rootIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`)
+  const roots = new Map([
+    rootAt(R("1"), "e-1"),
+    rootAt(R("2"), "e-2"),
+    rootAt(R("3"), "e-3"),
+    rootAt(R("4"), "e-4"),
+  ])
+  const archived = (
+    entry: string,
+    ago: number,
+    state: "archived" | "restored" = "archived",
+  ) =>
+    [
+      entryId(entry),
+      { root: entryId(entry), state, by: ADA, at: NOW - ago },
+    ] as const
+  const archive = new Map([
+    archived("e-1", 7 * DAY + 1000),
+    archived("e-2", 6 * DAY),
+    archived("e-3", 30 * DAY, "restored"),
+  ])
+  const doc = (root: RootId) => movesDocId(ADA, root)
+  const stored = [R("1"), R("2"), R("3"), R("4"), R("5")].map(doc)
+  const sweep = (startup: boolean) =>
+    planHistorySweep({ stored, roots, archive, now: NOW, startup })
+
+  test("a root archived 7 days and a second ago is retired; one archived 6 days ago, a restored one and one never archived are not", () => {
+    expect(sweep(false)).toEqual([doc(R("1"))])
+  })
+  test("at startup, a root the directory does not name is retired too", () => {
+    expect(sweep(true)).toEqual([doc(R("1")), doc(R("5"))])
   })
 })

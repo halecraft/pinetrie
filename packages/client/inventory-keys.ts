@@ -69,10 +69,10 @@ export function keyAct(event: KeyLike, focus: KeyFocus): Intent | null {
     return {
       kind: "undoMove",
       direction: event.shiftKey ? "redo" : "undo",
-      restored: null,
+      inPanel: focus.inPanel,
     }
   if (event.ctrlKey && !event.metaKey && !event.shiftKey && key === "y")
-    return { kind: "undoMove", direction: "redo", restored: null }
+    return { kind: "undoMove", direction: "redo", inPanel: focus.inPanel }
   const step = GRID[event.key]
   if (!focus.inPanel || step === undefined || event.ctrlKey || event.metaKey)
     return null

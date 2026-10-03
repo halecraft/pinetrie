@@ -218,9 +218,13 @@ export function createOfferState(input: {
     async refreshNow(ops, lane) {
       const name = nameOf(lane)
       if (name === undefined) return null
+      const root = docs.rootOfLane(lane)
       const archived =
-        archivedIn(docs.rootOfLane(lane), readRoots(doc), readArchive(doc)) !==
-        null
+        archivedIn(
+          root === null ? [] : [root],
+          readRoots(doc),
+          readArchive(doc),
+        ) !== null
       if (archived) {
         const target = `present(${revsetName(line.onto)})`
         const offer = await readOffer(ops.jj, { name, target })
