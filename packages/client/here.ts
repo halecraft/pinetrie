@@ -10,7 +10,6 @@ import {
   type EntryId,
   type LaneName,
   type RootId,
-  type RootRecord,
   rootOf,
   type TreeIndex,
   type WriterId,
@@ -69,7 +68,7 @@ export interface RunHere {
 /**
  * Every lane the agent is replying on, in any root (ADR-0063): each held
  * lane's run (`activity`), at its tip, then each other lane `running`
- * names, at its root's entry from the directory. A lane whose root has no
+ * names, at its root's entry (`rootEntriesOf`). A lane whose root has no
  * entry yet is left out.
  */
 export function runsHere(input: {
@@ -78,7 +77,7 @@ export function runsHere(input: {
     readonly lane: LaneName
     readonly root: RootId
   }[]
-  readonly directory: ReadonlyMap<RootId, RootRecord>
+  readonly rootEntries: ReadonlyMap<RootId, EntryId>
   readonly index: TreeIndex
 }): readonly RunHere[] {
   const out: RunHere[] = []
@@ -88,8 +87,8 @@ export function runsHere(input: {
   }
   const held = new Set(out.map(r => r.lane))
   for (const { lane, root } of input.running) {
-    const entry = input.directory.get(root)?.entry ?? null
-    if (!held.has(lane) && entry !== null)
+    const entry = input.rootEntries.get(root)
+    if (!held.has(lane) && entry !== undefined)
       out.push({ lane, root: entry, end: entry })
   }
   return out

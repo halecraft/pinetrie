@@ -1513,4 +1513,14 @@ export const mutations: readonly Mutation[] = [
     scenario: "images",
     expect: "another window draws it too",
   },
+  {
+    name: "an archived root's harness outlives its document",
+    file: "apps/pineta/host/index.ts",
+    from: "    releasing: async root => created?.release(root),\n",
+    to: "",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a sent card leaves the box empty, and a tab switch does not bring it back",
+  },
 ]

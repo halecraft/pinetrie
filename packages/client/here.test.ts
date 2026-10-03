@@ -1,11 +1,4 @@
-import {
-  entryId,
-  laneNameForThread,
-  type RootId,
-  type RootRecord,
-  rootIdFor,
-  writerId,
-} from "@pineta/core"
+import { entryId, laneNameForThread, rootIdFor, writerId } from "@pineta/core"
 import { expect, test } from "vitest"
 import { tree } from "./fixtures.ts"
 import {
@@ -115,8 +108,6 @@ test("runsHere: each held run at its tip, then each other running lane at its ro
   const fresh = laneNameForThread("fresh")
   const farRoot = rootIdFor("far")
   const freshRoot = rootIdFor("fresh")
-  const record = (root: RootId, entry: string | null) =>
-    ({ root, entry: entry === null ? null : entryId(entry) }) as RootRecord
   expect(
     runsHere({
       activity: [{ lane: held, tip: entryId("2-a") }],
@@ -125,10 +116,7 @@ test("runsHere: each held run at its tip, then each other running lane at its ro
         { lane: far, root: farRoot },
         { lane: fresh, root: freshRoot },
       ],
-      directory: new Map([
-        [farRoot, record(farRoot, "8-r9")],
-        [freshRoot, record(freshRoot, null)],
-      ]),
+      rootEntries: new Map([[farRoot, entryId("8-r9")]]),
       index,
     }),
   ).toEqual([

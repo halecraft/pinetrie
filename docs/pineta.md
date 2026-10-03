@@ -93,8 +93,8 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 1523/1523 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 942 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 1519/1519 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 945 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
 | end-to-end | `pnpm run e2e` | 12 scenarios, 40 checks, on the scripted model (S67) |
 | with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
@@ -285,8 +285,8 @@ holds streams and active runs. A record's spec names its home, and a command
 or a place that points at an entry carries its root (`Spot`). A tab holds
 only the roots it shows, and declines the rest; the host holds every root
 not archived. A run's end compacts only what it touched. The Archive tab
-searches labels. An existing store is carried over once by
-`scripts/split-session.ts`. With it, a lane's tools and prompt stay put
+searches labels. Duane's store was carried over by a one-off script,
+since deleted (ADR-0063). With it, a lane's tools and prompt stay put
 across runs, so a landing no longer drops the model's thinking (S85).
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's

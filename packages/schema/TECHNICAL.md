@@ -309,8 +309,9 @@ is never stored here: the host rejects it (`resolveDoc`). It is not a pi session
 **A root schema change cannot open an existing store**: Kyneta refuses a schema
 that cannot read what is stored. Migrate (root fields are migratable, S17), or
 move the file aside. A Loro store from before ADR-0023 cannot be opened at all.
-A store from before ADR-0063, the session as one document, is carried over
-once by `scripts/split-session.ts` (ADR-0063's runbook).
+A store from before ADR-0063, the session as one document, does not open. Its
+one-off migration, `scripts/split-session.ts`, was deleted once it had run:
+restore it from the revision before its deletion (ADR-0063).
 
 ## Authoritative JSON, compacted (ADR-0023)
 

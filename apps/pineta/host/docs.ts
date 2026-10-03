@@ -48,6 +48,16 @@ export interface HostDocuments {
 }
 
 /**
+ * What a starting host says it opened: `opened` of the directory's `total`
+ * roots; every other root is archived (`planLoads`).
+ */
+export const openedWords = (opened: number, total: number): string => {
+  const archived = total - opened
+  const roots = `opened ${opened} of ${total} ${total === 1 ? "root" : "roots"}`
+  return archived === 0 ? roots : `${roots} (${archived} archived)`
+}
+
+/**
  * The roots a starting host opens: every root in the directory that is not
  * archived. A busy root cannot be archived (`planArchive`), so these hold
  * every lane a crash could have interrupted. Pure.

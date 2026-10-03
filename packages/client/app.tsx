@@ -66,7 +66,7 @@ import { Column, type ColumnProps } from "./column.tsx"
 import { type Column as ColumnSpec, isPinned } from "./columns.ts"
 import type { SeenEnd } from "./follow.ts"
 import { Header } from "./header.tsx"
-import { planHeldRoots } from "./held-roots.ts"
+import { planHeldRoots, rootEntriesOf } from "./held-roots.ts"
 import { runsHere } from "./here.ts"
 import { type Identity, reconcileName } from "./identity.ts"
 import { type Inbox, mentionsOf } from "./inbox.ts"
@@ -335,22 +335,14 @@ export function App({
   const count = useMemo(() => messagesIn(directory), [directory])
   // The agent's runs and each lane's root, in every root, held or not
   // (ADR-0063): what the header lists.
+  const rootEntries = useMemo(() => rootEntriesOf(directory), [directory])
   const runs = useMemo(
-    () => runsHere({ activity, running, directory, index }),
-    [activity, running, directory, index],
-  )
-  const rootEntries = useMemo(
-    () =>
-      new Map(
-        [...directory.values()].flatMap(r =>
-          r.entry === null ? [] : [[r.root, r.entry] as const],
-        ),
-      ),
-    [directory],
+    () => runsHere({ activity, running, rootEntries, index }),
+    [activity, running, rootEntries, index],
   )
   const laneRoots = useMemo(
-    () => laneRootsOf(workFacts.lanes, directory),
-    [workFacts.lanes, directory],
+    () => laneRootsOf(workFacts.lanes, rootEntries),
+    [workFacts.lanes, rootEntries],
   )
   const work = useMemo(() => rootWork(index, lanes), [index, lanes])
   // A root with no message has no summary, so it has no label in `labels`.

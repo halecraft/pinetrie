@@ -63,7 +63,12 @@ import { createCommands } from "./commands/index.ts"
 import { startControl } from "./control.ts"
 import { createDigests } from "./digests.ts"
 import { createDirectory, type Directory } from "./directory.ts"
-import { type HostDocuments, hostDocuments, planLoads } from "./docs.ts"
+import {
+  type HostDocuments,
+  hostDocuments,
+  openedWords,
+  planLoads,
+} from "./docs.ts"
 import { hotReload as pauseHotReload } from "./hot-reload.ts"
 import { compactAfter, sweepBlobs } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
@@ -302,8 +307,10 @@ export async function startHost({
   directory = createDirectory({ basics, serial, agent: theAgent })
   // The roots that are not archived, opened before anything reads one: every
   // lane that could be running is in one of them (`planLoads`).
-  const roots = planLoads(readRoots(session), readArchive(session))
+  const directoryNow = readRoots(session)
+  const roots = planLoads(directoryNow, readArchive(session))
   for (const root of roots) await docs.root(root)
+  log(`[host] ${openedWords(roots.length, directoryNow.size)}`)
   // Each thread's column banner, when the user config turns banners on. Made
   // before the agent, whose `set_banner` asks it, so it reads the agent
   // lazily, as lane work does.

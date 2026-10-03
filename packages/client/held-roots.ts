@@ -7,13 +7,13 @@
 import type { EntryId, RootId, RootRecord } from "@pineta/core"
 import type { Layout } from "./layout.ts"
 
-/** Each root's id, by its root entry, from the directory. */
-export const rootIdsByEntry = (
+/** Each root's root entry, by its id, from the directory; a root with no message has none. */
+export const rootEntriesOf = (
   directory: ReadonlyMap<RootId, RootRecord>,
-): ReadonlyMap<EntryId, RootId> =>
+): ReadonlyMap<RootId, EntryId> =>
   new Map(
     [...directory.values()].flatMap(r =>
-      r.entry === null ? [] : [[r.entry, r.root] as const],
+      r.entry === null ? [] : [[r.root, r.entry] as const],
     ),
   )
 
@@ -23,7 +23,9 @@ export function planHeldRoots(input: {
   readonly preview: EntryId | null
   readonly directory: ReadonlyMap<RootId, RootRecord>
 }): ReadonlySet<RootId> {
-  const ids = rootIdsByEntry(input.directory)
+  const ids = new Map(
+    [...rootEntriesOf(input.directory)].map(([root, entry]) => [entry, root]),
+  )
   const { active } = input.layout
   const entries = [
     ...input.layout.open,

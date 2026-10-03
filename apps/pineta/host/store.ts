@@ -6,9 +6,9 @@
 // session's records, `pineta:live`, the places, and one `StorageDoc` per root,
 // which is that root's pi storage (ADR-0063). It is not a pi session file. A
 // document whose root schema drops a field still opens (S86); any other
-// change to it cannot open an existing store: migrate it
-// (`scripts/split-session.ts` did), or start a new file. The host's images are in the same
-// file, in `pineta_blobs` (`blobs.ts`, ADR-0042), on the same connection.
+// change to it cannot open an existing store: migrate it, or start a new
+// file. The host's images are in the same file, in `pineta_blobs` (`blobs.ts`,
+// ADR-0042), on the same connection.
 //
 // The store owns its file (S47). Kyneta's SQLite store issues the same seat on
 // every open, so the host keeps its peer id across restarts; that is sound

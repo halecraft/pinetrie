@@ -2331,7 +2331,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the header lists no run in a root not held",
     file: "packages/client/here.ts",
-    from: "    if (!held.has(lane) && entry !== null)",
+    from: "    if (!held.has(lane) && entry !== undefined)",
     to: "    if (false)",
     command: unit,
     expect: "runsHere: each held run at its tip",

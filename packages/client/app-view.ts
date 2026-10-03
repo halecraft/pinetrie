@@ -16,7 +16,6 @@ import {
   projectRail,
   type RailRow,
   type RootId,
-  type RootRecord,
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
@@ -80,15 +79,15 @@ export interface AppViewInput {
   readonly laneRoots: ReadonlyMap<LaneName, EntryId>
 }
 
-/** Every lane's root entry: its `LaneRecord`'s root, through the directory (ADR-0063). */
+/** Every lane's root entry: its `LaneRecord`'s root, through `rootEntries` (ADR-0063). */
 export const laneRootsOf = (
   records: ReadonlyMap<LaneName, LaneRecord>,
-  directory: ReadonlyMap<RootId, RootRecord>,
+  rootEntries: ReadonlyMap<RootId, EntryId>,
 ): ReadonlyMap<LaneName, EntryId> =>
   new Map(
     [...records.values()].flatMap(r => {
-      const entry = directory.get(r.root)?.entry ?? null
-      return entry === null ? [] : [[r.lane, entry] as const]
+      const entry = rootEntries.get(r.root)
+      return entry === undefined ? [] : [[r.lane, entry] as const]
     }),
   )
 

@@ -76,14 +76,12 @@ lane leaves (S30).
 - A tab load costs its own root. A closed tab holds no root.
 - pi runs a session and a harness per root, about 0.35 ms and 49 KB each
   (S84). Lanes in two roots never wait on one another's commits.
-- An existing store is carried over once by `scripts/split-session.ts`,
-  over the pure `planSplit` in `scripts/split-plan.ts`. Its runbook: stop
-  the host, run `node scripts/split-session.ts [.pineta/pineta.db]`, start
-  the host. The script copies the file to `pineta.db.before-0063` first, and
-  refuses a store a host has open. On Duane's store it carried 59 roots, 83
-  lanes and 378 session records over in about 6.5 s, and dropped 3 orphan
-  usage rows. Both files go in a later change, once that store is carried
-  over.
+- Duane's store was carried over once, on 2026-10-03, by a one-off
+  script (`scripts/split-session.ts`, over a pure `planSplit`), deleted once
+  it had run. It carried 60 roots, 86 lanes and 388 session records over in
+  about 4 s, and dropped 4 usage rows whose entries were gone. A store from
+  before this ADR no longer opens; for another such store, restore the
+  script from the revision before its deletion.
 - A command names its root, so the host can leave a root unloaded and still
   refuse a command at an archived one.
 

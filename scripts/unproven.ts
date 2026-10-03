@@ -54,7 +54,6 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     "the other window's edit reaches the card's owner, and the card names who wrote in it",
     "what you type is still there after switching tabs",
     "Cmd+Z undoes your last run of typing, and Cmd+Shift+Z redoes it",
-    "a sent card leaves the box empty, and a tab switch does not bring it back",
     "Cmd+Z after a send changes nothing",
     "Cmd+Z past a card's creation empties it and keeps its record, and Cmd+Shift+Z in its box brings its text back",
     "a new branch's text is kept across a tab switch",

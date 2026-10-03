@@ -1043,4 +1043,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a split whose skill read fails starts no container",
   },
+  {
+    name: "a starting host counts archived roots as opened",
+    file: "apps/pineta/host/docs.ts",
+    from: "  const archived = total - opened\n",
+    to: "  const archived = 0\n",
+    command: unit,
+    expect: "openedWords: how many roots a starting host opened",
+  },
 ]

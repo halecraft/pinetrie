@@ -65,8 +65,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a presence read gives a new array for the same entries",
     file: "packages/reads/index.ts",
-    from: "    if (before !== undefined && samePairs(before, now)) return before",
-    to: "    if (before !== undefined && false) return before",
+    from: "    samePairs,\n",
+    to: "    () => false,\n",
     command: unit,
     expect: "keeps its array while its entries are the same",
   },
@@ -146,9 +146,17 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the names are a new map on every session write",
     file: "packages/reads/index.ts",
-    from: "    [...now].every(([w, name]) => before.get(w) === name)",
-    to: "    false",
+    from: "      [...readRecords(doc, PARTICIPANT).values()].map(r => [r.writer, r.name]),\n    ),\n  sameMap,",
+    to: "      [...readRecords(doc, PARTICIPANT).values()].map(r => [r.writer, r.name]),\n    ),\n  () => false,",
     command: unit,
     expect: "readParticipantNames keeps its map while the names are the same",
+  },
+  {
+    name: "the reported roots are a new map on every presence write",
+    file: "packages/reads/index.ts",
+    from: "    return now\n  },\n  sameMap,",
+    to: "    return now\n  },\n  () => false,",
+    command: unit,
+    expect: "each followed end's root, as its column reported it",
   },
 ]

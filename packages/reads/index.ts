@@ -323,7 +323,29 @@ export function readRunningLanes(
     .map(r => ({ lane: r.lane, root: r.root }))
 }
 
-const lastNames = new WeakMap<SessionDocHandle, ReadonlyMap<WriterId, string>>()
+/**
+ * `read`, returning its last result for a document while a new one is
+ * `same`. Kyneta gives a record a new identity on every write, the same
+ * value written again included, and a memo or `React.memo` keyed on a read
+ * skips only while the read keeps its identity (S59).
+ */
+function keptWhileSame<D extends object, T>(
+  read: (doc: D) => T,
+  same: (a: T, b: T) => boolean,
+): (doc: D) => T {
+  const last = new WeakMap<D, T>()
+  return doc => {
+    const now = read(doc)
+    const before = last.get(doc)
+    if (before !== undefined && same(before, now)) return before
+    last.set(doc, now)
+    return now
+  }
+}
+
+/** Whether two maps hold the same keys, each with the same value. */
+const sameMap = <K, V>(a: ReadonlyMap<K, V>, b: ReadonlyMap<K, V>): boolean =>
+  a.size === b.size && [...a].every(([k, v]) => b.has(k) && b.get(k) === v)
 
 /**
  * Each writer's display name (`pineta.participant`). The same map while the
@@ -331,22 +353,13 @@ const lastNames = new WeakMap<SessionDocHandle, ReadonlyMap<WriterId, string>>()
  * session's other records, the directory's among them, change far more often
  * (ADR-0063).
  */
-export function readParticipantNames(
-  doc: SessionDocHandle,
-): ReadonlyMap<WriterId, string> {
-  const now = new Map(
-    [...readRecords(doc, PARTICIPANT).values()].map(r => [r.writer, r.name]),
-  )
-  const before = lastNames.get(doc)
-  if (
-    before !== undefined &&
-    before.size === now.size &&
-    [...now].every(([w, name]) => before.get(w) === name)
-  )
-    return before
-  lastNames.set(doc, now)
-  return now
-}
+export const readParticipantNames = keptWhileSame(
+  (doc: SessionDocHandle): ReadonlyMap<WriterId, string> =>
+    new Map(
+      [...readRecords(doc, PARTICIPANT).values()].map(r => [r.writer, r.name]),
+    ),
+  sameMap,
+)
 
 /**
  * Every participant's display name, guests included: the list a mention
@@ -389,61 +402,43 @@ const samePairs = (a: PresenceEntries, b: PresenceEntries): boolean =>
  * seat's `seatKey`, and the writer is what comes before the first colon
  * (`writerOfKey`).
  *
- * A write of the same value (the page's refresh) gives Kyneta's record a new
- * identity, so the last result is kept per document and returned while its
- * entries are the same: memos keyed on it then skip.
+ * The page's refresh writes the same values again, so the result is kept
+ * while its entries are the same (`keptWhileSame`).
  */
-function presenceField(
+const presenceField = (
   field: (doc: PresenceDocHandle) => Record<string, string | null>,
-): (doc: PresenceDocHandle) => PresenceEntries {
-  const last = new WeakMap<PresenceDocHandle, PresenceEntries>()
-  return doc => {
-    const now = Object.entries(field(doc)).flatMap(([key, value]) => {
-      const writer = writerOfKey(key)
-      return value === null || writer === undefined
-        ? []
-        : [[writer as WriterId, entryId(value)] as const]
-    })
-    const before = last.get(doc)
-    if (before !== undefined && samePairs(before, now)) return before
-    last.set(doc, now)
-    return now
-  }
-}
+): ((doc: PresenceDocHandle) => PresenceEntries) =>
+  keptWhileSame(
+    doc =>
+      Object.entries(field(doc)).flatMap(([key, value]) => {
+        const writer = writerOfKey(key)
+        return value === null || writer === undefined
+          ? []
+          : [[writer as WriterId, entryId(value)] as const]
+      }),
+    samePairs,
+  )
 
 /** One entry per open column: its writer, and the thread end it follows. */
 export const readReading = presenceField(doc => doc.reading())
-const lastReadingRoots = new WeakMap<
-  PresenceDocHandle,
-  ReadonlyMap<EntryId, EntryId>
->()
-
 /**
  * Each followed thread end's root entry (ADR-0063), from the column that
- * reports it: what a window that does not hold the root opens it by. The
- * same map while its pairs are the same, as `presenceField`'s are.
+ * reports it: what a window that does not hold the root opens it by. Kept
+ * while unchanged, as `presenceField`'s reads are.
  */
-export function readReadingRoots(
-  doc: PresenceDocHandle,
-): ReadonlyMap<EntryId, EntryId> {
-  const reading = doc.reading()
-  const roots = doc.readingRoot()
-  const now = new Map<EntryId, EntryId>()
-  for (const [key, end] of Object.entries(reading)) {
-    const root = roots[key]
-    if (end !== null && root !== null && root !== undefined)
-      now.set(entryId(end), entryId(root))
-  }
-  const before = lastReadingRoots.get(doc)
-  if (
-    before !== undefined &&
-    before.size === now.size &&
-    [...now].every(([end, root]) => before.get(end) === root)
-  )
-    return before
-  lastReadingRoots.set(doc, now)
-  return now
-}
+export const readReadingRoots = keptWhileSame(
+  (doc: PresenceDocHandle): ReadonlyMap<EntryId, EntryId> => {
+    const roots = doc.readingRoot()
+    const now = new Map<EntryId, EntryId>()
+    for (const [key, end] of Object.entries(doc.reading())) {
+      const root = roots[key]
+      if (end !== null && root !== null && root !== undefined)
+        now.set(entryId(end), entryId(root))
+    }
+    return now
+  },
+  sameMap,
+)
 
 /** One entry per seat typing: its writer, and the thread end. */
 export const readTyping = presenceField(doc => doc.typing())
