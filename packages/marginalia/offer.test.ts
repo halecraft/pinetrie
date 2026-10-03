@@ -18,7 +18,7 @@ import {
   acceptStack,
   answerDiff,
   answerReview,
-  baseBehind,
+  baseMoved,
   decodeBaseRecord,
   decodeLineRecord,
   decodeOfferRecord,
@@ -75,7 +75,7 @@ describe("offerView: ADR-0038's table", () => {
     o: OfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" | "split" = "idle",
     landing?: LandingRecord,
-    catching: { behind?: boolean; catchUp?: "drafted" | "queued" | null } = {},
+    catching: { behind?: boolean; catchingUp?: boolean } = {},
   ) =>
     offerView({
       offer: o,
@@ -85,7 +85,7 @@ describe("offerView: ADR-0038's table", () => {
       onto: "pineta-onto",
       wipAhead: 0,
       behind: catching.behind ?? false,
-      catchUp: catching.catchUp ?? null,
+      catchingUp: catching.catchingUp ?? false,
     })
   const at = (v: ReturnType<typeof view>) => [v.state, v.buttons, v.menu]
   test("every state, with its buttons", () => {
@@ -182,21 +182,20 @@ describe("offerView: ADR-0038's table", () => {
       [],
     ])
   })
-  test("a card bringing the thread up to date: drafting, the strip offers it no more; queued on an idle lane, the offer is busy with it", () => {
-    expect(
-      at(view(offer, "idle", undefined, { behind: true, catchUp: "drafted" })),
-    ).toEqual(["ready", ["take", "split"], ["describe"]])
-    const queued = view(offer, "idle", undefined, { catchUp: "queued" })
+  test("a card bringing the thread up to date, queued on an idle lane: the offer is busy with it", () => {
+    const queued = view(offer, "idle", undefined, { catchingUp: true })
     expect([queued.state, queued.buttons, queued.facts.activity]).toEqual([
       "busy",
       [],
       "catch-up",
     ])
     expect(
-      view(offer, "turn", undefined, { catchUp: "queued" }).facts.activity,
+      view(offer, "turn", undefined, { catchingUp: true }).facts.activity,
     ).toBe("turn")
   })
-  test("baseBehind: the commit a lane last took from its base is not the base's now", () => {
+  test("baseMoved: from the commit a lane last took from its base to the base's now", () => {
+    const moved = (...args: Parameters<typeof baseMoved>) =>
+      baseMoved(...args) !== null
     const L1 = commitId("l1")
     const L2 = commitId("l2")
     const W1 = commitId("w1")
@@ -230,22 +229,31 @@ describe("offerView: ADR-0038's table", () => {
       start: W1,
       state: "ok" as const,
     }
-    expect(baseBehind(onLine, line(L1))).toBe(false)
-    expect(baseBehind(onLine, line(L2))).toBe(true)
-    expect(baseBehind(onLine, line(null))).toBe(false)
-    expect(baseBehind(undefined, line(L2))).toBe(false)
+    expect(moved(onLine, line(L1))).toBe(false)
+    expect(moved(onLine, line(L2))).toBe(true)
+    expect(moved(onLine, line(null))).toBe(false)
+    expect(moved(undefined, line(L2))).toBe(false)
+    expect(moved(onWip, line(L2, [{ bookmark: "wip/a", commit: W1 }]))).toBe(
+      false,
+    )
     expect(
-      baseBehind(onWip, line(L2, [{ bookmark: "wip/a", commit: W1 }])),
-    ).toBe(false)
+      moved(onWip, line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }])),
+    ).toBe(true)
+    // Landed: on the line now, and caught up with it only once merged.
+    expect(moved({ ...onWip, state: "landed" }, line(L2))).toBe(true)
+    expect(moved({ ...onWip, state: "gone" }, line(L2))).toBe(false)
+    expect(baseMoved(onLine, line(L2))).toEqual({
+      base: { kind: "line" },
+      bookmark: "pineta-onto",
+      from: L1,
+      to: L2,
+    })
     expect(
-      baseBehind(
+      baseMoved(
         onWip,
         line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }]),
       ),
-    ).toBe(true)
-    // Landed: on the line now, and caught up with it only once merged.
-    expect(baseBehind({ ...onWip, state: "landed" }, line(L2))).toBe(true)
-    expect(baseBehind({ ...onWip, state: "gone" }, line(L2))).toBe(false)
+    ).toMatchObject({ bookmark: "wip/a", from: W1, to: "w2" })
   })
   test("a resolution that asked you counts only when newer than the offer", () => {
     const asked: LandingRecord = {

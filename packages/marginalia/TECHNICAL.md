@@ -409,10 +409,10 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   labels are the client's (`offerWords`, `@pineta/client`, ADR-0040). A
   resolution that asked for you counts only when newer than the offer. An
   open offer with no files is `nothing`: its work is already where it sits,
-  by a route the ledger does not record. Behind its base (`baseBehind`),
-  catching up moves from the menu to the buttons; a card of yours drafting
-  with the command removes it, and one queued makes the offer busy
-  (`catch-up`).
+  by a route the ledger does not record. Behind its base (`baseMoved`: the
+  bookmark, and the commits it moved from and to, or null), catching up
+  moves from the menu to the buttons; a card with the command queued makes
+  the offer busy (`catch-up`).
 - **`baseName`** (`work.ts`) is the one wording of a base: "the project"
   for the line, the bookmark for a WIP (ADR-0061). `updateLine` uses it
   through the update's stored `line` flag; an update stored before the flag

@@ -181,7 +181,7 @@ export function lineWords(view: LineView): LineWords {
     }
   }
   return {
-    trigger: "◆ the project",
+    trigger: "◆ project",
     label: `the project: where finished work is added, ${onto} in jj`,
     heading: "The project",
     notes: yourFiles(view.facts),

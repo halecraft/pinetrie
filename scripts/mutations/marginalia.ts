@@ -8,47 +8,38 @@ export const mutations: readonly Mutation[] = [
   {
     name: "behind its base, catching up stays in the menu",
     file: "packages/marginalia/offer.ts",
-    from: '        : input.behind && menu.includes("update")',
-    to: '        : false && menu.includes("update")',
+    from: '      input.behind && menu.includes("update")',
+    to: '      false && menu.includes("update")',
     command: unit,
     expect:
       "behind its base, catching up stands beside the offer; with nothing to take, alone",
   },
   {
-    name: "a drafted catch-up is offered again on the strip",
-    file: "packages/marginalia/offer.ts",
-    from: '      input.catchUp === "drafted"',
-    to: "      false",
-    command: unit,
-    expect:
-      "a card bringing the thread up to date: drafting, the strip offers it no more; queued on an idle lane, the offer is busy with it",
-  },
-  {
     name: "a queued catch-up is no activity",
     file: "packages/marginalia/offer.ts",
-    from: '    input.activity === "idle" && input.catchUp === "queued"',
+    from: '    input.activity === "idle" && input.catchingUp',
     to: "    false",
     command: unit,
     expect:
-      "a card bringing the thread up to date: drafting, the strip offers it no more; queued on an idle lane, the offer is busy with it",
+      "a card bringing the thread up to date, queued on an idle lane: the offer is busy with it",
   },
   {
-    name: "a line thread is never behind",
+    name: "a moved base is never seen",
     file: "packages/marginalia/offer.ts",
-    from: "  if (bookmark === null) return base.start !== line.commit",
-    to: "  if (bookmark === null) return false",
+    from: "  return now === undefined || now.commit === base.start\n",
+    to: "  return true\n",
     command: unit,
     expect:
-      "baseBehind: the commit a lane last took from its base is not the base's now",
+      "baseMoved: from the commit a lane last took from its base to the base's now",
   },
   {
-    name: "a WIP thread is never behind",
+    name: "a WIP thread is measured against the line",
     file: "packages/marginalia/offer.ts",
-    from: "  return wip !== undefined && wip.commit !== base.start",
-    to: "  return false",
+    from: '    thread.kind === "line"\n      ? { bookmark: line.onto, commit: line.commit }',
+    to: "    true\n      ? { bookmark: line.onto, commit: line.commit }",
     command: unit,
     expect:
-      "baseBehind: the commit a lane last took from its base is not the base's now",
+      "baseMoved: from the commit a lane last took from its base to the base's now",
   },
   {
     name: "the line is named by its bookmark",

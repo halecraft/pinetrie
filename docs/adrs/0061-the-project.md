@@ -3,8 +3,8 @@
 **Status:** Accepted (Duane, 2026-10-03). Evidence: S80. Implemented by
 `PLAN-2026-10-03-jj-ux`. Amends ADR-0060 (its
 words; and "Pineta never touches your files or your `@`", for one act you
-ask for), ADR-0055 ("bring up to date" is "catch up", and how a card with
-a command says so), ADR-0032 (where the composer says where an agent
+ask for), ADR-0055 ("bring up to date" is "catch up", its button acts at once,
+and how a card with a command says so), ADR-0032 (where the composer says where an agent
 works), ADR-0029 and ADR-0038 (archiving a root withdraws its threads'
 offers).
 
@@ -43,7 +43,7 @@ who does, it says nothing about what to do next.
   (land my work), and "update my files" (below).
 - **A thread knows when its base has moved on**, from records the page has:
   the commit its newest `Pineta-Base` names against the line's commit or the
-  WIP's (`baseBehind`). Then the offer's strip says "the project has new
+  WIP's (`baseMoved`). Then the offer's strip says "the project has new
   work", catching up stands beside the offer instead of in its menu, and
   the column's header shows ↓, titled with the bookmark and both commits.
 - **The composer says what a send does to your files**: "works on its own
@@ -54,8 +54,14 @@ who does, it says nothing about what to do next.
 - **A card with a command says what sending it does**, above its box:
   "↓ catches up with the project first, then sends what you write". Its
   button is "catch up", or "catch up and send" with text; its box's text is
-  optional. While it is drafting, the strip offers catching up no more;
-  queued, the strip says the thread is catching up.
+  optional. Queued, the strip says the thread is catching up.
+- **Catching up acts at once** (amended in place, Duane, 2026-10-03). The
+  strip's catch-up button (and "continue from the project", and "resolve in
+  the thread") queues a new card holding the command and no text, which the
+  host takes when the lane is free; your composer is left as it was. A
+  second press to send it was one step too many: what to do with the new
+  work can be said in a message after it. A card still carries a command
+  when one is unqueued, and then says so as above.
 - **Archiving a root withdraws its threads' offers**, edited ones too:
   offers are immutable, so editing one is an expert's deliberate act.
   Restoring builds them again from the lane history it brings back. It is
@@ -92,7 +98,7 @@ who does, it says nothing about what to do next.
 - **"Resolve with the agent" opens a new agent tab** working in your files
   (its box's `Prefill` carries the work setting), its box holding
   `/pineta:skill:resolve-conflicts` and the conflicted files, for you to
-  send, as catching up leaves its card for you to send (ADR-0055). The
+  send. The
   agent reads the conflicts from your working copy itself: the skill has a
   section for your own files, where `ask_for_guidance` is not available
   and it asks in its reply. No host-built prompt (`planResolution`) is

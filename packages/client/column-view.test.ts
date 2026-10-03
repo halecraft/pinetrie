@@ -193,7 +193,7 @@ const facts = (
     mountedBanner: null,
     writable: true,
     nameOf: new Map([[ADA, "Ada"]]),
-    catchUp: null,
+    catchingUp: false,
     lanes: [],
     work: work(),
     ...over,
@@ -517,7 +517,7 @@ describe("offerWords", () => {
     o: OfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" = "idle",
     base: Parameters<typeof offerView>[0]["base"] = LINE_BASE,
-    catching: { behind?: boolean; catchUp?: "drafted" | "queued" } = {},
+    catching: { behind?: boolean; catchingUp?: boolean } = {},
   ) =>
     offerWords(
       offerView({
@@ -528,7 +528,7 @@ describe("offerWords", () => {
         onto: "pineta-onto",
         wipAhead: 2,
         behind: catching.behind ?? false,
-        catchUp: catching.catchUp ?? null,
+        catchingUp: catching.catchingUp ?? false,
       }),
     )
   const WIP_BASE = {
@@ -627,7 +627,7 @@ describe("offerWords", () => {
     )
   })
   test("a queued catch-up is the offer's activity: the strip says it is catching up", () => {
-    expect(words(offer, "idle", LINE_BASE, { catchUp: "queued" }).line).toBe(
+    expect(words(offer, "idle", LINE_BASE, { catchingUp: true }).line).toBe(
       "catching up with the project…",
     )
   })

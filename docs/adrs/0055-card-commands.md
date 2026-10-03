@@ -10,9 +10,10 @@ request, and the cards document goes.
 Amended by ADR-0060: "bring up to date" is always with the thread's base,
 named on its button, and "continue on the line" is a second command, for a
 thread whose WIP is gone.
-Amended by ADR-0061: "bring up to date" is worded "catch up"; a card
-with a command says above its box what sending it does, and its button
-names the command.
+Amended by ADR-0061: "bring up to date" is worded "catch up"; its button
+queues a card with the command and no text at once, rather than giving
+your card the command to send; a card with a command says above its box
+what sending it does, and its button names the command.
 
 **Context.** ADR-0048 makes queued messages queued cards, and removes
 `pineta.outbox`. The outbox holds two kinds of thing: messages, and "Update

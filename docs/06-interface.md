@@ -64,7 +64,7 @@ the session, from live data only, as a document editor shows the people in it.
   threads it is working in. A click lists them, and a row opens one. Idle, it
   is not shown.
 - **The project** (ADR-0060, ADR-0061): a menu for the integration line,
-  "◆ the project", where finished work is added; its bookmark is in its
+  "◆ project", where finished work is added; its bookmark is in its
   title. Before it exists it offers **set up the project**, showing the
   bookmark it makes at your `@-` and the exact `immutable_heads()` and
   `revsets.log` text it writes to your repo's config (the log, so jj and
@@ -236,13 +236,15 @@ so it is the one behind the menu. What each does is under "Starting" below.
   thread lacks, the strip says so ("2 files ready · the project has new
   work"), catching up stands beside the offer, and the column's header shows
   ↓, titled with the bookmark and both commits. Catching up, and **resolve
-  in the thread** when your edits and the offer conflict, put the command
-  on your card at the thread's end, making one if you have none, and focus
-  it: the composer says above its box "↓ catches up with the project first,
-  then sends what you write", with a × that sends it as a plain message
-  instead, and its button reads "catch up", or "catch up and send". What you
-  write is what the agent should do with the new work (ADR-0055); while it
-  is queued, the strip says "catching up with the project…".
+  in the thread** when your edits and the offer conflict, do it at once
+  (ADR-0061): each queues a new card holding the command and no text, which
+  the host takes when the lane is free, and your composer is left as it
+  was. The queued card says "↓ catches up with the project first", and the
+  strip "catching up with the project…". A card that already carries a
+  command (one unqueued, say) says so above its box, with a × that sends it
+  as a plain message instead, and its button reads "catch up", or "catch up
+  and send"; what you write is what the agent should do with the new work
+  (ADR-0055).
 - **A column widens to review its offer** (ADR-0047). The offer's line opens
   the review to the right of the thread, which keeps its place and width: a
   file list when there is more than one file, and one scroll of every file's diff, each file's head pinned

@@ -100,16 +100,17 @@ export type ColumnAct =
       readonly command: CardCommand | null
     }
   /**
-   * The bring-up-to-date button, or continue-on-line's (ADR-0060): your card
-   * at the column's end, `card`, or `create` when you have none there, gets
-   * `command`, and the column keyed `key` takes focus (ADR-0055).
+   * The catch-up button, or continue-on-line's (ADR-0060, ADR-0061): a new
+   * card, `create`, made at the thread's end with `command` and no text,
+   * and queued on `lane` at once, so the host carries the command out when
+   * the lane is free. Your card in the composer is left as it is.
    */
   | {
       readonly kind: "bringUpToDate"
-      readonly key: string
-      readonly card: CardId | null
       readonly create: CardRecord
       readonly command: CardCommand
+      readonly lane: LaneName
+      readonly at: Position
     }
   /** Act on the lane's offer in your repo; a take names its destination (ADR-0060). */
   | {
@@ -532,20 +533,24 @@ function planColumn(
     }
     case "setCommand":
       return [{ kind: "setCommand", card: act.card, command: act.command }]
-    case "bringUpToDate": {
-      const { command } = act
+    case "bringUpToDate":
+      // Made, then queued: the host sets the command before the queue's
+      // move, so the drain that move starts takes it with its command.
       return [
-        act.card === null
-          ? {
-              kind: "createCard",
-              card: { ...act.create, command },
-              text: "",
-              how: NOT_RECORDED(key),
-            }
-          : { kind: "setCommand", card: act.card, command },
-        { kind: "armFocus", key: act.key },
+        {
+          kind: "createCard",
+          card: { ...act.create, command: act.command },
+          text: "",
+          how: NOT_RECORDED(key),
+        },
+        {
+          kind: "queueCard",
+          card: act.create.id,
+          lane: act.lane,
+          at: act.at,
+          how: NOT_RECORDED(key),
+        },
       ]
-    }
     case "offer":
       return [{ kind: "offer", lane: act.lane, action: act.action, to: act.to }]
   }

@@ -179,10 +179,7 @@ export function CardEditor(p: {
   onAct: (act: ColumnAct) => void
   /** The thread's base (`effectiveBase`): what a card's command catches up with. */
   threadBase: ThreadBase
-  /**
-   * Whether this column asked for focus: just opened, or its card given a
-   * command. Asked on mounting and when the command changes.
-   */
+  /** Whether this column asked for focus, just opened. Asked on mounting. */
   takeFocus: (() => boolean) | undefined
 }) {
   const { session, card, prefill, pending } = p
@@ -377,11 +374,10 @@ export function CardEditor(p: {
   // A column you just opened is for typing in: focus lands after its
   // prefill (`onFocus`). After the strip's alignment, which is a layout
   // effect; the focus scrolls a column opened past the strip's edge into view.
-  // A card given a command asks again: you write what to do with it.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on opening, and when the command changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, on opening
   useEffect(() => {
     if (p.takeFocus?.() === true) box.current?.focus()
-  }, [command])
+  }, [])
 
   /**
    * Write into the box as typing would: the element changes, and its `input`

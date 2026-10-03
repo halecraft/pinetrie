@@ -90,12 +90,9 @@ describe("lineView and lineWords (ADR-0060)", () => {
       "the project has 3 commits your files don't: rebase onto pineta-onto in jj",
     )
   })
-  test("the project is named as the project; its bookmark only in the label", () => {
+  test("the header's button says project; its bookmark only in the label", () => {
     const words = lineWords(lineView(record()))
-    expect([words.trigger, words.heading]).toEqual([
-      "◆ the project",
-      "The project",
-    ])
+    expect([words.trigger, words.heading]).toEqual(["◆ project", "The project"])
     expect(words.label).toContain("pineta-onto")
   })
   test("no record: absent", () => {

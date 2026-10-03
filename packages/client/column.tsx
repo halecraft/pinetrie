@@ -382,11 +382,7 @@ export function Column(p: ColumnProps) {
   )
   const shows = columnView({
     mountedBanner,
-    catchUp: queued.some(c => c.command !== null)
-      ? "queued"
-      : (mine?.command ?? null) !== null
-        ? "drafted"
-        : null,
+    catchingUp: queued.some(c => c.command !== null),
     index,
     view,
     lane,
@@ -457,9 +453,8 @@ export function Column(p: ColumnProps) {
           },
     )
   })
-  // Bringing the thread up to date is a command on your card here (ADR-0055):
-  // the one you have at its end, or a new one, focused, so you write what the
-  // agent should do with the new work.
+  // Catching up is a card with the command and no text, queued at once
+  // (ADR-0055, ADR-0061): the host takes it when the lane is free.
   // A take names its destination: the default, or the line (ADR-0060).
   const actOnOffer = (button: OfferButton) => {
     if (lane.kind !== "lane") return
@@ -480,16 +475,16 @@ export function Column(p: ColumnProps) {
     }
     if (button !== "update" && button !== "resolve" && button !== "continue")
       return act({ kind: "offer", lane: lane.name, action: button, to: null })
-    if (place?.kind !== "drafting") return
+    if (at.kind !== "entry") return
     act({
       kind: "bringUpToDate",
-      key: p.column.key,
       command: button === "continue" ? "continue-on-line" : "bring-up-to-date",
-      card: mine?.id ?? null,
+      lane: lane.name,
+      at,
       create: {
         id: newCardId(),
         owner: p.session.writer,
-        place,
+        place: { kind: "drafting", at, lane: lane.name },
         placer: p.session.writer,
         command: null,
         unsent: null,

@@ -624,14 +624,14 @@ became of its files (`strip`).
   the project, with your 2 commits beneath it". A conflicted offer on the
   line offers "resolve in the thread", never a take onto it. The bookmark is
   a fact of its own, drawn apart (`.offer-bookmark`), never in the line.
-- **A thread behind its base** (`baseBehind`, from `pineta.base`'s
+- **A thread behind its base** (`baseMoved`, from `pineta.base`'s
   `start` against `pineta.line`'s commits, with no host fact of its own):
   the strip's line adds "· the project has new work", or is that alone with
   nothing to add; catching up moves from the `⋯` menu to the buttons; the
-  header shows `behindMark`'s ↓. `ColumnFacts.catchUp` is a card at the
-  thread's end with a command: yours drafting (the strip offers catching up
-  no more), or one queued (`offerView`'s `catch-up` activity: "catching up
-  with the project…").
+  header shows `behindMark`'s ↓, titled from the same move (the bookmark,
+  and the commits it went from and to). `ColumnFacts.catchingUp` is a card
+  with a command queued on the lane (`offerView`'s `catch-up` activity:
+  "catching up with the project…").
 - **A thread's base** shows in its header only when it is not the line
   (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
   update becomes "continue from the project" and no take is offered.
@@ -1115,11 +1115,12 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   prompt's role) comes first: while it runs, the line counts files so far
   and offers nothing. A lane that works directly says so ("edits your files
   directly"), and names other lanes running in the same directory now.
-- **"Bring up to date" is a command on your card** (ADR-0055): the button is
-  the `bringUpToDate` act, which sets the command on your card at the
-  column's end, or creates one with it, and arms the column's focus. The
-  editor asks `takeFocus` again whenever its card's command changes, so the
-  box takes focus in a column already open. The card says above its box what
+- **Catching up is a card queued at once** (ADR-0055, ADR-0061): the button
+  is the `bringUpToDate` act, which creates a card at the thread's end with
+  the command and no text, then queues it, two effects in that order. The
+  host takes them in order, so the command is set before the queue's move
+  starts the drain that takes the card. Your card in the composer is not
+  touched. A card that carries a command anyway (one unqueued) says above its box what
   sending it does first (`commandNote`), its placeholder says its text is
   optional, and its button names the command (`commandSendWords`: "catch
   up", "catch up and send"), its queue place in the title. The card is

@@ -30,9 +30,8 @@ import {
   type WriterId,
 } from "@pineta/core"
 import {
-  baseBehind,
+  baseMoved,
   baseName,
-  effectiveBase,
   type OfferActivity,
   type OfferButton,
   type OfferView,
@@ -222,11 +221,8 @@ export interface ColumnFacts {
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly lanes: readonly LaneView[]
   readonly work: WorkFacts
-  /**
-   * A card at the thread's end bringing it up to date (ADR-0055): yours,
-   * still drafting, or one queued on its lane.
-   */
-  readonly catchUp: "drafted" | "queued" | null
+  /** A card bringing the thread up to date is queued on its lane (ADR-0055). */
+  readonly catchingUp: boolean
 }
 
 export interface ColumnShows {
@@ -241,7 +237,7 @@ export interface ColumnShows {
   readonly reserve: ReserveStep
   /** The thread's base when it is not the line (ADR-0060), worded; null otherwise. */
   readonly base: string | null
-  /** The thread's base has moved on since it last caught up (`baseBehind`). */
+  /** The thread's base has moved on since it last caught up (`baseMoved`). */
   readonly behind: { readonly mark: string; readonly title: string } | null
 }
 
@@ -302,18 +298,13 @@ export function behindMark(
   base: BaseRecord | undefined,
   line: LineRecord | null,
 ): ColumnShows["behind"] {
-  if (base === undefined || line === null || !baseBehind(base, line))
-    return null
-  const thread = effectiveBase(base)
-  const bookmark = thread.kind === "line" ? line.onto : thread.bookmark
-  const now =
-    thread.kind === "line"
-      ? line.commit
-      : line.wips.find(w => w.bookmark === thread.bookmark)?.commit
-  return {
-    mark: "↓",
-    title: `${baseName(thread)} has new work since this thread started · ${bookmark}: ${base.start.slice(0, 8)} → ${(now ?? "").slice(0, 8)}`,
-  }
+  const moved = baseMoved(base, line)
+  return moved === null
+    ? null
+    : {
+        mark: "↓",
+        title: `${baseName(moved.base)} has new work since this thread started · ${moved.bookmark}: ${moved.from.slice(0, 8)} → ${moved.to.slice(0, 8)}`,
+      }
 }
 
 /**
@@ -462,8 +453,8 @@ function workStrip(f: ColumnFacts): WorkStrip {
       work.line?.wips.find(
         w => base?.base.kind === "wip" && w.bookmark === base.base.bookmark,
       )?.ahead ?? 0,
-    behind: baseBehind(base ?? undefined, work.line),
-    catchUp: f.catchUp,
+    behind: baseMoved(base ?? undefined, work.line) !== null,
+    catchingUp: f.catchingUp,
   })
   return {
     kind: "offer",

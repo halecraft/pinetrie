@@ -98,8 +98,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the header never marks a thread behind",
     file: "packages/client/column-view.ts",
-    from: "  if (base === undefined || line === null || !baseBehind(base, line))",
-    to: "  if (true)",
+    from: "  return moved === null\n    ? null\n",
+    to: "  return true\n    ? null\n",
     command: unit,
     expect:
       "worded as the project, with the bookmark and both commits in its title",
@@ -1769,20 +1769,21 @@ export const mutations: readonly Mutation[] = [
     expect: "queue, unqueue and a command are one write each",
   },
   {
-    name: "bringUpToDate creates a card when you have one at the end",
+    name: "catching up leaves its card unqueued",
     file: "packages/client/intent.ts",
-    from: '        act.card === null\n          ? {\n              kind: "createCard",',
-    to: '        true\n          ? {\n              kind: "createCard",',
+    from: "      // Made, then queued: the host sets the command before the queue's\n",
+    to: "      return []\n      // Made, then queued: the host sets the command before the queue's\n",
     command: unit,
-    expect: "bring up to date sets the command on your card at the end",
+    expect:
+      "catching up makes a card with the command and no text, and queues it at once",
   },
   {
-    name: "bringUpToDate leaves focus where it is",
-    file: "packages/client/intent.ts",
-    from: '        { kind: "armFocus", key: act.key },\n      ]',
-    to: "      ]",
+    name: "the project's button says the project",
+    file: "packages/client/line-view.ts",
+    from: '    trigger: "◆ project",',
+    to: '    trigger: "◆ the project",',
     command: unit,
-    expect: "bring up to date with no card of yours there creates one",
+    expect: "the header's button says project",
   },
   {
     name: "a busy answer spends the card",

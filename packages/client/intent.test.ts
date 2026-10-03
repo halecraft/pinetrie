@@ -338,31 +338,15 @@ describe("planIntent", () => {
         ).toEqual([{ kind: "setCommand", card: c, command: null }])
       }
     })
-    test("bring up to date sets the command on your card at the end, and focuses its column", () => {
+    test("catching up makes a card with the command and no text, and queues it at once; nothing takes focus", () => {
       expect(
         plan(
           column({
             kind: "bringUpToDate",
-            key: "col",
-            card: c,
             create: fresh,
             command: "bring-up-to-date",
-          }),
-        ),
-      ).toEqual([
-        { kind: "setCommand", card: c, command: "bring-up-to-date" },
-        { kind: "armFocus", key: "col" },
-      ])
-    })
-    test("bring up to date with no card of yours there creates one, with the command", () => {
-      expect(
-        plan(
-          column({
-            kind: "bringUpToDate",
-            key: "col",
-            card: null,
-            create: fresh,
-            command: "bring-up-to-date",
+            lane,
+            at: where,
           }),
         ),
       ).toEqual([
@@ -372,7 +356,13 @@ describe("planIntent", () => {
           text: "",
           how: unrecorded,
         },
-        { kind: "armFocus", key: "col" },
+        {
+          kind: "queueCard",
+          card: fresh.id,
+          lane,
+          at: where,
+          how: unrecorded,
+        },
       ])
     })
     test("an offer's other buttons are one command each", () => {
@@ -380,18 +370,21 @@ describe("planIntent", () => {
         plan(column({ kind: "offer", lane, action: "split", to: null })),
       ).toEqual([{ kind: "offer", lane, action: "split", to: null }])
     })
-    test("continue on the line sets its own command (ADR-0060)", () => {
+    test("continue on the line queues its own command (ADR-0060)", () => {
       expect(
         plan(
           column({
             kind: "bringUpToDate",
-            key: "col",
-            card: c,
             create: fresh,
             command: "continue-on-line",
+            lane,
+            at: where,
           }),
         )[0],
-      ).toEqual({ kind: "setCommand", card: c, command: "continue-on-line" })
+      ).toMatchObject({
+        kind: "createCard",
+        card: { command: "continue-on-line" },
+      })
     })
   })
 

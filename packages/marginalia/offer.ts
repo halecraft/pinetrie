@@ -298,24 +298,37 @@ export const effectiveBase = (
     ? base.base
     : { kind: "line" }
 
+/** Where a thread's base moved since its lane last took from it (`baseMoved`). */
+export interface BaseMove {
+  readonly base: ThreadBase
+  /** The base's bookmark: the line's, or the WIP's. */
+  readonly bookmark: string
+  /** The commit the lane's newest `Pineta-Base` names, and the base's now. */
+  readonly from: CommitId
+  readonly to: CommitId
+}
+
 /**
- * Whether a thread's base has moved on since its lane last forked from it or
- * caught up (ADR-0060): the commit its newest `Pineta-Base` names (`start`)
- * is not where the base is now, the line's commit or the WIP's. Never for a
- * WIP gone, which only "continue on the line" moves, nor before the line is
- * set up.
+ * How a thread's base has moved on since its lane last forked from it or
+ * caught up (ADR-0060), or null: the commit its newest `Pineta-Base` names
+ * (`start`) against where the base is now, the line's commit or the WIP's.
+ * Never for a WIP gone, which only "continue on the line" moves, nor before
+ * the line is set up.
  */
-export function baseBehind(
+export function baseMoved(
   base: BaseRecord | undefined,
   line: LineRecord | null,
-): boolean {
-  if (base === undefined || line === null || line.commit === null) return false
-  if (base.state === "gone") return false
-  const bookmark =
-    base.base.kind === "wip" && base.state === "ok" ? base.base.bookmark : null
-  if (bookmark === null) return base.start !== line.commit
-  const wip = line.wips.find(w => w.bookmark === bookmark)
-  return wip !== undefined && wip.commit !== base.start
+): BaseMove | null {
+  if (base === undefined || line === null || line.commit === null) return null
+  if (base.state === "gone") return null
+  const thread = effectiveBase(base)
+  const now =
+    thread.kind === "line"
+      ? { bookmark: line.onto, commit: line.commit }
+      : line.wips.find(w => w.bookmark === thread.bookmark)
+  return now === undefined || now.commit === base.start
+    ? null
+    : { base: thread, bookmark: now.bookmark, from: base.start, to: now.commit }
 }
 
 /**
@@ -332,19 +345,14 @@ export function offerView(input: {
   readonly base: Pick<BaseRecord, "base" | "state"> | null
   readonly onto: string
   readonly wipAhead: number
-  /** `baseBehind`: the base has moved on, so catching up is offered beside it. */
+  /** `baseMoved`: the base has moved on, so catching up is offered beside it. */
   readonly behind: boolean
-  /**
-   * A card bringing the thread up to date: one of yours still drafting, whose
-   * send does it (so the strip offers it no more), or one queued.
-   */
-  readonly catchUp: "drafted" | "queued" | null
+  /** A card bringing the thread up to date is queued on its lane. */
+  readonly catchingUp: boolean
 }): OfferView {
   const { offer, landing } = input
   const activity: OfferActivity =
-    input.activity === "idle" && input.catchUp === "queued"
-      ? "catch-up"
-      : input.activity
+    input.activity === "idle" && input.catchingUp ? "catch-up" : input.activity
   const open = offer?.taken === null ? offer : undefined
   const facts: OfferFacts = {
     activity,
@@ -371,7 +379,6 @@ export function offerView(input: {
   const gone = input.base?.state === "gone"
   const takes = (buttons: readonly OfferButton[]): readonly OfferButton[] =>
     destinations.length === 0 ? buttons.filter(b => b !== "take") : buttons
-  const catching = (b: OfferButton) => b === "update" || b === "continue"
   const view = (
     state: OfferView["state"],
     buttons: readonly OfferButton[],
@@ -382,17 +389,14 @@ export function offerView(input: {
     const menu = gone
       ? listed.map(b => (b === "update" ? "continue" : b))
       : listed
-    // Behind its base, catching up stands beside the offer; your card already
-    // carrying it offers it no more.
+    // Behind its base, catching up stands beside the offer.
     const shown =
-      input.catchUp === "drafted"
-        ? { buttons, menu: menu.filter(b => !catching(b)) }
-        : input.behind && menu.includes("update")
-          ? {
-              buttons: [...buttons, "update" as const],
-              menu: menu.filter(b => b !== "update"),
-            }
-          : { buttons, menu }
+      input.behind && menu.includes("update")
+        ? {
+            buttons: [...buttons, "update" as const],
+            menu: menu.filter(b => b !== "update"),
+          }
+        : { buttons, menu }
     return {
       state,
       buttons: takes(shown.buttons),
