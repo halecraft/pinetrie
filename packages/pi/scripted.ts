@@ -22,6 +22,7 @@ import {
   type Provider,
   type TranscriptContext,
 } from "@earendil-works/pi-ai"
+import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pineta/rules"
 
 /**
  * One scripted reply: text; text made from the context the model was given,
@@ -64,6 +65,20 @@ const handles = new WeakMap<
 
 /** What a scripted model answers a describe request with, by default. */
 export const SCRIPTED_DESCRIPTION = "offer: scripted"
+
+/** What a scripted model says of a run's end (ADR-0077): nothing is needed. */
+export const SCRIPTED_VERDICT = "done"
+
+/**
+ * A describe request's answer: `describe`, with the verdict line first when
+ * the request is a run's end, which asks for it (`digestRequest`).
+ */
+function describeStep(describe: ScriptStep, asked: string): ScriptStep {
+  if (asked.includes(VERDICT_ALONE)) return { text: SCRIPTED_VERDICT }
+  if (asked.includes(VERDICT_THEN_DIGEST) && "text" in describe)
+    return { text: `${SCRIPTED_VERDICT}\n${describe.text}` }
+  return describe
+}
 
 /**
  * `tokensPerSecond` sets how fast replies stream: fast by default. A check
@@ -139,7 +154,9 @@ export function scriptedModel(
   }
   handles.set(model, {
     run,
-    describe: perRequest(describer, () => describe),
+    describe: perRequest(describer, context =>
+      describeStep(describe, lastUserText(context)),
+    ),
   })
   return model
 }

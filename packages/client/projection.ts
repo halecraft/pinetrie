@@ -27,6 +27,7 @@ import {
   type SeatRecord,
   type StopRecord,
   type TreeIndex,
+  type VerdictRecord,
 } from "@pineta/core"
 import {
   readAgentActivity,
@@ -49,6 +50,7 @@ import {
   readRunningLanes,
   readSeats,
   readStops,
+  readVerdicts,
 } from "@pineta/reads"
 import {
   type LiveDocHandle,
@@ -87,6 +89,8 @@ export interface SessionFacts {
   readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
   /** Each entry's title (ADR-0045); a root's is its label. */
   readonly marks: ReadonlyMap<EntryId, MarkRecord>
+  /** Each thread's last run's verdict, in any root (ADR-0077), by lane. */
+  readonly verdicts: ReadonlyMap<LaneName, VerdictRecord>
   readonly workFacts: WorkFacts
 }
 
@@ -109,6 +113,7 @@ export function readSessionFacts(view: HeldView): SessionFacts {
     seats: readSeats(doc),
     archive: readArchive(doc),
     marks: readHeld(roots, readMarks),
+    verdicts: readVerdicts(doc),
     workFacts: {
       project: readProject(doc),
       commands: readCommands(doc),

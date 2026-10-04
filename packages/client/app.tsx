@@ -66,6 +66,7 @@ import {
 import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { foldMemory } from "./ask-fold.ts"
+import { needsYouCount, pageTitle } from "./attention.ts"
 import { cardMarks, ownCards } from "./card-marks.ts"
 import { Column, type ColumnProps } from "./column.tsx"
 import {
@@ -78,7 +79,7 @@ import { Header } from "./header.tsx"
 import { planHeldRoots, rootEntriesOf } from "./held-roots.ts"
 import { runsHere } from "./here.ts"
 import { type Identity, reconcileName } from "./identity.ts"
-import { type Inbox, mentionsOf } from "./inbox.ts"
+import { mentionsOf } from "./inbox.ts"
 import {
   claimFocus,
   type Effect,
@@ -98,7 +99,6 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
-import type { Left } from "./left.ts"
 import { type AppPorts, perform } from "./perform.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { planReading, typingDue } from "./presence-report.ts"
@@ -124,6 +124,7 @@ import type { DeviceState, TabState } from "./tab-state.ts"
 import { TabBar } from "./tabs.tsx"
 import { offeredByRoot, tabsView } from "./tabs-view.ts"
 import type { RowMemory } from "./tool-row.ts"
+import { useAttention } from "./use-attention.ts"
 import { useColumnDrag } from "./use-column-drag.ts"
 import { useFilledCards } from "./use-filled-cards.ts"
 import { FLIGHT_MS, useFlight } from "./use-flight.ts"
@@ -142,9 +143,6 @@ import {
 /** What `App` keeps on this device and tab, built by `main.tsx`. */
 export interface AppStores {
   readonly layout: TabState<Layout>
-  readonly inbox: DeviceState<Inbox>
-  /** Where this device last left each thread (ADR-0056). */
-  readonly left: DeviceState<Left>
   readonly identity: DeviceState<Identity>
   /** Where the inventory panel is docked, on this device (ADR-0048). */
   readonly dock: DeviceState<Dock>
@@ -303,6 +301,7 @@ export function App({
     seats,
     archive,
     marks,
+    verdicts,
     workFacts,
     asks,
     stops,
@@ -600,12 +599,30 @@ export function App({
     [directory, session.writer, nameOf, participants],
   )
   const inbox = useInbox({
-    store: stores.inbox,
-    roots: directory.values(),
+    attention: session.attention,
     items: mentions,
     shown,
+  })
+  // What needs you, and where (ADR-0077): each tab's status, the header's
+  // rows, and the page's title.
+  const attention = useAttention({
+    me: session.writer,
+    attention: session.attention,
+    directory,
+    verdicts,
+    offers: view.offers,
+    running,
+    lanes,
+    laneRoots,
+    archived: archivedRoots,
+    work,
+    layout,
     settled,
   })
+  const needsYou = needsYouCount(attention.items) + inbox.unseen
+  useEffect(() => {
+    document.title = pageTitle(needsYou)
+  }, [needsYou])
 
   const strip = useRef<HTMLDivElement>(null)
 
@@ -709,6 +726,7 @@ export function App({
   const ports: AppPorts = {
     dispatch,
     session,
+    attention: session.attention,
     reveal,
     openWhenHeld: setWhenHeld,
     openFold: ask => {
@@ -906,7 +924,7 @@ export function App({
     folds,
     stops,
     live,
-    left: stores.left,
+    attention: session.attention,
     spots,
     viewports,
     digests,
@@ -965,6 +983,7 @@ export function App({
           project={workFacts.project}
           onIntent={onIntent}
           offers={view.offers}
+          attention={attention.items}
           me={{
             writer: session.writer,
             email: session.principal,
@@ -1021,6 +1040,9 @@ export function App({
               work,
               offered,
               unsent,
+              status: attention.status,
+              elsewhere: attention.elsewhere,
+              arrivals: attention.arrivals,
             })}
           />
           <main id="workspace">

@@ -45,9 +45,9 @@ follow this list. A name only this package uses is imported from its module.
   a run reads.
 - `card.ts`, `seat.ts`, `startup.ts`: cards and their moves, who wrote in a
   text, what a starting host resumes.
-- `archive.ts`, `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`:
-  a root put aside, the directory of roots, titles, who stopped a run, and
-  an ask's digest.
+- `archive.ts`, `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`,
+  `verdict.ts`: a root put aside, the directory of roots, titles, who
+  stopped a run, an ask's digest, and how a thread's last run ended.
 - `names.ts`, `banner.ts`: a thread's name and its banner, each with its
   record.
 - `work.ts`: where lanes work (`pineta.lane`, `pineta.revision`,
@@ -85,8 +85,16 @@ cannot reach the wrong document and needs no guard at run time.
 `records.test.ts` lists every spec's home.
 
 - **`ROOT`** (`roots.ts`): a root's directory record, keyed by its `RootId`:
-  its root entry, first line, title, counts, writers, the chats that name
+  its root entry, first line, title, counts, writers, each thread's writers
+  on its path (`threads`, its followers, ADR-0077), the chats that name
   someone, and its images. The host writes it from `readRootRecord`.
+  `threads` is optional when read, and a missing one is `{}`: a starting
+  host opens the roots its decoded records name (`planLoads`), so a record
+  from before the field must still decode.
+- **`VERDICT`** (`verdict.ts`, ADR-0077): a thread's last run's verdict,
+  keyed by lane, in the session: the run's prompt and last entry, and what
+  happened (pending, said, failed, stopped, unclassified), never a level,
+  which each client decides for its person.
 - **`LANE`** is written for every lane as it is created, naming its root;
   `work` is null for a lane with no work of its own.
 - **The archive gate** reads the roots a command writes in (`writesIn`) and
@@ -232,9 +240,10 @@ are the only code that builds or reads the shape.
   `started`.
 - **`planStartup`** (`startup.ts`): a starting host resumes every lane a
   crash interrupted, whose run's end then drains it, and drains every other
-  lane with cards queued for it, since no run's end will. What does not
-  survive a process (runs and streams) is cleared first, by `clearStreams`
-  in `@pineta/schema`.
+  lane with cards queued for it, since no run's end will. A verdict left
+  pending lost its request with the last host and is `unclassified`, unless
+  its lane is resumed. What does not survive a process (runs and streams)
+  is cleared first, by `clearStreams` in `@pineta/schema`.
 
 # Cards (`card.ts`, ADR-0048, ADR-0059, ADR-0066)
 
@@ -460,9 +469,33 @@ headline is a digest with nothing to draw. No agent reads it.
   reply writes nothing, so the last good digest stays. A refused final
   reply writes an empty final digest: a live headline says what the run
   was doing, which is no longer true.
+- **`askLines`** is an ask's run as transcript lines, `planDigest`'s and a
+  short ask's verdict request's alike.
 - **`digestRequest`** is the skill, the ask, the run's newest work that fits
-  (`fitNewest`: the oldest is cut first), the last word, and the last
-  digest. The ask and the last word are never cut.
+  (`fitNewest`: the oldest is cut first), the last word, the last digest,
+  and what to answer with (`Answer`): a digest alone ends with nothing
+  more, a verdict with `VERDICT_ALONE` or `VERDICT_THEN_DIGEST`, which the
+  scripted model reads. The ask and the last word are never cut.
+
+# Verdicts (`verdict.ts`, ADR-0077)
+
+How a thread's last run ended, for the people who follow it.
+
+- **`planRunEnded`** decides a run's end: a failed or stopped run's verdict
+  is its facts, and only a due digest is asked for; an answered run asks
+  for its verdict, with its final digest when `planDigest` gives one; a run
+  with no entry to read is unclassified; a run whose stored verdict is no
+  longer its own (`current`) gets no verdict.
+- **`verdictOf` refuses rather than cuts**, as `digestOf` does: `needs you:
+  <reason>`, `worth a read: <reason>` or `done`, in any case, a reason of at
+  most `REASON_WORDS` words.
+- **`endReplyOf`** reads a run's final reply as `Answer` asked for it: the
+  first line a verdict, the rest a digest, each refused on its own.
+- **`runEndedToWrite` is the whole write decision**, both records in one
+  write: the model's verdict, or `unclassified` for a failed request or a
+  refused line, never written over the next run's; the digest as
+  `digestToWrite` decides a final one, none for a failed request.
+- **`pendingVerdict`** is what a run's end writes before it closes the run.
 
 # The user config (`config.ts`)
 

@@ -20,7 +20,7 @@ import type { RootDocHandle } from "@pineta/schema"
 import { type Basics, failed, type HostKeeper } from "./basics.ts"
 
 export interface Directory {
-  /** Follow `root`'s document: called once, as the host opens it. */
+  /** Follow `root`'s document, and refresh its record: called once, as the host opens it. */
   watch(root: RootId, doc: RootDocHandle): void
   /** Refresh `root`'s record: one `once` step per root on the keeper. */
   refresh(root: RootId): Promise<void>
@@ -57,6 +57,10 @@ export function createDirectory(deps: {
       const changed = () => void refresh(root)
       subscribe(doc.entries, changed)
       subscribe(doc.values, changed)
+      // A root no one writes in would keep the record it was stored with,
+      // missing any field added since (`threads`, ADR-0077). Unchanged, the
+      // refresh writes nothing.
+      changed()
     },
     refresh,
   }

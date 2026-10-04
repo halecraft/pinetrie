@@ -1,23 +1,25 @@
 # ADR-0059 — A card's place has one owner at a time, and moves between owners are handoffs
 
-**Status:** Accepted (Duane, 2026-10-02). Evidence: S75, S76. Amends ADR-0048 (storage: places
-are no longer written by clients into a CRDT, and the inventory is a
-document of its own, of slots), ADR-0052 (how a move is undone), ADR-0023
-(the host writes places again) and ADR-0055 (where a card's command
-lives). For ADR-0048's step 4, and it changes how step 3's queue and
-unqueue are written. Amended in place (2026-10-02, with Duane): a tab
-knows its copy holds its move by a revision watermark, not by the reply
+**Status:** Accepted (Duane, 2026-10-02). Evidence: S75, S76. Amends
+ADR-0048 (storage: places are no longer written by clients into a CRDT, and
+the inventory is a document of its own, of slots), ADR-0052 (how a move is
+undone), ADR-0023 (the host writes places again) and ADR-0055 (where a
+card's command lives). For ADR-0048's step 4, and it changes how step 3's
+queue and unqueue are written. Amended in place (2026-10-02, with Duane): a
+tab knows its copy holds its move by a revision watermark, not by the reply
 alone (*A move is drawn at once*); a card's command is in the host's place
 record, set by a request, not in the card's own document. Implemented by
 `PLAN-2026-10-02-card-places`, for the places there are now (drafting,
 queued, fresh); the inventory by `PLAN-2026-10-03-inventory`, with three
 more amended in place (2026-10-03, with Duane): you can remove a card from
-your own inventory; a swap is undone by swapping back, not by Kyneta's
-undo; and the repair acts on a card only once it is steady (S79). Amended
-by ADR-0066: a handoff is undone by Kyneta on the host, not by the reverse
-handoff, and a swap by this tab's own stack over the inventory; `places`
-is on Yjs; `rev` is raised in a write of its own after each move; a keep's
-several cards are one command, accepted whole or refused.
+your own inventory; a swap is undone by swapping back, not by Kyneta's undo;
+and the repair acts on a card only once it is steady (S79). Amended by
+ADR-0066: a handoff is undone by Kyneta on the host, not by the reverse
+handoff, and a swap by this tab's own stack over the inventory; `places` is
+on Yjs; `rev` is raised in a write of its own after each move; a keep's
+several cards are one command, accepted whole or refused. Amended by
+ADR-0077: the inventory is one of a person's documents (`personDocId`),
+which share one policy.
 
 **Context.**
 

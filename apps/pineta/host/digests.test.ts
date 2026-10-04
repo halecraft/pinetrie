@@ -1,7 +1,15 @@
 import { entryId, laneNameForThread, runId, writerId } from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
-import { type Agent, SCRIPTED_DESCRIPTION } from "@pineta/pi"
-import { DIGEST, digestOf, setRecord } from "@pineta/rules"
+import { type Agent, SCRIPTED_DESCRIPTION, SCRIPTED_VERDICT } from "@pineta/pi"
+import { readVerdicts } from "@pineta/reads"
+import {
+  DIGEST,
+  digestOf,
+  endReplyOf,
+  pendingVerdict,
+  setRecord,
+  VERDICT,
+} from "@pineta/rules"
 import {
   beginRun,
   endRun,
@@ -48,6 +56,7 @@ const FINAL = setRecord(
  */
 function running(
   answer: string | null | Promise<string | null> = "Fixing the rail.",
+  enabled = true,
 ) {
   const b = basics()
   writeEntry(b.root, row(entryId("e-1"), null))
@@ -71,6 +80,7 @@ function running(
     keeper,
     presence,
     agent: () => agent.port,
+    enabled,
   })
   const read = () =>
     presence.reading.set(
@@ -108,12 +118,12 @@ test("at the run's end, the final digest, read or not; once written, no more", a
   const { b, agent, keeper, digests } = running(
     "Fixed the rail.\n- `rail.tsx` draws it",
   )
-  await digests.ended(ROOT_ID, entryId("e-1"), failed)
+  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
   expect(agent.calls.at(-1)?.args).toEqual([[FINAL]])
   putValue(b, FINAL)
   const before = agent.calls.length
-  await digests.ended(ROOT_ID, entryId("e-1"), failed)
+  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
   expect(agent.calls.length).toBe(before)
 })
@@ -171,7 +181,7 @@ test.each([
   for (const r of rows) writeEntry(b.root, r)
   writeLaneTip(b.root, lane, tip)
   if (next) beginRun(b.live, lane, runId("r-2"))
-  await digests.ended(ROOT_ID, entryId("e-1"), failed)
+  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
   expect(writesOf(agent.calls)).toEqual([FINAL])
   const asked = agent.calls.find(c => c.method === "complete")?.args[0] as {
@@ -211,7 +221,7 @@ test.each([
     ROOT_ID,
   )
   putValue(b, live)
-  await digests.ended(ROOT_ID, entryId("e-1"), failed)
+  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
   const cleared = setRecord(
     DIGEST,
@@ -227,7 +237,7 @@ test.each([
   expect(writesOf(agent.calls)).toEqual([cleared])
   putValue(b, cleared)
   const before = agent.calls.length
-  await digests.ended(ROOT_ID, entryId("e-1"), failed)
+  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
   expect(agent.calls.length).toBe(before)
 })
@@ -240,11 +250,152 @@ test("a short ask is not asked about", async () => {
     b.root,
     row(entryId("e-8"), "e-7", { role: "assistant", content: "done" }),
   )
-  await digests.ended(ROOT_ID, short, failed)
+  await digests.ended(ROOT_ID, lane, short, failed)
   await keeper.idle()
   expect(methods(agent.calls)).toEqual([])
 })
 
 test("the scripted model's answer is a digest, so the suites have one", () => {
   expect(digestOf(SCRIPTED_DESCRIPTION)?.headline).toBe(SCRIPTED_DESCRIPTION)
+})
+
+// ── a run's verdict (ADR-0077) ────────────────────────────────────────────
+
+/** Ada's ask `e-1` is stopping: its verdict is pending, as `runs.ts` writes it. */
+async function stopping(
+  answer: string | null | Promise<string | null>,
+  enabled = true,
+) {
+  const set = running(answer, enabled)
+  await set.digests.pending(lane, entryId("e-1"))
+  putValue(
+    set.b,
+    writesOf(set.agent.calls)[0] as Parameters<typeof putValue>[1],
+  )
+  endRun(set.b.live, lane, runId("r-1"))
+  return set
+}
+
+test("a run's verdict is pending as it stops, at the run's last entry", async () => {
+  const { b } = await stopping(null)
+  expect(readVerdicts(b.session).get(lane)).toEqual(
+    pendingVerdict(lane, entryId("e-1"), entryId("e-4")),
+  )
+})
+
+test("at a run's end, one request for the verdict and the final digest, written in one write", async () => {
+  const { agent, keeper, digests } = await stopping(
+    "needs you: which rail to keep\nFixed the rail.\n- `rail.tsx` draws it",
+  )
+  const before = agent.calls.length
+  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+  await keeper.idle()
+  expect(methods(agent.calls.slice(before))).toEqual([
+    "skill",
+    "complete",
+    "writeValues",
+  ])
+  expect(agent.calls.at(-1)?.args).toEqual([
+    [
+      setRecord(VERDICT, {
+        lane,
+        ask: entryId("e-1"),
+        end: entryId("e-4"),
+        verdict: {
+          kind: "said",
+          said: "needsYou",
+          reason: "which rail to keep",
+        },
+      }),
+      FINAL,
+    ],
+  ])
+  const asked = agent.calls.find(c => c.method === "complete")?.args[0] as {
+    user: string
+  }
+  expect(asked.user).toContain(
+    "Answer with the verdict line, then the summary.",
+  )
+})
+
+test("with digests off, a run's end asks for its verdict alone, and no live digest is asked", async () => {
+  const { agent, keeper, digests, read } = await stopping("done", false)
+  read()
+  const before = agent.calls.length
+  await digests.step(ROOT_ID, entryId("e-2"), failed)
+  await keeper.idle()
+  expect(agent.calls.length).toBe(before)
+  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+  await keeper.idle()
+  expect(writesOf(agent.calls).at(-1)).toEqual(
+    setRecord(VERDICT, {
+      lane,
+      ask: entryId("e-1"),
+      end: entryId("e-4"),
+      verdict: { kind: "said", said: "done", reason: null },
+    }),
+  )
+  const asked = agent.calls.findLast(c => c.method === "complete")?.args[0] as {
+    user: string
+  }
+  expect(asked.user).toContain("Answer with the verdict line alone.")
+})
+
+test.each([
+  ["fails", null],
+  ["answers in another shape", "All done here."],
+])("a request that %s leaves the verdict unclassified, never pending", async (_, answer) => {
+  const { agent, keeper, digests } = await stopping(answer, false)
+  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+  await keeper.idle()
+  expect(writesOf(agent.calls).at(-1)).toEqual(
+    setRecord(VERDICT, {
+      lane,
+      ask: entryId("e-1"),
+      end: entryId("e-4"),
+      verdict: { kind: "unclassified" },
+    }),
+  )
+})
+
+test("a failed run's verdict is its error, and no verdict is asked for", async () => {
+  const set = running("done", false)
+  writeEntry(
+    set.b.root,
+    row(entryId("e-5"), "e-4", {
+      role: "assistant",
+      content: "",
+      stopReason: "error",
+      errorMessage: "rate limited",
+    }),
+  )
+  writeLaneTip(set.b.root, lane, entryId("e-5"))
+  await set.digests.pending(lane, entryId("e-1"))
+  putValue(
+    set.b,
+    writesOf(set.agent.calls)[0] as Parameters<typeof putValue>[1],
+  )
+  await set.digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+  await set.keeper.idle()
+  expect(methods(set.agent.calls)).not.toContain("complete")
+  expect(writesOf(set.agent.calls).at(-1)).toEqual(
+    setRecord(VERDICT, {
+      lane,
+      ask: entryId("e-1"),
+      end: entryId("e-5"),
+      verdict: { kind: "failed", error: "rate limited" },
+    }),
+  )
+})
+
+test("the scripted model answers a run's end with a verdict and a digest, so the suites have both", () => {
+  expect(
+    endReplyOf(
+      `${SCRIPTED_VERDICT}\n${SCRIPTED_DESCRIPTION}`,
+      "verdict and digest",
+    ),
+  ).toEqual({
+    verdict: { said: "done", reason: null },
+    digest: { headline: SCRIPTED_DESCRIPTION, points: [] },
+  })
 })

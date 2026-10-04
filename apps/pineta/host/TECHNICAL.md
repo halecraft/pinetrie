@@ -116,8 +116,8 @@ wires them.
 ## A run's end
 
 `planRunEnd(role)` returns the order, and `runs.ts` carries it out: a
-resolution's `landingEnded` or a split's `splitEnded`, then `endRun`,
-`laneStopped`, `ended`. A run touches no tools: every lane's list is the
+resolution's `landingEnded` or a split's `splitEnded`, then
+`verdictPending`, `endRun`, `laneStopped`, `ended`. A run touches no tools: every lane's list is the
 same for every run (`packages/pi/TECHNICAL.md`, S85).
 
 - **`endRun` comes before `laneStopped` and `ended`.** It closes the lane's
@@ -126,10 +126,14 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   stops, and the offer is refreshed. `ended` runs hot reload, whose pause
   reads which lanes run, and drains the lane; a drain that ran before
   `endRun` could start the next run with the last one's reply still open.
+- **The verdict is pending before `endRun`** (ADR-0077, `Digests.pending`):
+  written after, a page would see the lane stopped beside the last run's
+  verdict, and draw its arrival. Its `end` is the run's last entry from its
+  asks, as at `ended`.
 - **A failure before `endRun` is logged as `run end failed`,** and `endRun`
   and every step after it still run.
 - **`ended` is one function, set once** in `startHost`: hot reload, then
-  `settle`, banners and the final digest. It breaks a cycle: a run's end
+  `settle`, banners, and the verdict with the final digest. It breaks a cycle: a run's end
   drains, the drain may run an update, and an update may start a run.
   `runs.ts` imports neither the take nor the commands.
 - **`ended` is given the run's prompt**, read at the start of `end()`,
@@ -280,19 +284,20 @@ rejects `shutdown()`.
   (§ Moves' history). It answers `undone` with each card it moved and its
   place now, `unmoved` (shaped as a refused move) when someone moved a card
   since, or `nothing`.
-- **Your inventory is a client's document the host only keeps**
-  (ADR-0059). `resolveDoc` interprets `inventory:<writer>` as
-  `InventoryDoc`; the policy shares it only with the peers whose principal
-  is that writer (`holdsInventory`), and who may write it is the
-  protocol's (`writersPolicy`, below). Kyneta fires
+- **A person's documents are clients' documents the host only keeps**
+  (ADR-0059, ADR-0077): their inventory and their attention. `resolveDoc`
+  names a `<kind>:<writer>` id's kind, and the host interprets it as
+  `InventoryDoc` or `AttentionDoc`; the policy shares it only with the
+  peers whose principal is that writer (`holdsPersonDoc`), and who may
+  write it is the protocol's (`writersPolicy`, below). Kyneta fires
   `resolve` only for a peer `canShare` grants (S76), so nobody else can
-  create someone's inventory. The host never writes one: it decides only
+  create someone's document. The host never writes one: it decides only
   whose inventory a card is in, and refuses a nineteenth card without
   knowing the slots.
 - **Who may write a document is declared once, on every peer**
   (`writersPolicy`, `@pineta/protocol/writers`, Kyneta's `canWrite`): the
-  session and the places only the host; an inventory its person, and the
-  host, which relays it between that person's tabs (Kyneta judges the
+  session and the places only the host; a person's document its person,
+  and the host, which relays it between that person's tabs (Kyneta judges the
   sender, not the author). The host registers it beside `hostPolicy`, and
   `connectSession` (`@pineta/session`) on every client, so a client's write to a document it
   may not write throws before it is made, rather than forking its copy
@@ -385,23 +390,41 @@ rejects `shutdown()`.
 ## Requests outside the queue (`outside.ts`)
 
 A model request takes seconds, and no command may wait on it. Banners,
-commit messages, digests and titles ask with `requestOutside`: the request runs
+commit messages, digests, verdicts and titles ask with `requestOutside`: the request runs
 outside the documents' keeper, tracked so `quiet` waits for it, and its
 answer is written in a step of its own (a keeper step, or for a commit
-message an owner command), after that step decides it is still wanted (`bannerStillWanted`, the offer's checks, `digestToWrite`, `titleStillWanted`). A
+message an owner command), after that step decides it is still wanted (`bannerStillWanted`, the offer's checks, `digestToWrite`, `runEndedToWrite`, `titleStillWanted`). A
 failure is logged, never thrown. With `held`, a key is in a set while the
 request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
-## Digests (`digests.ts`, ADR-0056)
+## Digests and verdicts (`digests.ts`, ADR-0056, ADR-0077)
 
+- **Always made.** The user config's `digests` (`enabled`) turns off live
+  digests and the final digest; a run's end still asks for its verdict.
+- **A run's end is one request** (`planRunEnded`): a failed or stopped run's
+  verdict is written from its facts and only a due digest is asked for; an
+  answered run asks for its verdict, with the final digest when
+  `planDigest` gives one, and for a short ask the verdict alone. The
+  request's last line says which (`VERDICT_ALONE`, `VERDICT_THEN_DIGEST`),
+  and the scripted model answers it (`packages/pi/scripted.ts`).
+- **One settle, one write** (`runEndedToWrite`): the verdict and the digest
+  together. A failed request still settles, so a verdict asked for is
+  `unclassified`, never left pending; a reply for a run whose stored
+  verdict the next run's end has replaced writes no verdict. A failed
+  request writes no digest, as before.
+- **The lane keys the verdict and nothing else.** `ended` takes it from
+  `runs.onEnded`, and reads the run's last entry from its asks: the lane's
+  tip may already be past the run (below).
+- **A starting host** writes `unclassified` over each verdict still pending
+  (`planStartup`), unless its lane is resumed.
 - **Asked on events, each naming an entry**: the tip the lane's `turnDone`
   hook is given (wrapped in `startHost` after lane work records the turn),
   and the prompt each run's end is given. The ask is `promptOf` that entry,
-  which never changes: entries are written once (ADR-0004). `Digests` takes
-  no lane, so it cannot read a lane's tip. At a run's end the tip is
-  already past the ask: a plain queued card taken there would lose the
-  ask its final digest, and a next run with work would take it, which then
-  refuses that run every later digest.
+  which never changes: entries are written once (ADR-0004). No step reads
+  a lane's tip. At a run's end the tip is already past the ask: a plain
+  queued card taken there would lose the ask its final digest, and a next
+  run with work would take it, which then refuses that run every later
+  digest.
 - **`planDigest` decides** in one step, from the stored digest, the request
   out, and presence: the host holds the presence document, and `readsAsk`
   reads its `reading` ends (S70).
@@ -410,11 +433,11 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   last entry, newest first within the budget, its last word, and the last
   digest. No agent reads the answer.
 - **The reply is read in `request`, as a title's is** (`titles.ts`):
-  `digestOf` there, and a refused reply logged ("the model's digest is not
-  one"). `settle` gets the parsed digest, or null for a refused one, and
-  writes what `digestToWrite` returns. A failed request (`complete` null)
-  writes nothing, even at the end.
-- A missing `ask-digest` skill is logged, and nothing is asked.
+  `endReplyOf` there, and each refused half logged ("the model's digest is
+  not one", "the model's verdict is not one"). `settle` gets the parsed
+  reply, never raw model text. A live digest writes what `digestToWrite`
+  returns; a run's end, what `runEndedToWrite` returns.
+- A missing `ask-digest` skill is logged, and settles as a failed request.
 
 ## Banners (`banners.ts`, ADR-0050, ADR-0053)
 

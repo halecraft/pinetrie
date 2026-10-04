@@ -8,10 +8,10 @@
 // names, and the merge would move cards. `repairStep` (`inventory.ts`)
 // decides each repair, and when to look again.
 
-import { type Exchange, sync } from "@kyneta/exchange"
-import { batch, subscribe } from "@kyneta/schema"
+import type { Exchange } from "@kyneta/exchange"
+import { batch } from "@kyneta/schema"
 import type { CardId, WriterId } from "@pineta/core"
-import { inventoryDocId } from "@pineta/protocol/writers"
+import { personDocId } from "@pineta/protocol/writers"
 import { InventoryDoc, readSlots } from "@pineta/schema"
 import {
   type HeldSince,
@@ -21,7 +21,8 @@ import {
   type SlotWrites,
   takeWrites,
 } from "./inventory.ts"
-import { type Readable, readable, snapshotStore } from "./store.ts"
+import { personDoc } from "./person-doc.ts"
+import type { Readable } from "./store.ts"
 
 export interface InventorySlots {
   /** The slots as your document holds them. */
@@ -52,8 +53,12 @@ export function inventorySlots(
     readonly intents: () => Intents
   },
 ): InventorySlots {
-  const inventory = exchange.get(inventoryDocId(me), InventoryDoc)
-  const slots = snapshotStore<Slots>(readSlots(inventory))
+  const own = personDoc(
+    exchange.get(personDocId("inventory", me), InventoryDoc),
+    host,
+    readSlots,
+  )
+  const inventory = own.doc
   const write = (writes: SlotWrites) => {
     if (Object.keys(writes.set).length === 0 && writes.clear.length === 0)
       return
@@ -66,7 +71,7 @@ export function inventorySlots(
   let heldSince: HeldSince = new Map()
   let wake: ReturnType<typeof setTimeout> | null = null
   const repair = () => {
-    if (!sync(inventory).readyFor(p => p.peerId === host)) return
+    if (!own.ready()) return
     const step = repairStep(heldSince, {
       held: inputs.held(),
       stored: readSlots(inventory),
@@ -81,21 +86,16 @@ export function inventorySlots(
         : setTimeout(repair, Math.max(0, step.wake - Date.now()))
     write(step.writes)
   }
-  const unsubscribe = subscribe(inventory, () => {
-    slots.set(readSlots(inventory))
-    repair()
-  })
-  const unsubscribeSync = sync(inventory).onPeerSyncChange(repair)
+  own.onChange(repair)
   repair()
   return {
-    slots: readable(slots),
+    slots: own.value,
     stored: () => readSlots(inventory),
     repair,
     write,
     take: (card, slot) => write(takeWrites(readSlots(inventory), card, slot)),
     dispose() {
-      unsubscribe()
-      unsubscribeSync()
+      own.dispose()
       if (wake !== null) clearTimeout(wake)
     },
   }

@@ -409,6 +409,7 @@ describe("archivedIn: a root's archive record, found by its root entry", () => {
       messages: 1,
       newest: entryId(entry),
       writers: [],
+      threads: {},
       mentions: [],
       images: [],
     },

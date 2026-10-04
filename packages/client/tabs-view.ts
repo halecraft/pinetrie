@@ -3,6 +3,7 @@
 // intent it names.
 
 import type { EntryId, LaneName, MarkRecord, ThreadName } from "@pineta/core"
+import type { Level, Moments, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
 import { type ActiveTab, type Layout, sameTab, tabBar } from "./layout.ts"
@@ -11,6 +12,8 @@ import { NO_TEXT } from "./root-label.ts"
 /** What a root tab's ⋯ offers. */
 export type TabMenuItem =
   | { readonly kind: "rename" }
+  /** What the tab raises is not needed (ADR-0077). */
+  | { readonly kind: "notNeeded"; readonly intent: Intent }
   /** Ask a model for a title from the root's messages (ADR-0074). */
   | { readonly kind: "retitle"; readonly intent: Intent }
   /**
@@ -32,7 +35,11 @@ interface TabCommon {
 }
 
 export type TabView =
-  | (TabCommon & { readonly kind: "archive" })
+  | (TabCommon & {
+      readonly kind: "archive"
+      /** The highest a root with no tab of its own raises (`untabbed`). */
+      readonly status: Level | null
+    })
   | (TabCommon & {
       readonly kind: "new"
       readonly key: string
@@ -48,7 +55,15 @@ export type TabView =
       readonly line: string
       /** Its stored title, or null: what the rename field starts with. */
       readonly title: string | null
-      readonly running: boolean
+      /** What its mark draws (`rootStatus`), or null for none. */
+      readonly status: Status | null
+      /**
+       * When its status last rose to needs you as you watched, or null: the
+       * mark pulses as it mounts then, and stays (`moving`).
+       */
+      readonly arrived: number | null
+      /** When its agent last stopped with a run you follow done, or null: a ✓ fades. */
+      readonly done: number | null
       /** Only the tab you are on can be archived and still in the bar. */
       readonly archived: boolean
       /** On every root tab not archived, the one you are on or not. */
@@ -78,6 +93,12 @@ export interface TabsViewInput {
   /** The threads with an open offer, by root (`offeredByRoot`). */
   readonly offered: ReadonlyMap<EntryId, readonly ThreadName[]>
   readonly unsent: CardMarks
+  /** Each root's status (`rootStatus`, ADR-0077). */
+  readonly status: ReadonlyMap<EntryId, Status>
+  /** The highest status of roots with no tab (`untabbed`): the Archive tab's. */
+  readonly elsewhere: Level | null
+  /** When each root's mark last arrived as you watched (`useAttention`). */
+  readonly arrivals: Moments
 }
 
 export function tabsView(input: TabsViewInput): TabsView {
@@ -97,8 +118,13 @@ function tabView(tab: ActiveTab, input: TabsViewInput): TabView {
   }
   switch (tab.kind) {
     case "archive":
-      // A root holding your card has no tab of its own.
-      return { ...common, kind: "archive", pip: input.unsent.elsewhere }
+      // A root holding your card, or raising something, has no tab of its own.
+      return {
+        ...common,
+        kind: "archive",
+        pip: input.unsent.elsewhere,
+        status: input.elsewhere,
+      }
     case "new":
       return {
         ...common,
@@ -114,6 +140,7 @@ function tabView(tab: ActiveTab, input: TabsViewInput): TabView {
     case "root": {
       const { root } = tab
       const archived = input.archived.has(root)
+      const status = input.status.get(root) ?? null
       return {
         ...common,
         kind: "root",
@@ -121,11 +148,25 @@ function tabView(tab: ActiveTab, input: TabsViewInput): TabView {
         label: input.labels.get(root) ?? NO_TEXT,
         line: input.lines.get(root) ?? NO_TEXT,
         title: input.marks.get(root)?.title ?? null,
-        running: input.work.get(root) === "running",
+        status,
+        arrived: input.arrivals.arrived.get(root) ?? null,
+        done: input.arrivals.done.get(root) ?? null,
         archived,
         menu: archived
           ? []
           : [
+              ...(status === null || status.kind === "working"
+                ? []
+                : [
+                    {
+                      kind: "notNeeded",
+                      intent: {
+                        kind: "notNeeded",
+                        lane: status.item.lane,
+                        raised: status.item.raised,
+                      },
+                    } as const,
+                  ]),
               { kind: "rename" },
               { kind: "retitle", intent: { kind: "retitle", root } },
               {

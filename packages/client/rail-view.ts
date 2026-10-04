@@ -13,7 +13,7 @@ import { digestText } from "@pineta/rules"
 
 /**
  * The messages this view draws on their own, never inside a stretch: thread
- * ends someone else follows, running lanes' tips, each open
+ * ends someone else is reading, running lanes' tips, each open
  * column's end, and each thread end holding a card of yours, whose dot
  * carries its mark. A column's end is kept because an anchored column can end
  * mid-stretch: inside one, half of it would be on the column's path and half
@@ -22,7 +22,7 @@ import { digestText } from "@pineta/rules"
  * column's path is the column's own end.
  */
 export function railKeep(input: {
-  /** Thread ends others follow: the rings' keys. */
+  /** Thread ends others are reading: the rings' keys. */
   readonly rings: ReadonlyMap<EntryId, unknown>
   readonly activity: readonly AgentRun[]
   /** Each open column's end (`ColumnView.tipId`). */

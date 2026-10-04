@@ -33,6 +33,7 @@ const ports = () => {
       refuse: vi.fn(),
     },
     inventory: { show: vi.fn(), select: vi.fn() },
+    attention: { dismiss: vi.fn(), dismissOffer: vi.fn() },
     fly: vi.fn(),
     intent: vi.fn(),
     reveal: vi.fn(),
@@ -225,4 +226,27 @@ test("a move flies only when its plan says so", () => {
   perform([{ kind: "moveCard", move, how, queuedBy: null, fly: false }], p)
   expect(p.fly).not.toHaveBeenCalled()
   expect(p.session.moveCard).toHaveBeenCalledOnce()
+})
+
+test("not needed marks a verdict by its ask, an offer by its source, and an offer with none not at all (ADR-0077)", () => {
+  const p: Ports = ports()
+  const lane = laneNameForThread("a")
+  perform(
+    [
+      {
+        kind: "notNeeded",
+        lane,
+        raised: {
+          kind: "verdict",
+          verdict: { kind: "unclassified" },
+          ask: entryId("p-1"),
+        },
+      },
+      { kind: "notNeeded", lane, raised: { kind: "offer", source: "c-1" } },
+      { kind: "notNeeded", lane, raised: { kind: "offer", source: null } },
+    ],
+    p,
+  )
+  expect(p.attention.dismiss.mock.calls).toEqual([[lane, "p-1"]])
+  expect(p.attention.dismissOffer.mock.calls).toEqual([[lane, "c-1"]])
 })

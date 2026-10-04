@@ -15,8 +15,10 @@ import {
   deleteRecord,
   encodeCard,
   PROJECT,
+  pendingVerdict,
   SEAT,
   setRecord,
+  VERDICT,
 } from "@pineta/rules"
 import { newPlacesDoc, writeLaneTip } from "@pineta/schema"
 import { expect, test } from "vitest"
@@ -144,6 +146,20 @@ test("recover writes the project record only when it changed, in one write", asy
   putValue(b, setRecord(PROJECT, project))
   const again = await run(b)
   expect(writesOf(again).map(w => w.namespace)).toEqual(["pineta.commands"])
+})
+
+test("recover writes unclassified over a verdict a stopped host left pending (ADR-0077)", async () => {
+  const LANE = laneNameForThread("0123456789abcdef")
+  const b = basics()
+  const pending = pendingVerdict(LANE, entryId("p-1"), entryId("w-1"))
+  putValue(b, setRecord(VERDICT, pending))
+  const agent = agentPort()
+  await recover(deps({ basics: b, agent: agent.port }))
+  expect(
+    writesOf(agent.calls).filter(w => w.namespace === VERDICT.namespace),
+  ).toEqual([
+    setRecord(VERDICT, { ...pending, verdict: { kind: "unclassified" } }),
+  ])
 })
 
 test("recover sweeps empty cards, texts no record names, and seats no text names (ADR-0048)", async () => {

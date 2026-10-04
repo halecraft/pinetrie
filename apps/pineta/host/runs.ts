@@ -81,20 +81,23 @@ export interface Runs {
 export type RunEndStep =
   | "landingEnded"
   | "splitEnded"
+  | "verdictPending"
   | "endRun"
   | "laneStopped"
   | "ended"
 
 /**
  * A run's end, in order, from its prompt's role. A resolution records its
- * outcome and a split checks its stack, however they started. `endRun` comes
+ * outcome and a split checks its stack, however they started. The run's
+ * verdict is pending before `endRun` (ADR-0077): written after, a reader
+ * would see the lane stopped beside the last run's verdict. `endRun` comes
  * before `laneStopped` and `ended`: it closes the lane's streams (ADR-0044),
  * and what follows reads the lane as idle.
  */
 export function planRunEnd(role: string | undefined): readonly RunEndStep[] {
   const outcome: readonly RunEndStep[] =
     role === "land" ? ["landingEnded"] : role === "stack" ? ["splitEnded"] : []
-  return [...outcome, "endRun", "laneStopped", "ended"]
+  return [...outcome, "verdictPending", "endRun", "laneStopped", "ended"]
 }
 
 /**
@@ -129,6 +132,8 @@ export function createRuns(deps: {
     "beforeRun" | "runEnded" | "landingEnded" | "splitEnded"
   >
   readonly readPinned: ReadPinned
+  /** Write `lane`'s run's verdict as pending (`Digests.pending`). */
+  readonly pending: (lane: LaneName, prompt: EntryId) => Promise<void>
 }): Runs {
   const { basics, agent, work, readPinned } = deps
   const { docs, live, log } = basics
@@ -156,6 +161,9 @@ export function createRuns(deps: {
           return
         case "splitEnded":
           if (prompt !== null) await work.splitEnded(lane, prompt.id)
+          return
+        case "verdictPending":
+          if (prompt !== null) await deps.pending(lane, prompt.id)
           return
         case "endRun":
           return endRun(live, lane, id)

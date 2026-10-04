@@ -476,7 +476,18 @@ export const mutations: readonly Mutation[] = [
     to: "      .activity-trigger:has(.activity-working) .agent-mark { background: #9ecbff; color: #111; animation: pulse 1s ease-in-out infinite; }",
     suite: "browser",
     scenario: "page",
-    expect: "the header's activity is still while the agent works",
+    expect:
+      "the header's activity and the thread's tab are still while the agent works",
+  },
+  {
+    name: "a tab pulses while its agent works",
+    file: "packages/client/index.html",
+    from: "      .tab-status.working { border: 1.5px solid #9ecbff; }",
+    to: "      .tab-status.working { border: 1.5px solid #9ecbff; animation: pulse 1s ease-in-out infinite; }",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the header's activity and the thread's tab are still while the agent works",
   },
   {
     name: "Escape leaves a popover open once its focused item has gone",
@@ -529,10 +540,10 @@ export const mutations: readonly Mutation[] = [
       "a mention counts on the activity badge, and choosing it opens its thread with the message drawn",
   },
   {
-    name: "the inbox is kept in page memory",
+    name: "seen mentions are never written to your attention document",
     file: "packages/client/use-inbox.ts",
-    from: "      if (next !== from) setInbox(store.save(next))",
-    to: "      if (next !== from) setInbox(next)",
+    from: "      if (next !== from) attention.setInbox(next)",
+    to: "      if (next !== from) return",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1446,8 +1457,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every inventory is shared with every peer",
     file: "apps/pineta/host/policy.ts",
-    from: "      : (routeLine(docId, peer) ?? holdsInventory(docId, peer.principal)),",
-    to: "      : (routeLine(docId, peer) ??\n        (holdsInventory(docId, peer.principal) === undefined ? undefined : true)),",
+    from: "      : (routeLine(docId, peer) ?? holdsPersonDoc(docId, peer.principal)),",
+    to: "      : (routeLine(docId, peer) ??\n        (holdsPersonDoc(docId, peer.principal) === undefined ? undefined : true)),",
     suite: "host",
     scenario: "cards",
     expect:
@@ -1618,8 +1629,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Auto-update title in a tab's ⋯ sends nothing",
     file: "packages/client/tabs.tsx",
-    from: '                                label: "Auto-update title",\n                                onChoose: () => onIntent(item.intent),',
-    to: '                                label: "Auto-update title",\n                                onChoose: () => {},',
+    from: '                                  label: "Auto-update title",\n                                  onChoose: () => onIntent(item.intent),',
+    to: '                                  label: "Auto-update title",\n                                  onChoose: () => {},',
     suite: "browser",
     scenario: "page",
     expect: "Auto-update title in a tab's ⋯ titles its root from the model",
@@ -1627,8 +1638,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startHost runs read no pinned cards",
     file: "apps/pineta/host/index.ts",
-    from: "  const runs = createRuns({ basics, agent, work, readPinned })",
-    to: "  const runs = createRuns({\n    basics,\n    agent,\n    work,\n    readPinned: async () => null,\n  })",
+    from: "    readPinned,\n    pending: digests.pending,\n",
+    to: "    readPinned: async () => null,\n    pending: digests.pending,\n",
     suite: "host",
     scenario: "cards",
     expect:

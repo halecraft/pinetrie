@@ -8,17 +8,13 @@ import {
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
-  decodeInbox,
-  encodeInbox,
   type Inbox,
   isUnseen,
   markAllSeen,
   markSeen,
   mentionsOf,
-  mergeInbox,
   seenNow,
   seenOnScreen,
-  startInbox,
 } from "./inbox.ts"
 
 const ADA = writerId("ada")
@@ -39,6 +35,7 @@ const record = (
   messages: mentions.length,
   newest: newest === null ? null : entryId(newest),
   writers: [],
+  threads: {},
   mentions: mentions.map(([id, by, text]) => ({
     id: entryId(id) as EntryId,
     by,
@@ -85,9 +82,8 @@ describe("mentionsOf", () => {
 
 describe("the inbox", () => {
   const start: Inbox = { since: "1-r1", seen: [] }
-  test("a device starts with nothing unseen: `since` is any root's newest entry", () => {
-    const fresh = startInbox(roots)
-    expect(fresh).toEqual({ since: "7-d", seen: [] })
+  test("from a watermark, a person starts with nothing unseen", () => {
+    const fresh: Inbox = { since: "7-d", seen: [] }
     expect(ids.filter(id => isUnseen(fresh, id))).toEqual([])
   })
   test("marking seen compacts `since` over a run of seen mentions", () => {
@@ -108,14 +104,6 @@ describe("the inbox", () => {
       seen: [],
     })
   })
-  test("two tabs' marks merge: the later `since`, and both islands above it", () => {
-    expect(
-      mergeInbox(
-        { since: "1-r1", seen: ["7-d"] },
-        { since: "3-b", seen: ["8-x"] },
-      ),
-    ).toEqual({ since: "3-b", seen: ["7-d", "8-x"] })
-  })
   test("seen on screen: the unseen mentions among what the tab you are on draws", () => {
     const shown = new Set(["1-r1", "7-d", "2-a"])
     expect(seenOnScreen(start, mine, shown)).toEqual(["7-d"])
@@ -128,16 +116,5 @@ describe("the inbox", () => {
       false,
     )
     expect(seenNow({ since: "7-d", seen: [] }, mine, shown)).toBe(null)
-  })
-  test("the stored form round-trips, and a malformed one restores nothing", () => {
-    const i: Inbox = { since: "1-r1", seen: ["7-d"] }
-    expect(decodeInbox(JSON.parse(JSON.stringify(encodeInbox(i))))).toEqual(i)
-    for (const raw of [
-      { v: 2, since: "", seen: [] },
-      { v: 1, since: 3, seen: [] },
-      { v: 1, since: "", seen: [4] },
-      null,
-    ])
-      expect(decodeInbox(raw)).toBeUndefined()
   })
 })

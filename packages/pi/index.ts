@@ -22,6 +22,7 @@ export {
 export type { LaneAccess, LaneHooks } from "./lanes.ts"
 export {
   SCRIPTED_DESCRIPTION,
+  SCRIPTED_VERDICT,
   type ScriptedModel,
   type ScriptStep,
   scriptedModel,

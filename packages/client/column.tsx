@@ -39,6 +39,7 @@ import {
   readStreamText,
   type StreamRecord,
 } from "@pineta/schema"
+import type { AttentionStore } from "@pineta/session"
 import {
   drawnPlace,
   newCardId,
@@ -94,7 +95,7 @@ import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { behind, type SeenEnd } from "./follow.ts"
 import type { ColumnAct, Intent } from "./intent.ts"
-import { type Left, leftLine } from "./left.ts"
+import { leftLine } from "./left.ts"
 import type { LiveWork } from "./live.ts"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
@@ -115,7 +116,6 @@ import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import type { ScreenMemory } from "./screen-memory.ts"
 import type { ColumnHow } from "./send.ts"
-import type { DeviceState } from "./tab-state.ts"
 import type { RowMemory } from "./tool-row.ts"
 import { useAskBar } from "./use-ask-bar.ts"
 import { PLACED, useFollow } from "./use-follow.ts"
@@ -149,7 +149,7 @@ export interface ColumnProps {
   /** Everyone who can be mentioned (`readParticipants`). */
   participants: readonly string[]
   /**
-   * Whether its header and composer show who else follows and types here
+   * Whether its header and composer show who else is reading and typing here
    * (ADR-0024): not in the Archive tab's preview.
    */
   showsPresence: boolean
@@ -201,8 +201,11 @@ export interface ColumnProps {
   folds: FoldMemory
   /** Each ask's model-written digest, by its prompt (ADR-0056). */
   digests: ReadonlyMap<EntryId, DigestRecord>
-  /** Where this device last left each thread (ADR-0056); none in a preview. */
-  left?: DeviceState<Left>
+  /**
+   * How far you have read each thread, on every device of yours (ADR-0056,
+   * ADR-0077); none in a preview.
+   */
+  attention?: AttentionStore
   /** Every mounted column's view, which the rail outlines (ADR-0058). */
   viewports?: ViewportStore
   /** Where columns were left, by message (ADR-0058). */
@@ -278,17 +281,24 @@ export function Column(p: ColumnProps) {
   const [mountedReleased] = useState(
     () => p.seenEnd?.get(p.column.key)?.released ?? null,
   )
-  // Where this device last left the thread: read as the column mounts and
-  // when the page shows again, so the line stays where it was while you
-  // read below it (ADR-0056).
+  // Where you last left the thread, on any device: read as the column
+  // mounts and when the page shows again, so the line stays where it was
+  // while you read below it (ADR-0056, ADR-0077).
   const leftLane = p.column.lane ?? null
   const readLeft = useStable(() =>
-    leftLane === null ? undefined : p.left?.load()?.get(leftLane),
+    leftLane === null
+      ? undefined
+      : p.attention?.attention.current().read.get(leftLane),
   )
   const [leftAt, setLeftAt] = useState(readLeft)
+  const [visible, setVisible] = useState(
+    () => document.visibilityState === "visible",
+  )
   useEffect(() => {
     const back = () => {
-      if (document.visibilityState === "visible") setLeftAt(readLeft())
+      const now = document.visibilityState === "visible"
+      if (now) setLeftAt(readLeft())
+      setVisible(now)
     }
     document.addEventListener("visibilitychange", back)
     return () => document.removeEventListener("visibilitychange", back)
@@ -302,8 +312,8 @@ export function Column(p: ColumnProps) {
     store: p.viewports,
   })
   // Leaving, the column remembers its end and its spot, and a column bound
-  // to a lane at its end leaves the device a mark there: written only then,
-  // so watching writes nothing.
+  // to a lane at its end marks it read there; the marks waiting are written
+  // at once (`AttentionStore.leave`).
   const leave = useStable(
     (left: {
       readonly unseen: boolean
@@ -316,7 +326,8 @@ export function Column(p: ColumnProps) {
         released: left.released,
       })
       if (left.following && leftLane !== null && view.tipId !== null)
-        p.left?.save(new Map([[leftLane, view.tipId]]))
+        p.attention?.read(leftLane, view.tipId)
+      p.attention?.leave()
       p.spots?.save(
         keepSpot(
           p.spots.load(),
@@ -334,6 +345,16 @@ export function Column(p: ColumnProps) {
     { unseen: mountedBehind, released: mountedReleased, leave },
     view.tipId,
   )
+  // Watching its end, in a page you can see, you have read the thread to it:
+  // a run you watch end raises nothing (ADR-0077). `readStep` decides when
+  // the mark is written.
+  const attention = p.attention
+  useEffect(() => {
+    if (attention === undefined || leftLane === null || view.tipId === null)
+      return
+    if (end.releasedTip === null && visible)
+      attention.read(leftLane, view.tipId)
+  }, [attention, leftLane, view.tipId, end.releasedTip, visible])
   // This thread's lane, as the host will find it: busy means a compelled
   // message waits.
   const thread = threadOf(p.index, p.lanes, {
@@ -1058,7 +1079,7 @@ export function Column(p: ColumnProps) {
 }
 
 /**
- * Others following this column's thread, in its header. It reads presence
+ * Others reading this column's thread, in its header. It reads presence
  * itself, so a presence write redraws this and not the column.
  */
 function SeenBy(p: {

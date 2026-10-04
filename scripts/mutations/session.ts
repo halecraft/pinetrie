@@ -340,4 +340,38 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "each card's version as this client has it",
   },
+  // ── your attention document (ADR-0077) ──
+  {
+    name: "a read mark moves back",
+    file: "packages/session/read-marks.ts",
+    from: "    if (!after(entry, stored.get(lane))) waiting.delete(lane)\n",
+    to: "",
+    command: unit,
+    expect: "a mark only moves forward",
+  },
+  {
+    name: "a read mark is written before the host's copy arrives",
+    file: "packages/session/read-marks.ts",
+    from: "  if (!input.ready)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect: "nothing is written before the host's copy has arrived",
+  },
+  {
+    name: "your attention is written before the host's copy arrives",
+    file: "packages/session/attention-doc.ts",
+    from: "    if (own.ready()) batch(doc, fn)",
+    to: "    batch(doc, fn)",
+    command: unit,
+    expect:
+      "before the host's copy arrives, your attention document is not written",
+  },
+  {
+    name: "a person starts with every mention unseen",
+    file: "packages/session/attention-doc.ts",
+    from: "    if (newest !== null && newest > since) since = newest",
+    to: "    if (newest === null) since = since",
+    command: unit,
+    expect: "a person starts at the directory's newest entry",
+  },
 ]

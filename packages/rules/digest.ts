@@ -137,25 +137,53 @@ export function digestDue(input: {
   )
 }
 
-/** A digest to ask for: whether it is the final one, and its request's parts. */
-interface DigestPlan {
-  readonly final: boolean
+/** An ask's run, as a request reads it. */
+export interface AskLines {
   /** The ask's message, as a transcript line. */
   readonly said: string
   /** The run's messages but `shown`, as transcript lines, oldest first. */
   readonly work: readonly string[]
   /** The run's last word (`lastWord`), which the reader sees after the fold. */
   readonly shown: string | null
+}
+
+/**
+ * Pure. `ask`'s run as transcript lines, or null for a run with no entry.
+ * The lines come from the ask's own entries, walked up from its run's last
+ * entry, so they do not depend on where its lane went after. `said` is
+ * worded from the prompt itself: `transcriptLines` leaves out a land or
+ * stack message.
+ */
+export function askLines(
+  index: TreeIndex,
+  asks: AskIndex,
+  ask: EntryId,
+): AskLines | null {
+  const last = asks.last.get(ask)
+  if (last === undefined) return null
+  const path = projectTranscript(index, last)
+  const prompt = path.find(m => m.id === ask)
+  const word = lastWord(index, asks, ask)
+  const shown = path.find(m => m.id === word)
+  return {
+    said: prompt === undefined ? "" : transcriptLine(prompt),
+    work: transcriptLines(
+      path.filter(m => asks.askOf.get(m.id) === ask && m.id !== word),
+    ),
+    shown: shown === undefined ? null : transcriptLine(shown),
+  }
+}
+
+/** A digest to ask for: whether it is the final one, and its request's parts. */
+export interface DigestPlan extends AskLines {
+  readonly final: boolean
   /** The stored digest, as `digestText` words it. */
   readonly previous: string | null
 }
 
 /**
  * Pure. The digest to ask for `ask` now, or null: none for a short ask
- * (`isLongAsk`) or when `digestDue` says no. The lines come from the ask's
- * own entries, walked up from its run's last entry, so they do not depend on
- * where its lane went after. `said` is worded from the prompt itself:
- * `transcriptLines` leaves out a land or stack message.
+ * (`isLongAsk`) or when `digestDue` says no. Its lines are `askLines`.
  */
 export function planDigest(input: {
   readonly index: TreeIndex
@@ -168,20 +196,12 @@ export function planDigest(input: {
   readonly now: number
 }): DigestPlan | null {
   const { index, asks, ask, stored } = input
-  const last = asks.last.get(ask)
-  if (!isLongAsk(asks, ask) || last === undefined) return null
-  if (!digestDue(input)) return null
-  const path = projectTranscript(index, last)
-  const prompt = path.find(m => m.id === ask)
-  const word = lastWord(index, asks, ask)
-  const shown = path.find(m => m.id === word)
+  if (!isLongAsk(asks, ask) || !digestDue(input)) return null
+  const lines = askLines(index, asks, ask)
+  if (lines === null) return null
   return {
+    ...lines,
     final: input.ended,
-    said: prompt === undefined ? "" : transcriptLine(prompt),
-    work: transcriptLines(
-      path.filter(m => asks.askOf.get(m.id) === ask && m.id !== word),
-    ),
-    shown: shown === undefined ? null : transcriptLine(shown),
     previous: stored === undefined ? null : digestText(stored),
   }
 }
@@ -209,12 +229,32 @@ export function digestToWrite(input: {
 }
 
 /**
+ * What a request asks the model to answer with. At a run's end it is asked
+ * for the verdict too (ADR-0077), first, then the digest when there is one
+ * to ask for.
+ */
+export type Answer = "digest" | "verdict" | "verdict and digest"
+
+/** The closing line of a request for the verdict alone. */
+export const VERDICT_ALONE = "Answer with the verdict line alone."
+/** The closing line of a request for the verdict and the digest. */
+export const VERDICT_THEN_DIGEST =
+  "Answer with the verdict line, then the summary."
+
+/** The request's closing line for `answer`; none for a digest alone, whose skill says it. */
+const answerLine = (answer: Answer): string =>
+  answer === "digest"
+    ? ""
+    : `\n${answer === "verdict" ? VERDICT_ALONE : VERDICT_THEN_DIGEST}\n`
+
+/**
  * The request: the skill as the system text, then the ask, the run's
  * newest messages that fit `budget`, the last word the reader sees after
- * them, and the digest before this one. The oldest work is cut first
- * (`fitNewest`); the ask and the last word never are.
+ * them, the digest before this one, and what to answer with. The oldest
+ * work is cut first (`fitNewest`); the ask and the last word never are.
  */
 export function digestRequest(input: {
+  readonly answer: Answer
   readonly skill: string
   /** The ask's message, as a transcript line. */
   readonly ask: string
@@ -231,6 +271,7 @@ export function digestRequest(input: {
       ? ""
       : `\nWhat the reader sees after the work:\n${input.shown}\n`,
     input.previous === null ? "" : `\nThe summary so far:\n${input.previous}\n`,
+    answerLine(input.answer),
   ].join("")
   const room = Math.max(0, input.budget - head.length - tail.length)
   const { text, dropped } = fitNewest(input.work, room - LEFT_OUT_NOTE)

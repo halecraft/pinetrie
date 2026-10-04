@@ -10,14 +10,15 @@ import {
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
-import { inventoryDocId } from "@pineta/protocol/writers"
+import { personDocId } from "@pineta/protocol/writers"
 import { cardDocId } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { acceptsWrite, hostPolicy, resolveDoc } from "./policy.ts"
 
 const CARD = cardDocId(cardId("c-1"))
 const UNDO = "undo:seat-a"
-const INVENTORY = inventoryDocId(writerId("ada@x.io"))
+const INVENTORY = personDocId("inventory", writerId("ada@x.io"))
+const ATTENTION = personDocId("attention", writerId("ada@x.io"))
 
 const KNOWN = rootIdFor("known")
 
@@ -33,10 +34,11 @@ test("acceptsWrite: cards' texts are written by clients; an undo stack is refuse
   expect(acceptsWrite(UNDO)).toBe(false)
 })
 
-test("resolveDoc: a card's text, an inventory, a known root, a tab's undo stack or an unknown root, and nothing else", () => {
+test("resolveDoc: a card's text, a person's document by its kind, a known root, a tab's undo stack or an unknown root, and nothing else", () => {
   const known = (root: string) => root === KNOWN
   expect(resolveDoc(CARD, known)).toBe("text")
   expect(resolveDoc(INVENTORY, known)).toBe("inventory")
+  expect(resolveDoc(ATTENTION, known)).toBe("attention")
   expect(resolveDoc(UNDO, known)).toBe("reject")
   // Only the host makes roots; one the directory names it loads (ADR-0063).
   expect(resolveDoc(rootDocId(KNOWN), known)).toBe("root")
@@ -50,6 +52,7 @@ test("resolveDoc: a card's text, an inventory, a known root, a tab's undo stack 
     "line:pineta.control:a→host",
     "card:",
     "inventory:ada@x.io",
+    "attention:ada@x.io",
   ])
     expect(resolveDoc(other, known)).toBeUndefined()
 })
@@ -79,14 +82,17 @@ test("a tab's undo stack is shared with no one and taken from no one; places and
   ]).toEqual([false, false, undefined, undefined, true])
 })
 
-test("an inventory is shared with its person only (ADR-0059)", () => {
+test.each([
+  ["an inventory", INVENTORY],
+  ["an attention document", ATTENTION],
+])("%s is shared with its person only (ADR-0059, ADR-0077)", (_, doc) => {
   const policy = hostPolicy
   const peer = (principal: string) =>
     ({ peerId: `seat-${principal}`, principal, type: "user" }) as const
   expect([
-    policy.canShare?.(INVENTORY, peer("Ada@X.io")),
-    policy.canShare?.(INVENTORY, peer("bea@x.io")),
-    policy.canShare?.(INVENTORY, peer("pineta-host")),
+    policy.canShare?.(doc, peer("Ada@X.io")),
+    policy.canShare?.(doc, peer("bea@x.io")),
+    policy.canShare?.(doc, peer("pineta-host")),
   ]).toEqual([true, false, false])
 })
 

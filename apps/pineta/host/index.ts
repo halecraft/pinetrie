@@ -41,6 +41,7 @@ import {
   decodeTitleConfig,
 } from "@pineta/rules"
 import {
+  AttentionDoc,
   asSessionDoc,
   cardDocId,
   InventoryDoc,
@@ -230,15 +231,18 @@ export async function startHost({
     // A client does not reconnect: a closed channel is a seat that has left,
     // so there is nothing to wait for before its Line goes.
     departureTimeout: 0,
-    // Cards' texts and inventories are created by clients (ADR-0048,
-    // ADR-0059): without this, a document the host never opened itself would
-    // be neither stored nor relayed (S58). The host never writes an inventory.
+    // Cards' texts and a person's documents are created by clients
+    // (ADR-0048, ADR-0059, ADR-0077): without this, a document the host never
+    // opened itself would be neither stored nor relayed (S58). The host never
+    // writes a person's document.
     resolve: docId => {
       switch (resolveDoc(docId, root => readRoots(session).has(root))) {
         case "text":
           return Interpret(TextDoc)
         case "inventory":
           return Interpret(InventoryDoc)
+        case "attention":
+          return Interpret(AttentionDoc)
         case "root":
           return Interpret(StorageDoc)
         case "reject":
@@ -335,11 +339,16 @@ export async function startHost({
     bannerConfig === null
       ? null
       : createBanners({ basics, keeper, blobs, agent: theAgent })
-  // Each ask's digest, unless the user config turns digests off (ADR-0071).
-  // Made before the agent, which it reads lazily, as banners do.
-  const digests = decodeDigestConfig(userJson)
-    ? createDigests({ basics, keeper, presence, agent: theAgent })
-    : null
+  // Each run's verdict (ADR-0077), and each ask's digest unless the user
+  // config turns digests off (ADR-0071). Made before the agent, which it
+  // reads lazily, as banners do.
+  const digests = createDigests({
+    basics,
+    keeper,
+    presence,
+    agent: theAgent,
+    enabled: decodeDigestConfig(userJson),
+  })
   const digestFailed = (lane: LaneName) =>
     failed(basics, "summarizing its ask", lane)
   // Each root's title, unasked as its first lane starts unless the user
@@ -394,7 +403,7 @@ export async function startHost({
                 await work.hooks.turnDone(lane, tip)
                 const root = docs.rootOfLane(lane)
                 if (root !== null)
-                  void digests?.step(root, tip, digestFailed(lane))
+                  void digests.step(root, tip, digestFailed(lane))
               },
             },
           },
@@ -432,7 +441,13 @@ export async function startHost({
   const listener = Control.listen(exchange)
   const cardPort = startCards({ exchange, store, session })
   const { readPinned } = createPinned({ basics, cards: cardPort })
-  const runs = createRuns({ basics, agent, work, readPinned })
+  const runs = createRuns({
+    basics,
+    agent,
+    work,
+    readPinned,
+    pending: digests.pending,
+  })
   const commands = createCommands({
     basics,
     agent,
@@ -491,7 +506,7 @@ export async function startHost({
     banners?.due(lane).catch(failed(basics, "banner"))
     const root = docs.rootOfLane(lane)
     if (prompt !== null && root !== null)
-      void digests?.ended(root, prompt, digestFailed(lane))
+      void digests.ended(root, lane, prompt, digestFailed(lane))
   })
   // A card queued on a lane that is not running is taken at once (ADR-0059):
   // the move that queued it asks for a drain. A lane's drain is the keeper's

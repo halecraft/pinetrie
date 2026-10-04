@@ -1,22 +1,41 @@
-// client/activity — the header's one menu of what needs you (ADR-0069): work
-// ready to add to the project, mentions of you, and where the agent works.
+// client/activity — the header's one menu of what needs you (ADR-0069,
+// ADR-0077): how the threads you follow ended, work ready to add to the
+// project, what is worth a read, mentions of you, and where the agent works.
 // Decided as a value (`activityView`) and worded in one function
-// (`activityWords`). The badge counts what needs you; running work is a
-// steady count beside it, since the tab, the column and the rail already
-// show where the agent works.
+// (`activityWords`). The badge counts what needs you: the verdicts that do,
+// the offers of threads you follow, and unseen mentions. What is worth a
+// read is listed, not counted. Running work is a steady count beside it,
+// since the tab, the column and the rail already show where the agent works.
 
 import { count } from "./counts.ts"
 
 /** The menu's groups, in the order they are drawn. */
-export type ActivitySection = "ready" | "mentions" | "working"
+export type ActivitySection =
+  | "needsYou"
+  | "ready"
+  | "worthARead"
+  | "mentions"
+  | "working"
 
-const ORDER: readonly ActivitySection[] = ["ready", "mentions", "working"]
+const ORDER: readonly ActivitySection[] = [
+  "needsYou",
+  "ready",
+  "worthARead",
+  "mentions",
+  "working",
+]
 
 export interface ActivityView {
-  /** Open offers plus unseen mentions: what the badge counts. */
+  /** What the badge counts: `needsYou`, `readyYours` and `unseen`. */
+  readonly badge: number
+  /** Verdicts that need you, on threads you follow (`attentionOf`). */
   readonly needsYou: number
-  /** Threads with an open offer (`openOffers`). */
+  /** Threads with an open offer (`openOffers`), yours or not. */
   readonly ready: number
+  /** Of them, those of threads you follow, not marked "not needed". */
+  readonly readyYours: number
+  /** Verdicts worth a read, on threads you follow. */
+  readonly worthARead: number
   /** Mentions of you, seen or not. */
   readonly mentions: number
   readonly unseen: number
@@ -32,7 +51,10 @@ export interface ActivityView {
 }
 
 export function activityView(input: {
+  readonly needsYou: number
   readonly ready: number
+  readonly readyYours: number
+  readonly worthARead: number
   /** Mentions of you, seen or not: any keeps the inbox reachable. */
   readonly mentions: number
   readonly unseen: number
@@ -44,14 +66,19 @@ export function activityView(input: {
   readonly kept: readonly ActivitySection[]
 }): ActivityView {
   const rows: Record<ActivitySection, number> = {
+    needsYou: input.needsYou,
     ready: input.ready,
+    worthARead: input.worthARead,
     mentions: input.mentions,
     working: input.working,
   }
   const sections = ORDER.filter(s => rows[s] > 0 || input.kept.includes(s))
   return {
-    needsYou: input.ready + input.unseen,
+    badge: input.needsYou + input.readyYours + input.unseen,
+    needsYou: input.needsYou,
     ready: input.ready,
+    readyYours: input.readyYours,
+    worthARead: input.worthARead,
     mentions: input.mentions,
     unseen: input.unseen,
     working: input.working,
@@ -70,15 +97,17 @@ export interface ActivityWords {
 }
 
 export function activityWords(view: ActivityView): ActivityWords {
-  const { needsYou, ready, mentions, unseen, working } = view
+  const { badge, needsYou, ready, readyYours, worthARead, mentions } = view
+  const { unseen, working } = view
   const what = [
-    ...(ready > 0 ? [`${ready} ready to add`] : []),
+    ...(needsYou > 0 ? [count(needsYou, "run ended", "runs ended")] : []),
+    ...(readyYours > 0 ? [`${readyYours} ready to add`] : []),
     ...(unseen > 0 ? [count(unseen, "unseen mention", "unseen mentions")] : []),
   ]
   const needs =
-    needsYou === 0
+    badge === 0
       ? "nothing needs you"
-      : `${count(needsYou, "thing needs", "things need")} you`
+      : `${count(badge, "thing needs", "things need")} you`
   const works =
     working === 0
       ? null
@@ -86,9 +115,11 @@ export function activityWords(view: ActivityView): ActivityWords {
   const detail = what.length === 0 ? needs : `${needs}: ${what.join(", ")}`
   return {
     label: works === null ? detail : `${detail} · ${works}`,
-    heading: needsYou === 0 ? "Nothing needs you" : needs,
+    heading: badge === 0 ? "Nothing needs you" : needs,
     sections: {
+      needsYou: needsYou > 0 ? "Needs you" : "Nothing needs you now.",
       ready: ready > 0 ? "Ready to add" : "Nothing left to add to the project.",
+      worthARead: worthARead > 0 ? "Worth a read" : "Nothing left to read.",
       mentions: mentions > 0 ? "Mentions of you" : "No one has mentioned you.",
       working:
         working > 0 ? "The agent is working in" : "The agent has finished",

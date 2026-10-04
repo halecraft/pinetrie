@@ -1,11 +1,13 @@
 # ADR-0069 — The header counts only what needs you, in one activity menu
 
 **Status:** Accepted (Duane, 2026-10-04). Implemented by
-`PLAN-2026-10-04-header-activity`. Amends ADR-0030 (`@` becomes the
-activity menu's mentions, and its count part of the menu's badge) and
-ADR-0061 (the ⇣ trigger goes; its threads are the menu's "Ready to add").
-Amended by ADR-0076: the project's trigger counts unpublished commits, and
-no longer marks your files being behind.
+`PLAN-2026-10-04-header-activity`. Amends ADR-0030 (`@` becomes the activity
+menu's mentions, and its count part of the menu's badge) and ADR-0061 (the ⇣
+trigger goes; its threads are the menu's "Ready to add"). Amended by
+ADR-0076: the project's trigger counts unpublished commits, and no longer
+marks your files being behind. Amended by ADR-0077: the badge counts
+verdicts that need you, offers of threads you follow and unseen mentions;
+the menu gains "Needs you" and "Worth a read".
 
 **Context.** Using the header alone, with the agent working most of the time,
 Duane found its right end noisy and unclear:

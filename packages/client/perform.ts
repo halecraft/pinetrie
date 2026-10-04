@@ -2,7 +2,7 @@
 // The shell: one port call per effect, and nothing decided here.
 
 import type { CardId, EntryId } from "@pineta/core"
-import type { SessionClient } from "@pineta/session"
+import type { AttentionStore, SessionClient } from "@pineta/session"
 import { afterKeep } from "./card-intents.ts"
 import type { Identity } from "./identity.ts"
 import { afterRestore, type Effect, type Intent } from "./intent.ts"
@@ -24,6 +24,8 @@ export interface AppPorts {
     | "undoSwap"
     | "refuse"
   >
+  /** Your attention document: what "not needed" marks (ADR-0077). */
+  readonly attention: Pick<AttentionStore, "dismiss" | "dismissOffer">
   /** The inventory panel: opened (briefly, for a take's flight), and its selection. */
   readonly inventory: {
     readonly show: (brief: boolean) => void
@@ -75,6 +77,12 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "retitle":
       void ports.session.retitle(effect.root)
+      return
+    case "notNeeded":
+      if (effect.raised.kind === "verdict")
+        ports.attention.dismiss(effect.lane, effect.raised.ask)
+      else if (effect.raised.source !== null)
+        ports.attention.dismissOffer(effect.lane, effect.raised.source)
       return
     case "createCard":
       void ports.session.createCard(effect.card, effect.text, effect.how)

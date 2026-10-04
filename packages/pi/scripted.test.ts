@@ -1,9 +1,15 @@
 // The scripted model: its queue, its standing answer, and paused replies.
 
 import path from "node:path"
+import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pineta/rules"
 import { expect, test, vi } from "vitest"
 import { setUpModel } from "./config.ts"
-import { type ScriptedModel, scriptedModel } from "./scripted.ts"
+import {
+  SCRIPTED_DESCRIPTION,
+  SCRIPTED_VERDICT,
+  type ScriptedModel,
+  scriptedModel,
+} from "./scripted.ts"
 
 const cwd = path.join(import.meta.dirname, "fixtures", "pi-agent")
 const ANSWER = { text: "the answer" }
@@ -100,4 +106,25 @@ test("a scripted tool step's call carries its arguments", async () => {
   expect(
     reply.content.flatMap(p => (p.type === "toolCall" ? [p] : [])),
   ).toMatchObject([{ name: "read", arguments: { path: "notes.txt" } }])
+})
+
+test("a run's end is answered with a verdict line, first, so the suites' threads are done (ADR-0077)", async () => {
+  const setup = await setUpModel(
+    { kind: "scripted", script: scriptedModel() },
+    { cwd },
+  )
+  const describe = async (user: string) =>
+    textOf(
+      await setup.models.completeSimple(setup.describeModel, {
+        systemPrompt: "summarize",
+        messages: [{ role: "user", content: user, timestamp: 0 }],
+      }),
+    )
+  expect(await describe(`What was asked\n\n${VERDICT_ALONE}\n`)).toBe(
+    SCRIPTED_VERDICT,
+  )
+  expect(await describe(`What was asked\n\n${VERDICT_THEN_DIGEST}\n`)).toBe(
+    `${SCRIPTED_VERDICT}\n${SCRIPTED_DESCRIPTION}`,
+  )
+  expect(await describe("a commit message, please")).toBe(SCRIPTED_DESCRIPTION)
 })

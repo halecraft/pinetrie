@@ -1,5 +1,5 @@
 // client/header — the right end of the header: who is here, one menu of what
-// needs you (`activity.ts`, ADR-0069), the project (ADR-0060, ADR-0061), and
+// needs you (`activity.ts`, ADR-0069, ADR-0077), the project (ADR-0060, ADR-0061), and
 // then your inventory and you (`profile.tsx`). Your tabs are your view; this
 // is the rest of the session. People and the agent come from live data
 // (presence, the running lanes), the inbox from the tree and this device's
@@ -20,10 +20,17 @@ import type { SessionClient } from "@pineta/session"
 import { useMemo, useState, useSyncExternalStore } from "react"
 import {
   type ActivitySection,
+  type ActivityView,
   activityView,
   activityWords,
 } from "./activity.ts"
 import type { OpenOffer } from "./app-view.ts"
+import {
+  attentionWords,
+  type Item,
+  LEVEL_CLASS,
+  type Level,
+} from "./attention.ts"
 import { INVENTORY } from "./card-words.ts"
 import { AGENT_MARK } from "./column-view.ts"
 import {
@@ -59,6 +66,7 @@ export function Header({
   mentions,
   inbox,
   offers,
+  attention,
   line,
   project,
   names,
@@ -80,6 +88,8 @@ export function Header({
   inbox: InboxView
   /** Threads with an offer open in your repo, at their lane's tip (ADR-0038). */
   offers: readonly OpenOffer[]
+  /** What the threads you follow raise for you (`attentionOf`, ADR-0077). */
+  attention: readonly Item[]
   /** The integration line (ADR-0060), as the host last read it. */
   line: LineRecord | null
   /** Where the host runs: "resolve with the agent" works in its root. */
@@ -107,6 +117,7 @@ export function Header({
     end: EntryId,
     root: EntryId,
     name?: string,
+    at: string = firstLine(messageText(index.entries[end]?.message), 48),
   ): MenuItem => ({
     key,
     className: "here-thread",
@@ -115,13 +126,57 @@ export function Header({
       <>
         {name !== undefined && <span className="here-name">{name}</span>}
         <span className="here-root">{labelOf(root)}</span>
-        <span className="here-at">
-          {firstLine(messageText(index.entries[end]?.message), 48)}
-        </span>
+        <span className="here-at">{at}</span>
       </>
     ),
     onChoose: () => onOpen(end, root),
   })
+  /** A raised item's rows: its thread, with its reason, and "not needed". */
+  const raised = (item: Item): MenuItem[] => [
+    {
+      ...thread(
+        `${item.lane}:${item.raised.kind}`,
+        item.end,
+        item.root,
+        names.get(item.lane),
+        attentionWords(item.raised, w => nameFor(nameOf, w)),
+      ),
+      className: `here-thread raised ${LEVEL_CLASS[item.level]}`,
+    },
+    ...(item.raised.kind === "offer" && item.raised.source === null
+      ? []
+      : [
+          {
+            key: `${item.lane}:${item.raised.kind}:not-needed`,
+            className: "not-needed",
+            keepOpen: true,
+            label: "not needed",
+            title: "clear it, on every device of yours",
+            onChoose: () =>
+              onIntent({
+                kind: "notNeeded",
+                lane: item.lane,
+                raised: item.raised,
+              }),
+          },
+        ]),
+  ]
+  const verdicts = (level: Level): MenuItem[] =>
+    attention.flatMap(i =>
+      i.raised.kind === "verdict" && i.level === level ? raised(i) : [],
+    )
+  const yourOffers = new Map(
+    attention.flatMap(i => (i.raised.kind === "offer" ? [[i.lane, i]] : [])),
+  )
+  const verdictsAt = (level: Level) =>
+    attention.filter(i => i.raised.kind === "verdict" && i.level === level)
+      .length
+  const counts = {
+    needsYou: verdictsAt("needsYou"),
+    ready: offers.length,
+    readyYours: yourOffers.size,
+    worthARead: verdictsAt("worthARead"),
+  }
   return (
     <div className="header-right">
       <div className="here">
@@ -139,9 +194,15 @@ export function Header({
         labelOf={labelOf}
         mentions={mentions}
         nameOf={nameOf}
-        offers={offers.map(o =>
-          thread(o.lane, o.end, o.root, names.get(o.lane)),
-        )}
+        counts={counts}
+        needsYou={verdicts("needsYou")}
+        offers={offers.flatMap(o => {
+          const yours = yourOffers.get(o.lane)
+          return yours === undefined
+            ? [thread(o.lane, o.end, o.root, names.get(o.lane))]
+            : raised(yours)
+        })}
+        worthARead={verdicts("worthARead")}
         onOpen={onOpen}
         runs={runs.map(r => thread(r.lane, r.end, r.root, names.get(r.lane)))}
       />
@@ -168,7 +229,7 @@ export function Header({
 }
 
 /**
- * Who else is here, a person each, with the threads they follow. It reads
+ * Who else is here, a person each, with the threads they are reading. It reads
  * presence itself, so a presence write redraws this and not the header. A
  * person who leaves while you have their menu open stays, marked gone, until
  * you close it (`withOpenMenus`).
@@ -226,7 +287,10 @@ function People({
  * the agent's runs are a steady count beside it. Nothing here animates.
  */
 function ActivityMenu({
+  counts,
+  needsYou,
   offers,
+  worthARead,
   runs,
   mentions,
   inbox,
@@ -234,8 +298,14 @@ function ActivityMenu({
   nameOf,
   onOpen,
 }: {
-  /** A row per thread with an open offer. */
+  /** What each section counts: its threads, not its rows. */
+  counts: Pick<ActivityView, "needsYou" | "ready" | "readyYours" | "worthARead">
+  /** Rows of the verdicts that need you, each with its "not needed". */
+  needsYou: readonly MenuItem[]
+  /** A row per thread with an open offer; one you follow with its "not needed". */
   offers: readonly MenuItem[]
+  /** Rows of the verdicts worth a read. */
+  worthARead: readonly MenuItem[]
   /** A row per lane the agent works on. */
   runs: readonly MenuItem[]
   mentions: readonly InboxItem[]
@@ -247,7 +317,7 @@ function ActivityMenu({
   const [onlyUnseen, setOnlyUnseen] = useState(false)
   const [kept, setKept] = useState<readonly ActivitySection[]>([])
   const view = activityView({
-    ready: offers.length,
+    ...counts,
     mentions: mentions.length,
     unseen: inbox.unseen,
     working: runs.length,
@@ -292,7 +362,9 @@ function ActivityMenu({
     },
   }))
   const items: Record<ActivitySection, readonly MenuItem[]> = {
+    needsYou,
     ready: offers,
+    worthARead,
     mentions: mentions.length === 0 ? [] : [...controls, ...rows],
     working: runs,
   }
@@ -318,9 +390,9 @@ function ActivityMenu({
           {view.working > 0 && (
             <span className="activity-working">{view.working}</span>
           )}
-          {view.needsYou > 0 && (
-            <span className="activity-badge" data-needs-you={view.needsYou}>
-              {view.needsYou}
+          {view.badge > 0 && (
+            <span className="activity-badge" data-needs-you={view.badge}>
+              {view.badge}
             </span>
           )}
         </>

@@ -616,13 +616,27 @@ shows each ask's message, one digest line folding its work, and its last
 word. The rail and the column compact the same stretches: one landmark rule
 (`railLandmarks`) is drawn apart in both, and a long ask is a dot and a
 capsule of its own. A bar names the ask whose work is at the column's top; a
-"since you were here" line marks where this device last left a thread; an
+"since you were here" line marks where you last left a thread, on any
+device of yours; an
 ask's files open a review of its range of revisions, from the paths each
 turn's revision records. Stop records who pressed it (`pineta.stop`). Unless
 `{ "digests": { "enabled": false } }` turns it off, a model writes each long
 ask a digest (`pineta.digest`, the `ask-digest` skill, ADR-0075), which no
 agent reads: a headline that leads the ask's fold line, and a few points
 under it in story, or nothing when the agent's last message says it all.
+
+**A thread's followers are told how its runs end** (ADR-0077). You follow a
+thread once you have written on it (`RootRecord.threads`). At each run's end
+the same request asks a model for a verdict, digests on or off: needs you,
+worth a read, or done, with a one-line reason (`pineta.verdict`, one per
+lane); a failed or stopped run's verdict is its facts. A tab's mark says
+what its threads need of you: a still ring while the agent works, an amber
+dot that pulses as it arrives when something needs you (a question, an
+error, work ready to add), a dim one when something is worth a read, a ✓
+that fades when a run ends with nothing to do. What you have dealt with is
+yours on every device, in your attention document (`attention:<writer>`,
+beside your inventory): how far you read each thread, what you marked "not
+needed", and the mentions you have seen.
 
 **The rail outlines what each column shows** (ADR-0058), in the column's
 colour, and scrolls to keep the outline of the column you move in view. A
@@ -791,7 +805,10 @@ context.**
   `~/.config/pineta/config.json` turns them off. Replace the `ask-digest`
   skill to change what it asks; yours must still ask for a headline line
   and `- ` points, or `nothing to add`, since a reply in another shape is
-  logged and dropped.
+  logged and dropped. With digests on or off, each run's end also asks
+  for its verdict (ADR-0077), a request of its own for a short ask; a
+  replaced skill must answer `needs you: <reason>`, `worth a read:
+  <reason>` or `done` first, or the run is unclassified.
 - `PINETA_TOOLS=0` removes the tools. A thread's agent that starts the
   development host itself needs `PINETA_PORT=0`, or it collides on 7391.
 - **Inviting a collaborator:** `PINETA_BIND=0.0.0.0` (or an address). The host

@@ -19,7 +19,7 @@ import {
 } from "@pineta/core"
 import { cardEnd } from "@pineta/rules"
 import { needsCard } from "./card-state.ts"
-import { type Layout, tabBar, tabOfColumn } from "./layout.ts"
+import { type Layout, tabOfColumn, untabbed } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
 
 /**
@@ -119,13 +119,10 @@ export function cardMarks(input: {
         break
     }
   }
-  const tabbed = new Set(
-    tabBar(input.layout).flatMap(t => (t.kind === "root" ? [t.root] : [])),
-  )
   return {
     roots,
     newTabs,
     ends,
-    elsewhere: [...roots].some(r => !tabbed.has(r) && !input.archived.has(r)),
+    elsewhere: untabbed(input.layout, input.archived, roots).length > 0,
   }
 }

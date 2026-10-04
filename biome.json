@@ -66,7 +66,6 @@
         "!packages/client/fixtures.ts",
         "!apps/pineta/host/fakes.ts",
         "!packages/client/layout.ts",
-        "!packages/client/left.ts",
         "!packages/client/use-ask-bar.ts"
       ],
       "linter": {

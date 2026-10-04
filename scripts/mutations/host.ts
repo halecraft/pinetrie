@@ -242,8 +242,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the lane stops before its streams close",
     file: "apps/pineta/host/runs.ts",
-    from: '  return [...outcome, "endRun", "laneStopped", "ended"]',
-    to: '  return [...outcome, "laneStopped", "endRun", "ended"]',
+    from: '  return [...outcome, "verdictPending", "endRun", "laneStopped", "ended"]',
+    to: '  return [...outcome, "verdictPending", "laneStopped", "endRun", "ended"]',
     command: unit,
     expect: "endRun comes before laneStopped",
   },
@@ -377,8 +377,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host shares every command Line with every client",
     file: "apps/pineta/host/policy.ts",
-    from: "      : (routeLine(docId, peer) ?? holdsInventory(docId, peer.principal)),",
-    to: "      : holdsInventory(docId, peer.principal),",
+    from: "      : (routeLine(docId, peer) ?? holdsPersonDoc(docId, peer.principal)),",
+    to: "      : holdsPersonDoc(docId, peer.principal),",
     command: unit,
     expect:
       "a command Line's documents are shared with, and taken from, its two ends only",
@@ -690,20 +690,20 @@ export const mutations: readonly Mutation[] = [
       "spend: a fresh column's first send leaves its other cards drafting",
   },
   {
-    name: "the policy shares every inventory with everyone",
+    name: "the policy shares every person's document with everyone",
     file: "packages/protocol/writers.ts",
-    from: "    : writerOfPrincipal(principal) === holder",
+    from: "    : writerOfPrincipal(principal) === owner.writer",
     to: "    : true",
     command: unit,
     expect: "an inventory is shared with its person only",
   },
   {
-    name: "resolveDoc leaves an inventory to Kyneta's default",
+    name: "resolveDoc leaves a person's document to Kyneta's default",
     file: "apps/pineta/host/policy.ts",
-    from: '  if (writerOfInventoryDoc(docId) !== undefined) return "inventory"',
+    from: "  if (person !== undefined) return person.kind",
     to: "",
     command: unit,
-    expect: "resolveDoc: a card's text, an inventory",
+    expect: "resolveDoc: a card's text, a person's document",
   },
   {
     name: "acceptsWrite refuses card documents",
@@ -1264,5 +1264,30 @@ export const mutations: readonly Mutation[] = [
     to: "        deps.drain(card.place.lane)",
     command: unit,
     expect: "a card that leaves the queue gives its wait up",
+  },
+  {
+    name: "the verdict is pending only after the run has stopped",
+    file: "apps/pineta/host/runs.ts",
+    from: '  return [...outcome, "verdictPending", "endRun", "laneStopped", "ended"]',
+    to: '  return [...outcome, "endRun", "verdictPending", "laneStopped", "ended"]',
+    command: unit,
+    expect: "the verdict is pending before endRun",
+  },
+  {
+    name: "a starting host leaves verdicts pending",
+    file: "apps/pineta/host/startup.ts",
+    from: "    ...planned.unclassified.map(v => setRecord(VERDICT, v)),\n",
+    to: "",
+    command: unit,
+    expect:
+      "recover writes unclassified over a verdict a stopped host left pending",
+  },
+  {
+    name: "a failed request leaves the verdict pending",
+    file: "apps/pineta/host/digests.ts",
+    from: "            return { reply }\n",
+    to: "            return reply === null ? null : { reply }\n",
+    command: unit,
+    expect: "leaves the verdict unclassified, never pending",
   },
 ]

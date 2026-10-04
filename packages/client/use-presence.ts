@@ -16,7 +16,7 @@ import { readReading, readReadingRoots, readTyping } from "@pineta/reads"
 import type { PresenceDocHandle } from "@pineta/schema"
 import { useMemo } from "react"
 
-/** Others following each thread end, you left out (`readingAt`). */
+/** Others reading each thread end, you left out (`readingAt`). */
 export function useReadingAt(
   presence: PresenceDocHandle,
   me: WriterId,
@@ -25,14 +25,14 @@ export function useReadingAt(
   return useMemo(() => readingAt(reading, me), [reading, me])
 }
 
-/** The root each followed thread end's reader reported (ADR-0063). */
+/** The root each thread end being read was reported in (ADR-0063). */
 export function useReadingRoots(
   presence: PresenceDocHandle,
 ): ReadonlyMap<EntryId, EntryId> {
   return useSelector(presence, readReadingRoots)
 }
 
-/** Others following the thread that ends at `end` (`seenBy`). */
+/** Others reading the thread that ends at `end` (`seenBy`). */
 export function useSeenBy(
   presence: PresenceDocHandle,
   me: WriterId,

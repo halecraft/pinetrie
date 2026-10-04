@@ -50,6 +50,7 @@ it.
 | `cardTexts` (`card-texts.ts`) | each card's text, and the copies to destroy | `hostLetGo`, `spentCards` (`card-copies.ts`) |
 | one `snapshotStore<LocalState>` | the host's records, this tab's moves, the cards drawn | `localStep` (`card-moves.ts`) |
 | `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `takeWrites`, `swapWrites` (`inventory.ts`) |
+| `attentionStore` (`attention-doc.ts`) | what you have dealt with, the read marks' alarm | `readStep` (`read-marks.ts`) |
 | `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
 | `hostLine` (`host-line.ts`) | the requests waiting for their replies | `encodeIntent`, `decodeReply` |
 | one `snapshotStore<ActingState>` | your offer and line commands out | `nextActing` (`acting.ts`) |
@@ -57,8 +58,9 @@ it.
 
 - **Order matters to Kyneta.** `writersPolicy` is registered before the
   transport is ready, and `rootDocs` registers its `canShare` policy before
-  any root's `get` (S86). The inventory repairs only once the host's copy
-  has reached this one (`readyFor`).
+  any root's `get` (S86). The inventory repairs, and your attention is
+  written, only once the host's copy has reached this one (`personDoc`'s
+  `ready`, S101).
 - **The host is found by principal** (`HOST_PRINCIPAL`, `whenPeer`), since
   its seat is Kyneta's to issue: a Line is addressed by seat.
 - **A closed line answers at once** (`HostLine.close`). When the host
@@ -195,6 +197,33 @@ session or someone else's inventory throws before it is made.
   gesture; the repair writes outside any, so an undo of a swap whose slot
   the repair changed is refused, `slots-changed` (S90). The text stack, on
   the same document under `cards`, never takes a swap step.
+
+## A person's documents (`person-doc.ts`, ADR-0059, ADR-0077)
+
+Your inventory and your attention are each a document of yours
+(`personDocId`), written only by your tabs and relayed by the host to you
+alone. `personDoc` is the one shell over either: the document read as a
+`Readable`, `onChange` for its changes and its sync with the host, and
+`ready()`, whether the host's copy has reached this one. A value written
+before then can win over a later one from another of your devices when
+the two merge (S101), so a writer asks `ready()` first.
+
+## What you have dealt with (`attention-doc.ts`, `read-marks.ts`, ADR-0077)
+
+- **`attentionStore`** reads your `AttentionDoc` (`readAttention`) and
+  writes it: read marks, "not needed" (`dismiss`, `dismissOffer`) and the
+  inbox's seen mentions (`setInbox`, as the page's `inbox.ts` decides
+  them). Nothing is written before `ready()`; a click before then is
+  dropped.
+- **Its first write sets where you start**: `since` and `mentionsSince`
+  from `startOf`, the directory's newest entry, or `EARLIEST` in an empty
+  session, and only once the session document has arrived (S29). Until
+  then `since` is "", which the page raises nothing against.
+- **Read marks are timed by `readStep`**, pure, as the repair is by
+  `repairStep`: a lane's mark only moves forward, is written at most once
+  a `READ_EVERY`, every waiting mark at once on `leave()`, and none before
+  `ready()`, losing nothing reported meanwhile. Each write stays in the
+  document's history, about 10 bytes (S101).
 
 ## Your offer and line commands (`acting.ts`)
 

@@ -251,26 +251,48 @@ writes it, through `applyPlaceSteps` (`apps/pineta/host/places.ts`).
   rows written before it existed do not decode, and no stored session held
   any.
 
-## Your inventory (`inventory.ts`, ADR-0059)
+## A person's documents (`inventory.ts`, `attention.ts`, ADR-0059, ADR-0077)
 
-`InventoryDoc` is `inventory:<writer>` (`inventoryDocId`,
-`writerOfInventoryDoc`): a Yjs document of slot index ("0"–"17") to card id,
-one per person, written only by that person's tabs. The host's places say
-whose inventory a card is in; this says which slot holds it, and each tab
-repairs it from the host's record (`planSlots`, `packages/client`).
+A person has one document of each kind in `PERSON_DOC_KINDS`, at
+`<kind>:<writer>` (`personDocId`, `ownerOfPersonDoc` in
+`@pineta/protocol/writers`): each a Yjs document written only by that
+person's tabs.
 
-- **The host stores and relays it, and never writes it.** Its policy
-  shares it only with peers whose principal is its writer
-  (`apps/pineta/host/policy.ts`).
-- **A slot naming a card that is gone stays until written over**: the
-  repair clears only a slot whose card it has seen not held for a while,
-  and the panel draws a slot whose card is not held as empty.
-- **Its id, and who may write it, are the protocol's**
-  (`inventoryDocId`, `writerOfInventoryDoc`, `mayWrite` in
-  `@pineta/protocol/writers`): its person, and the host, which relays it
-  between that person's tabs. `writerOfInventoryDoc` names a writer only
-  for an id `inventoryDocId` makes, so a hand-written `inventory:ada@x`
-  names nobody.
+- **The host stores and relays them, and never writes them.** Its policy
+  shares each only with peers whose principal is its writer
+  (`holdsPersonDoc`, `apps/pineta/host/policy.ts`), and `resolveDoc` names
+  its kind so the host interprets it with its schema.
+- **Who may write one is the protocol's** (`mayWrite`): its person, and the
+  host, which relays it between that person's tabs. `ownerOfPersonDoc`
+  names a writer only for an id `personDocId` makes, so a hand-written
+  `inventory:ada@x` names nobody.
+- **One document per kind, not one per person**: each is written at its own
+  rate and keeps its own history (S101).
+- **A tab writes one only after the host's copy has reached it**
+  (`personDoc` in `packages/session/person-doc.ts`): a value written earlier
+  can win over a later one from another device when the two merge (S101).
+
+`InventoryDoc` is a document of slot index ("0"–"17") to card id. The host's
+places say whose inventory a card is in; this says which slot holds it, and
+each tab repairs it from the host's record (`planSlots`, `packages/client`).
+A slot naming a card that is gone stays until written over: the repair
+clears only a slot whose card it has seen not held for a while, and the
+panel draws a slot whose card is not held as empty.
+
+`AttentionDoc` is what the person has dealt with (ADR-0077), read whole by
+`readAttention`:
+
+- `since`: where they started, set once by the first write and never moved:
+  a verdict that ended, or a mention written, at or before it is not new to
+  them. "" until then, which nothing is raised against.
+- `mentionsSince` and `seen`: the inbox (`packages/client/inbox.ts`). The
+  inbox's watermark moves as mentions are seen, so it is a field of its own:
+  verdicts read only `since`.
+- `read`: per lane, the furthest entry read, which only moves forward
+  (`readStep`).
+- `dismissed` and `dismissedOffers`: per lane, the ask whose verdict, and
+  the `ledger.source` whose offer, was marked "not needed".
+- A key that is no lane name is left out when read.
 
 ## A document per root (ADR-0063)
 

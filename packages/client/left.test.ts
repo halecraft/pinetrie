@@ -1,7 +1,7 @@
 import { entryId } from "@pineta/core"
 import { expect, test } from "vitest"
 import { tree } from "./fixtures.ts"
-import { decodeLeft, encodeLeft, leftLine, mergeLeft } from "./left.ts"
+import { leftLine } from "./left.ts"
 
 test("leftLine: before the first message below where it was left, which may be no message", () => {
   // a -> b -> r (a tool's result) -> c -> d, and a branch x off a.
@@ -12,22 +12,4 @@ test("leftLine: before the first message below where it was left, which may be n
   expect(leftLine(index, entryId("d"), ids)).toBeNull()
   expect(leftLine(index, entryId("x"), ids)).toBeNull()
   expect(leftLine(index, undefined, ids)).toBeNull()
-})
-
-test("left: two tabs' saves merge, the later winning for its own lanes, and it round-trips", () => {
-  const merged = mergeLeft(
-    new Map([
-      ["t-a", entryId("1")],
-      ["t-b", entryId("2")],
-    ]),
-    new Map([["t-b", entryId("3")]]),
-  )
-  expect([...merged]).toEqual([
-    ["t-a", "1"],
-    ["t-b", "3"],
-  ])
-  expect(decodeLeft(JSON.parse(JSON.stringify(encodeLeft(merged))))).toEqual(
-    merged,
-  )
-  expect(decodeLeft({ v: 2, lanes: {} })).toBeUndefined()
 })

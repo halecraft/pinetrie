@@ -370,6 +370,18 @@ export function tabBar(layout: Layout): readonly ActiveTab[] {
 }
 
 /**
+ * The roots among `roots` with no tab in your bar and not archived: what
+ * the Archive tab marks for them. An archived root's work is done, so it
+ * marks only its own row.
+ */
+export const untabbed = (
+  layout: Pick<Layout, "open">,
+  archived: ReadonlySet<EntryId>,
+  roots: Iterable<EntryId>,
+): readonly EntryId[] =>
+  [...roots].filter(r => !layout.open.includes(r) && !archived.has(r))
+
+/**
  * The column a new path should open beside: the one sharing the deepest
  * ancestor with `id`, so its colour link is short to follow.
  */

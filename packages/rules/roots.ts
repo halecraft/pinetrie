@@ -9,6 +9,8 @@
 import {
   type EntryId,
   entryId,
+  isLaneName,
+  type LaneName,
   type RootId,
   type RootRecord,
   type Sha256,
@@ -27,6 +29,9 @@ const RootRecordSchema = Type.Object({
   messages: Type.Number(),
   newest: Type.Union([Id, Type.Null()]),
   writers: Type.Array(Type.String()),
+  // Optional: a starting host chooses the roots it opens from these records
+  // (`planLoads`), and a record written before the field must still decode.
+  threads: Type.Optional(Type.Record(Type.String(), Type.Array(Type.String()))),
   mentions: Type.Array(
     Type.Object({ id: Id, by: Type.String(), text: Type.String() }),
   ),
@@ -35,6 +40,16 @@ const RootRecordSchema = Type.Object({
 
 const idOrNull = (id: string | null): EntryId | null =>
   id === null ? null : entryId(id)
+
+/** Each thread's writers, a key that is no lane name dropped. */
+const threadsOf = (
+  threads: Readonly<Record<string, readonly string[]>> | undefined,
+): Readonly<Record<LaneName, readonly WriterId[]>> =>
+  Object.fromEntries(
+    Object.entries(threads ?? {}).flatMap(([lane, writers]) =>
+      isLaneName(lane) ? [[lane, writers as WriterId[]]] : [],
+    ),
+  )
 
 /** Each root's directory record, at its id. */
 export const ROOT: RecordSpec<RootRecord, RootId, "session"> = {
@@ -52,6 +67,7 @@ export const ROOT: RecordSpec<RootRecord, RootId, "session"> = {
       messages: r.messages,
       newest: idOrNull(r.newest),
       writers: r.writers as WriterId[],
+      threads: threadsOf(r.threads),
       mentions: r.mentions.map(m => ({
         id: entryId(m.id),
         by: m.by as WriterId,

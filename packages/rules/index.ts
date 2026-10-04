@@ -76,6 +76,9 @@ export {
 } from "./commands.ts"
 export type { ModelRef } from "./config.ts"
 export {
+  type Answer,
+  type AskLines,
+  askLines,
   DIGEST,
   decodeDigestConfig,
   digestOf,
@@ -85,6 +88,8 @@ export {
   planDigest,
   pointsText,
   readsAsk,
+  VERDICT_ALONE,
+  VERDICT_THEN_DIGEST,
 } from "./digest.ts"
 export { pastedImages, planImages } from "./images.ts"
 export {
@@ -192,6 +197,15 @@ export {
   type StackMessage,
   type UpdateMessage,
 } from "./update.ts"
+export {
+  type EndReply,
+  endReplyOf,
+  pendingVerdict,
+  planRunEnded,
+  runEndedToWrite,
+  VERDICT,
+  verdictOf,
+} from "./verdict.ts"
 export {
   forkPoint,
   LANE,

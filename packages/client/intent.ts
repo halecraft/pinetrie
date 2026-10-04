@@ -37,6 +37,7 @@ import {
   type Slots,
 } from "@pineta/session"
 import type { Density } from "./ask-words.ts"
+import type { Raised } from "./attention.ts"
 import {
   afterUndo,
   cardOf,
@@ -160,6 +161,12 @@ export type Intent =
     }
   /** Ask a model for the root's title (ADR-0074). */
   | { readonly kind: "retitle"; readonly root: EntryId }
+  /** What `lane` raised for you is not needed (ADR-0077): it clears on every device. */
+  | {
+      readonly kind: "notNeeded"
+      readonly lane: LaneName
+      readonly raised: Raised
+    }
   /** Show entry `entry`, wherever it is (`planOpen`). */
   | { readonly kind: "openAt"; readonly entry: EntryId }
   /**
@@ -190,6 +197,12 @@ export type Intent =
 
 export type Effect =
   | { readonly kind: "layout"; readonly action: LayoutAction }
+  /** Mark what `lane` raised "not needed", in your attention document. */
+  | {
+      readonly kind: "notNeeded"
+      readonly lane: LaneName
+      readonly raised: Raised
+    }
   /** Ask the host for something that moves no card (`HostRequest`). */
   | { readonly kind: "request"; readonly intent: HostRequest }
   | { readonly kind: "restore"; readonly root: EntryId }
@@ -358,6 +371,8 @@ export function planIntent(
       return [{ kind: "mark", root: intent.root, title: intent.title }]
     case "retitle":
       return [{ kind: "retitle", root: intent.root }]
+    case "notNeeded":
+      return [{ kind: "notNeeded", lane: intent.lane, raised: intent.raised }]
     case "openAt":
       return planOpenAt(intent.entry, state, fresh)
     case "openIn":

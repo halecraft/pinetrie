@@ -6,7 +6,7 @@ import path from "node:path"
 import { type CardId, cardId, entryId, type LaneName, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import { PLACES_DOC_ID } from "@pineta/protocol/messages"
-import { inventoryDocId } from "@pineta/protocol/writers"
+import { personDocId } from "@pineta/protocol/writers"
 import { readPlaces, readSeats } from "@pineta/reads"
 import { yourCard } from "@pineta/rules"
 import { cardDocId, InventoryDoc, PlacesDoc } from "@pineta/schema"
@@ -431,7 +431,10 @@ async function run(check: Checks["check"]): Promise<void> {
       () => ada2.slots.current()["3"] === taking,
       5_000,
     )
-    const beaView = bea.exchange.get(inventoryDocId(ada.writer), InventoryDoc)
+    const beaView = bea.exchange.get(
+      personDocId("inventory", ada.writer),
+      InventoryDoc,
+    )
     const beaRefused = refusedWrite(() => beaView.slots.set("7", "planted"))
     await sleep(500)
     await ch.quiet()

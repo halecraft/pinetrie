@@ -35,53 +35,64 @@ export const isHostDoc = (docId: string): boolean =>
   rootOfDocId(docId) !== undefined ||
   docId.startsWith(MOVES_DOC_PREFIX)
 
-const INVENTORY_PREFIX = "inventory:"
+/**
+ * A person's own documents (ADR-0059, ADR-0077): only that person's tabs
+ * write one, and the host stores it and shares it with that person only.
+ * Each kind is its own document, since each is written at its own rate and
+ * keeps its own history.
+ */
+export const PERSON_DOC_KINDS = ["inventory", "attention"] as const
+export type PersonDocKind = (typeof PERSON_DOC_KINDS)[number]
 
-/** The document holding `writer`'s inventory slots (ADR-0059). */
-export const inventoryDocId = (writer: WriterId): string =>
-  `${INVENTORY_PREFIX}${writer}`
+/** The document holding `writer`'s `kind`: `inventory:w-ada@x.io`. */
+export const personDocId = (kind: PersonDocKind, writer: WriterId): string =>
+  `${kind}:${writer}`
 
 /**
- * A document id -> whose inventory it is, or undefined for any other
- * document: only an id `inventoryDocId` makes names a writer.
+ * A document id -> whose document of which kind it is, or undefined for any
+ * other document: only an id `personDocId` makes names a writer.
  */
-export function writerOfInventoryDoc(docId: string): WriterId | undefined {
-  if (!docId.startsWith(INVENTORY_PREFIX)) return undefined
-  const rest = docId.slice(INVENTORY_PREFIX.length)
+export function ownerOfPersonDoc(
+  docId: string,
+): { readonly kind: PersonDocKind; readonly writer: WriterId } | undefined {
+  const cut = docId.indexOf(":")
+  const kind = PERSON_DOC_KINDS.find(k => k === docId.slice(0, cut))
+  if (kind === undefined) return undefined
+  const rest = docId.slice(cut + 1)
   const writer = rest.startsWith("w-")
     ? writerOfPrincipal(rest.slice(2))
     : undefined
-  return writer !== undefined && inventoryDocId(writer) === docId
-    ? writer
+  return writer !== undefined && personDocId(kind, writer) === docId
+    ? { kind, writer }
     : undefined
 }
 
 /**
  * Whether the peer whose principal is `principal` is the person whose
- * inventory `docId` is; undefined for any other document. Pure.
+ * document `docId` is; undefined for any other document. Pure.
  */
-export function holdsInventory(
+export function holdsPersonDoc(
   docId: string,
   principal: string | undefined,
 ): boolean | undefined {
-  const holder = writerOfInventoryDoc(docId)
-  return holder === undefined
+  const owner = ownerOfPersonDoc(docId)
+  return owner === undefined
     ? undefined
-    : writerOfPrincipal(principal) === holder
+    : writerOfPrincipal(principal) === owner.writer
 }
 
 /**
  * Whether the peer whose principal is `principal` may write `docId`;
  * undefined leaves it to the other policies. The session, the places and
- * `pineta:live` are the host's (`isHostDoc`); an inventory is its person's,
- * relayed by the host. Pure.
+ * `pineta:live` are the host's (`isHostDoc`); a person's document is that
+ * person's, relayed by the host. Pure.
  */
 export function mayWrite(
   docId: string,
   principal: string | undefined,
 ): boolean | undefined {
   if (isHostDoc(docId)) return principal === HOST_PRINCIPAL
-  const holds = holdsInventory(docId, principal)
+  const holds = holdsPersonDoc(docId, principal)
   if (holds === undefined) return undefined
   return principal === HOST_PRINCIPAL || holds
 }

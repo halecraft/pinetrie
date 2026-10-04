@@ -1,8 +1,9 @@
 // client/use-inbox — the inbox's imperative shell: what you have seen, kept
-// per device and shared by its tabs (ADR-0030). The decisions are `inbox.ts`'s.
+// in your attention document, on every device of yours (ADR-0030,
+// ADR-0077). The decisions are `inbox.ts`'s.
 
-import type { RootRecord } from "@pineta/core"
-import { useCallback, useEffect, useState } from "react"
+import type { AttentionStore } from "@pineta/session"
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react"
 import {
   type Inbox,
   type InboxItem,
@@ -10,9 +11,7 @@ import {
   markAllSeen,
   markSeen,
   seenNow,
-  startInbox,
 } from "./inbox.ts"
-import type { DeviceState } from "./tab-state.ts"
 
 export interface InboxView {
   readonly unseen: number
@@ -21,46 +20,42 @@ export interface InboxView {
   readonly markAllSeen: () => void
 }
 
+const NOTHING_YET: InboxView = {
+  unseen: 0,
+  isUnseen: () => false,
+  markSeen: () => {},
+  markAllSeen: () => {},
+}
+
 export function useInbox({
-  store,
-  roots,
+  attention,
   items,
   shown,
-  settled,
 }: {
-  readonly store: DeviceState<Inbox>
-  /** Every root's directory record, for where a new device starts. */
-  readonly roots: Iterable<RootRecord>
+  readonly attention: AttentionStore
   readonly items: readonly InboxItem[]
   /** The tab you are on: its columns' paths. */
   readonly shown: ReadonlySet<string>
-  /** True once the document has settled (`whenSettled`). */
-  readonly settled: boolean
 }): InboxView {
-  const [inbox, setInbox] = useState<Inbox | null>(() => store.load() ?? null)
-
-  // With nothing stored, start once the session has settled: from a partial
-  // directory, every mention not yet arrived would count as new (S29).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once, at settle, with the directory of that render
-  useEffect(() => {
-    if (settled && inbox === null) setInbox(store.save(startInbox(roots)))
-  }, [settled])
-
-  // Another tab of this device saved: take the merged value. Nothing clears
-  // the inbox, so a clear keeps what this tab has.
-  useEffect(
+  const stored = useSyncExternalStore(
+    attention.attention.subscribe,
+    attention.attention.current,
+  )
+  // Before your document's first write (`AttentionStore`), where you start
+  // is not known, and every mention would count as new.
+  const inbox = useMemo<Inbox | null>(
     () =>
-      store.subscribe(value => {
-        if (value !== undefined) setInbox(value)
-      }),
-    [store],
+      stored.since === ""
+        ? null
+        : { since: stored.mentionsSince, seen: [...stored.seen].sort() },
+    [stored],
   )
 
   const save = useCallback(
     (next: Inbox, from: Inbox) => {
-      if (next !== from) setInbox(store.save(next))
+      if (next !== from) attention.setInbox(next)
     },
-    [store],
+    [attention],
   )
 
   // A mention drawn in a column of the tab you are on is seen.
@@ -70,13 +65,7 @@ export function useInbox({
     if (next !== null) save(next, inbox)
   }, [inbox, items, shown, save])
 
-  if (inbox === null)
-    return {
-      unseen: 0,
-      isUnseen: () => false,
-      markSeen: () => {},
-      markAllSeen: () => {},
-    }
+  if (inbox === null) return NOTHING_YET
   return {
     unseen: items.filter(i => isUnseen(inbox, i.id)).length,
     isUnseen: id => isUnseen(inbox, id),

@@ -20,6 +20,7 @@ import {
   planOpen,
   resolveLayout,
   tabBar,
+  untabbed,
 } from "./layout.ts"
 
 // Two roots: r1 -> a -> b, with a branch a -> c; and r2 -> d.
@@ -427,6 +428,17 @@ describe("tabBar", () => {
     expect(tabBar(l)).toEqual([ARCHIVE, R2, R1, { kind: "new", key: "n" }])
     expect(tabBar(initialLayout())).toEqual([ARCHIVE])
   })
+})
+
+test("untabbed: the roots with no tab of yours, and not archived (ADR-0077)", () => {
+  const open = { open: [entryId("1-r1")] }
+  expect(
+    untabbed(open, new Set([entryId("7-r3")]), [
+      entryId("1-r1"),
+      entryId("5-r2"),
+      entryId("7-r3"),
+    ]),
+  ).toEqual([entryId("5-r2")])
 })
 
 describe("planOpen", () => {

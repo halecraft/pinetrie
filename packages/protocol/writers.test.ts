@@ -7,23 +7,44 @@ import {
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "./messages.ts"
-import { inventoryDocId, mayWrite, writerOfInventoryDoc } from "./writers.ts"
+import {
+  holdsPersonDoc,
+  mayWrite,
+  ownerOfPersonDoc,
+  PERSON_DOC_KINDS,
+  personDocId,
+} from "./writers.ts"
 
 const ADA = writerId("ada@x.io")
 
-test("an inventory's document names its writer, and nothing else names one", () => {
-  expect(writerOfInventoryDoc(inventoryDocId(ADA))).toBe(ADA)
+test.each(
+  PERSON_DOC_KINDS,
+)("a person's %s document names its writer, and nothing else names one", kind => {
+  expect(ownerOfPersonDoc(personDocId(kind, ADA))).toEqual({
+    kind,
+    writer: ADA,
+  })
   for (const other of [
-    "inventory:",
-    "inventory:ada@x.io",
-    "inventory:w-Ada@X.io",
+    `${kind}:`,
+    `${kind}:ada@x.io`,
+    `${kind}:w-Ada@X.io`,
     "card:c-1",
     "places",
+    "person:w-ada@x.io",
   ])
-    expect(writerOfInventoryDoc(other)).toBeUndefined()
+    expect(ownerOfPersonDoc(other)).toBeUndefined()
 })
 
-test("mayWrite: the session, the places, now, every root and every stack of moves are the host's; an inventory its person's, relayed by the host", () => {
+test.each(
+  PERSON_DOC_KINDS,
+)("a person's %s document is held by that person only (ADR-0077)", kind => {
+  const doc = personDocId(kind, ADA)
+  expect(holdsPersonDoc(doc, "Ada@X.io")).toBe(true)
+  expect(holdsPersonDoc(doc, "bea@x.io")).toBe(false)
+  expect(holdsPersonDoc("card:c-1", "ada@x.io")).toBeUndefined()
+})
+
+test("mayWrite: the session, the places, now, every root and every stack of moves are the host's; a person's document its person's, relayed by the host", () => {
   for (const doc of [
     SESSION_DOC_ID,
     PLACES_DOC_ID,
@@ -34,11 +55,13 @@ test("mayWrite: the session, the places, now, every root and every stack of move
     expect(mayWrite(doc, HOST_PRINCIPAL)).toBe(true)
     expect(mayWrite(doc, "ada@x.io")).toBe(false)
   }
-  const inventory = inventoryDocId(ADA)
-  expect(mayWrite(inventory, "Ada@X.io")).toBe(true)
-  expect(mayWrite(inventory, HOST_PRINCIPAL)).toBe(true)
-  expect(mayWrite(inventory, "bea@x.io")).toBe(false)
-  expect(mayWrite(inventory, undefined)).toBe(false)
+  for (const kind of PERSON_DOC_KINDS) {
+    const own = personDocId(kind, ADA)
+    expect(mayWrite(own, "Ada@X.io")).toBe(true)
+    expect(mayWrite(own, HOST_PRINCIPAL)).toBe(true)
+    expect(mayWrite(own, "bea@x.io")).toBe(false)
+    expect(mayWrite(own, undefined)).toBe(false)
+  }
   for (const doc of [PRESENCE_DOC_ID, "card:c-1", "undo:seat-a"])
     expect(mayWrite(doc, "ada@x.io")).toBeUndefined()
 })

@@ -11,6 +11,7 @@ const record = (n: string): RootRecord => ({
   messages: 1,
   newest: entryId(`e${n}`),
   writers: [],
+  threads: {},
   mentions: [],
   images: [],
 })

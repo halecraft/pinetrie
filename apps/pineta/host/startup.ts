@@ -9,6 +9,7 @@ import {
   readRecords,
   readSeats,
   readThreadName,
+  readVerdicts,
 } from "@pineta/reads"
 import {
   COMMANDS,
@@ -20,6 +21,8 @@ import {
   planStartup,
   SEAT,
   setIfChanged,
+  setRecord,
+  VERDICT,
 } from "@pineta/rules"
 import { cardIdOfDoc, clearStreams, readStoredLanes } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
@@ -49,8 +52,9 @@ export interface StartupDeps {
  * In order: no stream survives a process, so clear them; log the stored lane
  * names that are not a thread's, which no reader is given; name every lane
  * that has none (ADR-0039); resume each lane a crash interrupted, in its own
- * directory (`planStartup`); write what the host found and the commands its
- * pi loaded, those that changed in one write; sweep what no one will type in
+ * directory (`planStartup`); write what the host found, the commands its
+ * pi loaded and the verdicts whose request died with the last host, those
+ * that changed in one write; sweep what no one will type in
  * again (`sweepTexts`); and last, settle the lanes with cards queued, whose
  * compaction then holds every write above. Nothing else runs yet, so
  * clearing the streams needs no keeper step.
@@ -70,6 +74,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
   const planned = planStartup({
     cards: readPlaces(places),
     interrupted: await agent.interrupted(deps.roots),
+    verdicts: [...readVerdicts(doc).values()],
   })
   for (const lane of planned.resume) {
     log(
@@ -78,6 +83,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
     deps.start(lane, { kind: "resume" })
   }
   const changed = [
+    ...planned.unclassified.map(v => setRecord(VERDICT, v)),
     ...(work.project === null
       ? []
       : setIfChanged(PROJECT, work.project, readProject(doc) ?? undefined)),

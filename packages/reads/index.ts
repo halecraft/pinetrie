@@ -22,6 +22,7 @@ import {
   type AgentRun,
   type ArchiveRecord,
   agentActivity,
+  ancestry,
   type BannerRecord,
   type BaseRecord,
   type CardRecord,
@@ -58,9 +59,11 @@ import {
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
+  type VerdictRecord,
   type WorkSetting,
   type WriterId,
   workFor,
+  writersOf,
 } from "@pineta/core"
 import {
   ARCHIVE,
@@ -93,6 +96,7 @@ import {
   renderableMessage,
   SEAT,
   STOP,
+  VERDICT,
 } from "@pineta/rules"
 import {
   type LiveDocHandle,
@@ -515,6 +519,11 @@ export const readStops = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, StopRecord> => readRecords(doc, STOP)
 
+/** Each thread's last run's verdict (`pineta.verdict`, ADR-0077), by lane. */
+export const readVerdicts = (
+  doc: SessionDocHandle,
+): ReadonlyMap<LaneName, VerdictRecord> => readRecords(doc, VERDICT)
+
 // ── where lanes work (ADR-0032, ADR-0033) ─────────────────────────────────
 
 /** Every lane's record (`pineta.lane`): where it works, by lane. */
@@ -678,8 +687,9 @@ export const readReferencedBlobs = (
 /**
  * A root's directory record, read from its document (ADR-0063): its first
  * message and that message's first line, its title, its messages, newest
- * entry and writers (`summarizeRoots`), its chats that name someone, and
- * every image it shows. What the host writes as `pineta.root`.
+ * entry and writers (`summarizeRoots`), each thread's writers on its path
+ * (ADR-0077), its chats that name someone, and every image it shows. What
+ * the host writes as `pineta.root`.
  */
 export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
   const index = readTreeIndex(doc)
@@ -703,6 +713,12 @@ export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
     messages: summary?.messages ?? 0,
     newest: summary?.newest ?? null,
     writers: summary?.writers ?? [],
+    threads: Object.fromEntries(
+      readLaneNames(doc).map(lane => [
+        lane,
+        writersOf(index, ancestry(index, readLaneTip(doc, lane)).path),
+      ]),
+    ),
     mentions: mentions.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
     images: [
       ...referencedBlobs({

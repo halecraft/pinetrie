@@ -289,13 +289,12 @@ export const mutations: readonly Mutation[] = [
   },
 
   {
-    name: "any inventory id names a writer",
+    name: "any person document's id names a writer",
     file: "packages/protocol/writers.ts",
-    from: "  return writer !== undefined && inventoryDocId(writer) === docId",
+    from: "  return writer !== undefined && personDocId(kind, writer) === docId",
     to: "  return writer !== undefined",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
-    expect:
-      "an inventory's document names its writer, and nothing else names one",
+    expect: "document names its writer, and nothing else names one",
   },
   {
     name: "a client may write the session",

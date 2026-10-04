@@ -39,8 +39,24 @@
         background: #23272e; color: #e6e6e6; border: 1px solid #3a3f48; border-bottom: 0;
         font: inherit; }
       .tab-title-input[aria-invalid="true"] { border-color: #d66; }
-      .tab.running::before { content: ""; width: 6px; height: 6px; border-radius: 50%;
-        background: #9ecbff; animation: pulse 1s ease-in-out infinite; }
+      /* A tab's status, before its label (ADR-0077). Working is a still ring: it
+         needs nothing from you, so it does not move. What needs you is a
+         filled amber dot, the colour of the "since you were here" line the tab
+         opens onto, which pulses three times as it arrives and then stays;
+         what is worth a read is a dim one. Done is a ✓ that fades. */
+      .tab-status { flex: 0 0 auto; width: 6px; height: 6px; box-sizing: border-box;
+        border-radius: 50%; }
+      .tab-status.working { border: 1.5px solid #9ecbff; }
+      .tab-status.needs-you { background: #e0c080; box-shadow: 0 0 0 1.5px #14161a; }
+      .tab-status.worth-a-read { background: #e0c080; opacity: .45; }
+      .tab-status.needs-you[data-arrived] { animation: arrive .6s ease-in-out 3; }
+      @keyframes arrive { 50% { transform: scale(1.8); } }
+      .tab-status.done { width: .7rem; height: auto; overflow: hidden; border-radius: 0;
+        font-size: .7rem; line-height: 1; color: #9ecbff;
+        animation: done-fade 3s ease-out forwards; }
+      /* It ends taking no room, so nothing need be redrawn to remove it. */
+      @keyframes done-fade { to { opacity: 0; width: 0; } }
+      @media (prefers-reduced-motion: reduce) { .tab-status { animation: none; } }
       .tab.archived .tab-label { text-decoration: line-through; color: #777; }
       .tab-new { font-style: italic; }
       .tab-close, .tab-menu { padding: 0 .35rem; background: none; color: #aaa; }
@@ -686,7 +702,7 @@
       .activity-trigger .agent-mark { background: #3a3f48; color: #aab4c3; }
       .activity-trigger:has(.activity-working) .agent-mark { background: #9ecbff; color: #111; }
       .activity-working { font-size: .75rem; color: #aab4c3; }
-      .activity-badge { min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #f28b82;
+      .activity-badge { min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #e0c080;
         color: #111; font-size: .72rem; font-weight: 600; text-align: center; }
       .line-trigger { padding: .15rem .6rem; font-size: .8rem; background: none; color: #ddd;
         border: 1px solid #3a3f48; border-radius: 999px; }
@@ -710,7 +726,12 @@
       .here-name { font-family: ui-monospace, monospace; font-size: .75rem; color: #d7dde6; }
       .here-at, .inbox-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .inbox-row.unseen .inbox-text { font-weight: 600; }
-      .inbox-row.unseen .inbox-who::before { content: "● "; color: #f28b82; font-size: .6rem; }
+      .inbox-row.unseen .inbox-who::before { content: "● "; color: #e0c080; font-size: .6rem; }
+      /* A row a thread you follow raises (ADR-0077): its reason in amber, and
+         its "not needed" a quiet item under it. */
+      .here-thread.raised.needs-you .here-at { color: #e0c080; }
+      .here-thread.raised.worth-a-read .here-at { color: #c9b48a; }
+      .menu button.not-needed { padding: 0 .5rem .3rem 1.2rem; font-size: .72rem; color: #8b93a1; }
       /* Who you are, asked once per device before anything connects (ADR-0037). */
       #identity { display: flex; flex-direction: column; gap: .6rem; width: 20rem;
         margin: 20vh auto 0; padding: 1.25rem; border: 1px solid #23272e; border-radius: 8px;

@@ -1,12 +1,14 @@
 # ADR-0030 — Your tabs are yours; the header shows who is here, and your inbox of mentions
 
 **Status:** Accepted. Implemented by `PLAN-2026-09-27-your-tabs-inbox`.
-Amends ADR-0029 (the tab bar is each person's; closing
-a tab is yours) and ADR-0027 (a stored layout holds your open roots, and the
-device keeps which mentions you have seen). Amended by ADR-0037: you are your
-email, so your other tabs and devices are you, and your tabs are yours per
-device. Amended by ADR-0069: `@` is the header's activity menu's mentions,
-and its count part of that menu's badge, with open offers.
+Amends ADR-0029 (the tab bar is each person's; closing a tab is yours) and
+ADR-0027 (a stored layout holds your open roots, and the device keeps which
+mentions you have seen). Amended by ADR-0037: you are your email, so your
+other tabs and devices are you, and your tabs are yours per device. Amended
+by ADR-0069: `@` is the header's activity menu's mentions, and its count
+part of that menu's badge, with open offers. Amended by ADR-0077: which
+mentions you have seen is kept per person, in your attention document, not
+per device.
 
 **Context.** ADR-0029 gave everyone the same tab bar, every root not archived,
 and rejected tabs each person opens and closes: a collaborator's new root would

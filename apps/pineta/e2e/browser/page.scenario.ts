@@ -875,7 +875,8 @@ async function run(check: Checks["check"]): Promise<void> {
       await idle()
       // The activity menu, open on the agent's work, stays when that work
       // ends: only you close it, and then, with nothing in it, it leaves the
-      // header. Nothing in the trigger animates while the agent works.
+      // header. Nothing in the trigger, and nothing on the thread's tab,
+      // animates while the agent works (ADR-0069, ADR-0077).
       const held = script.pause("say exactly: HELD")
       await other.chat("@agent say exactly: HELD", atEntry(entryId(forAdaId)), {
         mode: "branch",
@@ -888,18 +889,30 @@ async function run(check: Checks["check"]): Promise<void> {
           () => true,
           () => false,
         )
+      const tabWorking = await page
+        .waitForSelector("#tabs .tab-status.working", { timeout: 15_000 })
+        .then(
+          () => true,
+          () => false,
+        )
       const animated = await page
-        .$$eval("#top .activity-trigger, #top .activity-trigger *", ns =>
-          ns.flatMap(n => {
-            const name = getComputedStyle(n).animationName
-            return name === "none" ? [] : [name]
-          }),
+        .$$eval(
+          "#top .activity-trigger, #top .activity-trigger *, #tabs .tab-status",
+          ns =>
+            ns.flatMap(n => {
+              const name = getComputedStyle(n).animationName
+              return name === "none" ? [] : [name]
+            }),
         )
         .catch(() => ["no trigger"])
       check(
-        "the header's activity is still while the agent works",
-        working && animated.length === 0,
-        working ? animated.join(", ") : "no working count",
+        "the header's activity and the thread's tab are still while the agent works",
+        working && tabWorking && animated.length === 0,
+        !working
+          ? "no working count"
+          : !tabWorking
+            ? "no working mark on the tab"
+            : animated.join(", "),
       )
       const heldOpen = await page
         .click("#top .activity .activity-trigger")

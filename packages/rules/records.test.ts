@@ -6,6 +6,7 @@ import {
   entryId,
   laneNameForThread,
   type OfferRecord,
+  type RootRecord,
   rootIdFor,
   type Sha256,
   snapshotId,
@@ -36,6 +37,7 @@ import {
   STOP,
   setIfChanged,
   setRecord,
+  VERDICT,
 } from "./index.ts"
 
 const ADA = writerId("ada@x.io")
@@ -82,6 +84,20 @@ const writeOf = (spec: RecordSpec<unknown, string>, record: unknown) =>
   spec.home === "root"
     ? setRecord(spec as RecordSpec<unknown, string, "root">, record, TEST_ROOT)
     : setRecord(spec as RecordSpec<unknown, string, "session">, record)
+
+const rootRecord: RootRecord = {
+  root: TEST_ROOT,
+  entry: E,
+  first: E,
+  firstLine: "Plans",
+  title: null,
+  messages: 1,
+  newest: E,
+  writers: [ADA],
+  threads: { [L]: [ADA] },
+  mentions: [{ id: E, by: ADA, text: "@bea look" }],
+  images: [],
+}
 
 const SAMPLES: readonly Sample[] = [
   sample(
@@ -190,22 +206,17 @@ const SAMPLES: readonly Sample[] = [
     null,
   ),
   sample("commands", COMMANDS, { commands: [] }, null),
+  sample("root", ROOT, rootRecord, "root"),
   sample(
-    "root",
-    ROOT,
+    "verdict",
+    VERDICT,
     {
-      root: TEST_ROOT,
-      entry: E,
-      first: E,
-      firstLine: "Plans",
-      title: null,
-      messages: 1,
-      newest: E,
-      writers: [ADA],
-      mentions: [{ id: E, by: ADA, text: "@bea look" }],
-      images: [],
+      lane: L,
+      ask: E,
+      end: entryId("e-2"),
+      verdict: { kind: "stopped", by: ADA },
     },
-    "root",
+    "lane",
   ),
 ]
 
@@ -244,6 +255,22 @@ test("an offer record with no ledger reads back with none, and so does one writt
   expect(OFFER.decode(before, L)).toEqual(offer)
 })
 
+test("a root record written before its threads reads with none, so a starting host still opens it (ADR-0077)", () => {
+  const { threads: _, ...before } = ROOT.encode(rootRecord) as Record<
+    string,
+    unknown
+  >
+  expect(ROOT.decode(before, TEST_ROOT)).toEqual({ ...rootRecord, threads: {} })
+})
+
+test("a root record's thread that is no lane is dropped, and the record kept", () => {
+  const stored = ROOT.encode({
+    ...rootRecord,
+    threads: { [L]: [ADA], main: [ADA] } as RootRecord["threads"],
+  })
+  expect(ROOT.decode(stored, TEST_ROOT)?.threads).toEqual({ [L]: [ADA] })
+})
+
 test("a record keyed by lane does not read at an address that is no lane", () => {
   const write = setRecord(OFFER, offer)
   expect(recordsOf(OFFER, [{ ...write, key: "main" }]).size).toBe(0)
@@ -271,6 +298,7 @@ test("each record lives where it is read (ADR-0063): across roots in the session
     project: "session",
     commands: "session",
     root: "session",
+    verdict: "session",
   })
 })
 

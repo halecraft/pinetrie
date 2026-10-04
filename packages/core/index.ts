@@ -555,6 +555,12 @@ export interface RootRecord {
   readonly newest: EntryId | null
   /** Everyone who wrote a chat in it, in order of first message. */
   readonly writers: readonly WriterId[]
+  /**
+   * Per thread, everyone who wrote a chat on its path from the root to its
+   * tip, in order of first message: its followers (ADR-0077). A record
+   * written before the field holds none.
+   */
+  readonly threads: Readonly<Record<LaneName, readonly WriterId[]>>
   /** Its chats that name someone (`@`), for the inbox to resolve. */
   readonly mentions: readonly {
     readonly id: EntryId
@@ -613,6 +619,41 @@ export interface DigestRecord extends DigestBody {
   readonly at: number
   /** Written after its run ended: kept, and never replaced by a live one. */
   readonly final: boolean
+}
+
+/** What a model says a run's end asks of the people in its thread (ADR-0077). */
+export type Said = "needsYou" | "worthARead" | "done"
+
+/**
+ * How a thread's last run ended (ADR-0077): what happened, never what it
+ * asks of whom. Each client decides that for its person (`levelOf`).
+ */
+export type Verdict =
+  /** The run has stopped running, and the model has not answered yet. */
+  | { readonly kind: "pending" }
+  /** The model's answer; `reason` is null for `done`. */
+  | {
+      readonly kind: "said"
+      readonly said: Said
+      readonly reason: string | null
+    }
+  | { readonly kind: "failed"; readonly error: string }
+  /** `by` is null for a stop made before stops were recorded. */
+  | { readonly kind: "stopped"; readonly by: WriterId | null }
+  /** The request failed, its answer was no verdict, or its host stopped. */
+  | { readonly kind: "unclassified" }
+
+/** A thread's last run's verdict: a session record keyed by its lane. */
+export interface VerdictRecord {
+  readonly lane: LaneName
+  /** The run's prompt. */
+  readonly ask: EntryId
+  /**
+   * The run's last entry, from its asks (`AskIndex.last`), never the lane's
+   * tip: a card taken at the run's end can move the tip before this is read.
+   */
+  readonly end: EntryId
+  readonly verdict: Verdict
 }
 
 /** A title's longest form, in UTF-16 code units. */

@@ -40,10 +40,10 @@ export const PRESENCE_DECAY: PresenceDecay = {
  */
 export const presenceSchema = (d: PresenceDecay) =>
   Schema.struct({
-    /** Keyed `${writer}:${columnKey}`: the end of the thread that column follows. */
+    /** Keyed `${writer}:${columnKey}`: the end of the thread that column shows. */
     reading: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
     /**
-     * Keyed as `reading`: the root entry of the thread that column follows
+     * Keyed as `reading`: the root entry of the thread that column shows
      * (ADR-0063), so a window that does not hold that root can still name it
      * and open it.
      */

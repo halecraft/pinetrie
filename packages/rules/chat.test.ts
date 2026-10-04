@@ -24,6 +24,7 @@ import {
   decodeChat,
   encodeChat,
   participants,
+  pendingVerdict,
   planChat,
   planStartup,
   renderableMessage,
@@ -466,14 +467,32 @@ describe("settling and starting up", () => {
     const plan = planStartup({
       cards: [queuedOn(LANE1, "c-1"), queuedOn(LANE1, "c-2")],
       interrupted: [],
+      verdicts: [],
     })
-    expect(plan).toEqual({ resume: [], drain: [LANE1] })
+    expect(plan).toEqual({ resume: [], drain: [LANE1], unclassified: [] })
   })
   test("planStartup: an interrupted lane is resumed, and not drained", () => {
     const plan = planStartup({
       cards: [queuedOn(LANE1, "c-1"), queuedOn(LANE2, "c-2")],
       interrupted: [LANE1],
+      verdicts: [],
     })
     expect(plan).toMatchObject({ resume: [LANE1], drain: [LANE2] })
+  })
+  test("planStartup: a pending verdict is unclassified, unless its lane is resumed (ADR-0077)", () => {
+    const pending = (lane: typeof LANE1) =>
+      pendingVerdict(lane, entryId(`p-${lane}`), entryId(`w-${lane}`))
+    const said = {
+      ...pending(LANE2),
+      verdict: { kind: "said", said: "done", reason: null } as const,
+    }
+    const plan = planStartup({
+      cards: [],
+      interrupted: [LANE1],
+      verdicts: [pending(LANE1), pending(LANE2), said],
+    })
+    expect(plan.unclassified).toEqual([
+      { ...pending(LANE2), verdict: { kind: "unclassified" } },
+    ])
   })
 })

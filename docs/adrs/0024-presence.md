@@ -4,8 +4,9 @@
 ADR-0029: only the columns of the root tab you are on report; and by
 ADR-0037: every key is per seat, so a person here from two tabs has two sets
 of entries, shown once. Amended by ADR-0048 (step 3,
-`PLAN-2026-10-01-notes-removed`): `editing`, the note a seat was editing,
-is removed with notes.
+`PLAN-2026-10-01-notes-removed`): `editing`, the note a seat was editing, is
+removed with notes. Amended by ADR-0077: presence's verb is *reading*; a
+person follows a thread they have written on, and a column follows its end.
 
 **Context.** Several people share a session, each with their own columns, and
 nothing showed who else was there. The composer's "seen by" was removed because,

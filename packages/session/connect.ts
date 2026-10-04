@@ -7,14 +7,16 @@
 // `connectSession` connects, then wires its parts to each other: the roots
 // held (`root-docs.ts`), the cards' texts (`card-texts.ts`), this tab's moves
 // over the host's records (`localStep`), your inventory's slots
-// (`inventory-slots.ts`), this seat's presence (`presence-seat.ts`), and the
-// requests to the host (`host-line.ts`). Each part's decisions are pure
+// (`inventory-slots.ts`), what you have dealt with (`attention-doc.ts`),
+// this seat's presence (`presence-seat.ts`), and the requests to the host
+// (`host-line.ts`). Each part's decisions are pure
 // functions: `planHold` (`root-hold.ts`), `localStep`, `repairStep`,
 // `planChatRequest` (`chat.ts`).
 
 import {
   createUndoStack,
   Exchange,
+  sync,
   type Undone,
   type UndoStack,
   whenPeer,
@@ -45,8 +47,8 @@ import {
   PLACES_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
-import { inventoryDocId, writersPolicy } from "@pineta/protocol/writers"
-import { readOffers, readPlaces, readPlacesRev } from "@pineta/reads"
+import { personDocId, writersPolicy } from "@pineta/protocol/writers"
+import { readOffers, readPlaces, readPlacesRev, readRoots } from "@pineta/reads"
 import { offerSeen } from "@pineta/rules"
 import {
   asSessionDoc,
@@ -66,6 +68,11 @@ import {
   textVersion,
 } from "@pineta/schema"
 import { type ActingState, NO_ACTING, sendActing } from "./acting.ts"
+import {
+  type AttentionStore,
+  attentionStore,
+  startOf,
+} from "./attention-doc.ts"
 import {
   type ActedAt,
   AT_INVENTORY,
@@ -172,7 +179,7 @@ export interface SessionClient {
    */
   undoFor(id: CardId): CardUndo
   /**
-   * This window's column `columnKey` follows the thread ending at `end`,
+   * This window's column `columnKey` shows the thread ending at `end`,
    * in the root whose root entry is `root` (null: not yet known).
    */
   setReading(columnKey: string, end: string, root: string | null): void
@@ -255,6 +262,12 @@ export interface SessionClient {
    * tabs: the repair, a take's answer, and `swapSlots`.
    */
   readonly slots: Readable<Slots>
+  /**
+   * What you have dealt with, on every device of yours (ADR-0077): how far
+   * you have read each thread, what you marked "not needed", the mentions
+   * you have seen.
+   */
+  readonly attention: AttentionStore
   /**
    * Title the entry `entry`, or clear its title with null (ADR-0045), in
    * the held root that has it.
@@ -364,6 +377,13 @@ export async function connectSession(
     held: () => heldBy(local.current().records, me).map(c => c.id),
     intents: () => intentsOf(local.current().moves),
   })
+  // Before the directory arrives, a start would leave out every root not yet
+  // read, and their verdicts and mentions would count as new (S29).
+  const attention = attentionStore(exchange, me, host.peerId, () =>
+    sync(session).readyFor(p => p.peerId === host.peerId)
+      ? startOf(readRoots(session).values())
+      : null,
+  )
   const step = (event: LocalEvent) => {
     local.set(localStep(local.current(), event, me))
     inventory.repair()
@@ -382,7 +402,7 @@ export async function connectSession(
     exchange,
     docId: `undo:${exchange.peerId}`,
     key: "slots",
-    scope: id => id === inventoryDocId(me),
+    scope: id => id === personDocId("inventory", me),
   })
   const presence = presenceSeat(
     exchange,
@@ -502,6 +522,7 @@ export async function connectSession(
     cards,
     moves,
     slots: inventory.slots,
+    attention,
     cardText: texts.text,
     undoFor(id) {
       const docs = [cardDocId(id)]
@@ -624,6 +645,7 @@ export async function connectSession(
         unsubscribePlaces,
         unsubscribePeers,
         inventory.dispose,
+        attention.dispose,
         texts.dispose,
         () => undo.dispose(),
         () => swaps.dispose(),

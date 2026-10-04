@@ -31,6 +31,7 @@ const record = (
   messages: 2,
   newest: entryId(`f-${n}`),
   writers: [writerId("p-ada")],
+  threads: {},
   mentions: [],
   images: [],
 })

@@ -64,8 +64,8 @@ lanes and the archive together.
 **Ids arrive branded.** Every entry id the client holds came from the reads
 as an `EntryId`, and every lane as a `LaneName` (`packages/reads/TECHNICAL.md`),
 so the client never mints one but where an id comes back in from elsewhere:
-its stored forms (`layout.ts`'s `decodeLayout`, `left.ts`'s `decodeLeft`)
-and ids read back from the page (`use-ask-bar.ts`, from `data-ask-of`).
+its stored form (`layout.ts`'s `decodeLayout`), your attention document
+(`readAttention`, in `@pineta/schema`), and ids read back from the page (`use-ask-bar.ts`, from `data-ask-of`).
 `biome.json` refuses an `entryId` or `runId` import anywhere else in the
 client; tests build entries and trees through `fixtures.ts`, which mints.
 
@@ -414,11 +414,17 @@ in it opens a tab until you choose.
   `{ since, seen }`: every mention at or before `since`, and the ids above it
   in `seen`. Marking compacts: `since` moves past a run of seen mentions, so
   `seen` holds only those above an unseen one.
-- **`useInbox`** is its shell. With nothing stored, it starts at
-  `startInbox(roots)` (any root's newest entry) only after `whenSettled`:
-  from a partial directory, old mentions would count as new (S29). A mention on the
-  paths of the tab you are on is seen (`seenOnScreen`), and the effect writes
-  nothing when there is none.
+- **`useInbox`** is its shell, over your attention document's
+  `mentionsSince` and `seen` (ADR-0077), so what you have seen is seen on
+  every device of yours. Until the document's first write it shows nothing
+  unseen: the start (`startOf`, any root's newest entry, or `EARLIEST`) is
+  written only once the directory has arrived, since from a partial one old
+  mentions would count as new (S29). A mention on the paths of the tab you
+  are on is seen (`seenOnScreen`), and the effect writes nothing when there
+  is none.
+- **Your attention document** is the session's (`SessionClient.attention`,
+  `packages/session/TECHNICAL.md`): what you have dealt with, read and
+  written through its `AttentionStore`.
 - **"You" is your email** (ADR-0037). Your other tabs and devices are you, so
   they share your mentions; a mention resolves to your display name, so
   renaming yourself still changes which mentions are yours.
@@ -454,6 +460,35 @@ in it opens a tab until you choose.
   and the "+n" of `Avatars` (`.more`) are `.initial` and never `.avatar`.
   The circle's shape is `.initial`'s rule; `.avatar` has none.
 
+## What needs you (`attention.ts`, `use-attention.ts`, ADR-0077)
+
+- **`attentionOf` decides what is raised**, pure: a thread's verdict and its
+  open offer, for its followers only (`follows`, over the directory's
+  `RootRecord.threads`), while its lane is idle and its root not archived.
+  A verdict clears when your read mark passes its `end`, an offer when it
+  goes; either with "not needed" (`dismissed`, `dismissedOffers`). Nothing
+  is raised before your attention document's `since` is set.
+- **`levelOf` turns a verdict, a fact, into a level for you**: a stop is
+  done for whoever stopped it. `LEVELS` orders the levels once; `highest`
+  reads it.
+- **`rootStatus`** is each tab's mark: working while a lane of its root is
+  busy or its verdict pending, else its highest item. `untabbed`
+  (`layout.ts`) gives the Archive tab's, as it gives `cardMarks.elsewhere`.
+- **Motion is a change you saw, never a state.** `arrivals` compares two
+  statuses, and `useArrivals` takes the first status after the session has
+  settled and your `since` is known as the baseline, so a load moves
+  nothing. It keeps *when* each mark arrived, never a timer: a mark is
+  keyed by that time and moves only as it mounts within `ARRIVAL_MS`
+  (`moving`), and the ✓'s fade ends at no width. So the end of a motion
+  redraws nothing. A timer that dropped arrivals redrew `App` while you
+  typed, which the browser suite's render check caught.
+- **One count** (`needsYouCount` plus unseen mentions) is the badge's and
+  the page title's (`pageTitle`).
+- **Words:** `attentionWords` words each item's reason, `LEVEL_WORDS` and
+  `LEVEL_CLASS` a level's name and class. Selectors: `.tab-status`
+  (`.working`, `.needs-you`, `.worth-a-read`, `.done`, `data-arrived`),
+  `.here-thread.raised`, `.not-needed`.
+
 ## Kept per tab (`tab-state.ts`, ADR-0027)
 
 `tabState` keeps a value under one key in two slots: the tab's
@@ -467,12 +502,11 @@ The stores are built in `main.tsx`, the one module that touches
 given them (`AppStores`).
 
 `deviceState` keeps a value in the device's slot only, shared by the device's
-tabs: the inbox's seen state (`pineta-inbox:<session>`), where each thread
-was left (`pineta-left:<session>`, ADR-0056), and who you are
-(`pineta-identity`, below), which `reconcileName`'s `store` also saves, with
-the same email, so it reloads no tab. Each save reads what is stored and merges into it
-(`mergeInbox`; the identity's merge takes the new value), so two tabs marking
-at once both keep theirs. `subscribe` hears another tab's save through the
+tabs: where the inventory is docked, and who you are (`pineta-identity`,
+below), which `reconcileName`'s `store` also saves, with the same email, so
+it reloads no tab. What you have dealt with is not here but in your
+attention document, on every device of yours (ADR-0077), which merges; here
+the latest save wins. `subscribe` hears another tab's save through the
 `storage` event, which fires only in the other tabs, and hears a `clear()`
 as `undefined`. Both write through `writeSlot`, which drops a full quota's
 error.
@@ -633,12 +667,15 @@ the columns read one. `segmentPath` (core) decides what a column folds;
   among the messages would move both. `useAskBar` measures each
   `.ask-work[data-ask-of]` and its message once a frame at most; `askAtTop`
   decides.
-- **Since you were here** (`left.ts`): `pineta-left:<session>` on the
-  device, per lane, the column's tip when its reader left it at its end.
-  `seen.leave` writes it, on unmount, page hide and `pagehide`, in the same
-  call that saves `SeenEnd`; nothing is written while you watch, since each
-  write is a `storage` event in every other tab. A column reads it as it
-  mounts and when the page shows again, and `.left-line` takes no height.
+- **Since you were here** (`left.ts`, ADR-0077): your attention document's
+  `read`, per lane the furthest entry you have read, on any device of yours.
+  A column bound to a lane reports its tip while it follows its end in a
+  page you can see (`AttentionStore.read`), and `seen.leave` flushes every
+  waiting mark on unmount, page hide and `pagehide`. `readStep` writes a
+  lane's mark at most once a `READ_EVERY`, since each write stays in the
+  document's history (S101). A column reads the mark as it mounts and when
+  the page shows again, so the line stays where it was while you read below
+  it, and `.left-line` takes no height.
 - **Selectors:** `.column[data-density]`, `.density-choice[data-density]`
   (`aria-pressed`), `.ask-work[data-ask-of]`, `.ask-fold` (`aria-expanded`,
   `data-first`), `.ask-files`, `.ask-line` (`.running`), `.ask-headline`, `.ask-digest`,
@@ -866,6 +903,9 @@ A label is decided as a value and worded in one function: `offerView` and
 change of wording then touches the words function, its one test, and
 `docs/06-interface.md`.
 
+- **One verb, one meaning** (ADR-0077): a person follows a thread they wrote
+  on, reads one now (presence), and a column follows its end (Presence,
+  below).
 - **Tests check the value.** A test about who a message is for checks
   `SendPlan.to`, not the label. One table per words function (`test.each`, as
   `describe("offerWords")` and `describe("sendButton")` are) pins the words.
@@ -1466,6 +1506,11 @@ pipeline keeps the tree a pure function, testable without a DOM.
 
 ## Presence (ADR-0024)
 
+- **Presence's verb is *reading*** (ADR-0077): a person is reading a thread
+  now. A person *follows* a thread they have written on (`follows`,
+  `attention.ts`), and a column *follows its end* (`follow.ts`), a column's
+  verb, never a person's. Docs and comments keep to these; no word a person
+  sees says that someone follows a thread they are only reading.
 - **Every column of the tab you are on is reported** (ADR-0029), since there
   is no focused column: `App` writes each column's thread end when it changes,
   deletes the key of a column no longer reported (`planReading`,

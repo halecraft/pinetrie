@@ -933,6 +933,7 @@ describe("planHistorySweep (ADR-0066)", () => {
       messages: 0,
       newest: null,
       writers: [],
+      threads: {},
       mentions: [],
       images: [],
     },

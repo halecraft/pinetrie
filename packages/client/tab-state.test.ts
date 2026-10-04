@@ -93,7 +93,6 @@ test("readStored: empty, not JSON, and not a value are all undefined", () => {
 })
 
 describe("deviceState: one value per device, shared by its tabs", () => {
-  /** Sets of numbers, merged by union: two tabs' saves both survive. */
   const sets: Codec<readonly number[]> = {
     encode: ns => ({ ns }),
     decode: raw =>
@@ -105,19 +104,17 @@ describe("deviceState: one value per device, shared by its tabs", () => {
         ? raw.ns
         : undefined,
   }
-  const union = (a: readonly number[], b: readonly number[]) =>
-    [...new Set([...a, ...b])].sort()
   const events = new EventTarget()
   const make = (device: StorageLike) =>
-    deviceState({ key: "k", codec: sets, device, merge: union, events })
+    deviceState({ key: "k", codec: sets, device, events })
 
-  test("it writes only the device's slot, and a save merges with what another tab stored", () => {
+  test("it writes only the device's slot, and the latest save wins", () => {
     const device = storage()
     const one = make(device)
     const two = make(device)
     one.save([1])
-    expect(two.save([2])).toEqual([1, 2])
-    expect(one.load()).toEqual([1, 2])
+    expect(two.save([2])).toEqual([2])
+    expect(one.load()).toEqual([2])
     expect([...device.backing.keys()]).toEqual(["k"])
   })
 

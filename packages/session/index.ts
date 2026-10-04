@@ -5,6 +5,7 @@
 // tests use is not exported here.
 
 export type { LineActing, OfferActing, Unsuccessful } from "./acting.ts"
+export type { AttentionStore, SeenMentions } from "./attention-doc.ts"
 export {
   type ActedAt,
   AT_INVENTORY,

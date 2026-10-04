@@ -1,11 +1,14 @@
 import {
+  type EntryId,
   entryId,
   type LaneName,
+  laneNameForThread,
   type MarkRecord,
   type ThreadName,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
+import type { Item, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
 import { NEW_ROOT } from "./fixtures.ts"
 import {
@@ -61,6 +64,9 @@ const input = (over: Partial<TabsViewInput> = {}): TabsViewInput => ({
   work: new Map(),
   offered: new Map(),
   unsent: none,
+  status: new Map(),
+  elsewhere: null,
+  arrivals: { arrived: new Map(), done: new Map() },
   ...over,
 })
 const tabs = (over: Partial<TabsViewInput> = {}) => tabsView(input(over)).tabs
@@ -144,6 +150,51 @@ describe("tabsView", () => {
     }
     expect(tabs({ unsent }).map(t => t.pip)).toEqual([true, false, true, true])
     expect(tabs().map(t => t.pip)).toEqual([false, false, false, false])
+  })
+
+  test("a root tab draws its status, and what arrived as you watched; Archive, the highest elsewhere (ADR-0077)", () => {
+    const item: Item = {
+      lane: laneNameForThread("a"),
+      root: entryId("r2"),
+      end: entryId("e"),
+      level: "needsYou",
+      raised: { kind: "offer", source: "c-1" },
+    }
+    const status = new Map<EntryId, Status>([
+      [entryId("r1"), { kind: "working" }],
+      [entryId("r2"), { kind: "needsYou", item }],
+    ])
+    const [archive, r1, r2] = tabs({
+      status,
+      elsewhere: "worthARead",
+      arrivals: { arrived: new Map([[entryId("r2"), 5]]), done: new Map() },
+    })
+    expect(archive).toMatchObject({ kind: "archive", status: "worthARead" })
+    expect(r1).toMatchObject({ status: { kind: "working" }, arrived: null })
+    expect(r2).toMatchObject({ status: { kind: "needsYou" }, arrived: 5 })
+  })
+
+  test("a tab that raises something offers not needed first in its ⋯; a working one does not", () => {
+    const item: Item = {
+      lane: laneNameForThread("a"),
+      root: entryId("r1"),
+      end: entryId("e"),
+      level: "worthARead",
+      raised: { kind: "offer", source: "c-1" },
+    }
+    const [, raised] = tabs({
+      status: new Map([[entryId("r1"), { kind: "worthARead", item }]]),
+    })
+    expect(raised?.kind === "root" && raised.menu[0]).toEqual({
+      kind: "notNeeded",
+      intent: { kind: "notNeeded", lane: item.lane, raised: item.raised },
+    })
+    const [, working] = tabs({
+      status: new Map([[entryId("r1"), { kind: "working" }]]),
+    })
+    expect(working?.kind === "root" && working.menu[0]).toEqual({
+      kind: "rename",
+    })
   })
 
   test("× closes the tab for you; a new tab's label says what it starts", () => {

@@ -224,6 +224,7 @@ test("decodeDigestConfig: on unless enabled is false", () => {
 test("digestRequest: the ask always, the newest work that fits, the last word, and the summary so far", () => {
   const work = Array.from({ length: 50 }, (_, i) => `agent: step ${i}`)
   const { system, user } = digestRequest({
+    answer: "digest",
     skill: "  Summarize.  ",
     ask: "Ada: fix the rail",
     work,
@@ -244,6 +245,7 @@ test("digestRequest: the ask always, the newest work that fits, the last word, a
 
 test("digestRequest: the last word survives a budget too small for any work", () => {
   const { user } = digestRequest({
+    answer: "digest",
     skill: "",
     ask: "Ada: fix the rail",
     work: ["agent: a long step"],

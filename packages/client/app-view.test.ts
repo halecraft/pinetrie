@@ -105,7 +105,13 @@ test("the header's offers are the open ones, never one the line already holds: a
   const D = laneNameForThread("d")
   const E = laneNameForThread("e")
   const offer = (lane: LaneName, taken: string | null, files = ["a.txt"]) =>
-    ({ lane, taken, files, edited: false }) as unknown as OfferRecord
+    ({
+      lane,
+      taken,
+      files,
+      edited: false,
+      ledger: lane === A ? { source: "c-a", start: [] } : null,
+    }) as unknown as OfferRecord
   const lane = (name: LaneName, tip: string | null) =>
     ({ name, tip }) as unknown as LaneView
   const { offers } = appView(
@@ -128,8 +134,8 @@ test("the header's offers are the open ones, never one the line already holds: a
     }),
   )
   expect(offers).toEqual([
-    { lane: A, root: "r1", end: "t1" },
-    { lane: D, root: "r2", end: "r2" },
+    { lane: A, root: "r1", end: "t1", source: "c-a" },
+    { lane: D, root: "r2", end: "r2", source: null },
   ])
 })
 

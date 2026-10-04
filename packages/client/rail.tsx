@@ -109,7 +109,7 @@ export function Rail({
   /** Every running lane: each tip pulses, whether or not a column shows it. */
   activity: readonly AgentRun[]
   onPick: (id: EntryId) => void
-  /** Others following each thread end, with their names and colours: a ring there. */
+  /** Others reading each thread end, with their names and colours: a ring there. */
   here: ReadonlyMap<EntryId, readonly { name: string; color: string }[]>
   /**
    * Thread ends holding an unsent card of yours (`CardMarks.ends`), with your
@@ -460,7 +460,7 @@ function Dot(p: {
         left: x(p.across) - DOT,
         top: y(p.slot) - DOT,
         background: trackColor(p.track),
-        // Someone else follows this thread: a ring in their colour, with a
+        // Someone else is reading this thread: a ring in their colour, with a
         // dark gap so it reads against any track's colour. The dot is 8 px,
         // so the rail marks and the column header names.
         boxShadow:

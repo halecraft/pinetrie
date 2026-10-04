@@ -51,7 +51,7 @@ This document fixes the design before any code. It draws E and T directly.
 └──────┘└────────────────────────┘└───────────────────────┘└────────────────────┘
 ```
 
-### The header: who is here, and what needs you (ADR-0030, ADR-0069)
+### The header: who is here, and what needs you (ADR-0030, ADR-0069, ADR-0077)
 
 Your tabs are your view; the header shows what is happening in the rest of
 the session, from live data only, as a document editor shows the people in it.
@@ -64,16 +64,23 @@ the session, from live data only, as a document editor shows the people in it.
   colour. Hovering names them and the thread they are in; a click opens that
   thread as your tab, with a column on their path. You are never shown among
   them.
-- **Activity** (ADR-0069): one menu of what needs you, its trigger a ✦.
-  Its badge counts the threads with work ready to add plus the mentions you
-  have not seen; while the agent works, a steady count of its threads stands
-  beside the ✦, never in the badge. Its sections, each shown only with
-  rows: **Ready to add** (the threads with an open offer, each opening its
-  thread), **Mentions of you** (the inbox, below; shown once anyone has
-  mentioned you) and **The agent is working in** (its threads in every
-  root, each opening its thread). With nothing in it, it is not shown.
-  Nothing in the header animates: the tab, the column and the rail show
-  where the agent works.
+- **Activity** (ADR-0069, ADR-0077): one menu of what needs you, its
+  trigger a ✦. Its amber badge counts what the threads you follow need from
+  you (a run that ended asking something, failing, or that no one could
+  tell; work ready to add) plus the mentions you have not seen; the page's
+  title carries the same count, "(2) Pineta". While the agent works, a
+  steady count of its threads stands beside the ✦, never in the badge. Its
+  sections, each shown only with rows: **Needs you** (each thread's reason,
+  in amber), **Ready to add** (every thread with an open offer, those you
+  follow marked and counted), **Worth a read** (listed, not counted),
+  **Mentions of you** (the inbox, below; shown once anyone has mentioned
+  you) and **The agent is working in** (its threads in every root). Each
+  row opens its thread; under each of yours, **not needed** clears it on
+  every device of yours, until the next run's end or new work. You follow
+  a thread once you have written on it; threads you do not follow raise
+  nothing for you. With nothing in it, the menu is not shown. Nothing in
+  the header animates: the tab, the column and the rail show where the
+  agent works.
 - **The project** (ADR-0060, ADR-0061, ADR-0076): a menu for the
   integration line, "◆ project", where finished work is added; its
   bookmark is in its title. While the project has commits not yet on `main`
@@ -120,9 +127,8 @@ the session, from live data only, as a document editor shows the people in it.
   have not seen. One is seen when you open it from the inbox, when it is drawn
   in a column of the tab you are on, or when you **mark all seen**. A seen
   mention stays in the inbox; a filter shows only the unseen.
-- **The inbox is this device's**, shared by its tabs and kept across reloads.
-  A new device, or a cleared browser, starts from its first load, with no
-  backlog.
+- **The inbox is yours**, the same on every device of yours (ADR-0077). You
+  start from your first load, with no backlog.
 - **Your inventory** (below) and **you**, at the far right, apart from the
   rest.
 - **You:** your avatar, last, opens your profile (ADR-0037): your
@@ -134,7 +140,7 @@ the session, from live data only, as a document editor shows the people in it.
 - **Nothing opens a tab by itself.** A mention is a notification: you choose to
   open it.
 
-### Root tabs: the roots you have open (ADR-0029, ADR-0030, ADR-0045)
+### Root tabs: the roots you have open (ADR-0029, ADR-0030, ADR-0045, ADR-0077)
 
 A conversation's context is its path to its root, so nothing in one root is
 ever in the context of another. That is where the screen splits.
@@ -155,10 +161,20 @@ ever in the context of another. That is where the screen splits.
   it, asks the model again from what was said in the thread, and replaces the
   title for everyone. A title is a mark on the root (ADR-0045), and names the
   root wherever it is shown: the header, the inbox, the Archive tab.
-- **A tab shows what happens in it while you are elsewhere:** a pulse while the
-  agent is working there, and small avatars of the others reading there. For
-  the roots you have not opened, the header shows the same. A small dot in
-  your colour marks a tab holding something you typed and have not sent.
+- **A tab shows what happens in it while you are elsewhere** (ADR-0077),
+  before its label: a still blue ring while the agent works there or is
+  finishing its summary, which needs nothing from you; a filled amber dot
+  when something there needs you, which pulses three times as it arrives
+  and then stays still; a dim amber dot when something is worth a read; and,
+  when a run you follow ends with nothing to do, a ✓ that fades. Its title
+  says why ("needs you: asks whether to drop the v1 table"). Reading the
+  thread to its end, on any device of yours, clears it; work ready to add
+  clears when it is added, or with **Not needed** in the tab's `⋯`. A page
+  that loads draws every mark still: only a change you see moves. The
+  Archive tab carries the highest mark of the roots with no tab of yours.
+  After the label, small avatars of the others reading there, and a small
+  dot in your colour when the tab holds something you typed and have not
+  sent. For the roots you have not opened, the header shows the same.
 - **Archive is in a tab's `⋯` menu**, saying what it does: "hide for
   everyone; restore from Archive". The `⋯` shows on the tab you are on, and on
   any other root tab while it is hovered or focused. Archive is for work that
@@ -369,10 +385,11 @@ the tree.
   `↰ answering Ada: "…"`, and a press shows it there.
 - **A pick on the rail into an ask's work opens its fold**, then brings the
   message into view.
-- **Since you were here.** Each device remembers, per thread, where its
-  column's end was when you left it at its end: switching tabs, hiding the
-  page or closing it. Coming back, a dashed line, "since you were here",
-  marks the first message after it. It takes no room.
+- **Since you were here.** Your attention document remembers, per thread,
+  how far you have read it, on any device of yours (ADR-0077): a column at
+  its end in a page you can see marks it, and so does leaving it there.
+  Coming back, a dashed line, "since you were here", marks the first
+  message after it. It takes no room.
 - **A summary, unless digests are off** (`{ "digests": { "enabled": false } }` in
   `~/.config/pineta/config.json`, ADR-0071): a model's two or three sentences on an
   ask's work, under its digest line, set apart from the agent's words. It is
@@ -396,7 +413,7 @@ the tree.
   shows it, or in a new column opened beside it.
 - **Uneventful stretches are capsules** (ADR-0031, ADR-0056). A message is
   always its own dot if it is the root's first message, a branch's first
-  message, a fork, a thread end, a thread end someone else follows, where
+  message, a fork, a thread end, a thread end someone else is reading, where
   the agent is replying, the end of a column you have open, or the message
   of an ask whose work is three agent messages or more. Three or more other
   messages in a row are one capsule on their track, and a capsule never
@@ -453,16 +470,16 @@ The rail is E; the column is T. Seeing both at once is the product.
   section says where its copy **starts from**: the project, or a WIP, with
   how far that is behind the project (ADR-0060).
 - **Who else is here** (ADR-0024) shows where there is room for it:
-  - the **rail** rings the dot at the end of each thread someone else follows,
+  - the **rail** rings the dot at the end of each thread someone else is reading,
     in their colour, with a count when several do; hovering names them. The
     dots are 8 px, so the rail marks and the header names;
-  - a **column's header** shows small avatars of the others following its
+  - a **column's header** shows small avatars of the others reading its
     thread: this is "seen by", naming only others, and nothing when you are
     alone;
   - the **composer** says "Bea is typing…".
 
   Presence is thread-level: every column in the tab you are on reports the
-  thread it follows. Columns in other tabs report nothing, so a tab's avatars
+  thread it shows. Columns in other tabs report nothing, so a tab's avatars
   are the people looking at it now.
   Which message someone has on screen waits until thread-level proves too
   coarse.
@@ -720,9 +737,10 @@ archive record (ADR-0029); a card's text is its own document (ADR-0048).
   record, plus the root you are on.
 - **The header** reads presence (people, and the thread each is in) and the
   lanes (the agent's running threads). **Mentions of you** are the chats whose
-  mentions `address` resolves to you. **What you have seen** is kept in the
-  device's `localStorage`, never in the document: an entry id (`since`), at or
-  before which every mention is seen, and the ids of later ones you have seen.
+  mentions `address` resolves to you. **What you have seen** is kept in your
+  attention document (`attention:<you>`, ADR-0077), on every device of
+  yours: an entry id (`mentionsSince`), at or before which every mention is
+  seen, and the ids of later ones you have seen.
 - **The archive** is a host-written `pineta.archive` value per root: its state
   (`archived` or `restored`), who changed it and when (ADR-0029). The host
   refuses commands that would write in an archived root.

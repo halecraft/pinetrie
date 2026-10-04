@@ -127,3 +127,25 @@ test("five changes to one root before its refresh starts read and write it once"
   expect(reads).toBe(1)
   expect(writesOf(agent.calls)).toHaveLength(1)
 })
+
+test("a root is refreshed as it is watched, with no change to it, and an unchanged record is not written again (ADR-0077)", async () => {
+  const b = basics()
+  const keeper = createKeeper<HostKey>()
+  const agent = record<Pick<Agent, "writeValues">>({
+    writeValues: async writes => applyWrites(b, writes),
+  })
+  writeEntry(b.root, row("e1", null, chat("plan")))
+  const open = () =>
+    createDirectory({ basics: b, keeper, agent: () => agent.port }).watch(
+      ROOT_ID,
+      b.root,
+    )
+  open()
+  await keeper.idle()
+  expect(readRoots(b.session).get(ROOT_ID)).toMatchObject({ entry: "e1" })
+  const written = agent.calls.length
+  // A host started again opens the same root.
+  open()
+  await keeper.idle()
+  expect(agent.calls.length).toBe(written)
+})

@@ -614,6 +614,7 @@ export function rowRetainedTail(row: StoredEntryRow): readonly unknown[] {
   return row.type === "compaction" && Array.isArray(tail) ? tail : []
 }
 
+export * from "./attention.ts"
 export * from "./inventory.ts"
 export * from "./places.ts"
 export * from "./presence.ts"

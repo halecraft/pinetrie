@@ -5,7 +5,9 @@
 // for you and writes nothing. In its ⋯, Rename titles a root for everyone
 // (ADR-0045), and Archive hides it for everyone. A root someone else starts
 // opens no tab here. A tab holding an unsent card of yours carries a pip, and so
-// does Archive when such a root has no tab here (ADR-0048, `cardMarks`).
+// does Archive when such a root has no tab here (ADR-0048, `cardMarks`). Before
+// its label, a tab's status (ADR-0077): a still ring while its agent works, an
+// amber dot when something needs you, a dim one when something is worth a read.
 
 import { MAX_TITLE, type TreeIndex, type WriterId } from "@pineta/core"
 import { ROOT_BUSY_REASON } from "@pineta/rules"
@@ -18,11 +20,19 @@ import {
   useRef,
   useState,
 } from "react"
+import {
+  attentionWords,
+  LEVEL_CLASS,
+  LEVEL_WORDS,
+  type Level,
+  moving,
+  type Status,
+} from "./attention.ts"
 import { CardPip } from "./card-pip.tsx"
 import { peopleHere, readersByRoot } from "./here.ts"
 import type { Intent } from "./intent.ts"
 import { Menu } from "./menu.tsx"
-import { Avatars } from "./presence.tsx"
+import { Avatars, nameFor } from "./presence.tsx"
 import { planTitle, renameKey } from "./root-label.ts"
 import { dropsWords, renameIntent, type TabsView } from "./tabs-view.ts"
 import { useReadingAt, useReadingRoots } from "./use-presence.ts"
@@ -95,6 +105,13 @@ export function TabBar({
                 tabIndex={tab.selected ? 0 : -1}
                 type="button"
               >
+                {tab.status !== null && (
+                  <StatusMark
+                    arrived={null}
+                    level={tab.status}
+                    title={archiveWords(tab.status)}
+                  />
+                )}
                 Archive
                 {tab.pip && pip}
               </button>
@@ -143,12 +160,7 @@ export function TabBar({
             <span className="tab-wrap" key={`root:${root}`}>
               <button
                 aria-selected={tab.selected}
-                className={[
-                  "tab",
-                  "tab-root",
-                  tab.running ? "running" : "",
-                  tab.archived ? "archived" : "",
-                ]
+                className={["tab", "tab-root", tab.archived ? "archived" : ""]
                   .filter(c => c !== "")
                   .join(" ")}
                 data-root={root}
@@ -158,6 +170,12 @@ export function TabBar({
                 title={tab.label}
                 type="button"
               >
+                <TabStatus
+                  arrived={tab.arrived}
+                  done={tab.done}
+                  nameOf={nameOf}
+                  status={tab.status}
+                />
                 <span className="tab-label">{tab.label}</span>
                 {tab.pip && pip}
                 <Readers
@@ -178,49 +196,59 @@ export function TabBar({
                     {
                       key: "root",
                       items: tab.menu.map(item =>
-                        item.kind === "rename"
+                        item.kind === "notNeeded"
                           ? {
-                              key: "rename",
-                              className: "rename-root",
-                              title: "change this thread's title for everyone",
-                              label: "Rename",
-                              onChoose: () => setRenaming(root),
+                              key: "not-needed",
+                              className: "not-needed",
+                              title:
+                                "clear this tab's mark, on every device of yours",
+                              label: "Not needed",
+                              onChoose: () => onIntent(item.intent),
                             }
-                          : item.kind === "retitle"
+                          : item.kind === "rename"
                             ? {
-                                key: "retitle",
-                                className: "retitle-root",
+                                key: "rename",
+                                className: "rename-root",
                                 title:
-                                  "title this thread from what was said in it, for everyone",
-                                label: "Auto-update title",
-                                onChoose: () => onIntent(item.intent),
+                                  "change this thread's title for everyone",
+                                label: "Rename",
+                                onChoose: () => setRenaming(root),
                               }
-                            : {
-                                key: "archive",
-                                className: "archive-root",
-                                disabled: item.busy !== null,
-                                title:
-                                  "hide for everyone; restore from Archive",
-                                label: (
-                                  <>
-                                    Archive
-                                    {item.busy !== null && (
-                                      <span className="why">
-                                        {" "}
-                                        · {ROOT_BUSY_REASON[item.busy]}
-                                      </span>
-                                    )}
-                                    {item.busy === null &&
-                                      dropsWords(item.drops) !== null && (
-                                        <span className="why drops">
+                            : item.kind === "retitle"
+                              ? {
+                                  key: "retitle",
+                                  className: "retitle-root",
+                                  title:
+                                    "title this thread from what was said in it, for everyone",
+                                  label: "Auto-update title",
+                                  onChoose: () => onIntent(item.intent),
+                                }
+                              : {
+                                  key: "archive",
+                                  className: "archive-root",
+                                  disabled: item.busy !== null,
+                                  title:
+                                    "hide for everyone; restore from Archive",
+                                  label: (
+                                    <>
+                                      Archive
+                                      {item.busy !== null && (
+                                        <span className="why">
                                           {" "}
-                                          · {dropsWords(item.drops)}
+                                          · {ROOT_BUSY_REASON[item.busy]}
                                         </span>
                                       )}
-                                  </>
-                                ),
-                                onChoose: () => onIntent(item.intent),
-                              },
+                                      {item.busy === null &&
+                                        dropsWords(item.drops) !== null && (
+                                          <span className="why drops">
+                                            {" "}
+                                            · {dropsWords(item.drops)}
+                                          </span>
+                                        )}
+                                    </>
+                                  ),
+                                  onChoose: () => onIntent(item.intent),
+                                },
                       ),
                     },
                   ]}
@@ -306,6 +334,80 @@ function TitleField({
       placeholder={placeholder}
       ref={input}
       value={text}
+    />
+  )
+}
+
+/** The Archive tab's mark's title: what the roots with no tab raise. */
+const archiveWords = (level: Level): string =>
+  `a thread with no tab of yours: ${LEVEL_WORDS[level]}`
+
+/** A level's mark: an amber dot, bright for needs you, dim for worth a read. */
+function StatusMark({
+  level,
+  title,
+  arrived,
+}: {
+  level: Level
+  title: string
+  /** When it arrived as you watched, or null: it pulses only as it mounts fresh. */
+  arrived: number | null
+}) {
+  return (
+    <span
+      aria-label={LEVEL_WORDS[level]}
+      className={`tab-status ${LEVEL_CLASS[level]}`}
+      data-arrived={moving(arrived, Date.now()) ? "" : undefined}
+      // A new arrival is a new element, so its pulse plays again.
+      key={arrived ?? "still"}
+      role="img"
+      title={title}
+    />
+  )
+}
+
+/**
+ * A root tab's status, before its label (ADR-0077): a still ring while its
+ * agent works, its level's mark when something is raised, a ✓ that fades
+ * when a run you follow ended with nothing to do.
+ */
+function TabStatus({
+  status,
+  arrived,
+  done,
+  nameOf,
+}: {
+  status: Status | null
+  arrived: number | null
+  done: number | null
+  nameOf: ReadonlyMap<WriterId, string>
+}) {
+  if (status === null)
+    return moving(done, Date.now()) ? (
+      <span
+        aria-label="the agent has finished"
+        className="tab-status done"
+        key={done ?? "none"}
+        role="img"
+        title="the agent has finished"
+      >
+        ✓
+      </span>
+    ) : null
+  if (status.kind === "working")
+    return (
+      <span
+        aria-label="the agent is working"
+        className="tab-status working"
+        role="img"
+        title="the agent is working"
+      />
+    )
+  return (
+    <StatusMark
+      arrived={arrived}
+      level={status.kind}
+      title={`${LEVEL_WORDS[status.kind]}: ${attentionWords(status.item.raised, w => nameFor(nameOf, w))}`}
     />
   )
 }

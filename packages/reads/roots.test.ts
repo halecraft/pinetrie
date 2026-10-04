@@ -1,7 +1,14 @@
 // The directory of roots (ADR-0063): what is read of a root's document for
 // its record, and the tree of several held roots at once.
 
-import { entryId, NOBODY, rootIdFor, type Sha256, writerId } from "@pineta/core"
+import {
+  entryId,
+  laneNameForThread,
+  NOBODY,
+  rootIdFor,
+  type Sha256,
+  writerId,
+} from "@pineta/core"
 import { encodeChat, MARK, setRecord } from "@pineta/rules"
 import {
   newRootDoc,
@@ -10,6 +17,7 @@ import {
   type RootDocHandle,
   type StoredEntryRow,
   writeEntry,
+  writeLaneTip,
 } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import {
@@ -23,6 +31,8 @@ import {
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const ADA = writerId("ada@x.io")
+const BEA = writerId("bea@x.io")
+const CY = writerId("cy@x.io")
 const SHA = "a".repeat(64) as Sha256
 
 const row = (
@@ -37,11 +47,15 @@ const row = (
   fromId: null,
   payload: { message },
 })
-const chat = (text: string) =>
+const chat = (text: string, author = ADA) =>
   encodeChat(
-    { author: ADA, authorName: "Ada", text, compels: NOBODY, sendId: "s" },
+    { author, authorName: "Someone", text, compels: NOBODY, sendId: "s" },
     1,
   )
+const agent = (text: string) => ({
+  role: "assistant",
+  content: [{ type: "text", text }],
+})
 
 function rootWith(...rows: StoredEntryRow[]): RootDocHandle {
   const doc = newRootDoc()
@@ -94,6 +108,29 @@ describe("readRootRecord", () => {
       value: w.value,
     })
     expect(readRootRecord(ROOT, doc).title).toBe("Plans")
+  })
+
+  test("each thread's writers are those on its path, in order of first message (ADR-0077)", () => {
+    // e1 (Bea) ─ e2 (agent) ─ e3 (Ada) ─ e4 (agent)   lane A
+    //                     └─ e5 (Cy)                    lane B
+    const doc = rootWith(
+      row("e1", null, chat("plan", BEA)),
+      row("e2", "e1", agent("ok")),
+      row("e3", "e2", chat("and tests", ADA)),
+      row("e4", "e3", agent("done")),
+      row("e5", "e2", chat("another way", CY)),
+    )
+    const a = laneNameForThread("a")
+    const b = laneNameForThread("b")
+    const empty = laneNameForThread("c")
+    writeLaneTip(doc, a, entryId("e4"))
+    writeLaneTip(doc, b, entryId("e5"))
+    writeLaneTip(doc, empty, null)
+    expect(readRootRecord(ROOT, doc).threads).toEqual({
+      [a]: [BEA, ADA],
+      [b]: [BEA, CY],
+      [empty]: [],
+    })
   })
 
   test("a root with no message yet has no entry", () => {

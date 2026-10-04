@@ -2,10 +2,11 @@
 // (ADR-0030). Pure.
 //
 // The items are derived from each root's directory record, so a mention in a
-// root this tab does not hold is in the inbox too (ADR-0063); only what you have seen is stored, per
-// device (`use-inbox.ts`). `since` is a watermark: every mention at or before
-// it is seen, and `seen` holds the ids of later ones you have seen. Entry ids
-// are uuidv7, so id order is creation order (S9).
+// root this tab does not hold is in the inbox too (ADR-0063); only what you
+// have seen is stored, in your attention document, on every device of yours
+// (`use-inbox.ts`, ADR-0077). `since` is a watermark: every mention at or
+// before it is seen, and `seen` holds the ids of later ones you have seen.
+// Entry ids are uuidv7, so id order is creation order (S9).
 
 import {
   address,
@@ -14,8 +15,6 @@ import {
   type RootRecord,
   type WriterId,
 } from "@pineta/core"
-import { type Static, Type } from "typebox"
-import { Value } from "typebox/value"
 
 /** A message that mentions you. */
 export interface InboxItem {
@@ -57,17 +56,9 @@ export function mentionsOf(input: {
 
 /** What you have seen: every mention at or before `since`, and `seen` after it. */
 export interface Inbox {
-  /** An entry id; "" when the session was empty. */
+  /** An entry id, or `EARLIEST` (`@pineta/session`'s `startOf`). */
   readonly since: string
   readonly seen: readonly string[]
-}
-
-/** A device with nothing stored: everything so far is seen, so it starts with no backlog. */
-export function startInbox(roots: Iterable<RootRecord>): Inbox {
-  let since = ""
-  for (const { newest } of roots)
-    if (newest !== null && newest > since) since = newest
-  return { since, seen: [] }
 }
 
 export const isUnseen = (inbox: Inbox, id: string): boolean =>
@@ -111,18 +102,6 @@ export function markAllSeen(inbox: Inbox, items: readonly InboxItem[]): Inbox {
     : { since: newest, seen: [] }
 }
 
-/**
- * Two tabs' inboxes as one: the later `since`, and the union of `seen` above
- * it. So two tabs marking different mentions at once both keep theirs.
- */
-export function mergeInbox(a: Inbox, b: Inbox): Inbox {
-  const since = a.since > b.since ? a.since : b.since
-  const seen = [...new Set([...a.seen, ...b.seen])]
-    .filter(id => id > since)
-    .sort()
-  return { since, seen }
-}
-
 /** The unseen mentions drawn in the tab you are on: `shown` is its columns' paths. */
 export function seenOnScreen(
   inbox: Inbox,
@@ -146,24 +125,3 @@ export function seenNow(
   const drawn = seenOnScreen(inbox, items, shown)
   return drawn.length === 0 ? null : markSeen(inbox, drawn, items)
 }
-
-// ── stored form ───────────────────────────────────────────────────────────
-
-/** `v` changes when the shape does; an unknown one starts afresh. */
-const StoredInbox = Type.Object({
-  v: Type.Literal(1),
-  since: Type.String(),
-  seen: Type.Array(Type.String()),
-})
-
-export const encodeInbox = (inbox: Inbox): Static<typeof StoredInbox> => ({
-  v: 1,
-  since: inbox.since,
-  seen: [...inbox.seen],
-})
-
-/** A stored inbox, whole or not at all. Total. */
-export const decodeInbox = (raw: unknown): Inbox | undefined =>
-  Value.Check(StoredInbox, raw)
-    ? { since: raw.since, seen: raw.seen }
-    : undefined

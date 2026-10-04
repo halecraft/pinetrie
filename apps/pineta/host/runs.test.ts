@@ -44,17 +44,29 @@ describe("planRunEnd", () => {
   test("a land prompt adds landingEnded, a stack prompt splitEnded, both before endRun", () => {
     expect(planRunEnd("land")).toEqual([
       "landingEnded",
+      "verdictPending",
       "endRun",
       "laneStopped",
       "ended",
     ])
     expect(planRunEnd("stack")).toEqual([
       "splitEnded",
+      "verdictPending",
       "endRun",
       "laneStopped",
       "ended",
     ])
     expect(planRunEnd(undefined)).not.toContain("landingEnded")
+  })
+
+  test("the verdict is pending before endRun, for every role (ADR-0077)", () => {
+    for (const role of [undefined, "chat", "land", "stack"]) {
+      const steps = planRunEnd(role)
+      expect(steps.indexOf("verdictPending")).toBeGreaterThanOrEqual(0)
+      expect(steps.indexOf("verdictPending")).toBeLessThan(
+        steps.indexOf("endRun"),
+      )
+    }
   })
 })
 
@@ -73,11 +85,16 @@ function setUp(
     splitEnded: async () => null,
   })
   const agent = record<Pick<Agent, "lane">>({ lane: () => lane.lane })
+  // Whether the lane was still running when its verdict was made pending.
+  const pending: { prompt: string; running: boolean }[] = []
   const runs = createRuns({
     basics: b,
     agent: agent.port,
     work: work.port,
     readPinned,
+    pending: async (l, prompt) => {
+      pending.push({ prompt, running: readActiveRun(b.live, l) !== undefined })
+    },
   })
   const ended = deferred<{
     running: boolean
@@ -93,7 +110,7 @@ function setUp(
       prompt,
     }),
   )
-  return { b, lane, runs, ended: ended.promise }
+  return { b, lane, runs, pending, ended: ended.promise }
 }
 
 describe("a run's end", () => {
@@ -109,6 +126,19 @@ describe("a run's end", () => {
       work: ["beforeRun", "runEnded"],
       prompt: null,
     })
+  })
+
+  test("its verdict is made pending while the run is still active, for the prompt it answered", async () => {
+    const { b, lane, runs, pending, ended } = setUp()
+    runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+    writeEntry(
+      b.root,
+      row(entryId("p-1"), null, { role: "chat", content: "hi" }),
+    )
+    writeLaneTip(b.root, LANE, entryId("p-1"))
+    lane.finish({ kind: "ok" })
+    await ended
+    expect(pending).toEqual([{ prompt: "p-1", running: true }])
   })
 
   test("ended is given the prompt the run answered", async () => {

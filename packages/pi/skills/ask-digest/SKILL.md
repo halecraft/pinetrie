@@ -1,6 +1,6 @@
 ---
 name: ask-digest
-description: How Pineta summarizes an ask's work in a thread for the people reading it. Pineta asks for it; the agent does not choose it.
+description: How Pineta summarizes an ask's work in a thread for the people reading it, and says at a run's end what it needs from them. Pineta asks for it; the agent does not choose it.
 disable-model-invocation: true
 ---
 
@@ -31,3 +31,21 @@ nothing to add
 ```
 
 Reply with this alone: no heading, no quotes, no commentary. A reply in any other shape is thrown away.
+
+## At the end of a run
+
+When the request ends with "Answer with the verdict line", first say what the end of the run asks of the people in the thread, on one line of its own:
+
+```
+needs you: <reason>
+worth a read: <reason>
+done
+```
+
+- **needs you**: the last message asks them a question, reports an error the agent could not get past, or leaves a decision or a step only a person can take (a choice between options, credentials, approval, something on their machine).
+- **worth a read**: nothing is asked of them, but the work found or explained something they would want to know: a cause, a trade-off, how something works.
+- **done**: the work finished what was asked, with nothing to decide and nothing new to learn.
+- The reason is one line of 20 words or fewer, saying what they will find, not that they should look: "asks whether to drop the v1 table", "explains why the cache misses on reload".
+- When the last message asks anything at all, answer **needs you**.
+
+If the request says "the verdict line alone", reply with that line and nothing else. If it says "then the summary", put the summary, in the shape above, on the lines after it.
