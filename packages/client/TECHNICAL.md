@@ -527,9 +527,21 @@ else reads those rows (tab summaries, archive search, `branchColors`).
   stretch never crosses its work's edge. Short exchanges merge as before.
   The stretch carries its ask (`RailStretch.ask`), and its tooltip is
   `stretchWords`: `askWords`, `workWords`, then the ask's digest.
-- **Every item has `slot`, `span` and `ids`;** a dot is an item with one id and
-  a span of 1. An edge leaves its parent item's last slot, so the renderer
-  never asks which kind an item is, only how to draw it.
+- **Every item has `slot`, `span`, `ids`, `track` and `across`;** a dot is
+  an item with one id and a span of 1. An edge leaves its parent item's last
+  slot, so the renderer never asks which kind an item is, only how to draw
+  it.
+- **Rows are depths, places are booked (`placeRail`, ADR-0068):** an item's
+  slot is its parent item's `slot + span`, so a branch starts beside the
+  older subtree, and each branch takes the leftmost `across` free from its
+  fork's row to its last. `track` is the branch's colour, by creation order
+  (`projectRail`), and never the place: `data-track` on a dot, a capsule,
+  an outline or a tick is the colour the column shares. Places come after
+  compaction, so a ring that splits a capsule can move the rows and places
+  below it; colours never move. Items stay in depth-first order, the DOM's
+  and Tab's too, so they no longer run top to bottom: a branch's dots follow
+  its parent's whole subtree. The SVG is as tall as the lowest item, which
+  need not be the last.
 - **A click picks by where it lands** (`pickAt`, pure): a fraction of the way
   down the capsule is that fraction through the stretch. A click from the
   keyboard has `detail` 0 and no point, and picks the first message. A
@@ -545,7 +557,7 @@ else reads those rows (tab summaries, archive search, `branchColors`).
   `railCount` never counts it. The rail's `min-width` is wider than one
   track, in both, so the columns keep their place; the browser suite checks `#strip`'s left edge
   across that send. `.rail-tree` is `fit-content` and centred, and the SVG is
-  `PAD` wide on both sides of its outer tracks.
+  `PAD` wide on both sides of its outermost places.
 - **A capsule's background depends on its fill** (the panel's colour, the
   track's, or the two blended half and half), so a colour check reads a `.rail-dot`. Signals (`.pulse`, `[data-here]`, a `.card-pip`) are always on dots.
 
@@ -804,9 +816,9 @@ colour. There are no connector lines, so sibling branches never cross.
   modulo the palette; `:has()` rules in `index.html` outline one in
   `var(--track)` when the other is hovered. No component state. The rules are
   eight pairs: CSS cannot match two elements' attribute values.
-- **The palette is eight colours**, so tracks eight apart share one. Two open
-  columns can share a colour when their branches share a track slot; the rail
-  shows them the same way.
+- **The palette is eight colours**, so tracks eight apart share one. A track
+  is a branch's rank by creation (ADR-0068), so two columns share a colour
+  only then; the rail shows them the same way.
 
 ## Layout: columns scroll independently
 
@@ -844,7 +856,8 @@ serves the rail's outline and the column's spot.
 - **Only `RailViewport` reads the store** (`rail.tsx`, with
   `useSyncExternalStore`), so a scroll redraws the outlines alone, not a
   column and not the rail's dots. `railView` turns a column's ids and
-  edges into bands, one per track, of whole items, so an outline keeps the
+  edges into bands, one per branch, of whole items, each at its branch's
+  `across`, so an outline keeps the
   shape of what it wraps; ticks, a line where the view's top or bottom
   falls inside a capsule, sliced as `pickAt` reads it, at most two and one
   when both fall within `EDGE_MERGE`; and the `extent` the rail keeps in
@@ -881,7 +894,7 @@ serves the rail's outline and the column's spot.
   draws its outline.
 - **Selectors:** `.rail-view[data-key][data-track]`, one per band, and
   `.rail-tick[data-key][data-track]`, keyed by their column. The browser suite tests "around a dot" over every outline of
-  a column: a column's view can lie on two tracks.
+  a column: a column's view can lie on two branches.
 
 ## Moving columns (`reorder.ts`, `use-column-drag.ts`)
 

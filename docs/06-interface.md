@@ -334,9 +334,12 @@ the tree.
 
 ### The rail: a root's tree, compactly
 
-- A git-graph strip at the left edge draws every branch in the tab's root as a
-  line, and every message as a dot, in tree order, except for uneventful
-  stretches (below). The tree is centred in the rail.
+- A strip at the left edge draws every branch in the tab's root as a line,
+  and every message as a dot, except for uneventful stretches (below). A row
+  is a depth, not a turn in one order: a branch starts on the row under its
+  fork, beside the messages it diverged from, in the leftmost place free for
+  its whole height (ADR-0068). Each branch has its own colour, by when it
+  was made. The tree is centred in the rail.
 - **A new tab has a rail too**: a hollow dot where its first message will be.
   It is as wide as the rail it becomes, so the columns do not move when the
   first message lands.

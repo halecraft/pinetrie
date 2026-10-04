@@ -8,6 +8,8 @@ messages is a landmark, and its run is a stretch of its own, so a stretch
 never crosses such an ask. Short exchanges still merge as below. A
 capsule's tooltip leads with its ask, and the column folds the same
 stretches.
+Amended by ADR-0068: rows go by depth, so a branch starts beside its fork,
+and a capsule is drawn in its branch's place.
 
 **Context.** The rail drew a dot per message on a 16 px row. Tool results get
 no row, but each step of an agent's work does, so a loop of 200 steps was

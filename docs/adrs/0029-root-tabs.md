@@ -10,6 +10,8 @@ withdrawn), ADR-0021 (where Start Chat and Start Agent live) and ADR-0024
 (which columns report presence).
 Amended by ADR-0061: archiving a root withdraws its threads' offers from
 your repo, and restoring builds them again.
+Amended by ADR-0068: a track is a branch's colour, by creation order, not
+its place on the rail.
 
 **Context.** The rail draws every tree in one strip, one after another, and
 columns from different trees sit side by side. `projectRail` starts each

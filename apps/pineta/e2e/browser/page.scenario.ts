@@ -407,7 +407,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `${colours.head} · ${colours.dot} · ${colours.rail}`,
       )
       // Hovering the header outlines its fork dot in the branch's colour. The
-      // aside is the reply's younger child, so its track is 1 (`projectRail`),
+      // aside is the root's first branch, so its track is 1 (`projectRail`),
       // the slot the mutation names.
       await page.hover(`${col(1)} .column-head .head-row`)
       const outline = await page.evaluate(
@@ -2088,12 +2088,14 @@ async function run(check: Checks["check"]): Promise<void> {
               `at the top: first ${atTop[0]}, end ${atTop[1]}; at the end: first ${atEnd[0]}, end ${atEnd[1]}`,
             )
 
-            // The rail, shorter than its tree, keeps the column's view in
-            // view. Column 0's view at its end runs from the trunk's capsule
-            // past the branch's to its tip on the next track, about 100 px:
-            // the rail is taller than that and its margins.
+            // The rail, shorter than column 0's path, keeps the column's view
+            // in view. Column 0 ends on the late aside, one row under the
+            // fork, beside the trunk's continuation (ADR-0068): its path is
+            // about 100 px of the rail, its view at its end about 40 px, from
+            // inside the trunk's capsule. The rail is taller than that and
+            // its margins.
             const short = await lp.addStyleTag({
-              content: ".rail { max-height: 140px }",
+              content: ".rail { max-height: 80px }",
             })
             // Where the rail is, and whether the dots at the column's start
             // and its end are in the rail's view: the outline wraps whole

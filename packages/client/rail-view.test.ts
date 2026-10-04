@@ -71,23 +71,24 @@ test("railItems: a dot at a thread end holding your card carries your colour", (
   ])
 })
 
-test("railView: whole items outlined, one band per track, and a tick where an edge cuts a capsule", () => {
+test("railView: whole items outlined, one band per branch, and a tick where an edge cuts a capsule", () => {
   const itemOf = new Map<string, ViewItem>()
   const add = (item: ViewItem) => {
     for (const id of item.ids) itemOf.set(id, item)
   }
-  add({ slot: 0, span: 1, track: 0, ids: ["r"] })
+  add({ slot: 0, span: 1, track: 0, across: 0, ids: ["r"] })
   // Ten messages in a capsule three slots long.
   const run = Array.from({ length: 10 }, (_, i) => `s${i}`)
-  const capsule = { slot: 1, span: 3, track: 0, ids: run }
+  const capsule = { slot: 1, span: 3, track: 0, across: 0, ids: run }
   add(capsule)
-  add({ slot: 4, span: 1, track: 0, ids: ["t"] })
-  add({ slot: 5, span: 1, track: 1, ids: ["b"] })
-  // Five more on the trunk, two slots long, after the branch.
+  add({ slot: 4, span: 1, track: 0, across: 0, ids: ["t"] })
+  add({ slot: 5, span: 1, track: 1, across: 1, ids: ["b"] })
+  // Five more on the trunk, two slots long, beside the branch.
   const more = Array.from({ length: 5 }, (_, i) => `u${i}`)
-  add({ slot: 6, span: 2, track: 0, ids: more })
+  add({ slot: 5, span: 2, track: 0, across: 0, ids: more })
   const edge = (from: number) => ({
     track: 0,
+    across: 0,
     slot: 1,
     span: 3,
     from,
@@ -97,39 +98,46 @@ test("railView: whole items outlined, one band per track, and a tick where an ed
   // and a line at each edge, 2.5 and 7.25 tenths down it, never the part
   // between, which drawn would read as the capsule's own fill.
   expect(railView(itemOf, run.slice(2, 8), 0.5, 0.25)).toEqual({
-    bands: [{ track: 0, top: 0.5, bottom: 3.5 }],
+    bands: [{ track: 0, across: 0, top: 0.5, bottom: 3.5 }],
     ticks: [edge(0.25), edge(0.725)],
     extent: { top: 0.5 + 3 * 0.25, bottom: 0.5 + 3 * 0.725 },
   })
   // Part of one message: the two edges are one line.
   expect(railView(itemOf, ["s4"], 0.2, 0.4).ticks).toEqual([
-    { track: 0, slot: 1, span: 3, from: (4 + 0.2) / 10, to: (4 + 0.4) / 10 },
+    {
+      track: 0,
+      across: 0,
+      slot: 1,
+      span: 3,
+      from: (4 + 0.2) / 10,
+      to: (4 + 0.4) / 10,
+    },
   ])
   // From near one capsule's end, past a dot, into the next capsule: a line
   // in each, and nothing on the dot between.
   expect(
     railView(itemOf, ["s8", "s9", "t", "u0", "u1", "u2"], 0.5, 0.5),
   ).toEqual({
-    bands: [{ track: 0, top: 0.5, bottom: 7.5 }],
+    bands: [{ track: 0, across: 0, top: 0.5, bottom: 6.5 }],
     ticks: [
       edge(8.5 / 10),
-      { track: 0, slot: 6, span: 2, from: 2.5 / 5, to: 2.5 / 5 },
+      { track: 0, across: 0, slot: 5, span: 2, from: 2.5 / 5, to: 2.5 / 5 },
     ],
-    extent: { top: 0.5 + 3 * (8.5 / 10), bottom: 5.5 + 2 * (2.5 / 5) },
+    extent: { top: 0.5 + 3 * (8.5 / 10), bottom: 4.5 + 2 * (2.5 / 5) },
   })
   // A dot is whole, wherever the edges are in it, and has no tick.
   expect(railView(itemOf, ["r"], 0.9, 0.1)).toEqual({
-    bands: [{ track: 0, top: -0.5, bottom: 0.5 }],
+    bands: [{ track: 0, across: 0, top: -0.5, bottom: 0.5 }],
     ticks: [],
     extent: { top: -0.5, bottom: 0.5 },
   })
   expect(railView(itemOf, ["nope"], 0, 1).extent).toBeNull()
-  // A capsule shown whole has no tick. Onto a branch's track: a band of its
-  // own. An id the rail lacks is skipped.
+  // A capsule shown whole has no tick. Onto a branch: a band of its own, in
+  // its place, beside the trunk's rows. An id the rail lacks is skipped.
   expect(railView(itemOf, [...run, "t", "nope", "b"], 0, 1)).toEqual({
     bands: [
-      { track: 0, top: 0.5, bottom: 4.5 },
-      { track: 1, top: 4.5, bottom: 5.5 },
+      { track: 0, across: 0, top: 0.5, bottom: 4.5 },
+      { track: 1, across: 1, top: 4.5, bottom: 5.5 },
     ],
     ticks: [],
     extent: { top: 0.5, bottom: 5.5 },
@@ -137,7 +145,7 @@ test("railView: whole items outlined, one band per track, and a tick where an ed
   // The last message of the capsule, then the dot below: one line, where the
   // view's top is; the outline wraps both.
   expect(railView(itemOf, ["s9", "t"], 0.5, 1)).toEqual({
-    bands: [{ track: 0, top: 0.5, bottom: 4.5 }],
+    bands: [{ track: 0, across: 0, top: 0.5, bottom: 4.5 }],
     ticks: [edge(0.95)],
     extent: { top: 0.5 + 3 * 0.95, bottom: 4.5 },
   })

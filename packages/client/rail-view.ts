@@ -128,13 +128,19 @@ export function railItems<
 export interface ViewItem {
   readonly slot: number
   readonly span: number
+  /** Its branch, which colours it; `across` is where it is drawn. */
   readonly track: number
+  readonly across: number
   readonly ids: readonly string[]
 }
 
-/** Whole rail items a column's view touches, in slots: a dot's centre is its slot. */
+/**
+ * Whole rail items of one branch a column's view touches, in slots: a dot's
+ * centre is its slot.
+ */
 export interface Band {
   readonly track: number
+  readonly across: number
   readonly top: number
   readonly bottom: number
 }
@@ -147,6 +153,7 @@ export interface Band {
  */
 export interface Tick {
   readonly track: number
+  readonly across: number
   readonly slot: number
   readonly span: number
   readonly from: number
@@ -170,8 +177,8 @@ export interface RailView {
  * first and the last the edges are.
  *
  * The bands are whole items, so an outline only ever wraps a dot or a capsule
- * entire, and keeps their shape: messages in a row on one track make one
- * band, whatever other tracks draw beside them.
+ * entire, and keeps their shape: messages in a row on one branch make one
+ * band, whatever other branches draw beside them.
  *
  * Where the view's top or bottom falls inside a capsule, a tick crosses it
  * there, each of its messages an equal slice of it, as `pickAt` reads it.
@@ -202,10 +209,11 @@ export function railView(
     if (at !== undefined && at.track === item.track)
       bands[bands.length - 1] = {
         track: at.track,
+        across: at.across,
         top: Math.min(at.top, top),
         bottom: Math.max(at.bottom, bottom),
       }
-    else bands.push({ track: item.track, top, bottom })
+    else bands.push({ track: item.track, across: item.across, top, bottom })
     const k = item.ids.indexOf(id)
     const from = (k + (n === 0 ? first : 0)) / item.ids.length
     const to = (k + (n === ids.length - 1 ? last : 1)) / item.ids.length
@@ -228,6 +236,7 @@ export function railView(
   const tail = items.at(-1)
   const line = (item: ViewItem, from: number, to: number): Tick => ({
     track: item.track,
+    across: item.across,
     slot: item.slot,
     span: item.span,
     from,

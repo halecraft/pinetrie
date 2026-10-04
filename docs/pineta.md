@@ -332,6 +332,12 @@ The page reads one `offerStatus` per offer, so one the line already holds
 catching up would change, at the tip and base commit it was read at: catch
 up is disabled, with its reason, when it would change nothing.
 
+**ADR-0068 — the rail draws branches beside their fork** (built). Rows go
+by depth, not depth-first order: a branch starts on the row under its fork,
+and takes the leftmost place free for its whole height (`placeRail`). A
+track is a branch's colour, by creation order, apart from its place, since
+places follow capsule sizes and so presence, which `App` does not read.
+
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold

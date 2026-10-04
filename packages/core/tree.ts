@@ -688,23 +688,27 @@ export function projectColumns(
 
 export interface RailRow {
   readonly id: EntryId
-  /** Which vertical track the row sits on. */
+  /**
+   * Its branch: the rank of the branch's first message among every branch's
+   * in the tree, by id. It picks the colour; `placeRail` picks the place.
+   */
   readonly track: number
   /** The nearest ancestor with a row, or null at a root: the edge's other end. */
   readonly parentId: EntryId | null
-  /** That ancestor's track, or null at a root. */
-  readonly parentTrack: number | null
+  /** It begins a branch: a start, or any child but its parent's oldest. */
+  readonly head: boolean
 }
 
 /**
- * One root's tree as git-graph rows: a row per message, depth-first from
- * `root`, children in id order. Tracks start at 0 in every tree.
+ * One root's tree as rows: a row per message, depth-first from `root`,
+ * children in id order. Tracks start at 0 in every tree.
  *
- * The oldest child continues its parent's track; each younger child takes the
- * lowest track free at the parent's row, reserved there because its edge runs
- * down past the older subtree. A track frees where its chain ends. Intuition: a
- * branch is a new rail, the continuation is not. Non-message entries get no
- * row; their children attach to the nearest ancestor that has one.
+ * The oldest child continues its parent's track. A younger child, or a start
+ * under a root that is no message, begins a branch, whose track is its first
+ * message's rank by id among every branch's first message. Ids sort in
+ * creation order (S9), so the trunk is 0 and a new branch takes the next
+ * number without changing any other's. Non-message entries get no row; their
+ * children attach to the nearest ancestor that has one.
  */
 export function projectRail(
   index: TreeIndex,
@@ -725,65 +729,56 @@ export function projectRail(
     return out
   }
 
-  const busy = new Set<number>()
-  const claim = (): number => {
-    let t = 0
-    while (busy.has(t)) t += 1
-    busy.add(t)
-    return t
-  }
-
-  const rows: RailRow[] = []
+  // The tree depth-first, each message with its parent and whether it
+  // begins a branch; then each branch's track, by its first message's id.
+  type Visit = { id: EntryId; parentId: EntryId | null; head: boolean }
+  const visits: Visit[] = []
   // A root that is no message starts its visible children side by side.
-  const starts = visibleChildren([root])
-  type Visit = {
-    id: EntryId
-    track: number
-    parentId: EntryId | null
-    parentTrack: number | null
-  }
-  const stack: Visit[] = starts
+  const stack: Visit[] = visibleChildren([root])
     .toReversed()
-    .map(id => ({ id, track: -1, parentId: null, parentTrack: null }))
+    .map(id => ({ id, parentId: null, head: true }))
   const seen = new Set<EntryId>()
   for (let v = stack.pop(); v !== undefined; v = stack.pop()) {
     if (seen.has(v.id)) continue
     seen.add(v.id)
-    // A start claims its track when it is reached, after earlier starts freed theirs.
-    const track = v.track < 0 ? claim() : v.track
-    rows.push({
-      id: v.id,
-      track,
-      parentId: v.parentId,
-      parentTrack: v.parentTrack,
-    })
+    visits.push(v)
     const children = visibleChildren(index.childrenOf.get(v.id) ?? [])
-    if (children.length === 0) {
-      busy.delete(track)
-      continue
-    }
-    const tracks = children.map((_, i) => (i === 0 ? track : claim()))
     for (let i = children.length - 1; i >= 0; i -= 1) {
       const id = children[i]
-      const t = tracks[i]
-      if (id !== undefined && t !== undefined)
-        stack.push({ id, track: t, parentId: v.id, parentTrack: track })
+      if (id !== undefined) stack.push({ id, parentId: v.id, head: i > 0 })
     }
   }
-  return rows
+  const rank = new Map(
+    visits
+      .filter(v => v.head)
+      .map(v => v.id)
+      .sort(ascending)
+      .map((id, n) => [id, n]),
+  )
+  const trackOf = new Map<EntryId, number>()
+  return visits.map(v => {
+    const track =
+      rank.get(v.id) ??
+      (v.parentId === null ? undefined : trackOf.get(v.parentId)) ??
+      0
+    trackOf.set(v.id, track)
+    return { ...v, track }
+  })
 }
 
 interface RailItemBase {
-  /** Its first row slot. Each item's is the previous item's `slot + span`. */
+  /** Its first row: its parent item's `slot + span`, or 0 at a start (`placeRail`). */
   readonly slot: number
   /** Rows it takes. */
   readonly span: number
   /** Its messages, top to bottom: each the only child of the one above. */
   readonly ids: readonly [EntryId, ...EntryId[]]
+  /** Its branch (`RailRow.track`): the colour, not the place. */
   readonly track: number
-  /** The first message's parent and that parent's track: the edge into it. */
+  /** Where it is drawn across the rail, 0 at the left (`placeRail`). */
+  readonly across: number
+  /** The first message's parent, the last message of the item above: the edge into it. */
   readonly parentId: EntryId | null
-  readonly parentTrack: number | null
 }
 
 /** A message the rail draws on its own. */
@@ -854,11 +849,8 @@ export function railLandmarks(
       .filter(
         r =>
           keep.has(r.id) ||
-          r.parentId === null ||
-          // Off its parent's track means a branch's first message: only a
-          // younger child is, since the oldest keeps its parent's track
-          // (`projectRail`).
-          r.track !== r.parentTrack ||
+          // The root's first message, or a branch's.
+          r.head ||
           childRows.get(r.id) !== 1,
       )
       .map(r => r.id),
@@ -882,7 +874,8 @@ export interface RailAsks {
  * So a stretch holds no structure, and the compacted rail has every branch
  * the full one has.
  * An uneventful row's only child is the next row in depth-first order, so a
- * stretch is a run of consecutive rows.
+ * stretch is a run of consecutive rows. The items come back placed
+ * (`placeRail`), in the rows' order.
  */
 export function compactRail(
   index: TreeIndex,
@@ -904,11 +897,9 @@ export function compactRail(
     return prompt !== undefined && long.has(prompt) ? prompt : null
   }
 
-  const items: RailItem[] = []
-  let slot = 0
+  const items: Unplaced[] = []
   const dot = (r: RailRow) => {
-    items.push({ kind: "dot", slot, span: 1, ids: [r.id], ...edge(r) })
-    slot += 1
+    items.push({ kind: "dot", span: 1, ids: [r.id], ...edge(r) })
   }
   /** Row `j` carries on the stretch that row `j - 1` is in. */
   const continues = (j: number): boolean => {
@@ -943,25 +934,78 @@ export function compactRail(
       ]
       items.push({
         kind: "stretch",
-        slot,
         span,
         ids,
         ...edge(first),
         stats: workStats(index, ids, rows[end]?.id, revisions),
         ask: longAsk(first.id),
       })
-      slot += span
     }
     i = end
   }
-  return items
+  return placeRail(items)
 }
 
-const edge = (r: RailRow) => ({
-  track: r.track,
-  parentId: r.parentId,
-  parentTrack: r.parentTrack,
-})
+const edge = (r: RailRow) => ({ track: r.track, parentId: r.parentId })
+
+/** A rail item before `placeRail` says where it is drawn. */
+type Unplaced =
+  | Omit<RailDot, "slot" | "across">
+  | Omit<RailStretch, "slot" | "across">
+
+/**
+ * Where each item is drawn: `items` in depth-first order, each after the item
+ * holding its parent.
+ *
+ * Rows go by depth, not by order: an item's slot is its parent item's
+ * `slot + span`, so a branch starts on the row under its fork, beside the
+ * older subtree rather than below it.
+ *
+ * A branch (the items of one track) takes the rows from its fork's last row
+ * to its own last row, and the lowest place across whose last branch ended
+ * above them, branches taken by their first row. Like booking rooms, each
+ * branch takes the leftmost one free for its whole stay, so the rail is no
+ * wider than the most branches on any one row. The fork's row is in the
+ * range, so a branch never shares its parent's place, and the bend into it
+ * never lands on another branch's dot.
+ */
+function placeRail(items: readonly Unplaced[]): readonly RailItem[] {
+  const slots: number[] = []
+  const itemAt = new Map<EntryId, number>()
+  const parentOf = (it: Unplaced): number | undefined =>
+    it.parentId === null ? undefined : itemAt.get(it.parentId)
+  /** The last row item `k` takes. */
+  const lastRow = (k: number): number =>
+    (slots[k] ?? 0) + (items[k]?.span ?? 1) - 1
+  const branches = new Map<number, { from: number; to: number }>()
+  for (const [k, it] of items.entries()) {
+    const p = parentOf(it)
+    const slot = p === undefined ? 0 : lastRow(p) + 1
+    slots.push(slot)
+    for (const id of it.ids) itemAt.set(id, k)
+    const was = branches.get(it.track)
+    branches.set(it.track, {
+      from: was?.from ?? (p === undefined ? slot : lastRow(p)),
+      to: Math.max(was?.to ?? 0, lastRow(k)),
+    })
+  }
+  const ends: number[] = []
+  const acrossOf = new Map<number, number>()
+  const order = [...branches].sort(
+    ([ta, a], [tb, b]) => a.from - b.from || ta - tb,
+  )
+  for (const [track, { from, to }] of order) {
+    let across = 0
+    while ((ends[across] ?? -1) >= from) across += 1
+    ends[across] = to
+    acrossOf.set(track, across)
+  }
+  return items.map((it, k) => ({
+    ...it,
+    slot: slots[k] ?? 0,
+    across: acrossOf.get(it.track) ?? 0,
+  }))
+}
 
 /**
  * What `ids`' messages hold, consecutive on one path. Their tool results are

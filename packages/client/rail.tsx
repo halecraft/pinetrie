@@ -83,7 +83,7 @@ const PAD = 8
 const DOT = 4
 /** The panel behind the rail: a ring's gap, and a capsule's unfilled part. */
 const PANEL = "#14161a"
-const x = (track: number) => PAD + track * GAP
+const x = (across: number) => PAD + across * GAP
 const y = (slot: number) => PAD + slot * ROW
 
 export function Rail({
@@ -122,28 +122,28 @@ export function Rail({
 }) {
   // Every message, a stretch's included, to the item that draws it.
   const itemOf = new Map(items.flatMap(it => it.ids.map(id => [id, it])))
-  const tracks = items.reduce((n, it) => Math.max(n, it.track + 1), 1)
-  const last = items.at(-1)
-  const slots = last === undefined ? 0 : last.slot + last.span
+  const places = items.reduce((n, it) => Math.max(n, it.across + 1), 1)
+  // Rows go by depth, so the last item in depth-first order need not be the lowest.
+  const slots = items.reduce((n, it) => Math.max(n, it.slot + it.span), 0)
   return (
     <nav aria-label="this thread's tree" className="rail">
       <div className="rail-tree">
-        <svg height={y(slots)} width={x(tracks - 1) + PAD}>
+        <svg height={y(slots)} width={x(places - 1) + PAD}>
           <title>
-            every message, as a dot on its branch's track, or in a capsule
+            every message, as a dot in its branch's colour, or in a capsule
           </title>
           {items.map(it => {
             const parent =
               it.parentId === null ? undefined : itemOf.get(it.parentId)
-            if (parent === undefined || it.parentTrack === null) return null
+            if (parent === undefined) return null
             // An edge leaves its parent's last slot: a capsule's bottom.
             const from = parent.slot + parent.span - 1
-            // Down the parent's track to its row, then across and down the
-            // child's: a branch leaves its parent and runs on its own rail.
+            // A branch bends from its parent's place to its own within half
+            // a row, then runs down to its first item on the next row.
             const d =
-              it.track === it.parentTrack
-                ? `M${x(it.track)},${y(from)} L${x(it.track)},${y(it.slot)}`
-                : `M${x(it.parentTrack)},${y(from)} L${x(it.track)},${y(from) + ROW / 2} L${x(it.track)},${y(it.slot)}`
+              it.across === parent.across
+                ? `M${x(it.across)},${y(from)} L${x(it.across)},${y(it.slot)}`
+                : `M${x(parent.across)},${y(from)} L${x(it.across)},${y(from) + ROW / 2} L${x(it.across)},${y(it.slot)}`
             return (
               <path
                 d={d}
@@ -179,6 +179,7 @@ export function Rail({
               onPick={onPick}
               open={marks.open}
               people={here.get(it.ids[0]) ?? []}
+              across={it.across}
               slot={it.slot}
               track={it.track}
             />
@@ -307,7 +308,7 @@ function RailViewport({
           data-track={o.track}
           key={`${o.key}-${o.n}`}
           style={{
-            left: x(o.track) - OUTLINE / 2,
+            left: x(o.across) - OUTLINE / 2,
             top: y(o.top),
             height: (o.bottom - o.top) * ROW,
             borderColor: o.color,
@@ -323,7 +324,7 @@ function RailViewport({
           data-track={t.track}
           key={`${t.key}-${t.n}`}
           style={{
-            left: x(t.track) - TICK / 2,
+            left: x(t.across) - TICK / 2,
             width: TICK,
             ...tickBox(t),
             background: t.color,
@@ -426,6 +427,7 @@ export function EmptyRail() {
 function Dot(p: {
   id: EntryId
   slot: number
+  across: number
   track: number
   open: boolean
   /** Your colour when a card of yours waits at this end; null otherwise. */
@@ -454,7 +456,7 @@ function Dot(p: {
       data-track={p.track}
       onClick={() => p.onPick(p.id)}
       style={{
-        left: x(p.track) - DOT,
+        left: x(p.across) - DOT,
         top: y(p.slot) - DOT,
         background: trackColor(p.track),
         // Someone else follows this thread: a ring in their colour, with a
@@ -492,10 +494,10 @@ const FILL: Record<StretchFill, (color: string) => string> = {
 }
 
 /**
- * A stretch: a capsule on its track, `span` rows long (one, and one more per
- * digit of its size), filled by who wrote it (`stretchFill`). A click opens
- * the message at that point of the stretch (`pickAt`), its ask's fold
- * included; the column is where a stretch is read.
+ * A stretch: a capsule in its branch's place and colour, `span` rows long
+ * (one, and one more per digit of its size), filled by who wrote it
+ * (`stretchFill`). A click opens the message at that point of the stretch
+ * (`pickAt`), its ask's fold included; the column is where a stretch is read.
  */
 function Capsule(p: {
   stretch: RailStretch
@@ -524,7 +526,7 @@ function Capsule(p: {
         p.onPick(pickAt(stretch.ids, at))
       }}
       style={{
-        left: x(stretch.track) - DOT,
+        left: x(stretch.across) - DOT,
         top: y(stretch.slot) - ROW / 2 + 2,
         height: stretch.span * ROW - 4,
         borderColor: color,

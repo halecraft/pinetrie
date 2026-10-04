@@ -220,6 +220,23 @@ describe("projectRail", () => {
     expect(trackOf("4-a1")).toBe(1)
     expect(trackOf("6-b1")).toBe(2)
   })
+  test("a branch's track is its first message's rank by id, so a new branch moves no other", () => {
+    // A branch off A's first message: the fourth branch made, so track 3,
+    // though the trunk's track 0 has ended by then in depth-first order. A
+    // newer branch off T2 is drawn before A's, and still takes the next number.
+    const sub = projectRail(
+      indexTree({ ...forks, ...tree({ "8-s1": "4-a1" }) }),
+      entryId("1-t1"),
+    )
+    expect(sub.find(r => r.id === "8-s1")?.track).toBe(3)
+    const newer = projectRail(
+      indexTree({ ...forks, ...tree({ "8-s1": "4-a1", "9-n1": "2-t2" }) }),
+      entryId("1-t1"),
+    )
+    for (const r of sub)
+      expect(newer.find(n => n.id === r.id)?.track).toBe(r.track)
+    expect(newer.find(r => r.id === "9-n1")?.track).toBe(4)
+  })
   test("rows are depth-first, children in id order, each with its parent's track", () => {
     expect(ids(rows)).toEqual([
       "1-t1",
@@ -232,8 +249,9 @@ describe("projectRail", () => {
     ])
     expect(rows.find(r => r.id === "6-b1")).toMatchObject({
       parentId: "2-t2",
-      parentTrack: 0,
+      head: true,
     })
+    expect(rows.find(r => r.id === "3-t3")).toMatchObject({ head: false })
   })
   test("the same entries in another insertion order give the same rows", () => {
     const shuffled = entriesOf(Object.values(forks).toReversed())
@@ -382,7 +400,7 @@ describe("compactRail", () => {
     expect([3, 9, 10, 99, 100].map(stretchSpan)).toEqual([2, 2, 3, 3, 4])
     expect(compact(loop(100), "000-q")[1]).toMatchObject({ span: 4 })
   })
-  test("every row is in exactly one item, in order, and slots add up", () => {
+  test("every row is in exactly one item, in order", () => {
     const i = indexTree({ ...loop(12), ...tree({ "005-x": "004-s" }) })
     const rows = projectRail(i, entryId("000-q"))
     const items = compactRail(i, rows, new Set(), {
@@ -390,10 +408,6 @@ describe("compactRail", () => {
       revisions: new Map(),
     })
     expect(items.flatMap(it => it.ids)).toEqual(rows.map(r => r.id))
-    for (const [k, it] of items.entries())
-      expect(it.slot).toBe(
-        k === 0 ? 0 : (items[k - 1]?.slot ?? 0) + (items[k - 1]?.span ?? 0),
-      )
   })
   test("a stretch counts the messages people wrote, and who, in order", () => {
     const ada = writerId("w-ada")
@@ -415,6 +429,136 @@ describe("compactRail", () => {
       ids: ["02", "03", "04", "05"],
       stats: { people: 2, writers: [bea, ada], calls: 0 },
     })
+  })
+})
+
+describe("placeRail", () => {
+  /** The rail's items, every message kept apart unless `compacted`. */
+  const items = (
+    entries: Record<EntryId, EntryLike>,
+    root: string,
+    compacted = false,
+  ) => {
+    const i = indexTree(entries)
+    const rows = projectRail(i, entryId(root))
+    return compactRail(i, rows, new Set(compacted ? [] : rows.map(r => r.id)), {
+      asks: indexAsks(i),
+      revisions: new Map(),
+    })
+  }
+  /** Each item by its first message: `[slot, across]`. */
+  const at = (placed: readonly RailItem[]) =>
+    Object.fromEntries(placed.map(it => [it.ids[0], [it.slot, it.across]]))
+  /** Rows a branch takes: from its fork's last row to its own last row. */
+  const ranges = (placed: readonly RailItem[]) => {
+    const itemOf = new Map(placed.flatMap(it => it.ids.map(id => [id, it])))
+    const last = (it: RailItem) => it.slot + it.span - 1
+    const out = new Map<number, { from: number; to: number; across: number }>()
+    for (const it of placed) {
+      const fork = it.parentId === null ? undefined : itemOf.get(it.parentId)
+      const was = out.get(it.track)
+      out.set(it.track, {
+        from: was?.from ?? (fork === undefined ? it.slot : last(fork)),
+        to: Math.max(was?.to ?? 0, last(it)),
+        across: it.across,
+      })
+    }
+    return [...out.values()]
+  }
+
+  test("a branch starts on the row under its fork, beside the older subtree", () => {
+    expect(at(items(forks, "1-t1"))).toEqual({
+      "1-t1": [0, 0],
+      "2-t2": [1, 0],
+      "3-t3": [2, 0],
+      "6-b1": [2, 2],
+      "7-b2": [3, 2],
+      "4-a1": [1, 1],
+      "5-a2": [2, 1],
+    })
+  })
+  test("an item under a capsule starts on the row after the capsule's last", () => {
+    const ids = (["001", "002", "003", "004", "005", "006"] as const).map(
+      n => `${n}-m`,
+    )
+    const placed = items(
+      tree(Object.fromEntries(ids.map((id, k) => [id, ids[k - 1] ?? null]))),
+      "001-m",
+      true,
+    )
+    expect(placed.map(it => [it.slot, it.span])).toEqual([
+      [0, 1],
+      [1, 2],
+      [3, 1],
+    ])
+  })
+  test("a branch that has ended frees its place for a later one", () => {
+    const trunk = { "01": null, "02": "01", "03": "02", "04": "03" }
+    const placed = items(
+      tree({ ...trunk, "05": "04", "06": "05", "10": "01", "11": "04" }),
+      "01",
+    )
+    expect(at(placed)["10"]).toEqual([1, 1])
+    expect(at(placed)["11"]).toEqual([4, 1])
+  })
+  test("a branch never takes a place whose branch ends on its fork's row", () => {
+    // A ends on row 2, and B forks from row 2: B's bend would meet A's dot.
+    const placed = items(
+      tree({
+        "01": null,
+        "02": "01",
+        "03": "02",
+        "04": "03",
+        "10": "01",
+        "11": "10",
+        "12": "03",
+      }),
+      "01",
+    )
+    expect(at(placed)["11"]).toEqual([2, 1])
+    expect(at(placed)["12"]).toEqual([3, 2])
+  })
+  test("a root that is no message starts its children side by side on row 0", () => {
+    const placed = items(
+      {
+        ...tree({ "1-a": "0-s", "2-b": "0-s", "3-c": "1-a" }),
+        ...entriesOf([entry("0-s", null, undefined, { type: "compaction" })]),
+      },
+      "0-s",
+    )
+    expect(at(placed)).toEqual({
+      "1-a": [0, 0],
+      "3-c": [1, 0],
+      "2-b": [0, 1],
+    })
+  })
+  test("in a bushy tree no two branches share a place on a row, and the rail is as narrow as its busiest row", () => {
+    // A fixed pseudo-random tree: mostly chains, with forks anywhere.
+    let seed = 7
+    const next = () => {
+      seed = (seed * 48271) % 2147483647
+      return seed / 2147483647
+    }
+    const parents: Record<string, string | null> = { "000": null }
+    for (let k = 1; k < 120; k += 1) {
+      const back = next() < 0.75 ? 1 : 1 + Math.floor(next() * k)
+      parents[String(k).padStart(3, "0")] = String(k - back).padStart(3, "0")
+    }
+    const placed = items(tree(parents), "000", true)
+    const branches = ranges(placed)
+    expect(branches.length).toBeGreaterThan(10)
+    for (const [n, a] of branches.entries())
+      for (const b of branches.slice(n + 1))
+        if (a.across === b.across)
+          expect(a.to < b.from || b.to < a.from).toBe(true)
+    const rows = Math.max(...branches.map(b => b.to)) + 1
+    const busiest = Math.max(
+      ...Array.from(
+        { length: rows },
+        (_, row) => branches.filter(b => b.from <= row && row <= b.to).length,
+      ),
+    )
+    expect(Math.max(...placed.map(it => it.across)) + 1).toBe(busiest)
   })
 })
 
