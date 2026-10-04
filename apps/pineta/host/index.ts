@@ -331,7 +331,7 @@ export async function startHost({
     bannerConfig === null
       ? null
       : createBanners({ basics, keeper, blobs, agent: theAgent })
-  // Each ask's digest, when the user config turns digests on (ADR-0056).
+  // Each ask's digest, unless the user config turns digests off (ADR-0071).
   // Made before the agent, which it reads lazily, as banners do.
   const digests = decodeDigestConfig(userJson)
     ? createDigests({ basics, keeper, presence, agent: theAgent })

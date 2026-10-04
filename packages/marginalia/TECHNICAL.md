@@ -355,8 +355,8 @@ the one named. A stop recorded for a run that answered anyway is ignored
 
 # Digests (`digest.ts`, ADR-0056)
 
-A model's short summary of an ask's work, when `{ "digests": { "enabled":
-true } }` is in the user config (`decodeDigestConfig`). A host-written
+A model's short summary of an ask's work, unless `{ "digests": { "enabled":
+false } }` is in the user config (`decodeDigestConfig`, ADR-0071). A host-written
 `pineta.digest` value keyed by the ask's prompt, replaced whole each time:
 a value, not a text, since nothing accumulates (ADR-0014). No agent reads
 it.

@@ -326,8 +326,8 @@ the tree.
   column's end was when you left it at its end: switching tabs, hiding the
   page or closing it. Coming back, a dashed line, "since you were here",
   marks the first message after it. It takes no room.
-- **A summary, when digests are on** (`{ "digests": { "enabled": true } }` in
-  `~/.config/pineta/config.json`): a model's two or three sentences on an
+- **A summary, unless digests are off** (`{ "digests": { "enabled": false } }` in
+  `~/.config/pineta/config.json`, ADR-0071): a model's two or three sentences on an
   ask's work, under its digest line, set apart from the agent's words. It is
   refreshed at most once a minute while someone reads the running thread,
   written once more when its run ends, and read by no agent.

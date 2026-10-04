@@ -59,9 +59,9 @@ const recordOf = (v: unknown): Record<string, unknown> | undefined =>
     ? (v as Record<string, unknown>)
     : undefined
 
-/** The user config's `digests`: on only when `enabled` is `true`. Total. */
+/** The user config's `digests`: on unless `enabled` is `false` (ADR-0071). Total. */
 export const decodeDigestConfig = (json: unknown): boolean =>
-  recordOf(recordOf(json)?.digests)?.enabled === true
+  recordOf(recordOf(json)?.digests)?.enabled !== false
 
 // ── the decision ──────────────────────────────────────────────────────────
 

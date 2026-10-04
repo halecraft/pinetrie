@@ -35,7 +35,7 @@ wires them.
 | `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers) |
 | `names.ts` | every thread's name (ADR-0039): `ensure` for the lanes pi holds, `reserve` for a lane id a column reserved before its lane exists (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
-| `digests.ts` | each ask's digest (ADR-0056), when the user config turns them on |
+| `digests.ts` | each ask's digest (ADR-0056), unless the user config turns them off (ADR-0071) |
 | `outside.ts` | `requestOutside`: a model request outside a keeper, its answer written in a step of its own |
 | `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue` and `applyWrites` (each write to the document its target names), `writesOf`, `basics` (one root, `ROOT_ID`, in `fakeDocuments`), `putLane`, `writeDirectory` |
 

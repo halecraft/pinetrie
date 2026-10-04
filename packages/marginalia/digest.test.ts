@@ -77,10 +77,12 @@ test("the record round-trips; a malformed one is dropped", () => {
   ]).toEqual([[P, r]])
 })
 
-test("decodeDigestConfig: on only when enabled is true", () => {
+test("decodeDigestConfig: on unless enabled is false", () => {
+  expect(decodeDigestConfig({ digests: { enabled: false } })).toBe(false)
   expect(decodeDigestConfig({ digests: { enabled: true } })).toBe(true)
-  expect(decodeDigestConfig({ digests: { enabled: "yes" } })).toBe(false)
-  expect(decodeDigestConfig(null)).toBe(false)
+  expect(decodeDigestConfig({ digests: { enabled: "no" } })).toBe(true)
+  expect(decodeDigestConfig({ digests: {} })).toBe(true)
+  expect(decodeDigestConfig(null)).toBe(true)
 })
 
 test("digestRequest: the ask always, the newest work that fits, and the summary so far", () => {

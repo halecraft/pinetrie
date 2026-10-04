@@ -852,6 +852,22 @@ export const mutations: readonly Mutation[] = [
     expect: "a range only between two commits one lane's turns recorded",
   },
   {
+    name: "digests are opt-in again",
+    file: "packages/marginalia/digest.ts",
+    from: "  recordOf(recordOf(json)?.digests)?.enabled !== false",
+    to: "  recordOf(recordOf(json)?.digests)?.enabled === true",
+    command: unit,
+    expect: "decodeDigestConfig: on unless enabled is false",
+  },
+  {
+    name: "digests ignore being turned off",
+    file: "packages/marginalia/digest.ts",
+    from: "  recordOf(recordOf(json)?.digests)?.enabled !== false",
+    to: "  recordOf(recordOf(json)?.digests) !== null",
+    command: unit,
+    expect: "decodeDigestConfig: on unless enabled is false",
+  },
+  {
     name: "a live digest replaces the final one",
     file: "packages/marginalia/digest.ts",
     from: "): boolean => asked.final || stored?.final !== true",
