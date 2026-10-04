@@ -1,86 +1,49 @@
 // client/blob-image — an image the host keeps (ADR-0042), as a message's
-// markdown or a tool's result draws it. A click shows it over the page in a
-// modal `<dialog>` (S66); a Cmd- or Ctrl-click opens it in a new tab.
+// markdown or a tool's result draws it. A click opens it in the column's pane
+// (ADR-0078); a Cmd- or Ctrl-click opens it in a new tab.
 
 import { blobOfUrl, blobUrl, type ImageRef } from "@pineta/core"
-import {
-  type ComponentProps,
-  type CSSProperties,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react"
-import { createPortal } from "react-dom"
+import { type ComponentProps, type CSSProperties, useContext } from "react"
 import { imageClick } from "./image-click.ts"
-
-/** An image; a `/blob/` one, clicked, is shown over the page. */
-export function BlobImage(props: ComponentProps<"img">) {
-  const { src, alt } = props
-  const [open, setOpen] = useState(false)
-  if (typeof src !== "string" || blobOfUrl(src) === null)
-    return <img {...props} alt={alt ?? ""} />
-  return (
-    <>
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: a shortcut for the mouse; the image is not a control */}
-      <img
-        {...props}
-        alt={alt ?? ""}
-        className="blob-image"
-        onClick={e => {
-          if (imageClick(e) === "tab") {
-            window.open(src, "_blank", "noopener")
-            return
-          }
-          // An image inside a markdown link shows; the link is not followed.
-          e.preventDefault()
-          setOpen(true)
-        }}
-      />
-      {open &&
-        // In `body`: a pasted image is inside a `<p>`, which cannot hold a
-        // `<dialog>`. Its React events still reach the image's ancestors
-        // (TECHNICAL.md, "A clicked blob image is shown over the page").
-        createPortal(
-          <ImageViewer
-            alt={alt ?? ""}
-            onClose={() => setOpen(false)}
-            src={src}
-          />,
-          document.body,
-        )}
-    </>
-  )
-}
+import { type PaneSubject, samePane } from "./pane.ts"
+import { MessageSource, PaneReach } from "./pane-context.ts"
 
 /**
- * The image over the page, at its own size or shrunk to fit the window.
- * Escape closes a modal dialog, and gives focus back to what had it; a click
- * does not, so any click, on the backdrop or the image, closes it here.
+ * An image; a `/blob/` one, clicked, opens in the column's pane, outlined
+ * while it shows there. Outside a column it is only drawn.
  */
-function ImageViewer({
-  src,
-  alt,
-  onClose,
-}: {
-  src: string
-  alt: string
-  onClose: () => void
-}) {
-  const dialog = useRef<HTMLDialogElement>(null)
-  useLayoutEffect(() => {
-    dialog.current?.showModal()
-  }, [])
+export function BlobImage(props: ComponentProps<"img">) {
+  const { src, alt, title } = props
+  const reach = useContext(PaneReach)
+  const source = useContext(MessageSource)
+  const sha = typeof src === "string" ? blobOfUrl(src) : null
+  if (typeof src !== "string" || sha === null || reach === null)
+    return <img {...props} alt={alt ?? ""} />
+  const mine: PaneSubject = {
+    kind: "image",
+    sha256: sha,
+    from: source?.kind === "entry" ? source.entry : null,
+    alt: alt ?? "",
+    ...(title === undefined ? {} : { title }),
+  }
+  const shown = reach.shown !== null && samePane(reach.shown, mine)
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: Escape closes it natively
-    <dialog
-      aria-label={alt === "" ? "image" : alt}
-      className="image-viewer"
-      onClick={() => dialog.current?.close()}
-      onClose={onClose}
-      ref={dialog}
-    >
-      <img alt={alt} src={src} />
-    </dialog>
+    // biome-ignore lint/a11y/useKeyWithClickEvents: a shortcut for the mouse; the image is not a control
+    <img
+      {...props}
+      alt={alt ?? ""}
+      className="blob-image"
+      data-shown={shown || undefined}
+      onClick={e => {
+        if (imageClick(e) === "tab") {
+          window.open(src, "_blank", "noopener")
+          return
+        }
+        // An image inside a markdown link opens; the link is not followed.
+        e.preventDefault()
+        reach.open(mine)
+      }}
+    />
   )
 }
 

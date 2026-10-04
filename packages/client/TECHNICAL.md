@@ -114,6 +114,14 @@ about 55 ms (S59).
   its closed branches and its calls' streams (`callStreams`) are compared by
   value, since `projectSpine` builds new nodes on every projection. The rest
   are compared by identity.
+- **What a message's tables and images need from the pane comes by context,
+  never a prop** (`pane-context.ts`, ADR-0078). `PaneReach` (what the pane
+  shows, and `open`) is provided by `Column`, memoised on the subject with
+  a stable `open`; `MessageSource` (the message's entry, or a reply still
+  streaming) by `MessageView`, memoised on its id, and by `Reply`. A
+  context change redraws only `MessageTable`, `BlobImage` and `AskWork`,
+  which read it, and React records no such render, since their props are
+  the same. So `MessageList` takes no handler for an ask's review.
 - **A message is given only its own calls' streams** (`callStreams`), never
   `liveWork`'s map: the map is new whenever the facts are, and would redraw
   every message.
@@ -131,8 +139,8 @@ about 55 ms (S59).
   once. `lane` and `joins` are rebuilt on every render of the column and
   compared by value; `sameData` compares a `Map` by its entries.
 - **The review redraws with its data, not its column.** `ReviewPane` compares
-  its target and line by value, since `columnView` builds them anew, and its
-  `onClose` is `useStable`'s. A file section (up to 5,000 lines) compares its
+  its target, line and `narrow` by value, since `columnView` and `paneView`
+  build them anew, and its `close` is `useStable`'s. A file section (up to 5,000 lines) compares its
   row by value, so a scroll that moves the list's current file redraws no
   diff. `useFetched` keys on its URLs' values, not the array's identity. The
   browser suite checks that typing beside an open review redraws neither.
@@ -425,17 +433,6 @@ in it opens a tab until you choose.
   the trigger or the box, or on nothing: live data can remove the item that
   held focus. `role` is `menu` or `dialog`: a dialog's box takes the role,
   and a menu's list does.
-- **A clicked blob image is shown over the page** (`BlobImage` in
-  `blob-image.tsx`, for markdown and tool rows alike). It is a modal
-  `<dialog>`, which the browser draws in the top layer, so no column clips
-  it; Escape closes it and gives focus back (S66). A click does not close a
-  modal dialog, so any click in it, on the backdrop or the image, does. It is
-  portalled to `body`: a pasted image sits in a `<p>`, which cannot hold a
-  `<dialog>`. React events still bubble through the React tree, so the
-  viewer's clicks and pointerdowns reach the image's ancestors, among them
-  `#strip`'s `onPointerDown`, which ignores anything off a column's head. A
-  handler added above an image sees them too. A Cmd- or Ctrl-click opens
-  the image in a new tab instead (`imageClick`, `image-click.ts`).
 - **A trigger from live data is `gone`, not unmounted.** Unmounting a
   `Popover` takes its open box with it, so a change in the session would
   close a menu you opened. The header keeps its activity menu
@@ -891,9 +888,11 @@ Each column takes the rail track of its last message (`branchColors`); its
 header, its fork dot in the parent column and its rail track share that
 colour. There are no connector lines, so sibling branches never cross.
 
-- **One inline `--track` per element** (`trackStyle`, `rail.tsx`): the
-  header's border, name and origin dot, and the fork dot, read
-  `var(--track)` in CSS.
+- **One inline `--track` per column** (`trackStyle`, `rail.tsx`), on
+  `.column`: the header's border, name and origin dot, the thread's details
+  and the pane read `var(--track)` in CSS. A fork dot sets its own, the
+  track of the branch it opens, and so does the narrow pane's dialog, which
+  is outside the column.
 - **Hover linking is CSS.** Headers and fork dots carry `data-color`, the track
   modulo the palette; `:has()` rules in `index.html` outline one in
   `var(--track)` when the other is hovered. No component state. The rules are
@@ -1353,19 +1352,19 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 
 ## Reviewing an offer (`review.ts`, `review-pane.tsx`, `use-fetched.ts`, ADR-0047)
 
-The offer's line opens a review, and the column widens to hold it. So does
-an ask's file count (ADR-0056): every review is of spans (`DiffSpan`), an
-offer's revisions or an ask's range from its prompt's commit to its last
-turn's, and `ReviewTarget.title` heads a range, which has no description.
-One review is open at a time.
+The offer's line opens a review in the column's pane ("A column's pane",
+below). So does an ask's file count (ADR-0056): every review is of spans
+(`DiffSpan`), an offer's revisions or an ask's range from its prompt's
+commit to its last turn's (`askReviewTarget`), and `ReviewTarget.title`
+heads a range, which has no description.
 
-- **A column is `.column` > `.column-thread` + `.review`.** `.column` stays
+- **A column is `.column` > `.column-thread` + its pane.** `.column` stays
   `#strip`'s direct child with its key, position and track, so dragging,
   alignment and revealing find it as before; the thread, 28rem, holds the
-  header, body, others' cards, strip and composer. `reviewing` is `Column`'s state,
-  never stored, and is reset during render when the strip's `review` goes
-  (a take, a withdrawal), so no frame draws a review that is gone. Hiding
-  it instead would let the next offer open it unasked.
+  header, body, others' cards, strip and composer. The pane's frame owns
+  the review's width, Escape, focus and coming into view, and `PaneHead`
+  its head and close; `ReviewPane` draws the list and the diffs inside
+  `.review`, which fills `.pane`.
 - **Every URL names its commits** (`reviewUrl`, `diffUrl`, `@pineta/rules`),
   and the answer is immutable, so the browser's HTTP cache is the only
   cache and `useFetched` has no refetch rule. The record's `commits` is what
@@ -1383,6 +1382,55 @@ One review is open at a time.
   replace their placeholders.
 - **A 404 for a commit the offer has just left is brief:** the record arrives
   with the new commits, and the review asks for their URLs.
+
+## A column's pane (`pane.ts`, `pane.tsx`, ADR-0078)
+
+Beside the thread, a column has one pane, holding one thing at a time: the
+offer's review, an ask's, a table from a message, or a stored image.
+
+- **A subject is a name, never data** (`PaneSubject`): the offer, an ask by
+  its entry, a table by its entry and its number in that message, an image
+  by its hash and the message it is in (null in a reply still streaming).
+  `paneKey` names it as a string; `samePane` compares keys, and the pane is
+  keyed by it, so another subject mounts afresh and comes into view.
+- **`paneView` decides what a subject draws, and null closes the pane.**
+  The offer's review goes with the strip's, an ask's with its span, a table
+  or an image with its message leaving the column (`ColumnView.nodes`).
+  `Column` resets its one state in render when the view is null, so no
+  frame draws a pane that is gone, and the next offer does not open it
+  unasked. `Column` asks on every render: a message's tree is parsed once
+  per node (`treeOf`, a `WeakMap`), and `App` keeps a column's nodes while
+  the index is the same, so a table keeps its identity and `TablePane`,
+  memoised, redraws only when the column's messages change.
+- **Two frames, one breakpoint** (`useNarrow`, `NARROW`). Wide, the pane is
+  `section.pane`, `.column`'s child after `.column-thread`. Under
+  `NARROW_REM` (76rem, the 36rem margin plus the 40rem minimum of `.pane`'s
+  `clamp`; `pane.test.ts` reads `index.html` to hold them together), it is
+  `dialog.pane`, modal, portalled to `body`: the top layer covers every
+  stacking context and makes the page inert. Crossing the line remounts it.
+- **Focus goes back to what had it.** The wide frame reads
+  `document.activeElement` in render, before `PaneHead`'s layout effect
+  takes focus, and gives it back in its layout cleanup, which React runs
+  while the section is still in the document. The dialog closes itself in
+  its cleanup, so a modal dialog's own return applies however it goes (S66).
+- **The dialog's `close` event is the reader's only when the dialog is
+  still in the document and shut.** A cleanup's `close()` dispatches the
+  event later: StrictMode's second mount has the dialog open again by then,
+  and an unmounted one has been replaced by the next subject's. Taken as
+  the reader's, it closed every pane just opened over a narrow window.
+- **`--track` is set once, on `.column`**, and on the dialog, which is
+  outside it. The pane's border, a shown table's or image's outline and
+  ⤢'s pressed colour read it.
+- **A table in the pane is `display: table`,** not the thread's
+  `display: block; overflow-x: auto`: a table that scrolls itself would pin
+  its header row to itself. The pane's body scrolls both ways, and
+  `thead th` is sticky in it. These rules come after the `.text` ones,
+  which they override at equal specificity.
+- **Selectors:** `.column[data-pane]`, `.pane` (`dialog.pane[open]` when
+  narrow), `.pane-head`, `.pane-close`, `.pane-body`, `.pane-table`,
+  `.pane-image img[data-zoom]`, `.pane-link`; in the thread,
+  `.table-wrap[data-shown]`, `.table-bar .table-open[aria-pressed]` and
+  `img.blob-image[data-shown]`.
 
 ## Message text is markdown (S27)
 
@@ -1403,8 +1451,13 @@ pipeline keeps the tree a pure function, testable without a DOM.
   it at the column's width with `height: auto`, which keeps the ratio the
   attributes give. A blob image the message does not hold (a
   streaming one's) is drawn unsized. A click on a blob image
-  (`.blob-image`) shows it over the page ("A clicked blob image is shown
-  over the page", beside `Popover`).
+  (`.blob-image`) opens it in the column's pane, and a Cmd- or Ctrl-click
+  in a new tab (`imageClick`).
+- **Each table is numbered in the tree** (`dataTable`, in document order,
+  nested ones included), so the pane names a table by its message and
+  number (`tableAt`, `tableHeads` for its title). `drawTree` draws a tree;
+  in a message, `<table>` is `MessageTable`, with its bar, and `<img>`
+  `BlobImage`.
 - **Streaming text goes through remend**, which closes an unfinished `**`,
   fence or link, with `singleTilde` and `comparisonOperators` off: those
   escape mid-text, and the message would change when it commits. Committed

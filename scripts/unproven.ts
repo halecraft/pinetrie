@@ -13,8 +13,6 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
   ],
   "browser/images": [
     "the sent message draws the image, at its stored width",
-    "Escape closes the image's view",
-    "a click on the shown image closes its view",
     "a click on its summary shows the image whole",
     "folded, it stays folded when another message arrives",
   ],

@@ -1,7 +1,7 @@
 import type { Sha256 } from "@pineta/core"
 import type { Element, ElementContent, Root } from "hast"
 import { describe, expect, test } from "vitest"
-import { messageTree, safeUrl } from "./markdown.ts"
+import { messageTree, safeUrl, tableAt, tableHeads } from "./markdown.ts"
 
 function* walk(node: Root | Element): Generator<ElementContent> {
   for (const child of node.children) {
@@ -142,5 +142,45 @@ describe("images (ADR-0042)", () => {
       expect(p?.width).toBeUndefined()
       expect(p?.loading).toBeUndefined()
     }
+  })
+})
+
+describe("tables (ADR-0078)", () => {
+  const TWO = [
+    "| State | When |",
+    "|---|---|",
+    "| **Working** | a run |",
+    "",
+    "- an item",
+    "",
+    "  | x |",
+    "  |---|",
+    "  | 1 |",
+  ].join("\n")
+
+  test("each table is numbered in document order, one in a list item included", () => {
+    expect(
+      elements(committed(TWO), "table").map(t => t.properties.dataTable),
+    ).toEqual([0, 1])
+  })
+
+  test("tableAt finds a table by its number, and none past the count", () => {
+    const tree = committed(TWO)
+    expect(tableAt(tree, 1)).toBe(elements(tree, "table")[1])
+    expect(tableAt(tree, 2)).toBeNull()
+  })
+
+  test("tableHeads is the header row's text, and empty without one", () => {
+    const tree = committed(TWO)
+    const first = tableAt(tree, 0)
+    expect(first === null ? null : tableHeads(first)).toEqual(["State", "When"])
+    expect(
+      tableHeads({
+        type: "element",
+        tagName: "table",
+        properties: {},
+        children: [],
+      }),
+    ).toEqual([])
   })
 })

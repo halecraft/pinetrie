@@ -694,35 +694,38 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a click on a blob image opens a new tab",
     file: "packages/client/blob-image.tsx",
-    from: '          if (imageClick(e) === "tab") {',
-    to: "          if (true) {",
+    from: '        if (imageClick(e) === "tab") {',
+    to: "        if (true) {",
     suite: "browser",
     scenario: "images",
-    expect: "a click on an image shows it large in the page, not in a new tab",
+    expect:
+      "a click on an image opens it beside the thread, which keeps its 28rem, and no new tab",
   },
   {
-    name: "a click in the image's view closes nothing",
-    file: "packages/client/blob-image.tsx",
-    from: "      onClick={() => dialog.current?.close()}",
-    to: "      onClick={() => {}}",
+    name: "a table's header row scrolls away in the pane",
+    file: "packages/client/index.html",
+    from: "      .pane-table thead th { position: sticky; top: 0;",
+    to: "      .pane-table thead th { top: 0;",
     suite: "browser",
     scenario: "images",
-    expect: "a click beside the image closes its view",
+    expect:
+      "a table's ⤢ opens it in the pane, its header row pinned as the pane scrolls",
   },
   {
-    name: "the image's view stays mounted when it closes",
-    file: "packages/client/blob-image.tsx",
-    from: "      onClose={onClose}",
-    to: "      onClose={() => {}}",
+    name: "the pane is never narrow",
+    file: "packages/client/use-narrow.ts",
+    from: "const narrow = (): boolean => query().matches",
+    to: "const narrow = (): boolean => false",
     suite: "browser",
     scenario: "images",
-    expect: "a closed image's view opens again on a click",
+    expect:
+      "in a narrow window the pane covers the page, and Escape gives focus back to the table's ⤢",
   },
   {
     name: "the column does not know who you are",
     file: "packages/client/column.tsx",
-    from: "          reader={{ me: p.session.writer, nameOf: p.nameOf }}\n          prefill={p.column.fresh?.prefill}",
-    to: '          reader={{ me: "w-nobody" as WriterId, nameOf: p.nameOf }}\n          prefill={p.column.fresh?.prefill}',
+    from: "            reader={{ me: p.session.writer, nameOf: p.nameOf }}\n            prefill={p.column.fresh?.prefill}",
+    to: '            reader={{ me: "w-nobody" as WriterId, nameOf: p.nameOf }}\n            prefill={p.column.fresh?.prefill}',
     suite: "browser",
     scenario: "page",
     expect:
@@ -782,8 +785,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column's mark never pulses",
     file: "packages/client/column.tsx",
-    from: "              running={running}",
-    to: "              running={false}",
+    from: "                running={running}\n                working={working}",
+    to: "                running={false}\n                working={working}",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -948,8 +951,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column's header draws no banner",
     file: "packages/client/column.tsx",
-    from: "              banner={shows.banner}\n",
-    to: "              banner={null}\n",
+    from: "                banner={shows.banner}\n                detailsId",
+    to: "                banner={null}\n                detailsId",
     suite: "browser",
     scenario: "banner",
     expect:

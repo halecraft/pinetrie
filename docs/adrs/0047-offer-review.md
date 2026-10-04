@@ -3,6 +3,8 @@
 **Status:** Accepted. Evidence: S57. Implementation:
 `PLAN-2026-09-29-offer-review`. Amends ADR-0038 (the offer as a preview) and
 ADR-0040 (the work strip's line and bookmark).
+Amended by ADR-0078: the review is one of the column's pane's subjects,
+which owns its width, head, Escape and focus, and covers a narrow screen.
 
 **Context.** The work strip counts an offer's files ("2 files ready",
 "conflicts with your edits in 1 file"), and its line could not be opened.

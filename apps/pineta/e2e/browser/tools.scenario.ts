@@ -1390,7 +1390,7 @@ async function run(
             `pinned ${pinned}, jumped ${listJumped}`,
           )
           await tp
-            .click(`${review} .review-close`, { timeout: 5_000 })
+            .click(`${col(0)} > .pane .pane-close`, { timeout: 5_000 })
             .catch(() => {})
           const closed = await appears(`${col(0)}:not(:has(.review))`, 5_000)
           if (takeShown) await tp.click(`${col(0)} .work .offer-take`)

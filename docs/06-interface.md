@@ -314,11 +314,18 @@ so it is the one behind the menu. What each does is under "Starting" below.
   send would start a thread on its own copy cloned from a commit with
   conflicts, the line under the box says "starts from a copy with an
   unresolved conflict in 1 file".
-- **A column widens to review its offer** (ADR-0047). The offer's line opens
-  the review to the right of the thread, which keeps its place and width: a
-  file list when there is more than one file, and one scroll of every file's diff, each file's head pinned
-  while its diff is in view, with the files that conflict and those you are
-  editing flagged.
+- **A column's pane opens what you read beside the thread** (ADR-0078):
+  the offer's review, an ask's review, a table, or an image, one at a time.
+  The thread keeps its place and width, and the column widens to hold the
+  pane. Opening something else replaces it; opening it again, the pane's
+  ×, or Escape inside it closes it, and its source in the thread is
+  outlined in the column's colour while it shows. A window too narrow for
+  both (under 76rem) shows the pane over the page instead, with ← to go
+  back to the thread. Nothing in it is kept: a reload closes it.
+- **The offer's line opens its review in the pane** (ADR-0047): a file
+  list when there is more than one file, and one scroll of every file's
+  diff, each file's head pinned while its diff is in view, with the files
+  that conflict and those you are editing flagged.
 - On a narrow screen, columns stack as a back-navigable sequence (the macOS
   Finder column view on a phone), with a breadcrumb of fork points.
 
@@ -504,7 +511,8 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **An image a tool read is drawn in its row** (ADR-0051), which opens on
   its own, capped at 10rem tall. The image takes the place of the caption
   ("Read image file [image/png]"), which is its tooltip; a click on the
-  summary shows it whole, and a click on the image opens it in a new tab.
+  summary shows it whole, and a click on the image opens it in the pane
+  (ADR-0078), Cmd- or Ctrl-click in a new tab.
 - **While the agent works, its column shows it live**: the reply as it is
   written, and each running command's output in its own row, open, following
   its end as a column does. Each becomes the committed message or result in
@@ -528,9 +536,18 @@ The rail is E; the column is T. Seeing both at once is the product.
   It is uploaded as it is pasted, and its markdown, `![name](/blob/…)`, goes
   in where the cursor was; the send button reads "uploading image…" until
   it is done. Sent, the message draws the image at its stored size, capped
-  at the column's width, and a click opens it in a new tab. The agent is
+  at the column's width. A click opens it in the pane, fitted to its width,
+  where a click on it shows its own size and **open in a new tab** shows it
+  alone; Cmd- or Ctrl-click opens a new tab at once. The agent is
   given the image itself, after the text. An image no longer stored refuses
   the send, and the text comes back to the box.
+- **A table in a message has a bar above its right edge, always shown**
+  (ADR-0078). Its ⤢ ("open the table beside the thread") opens the table in
+  the pane, where it scrolls both ways under its pinned header row, titled
+  by its header cells; pressed again ("close the table"), it closes it. In
+  a reply still being written it waits ("the reply is still being
+  written"). A table keeps its words whole, and one wider than the column
+  scrolls sideways in it.
 - **A message's tools are one row** over its top right, shown on hover or
   focus (ADR-0043): *copy* first, then *edit*, and `→` last, in the
   right margin, since what it opens appears to the right. Copy puts the
@@ -717,7 +734,9 @@ archive record (ADR-0029); a card's text is its own document (ADR-0048).
 ## Deferred, but designed for
 
 - **Narrow screens**: the stacked sequence described above, with the tab bar as
-  a switcher above it; built after the wide layout works.
+  a switcher above it; built after the wide layout works. The column's pane
+  is its first step (ADR-0078): over a narrow window it covers the page,
+  and ← goes back to the thread.
 - **What's new since you looked** (ADR-0030 defers it): a last-read position
   per root gives unread marks on tabs, a "3 new" count in the header, and a
   "what's happening" panel listing roots by activity. It can reuse the
@@ -729,9 +748,9 @@ archive record (ADR-0029); a card's text is its own document (ADR-0048).
 - **The review, grown** (ADR-0047): side-by-side diffs; a review of one turn,
   its revision record's commit, through the same URLs; "ask about this" on a
   hunk, which puts its path, line and quoted lines into the column's
-  composer; on narrow screens, the review as one more step in the stacked
-  sequence; the agent's edit tool rows drawn as diffs, if pi's results carry
-  them.
+  composer; the agent's edit tool rows drawn as diffs, if pi's results carry
+  them. (On narrow screens, the review is one more step already: the pane
+  covers the page, ADR-0078.)
 
 ## Settled while planning
 

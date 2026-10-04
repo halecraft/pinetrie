@@ -105,8 +105,8 @@
       .archive-row > .card-pip { position: absolute; top: .6rem; right: .5rem; }
       #strip { flex: 1; display: flex; overflow-x: auto; min-width: 0; }
 
-      /* A column is its thread, and while you review its offer, the review
-         beside it (ADR-0047). The thread is one path, on its own scroll, its
+      /* A column is its thread, and its pane beside it while you have opened
+         something there (ADR-0078). The thread is one path, on its own scroll, its
          composer at its foot. Its width and min-width: 0 hold it at 28rem: a
          flex item's automatic minimum is its widest unbreakable line,
          so a long line in a code block or a tool's output would widen the
@@ -116,7 +116,8 @@
       .column-thread { flex: 0 0 28rem; width: 28rem; min-width: 0; display: flex;
         flex-direction: column; min-height: 0; }
       /* A column's header (ADR-0040): who works in it, then where it forks. Every
-         track colour in a column is `var(--track)`, set inline (`trackStyle`). */
+         track colour in a column is `var(--track)`, set inline on `.column`
+         (`trackStyle`), and on the narrow pane's dialog, which is outside it. */
       .column-head { display: flex; flex-direction: column; gap: .2rem; padding: .4rem .75rem;
         border-top: 4px solid var(--track, #777); font-size: .8rem; color: #aaa; }
       .column-head button { background: none; border: none; border-radius: 0; padding: 0; color: inherit; }
@@ -239,19 +240,33 @@
       .work .offer-note[data-acting="said"] { color: #e8c07a; }
       .work button:disabled { opacity: .5; cursor: progress; }
 
-      /* The review of a column's offer (ADR-0047): a file list (for more than one
-         file), and one scroll of every file's diff, each file's head pinned
-         while its diff shows. */
-      .review { flex: 0 0 auto; width: clamp(40rem, 100vw - 36rem, 64rem); min-height: 0;
+      /* A column's pane (ADR-0078): beside the thread, or, below 76rem
+         (`NARROW_REM` in pane.ts, which pane.test.ts holds to this width), a
+         modal dialog over the page. One thing at a time: a review, a table or
+         an image, each under one head. */
+      .pane { flex: 0 0 auto; width: clamp(40rem, 100vw - 36rem, 64rem); min-height: 0;
         display: flex; flex-direction: column; border-top: 4px solid var(--track, #777);
-        border-left: 1px solid #23272e; font-size: .8rem; --diff-line: 1.35em; }
-      .review-head { display: flex; align-items: center; gap: .6rem; padding: .4rem .75rem;
+        border-left: 1px solid #23272e; font-size: .8rem; }
+      dialog.pane { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0;
+        padding: 0; border: 0; border-top: 4px solid var(--track, #777); background: #14161a;
+        color: inherit; }
+      dialog.pane::backdrop { background: #14161a; }
+      dialog.pane:not([open]) { display: none; }
+      .pane-head { display: flex; align-items: center; gap: .6rem; padding: .4rem .75rem;
         border-bottom: 1px solid #23272e; color: #aaa; outline: none; }
-      .review-head .review-line { color: #a8d8a8; }
-      .review-head .review-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+      .pane-head .pane-line { color: #a8d8a8; }
+      .pane-head .pane-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; color: #ddd; }
-      .review-head .review-close { margin-left: auto; background: none; border: none; color: #8b93a1;
+      .pane-head .pane-link { color: #9ecbff; white-space: nowrap; }
+      .pane-head .pane-close { margin-left: auto; background: none; border: none; color: #8b93a1;
         font-size: 1rem; padding: 0 .25rem; }
+      .pane-head .pane-close:hover, .pane-head .pane-close:focus-visible { color: #e6e6e6; }
+      .pane-body { flex: 1; min-height: 0; overflow: auto; }
+
+      /* A review (ADR-0047): a file list (for more than one file), and one
+         scroll of every file's diff, each file's head pinned while its diff
+         shows. */
+      .review { flex: 1; min-height: 0; display: flex; flex-direction: column; --diff-line: 1.35em; }
       .review-body { flex: 1; display: flex; min-height: 0; }
       .review-list { flex: 0 0 12rem; overflow: auto; padding: .4rem 0; border-right: 1px solid #23272e; }
       .review-list-title { padding: .4rem .6rem .15rem; color: #8b93a1; font-size: .72rem;
@@ -328,6 +343,18 @@
          ("Wo/rki/ng") rather than the table scrolling. */
       .text table { border-collapse: collapse; display: block; overflow-x: auto;
         overflow-wrap: break-word; }
+      /* A message's table, under its bar of actions (ADR-0078): always shown,
+         as a touch screen has no hover. Outlined while the pane shows it. */
+      .text .table-wrap { margin: .45rem 0; }
+      .text .table-wrap > table { margin: 0; }
+      .table-bar { display: flex; justify-content: flex-end; line-height: 1; }
+      .table-open { padding: 0 .3rem; border: none; border-radius: 3px; background: none;
+        color: #6f7784; font-size: .85rem; line-height: 1.2; }
+      .table-open:hover:not(:disabled), .table-open:focus-visible { color: #e6e6e6; }
+      .table-open[aria-pressed="true"] { color: var(--track, #9ecbff); }
+      .table-open:disabled { opacity: .4; cursor: default; }
+      .table-wrap[data-shown] > table, img.blob-image[data-shown] {
+        outline: 2px solid var(--track, #9ecbff); outline-offset: 1px; }
       .text th, .text td { padding: .15rem .45rem; border: 1px solid #23272e; }
       .text a { color: #9ecbff; }
       .text hr { border: 0; border-top: 1px solid #23272e; }
@@ -336,15 +363,17 @@
          it loads (ADR-0042). */
       .text img { max-width: 100%; height: auto; vertical-align: middle; }
       img.blob-image { cursor: zoom-in; border: 1px solid #23272e; }
-      /* A clicked blob image, over the page (blob-image.tsx). Its img has no
-         width or height attributes, so it draws at its own size; the maxima
-         shrink it to fit and keep its ratio. */
-      dialog.image-viewer { padding: 0; border: 0; background: none; max-width: none; max-height: none;
-        cursor: zoom-out; }
-      dialog.image-viewer::backdrop { background: rgb(0 0 0 / .8); }
-      dialog.image-viewer img { display: block; max-width: 95vw; max-height: 95vh; }
       .text img { max-width: 100%; }
       .text .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+      /* A table in the pane scrolls with the pane's body, both ways, and is
+         no scroller of its own as it is in the thread: its header row then
+         pins to the body's top. After the `.text` rules, which it overrides. */
+      .pane-table { margin-top: 0; padding: 0 .75rem .75rem; font-size: .85rem; }
+      .pane-table table { display: table; overflow: visible; margin: 0; }
+      .pane-table thead th { position: sticky; top: 0; z-index: 1; background: #181b20; }
+      .pane-image { padding: .75rem; }
+      .pane-image img { display: block; max-width: 100%; height: auto; cursor: zoom-in; }
+      .pane-image img[data-zoom] { max-width: none; cursor: zoom-out; }
       .fork-dot { display: inline-block; width: 10px; height: 10px; padding: 0; margin-left: .4rem;
         border-radius: 50%; vertical-align: middle; background: var(--track); }
       .actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center;

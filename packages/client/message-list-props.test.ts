@@ -36,7 +36,6 @@ const shared = {
   stops: new Map(),
   revisions: new Map(),
   folds: foldMemory(),
-  onReviewAsk: () => {},
   digests: new Map(),
 }
 const props = (over: Partial<MessageListProps> = {}): MessageListProps => ({

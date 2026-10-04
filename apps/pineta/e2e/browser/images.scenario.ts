@@ -1,5 +1,6 @@
-// e2e/browser/images — an image pasted into the composer (ADR-0042), and a
-// tool's image, drawn in its row, which opens capped (ADR-0051).
+// e2e/browser/images — an image pasted into the composer (ADR-0042), opened
+// in the column's pane, as a table is (ADR-0078), and a tool's image, drawn
+// in its row, which opens capped (ADR-0051).
 
 import { UPLOADING } from "@pineta/client/send"
 import { scriptedModel, sha256Of } from "@pineta/pi"
@@ -157,46 +158,138 @@ async function run(check: Checks["check"]): Promise<void> {
           JSON.stringify(theirs) === JSON.stringify([40, "40"]),
           `${JSON.stringify(theirs)}`,
         )
-        // A click shows it over the page; Escape or a click closes it (S66).
-        const viewer = "dialog.image-viewer[open]"
-        /** Whether the viewer reaches `state` within 2 s. */
-        const viewing = (state: "visible" | "hidden") =>
-          pp.waitForSelector(viewer, { state, timeout: 2_000 }).then(
-            () => true,
-            () => false,
-          )
+        // A click opens it in the column's pane, beside the thread (ADR-0078).
         const pages: Page[] = []
         pp.context().on("page", p => pages.push(p))
         const url = pp.url()
+        const pane = `${col(0)} > .pane`
         await pp.click(drawn)
-        const shown =
-          (await loaded(pp, `${viewer} img[src="/blob/${sha}"]`, 2_000)) !==
-          null
+        const beside = await pp
+          .waitForSelector(`${pane} .pane-image img[src="/blob/${sha}"]`, {
+            timeout: 5_000,
+          })
+          .then(
+            () =>
+              pp.evaluate(
+                ([column, panel]) => {
+                  const thread = document.querySelector(
+                    `${column} > .column-thread`,
+                  )
+                  const shown = document.querySelector(panel)
+                  if (thread === null || shown === null) return null
+                  const rem = Number.parseFloat(
+                    getComputedStyle(document.documentElement).fontSize,
+                  )
+                  const t = thread.getBoundingClientRect()
+                  const q = shown.getBoundingClientRect()
+                  return {
+                    thread: Math.round(t.width) === Math.round(28 * rem),
+                    right: q.left >= t.right - 1,
+                  }
+                },
+                [col(0), pane] as const,
+              ),
+            () => null,
+          )
         check(
-          "a click on an image shows it large in the page, not in a new tab",
-          shown && pages.length === 0 && pp.url() === url,
-          `${shown}, ${pages.length} new pages, ${pp.url() === url}`,
+          "a click on an image opens it beside the thread, which keeps its 28rem, and no new tab",
+          beside?.thread === true &&
+            beside.right &&
+            pages.length === 0 &&
+            pp.url() === url,
+          `${JSON.stringify(beside)}, ${pages.length} new pages`,
         )
+        await pp.click(`${pane} .pane-close`)
+        // A person's table, long enough to scroll the pane.
+        await waitFor(() => idleNow(imageHost))
+        await pp.fill(
+          box,
+          [
+            "| n | what |",
+            "|---|---|",
+            ...Array.from({ length: 80 }, (_, i) => `| ${i} | row ${i} |`),
+          ].join("\n"),
+        )
+        await pp.click(sendButton)
+        const open = `${col(0)} .msg[data-entry] .table-wrap .table-open`
+        await pp.click(open, { timeout: 15_000 })
+        const table = `${pane} .pane-table`
+        const pinned = await pp
+          .waitForSelector(`${table} thead th`, { timeout: 5_000 })
+          .then(
+            () =>
+              pp.$eval(`${pane} .pane-body`, body => {
+                body.scrollTop = 600
+                const th = body.querySelector("thead th")
+                return {
+                  scrolled: body.scrollTop > 0,
+                  top:
+                    th === null
+                      ? null
+                      : Math.round(
+                          th.getBoundingClientRect().top -
+                            body.getBoundingClientRect().top,
+                        ),
+                }
+              }),
+            () => null,
+          )
+        check(
+          "a table's ⤢ opens it in the pane, its header row pinned as the pane scrolls",
+          pinned?.scrolled === true &&
+            pinned.top !== null &&
+            Math.abs(pinned.top) <= 1,
+          `${JSON.stringify(pinned)}`,
+        )
+        // Over a narrow window, the pane is a modal dialog over the page.
+        await pp.click(open)
+        const size = pp.viewportSize()
+        await pp.setViewportSize({ width: 900, height: size?.height ?? 720 })
+        await pp.click(open)
+        const covers = await pp
+          .waitForSelector("dialog.pane[open] .pane-table", { timeout: 5_000 })
+          .then(
+            () =>
+              pp.evaluate(() => {
+                const d = document.querySelector("dialog.pane[open]")
+                if (d === null) return null
+                const r = d.getBoundingClientRect()
+                const hit = document.elementFromPoint(
+                  innerWidth / 2,
+                  innerHeight / 2,
+                )
+                return {
+                  box: [r.left, r.top, r.right, r.bottom].map(Math.round),
+                  window: [innerWidth, innerHeight],
+                  hit: hit !== null && d.contains(hit),
+                }
+              }),
+            () => null,
+          )
         await pp.keyboard.press("Escape")
-        check("Escape closes the image's view", await viewing("hidden"))
-        await pp.click(drawn)
+        const back = await pp
+          .waitForFunction(
+            sel =>
+              document.querySelector("dialog.pane") === null &&
+              document.activeElement === document.querySelector(sel),
+            open,
+            { timeout: 2_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        if (size !== null) await pp.setViewportSize(size)
         check(
-          "a closed image's view opens again on a click",
-          await viewing("visible"),
-        )
-        // The backdrop: the image is centred, and no image fills the window.
-        await pp.mouse.click(5, 5)
-        check(
-          "a click beside the image closes its view",
-          await viewing("hidden"),
-        )
-        await pp.click(drawn)
-        const reopened = await viewing("visible")
-        await pp.click(`${viewer} img`)
-        check(
-          "a click on the shown image closes its view",
-          reopened && (await viewing("hidden")),
-          `${reopened}`,
+          "in a narrow window the pane covers the page, and Escape gives focus back to the table's ⤢",
+          covers !== null &&
+            covers.box[0] === 0 &&
+            covers.box[1] === 0 &&
+            (covers.box[2] ?? 0) >= (covers.window[0] ?? 1) &&
+            (covers.box[3] ?? 0) >= (covers.window[1] ?? 1) &&
+            covers.hit &&
+            back,
+          `${JSON.stringify(covers)}, focus back ${back}`,
         )
       } finally {
         await pp.context().close()

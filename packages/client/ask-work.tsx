@@ -8,6 +8,7 @@ import {
   Fragment,
   type ReactNode,
   useCallback,
+  useContext,
   useSyncExternalStore,
 } from "react"
 import { digestApart, type FoldMemory, foldOpen, toggled } from "./ask-fold.ts"
@@ -15,6 +16,7 @@ import type { AskView } from "./ask-view.ts"
 import { type Density, type FoldPart, foldWords } from "./ask-words.ts"
 import { plural } from "./counts.ts"
 import { MessageText } from "./message-text.tsx"
+import { PaneReach } from "./pane-context.ts"
 
 /** A model's words, marked as such. */
 const Headline = ({ text }: { text: string }) => (
@@ -38,7 +40,6 @@ export function AskWork({
   density,
   folds,
   message,
-  onReview,
 }: {
   view: AskView
   /** Its segments on this column's path (`columnRows`). */
@@ -47,10 +48,10 @@ export function AskWork({
   folds: FoldMemory
   /** A message of this column, drawn as the list draws it. */
   message: (id: EntryId) => ReactNode
-  /** Open the review of this ask's files beside the column (ADR-0056). */
-  onReview: (ask: EntryId) => void
 }) {
   const { ask } = view
+  // Its files open their review in the column's pane (ADR-0056, ADR-0078).
+  const pane = useContext(PaneReach)
   const choice = useSyncExternalStore(
     folds.subscribe,
     useCallback(() => folds.get(ask) ?? null, [folds, ask]),
@@ -123,10 +124,10 @@ export function AskWork({
             plural(s.ids.length, "step")
           )}
         </button>
-        {s.first && view.span !== null && view.files > 0 && (
+        {s.first && view.span !== null && view.files > 0 && pane !== null && (
           <button
             className="ask-files"
-            onClick={() => onReview(ask)}
+            onClick={() => pane.open({ kind: "ask", ask })}
             title="review what this ask changed"
             type="button"
           >

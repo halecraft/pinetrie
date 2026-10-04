@@ -5,7 +5,7 @@
 import { useSelector } from "@kyneta/react"
 import type { ToolCallView, TranscriptMessage } from "@pineta/core"
 import { type LiveDocHandle, readStreamText } from "@pineta/schema"
-import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
 import {
   pinnedMarkerWords,
@@ -26,6 +26,7 @@ import {
   showsText,
 } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
+import { MessageSource } from "./pane-context.ts"
 import { nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import type { ScreenMemory } from "./screen-memory.ts"
@@ -64,8 +65,13 @@ function MessageView(p: MessageProps) {
     node.role,
     node.compelled === true ? "asked" : "",
   ].filter(c => c !== "")
+  // What its tables and images name it by, in the column's pane (ADR-0078).
+  const source = useMemo<MessageSource>(
+    () => ({ kind: "entry", entry: node.id }),
+    [node.id],
+  )
   return (
-    <>
+    <MessageSource value={source}>
       {p.join !== undefined && (
         <div className="lane-join" data-thread={p.join.name}>
           {joinWords(p.join)}
@@ -142,7 +148,7 @@ function MessageView(p: MessageProps) {
           </div>
         )}
       </div>
-    </>
+    </MessageSource>
   )
 }
 

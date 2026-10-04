@@ -388,6 +388,15 @@ what may run for the host and the page; the trigger counts unpublished
 commits, and a move of `main` outside Pineta refreshes the line's record
 alone.
 
+**ADR-0078 — a column's pane: one place to open what you read** (built).
+Beside the thread a column has one pane, holding one thing at a time: the
+offer's review, an ask's, a table or a stored image. Every table in a
+message has a bar whose ⤢ opens it there, scrolling both ways under its
+pinned header row; a click on an image opens it there instead of over the
+page. A subject is a name, never data (`paneView` decides what it draws and
+when it is gone), and nothing about it is stored. Under 76rem the pane is
+a modal dialog over the page, the first piece of the narrow layout.
+
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold
@@ -751,7 +760,7 @@ context.**
   `pineta-offer/<name>`. While the thread works, the offer reads
   `WIP (<name>): <its first message>` and grows in place; when a run ends,
   an agent writes its commit message. Before you take it, press the offer's
-  line in the work strip: the column widens to show its message, its files
+  line in the work strip: the column's pane shows its message, its files
   (flagging those that conflict with your committed work, and those you are
   editing) and every file's diff. Or find its bookmark, which a press
   copies, in jj or jjui. **take**, in the work

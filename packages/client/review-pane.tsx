@@ -1,11 +1,14 @@
-// client/review-pane — a column's review of its offer (ADR-0047): a file
-// list, when there is more than one file, beside one scroll of every file's
-// diff, each file's head pinned while its diff is in view. `review.ts` decides what it shows; `useFetched` reads.
+// client/review-pane — a review in a column's pane (ADR-0047, ADR-0078): of
+// its offer, or of what an ask changed. A file list, when there is more than
+// one file, beside one scroll of every file's diff, each file's head pinned
+// while its diff is in view. `review.ts` decides what it shows; `useFetched`
+// reads. The pane's frame (`pane.tsx`) gives it its width, Escape and focus.
 
 import type { RevisionReview } from "@pineta/core"
 import { decodeRevisionReview, diffUrl, reviewUrl } from "@pineta/rules"
-import { memo, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { memo, useEffect, useRef, useState } from "react"
 import type { ReviewTarget } from "./column-view.ts"
+import { PaneHead } from "./pane-head.tsx"
 import {
   DIFF_LINES_SHOWN,
   diffLines,
@@ -31,23 +34,23 @@ const AHEAD = "1000px 0px"
 type Watch = (el: Element, near: () => void) => () => void
 
 export interface ReviewPaneProps {
-  /** The review's element id, which the strip's line controls. */
-  id: string
   target: ReviewTarget
-  /** The strip's line: "a stack of 3 · 5 files ready", and the rest. */
+  /** The strip's line, "a stack of 3 · 5 files ready", or an ask's. */
   line: string
-  onClose: () => void
+  /** Over a narrow screen, its close control goes back to the thread. */
+  narrow: boolean
+  close: () => void
 }
 
 /**
- * `target` and `line` are rebuilt by `columnView` on every render of the
- * column, which redraws on every presence change (S54); `onClose` is stable.
+ * `target` and `line` are rebuilt on every render of the column
+ * (`columnView`, `paneView`); `close` is stable.
  */
 const REVIEW_PANE_PROPS = {
-  id: "identity",
   target: "value",
   line: "value",
-  onClose: "identity",
+  narrow: "value",
+  close: "identity",
 } as const
 
 function ReviewPaneView(p: ReviewPaneProps) {
@@ -56,15 +59,7 @@ function ReviewPaneView(p: ReviewPaneProps) {
     readReview,
   )
   const view = reviewView(p.target, revisions)
-  const pane = useRef<HTMLElement>(null)
-  const head = useRef<HTMLDivElement>(null)
   const diffs = useRef<HTMLDivElement>(null)
-
-  // Opening brings the review into view: the strip may have to scroll right.
-  useLayoutEffect(() => {
-    pane.current?.scrollIntoView({ inline: "nearest", block: "nearest" })
-    head.current?.focus({ preventScroll: true })
-  }, [])
 
   // One observer for every section, rooted at the diffs' scroll.
   const observer = useRef<IntersectionObserver | null>(null)
@@ -107,29 +102,13 @@ function ReviewPaneView(p: ReviewPaneProps) {
   }
 
   return (
-    <section
-      aria-label="review of this thread's offer"
-      className="review"
-      id={p.id}
-      onKeyDown={e => {
-        if (e.key === "Escape") p.onClose()
-      }}
-      ref={pane}
-    >
-      <div className="review-head" ref={head} tabIndex={-1}>
-        <span className="review-line">{p.line}</span>
-        {view.title !== undefined && (
-          <span className="review-title">{view.title}</span>
-        )}
-        <button
-          aria-label="close the review"
-          className="review-close"
-          onClick={p.onClose}
-          type="button"
-        >
-          ×
-        </button>
-      </div>
+    <div className="review">
+      <PaneHead
+        close={p.close}
+        line={p.line}
+        narrow={p.narrow}
+        title={view.title}
+      />
       <div className="review-body">
         {view.listed && (
           <nav aria-label="files" className="review-list">
@@ -199,7 +178,7 @@ function ReviewPaneView(p: ReviewPaneProps) {
           ))}
         </div>
       </div>
-    </section>
+    </div>
   )
 }
 

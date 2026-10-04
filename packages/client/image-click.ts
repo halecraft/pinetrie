@@ -1,11 +1,11 @@
 // client/image-click — what a click on a blob image does.
 
 /**
- * Shown over the page, or opened alone in a new tab: Cmd- or Ctrl-click opens
- * a tab, as a browser does for a link.
+ * Opened in the column's pane (ADR-0078), or alone in a new tab: Cmd- or
+ * Ctrl-click opens a tab, as a browser does for a link.
  */
 export function imageClick(
   e: Pick<MouseEvent, "metaKey" | "ctrlKey">,
-): "view" | "tab" {
-  return e.metaKey || e.ctrlKey ? "tab" : "view"
+): "pane" | "tab" {
+  return e.metaKey || e.ctrlKey ? "tab" : "pane"
 }

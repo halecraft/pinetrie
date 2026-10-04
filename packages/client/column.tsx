@@ -4,7 +4,6 @@ import { useSelector } from "@kyneta/react"
 import {
   type AgentRun,
   type AskIndex,
-  askSpan,
   atEntry,
   type CardId,
   type CardRecord,
@@ -78,7 +77,6 @@ import {
   identityWords,
   newPinAt,
   type ReserveStep,
-  type ReviewTarget,
   START_WORDS,
   startedWords,
   type ThreadDetails,
@@ -97,12 +95,20 @@ import type { LiveWork } from "./live.ts"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
+import {
+  askReviewTarget,
+  type PaneSubject,
+  paneKey,
+  paneView,
+  togglePane,
+} from "./pane.ts"
+import { Pane } from "./pane.tsx"
+import { MessageSource, PaneReach, STREAMING } from "./pane-context.ts"
 import { PinnedStrip } from "./pinned-strip.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { type ComposerPlacesStore, dropProps } from "./put-target.ts"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
-import { ReviewPane } from "./review-pane.tsx"
 import type { ScreenMemory } from "./screen-memory.ts"
 import type { ColumnHow } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
@@ -129,7 +135,7 @@ export interface ColumnProps {
   count: number
   view: ColumnView
   index: TreeIndex
-  /** This column's colour track; its header carries it. */
+  /** This column's colour track: `--track` on the column (`trackStyle`). */
   track: number
   /** Fork dots, by the message they sit on. */
   forks: ReadonlyMap<EntryId, readonly number[]>
@@ -470,47 +476,37 @@ export function Column(p: ColumnProps) {
       : { root: p.column.fresh.root }),
     ...(pinned.length === 0 ? {} : { pinned: pinned.map(c => c.id) }),
   }
-  // The review of the offer beside the thread (ADR-0047): your choice, kept
-  // only while the column is mounted. Reset when the offer goes, so the
-  // thread's next offer does not open it with nobody asking.
+  // The column's pane (ADR-0078): what you opened beside the thread, kept
+  // only while the column is mounted. One subject at a time, named, so
+  // `paneView` can tell when it is gone: the offer's review after a take or
+  // a withdrawal, a table or an image whose message this column no longer
+  // draws. The thread's next offer does not open it with nobody asking.
+  const [pane, setPane] = useState<PaneSubject | null>(null)
+  const openPane = useStable((subject: PaneSubject) =>
+    setPane(shown => togglePane(shown, subject)),
+  )
+  const closePane = useStable(() => setPane(null))
+  const reach = useMemo(
+    () => ({ shown: pane, open: openPane }),
+    [pane, openPane],
+  )
   const review = shows.strip.kind === "offer" ? shows.strip.review : null
-  const [reviewing, setReviewing] = useState(false)
-  // Reset in render, not an effect: no frame draws a review that is gone.
-  if (review === null && reviewing) setReviewing(false)
-  // Or an ask's files, from its digest line (ADR-0056): one review at a time.
-  const [askReview, setAskReview] = useState<{
-    readonly ask: string
-    readonly target: ReviewTarget
-  } | null>(null)
-  const reviewId = `review-${p.column.key}`
-  const toggleReview = useStable(() => {
-    setAskReview(null)
-    setReviewing(r => !r)
-  })
-  const closeReview = useStable(() => {
-    setAskReview(null)
-    setReviewing(false)
-  })
-  const reviewAsk = useStable((ask: EntryId) => {
-    const span = askSpan(index, p.asks, ask, p.work.revisions)
-    const lane = p.work.revisions.get(ask)?.lane
-    if (span === null || lane === undefined) return
-    setReviewing(false)
-    setAskReview(r =>
-      r?.ask === ask
-        ? null
-        : {
-            ask,
-            target: {
-              lane,
-              spans: [span],
-              conflicts: [],
-              yourEdits: [],
-              title: askLine(ask) ?? undefined,
-            },
-          },
-    )
-  })
+  const paneShows =
+    pane === null
+      ? null
+      : paneView(pane, {
+          offer:
+            review === null || shows.strip.kind !== "offer"
+              ? null
+              : { target: review, line: shows.strip.words.line },
+          nodes: view.nodes,
+          askTarget: ask =>
+            askReviewTarget(index, p.asks, p.work.revisions, ask, askLine(ask)),
+        })
+  // Reset in render, not an effect: no frame draws a pane that is gone.
+  if (pane !== null && paneShows === null) setPane(null)
+  const paneId = `pane-${p.column.key}`
+  const toggleReview = useStable(() => openPane({ kind: "offer" }))
   // Catching up is a card with the command and no text, queued at once
   // (ADR-0055, ADR-0061): the host takes it when the lane is free.
   // A take names its destination: the default, or the line (ADR-0060).
@@ -652,416 +648,408 @@ export function Column(p: ColumnProps) {
       data-density={density}
       data-key={p.column.key}
       data-position={p.position}
-      data-reviewing={reviewing || askReview !== null || undefined}
+      data-pane={pane?.kind}
       data-track={p.track}
+      style={trackStyle(p.track)}
     >
-      <div className="column-thread">
-        <header
-          className="column-head"
-          data-color={colorSlot(p.track)}
-          style={trackStyle(p.track)}
-        >
-          <div className="head-row">
-            {p.count > 1 && (
-              <button
-                aria-keyshortcuts="ArrowLeft ArrowRight Home End"
-                aria-label="move column"
-                className="grip"
-                onKeyDown={e => {
-                  const to = keyMove(p.position, p.count, e.key)
-                  if (to === null) return
-                  e.preventDefault()
-                  movedByKey.current = true
-                  act({ kind: "move", to })
+      <PaneReach value={reach}>
+        <div className="column-thread">
+          <header className="column-head" data-color={colorSlot(p.track)}>
+            <div className="head-row">
+              {p.count > 1 && (
+                <button
+                  aria-keyshortcuts="ArrowLeft ArrowRight Home End"
+                  aria-label="move column"
+                  className="grip"
+                  onKeyDown={e => {
+                    const to = keyMove(p.position, p.count, e.key)
+                    if (to === null) return
+                    e.preventDefault()
+                    movedByKey.current = true
+                    act({ kind: "move", to })
+                  }}
+                  ref={grip}
+                  title="drag to move · ← → Home End"
+                  type="button"
+                >
+                  ⠿
+                </button>
+              )}
+              <Identity
+                banner={shows.banner}
+                detailsId={detailsId}
+                identity={shows.identity}
+                onToggle={open => {
+                  if (open) setOpenedHere(true)
+                  // No `PLACED`, unlike density: this changes the viewport's
+                  // height, not the content's, and `useFollow`'s resize step
+                  // keeps a column at its end there.
+                  act({ kind: "details", open })
                 }}
-                ref={grip}
-                title="drag to move · ← → Home End"
-                type="button"
-              >
-                ⠿
-              </button>
+                running={running}
+                working={working}
+              />
+              {shows.base !== null && (
+                <span className="thread-base">{shows.base}</span>
+              )}
+              {shows.behind !== null && (
+                <span className="thread-behind" title={shows.behind.title}>
+                  {shows.behind.mark}
+                </span>
+              )}
+              <span className="head-space" />
+              {newPin === "header" && (
+                <button
+                  className="new-pin"
+                  onClick={openPin}
+                  title={NEW_PIN_TITLE}
+                  type="button"
+                >
+                  {NEW_PIN}
+                </button>
+              )}
+              {view.nodes.length > 0 && (
+                <DensityControl
+                  density={density}
+                  onChoose={d => {
+                    act({ kind: "density", density: d })
+                    // The reader's own move: at the end, it stays there, and
+                    // no floor holds the change (`follow.ts`).
+                    body.current?.dispatchEvent(new Event(PLACED))
+                  }}
+                />
+              )}
+              {p.showsPresence && view.tipId !== null && (
+                <SeenBy
+                  colorOf={p.colorOf}
+                  end={view.tipId}
+                  index={index}
+                  nameOf={p.nameOf}
+                  session={p.session}
+                />
+              )}
+              {p.closable && (
+                <button
+                  aria-label="close column"
+                  className="close"
+                  onClick={close}
+                  title="close column"
+                  type="button"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <Origin onOpen={openAt} origin={shows.origin} />
+            {askClose !== null && (
+              <div className="close-ask">
+                {closeAskWords(askClose.length)}{" "}
+                <button
+                  // biome-ignore lint/a11y/noAutofocus: the default answer to the ask just shown
+                  autoFocus
+                  className="close-keep"
+                  onClick={() => {
+                    setAskClose(null)
+                    act({ kind: "keep", cards: askClose })
+                  }}
+                  type="button"
+                >
+                  {KEEP_IN_INVENTORY}
+                </button>{" "}
+                <button
+                  className="close-discard"
+                  onClick={() => {
+                    setAskClose(null)
+                    act({ kind: "close", discard: askClose })
+                  }}
+                  type="button"
+                >
+                  {DISCARD}
+                </button>{" "}
+                <button
+                  className="close-cancel"
+                  onClick={() => setAskClose(null)}
+                  type="button"
+                >
+                  cancel
+                </button>
+              </div>
             )}
-            <Identity
+          </header>
+          {shows.identity.kind === "agent" && shows.identity.details.open && (
+            <ThreadDetailsPanel
               banner={shows.banner}
-              detailsId={detailsId}
-              identity={shows.identity}
-              onToggle={open => {
-                if (open) setOpenedHere(true)
-                // No `PLACED`, unlike density: this changes the viewport's
-                // height, not the content's, and `useFollow`'s resize step
-                // keeps a column at its end there.
-                act({ kind: "details", open })
-              }}
+              details={shows.identity.details}
+              id={detailsId}
+              name={shows.identity.name}
+              onOpen={openAt}
               running={running}
+              spinFirst={openedHere}
               working={working}
             />
-            {shows.base !== null && (
-              <span className="thread-base">{shows.base}</span>
+          )}
+          {!fresh && threadEnd !== null && (
+            <PinnedStrip
+              box={
+                pinning && pinKey !== null ? (
+                  <CardEditor
+                    at={at}
+                    card={pinned.find(c => c.id === pinShown)}
+                    catchUps={catchUps}
+                    commands={[]}
+                    fresh={false}
+                    how={how}
+                    lane={lane}
+                    onAct={act}
+                    onBranchInstead={branchInstead}
+                    onCreatesLane={undefined}
+                    onIntent={p.onIntent}
+                    onLeave={() => setPinning(false)}
+                    onSend={onSend}
+                    onShows={setPinBox}
+                    onTyping={p.onTyping}
+                    participants={p.participants}
+                    pending={undefined}
+                    place={drawnPlace(pinKey, p.session.writer)}
+                    prefill={undefined}
+                    readOnly={p.readOnly}
+                    reader={reader}
+                    seats={p.seats}
+                    session={p.session}
+                    takeFocus={() => true}
+                    where={undefined}
+                  />
+                ) : null
+              }
+              cards={pinned.filter(c => c.id !== pinShown)}
+              inView={inView}
+              onNewPin={newPin === "strip" ? openPin : null}
+              onAct={act}
+              onTyping={p.onTyping}
+              putKey={putPinned}
+              readOnly={p.readOnly}
+              reader={reader}
+              session={p.session}
+            />
+          )}
+          <div className="column-body" ref={body}>
+            {atTop !== null && (
+              <div className="ask-bar-slot">
+                <button
+                  className="ask-bar"
+                  data-ask={atTop.ask}
+                  data-where={atTop.kind}
+                  onClick={() => {
+                    if (atTop.kind === "elsewhere") return openAt(atTop.ask)
+                    body.current
+                      ?.querySelector(`.msg[data-entry="${atTop.ask}"]`)
+                      ?.scrollIntoView({ block: "start" })
+                  }}
+                  title="the message this work answers"
+                  type="button"
+                >
+                  {atTop.kind === "elsewhere" && "↰ answering "}
+                  {askLine(atTop.ask)}
+                </button>
+              </div>
             )}
-            {shows.behind !== null && (
-              <span className="thread-behind" title={shows.behind.title}>
-                {shows.behind.mark}
-              </span>
-            )}
-            <span className="head-space" />
-            {newPin === "header" && (
-              <button
-                className="new-pin"
-                onClick={openPin}
-                title={NEW_PIN_TITLE}
-                type="button"
-              >
-                {NEW_PIN}
-              </button>
-            )}
-            {view.nodes.length > 0 && (
-              <DensityControl
-                density={density}
-                onChoose={d => {
-                  act({ kind: "density", density: d })
-                  // The reader's own move: at the end, it stays there, and
-                  // no floor holds the change (`follow.ts`).
-                  body.current?.dispatchEvent(new Event(PLACED))
-                }}
-              />
-            )}
-            {p.showsPresence && view.tipId !== null && (
-              <SeenBy
-                colorOf={p.colorOf}
-                end={view.tipId}
+            {/* `useFollow` watches its height. Keep it unpositioned: it would
+            become the messages' offsetParent, and `alignOnOpen` measures
+            their offsetTop against the body's. */}
+            <div className="column-content" ref={content}>
+              {/* Room above the first message, so opening can bring it level with
+            its fork point even when the column is short. */}
+              <div className="spacer" ref={spacer} />
+              <MessageList
+                forks={p.forks}
                 index={index}
+                joins={shows.joins}
+                lane={lane}
                 nameOf={p.nameOf}
-                session={p.session}
+                onAct={act}
+                rows={p.rows}
+                asks={p.asks}
+                density={density}
+                folds={p.folds}
+                landmarks={p.landmarks}
+                releasedTip={end.releasedTip}
+                revisions={p.work.revisions}
+                runningAsk={runningAsk}
+                digests={p.digests}
+                leftBefore={leftLine(
+                  index,
+                  leftAt,
+                  view.nodes.map(n => n.id),
+                )}
+                stops={p.stops}
+                live={p.session.live}
+                shown={p.shown}
+                tools={p.live.tools}
+                view={view}
+                writable={writable}
               />
-            )}
-            {p.closable && (
-              <button
-                aria-label="close column"
-                className="close"
-                onClick={close}
-                title="close column"
-                type="button"
-              >
-                ×
-              </button>
+              {streamingLanes.map(l => {
+                const reply = p.live.replies.get(l)
+                return (
+                  reply !== undefined && (
+                    <Reply doc={p.session.live} key={reply.id} stream={reply} />
+                  )
+                )
+              })}
+              {/* Where the agent's next text will appear. It takes no height:
+            CSS hides it while a row the work opened runs, and in outline,
+            where the running ask's own line pulses. */}
+              {running && <div aria-hidden className="working-line" />}
+              {/* Cards queued for this thread's lane, in the order the host takes
+            them: not in the tree yet, and editable by anyone until taken. */}
+              {queued.map((c, n) => (
+                <QueuedCardEditor
+                  card={c}
+                  key={c.id}
+                  n={n}
+                  onAct={act}
+                  onTyping={p.onTyping}
+                  readOnly={p.readOnly}
+                  reader={reader}
+                  session={p.session}
+                  catchUps={catchUps}
+                />
+              ))}
+              {refused.map(r => (
+                <div className="refused-move" key={refusalKey(r)}>
+                  {refusalWords(r, reader)}
+                </div>
+              ))}
+            </div>
+            {/* What the content shrank by while the agent works, up to a third
+          of the view (`useFollow`). Not the spacer above: that one lines the
+          column up on opening. */}
+            <div className="column-floor" ref={floor} />
+            {end.unseen && (
+              <div className="jump-slot">
+                <button
+                  className="jump-latest"
+                  onClick={end.follow}
+                  type="button"
+                >
+                  ↓ new below
+                </button>
+              </div>
             )}
           </div>
-          <Origin onOpen={openAt} origin={shows.origin} />
-          {askClose !== null && (
-            <div className="close-ask">
-              {closeAskWords(askClose.length)}{" "}
-              <button
-                // biome-ignore lint/a11y/noAutofocus: the default answer to the ask just shown
-                autoFocus
-                className="close-keep"
-                onClick={() => {
-                  setAskClose(null)
-                  act({ kind: "keep", cards: askClose })
-                }}
-                type="button"
-              >
-                {KEEP_IN_INVENTORY}
-              </button>{" "}
-              <button
-                className="close-discard"
-                onClick={() => {
-                  setAskClose(null)
-                  act({ kind: "close", discard: askClose })
-                }}
-                type="button"
-              >
-                {DISCARD}
-              </button>{" "}
-              <button
-                className="close-cancel"
-                onClick={() => setAskClose(null)}
-                type="button"
-              >
-                cancel
-              </button>
-            </div>
-          )}
-        </header>
-        {shows.identity.kind === "agent" && shows.identity.details.open && (
-          <ThreadDetailsPanel
-            banner={shows.banner}
-            details={shows.identity.details}
-            id={detailsId}
-            name={shows.identity.name}
-            onOpen={openAt}
-            running={running}
-            spinFirst={openedHere}
-            track={p.track}
-            working={working}
-          />
-        )}
-        {!fresh && threadEnd !== null && (
-          <PinnedStrip
-            box={
-              pinning && pinKey !== null ? (
+          {/* Everyone else's cards at this end (ADR-0048): shown in full, each
+          editable and sendable by anyone here. */}
+          {others.length > 0 && (
+            <div
+              className="cards"
+              {...(putColumn === null
+                ? {}
+                : dropProps({ kind: "column", key: putColumn }))}
+            >
+              {others.map(c => (
                 <CardEditor
                   at={at}
-                  card={pinned.find(c => c.id === pinShown)}
-                  catchUps={catchUps}
-                  commands={[]}
-                  fresh={false}
+                  card={c}
+                  commands={p.work.commands}
+                  fresh={fresh}
                   how={how}
+                  key={c.id}
                   lane={lane}
                   onAct={act}
                   onBranchInstead={branchInstead}
                   onCreatesLane={undefined}
+                  onShows={undefined}
                   onIntent={p.onIntent}
-                  onLeave={() => setPinning(false)}
                   onSend={onSend}
-                  onShows={setPinBox}
                   onTyping={p.onTyping}
                   participants={p.participants}
                   pending={undefined}
-                  place={drawnPlace(pinKey, p.session.writer)}
+                  place={undefined}
                   prefill={undefined}
                   readOnly={p.readOnly}
                   reader={reader}
                   seats={p.seats}
                   session={p.session}
-                  takeFocus={() => true}
+                  takeFocus={undefined}
+                  onLeave={undefined}
+                  catchUps={catchUps}
                   where={undefined}
                 />
-              ) : null
-            }
-            cards={pinned.filter(c => c.id !== pinShown)}
-            inView={inView}
-            onNewPin={newPin === "strip" ? openPin : null}
+              ))}
+            </div>
+          )}
+          <WorkStripView
+            act={actOnOffer}
+            review={{
+              id: paneId,
+              open: pane?.kind === "offer",
+              toggle: toggleReview,
+            }}
+            strip={shows.strip}
+          />
+          {writable && running && (
+            <button
+              className="stop"
+              onClick={() =>
+                void p.session.request({ kind: "stop", lane: lane.name })
+              }
+              title="end the agent's turn here; cards queued are then taken"
+              type="button"
+            >
+              Stop
+            </button>
+          )}
+          <Composer
+            card={mine}
+            place={place}
+            seats={p.seats}
+            where={{
+              defaultWork,
+              project: p.work.project,
+              line: p.work.line,
+              forkConflicts: forkConflicts.length,
+              usedDirs: [
+                ...new Set(
+                  [...p.work.lanes.values()].flatMap(r =>
+                    r.work?.kind === "direct" ? [r.work.dir] : [],
+                  ),
+                ),
+              ],
+            }}
+            commands={p.work.commands}
+            at={at}
+            how={how}
+            fresh={fresh}
+            reader={{ me: p.session.writer, nameOf: p.nameOf }}
+            prefill={p.column.fresh?.prefill}
+            lane={lane}
+            onBranchInstead={branchInstead}
+            onSend={onSend}
             onAct={act}
+            onCreatesLane={setCreatesLane}
+            onShows={setComposer}
+            onIntent={p.onIntent}
             onTyping={p.onTyping}
-            putKey={putPinned}
+            takeFocus={() => p.takeFocus(p.column.key)}
+            catchUps={catchUps}
+            putColumn={putColumn}
+            participants={p.participants}
+            pending={p.column.fresh?.pending}
             readOnly={p.readOnly}
-            reader={reader}
+            typingAt={p.showsPresence ? view.tipId : null}
             session={p.session}
           />
-        )}
-        <div className="column-body" ref={body}>
-          {atTop !== null && (
-            <div className="ask-bar-slot">
-              <button
-                className="ask-bar"
-                data-ask={atTop.ask}
-                data-where={atTop.kind}
-                onClick={() => {
-                  if (atTop.kind === "elsewhere") return openAt(atTop.ask)
-                  body.current
-                    ?.querySelector(`.msg[data-entry="${atTop.ask}"]`)
-                    ?.scrollIntoView({ block: "start" })
-                }}
-                title="the message this work answers"
-                type="button"
-              >
-                {atTop.kind === "elsewhere" && "↰ answering "}
-                {askLine(atTop.ask)}
-              </button>
-            </div>
-          )}
-          {/* `useFollow` watches its height. Keep it unpositioned: it would
-            become the messages' offsetParent, and `alignOnOpen` measures
-            their offsetTop against the body's. */}
-          <div className="column-content" ref={content}>
-            {/* Room above the first message, so opening can bring it level with
-            its fork point even when the column is short. */}
-            <div className="spacer" ref={spacer} />
-            <MessageList
-              forks={p.forks}
-              index={index}
-              joins={shows.joins}
-              lane={lane}
-              nameOf={p.nameOf}
-              onAct={act}
-              rows={p.rows}
-              asks={p.asks}
-              density={density}
-              folds={p.folds}
-              landmarks={p.landmarks}
-              releasedTip={end.releasedTip}
-              revisions={p.work.revisions}
-              runningAsk={runningAsk}
-              onReviewAsk={reviewAsk}
-              digests={p.digests}
-              leftBefore={leftLine(
-                index,
-                leftAt,
-                view.nodes.map(n => n.id),
-              )}
-              stops={p.stops}
-              live={p.session.live}
-              shown={p.shown}
-              tools={p.live.tools}
-              view={view}
-              writable={writable}
-            />
-            {streamingLanes.map(l => {
-              const reply = p.live.replies.get(l)
-              return (
-                reply !== undefined && (
-                  <Reply doc={p.session.live} key={reply.id} stream={reply} />
-                )
-              )
-            })}
-            {/* Where the agent's next text will appear. It takes no height:
-            CSS hides it while a row the work opened runs, and in outline,
-            where the running ask's own line pulses. */}
-            {running && <div aria-hidden className="working-line" />}
-            {/* Cards queued for this thread's lane, in the order the host takes
-            them: not in the tree yet, and editable by anyone until taken. */}
-            {queued.map((c, n) => (
-              <QueuedCardEditor
-                card={c}
-                key={c.id}
-                n={n}
-                onAct={act}
-                onTyping={p.onTyping}
-                readOnly={p.readOnly}
-                reader={reader}
-                session={p.session}
-                catchUps={catchUps}
-              />
-            ))}
-            {refused.map(r => (
-              <div className="refused-move" key={refusalKey(r)}>
-                {refusalWords(r, reader)}
-              </div>
-            ))}
-          </div>
-          {/* What the content shrank by while the agent works, up to a third
-          of the view (`useFollow`). Not the spacer above: that one lines the
-          column up on opening. */}
-          <div className="column-floor" ref={floor} />
-          {end.unseen && (
-            <div className="jump-slot">
-              <button
-                className="jump-latest"
-                onClick={end.follow}
-                type="button"
-              >
-                ↓ new below
-              </button>
-            </div>
-          )}
         </div>
-        {/* Everyone else's cards at this end (ADR-0048): shown in full, each
-          editable and sendable by anyone here. */}
-        {others.length > 0 && (
-          <div
-            className="cards"
-            {...(putColumn === null
-              ? {}
-              : dropProps({ kind: "column", key: putColumn }))}
-          >
-            {others.map(c => (
-              <CardEditor
-                at={at}
-                card={c}
-                commands={p.work.commands}
-                fresh={fresh}
-                how={how}
-                key={c.id}
-                lane={lane}
-                onAct={act}
-                onBranchInstead={branchInstead}
-                onCreatesLane={undefined}
-                onShows={undefined}
-                onIntent={p.onIntent}
-                onSend={onSend}
-                onTyping={p.onTyping}
-                participants={p.participants}
-                pending={undefined}
-                place={undefined}
-                prefill={undefined}
-                readOnly={p.readOnly}
-                reader={reader}
-                seats={p.seats}
-                session={p.session}
-                takeFocus={undefined}
-                onLeave={undefined}
-                catchUps={catchUps}
-                where={undefined}
-              />
-            ))}
-          </div>
-        )}
-        <WorkStripView
-          act={actOnOffer}
-          review={{ id: reviewId, open: reviewing, toggle: toggleReview }}
-          strip={shows.strip}
-        />
-        {writable && running && (
-          <button
-            className="stop"
-            onClick={() =>
-              void p.session.request({ kind: "stop", lane: lane.name })
-            }
-            title="end the agent's turn here; cards queued are then taken"
-            type="button"
-          >
-            Stop
-          </button>
-        )}
-        <Composer
-          card={mine}
-          place={place}
-          seats={p.seats}
-          where={{
-            defaultWork,
-            project: p.work.project,
-            line: p.work.line,
-            forkConflicts: forkConflicts.length,
-            usedDirs: [
-              ...new Set(
-                [...p.work.lanes.values()].flatMap(r =>
-                  r.work?.kind === "direct" ? [r.work.dir] : [],
-                ),
-              ),
-            ],
-          }}
-          commands={p.work.commands}
-          at={at}
-          how={how}
-          fresh={fresh}
-          reader={{ me: p.session.writer, nameOf: p.nameOf }}
-          prefill={p.column.fresh?.prefill}
-          lane={lane}
-          onBranchInstead={branchInstead}
-          onSend={onSend}
-          onAct={act}
-          onCreatesLane={setCreatesLane}
-          onShows={setComposer}
-          onIntent={p.onIntent}
-          onTyping={p.onTyping}
-          takeFocus={() => p.takeFocus(p.column.key)}
-          catchUps={catchUps}
-          putColumn={putColumn}
-          participants={p.participants}
-          pending={p.column.fresh?.pending}
-          readOnly={p.readOnly}
-          typingAt={p.showsPresence ? view.tipId : null}
-          session={p.session}
-        />
-      </div>
-      {askReview !== null ? (
-        <ReviewPane
-          id={reviewId}
-          line="what this ask changed"
-          onClose={closeReview}
-          target={askReview.target}
-        />
-      ) : (
-        reviewing &&
-        review !== null && (
-          <ReviewPane
-            id={reviewId}
-            line={shows.strip.kind === "offer" ? shows.strip.words.line : ""}
-            onClose={closeReview}
-            target={review}
+        {pane !== null && paneShows !== null && (
+          <Pane
+            close={closePane}
+            id={paneId}
+            key={paneKey(pane)}
+            track={p.track}
+            view={paneShows}
           />
-        )
-      )}
+        )}
+      </PaneReach>
     </section>
   )
 }
@@ -1100,10 +1088,12 @@ function Reply({ doc, stream }: { doc: LiveDocHandle; stream: StreamRecord }) {
     ),
   )
   return (
-    <div className="msg assistant streaming" data-stream={stream.id}>
-      <span className="role">agent</span>
-      <MessageText mode="streaming" text={text} />
-    </div>
+    <MessageSource value={STREAMING}>
+      <div className="msg assistant streaming" data-stream={stream.id}>
+        <span className="role">agent</span>
+        <MessageText mode="streaming" text={text} />
+      </div>
+    </MessageSource>
   )
 }
 
@@ -1227,7 +1217,6 @@ function ThreadDetailsPanel({
   onOpen,
   running,
   spinFirst,
-  track,
   working,
 }: {
   banner: HeadBanner | null
@@ -1237,20 +1226,13 @@ function ThreadDetailsPanel({
   onOpen: (id: EntryId) => void
   running: boolean
   spinFirst: boolean
-  /** The column's colour, which the name and the star take, as in the header. */
-  track: number
   working: string | undefined
 }) {
   const [spins, setSpins] = useState(spinFirst ? 1 : 0)
   const [now] = useState(() => Date.now())
   const { started, where, behind, start } = details
   return (
-    <section
-      aria-label={name}
-      className="thread-details"
-      id={id}
-      style={trackStyle(track)}
-    >
+    <section aria-label={name} className="thread-details" id={id}>
       <button
         aria-label="spin"
         className="thread-details-icon"

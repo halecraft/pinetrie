@@ -64,8 +64,6 @@ export interface MessageListProps {
   folds: FoldMemory
   /** The message a "since you were here" line goes before (`leftLine`). */
   leftBefore: EntryId | null
-  /** Open the review of an ask's files (ADR-0056). */
-  onReviewAsk: (ask: EntryId) => void
   /** Each ask's model-written digest, by its prompt. */
   digests: ReadonlyMap<EntryId, DigestRecord>
 }
@@ -106,7 +104,6 @@ const MESSAGE_LIST_PROPS = {
   revisions: "value",
   folds: "identity",
   leftBefore: "value",
-  onReviewAsk: "identity",
   digests: "value",
 } as const satisfies { readonly [K in keyof MessageListProps]-?: PropRule }
 

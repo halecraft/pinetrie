@@ -86,7 +86,6 @@ function MessageListView(p: MessageListProps) {
         folds={p.folds}
         key={`ask-${row.ask}-${row.parts[0].kind === "entry" ? row.parts[0].id : row.parts[0].ids[0]}`}
         message={message}
-        onReview={p.onReviewAsk}
         parts={row.parts}
         view={askView({
           index,

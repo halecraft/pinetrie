@@ -38,10 +38,20 @@ export type ImageLookup = ReadonlyMap<Sha256, ImageRef>
 
 export const NO_IMAGES: ImageLookup = new Map()
 
+/** The images a message holds, by hash. */
+export const imageLookup = (
+  images: readonly ImageRef[] | undefined,
+): ImageLookup =>
+  images === undefined
+    ? NO_IMAGES
+    : new Map(images.map(image => [image.sha256, image]))
+
 /**
  * The tree to draw for a message's text. A `/blob/` image found in `images`
  * gets its stored size, so its box is laid out before it loads: alignment
- * and following measure a message once (ADR-0042).
+ * and following measure a message once (ADR-0042). Each table is numbered
+ * in document order (`dataTable`), so the column's pane can name it
+ * (ADR-0078).
  */
 export function messageTree(
   source: string,
@@ -51,8 +61,47 @@ export function messageTree(
   const text = mode === "streaming" ? remend(source, REMEND) : source
   const tree = toHast.runSync(toHast.parse(text))
   tree.children = finish(tree.children, false, images)
+  let n = 0
+  for (const table of tables(tree)) table.properties.dataTable = n++
   return tree
 }
+
+/** The tree's tables in document order, nested ones included. */
+function* tables(node: Root | Element): Generator<Element> {
+  for (const child of node.children) {
+    if (child.type !== "element") continue
+    if (child.tagName === "table") yield child
+    yield* tables(child)
+  }
+}
+
+/** The `nth` table of a tree `messageTree` made, or null. */
+export function tableAt(tree: Root, nth: number): Element | null {
+  for (const table of tables(tree))
+    if (table.properties.dataTable === nth) return table
+  return null
+}
+
+/** The text of each cell of a table's header row; none without one. */
+export function tableHeads(table: Element): readonly string[] {
+  const head = table.children.find(
+    (c): c is Element => c.type === "element" && c.tagName === "thead",
+  )
+  const row = head?.children.find(
+    (c): c is Element => c.type === "element" && c.tagName === "tr",
+  )
+  if (row === undefined) return []
+  return row.children.flatMap(c =>
+    c.type === "element" ? [textOf(c).trim()] : [],
+  )
+}
+
+const textOf = (node: ElementContent): string =>
+  node.type === "text"
+    ? node.value
+    : node.type === "element"
+      ? node.children.map(textOf).join("")
+      : ""
 
 function finish(
   children: readonly RootContent[],
