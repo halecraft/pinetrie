@@ -24,6 +24,7 @@ import {
   queueRoot,
   type RootId,
   sameKey,
+  type TraceRecord,
   type WriterId,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
@@ -37,7 +38,12 @@ import {
   type MoveHow,
   type Slots,
 } from "@pineta/session"
-import type { CardFacts, Effect, IntentState } from "./intent.ts"
+import {
+  type CardFacts,
+  type Effect,
+  type IntentState,
+  planOpenAt,
+} from "./intent.ts"
 import { type PutTarget, placeOfTarget } from "./put-target.ts"
 import { revealOf } from "./reveal.ts"
 
@@ -327,4 +333,22 @@ export function afterUndo(
     default:
       return []
   }
+}
+
+/**
+ * Where a trace leads (ADR-0048, *Other people*): the card's place now, or,
+ * for a card sent, the message it became. Nothing for a card in someone
+ * else's inventory, or one gone some other way.
+ */
+export function planOpenTrace(
+  trace: TraceRecord,
+  state: IntentState,
+  fresh: string,
+): readonly Effect[] {
+  const now = state.cards.cards.find(c => c.id === trace.card)
+  if (now === undefined)
+    return trace.message === null ? [] : planOpenAt(trace.message, state, fresh)
+  if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)
+    return []
+  return revealOf(keyOf(now.place), state, fresh).effects
 }

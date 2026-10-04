@@ -80,6 +80,7 @@ import { createMoveHistories } from "./move-history.ts"
 import { createNames } from "./names.ts"
 import { createPinned } from "./pinned.ts"
 import { hostPolicy, resolveDoc } from "./policy.ts"
+import { createProvenance } from "./provenance.ts"
 import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
 import { createSettle } from "./settle.ts"
@@ -440,6 +441,7 @@ export async function startHost({
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
   const cardPort = startCards({ exchange, store, session })
+  const provenance = createProvenance({ basics, presence, agent: () => agent })
   const { readPinned } = createPinned({ basics, cards: cardPort })
   const runs = createRuns({
     basics,
@@ -460,6 +462,7 @@ export async function startHost({
     titles,
     drain: lane => queueDrain(lane),
     histories,
+    provenance,
     keeper,
   })
   const behind = createBehind({
@@ -477,6 +480,7 @@ export async function startHost({
         send: taken =>
           commands.sendTaken(taken.card.place.by, newId(), takenChat(taken)),
         behind,
+        provenance,
       },
       lane,
     )
@@ -494,6 +498,7 @@ export async function startHost({
         texts: cardPort.texts,
       })
       await sweepHistories({ basics, store, histories, startup: false })
+      await provenance.sweep()
     },
   })
   // A run's end: hot reload may reload the page, then the lane drains and
@@ -538,6 +543,7 @@ export async function startHost({
     start: runs.start,
     settle,
     cards: cardPort,
+    provenance,
     ensureNames: names.ensure,
   })
   await sweepHistories({ basics, store, histories, startup: true })

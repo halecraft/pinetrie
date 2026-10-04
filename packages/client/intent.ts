@@ -24,6 +24,7 @@ import {
   type OfferAction,
   type Position,
   type RootId,
+  type TraceRecord,
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
@@ -44,6 +45,7 @@ import {
   cardOf,
   moveCard,
   planKeep,
+  planOpenTrace,
   planPin,
   planPut,
   planRemove,
@@ -195,6 +197,8 @@ export type Intent =
     }
   /** The host's answer to an undo of moves: bring what it moved into view. */
   | { readonly kind: "undoAnswered"; readonly outcome: Outcome }
+  /** Follow a trace to where its card is now, or the message it became. */
+  | { readonly kind: "openTrace"; readonly trace: TraceRecord }
 
 export type Effect =
   | { readonly kind: "layout"; readonly action: LayoutAction }
@@ -392,6 +396,8 @@ export function planIntent(
       return planUndoMove(intent.direction, intent.inPanel, state)
     case "undoAnswered":
       return afterUndo(intent.outcome, state, fresh)
+    case "openTrace":
+      return planOpenTrace(intent.trace, state, fresh)
   }
 }
 

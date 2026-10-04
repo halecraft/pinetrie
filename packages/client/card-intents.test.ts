@@ -437,3 +437,42 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
     expect(answered({ kind: "nothing" })).toEqual([])
   })
 })
+
+describe("openTrace: where a trace leads (ADR-0048, Other people)", () => {
+  const BEA = writerId("bea@x.io")
+  const trace = (message: ReturnType<typeof entryId> | null) =>
+    ({
+      id: "t-1",
+      for: ADA,
+      card: C1,
+      by: BEA,
+      from: drafting,
+      to: null,
+      message,
+      at: 1,
+    }) as const
+  const follow = (s: IntentState, message: ReturnType<typeof entryId> | null) =>
+    plan({ kind: "openTrace", trace: trace(message) }, s)
+
+  test("a card still here: shown where it is now, as an undo shows it", () => {
+    expect(
+      follow(
+        state({ cards: [card(C1, { ...pinnedKey, order: "1" })] }, onR1),
+        null,
+      ),
+    ).toContainEqual({ kind: "reveal", entry: A })
+  })
+
+  test("a card sent: the message it became", () => {
+    expect(follow(state({}, onR1), A)).toContainEqual({
+      kind: "reveal",
+      entry: A,
+    })
+  })
+
+  test("a card in someone else's inventory, or gone some other way: nothing", () => {
+    const theirs = { kind: "inventory", holder: BEA } as const
+    expect(follow(state({ cards: [card(C1, theirs)] }, onR1), null)).toEqual([])
+    expect(follow(state({}, onR1), null)).toEqual([])
+  })
+})

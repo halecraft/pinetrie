@@ -28,6 +28,7 @@ import { cardIdOfDoc, clearStreams, readStoredLanes } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import { applyPlaceSteps } from "./places.ts"
+import type { Provenance } from "./provenance.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -46,6 +47,8 @@ export interface StartupDeps {
   readonly start: Runs["start"]
   readonly settle: (lanes: readonly LaneName[]) => Promise<void>
   readonly cards: Pick<CardPort, "texts" | "stored" | "destroyDocs">
+  /** Each card's history and traces (ADR-0048 step 6), swept with the cards. */
+  readonly provenance: Pick<Provenance, "sweep">
 }
 
 /**
@@ -140,6 +143,8 @@ async function sweepTexts(deps: StartupDeps): Promise<void> {
   )
   await cards.destroyDocs(swept.docs)
   await agent.writeValues(staleSeats.map(s => deleteRecord(SEAT, s.peer)))
+  // The swept cards' histories, and traces too old to keep.
+  await deps.provenance.sweep()
   if (swept.records.length + swept.docs.length + staleSeats.length > 0)
     log(
       `[host] swept ${swept.records.length} empty card(s), ${swept.docs.length} unused text(s), ${staleSeats.length} seat(s)`,

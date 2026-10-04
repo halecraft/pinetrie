@@ -15,6 +15,73 @@ const tools = "packages/client/message-tools.ts"
 const copyText = "packages/client/copy-text.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── card history and traces (ADR-0048 step 6) ──
+  {
+    name: "traces seen go in one request however many",
+    file: "packages/client/traces.ts",
+    from: "  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size))",
+    to: "  if (ids.length > 0) out.push([...ids])",
+    command: unit,
+    expect: "seenBatches: no request names more ids",
+  },
+  {
+    name: "every write to the session gives every fact a new identity",
+    file: "packages/client/projection.ts",
+    from: "  const kept = before === undefined ? next : keptFacts(before, next)",
+    to: "  const kept = next",
+    command: unit,
+    expect: "readSessionFacts: a write to the session keeps every fact",
+  },
+  {
+    name: "a column draws everyone's traces",
+    file: "packages/client/traces.ts",
+    from: "    .filter(t => t.for === me && endOf(t.from, t.for) === end)",
+    to: "    .filter(t => endOf(t.from, t.for) === end)",
+    command: unit,
+    expect: "tracesAt: yours",
+  },
+  {
+    name: "traces by one person group whatever they did",
+    file: "packages/client/traces.ts",
+    from: "    const group = groups.find(g => g.by === t.by && g.verb === verb)",
+    to: "    const group = groups.find(g => g.by === t.by)",
+    command: unit,
+    expect: "traceGroups: one line per person and verb",
+  },
+  {
+    name: "a column forgets the traces it drew",
+    file: "packages/client/traces.ts",
+    from: "  const all = new Map(drawn)",
+    to: "  const all = new Map<string, TraceRecord>()",
+    command: unit,
+    expect: "keptTraces: what was drawn stays",
+  },
+  {
+    name: "a trace opens someone else's inventory",
+    file: "packages/client/card-intents.ts",
+    from: '  if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)\n    return []\n',
+    to: "",
+    command: unit,
+    expect: "a card in someone else's inventory",
+  },
+  {
+    name: "several traces read as one",
+    file: "packages/client/card-words.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  if (n > 1) return `${n} cards ${PARTICIPLE[group.verb]} by ${name}`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "  if (n > 99) return `${n} cards ${PARTICIPLE[group.verb]} by ${name}`",
+    command: unit,
+    expect: "traceWords",
+  },
+  {
+    name: "an undone move reads as a plain one",
+    file: "packages/client/card-words.ts",
+    from: '          ? " (an undo)"',
+    to: '          ? ""',
+    command: unit,
+    expect: "historyWords",
+  },
   {
     name: "a live digest's points are drawn",
     file: "packages/client/ask-view.ts",

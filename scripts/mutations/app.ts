@@ -6,6 +6,37 @@
 import type { Mutation } from "../mutate.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── card history and traces (ADR-0048 step 6) ──
+  {
+    name: "the host reads no presence for traces",
+    file: "apps/pineta/host/provenance.ts",
+    from: "        reading: readReading(deps.presence),",
+    to: "        reading: [],",
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a card someone else moves while its placer is away leaves them a trace; none while they read its thread",
+  },
+  {
+    name: "a column draws no traces",
+    file: "packages/client/column.tsx",
+    from: "  const watches = writable && threadEnd !== null",
+    to: "  const watches = false",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a card someone else pins while you are away leaves a trace where it was, which leads to it, and its history names them",
+  },
+  {
+    name: "the dispatcher drops traces seen",
+    file: "apps/pineta/host/commands/index.ts",
+    from: "        return cardCommands.tracesSeen(writer, intent.traces)",
+    to: '        return settled({ kind: "seen" })',
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a trace its placer has seen is deleted on the host, for every device",
+  },
   {
     name: "the take button takes nowhere",
     file: "packages/client/column.tsx",
@@ -241,8 +272,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup does not compact",
     file: "apps/pineta/host/index.ts",
-    from: "    settle,\n    cards: cardPort,\n    ensureNames: names.ensure,\n  })",
-    to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    ensureNames: names.ensure,\n  })",
+    from: "    settle,\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n  })",
+    to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n  })",
     suite: "host",
     scenario: "tools",
     expect: "a starting host compacts the session it opened",

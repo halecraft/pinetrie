@@ -28,6 +28,7 @@ import {
   encodeKey,
   encodeMoves,
   encodeOutcome,
+  MAX_TRACES_SEEN,
   type Outcome,
   revOfReply,
 } from "./codec.ts"
@@ -294,6 +295,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "undo-move", root: TEST_ROOT, direction: "redo" },
     { kind: "set-command", card: cardId("c-7"), command: "bring-up-to-date" },
     { kind: "set-command", card: cardId("c-7"), command: null },
+    { kind: "traces-seen", traces: ["t-1", "t-2"] },
   ] as const
   for (const intent of intents) {
     assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
@@ -366,6 +368,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "taken" },
     { kind: "offered" },
     { kind: "reserved" },
+    { kind: "seen" },
     { kind: "line-moved" },
     { kind: "queued" },
     { kind: "moved" },
@@ -467,6 +470,20 @@ test("decode: a move needs its cards, each with a place; set-command a known com
     { kind: "undo-move", root: TEST_ROOT, mode: "sideways" },
   ])
     assert.equal(decodeCommand(wire).kind, "refused")
+})
+
+test("decode: traces seen name 1 to MAX_TRACES_SEEN ids, none empty", () => {
+  const seen = (ids: unknown) =>
+    decodeCommand({ kind: "traces-seen", text: JSON.stringify(ids) }).kind
+  assert.equal(seen(["t-1"]), "traces-seen")
+  for (const ids of [
+    [],
+    [""],
+    [1],
+    "t-1",
+    Array.from({ length: MAX_TRACES_SEEN + 1 }, (_, i) => `t-${i}`),
+  ])
+    assert.equal(seen(ids), "refused")
 })
 
 test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {

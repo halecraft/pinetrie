@@ -664,6 +664,21 @@ The rail is E; the column is T. Seeing both at once is the product.
   keep a direction, take a copy of the card and pin it in the branch.
 - **Pinned cards are not unsent work:** they mark no tab and no rail dot.
 
+### History and traces (ADR-0048 step 6)
+
+- **Every card has a history button.** It lists where the card has been and
+  who moved it, oldest first: "created by you", "queued by Bea", "unpinned
+  by Carl (an undo)", then "written by you, Bea".
+- **A card someone else moved back below the line says so** beside its
+  heading: "unqueued by Bea", "unpinned by Bea", until it moves again.
+- **A trace stays where your card was** when someone else moved it while you
+  had no column open on that thread: "Bea queued this", "Bea sent this →",
+  "Carl took this", or "3 cards moved by Bea". Only you see your traces.
+  Click one to go to the card where it is now, or to the message it became.
+  A trace is gone once you have seen it, on every device; the column keeps
+  showing it until you leave. An unqueue or an unpin leaves no trace: the
+  card is still in your column, saying who moved it.
+
 ### Your inventory (ADR-0048 step 4)
 
 - **A panel of your own, floating over the columns**, opened and closed by

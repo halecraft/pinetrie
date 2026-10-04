@@ -189,7 +189,10 @@ or drag, with moves you can undo (ADR-0066), and step 5: several cards
 per place ("+ card", "+ pin"), and pinned cards, a
 strip at the top of a thread's column the agent reads on every run, in a
 cards entry pi writes with the run's prompt when they changed, carried
-across pi's compaction (S92). A send
+across pi's compaction (S92); and step 6's card history and traces: every
+card's moves in a session record the host writes in the step that moved
+it, and a trace where your card was when someone else moved it while you
+were away, deleted once seen (who contributed waits for Kyneta). A send
 to a busy thread queues your
 card above the line, in the host's step that found the lane busy, where
 anyone can edit it or unqueue it until the host takes it; the take and an

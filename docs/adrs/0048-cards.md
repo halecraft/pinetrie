@@ -12,7 +12,8 @@ take/unqueue race, implemented by `PLAN-2026-10-01-queued-cards`: it
 supersedes ADR-0026 (queued notes become queued cards), with ADR-0055, and
 amends ADR-0020 (nothing waits in `pineta.outbox`, which is gone). Probe 2
 is answered by S69, probes 1 and 4, for the inventory, by S75 and S76,
-and probe 5 by S92. A later step would amend ADR-0046 (a fixed line about
+and probe 5 by S92; S102 found a real model acts on the pinned cards it
+reads, a retired one included. A later step would amend ADR-0046 (a fixed line about
 pinned cards in the prompt). Amended in place (2026-10-02): a queued card is
 *unqueued*, not stopped; "stop" is a run's word (ADR-0056). Amended in
 place (2026-10-02, with Duane): the drawer is the *inventory*, a floating
@@ -46,7 +47,14 @@ the cards changed; pi's compaction carries it; the run waits for its
 sender's text; a branch starts with no pinned cards. Its second part, "+ card"
 and "+ pin", implemented by `PLAN-2026-10-04-cards-per-place`, with "+ pin"
 in the column's header while a thread has no pinned card (2026-10-05, with
-Duane).
+Duane). Amended in place (2026-10-05, with Duane): who contributed to a card
+waits for Kyneta. Step 1's attribution stays until Kyneta can name the
+writers whose text still stands without Pineta unwrapping Yjs; step 6
+goes on with traces and card history (*Who contributed*). Step 6's traces
+and card history implemented by `PLAN-2026-10-05-card-history-traces`, with
+*Other people* amended in place (2026-10-05): where history and traces
+live, an unpin treated as an unqueue, "on your screen" as an open column,
+a trace seen as deleted by the host, and the 30-day sweep.
 
 **Context.**
 
@@ -262,18 +270,58 @@ centred by default, and open while you work in them, since nothing pauses.
   An unqueued card has not left its place; it gets a mark on itself
   ("unqueued by Bea"). A trace is gone once seen, as a seen mention is (ADR-0030).
   Traces at one spot collapse into one ("3 cards moved by Bea").
+
+  *Amended in place (step 6):*
+  - **Only shared places leave traces**: drafting, queued and pinned. Nobody
+    else moves a fresh column's card, which only its owner's column draws,
+    or a card in someone's inventory.
+  - **An unpin is treated as an unqueue.** The card goes back below the
+    line in the same column, so it leaves no trace, and gets a mark on
+    itself ("unpinned by Bea").
+  - **"On your screen" is a column open at the card's thread end**, as
+    presence reports. A column scrolled out of view still counts as seen; a
+    hidden or closed page does not, which is the case traces are for.
+  - **"Gone once seen" means the host deletes it.** A trace drawn in a
+    column you can write, in a page you can see, is reported seen, and the
+    host deletes its record, so it is gone on every device. The column
+    keeps drawing it until it unmounts. Seen is not kept in
+    `attention:<writer>` (ADR-0077): that document keeps every write for
+    good (S101), and the trace's record would stay stored.
+  - **A trace whose card is back where it was goes**, as an undo returns
+    it. Traces no one has seen are swept after 30 days.
+  - **Only the placer is shown a trace**, but every client holds the
+    records, as with the inventory. That is not a security claim.
 - **Each card keeps its history:** created by, typed in by, moved, queued,
   unqueued, taken, sent. That is its provenance, reached from the card and
   from a trace. Someone taking your card into their inventory is recorded there,
-  not notified.
+  not notified. *Amended in place (step 6):* a card's history and its traces
+  are host records in the session's document (`pineta.card-history`, keyed
+  by the card, and `pineta.trace`, keyed by its own id), not fields of the
+  places: that document grows for good (S90), and a field every event
+  changes would refuse each whole undo of a move (S82). A card's history is
+  deleted with the card; a trace outlives it ("Bea sent this →" leads to
+  the message). Each event says who moved the card, from where to where,
+  and when; what the move was called is read from the two places. Typed in
+  by is the card's writers, shown beside its history, with no events.
 - **Who contributed to a card is a projection of its history**: each edit,
   a deletion as much as typing, and each undo and redo, by its author. A
   person contributed while any edit of theirs still stands, so undoing every
   edit you made removes you, and redo brings you back. No client can keep
   this as a cache: each tab undoes on its own (ADR-0052), so only the
   history knows what still stands across tabs and devices. It lasts as long
-  as the card. Open for step 6: whether someone else editing away all your
-  text, rather than your undoing it, removes you.
+  as the card. Someone else editing away all your text, rather than your
+  undoing it, removes you too (2026-10-05, with Duane).
+
+  *Deferred (2026-10-05, with Duane):* the projection waits for Kyneta. Yjs
+  records who typed each character but not who deleted it, and Pineta
+  reaches even the first only by unwrapping Kyneta (`textClients`), so it
+  has asked Kyneta for a read of the writers whose text still stands. When
+  that lands, contributors become those writers, and a deletion counts for
+  no one: someone who only deleted in a card is not named. Until then,
+  step 1's attribution stays for the heading and a sent message's "with",
+  and marks do not count cards you contributed to. Keeping a log of each
+  person's edits in Pineta, which would also credit deletions, was
+  rejected as large for what it adds.
 
 *Closing a column.*
 - **A thread's column:** closing it moves nothing. Its cards stay on the
@@ -387,7 +435,8 @@ where the card becomes a message in the immutable tree.
   `packages/schema/index.ts`), with CRDTs where people type together. Cards
   are where people type and move things together, so they live in CRDT
   documents: one per session for the shared places (each card's place, owner,
-  placer, marks, history); one per person for the inventory; and each card's text
+  placer, marks; *amended, step 6:* history and traces are session records,
+  *Other people*); one per person for the inventory; and each card's text
   in its own Yjs document (`TextDoc`, `packages/schema/text.ts`, shared with
   notes). Step 1 built the first and the third (`CardsDoc`,
   `packages/schema/card.ts`). Clients write a card whole once, and only its
@@ -444,7 +493,8 @@ and a pinned card can quote one.
   4. the inventory: grid, take and put, drag, keys;
   5. several cards per place, and pinned cards read by the agent;
   6. traces and card history, and who contributed, projected from it (for
-     marks, a card's heading and a sent message's "with");
+     marks, a card's heading and a sent message's "with"; traces and history
+     built, who contributed waits for Kyneta, *Who contributed*);
   7. queue control: staging, reordering, unqueues;
   8. later: reminders (inventory cards that light up when due and reach your `@`
      inbox, separate from the queue), conditions on queued cards (ADR-0026),

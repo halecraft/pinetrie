@@ -7,7 +7,7 @@ import { type CardId, cardId, entryId, type LaneName, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import { PLACES_DOC_ID } from "@pineta/protocol/messages"
 import { personDocId } from "@pineta/protocol/writers"
-import { readPlaces, readSeats } from "@pineta/reads"
+import { readPlaces, readReading, readSeats, readTraces } from "@pineta/reads"
 import { yourCard } from "@pineta/rules"
 import { cardDocId, InventoryDoc, PlacesDoc } from "@pineta/schema"
 import type { SessionClient } from "@pineta/session"
@@ -380,6 +380,72 @@ async function run(check: Checks["check"]): Promise<void> {
       lastCards.slice(0, 200),
     )
     await adaLate.close()
+    await ch.quiet()
+
+    // 4g. Traces (ADR-0048 step 6): Bea pins a card of Ada's while Ada has no
+    // column open at its thread, which leaves Ada a trace naming Bea; she pins
+    // another while Ada reads that thread, which leaves none. The host learns
+    // what Ada reads from presence alone.
+    const traceEnd = tipOf()
+    const pinnedAt = (end: string | null) =>
+      ({
+        kind: "pinned",
+        root: rootAt(ch, at(end)),
+        at: at(end),
+        lane: null,
+      }) as const
+    const away = newCard(ada, traceEnd, "pinned while Ada was away")
+    const watched = newCard(ada, traceEnd, "pinned while Ada read")
+    await waitFor(
+      () => onHost(away) !== undefined && onHost(watched) !== undefined,
+      5_000,
+    )
+    const byBea = {
+      actedAt: { kind: "column", key: "k-bea" },
+      slot: null,
+    } as const
+    await bea.moveCard(
+      { card: away, from: drafting(traceEnd), to: pinnedAt(traceEnd) },
+      byBea,
+    )
+    ada.setReading("k-ada", traceEnd ?? "", rootAt(ch, at(traceEnd)))
+    await waitFor(
+      () =>
+        readReading(ch.presence).some(
+          ([w, end]) => w === ada.writer && end === traceEnd,
+        ),
+      5_000,
+    )
+    await bea.moveCard(
+      { card: watched, from: drafting(traceEnd), to: pinnedAt(traceEnd) },
+      byBea,
+    )
+    const tracesOf = (card: CardId) =>
+      [...readTraces(ada.session).values()].filter(t => t.card === card)
+    const traced = await waitFor(() => tracesOf(away).length === 1, 5_000)
+    const [trace] = tracesOf(away)
+    check(
+      "a card someone else moves while its placer is away leaves them a trace; none while they read its thread",
+      traced >= 0 &&
+        trace?.for === ada.writer &&
+        trace.by === bea.writer &&
+        [...readTraces(ch.session).values()].every(t => t.card !== watched),
+      `${tracesOf(away).length} away, ${tracesOf(watched).length} watched`,
+    )
+    // Seen: the host deletes it, and Ada's copy loses it too.
+    await ada.request({ kind: "traces-seen", traces: [trace?.id ?? ""] })
+    const gone = await waitFor(() => tracesOf(away).length === 0, 5_000)
+    check(
+      "a trace its placer has seen is deleted on the host, for every device",
+      gone >= 0 &&
+        ![...readTraces(ch.session).keys()].includes(trace?.id ?? ""),
+    )
+    ada.clearReading("k-ada")
+    for (const card of [away, watched])
+      await bea.moveCard(
+        { card, from: pinnedAt(traceEnd), to: drafting(traceEnd) },
+        byBea,
+      )
     await ch.quiet()
 
     // 4d. A client cannot write the places document: only the host writes it

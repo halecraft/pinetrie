@@ -203,6 +203,8 @@ export function writesIn(
     case "line":
     // A command acts only when its card is taken, behind the take's own check.
     case "set-command":
+    // Traces are the session's, in no root.
+    case "traces-seen":
       return []
   }
 }

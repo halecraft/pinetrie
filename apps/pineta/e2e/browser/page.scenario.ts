@@ -10,7 +10,9 @@ import {
   cardId,
   entryId,
   handleOf,
+  keyOf,
   type LaneName,
+  pinnedOf,
   projectRail,
   ROOT,
   writerId,
@@ -21,6 +23,7 @@ import {
   readNames,
   readParticipantNames,
   readPlaces,
+  readReading,
   readRoots,
   readTyping,
 } from "@pineta/reads"
@@ -3099,6 +3102,79 @@ async function run(check: Checks["check"]): Promise<void> {
           placeOf(newPinned)?.kind === "pinned" &&
           pinMoved,
         `focused ${pinFocused}, lines ${twoLines}, drawn ${drawnPinned}, ${placeOf(newPinned)?.kind}, moved ${pinMoved}`,
+      )
+
+      // A trace (ADR-0048 step 6): someone else pins Ada's card in the
+      // conversation below while she is on the Archive tab, which reports no
+      // column. Back on her tab, a trace says so where the card was, leads to
+      // it, and the card's history names who pinned it.
+      const traceBox = `${col(1)} .composer .input`
+      await page.click(traceBox)
+      await page.keyboard.type("pinned while away")
+      await page.waitForFunction(
+        s => document.querySelector(s)?.getAttribute("data-card") != null,
+        traceBox,
+        { timeout: 10_000 },
+      )
+      const traced = cardId(
+        (await page.getAttribute(traceBox, "data-card")) ?? "",
+      )
+      await waitFor(() => placeOf(traced)?.kind === "drafting", 5_000)
+      const tracedFrom = placeOf(traced)
+      await page.click("#tabs .tab-archive")
+      await waitFor(
+        () => !readReading(host.presence).some(([w]) => w === ME),
+        5_000,
+      )
+      const pinTo = tracedFrom === undefined ? null : pinnedOf(tracedFrom)
+      if (tracedFrom !== undefined && pinTo !== null)
+        await api.moveCard(
+          { card: traced, from: keyOf(tracedFrom), to: pinTo },
+          { actedAt: { kind: "column", key: "k-api" }, slot: null },
+        )
+      await page.click(tabSel(downRoot))
+      const traceRow = `${col(1)} .trace`
+      const drawnTrace = await appears(traceRow)
+      const traceText = (await page.textContent(traceRow).catch(() => "")) ?? ""
+      await page.click(traceRow).catch(() => {})
+      const leads = await appears(
+        `${col(1)} .pinned-strip textarea[data-card="${traced}"]`,
+      )
+      // The inventory, left open in the middle of the screen, would cover it.
+      if ((await page.locator(".inventory").count()) > 0)
+        await page.click("#top .inventory-toggle")
+      const clickError = await page
+        .click(
+          `${col(1)} .pinned-strip .card-editor:has(textarea[data-card="${traced}"]) .card-history-trigger`,
+          { timeout: 5_000 },
+        )
+        .then(
+          () => "",
+          (e: unknown) => String(e).split("\n").slice(-4).join(" | "),
+        )
+      // Who pinned it, as the trace names them.
+      const pinner = traceText.replace(" pinned this", "")
+      const historyNames = await page
+        .waitForFunction(
+          words =>
+            (
+              document.querySelector(".card-history-box")?.textContent ?? ""
+            ).includes(words),
+          `pinned by ${pinner}`,
+          { timeout: 5_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      await page.keyboard.press("Escape")
+      check(
+        "a card someone else pins while you are away leaves a trace where it was, which leads to it, and its history names them",
+        drawnTrace &&
+          traceText.includes("pinned this") &&
+          leads &&
+          historyNames,
+        `trace ${drawnTrace} (${traceText}), leads ${leads}, history ${historyNames}${clickError === "" ? "" : `: ${clickError}`}`,
       )
 
       // A reload keeps the tab you are on, and its open columns (ADR-0027).

@@ -610,6 +610,17 @@
       .pinned-size, .pinned-status { font-size: .72rem; color: #8b93a1; }
       .pinned-status[data-status="changed"], .pinned-status[data-status="unread"] { color: #e8c07a; }
       .pin, .unpin, .new-card, .new-pin { padding: .05rem .45rem; font-size: .72rem; }
+      /* A card's history (ADR-0048 step 6): a quiet button, a small list. */
+      .card-history-trigger { padding: .05rem .45rem; font-size: .72rem; }
+      .card-history-events { margin: 0; padding: .25rem .5rem .25rem 1.4rem; font-size: .75rem; }
+      .card-history-at, .card-history-writers { color: #8b93a1; }
+      .card-history-writers { list-style: none; margin-left: -1rem; padding-top: .25rem; }
+      .moved-back { font-size: .72rem; color: #d0a15f; }
+      /* Where your card was when someone else moved it: a line that leads to it. */
+      .traces { padding: .25rem .75rem 0; }
+      .trace { display: block; background: none; border: 0; padding: .1rem 0;
+        font-size: .75rem; color: #d0a15f; cursor: pointer; text-align: left; }
+      .trace:hover { text-decoration: underline; }
       /* Where a run read pinned cards: a small marker above its prompt. */
       .pinned-read { font-size: .72rem; color: #8b93a1; margin: 0 0 .4rem; }
       .pinned-read summary { cursor: pointer; }

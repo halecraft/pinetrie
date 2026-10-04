@@ -212,6 +212,11 @@ record of flat string rows (`owner`, `kind`, `root`, `at`, `lane`,
 and `rev`. Its id is `pineta:card-places` (`PLACES_DOC_ID`). Only the host
 writes it, through `applyPlaceSteps` (`apps/pineta/host/places.ts`).
 
+A card's history and its traces are not here (ADR-0048 step 6): they are
+session records (`pineta.card-history`, `pineta.trace`). This document
+grows for good with each write (S90), and a field every event changed
+would refuse each whole undo of a move (S82).
+
 - **A place does not merge** (S75): one writer, in arrival order, through
   handoffs the host applies or refuses (ADR-0059). It is Yjs anyway, so the
   host's undo stacks can undo a move whole or refuse it (ADR-0066, S82).

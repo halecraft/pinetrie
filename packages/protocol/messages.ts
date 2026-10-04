@@ -62,6 +62,8 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     newest move in the root `root` (ADR-0066).
  *   - `set-command` sets the card `cardId`'s command to `mode`, or
  *     clears it with `""` (ADR-0055).
+ *   - `traces-seen` names the sender's traces they have seen, a JSON list
+ *     of ids in `text`; the host deletes them (ADR-0048).
  */
 export const COMMAND_KINDS = [
   "chat",
@@ -76,6 +78,7 @@ export const COMMAND_KINDS = [
   "set-command",
   "line",
   "undo-move",
+  "traces-seen",
 ] as const
 export type CommandKind = (typeof COMMAND_KINDS)[number]
 
@@ -174,6 +177,7 @@ export const OUTCOME_KINDS = [
   "taken",
   "offered",
   "reserved",
+  "seen",
   "line-moved",
   "moved",
   "queued",

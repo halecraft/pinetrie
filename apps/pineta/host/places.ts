@@ -8,6 +8,10 @@
 // the records' batch because that batch may be an undo step: a `rev` raised
 // inside it changes with every later write, so every whole undo of the step
 // would be refused (S82).
+//
+// A caller then writes the cards' history and traces in the same step
+// (`provenance.ts`): they are session records, not fields here, for the same
+// reason as `rev`.
 
 import { batch } from "@kyneta/schema"
 import { encodeCard, type PlaceStep } from "@pineta/rules"

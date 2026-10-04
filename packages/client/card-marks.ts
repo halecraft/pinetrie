@@ -2,10 +2,12 @@
 // 2): on root tabs and new tabs, on the rail at a thread's end, and on the
 // Archive tab for a root whose tab you closed. An archived root's work is
 // done, so it lights only its own row, never the Archive tab. They answer "where was I?",
-// so they count only the cards you own (contributors wait for step 6's
-// history). A card counts while it holds text, not while its record exists:
+// so they count only the cards you own (contributors wait for Kyneta,
+// ADR-0048's *Who contributed*). A card counts while it holds text, not while its record exists:
 // a record outlives its text. Only drafting and fresh cards count: a queued
-// card is on its way to being sent, not left somewhere. Pure.
+// card is on its way to being sent, not left somewhere. A trace marks
+// nothing yet: raising it is for `attentionOf` (ADR-0077), beside verdicts
+// and offers. Pure.
 
 import {
   type CardId,
@@ -24,7 +26,7 @@ import { AGENT_PREFILL } from "./message-tools.ts"
 
 /**
  * The cards that are yours, as the marks count them: those you own. Cards you
- * contributed to wait for step 6's history.
+ * contributed to wait for Kyneta (ADR-0048, *Who contributed*).
  */
 export const ownCards = (
   me: WriterId,

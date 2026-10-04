@@ -20,6 +20,7 @@ import { type Basics, messageOf } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { Chat } from "./commands/chat.ts"
 import { applyPlaceSteps } from "./places.ts"
+import type { Provenance } from "./provenance.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -86,6 +87,8 @@ export interface TakeDeps {
   readonly send: (taken: Taken) => Promise<Outcome>
   /** The top card's text is behind: drain the lane again once the host holds it. */
   readonly behind: (card: QueuedCard) => void
+  /** Each card's history (ADR-0048 step 6). */
+  readonly provenance: Pick<Provenance, "before" | "after">
 }
 
 /**
@@ -109,6 +112,7 @@ export async function drain(deps: TakeDeps, lane: LaneName): Promise<void> {
       continue
     }
     // No await between the check above and the take.
+    const before = deps.provenance.before()
     const top = takeTop(
       places,
       lane,
@@ -118,7 +122,10 @@ export async function drain(deps: TakeDeps, lane: LaneName): Promise<void> {
     if (top.kind === "idle") return
     // The queue waits for its top card: those behind it keep their turn.
     if (top.kind === "behind") return deps.behind(top.card)
-    if ((await carryOut(deps, lane, top.taken)) === "ran") return
+    const done = await carryOut(deps, lane, top.taken)
+    // Taken, written back or below the line again: the host's own write.
+    await deps.provenance.after({ kind: "host" }, before)
+    if (done === "ran") return
   }
 }
 

@@ -11,12 +11,13 @@ import {
   writerId,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
-import { readPlaces, readPlacesRev } from "@pineta/reads"
-import { encodeCard } from "@pineta/rules"
-import { beginRun, newPlacesDoc } from "@pineta/schema"
+import { readCardHistories, readPlaces, readPlacesRev } from "@pineta/reads"
+import { CARD_HISTORY, encodeCard, setRecord } from "@pineta/rules"
+import { beginRun, newPlacesDoc, newPresenceDoc } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
-import { basics, record } from "./fakes.ts"
+import { applyWrites, basics, putValue, record } from "./fakes.ts"
+import { createProvenance } from "./provenance.ts"
 import {
   createBehind,
   drain,
@@ -219,6 +220,11 @@ function setUp(
     behind: card => {
       events.push(`behind ${card.id}`)
     },
+    provenance: createProvenance({
+      basics: b,
+      presence: newPresenceDoc(),
+      agent: () => ({ writeValues: async w => applyWrites(b, w) }),
+    }),
   }
   return { b, events, deps }
 }
@@ -258,6 +264,14 @@ describe("drain", () => {
       "destroy c-2",
     ])
     expect(readPlaces(b.places).map(c => c.id)).toEqual(["c-3"])
+  })
+
+  test("a card taken and sent leaves no history (ADR-0048 step 6)", async () => {
+    const { b, deps } = setUp({ "c-1": "first" }, [])
+    queue(b.places, "c-1", "a")
+    putValue(b, setRecord(CARD_HISTORY, { card: cardId("c-1"), events: [] }))
+    await drain(deps, LANE)
+    expect(readCardHistories(b.session).size).toBe(0)
   })
 
   test("takes nothing while the lane runs", async () => {

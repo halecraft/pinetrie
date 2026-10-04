@@ -10,8 +10,7 @@
 //
 // Nothing in this file may import pi, Kyneta, or a Node builtin.
 //
-// What belongs here, as `@pineta/rules`, `@pineta/session` and `@pineta/repo`
-// state it too: core holds the vocabulary (ids, intents, every record's type)
+// What belongs here, as `@pineta/rules` and `@pineta/repo` state it too: core holds the vocabulary (ids, intents, every record's type)
 // and the reads of the tree. A format or type that `lanes` or `repo` must
 // read, write or name lives in core too, since neither can declare
 // `@pineta/rules`. What a stored shape says, and how the host changes it, is
@@ -488,6 +487,11 @@ export type Intent =
       readonly card: CardId
       readonly command: CardCommand | null
     }
+  /**
+   * The sender has seen these traces of theirs (ADR-0048, *Other people*):
+   * the host deletes them. Ids not the sender's are ignored.
+   */
+  | { readonly kind: "traces-seen"; readonly traces: readonly string[] }
 
 /**
  * What can be done with an offer: take it into your repo, have the agent split
@@ -1586,12 +1590,63 @@ export interface CardRecord {
   /**
    * Who put it where it is: the sender of the last move the host accepted.
    * A write the host makes itself (a refused take written back) keeps it.
+   * When someone else moves the card, the trace is for them (ADR-0048).
    */
   readonly placer: WriterId
   /** What it is sent through when taken (ADR-0055); null for a plain message. */
   readonly command: CardCommand | null
   /** Why the host could not send it, until it is queued again; null when it never failed. */
   readonly unsent: string | null
+}
+
+/**
+ * One change to a living card's place (ADR-0048 step 6): who made it, from
+ * where to where, and when. What the change was called (queued, took,
+ * pinned) is read from the two places when it is worded (`verbOf`).
+ */
+export interface CardEvent {
+  readonly kind:
+    | "created"
+    | "moved"
+    | "undone"
+    | "redone"
+    | "unsent"
+    | "followed"
+  /** Who made it; null for the host's own write. */
+  readonly by: WriterId | null
+  readonly from: PlaceKey | null
+  readonly to: PlaceKey
+  readonly at: number
+}
+
+/**
+ * A card's history: a host-written `pineta.card-history` value in the
+ * session, keyed by the card, and deleted with it.
+ */
+export interface CardHistoryRecord {
+  readonly card: CardId
+  /** Oldest first; at most `HISTORY_EVENTS`, the first always kept. */
+  readonly events: readonly CardEvent[]
+}
+
+/**
+ * What stays where your card was when someone else moved it, while you were
+ * not looking (ADR-0048, *Other people*): a host-written `pineta.trace`
+ * value in the session, keyed by its own id, since it outlives its card.
+ * Drawn only for its placer, and deleted once they have seen it.
+ */
+export interface TraceRecord {
+  readonly id: string
+  /** The card's placer before it moved: the one person it is drawn for. */
+  readonly for: WriterId
+  readonly card: CardId
+  readonly by: WriterId
+  readonly from: PlaceKey
+  /** Where the card went; null when it was sent. */
+  readonly to: PlaceKey | null
+  /** The message a send wrote; null for any other move. */
+  readonly message: EntryId | null
+  readonly at: number
 }
 
 /**

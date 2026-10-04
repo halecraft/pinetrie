@@ -4,6 +4,47 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "apps/pineta/host"]
 
 export const mutations: readonly Mutation[] = [
+  // ── card history and traces (ADR-0048 step 6) ──
+  {
+    name: "traces seen delete someone else's trace",
+    file: "apps/pineta/host/provenance.ts",
+    from: '          traces.get(id)?.for === writer ? [{ kind: "delete", key: id }] : [],',
+    to: '          traces.has(id) ? [{ kind: "delete", key: id }] : [],',
+    command: unit,
+    expect: "traces seen: only the sender's go",
+  },
+  {
+    name: "a spend records nothing",
+    file: "apps/pineta/host/commands/cards.ts",
+    from: '        { kind: "spend", by: writer, message: followed.message },',
+    to: "        null,",
+    command: unit,
+    expect: "a spend: the history goes with the card",
+  },
+  {
+    name: "an undo records nothing",
+    file: "apps/pineta/host/commands/cards.ts",
+    from: "          await deps.provenance.after({ kind: direction, by: writer }, before)\n",
+    to: "",
+    command: unit,
+    expect: "an undo, whose revert Kyneta writes",
+  },
+  {
+    name: "a take leaves its card's history behind",
+    file: "apps/pineta/host/take.ts",
+    from: '    await deps.provenance.after({ kind: "host" }, before)\n',
+    to: "",
+    command: unit,
+    expect: "a card taken and sent leaves no history",
+  },
+  {
+    name: "before reads ends from a root not loaded",
+    file: "apps/pineta/host/provenance.ts",
+    from: "    if (root !== null)\n",
+    to: "    if (true)\n",
+    command: unit,
+    expect: "before: a shared card's thread end in a loaded root",
+  },
   {
     name: "a root's new entry leaves its record behind",
     file: "apps/pineta/host/directory.ts",
@@ -394,8 +435,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the drain goes on after a run starts",
     file: "apps/pineta/host/take.ts",
-    from: '    if ((await carryOut(deps, lane, top.taken)) === "ran") return',
-    to: "    await carryOut(deps, lane, top.taken)",
+    from: '    if (done === "ran") return',
+    to: "",
     command: unit,
     expect: "sends in order until one starts a run",
   },
@@ -812,7 +853,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher never spends a chat's card",
     file: "apps/pineta/host/commands/index.ts",
-    from: "            await cardCommands.spend(card.id, { sendId, chat: intent }),",
+    from: "            await cardCommands.spend(writer, card.id, { sendId, chat: intent }),",
     to: "            null,",
     command: unit,
     expect: "a chat command spends its card once written",
@@ -994,8 +1035,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move is recorded in no history",
     file: "apps/pineta/host/commands/cards.ts",
-    from: "      return carry(step, drain, gesture)",
-    to: "      return carry(step, drain)",
+    from: '      return carry(step, drain, { kind: "move", by: writer }, gesture)',
+    to: '      return carry(step, drain, { kind: "move", by: writer })',
     command: unit,
     expect:
       "a take is one step of the taker's history in the root it left; a creation is in none",
@@ -1003,8 +1044,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an undo raises no rev",
     file: "apps/pineta/host/commands/cards.ts",
-    from: "            raiseRev(places),",
-    to: "            places.rev(),",
+    from: "          const rev = raiseRev(places)",
+    to: "          const rev = places.rev()",
     command: unit,
     expect:
       "an undo answers each card it moved and where it is now, with a rev raised after it",

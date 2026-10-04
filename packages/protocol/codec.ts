@@ -107,6 +107,8 @@ export type Outcome =
   | { readonly kind: "offered" }
   /** A thread is named before its lane exists, or already was (ADR-0057). */
   | { readonly kind: "reserved" }
+  /** Traces the sender has seen are gone (ADR-0048). */
+  | { readonly kind: "seen" }
   /** The integration line was set up, or moved forward to your work (ADR-0060). */
   | { readonly kind: "line-moved" }
   | Refusal
@@ -243,6 +245,15 @@ export function decodeCommand(
       command: name === "" ? null : name,
     }
   }
+  if (kind === "traces-seen") {
+    const traces = tracesFromWire(text(wire?.text))
+    return traces === undefined
+      ? refused(
+          ERR.UNKNOWN_TARGET,
+          `traces seen must be 1 to ${MAX_TRACES_SEEN} ids`,
+        )
+      : { kind: "traces-seen", traces }
+  }
   if (kind === "reserve") {
     const lane = text(wire?.lane)
     const reserved = parseNewLane(lane)
@@ -348,6 +359,22 @@ const pinnedToWire = (pinned: readonly SentCard[]): string =>
     : JSON.stringify(pinned.map(p => ({ card: p.id, seen: p.seen })))
 
 /** The wire -> a chat's pinned cards; undefined for anything malformed. */
+/** The most traces one `traces-seen` names: a column's worth, and more. */
+export const MAX_TRACES_SEEN = 100
+
+/** A JSON list of trace ids, each non-empty: 1 to `MAX_TRACES_SEEN`. */
+function tracesFromWire(s: string): readonly string[] | undefined {
+  const value = parsed(s)
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > MAX_TRACES_SEEN ||
+    !value.every(id => typeof id === "string" && id !== "")
+  )
+    return undefined
+  return value as string[]
+}
+
 function pinnedFromWire(s: string): readonly SentCard[] | undefined {
   if (s === "") return []
   const value = parsed(s)
@@ -580,6 +607,12 @@ export function encodeIntent(id: string, intent: Intent): Command {
         cardId: intent.card,
         mode: intent.command ?? "",
       })
+    case "traces-seen":
+      return command({
+        id,
+        kind: "traces-seen",
+        text: JSON.stringify(intent.traces),
+      })
   }
 }
 
@@ -623,6 +656,8 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "offered" })
     case "reserved":
       return reply({ id, outcome: "reserved" })
+    case "seen":
+      return reply({ id, outcome: "seen" })
     case "line-moved":
       return reply({ id, outcome: "line-moved" })
     case "queued":
@@ -689,6 +724,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "offered" }
     case "reserved":
       return { kind: "reserved" }
+    case "seen":
+      return { kind: "seen" }
     case "line-moved":
       return { kind: "line-moved" }
     case "queued":

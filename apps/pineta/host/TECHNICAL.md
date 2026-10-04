@@ -14,6 +14,7 @@ wires them.
 | `basics.ts` | `Basics` (the session, `pineta:live`, the documents, the places, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
 | `places.ts` | `applyPlaceSteps`: the one writer of the places document (ADR-0059), which writes its records in one batch, in an undo step when given one, then raises its `rev` in a batch of its own (`raiseRev`) |
 | `move-history.ts` | each person's history of moves per root (ADR-0066): `MoveHistories`, a shell over Kyneta's undo stacks |
+| `provenance.ts` | each card's history and the traces left where someone else moved your card (ADR-0048 step 6): `before` at a step's start, `after` its places write, `seen` and `sweep` |
 | `shutdown.ts` | the order a host stops in (`planShutdown`) |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`) |
 | `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
@@ -187,7 +188,9 @@ interrupted lane resumed before anything waiting for it (S36 item 18), the
 project and commands records that changed in one write (`setIfChanged`),
 the sweep of what no one will type in again: empty cards, card documents
 with no record, and seat records no stored text names, all of them in one
-write (`sweepTexts`), and last `settle` for the lanes with cards queued:
+write (`sweepTexts`), then the histories of the cards it swept and traces
+older than 30 days (`provenance.sweep`, which each run's end's settle runs
+too), and last `settle` for the lanes with cards queued:
 its compaction is `later`, so it runs after every write above, and after
 any refresh they queued.
 
@@ -280,6 +283,19 @@ rejects `shutdown()`.
   and the current `rev`. A move that leaves a card queued on a lane that is
   not running queues the lane's drain, a voided `keeper.once`
   (`drain:<lane>`) behind the move's own step.
+- **Every place-changing command records its provenance in the same step**
+  (`provenance.ts`): `before()` reads the places and each shared card's
+  thread end at the step's start, and `after(cause, before)`, once the
+  places are written, plans the cards' history and the traces
+  (`planProvenance`) and writes them in one `writeValues`. In
+  `commands/cards.ts`, `carry` is the one path for a move, a busy chat's
+  queue and a spend, each with its cause; a command moves no card and has
+  none. `undoMove` calls both itself, since Kyneta writes the revert. The
+  drain does too, around each take (`take.ts`), with `takeTop` still
+  synchronous (S69). The presence it reads is `readReading`'s pairs: a
+  placer with a column open at the card's end saw it go.
+- **`traces-seen` deletes the sender's own traces**, ignoring any other
+  id, and answers `seen`. A client sends it for the traces a column drew.
 - **`undo-move` undoes or redoes the sender's newest move in a root**
   (§ Moves' history). It answers `undone` with each card it moved and its
   place now, `unmoved` (shaped as a refused move) when someone moved a card

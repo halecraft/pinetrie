@@ -32,6 +32,7 @@ import { textClients } from "@pineta/schema"
 import { IN_COLUMN, newCardId, type SessionClient } from "@pineta/session"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import type { ReadOnly } from "./app-view.ts"
+import { CardHistory, MovedBack } from "./card-history.tsx"
 import {
   type EditorEvent,
   type EditorState,
@@ -490,8 +491,12 @@ export function CardEditor(p: {
     >
       {others && card !== undefined && (
         <div className="card-heading">
-          {cardHeading(p.reader.nameOf, card.owner, writers)}
+          {cardHeading(p.reader.nameOf, card.owner, writers)}{" "}
+          <MovedBack card={card.id} owner={card.owner} />
         </div>
+      )}
+      {!others && card !== undefined && (
+        <MovedBack card={card.id} owner={card.owner} />
       )}
       {conflict !== null && (
         <div className="conflict">
@@ -694,6 +699,7 @@ export function CardEditor(p: {
               {PIN}
             </button>
           )}
+          {card !== undefined && <CardHistory card={card.id} />}
           {card !== undefined && (
             <TakeButton
               card={card.id}
@@ -782,7 +788,9 @@ export function BoundCardEditor(p: {
   }, [session, card.id, told])
   return (
     <div className={p.className} data-queued={p.queued ?? undefined}>
-      <div className="card-heading">{p.heading}</div>
+      <div className="card-heading">
+        {p.heading} <MovedBack card={card.id} owner={card.owner} />
+      </div>
       <textarea
         autoComplete="off"
         className="input"
@@ -792,7 +800,10 @@ export function BoundCardEditor(p: {
         ref={box}
         rows={Math.min(8, Math.max(p.rows, text.split("\n").length))}
       />
-      <div className="compose-row">{p.children}</div>
+      <div className="compose-row">
+        {p.children}
+        <CardHistory card={card.id} />
+      </div>
     </div>
   )
 }

@@ -16,6 +16,8 @@ import {
   type AgentRun,
   type ArchiveRecord,
   type AskIndex,
+  type CardHistoryRecord,
+  type CardId,
   type CardRecord,
   type DigestRecord,
   type EntryId,
@@ -26,6 +28,7 @@ import {
   type RootId,
   type SeatRecord,
   type StopRecord,
+  type TraceRecord,
   type TreeIndex,
   type VerdictRecord,
 } from "@pineta/core"
@@ -34,6 +37,7 @@ import {
   readArchive,
   readBanners,
   readBases,
+  readCardHistories,
   readCommands,
   readDigests,
   readHeld,
@@ -50,6 +54,7 @@ import {
   readRunningLanes,
   readSeats,
   readStops,
+  readTraces,
   readVerdicts,
 } from "@pineta/reads"
 import {
@@ -60,6 +65,7 @@ import {
 } from "@pineta/schema"
 import type { WorkFacts } from "./column-view.ts"
 import { type LiveWork, liveWork } from "./live.ts"
+import { sameData } from "./same-props.ts"
 
 /** The documents a page reads: the session's, what streams, and the roots it holds. */
 export interface HeldView {
@@ -91,6 +97,10 @@ export interface SessionFacts {
   readonly marks: ReadonlyMap<EntryId, MarkRecord>
   /** Each thread's last run's verdict, in any root (ADR-0077), by lane. */
   readonly verdicts: ReadonlyMap<LaneName, VerdictRecord>
+  /** Each card's history (ADR-0048 step 6), by card. */
+  readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
+  /** Every trace, by id: each column draws its reader's own. */
+  readonly traces: ReadonlyMap<string, TraceRecord>
   readonly workFacts: WorkFacts
 }
 
@@ -99,6 +109,51 @@ export interface SessionFacts {
  * touches in any of them. The tree is every held root's, in one index.
  */
 export function readSessionFacts(view: HeldView): SessionFacts {
+  const next = readFacts(view)
+  const before = lastFacts.get(view)
+  const kept = before === undefined ? next : keptFacts(before, next)
+  lastFacts.set(view, kept)
+  return kept
+}
+
+/** What each view last gave, so a fact that reads the same keeps its identity. */
+const lastFacts = new WeakMap<HeldView, SessionFacts>()
+
+/** `next`, field by field, with each one that reads the same as before kept. */
+function keptFields<T extends object>(
+  before: T,
+  next: T,
+  byIdentity: readonly (keyof T)[] = [],
+): T {
+  const out = { ...next }
+  let same = true
+  for (const k of Object.keys(next) as (keyof T)[])
+    if (
+      byIdentity.includes(k)
+        ? Object.is(before[k], next[k])
+        : sameData(before[k], next[k])
+    )
+      out[k] = before[k]
+    else same = false
+  return same ? before : out
+}
+
+/**
+ * Any write to the session's values (a card's move writes its history,
+ * ADR-0048) reads every fact again, and each read builds new maps. Kept
+ * while the same, they redraw nothing: every message list compares its
+ * props by identity (S54, S59). The tree and the asks are kept by their own
+ * reads, and are too large to compare.
+ */
+function keptFacts(before: SessionFacts, next: SessionFacts): SessionFacts {
+  return keptFields(
+    before,
+    { ...next, workFacts: keptFields(before.workFacts, next.workFacts) },
+    ["index", "asks", "workFacts"],
+  )
+}
+
+function readFacts(view: HeldView): SessionFacts {
   const { session: doc, live, roots } = view
   const index = readHeldIndex(roots)
   const activity = roots.flatMap(root => readAgentActivity({ doc: root, live }))
@@ -114,6 +169,8 @@ export function readSessionFacts(view: HeldView): SessionFacts {
     archive: readArchive(doc),
     marks: readHeld(roots, readMarks),
     verdicts: readVerdicts(doc),
+    histories: readCardHistories(doc),
+    traces: readTraces(doc),
     workFacts: {
       project: readProject(doc),
       commands: readCommands(doc),

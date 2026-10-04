@@ -49,6 +49,20 @@ export {
   yourCard,
 } from "./card.ts"
 export {
+  CARD_HISTORY,
+  type Cause,
+  HISTORY_EVENTS,
+  movedBackBy,
+  type ProvenanceSteps,
+  planProvenance,
+  planTraceSweep,
+  type RecordStep,
+  TRACE,
+  TRACE_MAX_AGE_MS,
+  type Verb,
+  verbOf,
+} from "./card-history.ts"
+export {
   addressChat,
   agentByDefault,
   CHAT_TYPE,

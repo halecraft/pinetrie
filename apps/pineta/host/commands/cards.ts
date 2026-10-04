@@ -1,18 +1,21 @@
 // host/commands/cards — the commands that move cards (ADR-0059): a move, an
-// undo of moves (ADR-0066), a card's command, a busy chat's card queued, and
-// a sent card spent.
+// undo of moves (ADR-0066), a card's command, a busy chat's card queued, a
+// sent card spent, and traces seen (ADR-0048 step 6).
 //
 // Each runs inside one step of the documents' keeper, as every command does, so
 // it is ordered with the take and with every other move: gather the places,
 // plan purely, then write through `applyPlaceSteps`. Nothing else writes the
 // places while a step awaits a stack loading, or an undo's write landing.
 // Every answer that wrote the places document, or refused a move, carries
-// its `rev`: a client draws its move until its copy reaches it.
+// its `rev`: a client draws its move until its copy reaches it. Each write
+// that moves a card records the cards' history and traces in the same step
+// (`carry`, and `undoMove` around Kyneta's revert).
 
 import {
   type CardCommand,
   type CardId,
   type CardRecord,
+  type EntryId,
   keyOf,
   type LaneName,
   type Move,
@@ -32,6 +35,7 @@ import {
   readTreeIndex,
 } from "@pineta/reads"
 import {
+  type Cause,
   historyOf,
   type MoveStep,
   type MovesStep,
@@ -45,6 +49,7 @@ import type { Basics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { MoveHistories } from "../move-history.ts"
 import { applyPlaceSteps, type Gesture, raiseRev } from "../places.ts"
+import type { Provenance } from "../provenance.ts"
 import type { Chat } from "./chat.ts"
 
 /**
@@ -67,6 +72,8 @@ export interface CardCommandDeps {
   /** Queue a drain of the lane on the documents' keeper, not awaited. */
   readonly drain: (lane: LaneName) => void
   readonly histories: Pick<MoveHistories, "gestureOf" | "step">
+  /** Each card's history, and traces (ADR-0048 step 6). */
+  readonly provenance: Pick<Provenance, "before" | "after" | "seen">
 }
 
 export function createCardCommands(deps: CardCommandDeps) {
@@ -87,20 +94,25 @@ export function createCardCommands(deps: CardCommandDeps) {
 
   /**
    * Carry out steps, as one step of a history of moves when `gesture` is
-   * given: writes, and removals whose texts then go (record first, S64), and
-   * the drains they call for. A refusal says where the card is now and who
-   * put it there.
+   * given: writes, and removals whose texts then go (record first, S64),
+   * the cards' history and traces `cause` calls for (none for a command,
+   * which moves no card), and the drains. A refusal says where the card is
+   * now and who put it there.
    */
   async function carry(
     step: MovesStep | MoveStep,
     drain: readonly LaneName[],
+    cause: Cause | null,
     gesture?: Gesture,
   ): Promise<Settled> {
     if (step.kind === "refused") return unmoved(step)
     const steps = step.kind === "steps" ? step.steps : [step]
+    const before = cause === null ? null : deps.provenance.before()
     const rev = applyPlaceSteps(places, steps, gesture)
     for (const s of steps)
       if (s.kind === "remove") await deps.cards.destroy(s.id)
+    if (cause !== null && before !== null)
+      await deps.provenance.after(cause, before)
     for (const lane of drain) deps.drain(lane)
     return settled({ kind: "moved" }, rev)
   }
@@ -114,23 +126,29 @@ export function createCardCommands(deps: CardCommandDeps) {
     cards: readonly CardRecord[],
     card: CardId,
     sent: { readonly sendId: string; readonly chat: Chat },
-  ) {
+  ): Promise<{
+    readonly message: EntryId | null
+    readonly steps: readonly PlaceStep[]
+  }> {
     const { root } = sent.chat
     const doc = await docs.root(root)
     const index = readTreeIndex(doc)
     const at = index.bySend.get(sent.sendId)
-    if (at === undefined) return []
+    if (at === undefined) return { message: null, steps: [] }
     const { lane, reserved } = sent.chat
     const held =
       reserved !== null &&
       readLanes({ doc, live }, index, cards).some(l => l.name === reserved)
-    return planFreshFollow(
-      cards,
-      card,
-      root,
-      at,
-      lane ?? (held ? reserved : null),
-    )
+    return {
+      message: at,
+      steps: planFreshFollow(
+        cards,
+        card,
+        root,
+        at,
+        lane ?? (held ? reserved : null),
+      ),
+    }
   }
 
   return {
@@ -152,7 +170,7 @@ export function createCardCommands(deps: CardCommandDeps) {
         running,
       )
       // execute
-      return carry(step, drain, gesture)
+      return carry(step, drain, { kind: "move", by: writer }, gesture)
     },
 
     /**
@@ -165,6 +183,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       root: RootId,
       direction: MoveDirection,
     ): Promise<Settled> {
+      const before = deps.provenance.before()
       const result = await deps.histories.step(writer, root, direction)
       const answer = undoAnswer(result, readPlaces(places), PLACES_DOC_ID)
       switch (answer.kind) {
@@ -172,17 +191,17 @@ export function createCardCommands(deps: CardCommandDeps) {
           return settled({ kind: "nothing" })
         case "refused":
           return unmoved(answer)
-        case "undone":
-          return settled(
-            { kind: "undone", cards: answer.cards },
-            raiseRev(places),
-          )
+        case "undone": {
+          const rev = raiseRev(places)
+          await deps.provenance.after({ kind: direction, by: writer }, before)
+          return settled({ kind: "undone", cards: answer.cards }, rev)
+        }
       }
     },
 
     /** Set a card's command, or clear it (ADR-0055). */
     setCommand(card: CardId, command: CardCommand | null): Promise<Settled> {
-      return carry(planSetCommand(readPlaces(places), card, command), [])
+      return carry(planSetCommand(readPlaces(places), card, command), [], null)
     },
 
     /**
@@ -191,17 +210,27 @@ export function createCardCommands(deps: CardCommandDeps) {
      * (`planFreshFollow`), in this step. Its `rev` after.
      */
     async spend(
+      writer: WriterId,
       card: CardId,
       sent: { readonly sendId: string; readonly chat: Chat },
     ): Promise<number> {
       const cards = readPlaces(places)
       const followed = await followers(cards, card, sent)
-      const removed: readonly PlaceStep[] = cards.some(c => c.id === card)
-        ? [{ kind: "remove", id: card }]
-        : []
-      const rev = applyPlaceSteps(places, [...followed, ...removed])
-      await deps.cards.destroy(card)
-      return rev
+      const held = cards.some(c => c.id === card)
+      const { rev } = await carry(
+        {
+          kind: "steps",
+          steps: [
+            ...followed.steps,
+            ...(held ? [{ kind: "remove", id: card } as const] : []),
+          ],
+        },
+        [],
+        { kind: "spend", by: writer, message: followed.message },
+      )
+      // A card the host no longer holds may still have a text.
+      if (!held) await deps.cards.destroy(card)
+      return rev ?? places.rev()
     },
 
     /**
@@ -244,8 +273,20 @@ export function createCardCommands(deps: CardCommandDeps) {
         running,
       )
       if (step.kind !== "steps") return null
-      const { rev } = await carry(step, drain)
+      const { rev } = await carry(step, drain, {
+        kind: "queued-busy",
+        by: writer,
+      })
       return settled({ kind: "queued" }, rev)
+    },
+
+    /** Delete the traces the sender has seen (ADR-0048). */
+    async tracesSeen(
+      writer: WriterId,
+      ids: readonly string[],
+    ): Promise<Settled> {
+      await deps.provenance.seen(writer, ids)
+      return settled({ kind: "seen" })
     },
   }
 }

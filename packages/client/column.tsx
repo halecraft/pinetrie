@@ -22,6 +22,7 @@ import {
   type SeatRecord,
   type StopRecord,
   type ThreadLane,
+  type TraceRecord,
   type TreeIndex,
   threadOf,
   type WriterId,
@@ -31,6 +32,7 @@ import {
   cardsAt,
   effectiveBase,
   type OfferButton,
+  placeEnd,
   queuedOn,
   yourCard,
 } from "@pineta/rules"
@@ -69,6 +71,7 @@ import {
   NEW_PIN_TITLE,
   refusalKey,
   refusalWords,
+  traceWords,
 } from "./card-words.ts"
 import {
   AGENT_MARK,
@@ -117,6 +120,7 @@ import { keyMove } from "./reorder.ts"
 import type { ScreenMemory } from "./screen-memory.ts"
 import type { ColumnHow } from "./send.ts"
 import type { RowMemory } from "./tool-row.ts"
+import { keptTraces, seenBatches, traceGroups, tracesAt } from "./traces.ts"
 import { useAskBar } from "./use-ask-bar.ts"
 import { PLACED, useFollow } from "./use-follow.ts"
 import { useSeenBy } from "./use-presence.ts"
@@ -210,6 +214,11 @@ export interface ColumnProps {
   viewports?: ViewportStore
   /** Where columns were left, by message (ADR-0058). */
   spots?: SpotStore
+  /**
+   * Every trace, by id (ADR-0048): the column draws its reader's own at its
+   * thread's end. None in the Archive preview.
+   */
+  traces?: ReadonlyMap<string, TraceRecord>
   /** Each column's composer place, which a put lands in (`put-target.ts`). */
   composers: ComposerPlacesStore
 }
@@ -649,6 +658,42 @@ export function Column(p: ColumnProps) {
     setPinBox(undefined)
     setPinning(true)
   }
+  // Your traces where your cards were at this thread's end, when someone
+  // else moved them while you were away (ADR-0048). Drawn in a page you can
+  // see, a trace is seen: the host deletes it, and this column keeps drawing
+  // what it drew until it unmounts (`keptTraces`). Not in a column that
+  // cannot be written: the Archive preview is a glance, not a return.
+  const watches = writable && threadEnd !== null
+  const traces =
+    !watches || threadEnd === null
+      ? []
+      : tracesAt(
+          p.traces?.values() ?? [],
+          p.session.writer,
+          threadEnd,
+          (from, placer) =>
+            from.kind === "drafting" ||
+            from.kind === "queued" ||
+            from.kind === "pinned"
+              ? placeEnd(from, placer, p.lanes, index)
+              : null,
+        )
+  const [keptHere, setKeptHere] = useState<ReadonlyMap<string, TraceRecord>>(
+    () => new Map(),
+  )
+  const traceIds = traces.map(t => t.id).join(" ")
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on the traces here changing, and the page showing
+  useEffect(() => {
+    if (!visible) return
+    const unseen = traces.filter(t => !keptHere.has(t.id))
+    if (unseen.length === 0) return
+    setKeptHere(
+      kept => new Map([...kept, ...unseen.map(t => [t.id, t] as const)]),
+    )
+    for (const traces of seenBatches(unseen.map(t => t.id)))
+      void p.session.request({ kind: "traces-seen", traces })
+  }, [traceIds, visible])
+  const traceRows = traceGroups(keptTraces(keptHere, traces))
   // Closing a fresh column whose cards hold text asks first: they have no
   // thread to stay on. Keeping them in your inventory is the default, and can
   // be undone; discarding them is final (ADR-0048).
@@ -961,6 +1006,29 @@ export function Column(p: ColumnProps) {
               </div>
             )}
           </div>
+          {traceRows.length > 0 && (
+            <div className="traces">
+              {traceRows.map(g => {
+                const last = g.traces.at(-1)
+                return (
+                  last !== undefined && (
+                    <button
+                      className="trace"
+                      data-trace={g.traces.map(t => t.id).join(" ")}
+                      key={last.id}
+                      onClick={() =>
+                        p.onIntent({ kind: "openTrace", trace: last })
+                      }
+                      title="show where it is now"
+                      type="button"
+                    >
+                      {traceWords(g, reader)}
+                    </button>
+                  )
+                )
+              })}
+            </div>
+          )}
           {/* Everyone else's cards at this end (ADR-0048): shown in full, each
           editable and sendable by anyone here. */}
           {others.length > 0 && (

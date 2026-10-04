@@ -10,6 +10,14 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "traces seen may name none",
+    file: "packages/protocol/codec.ts",
+    from: "    value.length === 0 ||\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "decode: traces seen name 1 to MAX_TRACES_SEEN ids",
+  },
+  {
     name: "another thread's WIP line counts as this one's",
     file: trailers,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text

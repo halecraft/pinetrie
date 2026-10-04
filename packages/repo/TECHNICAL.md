@@ -19,8 +19,9 @@ host connects the two. The rule all three packages keep:
 > or name lives in core too, since neither can declare @pineta/rules.
 > What a stored shape says, and how the host changes it, is
 > @pineta/rules', whoever reads it. One client's own in-flight state
-> (its moves, held roots, slot repair, commands out) is @pineta/session's.
-> What the page draws, and its words, is @pineta/client's.
+> (its moves, held roots, slot repair, commands out) is its session's
+> (connectSession, in @pineta/client for now). What the page draws, and
+> its words, is @pineta/client's.
 
 `index.ts` names its exports: only what other packages use. The separate
 reads, the one-read path and the step planners stay inside, so the host

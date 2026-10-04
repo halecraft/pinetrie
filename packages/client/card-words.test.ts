@@ -1,6 +1,11 @@
 import {
+  atEntry,
+  type CardEvent,
   cardId,
+  entryId,
   laneNameForThread,
+  type PlaceKey,
+  rootIdFor,
   type ThreadName,
   writerId,
 } from "@pineta/core"
@@ -10,6 +15,8 @@ import {
   cardStatus,
   commandNote,
   commandWords,
+  historyWords,
+  movedBackWords,
   pinnedMarkerWords,
   pinnedStatusWords,
   pinnedWords,
@@ -17,8 +24,11 @@ import {
   refusalWords,
   retiredWords,
   sizeWords,
+  traceWords,
   unsentWords,
+  writtenWords,
 } from "./card-words.ts"
+import type { TraceGroup } from "./traces.ts"
 
 const ME = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
@@ -172,5 +182,81 @@ describe("pinned card words (ADR-0048 step 5)", () => {
     ],
   ])("%s", (_, said, expected) => {
     expect(said).toBe(expected)
+  })
+})
+
+describe("history and traces (ADR-0048 step 6)", () => {
+  const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+  const drafting: PlaceKey = {
+    kind: "drafting",
+    root: ROOT,
+    at: atEntry(entryId("e-1")),
+    lane: laneNameForThread("x"),
+  }
+  const queued: PlaceKey = {
+    kind: "queued",
+    root: ROOT,
+    at: atEntry(entryId("e-1")),
+    lane: laneNameForThread("x"),
+    seen: "",
+  }
+  const event = (over: Partial<CardEvent>): CardEvent => ({
+    kind: "moved",
+    by: BEA,
+    from: drafting,
+    to: queued,
+    at: 1,
+    ...over,
+  })
+  test.each([
+    [event({ kind: "created", by: ME, from: null }), "created by you"],
+    [event({}), "queued by Bea"],
+    [event({ from: queued, to: drafting }), "unqueued by Bea"],
+    [event({ to: { kind: "inventory", holder: BEA } }), "taken by Bea"],
+    [
+      event({ kind: "undone", from: queued, to: drafting }),
+      "unqueued by Bea (an undo)",
+    ],
+    [
+      event({ kind: "unsent", by: null, from: queued, to: drafting }),
+      "not sent: back below the line",
+    ],
+    [event({ kind: "followed", by: null }), "moved to the new thread"],
+  ] as const)("historyWords: %o", (e, words) => {
+    expect(historyWords(e, READER)).toBe(words)
+  })
+
+  const trace = (to: PlaceKey | null) => ({
+    id: "t",
+    for: ME,
+    card: cardId("c-1"),
+    by: BEA,
+    from: drafting,
+    to,
+    message: null,
+    at: 1,
+  })
+  test.each([
+    [{ by: BEA, verb: "queued", traces: [trace(queued)] }, "Bea queued this"],
+    [{ by: BEA, verb: "sent", traces: [trace(null)] }, "Bea sent this →"],
+    [{ by: BEA, verb: "took", traces: [trace(null)] }, "Bea took this"],
+    [
+      {
+        by: BEA,
+        verb: "moved",
+        traces: [trace(null), trace(null), trace(null)],
+      },
+      "3 cards moved by Bea",
+    ],
+  ] as const)("traceWords: %#", (group, words) => {
+    expect(traceWords(group as TraceGroup, READER)).toBe(words)
+  })
+
+  test("movedBackWords and writtenWords", () => {
+    expect(movedBackWords({ verb: "unpinned", by: BEA }, READER)).toBe(
+      "unpinned by Bea",
+    )
+    expect(writtenWords([ME, BEA], READER)).toBe("written by you, Bea")
+    expect(writtenWords([], READER)).toBeNull()
   })
 })

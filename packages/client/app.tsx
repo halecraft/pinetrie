@@ -67,6 +67,7 @@ import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { foldMemory } from "./ask-fold.ts"
 import { needsYouCount, pageTitle } from "./attention.ts"
+import { CardHistories } from "./card-history.tsx"
 import { cardMarks, ownCards } from "./card-marks.ts"
 import { Column, type ColumnProps } from "./column.tsx"
 import {
@@ -306,6 +307,8 @@ export function App({
     asks,
     stops,
     digests,
+    histories,
+    traces,
   } = useSelector(heldView, readSessionFacts)
   // Every card's record (ADR-0059): the host's places, with this tab's moves
   // drawn over them until its copy holds them. An unchanged card keeps its
@@ -939,8 +942,20 @@ export function App({
     seats,
     session,
     takeFocus,
+    traces,
     work: workFacts,
   }
+  // What every card's history reads (`card-history.tsx`): one object while
+  // its parts are the same, since every card's editor reads it.
+  const historyFacts = useMemo(
+    () => ({
+      histories,
+      seats,
+      session,
+      reader: { me: session.writer, nameOf },
+    }),
+    [histories, seats, session, nameOf],
+  )
 
   /** A root, read-only, for the Archive tab: its rail and one column. */
   const preview = (r: EntryId) => (
@@ -956,7 +971,7 @@ export function App({
 
   const { workspace } = view
   return (
-    <>
+    <CardHistories value={historyFacts}>
       <header id="top">
         <div className="header-left">
           <h1>pineta</h1>
@@ -1128,7 +1143,7 @@ export function App({
           </main>
         </>
       )}
-    </>
+    </CardHistories>
   )
 }
 

@@ -3,15 +3,23 @@
 
 import type {
   CardCommand,
+  CardEvent,
   CatchUpFrom,
   ParentThread,
   ThreadBase,
   WriterId,
 } from "@pineta/core"
-import { catchUpName, displayName, type PinnedStatus } from "@pineta/rules"
+import {
+  catchUpName,
+  displayName,
+  type PinnedStatus,
+  type Verb,
+  verbOf,
+} from "@pineta/rules"
 import type { CardRefusal } from "@pineta/session"
 import type { PinnedMarker } from "./column-view.ts"
 import { lineWords, type Reader } from "./send.ts"
+import type { TraceGroup } from "./traces.ts"
 
 /** What a thread catches up with, for a command's words. */
 export interface CatchUps {
@@ -191,3 +199,87 @@ export const pinnedMarkerWords = (marker: PinnedMarker): string =>
 /** A card the agent was told no longer applies, by its first line. */
 export const retiredWords = (line: string): string =>
   `no longer applies: “${line}”`
+
+// ── history and traces (ADR-0048 step 6) ──────────────────────────────────
+
+/** A card's button that shows where it has been. */
+export const HISTORY = "history"
+export const HISTORY_TITLE = "where this card has been, and who moved it"
+
+/** A verb as it reads after "by": "queued by Bea", "taken by Carl". */
+const PARTICIPLE: Readonly<Record<Verb, string>> = {
+  created: "created",
+  sent: "sent",
+  queued: "queued",
+  unqueued: "unqueued",
+  pinned: "pinned",
+  unpinned: "unpinned",
+  took: "taken",
+  put: "put",
+  moved: "moved",
+}
+
+/** One event in a card's history. */
+export function historyWords(event: CardEvent, reader: Reader): string {
+  const by = event.by === null ? "" : ` by ${who(event.by, reader)}`
+  switch (event.kind) {
+    case "created":
+      return `created${by}`
+    case "unsent":
+      return "not sent: back below the line"
+    case "followed":
+      return "moved to the new thread"
+    case "moved":
+    case "undone":
+    case "redone": {
+      const verb = PARTICIPLE[verbOf(event.from, event.to)]
+      const undo =
+        event.kind === "undone"
+          ? " (an undo)"
+          : event.kind === "redone"
+            ? " (a redo)"
+            : ""
+      return `${verb}${by}${undo}`
+    }
+  }
+}
+
+/** A verb as its doer does it: "Bea queued this", "Carl took this". */
+const ACTIVE: Readonly<Record<Verb, string>> = {
+  created: "created",
+  sent: "sent",
+  queued: "queued",
+  unqueued: "unqueued",
+  pinned: "pinned",
+  unpinned: "unpinned",
+  took: "took",
+  put: "put",
+  moved: "moved",
+}
+
+/**
+ * Where your card was when someone else moved it: "Bea queued this", "Bea
+ * sent this →"; several at one spot by one person, "3 cards moved by Bea".
+ */
+export function traceWords(group: TraceGroup, reader: Reader): string {
+  const name = who(group.by, reader)
+  const n = group.traces.length
+  if (n > 1) return `${n} cards ${PARTICIPLE[group.verb]} by ${name}`
+  const arrow = group.verb === "sent" ? " →" : ""
+  return `${name} ${ACTIVE[group.verb]} this${arrow}`
+}
+
+/** A card someone else moved back below the line: "unqueued by Bea". */
+export const movedBackWords = (
+  moved: { readonly verb: "unqueued" | "unpinned"; readonly by: WriterId },
+  reader: Reader,
+): string => `${moved.verb} by ${who(moved.by, reader)}`
+
+/** Who has text in a card, under its history: "written by you, Bea". */
+export const writtenWords = (
+  writers: readonly WriterId[],
+  reader: Reader,
+): string | null =>
+  writers.length === 0
+    ? null
+    : `written by ${writers.map(w => who(w, reader)).join(", ")}`

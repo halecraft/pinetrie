@@ -50,6 +50,7 @@ export interface CommandDeps {
   readonly titles: ChatDeps["titles"] & Pick<Titles, "asked">
   readonly drain: CardCommandDeps["drain"]
   readonly histories: CardCommandDeps["histories"]
+  readonly provenance: CardCommandDeps["provenance"]
   /** The documents' keeper: a `documents` command is one step on it. */
   readonly keeper: Pick<HostKeeper, "run" | "track">
 }
@@ -164,7 +165,7 @@ export function createCommands(deps: CommandDeps): Commands {
         if (spendsCard(sent))
           return settled(
             sent,
-            await cardCommands.spend(card.id, { sendId, chat: intent }),
+            await cardCommands.spend(writer, card.id, { sendId, chat: intent }),
           )
         if (sent.kind === "busy")
           return (
@@ -179,6 +180,8 @@ export function createCommands(deps: CommandDeps): Commands {
         return cardCommands.undoMove(writer, intent.root, intent.direction)
       case "set-command":
         return cardCommands.setCommand(intent.card, intent.command)
+      case "traces-seen":
+        return cardCommands.tracesSeen(writer, intent.traces)
       case "name":
         await agent.writeValues([
           setRecord(PARTICIPANT, { writer, name: intent.name }),

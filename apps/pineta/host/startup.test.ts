@@ -51,6 +51,7 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
     stored: async () => [],
     destroyDocs: async () => {},
   }).port,
+  provenance: { sweep: async () => {} },
   ...over,
 })
 

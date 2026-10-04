@@ -2,6 +2,8 @@
 // record reads back whole from what is stored.
 
 import {
+  atEntry,
+  cardId,
   commitId,
   entryId,
   laneNameForThread,
@@ -18,6 +20,7 @@ import {
   ARCHIVE,
   BANNER,
   BASE,
+  CARD_HISTORY,
   COMMANDS,
   DIGEST,
   deleteRecord,
@@ -37,6 +40,7 @@ import {
   STOP,
   setIfChanged,
   setRecord,
+  TRACE,
   VERDICT,
 } from "./index.ts"
 
@@ -208,6 +212,45 @@ const SAMPLES: readonly Sample[] = [
   sample("commands", COMMANDS, { commands: [] }, null),
   sample("root", ROOT, rootRecord, "root"),
   sample(
+    "card history",
+    CARD_HISTORY,
+    {
+      card: cardId("c-1"),
+      events: [
+        {
+          kind: "created",
+          by: ADA,
+          from: null,
+          to: { kind: "drafting", root: TEST_ROOT, at: atEntry(E), lane: L },
+          at: 1,
+        },
+        {
+          kind: "moved",
+          by: null,
+          from: { kind: "drafting", root: TEST_ROOT, at: atEntry(E), lane: L },
+          to: { kind: "inventory", holder: ADA },
+          at: 2,
+        },
+      ],
+    },
+    "card",
+  ),
+  sample(
+    "trace",
+    TRACE,
+    {
+      id: "t-1",
+      for: ADA,
+      card: cardId("c-1"),
+      by: writerId("bea@x.io"),
+      from: { kind: "pinned", root: TEST_ROOT, at: atEntry(E), lane: null },
+      to: null,
+      message: entryId("e-3"),
+      at: 3,
+    },
+    "id",
+  ),
+  sample(
     "verdict",
     VERDICT,
     {
@@ -242,7 +285,7 @@ describe.each(SAMPLES)("%s", (_, spec, record, keyField) => {
     if (keyField === null || typeof write.value !== "object") return
     const old = {
       key: write.key,
-      value: { ...(record as object), [keyField]: "a-stale-copy" },
+      value: { ...(write.value as object), [keyField]: "a-stale-copy" },
     }
     expect(recordsOf(spec, [old]).get(write.key)).toEqual(record)
   })
@@ -298,6 +341,8 @@ test("each record lives where it is read (ADR-0063): across roots in the session
     project: "session",
     commands: "session",
     root: "session",
+    "card history": "session",
+    trace: "session",
     verdict: "session",
   })
 })

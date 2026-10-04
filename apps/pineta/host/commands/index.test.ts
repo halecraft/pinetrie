@@ -12,7 +12,7 @@ import type { WireCommand } from "@pineta/protocol/codec"
 import type { Reply } from "@pineta/protocol/messages"
 import { readPlaces } from "@pineta/reads"
 import { ARCHIVE, setRecord } from "@pineta/rules"
-import { writeEntry } from "@pineta/schema"
+import { newPresenceDoc, writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
 import type { HostKey } from "../basics.ts"
 import {
@@ -26,6 +26,7 @@ import {
 } from "../fakes.ts"
 import type { Offers } from "../offers/index.ts"
 import { applyPlaceSteps } from "../places.ts"
+import { createProvenance } from "../provenance.ts"
 import { type CommandDeps, createCommands, placeOfCommand } from "./index.ts"
 
 const ALICE = writerId("alice@example.com")
@@ -69,6 +70,12 @@ function setUp(
     }).port,
     drain: lane => void drains.push(lane),
     histories: record<CommandDeps["histories"]>().port,
+    // Its own writes, so a test counting the agent's sees only the command's.
+    provenance: createProvenance({
+      basics: b,
+      presence: newPresenceDoc(),
+      agent: () => ({ writeValues: async w => applyWrites(b, w) }),
+    }),
     titles: titles.port,
     keeper,
   })

@@ -11,17 +11,16 @@ modules decide, and the host writes.
 The package was `@pineta/marginalia` (`packages/marginalia/`) until it was
 renamed; the ADRs and findings use that name.
 
-Where a rule lives, as `@pineta/core`, `@pineta/repo` and `@pineta/session`
-state it too:
+Where a rule lives, as `@pineta/core` and `@pineta/repo` state it too:
 
 > Core holds the vocabulary (ids, intents, every record's type) and the
 > reads of the tree. A format or type that `lanes` or `repo` must read,
 > write or name lives in core too, since neither can declare
 > `@pineta/rules`. What a stored shape says, and how the host changes it,
 > is `@pineta/rules`', whoever reads it. One client's own in-flight state
-> (its moves, held roots, slot repair, commands out) is
-> `@pineta/session`'s. What the page draws, and its words, is
-> `@pineta/client`'s.
+> (its moves, held roots, slot repair, commands out) is its session's
+> (`connectSession`, in `@pineta/client` for now). What the page draws,
+> and its words, is `@pineta/client`'s.
 
 So `planStop` is here beside `STOP`, and `agentByDefault` beside
 `addressChat`; `address`, `parseMentions` and `moveOf`, which know no
@@ -341,6 +340,41 @@ which are swept.
 - **`planCardSweep`**: records whose text is empty and that carry no
   command, and stored `card:` documents with no record, a spent or empty
   card's among them.
+
+# Card history and traces (`card-history.ts`, ADR-0048 step 6)
+
+Each card's history and the traces left where someone else moved your card.
+Both are session records the host writes: `CARD_HISTORY`
+(`pineta.card-history`, keyed by the card, deleted with it) and `TRACE`
+(`pineta.trace`, keyed by its own id, since a trace outlives its card). A
+place in them is stored as core's flat key fields (`placeFields`,
+`keyOfFields`), the wire's own codec; an event whose place this build cannot
+read is dropped, not its history.
+
+- **`planProvenance` is the one decision**, from the cards before and after
+  a write, the cause, the records, the presence pairs (`reading`) and each
+  shared card's thread end before the write (`ends`). It diffs, so an undo,
+  whose revert Kyneta writes, is read like any other write.
+  - A card that appeared is `created`; one whose key changed gets `moved`,
+    `undone`, `redone`, `unsent` (the host wrote a queued card back below
+    the line with `unsent`) or `followed` (a fresh card to drafting); one
+    that went has its history deleted. A reorder changes no key, and adds
+    nothing.
+  - **A trace** is left for the card's placer when a person (not the host)
+    other than the placer moved it out of a shared place (drafting, queued,
+    pinned), it was not an unqueue or an unpin, and no presence pair has the
+    placer at the card's end. A card whose end is unknown (its root not
+    loaded) counts as not watched. A spend's trace carries the message.
+  - **A trace whose card is back at its `from`** is deleted.
+  - Histories keep `HISTORY_EVENTS` (50): the first event and the newest.
+- **`verbOf(from, to)`** is the one rule for what a change is called: sent,
+  queued, unqueued, pinned, unpinned, took, put, moved or created. The
+  page's words read it; nothing stores a verb.
+- **`movedBackBy`**: who unqueued or unpinned a card, when that is the last
+  thing that happened to it and it was not its owner.
+- **`planTraceSweep`**: traces older than `TRACE_MAX_AGE_MS` (30 days), and
+  histories whose card has no record (the startup sweep's empty cards, or a
+  crash between the places write and the history's).
 
 # Seats (`seat.ts`, ADR-0048)
 

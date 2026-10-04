@@ -96,6 +96,15 @@ about 55 ms (S59).
   presence (the reported columns, the refresh, `typing`); writing reads
   nothing.
 
+- **`readSessionFacts` keeps each fact it did not change, by identity.**
+  Any write to the session's values (a directory refresh, a card's move,
+  which writes its history) reads every fact again, and each read builds
+  new maps. `keptFacts` (`projection.ts`) keeps the previous value of each
+  fact that reads the same (`sameData`), per held view, and the whole
+  object when nothing changed; the tree and the asks are kept by their own
+  reads, and compared by identity. Without it, a card moved by someone else
+  redrew every message list (the browser suite's "another window's card
+  redraws the column and none of its messages").
 - **Every subscription is `useSelector(ref, read)` over a named read**, never
   an inline `useTracked(() => …)`. `useTracked` re-runs a thunk that is a new
   function, so an inline one reads the document again on every render,
@@ -1628,8 +1637,9 @@ the session sends moves and draws them until its copy holds them
 - **Who wrote in a card** is `writersOfClients(textClients(cardText), seats)`: its
   Yjs `clientID`s, through the host's seat records (`readSessionFacts`
   reads them). Provisional (ADR-0048): undo does not remove a `clientID`, so
-  someone who undid everything they wrote is still named. Step 6 replaces it
-  with a projection of the card's history; marks do not use it.
+  someone who undid everything they wrote is still named. It stays until
+  Kyneta can name the writers whose text still stands
+  (ADR-0048, *Who contributed*); marks do not use it.
 - **Closing a fresh column whose cards hold text** asks in its header: keep
   in inventory, the default (`keep`, below), or discard, which asks the host
   to remove them, outside any history, since no column could show them
@@ -1686,6 +1696,36 @@ stays in view; the strip scrolls past 30vh.
   `.pinned-status[data-status]`, and `details.pinned-read` just before its
   prompt's `.msg`.
 
+## History and traces (ADR-0048 step 6)
+
+- **Each card's editor has a history button** (`card-history.tsx`): the
+  composer's, others' cards', and every `BoundCardEditor`'s (queued, pinned,
+  the inventory's selected card). Its popover lists `historyWords` for each
+  event, oldest first, then `writtenWords`, the card's writers, read only
+  while it is open. A card someone other than its owner unqueued or
+  unpinned says so beside its heading (`MovedBack`, `movedBackBy`).
+- **They read by context, not props** (`CardHistories`): `App` reads the
+  histories with the session's facts and provides them, the seats, the
+  session and the reader, in one object kept while those are the same, as
+  `pane-context.ts` does for a message. A prop would pass through five
+  editors.
+- **A column draws your traces at its thread's end** (`traces.ts`):
+  `tracesAt` keeps yours whose place resolves to this end (`placeEnd`, as a
+  card there would), `traceGroups` makes one line per person and verb
+  (`verbOf`), and `traceWords` words it ("Bea queued this", "3 cards moved
+  by Bea"). Only a column that can be written draws them: the Archive
+  preview is a glance.
+- **A click is `openTrace`** (`planOpenTrace`, `card-intents.ts`): the card's
+  place now, as an undo's answer shows it (`revealOf`); a sent card's
+  message; nothing for a card in someone else's inventory.
+- **Seen is the host's.** An effect in `Column` sends `traces-seen` for the
+  traces it draws, once each, while its `visible` state says the page can
+  be seen (the read marks' condition, ADR-0077). The host deletes them; the
+  column keeps drawing what it drew until it unmounts (`keptTraces`).
+- **Selectors for the browser suite:** `.trace` (with `data-trace`, its ids)
+  inside `.traces`; `.card-history-trigger`, `.card-history-box` and its
+  `li[data-event]`; `.moved-back`.
+
 ## Marks for your cards (ADR-0048, step 2)
 
 A pip in your colour (`CardPip`, `.card-pip`, the one selector the suites
@@ -1716,9 +1756,9 @@ so it never lights the tab (`elsewhere`).
   column's composer shows the text; scrolled away or closed, the column
   cannot show a mark, and the rail shows every thread. `railKeep` keeps the
   marked ends out of runs, so a mark is always on a dot.
-- **Only your own cards count.** Cards you contributed to wait for step 6,
-  where who contributed is a projection of the card's history and follows
-  undo.
+- **Only your own cards count.** Cards you contributed to wait until
+  Kyneta can name the writers whose text still stands (ADR-0048, *Who
+  contributed*), so that the count follows undo.
 
 ## Your inventory (ADR-0048 step 4, ADR-0059)
 

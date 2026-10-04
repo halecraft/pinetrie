@@ -25,6 +25,8 @@ import {
   ancestry,
   type BannerRecord,
   type BaseRecord,
+  type CardHistoryRecord,
+  type CardId,
   type CardRecord,
   type CommandSummary,
   type DigestRecord,
@@ -58,6 +60,7 @@ import {
   summarizeRoots,
   type ThreadLane,
   type ThreadName,
+  type TraceRecord,
   type TreeIndex,
   type VerdictRecord,
   type WorkSetting,
@@ -69,6 +72,7 @@ import {
   ARCHIVE,
   BANNER,
   BASE,
+  CARD_HISTORY,
   COMMANDS,
   COMMANDS_KEY,
   DIGEST,
@@ -96,6 +100,7 @@ import {
   renderableMessage,
   SEAT,
   STOP,
+  TRACE,
   VERDICT,
 } from "@pineta/rules"
 import {
@@ -520,6 +525,16 @@ export const readStops = (
 ): ReadonlyMap<EntryId, StopRecord> => readRecords(doc, STOP)
 
 /** Each thread's last run's verdict (`pineta.verdict`, ADR-0077), by lane. */
+/** Every card's history (`pineta.card-history`, ADR-0048 step 6), by card. */
+export const readCardHistories = (
+  doc: SessionDocHandle,
+): ReadonlyMap<CardId, CardHistoryRecord> => readRecords(doc, CARD_HISTORY)
+
+/** Every trace (`pineta.trace`, ADR-0048), by id. */
+export const readTraces = (
+  doc: SessionDocHandle,
+): ReadonlyMap<string, TraceRecord> => readRecords(doc, TRACE)
+
 export const readVerdicts = (
   doc: SessionDocHandle,
 ): ReadonlyMap<LaneName, VerdictRecord> => readRecords(doc, VERDICT)
