@@ -7,7 +7,6 @@
 import {
   type BaseMerge,
   type CardCommand,
-  type CatchUpFrom,
   type CommitId,
   type EntryId,
   ERR,
@@ -42,6 +41,7 @@ import {
   LANDING,
   type LandMessage,
   landingRecord,
+  mergedFrom,
   type ParentNow,
   parentNow,
   planParentUpdate,
@@ -78,7 +78,7 @@ function updateRefusal(code: UpdateRefusal): string {
     case ERR.BASE_GONE:
       return "this thread's WIP bookmark is gone: continue it on the line"
     case ERR.NO_PARENT:
-      return "this thread began from the project, not from another thread"
+      return "this thread did not branch from another thread's copy"
     case ERR.PARENT_RUNNING:
       return "the thread this one branched from is working: catch up when its run ends"
   }
@@ -177,12 +177,7 @@ export function planSettle(
   },
 ): Settle {
   const { lane, by, from } = ctx
-  const caughtUp: CatchUpFrom =
-    from.kind === "line"
-      ? { kind: "line" }
-      : from.kind === "wip"
-        ? { kind: "wip", bookmark: from.bookmark }
-        : { kind: "parent", lane: from.lane, name: from.name }
+  const caughtUp = mergedFrom(from)
   const bookmark =
     from.kind === "line"
       ? from.onto

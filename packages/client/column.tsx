@@ -70,7 +70,6 @@ import {
   type HeadOrigin,
   headLane,
   identityWords,
-  parentOfLane,
   type ReserveStep,
   type ReviewTarget,
   START_WORDS,
@@ -393,27 +392,6 @@ export function Column(p: ColumnProps) {
           p.lanes,
           index,
         )
-  // What a card's command catches up with: the thread's base (ADR-0060),
-  // or the thread it branched from (ADR-0072).
-  const parent =
-    lane.kind === "lane"
-      ? parentOfLane(index, p.work, p.lanes, lane.name)
-      : null
-  const baseRecord =
-    lane.kind === "lane" ? (p.work.bases.get(lane.name) ?? null) : null
-  // One object while what it says is the same: the composer is memoised.
-  const parentLane = parent?.lane ?? null
-  const parentName = parent?.name ?? null
-  const catchUps: CatchUps = useMemo(
-    () => ({
-      base: effectiveBase(baseRecord),
-      parent:
-        parentLane === null || parentName === null
-          ? null
-          : { kind: "parent", lane: parentLane, name: parentName },
-    }),
-    [baseRecord, parentLane, parentName],
-  )
   // Your last offer command on this lane: in flight, refused or failed.
   const acting = useSyncExternalStore(
     p.session.acting.subscribe,
@@ -435,6 +413,23 @@ export function Column(p: ColumnProps) {
     lanes: p.lanes,
     work: p.work,
   })
+  // What a card's command catches up with: the thread's base (ADR-0060),
+  // or the thread it branched from (ADR-0072). One object while what it
+  // says is the same: the composer is memoised.
+  const baseRecord =
+    lane.kind === "lane" ? (p.work.bases.get(lane.name) ?? null) : null
+  const parentLane = shows.parent?.lane ?? null
+  const parentName = shows.parent?.name ?? null
+  const catchUps: CatchUps = useMemo(
+    () => ({
+      base: effectiveBase(baseRecord),
+      parent:
+        parentLane === null || parentName === null
+          ? null
+          : { kind: "parent", lane: parentLane, name: parentName },
+    }),
+    [baseRecord, parentLane, parentName],
+  )
   // The thread is named before its first send (ADR-0057). The step changes
   // with the person's typing (`createsLane`) and as the name arrives, so the
   // effect runs once per step, not once per render.

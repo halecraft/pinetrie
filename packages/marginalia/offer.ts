@@ -487,10 +487,7 @@ export function offerView(input: {
     catchUp: input.catchUp,
     untraced: input.untraced,
     conflictCause: cause,
-    parent:
-      ahead === null
-        ? null
-        : { kind: "parent", lane: ahead.lane, name: ahead.name },
+    parent: ahead,
     parentResolves,
   }
   const destinations =

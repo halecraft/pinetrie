@@ -697,10 +697,11 @@ became of its files (`strip`).
   `baseChoices`'. A card's command is worded from `CatchUps` (the thread's
   base and its parent), which `Column` keeps as one object while it says
   the same, since the composer is memoised.
-- **The thread a thread branched from** (`parentOfLane`, `parentNow`,
-  ADR-0072) is read from the column's tree, the revisions and each lane's
-  thread end, with no read of your repo. `offerView` takes it and whether
-  its lane runs. A conflicted offer whose conflict came with its copy says
+- **The thread a thread branched from** (`parentNow`, ADR-0072) is read
+  from the column's tree, the revisions and each lane's thread end, with no
+  read of your repo, once per `columnView` (`ColumnShows.parent`): the
+  strip's `offerView` takes it with whether its lane runs, and `Column`
+  words the composer's commands from it. A conflicted offer whose conflict came with its copy says
   "began from a copy with an unresolved conflict in N files", adding "·
   \<parent\> has resolved it" with "catch up with \<parent\>" as its button
   when the parent holds those files resolved; every other conflicted offer's

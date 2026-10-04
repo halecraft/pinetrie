@@ -729,6 +729,14 @@ export function planParentUpdate(
   }
 }
 
+/** What a merge planned for an update merges, as `catchUpName` words it. */
+export const mergedFrom = (merge: BaseMerge): CatchUpFrom =>
+  merge.kind === "line"
+    ? { kind: "line" }
+    : merge.kind === "wip"
+      ? { kind: "wip", bookmark: merge.bookmark }
+      : { kind: "parent", lane: merge.lane, name: merge.name }
+
 /**
  * What a catch-up merges, as people read it: the integration line is "the
  * project", whatever its bookmark is called; a WIP is its bookmark; the

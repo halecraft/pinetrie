@@ -93,7 +93,7 @@ export interface WorkFacts {
  * The thread `lane` branched from, and where both stand (`parentNow`,
  * ADR-0072), from the column's tree and each lane's thread end.
  */
-export const parentOfLane = (
+const parentOfLane = (
   index: TreeIndex,
   work: Pick<WorkFacts, "revisions" | "names">,
   lanes: readonly LaneView[],
@@ -302,6 +302,8 @@ export interface ColumnShows {
   readonly base: string | null
   /** Catching up would change files in the thread (`catchUpOf`'s `brings`). */
   readonly behind: { readonly mark: string; readonly title: string } | null
+  /** The thread this one branched from, and where both stand (ADR-0072); null for none. */
+  readonly parent: ParentNow | null
 }
 
 /**
@@ -342,6 +344,8 @@ export function columnView(f: ColumnFacts): ColumnShows {
     head === null ? undefined : work.bases.get(head),
     work.line,
   )
+  const parent =
+    lane.kind === "lane" ? parentOfLane(index, work, f.lanes, lane.name) : null
   return {
     identity: identityOf(
       head,
@@ -352,10 +356,11 @@ export function columnView(f: ColumnFacts): ColumnShows {
     banner: bannerOf(bannerUrl(head, work.banners), f.mountedBanner),
     origin: originOf(f, stretches),
     joins: joinsOf(view, stretches, work.names),
-    strip: workStrip(f),
+    strip: workStrip(f, parent),
     reserve: reserveStep(f),
     base: baseWords(head === null ? undefined : work.bases.get(head)),
     behind,
+    parent,
   }
 }
 
@@ -536,7 +541,7 @@ function joinsOf(
 
 const NO_STRIP: WorkStrip = { kind: "none" }
 
-function workStrip(f: ColumnFacts): WorkStrip {
+function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip {
   const { lane, work } = f
   const project = work.project
   if (!f.writable || lane.kind !== "lane" || project === null) return NO_STRIP
@@ -563,7 +568,6 @@ function workStrip(f: ColumnFacts): WorkStrip {
   if (project.kind !== "lanes") return NO_STRIP
   const offer = offerStatus(work.offers.get(lane.name))
   const base = work.bases.get(lane.name) ?? null
-  const parent = parentOfLane(f.index, work, f.lanes, lane.name)
   const view = offerView({
     offer,
     activity: activityOf(f.index, lane),
