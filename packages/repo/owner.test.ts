@@ -35,7 +35,17 @@ async function repo(name: string) {
   await jj("bookmark", "create", DEFAULT_LINE.onto, "-r", "@-")
   const heads = async () =>
     (await readdir(await headsDir(dir))).filter(h => /^[0-9a-f]+$/.test(h))
-  return { dir, jj, heads }
+  /**
+   * Two operation heads, as two jj processes racing leave them. Call it with
+   * no owner watching: a live owner's watch merges them.
+   */
+  const diverge = async () => {
+    const op = (await jj("op", "log", "--no-graph", "-n", "1", "-T", "id"))
+      .stdout
+    await jj("--ignore-working-copy", "describe", "-m", "one")
+    await jj("--ignore-working-copy", "--at-op", op, "describe", "-m", "two")
+  }
+  return { dir, jj, heads, diverge }
 }
 
 /** An owner on `dir`, with what it reports and which steps it ran. */
@@ -183,22 +193,14 @@ describe("the owner of your repo", () => {
     close(owner)
   })
 
-  test("a pinned read with two heads leaves two; the observation merges them and names the result", async () => {
-    const { dir, jj, heads } = await repo("divergent")
+  test("an owner started on two heads observes before it reads: the observation merges them and names the result", async () => {
+    const { dir, heads, diverge } = await repo("divergent")
+    await diverge()
+    expect(await heads()).toHaveLength(2)
     const { owner } = own(dir, 10 * 60_000)
     await owner.idle()
-    const old = (await jj("op", "log", "--no-graph", "-n", "1", "-T", "id"))
-      .stdout
-    await jj("--ignore-working-copy", "describe", "-m", "x")
-    await jj("--ignore-working-copy", "--at-op", old, "describe", "-m", "y")
-    expect(await heads()).toHaveLength(2)
-    owner.close()
-    // A second owner, on the divergent repo, before it observes: reads are
-    // pinned to the head it observed, so it must observe first.
-    const second = own(dir, 10 * 60_000)
-    await second.owner.idle()
     expect(await heads()).toHaveLength(1)
-    const seen = await second.owner.read(
+    const seen = await owner.read(
       async ops =>
         (
           await ops.jj([
@@ -213,13 +215,20 @@ describe("the owner of your repo", () => {
         ).stdout,
     )
     expect(seen).toContain("reconcile divergent operations")
-    // Divergent again: the pinned read leaves both heads.
-    const now = (await jj("op", "log", "--no-graph", "-n", "1", "-T", "id"))
-      .stdout
-    await jj("--ignore-working-copy", "describe", "-m", "z")
-    await jj("--ignore-working-copy", "--at-op", now, "describe", "-m", "w")
-    await second.owner.read(ops => ops.jj(["log", "--no-graph", "-r", "@"]))
+    close(owner)
+  })
+
+  test("a pinned read with two heads leaves two", async () => {
+    const { dir, heads, diverge } = await repo("pinned")
+    const { owner } = own(dir, 10 * 60_000)
+    await owner.idle()
+    // `close` stops the watch and `idle` waits out an observation already
+    // queued, so only the read could merge the heads. A closed owner still
+    // reads: `read` does not go through the keeper.
+    owner.close()
+    await owner.idle()
+    await diverge()
+    await owner.read(ops => ops.jj(["log", "--no-graph", "-r", "@"]))
     expect(await heads()).toHaveLength(2)
-    second.owner.close()
   })
 })

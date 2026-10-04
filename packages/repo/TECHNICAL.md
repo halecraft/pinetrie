@@ -304,7 +304,11 @@ operation is read once and kept until the head moves.**
   a read in the same step, or after it, sees it; a step that only read
   observes nothing; your `jj describe` is seen through the watch with no
   timer; a pinned read leaves two heads two, and an observation merges
-  them; jj's words for an operation that is gone.
+  them; jj's words for an operation that is gone. Only a test of the watch
+  writes to the repo while an owner is live: the watch merges two heads, so
+  a test that counts them makes them (`diverge`) before an owner starts, or
+  after it is closed and idle. Otherwise, the count races the watch, and
+  the test fails under load.
 - **`repo.test.ts`**: a lane's whole life against jj and git, in throwaway
   repos on the host, with no container: the lane's steps from `lanes`, its
   bundle fetched into your repo (`planBundle`, then `planImport`, whose
