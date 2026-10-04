@@ -12,6 +12,8 @@ Amended by ADR-0061: archiving a root withdraws its threads' offers from
 your repo, and restoring builds them again.
 Amended by ADR-0068: a track is a branch's colour, by creation order, not
 its place on the rail.
+Amended by ADR-0081: the tab bar is the header, and the tab you are on is
+drawn as part of the page.
 
 **Context.** The rail draws every tree in one strip, one after another, and
 columns from different trees sit side by side. `projectRail` starts each

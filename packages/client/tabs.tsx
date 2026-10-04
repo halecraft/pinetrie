@@ -33,8 +33,8 @@ import { peopleHere, readersByRoot } from "./here.ts"
 import type { Intent } from "./intent.ts"
 import { Menu } from "./menu.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
-import { planTitle, renameKey } from "./root-label.ts"
-import { dropsWords, renameIntent, type TabsView } from "./tabs-view.ts"
+import { messageCountTitle, planTitle, renameKey } from "./root-label.ts"
+import { dropsWords, renameIntent, type TabsView, tabKey } from "./tabs-view.ts"
 import { useReadingAt, useReadingRoots } from "./use-presence.ts"
 
 /** Left and Right move focus between tabs. */
@@ -84,6 +84,15 @@ export function TabBar({
       ?.focus()
     setRefocus(null)
   }, [refocus])
+  // The tab you are on, scrolled into the bar's view as you choose it.
+  // `.tab-list`'s scroll padding keeps it clear of the sticky Archive tab.
+  const here = view.selected === null ? null : tabKey(view.selected)
+  useEffect(() => {
+    if (here === null) return
+    nav.current
+      ?.querySelector(".tab-wrap[data-selected]")
+      ?.scrollIntoView({ inline: "nearest", block: "nearest" })
+  }, [here])
   return (
     <nav aria-label="threads" id="tabs" ref={nav}>
       <div
@@ -93,32 +102,44 @@ export function TabBar({
         role="tablist"
       >
         {view.tabs.map(tab => {
+          const key = tabKey(tab)
           if (tab.kind === "archive")
             return (
-              <button
-                aria-selected={tab.selected}
-                className="tab tab-archive"
-                data-tab="archive"
-                key="archive"
-                onClick={() => onIntent(tab.show)}
-                role="tab"
-                tabIndex={tab.selected ? 0 : -1}
-                type="button"
+              <span
+                className="tab-wrap"
+                data-selected={tab.selected || undefined}
+                key={key}
               >
-                {tab.status !== null && (
-                  <StatusMark
-                    arrived={null}
-                    level={tab.status}
-                    title={archiveWords(tab.status)}
-                  />
-                )}
-                Archive
-                {tab.pip && pip}
-              </button>
+                <button
+                  aria-selected={tab.selected}
+                  className="tab tab-archive"
+                  data-messages={tab.messages.total}
+                  data-tab="archive"
+                  onClick={() => onIntent(tab.show)}
+                  role="tab"
+                  tabIndex={tab.selected ? 0 : -1}
+                  title={messageCountTitle(tab.messages)}
+                  type="button"
+                >
+                  {tab.status !== null && (
+                    <StatusMark
+                      arrived={null}
+                      level={tab.status}
+                      title={archiveWords(tab.status)}
+                    />
+                  )}
+                  {tab.label}
+                  {tab.pip && pip}
+                </button>
+              </span>
             )
           if (tab.kind === "new")
             return (
-              <span className="tab-wrap" key={`new:${tab.key}`}>
+              <span
+                className="tab-wrap"
+                data-selected={tab.selected || undefined}
+                key={key}
+              >
                 <button
                   aria-selected={tab.selected}
                   className="tab tab-new"
@@ -144,7 +165,11 @@ export function TabBar({
           const { root } = tab
           if (renaming === root)
             return (
-              <span className="tab-wrap" key={`root:${root}`}>
+              <span
+                className="tab-wrap"
+                data-selected={tab.selected || undefined}
+                key={key}
+              >
                 <TitleField
                   onEnd={focusTab => {
                     setRenaming(null)
@@ -157,7 +182,11 @@ export function TabBar({
               </span>
             )
           return (
-            <span className="tab-wrap" key={`root:${root}`}>
+            <span
+              className="tab-wrap"
+              data-selected={tab.selected || undefined}
+              key={key}
+            >
               <button
                 aria-selected={tab.selected}
                 className={["tab", "tab-root", tab.archived ? "archived" : ""]

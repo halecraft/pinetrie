@@ -301,7 +301,3 @@ export function attentionWords(
       return "the agent is finishing"
   }
 }
-
-/** The page's title: the badge's count first, so a background tab shows it. */
-export const pageTitle = (count: number): string =>
-  count === 0 ? "Pineta" : `(${count}) Pineta`

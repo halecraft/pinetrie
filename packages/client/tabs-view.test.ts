@@ -18,9 +18,12 @@ import {
   layoutReducer,
 } from "./layout.ts"
 import {
+  ARCHIVE_LABEL,
   dropsWords,
   offeredByRoot,
+  pageTitle,
   type TabsViewInput,
+  tabKey,
   tabsView,
 } from "./tabs-view.ts"
 
@@ -67,6 +70,7 @@ const input = (over: Partial<TabsViewInput> = {}): TabsViewInput => ({
   status: new Map(),
   elsewhere: null,
   arrivals: { arrived: new Map(), done: new Map() },
+  count: { held: 2, total: 4 },
   ...over,
 })
 const tabs = (over: Partial<TabsViewInput> = {}) => tabsView(input(over)).tabs
@@ -215,5 +219,30 @@ test("the add tab's main action starts agent work; its menu, a conversation", ()
   expect(tabsView(input()).add).toEqual({
     agent: { kind: "newTab", asksAgent: true },
     conversation: { kind: "newTab", asksAgent: false },
+  })
+})
+
+test("selected is the tab you are on, and each tab has its own key", () => {
+  const view = tabsView(input({ active: R2 }))
+  expect(view.selected).toMatchObject({ kind: "root", root: entryId("r2") })
+  expect(view.tabs.map(tabKey)).toEqual([
+    "archive",
+    "root:r1",
+    "root:r2",
+    "new:t",
+  ])
+})
+
+describe("pageTitle", () => {
+  const [archive, r1, , t] = tabs()
+  test.each([
+    [0, "no tab", null, "Pineta"],
+    [3, "no tab", null, "(3) Pineta"],
+    [0, "Archive", archive, `${ARCHIVE_LABEL} · Pineta`],
+    [0, "a root", r1, "Tab names · Pineta"],
+    [3, "a root", r1, "(3) Tab names · Pineta"],
+    [0, "a new tab", t, "new agent · Pineta"],
+  ])("%i needing you, on %s", (count, _, here, words) => {
+    expect(pageTitle(count, here ?? null)).toBe(words)
   })
 })

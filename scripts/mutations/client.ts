@@ -1810,6 +1810,25 @@ export const mutations: readonly Mutation[] = [
     expect: "every root tab not archived offers ⋯",
   },
   {
+    name: "the window's title names no tab",
+    file: "packages/client/tabs-view.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  const place = here === null ? "Pineta" : `${here.label} · Pineta`',
+    to: '  const place = "Pineta"',
+    command: unit,
+    expect: "0 needing you, on a root",
+  },
+  {
+    name: "the window's title counts nothing needing you",
+    file: "packages/client/tabs-view.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  return count === 0 ? place : `(${count}) ${place}`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "  return `(${count}) ${place}`",
+    command: unit,
+    expect: "0 needing you, on no tab",
+  },
+  {
     name: "the tab bar draws no mark",
     file: "packages/client/tabs-view.ts",
     from: "        pip: input.unsent.roots.has(root),",

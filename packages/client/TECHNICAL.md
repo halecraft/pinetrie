@@ -236,7 +236,19 @@ give the roots and each tab's signals.
 - **What the bar shows and offers is `tabsView`'s** (`tabs-view.ts`), over
   `tabBar`'s order: each tab's label, pip, ⋯ items and the intents it
   sends. `TabBar` draws it; the `Readers` on each tab read presence
-  themselves (S59).
+  themselves (S59). Every tab has a `label`, Archive's `ARCHIVE_LABEL`.
+  `selected` is the tab you are on, decided there once: `App` titles the
+  window from it (`pageTitle`) and `TabBar` scrolls it into view, keyed by
+  `tabKey`, which is also each tab's React key.
+- **The tab bar is the header** (ADR-0081): `#top` holds `TabBar`, then
+  `Header` (`.header-right`, pushed right by `margin-left: auto`, so
+  nothing stands in for a `TabBar` not yet drawn). Every tab, Archive
+  included, is a `.tab-wrap` around its `.tab` button, ⋯ and ×; the wrap is
+  what is drawn as the tab. The selected wrap carries `data-selected`,
+  set from `TabView.selected`, so it holds even while its button is the
+  rename field; it is filled with `--page`, and the bar is `--chrome`. The session's message count is
+  the Archive tab's (`TabView.messages`): its title and `data-messages`,
+  and `.archive-count` in its list.
 
 - **Only you put a root in `open`.** `show` of a root opens it, so every way of
   opening goes through `show`: `planOpen`, the Archive tab's Open and Restore,
@@ -388,8 +400,10 @@ rail's scroll-to, the alignment) must search every column.
 
 ## Who is here, and your inbox (ADR-0030)
 
-The header (`header.tsx`) is the rest of the session, from live data; nothing
-in it opens a tab until you choose.
+The header's right end (`header.tsx`, beside the tabs in `#top`) is the
+rest of the session, from live data; nothing in it opens a tab until you
+choose. It leads with "syncing…" (`.sync-note`) while the document's status
+is pending.
 
 - **People:** `peopleHere` (`here.ts`) groups `readingAt` by
   person, in `writerOrder`. An end's root is found in the index, else in
@@ -469,7 +483,9 @@ in it opens a tab until you choose.
   suite counts people by `.avatar`, and proves you are never among them by
   it. So your profile's trigger (`.me`), the agent's mark (`.agent-mark`)
   and the "+n" of `Avatars` (`.more`) are `.initial` and never `.avatar`.
-  The circle's shape is `.initial`'s rule; `.avatar` has none.
+  The circle's shape is `.initial`'s rule; `.avatar` has none. `#top` holds
+  the tabs too (ADR-0081), so `#top .avatar` also matches a tab's readers,
+  who never include you either.
 
 ## What needs you (`attention.ts`, `use-attention.ts`, ADR-0077)
 
@@ -494,7 +510,8 @@ in it opens a tab until you choose.
   redraws nothing. A timer that dropped arrivals redrew `App` while you
   typed, which the browser suite's render check caught.
 - **One count** (`needsYouCount` plus unseen mentions) is the badge's and
-  the page title's (`pageTitle`).
+  the window title's. `pageTitle` (`tabs-view.ts`) puts it before the
+  selected tab's label.
 - **Words:** `attentionWords` words each item's reason, `LEVEL_WORDS` and
   `LEVEL_CLASS` a level's name and class. Selectors: `.tab-status`
   (`.working`, `.needs-you`, `.worth-a-read`, `.done`, `data-arrived`),
@@ -928,6 +945,17 @@ change of wording then touches the words function, its one test, and
 - **Docs quote labels in `docs/06-interface.md` only.** An ADR states the rule
   ("the button says what the send does, and to whom"), and this file names the
   function.
+
+## The page's colours (`index.html`, ADR-0081)
+
+`:root` names them: `--page` (the paper the columns and the tab you are on
+are drawn on), `--chrome` (the bar), `--edge` (its line and the selected
+tab's sides) and `--on` (the selected tab's top edge). No page-colour
+literal is left in the stylesheet. `--surface` is the colour behind a
+thing, set by context: `--page` by default, `--chrome` in `#top`, the hover
+fill on a hovered tab, `--page` on the selected one. A ring that must read
+as a gap around a dot (`.tab-status.needs-you`, `.card-pip`) is drawn in
+`--surface`, so it matches whatever the dot sits on.
 
 ## Colour carries the link, not geometry
 
@@ -1927,10 +1955,19 @@ shown by their email's part before the `@`. Each rendered chat carries its
   Enter or Escape, which would save again, or save a cancel. Only Enter and
   Escape give the tab focus back; a blur leaves focus where the person put
   it.
-- **A root tab's `⋯` is always rendered, hidden with `visibility`** except on
-  the tab you are on, while hovered or focused, or while its menu is open
-  (`Menu`'s wrapper, `.tab-more`, gains `open`). The menu is its child, so
-  hiding the `⋯` would hide an open menu too.
+- **A root tab's `⋯` and a tab's × are always rendered, hidden with
+  `visibility`** except on the tab you are on, while hovered or focused, or
+  (the `⋯`) while its menu is open (`Menu`'s wrapper, `.tab-more`, gains
+  `open`). The menu is its child, so hiding the `⋯` would hide an open menu
+  too. On a tab you are not on, both are absolutely placed over the label's
+  end, so they take no width from a shrunk label. A browser check clicks a
+  × on the tab you are on, or hovers first: Playwright waits on a hidden
+  target until it times out.
+- **The bar's bottom line is an inset shadow on `#top`**, which the selected
+  tab's fill covers: a descendant's background paints over an ancestor's
+  inset shadow. A negative bottom margin on the tab could not do it, since
+  `.tab-list` scrolls sideways and so clips what hangs below it ("Anything
+  that pops out of the tab bar", below).
 - **A column's × (`.close`) is `closable`** (`ColumnSlot`, `appView`):
   hidden on a root tab's only column (`columnsOf` would give it back) and in
   the Archive tab's preview.
@@ -1954,11 +1991,15 @@ shown by their email's part before the `@`. Each rendered chat carries its
   the suite goes on.
 
 - **Selectors for root tabs:** a root's tab is `#tabs .tab[data-root="…"]`,
-  the one you are on has `aria-selected="true"`, its × is the `.tab-close`
+  the one you are on has `aria-selected="true"` and its wrap
+  `data-selected`, its × is the `.tab-close`
   after it, its `⋯` holds `.rename-root` and `.archive-root`, a root being
   renamed is `.tab-title-input`, Archive is `.tab-archive`, new tabs are
   `.tab-new`, and the add tab's buttons are `.add-agent`, `.add-menu` and
-  `.add-conversation`. In the header: `#top .here-person .here-trigger` per
+  `.add-conversation`. The Archive tab's `data-messages` is the session's
+  message count; the browser suite's `countIsHosts` waits on it, and
+  `connected` (`page.ts`) waits for `#tabs .tab-archive` with no
+  `.sync-note`. In the header: `#top .here-person .here-trigger` per
   person, `.here-agent`, and `.inbox-trigger` with
   `.inbox-count[data-unseen]`; menu rows are `.here-thread` and `.inbox-row`,
   each with `data-entry`. You are

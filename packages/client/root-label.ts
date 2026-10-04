@@ -20,7 +20,7 @@ const withEntries = (directory: ReadonlyMap<RootId, RootRecord>) =>
     r.entry === null ? [] : [{ ...r, entry: r.entry }],
   )
 
-/** The header's count: messages in the roots this tab holds, of every root's. */
+/** Messages in the roots this tab holds, of every root's. */
 export interface MessageCount {
   readonly held: number
   readonly total: number
@@ -40,7 +40,11 @@ export const messageCount = (
   return { held: inHeld, total }
 }
 
-/** The header count's tooltip. */
+/** The count's words, in the Archive tab's list. */
+export const messageCountWords = ({ held, total }: MessageCount): string =>
+  `messages ${held} of ${total}`
+
+/** The count's tooltip: on the Archive tab, and on its list's count. */
 export const messageCountTitle = ({ held, total }: MessageCount): string =>
   `${held} in the threads this tab has loaded, of ${total} in the session`
 

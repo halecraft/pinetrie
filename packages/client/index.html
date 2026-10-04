@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Pineta</title>
     <style>
-      :root { color-scheme: dark; }
+      /* --page is the paper the columns are on, --chrome the darker bar above
+         it (ADR-0081). --surface is whatever a thing sits on, set by its
+         context: a ring that must read as a gap around a dot uses it. */
+      :root { color-scheme: dark; --page: #14161a; --chrome: #0e1013; --edge: #23272e;
+        --on: #c9d1d9; --surface: var(--page); }
       * { box-sizing: border-box; }
       button { padding: .5rem .9rem; border-radius: 6px; border: 0; background: #2f6feb; color: #fff; font: inherit; cursor: pointer; }
       .actions button, .tools button { background: none; border: 1px solid #3a3f48; color: #aaa;
@@ -13,31 +17,48 @@
       body {
         margin: 0; height: 100vh; display: flex; flex-direction: column;
         font: 15px/1.55 ui-sans-serif, system-ui, sans-serif;
-        background: #14161a; color: #e6e6e6;
+        background: var(--page); color: #e6e6e6;
       }
       #root { display: contents; }
-      #top { display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-        padding: .75rem 1rem .5rem; border-bottom: 1px solid #23272e; }
+      /* The header is the tab bar, then the session's indicators at its right
+         (ADR-0081). Its bottom line is an inset shadow: a descendant's fill
+         paints over it, so the tab you are on, filled with the page's colour,
+         opens into the page. A negative margin could not: `.tab-list` scrolls
+         sideways, which clips what hangs below it. */
+      #top { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .5rem;
+        padding: .35rem .5rem 0; background: var(--chrome); --surface: var(--chrome);
+        box-shadow: inset 0 -1px 0 var(--edge); }
+      /* The identity form's title. */
       h1 { font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: #8b93a1; margin: 0 0 .25rem; }
-      .meta { font-size: 12px; color: #6f7784; }
 
 
       /* A tab per root (ADR-0029): Archive, the open roots, new tabs, and ＋. The
-         list scrolls; Archive and ＋ stay put. */
-      #tabs { display: flex; align-items: stretch; gap: .25rem; padding: .3rem .5rem 0;
-        border-bottom: 1px solid #23272e; font-size: .8rem; }
-      .tab-list { display: flex; gap: .25rem; flex: 1; min-width: 0; overflow-x: auto; }
-      .tab-list .tab-archive { position: sticky; left: 0; z-index: 1; }
-      .tab-wrap { display: inline-flex; align-items: center; flex: 0 0 auto; }
-      .tab { display: inline-flex; gap: .35rem; align-items: center; max-width: 16rem;
-        padding: .3rem .6rem; border-radius: 6px 6px 0 0; background: #1b1e24; color: #aab4c3;
-        border: 1px solid #23272e; border-bottom: 0; }
-      .tab[aria-selected="true"] { background: #23272e; color: #e6e6e6; }
+         list scrolls; Archive and ＋ stay put. A tab is its wrap: its button,
+         ⋯ and ×. At rest it has no fill, and its border is there but clear,
+         so the border takes the same room chosen or not. */
+      #tabs { display: flex; align-items: flex-end; gap: .25rem; flex: 1; min-width: 0;
+        font-size: .8rem; --tab-control: 1.4rem; }
+      .tab-list { display: flex; align-items: flex-end; gap: .15rem; flex: 1; min-width: 0;
+        overflow-x: auto; scroll-padding-inline-start: 7rem; }
+      .tab-wrap { position: relative; display: inline-flex; align-items: center; flex: 0 1 auto;
+        min-width: 7.5rem;
+        border: 1px solid transparent; border-top-width: 2px; border-bottom: 0;
+        border-radius: 6px 6px 0 0; }
+      /* Archive stays put, over the tabs scrolled under it, and never shrinks. */
+      .tab-wrap:has(> .tab-archive) { position: sticky; left: 0; z-index: 1; flex-shrink: 0;
+        min-width: 0; background: var(--chrome); }
+      .tab-wrap:hover { background: #1b1e24; --surface: #1b1e24; }
+      /* The tab you are on is the page's colour, and covers the bar's line. */
+      .tab-wrap[data-selected] { flex-shrink: 0;
+        background: var(--page); --surface: var(--page); border-color: var(--edge);
+        border-top-color: var(--on); }
+      .tab { display: inline-flex; gap: .35rem; align-items: center; min-width: 0; max-width: 16rem;
+        padding: .45rem .7rem; border-radius: 0; background: none; color: #aab4c3; }
+      .tab[aria-selected="true"] { max-width: 32rem; color: #e6e6e6; font-weight: 600; }
       .tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      /* A root tab while it is renamed: the tab's box, holding a field. */
-      .tab-title-input { width: 14rem; padding: .3rem .6rem; border-radius: 6px 6px 0 0;
-        background: #23272e; color: #e6e6e6; border: 1px solid #3a3f48; border-bottom: 0;
-        font: inherit; }
+      /* A root tab while it is renamed: a field in the tab's place. */
+      .tab-title-input { width: 14rem; margin: .2rem .3rem; padding: .2rem .5rem; border-radius: 4px;
+        background: #1b1e24; color: #e6e6e6; border: 1px solid #3a3f48; font: inherit; }
       .tab-title-input[aria-invalid="true"] { border-color: #d66; }
       /* A tab's status, before its label (ADR-0077). Working is a still ring: it
          needs nothing from you, so it does not move. What needs you is a
@@ -47,7 +68,7 @@
       .tab-status { flex: 0 0 auto; width: 6px; height: 6px; box-sizing: border-box;
         border-radius: 50%; }
       .tab-status.working { border: 1.5px solid #9ecbff; }
-      .tab-status.needs-you { background: #e0c080; box-shadow: 0 0 0 1.5px #14161a; }
+      .tab-status.needs-you { background: #e0c080; box-shadow: 0 0 0 1.5px var(--surface); }
       .tab-status.worth-a-read { background: #e0c080; opacity: .45; }
       .tab-status.needs-you[data-arrived] { animation: arrive .6s ease-in-out 3; }
       @keyframes arrive { 50% { transform: scale(1.8); } }
@@ -59,13 +80,22 @@
       @media (prefers-reduced-motion: reduce) { .tab-status { animation: none; } }
       .tab.archived .tab-label { text-decoration: line-through; color: #777; }
       .tab-new { font-style: italic; }
-      .tab-close, .tab-menu { padding: 0 .35rem; background: none; color: #aaa; }
+      .tab-close, .tab-menu { width: var(--tab-control); padding: 0; background: none; color: #aaa; }
       .tab-more { position: relative; }
-      /* ⋯ on the tab you are on, and on another while hovered or focused. Hidden
-         with visibility, which keeps the tab's width from jumping. */
-      .tab-wrap .tab-more { visibility: hidden; }
+      /* ⋯ and × on the tab you are on, and on another while hovered or focused.
+         Hidden with visibility, so the tab's width never jumps. On another
+         tab they lie over its label's end, in the colour behind them, so a
+         label shrunk to the tab's min-width keeps all of it. */
+      .tab-wrap .tab-more, .tab-wrap .tab-close { visibility: hidden; }
+      .tab-wrap:not([data-selected]) > .tab-close {
+        position: absolute; top: 0; bottom: 0; right: 0; background: var(--surface); }
+      .tab-wrap:not([data-selected]) > .tab-more {
+        position: absolute; top: 0; bottom: 0; right: var(--tab-control); display: flex;
+        background: var(--surface); }
       .tab-wrap:hover .tab-more, .tab-wrap:focus-within .tab-more, .tab-more.open,
-      .tab-wrap:has(> .tab[aria-selected="true"]) .tab-more { visibility: visible; }
+      .tab-wrap[data-selected] .tab-more,
+      .tab-wrap:hover .tab-close, .tab-wrap:focus-within .tab-close,
+      .tab-wrap[data-selected] .tab-close { visibility: visible; }
       .popover { position: absolute; z-index: 4; top: 100%; right: 0; display: flex;
         flex-direction: column; min-width: 12rem; padding: .25rem; background: #1b1e24;
         border: 1px solid #3a3f48; border-radius: 6px; }
@@ -83,7 +113,7 @@
       .connecting { margin: 1rem; color: #6f7784; }
 
       /* The workspace: the rail (E, everything in this root) beside the columns (paths). */
-      #workspace { position: relative; flex: 1; display: flex; min-height: 0; }
+      #workspace { position: relative; flex: 1; display: flex; min-height: 0; background: var(--page); }
       .rail { position: relative; flex: 0 0 auto; min-width: 3rem; padding: 0 .25rem;
         overflow-y: auto; border-right: 1px solid #23272e; }
       /* Centred in the rail, whose min-width is wider than a narrow tree. */
@@ -109,10 +139,10 @@
       .here-count { position: absolute; top: -9px; left: 7px; font-size: 9px; line-height: 1;
         color: #ddd; pointer-events: none; }
       @keyframes pulse { 50% { transform: scale(1.8); } }
-      /* An unsent card of yours (ADR-0048): a round pip in your colour, with a
-         dark ring so it reads against a tab or a track. */
+      /* An unsent card of yours (ADR-0048): a round pip in your colour, ringed in
+         the colour behind it so it reads against a tab or a track. */
       .card-pip { display: inline-block; flex: 0 0 auto; width: 6px; height: 6px;
-        border-radius: 50%; box-shadow: 0 0 0 1.5px #14161a; }
+        border-radius: 50%; box-shadow: 0 0 0 1.5px var(--surface); }
       /* On a rail dot: centred, with no ring, so the track's colour shows
          around it. 4 px in the 8 px dot keeps it on whole pixels. */
       .rail-dot > .card-pip { position: absolute; left: 2px; top: 2px; width: 4px; height: 4px;
@@ -148,7 +178,7 @@
          `lighten` blends with, so the sprite's black goes. A new banner fades
          in once loaded, and the star out; the one there as the column mounts
          does not. The head row is the square's height, with or without one. */
-      .column-head { isolation: isolate; background: #14161a; }
+      .column-head { isolation: isolate; background: var(--page); }
       .column-head .agent-name { flex: 0 0 auto; display: inline-flex; align-items: center;
         gap: .3rem; white-space: nowrap; font-size: .85rem;
         font-weight: 600; color: var(--track, #9ecbff); }
@@ -178,7 +208,7 @@
          in as they are opened, and at each click; a new animation name each
          time (`data-spin` odd or even) restarts it. */
       .thread-details { flex: 0 0 auto; display: flex; gap: .75rem; align-items: center;
-        padding: .5rem .75rem .6rem; isolation: isolate; background: #14161a;
+        padding: .5rem .75rem .6rem; isolation: isolate; background: var(--page);
         border-bottom: 1px solid #23272e; font-size: .8rem; color: #aaa; }
       .thread-details-icon { flex: 0 0 auto; padding: 0; border: none; border-radius: 0;
         background: none; color: var(--track, #9ecbff); cursor: pointer; }
@@ -218,7 +248,7 @@
       /* The header holds the pointer while it drags, so its cursor is the one shown. */
       #strip[data-reordering] .column[data-dragging] .column-head,
       #strip[data-reordering] .column[data-dragging] .grip { cursor: grabbing; }
-      .column[data-dragging] { position: relative; z-index: 2; background: #14161a; opacity: .92;
+      .column[data-dragging] { position: relative; z-index: 2; background: var(--page); opacity: .92;
         box-shadow: 0 0 0 1px #3a3f48, 0 8px 24px rgb(0 0 0 / .5); }
       .column[data-drop="before"] { box-shadow: inset 3px 0 0 #8ab4f8; }
       .column[data-drop="after"] { box-shadow: inset -3px 0 0 #8ab4f8; }
@@ -264,9 +294,9 @@
         display: flex; flex-direction: column; border-top: 4px solid var(--track, #777);
         border-left: 1px solid #23272e; font-size: .8rem; }
       dialog.pane { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0;
-        padding: 0; border: 0; border-top: 4px solid var(--track, #777); background: #14161a;
+        padding: 0; border: 0; border-top: 4px solid var(--track, #777); background: var(--page);
         color: inherit; }
-      dialog.pane::backdrop { background: #14161a; }
+      dialog.pane::backdrop { background: var(--page); }
       dialog.pane:not([open]) { display: none; }
       .pane-head { display: flex; align-items: center; gap: .6rem; padding: .4rem .75rem;
         border-bottom: 1px solid #23272e; color: #aaa; outline: none; }
@@ -526,7 +556,7 @@
       .left-line { position: relative; height: 0; outline: 1px dashed #e0c080;
         transform: translateY(-.5rem); }
       .left-line::after { content: attr(data-words); position: absolute; right: 0; top: -.6rem;
-        padding: 0 .3rem; font-size: .65rem; line-height: 1.1rem; color: #e0c080; background: #14161a; }
+        padding: 0 .3rem; font-size: .65rem; line-height: 1.1rem; color: #e0c080; background: var(--page); }
       /* In outline, the running ask's own line says the agent works. */
       .column[data-density="outline"] .working-line { display: none; }
       .stop { margin: 0 .75rem .35rem; padding: .1rem .6rem; font-size: .75rem;
@@ -571,6 +601,7 @@
       .archive-row[aria-current="true"] { outline: 1px solid #9ecbff; }
       .archive-row[data-state="archived"] .archive-label { color: #8b93a1; }
       .archive-meta { font-size: .72rem; color: #6f7784; }
+      .archive-count { margin: 0; font-size: .72rem; color: #6f7784; }
       .archive-empty, .archive-hint { color: #6f7784; }
       .archive-preview { flex: 1; display: flex; min-width: 0; }
       .preview { flex: 1; display: flex; min-height: 0; }
@@ -701,10 +732,16 @@
       #strip:has(.fork-dot[data-color="7"]:hover) .column-head[data-color="7"] { outline: 2px solid var(--track); outline-offset: 2px; }
       #strip:has(.column-head[data-color="pending"]:hover) .fork-dot[data-color="pending"],
       #strip:has(.fork-dot[data-color="pending"]:hover) .column-head[data-color="pending"] { outline: 2px solid var(--track); outline-offset: 2px; }
-      /* The header's right: who is here, what needs you (ADR-0069), the
-         project, then your inventory and you. Nothing here animates: the tab,
+      /* The header's right: "syncing…" while pending, who is here, what needs
+         you (ADR-0069), the project, then your inventory and you. Nothing here animates: the tab,
          the column and the rail show where the agent works. */
-      .header-right { display: flex; align-items: center; gap: .75rem; }
+      .header-right { display: flex; align-items: center; gap: .75rem; margin-left: auto;
+        align-self: center; padding-bottom: .3rem; }
+      .sync-note { font-size: .75rem; color: #6f7784; }
+      /* Too narrow for both on one row: the indicators go above the tabs. */
+      @media (width < 56rem) {
+        .header-right { order: -1; flex-basis: 100%; justify-content: flex-end; }
+      }
       .here { display: flex; align-items: center; gap: .25rem; }
       .here-trigger, .activity-trigger, .me-trigger { display: inline-flex; align-items: center; gap: .3rem;
         padding: .1rem .3rem; background: none; color: #ddd; border-radius: 999px; }

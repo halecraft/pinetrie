@@ -48,6 +48,7 @@ import type { Scenario } from "../scenario.ts"
 import {
   chooseFromMenu,
   componentRenders,
+  connected,
   launchBrowser,
   OWN_MENU,
   openProfile,
@@ -73,14 +74,17 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     console.log(`  host              : ${host.httpUrl}\n`)
     /**
-     * The page's message count reaches the host's directory's: it has every
-     * root's record, held or not (ADR-0063).
+     * The page's message count, on the Archive tab, reaches the host's
+     * directory's: it has every root's record, held or not (ADR-0063).
      */
     const countIsHosts = (p: Page) =>
       waitFor(async () => {
         let n = 0
         for (const r of readRoots(host.session).values()) n += r.messages
-        return (await p.textContent("#count").catch(() => null)) === String(n)
+        const shown = await p
+          .getAttribute("#tabs .tab-archive", "data-messages")
+          .catch(() => null)
+        return shown === String(n)
       }, 15_000)
 
     // An explicit context: a page from `browser.newPage()` owns its context, and
@@ -137,10 +141,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // The bundle must load and connect before anything renders: a module the
       // browser cannot run fails exactly here, which a browser-free check cannot
       // see.
-      await page.waitForFunction(
-        () => document.getElementById("status")?.textContent === "connected",
-        { timeout: 20_000 },
-      )
+      await connected(page)
       check(
         "page loaded, wasm instantiated, client connected to the host",
         true,
@@ -251,6 +252,39 @@ async function run(check: Checks["check"]): Promise<void> {
         "＋ agent's new tab is ready to type in: its box has focus",
         (await caretIn(0)) === 0,
       )
+      {
+        const surface = await page.evaluate(() => {
+          const look = (sel: string) => {
+            const n = document.querySelector(sel)
+            return n === null
+              ? null
+              : {
+                  fill: getComputedStyle(n).backgroundColor,
+                  rect: n.getBoundingClientRect(),
+                }
+          }
+          return {
+            tab: look("#tabs .tab-wrap[data-selected]"),
+            page: look("#workspace"),
+            bar: look("#top"),
+          }
+        })
+        const { tab, page: paper, bar } = surface
+        check(
+          "the tab you are on is the page's colour, the bar is not, and the tab meets the page",
+          tab !== null &&
+            paper !== null &&
+            bar !== null &&
+            tab.fill === paper.fill &&
+            bar.fill !== paper.fill &&
+            Math.abs(tab.rect.bottom - paper.rect.top) <= 1,
+          JSON.stringify({
+            tab: tab && [tab.fill, tab.rect.bottom],
+            page: paper && [paper.fill, paper.rect.top],
+            bar: bar?.fill,
+          }),
+        )
+      }
       // Its thread is named before anything is typed (ADR-0057).
       const nameBefore = await page
         .waitForSelector(`${col(0)} .column-head .agent-name[data-thread]`, {
@@ -1372,17 +1406,10 @@ async function run(check: Checks["check"]): Promise<void> {
       await asPerson(tb, "tabs-b@browser.test", "Tabby")
       try {
         await tb.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
-        const knownHere = await tb
-          .waitForFunction(
-            () =>
-              document.getElementById("status")?.textContent === "connected",
-            undefined,
-            { timeout: 20_000 },
-          )
-          .then(
-            () => true,
-            () => false,
-          )
+        const knownHere = await connected(tb).then(
+          () => true,
+          () => false,
+        )
         check(
           "a browser that knows who you are connects without asking",
           knownHere && (await tb.locator("#identity").count()) === 0,
@@ -3191,12 +3218,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const me = ME
       await page.reload({ waitUntil: "domcontentloaded" })
       // Not asked again: a page that asks never connects, which the check says.
-      await page
-        .waitForFunction(
-          () => document.getElementById("status")?.textContent === "connected",
-          { timeout: 20_000 },
-        )
-        .catch(() => null)
+      await connected(page).catch(() => null)
       const kept = await page
         .waitForFunction(
           n =>
@@ -3261,10 +3283,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const newTab = await page.context().newPage()
       try {
         await newTab.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
-        await newTab.waitForFunction(
-          () => document.getElementById("status")?.textContent === "connected",
-          { timeout: 20_000 },
-        )
+        await connected(newTab)
         await waitFor(() => false, 1_000)
         const inNewTab = await columnKeys(newTab)
         check(

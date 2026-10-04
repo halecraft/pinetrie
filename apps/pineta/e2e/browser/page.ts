@@ -249,6 +249,19 @@ export async function readRaw(p: Page, n = 0): Promise<void> {
   if (!shown) return
   if ((await p.getAttribute(raw, "aria-pressed")) !== "true") await p.click(raw)
 }
+/**
+ * Wait until `p` has connected and synced: its tab bar is drawn, which waits
+ * for the document to settle, and it shows no "syncing…". Rejects after
+ * `timeout`.
+ */
+export const connected = (p: Page, timeout = 20_000) =>
+  p.waitForFunction(
+    () =>
+      document.querySelector("#tabs .tab-archive") !== null &&
+      document.querySelector(".sync-note") === null,
+    undefined,
+    { timeout },
+  )
 /** A root's tab. */
 export const tabSel = (root: string) => `#tabs .tab[data-root="${root}"]`
 /** The messages the rail on `p` accounts for: dots, and each stretch's count. */

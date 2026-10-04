@@ -1,4 +1,5 @@
-// client/header — the right end of the header: who is here, one menu of what
+// client/header — the right end of the header, beside the tabs (ADR-0081):
+// "syncing…" while the document is pending, who is here, one menu of what
 // needs you (`activity.ts`, ADR-0069, ADR-0077), the project (ADR-0060, ADR-0061), and
 // then your inventory and you (`profile.tsx`). Your tabs are your view; this
 // is the rest of the session. People and the agent come from live data
@@ -56,6 +57,7 @@ import type { InboxView } from "./use-inbox.ts"
 import { useReadingAt, useReadingRoots } from "./use-presence.ts"
 
 export function Header({
+  syncing,
   session,
   order,
   runs,
@@ -75,6 +77,8 @@ export function Header({
   inventory,
   me,
 }: {
+  /** The document's status is "pending" (`useDocStatus`). */
+  syncing: boolean
   session: SessionClient
   /** Everyone, in the order every window agrees on (`writerOrder`). */
   order: readonly WriterId[]
@@ -179,6 +183,7 @@ export function Header({
   }
   return (
     <div className="header-right">
+      {syncing && <span className="sync-note">syncing…</span>}
       <div className="here">
         <People
           colorOf={colorOf}

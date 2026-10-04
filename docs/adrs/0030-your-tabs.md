@@ -8,7 +8,8 @@ other tabs and devices are you, and your tabs are yours per device. Amended
 by ADR-0069: `@` is the header's activity menu's mentions, and its count
 part of that menu's badge, with open offers. Amended by ADR-0077: which
 mentions you have seen is kept per person, in your attention document, not
-per device.
+per device. Amended by ADR-0081: the header holds your tabs, and the
+message count moved to the Archive tab.
 
 **Context.** ADR-0029 gave everyone the same tab bar, every root not archived,
 and rejected tabs each person opens and closes: a collaborator's new root would

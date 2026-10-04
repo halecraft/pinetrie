@@ -7,7 +7,10 @@ import type { Level, Moments, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
 import { type ActiveTab, type Layout, sameTab, tabBar } from "./layout.ts"
-import { NO_TEXT } from "./root-label.ts"
+import { type MessageCount, NO_TEXT } from "./root-label.ts"
+
+/** The Archive tab's label. */
+export const ARCHIVE_LABEL = "Archive"
 
 /** What a root tab's ⋯ offers. */
 export type TabMenuItem =
@@ -28,6 +31,8 @@ export type TabMenuItem =
     }
 
 interface TabCommon {
+  /** What the tab says, and what the window's title names (`pageTitle`). */
+  readonly label: string
   readonly selected: boolean
   readonly show: Intent
   /** An unsent card of yours is in it (ADR-0048, `cardMarks`). */
@@ -39,18 +44,17 @@ export type TabView =
       readonly kind: "archive"
       /** The highest a root with no tab of its own raises (`untabbed`). */
       readonly status: Level | null
+      /** The session's message count: its tooltip, and `data-messages`. */
+      readonly messages: MessageCount
     })
   | (TabCommon & {
       readonly kind: "new"
       readonly key: string
-      readonly label: string
       readonly close: Intent
     })
   | (TabCommon & {
       readonly kind: "root"
       readonly root: EntryId
-      /** Its title, else its first message's first line (`labelsOf`). */
-      readonly label: string
       /** Its first line: the rename field's placeholder. */
       readonly line: string
       /** Its stored title, or null: what the rename field starts with. */
@@ -74,6 +78,8 @@ export type TabView =
 export interface TabsView {
   /** Archive, your open roots, then new tabs (`tabBar`). */
   readonly tabs: readonly TabView[]
+  /** The tab you are on, or null when the bar lacks it. */
+  readonly selected: TabView | null
   /** The add tab: agent work, its main action, and a conversation. */
   readonly add: { readonly agent: Intent; readonly conversation: Intent }
 }
@@ -99,11 +105,15 @@ export interface TabsViewInput {
   readonly elsewhere: Level | null
   /** When each root's mark last arrived as you watched (`useAttention`). */
   readonly arrivals: Moments
+  /** The session's message count (`messageCount`), shown on the Archive tab. */
+  readonly count: MessageCount
 }
 
 export function tabsView(input: TabsViewInput): TabsView {
+  const tabs = tabBar(input.layout).map(tab => tabView(tab, input))
   return {
-    tabs: tabBar(input.layout).map(tab => tabView(tab, input)),
+    tabs,
+    selected: tabs.find(t => t.selected) ?? null,
     add: {
       agent: { kind: "newTab", asksAgent: true },
       conversation: { kind: "newTab", asksAgent: false },
@@ -122,8 +132,10 @@ function tabView(tab: ActiveTab, input: TabsViewInput): TabView {
       return {
         ...common,
         kind: "archive",
+        label: ARCHIVE_LABEL,
         pip: input.unsent.elsewhere,
         status: input.elsewhere,
+        messages: input.count,
       }
     case "new":
       return {
@@ -181,6 +193,27 @@ function tabView(tab: ActiveTab, input: TabsViewInput): TabView {
       }
     }
   }
+}
+
+/** A tab's key among the tabs: its React key, and what the bar scrolls to. */
+export const tabKey = (tab: TabView): string => {
+  switch (tab.kind) {
+    case "archive":
+      return "archive"
+    case "new":
+      return `new:${tab.key}`
+    case "root":
+      return `root:${tab.root}`
+  }
+}
+
+/**
+ * The window's title: what needs you (`needsYouCount` plus unseen
+ * mentions), then the tab you are on. `here` is null before a tab is chosen.
+ */
+export const pageTitle = (count: number, here: TabView | null): string => {
+  const place = here === null ? "Pineta" : `${here.label} · Pineta`
+  return count === 0 ? place : `(${count}) ${place}`
 }
 
 /**

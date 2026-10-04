@@ -66,7 +66,7 @@ import {
 import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { foldMemory } from "./ask-fold.ts"
-import { needsYouCount, pageTitle } from "./attention.ts"
+import { needsYouCount } from "./attention.ts"
 import { CardHistories } from "./card-history.tsx"
 import { cardMarks, ownCards } from "./card-marks.ts"
 import { Column, type ColumnProps } from "./column.tsx"
@@ -116,14 +116,13 @@ import {
   firstLinesOf,
   labelsOf,
   messageCount,
-  messageCountTitle,
   NO_TEXT,
   summariesOf,
 } from "./root-label.ts"
 import { screenMemory } from "./screen-memory.ts"
 import type { DeviceState, TabState } from "./tab-state.ts"
 import { TabBar } from "./tabs.tsx"
-import { offeredByRoot, tabsView } from "./tabs-view.ts"
+import { offeredByRoot, pageTitle, tabsView } from "./tabs-view.ts"
 import type { RowMemory } from "./tool-row.ts"
 import { useAttention } from "./use-attention.ts"
 import { useColumnDrag } from "./use-column-drag.ts"
@@ -623,9 +622,28 @@ export function App({
     settled,
   })
   const needsYou = needsYouCount(attention.items) + inbox.unseen
+  const tabs =
+    active === null
+      ? null
+      : tabsView({
+          layout,
+          active,
+          labels,
+          lines,
+          marks,
+          archived: archivedRoots,
+          work,
+          offered,
+          unsent,
+          status: attention.status,
+          elsewhere: attention.elsewhere,
+          arrivals: attention.arrivals,
+          count,
+        })
+  const title = pageTitle(needsYou, tabs?.selected ?? null)
   useEffect(() => {
-    document.title = pageTitle(needsYou)
-  }, [needsYou])
+    document.title = title
+  }, [title])
 
   const strip = useRef<HTMLDivElement>(null)
 
@@ -973,20 +991,19 @@ export function App({
   return (
     <CardHistories value={historyFacts}>
       <header id="top">
-        <div className="header-left">
-          <h1>pineta</h1>
-          <div className="meta">
-            <span title={messageCountTitle(count)}>
-              messages <span id="held">{count.held}</span> of{" "}
-              <span id="count">{count.total}</span>
-            </span>{" "}
-            ·{" "}
-            <span id="status">
-              {status === "pending" ? "syncing…" : "connected"}
-            </span>
-          </div>
-        </div>
+        {tabs !== null && workspace.kind !== "connecting" && (
+          <TabBar
+            colorOf={colorOf}
+            index={index}
+            nameOf={nameOf}
+            onIntent={onIntent}
+            order={order}
+            session={session}
+            view={tabs}
+          />
+        )}
         <Header
+          syncing={status === "pending"}
           colorOf={colorOf}
           inbox={inbox}
           index={index}
@@ -1032,116 +1049,93 @@ export function App({
           slots={slots}
         />
       )}
-      {active === null || workspace.kind === "connecting" ? (
+      {tabs === null || workspace.kind === "connecting" ? (
         <main id="workspace">
           <p className="connecting">connecting…</p>
         </main>
       ) : (
-        <>
-          <TabBar
-            colorOf={colorOf}
-            index={index}
-            nameOf={nameOf}
-            onIntent={onIntent}
-            order={order}
-            session={session}
-            view={tabsView({
-              layout,
-              active,
-              labels,
-              lines,
-              marks,
-              archived: archivedRoots,
-              work,
-              offered,
-              unsent,
-              status: attention.status,
-              elsewhere: attention.elsewhere,
-              arrivals: attention.arrivals,
-            })}
-          />
-          <main id="workspace">
-            {workspace.kind === "archive" ? (
-              <ArchiveTab
-                filter={archiveFilter}
-                labelOf={labelOf}
-                myColor={yours.color}
-                nameOf={nameOf}
-                onFilter={setArchiveFilter}
-                onQuery={setArchiveQuery}
-                onSelect={setArchivePick}
-                preview={preview}
-                query={archiveQuery}
-                rows={archiveIndex({
-                  roots: summaries,
-                  labels,
-                  archive,
-                  filter: archiveFilter,
-                  query: archiveQuery,
-                  me: session.writer,
-                  cardRoots: unsent.roots,
-                })}
-                selected={archivePick}
-              />
-            ) : (
-              <>
-                {workspace.kind === "root" ? (
-                  <LiveRail
-                    activity={activity}
-                    asks={asks}
-                    digests={digests}
-                    revisions={workFacts.revisions}
-                    colorOf={colorOf}
-                    ends={ends}
-                    index={index}
-                    names={nameOf}
-                    onPick={openAt}
-                    open={shown}
-                    rows={rail}
-                    session={session}
-                    viewports={viewports}
-                    yours={yours}
-                  />
-                ) : (
-                  <EmptyRail />
-                )}
-                {/* A column's header is its drag handle; its grip is the
+        <main id="workspace">
+          {workspace.kind === "archive" ? (
+            <ArchiveTab
+              count={count}
+              filter={archiveFilter}
+              labelOf={labelOf}
+              myColor={yours.color}
+              nameOf={nameOf}
+              onFilter={setArchiveFilter}
+              onQuery={setArchiveQuery}
+              onSelect={setArchivePick}
+              preview={preview}
+              query={archiveQuery}
+              rows={archiveIndex({
+                roots: summaries,
+                labels,
+                archive,
+                filter: archiveFilter,
+                query: archiveQuery,
+                me: session.writer,
+                cardRoots: unsent.roots,
+              })}
+              selected={archivePick}
+            />
+          ) : (
+            <>
+              {workspace.kind === "root" ? (
+                <LiveRail
+                  activity={activity}
+                  asks={asks}
+                  digests={digests}
+                  revisions={workFacts.revisions}
+                  colorOf={colorOf}
+                  ends={ends}
+                  index={index}
+                  names={nameOf}
+                  onPick={openAt}
+                  open={shown}
+                  rows={rail}
+                  session={session}
+                  viewports={viewports}
+                  yours={yours}
+                />
+              ) : (
+                <EmptyRail />
+              )}
+              {/* A column's header is its drag handle; its grip is the
                     keyboard's way to move it. */}
-                <div id="strip" onPointerDown={dragColumn} ref={strip}>
-                  {workspace.slots.map(slot => {
-                    const column = columns[slot.position]
-                    const columnView = views[slot.position]
-                    if (column === undefined || columnView === undefined)
-                      return null
-                    return (
-                      <Column
-                        {...shared}
-                        closable={slot.closable}
-                        column={column}
-                        count={workspace.slots.length}
-                        landmarks={landmarks}
-                        seenEnd={seenEnds}
-                        forks={colors.forks}
-                        key={slot.key}
-                        onIntent={onIntent}
-                        onTyping={() => typing(columnView.tipId)}
-                        path={paths[slot.position] ?? new Set()}
-                        position={slot.position}
-                        readOnly={
-                          workspace.kind === "root" ? workspace.readOnly : null
-                        }
-                        shown={shown}
-                        track={slot.track}
-                        showsPresence
-                        view={columnView}
-                      />
-                    )
-                  })}
-                </div>
-              </>
-            )}
-          </main>
-        </>
+              <div id="strip" onPointerDown={dragColumn} ref={strip}>
+                {workspace.slots.map(slot => {
+                  const column = columns[slot.position]
+                  const columnView = views[slot.position]
+                  if (column === undefined || columnView === undefined)
+                    return null
+                  return (
+                    <Column
+                      {...shared}
+                      closable={slot.closable}
+                      column={column}
+                      count={workspace.slots.length}
+                      landmarks={landmarks}
+                      seenEnd={seenEnds}
+                      forks={colors.forks}
+                      key={slot.key}
+                      onIntent={onIntent}
+                      onTyping={() => typing(columnView.tipId)}
+                      path={paths[slot.position] ?? new Set()}
+                      position={slot.position}
+                      readOnly={
+                        workspace.kind === "root" ? workspace.readOnly : null
+                      }
+                      shown={shown}
+                      track={slot.track}
+                      showsPresence
+                      view={columnView}
+                    />
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </main>
       )}
     </CardHistories>
   )

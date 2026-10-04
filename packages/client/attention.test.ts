@@ -20,7 +20,6 @@ import {
   highest,
   levelOf,
   needsYouCount,
-  pageTitle,
   rootStatus,
   type Status,
 } from "./attention.ts"
@@ -318,9 +317,4 @@ test("needsYouCount: what needs you, an offer of a thread you follow among it, o
   )
   expect(items).toHaveLength(3)
   expect(needsYouCount(items)).toBe(2)
-})
-
-test("pageTitle: the count first, none at zero", () => {
-  expect(pageTitle(0)).toBe("Pineta")
-  expect(pageTitle(3)).toBe("(3) Pineta")
 })

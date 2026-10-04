@@ -511,6 +511,16 @@ export const mutations: readonly Mutation[] = [
       "the header's activity and the thread's tab are still while the agent works",
   },
   {
+    name: "the tab you are on is the bar's colour",
+    file: "packages/client/index.html",
+    from: "        background: var(--page); --surface: var(--page); border-color: var(--edge);",
+    to: "        background: var(--chrome); --surface: var(--page); border-color: var(--edge);",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the tab you are on is the page's colour, the bar is not, and the tab meets the page",
+  },
+  {
     name: "a tab pulses while its agent works",
     file: "packages/client/index.html",
     from: "      .tab-status.working { border: 1.5px solid #9ecbff; }",

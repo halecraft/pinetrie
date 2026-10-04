@@ -1,6 +1,7 @@
 // client/archive — the Archive tab: every root, open or archived, to find,
 // preview and restore (ADR-0029). Its body is a list, since it is for finding
-// a root; the selected root is previewed read-only beside it.
+// a root; the selected root is previewed read-only beside it. Its list shows
+// the session's message count.
 
 import { type EntryId, idTime, type WriterId } from "@pineta/core"
 import { type ReactNode, useState } from "react"
@@ -12,6 +13,11 @@ import {
 import { CardPip } from "./card-pip.tsx"
 import { ago, plural } from "./counts.ts"
 import { nameFor } from "./presence.tsx"
+import {
+  type MessageCount,
+  messageCountTitle,
+  messageCountWords,
+} from "./root-label.ts"
 
 export function ArchiveTab({
   rows,
@@ -25,6 +31,7 @@ export function ArchiveTab({
   nameOf,
   myColor,
   preview,
+  count,
 }: {
   /** `archiveIndex` over the filter and query below. */
   rows: readonly ArchiveRow[]
@@ -40,6 +47,7 @@ export function ArchiveTab({
   myColor: string
   /** The selected root, read-only: its rail and one column. */
   preview: (root: EntryId) => ReactNode
+  count: MessageCount
 }) {
   const [now] = useState(() => Date.now())
   return (
@@ -67,6 +75,9 @@ export function ArchiveTab({
               </button>
             ))}
           </div>
+          <p className="archive-count" title={messageCountTitle(count)}>
+            {messageCountWords(count)}
+          </p>
         </div>
         {rows.length === 0 && (
           <p className="archive-empty">

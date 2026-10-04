@@ -34,9 +34,8 @@ This document fixes the design before any code. It draws E and T directly.
 ## Layout
 
 ```
- pineta   Ada · connected                                   (B)(C)  (✦ 2)   @ 2
- Archive │ Fix the sync bug ◉ × │ Release notes ·Bea × │ Q3 planning × │ ＋ agent ▾
-━━━━━━━━━┷━━━━━━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━┷━━━━━━━━━━━
+ Archive ┌ Fix the sync bug ◉ ⋯ × ┐ Release notes ·Bea  Q3 planning  ＋ agent ▾  (B)(C) (✦ 2) (A)
+━━━━━━━━━┛                        ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ┌ rail ┐┌ column 1 ──────────────┐┌ column 2 ─────────────┐┌ column 3 ──────────┐
 │ ●    ││ Ada                    ││▌from Ada: "Say…" (blue)││▌from agent (green)  │
 │ │    ││ Say exactly: OK  ●blue ││ Bea                   ││ Ada                │
@@ -51,15 +50,15 @@ This document fixes the design before any code. It draws E and T directly.
 └──────┘└────────────────────────┘└───────────────────────┘└────────────────────┘
 ```
 
-### The header: who is here, and what needs you (ADR-0030, ADR-0069, ADR-0077)
+### The header: your tabs, who is here, and what needs you (ADR-0030, ADR-0069, ADR-0077, ADR-0081)
 
-Your tabs are your view; the header shows what is happening in the rest of
-the session, from live data only, as a document editor shows the people in it.
+The header is one row: your tabs on the left (below), and at its right end
+what is happening in the rest of the session, from live data only, as a
+document editor shows the people in it. Too narrow for both, the right end
+goes on a row above the tabs. It is darker than the page, and the tab you
+are on is the page's colour and opens into it, so the columns below read as
+that tab's. While the page syncs, "syncing…" leads the right end.
 
-- **Messages, M of N** (under the title): M is the messages in the threads
-  this browser tab has loaded (your open tabs, and the Archive tab's
-  preview), N every thread's, archived or not. Opening or closing a tab
-  moves M; archiving a thread moves neither, unless its tab was open.
 - **People here:** an avatar per person with a live presence entry, in their
   colour. Hovering names them and the thread they are in; a click opens that
   thread as your tab, with a column on their path. You are never shown among
@@ -68,7 +67,8 @@ the session, from live data only, as a document editor shows the people in it.
   trigger a ✦. Its amber badge counts what the threads you follow need from
   you (a run that ended asking something, failing, or that no one could
   tell; work ready to add) plus the mentions you have not seen; the page's
-  title carries the same count, "(2) Pineta". While the agent works, a
+  title carries the same count, before the tab you are on: "(2) Fix the
+  sync bug · Pineta". While the agent works, a
   steady count of its threads stands beside the ✦, never in the badge. Its
   sections, each shown only with rows: **Needs you** (each thread's reason,
   in amber), **Ready to add** (every thread with an open offer, those you
@@ -190,7 +190,12 @@ ever in the context of another. That is where the screen splits.
 - **If someone else archives the tab you are on**, it stays while you are there,
   read-only, saying who archived it, with **Restore**. It leaves the bar when
   you switch away.
-- **With many tabs**, the bar scrolls; Archive and ＋ stay put.
+- **The tab you are on** has no edge below it and a light one above, and its
+  label is bright and bold, shown up to 32rem. The other tabs have no box
+  until hovered, and their labels keep their colour; their ⋯ and × show over
+  the label's end on hover.
+- **With many tabs**, the other tabs shrink to a floor, then the bar
+  scrolls; Archive and ＋ stay put, and the tab you choose scrolls into view.
 
 ### The Archive tab
 
@@ -205,6 +210,11 @@ The leftmost tab. It finds roots, so it is a list, not a rail with columns.
   **Restore** for an archived root, and **Open** for an open one. Taking a
   copy of a message into your inventory is not offered here yet, though it
   writes nothing in the root; it is offered wherever you can write.
+- **Messages, M of N** heads the list, and is the Archive tab's tooltip on
+  every tab: M is the messages in the threads this browser tab has loaded
+  (your open tabs, and the Archive tab's preview), N every thread's,
+  archived or not. Opening or closing a tab moves M; archiving a thread
+  moves neither, unless its tab was open.
 - **Restore** opens the root as your tab and switches to it; for everyone
   else it is simply no longer archived. **Open** opens an open root as your
   tab. Restoring is the only way to write in an archived root; the host
@@ -771,7 +781,8 @@ archive record (ADR-0029); a card's text is its own document (ADR-0048).
 - **Narrow screens**: the stacked sequence described above, with the tab bar as
   a switcher above it; built after the wide layout works. The column's pane
   is its first step (ADR-0078): over a narrow window it covers the page,
-  and ← goes back to the thread.
+  and ← goes back to the thread. The header's indicators going on a row
+  above the tabs, below 56rem, is another (ADR-0081).
 - **What's new since you looked** (ADR-0030 defers it): a last-read position
   per root gives unread marks on tabs, a "3 new" count in the header, and a
   "what's happening" panel listing roots by activity. It can reuse the
