@@ -119,6 +119,10 @@ export const INVENTORY = "inventory"
 export const TAKE = "take"
 export const TAKE_TITLE =
   "take into your inventory (Ctrl+Shift+I) · drag to move"
+/** The composer's button that empties it for another card here. */
+export const NEW_CARD = "+ card"
+export const NEW_CARD_TITLE =
+  "start another card here: this one stays, above the box"
 /** A message's button that takes a copy of it, or of your selection in it. */
 export const TAKE_COPY = "take a copy into your inventory"
 /** The panel's button that puts the selected card in the column last focused. */

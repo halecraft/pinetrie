@@ -1651,6 +1651,16 @@ export const mutations: readonly Mutation[] = [
       "pin draws the card in the strip at the top of its column, above the messages, and empties the composer",
   },
   {
+    name: "+ card leaves focus on its button",
+    file: "packages/client/card-editor.tsx",
+    from: '    setStatus("")\n    box.current?.focus()',
+    to: '    setStatus("")',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      '"+ card" empties the focused composer, draws your card above it, and typing makes another',
+  },
+  {
     name: "a run's prompt draws no marker of the pinned cards it read",
     file: "packages/client/message-list.tsx",
     from: "        pinned={markers.get(node.id)}",

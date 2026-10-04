@@ -53,6 +53,7 @@ import type { ReadOnly } from "./app-view.ts"
 import type { FoldMemory } from "./ask-fold.ts"
 import { askWords, DENSITIES, type Density, densityWords } from "./ask-words.ts"
 import { CardEditor, QueuedCardEditor } from "./card-editor.tsx"
+import { type EditorState, shownBelow } from "./card-state.ts"
 import {
   type CatchUps,
   closeAskWords,
@@ -567,12 +568,12 @@ export function Column(p: ColumnProps) {
   const forkConflicts =
     above.commit === null ? [] : conflictsAt(p.work.revisions, above.commit)
 
-  // Every card here but the one the composer shows: everyone else's, and
-  // any other of yours, such as one someone unqueued while you typed this
-  // one, or one put here while you had one. A fresh column's are those under
-  // its key. The composer shows your newest once it is free (`yourCard`).
-  const [composerShows, setComposerShows] = useState<CardId | null>(null)
-  const shownBelow = composerShows ?? mine?.id
+  // Every card here but the one the composer shows (`shownBelow`):
+  // everyone else's, and any other of yours, such as one someone unqueued
+  // while you typed this one, one put here while you had one, or the one
+  // "+ card" set aside. A fresh column's are those under its key.
+  const [composer, setComposer] = useState<EditorState | undefined>(undefined)
+  const shown = shownBelow(composer, mine?.id)
   const others = (
     fresh
       ? p.cards.filter(
@@ -581,7 +582,7 @@ export function Column(p: ColumnProps) {
       : threadEnd === null
         ? []
         : cardsAt("drafting", threadEnd, p.cards, p.lanes, index)
-  ).filter(c => c.id !== shownBelow)
+  ).filter(c => c.id !== shown)
   const place =
     composerPlace(
       p.column,
@@ -968,7 +969,7 @@ export function Column(p: ColumnProps) {
           onSend={onSend}
           onAct={act}
           onCreatesLane={setCreatesLane}
-          onShows={setComposerShows}
+          onShows={setComposer}
           onIntent={p.onIntent}
           onTyping={p.onTyping}
           takeFocus={() => p.takeFocus(p.column.key)}

@@ -1513,9 +1513,17 @@ places, the session or someone else's inventory throws before it is made.
   its key (`CardPlace` `fresh`). So a tab switch, a reload or another device
   finds the same card: it belongs to the thread, not to the mounted column.
   Every card there but the one the composer shows is drawn above it: the
-  composer reports which it shows (`onShows`), so a card put where you
-  already had one is drawn too, and once a send frees the box it takes your
-  newest card there.
+  composer reports its `EditorState` (`onShows`), and `shownBelow` decides
+  which card that leaves out. So a card put where you already had one is
+  drawn too, and once a send frees the box it takes your newest card there.
+- **"+ card" empties the box for another card** (`blank`). It shows while the
+  box is bound to a card with text, detaches and focuses the box, and moves
+  no card, so it adds no history step. A blank box takes no card it finds:
+  `card` is still your newest, so the editor reads only the card its state
+  holds (`shownBy`), and `shownBelow` leaves nothing out, so the card set
+  aside is drawn above. Typing creates a new card at the first input
+  `needsCard` accepts, as from `local`; a send's settling returns the box to
+  `local`, which takes your newest card here.
 - **One editor for every card: `card-editor.tsx`.** Your composer is one, and
   everyone else's cards above it are others, with a heading (`cardHeading`)
   and no where-menu. `Composer` is the column's foot: typing presence and your

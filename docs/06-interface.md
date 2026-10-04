@@ -585,6 +585,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   branch stays open.
 - **A new branch shows every card in it**, a card put there among them, and
   its first message leaves the others drafting below it.
+- **"+ card" starts another card in the same place.** The composer empties
+  and stays focused; the card you were writing is drawn above it, still
+  yours to edit or send. Nothing is made until you type something worth
+  keeping, and after a send the box takes your other card back.
 
 ### Pinned cards (ADR-0048 step 5)
 

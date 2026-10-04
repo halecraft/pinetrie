@@ -2946,20 +2946,21 @@ async function run(check: Checks["check"]): Promise<void> {
       // Pinned cards (ADR-0048 step 5), in the DOWN thread's agent column:
       // pin moves the composer's card to the strip at the column's top, above
       // its scrolling messages, and the composer is empty again.
-      const pinBox = `${col(0)} .composer .input`
-      await page.click(pinBox)
+      const composerBox = `${col(0)} .composer .input`
+      await page.click(composerBox)
       await page.keyboard.type("keep the tests green")
       await page.waitForFunction(
         s => document.querySelector(s)?.getAttribute("data-card") != null,
-        pinBox,
+        composerBox,
         { timeout: 10_000 },
       )
-      const pinnedCard = (await page.getAttribute(pinBox, "data-card")) ?? ""
+      const pinnedCard =
+        (await page.getAttribute(composerBox, "data-card")) ?? ""
       await page.click(`${col(0)} .composer .pin`)
       const inStrip = await appears(
         `${col(0)} .pinned-strip textarea[data-card="${pinnedCard}"]`,
       )
-      const pinEmptied = await valueIs(pinBox, "")
+      const pinEmptied = await valueIs(composerBox, "")
       const stripAbove = await page
         .$eval(col(0), c => {
           const strip = c
@@ -3006,6 +3007,46 @@ async function run(check: Checks["check"]): Promise<void> {
       check(
         "after a run, the marker of the pinned cards it read is drawn above its prompt",
         readMarked,
+      )
+
+      // "+ card" (ADR-0048): the composer empties and keeps focus, the card
+      // you were writing is drawn above it, and typing makes another.
+      await page.click(composerBox)
+      await page.keyboard.type("one thought")
+      await page.waitForFunction(
+        s => document.querySelector(s)?.getAttribute("data-card") != null,
+        composerBox,
+        { timeout: 10_000 },
+      )
+      const setAside = (await page.getAttribute(composerBox, "data-card")) ?? ""
+      await page.click(`${col(0)} .composer .new-card`)
+      const blanked = await valueIs(composerBox, "")
+      const blankFocused = await page
+        .$eval(composerBox, el => el === document.activeElement)
+        .catch(() => false)
+      const drawnAbove = await appears(
+        `${col(0)} .cards textarea[data-card="${setAside}"]`,
+      )
+      await page.keyboard.type("another thought")
+      const another = await page
+        .waitForFunction(
+          ([s, old]) => {
+            const id = document
+              .querySelector(s ?? "")
+              ?.getAttribute("data-card")
+            return id != null && id !== old
+          },
+          [composerBox, setAside],
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        '"+ card" empties the focused composer, draws your card above it, and typing makes another',
+        blanked && blankFocused && drawnAbove && another,
+        `emptied ${blanked}, focused ${blankFocused}, above ${drawnAbove}, another ${another}`,
       )
 
       // A reload keeps the tab you are on, and its open columns (ADR-0027).

@@ -2,7 +2,6 @@
 // (ADR-0048), and who else is typing here.
 
 import type {
-  CardId,
   CardPlace,
   CardRecord,
   CommandSummary,
@@ -13,6 +12,7 @@ import type {
 } from "@pineta/core"
 import type { ReadOnly } from "./app-view.ts"
 import { CardEditor, type Where } from "./card-editor.tsx"
+import type { EditorState } from "./card-state.ts"
 import type { CatchUps } from "./card-words.ts"
 import type { Pending, Prefill } from "./columns.ts"
 import type { ColumnAct, Intent } from "./intent.ts"
@@ -52,8 +52,8 @@ export function Composer(p: {
   onSend: () => string | undefined
   onBranchInstead: (pending: Pending) => void
   onCreatesLane: (createsLane: boolean) => void
-  /** Told which card the box shows (`CardEditor`). */
-  onShows: (card: CardId | null) => void
+  /** Told the box's state, so the column knows which card it shows (`CardEditor`). */
+  onShows: (state: EditorState) => void
   /** Where a read-only action goes (`ReadOnly.action.intent`). */
   onIntent: (intent: Intent) => void
   /** The column's acts: queueing your card, clearing its command. */

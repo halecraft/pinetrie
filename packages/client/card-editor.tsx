@@ -37,6 +37,9 @@ import {
   type EditorState,
   type EditorStep,
   editorState,
+  free,
+  needsCard,
+  shownBy,
   startText,
 } from "./card-state.ts"
 import {
@@ -44,6 +47,8 @@ import {
   CLEAR_COMMAND,
   cardStatus,
   commandNote,
+  NEW_CARD,
+  NEW_CARD_TITLE,
   PIN,
   PIN_TITLE,
   pinnedStatusWords,
@@ -140,7 +145,10 @@ export interface Where {
  */
 export function CardEditor(p: {
   session: SessionClient
-  /** The card this edits: yours here once it exists, or someone else's. */
+  /**
+   * The card this edits: your newest here once it exists, or someone
+   * else's. After "+ card" the box shows none, though this is still yours.
+   */
   card: CardRecord | undefined
   /**
    * Where a card made from this box goes: yours, at this column. Undefined
@@ -182,10 +190,11 @@ export function CardEditor(p: {
   /** Told whether the next send would create a lane, each time that changes. */
   onCreatesLane: ((createsLane: boolean) => void) | undefined
   /**
-   * Told which card the box shows, each time that changes: the column draws
-   * every other card at its end above it, a card put there among them.
+   * Told the box's state each time it changes: the column draws every card
+   * at its end but the one the box shows above it (`shownBelow`), a card put
+   * there among them.
    */
-  onShows: ((card: CardId | null) => void) | undefined
+  onShows: ((state: EditorState) => void) | undefined
   /** Where a read-only action goes (`ReadOnly.action.intent`). */
   onIntent: (intent: Intent) => void
   /** The column's acts: queueing a card, clearing its command. */
@@ -195,15 +204,22 @@ export function CardEditor(p: {
   /** Whether this column asked for focus, just opened. Asked on mounting. */
   takeFocus: (() => boolean) | undefined
 }) {
-  const { session, card, prefill, pending } = p
+  const { session, prefill, pending } = p
   const box = useRef<HTMLTextAreaElement>(null)
   const [state, setState] = useState<EditorState>(() =>
-    card === undefined ? { kind: "local" } : { kind: "bound", card: card.id },
+    p.card === undefined
+      ? { kind: "local" }
+      : { kind: "bound", card: p.card.id },
   )
+  // The card the box shows: `p.card` once the state holds it. Not after
+  // "+ card", when `p.card` is still the one you were writing.
+  const card = p.card?.id === shownBy(state) ? p.card : undefined
   // The state as the handlers last left it, read synchronously between renders.
   const current = useRef(state)
   // The box's text, as shown: the element's while local, the card's while bound.
-  const [text, setText] = useState(() => startText({ pending, card, prefill }))
+  const [text, setText] = useState(() =>
+    startText({ pending, card: p.card, prefill }),
+  )
   const detach = useRef<(() => void) | null>(null)
   const [status, setStatus] = useState("")
   const [uploading, setUploading] = useState(0)
@@ -241,8 +257,7 @@ export function CardEditor(p: {
     () => onCreatesLane?.(plan.createsLane),
     [plan.createsLane, onCreatesLane],
   )
-  const shows = state.kind === "local" ? null : state.card
-  useEffect(() => onShows?.(shows), [shows, onShows])
+  useEffect(() => onShows?.(state), [state, onShows])
 
   /** Bind the box to a card's text, keeping the caret where it is. */
   const bind = (id: CardId) => {
@@ -303,11 +318,13 @@ export function CardEditor(p: {
   // The card as the column finds it: found, or gone. Gone only once it was
   // seen: a card just created is not in the records until they redraw. A box
   // left empty by a send finds the card the column gives it then: one put
-  // here while this one was being written.
+  // here while this one was being written, or the one "+ card" set aside.
+  // A blank box takes none (`editorState`).
   const seen = useRef<CardId | null>(null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: on the card's coming and going, and the box coming free
   useEffect(() => {
     const now = current.current
+    const card = p.card
     if (card !== undefined) {
       if (now.kind === "bound" && now.card === card.id) {
         seen.current = card.id
@@ -319,7 +336,7 @@ export function CardEditor(p: {
     } else if (now.kind === "bound" && seen.current === now.card) {
       step({ kind: "gone" })
     }
-  }, [card?.id, state.kind === "local"])
+  }, [p.card?.id, state.kind === "local"])
   // Unbound on unmount. StrictMode mounts twice, so the handle is cleared
   // too: the second mount binds again.
   useEffect(
@@ -370,8 +387,13 @@ export function CardEditor(p: {
     setConflict(settled.conflict)
     setStatus(settled.status)
   }
-  const cardOf = (s: EditorState): CardId | null =>
-    s.kind === "local" ? null : s.card
+  /** "+ card": empty the box for another; the one it showed goes above. */
+  const another = () => {
+    step({ kind: "new" })
+    setConflict(null)
+    setStatus("")
+    box.current?.focus()
+  }
 
   // Sent once, however often React runs effects (StrictMode runs them twice).
   const sentPending = useRef(false)
@@ -411,7 +433,7 @@ export function CardEditor(p: {
     const now = current.current
     if (message === null || p.readOnly !== null || now.kind === "sending")
       return
-    await send(message, plan.mode, cardOf(now))
+    await send(message, plan.mode, shownBy(now))
   }
 
   /**
@@ -462,7 +484,7 @@ export function CardEditor(p: {
           <button
             className="queue-after"
             onClick={() =>
-              void send(conflict.text, "queue", cardOf(current.current))
+              void send(conflict.text, "queue", shownBy(current.current))
             }
             title={queue.title ?? undefined}
             type="button"
@@ -473,7 +495,7 @@ export function CardEditor(p: {
             className="branch-instead"
             onClick={() => {
               setConflict(null)
-              const from = cardOf(current.current)
+              const from = shownBy(current.current)
               p.onBranchInstead({
                 text: conflict.text,
                 ...(from === null ? {} : { card: from }),
@@ -550,7 +572,7 @@ export function CardEditor(p: {
           setText(value)
           setPicked(0)
           p.onTyping()
-          if (current.current.kind === "local" && p.place !== undefined)
+          if (free(current.current) && p.place !== undefined)
             step({ kind: "input", text: value, card: newCardId() })
         }}
         onPaste={e => {
@@ -626,6 +648,18 @@ export function CardEditor(p: {
                   </span>
                 )}
               </div>
+            )}
+          {state.kind === "bound" &&
+            p.place !== undefined &&
+            needsCard(text, prefill) && (
+              <button
+                className="new-card"
+                onClick={another}
+                title={NEW_CARD_TITLE}
+                type="button"
+              >
+                {NEW_CARD}
+              </button>
             )}
           {card?.place.kind === "drafting" && (
             <button
