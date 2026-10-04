@@ -5,6 +5,7 @@ import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { ROOT } from "@pineta/core"
+import { TITLE_REQUEST_HEAD } from "@pineta/marginalia"
 import { scriptedModel } from "@pineta/pi"
 import { readRoots } from "@pineta/reads"
 import type { Checks } from "../checks.ts"
@@ -22,9 +23,6 @@ export const scenario: Scenario = {
   run: ({ check }) => run(check),
 }
 
-/** A title request's text begins so (`titleRequest`). */
-const TITLE_REQUEST = "How it began:"
-
 async function run(check: Checks["check"]): Promise<void> {
   const project = committedProject("pineta-titles-", { "a.txt": "a\n" })
   // An empty config: titles are on by default.
@@ -40,7 +38,7 @@ async function run(check: Checks["check"]): Promise<void> {
     describe: {
       reply: context => {
         const asked = context.at(-1) ?? ""
-        if (!asked.startsWith(TITLE_REQUEST)) return "offer: scripted"
+        if (!asked.startsWith(TITLE_REQUEST_HEAD)) return "offer: scripted"
         return asked.includes("lexer") ? "Lexer work" : "Parser plan"
       },
     },

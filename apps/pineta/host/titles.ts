@@ -11,6 +11,7 @@ import {
   type EntryId,
   type LaneName,
   type Position,
+  type Refusal,
   type RootId,
   summarizeRoots,
   type WriterId,
@@ -103,11 +104,14 @@ export function createTitles(deps: {
   // Roots an unasked title is being asked for.
   const asking = new Set<RootId>()
 
-  /** Gather and plan in the caller's step; ask outside it, then write in a step of its own. */
+  /**
+   * Gather and plan in the caller's step; ask outside it, then write in a
+   * step of its own. Returns the refusal, or null once asked or skipped.
+   */
   async function consider(
     root: RootId,
     trigger: TitleTrigger,
-  ): Promise<Outcome> {
+  ): Promise<Refusal | null> {
     const doc = await basics.docs.root(root)
     const plan = planTitling({
       index: readTreeIndex(doc),
@@ -119,7 +123,7 @@ export function createTitles(deps: {
       inFlight: asking.has(root),
     })
     if (plan.kind === "refused") return plan
-    if (plan.kind === "skip") return { kind: "retitling" }
+    if (plan.kind === "skip") return null
     const { by } = plan
     void requestOutside({
       keeper,
@@ -170,13 +174,14 @@ export function createTitles(deps: {
             .writeValues([setRecord(MARK, planned.record, root)])
       },
     })
-    return { kind: "retitling" }
+    return null
   }
 
   return {
     laneStarted: async ({ root, ...started }) => {
       await consider(root, { kind: "lane", ...started })
     },
-    asked: (root, by) => consider(root, { kind: "asked", by }),
+    asked: async (root, by) =>
+      (await consider(root, { kind: "asked", by })) ?? { kind: "retitling" },
   }
 }

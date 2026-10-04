@@ -123,7 +123,6 @@ export function planTitling(input: {
     lines: [
       ...transcriptLines(above),
       transcriptLine({
-        id: "" as EntryId,
         role: "chat",
         author: trigger.prompt.author,
         text: trigger.prompt.text,
@@ -132,6 +131,9 @@ export function planTitling(input: {
     by: THE_AGENT,
   }
 }
+
+/** How a title request's text begins: a suite tells one from a commit message's by it. */
+export const TITLE_REQUEST_HEAD = "How it began:"
 
 /**
  * Pure. The request: the skill, the root's first message always, since it
@@ -143,7 +145,7 @@ export function titleRequest(input: {
   readonly budget: number
 }): { readonly system: string; readonly user: string } {
   const [first, ...rest] = input.lines
-  const head = `How it began:\n- ${(first ?? "").trim()}\n\n`
+  const head = `${TITLE_REQUEST_HEAD}\n- ${(first ?? "").trim()}\n\n`
   const room = Math.max(0, input.budget - head.length)
   const { text, dropped } = fitNewest(rest, room - LEFT_OUT_NOTE)
   return {

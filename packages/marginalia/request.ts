@@ -8,7 +8,9 @@ import type { TranscriptMessage } from "@pineta/core"
  * One message as `speaker: text`. A chat's speaker is its author as sent;
  * a land, update or stack message carries no author, so its role speaks.
  */
-export const transcriptLine = (m: TranscriptMessage): string => {
+export const transcriptLine = (
+  m: Pick<TranscriptMessage, "role" | "author" | "text">,
+): string => {
   const speaker =
     m.role === "assistant"
       ? "agent"

@@ -1269,8 +1269,9 @@ export const mutations: readonly Mutation[] = [
     name: "a title request leaves out how the thread began",
     file: "packages/marginalia/title.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '  const head = `How it began:\\n- ${(first ?? "").trim()}\\n\\n`',
-    to: '  const head = "How it began:\\n\\n"',
+    from: '  const head = `${TITLE_REQUEST_HEAD}\\n- ${(first ?? "").trim()}\\n\\n`',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "  const head = `${TITLE_REQUEST_HEAD}\\n\\n`",
     command: unit,
     expect: "titleRequest: the first line always, then the newest that fit",
   },

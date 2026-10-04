@@ -93,13 +93,13 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 1693/1693 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 1049 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 1789/1789 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 1117 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 12 scenarios, 43 checks, on the scripted model (S94) |
+| end-to-end | `pnpm run e2e` | 13 scenarios, 45 checks, on the scripted model (S94) |
 | with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
-| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 161 checks; in a lane with no containers, the 6 that need one report SKIP |
-| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 17 host and lanes scenarios ≤ ⌊√1693⌋; 4 browser ≤ ⌊√17⌋ |
+| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 162 checks; in a lane with no containers, the 6 that need one report SKIP |
+| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 18 host and lanes scenarios ≤ ⌊√1789⌋; 4 browser ≤ ⌊√18⌋ |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
