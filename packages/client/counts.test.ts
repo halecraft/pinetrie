@@ -1,5 +1,5 @@
 import { expect, test } from "vitest"
-import { listOf, plural } from "./counts.ts"
+import { ago, listOf, plural } from "./counts.ts"
 
 test("plural: one is singular, anything else takes an s", () => {
   expect([0, 1, 2].map(n => plural(n, "card"))).toEqual([
@@ -13,4 +13,18 @@ test("listOf: names joined as a sentence would", () => {
   expect(listOf(["Ada"])).toBe("Ada")
   expect(listOf(["Ada", "Bea"])).toBe("Ada and Bea")
   expect(listOf(["Ada", "Bea", "Cat"])).toBe("Ada, Bea, and Cat")
+})
+
+const NOW = 1_000_000_000
+test.each([
+  [0, "just now"],
+  [59, "just now"],
+  [60, "1 min ago"],
+  [3000, "50 min ago"],
+  [3600, "1 h ago"],
+  [7200, "2 h ago"],
+  [86_400, "1 d ago"],
+  [-5, "just now"],
+])("ago: %d s before is %s", (seconds, words) => {
+  expect(ago(NOW - seconds * 1000, NOW)).toBe(words)
 })

@@ -338,6 +338,14 @@ and takes the leftmost place free for its whole height (`placeRail`). A
 track is a branch's colour, by creation order, apart from its place, since
 places follow capsule sizes and so presence, which `App` does not read.
 
+**ADR-0071 — a thread's name opens its details** (built). The name and
+icon toggle a panel under the header: the icon magnified, spinning in as it
+opens, who started the thread and when, where it works, and the `↓` in
+full. The reveal of the lane's start moves there, offered only below the
+path's first message. Open or closed is the column's, stored like its
+density; both are addressed by key, so they work in new tabs and the
+Archive preview too.
+
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold

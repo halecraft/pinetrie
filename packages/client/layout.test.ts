@@ -163,6 +163,30 @@ describe("layoutReducer", () => {
     ])
   })
 
+  test("a new tab's column takes the reader's settings, and keeps them as it becomes its root's (ADR-0071)", () => {
+    const opened = layoutReducer(at(initialLayout()), {
+      kind: "newTab",
+      key: "n",
+      root: NEW_ROOT,
+      asksAgent: true,
+    })
+    const shown = layoutReducer(opened, {
+      kind: "newTabColumn",
+      key: "n",
+      action: { kind: "details", key: "n", open: true },
+    })
+    expect(shown.newTabs[0]?.details).toBe(true)
+    const sent = layoutReducer(shown, {
+      kind: "newTabColumn",
+      key: "n",
+      action: { kind: "sent", key: "n", sendId: "s" },
+    })
+    const written = tree({ ...parents, "7-r3": null }, { "7-r3": "s" })
+    expect(columnsOf(sync(sent, written), entryId("7-r3"))[0]?.details).toBe(
+      true,
+    )
+  })
+
   test("a new tab bound by its reserved lane becomes that root's tab, in every browser tab holding it (ADR-0057)", () => {
     const R = laneNameForThread("r")
     const opened = layoutReducer(at(initialLayout()), {
@@ -494,6 +518,29 @@ describe("encodeLayout / decodeLayout", () => {
       key: "a",
       anchor: entryId("1-r1"),
     })
+  })
+
+  test("a column's open details are kept, and a layout stored before them decodes closed (ADR-0071)", () => {
+    const l: Layout = {
+      active: { kind: "root", root: entryId("1-r1") },
+      open: [entryId("1-r1")],
+      roots: new Map([
+        [
+          entryId("1-r1"),
+          [
+            { key: "a", anchor: entryId("1-r1"), details: true },
+            { key: "b", anchor: entryId("2-a") },
+          ],
+        ],
+      ]),
+      newTabs: [],
+    }
+    expect(trip(l)).toEqual(l)
+    const before = JSON.parse(JSON.stringify(encodeLayout(l)))
+    delete before.roots["1-r1"][0].details
+    expect(
+      decodeLayout(before, () => NEW_ROOT)?.roots.get(entryId("1-r1"))?.[0],
+    ).toEqual({ key: "a", anchor: entryId("1-r1") })
   })
 
   test("a message waiting to be sent is never stored, nor restored: it would be sent again", () => {

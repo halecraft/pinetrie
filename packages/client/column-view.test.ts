@@ -29,10 +29,12 @@ import {
   joinWords,
   lanesAlong,
   offerWords,
+  startedWords,
   type WorkFacts,
   workingWords,
 } from "./column-view.ts"
 import { entry, indexOf, TEST_ROOT } from "./fixtures.ts"
+import { whereWords } from "./send.ts"
 
 const A = laneNameForThread("a")
 const B = laneNameForThread("b")
@@ -192,6 +194,7 @@ const facts = (
     view,
     lane: { kind: "none" },
     createsLane: false,
+    detailsOpen: false,
     reserved: null,
     mountedBanner: null,
     writable: true,
@@ -217,10 +220,10 @@ describe("columnView: the header", () => {
         work: work({ revisions: OWNERS, names: NAMES }),
       }),
     )
-    expect(named.identity).toEqual({
+    expect(named.identity).toMatchObject({
       kind: "agent",
       name: COPPER,
-      start: entryId("b1"),
+      details: { start: entryId("b1") },
     })
     const unnamed = columnView(facts(1, { lane: onLane(laneView(B, "b2")) }))
     expect(unnamed.identity).toEqual({ kind: "pending" })
@@ -243,7 +246,13 @@ describe("columnView: the header", () => {
     expect(about({ createsLane: true }).identity).toEqual({
       kind: "agent",
       name: COPPER,
-      start: null,
+      details: {
+        open: false,
+        started: null,
+        where: null,
+        behind: null,
+        start: null,
+      },
     })
     expect(about({ createsLane: true }).banner?.url).toBe(`/blob/${sha}`)
     expect(about({ createsLane: false }).identity).toEqual({ kind: "none" })
@@ -315,10 +324,10 @@ describe("columnView: the header", () => {
       lane: onLane(laneView(A, "b3")),
       work: work({ revisions: revisions({ "3": A }), names: NAMES }),
     })
-    expect(shows.identity).toEqual({
+    expect(shows.identity).toMatchObject({
       kind: "agent",
       name: AMBER,
-      start: entryId("3"),
+      details: { start: entryId("3") },
     })
   })
   test("the origin: a chat by its speaker, an agent reply by its lane, else 'agent'", () => {
@@ -342,6 +351,76 @@ describe("columnView: the header", () => {
     expect(
       columnView({ ...facts(0), index, view: fromChat }).origin,
     ).toMatchObject({ speaker: "Ada", text: "hi" })
+  })
+})
+
+describe("columnView: a thread's details (ADR-0071)", () => {
+  const detailsOf = (shows: ReturnType<typeof columnView>) =>
+    shows.identity.kind === "agent" ? shows.identity.details : null
+  const onB = (over: Partial<ColumnFacts> = {}) =>
+    facts(1, {
+      lane: onLane(laneView(B, "b2")),
+      work: work({ revisions: OWNERS, names: NAMES }),
+      ...over,
+    })
+  test("closed unless the column keeps them open", () => {
+    expect(detailsOf(columnView(onB()))?.open).toBe(false)
+    expect(detailsOf(columnView(onB({ detailsOpen: true })))?.open).toBe(true)
+  })
+  test("who started the lane, and where it works, from its record; neither before it has one", () => {
+    const lanes = new Map([[B, record(B, { kind: "own" })]])
+    const shown = detailsOf(
+      columnView(
+        onB({ work: work({ revisions: OWNERS, names: NAMES, lanes }) }),
+      ),
+    )
+    expect(shown?.started).toEqual({ by: "Ada", at: 1 })
+    expect(shown?.where).toBe(whereWords({ kind: "own" }, PROJECT))
+    const none = detailsOf(columnView(onB()))
+    expect(none?.started).toBeNull()
+    expect(none?.where).toBeNull()
+  })
+  test.each([
+    [
+      "at the root",
+      [
+        ["r", null, chat("@agent go", true)],
+        ["r2", "r", reply("Gone.")],
+      ],
+      null,
+    ],
+    [
+      "at a message whose parent the index lacks",
+      [
+        ["o", "gone", chat("@agent go", true)],
+        ["o2", "o", reply("Gone.")],
+      ],
+      null,
+    ],
+    [
+      "below the first message",
+      [
+        ["r", null, chat("hello")],
+        ["o", "r", chat("@agent go", true)],
+        ["o2", "o", reply("Gone.")],
+      ],
+      "o",
+    ],
+  ] as const)("a lane that started %s", (_, lines, start) => {
+    const index = tree(lines)
+    const tip = lines.at(-1)?.[0] ?? ""
+    const [view] = projectColumns(index, [
+      { anchor: entryId(tip), pinned: true },
+    ])
+    if (view === undefined) throw new Error("no view")
+    const shows = columnView({
+      ...facts(0),
+      index,
+      view,
+      lane: onLane(laneView(A, tip)),
+      work: work({ names: NAMES }),
+    })
+    expect(detailsOf(shows)?.start).toBe(start === null ? null : entryId(start))
   })
 })
 
@@ -819,6 +898,18 @@ describe("behindMark: the header's mark for a base that moved on", () => {
         "the project has new work since this thread started, in 2 files · pineta-onto: aaaaaaaa → bbbbbbbb",
     })
   })
+  test("a thread's details say it in full (ADR-0071)", () => {
+    const shows = columnView(
+      facts(1, {
+        lane: onLane(laneView(B, "b2")),
+        work: work({ names: NAMES, line, bases: new Map([[B, base]]) }),
+      }),
+    )
+    expect(shows.identity).toMatchObject({
+      details: { behind: behindMark(base, line)?.title },
+    })
+    expect(shows.behind?.title).toBe(behindMark(base, line)?.title)
+  })
   test("none once caught up, before the host read the base, or when catching up would change nothing or is not yet read (S97)", () => {
     expect(behindMark({ ...base, start: line.commit }, line)).toBe(null)
     expect(behindMark(undefined, line)).toBe(null)
@@ -834,11 +925,30 @@ describe("behindMark: the header's mark for a base that moved on", () => {
 describe("identityWords", () => {
   test.each<[Parameters<typeof identityWords>[0], string]>([
     [
-      { kind: "agent", name: "amber-fox" as ThreadName, start: null },
+      {
+        kind: "agent",
+        name: "amber-fox" as ThreadName,
+        details: {
+          open: false,
+          started: null,
+          where: null,
+          behind: null,
+          start: null,
+        },
+      },
       "amber-fox",
     ],
     [{ kind: "pending" }, "new agent"],
   ])("%o", (identity, words) => {
     expect(identityWords(identity)).toBe(words)
+  })
+})
+
+describe("startedWords", () => {
+  test.each([
+    [30, "started by Ada · just now"],
+    [3 * 3600, "started by Ada · 3 h ago"],
+  ])("%d s ago: %s", (seconds, words) => {
+    expect(startedWords({ by: "Ada", at: 0 }, seconds * 1000)).toBe(words)
   })
 })

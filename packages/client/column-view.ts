@@ -34,6 +34,7 @@ import {
   baseName,
   type CatchUpNow,
   catchUpOf,
+  displayName,
   type OfferActivity,
   type OfferButton,
   type OfferView,
@@ -44,6 +45,7 @@ import {
 import type { OfferActing } from "./acting.ts"
 import { commandWords } from "./card-words.ts"
 import type { Column } from "./columns.ts"
+import { ago } from "./counts.ts"
 import { speakerLabel } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
 import { whereWords } from "./send.ts"
@@ -127,13 +129,35 @@ export type HeadIdentity =
   | {
       readonly kind: "agent"
       readonly name: ThreadName
-      /** Where its lane started on this path, when known. */
-      readonly start: EntryId | null
+      readonly details: ThreadDetails
     }
   /** A lane not named yet, or a next send that would create one. */
   | { readonly kind: "pending" }
   /** A conversation. */
   | { readonly kind: "none" }
+
+/**
+ * What a named thread's details show, under the header (ADR-0071). Only a
+ * named agent has them: a conversation has no thread to describe, and a new
+ * agent not yet named has nothing to show.
+ */
+export interface ThreadDetails {
+  readonly open: boolean
+  /** Who started its lane and when, from the lane's record; null before there is one. */
+  readonly started: { readonly by: string; readonly at: number } | null
+  /**
+   * Where it works (`whereWords`): a direct lane's strip says it too, at the
+   * column's foot. Null with no project, or for a lane with no work of its own.
+   */
+  readonly where: string | null
+  /** `behindMark`'s title, in full: the header shows only its ↓. */
+  readonly behind: string | null
+  /**
+   * Where its lane started on this path, to reveal it; null when that is the
+   * path's first message, where the reveal would only scroll to the top.
+   */
+  readonly start: EntryId | null
+}
 
 /** The thread's icon in a column's header. */
 export interface HeadBanner {
@@ -224,6 +248,8 @@ export interface ColumnFacts {
   readonly lane: ThreadLane
   /** The composer's next send would create a lane. */
   readonly createsLane: boolean
+  /** The reader has the thread's details open (`Column.details`). */
+  readonly detailsOpen: boolean
   /** The id this column reserved for the lane its next send creates (ADR-0057). */
   readonly reserved: LaneName | null
   /** The banner's URL as the column mounted (`bannerUrl`), or null. */
@@ -288,18 +314,24 @@ export function columnView(f: ColumnFacts): ColumnShows {
     lane.kind === "lane" ? lane.name : null,
   )
   const head = headLane(lane, f.createsLane, f.reserved)
+  const behind = behindMark(
+    head === null ? undefined : work.bases.get(head),
+    work.line,
+  )
   return {
-    identity: identityOf(head, f.createsLane, work.names, stretches),
+    identity: identityOf(
+      head,
+      f.createsLane,
+      work.names,
+      detailsOf(f, head, stretches, behind),
+    ),
     banner: bannerOf(bannerUrl(head, work.banners), f.mountedBanner),
     origin: originOf(f, stretches),
     joins: joinsOf(view, stretches, work.names),
     strip: workStrip(f),
     reserve: reserveStep(f),
     base: baseWords(head === null ? undefined : work.bases.get(head)),
-    behind: behindMark(
-      head === null ? undefined : work.bases.get(head),
-      work.line,
-    ),
+    behind,
   }
 }
 
@@ -370,22 +402,72 @@ export const identityWords = (
   identity: Exclude<HeadIdentity, { kind: "none" }>,
 ): string => (identity.kind === "agent" ? identity.name : "new agent")
 
-/** `head` is `headLane`'s: a lane not yet created has no start on the path. */
+/** Who started a thread, and how long before `now`: its details' line. */
+export const startedWords = (
+  started: NonNullable<ThreadDetails["started"]>,
+  now: number,
+): string => `started by ${started.by} · ${ago(started.at, now)}`
+
+/** The details' button that reveals where the thread's lane started. */
+export const START_WORDS = "where it started"
+
+/** The title of a thread's name, which opens or closes its details. */
+export const detailsTitle = (open: boolean): string =>
+  open ? "hide this thread's details" : "show this thread's details"
+
+/** `head` is `headLane`'s. Only a named agent carries `details`. */
 function identityOf(
   head: LaneName | null,
   createsLane: boolean,
   names: ReadonlyMap<LaneName, ThreadName>,
-  stretches: readonly LaneStretch[],
+  details: ThreadDetails,
 ): HeadIdentity {
   if (head === null) return createsLane ? { kind: "pending" } : { kind: "none" }
   const name = names.get(head)
   if (name === undefined) return { kind: "pending" }
+  return { kind: "agent", name, details }
+}
+
+/**
+ * A named thread's details. `head` is `headLane`'s: a lane not yet created
+ * has no record and no start on the path.
+ */
+function detailsOf(
+  f: ColumnFacts,
+  head: LaneName | null,
+  stretches: readonly LaneStretch[],
+  behind: ColumnShows["behind"],
+): ThreadDetails {
+  const { index, work } = f
+  const record = head === null ? undefined : work.lanes.get(head)
+  const setting = record?.work ?? null
   const last = stretches.at(-1)
+  const start = last?.lane === head ? last.start : null
   return {
-    kind: "agent",
-    name,
-    start: last?.lane === head ? last.start : null,
+    open: f.detailsOpen,
+    started:
+      record === undefined
+        ? null
+        : {
+            by: displayName(record.by, f.nameOf.get(record.by)),
+            at: record.createdAt,
+          },
+    where:
+      setting === null || work.project === null
+        ? null
+        : whereWords(setting, work.project),
+    behind: behind?.title ?? null,
+    start: start === null || isFirst(index, start) ? null : start,
   }
+}
+
+/**
+ * Whether `id` is the first message of any path through it: it has no
+ * parent, or one the index lacks, which is where `ancestry` stops.
+ */
+const isFirst = (index: TreeIndex, id: EntryId): boolean => {
+  const parent = index.parentOf(id)
+  return parent === null || index.entries[parent] === undefined
 }
 
 function originOf(

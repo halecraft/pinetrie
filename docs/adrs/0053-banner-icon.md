@@ -1,7 +1,9 @@
 # ADR-0053 — A thread's banner is its name's icon: a square sprite drawn from the name alone, as the thread is named
 
 **Status:** Accepted. Amends ADR-0050. **Amended by ADR-0057:**
-the icon starts when the column first wants an agent, before the first send.
+the icon starts when the column first wants an agent, before the first send. **Amended by ADR-0071:**
+the icon is also drawn magnified, in the thread's details, where it spins
+in as they are opened.
 
 **Context.** ADR-0050's banners were wide images behind the header, briefed
 by the text model from the thread's messages and drawn at 8:1 after the

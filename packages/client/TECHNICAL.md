@@ -295,7 +295,8 @@ give the roots and each tab's signals.
   (`archive-rows.ts`, a client-only read like `projection.ts`). Its filter,
   search, selection and preview anchor are component state, never stored. The
   preview is a `Rail` and one `Column` with `readOnly`: Restore for an
-  archived root, Open for an open one.
+  archived root, Open for an open one. Its column's reader settings
+  (density, details) are its own state, never stored.
 
 ## The column model (`columns.ts`)
 
@@ -585,7 +586,13 @@ the columns read one. `segmentPath` (core) decides what a column folds;
   `density` column act and stored with the layout as an optional field,
   with no new `v`: a layout stored before it decodes. A change dispatches
   `PLACED`, so a column at its end stays there and no floor holds the
-  change.
+  change. Whether its thread's details are open (`Column.details`,
+  ADR-0071) is kept the same way.
+- **Both are `ReaderAction`s, by the column's key** (`readerAction`,
+  `intent.ts`), as `sent` and `reserve` are: `planColumn` sends them
+  through `onColumn`, so a new tab's one column takes them
+  (`newTabColumn`), and the Archive preview reduces its own column with
+  `columnsReducer`, keeping them only while it shows.
 - **What `askView` decides:** the digest line (`workWords` over
   `askStats`), the outcome's words, the live line while it runs, the last
   word outline hides (none in the column's last ended ask, `lastEndedAsk`,
@@ -753,9 +760,33 @@ became of its files (`strip`).
   what it is doing while out (its actions are disabled), then a refusal or
   failure (`outcomeWords`).
   A host that admits others offers none, and says to use jj on its machine.
-- **The header's clicks are `openAt` intents** (`planOpen`), which reveal
-  the entry in whichever column shows it. A column's lane may have
-  started in a column to its left.
+- **The origin row and the details' "where it started" are `openAt`
+  intents** (`planOpen`), which reveal the entry in whichever column shows
+  it. A column's lane may have started in a column to its left.
+- **A named thread's details (ADR-0071) are `ThreadDetails`**, built by
+  `detailsOf` and carried in `HeadIdentity`'s agent variant, so a pending or
+  absent identity cannot have any, by type. The name is their toggle
+  (`aria-expanded`); its chevron is `::after`, so `.agent-name`'s text stays
+  `✦ name`, which the browser suite reads. The panel is drawn after the
+  header, outside it: no drag handle (`NOT_A_HANDLE` needs `.column-head`),
+  and its text can be selected.
+  - **`start` is null at the path's first message,** where the reveal
+    would only scroll to the top. It is the first exactly when its parent is
+    null or missing from the index, which is where `ancestry` stops: one
+    lookup, no second walk.
+  - **The panel draws `ThreadMark` itself,** scaled by CSS, so the star,
+    the banner, its fade and its blend are one component's. The spin is on
+    the button around it: `.thread-mark` animates `transform` while the lane
+    runs, and a spin on the same element would replace the pulse. A spin
+    restarts by changing the animation's name (`data-spin` odd or even), not
+    by a key, which would draw the mark again and fade a new banner in again.
+  - **It spins only when opened here.** `Column` keeps `openedHere`, set by
+    the opening click; details mounted open, by a reload or a tab switch,
+    are still, as `mountedBanner` keeps a banner there at mount from fading.
+  - **`where` repeats a direct lane's strip line** (`whereWords`), on
+    purpose: every thread's details say where it works.
+  - **Toggling dispatches no `PLACED`**, unlike density: it changes the
+    view's height, not the content's, and `useFollow` follows that.
 - **The banner (ADR-0050, ADR-0053) is the thread's at the column's end**
   (`banner`): the lane's `pineta.banner`, none for a conversation. It takes
   the star's place before the name (`ThreadMark`): a fixed 1.5rem square,
@@ -767,7 +798,9 @@ became of its files (`strip`).
   as it mounted (`bannerUrl`), and `columnView` decides `fade` from it.
   `isolation: isolate` makes the
   header's own background what `mix-blend-mode: lighten` blends with: the
-  sprite's black ground becomes the header's colour. The header has no `overflow: hidden`: on a flex item that
+  sprite's black ground becomes the header's colour. The mark's rules are
+  `.thread-mark`'s, not the header's, since the details draw it too, with
+  `isolation` of their own; only its pulse is scoped to where it is. The header has no `overflow: hidden`: on a flex item that
   removes its minimum height, and a tall column squeezed the header.
 - **`onCreatesLane`:** the composer tells the column, in an effect, whether its
   next send would create a lane, so the header can say `✦ new agent`. It is a
@@ -918,7 +951,8 @@ fast the strip scrolls near an edge (`edgeScroll`).
   container's overflow, so an unclamped column dragged right would keep
   widening the strip that the edge scroll is chasing.
 - **A press on a control starts no drag** (`NOT_A_HANDLE`): the name and the
-  origin row are buttons. The header is `user-select: none`; the offer's
+  origin row are buttons. A thread's details are drawn below the header,
+  outside it, so no press on them starts one. The header is `user-select: none`; the offer's
   bookmark, which a press copies, is in the work strip, outside it. A press is
   a drag only once it has moved 5 px, so clicks still reach the header.
 - **Escape or a cancelled pointer moves nothing.** A drop in the gap on either
@@ -1259,8 +1293,12 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `.work-warning`. The header's `.agent-name` holds the thread's name in
   `data-thread` (`.agent-name.pending` before it has one); its origin row
   is `.origin`. A lane's divider is `.lane-join`, with `data-thread`. The
-  header's mark is `.thread-mark` (`.pulse` while its lane runs), the line
-  `.working-line`, and a row the work opened `.tool[data-revealed]`.
+  header's mark is `.thread-mark` (`.pulse` while its lane runs). The name
+  has `aria-expanded`; open, the details are `.thread-details`, with
+  `.thread-details-icon[data-spin]` around their mark,
+  `.thread-details-started`, `.thread-details-where`,
+  `.thread-details-working`, `.thread-details-behind` and
+  `.thread-details-start`. The line is `.working-line`, and a row the work opened `.tool[data-revealed]`.
 - **The invite key** needs no client code: the host's redirect sets a cookie
   that same-origin requests and upgrades carry. `connectSession({ key })` is
   for Node clients.

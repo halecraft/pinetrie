@@ -46,7 +46,7 @@ import {
   type MoveHow,
   type Refusal,
 } from "./card-moves.ts"
-import type { Pending, Prefill } from "./columns.ts"
+import type { Pending, Prefill, ReaderAction } from "./columns.ts"
 import type { Identity, NameStep } from "./identity.ts"
 import type { Slots } from "./inventory.ts"
 import {
@@ -75,6 +75,8 @@ export type ColumnAct =
   | { readonly kind: "move"; readonly to: number }
   /** Read the column at `density` (ADR-0056). */
   | { readonly kind: "density"; readonly density: Density }
+  /** Open or close the thread's details under the header (ADR-0071). */
+  | { readonly kind: "details"; readonly open: boolean }
   /** A fresh column's first send, as send `sendId`. */
   | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
   /** Keep `lane` as the id this column's next send creates a lane under (ADR-0057). */
@@ -407,9 +409,24 @@ export function planOpenAt(
 }
 
 /**
+ * The column action a reader's setting is, for column `key`; null for any
+ * other act. `planColumn` and the Archive preview both apply it.
+ */
+export function readerAction(act: ColumnAct, key: string): ReaderAction | null {
+  switch (act.kind) {
+    case "density":
+      return { kind: "density", key, density: act.density }
+    case "details":
+      return { kind: "details", key, open: act.open }
+    default:
+      return null
+  }
+}
+
+/**
  * A column's act. One that changes the columns is the column action of the
  * root whose tab you are on; a new tab's one column can only send, reserve
- * its lane, and close, which closes the tab.
+ * its lane, take a reader's setting, and close, which closes the tab.
  */
 function planColumn(
   position: number,
@@ -488,7 +505,10 @@ function planColumn(
     case "move":
       return onRoot({ kind: "move", from: position, to: act.to })
     case "density":
-      return onRoot({ kind: "density", index: position, density: act.density })
+    case "details": {
+      const action = readerAction(act, key)
+      return action === null ? [] : onColumn(action)
+    }
     case "sent":
       return onColumn({ kind: "sent", key: act.key, sendId: act.sendId })
     case "reserve":

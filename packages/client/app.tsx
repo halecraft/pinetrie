@@ -63,7 +63,11 @@ import { cardMarks, ownCards } from "./card-marks.ts"
 import { intentsOf } from "./card-moves.ts"
 import { INVENTORY } from "./card-words.ts"
 import { Column, type ColumnProps } from "./column.tsx"
-import { type Column as ColumnSpec, isPinned } from "./columns.ts"
+import {
+  type Column as ColumnSpec,
+  columnsReducer,
+  isPinned,
+} from "./columns.ts"
 import type { SeenEnd } from "./follow.ts"
 import { Header } from "./header.tsx"
 import { planHeldRoots, rootEntriesOf } from "./held-roots.ts"
@@ -78,6 +82,7 @@ import {
   type Intent,
   nameEffects,
   planIntent,
+  readerAction,
 } from "./intent.ts"
 import { heldBy, settleSlots } from "./inventory.ts"
 import type { Dock } from "./inventory-dock.ts"
@@ -1092,7 +1097,8 @@ export function App({
  * A root, read-only, in the Archive tab: its rail, and one column that a pick
  * on the rail moves. Its anchor is its own state, never stored. A click that
  * shows an entry picks it here; a read-only action (Restore, Open) goes on to
- * `App`; the column offers nothing else.
+ * `App`; a reader's setting (density, details) is kept here, as long as the
+ * preview shows; the column offers nothing else.
  */
 function Preview({
   root,
@@ -1125,6 +1131,11 @@ function Preview({
   onIntent: (intent: Intent) => void
 }) {
   const [anchor, setAnchor] = useState(root)
+  const key = `preview-${root}`
+  // The reader's settings, by the same reducer a root's columns take.
+  const [own, setOwn] = useState<readonly ColumnSpec[]>(() => [
+    { key, anchor: root },
+  ])
   const previewStrip = useRef<HTMLDivElement>(null)
   const reveal = useReveal(previewStrip)
   const pick = (id: EntryId) => {
@@ -1136,9 +1147,14 @@ function Preview({
     if (entry !== null) pick(entry)
     else if (intent.kind === "restore" || intent.kind === "show")
       onIntent(intent)
+    else if (intent.kind === "column") {
+      const action = readerAction(intent.act, key)
+      if (action !== null) setOwn(columns => columnsReducer(columns, action))
+    }
   })
   const { index } = shared
-  const column: ColumnSpec = { key: `preview-${root}`, anchor }
+  const [settings] = own
+  const column: ColumnSpec = { ...settings, key, anchor }
   const [view] = projectColumns(index, [{ anchor }])
   const rail = projectRail(index, root)
   const landmarks = columnLandmarks(rail, {

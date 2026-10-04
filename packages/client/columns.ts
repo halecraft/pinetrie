@@ -70,6 +70,11 @@ export interface Column {
    */
   readonly density?: Density
   /**
+   * The thread's details are open under the header (ADR-0071). The reader's
+   * choice, never the document's.
+   */
+  readonly details?: true
+  /**
    * A fresh column: nothing of its own yet. Once its first message is sent,
    * `sendId` is that send's id, and `sync` anchors the column at the entry it
    * wrote (`TreeIndex.bySend`): exactly, whatever else appeared meanwhile.
@@ -113,12 +118,7 @@ export type ColumnAction =
   | { readonly kind: "close"; readonly index: number }
   /** Move column `from` to index `to` (`reorder.ts`); the rest keep their order. */
   | { readonly kind: "move"; readonly from: number; readonly to: number }
-  /** Read column `index` at `density` (ADR-0056). */
-  | {
-      readonly kind: "density"
-      readonly index: number
-      readonly density: Density
-    }
+  | ReaderAction
   | {
       readonly kind: "sync"
       readonly index: TreeIndex
@@ -126,6 +126,20 @@ export type ColumnAction =
     }
   /** Drop restored columns whose anchor the settled document does not have. */
   | { readonly kind: "prune"; readonly index: TreeIndex }
+
+/**
+ * The reader's settings for column `key`: how much of each ask it draws
+ * (ADR-0056), and whether its thread's details are open (ADR-0071). By key,
+ * so they reach a new tab's one column and the Archive preview's as they
+ * reach a root's.
+ */
+export type ReaderAction =
+  | {
+      readonly kind: "density"
+      readonly key: string
+      readonly density: Density
+    }
+  | { readonly kind: "details"; readonly key: string; readonly open: boolean }
 
 /** Whether a column's path ends at its anchor (`ColumnSpec.pinned`). */
 export const isPinned = (c: Column): boolean =>
@@ -190,9 +204,15 @@ export function columnsReducer(
       return [...rest.slice(0, to), column, ...rest.slice(to)]
     }
     case "density":
-      return state.map((c, i) =>
-        i === action.index ? { ...c, density: action.density } : c,
+      return withColumn(state, action.key, c =>
+        c.density === action.density ? c : { ...c, density: action.density },
       )
+    case "details":
+      return withColumn(state, action.key, c => {
+        if ((c.details === true) === action.open) return c
+        const { details: _, ...rest } = c
+        return action.open ? { ...rest, details: true } : rest
+      })
     case "sync":
       return syncColumns(state, action.index, action.lanes)
     case "prune": {
@@ -202,6 +222,23 @@ export function columnsReducer(
       return known.length === state.length ? state : known
     }
   }
+}
+
+/**
+ * Column `key` changed by `change`. The same state when that changes nothing,
+ * or no column has the key: a root with no stored columns would otherwise
+ * store its first one.
+ */
+function withColumn(
+  state: readonly Column[],
+  key: string,
+  change: (column: Column) => Column,
+): readonly Column[] {
+  const at = state.findIndex(c => c.key === key)
+  const column = state[at]
+  if (column === undefined) return state
+  const changed = change(column)
+  return changed === column ? state : state.with(at, changed)
 }
 
 /**

@@ -23,6 +23,7 @@ import {
   type IntentState,
   nameEffects,
   planIntent,
+  readerAction,
 } from "./intent.ts"
 import {
   initialLayout,
@@ -234,6 +235,31 @@ describe("planIntent", () => {
     expect(plan(column(action), at(onNewTab))).toEqual([
       { kind: "layout", action: { kind: "newTabColumn", key: "t", action } },
     ])
+  })
+
+  test.each([
+    [
+      "density (ADR-0056)",
+      { kind: "density", density: "outline" },
+      { kind: "density", key: "col-k", density: "outline" },
+    ],
+    [
+      "details (ADR-0071)",
+      { kind: "details", open: true },
+      { kind: "details", key: "col-k", open: true },
+    ],
+  ] as const)("a column's %s is set by its key, on its root's tab or its new tab", (_, act, action) => {
+    expect(readerAction(act, "col-k")).toEqual(action)
+    expect(plan(column(act, 2))).toEqual([
+      { kind: "layout", action: { kind: "columns", root: "1-r1", action } },
+    ])
+    expect(plan(column(act), at(onNewTab))).toEqual([
+      { kind: "layout", action: { kind: "newTabColumn", key: "t", action } },
+    ])
+  })
+
+  test("no other act is a reader's setting", () => {
+    expect(readerAction({ kind: "move", to: 0 }, "col-k")).toBeNull()
   })
 
   test("a move is its root's; a new tab's column has nowhere to move", () => {

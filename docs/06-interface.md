@@ -185,14 +185,21 @@ so it is the one behind the menu. What each does is under "Starting" below.
   aside of an aside opens a third column.
 - **A column's header says who works in it and where it came from**
   (ADR-0040). Its first row names the agent working there, `✦ amber-fox` in
-  the column's colour, which leads to where that agent started. While the
-  composer's next send would start one, the agent to come is named already
-  (ADR-0057), with `✦ new agent` only until its name arrives. A conversation
+  the column's colour. While the composer's next send would start one, the
+  agent to come is named already (ADR-0057), with `✦ new agent` only until its name arrives. A conversation
   shows nothing there, since a message goes to people. Its second row, for a column
   that forks, names the fork, `↰ Ada: “Say exactly…”`, and clicking it brings
   the fork point into view. A thread that started from a WIP says so, "on
   wip/search", or "wip/search is gone" once it is (ADR-0060); one on the
   line says nothing.
+- **A thread's name opens its details** (ADR-0071), under the header, and a
+  second click on it closes them; a chevron after the name turns as they
+  open. They show the thread's icon magnified, which spins in as they open
+  and again at a click, its name, "started by Ada · 3 h ago", where it
+  works, what it is working on, and what its base has new, in full. Where
+  the agent joined below the path's first message, **where it started**
+  brings that message into view. Open details stay open, through a reload
+  too, as a column's density does.
 - **Colour, not lines, links a branch to its parent.** Each open branch takes
   its rail track's colour: its column's header carries a stripe of it and a dot
   beside its fork, and the fork point in the parent column shows a dot of it.

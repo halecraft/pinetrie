@@ -62,6 +62,7 @@ import {
   bannerUrl,
   columnView,
   composerPlace,
+  detailsTitle,
   type HeadBanner,
   type HeadIdentity,
   type HeadOrigin,
@@ -69,6 +70,9 @@ import {
   identityWords,
   type ReserveStep,
   type ReviewTarget,
+  START_WORDS,
+  startedWords,
+  type ThreadDetails,
   type WorkFacts,
   type WorkStrip,
   workingWords,
@@ -240,6 +244,8 @@ export function Column(p: ColumnProps) {
   const openAt = useStable((entry: EntryId) =>
     p.onIntent({ kind: "openAt", entry }),
   )
+  // What the name's `aria-controls` points at.
+  const detailsId = `details-${p.column.key}`
 
   // The lanes running on this column's path stream here.
   const streamingLanes = p.activity
@@ -355,6 +361,11 @@ export function Column(p: ColumnProps) {
   const [mountedBanner] = useState(() =>
     bannerUrl(headLane(lane, true, reserved), p.work.banners),
   )
+  // Whether the reader opened the thread's details here, since the column
+  // mounted: they spin only then, and not when a reload or a tab switch
+  // mounts them open (ADR-0071), as a banner there at mount does not fade.
+  const [openedHere, setOpenedHere] = useState(false)
+  const working = workingWords(running, askLine(runningAsk))
   // The cards at this column's end (ADR-0048): yours, which the composer
   // edits, and everyone else's, drawn above it. A thread's cards are found
   // by where its thread ends now; a fresh column's by its key.
@@ -397,6 +408,7 @@ export function Column(p: ColumnProps) {
     view,
     lane,
     createsLane,
+    detailsOpen: p.column.details === true,
     reserved,
     writable,
     nameOf: p.nameOf,
@@ -609,10 +621,17 @@ export function Column(p: ColumnProps) {
             )}
             <Identity
               banner={shows.banner}
+              detailsId={detailsId}
               identity={shows.identity}
-              onOpen={openAt}
+              onToggle={open => {
+                if (open) setOpenedHere(true)
+                // No `PLACED`, unlike density: this changes the viewport's
+                // height, not the content's, and `useFollow`'s resize step
+                // keeps a column at its end there.
+                act({ kind: "details", open })
+              }}
               running={running}
-              working={workingWords(running, askLine(runningAsk))}
+              working={working}
             />
             {shows.base !== null && (
               <span className="thread-base">{shows.base}</span>
@@ -691,6 +710,19 @@ export function Column(p: ColumnProps) {
             </div>
           )}
         </header>
+        {shows.identity.kind === "agent" && shows.identity.details.open && (
+          <ThreadDetailsPanel
+            banner={shows.banner}
+            details={shows.identity.details}
+            id={detailsId}
+            name={shows.identity.name}
+            onOpen={openAt}
+            running={running}
+            spinFirst={openedHere}
+            track={p.track}
+            working={working}
+          />
+        )}
         <div className="column-body" ref={body}>
           {atTop !== null && (
             <div className="ask-bar-slot">
@@ -1013,20 +1045,24 @@ function BannerImage({ url, fade }: { url: string; fade: boolean }) {
 }
 
 /**
- * Who works in the column: its lane's name, which leads to where the lane
- * started; a lane about to start; or nothing, in a conversation. Its mark
- * pulses while the lane runs.
+ * Who works in the column: its lane's name, which opens or closes the
+ * thread's details (ADR-0071); a lane about to start; or nothing, in a
+ * conversation. Its mark pulses while the lane runs. The name's chevron is
+ * CSS, so its text is the mark and the name alone.
  */
 function Identity({
   identity,
   banner,
-  onOpen,
+  detailsId,
+  onToggle,
   running,
   working,
 }: {
   identity: HeadIdentity
   banner: HeadBanner | null
-  onOpen: (id: EntryId) => void
+  /** The details' element id, for `aria-controls`. */
+  detailsId: string
+  onToggle: (open: boolean) => void
   running: boolean
   working: string | undefined
 }) {
@@ -1038,21 +1074,101 @@ function Identity({
         {identityWords(identity)}
       </span>
     )
-  const { start } = identity
+  const { open } = identity.details
   return (
     <button
+      aria-controls={open ? detailsId : undefined}
+      aria-expanded={open}
       className="agent-name"
       data-thread={identity.name}
-      disabled={start === null}
-      onClick={() => {
-        if (start !== null) onOpen(start)
-      }}
-      title="where this agent started"
+      onClick={() => onToggle(!open)}
+      title={detailsTitle(open)}
       type="button"
     >
       <ThreadMark banner={banner} running={running} working={working} />{" "}
       {identityWords(identity)}
     </button>
+  )
+}
+
+/**
+ * A named thread's details, under its header (ADR-0071): its mark
+ * magnified, its name, who started it and where it works, what it works on
+ * now, whether its base has moved on, and where its lane started on this
+ * path. The mark is `ThreadMark` itself, scaled by CSS. It spins as the
+ * reader opens the details here (`spinFirst`) and at each click; mounted
+ * open, by a reload or a tab switch, it stays still. The spin is on the
+ * button around the mark, since the mark's own transform pulses while the
+ * lane runs.
+ */
+function ThreadDetailsPanel({
+  banner,
+  details,
+  id,
+  name,
+  onOpen,
+  running,
+  spinFirst,
+  track,
+  working,
+}: {
+  banner: HeadBanner | null
+  details: ThreadDetails
+  id: string
+  name: string
+  onOpen: (id: EntryId) => void
+  running: boolean
+  spinFirst: boolean
+  /** The column's colour, which the name and the star take, as in the header. */
+  track: number
+  working: string | undefined
+}) {
+  const [spins, setSpins] = useState(spinFirst ? 1 : 0)
+  const [now] = useState(() => Date.now())
+  const { started, where, behind, start } = details
+  return (
+    <section
+      aria-label={name}
+      className="thread-details"
+      id={id}
+      style={trackStyle(track)}
+    >
+      <button
+        aria-label="spin"
+        className="thread-details-icon"
+        // Each spin changes the animation's name, which restarts it without
+        // drawing the mark again: a new banner would fade in again.
+        data-spin={spins === 0 ? undefined : spins % 2 === 1 ? "odd" : "even"}
+        onClick={() => setSpins(n => n + 1)}
+        type="button"
+      >
+        <ThreadMark banner={banner} running={running} working={working} />
+      </button>
+      <div className="thread-details-facts">
+        <div className="thread-details-name">{name}</div>
+        {started !== null && (
+          <div className="thread-details-started">
+            {startedWords(started, now)}
+          </div>
+        )}
+        {where !== null && <div className="thread-details-where">{where}</div>}
+        {working !== undefined && (
+          <div className="thread-details-working">{working}</div>
+        )}
+        {behind !== null && (
+          <div className="thread-details-behind">{behind}</div>
+        )}
+        {start !== null && (
+          <button
+            className="thread-details-start"
+            onClick={() => onOpen(start)}
+            type="button"
+          >
+            {START_WORDS}
+          </button>
+        )}
+      </div>
+    </section>
   )
 }
 

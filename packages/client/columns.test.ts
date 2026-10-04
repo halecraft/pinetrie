@@ -229,6 +229,50 @@ describe("columnsReducer", () => {
     })
   })
 
+  describe("a reader's settings (ADR-0056, ADR-0071)", () => {
+    const ab: readonly Column[] = [
+      { key: "a", anchor: entryId("1-a") },
+      { key: "b", anchor: entryId("1-a") },
+    ]
+    test("details and density change only the column with their key", () => {
+      const open = columnsReducer(ab, { kind: "details", key: "b", open: true })
+      expect(open.map(c => c.details)).toEqual([undefined, true])
+      const closed = columnsReducer(open, {
+        kind: "details",
+        key: "b",
+        open: false,
+      })
+      expect(closed).toEqual(ab)
+      const outline = columnsReducer(ab, {
+        kind: "density",
+        key: "a",
+        density: "outline",
+      })
+      expect(outline.map(c => c.density)).toEqual(["outline", undefined])
+    })
+    test("a key no column has, or a setting already so, returns the same state", () => {
+      expect(
+        columnsReducer(ab, { kind: "details", key: "z", open: true }),
+      ).toBe(ab)
+      expect(
+        columnsReducer(ab, { kind: "details", key: "a", open: false }),
+      ).toBe(ab)
+      expect(
+        columnsReducer(ab, { kind: "density", key: "z", density: "raw" }),
+      ).toBe(ab)
+    })
+    test("open details survive the column binding to its lane", () => {
+      const bound = sync(
+        [{ key: "k", anchor: entryId("1-a"), details: true, reserved: L }],
+        tree({ "1-a": null, "2-t": "1-a" }),
+        [lane("2-t")],
+      )
+      expect(bound).toEqual([
+        { key: "k", anchor: entryId("2-t"), lane: L, details: true },
+      ])
+    })
+  })
+
   test("sync leaves a column whose anchor has not arrived, and settles it once it has", () => {
     const waiting: readonly Column[] = [{ key: "k", anchor: entryId("2-b") }]
     expect(sync(waiting, tree({ "1-a": null }))).toBe(waiting)

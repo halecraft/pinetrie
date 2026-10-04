@@ -32,6 +32,7 @@ import {
   columnsReducer,
   isPinned,
   type Prefill,
+  type ReaderAction,
 } from "./columns.ts"
 
 export type ActiveTab =
@@ -78,13 +79,15 @@ export type LayoutAction =
       readonly action: Exclude<ColumnAction, { kind: "sync" | "prune" }>
     }
   /**
-   * A column action on new tab `key`'s one column: its first send, or the
-   * lane id it reserves (ADR-0057).
+   * A column action on new tab `key`'s one column: its first send, the lane
+   * id it reserves (ADR-0057), or a reader's setting (`ReaderAction`).
    */
   | {
       readonly kind: "newTabColumn"
       readonly key: string
-      readonly action: Extract<ColumnAction, { kind: "sent" | "reserve" }>
+      readonly action:
+        | Extract<ColumnAction, { kind: "sent" | "reserve" }>
+        | ReaderAction
     }
   /** Store what `resolveLayout` draws for these facts. */
   | ({ readonly kind: "resolve" } & LayoutFacts)
@@ -433,7 +436,8 @@ export function planOpen(
 // `fresh.pending` is one: restoring it would send its message again.
 // `fresh.prefill` is stored: only `pending` is sent on opening. `reserved` is
 // stored, so a reload keeps the thread's name (ADR-0057). It is optional, so
-// a v4 layout stored without it still decodes.
+// a v4 layout stored without it still decodes. So are the reader's settings,
+// `density` and `details`, kept so a reload shows the column as it was left.
 
 const StoredColumn = Type.Object({
   key: Type.String(),
@@ -450,6 +454,8 @@ const StoredColumn = Type.Object({
       Type.Literal("raw"),
     ]),
   ),
+  // Optional too, and for the same reason: absent is closed (ADR-0071).
+  details: Type.Optional(Type.Literal(true)),
   fresh: Type.Optional(
     Type.Object({
       sendId: Type.Optional(Type.String()),
@@ -497,6 +503,7 @@ const toStored = (c: Column): Stored => ({
   ...(c.reserved === undefined ? {} : { reserved: c.reserved }),
   ...(c.asksAgent ? { asksAgent: true } : {}),
   ...(c.density === undefined ? {} : { density: c.density }),
+  ...(c.details ? { details: true } : {}),
   ...(c.fresh === undefined
     ? {}
     : {
@@ -532,6 +539,7 @@ const fromStored = (s: Stored, mintRoot: (() => RootId) | null): Column => ({
   ...reservedFromStored(s.reserved),
   ...(s.asksAgent ? { asksAgent: true } : {}),
   ...(s.density === undefined ? {} : { density: s.density }),
+  ...(s.details ? { details: true } : {}),
   ...(s.fresh === undefined
     ? {}
     : {
