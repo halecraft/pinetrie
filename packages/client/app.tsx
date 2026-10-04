@@ -61,7 +61,6 @@ import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { foldMemory } from "./ask-fold.ts"
 import { cardMarks, ownCards } from "./card-marks.ts"
 import { intentsOf } from "./card-moves.ts"
-import { INVENTORY } from "./card-words.ts"
 import { Column, type ColumnProps } from "./column.tsx"
 import {
   type Column as ColumnSpec,
@@ -957,16 +956,12 @@ export function App({
           order={order}
           session={session}
           runs={runs}
+          inventory={{
+            open: inventoryOpen,
+            count: held.length,
+            onToggle: () => setInventoryOpen(open => !open),
+          }}
         />
-        <button
-          aria-pressed={inventoryOpen}
-          className="inventory-toggle"
-          onClick={() => setInventoryOpen(open => !open)}
-          title="your inventory: cards you keep for later"
-          type="button"
-        >
-          {INVENTORY} {held.length}
-        </button>
       </header>
       {inventoryOpen && (
         <InventoryPanel

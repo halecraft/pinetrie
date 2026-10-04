@@ -566,7 +566,8 @@
       .inventory-card { flex: 1; min-width: 0; }
       .inventory-card .compose-row { justify-content: flex-start; }
       .inventory-empty { color: #6f7784; font-size: .8rem; }
-      .inventory-toggle { margin-left: .75rem; padding: .15rem .6rem; font-size: .75rem; }
+      .inventory-toggle { padding: .15rem .6rem; font-size: .75rem; background: none; color: #ddd;
+        border: 1px solid #3a3f48; border-radius: 999px; }
       .inventory-toggle[aria-pressed="true"] { border-color: #9ecbff; color: #e6e6e6; }
       dialog.restore-ask { background: #171a1f; color: inherit; border: 1px solid #3a3f48;
         border-radius: 8px; }
@@ -615,19 +616,23 @@
       #strip:has(.fork-dot[data-color="7"]:hover) .column-head[data-color="7"] { outline: 2px solid var(--track); outline-offset: 2px; }
       #strip:has(.column-head[data-color="pending"]:hover) .fork-dot[data-color="pending"],
       #strip:has(.fork-dot[data-color="pending"]:hover) .column-head[data-color="pending"] { outline: 2px solid var(--track); outline-offset: 2px; }
-      /* The header's right: who is here, the agent, offers, your inbox (ADR-0030), and you. */
+      /* The header's right: who is here, what needs you (ADR-0069), the
+         project, then your inventory and you. Nothing here animates: the tab,
+         the column and the rail show where the agent works. */
       .header-right { display: flex; align-items: center; gap: .75rem; }
       .here { display: flex; align-items: center; gap: .25rem; }
-      .here-trigger, .inbox-trigger, .me-trigger { display: inline-flex; align-items: center; gap: .2rem;
+      .here-trigger, .activity-trigger, .me-trigger { display: inline-flex; align-items: center; gap: .3rem;
         padding: .1rem .3rem; background: none; color: #ddd; border-radius: 999px; }
-      .here-trigger .initial, .me-trigger .initial { width: 22px; height: 22px; line-height: 22px;
-        font-size: 12px; }
-      .agent-mark { background: #9ecbff; }
-      .here-agent.running .agent-mark { animation: pulse 1s ease-in-out infinite; }
-      .here-count { font-size: .75rem; color: #aab4c3; }
-      .inbox-trigger { font-weight: 600; border: 1px solid #3a3f48; padding: .1rem .5rem; }
-      .inbox-count { min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #f28b82;
-        color: #111; font-size: .72rem; text-align: center; }
+      .here-trigger .initial, .activity-trigger .initial, .me-trigger .initial { width: 22px; height: 22px;
+        line-height: 22px; font-size: 12px; }
+      .activity-trigger .agent-mark { background: #3a3f48; color: #aab4c3; }
+      .activity-trigger:has(.activity-working) .agent-mark { background: #9ecbff; color: #111; }
+      .activity-working { font-size: .75rem; color: #aab4c3; }
+      .activity-badge { min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #f28b82;
+        color: #111; font-size: .72rem; font-weight: 600; text-align: center; }
+      .line-trigger { padding: .15rem .6rem; font-size: .8rem; background: none; color: #ddd;
+        border: 1px solid #3a3f48; border-radius: 999px; }
+      .header-tools { display: flex; align-items: center; gap: .5rem; margin-left: .75rem; }
       .menu-heading { margin: .1rem .5rem .3rem; font-size: .75rem; color: #8b93a1; }
       /* A later section of a menu: its heading under a rule. Notes say how
          things stand, as text, not as items. A choice's ✓ keeps its column
@@ -636,6 +641,10 @@
       fieldset.menu-section { min-width: 0; margin: 0; padding: 0; border: 0; }
       .menu-section + .menu-section { margin-top: .25rem; padding-top: .25rem;
         border-top: 1px solid #2c313a; }
+      /* A first section that only names its menu draws nothing, and no rule
+         under it. */
+      .menu-section:empty { display: none; }
+      .menu-section:empty + .menu-section { margin-top: 0; padding-top: 0; border-top: 0; }
       .menu-note { margin: .1rem .5rem .3rem; font-size: .75rem; color: #aab4c3; }
       .menu .menu-check { display: inline-block; width: 1.1rem; color: #9ecbff; }
       .here-thread, .inbox-row { display: flex; flex-direction: column; max-width: 22rem; }
@@ -643,7 +652,7 @@
       .here-name { font-family: ui-monospace, monospace; font-size: .75rem; color: #d7dde6; }
       .here-at, .inbox-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .inbox-row.unseen .inbox-text { font-weight: 600; }
-      .inbox-row.unseen::before { content: "●"; color: #f28b82; font-size: .6rem; }
+      .inbox-row.unseen .inbox-who::before { content: "● "; color: #f28b82; font-size: .6rem; }
       /* Who you are, asked once per device before anything connects (ADR-0037). */
       #identity { display: flex; flex-direction: column; gap: .6rem; width: 20rem;
         margin: 20vh auto 0; padding: 1.25rem; border: 1px solid #23272e; border-radius: 8px;

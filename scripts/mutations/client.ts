@@ -6,6 +6,7 @@ const file = "packages/client/columns.ts"
 const layout = "packages/client/layout.ts"
 const send = "packages/client/send.ts"
 const inbox = "packages/client/inbox.ts"
+const activity = "packages/client/activity.ts"
 const tabStateFile = "packages/client/tab-state.ts"
 const markdown = "packages/client/markdown.ts"
 const tabState = "packages/client/tab-state.ts"
@@ -1961,8 +1962,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the project's button says the project",
     file: "packages/client/line-view.ts",
-    from: '    trigger: "◆ project",',
-    to: '    trigger: "◆ the project",',
+    from: '    trigger: behind > 0 ? "◆ project ↓" : "◆ project",',
+    to: '    trigger: behind > 0 ? "◆ project ↓" : "◆ the project",',
     command: unit,
     expect: "the header's button says project",
   },
@@ -2566,6 +2567,78 @@ export const mutations: readonly Mutation[] = [
     to: "        refusals: state.refusals,",
     command: unit,
     expect: "a swap forgets the refusals at the inventory, not elsewhere",
+  },
+  {
+    name: "the project hides that your files are behind",
+    file: "packages/client/line-view.ts",
+    from: '    trigger: behind > 0 ? "◆ project ↓" : "◆ project",',
+    to: '    trigger: "◆ project",',
+    command: unit,
+    expect: "your files behind the project: the button marks it ↓",
+  },
+  {
+    name: "the activity badge counts running work",
+    file: activity,
+    from: "    needsYou: input.ready + input.unseen,",
+    to: "    needsYou: input.ready + input.unseen + input.working,",
+    command: unit,
+    expect: "the badge counts offers and unseen mentions, never running work",
+  },
+  {
+    name: "the activity badge leaves out offers",
+    file: activity,
+    from: "    needsYou: input.ready + input.unseen,",
+    to: "    needsYou: input.unseen,",
+    command: unit,
+    expect: "the badge counts offers and unseen mentions, never running work",
+  },
+  {
+    name: "a seen mention counts on the activity badge",
+    file: activity,
+    from: "    needsYou: input.ready + input.unseen,",
+    to: "    needsYou: input.ready + input.mentions,",
+    command: unit,
+    expect: "a seen mention counts nothing",
+  },
+  {
+    name: "the mentions section shows alone",
+    file: activity,
+    from: "  const sections = ORDER.filter(s => rows[s] > 0 || input.kept.includes(s))",
+    to: '  const sections = ORDER.filter(s => rows[s] > 0 || s === "mentions" || input.kept.includes(s))',
+    command: unit,
+    expect: "alone, with no mentions, there is no mentions section",
+  },
+  {
+    name: "an emptied section closes an open activity menu",
+    file: activity,
+    from: "  const sections = ORDER.filter(s => rows[s] > 0 || input.kept.includes(s))",
+    to: "  const sections = ORDER.filter(s => rows[s] > 0)",
+    command: unit,
+    expect: "an open menu keeps its emptied section",
+  },
+  {
+    name: "an empty activity menu keeps its trigger",
+    file: activity,
+    from: "    gone: ORDER.every(s => rows[s] === 0),",
+    to: "    gone: false,",
+    command: unit,
+    expect: "with nothing in it the trigger is gone",
+  },
+  {
+    name: "the activity sections are out of order",
+    file: activity,
+    from: 'const ORDER: readonly ActivitySection[] = ["ready", "mentions", "working"]',
+    to: 'const ORDER: readonly ActivitySection[] = ["working", "ready", "mentions"]',
+    command: unit,
+    expect: "sections come ready, mentions, working",
+  },
+  {
+    name: "an emptied section names what it listed",
+    file: activity,
+    from: '        working > 0 ? "The agent is working in" : "The agent has finished",',
+    to: '        "The agent is working in",',
+    command: unit,
+    expect: "a section kept open after its rows went says it has emptied",
   },
   {
     name: "a root no lane works in is called by its first line",

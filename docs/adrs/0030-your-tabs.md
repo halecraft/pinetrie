@@ -5,7 +5,8 @@ Amends ADR-0029 (the tab bar is each person's; closing
 a tab is yours) and ADR-0027 (a stored layout holds your open roots, and the
 device keeps which mentions you have seen). Amended by ADR-0037: you are your
 email, so your other tabs and devices are you, and your tabs are yours per
-device.
+device. Amended by ADR-0069: `@` is the header's activity menu's mentions,
+and its count part of that menu's badge, with open offers.
 
 **Context.** ADR-0029 gave everyone the same tab bar, every root not archived,
 and rejected tabs each person opens and closes: a collaborator's new root would

@@ -1,10 +1,11 @@
-// client/header — who is here, what the agent is doing, the threads with an
-// offer in your repo (ADR-0038), your inbox of mentions (ADR-0030), and you
-// (`profile.tsx`). Your tabs are your view; this is the rest of the session.
-// People and the agent come from live data (presence, the running lanes), the
-// inbox from the tree and this device's seen state. Nothing here opens a tab
-// until you choose, and nothing closes a menu you opened: a trigger whose
-// live data has gone stays until you close its menu (`Popover`'s `gone`).
+// client/header — the right end of the header: who is here, one menu of what
+// needs you (`activity.ts`, ADR-0069), the project (ADR-0060, ADR-0061), and
+// then your inventory and you (`profile.tsx`). Your tabs are your view; this
+// is the rest of the session. People and the agent come from live data
+// (presence, the running lanes), the inbox from the tree and this device's
+// seen state. Nothing here opens a tab until you choose, and nothing closes a
+// menu you opened: a trigger whose live data has gone stays until you close
+// its menu (`Popover`'s `gone`).
 
 import {
   type EntryId,
@@ -16,7 +17,13 @@ import {
   type WriterId,
 } from "@pineta/core"
 import { useMemo, useState, useSyncExternalStore } from "react"
+import {
+  type ActivitySection,
+  activityView,
+  activityWords,
+} from "./activity.ts"
 import type { OpenOffer } from "./app-view.ts"
+import { INVENTORY } from "./card-words.ts"
 import { AGENT_MARK } from "./column-view.ts"
 import {
   type OpenMenus,
@@ -51,6 +58,7 @@ export function Header({
   names,
   onOpen,
   onIntent,
+  inventory,
   me,
 }: {
   session: SessionClient
@@ -76,10 +84,14 @@ export function Header({
   onOpen: (id: EntryId, root: EntryId) => void
   /** Where the project menu's "resolve with the agent" goes. */
   onIntent: (intent: Intent) => void
+  /** Your inventory's toggle: whether its panel is open, and its cards. */
+  inventory: {
+    readonly open: boolean
+    readonly count: number
+    readonly onToggle: () => void
+  }
   me: Me
 }) {
-  const working = runs.length > 0
-  const offering = offers.length > 0
   /**
    * A thread as a row: its lane's name when it has one, its root's label, and
    * the start of the message at `end`.
@@ -115,70 +127,17 @@ export function Header({
           session={session}
           thread={thread}
         />
-        <Menu
-          className={working ? "here-agent running" : "here-agent"}
-          gone={!working}
-          sections={[
-            {
-              key: "runs",
-              heading: working
-                ? "The agent is working in"
-                : "The agent has finished",
-              items: runs.map(r =>
-                thread(r.lane, r.end, r.root, names.get(r.lane)),
-              ),
-            },
-          ]}
-          label={
-            working
-              ? `the agent is working in ${runs.length} ${runs.length === 1 ? "thread" : "threads"}`
-              : "the agent has finished"
-          }
-          title={working ? "the agent is working" : "the agent has finished"}
-          trigger={
-            <>
-              <span className="initial agent-mark">{AGENT_MARK}</span>
-              {working && <span className="here-count">{runs.length}</span>}
-            </>
-          }
-          triggerClassName="here-trigger"
-        />
       </div>
-      <Menu
-        className="offers"
-        gone={!offering}
-        sections={[
-          {
-            key: "offers",
-            heading: offering
-              ? "Work ready to add to the project"
-              : "Nothing left to add to the project.",
-            items: offers.map(o =>
-              thread(o.lane, o.end, o.root, names.get(o.lane)),
-            ),
-          },
-        ]}
-        label={
-          offering
-            ? `${offers.length} ${offers.length === 1 ? "thread has" : "threads have"} work ready to add to the project`
-            : "nothing left to add to the project"
-        }
-        title={
-          offering
-            ? "work ready to add to the project"
-            : "nothing left to add to the project"
-        }
-        trigger={
-          <>
-            <span className="offer-mark">⇣</span>
-            {offering && (
-              <span className="offers-count" data-offers={offers.length}>
-                {offers.length}
-              </span>
-            )}
-          </>
-        }
-        triggerClassName="offers-trigger"
+      <ActivityMenu
+        inbox={inbox}
+        labelOf={labelOf}
+        mentions={mentions}
+        nameOf={nameOf}
+        offers={offers.map(o =>
+          thread(o.lane, o.end, o.root, names.get(o.lane)),
+        )}
+        onOpen={onOpen}
+        runs={runs.map(r => thread(r.lane, r.end, r.root, names.get(r.lane)))}
       />
       <LineMenu
         line={line}
@@ -186,14 +145,18 @@ export function Header({
         project={project}
         session={session}
       />
-      <InboxMenu
-        inbox={inbox}
-        labelOf={labelOf}
-        mentions={mentions}
-        nameOf={nameOf}
-        onOpen={onOpen}
-      />
-      <Profile {...me} colorOf={colorOf} nameOf={nameOf} />
+      <div className="header-tools">
+        <button
+          aria-pressed={inventory.open}
+          className="inventory-toggle"
+          onClick={inventory.onToggle}
+          title="your inventory: cards you keep for later"
+          type="button"
+        >
+          {INVENTORY} {inventory.count}
+        </button>
+        <Profile {...me} colorOf={colorOf} nameOf={nameOf} />
+      </div>
     </div>
   )
 }
@@ -251,14 +214,24 @@ function People({
   ))
 }
 
-/** `@`: the messages that mention you, and how many you have not seen. */
-function InboxMenu({
+/**
+ * What needs you, in one menu (ADR-0069): threads with work ready to add,
+ * mentions of you, and where the agent works. The badge counts the first two;
+ * the agent's runs are a steady count beside it. Nothing here animates.
+ */
+function ActivityMenu({
+  offers,
+  runs,
   mentions,
   inbox,
   labelOf,
   nameOf,
   onOpen,
 }: {
+  /** A row per thread with an open offer. */
+  offers: readonly MenuItem[]
+  /** A row per lane the agent works on. */
+  runs: readonly MenuItem[]
   mentions: readonly InboxItem[]
   inbox: InboxView
   labelOf: (root: EntryId) => string
@@ -266,6 +239,15 @@ function InboxMenu({
   onOpen: (id: EntryId, root: EntryId) => void
 }) {
   const [onlyUnseen, setOnlyUnseen] = useState(false)
+  const [kept, setKept] = useState<readonly ActivitySection[]>([])
+  const view = activityView({
+    ready: offers.length,
+    mentions: mentions.length,
+    unseen: inbox.unseen,
+    working: runs.length,
+    kept,
+  })
+  const words = activityWords(view)
   const listed = onlyUnseen
     ? mentions.filter(m => inbox.isUnseen(m.id))
     : mentions
@@ -303,32 +285,41 @@ function InboxMenu({
       onOpen(m.id, m.root)
     },
   }))
+  const items: Record<ActivitySection, readonly MenuItem[]> = {
+    ready: offers,
+    mentions: mentions.length === 0 ? [] : [...controls, ...rows],
+    working: runs,
+  }
   return (
     <Menu
-      className="inbox"
+      className="activity"
+      gone={view.gone}
+      // The first section only names the menu; each later one is a group.
       sections={[
-        {
-          key: "mentions",
-          heading:
-            mentions.length === 0
-              ? "No one has mentioned you."
-              : "Mentions of you",
-          items: mentions.length === 0 ? [] : [...controls, ...rows],
-        },
+        { key: "activity", heading: words.heading, items: [] },
+        ...view.sections.map(s => ({
+          key: s,
+          heading: words.sections[s],
+          items: items[s],
+        })),
       ]}
-      label={`mentions of you: ${inbox.unseen} unseen`}
-      title="mentions of you"
+      label={words.label}
+      onToggle={open => setKept(open ? view.sections : [])}
+      title={words.label}
       trigger={
         <>
-          @
-          {inbox.unseen > 0 && (
-            <span className="inbox-count" data-unseen={inbox.unseen}>
-              {inbox.unseen}
+          <span className="initial agent-mark">{AGENT_MARK}</span>
+          {view.working > 0 && (
+            <span className="activity-working">{view.working}</span>
+          )}
+          {view.needsYou > 0 && (
+            <span className="activity-badge" data-needs-you={view.needsYou}>
+              {view.needsYou}
             </span>
           )}
         </>
       }
-      triggerClassName="inbox-trigger"
+      triggerClassName="activity-trigger"
     />
   )
 }

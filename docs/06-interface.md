@@ -51,7 +51,7 @@ This document fixes the design before any code. It draws E and T directly.
 └──────┘└────────────────────────┘└───────────────────────┘└────────────────────┘
 ```
 
-### The header: who is here, and what mentions you (ADR-0030)
+### The header: who is here, and what needs you (ADR-0030, ADR-0069)
 
 Your tabs are your view; the header shows what is happening in the rest of
 the session, from live data only, as a document editor shows the people in it.
@@ -64,12 +64,20 @@ the session, from live data only, as a document editor shows the people in it.
   colour. Hovering names them and the thread they are in; a click opens that
   thread as your tab, with a column on their path. You are never shown among
   them.
-- **The agent:** one avatar while it works, pulsing, with the number of
-  threads it is working in. A click lists them, and a row opens one. Idle, it
-  is not shown.
+- **Activity** (ADR-0069): one menu of what needs you, its trigger a ✦.
+  Its badge counts the threads with work ready to add plus the mentions you
+  have not seen; while the agent works, a steady count of its threads stands
+  beside the ✦, never in the badge. Its sections, each shown only with
+  rows: **Ready to add** (the threads with an open offer, each opening its
+  thread), **Mentions of you** (the inbox, below; shown once anyone has
+  mentioned you) and **The agent is working in** (its threads in every
+  root, each opening its thread). With nothing in it, it is not shown.
+  Nothing in the header animates: the tab, the column and the rail show
+  where the agent works.
 - **The project** (ADR-0060, ADR-0061): a menu for the integration line,
   "◆ project", where finished work is added; its bookmark is in its
-  title. Before it exists it offers **set up the project**, showing the
+  title. While the project has commits your files don't, it reads "◆
+  project ↓", the count in its title; that is not on the activity badge. Before it exists it offers **set up the project**, showing the
   bookmark it makes at your `@-` and the exact `immutable_heads()` and
   `revsets.log` text it writes to your repo's config (the log, so jj and
   jjui show the offers), and what to add to a jjui revset of its own
@@ -90,24 +98,24 @@ the session, from live data only, as a document editor shows the people in it.
   no commit in common with the project, it says to rebase in jj. A host
   that admits others offers none of these, and says to use jj on its
   machine.
-- **Work ready to add to the project** (⇣, with a count): the threads with
-  an open offer, each opening its thread.
 - **A menu you opened stays open until you close it.** The header's avatars
   and counts come from live data, but when what one stands for goes while
   its menu is open (a person leaves, the agent finishes, the last offer is
   taken), the menu says so ("The agent has finished") and its trigger stays
   until you close it (principle 6).
-- **`@` is your inbox**: the messages that mention you, newest first, each
+- **The inbox**, activity's mentions: the messages that mention you, newest first, each
   with who, the thread, and the start of the message. A row opens that thread
   as your tab, with a column on the message; a message in an archived root
-  opens that root's preview in the Archive tab. The count is the mentions you
+  opens that root's preview in the Archive tab. The badge counts the mentions you
   have not seen. One is seen when you open it from the inbox, when it is drawn
   in a column of the tab you are on, or when you **mark all seen**. A seen
   mention stays in the inbox; a filter shows only the unseen.
 - **The inbox is this device's**, shared by its tabs and kept across reloads.
   A new device, or a cleared browser, starts from its first load, with no
   backlog.
-- **You:** your avatar, at the far right, opens your profile (ADR-0037): your
+- **Your inventory** (below) and **you**, at the far right, apart from the
+  rest.
+- **You:** your avatar, last, opens your profile (ADR-0037): your
   name, and the handle it gives you as you type it; your email; and **Not
   you? Sign in as someone else**, which forgets who this device says you are
   and asks again. A rename is sent on Enter or **save**, and Escape or a click
@@ -631,7 +639,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 | a column on another root, with no stripe and no fork dot | nothing: a tab's columns share its root |
 | the rail's `+`, and Start Chat and Start Agent in place of a composer | the add tab: ＋ agent, or conversation |
 | a tab bar shared by everyone, with no close for yourself | your tabs, with **×** (ADR-0030) |
-| a new root by anyone appearing as a tab | the header's avatars and `@`; you open it |
+| a new root by anyone appearing as a tab | the header's avatars and activity; you open it |
 
 The last row mattered for `PLAN-2026-09-26-thread-lanes`: with no control moving
 a lane, the `navigate` command had no caller and was deleted with `prompt` and

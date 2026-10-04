@@ -1656,7 +1656,7 @@ async function run(
 
         // ── the agent's work, in the header (ADR-0030) ──────────────────────
         // Another writer starts agent work at the root: no tab opens, the
-        // header's agent pulses with its thread count, choosing the thread
+        // header's activity counts its thread, choosing the thread
         // opens it, and that root cannot be archived until the agent is done.
         await tp
           .$eval('#tabs .tab[aria-selected="true"]', n =>
@@ -1670,12 +1670,11 @@ async function run(
             mode: "branch",
           })
           const newRoot = treeOf(toolHost).roots.at(-1) ?? ""
-          await appears("#top .here-agent.running .here-count")
-          await tp.textContent("#top .here-agent .here-count").catch(() => "")
+          await appears("#top .activity .activity-working")
 
           await chooseFromMenu(
             tp,
-            "#top .here-agent .here-trigger",
+            "#top .activity .activity-trigger",
             ".here-thread",
           )
           await appears(

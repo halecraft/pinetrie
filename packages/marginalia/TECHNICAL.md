@@ -539,7 +539,7 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   followed once. The record's `stale` uses the same rule.
 - **`offerStatus`** decodes a `pineta.offer` record once (ADR-0067): `none`,
   `taken`, `held` or `open`. Every reader on the page switches on it, never
-  on the record's fields: the strip, the header's ⇣ and the tab's Archive
+  on the record's fields: the strip, the header's activity badge and the tab's Archive
   item (`openOffers`, client), and the review read (`planOfferRead`). An
   untaken record with no files that you did not edit is `held`: its work is
   already where it sits, by a route the ledger does not record (S89), so

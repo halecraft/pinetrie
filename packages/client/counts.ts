@@ -4,6 +4,10 @@
 export const plural = (n: number, noun: string): string =>
   `${n} ${noun}${n === 1 ? "" : "s"}`
 
+/** "1 commit", "3 commits": a count with its noun in either form. */
+export const count = (n: number, one: string, many: string): string =>
+  `${n} ${n === 1 ? one : many}`
+
 const names = new Intl.ListFormat("en", { style: "long", type: "conjunction" })
 
 /** "Ada", "Ada and Bea", "Ada, Bea, and Cat". */

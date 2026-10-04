@@ -38,7 +38,6 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     "another window shows on the tab it is on, and leaves it when it switches",
     "Escape leaves a tab's title as it was, and sends nothing",
     "the add menu's conversation, chosen by keyboard, opens a new tab that only sends",
-    "a mention counts on @, and choosing it opens its thread with the message drawn",
     "two tabs of one device share the inbox: mark all seen in one clears the other",
     "a tab's ⋯ opens a menu drawn in full below the tab bar",
     "restoring it in place brings back the composer with its text, and opens no tab for the other window",

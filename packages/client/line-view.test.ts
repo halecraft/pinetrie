@@ -90,6 +90,22 @@ describe("lineView and lineWords (ADR-0060)", () => {
     expect([words.trigger, words.heading]).toEqual(["◆ project", "The project"])
     expect(words.label).toContain("pineta-onto")
   })
+  test("your files behind the project: the button marks it ↓, its label counts it", () => {
+    const words = lineWords(
+      lineView(
+        record({
+          yours: {
+            behind: 2,
+            ahead: null,
+            follow: null,
+            conflicts: { commits: 0, files: [] },
+          },
+        }),
+      ),
+    )
+    expect(words.trigger).toBe("◆ project ↓")
+    expect(words.label).toContain("it has 2 commits your files don't")
+  })
   test("no record: absent", () => {
     expect(lineView(null).state).toBe("absent")
   })

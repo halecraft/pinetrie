@@ -873,17 +873,38 @@ async function run(check: Checks["check"]): Promise<void> {
         await shows("@agent say exactly: PULSE"),
       )
       await idle()
-      // A menu open on the agent stays when its work ends: only you close it,
-      // and then the agent, idle, leaves the header.
+      // The activity menu, open on the agent's work, stays when that work
+      // ends: only you close it, and then, with nothing in it, it leaves the
+      // header. Nothing in the trigger animates while the agent works.
       const held = script.pause("say exactly: HELD")
       await other.chat("@agent say exactly: HELD", atEntry(entryId(forAdaId)), {
         mode: "branch",
       })
+      const working = await page
+        .waitForSelector("#top .activity .activity-working", {
+          timeout: 30_000,
+        })
+        .then(
+          () => true,
+          () => false,
+        )
+      const animated = await page
+        .$$eval("#top .activity-trigger, #top .activity-trigger *", ns =>
+          ns.flatMap(n => {
+            const name = getComputedStyle(n).animationName
+            return name === "none" ? [] : [name]
+          }),
+        )
+        .catch(() => ["no trigger"])
+      check(
+        "the header's activity is still while the agent works",
+        working && animated.length === 0,
+        working ? animated.join(", ") : "no working count",
+      )
       const heldOpen = await page
-        .waitForSelector("#top .here-agent.running", { timeout: 30_000 })
-        .then(() => page.click("#top .here-agent .here-trigger"))
+        .click("#top .activity .activity-trigger")
         .then(() =>
-          page.waitForSelector("#top .here-agent .menu .here-thread", {
+          page.waitForSelector("#top .activity .menu .here-thread", {
             timeout: 15_000,
           }),
         )
@@ -896,8 +917,9 @@ async function run(check: Checks["check"]): Promise<void> {
       const finished = await page
         .waitForFunction(
           () =>
-            document.querySelector("#top .here-agent .menu-heading")
-              ?.textContent === "The agent has finished",
+            [...document.querySelectorAll("#top .activity .menu-heading")].some(
+              h => h.textContent === "The agent has finished",
+            ),
           undefined,
           { timeout: 15_000 },
         )
@@ -908,7 +930,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.keyboard.press("Escape")
       const left = await page
         .waitForFunction(
-          () => document.querySelector("#top .here-agent") === null,
+          () => document.querySelector("#top .activity") === null,
           undefined,
           { timeout: 15_000 },
         )
@@ -917,7 +939,7 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       check(
-        "a menu open on the agent stays open when its work ends, and the agent leaves the header once you close it",
+        "an activity menu open when the agent finishes stays open and says so, and the trigger leaves once you close it",
         heldOpen && finished && left,
         `opened ${heldOpen}, stayed ${finished}, left ${left}`,
       )
@@ -1538,11 +1560,13 @@ async function run(check: Checks["check"]): Promise<void> {
           )
           .catch(() => null)
 
-        // 6. Mentions: @ counts what you have not seen, and takes you there.
+        // 6. Mentions: the activity badge counts what you have not seen, and
+        // the menu takes you there. With no lanes of their own here there are
+        // no offers, so the badge is the unseen mentions alone.
         const unseen = () =>
           page
-            .$eval("#top .inbox-count", n =>
-              Number(n.getAttribute("data-unseen")),
+            .$eval("#top .activity-badge", n =>
+              Number(n.getAttribute("data-needs-you")),
             )
             .catch(() => 0)
         // The page's handle, from its name as it is now (it was renamed above).
@@ -1558,8 +1582,8 @@ async function run(check: Checks["check"]): Promise<void> {
             n =>
               Number(
                 document
-                  .querySelector("#top .inbox-count")
-                  ?.getAttribute("data-unseen") ?? 0,
+                  .querySelector("#top .activity-badge")
+                  ?.getAttribute("data-needs-you") ?? 0,
               ) === n,
             before + 1,
             { timeout: 15_000 },
@@ -1570,7 +1594,7 @@ async function run(check: Checks["check"]): Promise<void> {
           )
         const picked = await chooseFromMenu(
           page,
-          "#top .inbox-trigger",
+          "#top .activity-trigger",
           `.inbox-row[data-entry="${mentionId}"]`,
         )
         const drawn = await page
@@ -1583,13 +1607,13 @@ async function run(check: Checks["check"]): Promise<void> {
           )
         await page
           .waitForFunction(
-            () => document.querySelector("#top .inbox-count") === null,
+            () => document.querySelector("#top .activity-badge") === null,
             undefined,
             { timeout: 15_000 },
           )
           .catch(() => null)
         check(
-          "a mention counts on @, and choosing it opens its thread with the message drawn",
+          "a mention counts on the activity badge, and choosing it opens its thread with the message drawn",
           counted && picked && drawn && (await unseen()) === 0,
           `${before} → ${before + 1} → ${await unseen()}`,
         )
@@ -1603,8 +1627,8 @@ async function run(check: Checks["check"]): Promise<void> {
           (await page.$eval(msg(`${handle} and here`), n =>
             n.getAttribute("data-entry"),
           )) ?? ""
-        await page.click("#top .inbox-trigger")
-        await page.waitForSelector("#top .inbox .menu", { timeout: 15_000 })
+        await page.click("#top .activity-trigger")
+        await page.waitForSelector("#top .activity .menu", { timeout: 15_000 })
         await page.evaluate(() => {
           const w = window as { columnScrolls?: number }
           w.columnScrolls = 0
@@ -1637,7 +1661,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         check(
           "an open menu stays open while an entry arrives and its column scrolls to follow it",
-          columnScrolls > 0 && (await page.$("#top .inbox .menu")) !== null,
+          columnScrolls > 0 && (await page.$("#top .activity .menu")) !== null,
           `${columnScrolls} scrolls`,
         )
         await page.keyboard.press("Escape")
@@ -1658,8 +1682,8 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             () =>
               document
-                .querySelector("#top .inbox-count")
-                ?.getAttribute("data-unseen") === "1",
+                .querySelector("#top .activity-badge")
+                ?.getAttribute("data-needs-you") === "1",
             undefined,
             { timeout: 20_000 },
           )
@@ -1683,17 +1707,17 @@ async function run(check: Checks["check"]): Promise<void> {
           await sibling.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
           // A second tab of the device is the same person (ADR-0037), so its
           // mentions are the page's.
-          await sibling.waitForSelector("#top .inbox-count", {
+          await sibling.waitForSelector("#top .activity-badge", {
             timeout: 20_000,
           })
           await chooseFromMenu(
             sibling,
-            "#top .inbox-trigger",
+            "#top .activity-trigger",
             ".inbox-all-seen",
           )
           const cleared = await page
             .waitForFunction(
-              () => document.querySelector("#top .inbox-count") === null,
+              () => document.querySelector("#top .activity-badge") === null,
               undefined,
               { timeout: 15_000 },
             )

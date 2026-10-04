@@ -47,7 +47,7 @@ import {
 import type { OfferActing } from "./acting.ts"
 import { commandWords } from "./card-words.ts"
 import type { Column } from "./columns.ts"
-import { ago } from "./counts.ts"
+import { ago, count } from "./counts.ts"
 import { speakerLabel } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
 import { whereWords } from "./send.ts"
@@ -620,9 +620,6 @@ export function activityOf(
 }
 
 // ── words ─────────────────────────────────────────────────────────────────
-
-const count = (n: number, one: string, many: string) =>
-  `${n} ${n === 1 ? one : many}`
 
 const BUTTON_LABEL: Record<
   Exclude<

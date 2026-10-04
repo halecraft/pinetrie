@@ -467,7 +467,16 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "a menu open on the agent stays open when its work ends, and the agent leaves the header once you close it",
+      "an activity menu open when the agent finishes stays open and says so, and the trigger leaves once you close it",
+  },
+  {
+    name: "the header's agent mark pulses again",
+    file: "packages/client/index.html",
+    from: "      .activity-trigger:has(.activity-working) .agent-mark { background: #9ecbff; color: #111; }",
+    to: "      .activity-trigger:has(.activity-working) .agent-mark { background: #9ecbff; color: #111; animation: pulse 1s ease-in-out infinite; }",
+    suite: "browser",
+    scenario: "page",
+    expect: "the header's activity is still while the agent works",
   },
   {
     name: "Escape leaves a popover open once its focused item has gone",
@@ -477,7 +486,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "a menu open on the agent stays open when its work ends, and the agent leaves the header once you close it",
+      "an activity menu open when the agent finishes stays open and says so, and the trigger leaves once you close it",
   },
   {
     name: "a revealed column still follows its end",
@@ -508,6 +517,16 @@ export const mutations: readonly Mutation[] = [
     scenario: "tools",
     expect:
       "a long loop is one hollow capsule on the rail, as long as its size has digits, its label counting the failed call",
+  },
+  {
+    name: "the activity badge never hears of unseen mentions",
+    file: "packages/client/header.tsx",
+    from: "    unseen: inbox.unseen,",
+    to: "    unseen: 0,",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a mention counts on the activity badge, and choosing it opens its thread with the message drawn",
   },
   {
     name: "the inbox is kept in page memory",

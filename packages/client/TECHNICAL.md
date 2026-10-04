@@ -386,6 +386,14 @@ in it opens a tab until you choose.
 - **The agent:** `runsHere` is its running lanes in every root: a held
   lane's run at its tip (`activity`), any other at its root entry, from the
   lane's record (`running`) and the directory.
+- **Activity** (`activity.ts`, pure, ADR-0069): the agent's runs, the open
+  offers and your mentions, in one menu (`ActivityMenu`). `activityView`
+  decides the badge (offers plus unseen mentions, never runs), which
+  sections show, and whether the trigger is drawn; `activityWords` words
+  them. `kept` is the sections shown when the menu opened, set through
+  `onToggle`, so an open menu keeps a section whose rows have gone and says
+  so. Its first section has a heading and no items: it names the menu, and
+  its empty `.menu-section` is hidden, with no rule under it.
 - **The inbox** (`inbox.ts`, pure): `mentionsOf` is every chat, from each
   root's directory record (`RootRecord.mentions`), whose mentions
   `address` resolves to your display name, never your own; `InboxItem` is one
@@ -422,12 +430,12 @@ in it opens a tab until you choose.
   the image in a new tab instead (`imageClick`, `image-click.ts`).
 - **A trigger from live data is `gone`, not unmounted.** Unmounting a
   `Popover` takes its open box with it, so a change in the session would
-  close a menu you opened. The header keeps its agent and offers menus
+  close a menu you opened. The header keeps its activity menu
   mounted with `gone` when there is nothing to list (no trigger drawn unless
   open), and keeps a person who leaves while their menu is open
   (`withOpenMenus`, told by `onToggle`) until you close it.
 - **`Menu`** (`menu.tsx`) is a `Popover` whose box is a `role="menu"` list,
-  in sections (`MenuSection`): the header's people, agent, offers, `@` and
+  in sections (`MenuSection`): the header's people, activity and
   project, the tab's `⋯`, the add tab's menu and the composer's where line.
   The first section's heading is drawn above the list, not in it, since a
   menu holds only menu items, and names it (`aria-labelledby`); each later

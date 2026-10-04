@@ -4,6 +4,7 @@
 
 import type { LineAction, LineRecord, ProjectRecord } from "@pineta/core"
 import type { LineActing } from "./acting.ts"
+import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"
 import { outcomeWords } from "./outcome-words.ts"
 
@@ -95,9 +96,6 @@ export interface LineWords {
   }[]
 }
 
-const count = (n: number, one: string, many: string) =>
-  `${n} ${n === 1 ? one : many}`
-
 /** Files named, the first three, then how many more. */
 const named = (files: readonly string[]): string =>
   files.length <= 3
@@ -181,9 +179,16 @@ export function lineWords(view: LineView): LineWords {
         return `add my work to the project (${count(ahead ?? 0, "commit", "commits")})`
     }
   }
+  const where = `the project: where finished work is added, ${onto} in jj`
+  // Being behind marks this trigger only; the activity badge leaves it out
+  // (ADR-0069).
+  const behind = view.facts.behind
   return {
-    trigger: "◆ project",
-    label: `the project: where finished work is added, ${onto} in jj`,
+    trigger: behind > 0 ? "◆ project ↓" : "◆ project",
+    label:
+      behind > 0
+        ? `${where}; it has ${count(behind, "commit", "commits")} your files don't`
+        : where,
     heading: "The project",
     notes: yourFiles(view.facts),
     actions: view.actions.map(action => ({ action, label: label(action) })),

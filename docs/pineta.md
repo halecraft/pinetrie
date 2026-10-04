@@ -93,13 +93,13 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 1789/1789 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 1117 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 1798/1798 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 1128 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
 | end-to-end | `pnpm run e2e` | 13 scenarios, 45 checks, on the scripted model (S94) |
 | with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
-| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 162 checks; in a lane with no containers, the 6 that need one report SKIP |
-| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 18 host and lanes scenarios ≤ ⌊√1789⌋; 4 browser ≤ ⌊√18⌋ |
+| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 165 checks; in a lane with no containers, the 6 that need one report SKIP |
+| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 18 host and lanes scenarios ≤ ⌊√1798⌋; 4 browser ≤ ⌊√18⌋ |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -337,6 +337,15 @@ by depth, not depth-first order: a branch starts on the row under its fork,
 and takes the leftmost place free for its whole height (`placeRail`). A
 track is a branch's colour, by creation order, apart from its place, since
 places follow capsule sizes and so presence, which `App` does not read.
+
+**ADR-0069 — the header counts only what needs you, in one activity menu**
+(built). The header's ✦ pulsed whenever the agent worked, which was almost
+always, and seven triggers looked alike. Now one activity menu holds the
+threads ready to add to the project, mentions of you (only once someone has
+mentioned you) and where the agent works. Its badge counts open offers and
+unseen mentions; running work is a steady count beside it, and nothing in
+the header animates. The project stays apart, marked ↓ when your files are
+behind it; your inventory and you sit at the far right.
 
 **ADR-0072 — a thread catches up with the thread it branched from** (built).
 A branch cloned from a conflicted copy kept that conflict in its offer, even
