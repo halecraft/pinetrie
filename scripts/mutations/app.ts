@@ -690,7 +690,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "an archived root leaves the other window's bar, and the page on it reads it",
+      "archiving closes the tab of the window that archived it, and the page someone else is on reads it",
   },
   {
     name: "a paste of images keeps the browser's default",

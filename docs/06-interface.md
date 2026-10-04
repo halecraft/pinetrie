@@ -185,7 +185,9 @@ ever in the context of another. That is where the screen splits.
   changes. It withdraws the root's threads' offers from your repo, and the
   item names them first ("work not added to the project goes: amber-fox");
   restoring builds them again (ADR-0061).
-- **If someone archives the tab you are on**, it stays while you are there,
+- **Archiving closes the tab for you** once the host accepts it, as **×**
+  does, showing its right neighbour, else its left; a refusal leaves it open.
+- **If someone else archives the tab you are on**, it stays while you are there,
   read-only, saying who archived it, with **Restore**. It leaves the bar when
   you switch away.
 - **With many tabs**, the bar scrolls; Archive and ＋ stay put.

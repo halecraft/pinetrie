@@ -7,6 +7,7 @@
 // a message's acts (`MessageAct`) are among them.
 
 import {
+  type ArchiveAction,
   type ArchiveRecord,
   type AskIndex,
   type CardCommand,
@@ -205,7 +206,12 @@ export type Effect =
     }
   /** Ask the host for something that moves no card (`HostRequest`). */
   | { readonly kind: "request"; readonly intent: HostRequest }
-  | { readonly kind: "restore"; readonly root: EntryId }
+  /** Archive or restore `root`; `afterArchive` plans the answer. */
+  | {
+      readonly kind: "archive"
+      readonly action: ArchiveAction
+      readonly root: EntryId
+    }
   | {
       readonly kind: "mark"
       readonly root: EntryId
@@ -359,14 +365,9 @@ export function planIntent(
       }
       return []
     case "archive":
-      return [
-        {
-          kind: "request",
-          intent: { kind: "archive", action: "archive", root: intent.root },
-        },
-      ]
+      return [{ kind: "archive", action: "archive", root: intent.root }]
     case "restore":
-      return [{ kind: "restore", root: intent.root }]
+      return [{ kind: "archive", action: "restore", root: intent.root }]
     case "rename":
       return [{ kind: "mark", root: intent.root, title: intent.title }]
     case "retitle":
@@ -617,11 +618,25 @@ export const entryShown = (intent: Intent): EntryId | null =>
       ? intent.act.entry
       : null
 
-/** After a restore is answered: the root is shown only if it was restored. */
-export const afterRestore = (
+/**
+ * After an archive or a restore is answered. Archiving a root closes its tab
+ * for you, the one you are on too: only a root someone else archives stays
+ * while you are on it (`resolveLayout`). A restored root is shown. A refusal
+ * changes no tab.
+ */
+export function afterArchive(
   outcome: Outcome,
   root: EntryId,
-): readonly Effect[] => (outcome.kind === "restored" ? [showRoot(root)] : [])
+): readonly Effect[] {
+  switch (outcome.kind) {
+    case "archived":
+      return [layout({ kind: "closeRoot", root })]
+    case "restored":
+      return [showRoot(root)]
+    default:
+      return []
+  }
+}
 
 /** `reconcileName`'s step, as effects. */
 export function nameEffects(step: NameStep | null): readonly Effect[] {

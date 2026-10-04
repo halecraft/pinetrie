@@ -181,7 +181,7 @@ function is proven by a unit test in a second.
   does: which root a column act belongs to, that × closes a tab and writes
   nothing, that a column you open takes focus (`armFocus`). Fresh column
   keys come from the shell as an argument, as `columnsReducer` takes them.
-  `afterRestore` plans a restore's answer, and `nameEffects` the settle's
+  `afterArchive` plans an archive's or a restore's answer, and `nameEffects` the settle's
   name step (`reconcileName`).
 - **`perform` carries the effects out** (`perform.ts`), one port call each,
   through `AppPorts`: the reducer's `dispatch`, the session's writes,
@@ -251,6 +251,8 @@ give the roots and each tab's signals.
   itself. No action sets `active` back to null.
 - **A landed new tab moves left of any unsent ones**: its root joins `open` at
   the end, and new tabs are drawn after `open`.
+- **Archiving closes the root's tab once the host answers `archived`**
+  (`afterArchive`), not when it is asked: a refusal leaves the tab open.
 - **An archived active root stays active** until you switch or reload, and
   keeps its place in the bar (`resolveLayout` keeps it). Its columns are drawn with `readOnly`: the
   composer stays mounted, disabled, so what was typed survives; Restore brings

@@ -14,7 +14,7 @@ import {
 import { describe, expect, test } from "vitest"
 import { NEW_ROOT, tree } from "./fixtures.ts"
 import {
-  afterRestore,
+  afterArchive,
   type CardFacts,
   claimFocus,
   type Effect,
@@ -568,12 +568,11 @@ describe("planIntent", () => {
   test("archive, restore, rename and retitle are one write each", () => {
     const root = entryId("1-r1")
     expect(plan({ kind: "archive", root })).toEqual([
-      {
-        kind: "request",
-        intent: { kind: "archive", action: "archive", root },
-      },
+      { kind: "archive", action: "archive", root },
     ])
-    expect(plan({ kind: "restore", root })).toEqual([{ kind: "restore", root }])
+    expect(plan({ kind: "restore", root })).toEqual([
+      { kind: "archive", action: "restore", root },
+    ])
     expect(plan({ kind: "rename", root, title: "T" })).toEqual([
       { kind: "mark", root, title: "T" },
     ])
@@ -581,13 +580,16 @@ describe("planIntent", () => {
   })
 })
 
-test("a restore shows its root only once it is restored", () => {
+test("archiving closes your tab once it is archived, and a restore shows its root once it is restored", () => {
   const root = entryId("1-r1")
-  expect(afterRestore({ kind: "restored" }, root)).toEqual<Effect[]>([
+  expect(afterArchive({ kind: "archived" }, root)).toEqual<Effect[]>([
+    { kind: "layout", action: { kind: "closeRoot", root } },
+  ])
+  expect(afterArchive({ kind: "restored" }, root)).toEqual<Effect[]>([
     { kind: "layout", action: { kind: "show", tab: { kind: "root", root } } },
   ])
   expect(
-    afterRestore({ kind: "refused", code: "x", message: "no" } as never, root),
+    afterArchive({ kind: "refused", code: "x", message: "no" } as never, root),
   ).toEqual([])
 })
 

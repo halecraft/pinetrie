@@ -5,7 +5,7 @@ import type { CardId, EntryId } from "@pineta/core"
 import type { AttentionStore, SessionClient } from "@pineta/session"
 import { afterKeep } from "./card-intents.ts"
 import type { Identity } from "./identity.ts"
-import { afterRestore, type Effect, type Intent } from "./intent.ts"
+import { afterArchive, type Effect, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
 
 export interface AppPorts {
@@ -67,10 +67,10 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "offer":
       void ports.session.offer(effect.lane, effect.action, effect.to)
       return
-    case "restore":
+    case "archive":
       void ports.session
-        .request({ kind: "archive", action: "restore", root: effect.root })
-        .then(outcome => perform(afterRestore(outcome, effect.root), ports))
+        .request({ kind: "archive", action: effect.action, root: effect.root })
+        .then(outcome => perform(afterArchive(outcome, effect.root), ports))
       return
     case "mark":
       void ports.session.mark(effect.root, effect.title)

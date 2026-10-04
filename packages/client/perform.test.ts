@@ -205,9 +205,23 @@ test("an undo of moves plans what its answer shows, afresh", async () => {
   )
 })
 
+test("an archive, once answered archived, closes its tab", async () => {
+  const p = ports()
+  p.session.request.mockImplementationOnce(async () => ({ kind: "archived" }))
+  perform([{ kind: "archive", action: "archive", root }], p)
+  expect(p.session.request).toHaveBeenCalledWith({
+    kind: "archive",
+    action: "archive",
+    root,
+  })
+  await vi.waitFor(() =>
+    expect(p.dispatch).toHaveBeenCalledWith({ kind: "closeRoot", root }),
+  )
+})
+
 test("a restore, once answered restored, shows its root", async () => {
   const p = ports()
-  perform([{ kind: "restore", root }], p)
+  perform([{ kind: "archive", action: "restore", root }], p)
   expect(p.session.request).toHaveBeenCalledWith({
     kind: "archive",
     action: "restore",

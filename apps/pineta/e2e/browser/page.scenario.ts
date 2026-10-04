@@ -49,6 +49,7 @@ import {
   OWN_MENU,
   openProfile,
   RAIL_MESSAGES,
+  seeInMenu,
   shownName,
   storedName,
   TO_NOBODY,
@@ -1746,21 +1747,24 @@ async function run(check: Checks["check"]): Promise<void> {
           await sibling.close().catch(() => {})
         }
 
-        // 7. Archived, a root leaves every tab bar; the page on it reads it.
+        // 7. Archived, a root leaves every tab bar: the window that archives
+        // it closes its tab, and the page someone else is on reads it.
         await page.click(tabSel(thirdRoot))
         await page.waitForSelector(`${col(0)} .composer .send`, {
           timeout: 15_000,
         })
-        // tb opens the third root again, so it has a tab there to lose, and then
-        // is on another: the tab someone is on stays until they leave it.
+        // tb opens the third root again, so it has a tab there to lose, and
+        // archives it from there.
         await openFromArchive(tb, thirdRoot)
-        await tb.click(tabSel(firstRoot))
         await page.fill(`${col(0)} .composer .input`, "typed, not sent")
-        const menuSeen = await chooseFromMenu(page, OWN_MENU, ".archive-root")
+        const menuSeen =
+          (await seeInMenu(page, OWN_MENU, ".archive-root")) !== null
+        await page.keyboard.press("Escape")
         check(
           "a tab's ⋯ opens a menu drawn in full below the tab bar",
           menuSeen,
         )
+        await chooseFromMenu(tb, OWN_MENU, ".archive-root")
         await page
           .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })
           .catch(() => null)
@@ -1795,8 +1799,8 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "an archived root leaves the other window's bar, and the page on it reads it",
-          banner.startsWith("archived by Ada") &&
+          "archiving closes the tab of the window that archived it, and the page someone else is on reads it",
+          banner.startsWith("archived by Tabby") &&
             kept === "typed, not sent" &&
             frozen &&
             tools === 0 &&
@@ -1815,13 +1819,9 @@ async function run(check: Checks["check"]): Promise<void> {
             (await tb.locator(tabSel(thirdRoot)).count()) === 0,
         )
 
-        // Archived again and left, its tab goes; the Archive tab brings it back.
+        // Archived again, here, its tab goes; the Archive tab brings it back.
         await page.fill(input, "")
         await chooseFromMenu(page, OWN_MENU, ".archive-root")
-        await page
-          .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })
-          .catch(() => null)
-        await page.click(tabSel(firstRoot))
         await page
           .waitForFunction(
             r =>
@@ -2751,7 +2751,6 @@ async function run(check: Checks["check"]): Promise<void> {
         // An archived root's work is done: its card lights its own row, never
         // the Archive tab. Restored after, for what follows.
         await chooseFromMenu(page, OWN_MENU, ".archive-root")
-        await page.click(tabSel(downRoot))
         await page.waitForFunction(
           r => document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
           here,

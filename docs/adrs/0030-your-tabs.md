@@ -59,9 +59,10 @@ bar can be yours.
   starts afresh.
 - **Archiving stays a shared "done"** (ADR-0029): the host-written record,
   read-only until restored, refused while the agent works there or messages
-  wait. Archiving takes the root out of every tab bar; the tab you are on
-  stays while you are there, as before. Restoring opens it as a tab only for
-  whoever restores it.
+  wait. Archiving takes the root out of every tab bar. Whoever archives it
+  has its tab closed once the host accepts, as `×` closes it; a refusal
+  leaves it open. For anyone else on it, the tab stays while they are there,
+  as before. Restoring opens it as a tab only for whoever restores it.
 - **Tabs keep their signals** (ADR-0029): a pulse while the agent works in
   that root, and avatars of the others on it. Only the tab you are on reports
   presence.
