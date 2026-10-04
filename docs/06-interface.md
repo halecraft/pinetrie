@@ -323,7 +323,9 @@ so it is the one behind the menu. What each does is under "Starting" below.
   menu, greyed out, and says why: "already caught up with the project", or,
   when the project moved only by this thread's own work you added, "the
   project's new work is this thread's own: catching up changes no file"
-  (ADR-0067). An offer whose work the project already has says "nothing to
+  (ADR-0067). A thread whose base Pineta has not read yet (one whose agent
+  never changed a file, so its work never reached your repo) keeps it in
+  the menu, enabled, and claims nothing. An offer whose work the project already has says "nothing to
   add: the project already has this thread's work": the header does not
   count it, and archiving its thread warns of nothing. A thread whose
   earlier add was made before Pineta recorded what an add took says "an

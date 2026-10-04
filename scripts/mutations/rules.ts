@@ -130,10 +130,19 @@ export const mutations: readonly Mutation[] = [
       "catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)",
   },
   {
+    name: "a lane the host has not read is caught up",
+    file: "packages/rules/line.ts",
+    from: '  if (base === undefined) return { kind: "unknown" }',
+    to: '  if (base === undefined) return { kind: "current" }',
+    command: unit,
+    expect:
+      "catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)",
+  },
+  {
     name: "a WIP thread is measured against the line",
     file: "packages/rules/line.ts",
-    from: '    thread.kind === "line"\n      ? { bookmark: line.onto, commit: line.commit }',
-    to: "    true\n      ? { bookmark: line.onto, commit: line.commit }",
+    from: '    thread.kind === "line"\n      ? { bookmark: line.onto, commit }',
+    to: "    true\n      ? { bookmark: line.onto, commit }",
     command: unit,
     expect:
       "catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)",
@@ -203,8 +212,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host's read of catching up counts at any commit",
     file: "packages/rules/line.ts",
-    from: "  if (read === undefined || read === null || read.to !== move.to)",
-    to: "  if (read === undefined || read === null)",
+    from: '  if (read === null || read.to !== move.to) return { kind: "unknown" }',
+    to: '  if (read === null) return { kind: "unknown" }',
     command: unit,
     expect:
       "catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)",

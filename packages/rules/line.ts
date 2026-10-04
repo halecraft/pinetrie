@@ -349,21 +349,21 @@ interface BaseMove {
 /**
  * How a thread's base has moved on since its lane last forked from it or
  * caught up (ADR-0060), or null: the commit its newest `Pineta-Base` names
- * (`start`) against where the base is now, the line's commit or the WIP's.
- * Never for a WIP gone, which only "continue on the line" moves, nor before
- * the line is set up. Commits only: whether catching up would change a file
- * is `catchUpOf`'s.
+ * (`start`) against where the base is now, the line's `commit` or the WIP's.
+ * Never for a WIP gone, which only "continue on the line" moves. Commits
+ * only: whether catching up would change a file is `catchUpOf`'s, which
+ * also decides what a missing record or line means.
  */
 function baseMoved(
-  base: BaseRecord | undefined,
-  line: LineRecord | null,
+  base: BaseRecord,
+  line: LineRecord,
+  commit: CommitId,
 ): BaseMove | null {
-  if (base === undefined || line === null || line.commit === null) return null
   if (base.state === "gone") return null
   const thread = effectiveBase(base)
   const now =
     thread.kind === "line"
-      ? { bookmark: line.onto, commit: line.commit }
+      ? { bookmark: line.onto, commit }
       : line.wips.find(w => w.bookmark === thread.bookmark)
   return now === undefined || now.commit === base.start
     ? null
@@ -372,16 +372,20 @@ function baseMoved(
 
 /**
  * What catching up would do to a thread, as the page can tell (S97):
- * - `current`: its base has not moved since the lane last took from it;
+ * - `current`: its base has not moved since the lane last took from it, or
+ *   there is no line to catch up with;
  * - `unknown`: it moved, and the host has not yet read what that changes;
+ *   or the host has never read the lane at all (no `pineta.base`): a lane
+ *   whose turns changed no file never reached your repo;
  * - `nothing-new`: it moved, but by work the lane already holds, as after
  *   you took its own offer: catching up changes no file;
- * - `brings`: catching up changes `files` files in the lane.
+ * - `brings`: catching up changes `files` files in the lane. Only this one
+ *   says the move, for the header's ↓ (`behindMark`).
  */
 export type CatchUpNow =
   | { readonly kind: "current" }
-  | { readonly kind: "unknown"; readonly move: BaseMove }
-  | { readonly kind: "nothing-new"; readonly move: BaseMove }
+  | { readonly kind: "unknown" }
+  | { readonly kind: "nothing-new" }
   | {
       readonly kind: "brings"
       readonly move: BaseMove
@@ -389,21 +393,24 @@ export type CatchUpNow =
     }
 
 /**
- * `CatchUpNow` from the lane's base record and the line's: the host's read
- * (`BaseRecord.catchUp`) counts only when it was made at the commit the base
- * is at now; else what it would change is unknown.
+ * `CatchUpNow` from the lane's base record and the line's. With no line set
+ * up there is nothing to catch up with. With no record, the host has not read
+ * the lane, so nothing is claimed. The host's read (`BaseRecord.catchUp`)
+ * counts only when it was made at the commit the base is at now; else what
+ * it would change is unknown.
  */
 export function catchUpOf(
   base: BaseRecord | undefined,
   line: LineRecord | null,
 ): CatchUpNow {
-  const move = baseMoved(base, line)
+  if (line === null || line.commit === null) return { kind: "current" }
+  if (base === undefined) return { kind: "unknown" }
+  const move = baseMoved(base, line, line.commit)
   if (move === null) return { kind: "current" }
-  const read = base?.catchUp
-  if (read === undefined || read === null || read.to !== move.to)
-    return { kind: "unknown", move }
+  const read = base.catchUp
+  if (read === null || read.to !== move.to) return { kind: "unknown" }
   return read.files.length === 0
-    ? { kind: "nothing-new", move }
+    ? { kind: "nothing-new" }
     : { kind: "brings", move, files: read.files.length }
 }
 

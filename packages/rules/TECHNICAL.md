@@ -762,10 +762,14 @@ commit-message request `request.ts` (`describeRequest`).
   newest commit, or nothing, or refuses `no_parent` and `parent_running`.
 - **`catchUpOf`** (`line.ts`) says what catching up would do, from `pineta.base` and
   the line's record: `current` (the base has not moved since the lane took
-  from it), `unknown` (it moved, and the host's `catchUp` was not read at
-  the commit it is at now), `nothing-new` (it moved by work the lane holds,
-  as after you took its own offer) or `brings`, with the file count. The
-  commit comparison it starts from (`baseMoved`) is private to it.
+  from it, or no line is set up), `unknown` (it moved, and the host's
+  `catchUp` was not read at the commit it is at now; or there is no
+  `pineta.base` at all: the host has never read the lane, as for a lane
+  whose turns never committed, so never reached your repo), `nothing-new`
+  (it moved by work the lane holds, as after you took its own offer) or
+  `brings`, with the file count and the move, the one kind that carries it.
+  `catchUpOf` owns those checks; the commit comparison under them
+  (`baseMoved`) is private to it.
 - **`catchUpName`** (`line.ts`) is the one wording of what a catch-up
   merges (`CatchUpFrom`): "the project" for the line, the bookmark for a
   WIP (ADR-0061), the thread's name for the thread a thread branched from

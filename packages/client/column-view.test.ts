@@ -9,6 +9,7 @@ import {
   type LaneName,
   type LaneRecord,
   type LaneView,
+  type LineRecord,
   laneNameForThread,
   type OfferRecord,
   type PinnedView,
@@ -178,6 +179,36 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   bases: new Map(),
   ...over,
 })
+/** The line, one commit past the lane's base: `base` read what catching up brings. */
+const LINE = {
+  onto: "pineta-onto",
+  wipPrefix: "wip/",
+  publish: "main",
+  published: { commit: null, behind: 0, ahead: 0 },
+  commit: commitId("bbbbbbbbbbbb"),
+  heads: { current: null, proposed: "" },
+  log: { current: null, proposed: "" },
+  wips: [],
+  yours: {
+    behind: 0,
+    ahead: null,
+    follow: null,
+    conflicts: { commits: 0, files: [] },
+  },
+  commands: true,
+} satisfies LineRecord
+const BASE: BaseRecord = {
+  lane: laneNameForThread("1"),
+  base: { kind: "line" as const },
+  start: commitId("aaaaaaaaaaaa"),
+  state: "ok" as const,
+  catchUp: {
+    tip: commitId("t"),
+    to: commitId("bbbbbbbbbbbb"),
+    files: ["a.txt", "b.txt"],
+  },
+  untraced: [],
+}
 const laneView = (name: LaneName, tip: string, running = false): LaneView => ({
   name,
   tip: entryId(tip),
@@ -489,6 +520,23 @@ describe("columnView: the work strip", () => {
       ).strip,
     ).toEqual({ kind: "none" })
   })
+  test("a lane the host has never read (no base record) can catch up, and claims nothing", () => {
+    const shows = columnView(
+      own({
+        work: work({
+          line: LINE,
+          lanes: new Map([[B, record(B, { kind: "own" })]]),
+        }),
+      }),
+    )
+    if (shows.strip.kind !== "offer") throw new Error("no offer strip")
+    expect(shows.strip.words.menu.find(b => b.button === "update")).toEqual({
+      button: "update",
+      label: "catch up with the project",
+      title: "merges pineta-onto into this thread's copy",
+    })
+    expect(shows.behind).toBeNull()
+  })
   test("own copy: the offer, in words", () => {
     expect(columnView(own()).strip).toMatchObject({
       kind: "offer",
@@ -755,7 +803,7 @@ describe("offerWords", () => {
   } as const
   test("the jj facts are titles: which bookmark a take moves, and what catching up merges", () => {
     const w = words(offer, "idle", LINE_BASE, {
-      catchUp: { kind: "unknown", move: MOVE },
+      catchUp: { kind: "unknown" },
     })
     expect(w.buttons[0]?.title).toBe(
       "moves pineta-onto forward to pineta-offer/amber-fox",
@@ -794,14 +842,14 @@ describe("offerWords", () => {
       title: "already caught up with the project",
       disabled: true,
     })
-    expect(update({ kind: "nothing-new", move: MOVE })).toEqual({
+    expect(update({ kind: "nothing-new" })).toEqual({
       button: "update",
       label: "catch up with the project",
       title:
         "the project's new work is this thread's own: catching up changes no file",
       disabled: true,
     })
-    expect(update({ kind: "unknown", move: MOVE })).toEqual({
+    expect(update({ kind: "unknown" })).toEqual({
       button: "update",
       label: "catch up with the project",
       title: "merges pineta-onto into this thread's copy",
@@ -809,7 +857,7 @@ describe("offerWords", () => {
     // Nothing new is no "new work" either.
     expect(
       words(offer, "idle", LINE_BASE, {
-        catchUp: { kind: "nothing-new", move: MOVE },
+        catchUp: { kind: "nothing-new" },
       }).line,
     ).toBe("2 files ready")
   })
@@ -935,37 +983,8 @@ describe("offerWords", () => {
 })
 
 describe("behindMark: the header's mark for a base that moved on", () => {
-  const line = {
-    onto: "pineta-onto",
-    wipPrefix: "wip/",
-    publish: "main",
-    published: { commit: null, behind: 0, ahead: 0 },
-    commit: commitId("bbbbbbbbbbbb"),
-    heads: { current: null, proposed: "" },
-    log: { current: null, proposed: "" },
-    wips: [],
-    yours: {
-      behind: 0,
-      ahead: null,
-      follow: null,
-      conflicts: { commits: 0, files: [] },
-    },
-    commands: true,
-  }
-  const base: BaseRecord = {
-    lane: laneNameForThread("1"),
-    base: { kind: "line" as const },
-    start: commitId("aaaaaaaaaaaa"),
-    state: "ok" as const,
-    catchUp: {
-      tip: commitId("t"),
-      to: commitId("bbbbbbbbbbbb"),
-      files: ["a.txt", "b.txt"],
-    },
-    untraced: [],
-  }
   test("worded as the project, with the files catching up changes, the bookmark and both commits in its title", () => {
-    expect(behindMark(base, line)).toEqual({
+    expect(behindMark(BASE, LINE)).toEqual({
       mark: "↓",
       title:
         "the project has new work since this thread started, in 2 files · pineta-onto: aaaaaaaa → bbbbbbbb",
@@ -975,23 +994,23 @@ describe("behindMark: the header's mark for a base that moved on", () => {
     const shows = columnView(
       facts(1, {
         lane: onLane(laneView(B, "b2")),
-        work: work({ names: NAMES, line, bases: new Map([[B, base]]) }),
+        work: work({ names: NAMES, line: LINE, bases: new Map([[B, BASE]]) }),
       }),
     )
     expect(shows.identity).toMatchObject({
-      details: { behind: behindMark(base, line)?.title },
+      details: { behind: behindMark(BASE, LINE)?.title },
     })
-    expect(shows.behind?.title).toBe(behindMark(base, line)?.title)
+    expect(shows.behind?.title).toBe(behindMark(BASE, LINE)?.title)
   })
   test("none once caught up, before the host read the base, or when catching up would change nothing or is not yet read (S97)", () => {
-    expect(behindMark({ ...base, start: line.commit }, line)).toBe(null)
-    expect(behindMark(undefined, line)).toBe(null)
-    const read = base.catchUp
+    expect(behindMark({ ...BASE, start: LINE.commit }, LINE)).toBe(null)
+    expect(behindMark(undefined, LINE)).toBe(null)
+    const read = BASE.catchUp
     if (read === null) throw new Error("no read")
-    expect(behindMark({ ...base, catchUp: { ...read, files: [] } }, line)).toBe(
+    expect(behindMark({ ...BASE, catchUp: { ...read, files: [] } }, LINE)).toBe(
       null,
     )
-    expect(behindMark({ ...base, catchUp: null }, line)).toBe(null)
+    expect(behindMark({ ...BASE, catchUp: null }, LINE)).toBe(null)
   })
 })
 

@@ -108,6 +108,10 @@ everything else reads at the head it last saw.**
 **An operation id names the repo exactly, so what every lane reads at one
 operation is read once and kept until the head moves.**
 
+- **A lane with no ref in your repo is `"none"`** to `gatherLane` and
+  `gatherRefresh`: one that never committed was never fetched. No
+  `pineta.base` is written for it, and the page reads catching up as
+  `unknown` (`catchUpOf`, `@pineta/rules`), never as caught up.
 - **`SharedFacts`**, per operation (`RepoOps.shared()`): the line's facts
   (`lineFacts`, for the line's record), the takes on the line (`TAKES`: a
   `Pineta-Source` or `Pineta-Thread` trailer), split into those naming

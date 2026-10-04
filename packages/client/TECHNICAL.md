@@ -841,7 +841,8 @@ became of its files (`strip`).
   `nothing-new`: the base moved by the thread's own work), it stays in the
   menu, quiet: `LabelledButton.disabled`, with the reason as its title, and
   `column.tsx` disables it. Until the host has read the move (`unknown`), it
-  stays in the menu, enabled, and claims nothing. An untraced thread
+  stays in the menu, enabled, and claims nothing. So does a lane with no
+  base record at all: the host has never read it. An untraced thread
   (`pineta.base`'s `untraced`) says "an earlier add of this thread can't be
   traced: catch up with the project to offer what's new", with catching up
   beside it. `ColumnFacts.catchingUp` is a card with a command queued on
@@ -850,7 +851,15 @@ became of its files (`strip`).
 - **A thread's base** shows in its header only when it is not the line
   (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
   update becomes "continue from the project" and no take is offered.
-  Catching up says its base: "catch up with wip/search".
+  Catching up says its base: "catch up with wip/search". Two known limits,
+  both in words only:
+  - until a lane has a base record, the page names the line as its base
+    (`effectiveBase(null)`), so a WIP thread that never changed a file says
+    "catch up with the project". The host merges the WIP, read from the
+    lane's own history;
+  - with no line set up, `catchUpOf` is `current`, so the menu says
+    "already caught up with the project" where the project is not set up.
+    The host refuses the catch-up (`no_line`).
 - **The header's project menu** (`LineMenu`, `lineView`, `lineWords`)
   offers "set up the project", showing the config text it writes
   (`immutable_heads()` and `revsets.log`); then notes of where your files

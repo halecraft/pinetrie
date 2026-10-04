@@ -210,8 +210,8 @@ describe("offerView: ADR-0038's table", () => {
     const quiet = (catchUp: CatchUpNow) =>
       view(offer, "idle", undefined, { catchUp }).quiet
     expect(quiet({ kind: "current" })).toEqual(["update"])
-    expect(quiet({ kind: "nothing-new", move: MOVE })).toEqual(["update"])
-    expect(quiet({ kind: "unknown", move: MOVE })).toEqual([])
+    expect(quiet({ kind: "nothing-new" })).toEqual(["update"])
+    expect(quiet({ kind: "unknown" })).toEqual([])
     expect(quiet({ kind: "brings", move: MOVE, files: 1 })).toEqual([])
     // A thread whose WIP is gone continues on the line: never quiet.
     const gone = offerView({
@@ -301,7 +301,10 @@ describe("offerView: ADR-0038's table", () => {
     expect(moved(onLine, line(L1))).toBe(false)
     expect(moved(onLine, line(L2))).toBe(true)
     expect(moved(onLine, line(null))).toBe(false)
-    expect(moved(undefined, line(L2))).toBe(false)
+    // A lane the host never read (no record): nothing is claimed, unless
+    // there is no line to catch up with.
+    expect(catchUpOf(undefined, line(L2))).toEqual({ kind: "unknown" })
+    expect(catchUpOf(undefined, line(null))).toEqual({ kind: "current" })
     expect(moved(onWip, line(L2, [{ bookmark: "wip/a", commit: W1 }]))).toBe(
       false,
     )
@@ -311,16 +314,13 @@ describe("offerView: ADR-0038's table", () => {
     // Landed: on the line now, and caught up with it only once merged.
     expect(moved({ ...onWip, state: "landed" }, line(L2))).toBe(true)
     expect(moved({ ...onWip, state: "gone" }, line(L2))).toBe(false)
-    const move = {
-      base: { kind: "line" },
-      bookmark: "pineta-onto",
-      from: L1,
-      to: L2,
-    }
-    expect(catchUpOf(onLine, line(L2))).toEqual({ kind: "unknown", move })
+    expect(catchUpOf(onLine, line(L2))).toEqual({ kind: "unknown" })
     expect(
       catchUpOf(
-        onWip,
+        {
+          ...onWip,
+          catchUp: { tip: commitId("t"), to: commitId("w2"), files: ["w"] },
+        },
         line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }]),
       ),
     ).toMatchObject({ move: { bookmark: "wip/a", from: W1, to: "w2" } })
@@ -329,10 +329,14 @@ describe("offerView: ADR-0038's table", () => {
       ...onLine,
       catchUp: { tip: commitId("t"), to, files },
     })
-    expect(catchUpOf(read(L2, []), line(L2))).toEqual({
-      kind: "nothing-new",
-      move,
-    })
+    expect(catchUpOf(read(L2, []), line(L2))).toEqual({ kind: "nothing-new" })
+    // Only what brings files says the move: the header's ↓ names it.
+    const move = {
+      base: { kind: "line" },
+      bookmark: "pineta-onto",
+      from: L1,
+      to: L2,
+    }
     expect(catchUpOf(read(L2, ["a", "b"]), line(L2))).toEqual({
       kind: "brings",
       move,
@@ -340,7 +344,6 @@ describe("offerView: ADR-0038's table", () => {
     })
     expect(catchUpOf(read(commitId("l0"), []), line(L2))).toEqual({
       kind: "unknown",
-      move,
     })
   })
   test("a resolution that asked you counts only when newer than the offer", () => {

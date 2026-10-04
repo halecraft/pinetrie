@@ -521,7 +521,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 | `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
 | `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`), `beforeRun`, `runEnded` |
 | `fetch.ts` | a lane's history into your repo: the bundle on the lane's queue, the import an owner command (`importLane`) |
-| `turns.ts` | pi's `turnDone`: the turn's revision, snapshot and fetch; the turn records still being written (`pendingRecords`) |
+| `turns.ts` | pi's `turnDone`: the turn's revision, snapshot and fetch; the turn records still being written (`pendingRecords`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pineta-<lane>`, no refresh and no `pineta.base` until it catches up (a clean merge is fetched) |
 | `create.ts` | a new lane: `checkDirectory`, its record and name, its fork (`forkFacts` waits for `pendingRecords`) |
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`), and a resolution's outcome, with the guidance flag pi's hook sets |
 | `split.ts` | a split's prompt, and its end (`finishSplit`) |
