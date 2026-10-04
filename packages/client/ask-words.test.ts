@@ -139,13 +139,13 @@ describe("foldWords", () => {
         "[Moved offers out of core] · 30 steps · 12 files · stopped by Bea",
       ],
       [
-        "outline: how it ended leads, then the headline and the work",
+        "outline: how it ended, then the work; the headline is drawn under it",
         ended,
         "line",
-        "stopped by Bea · [Moved offers out of core] · 30 steps · 12 files",
+        "stopped by Bea · 30 steps · 12 files",
       ],
       [
-        "outline, running: what it does now, never a headline",
+        "outline, running: what it does now, then the work",
         running,
         "line",
         "$ pnpm test · 30 steps · 12 files",

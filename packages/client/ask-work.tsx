@@ -10,7 +10,7 @@ import {
   useCallback,
   useSyncExternalStore,
 } from "react"
-import { type FoldMemory, foldOpen, toggled } from "./ask-fold.ts"
+import { digestApart, type FoldMemory, foldOpen, toggled } from "./ask-fold.ts"
 import type { AskView } from "./ask-view.ts"
 import { type Density, type FoldPart, foldWords } from "./ask-words.ts"
 import { plural } from "./counts.ts"
@@ -64,8 +64,6 @@ export function AskWork({
   const toggle = () => folds.set(ask, toggled(open))
   const outline = density === "outline"
   const hasFold = parts.some(s => s.kind === "fold")
-  // A fold's head carries the headline; with none to carry it, the digest
-  // holds it above the points.
   const digest = (withHeadline: boolean) => {
     const headline = withHeadline ? view.headline : null
     if (headline === null && view.points.length === 0) return null
@@ -99,7 +97,8 @@ export function AskWork({
         <FoldLine parts={foldWords(view, "line")} />
       </button>,
     )
-  if (!outline && !hasFold) drawn.push(digest(true))
+  const apart = digestApart({ density, open, hasFold })
+  if (apart) drawn.push(digest(true))
   for (const s of parts) {
     if (s.kind === "entry") {
       // Outline keeps what the rail draws apart, and folds the rest.
@@ -136,7 +135,7 @@ export function AskWork({
         )}
       </div>,
     )
-    if (s.first) drawn.push(digest(false))
+    if (s.first && !apart) drawn.push(digest(false))
     if (open) for (const id of s.ids) drawn.push(message(id))
   }
   if (!outline && !hasFold && view.outcome !== null)

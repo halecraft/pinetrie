@@ -76,10 +76,10 @@ export interface FoldPart {
 /**
  * An ask's fold line, in order, the parts drawn with " · " between them.
  * `line` is outline's: while its run lasts, what it does now and what its
- * work holds; once ended, how it ended, the headline, and what its work
- * holds. `fold` is story's first fold: the headline, what its work holds,
- * and how it ended. Outline's running line leaves the headline out: `live`
- * is newer than a digest asked at most once a minute.
+ * work holds; once ended, how it ended and what its work holds. Its
+ * headline is drawn under it, with the points (`digestApart`), since the
+ * line is one line cut to the column's width. `fold` is story's first
+ * fold: the headline, what its work holds, and how it ended.
  */
 export function foldWords(
   view: Pick<AskView, "running" | "headline" | "work" | "outcome" | "live">,
@@ -87,12 +87,13 @@ export function foldWords(
 ): readonly FoldPart[] {
   const part = (text: string | null, byModel = false) =>
     text === null || text === "" ? [] : [{ text, byModel }]
-  const headline = part(view.headline, true)
   if (where === "fold")
-    return [...headline, ...part(view.work), ...part(view.outcome)]
-  return view.running
-    ? [...part(view.live), ...part(view.work)]
-    : [...part(view.outcome), ...headline, ...part(view.work)]
+    return [
+      ...part(view.headline, true),
+      ...part(view.work),
+      ...part(view.outcome),
+    ]
+  return [...part(view.running ? view.live : view.outcome), ...part(view.work)]
 }
 
 /** How an ask ended, when that needs saying: a stop or a failure. */

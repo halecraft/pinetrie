@@ -41,6 +41,19 @@ export function foldOpen(f: FoldFacts): boolean {
   }
 }
 
+/**
+ * Whether an ask's digest is drawn whole, its headline above its points,
+ * rather than its headline in the first fold's head and its points under
+ * it. Whole where no fold head is drawn to carry the headline: an ask with
+ * no fold, and outline's closed line, whose one line says what the run does
+ * now or how it ended (ADR-0075).
+ */
+export const digestApart = (f: {
+  readonly density: Density
+  readonly open: boolean
+  readonly hasFold: boolean
+}): boolean => !f.hasFold || (f.density === "outline" && !f.open)
+
 /** A press on an ask's fold: the other of what it shows now. */
 export const toggled = (open: boolean): FoldChoice => (open ? "closed" : "open")
 

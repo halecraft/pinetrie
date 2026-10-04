@@ -622,10 +622,13 @@ the columns read one. `segmentPath` (core) decides what a column folds;
 - **`foldWords` orders an ask's line** (`line`, outline's) and first fold
   (`fold`, story's) as parts, a model's headline marked as one, so
   `AskWork` only lays them out and wraps the headline in `.ask-headline`.
-  Outline's running line has no headline: `live` is newer than a digest.
-  The points are one `MessageText` over `pointsText`, in `.ask-digest`,
-  under the first fold's head; with no fold to carry the headline (raw, or
-  an ask with no fold), `.ask-digest` holds the headline too.
+  Outline's line holds no headline: it is cut to one line, and while the
+  run lasts it says what the run does now.
+- **`digestApart` decides where a digest goes** (`ask-fold.ts`): whole in
+  `.ask-digest`, headline above points, where no fold head carries the
+  headline (outline's closed line, or an ask with no fold); else the
+  headline in the first fold's head and the points under it. The points
+  are one `MessageText` over `pointsText`.
 - **`openFold`:** `planIntent`'s `openAt` puts it before the reveal when
   the entry is in an ask's work. `perform` sets the fold's memory and
   renders `App` once, so `useReveal`'s wait finds the message drawn.

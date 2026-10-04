@@ -44,15 +44,17 @@ paragraph under the ask's fold line. In use:
 - **`pineta.digest` holds `{ headline, points, at, final }`;** a null
   headline is a digest with nothing to draw. A record written before this
   ADR, `{ text, at, final }`, does not decode and is dropped.
-- **The headline leads the fold line.** In story it opens the first fold's
-  line, before the counts. In outline it follows the outcome on the ask's
-  line, except while the run lasts, when the line says what the run is
-  doing now (`live`) instead. It is marked as a model's words (a ✦, and
-  "written by a model" as its title), which is how it is now told apart
-  from the agent's words.
-- **A final digest's points are a short markdown list under the fold
-  line** in story. A live digest's points are not drawn: they change with
-  each request and are replaced at the end. Outline draws no points.
+- **In story, the headline leads the fold line,** before the counts, and
+  a final digest's points are a short markdown list under it. It is marked
+  as a model's words (a ✦, and "written by a model" as its title), which is
+  how it is now told apart from the agent's words.
+- **In outline, the digest is drawn under the ask's line,** headline and
+  points together (`digestApart`), as the summary was before this ADR. The
+  line itself is one line cut to the column's width, and says what the run
+  is doing now or how it ended, so a headline in it would be hidden while
+  the run lasts, which is when a reader coming back most needs it.
+- **A live digest's points are not drawn:** they change with each request
+  and are replaced at the end. Its headline is.
 - **One wording serves every reader:** `digestText` writes a digest as the
   model is asked to answer. It is the next request's "summary so far" and
   the rail capsule's tooltip, and `pointsText` is the list drawn under the

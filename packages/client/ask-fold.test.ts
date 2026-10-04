@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest"
-import { type FoldFacts, foldMemory, foldOpen, toggled } from "./ask-fold.ts"
+import {
+  digestApart,
+  type FoldFacts,
+  foldMemory,
+  foldOpen,
+  toggled,
+} from "./ask-fold.ts"
 
 const facts = (over: Partial<FoldFacts>): FoldFacts => ({
   choice: null,
@@ -40,6 +46,33 @@ describe("foldOpen", () => {
   })
   test("a press chooses the other of what it shows", () => {
     expect([toggled(true), toggled(false)]).toEqual(["closed", "open"])
+  })
+})
+
+describe("digestApart", () => {
+  test.each<[string, Parameters<typeof digestApart>[0], boolean]>([
+    [
+      "outline's closed line: under it, running or not",
+      { density: "outline", open: false, hasFold: true },
+      true,
+    ],
+    [
+      "outline opened: the first fold's head carries it",
+      { density: "outline", open: true, hasFold: true },
+      false,
+    ],
+    [
+      "story with a fold: the fold's head carries it",
+      { density: "story", open: false, hasFold: true },
+      false,
+    ],
+    [
+      "no fold to carry it: whole",
+      { density: "story", open: true, hasFold: false },
+      true,
+    ],
+  ])("%s", (_, facts, apart) => {
+    expect(digestApart(facts)).toBe(apart)
   })
 })
 

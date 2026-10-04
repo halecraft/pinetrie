@@ -25,12 +25,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a live digest shows its headline, never its points",
   },
   {
-    name: "outline's running line carries a headline",
-    file: "packages/client/ask-words.ts",
-    from: "    ? [...part(view.live), ...part(view.work)]\n",
-    to: "    ? [...part(view.live), ...headline, ...part(view.work)]\n",
+    name: "outline draws no digest under its line",
+    file: "packages/client/ask-fold.ts",
+    from: '}): boolean => !f.hasFold || (f.density === "outline" && !f.open)\n',
+    to: "}): boolean => !f.hasFold\n",
     command: unit,
-    expect: "outline, running: what it does now, never a headline",
+    expect: "outline's closed line: under it, running or not",
   },
   {
     name: "the running ask counts as the last ended",
