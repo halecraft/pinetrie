@@ -692,14 +692,25 @@ became of its files (`strip`).
   the project, with your 2 commits beneath it". A conflicted offer on the
   line offers "resolve in the thread", never a take onto it. The bookmark is
   a fact of its own, drawn apart (`.offer-bookmark`), never in the line.
-- **A thread behind its base** (`baseMoved`, from `pineta.base`'s
-  `start` against `pineta.line`'s commits, with no host fact of its own):
-  the strip's line adds "· the project has new work", or is that alone with
-  nothing to add; catching up moves from the `⋯` menu to the buttons; the
-  header shows `behindMark`'s ↓, titled from the same move (the bookmark,
-  and the commits it went from and to). `ColumnFacts.catchingUp` is a card
-  with a command queued on the lane (`offerView`'s `catch-up` activity:
-  "catching up with the project…").
+  `workStrip` hands `offerView` the record decoded (`offerStatus`): a `held`
+  offer says "nothing to add: the project already has this thread's work",
+  and has no review.
+- **What catching up would do** (`catchUpOf`, from `pineta.base`'s `start`
+  and `catchUp` against `pineta.line`'s commits, S97): when it `brings`
+  files, the strip's line adds "· the project has new work", or is that
+  alone with nothing to add, catching up moves from the `⋯` menu to the
+  buttons, its title counts the files, and the header shows `behindMark`'s
+  ↓, titled with the count and the move (the bookmark, and the commits it
+  went from and to). When it would change nothing (`current`, or
+  `nothing-new`: the base moved by the thread's own work), it stays in the
+  menu, quiet: `LabelledButton.disabled`, with the reason as its title, and
+  `column.tsx` disables it. Until the host has read the move (`unknown`), it
+  stays in the menu, enabled, and claims nothing. An untraced thread
+  (`pineta.base`'s `untraced`) says "an earlier add of this thread can't be
+  traced: catch up with the project to offer what's new", with catching up
+  beside it. `ColumnFacts.catchingUp` is a card with a command queued on
+  the lane (`offerView`'s `catch-up` activity: "catching up with the
+  project…").
 - **A thread's base** shows in its header only when it is not the line
   (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
   update becomes "continue from the project" and no take is offered.
@@ -1208,7 +1219,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   the project"), as it counts mentions, and the agent's running threads;
   each row leads with the thread's name and opens its thread. Archive in a
   tab's `⋯` names the threads whose offers it withdraws (`offeredByRoot`,
-  `dropsWords`).
+  `dropsWords`). Both read `openOffers`, which keeps only `offerStatus`'s
+  `open` (ADR-0067): one the line already holds (`held`) has nothing to
+  add, so it is neither counted nor named, as the strip says.
 - **Selectors in the browser suite:** a column's offer is `.work.offer`, with
   `data-state` (`ready`, `conflicts`, `stack`, and the rest of
   `offerView`'s states); its line is `.offer-line` (a button when the offer

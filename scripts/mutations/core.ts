@@ -9,6 +9,24 @@ const core = "packages/core/index.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a take that names a source reads as untraced",
+    file: core,
+    from: "        trailerValues(p, TRAILERS.source).length === 0,\n",
+    to: "        true,\n",
+    command: unit,
+    expect:
+      "untracedLanes: a take's paragraph naming a thread and a lane but no source; never a turn's, nor a traced take's (S97)",
+  },
+  {
+    name: "a turn reads as an untraced take",
+    file: core,
+    from: "        trailerValues(p, TRAILERS.thread).length > 0 &&\n",
+    to: "        true &&\n",
+    command: unit,
+    expect:
+      "untracedLanes: a take's paragraph naming a thread and a lane but no source; never a turn's, nor a traced take's (S97)",
+  },
+  {
     name: "a chat at the root may name any root",
     file: "packages/protocol/codec.ts",
     from: "        ? parseNewRoot(rootText)\n",

@@ -17,7 +17,7 @@ import { describe } from "./describe.ts"
 import { executeTake } from "./execute.ts"
 import { changesOf, offerRecord, planTake } from "./plan.ts"
 import { type Refresh, wipLine } from "./refresh.ts"
-import type { OfferState } from "./state.ts"
+import { type OfferState, placedOf } from "./state.ts"
 
 export async function act(
   state: OfferState,
@@ -50,7 +50,9 @@ export async function act(
     if (action === "describe") return { code: null, describe: true }
     const { place, name, offer } = now
     if (place.target === null) return code(ERR.BAD_DESTINATION)
-    const at = { ...place, target: place.target }
+    // An untraced start builds nothing, and leaves only an offer you edited.
+    const at = placedOf(place)
+    if (at === null) return code(ERR.NO_OFFER)
     if (action === "take") {
       // A take that names no offer was shown none.
       if (seen === null) return code(ERR.OFFER_CHANGED)
@@ -96,7 +98,7 @@ export async function act(
           lane,
           name,
           offer,
-          place,
+          place: at,
           editing,
           now: takenAt,
         }),

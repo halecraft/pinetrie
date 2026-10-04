@@ -98,13 +98,14 @@ test("readOnlyWords offers Restore for an archived root, Open for any other", ()
   )
 })
 
-test("the header's offers are the open ones: a held lane's at its tip, if it has one; another's at its root (ADR-0063)", () => {
+test("the header's offers are the open ones, never one the line already holds: a held lane's at its tip, if it has one; another's at its root (ADR-0063)", () => {
   const A = laneNameForThread("a")
   const B = laneNameForThread("b")
   const C = laneNameForThread("c")
   const D = laneNameForThread("d")
-  const offer = (lane: LaneName, taken: string | null) =>
-    ({ lane, taken }) as unknown as OfferRecord
+  const E = laneNameForThread("e")
+  const offer = (lane: LaneName, taken: string | null, files = ["a.txt"]) =>
+    ({ lane, taken, files, edited: false }) as unknown as OfferRecord
   const lane = (name: LaneName, tip: string | null) =>
     ({ name, tip }) as unknown as LaneView
   const { offers } = appView(
@@ -114,6 +115,7 @@ test("the header's offers are the open ones: a held lane's at its tip, if it has
         [B, offer(B, "taken")],
         [C, offer(C, null)],
         [D, offer(D, null)],
+        [E, offer(E, null, [])],
       ]),
       lanes: [lane(A, "t1"), lane(B, "t2"), lane(C, null)],
       laneRoots: new Map([
@@ -121,6 +123,7 @@ test("the header's offers are the open ones: a held lane's at its tip, if it has
         [B, entryId("r1")],
         [C, entryId("r1")],
         [D, entryId("r2")],
+        [E, entryId("r2")],
       ]),
     }),
   )

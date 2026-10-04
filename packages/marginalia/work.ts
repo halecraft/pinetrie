@@ -201,6 +201,11 @@ const BaseRecordSchema = Type.Object({
     Type.Literal("landed"),
     Type.Literal("gone"),
   ]),
+  catchUp: Type.Union([
+    Type.Object({ tip: Commit, to: Commit, files: Type.Array(Type.String()) }),
+    Type.Null(),
+  ]),
+  untraced: Type.Array(Commit),
 })
 
 /**
@@ -357,6 +362,11 @@ export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
   encode: ({ lane, ...contents }) => ({
     ...contents,
     base: { ...contents.base },
+    catchUp:
+      contents.catchUp === null
+        ? null
+        : { ...contents.catchUp, files: [...contents.catchUp.files] },
+    untraced: [...contents.untraced],
   }),
   decode: (contents, key) =>
     decodeAt(BaseRecordSchema, contents, laneKey(key), (r, lane) => ({
@@ -364,6 +374,15 @@ export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
       base: r.base,
       start: commitId(r.start),
       state: r.state,
+      catchUp:
+        r.catchUp === null
+          ? null
+          : {
+              tip: commitId(r.catchUp.tip),
+              to: commitId(r.catchUp.to),
+              files: r.catchUp.files,
+            },
+      untraced: r.untraced.map(commitId),
     })),
 }
 

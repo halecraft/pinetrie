@@ -2,12 +2,13 @@
 // where its offer sits and starts, and the offer as your repo holds it, read
 // as rows and decided by pure code here (`planLaneRead`), with the shared
 // facts (`shared.ts`). It reads what `laneTipIn`, `laneBase`,
-// `startOfOffer`, `readOffer` and `changesNoFile` read, and says the same
+// `startOfOffer`, `readOffer` and `workChanges` read, and says the same
 // (`repo.test.ts` holds them side by side). Only a lane on the line takes
 // this path: a WIP's base reads more of your repo, and keeps the separate
 // reads.
 
 import {
+  type CatchUpRead,
   type CommitId,
   commitId,
   type LaneBase,
@@ -15,9 +16,11 @@ import {
   type OfferInRepo,
   type OfferRevision,
   offerLedger,
+  type StartRead,
   type ThreadName,
   TRAILERS,
   trailerValues,
+  type WorkChanges,
 } from "@pineta/core"
 import {
   bookmarkRevset,
@@ -30,7 +33,7 @@ import {
   type Runner,
   revsetName,
 } from "@pineta/lanes"
-import { changesNoFile, sinceHost } from "./offer.ts"
+import { readCatchUp, sinceHost, workChanges } from "./offer.ts"
 import { offerStart } from "./plan.ts"
 import type { SharedFacts } from "./shared.ts"
 
@@ -53,6 +56,8 @@ export interface LaneRow {
   readonly underBase: boolean
   /** One of the taken commits the shared facts list. */
   readonly taken: boolean
+  /** A take of this lane that names no source (`SharedFacts.untraced`). */
+  readonly untraced: boolean
   readonly divergent: boolean
   readonly conflict: boolean
   /** Files it changes; read only in the region. */
@@ -66,6 +71,8 @@ export function laneRead(input: {
   readonly name: ThreadName | undefined
   readonly line: LineConfig
   readonly taken: readonly CommitId[]
+  /** The takes of this lane that name no source. */
+  readonly untraced: readonly CommitId[]
 }): readonly string[] {
   const tip = `present(${laneTipName(input.lane)})`
   const onto = `present(${revsetName(input.line.onto)})`
@@ -80,13 +87,17 @@ export function laneRead(input: {
     input.taken.length === 0
       ? "none()"
       : `(${input.taken.map(c => `present(${c})`).join(" | ")})`
+  const untraced =
+    input.untraced.length === 0
+      ? "none()"
+      : `(${input.untraced.map(c => `present(${c})`).join(" | ")})`
   const flag = (letter: string, revset: string) =>
     `if(self.contained_in(${JSON.stringify(revset)}), "${letter}")`
   return [
     "log",
     "--no-graph",
     "-r",
-    `${tip} | ${based} | ${line} | ${region} | (${taken} ~ ::${based})`,
+    `${tip} | ${based} | ${line} | ${region} | ((${taken} | ${untraced}) ~ ::${based})`,
     "-T",
     [
       'commit_id ++ "\\t" ++ change_id ++ "\\t"',
@@ -98,6 +109,7 @@ export function laneRead(input: {
       flag("L", line),
       flag("U", `::${based}`),
       flag("K", taken),
+      flag("X", untraced),
       'if(divergent, "D") ++ if(conflict, "C") ++ "\\t"',
       `if(self.contained_in(${JSON.stringify(region)}), "[" ++ self.diff().files().map(|f| json(f.path())).join(",") ++ "]", "[]") ++ "\\t"`,
       'json(description) ++ "\\n"',
@@ -124,6 +136,7 @@ export function parseLaneRows(stdout: string): LaneRow[] {
       line: flags.includes("L"),
       underBase: flags.includes("U"),
       taken: flags.includes("K"),
+      untraced: flags.includes("X"),
       divergent: flags.includes("D"),
       conflict: flags.includes("C"),
       files: JSON.parse(files) as string[],
@@ -144,10 +157,11 @@ export type LanePlan =
       readonly base: LaneBase
       /**
        * Where the offer starts, when no taken source above the base names
-       * more than the base's own start; else the sources to start from too.
+       * more than the base's own start; else the sources to start from too;
+       * or `untraced`, when a take of this lane above the base names none.
        */
       readonly start:
-        | { readonly kind: "known"; readonly start: readonly CommitId[] }
+        | StartRead
         | { readonly kind: "read"; readonly sources: readonly CommitId[] }
       /** The offer as the rows show it; its evolog facts still to read. */
       readonly offer:
@@ -201,6 +215,7 @@ export function planLaneRead(
     if (line === undefined) return { kind: "none" }
     base = { base: { kind: "line" }, start: line.commit, source: line.commit }
   }
+  const untraced = rows.filter(r => r.untraced && !r.underBase)
   const applying = new Set(
     rows.filter(r => r.taken && !r.underBase).map(r => r.commit),
   )
@@ -210,9 +225,11 @@ export function planLaneRead(
     ),
   ]
   const start =
-    sources.length === 0
-      ? { kind: "known" as const, start: [base.start] }
-      : { kind: "read" as const, sources }
+    untraced.length > 0
+      ? { kind: "untraced" as const, takes: untraced.map(r => r.commit) }
+      : sources.length === 0
+        ? { kind: "known" as const, start: [base.start] }
+        : { kind: "read" as const, sources }
   return {
     kind: "line",
     tip: tip.commit,
@@ -265,16 +282,20 @@ export interface LaneGather {
   readonly base: LaneBase
   /** Where the line is: the offer's target. */
   readonly target: CommitId
-  readonly start: readonly CommitId[]
+  readonly start: StartRead
   readonly offer: OfferInRepo | null
-  readonly empty: boolean
+  readonly work: WorkChanges
+  /** What catching up with the line would change (`readCatchUp`). */
+  readonly catchUp: CatchUpRead | null
 }
 
 /**
  * One lane's refresh facts: one `jj log`, then each revision's evolog
  * (`sinceHost`), and only when the rows cannot say it, where the offer
  * starts (taken sources above its base), a stack's files, and the top's
- * conflicted files; and always whether the lane's work changes any file.
+ * conflicted files; whether the lane's work changes any file, unless its
+ * start is untraced; and, once the line has moved past its base, what
+ * catching up would change, unless `known` says it at the same tip and line.
  * "none" or "wip" for a lane not on the line: read it the separate way.
  */
 export async function gatherLane(
@@ -284,6 +305,8 @@ export async function gatherLane(
     readonly name: ThreadName | undefined
     readonly line: LineConfig
     readonly shared: SharedFacts
+    /** What catching up would change, as last read: kept at the same tip and line. */
+    readonly known: CatchUpRead | null
   },
 ): Promise<LaneGather | "none" | "wip"> {
   const onto = input.shared.line.commit
@@ -294,6 +317,9 @@ export async function gatherLane(
       name: input.name,
       line: input.line,
       taken: input.shared.taken.map(t => t.commit),
+      untraced: input.shared.untraced
+        .filter(u => u.lanes.includes(input.lane))
+        .map(u => u.commit),
     }),
   )
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
@@ -304,17 +330,29 @@ export async function gatherLane(
   })
   if (planned.kind !== "line") return planned.kind
   const { tip, base } = planned
-  const start =
-    planned.start.kind === "known"
-      ? planned.start.start
-      : await startFrom(jj, tip, base.start, planned.start.sources)
+  const start: StartRead =
+    planned.start.kind === "read"
+      ? {
+          kind: "known",
+          start: await startFrom(jj, tip, base.start, planned.start.sources),
+        }
+      : planned.start
   const offer = await offerFrom(jj, planned.offer, onto)
-  // Always asked of the lane's own range, never read from the offer's files:
-  // those are its diff against the target, empty once the line holds the
-  // lane's work, while the work itself still changes files. Read from the
-  // offer, an empty one was withdrawn and then built again, without end.
-  const empty = await changesNoFile(jj, { start, tip })
-  return { tip, base, target: onto, start, offer, empty }
+  // Asked of the lane's own work, never read from the offer's files: those
+  // are its diff against the target, empty once the line holds the lane's
+  // work, while the work itself still changes files. Read from the offer, an
+  // empty one was withdrawn and then built again, without end (S89).
+  const work =
+    start.kind === "known"
+      ? await workChanges(jj, { start: start.start, tip })
+      : "unknown"
+  const catchUp = await readCatchUp(jj, {
+    start: base.start,
+    to: onto,
+    tip,
+    known: input.known,
+  })
+  return { tip, base, target: onto, start, offer, work, catchUp }
 }
 
 const commitsIn = async (jj: Runner, revset: string): Promise<CommitId[]> => {

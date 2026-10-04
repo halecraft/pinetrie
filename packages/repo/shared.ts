@@ -1,9 +1,17 @@
 // repo/shared — what the line's record and every lane's refresh read, read
-// once per operation (ADR-0065): the line's facts, the taken offers' sources
-// on the line, and the files `@` changes. An operation id names the repo
+// once per operation (ADR-0065): the line's facts, the takes on the line
+// with their sources or the lanes they name none for, and the files `@`
+// changes. An operation id names the repo
 // exactly, so the owner keeps one set until the head moves.
 
-import { type CommitId, commitId, TRAILERS, trailerValues } from "@pineta/core"
+import {
+  type CommitId,
+  commitId,
+  type LaneName,
+  TRAILERS,
+  trailerValues,
+  untracedLanes,
+} from "@pineta/core"
 import {
   describeFailure,
   type LineConfig,
@@ -12,12 +20,19 @@ import {
   revsetName,
 } from "@pineta/lanes"
 import { type LineFacts, lineFacts } from "./line.ts"
+import { TAKES } from "./plan.ts"
 
 /** A commit on the line carrying taken offers' `Pineta-Source` trailers. */
 export interface Taken {
   readonly commit: CommitId
   /** The lane commits it names, from every paragraph (S77 item 6). */
   readonly sources: readonly CommitId[]
+}
+
+/** A take on the line whose sources are not named, for the lanes it names (S97). */
+export interface Untraced {
+  readonly commit: CommitId
+  readonly lanes: readonly LaneName[]
 }
 
 /** What the line's record and every lane's refresh read, as one operation left your repo. */
@@ -27,6 +42,8 @@ export interface SharedFacts {
   readonly line: LineFacts
   /** Every commit on the line that a take named sources in. */
   readonly taken: readonly Taken[]
+  /** Every commit on the line holding a take that named none (`untracedLanes`). */
+  readonly untraced: readonly Untraced[]
   /** Files `@` changes: an offer's `yourEdits` is its files that are here. */
   readonly editing: ReadonlySet<string>
 }
@@ -42,12 +59,12 @@ export async function readShared(
     "log",
     "--no-graph",
     "-r",
-    `::present(${revsetName(line.onto)}) & description(regex:"(?m)^${TRAILERS.source}: ")`,
+    `::present(${revsetName(line.onto)}) & ${TAKES}`,
     "-T",
     'commit_id ++ "\\t" ++ json(description) ++ "\\n"',
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  const taken = lines(ran.stdout).map(row => {
+  const takes = lines(ran.stdout).map(row => {
     const tab = row.indexOf("\t")
     const description = JSON.parse(row.slice(tab + 1)) as string
     return {
@@ -55,6 +72,7 @@ export async function readShared(
       sources: [...new Set(trailerValues(description, TRAILERS.source))].map(
         commitId,
       ),
+      lanes: untracedLanes(description),
     }
   })
   const edited = await jj(["diff", "-r", "@", "--name-only"])
@@ -62,7 +80,12 @@ export async function readShared(
   return {
     op,
     line: await lineFacts(jj, git, line),
-    taken,
+    taken: takes
+      .filter(t => t.sources.length > 0)
+      .map(({ commit, sources }) => ({ commit, sources })),
+    untraced: takes
+      .filter(t => t.lanes.length > 0)
+      .map(({ commit, lanes }) => ({ commit, lanes })),
     editing: new Set(lines(edited.stdout)),
   }
 }

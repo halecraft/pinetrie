@@ -251,10 +251,20 @@ so it is the one behind the menu. What each does is under "Starting" below.
   working directly says "edits your files directly", and warns while
   another agent works in the same directory. Its **⋯** menu holds **catch
   up with** the thread's base (the project, or its WIP), or, once its WIP is
-  gone, **continue from the project**. When the base has new work the
-  thread lacks, the strip says so ("2 files ready · the project has new
-  work"), catching up stands beside the offer, and the column's header shows
-  ↓, titled with the bookmark and both commits. Catching up, and **resolve
+  gone, **continue from the project**. When catching up would change files
+  in the thread, the strip says so ("2 files ready · the project has new
+  work"), catching up stands beside the offer, titled with how many files it
+  changes, and the column's header shows ↓, titled with the count, the
+  bookmark and both commits. When it would change nothing, it stays in the
+  menu, greyed out, and says why: "already caught up with the project", or,
+  when the project moved only by this thread's own work you added, "the
+  project's new work is this thread's own: catching up changes no file"
+  (ADR-0067). An offer whose work the project already has says "nothing to
+  add: the project already has this thread's work": the header does not
+  count it, and archiving its thread warns of nothing. A thread whose
+  earlier add was made before Pineta recorded what an add took says "an
+  earlier add of this thread can't be traced: catch up with the project to
+  offer what's new", with catching up beside it. Catching up, and **resolve
   in the thread** when your edits and the offer conflict, do it at once
   (ADR-0061): each queues a new card holding the command and no text, which
   the host takes when the lane is free, and your composer is left as it

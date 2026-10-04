@@ -10,11 +10,13 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
+  type CatchUpRead,
   type CommitId,
   commitId,
   type EntryId,
   entryId,
   firstLine,
+  type LaneBase,
   type LaneName,
   laneNameForThread,
   NO_EDITOR,
@@ -39,6 +41,7 @@ import {
   hostRunner,
   LANE_JJ_CONFIG,
   type LaneStep,
+  type LineConfig,
   laneBase,
   laneIgnores,
   lines,
@@ -61,8 +64,8 @@ import {
 } from "@pineta/lanes"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import {
+  catchUpFiles,
   changeOf,
-  changesNoFile,
   fileDiff,
   gatherLane,
   hostCommitIn,
@@ -83,10 +86,12 @@ import {
   planRefreshOffer,
   planRepair,
   planTakeOffer,
+  readCatchUp,
   readOffer,
   readShared,
   revisionRead,
   startOfOffer,
+  workChanges,
 } from "./index.ts"
 import { executeRepo, hostJj, hostOps, runnerFor } from "./run.ts"
 
@@ -95,6 +100,20 @@ const NAME = "amber-fox" as ThreadName
 const FORK = laneNameForThread("2")
 const ROOT = laneNameForThread("3")
 const TURN = { lane: LANE, title: "a turn" }
+
+/** Where `LANE`'s offer starts, as commits: a test of an untraced start reads `startOfOffer` itself. */
+const knownStart = async (
+  jj: Runner,
+  input: {
+    readonly tip: CommitId
+    readonly base: LaneBase
+    readonly line: LineConfig
+  },
+): Promise<readonly CommitId[]> => {
+  const read = await startOfOffer(jj, { ...input, lane: LANE })
+  if (read.kind !== "known") throw new Error("an untraced start")
+  return read.start
+}
 
 /** `commitTurn` with the lane's bookmark read first, as the host reads it. */
 const turnOn = async (
@@ -588,6 +607,17 @@ describe("a lane's repo, with jj", () => {
       }))
     const baseOfLane = () =>
       laneBase(laneJj, bookmarkRevset(bookmarkName(LANE)), line)
+    /** jj on the lane's repo from its root, so the paths it prints are the repo's. */
+    const laneRoot: Runner = args =>
+      run("jj", ["-R", laneDir, "--ignore-working-copy", ...args], {
+        cwd: laneDir,
+      })
+    /** The lane's head now. */
+    const head = async (): Promise<CommitId> => {
+      const at = await bookmarkOf(laneJj, LANE)
+      if (at === null) throw new Error("no lane head")
+      return at
+    }
 
     await edit(yoursDir, "a.txt", "a\n")
     await edit(yoursDir, "b.txt", "b\n")
@@ -614,6 +644,7 @@ describe("a lane's repo, with jj", () => {
     await yours("c.txt", "c (yours)\n", "yours two\n\nwith a body")
     await moveLine()
     const line1 = await lineNow()
+    const before = await head()
     const clean = await mergeUpdate(laneJj, runners, LANE, await lineMerge())
     expect(clean).toMatchObject({
       kind: "clean",
@@ -622,6 +653,12 @@ describe("a lane's repo, with jj", () => {
     })
     if (clean.kind !== "clean") throw new Error("not clean")
     expect([...clean.files].sort()).toEqual(["a.txt", "c.txt"])
+    // What `catchUpFiles` said catching up would change, it changed (S97).
+    expect(
+      (
+        await catchUpFiles(laneRoot, { start: base, to: line1, tip: before })
+      )?.sort(),
+    ).toEqual(["a.txt", "c.txt"])
     expect(await baseOfLane()).toEqual({
       base: { kind: "line" },
       start: line1,
@@ -693,6 +730,7 @@ describe("a lane's repo, with jj", () => {
     if (w1 === undefined) throw new Error("no wip")
     const wipMerge = (commit: CommitId, on: CommitId) =>
       planMerge({ kind: "wip", bookmark: "wip/x", commit, under: line2, on })
+    const beforeFirst = await head()
     const first = await mergeUpdate(laneJj, runners, LANE, wipMerge(w1, line2))
     expect(first).toMatchObject({
       kind: "clean",
@@ -700,11 +738,15 @@ describe("a lane's repo, with jj", () => {
       commits: ["wip one"],
     })
     if (first.kind !== "clean") throw new Error("not clean")
+    expect(
+      await catchUpFiles(laneRoot, { start: line2, to: w1, tip: beforeFirst }),
+    ).toEqual(["w.txt"])
     await yours("w.txt", "w2\n", "wip two")
     await yoursJj(["bookmark", "move", "wip/x", "--to", "@-"])
     const [w2] = await commitsOf(yoursJj, "@-")
     if (w2 === undefined) throw new Error("no wip")
     expect(await commitsOf(yoursJj, `present(${first.from})`)).toEqual([])
+    const beforeNext = await head()
     const next = await mergeUpdate(
       laneJj,
       runners,
@@ -718,6 +760,14 @@ describe("a lane's repo, with jj", () => {
     })
     if (next.kind !== "clean") throw new Error("not clean")
     expect(await commitsOf(laneJj, `${next.from}-`)).toEqual([first.from])
+    // From the lane's copy, the WIP's base start, to the WIP's commit.
+    expect(
+      await catchUpFiles(laneRoot, {
+        start: first.from,
+        to: w2,
+        tip: beforeNext,
+      }),
+    ).toEqual(["w.txt"])
   }, 60_000)
 
   test("an update merges on an adopted commit; a stack's commits are never adopted", async () => {
@@ -927,7 +977,7 @@ describe("a lane's repo, with jj", () => {
       if (tip === null) throw new Error("no tip")
       const base = await laneBase(ops, tip, line)
       if (base === null) throw new Error("no base")
-      const start = await startOfOffer(ops, { tip, base, line })
+      const start = await knownStart(ops, { tip, base, line })
       await executeRepo(
         yoursDir,
         planOffer({
@@ -984,6 +1034,7 @@ describe("a lane's repo, with jj", () => {
         name: NAME,
         line,
         shared,
+        known: null,
       })
       const tip = await laneTipIn(ops, LANE)
       const base = tip === null ? null : await laneBase(ops, tip, line)
@@ -996,14 +1047,23 @@ describe("a lane's repo, with jj", () => {
         return
       }
       const target = await lineNow()
-      const start = await startOfOffer(ops, { tip, base, line })
+      const start = await startOfOffer(ops, { tip, base, line, lane: LANE })
       expect(gathered).toEqual({
         tip,
         base,
         target,
         start,
         offer: await readOffer(ops, { name: NAME, target }),
-        empty: await changesNoFile(ops, { start, tip }),
+        work:
+          start.kind === "known"
+            ? await workChanges(ops, { start: start.start, tip })
+            : "unknown",
+        catchUp: await readCatchUp(ops, {
+          start: base.start,
+          to: target,
+          tip,
+          known: null,
+        }),
       })
     }
     /** An offer of the lane's tip, fetched from `from`, its ledger naming the tip. */
@@ -1278,7 +1338,7 @@ describe("a lane's repo, with jj", () => {
       yoursDir,
       planFollowOffer({
         change: nc,
-        start: await startOfOffer(ops, { tip: t3, base: b3, line }),
+        start: await knownStart(ops, { tip: t3, base: b3, line }),
         tip: t3,
         target: await lineNow(),
         description: `WIP\n\nPineta-Source: ${t3}\n`,
@@ -1396,7 +1456,7 @@ describe("a lane's repo, with jj", () => {
     if (tip === null) throw new Error("no tip")
     const b = await laneBase(ops, tip, line)
     if (b === null) throw new Error("no base")
-    expect(await startOfOffer(ops, { tip, base: b, line })).toEqual([
+    expect(await knownStart(ops, { tip, base: b, line })).toEqual([
       await lineNow(),
     ])
   }, 60_000)
@@ -1486,7 +1546,7 @@ describe("a lane's repo, with jj", () => {
     ).toHaveLength(1)
   }, 60_000)
 
-  test("an unchanged offer's refresh reads at most 3 jj processes (ADR-0065)", async () => {
+  test("an unchanged offer's refresh reads at most 3 jj processes (ADR-0065), and what catching up changes is read once per move (S97)", async () => {
     const rig = await turnRig("count")
     const { ops, line, fetch, build, lineNow, base } = rig
     await fetch(base)
@@ -1494,7 +1554,7 @@ describe("a lane's repo, with jj", () => {
     if (tip === null) throw new Error("no tip")
     const b = await laneBase(ops, tip, line)
     if (b === null) throw new Error("no base")
-    const start = await startOfOffer(ops, { tip, base: b, line })
+    const start = await knownStart(ops, { tip, base: b, line })
     // As the host builds one: its ledger names the tip and the start.
     await build([
       {
@@ -1520,15 +1580,56 @@ describe("a lane's repo, with jj", () => {
       name: NAME,
       line,
       shared,
+      known: null,
     })
     expect(gathered).toMatchObject({
       tip,
       target: await lineNow(),
-      empty: false,
+      work: "some",
     })
     // One `jj log`, the revision's evolog, and whether the lane's work
     // changes any file.
     expect(ran).toBe(3)
+    // The line moves: what catching up changes is read once, in two diffs,
+    // and kept while the lane's tip and the line stay where they are.
+    await rig.edit(rig.yoursDir, "line.txt", "line\n")
+    await rig.yoursJj(["commit", "-m", "the line moves"])
+    await rig.yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
+    const gather = async (known: CatchUpRead | null) => {
+      const now = (
+        await ops(["op", "log", "--no-graph", "-n", "1", "-T", "id"])
+      ).stdout
+      const facts = await readShared(
+        now,
+        ops,
+        runnerFor(rig.yoursDir, "git"),
+        line,
+      )
+      ran = 0
+      const read = await gatherLane(counted, {
+        lane: LANE,
+        name: NAME,
+        line,
+        shared: facts,
+        known,
+      })
+      if (read === "none" || read === "wip") throw new Error("not on the line")
+      return { read, ran }
+    }
+    const moved = await gather(null)
+    expect(moved.read.catchUp).toEqual({
+      tip,
+      to: await lineNow(),
+      files: ["line.txt"],
+    })
+    expect(moved.ran).toBe(5)
+    expect((await gather(moved.read.catchUp)).ran).toBe(3)
+    // Moved again: what was read at the line before is read again.
+    await rig.edit(rig.yoursDir, "line.txt", "line, again\n")
+    await rig.yoursJj(["commit", "-m", "the line moves again"])
+    await rig.yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
+    const again = await gather(moved.read.catchUp)
+    expect([again.ran, again.read.catchUp?.to]).toEqual([5, await lineNow()])
   }, 60_000)
 
   test("an offer the line already holds is empty, and the lane's work still changes files: it is kept, not withdrawn and built again", async () => {
@@ -1549,7 +1650,7 @@ describe("a lane's repo, with jj", () => {
     if (tip === null) throw new Error("no tip")
     const b = await laneBase(ops, tip, line)
     if (b === null) throw new Error("no base")
-    const start = await startOfOffer(ops, { tip, base: b, line })
+    const start = await knownStart(ops, { tip, base: b, line })
     const [offered] = (
       await build([
         {
@@ -1572,9 +1673,79 @@ describe("a lane's repo, with jj", () => {
       name: NAME,
       line,
       shared,
+      known: null,
     })
-    expect(gathered).toMatchObject({ empty: false, offer: { files: [] } })
+    expect(gathered).toMatchObject({ work: "some", offer: { files: [] } })
     await agrees()
+  }, 60_000)
+
+  test("a take of the lane that names no source makes its start untraced, read either way, until it catches up past it (S97)", async () => {
+    const {
+      ops,
+      laneDir,
+      line,
+      edit,
+      fetch,
+      build,
+      take,
+      turn,
+      update,
+      agrees,
+      lineNow,
+      base,
+    } = await turnRig("untraced")
+    await fetch(base)
+    const t1 = await laneTipIn(ops, LANE)
+    if (t1 === null) throw new Error("no tip")
+    // Taken as offers were before they carried their ledger.
+    const built = await build([
+      {
+        commit: t1,
+        description: `feat: a\n\nPineta-Thread: ${NAME}\nPineta-Lane: ${LANE}\n`,
+      },
+    ])
+    await take({ built })
+    await edit(laneDir, "b.txt", "b\n")
+    const t2 = await turn()
+    await fetch([t1])
+    await agrees()
+    const b2 = await laneBase(ops, t2, line)
+    if (b2 === null) throw new Error("no base")
+    expect(
+      await startOfOffer(ops, { tip: t2, base: b2, line, lane: LANE }),
+    ).toEqual({ kind: "untraced", takes: [await lineNow()] })
+    // Caught up: the take is under its base, and the start is the line.
+    await update({ "c.txt": "c\n" })
+    await fetch([t2])
+    await agrees()
+    const t3 = await laneTipIn(ops, LANE)
+    if (t3 === null) throw new Error("no tip")
+    const b3 = await laneBase(ops, t3, line)
+    if (b3 === null) throw new Error("no base")
+    expect(
+      await startOfOffer(ops, { tip: t3, base: b3, line, lane: LANE }),
+    ).toEqual({ kind: "known", start: [await lineNow()] })
+  }, 60_000)
+
+  test("catching up with your own take of the lane's work changes no file, as catchUpFiles says (S97)", async () => {
+    const { ops, laneJj, inLane, offer, take, lineNow, base } =
+      await turnRig("own-take")
+    await take(await offer(base))
+    const tip = await laneTipIn(ops, LANE)
+    const [start] = base
+    if (tip === null || start === undefined) throw new Error("no tip")
+    const to = await lineNow()
+    expect(to).not.toBe(start)
+    expect(await catchUpFiles(ops, { start, to, tip })).toEqual([])
+    await inLane([fetchById([to])])
+    const { ours, merge } = await mergeBase(laneJj, LANE, to, "update")
+    if (merge === null) throw new Error("nothing merged")
+    expect(
+      lines(
+        (await laneJj(["diff", "--from", ours, "--to", merge, "--name-only"]))
+          .stdout,
+      ),
+    ).toEqual([])
   }, 60_000)
 
   test("a lane whose work undoes itself changes no file, over a range jj diffs as one", async () => {
@@ -1582,17 +1753,22 @@ describe("a lane's repo, with jj", () => {
     await fetch(base)
     const first = await laneTipIn(ops, LANE)
     if (first === null) throw new Error("no tip")
-    expect(await changesNoFile(ops, { start: base, tip: first })).toBe(false)
+    expect(await workChanges(ops, { start: base, tip: first })).toBe("some")
     await rm(path.join(laneDir, "a.txt"))
     await turn()
     await fetch(base)
     const undone = await laneTipIn(ops, LANE)
     if (undone === null) throw new Error("no tip")
-    expect(await changesNoFile(ops, { start: base, tip: undone })).toBe(true)
-    expect(await changesNoFile(ops, { start: [first], tip: undone })).toBe(
-      false,
-    )
-    expect(await changesNoFile(ops, { start: [], tip: undone })).toBe(false)
+    expect(await workChanges(ops, { start: base, tip: undone })).toBe("none")
+    expect(await workChanges(ops, { start: [first], tip: undone })).toBe("some")
+    expect(await workChanges(ops, { start: [], tip: undone })).toBe("unknown")
+    // A range jj refuses, here for a commit it does not have, is not a change.
+    expect(
+      await workChanges(ops, {
+        start: [first, commitId("1".repeat(40))],
+        tip: undone,
+      }),
+    ).toBe("unknown")
   }, 60_000)
 
   test("a thread on a WIP starts from its copy, and freezes nothing of yours (ADR-0060)", async () => {
@@ -1639,7 +1815,7 @@ describe("a lane's repo, with jj", () => {
     await rig.yoursJj(["squash", "--into", "wip/search"])
     const b = await laneBase(rig.ops, tip, rig.line)
     if (b === null) throw new Error("no base")
-    const start = await startOfOffer(rig.ops, { tip, base: b, line: rig.line })
+    const start = await knownStart(rig.ops, { tip, base: b, line: rig.line })
     const [target] = await commitsOf(rig.ops, "wip/search")
     if (target === undefined) throw new Error("no wip")
     await executeRepo(

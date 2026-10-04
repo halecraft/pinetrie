@@ -150,6 +150,9 @@ export const laneRefSteps = (
         IMPORT,
       ]
 
+/** The commits a take made: its offer's trailers name a source or a thread. */
+export const TAKES = `description(regex:"(?m)^(${TRAILERS.source}|${TRAILERS.thread}): ")`
+
 /**
  * Where an offer starts, as a revset (ADR-0060): the newest ancestors of the
  * lane's tip you already have. That is the commit the lane's base names
@@ -171,9 +174,10 @@ export function offerStart(input: {
 }
 
 /**
- * The commits whose `Pineta-Source` trailers `offerStart` reads: those in
- * `::<onto>`, and in `::<wip>` for a lane on a WIP, but not in the history
- * of the base's `source` (S81). The lane merged that commit, so it holds
+ * The takes `offerStart` reads, by their `Pineta-Source` or `Pineta-Thread`
+ * trailers: a take's sources, or none for a take made before offers carried
+ * them (`untracedLanes`, S97). Those in `::<onto>`, and in `::<wip>` for a
+ * lane on a WIP, but not in the history of the base's `source` (S81). The lane merged that commit, so it holds
  * what was taken below it. An offer keeps the diff from the merge of its
  * start to the tip, so a source the target holds as another commit would be
  * subtracted from the target, and conflict where the line changed it since.
@@ -188,7 +192,7 @@ export function takenRevset(input: {
     `present(${revsetName(input.line.onto)})`,
     ...(base.kind === "wip" ? [`present(${revsetName(base.bookmark)})`] : []),
   ].join(" | ")
-  return `(::(${heads}) ~ ::present(${input.base.source})) & description(regex:"(?m)^${TRAILERS.source}: ")`
+  return `(::(${heads}) ~ ::present(${input.base.source})) & ${TAKES}`
 }
 
 /** One version of a commit in `jj evolog`: who made it, and from what. */

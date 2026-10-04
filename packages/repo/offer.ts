@@ -2,8 +2,8 @@
 //
 // Reads only, each a query over jj on your repo (a step's, or a pinned read's)
 // returning values: the facts a trigger plans from (`readOffer`,
-// `startOfOffer`, `laneTipIn`; a lane on the line reads them in one `jj log`,
-// `lane-read.ts`), what a review shows of a commit (`revisionRead`,
+// `startOfOffer`, `laneTipIn`, `workChanges`, `readCatchUp`; a lane on the
+// line reads them in one `jj log`, `lane-read.ts`), what a review shows of a commit (`revisionRead`,
 // `fileDiff`), and which of a divergent revision's commits
 // the host made (`hostCommitIn`, from `evologOf`). What the host then does is
 // planned in `plan.ts` (`planOffer`, `planTakeOffer`, `planRepair`) and
@@ -11,6 +11,7 @@
 // `@pineta/lanes`' `laneBase`, since a lane reads it too.
 
 import {
+  type CatchUpRead,
   type CommitId,
   commitId,
   type DiffSpan,
@@ -20,9 +21,12 @@ import {
   type OfferRevision,
   offerLedger,
   type RevisionFacts,
+  type StartRead,
   type ThreadName,
   TRAILERS,
   trailerValues,
+  untracedLanes,
+  type WorkChanges,
 } from "@pineta/core"
 import {
   bookmarkRevset,
@@ -60,33 +64,54 @@ export async function laneTipIn(
 }
 
 /**
- * The lane commits taken offers name, from their `Pineta-Source` trailers in
- * `takenRevset`'s commits: what you have of lanes that the lane's base does
- * not already hold. Read from every paragraph of each message (S77 item 6).
+ * What `takenRevset`'s takes say for `lane`: the lane commits they name in
+ * `Pineta-Source` trailers, what you have of lanes that the lane's base does
+ * not already hold, read from every paragraph of each message (S77 item 6);
+ * and the takes of `lane` that name none (`untracedLanes`, S97).
  */
-export async function takenSources(
+export async function takenFacts(
   jj: Runner,
-  line: LineConfig,
-  base: LaneBase,
-): Promise<CommitId[]> {
+  input: {
+    readonly line: LineConfig
+    readonly base: LaneBase
+    readonly lane: LaneName
+  },
+): Promise<{ readonly sources: CommitId[]; readonly untraced: CommitId[] }> {
   const ran = await jj([
     "log",
     "--ignore-working-copy",
     "--no-graph",
     "-r",
-    takenRevset({ line, base }),
+    takenRevset(input),
     "-T",
-    'description ++ "\\n"',
+    'commit_id ++ "\\t" ++ json(description) ++ "\\n"',
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  return [...new Set(trailerValues(ran.stdout, TRAILERS.source))].map(commitId)
+  const takes = lines(ran.stdout).map(row => {
+    const tab = row.indexOf("\t")
+    return {
+      commit: commitId(row.slice(0, tab)),
+      description: JSON.parse(row.slice(tab + 1)) as string,
+    }
+  })
+  return {
+    sources: [
+      ...new Set(
+        takes.flatMap(t => trailerValues(t.description, TRAILERS.source)),
+      ),
+    ].map(commitId),
+    untraced: takes
+      .filter(t => untracedLanes(t.description).includes(input.lane))
+      .map(t => t.commit),
+  }
 }
 
 /**
- * Where an offer starts, as commits: the lane's base and the taken offers'
- * sources above what the base holds (read), then `offerStart`'s revset
- * (read). The host's every start comes from here, so an offer is built,
- * followed and split from one start.
+ * Where an offer starts: the lane's base and the taken offers' sources above
+ * what the base holds (read), then `offerStart`'s revset (read); or
+ * `untraced`, when a take of the lane above its base names no source. The
+ * host's every start comes from here, so an offer is built, followed and
+ * split from one start.
  */
 export async function startOfOffer(
   jj: Runner,
@@ -94,32 +119,103 @@ export async function startOfOffer(
     readonly tip: CommitId
     readonly base: LaneBase
     readonly line: LineConfig
+    readonly lane: LaneName
   },
-): Promise<CommitId[]> {
-  const sources = await takenSources(jj, input.line, input.base)
-  return commitsOf(
-    jj,
-    offerStart({ tip: input.tip, start: input.base.start, sources }),
-  )
+): Promise<StartRead> {
+  const { sources, untraced } = await takenFacts(jj, input)
+  if (untraced.length > 0) return { kind: "untraced", takes: untraced }
+  return {
+    kind: "known",
+    start: await commitsOf(
+      jj,
+      offerStart({ tip: input.tip, start: input.base.start, sources }),
+    ),
+  }
 }
 
 /**
- * Whether a lane's work since `start` changes no file: one diff over
- * `start..tip`, from its roots' parents (merged, for several) to the tip. jj
- * refuses a range with gaps; that reads as a change, so the offer is built.
+ * Whether a lane's work since `start` changes any file. From one start, the
+ * diff from it to the tip: what a build restores, so the two agree. From
+ * several, one diff over `start..tip`, from its roots' parents, merged, to
+ * the tip. jj refuses a range with gaps, as after a catch-up merged a take
+ * (S97): that, or no start, is `unknown`.
  */
-export async function changesNoFile(
+export async function workChanges(
   jj: Runner,
   input: { readonly start: readonly CommitId[]; readonly tip: CommitId },
-): Promise<boolean> {
-  if (input.start.length === 0) return false
-  const ran = await jj([
+): Promise<WorkChanges> {
+  const [only, ...more] = input.start
+  if (only === undefined) return "unknown"
+  const ran = await jj(
+    more.length === 0
+      ? ["diff", "--from", only, "--to", input.tip, "--name-only"]
+      : [
+          "diff",
+          "-r",
+          `(${input.start.join(" | ")})..${input.tip}`,
+          "--name-only",
+        ],
+  )
+  if (!ran.ok) return "unknown"
+  return lines(ran.stdout).length === 0 ? "none" : "some"
+}
+
+/**
+ * The files catching up with a base would change in the lane, or null when
+ * jj cannot say: those the base changed between `start` (where the lane last
+ * took from it) and `to` (where it is now) that the lane's `tip` does not
+ * already hold as `to` does. A three-way merge from `start` changes no other
+ * file, so none at all when the base's new work is the lane's own, taken.
+ */
+export async function catchUpFiles(
+  jj: Runner,
+  input: {
+    readonly start: CommitId
+    readonly to: CommitId
+    readonly tip: CommitId
+  },
+): Promise<string[] | null> {
+  const moved = await jj([
     "diff",
-    "-r",
-    `(${input.start.join(" | ")})..${input.tip}`,
+    "--from",
+    input.start,
+    "--to",
+    input.to,
     "--name-only",
   ])
-  return ran.ok && lines(ran.stdout).length === 0
+  const differ = await jj([
+    "diff",
+    "--from",
+    input.tip,
+    "--to",
+    input.to,
+    "--name-only",
+  ])
+  if (!moved.ok || !differ.ok) return null
+  const lacking = new Set(lines(differ.stdout))
+  return lines(moved.stdout).filter(f => lacking.has(f))
+}
+
+/**
+ * What catching up would change (`catchUpFiles`), read at `tip` and the
+ * base's commit `to`: null when the base has not moved from `start`, or jj
+ * cannot say. `known`, read before at the same tip and commit, is kept, so
+ * each lane reads it once per move of either.
+ */
+export async function readCatchUp(
+  jj: Runner,
+  input: {
+    readonly start: CommitId
+    readonly to: CommitId
+    readonly tip: CommitId
+    readonly known: CatchUpRead | null
+  },
+): Promise<CatchUpRead | null> {
+  const { start, to, tip, known } = input
+  if (start === to) return null
+  if (known !== null && known.tip === tip && known.to === to) return known
+  const files = await catchUpFiles(jj, { start, to, tip })
+  return files === null ? null : { tip, to, files }
 }
 
 /** Whether `to` has `from`'s description, and `jj interdiff` between them is empty. */

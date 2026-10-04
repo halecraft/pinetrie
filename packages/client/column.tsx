@@ -1148,10 +1148,10 @@ function WorkStripView({
         </span>
       )}
       <span className="work-space" />
-      {words.buttons.map(({ button, label, title }) => (
+      {words.buttons.map(({ button, label, title, disabled }) => (
         <button
           className={`offer-${button}`}
-          disabled={strip.waiting}
+          disabled={strip.waiting || disabled === true}
           key={button}
           onClick={() => act(button)}
           title={title}
@@ -1166,11 +1166,11 @@ function WorkStripView({
           sections={[
             {
               key: "offer",
-              items: words.menu.map(({ button, label, title }) => ({
+              items: words.menu.map(({ button, label, title, disabled }) => ({
                 key: button,
                 label,
                 className: `offer-${button}`,
-                disabled: strip.waiting,
+                disabled: strip.waiting || disabled === true,
                 ...(title === undefined ? {} : { title }),
                 onChoose: () => act(button),
               })),

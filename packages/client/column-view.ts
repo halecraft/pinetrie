@@ -31,11 +31,13 @@ import {
   type WriterId,
 } from "@pineta/core"
 import {
-  baseMoved,
   baseName,
+  type CatchUpNow,
+  catchUpOf,
   type OfferActivity,
   type OfferButton,
   type OfferView,
+  offerStatus,
   offerView,
   type TakeDestination,
 } from "@pineta/marginalia"
@@ -172,8 +174,10 @@ export interface OfferWords {
 export interface LabelledButton {
   readonly button: OfferButton
   readonly label: string
-  /** What it does in jj, for whoever works there too. */
+  /** What it does in jj, for whoever works there too; or why it is disabled. */
   readonly title?: string
+  /** It would change nothing now (`OfferView.quiet`). */
+  readonly disabled?: true
 }
 
 /**
@@ -246,7 +250,7 @@ export interface ColumnShows {
   readonly reserve: ReserveStep
   /** The thread's base when it is not the line (ADR-0060), worded; null otherwise. */
   readonly base: string | null
-  /** The thread's base has moved on since it last caught up (`baseMoved`). */
+  /** Catching up would change files in the thread (`catchUpOf`'s `brings`). */
   readonly behind: { readonly mark: string; readonly title: string } | null
 }
 
@@ -300,20 +304,21 @@ export function columnView(f: ColumnFacts): ColumnShows {
 }
 
 /**
- * The header's mark for a thread whose base moved on: its words say so, and
- * its title adds the jj facts, the bookmark and both commits.
+ * The header's mark for a thread whose base has new work for it: catching
+ * up would change files (`catchUpOf`'s `brings`). Its title says how many,
+ * and adds the jj facts, the bookmark and both commits.
  */
 export function behindMark(
   base: BaseRecord | undefined,
   line: LineRecord | null,
 ): ColumnShows["behind"] {
-  const moved = baseMoved(base, line)
-  return moved === null
-    ? null
-    : {
-        mark: "↓",
-        title: `${baseName(moved.base)} has new work since this thread started · ${moved.bookmark}: ${moved.from.slice(0, 8)} → ${moved.to.slice(0, 8)}`,
-      }
+  const now = catchUpOf(base, line)
+  if (now.kind !== "brings") return null
+  const { move } = now
+  return {
+    mark: "↓",
+    title: `${baseName(move.base)} has new work since this thread started, in ${count(now.files, "file", "files")} · ${move.bookmark}: ${move.from.slice(0, 8)} → ${move.to.slice(0, 8)}`,
+  }
 }
 
 /**
@@ -450,7 +455,7 @@ function workStrip(f: ColumnFacts): WorkStrip {
     }
   }
   if (project.kind !== "lanes") return NO_STRIP
-  const offer = work.offers.get(lane.name)
+  const offer = offerStatus(work.offers.get(lane.name))
   const base = work.bases.get(lane.name) ?? null
   const view = offerView({
     offer,
@@ -462,7 +467,8 @@ function workStrip(f: ColumnFacts): WorkStrip {
       work.line?.wips.find(
         w => base?.base.kind === "wip" && w.bookmark === base.base.bookmark,
       )?.ahead ?? 0,
-    behind: baseMoved(base ?? undefined, work.line) !== null,
+    catchUp: catchUpOf(base ?? undefined, work.line),
+    untraced: (base?.untraced.length ?? 0) > 0,
     catchingUp: f.catchingUp,
   })
   return {
@@ -473,16 +479,16 @@ function workStrip(f: ColumnFacts): WorkStrip {
     bookmark: view.facts.bookmark,
     destinations: view.destinations,
     review:
-      offer === undefined || offer.taken !== null || offer.files.length === 0
+      offer.kind !== "open"
         ? null
         : {
-            lane: offer.lane,
-            spans: offer.commits.map(commit => ({
+            lane: offer.record.lane,
+            spans: offer.record.commits.map(commit => ({
               kind: "revision",
               commit,
             })),
-            conflicts: offer.conflicts,
-            yourEdits: offer.yourEdits,
+            conflicts: offer.record.conflicts,
+            yourEdits: offer.record.yourEdits,
           },
   }
 }
@@ -559,11 +565,16 @@ export function offerWords(
       ? ""
       : `conflicts with ${base} in ${count(facts.conflicts, "file", "files")}`
   const moved = `${base} has new work since this thread started`
+  const brings = facts.catchUp.kind === "brings"
   const said =
     state === "nothing"
-      ? facts.behind
-        ? moved
-        : "nothing to add yet"
+      ? facts.untraced
+        ? `an earlier add of this thread can't be traced: catch up with ${base} to offer what's new`
+        : brings
+          ? moved
+          : facts.held
+            ? "nothing to add: the project already has this thread's work"
+            : "nothing to add yet"
       : state === "running"
         ? facts.files === 0
           ? "no files changed yet"
@@ -588,10 +599,7 @@ export function offerWords(
                       ? `a stack of ${facts.size} · ${files} ready${yours}`
                       : `${files} ready${yours}`
   const line =
-    facts.behind &&
-    state !== "nothing" &&
-    state !== "busy" &&
-    state !== "running"
+    brings && state !== "nothing" && state !== "busy" && state !== "running"
       ? `${said} · ${base} has new work`
       : said
   const [first] = view.destinations
@@ -635,7 +643,7 @@ export function offerWords(
         return {
           button,
           label: commandWords("bring-up-to-date", facts.base),
-          title: `merges ${baseBookmark} into this thread's copy`,
+          title: catchUpTitle(facts.catchUp, base, baseBookmark),
         }
       case "continue":
         return {
@@ -652,11 +660,38 @@ export function offerWords(
         return { button, label: BUTTON_LABEL[button] }
     }
   }
+  /** A quiet button is drawn disabled: it would change nothing now. */
+  const shown = (button: OfferButton): LabelledButton =>
+    view.quiet.includes(button)
+      ? { ...labelled(button), disabled: true }
+      : labelled(button)
   return {
     line,
     note: actingWords(acting, view.destinations),
-    buttons: view.buttons.map(labelled),
-    menu: view.menu.map(labelled),
+    buttons: view.buttons.map(shown),
+    menu: view.menu.map(shown),
+  }
+}
+
+/**
+ * Catching up's title: what it merges, and what that changes, or why it
+ * changes nothing (S97).
+ */
+function catchUpTitle(
+  catchUp: CatchUpNow,
+  base: string,
+  bookmark: string,
+): string {
+  const merges = `merges ${bookmark} into this thread's copy`
+  switch (catchUp.kind) {
+    case "current":
+      return `already caught up with ${base}`
+    case "nothing-new":
+      return `${base}'s new work is this thread's own: catching up changes no file`
+    case "unknown":
+      return merges
+    case "brings":
+      return `${merges} · changes ${count(catchUp.files, "file", "files")}`
   }
 }
 

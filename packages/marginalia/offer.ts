@@ -2,8 +2,9 @@
 // ADR-0039).
 //
 // Every decision an offer needs, pure, over what the host gathers from jj and
-// the document: what a trigger does to it (`planRefresh`), its state and
-// what can be done in it (`offerView`), whether the agent's stack may replace it
+// the document: what a trigger does to it (`planRefresh`), what its record
+// says (`offerStatus`), what catching up would do (`catchUpOf`), its state
+// and what can be done in it (`offerView`), whether the agent's stack may replace it
 // (`acceptStack`), the commit-message request (`describeRequest`,
 // `withTrailers`, `wipDescription`), and the review's wire: its URLs, what a
 // request may read and how it is answered (`planOfferRead`, `answerReview`,
@@ -26,10 +27,12 @@ import {
   type RevisionFacts,
   type RevisionRecord,
   type RevisionReview,
+  type StartRead,
   spanKey,
   type ThreadBase,
   type ThreadName,
   TRAILERS,
+  type WorkChanges,
 } from "@pineta/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
@@ -84,10 +87,13 @@ export type RefreshFacts =
       readonly archived: false
       /** The lane's tip in your repo. */
       readonly tip: CommitId
-      /** Where an offer would start; the tip itself when nothing is new. */
-      readonly start: readonly CommitId[]
-      /** The lane's work since its start changes no file. */
-      readonly empty: boolean
+      /**
+       * Where an offer would start, the tip itself when nothing is new; or
+       * untraced, when a take of the lane names no source (S97).
+       */
+      readonly start: StartRead
+      /** Whether the lane's work since its start changes any file. */
+      readonly work: WorkChanges
       readonly offer: OfferInRepo | null
     }
 
@@ -98,8 +104,8 @@ export type RefreshFacts =
  * - `follow`: the lane, or where the offer starts, moved under an unedited
  *   single offer: update it in place (ADR-0039, S49);
  * - `withdraw`: it holds nothing you lack (where it starts reached the
- *   lane's tip, or the lane's work changes no file), or its thread is
- *   archived: abandon it (S49 item 5);
+ *   lane's tip, or the lane's work changes no file), its start is untraced,
+ *   or its thread is archived: abandon it (S49 item 5);
  * - `forget`: there is no offer and none to build: remove a record left
  *   from one;
  * - `stale`: the lane, or where it starts, moved under a stack: kept, marked
@@ -121,22 +127,26 @@ export type RefreshPlan =
 
 /**
  * An archived thread's offer goes whatever its state, an edited one too:
- * an offer is immutable, so editing one is an expert's own act. A lane whose
- * work changes no file is never built: withdrawing what was built would
- * repeat on every poll, since each step moves your repo's operation head.
+ * an offer is immutable, so editing one is an expert's own act. An offer is
+ * built only when the lane's work is known to change a file from a known
+ * start (ADR-0067): one built from less would be empty, or bring back what
+ * you took, and withdrawing it would repeat on every poll, since each step
+ * moves your repo's operation head. An unknown answer keeps what is there.
  */
 export function planRefresh(facts: RefreshFacts): RefreshPlan {
   const { offer } = facts
   if (facts.archived) return offer === null ? "forget" : "withdraw"
-  const { tip, start } = facts
-  const nothingNew = facts.empty || (start.length === 1 && start[0] === tip)
-  if (offer === null) return nothingNew ? "forget" : "build"
+  const { tip, work } = facts
+  const start = facts.start.kind === "known" ? facts.start.start : null
+  const reached = start !== null && start.length === 1 && start[0] === tip
+  if (offer === null)
+    return start === null || work !== "some" || reached ? "forget" : "build"
   if (offer.kind === "divergent") return "repair"
   if (offerEdited(offer)) return "leave"
-  if (facts.empty) return "withdraw"
+  if (start === null || work === "none") return "withdraw"
   if (offerMoved(offer.ledger, { tip, start })) {
     if (offer.revisions.length > 1) return "stale"
-    return nothingNew ? "withdraw" : "follow"
+    return reached ? "withdraw" : "follow"
   }
   return offer.onTarget ? "none" : "refresh"
 }
@@ -235,6 +245,29 @@ export type OfferActivity =
   | "catch-up"
 
 /**
+ * What a lane's `pineta.offer` record says, decoded once (ADR-0067): every
+ * reader of the page switches on this, never on the record's fields.
+ * - `none`: no record;
+ * - `taken`: added to the project, as the change `as`;
+ * - `held`: open, but it brings no file: the line already holds its work,
+ *   by a route the ledger does not record (S89), so there is nothing to add;
+ * - `open`: work to add. One you edited is open whatever its files: it is
+ *   yours.
+ */
+export type OfferStatus =
+  | { readonly kind: "none" }
+  | { readonly kind: "taken"; readonly as: string }
+  | { readonly kind: "held"; readonly record: OfferRecord }
+  | { readonly kind: "open"; readonly record: OfferRecord }
+
+export function offerStatus(record: OfferRecord | undefined): OfferStatus {
+  if (record === undefined) return { kind: "none" }
+  if (record.taken !== null) return { kind: "taken", as: record.taken }
+  const held = record.files.length === 0 && !record.edited
+  return { kind: held ? "held" : "open", record }
+}
+
+/**
  * One state of a lane's offer, what can be done in it (ADR-0038's table), and
  * the facts its words are made from. The words are the client's
  * (`offerWords`, `@pineta/client`).
@@ -255,6 +288,8 @@ export interface OfferView {
   readonly buttons: readonly OfferButton[]
   /** Buttons in the offer's menu. */
   readonly menu: readonly OfferButton[]
+  /** Of those, the ones that would change nothing now: drawn, but disabled. */
+  readonly quiet: readonly OfferButton[]
   /** Where `take` (the first) and `take-line` (the line, from a WIP) go. */
   readonly destinations: readonly TakeDestination[]
   readonly facts: OfferFacts
@@ -273,6 +308,8 @@ export interface OfferFacts {
   readonly touchesYourEdits: boolean
   /** Its bookmark, to find it in jj; null with no untaken offer. */
   readonly bookmark: string | null
+  /** An untaken offer the line already holds the work of (`held`). */
+  readonly held: boolean
   /** The change id it was taken as, or null. */
   readonly taken: string | null
   /**
@@ -282,8 +319,10 @@ export interface OfferFacts {
   readonly base: ThreadBase
   /** The line's bookmark, for titles. */
   readonly onto: string
-  /** The thread's base has moved on since the lane last forked or caught up. */
-  readonly behind: boolean
+  /** What catching up would do (`catchUpOf`). */
+  readonly catchUp: CatchUpNow
+  /** A take of this thread names no source: nothing is offered until it catches up (S97). */
+  readonly untraced: boolean
 }
 
 /**
@@ -314,9 +353,10 @@ export interface BaseMove {
  * caught up (ADR-0060), or null: the commit its newest `Pineta-Base` names
  * (`start`) against where the base is now, the line's commit or the WIP's.
  * Never for a WIP gone, which only "continue on the line" moves, nor before
- * the line is set up.
+ * the line is set up. Commits only: whether catching up would change a file
+ * is `catchUpOf`'s.
  */
-export function baseMoved(
+function baseMoved(
   base: BaseRecord | undefined,
   line: LineRecord | null,
 ): BaseMove | null {
@@ -333,6 +373,43 @@ export function baseMoved(
 }
 
 /**
+ * What catching up would do to a thread, as the page can tell (S97):
+ * - `current`: its base has not moved since the lane last took from it;
+ * - `unknown`: it moved, and the host has not yet read what that changes;
+ * - `nothing-new`: it moved, but by work the lane already holds, as after
+ *   you took its own offer: catching up changes no file;
+ * - `brings`: catching up changes `files` files in the lane.
+ */
+export type CatchUpNow =
+  | { readonly kind: "current" }
+  | { readonly kind: "unknown"; readonly move: BaseMove }
+  | { readonly kind: "nothing-new"; readonly move: BaseMove }
+  | {
+      readonly kind: "brings"
+      readonly move: BaseMove
+      readonly files: number
+    }
+
+/**
+ * `CatchUpNow` from the lane's base record and the line's: the host's read
+ * (`BaseRecord.catchUp`) counts only when it was made at the commit the base
+ * is at now; else what it would change is unknown.
+ */
+export function catchUpOf(
+  base: BaseRecord | undefined,
+  line: LineRecord | null,
+): CatchUpNow {
+  const move = baseMoved(base, line)
+  if (move === null) return { kind: "current" }
+  const read = base?.catchUp
+  if (read === undefined || read === null || read.to !== move.to)
+    return { kind: "unknown", move }
+  return read.files.length === 0
+    ? { kind: "nothing-new", move }
+    : { kind: "brings", move, files: read.files.length }
+}
+
+/**
  * The offer's state and buttons. `landing` is the lane's latest resolution;
  * it asks for you only when newer than the offer. `base` is the lane's
  * (`pineta.base`), null before the host read it, as the line; `onto` and
@@ -340,32 +417,38 @@ export function baseMoved(
  * destination (`takeDestinations`).
  */
 export function offerView(input: {
-  readonly offer: OfferRecord | undefined
+  readonly offer: OfferStatus
   readonly activity: Exclude<OfferActivity, "catch-up">
   readonly landing: LandingRecord | undefined
   readonly base: Pick<BaseRecord, "base" | "state"> | null
   readonly onto: string
   readonly wipAhead: number
-  /** `baseMoved`: the base has moved on, so catching up is offered beside it. */
-  readonly behind: boolean
+  /** What catching up would do (`catchUpOf`). */
+  readonly catchUp: CatchUpNow
+  /** Takes of this thread that name no source (`BaseRecord.untraced`). */
+  readonly untraced: boolean
   /** A card bringing the thread up to date is queued on its lane. */
   readonly catchingUp: boolean
 }): OfferView {
   const { offer, landing } = input
   const activity: OfferActivity =
     input.activity === "idle" && input.catchingUp ? "catch-up" : input.activity
-  const open = offer?.taken === null ? offer : undefined
+  const untaken =
+    offer.kind === "open" || offer.kind === "held" ? offer.record : undefined
+  const open = offer.kind === "open" ? offer.record : undefined
   const facts: OfferFacts = {
     activity,
     files: open?.files.length ?? 0,
     size: open?.size ?? 0,
     conflicts: open?.conflicts.length ?? 0,
     touchesYourEdits: (open?.yourEdits.length ?? 0) > 0,
-    bookmark: open?.bookmark ?? null,
-    taken: offer?.taken ?? null,
+    bookmark: untaken?.bookmark ?? null,
+    held: offer.kind === "held",
+    taken: offer.kind === "taken" ? offer.as : null,
     base: effectiveBase(input.base),
     onto: input.onto,
-    behind: input.behind,
+    catchUp: input.catchUp,
+    untraced: input.untraced,
   }
   const destinations =
     open === undefined
@@ -390,14 +473,20 @@ export function offerView(input: {
     const menu = gone
       ? listed.map(b => (b === "update" ? "continue" : b))
       : listed
-    // Behind its base, catching up stands beside the offer.
+    // When it brings work, or must come before any offer, catching up
+    // stands beside the offer; when it would change nothing, it is quiet.
+    const { kind } = input.catchUp
     const shown =
-      input.behind && menu.includes("update")
+      (kind === "brings" || input.untraced) && menu.includes("update")
         ? {
             buttons: [...buttons, "update" as const],
             menu: menu.filter(b => b !== "update"),
           }
         : { buttons, menu }
+    const quiet =
+      !input.untraced && (kind === "current" || kind === "nothing-new")
+        ? (["update"] as const).filter(b => shown.menu.includes(b))
+        : []
     return {
       state,
       buttons: takes(shown.buttons),
@@ -405,24 +494,24 @@ export function offerView(input: {
         ...shown.menu,
         ...(destinations.length > 1 ? (["take-line"] as const) : []),
       ],
+      quiet,
       destinations,
       facts,
     }
   }
   if (activity === "turn") return view("running", [], [])
   if (activity !== "idle") return view("busy", [], [])
-  if (offer === undefined) return view("nothing", [], ["update"])
-  if (offer.taken !== null) return view("taken", [], ["update"])
-  if (landing?.state === "needs_you" && landing.at > offer.at)
+  if (offer.kind === "none") return view("nothing", [], ["update"])
+  if (offer.kind === "taken") return view("taken", [], ["update"])
+  const { record } = offer
+  if (landing?.state === "needs_you" && landing.at > record.at)
     return view("needs_you", ["take"], ["update"])
-  if (offer.edited) return view("edited", ["take", "refresh"], ["update"])
-  // The lane's work is already where the offer sits, by a route the ledger
-  // does not record (a squash that dropped its trailers): nothing to take.
-  if (offer.files.length === 0) return view("nothing", [], ["update"])
-  if (offer.conflicts.length > 0)
+  if (offer.kind === "held") return view("nothing", [], ["update"])
+  if (record.edited) return view("edited", ["take", "refresh"], ["update"])
+  if (record.conflicts.length > 0)
     return view("conflicts", ["resolve", "take"], [])
-  if (offer.size > 1)
-    return offer.stale
+  if (record.size > 1)
+    return record.stale
       ? view("stale", ["split", "take"], ["update"])
       : view("stack", ["take", "squash"], ["update"])
   return view("ready", ["take", "split"], ["describe", "update"])
@@ -709,7 +798,7 @@ function recordedSpan(
 ): DiffSpan | null {
   if (asked.kind === "revision") {
     const commit = [...facts.offers.values()]
-      .flatMap(o => (o.taken === null ? o.commits : []))
+      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))
       .find(c => c === asked.commit)
     return commit === undefined ? null : { kind: "revision", commit }
   }

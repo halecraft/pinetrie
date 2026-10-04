@@ -1,5 +1,6 @@
 import {
   type AgentMessageLike,
+  type BaseRecord,
   commitId,
   type EntryId,
   entryId,
@@ -17,7 +18,7 @@ import {
   type TreeIndex,
   writerId,
 } from "@pineta/core"
-import { offerView } from "@pineta/marginalia"
+import { type CatchUpNow, offerStatus, offerView } from "@pineta/marginalia"
 import { describe, expect, test } from "vitest"
 import type { OfferActing } from "./acting.ts"
 import {
@@ -542,18 +543,23 @@ describe("offerWords", () => {
     o: OfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" = "idle",
     base: Parameters<typeof offerView>[0]["base"] = LINE_BASE,
-    catching: { behind?: boolean; catchingUp?: boolean } = {},
+    catching: {
+      catchUp?: CatchUpNow
+      untraced?: boolean
+      catchingUp?: boolean
+    } = {},
     acting: OfferActing | null = null,
   ) =>
     offerWords(
       offerView({
-        offer: o,
+        offer: offerStatus(o),
         activity,
         landing: undefined,
         base,
         onto: "pineta-onto",
         wipAhead: 2,
-        behind: catching.behind ?? false,
+        catchUp: catching.catchUp ?? { kind: "current" },
+        untraced: catching.untraced ?? false,
         catchingUp: catching.catchingUp ?? false,
       }),
       acting,
@@ -564,6 +570,12 @@ describe("offerWords", () => {
   } as const
   test.each([
     ["nothing", undefined, "idle", "nothing to add yet"],
+    [
+      "held: the project already has its work",
+      { ...offer, files: [] },
+      "idle",
+      "nothing to add: the project already has this thread's work",
+    ],
     ["running, nothing yet", undefined, "turn", "no files changed yet"],
     ["running", offer, "turn", "2 files so far"],
     [
@@ -628,8 +640,16 @@ describe("offerWords", () => {
       "catch up with the project",
     ])
   })
+  const MOVE = {
+    base: { kind: "line" },
+    bookmark: "pineta-onto",
+    from: commitId("a"),
+    to: commitId("b"),
+  } as const
   test("the jj facts are titles: which bookmark a take moves, and what catching up merges", () => {
-    const w = words(offer)
+    const w = words(offer, "idle", LINE_BASE, {
+      catchUp: { kind: "unknown", move: MOVE },
+    })
     expect(w.buttons[0]?.title).toBe(
       "moves pineta-onto forward to pineta-offer/amber-fox",
     )
@@ -640,18 +660,60 @@ describe("offerWords", () => {
       "moves wip/search forward to pineta-offer/amber-fox",
     )
   })
+  const brings = { catchUp: { kind: "brings", move: MOVE, files: 3 } } as const
   test("behind its base, the strip says so and offers catching up beside the offer", () => {
-    const behind = words(offer, "idle", LINE_BASE, { behind: true })
+    const behind = words(offer, "idle", LINE_BASE, brings)
     expect(behind.line).toBe("2 files ready · the project has new work")
-    expect(behind.buttons.map(b => b.label)).toContain(
-      "catch up with the project",
-    )
-    expect(words(undefined, "idle", LINE_BASE, { behind: true }).line).toBe(
+    expect(behind.buttons.find(b => b.button === "update")).toEqual({
+      button: "update",
+      label: "catch up with the project",
+      title: "merges pineta-onto into this thread's copy · changes 3 files",
+    })
+    expect(words(undefined, "idle", LINE_BASE, brings).line).toBe(
       "the project has new work since this thread started",
     )
-    expect(words(undefined, "idle", WIP_BASE, { behind: true }).line).toBe(
+    expect(words(undefined, "idle", WIP_BASE, brings).line).toBe(
       "wip/search has new work since this thread started",
     )
+  })
+  test("catching up that would change nothing is disabled, and says why; one not yet read is not (S97)", () => {
+    const update = (catchUp: CatchUpNow) =>
+      words(offer, "idle", LINE_BASE, { catchUp }).menu.find(
+        b => b.button === "update",
+      )
+    expect(update({ kind: "current" })).toEqual({
+      button: "update",
+      label: "catch up with the project",
+      title: "already caught up with the project",
+      disabled: true,
+    })
+    expect(update({ kind: "nothing-new", move: MOVE })).toEqual({
+      button: "update",
+      label: "catch up with the project",
+      title:
+        "the project's new work is this thread's own: catching up changes no file",
+      disabled: true,
+    })
+    expect(update({ kind: "unknown", move: MOVE })).toEqual({
+      button: "update",
+      label: "catch up with the project",
+      title: "merges pineta-onto into this thread's copy",
+    })
+    // Nothing new is no "new work" either.
+    expect(
+      words(offer, "idle", LINE_BASE, {
+        catchUp: { kind: "nothing-new", move: MOVE },
+      }).line,
+    ).toBe("2 files ready")
+  })
+  test("an untraced thread says why nothing is offered, and offers catching up (S97)", () => {
+    const w = words(undefined, "idle", LINE_BASE, { untraced: true })
+    expect(w.line).toBe(
+      "an earlier add of this thread can't be traced: catch up with the project to offer what's new",
+    )
+    expect(w.buttons.map(b => [b.label, b.disabled])).toEqual([
+      ["catch up with the project", undefined],
+    ])
   })
   test("a queued catch-up is the offer's activity: the strip says it is catching up", () => {
     expect(words(offer, "idle", LINE_BASE, { catchingUp: true }).line).toBe(
@@ -738,22 +800,34 @@ describe("behindMark: the header's mark for a base that moved on", () => {
     },
     commands: true,
   }
-  const base = {
+  const base: BaseRecord = {
     lane: laneNameForThread("1"),
     base: { kind: "line" as const },
     start: commitId("aaaaaaaaaaaa"),
     state: "ok" as const,
+    catchUp: {
+      tip: commitId("t"),
+      to: commitId("bbbbbbbbbbbb"),
+      files: ["a.txt", "b.txt"],
+    },
+    untraced: [],
   }
-  test("worded as the project, with the bookmark and both commits in its title", () => {
+  test("worded as the project, with the files catching up changes, the bookmark and both commits in its title", () => {
     expect(behindMark(base, line)).toEqual({
       mark: "↓",
       title:
-        "the project has new work since this thread started · pineta-onto: aaaaaaaa → bbbbbbbb",
+        "the project has new work since this thread started, in 2 files · pineta-onto: aaaaaaaa → bbbbbbbb",
     })
   })
-  test("none once caught up, or before the host read the base", () => {
+  test("none once caught up, before the host read the base, or when catching up would change nothing or is not yet read (S97)", () => {
     expect(behindMark({ ...base, start: line.commit }, line)).toBe(null)
     expect(behindMark(undefined, line)).toBe(null)
+    const read = base.catchUp
+    if (read === null) throw new Error("no read")
+    expect(behindMark({ ...base, catchUp: { ...read, files: [] } }, line)).toBe(
+      null,
+    )
+    expect(behindMark({ ...base, catchUp: null }, line)).toBe(null)
   })
 })
 

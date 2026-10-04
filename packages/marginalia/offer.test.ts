@@ -1,4 +1,6 @@
 import {
+  type BaseRecord,
+  type CommitId,
   commitId,
   type EntryId,
   entryId,
@@ -8,9 +10,11 @@ import {
   type OfferInRepo,
   type OfferRecord,
   type RevisionRecord,
+  type StartRead,
   type ThreadName,
   TRAILERS,
   trailerValues,
+  type WorkChanges,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
@@ -19,7 +23,8 @@ import {
   answerDiff,
   answerReview,
   BASE as BASE_RECORD,
-  baseMoved,
+  type CatchUpNow,
+  catchUpOf,
   decodeStack,
   decodeUpdate,
   describeRequest,
@@ -33,6 +38,7 @@ import {
   OFFER_WIRE,
   offerMoved,
   offerSeen,
+  offerStatus,
   offerView,
   parseOfferPath,
   planOfferRead,
@@ -83,20 +89,31 @@ test("offerSeen: what a take was shown is the record's ledger and whether it con
 })
 
 describe("offerView: ADR-0038's table", () => {
+  const MOVE = {
+    base: { kind: "line" },
+    bookmark: "pineta-onto",
+    from: commitId("l1"),
+    to: commitId("l2"),
+  } as const
   const view = (
     o: OfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" | "split" = "idle",
     landing?: LandingRecord,
-    catching: { behind?: boolean; catchingUp?: boolean } = {},
+    catching: {
+      catchUp?: CatchUpNow
+      untraced?: boolean
+      catchingUp?: boolean
+    } = {},
   ) =>
     offerView({
-      offer: o,
+      offer: offerStatus(o),
       activity,
       landing,
       base: null,
       onto: "pineta-onto",
       wipAhead: 0,
-      behind: catching.behind ?? false,
+      catchUp: catching.catchUp ?? { kind: "current" },
+      untraced: catching.untraced ?? false,
       catchingUp: catching.catchingUp ?? false,
     })
   const at = (v: ReturnType<typeof view>) => [v.state, v.buttons, v.menu]
@@ -159,10 +176,12 @@ describe("offerView: ADR-0038's table", () => {
       conflicts: 0,
       touchesYourEdits: false,
       bookmark: "pineta-offer/t-1",
+      held: false,
       taken: null,
       base: { kind: "line" },
       onto: "pineta-onto",
-      behind: false,
+      catchUp: { kind: "current" },
+      untraced: false,
     })
     expect(view(offer, "turn").facts.files).toBe(2)
     const none = view(undefined).facts
@@ -173,9 +192,28 @@ describe("offerView: ADR-0038's table", () => {
       null,
       "zz12345678",
     ])
+    // Held: its bookmark is a fact in jj, and nothing in it is to take.
+    const held = view({ ...offer, files: [] })
+    expect([held.facts.held, held.facts.bookmark, held.destinations]).toEqual([
+      true,
+      "pineta-offer/t-1",
+      [],
+    ])
+  })
+  test("offerStatus: one decoding of a record, which every reader shares (ADR-0067)", () => {
+    expect(offerStatus(undefined)).toEqual({ kind: "none" })
+    expect(offerStatus({ ...offer, taken: "zz" })).toEqual({
+      kind: "taken",
+      as: "zz",
+    })
+    expect(offerStatus({ ...offer, files: [] }).kind).toBe("held")
+    expect(offerStatus({ ...offer, files: [], edited: true }).kind).toBe("open")
+    expect(offerStatus(offer).kind).toBe("open")
   })
   test("behind its base, catching up stands beside the offer; with nothing to take, alone", () => {
-    const behind = { behind: true }
+    const behind = {
+      catchUp: { kind: "brings", move: MOVE, files: 2 },
+    } as const
     expect(at(view(offer, "idle", undefined, behind))).toEqual([
       "ready",
       ["take", "split", "update"],
@@ -186,12 +224,45 @@ describe("offerView: ADR-0038's table", () => {
       ["update"],
       [],
     ])
-    expect(view(undefined, "idle", undefined, behind).facts.behind).toBe(true)
+    expect(view(undefined, "idle", undefined, behind).facts.catchUp).toEqual(
+      behind.catchUp,
+    )
     // Running, nothing to catch up with is offered at all.
     expect(at(view(offer, "turn", undefined, behind))).toEqual([
       "running",
       [],
       [],
+    ])
+  })
+  test("catching up that would change nothing is listed, but quiet; one not yet read is not (S97)", () => {
+    const quiet = (catchUp: CatchUpNow) =>
+      view(offer, "idle", undefined, { catchUp }).quiet
+    expect(quiet({ kind: "current" })).toEqual(["update"])
+    expect(quiet({ kind: "nothing-new", move: MOVE })).toEqual(["update"])
+    expect(quiet({ kind: "unknown", move: MOVE })).toEqual([])
+    expect(quiet({ kind: "brings", move: MOVE, files: 1 })).toEqual([])
+    // A thread whose WIP is gone continues on the line: never quiet.
+    const gone = offerView({
+      offer: offerStatus(undefined),
+      activity: "idle",
+      landing: undefined,
+      base: { base: { kind: "wip", bookmark: "wip/a" }, state: "gone" },
+      onto: "pineta-onto",
+      wipAhead: 0,
+      catchUp: { kind: "current" },
+      untraced: false,
+      catchingUp: false,
+    })
+    expect([gone.menu, gone.quiet]).toEqual([["continue"], []])
+  })
+  test("an untraced thread offers nothing, and catching up beside it, never quiet (S97)", () => {
+    const untraced = view(undefined, "idle", undefined, { untraced: true })
+    expect([...at(untraced), untraced.quiet, untraced.facts.untraced]).toEqual([
+      "nothing",
+      ["update"],
+      [],
+      [],
+      true,
     ])
   })
   test("a card bringing the thread up to date, queued on an idle lane: the offer is busy with it", () => {
@@ -205,9 +276,9 @@ describe("offerView: ADR-0038's table", () => {
       view(offer, "turn", undefined, { catchingUp: true }).facts.activity,
     ).toBe("turn")
   })
-  test("baseMoved: from the commit a lane last took from its base to the base's now", () => {
-    const moved = (...args: Parameters<typeof baseMoved>) =>
-      baseMoved(...args) !== null
+  test("catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)", () => {
+    const moved = (...args: Parameters<typeof catchUpOf>) =>
+      catchUpOf(...args).kind !== "current"
     const L1 = commitId("l1")
     const L2 = commitId("l2")
     const W1 = commitId("w1")
@@ -229,17 +300,21 @@ describe("offerView: ADR-0038's table", () => {
       },
       commands: true,
     })
-    const onLine = {
+    const onLine: BaseRecord = {
       lane: LANE,
       base: { kind: "line" as const },
       start: L1,
       state: "ok" as const,
+      catchUp: null,
+      untraced: [],
     }
-    const onWip = {
+    const onWip: BaseRecord = {
       lane: LANE,
       base: { kind: "wip" as const, bookmark: "wip/a" },
       start: W1,
       state: "ok" as const,
+      catchUp: null,
+      untraced: [],
     }
     expect(moved(onLine, line(L1))).toBe(false)
     expect(moved(onLine, line(L2))).toBe(true)
@@ -254,18 +329,37 @@ describe("offerView: ADR-0038's table", () => {
     // Landed: on the line now, and caught up with it only once merged.
     expect(moved({ ...onWip, state: "landed" }, line(L2))).toBe(true)
     expect(moved({ ...onWip, state: "gone" }, line(L2))).toBe(false)
-    expect(baseMoved(onLine, line(L2))).toEqual({
+    const move = {
       base: { kind: "line" },
       bookmark: "pineta-onto",
       from: L1,
       to: L2,
-    })
+    }
+    expect(catchUpOf(onLine, line(L2))).toEqual({ kind: "unknown", move })
     expect(
-      baseMoved(
+      catchUpOf(
         onWip,
         line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }]),
       ),
-    ).toMatchObject({ bookmark: "wip/a", from: W1, to: "w2" })
+    ).toMatchObject({ move: { bookmark: "wip/a", from: W1, to: "w2" } })
+    // The host's read counts only at the commit the base is at now.
+    const read = (to: typeof L1, files: string[]): BaseRecord => ({
+      ...onLine,
+      catchUp: { tip: commitId("t"), to, files },
+    })
+    expect(catchUpOf(read(L2, []), line(L2))).toEqual({
+      kind: "nothing-new",
+      move,
+    })
+    expect(catchUpOf(read(L2, ["a", "b"]), line(L2))).toEqual({
+      kind: "brings",
+      move,
+      files: 2,
+    })
+    expect(catchUpOf(read(commitId("l0"), []), line(L2))).toEqual({
+      kind: "unknown",
+      move,
+    })
   })
   test("a resolution that asked you counts only when newer than the offer", () => {
     const asked: LandingRecord = {
@@ -301,19 +395,38 @@ describe("planRefresh", () => {
   const facts = (
     offer: OfferInRepo | null,
     tip = TIP,
-    start = [BASE],
-    empty = false,
-  ): RefreshFacts => ({ archived: false, tip, start, empty, offer })
+    start: readonly CommitId[] | StartRead = [BASE],
+    work: WorkChanges = "some",
+  ): RefreshFacts => ({
+    archived: false,
+    tip,
+    start: "kind" in start ? start : { kind: "known", start },
+    work,
+    offer,
+  })
   test("no offer in your repo (never built, taken, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten", () => {
     expect(planRefresh(facts(null))).toBe("build")
     expect(planRefresh(facts(null, TIP, [TIP]))).toBe("forget")
   })
   test("a lane whose work changes no file is never built, and its offer is withdrawn unless you edited it", () => {
-    expect(planRefresh(facts(null, TIP, [BASE], true))).toBe("forget")
-    expect(planRefresh(facts(read(), TIP, [BASE], true))).toBe("withdraw")
+    expect(planRefresh(facts(null, TIP, [BASE], "none"))).toBe("forget")
+    expect(planRefresh(facts(read(), TIP, [BASE], "none"))).toBe("withdraw")
     expect(
-      planRefresh(facts(read({ chained: false }), TIP, [BASE], true)),
+      planRefresh(facts(read({ chained: false }), TIP, [BASE], "none")),
     ).toBe("leave")
+  })
+  test("what jj could not tell never builds an offer, and keeps one that is there (ADR-0067)", () => {
+    expect(planRefresh(facts(null, TIP, [BASE], "unknown"))).toBe("forget")
+    expect(planRefresh(facts(read(), TIP, [BASE], "unknown"))).toBe("none")
+    expect(planRefresh(facts(read(), T2, [BASE], "unknown"))).toBe("follow")
+  })
+  test("an untraced start builds nothing, withdraws an offer, and leaves one you edited (S97)", () => {
+    const untraced: StartRead = { kind: "untraced", takes: [BASE] }
+    expect(planRefresh(facts(null, TIP, untraced))).toBe("forget")
+    expect(planRefresh(facts(read(), TIP, untraced))).toBe("withdraw")
+    expect(planRefresh(facts(read({ chained: false }), TIP, untraced))).toBe(
+      "leave",
+    )
   })
   test("an archived thread's offer is withdrawn, an edited one too; with none, its record is forgotten", () => {
     expect(planRefresh({ archived: true, offer: read() })).toBe("withdraw")
@@ -527,15 +640,25 @@ describe("records", () => {
     const l = setRecord(LINE, line)
     expect([l.namespace, l.key]).toEqual(["pineta.line", "line"])
     expect(LINE.decode(structuredClone(l.value), "line")).toEqual(line)
-    const base = {
+    const base: BaseRecord = {
       lane: LANE,
       base: { kind: "wip", bookmark: "wip/x" },
       start: COPY,
       state: "ok",
-    } as const
+      catchUp: { tip: TIP, to: COPY, files: ["a.txt"] },
+      untraced: [TIP],
+    }
     const b = setRecord(BASE_RECORD, base)
     expect([b.namespace, b.key]).toEqual(["pineta.base", LANE])
     expect(BASE_RECORD.decode(structuredClone(b.value), LANE)).toEqual(base)
+    // One stored before what catching up changes was read: dropped, so the
+    // page reads it as unknown until the host writes it again (ADR-0067).
+    const {
+      catchUp: _c,
+      untraced: _u,
+      ...before
+    } = b.value as Record<string, unknown>
+    expect(BASE_RECORD.decode(before, LANE)).toBeUndefined()
   })
   test("an offer stored before its commits were kept does not decode", () => {
     const { commits: _, ...before } = offer
@@ -579,6 +702,9 @@ describe("the review (ADR-0047)", () => {
     expect(status(offers, "ffff")).toBe(404)
     const taken = new Map([[LANE, { ...open, taken: "t" }]])
     expect(status(taken, C1)).toBe(404)
+    // One the line already holds brings nothing to review.
+    const held = new Map([[LANE, { ...open, files: [] }]])
+    expect(status(held, C1)).toBe(404)
     const path = (p: string) => {
       const read = planOfferRead(facts(offers), {
         kind: "diff",

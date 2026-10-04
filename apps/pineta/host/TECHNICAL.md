@@ -470,7 +470,11 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   one reads, plans `none`, and writes nothing, so it ends there. The record
   is only a hint of where to look: it is how an offer you abandoned by hand
   is built again. A bookmark of yours that no offer depends on moves
-  nothing.
+  nothing. Every named lane, not only those with an offer, so each lane's
+  `pineta.base` follows the line, and with it what catching up would
+  change. That is safe because an untraced start, or what jj cannot say,
+  builds nothing (ADR-0067): a thread taken before offers carried
+  `Pineta-Source` is not offered again (S97).
 - **Reads are pinned and never queued:** a page's review or diff
   (`Offers.read`), a description's gather, and lane work's reads of your
   repo run at the head the owner last observed (`owner.read`). A take
@@ -490,15 +494,20 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 - **The host decides an offer only from your repo** (ADR-0060), and the
   archive. A refresh gathers with `refreshNow`: for a thread whose root is
   archived, only its offer, read against the line; else `offerNow`'s facts
-  and whether the lane's work changes any file (`changesNoFile`). Archived
+  and whether the lane's work changes any file (`workChanges`). A place
+  whose start is untraced, or whose WIP is gone, is no `Placed`
+  (`placedOf`): nothing is built from it, and act, describe and a split's
+  span refuse it. Archived
   is read from the archive record, not from the lane's tip being missing:
   a tip missing for one import (S78) must not withdraw a live offer. One gather,
   `offerNow`, reads where it sits and starts (`placeOf`: its base from the
   lane's newest `Pineta-Base`, its target the line's commit or the WIP's,
   its start `startOfOffer`) and the offer itself (`readOffer`). Refresh,
   take, squash, describe and a split's replacement all plan from it.
-  **`placeOf` reads, and writes nothing:** the lane's `pineta.base` cache
-  is among the writes `planOfferEffects` and `planTake` plan
+  **`placeOf` reads, and writes nothing:** it reads the stored
+  `pineta.base` only as a memo of what catching up changes
+  (`knownCatchUp`, `readCatchUp`), never to decide; the lane's
+  `pineta.base` cache, with that and its untraced takes, is among the writes `planOfferEffects` and `planTake` plan
   (`baseWrites`, `setIfChanged`), so a gather can run pinned, outside the
   owner's queue. A WIP gone without landing writes only its base record.
   `OfferState` has no record reader: `write` compares with the stored

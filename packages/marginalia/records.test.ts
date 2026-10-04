@@ -151,7 +151,14 @@ const SAMPLES: readonly Sample[] = [
   sample(
     "base",
     BASE,
-    { lane: L, base: { kind: "line" }, start: C, state: "ok" },
+    {
+      lane: L,
+      base: { kind: "line" },
+      start: C,
+      state: "ok",
+      catchUp: { tip: C, to: C, files: ["a.txt"] },
+      untraced: [C],
+    },
     "lane",
   ),
   sample(

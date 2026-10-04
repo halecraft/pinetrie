@@ -1152,10 +1152,28 @@ export const mutations: readonly Mutation[] = [
     expect: "the lane's base record is written first when it changed",
   },
   {
+    name: "the base record leaves out the untraced takes",
+    file: "apps/pineta/host/offers/state.ts",
+    from: '      untraced: place.start.kind === "untraced" ? place.start.takes : [],\n',
+    to: "      untraced: [],\n",
+    command: unit,
+    expect:
+      "a take of the lane with no Pineta-Source builds nothing until the lane catches up past it; then only what is new (S97)",
+  },
+  {
+    name: "the base record leaves out what catching up changes",
+    file: "apps/pineta/host/offers/state.ts",
+    from: "      catchUp: place.catchUp,\n",
+    to: "      catchUp: null,\n",
+    command: unit,
+    expect:
+      "work you landed yourself leaves the offer held: kept, with no files, and settled (S89)",
+  },
+  {
     name: "placeOf writes as it reads",
     file: "apps/pineta/host/offers/state.ts",
-    from: "    const start = await startOfOffer(jj, { tip, base, line })\n",
-    to: "    const start = await startOfOffer(jj, { tip, base, line })\n    await writeValues([])\n",
+    from: "    const start = await startOfOffer(jj, { tip, base, line, lane })\n",
+    to: "    const start = await startOfOffer(jj, { tip, base, line, lane })\n    await writeValues([])\n",
     command: unit,
     expect:
       "placeOf reads where a lane's offer sits and starts, and writes nothing",

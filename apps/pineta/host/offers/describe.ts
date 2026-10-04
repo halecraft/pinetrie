@@ -15,7 +15,7 @@ import { readLaneTip } from "@pineta/schema"
 import { failed } from "../basics.ts"
 import { requestOutside } from "../outside.ts"
 import type { Refresh } from "./refresh.ts"
-import type { OfferState } from "./state.ts"
+import { type OfferState, placedOf } from "./state.ts"
 
 /** A commit message request's size: the skill, recent messages, the thread, the diff. */
 const DESCRIBE_BUDGET = 24_000
@@ -91,8 +91,9 @@ export function describe(
               // model wrote: the message describes what it held then.
               const now = await state.offerNow(ops, lane)
               if (now === null || now.name === undefined) return
-              const { offer, name, place } = now
-              if (!describeWanted(offer, name, force)) return
+              const { offer, name } = now
+              const place = placedOf(now.place)
+              if (place === null || !describeWanted(offer, name, force)) return
               const [revision] = offer.revisions
               if (revision === undefined || revision.commit !== gathered.commit)
                 return
@@ -111,14 +112,9 @@ export function describe(
                 ),
               )
               const after = await state.offerNow(ops, lane)
-              if (after !== null && after.name !== undefined)
-                await refresh.record(
-                  ops,
-                  lane,
-                  after.name,
-                  after.place,
-                  after.offer,
-                )
+              const at = after === null ? null : placedOf(after.place)
+              if (after !== null && after.name !== undefined && at !== null)
+                await refresh.record(ops, lane, after.name, at, after.offer)
             }),
         })
       })

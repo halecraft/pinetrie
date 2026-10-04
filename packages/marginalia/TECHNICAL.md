@@ -389,7 +389,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
 | how a resolution ended | `pineta.landing` | its own id | when its run ends |
 | a lane's offer in your repo | `pineta.offer` | the lane | when a trigger changed it, or it was taken |
 | the integration line: its commit, the WIP bookmarks above it, your `@-` against it, and whether this host takes `line` commands | `pineta.line` | `line` | when your repo's operation head moves |
-| a lane's base, as its newest `Pineta-Base` says it, and whether a WIP base landed or is gone | `pineta.base` | the lane | when a refresh reads the lane |
+| a lane's base, as its newest `Pineta-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced takes (S97) | `pineta.base` | the lane | when a refresh reads the lane |
 | a thread's name, `word-word` | `pineta.name` | the lane | once: when a column reserves the lane (ADR-0057), else at the host's start or before the lane's first run |
 | a thread's column banner: the image's hash (ADR-0050, ADR-0053) | `pineta.banner` | the lane | when a banner is made or set |
 | what the host found where it runs: `lanes`, or `direct` and why | `pineta.project` | `project` | at every start |
@@ -417,6 +417,10 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
     host rewrites it at start.
 - **`pineta.line` and `pineta.base` are caches** (ADR-0060): the repo is
   the ledger, and the host rewrites each from it. A lost one costs a read.
+  A `pineta.base` from before `catchUp` and `untraced` does not decode, and
+  is dropped (ADR-0067): the page reads catching up as unknown until the
+  host writes it again. `catchUp` names the lane tip and base commit it was
+  read at; the host keeps it while both stay, so it is read once per move.
 - **`forkPoint`** is where a new lane of its own starts: the nearest snapshot
   above it, else the base snapshot; and the nearest commit, else the
   thread's base (`planBegin`): the line's commit, or a WIP's copy on the line
@@ -468,17 +472,20 @@ repo. The decisions are here; the jj steps that carry them out, and where an
 offer starts (`offerStart`), are `@pineta/lanes`'s.
 
 - **`planRefresh`** decides what a trigger does, from the lane's tip, where an
-  offer would start, whether the lane's work changes any file (`empty`), and
+  offer would start (`StartRead`: known, or `untraced`), whether the lane's
+  work changes any file (`WorkChanges`: `none`, `some` or `unknown`), and
   the offer as your repo holds it (`OfferInRepo`); or, for a thread whose
   root is archived, the offer alone (ADR-0061): `build` (none: never built,
   taken, or gone), `follow` (the lane, or where the offer starts, moved under a single
   offer: updated in place, ADR-0039), `withdraw` (where it starts reached the
-  tip, the lane's work changes no file, or the thread is archived, edited or
-  not), `forget` (no offer and none to build: a record left from one
+  tip, the lane's work changes no file, its start is untraced, or the
+  thread is archived, edited or not), `forget` (no offer and none to build: a record left from one
   goes), `stale` (either moved under a stack), `refresh` (only
   the target moved), `leave` (you edited it), `repair` (a race left it
-  divergent), or `none`. An empty lane is never built: withdrawn after a
-  build, it would be built again on the next poll. Where it starts is compared as a set: a merge's
+  divergent), or `none`. Only work known to change a file, from a known
+  start, is built (ADR-0067): one built from less would be empty, or bring
+  back what you took, and withdrawn after a build it would be built again on
+  the next poll. `unknown` keeps an offer that is there, and builds none. Where it starts is compared as a set: a merge's
   parents come in any order. `follow` is not `update`, which is "update from
   my work" (`planUpdate`). An offer is edited (`offerEdited`) when its
   bottom's parent is not an ancestor of the target (S48 item 7), a commit of
@@ -489,17 +496,33 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   writes can hide your version. Moved (`offerMoved`) is its ledger against
   the lane's tip and start; an offer with no ledger reads as moved, and is
   followed once. The record's `stale` uses the same rule.
-- **`offerView`** is ADR-0038's state table as a decision: the offer's
-  state, its buttons, its menu, and the facts its words are made from
-  (`OfferFacts`: files, size, conflicts, bookmark, the base as
-  `effectiveBase` gives it, …). It writes no words: the line and the button
-  labels are the client's (`offerWords`, `@pineta/client`, ADR-0040). A
-  resolution that asked for you counts only when newer than the offer. An
-  open offer with no files is `nothing`: its work is already where it sits,
-  by a route the ledger does not record. Behind its base (`baseMoved`: the
-  bookmark, and the commits it moved from and to, or null), catching up
-  moves from the menu to the buttons; a card with the command queued makes
-  the offer busy (`catch-up`).
+- **`offerStatus`** decodes a `pineta.offer` record once (ADR-0067): `none`,
+  `taken`, `held` or `open`. Every reader on the page switches on it, never
+  on the record's fields: the strip, the header's ⇣ and the tab's Archive
+  item (`openOffers`, client), and the review read (`planOfferRead`). An
+  untaken record with no files that you did not edit is `held`: its work is
+  already where it sits, by a route the ledger does not record (S89), so
+  nothing counts it, warns about it, reviews it or takes it. One you edited
+  is `open` whatever its files.
+- **`catchUpOf`** says what catching up would do, from `pineta.base` and
+  the line's record: `current` (the base has not moved since the lane took
+  from it), `unknown` (it moved, and the host's `catchUp` was not read at
+  the commit it is at now), `nothing-new` (it moved by work the lane holds,
+  as after you took its own offer) or `brings`, with the file count. The
+  commit comparison it starts from (`baseMoved`) is private to it.
+- **`offerView`** is ADR-0038's state table as a decision, from an
+  `OfferStatus`: the offer's state, its buttons, its menu, which of those
+  are `quiet` (listed, but changing nothing now), and the facts its words
+  are made from (`OfferFacts`: files, size, conflicts, bookmark, held, the
+  base as `effectiveBase` gives it, the catch-up, untraced, …). It writes
+  no words: the line and the button labels are the client's (`offerWords`,
+  `@pineta/client`, ADR-0040). A resolution that asked for you counts only
+  when newer than the offer. A held offer is `nothing`, with no
+  destinations. When catching up `brings`, or the thread is untraced,
+  catching up moves from the menu to the buttons; when it is `current` or
+  `nothing-new` it stays in the menu, quiet; `unknown` leaves it there,
+  enabled. A card with the command queued makes the offer busy
+  (`catch-up`).
 - **`baseName`** (`work.ts`) is the one wording of a base: "the project"
   for the line, the bookmark for a WIP (ADR-0061). `updateLine` uses it
   through the update's stored `line` flag; an update stored before the flag

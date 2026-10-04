@@ -65,6 +65,8 @@ const BASE_RECORD: BaseRecord = {
   base: { kind: "line" },
   start: START,
   state: "ok",
+  catchUp: null,
+  untraced: [],
 }
 const UNCHANGED = { next: BASE_RECORD, stored: BASE_RECORD }
 const context = (read: OfferInRepo | null): RefreshContext => ({

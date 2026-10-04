@@ -10,11 +10,13 @@
 
 import type {
   BaseRecord,
+  CatchUpRead,
   CommitId,
   LaneBase,
   LaneName,
   OfferInRepo,
   OfferRecord,
+  StartRead,
   ThreadName,
   ValueWrite,
 } from "@pineta/core"
@@ -42,14 +44,15 @@ import {
   readRoots,
 } from "@pineta/reads"
 import {
-  changesNoFile,
   gatherLane,
   laneTipIn,
   type RepoOps,
   type RepoOwner,
+  readCatchUp,
   readOffer,
   startOfOffer,
   wipFacts,
+  workChanges,
 } from "@pineta/repo"
 import type { Basics } from "../basics.ts"
 import type { BaseNow } from "./plan.ts"
@@ -71,12 +74,26 @@ export interface OfferPlace {
    * a WIP gone without landing, where nothing moves.
    */
   readonly target: CommitId | null
-  /** Where it starts (`startOfOffer`). */
+  /** Where it starts (`startOfOffer`), or untraced, which nothing is built from. */
+  readonly start: StartRead
+  /** What catching up with its base would change (`readCatchUp`). */
+  readonly catchUp: CatchUpRead | null
+}
+
+/**
+ * A place where an offer can be built and sit: its base has a commit (not a
+ * WIP gone), and its start is known.
+ */
+export type Placed = Omit<OfferPlace, "target" | "start"> & {
+  readonly target: CommitId
   readonly start: readonly CommitId[]
 }
 
-/** A place where the offer can sit: its base has a commit (not a WIP gone). */
-export type Placed = OfferPlace & { readonly target: CommitId }
+/** `place` as a `Placed`, or null where nothing can be built: no target, or an untraced start. */
+export const placedOf = (place: OfferPlace): Placed | null =>
+  place.target === null || place.start.kind !== "known"
+    ? null
+    : { ...place, target: place.target, start: place.start.start }
 
 /**
  * What a refresh plans from: `planRefresh`'s facts, where they were read, and
@@ -87,7 +104,10 @@ export type RefreshNow =
   | {
       readonly kind: "plan"
       readonly name: ThreadName
-      /** Null for an archived thread, whose lane's history left your repo. */
+      /**
+       * Null for an archived thread, whose lane's history left your repo,
+       * and for an untraced start, from which nothing is built.
+       */
       readonly place: Placed | null
       /** Null for an archived thread. */
       readonly base: BaseNow | null
@@ -179,9 +199,22 @@ export function createOfferState(input: {
         : state === "gone"
           ? null
           : await commitOf(ops, line.onto)
-    const start = await startOfOffer(jj, { tip, base, line })
-    return { tip, base, state, target, start }
+    const start = await startOfOffer(jj, { tip, base, line, lane })
+    const catchUp =
+      target === null
+        ? null
+        : await readCatchUp(jj, {
+            start: base.start,
+            to: target,
+            tip,
+            known: knownCatchUp(lane),
+          })
+    return { tip, base, state, target, start, catchUp }
   }
+
+  /** What catching up would change, as the page's record last said: `readCatchUp` keeps it only at the same tip and base commit. */
+  const knownCatchUp = (lane: LaneName) =>
+    readBases(doc).get(lane)?.catchUp ?? null
 
   function baseOf(lane: LaneName, place: OfferPlace): BaseNow {
     const next: BaseRecord = {
@@ -189,6 +222,8 @@ export function createOfferState(input: {
       base: place.base.base,
       start: place.base.start,
       state: place.state,
+      catchUp: place.catchUp,
+      untraced: place.start.kind === "untraced" ? place.start.takes : [],
     }
     return { next, stored: readBases(doc).get(lane) }
   }
@@ -238,17 +273,30 @@ export function createOfferState(input: {
       }
       // A lane on the line: one read, and the shared facts (ADR-0065).
       const shared = await ops.shared()
-      const gathered = await gatherLane(ops.jj, { lane, name, line, shared })
+      const gathered = await gatherLane(ops.jj, {
+        lane,
+        name,
+        line,
+        shared,
+        known: knownCatchUp(lane),
+      })
       if (gathered === "none") return null
       if (gathered !== "wip") {
-        const { tip, base, target, start, offer, empty } = gathered
-        const placed: Placed = { tip, base, state: "ok", target, start }
+        const { tip, base, target, start, offer, work, catchUp } = gathered
+        const place: OfferPlace = {
+          tip,
+          base,
+          state: "ok",
+          target,
+          start,
+          catchUp,
+        }
         return {
           kind: "plan",
           name,
-          base: baseOf(lane, placed),
-          place: placed,
-          facts: { archived, tip, start, empty, offer },
+          base: baseOf(lane, place),
+          place: placedOf(place),
+          facts: { archived, tip, start, work, offer },
         }
       }
       // A lane on a WIP: the separate reads.
@@ -261,12 +309,15 @@ export function createOfferState(input: {
         kind: "plan",
         name,
         base,
-        place: { ...place, target },
+        place: placedOf(place),
         facts: {
           archived,
           tip,
           start,
-          empty: await changesNoFile(ops.jj, { start, tip }),
+          work:
+            start.kind === "known"
+              ? await workChanges(ops.jj, { start: start.start, tip })
+              : "unknown",
           offer: await readOffer(ops.jj, { name, target }),
         },
       }

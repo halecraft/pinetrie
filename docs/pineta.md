@@ -321,6 +321,17 @@ each move. A keep is one move. A new tab mints its `RootId` as it opens. A
 swap in your inventory is undone by the tab's own stack (S90). Histories are
 retired 7 days after their root is archived.
 
+**ADR-0067 — what the host cannot tell, it does not act on** (built). The
+page counted empty offers, and the host built them, or replayed work you
+took before offers carried `Pineta-Source` (S97). Now whether a lane's work
+changes a file is `none`, `some` or `unknown`, from the diff a build
+restores, and only a known change from a known start builds an offer. A take
+that names no source makes the lane's start untraced until it catches up.
+The page reads one `offerStatus` per offer, so one the line already holds
+(`held`) is never counted or warned about. `pineta.base` records what
+catching up would change, at the tip and base commit it was read at: catch
+up is disabled, with its reason, when it would change nothing.
+
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold

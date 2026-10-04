@@ -16,7 +16,9 @@ export function stackSpan(
 ): Promise<{ readonly start: CommitId[]; readonly tip: CommitId } | null> {
   return state.owner.command(async ops => {
     const place = await state.placeOf(ops, lane)
-    return place === null ? null : { start: [...place.start], tip: place.tip }
+    return place === null || place.start.kind !== "known"
+      ? null
+      : { start: [...place.start.start], tip: place.tip }
   })
 }
 

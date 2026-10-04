@@ -867,16 +867,16 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     const yours: Runner = args =>
       run("jj", ["-R", project, "--ignore-working-copy", ...args])
     const base = await laneBase(yours, tipCommit, DEFAULT_LINE)
-    const start =
-      base === null
-        ? ""
-        : (
-            await startOfOffer(yours, {
-              tip: tipCommit,
-              base,
-              line: DEFAULT_LINE,
-            })
-          ).join(" ")
+    const read =
+      base === null || lane2 === undefined
+        ? null
+        : await startOfOffer(yours, {
+            tip: tipCommit,
+            base,
+            line: DEFAULT_LINE,
+            lane: lane2,
+          })
+    const start = read?.kind === "known" ? read.start.join(" ") : ""
     script.use([
       {
         tool: "bash",

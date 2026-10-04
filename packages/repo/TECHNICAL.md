@@ -71,9 +71,10 @@ everything else reads at the head it last saw.**
 operation is read once and kept until the head moves.**
 
 - **`SharedFacts`**, per operation (`RepoOps.shared()`): the line's facts
-  (`lineFacts`, for the line's record), the commits on the line carrying
-  taken offers' `Pineta-Source` trailers with their sources, and the files
-  `@` changes (`editing`). The owner keeps one set, keyed by the head as it
+  (`lineFacts`, for the line's record), the takes on the line (`TAKES`: a
+  `Pineta-Source` or `Pineta-Thread` trailer), split into those naming
+  sources (`taken`) and those that name none for some lane (`untraced`,
+  `untracedLanes`, S97), and the files `@` changes (`editing`). The owner keeps one set, keyed by the head as it
   is at the moment of reading: the one file in the heads directory; any
   other (an outside write, two heads) is observed first. A write in the same
   step observes, so a read after it reads a fresh set.
@@ -83,28 +84,32 @@ operation is read once and kept until the head moves.**
 - **A lane on the line is read in one `jj log`** (`laneRead`): its tip, the
   newest commit carrying `Pineta-Base`, the newest line commit in its
   history, the offer's region (`::<bookmark> ~ ::<line>`), and the taken
-  commits not under its base; each row with its parents, its flags
-  (`contained_in` each revset: tip, bookmark, region, base, under the base,
-  taken), whether it is divergent or conflicted, its files (in the region)
-  and its description as JSON. `planLaneRead` (pure) says the base, the
-  start and the offer from them. "Under the base" stands for
+  commits and this lane's untraced takes not under its base; each row with
+  its parents, its flags (`contained_in` each revset: tip, bookmark, region,
+  base, under the base, taken, untraced), whether it is divergent or
+  conflicted, its files (in the region) and its description as JSON.
+  `planLaneRead` (pure) says the base, the start and the offer from them: an
+  untraced take above the base makes the start `untraced`. "Under the base" stands for
   `takenRevset`'s `~ ::present(<base source>)`: the base commit merged that
   source, and a taken commit is a line commit.
 - **What the rows cannot say is read only when needed:** the start, when a
   taken source above the base names more (`offerStart`); a stack's files,
   and the top's conflicted files when it conflicts. Each revision's evolog
-  (`sinceHost`), and whether the lane's work changes any file, are always
-  read. The second is asked of the lane's own range (`changesNoFile`),
-  never read from the offer's files: those are a diff against the target,
-  empty once the line holds the lane's work, which still changes files.
-  Read from them, such an offer was withdrawn and built again on every
-  observation, without end.
+  (`sinceHost`) is always read, and whether the lane's work changes any
+  file (`workChanges`) unless the start is untraced. The second is asked of
+  the lane's own work, never read from the offer's files: those are a diff
+  against the target, empty once the line holds the lane's work, which
+  still changes files. Read from them, such an offer was withdrawn and built
+  again on every observation, without end (S89).
+- **What catching up would change** (`readCatchUp`) is read only once the
+  base has moved from the lane's base start, and kept (`known`: the page's
+  `pineta.base`, as a memo) while the lane's tip and the base's commit stay.
 - **The budget:** an unchanged offer's refresh runs at most 3 jj processes
-  (`repo.test.ts` counts 3: the read, the evolog, and the range); S89
-  measured 18 before.
+  (`repo.test.ts` counts 3: the read, the evolog, and `workChanges`); S89
+  measured 18 before. A lane whose base moved runs two more, once per move.
 - **One rule decides both.** `repo.test.ts` holds `gatherLane` beside the
   separate reads (`laneTipIn`, `laneBase`, `startOfOffer`, `readOffer`,
-  `changesNoFile`) at every offer it builds, takes, follows, repairs and
+  `workChanges`, `readCatchUp`) at every offer it builds, takes, follows, repairs and
   stacks, and expects the same values. A lane on a WIP reads the separate
   way (`wipFacts`): its target and state need more of your repo.
 
@@ -171,7 +176,7 @@ operation is read once and kept until the head moves.**
   commit in the tip's history. The sources are the lane commits that taken
   offers' `Pineta-Source` trailers name, in `::<onto>` and in `::<wip>`
   for a lane on a WIP, minus `::present(<base source>)` (`takenRevset`,
-  read by `takenSources`), each `present()`: one never fetched here names
+  read by `takenFacts` with the lane's untraced takes), each `present()`: one never fetched here names
   nothing you have. A squash of two taken offers keeps both trailer
   paragraphs, and `trailerValues` reads every one; jj's `trailers` template
   reads only the last (S77 item 6).
@@ -201,11 +206,31 @@ operation is read once and kept until the head moves.**
   moves every head on your work, which the preview counts: `-r` would
   strip them of the commits under them. `yours.conflicts` counts your
   conflicted commits above the line, and lists `@`'s conflicted files.
-- **`changesNoFile`** says whether a lane's work since its start changes
-  no file: one `jj diff -r '(<start>)..<tip>' --name-only`, which diffs a
-  range from its roots' parents, merged for several, to its tip. jj refuses
-  a range with gaps; that reads as a change, so the offer is built.
-- **`startOfOffer` is the one path to a start.** The host's refresh, its
+- **`workChanges`** says whether a lane's work since its start changes any
+  file: `none`, `some` or `unknown` (ADR-0067). From one start, `jj diff
+  --from <start> --to <tip>`: the diff a build restores, so the two always
+  agree. From several, `jj diff -r '(<start>)..<tip>'`, which diffs a range
+  from its roots' parents, merged, to its tip. jj refuses a range with gaps,
+  as after a catch-up merged a take (S97): the merge is in the range and
+  one of its parents is not. A refusal, or no start, is `unknown`, which
+  never builds an offer.
+- **An untraced take** is one whose paragraph names a thread and a lane but
+  no source (`untracedLanes`, core): a take made before offers carried their
+  ledger. Above a lane's base, it makes the lane's start `untraced`
+  (`StartRead`), since no start can leave out what it brought: nothing is
+  offered until the lane catches up past it, which puts it under the base.
+  A turn's commit names no thread, so it is never one. Only the lane's own
+  takes are matched, by `Pineta-Lane`: an untraced take of a lane it forked
+  from is not found.
+- **`catchUpFiles`** says which files catching up would change in a lane:
+  those the base changed between the lane's base start and its commit now
+  (`jj diff --from <start> --to <to>`) that the lane's tip does not hold as
+  the base does (`jj diff --from <tip> --to <to>`). A three-way merge from
+  the start changes no other file. For a WIP, `to` is the WIP's commit: the
+  copy the update makes has its files. `repo.test.ts` holds it against
+  `mergeUpdate`'s files on the line and on a WIP, and against your own take
+  (none).
+- **`startOfOffer` is the one path to a start**, or to `untraced`. The host's refresh, its
   `squash` and `refresh` actions and `stackSpan` all use it: a start from
   another rule would read as a moved start to `planRefresh`, and a split
   would build on it. The exclusion above is inside it: sources read any
@@ -289,7 +314,13 @@ operation is read once and kept until the head moves.**
   start, each checked against a fresh build; an offer after you committed
   your edits differently, after a taken branch that holds the lane's tip,
   from a branch whose parent was taken after the fork (S72), and from a lane
-  after a branch of it was taken before its update (S51, S72); and a review
-  of an offer's commit (its description, a rename, names with a space and a
+  after a branch of it was taken before its update (S51, S72); an untraced
+  take, read either way until the lane catches up past it, and what catching
+  up changes against what the merge changed (S97); and a review of an
+  offer's commit (its description, a rename, names with a space and a
   quote, and one file's diff, never a directory's).
+- **`apps/pineta/host/offers/refresh.test.ts`** runs the host's own refresh
+  (`createRefresh`, a real owner) on the histories S97 found, until a round
+  writes nothing: it lives with the host, since this package may not import
+  `planRefresh` (`workspace.test.ts`).
 - Mutations are in `scripts/mutations/repo.ts`.

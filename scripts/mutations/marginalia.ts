@@ -8,8 +8,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "behind its base, catching up stays in the menu",
     file: "packages/marginalia/offer.ts",
-    from: '      input.behind && menu.includes("update")',
-    to: '      false && menu.includes("update")',
+    from: '      (kind === "brings" || input.untraced) && menu.includes("update")',
+    to: '      input.untraced && menu.includes("update")',
     command: unit,
     expect:
       "behind its base, catching up stands beside the offer; with nothing to take, alone",
@@ -30,7 +30,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return true\n",
     command: unit,
     expect:
-      "baseMoved: from the commit a lane last took from its base to the base's now",
+      "catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)",
   },
   {
     name: "a WIP thread is measured against the line",
@@ -39,7 +39,7 @@ export const mutations: readonly Mutation[] = [
     to: "    true\n      ? { bookmark: line.onto, commit: line.commit }",
     command: unit,
     expect:
-      "baseMoved: from the commit a lane last took from its base to the base's now",
+      "catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)",
   },
   {
     name: "the line is named by its bookmark",
@@ -62,16 +62,52 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an offer of no files can be taken",
     file: "packages/marginalia/offer.ts",
-    from: '  if (offer.files.length === 0) return view("nothing", [], ["update"])\n',
+    from: '  if (offer.kind === "held") return view("nothing", [], ["update"])\n',
     to: "",
     command: unit,
     expect: "every state, with its buttons",
   },
   {
+    name: "an offer of no files is open",
+    file: "packages/marginalia/offer.ts",
+    from: "  const held = record.files.length === 0 && !record.edited\n",
+    to: "  const held = false\n",
+    command: unit,
+    expect:
+      "offerStatus: one decoding of a record, which every reader shares (ADR-0067)",
+  },
+  {
+    name: "an untraced thread keeps catching up in the menu",
+    file: "packages/marginalia/offer.ts",
+    from: '      (kind === "brings" || input.untraced) && menu.includes("update")',
+    to: '      kind === "brings" && menu.includes("update")',
+    command: unit,
+    expect:
+      "an untraced thread offers nothing, and catching up beside it, never quiet (S97)",
+  },
+  {
+    name: "catching up into the lane's own work is not quiet",
+    file: "packages/marginalia/offer.ts",
+    from: '      !input.untraced && (kind === "current" || kind === "nothing-new")',
+    to: '      !input.untraced && kind === "current"',
+    command: unit,
+    expect:
+      "catching up that would change nothing is listed, but quiet; one not yet read is not (S97)",
+  },
+  {
+    name: "the host's read of catching up counts at any commit",
+    file: "packages/marginalia/offer.ts",
+    from: "  if (read === undefined || read === null || read.to !== move.to)",
+    to: "  if (read === undefined || read === null)",
+    command: unit,
+    expect:
+      "catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)",
+  },
+  {
     name: "a record left from a gone offer is kept",
     file: "packages/marginalia/offer.ts",
-    from: '  if (offer === null) return nothingNew ? "forget" : "build"',
-    to: '  if (offer === null) return nothingNew ? "none" : "build"',
+    from: '    return start === null || work !== "some" || reached ? "forget" : "build"',
+    to: '    return start === null || work !== "some" || reached ? "none" : "build"',
     command: unit,
     expect:
       "no offer in your repo (never built, taken, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten",
@@ -79,11 +115,29 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane whose work undoes itself is offered",
     file: "packages/marginalia/offer.ts",
-    from: "  const nothingNew = facts.empty || (start.length === 1 && start[0] === tip)",
-    to: "  const nothingNew = start.length === 1 && start[0] === tip",
+    from: '  if (start === null || work === "none") return "withdraw"',
+    to: '  if (start === null) return "withdraw"',
     command: unit,
     expect:
       "a lane whose work changes no file is never built, and its offer is withdrawn unless you edited it",
+  },
+  {
+    name: "what jj could not tell builds an offer",
+    file: "packages/marginalia/offer.ts",
+    from: '    return start === null || work !== "some" || reached',
+    to: '    return start === null || work === "none" || reached',
+    command: unit,
+    expect:
+      "what jj could not tell never builds an offer, and keeps one that is there (ADR-0067)",
+  },
+  {
+    name: "an untraced start reads as an empty one",
+    file: "packages/marginalia/offer.ts",
+    from: '  const start = facts.start.kind === "known" ? facts.start.start : null\n',
+    to: '  const start = facts.start.kind === "known" ? facts.start.start : []\n',
+    command: unit,
+    expect:
+      "an untraced start builds nothing, withdraws an offer, and leaves one you edited (S97)",
   },
   {
     name: "an archived thread's offer stays",
@@ -419,7 +473,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the bookmark is left out",
     file: "packages/marginalia/offer.ts",
-    from: "    bookmark: open?.bookmark ?? null,",
+    from: "    bookmark: untaken?.bookmark ?? null,",
     to: "    bookmark: null,",
     command: unit,
     expect: "the facts",
@@ -483,8 +537,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a taken offer's commit is read",
     file: "packages/marginalia/offer.ts",
-    from: "    .flatMap(o => (o.taken === null ? o.commits : []))",
-    to: "    .flatMap(o => o.commits)",
+    from: '      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))',
+    to: "      .flatMap(o => o.commits)",
+    command: unit,
+    expect: "planOfferRead: only a commit an open offer holds now",
+  },
+  {
+    name: "a held offer's commit is read",
+    file: "packages/marginalia/offer.ts",
+    from: '      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))',
+    to: "      .flatMap(o => (o.taken === null ? o.commits : []))",
     command: unit,
     expect: "planOfferRead: only a commit an open offer holds now",
   },

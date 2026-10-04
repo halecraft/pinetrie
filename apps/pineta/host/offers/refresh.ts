@@ -26,7 +26,7 @@ import {
 import { type RootDocHandle, readLaneTip } from "@pineta/schema"
 import { executeOffer } from "./execute.ts"
 import { baseWrites, offerRecord, planOfferEffects } from "./plan.ts"
-import type { OfferPlace, OfferState, Placed, Reader } from "./state.ts"
+import type { OfferState, Placed, Reader } from "./state.ts"
 
 /**
  * An offer's line until an agent describes it: the thread's name and its
@@ -65,7 +65,7 @@ export interface Refresh {
     ops: RepoOps,
     lane: LaneName,
     name: ThreadName,
-    place: OfferPlace,
+    place: Placed,
     offer: OfferInRepo | null,
   ): Promise<void>
   /** What a trigger does to one lane's offer: "built" when its content changed. */
@@ -86,7 +86,7 @@ export function createRefresh(state: OfferState): Refresh {
     ops: RepoOps,
     lane: LaneName,
     name: ThreadName,
-    place: OfferPlace,
+    place: Placed,
     offer: OfferInRepo | null,
   ): Promise<void> {
     if (offer === null || offer.kind === "divergent") return

@@ -80,7 +80,7 @@ describe("offers (ADR-0038)", () => {
     ).toBe("heads(::c1 & (c2 | ::(present(t1) | present(t2))))")
   })
   test("takenRevset: taken sources above the commit the base holds, never a WIP's copy (S81)", () => {
-    const taken = 'description(regex:"(?m)^Pineta-Source: ")'
+    const taken = 'description(regex:"(?m)^(Pineta-Source|Pineta-Thread): ")'
     expect(
       takenRevset({
         line: DEFAULT_LINE,
@@ -407,6 +407,7 @@ describe("planLaneRead: what one lane's rows say", () => {
     line: false,
     underBase: false,
     taken: false,
+    untraced: false,
     divergent: false,
     conflict: false,
     files: [],
@@ -472,6 +473,20 @@ describe("planLaneRead: what one lane's rows say", () => {
     expect(
       read([tip, based, under], [{ commit: "t2", sources: ["s2"] }]),
     ).toMatchObject({ start: { kind: "known", start: ["c0"] } })
+  })
+  test("a take of the lane that names no source, above the base, makes the start untraced; one under it does not (S97)", () => {
+    const above = row("u1", { untraced: true })
+    const under = row("u2", { untraced: true, underBase: true })
+    const taken = row("t1", { taken: true })
+    expect(
+      read(
+        [tip, based, above, under, taken],
+        [{ commit: "t1", sources: ["s1"] }],
+      ),
+    ).toMatchObject({ start: { kind: "untraced", takes: ["u1"] } })
+    expect(read([tip, based, under])).toMatchObject({
+      start: { kind: "known", start: ["c0"] },
+    })
   })
   test("a revision whose change id names two commits is divergent", () => {
     expect(read([tip, based, { ...offerRow, divergent: true }])).toMatchObject({

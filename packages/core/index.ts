@@ -723,6 +723,41 @@ export function offerLedger(message: string): OfferLedger | null {
 }
 
 /**
+ * The lanes a message's takes name with no source (S97): each paragraph
+ * carrying `Pineta-Thread` and `Pineta-Lane` but no `Pineta-Source`, as the
+ * takes made before offers carried their ledger did. What such a take brought
+ * cannot be placed in its lane's history. A turn's commit carries no
+ * `Pineta-Thread`, so it is never one.
+ */
+export function untracedLanes(message: string): LaneName[] {
+  return message
+    .split("\n\n")
+    .filter(
+      p =>
+        trailerValues(p, TRAILERS.thread).length > 0 &&
+        trailerValues(p, TRAILERS.source).length === 0,
+    )
+    .flatMap(p => trailerValues(p, TRAILERS.lane))
+    .filter(isLaneName)
+}
+
+/**
+ * Whether a lane's work since its start changes any file, as far as jj can
+ * tell (ADR-0067): `unknown` when it cannot, which never builds an offer.
+ */
+export type WorkChanges = "none" | "some" | "unknown"
+
+/**
+ * Where a lane's offer starts (ADR-0060), or `untraced`: a take of this
+ * lane above its base names no source (`untracedLanes`), so no start can
+ * leave out what it brought, and nothing is offered until the lane catches
+ * up past it (ADR-0067).
+ */
+export type StartRead =
+  | { readonly kind: "known"; readonly start: readonly CommitId[] }
+  | { readonly kind: "untraced"; readonly takes: readonly CommitId[] }
+
+/**
  * Where a thread's lane starts and is brought up to date from (ADR-0060):
  * the integration line, or a WIP bookmark you chose at its first message.
  */
@@ -909,6 +944,7 @@ export interface OfferRecord {
   readonly size: number
   /** The lane turned since the stack was made: it no longer holds all of it. */
   readonly stale: boolean
+  /** None when the line already holds its work (`offerStatus`'s `held`, S89). */
   readonly files: readonly string[]
   /** Files that conflict with your committed work (S48 item 3). */
   readonly conflicts: readonly string[]
@@ -1121,6 +1157,25 @@ export interface BaseRecord {
   readonly start: CommitId
   /** A WIP base: on the line now (landed), gone without landing, or neither. */
   readonly state: "ok" | "landed" | "gone"
+  /**
+   * What catching up would change, read at the lane's tip and the base's
+   * commit then (S97); null when the base had not moved, or jj could not
+   * say. A reader whose base has moved since reads it as unknown.
+   */
+  readonly catchUp: CatchUpRead | null
+  /**
+   * Takes of this thread on the line, above its base, that name no source
+   * (`untracedLanes`, S97): nothing is offered until it catches up past them.
+   */
+  readonly untraced: readonly CommitId[]
+}
+
+/** What catching up would change in a lane (`catchUpFiles`), and what it was read at. */
+export interface CatchUpRead {
+  readonly tip: CommitId
+  /** The base's commit: the line's, or the WIP's. */
+  readonly to: CommitId
+  readonly files: readonly string[]
 }
 
 // --- cards (ADR-0048) --------------------------------------------------------

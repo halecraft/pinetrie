@@ -15,6 +15,10 @@ your `@`.
 Amended in place (S81, `PLAN-2026-10-02-offer-start-after-catch-up`): a
 source taken at or below the commit the lane's base names is superseded by
 it, so an offer after a catch-up starts there alone.
+**Amended by ADR-0067:** a take above the lane's base that names no source
+makes its start untraced, and nothing is offered until it catches up past
+it; `pineta.base` records what catching up would change, and where it was
+read.
 
 **Context.**
 

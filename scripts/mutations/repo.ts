@@ -7,6 +7,13 @@ import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/repo"]
 const repoTest = ["pnpm", "exec", "vitest", "run", "packages/repo/repo.test.ts"]
+const offersRefresh = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "apps/pineta/host/offers/refresh.test.ts",
+]
 
 export const mutations: readonly Mutation[] = [
   {
@@ -40,8 +47,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's work always changes a file",
     file: "packages/repo/offer.ts",
-    from: "  return ran.ok && lines(ran.stdout).length === 0\n",
-    to: "  return false\n",
+    from: '  return lines(ran.stdout).length === 0 ? "none" : "some"\n',
+    to: '  return "some"\n',
     command: repoTest,
     expect:
       "a lane whose work undoes itself changes no file, over a range jj diffs as one",
@@ -136,8 +143,9 @@ export const mutations: readonly Mutation[] = [
     name: "a source taken below the base still starts the offer",
     file: "packages/repo/plan.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: " ~ ::present(${input.base.source})) & description",
-    to: ") & description",
+    from: " ~ ::present(${input.base.source})) & ${TAKES}",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: ") & ${TAKES}",
     command: unit,
     expect:
       "an offer after a catch-up starts at the line it merged, not at what you took below it",
@@ -146,9 +154,9 @@ export const mutations: readonly Mutation[] = [
     name: "a WIP lane holds its copy",
     file: "packages/repo/plan.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: " ~ ::present(${input.base.source})) & description",
+    from: " ~ ::present(${input.base.source})) & ${TAKES}",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: " ~ ::present(${input.base.start})) & description",
+    to: " ~ ::present(${input.base.start})) & ${TAKES}",
     command: unit,
     expect: "takenRevset: taken sources above the commit the base holds",
   },
@@ -163,8 +171,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "taken offers' sources are not read",
     file: "packages/repo/offer.ts",
-    from: "  return [...new Set(trailerValues(ran.stdout, TRAILERS.source))].map(commitId)",
-    to: "  return []",
+    from: "        takes.flatMap(t => trailerValues(t.description, TRAILERS.source)),\n",
+    to: "        [] as string[],\n",
     command: unit,
     expect: "an offer on the line (ADR-0060)",
   },
@@ -458,10 +466,73 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the offer's own files say whether the lane's work changes any",
     file: "packages/repo/lane-read.ts",
-    from: "  const empty = await changesNoFile(jj, { start, tip })\n",
-    to: '  const empty =\n    offer?.kind === "offer" ? offer.files.length === 0 : await changesNoFile(jj, { start, tip })\n',
+    from: '  const work =\n    start.kind === "known"\n',
+    to: '  const work =\n    offer?.kind === "offer"\n      ? offer.files.length === 0\n        ? "none"\n        : "some"\n      : start.kind === "known"\n',
     command: repoTest,
     expect: "an offer the line already holds is empty",
+  },
+  {
+    name: "one start's work is read over its range",
+    file: "packages/repo/offer.ts",
+    from: "    more.length === 0\n",
+    to: "    false\n",
+    command: offersRefresh,
+    expect:
+      "a catch-up that merged your take of the lane's work leaves nothing to offer: an empty offer built before is withdrawn (S97)",
+  },
+  {
+    name: "a range jj refuses reads as a change",
+    file: "packages/repo/offer.ts",
+    from: '  if (!ran.ok) return "unknown"\n',
+    to: '  if (!ran.ok) return "some"\n',
+    command: repoTest,
+    expect:
+      "a lane whose work undoes itself changes no file, over a range jj diffs as one",
+  },
+  {
+    name: "an untraced take is left out of the separate reads",
+    file: "packages/repo/offer.ts",
+    from: '  if (untraced.length > 0) return { kind: "untraced", takes: untraced }\n',
+    to: "",
+    command: repoTest,
+    expect:
+      "a take of the lane that names no source makes its start untraced, read either way, until it catches up past it (S97)",
+  },
+  {
+    name: "an untraced take is left out of the one read",
+    file: "packages/repo/lane-read.ts",
+    from: "    untraced.length > 0\n",
+    to: "    false\n",
+    command: unit,
+    expect:
+      "a take of the lane that names no source, above the base, makes the start untraced; one under it does not (S97)",
+  },
+  {
+    name: "catching up counts every file the base changed",
+    file: "packages/repo/offer.ts",
+    from: "  return lines(moved.stdout).filter(f => lacking.has(f))\n",
+    to: "  return lines(moved.stdout)\n",
+    command: repoTest,
+    expect:
+      "catching up with your own take of the lane's work changes no file, as catchUpFiles says (S97)",
+  },
+  {
+    name: "what catching up changes is read on every refresh",
+    file: "packages/repo/offer.ts",
+    from: "  if (known !== null && known.tip === tip && known.to === to) return known\n",
+    to: "",
+    command: repoTest,
+    expect:
+      "an unchanged offer's refresh reads at most 3 jj processes (ADR-0065), and what catching up changes is read once per move (S97)",
+  },
+  {
+    name: "what catching up changes is kept past a move",
+    file: "packages/repo/offer.ts",
+    from: "  if (known !== null && known.tip === tip && known.to === to) return known\n",
+    to: "  if (known !== null) return known\n",
+    command: repoTest,
+    expect:
+      "an unchanged offer's refresh reads at most 3 jj processes (ADR-0065), and what catching up changes is read once per move (S97)",
   },
   {
     name: "the shared facts are read for every step",

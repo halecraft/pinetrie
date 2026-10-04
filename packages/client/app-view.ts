@@ -19,7 +19,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
-import { displayName } from "@pineta/marginalia"
+import { displayName, offerStatus } from "@pineta/marginalia"
 import type { Column } from "./columns.ts"
 import type { Intent } from "./intent.ts"
 import type { ActiveTab } from "./layout.ts"
@@ -92,8 +92,9 @@ export const laneRootsOf = (
   )
 
 /**
- * An open offer, for the header: its lane, its root entry, and where it
- * opens: its lane's tip, or its root entry in a root this tab does not hold.
+ * An open offer (`offerStatus`), for the header and the tab's Archive item:
+ * its lane, its root entry, and where it opens: its lane's tip, or its root
+ * entry in a root this tab does not hold.
  */
 export interface OpenOffer {
   readonly lane: LaneName
@@ -140,14 +141,15 @@ function workspaceOf(input: AppViewInput): Workspace {
 }
 
 /**
- * The offers not taken, each in a root with an entry. A lane this tab holds
- * opens at its tip, and one with none yet is left out; any other lane opens
- * at its root entry (ADR-0063).
+ * The offers with work to add (`offerStatus`'s `open`; not one taken, nor
+ * one the line already holds), each in a root with an entry. A lane this
+ * tab holds opens at its tip, and one with none yet is left out; any other
+ * lane opens at its root entry (ADR-0063).
  */
 const openOffers = (input: AppViewInput): readonly OpenOffer[] =>
   [...input.offers.values()].flatMap(o => {
     const root = input.laneRoots.get(o.lane)
-    if (o.taken !== null || root === undefined) return []
+    if (offerStatus(o).kind !== "open" || root === undefined) return []
     const held = input.lanes.find(l => l.name === o.lane)
     if (held === undefined) return [{ lane: o.lane, root, end: root }]
     return held.tip === null ? [] : [{ lane: o.lane, root, end: held.tip }]

@@ -18,6 +18,10 @@ above the tip's newest copy.
 Amended in place (S73, `PLAN-2026-10-01-offer-lost-write`): an offer is
 edited only by a change an operation not the host's made; an edited offer
 that conflicts says so.
+**Amended by ADR-0067:** an offer is built only from work known to change a
+file, from a known start; what jj cannot say never builds one. The page
+reads one status per offer, and one the line already holds is `held`:
+nothing counts it or warns about it.
 Amended in place (`PLAN-2026-10-02-offer-from-repo`): "edited" is a change
 an operation not the host's made since the host's newest version in the
 evolog, and the host keeps no record of what it wrote.

@@ -85,7 +85,14 @@ test("a take writes the lane's base record, runs its steps, marks the offer take
   const planned = planTake({
     seen: { ledger: BEFORE.ledger, conflicted: false },
     base: {
-      next: { lane: LANE, base: { kind: "line" }, start: TIP, state: "ok" },
+      next: {
+        lane: LANE,
+        base: { kind: "line" },
+        start: TIP,
+        state: "ok",
+        catchUp: null,
+        untraced: [],
+      },
       stored: undefined,
     },
     offer: BEFORE,

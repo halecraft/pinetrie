@@ -4,6 +4,11 @@
 `PLAN-2026-10-03-repo-owner`. Amends ADR-0038 (an offer is refreshed on an
 observed move, not a poll), ADR-0060 (a take names the offer it was shown)
 and ADR-0034 (a lane's fetch is imported by the owner).
+**Amended by ADR-0067:** whether a lane's work changes any file is `none`,
+`some` or `unknown`, and an untraced start or an unknown answer builds no
+offer, so refreshing every named lane on a full observation wakes none from
+before `Pineta-Source`; a lane whose base moved runs two more jj processes,
+once per move.
 
 **Context.** A take ("add to the project") sometimes took 30–60 s, and the
 page showed nothing meanwhile. S89 measured it on a clone of Pineta's repo:

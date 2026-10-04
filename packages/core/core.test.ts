@@ -34,6 +34,7 @@ import {
   THE_AGENT,
   TRAILERS,
   trailerValues,
+  untracedLanes,
   writerId,
   writerOfPrincipal,
 } from "@pineta/core"
@@ -336,6 +337,25 @@ test("offerLedger reads the newest paragraph that names a source; none without o
   })
   expect(offerLedger("offer: yours, rewritten\n")).toBeNull()
   expect(offerLedger("offer: x\n\nPineta-Source: aaaa\n")).toBeNull()
+})
+
+test("untracedLanes: a take's paragraph naming a thread and a lane but no source; never a turn's, nor a traced take's (S97)", () => {
+  const lane = laneNameForThread("1")
+  const old = `feat: x\n\nPineta-Thread: amber-fox\nPineta-Lane: ${lane}\nPineta-Entry: e\n`
+  expect(untracedLanes(old)).toEqual([lane])
+  expect(
+    untracedLanes(
+      `${old}\nPineta-Thread: amber-fox\nPineta-Lane: ${lane}\nPineta-Source: aaaa\n`,
+    ),
+  ).toEqual([lane])
+  expect(
+    untracedLanes(
+      `feat: x\n\nPineta-Thread: amber-fox\nPineta-Lane: ${lane}\nPineta-Source: aaaa\n`,
+    ),
+  ).toEqual([])
+  expect(
+    untracedLanes(`turn\n\nPineta-Lane: ${lane}\nPineta-Entry: e\n`),
+  ).toEqual([])
 })
 
 describe("a card's place as flat fields (ADR-0059)", () => {

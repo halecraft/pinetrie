@@ -143,9 +143,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "catching up says nothing of what it merges",
     file: "packages/client/column-view.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "          title: `merges ${baseBookmark} into this thread's copy`,",
-    to: "",
+    from: '    case "unknown":\n      return merges\n',
+    to: '    case "unknown":\n      return ""\n',
     command: unit,
     expect:
       "the jj facts are titles: which bookmark a take moves, and what catching up merges",
@@ -153,8 +152,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an offer's line says nothing of its base moving on",
     file: "packages/client/column-view.ts",
-    from: '    facts.behind &&\n    state !== "nothing" &&',
-    to: '    false &&\n    state !== "nothing" &&',
+    from: '    brings && state !== "nothing" && state !== "busy" && state !== "running"',
+    to: '    false && state !== "nothing" && state !== "busy" && state !== "running"',
     command: unit,
     expect:
       "behind its base, the strip says so and offers catching up beside the offer",
@@ -162,11 +161,38 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the header never marks a thread behind",
     file: "packages/client/column-view.ts",
-    from: "  return moved === null\n    ? null\n",
-    to: "  return true\n    ? null\n",
+    from: '  if (now.kind !== "brings") return null\n',
+    to: "  return null\n",
     command: unit,
     expect:
-      "worded as the project, with the bookmark and both commits in its title",
+      "worded as the project, with the files catching up changes, the bookmark and both commits in its title",
+  },
+  {
+    name: "the header marks a thread behind by its own work",
+    file: "packages/client/column-view.ts",
+    from: '  if (now.kind !== "brings") return null\n',
+    to: '  if (now.kind === "current") return null\n',
+    command: unit,
+    expect:
+      "none once caught up, before the host read the base, or when catching up would change nothing or is not yet read (S97)",
+  },
+  {
+    name: "catching up that would change nothing is enabled",
+    file: "packages/client/column-view.ts",
+    from: "    view.quiet.includes(button)\n",
+    to: "    false\n",
+    command: unit,
+    expect:
+      "catching up that would change nothing is disabled, and says why; one not yet read is not (S97)",
+  },
+  {
+    name: "an untraced thread reads as having nothing yet",
+    file: "packages/client/column-view.ts",
+    from: "      ? facts.untraced\n",
+    to: "      ? false\n",
+    command: unit,
+    expect:
+      "an untraced thread says why nothing is offered, and offers catching up (S97)",
   },
   {
     name: "a command's button never says it sends the text",
@@ -1582,6 +1608,24 @@ export const mutations: readonly Mutation[] = [
     to: "  const clear: string[] = []",
     command: unit,
     expect: "switching tabs clears every column of the last tab",
+  },
+  {
+    name: "the header counts an offer the line already holds",
+    file: "packages/client/app-view.ts",
+    from: '    if (offerStatus(o).kind !== "open" || root === undefined) return []',
+    to: "    if (o.taken !== null || root === undefined) return []",
+    command: unit,
+    expect:
+      "the header's offers are the open ones, never one the line already holds",
+  },
+  {
+    name: "a held offer reviews nothing, but the strip offers it",
+    file: "packages/client/column-view.ts",
+    from: '      offer.kind !== "open"\n        ? null',
+    to: '      offer.kind === "none" || offer.kind === "taken"\n        ? null',
+    command: unit,
+    expect:
+      "an open offer with files can be reviewed, in every state; a taken or empty one cannot",
   },
   {
     name: "a new tab has no rail",
