@@ -85,7 +85,7 @@ export const unsentWords = (reason: string): string => `not sent: ${reason}`
 /**
  * Something of yours refused (ADR-0059): a move or an undo the host
  * refused, or an undone swap whose slots changed. Gone from the queue, the
- * host had taken the card first (S69), so it was sent as its queuer's
+ * host had popped the card first (S69), so it was sent as its queuer's
  * message; moved, someone else moved it first.
  */
 export function refusalWords(refusal: CardRefusal, reader: Reader): string {
@@ -96,10 +96,10 @@ export function refusalWords(refusal: CardRefusal, reader: Reader): string {
     case "gone":
       if (!refusal.fromQueue) return "not moved: it was sent or removed first"
       return by === null
-        ? "already sent: it was taken before you unqueued it"
+        ? "already sent: it was sent before you unqueued it"
         : by === reader.me
-          ? "already sent as your message: it was taken before you unqueued it"
-          : `already sent as ${displayName(by, reader.nameOf.get(by))}'s message: it was taken before you unqueued it`
+          ? "already sent as your message: it was sent before you unqueued it"
+          : `already sent as ${displayName(by, reader.nameOf.get(by))}'s message: it was sent before you unqueued it`
     case "moved":
       return by === null
         ? "not moved: someone moved it first"
@@ -123,16 +123,16 @@ export const cardStatus = (status: string, unsent: string | null): string =>
 
 /** The inventory panel's name, and its button in the header. */
 export const INVENTORY = "inventory"
-/** A card's button that takes it into your inventory; its drag handle too. */
-export const TAKE = "take"
-export const TAKE_TITLE =
+/** A card's button that takes it into your inventory; its drag handle too. The page says "take". */
+export const TAKE_INTO_INVENTORY = "take"
+export const TAKE_INTO_INVENTORY_TITLE =
   "take into your inventory (Ctrl+Shift+I) · drag to move"
 /** The composer's button that empties it for another card here. */
 export const NEW_CARD = "+ card"
 export const NEW_CARD_TITLE =
   "start another card here: this one stays, above the box"
 /** A message's button that takes a copy of it, or of your selection in it. */
-export const TAKE_COPY = "take a copy into your inventory"
+export const TAKE_COPY_INTO_INVENTORY = "take a copy into your inventory"
 /** The panel's button that puts the selected card in the column last focused. */
 export const PUT = "put"
 export const PUT_TITLE =
@@ -206,7 +206,7 @@ export const retiredWords = (line: string): string =>
 export const HISTORY = "history"
 export const HISTORY_TITLE = "where this card has been, and who moved it"
 
-/** A verb as it reads after "by": "queued by Bea", "taken by Carl". */
+/** A verb as it reads after "by": "queued by Bea", "taken by Carl" (into an inventory). */
 const PARTICIPLE: Readonly<Record<Verb, string>> = {
   created: "created",
   sent: "sent",
@@ -214,7 +214,7 @@ const PARTICIPLE: Readonly<Record<Verb, string>> = {
   unqueued: "unqueued",
   pinned: "pinned",
   unpinned: "unpinned",
-  took: "taken",
+  "took-into-inventory": "taken",
   put: "put",
   moved: "moved",
 }
@@ -252,7 +252,7 @@ const ACTIVE: Readonly<Record<Verb, string>> = {
   unqueued: "unqueued",
   pinned: "pinned",
   unpinned: "unpinned",
-  took: "took",
+  "took-into-inventory": "took",
   put: "put",
   moved: "moved",
 }

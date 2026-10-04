@@ -25,13 +25,13 @@ describe("threadNameFor", () => {
     expect(a).toMatch(/^[a-z]+-[a-z]+$/)
     expect(threadNameFor(B, new Set())).not.toBe(a)
   })
-  test("a taken name moves to the next free pair", () => {
+  test("a name in use moves to the next free pair", () => {
     const first = threadNameFor(A, new Set())
     const second = threadNameFor(A, new Set([first]))
     expect(second).not.toBe(first)
     expect(threadNameFor(A, new Set([second]))).toBe(first)
   })
-  test("every pair of the first choice's adjective taken: another adjective", () => {
+  test("every pair of the first choice's adjective in use: another adjective", () => {
     const first = threadNameFor(A, new Set())
     const adjective = first.split("-")[0]
     const all = new Set(NOUNS.map(n => `${adjective}-${n}`))

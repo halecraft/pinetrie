@@ -303,7 +303,7 @@ test.each([
   [DRAFTING, PINNED, "pinned"],
   [PINNED, DRAFTING, "unpinned"],
   [QUEUED, ELSEWHERE, "moved"],
-  [DRAFTING, BEAS, "took"],
+  [DRAFTING, BEAS, "took-into-inventory"],
   [BEAS, ELSEWHERE, "put"],
   [DRAFTING, ELSEWHERE, "moved"],
 ] as const)("verbOf(%o, %o): %s", (from, to, verb) => {

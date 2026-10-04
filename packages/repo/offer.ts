@@ -35,21 +35,21 @@ import {
   commitsOf,
   conflictedFilesAt,
   describeFailure,
+  INTEGRATED_OFFER_COMMIT_ROW,
   type LineConfig,
   laneTipName,
   lines,
   offerBookmark,
-  parseTakes,
+  parseIntegratedOfferCommits,
   REVISION_READ,
   type Runner,
-  TAKE_ROW,
 } from "@pineta/lanes"
 import {
   EVOLOG_ENTRY,
   type EvologEntry,
+  integratedOfferCommitsRevset,
   offerStart,
   parseEvolog,
-  takenRevset,
   walkToHost,
 } from "./plan.ts"
 
@@ -90,12 +90,13 @@ export async function laneTipIn(
 }
 
 /**
- * What `takenRevset`'s takes say for `lane`: the lane commits they name in
- * `Pineta-Source` trailers, what you have of lanes that the lane's base does
- * not already hold, read from every paragraph of each message (S77 item 6);
- * and the takes of `lane` that name none (`untracedLanes`, S97).
+ * What the integrated-offer commits `integratedOfferCommitsRevset` finds say
+ * for `lane`: the lane commits they name in `Pineta-Source` trailers, what
+ * you have of lanes that the lane's base does not already hold, read from
+ * every paragraph of each message (S77 item 6); and the integrated-offer
+ * commits of `lane` that name none (`untracedLanes`, S97).
  */
-async function takenFacts(
+async function integratedOfferCommitFacts(
   jj: Runner,
   input: {
     readonly line: LineConfig
@@ -108,24 +109,25 @@ async function takenFacts(
     "--ignore-working-copy",
     "--no-graph",
     "-r",
-    takenRevset(input),
+    integratedOfferCommitsRevset(input),
     "-T",
-    TAKE_ROW,
+    INTEGRATED_OFFER_COMMIT_ROW,
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  const takes = parseTakes(ran.stdout)
+  const integrated = parseIntegratedOfferCommits(ran.stdout)
   return {
-    sources: [...new Set(takes.flatMap(t => sourcesOf(t.description)))],
-    untraced: takes
+    sources: [...new Set(integrated.flatMap(t => sourcesOf(t.description)))],
+    untraced: integrated
       .filter(t => untracedLanes(t.description).includes(input.lane))
       .map(t => t.commit),
   }
 }
 
 /**
- * Where an offer starts: the lane's base and the taken offers' sources above
- * what the base holds (read), then `offerStart`'s revset (read); or
- * `untraced`, when a take of the lane above its base names no source. The
+ * Where an offer starts: the lane's base and the integrated offers' sources
+ * above what the base holds (read), then `offerStart`'s revset (read); or
+ * `untraced`, when an integrated-offer commit of the lane above its base
+ * names no source. The
  * host's every start comes from here, so an offer is built, followed and
  * split from one start.
  */
@@ -138,8 +140,9 @@ export async function startOfOffer(
     readonly lane: LaneName
   },
 ): Promise<StartRead> {
-  const { sources, untraced } = await takenFacts(jj, input)
-  if (untraced.length > 0) return { kind: "untraced", takes: untraced }
+  const { sources, untraced } = await integratedOfferCommitFacts(jj, input)
+  if (untraced.length > 0)
+    return { kind: "untraced", integratedOfferCommits: untraced }
   return {
     kind: "known",
     start: await commitsOf(
@@ -153,8 +156,9 @@ export async function startOfOffer(
  * Whether a lane's work since `start` changes any file. From one start, the
  * diff from it to the tip: what a build restores, so the two agree. From
  * several, one diff over `start..tip`, from its roots' parents, merged, to
- * the tip. jj refuses a range with gaps, as after a catch-up merged a take
- * (S97): that, no start, or an untraced one is `unknown`.
+ * the tip. jj refuses a range with gaps, as after a catch-up merged an
+ * integrated-offer commit (S97): that, no start, or an untraced one is
+ * `unknown`.
  */
 export async function workChanges(
   jj: Runner,
@@ -176,9 +180,10 @@ export async function workChanges(
 /**
  * The files catching up with a base would change in the lane, or null when
  * jj cannot say: those the base changed between `start` (where the lane last
- * took from it) and `to` (where it is now) that the lane's `tip` does not
- * already hold as `to` does. A three-way merge from `start` changes no other
- * file, so none at all when the base's new work is the lane's own, taken.
+ * caught up with it) and `to` (where it is now) that the lane's `tip` does
+ * not already hold as `to` does. A three-way merge from `start` changes no
+ * other file, so none at all when the base's new work is the lane's own,
+ * integrated.
  */
 export async function catchUpFiles(
   jj: Runner,
@@ -288,7 +293,7 @@ export async function sinceHost(
 /**
  * An offer's revisions in your repo, bottom first, each with its change id:
  * what is under its bookmark and not already under its target, and carries
- * its thread's trailer. A taken offer below carries a ledger too, but is
+ * its thread's trailer. An integrated offer below carries a ledger too, but is
  * under the target; your commits carry no thread trailer. The bookmark's own
  * commit is always the top, so an offer built before the trailer was
  * written there is still found. Empty with no bookmark.
@@ -339,7 +344,7 @@ export async function startConflictsOf(
  * An offer as your repo holds it now (`OfferInRepo`): its revisions and
  * what each one's evolog says since the host's newest version, its ledger
  * and first line, where it sits, its files and conflicts. Null when its
- * bookmark is gone (you abandoned it, or took it by hand). Divergent when
+ * bookmark is gone (you abandoned it, or integrated it by hand). Divergent when
  * the bookmark is conflicted or a change id names two commits (S48 item 8):
  * then only its change ids. Every read after the first names commits, so no
  * read acts on a hidden one (S48 item 2).

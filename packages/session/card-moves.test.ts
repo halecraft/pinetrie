@@ -116,7 +116,7 @@ describe("the tab's moves (ADR-0059)", () => {
     expect(s.pending).toEqual([])
   })
 
-  test("overtaken: accepted, then the take removes the card before the copy catches up; nothing stays drawn", () => {
+  test("overtaken: accepted, then the queued card's pop removes it before the copy catches up; nothing stays drawn", () => {
     const s = run([sent(queueIt), accepted("m-1", 4)])
     // The copy goes from drafting straight to gone, at rev 5.
     const after = movesStep(s, changed(5))
@@ -196,7 +196,7 @@ describe("answerOf", () => {
       })
   })
 
-  test("an unqueue the take beat: gone, naming who queued it", () => {
+  test("an unqueue the pop beat: gone, naming who queued it", () => {
     expect(
       answerOf({ kind: "unmoved", code: "gone", place: null, by: null }, 3, {
         ...context,
@@ -298,8 +298,8 @@ describe("acted with no host to ask", () => {
 })
 
 describe("intentsOf", () => {
-  test("each take in flight's slot, a creation's too, until its copy holds it", () => {
-    const take: Pending = {
+  test("each take into the inventory in flight's slot, a creation's too, until its copy holds it", () => {
+    const intoInventory: Pending = {
       ...sentAs,
       id: "m-1",
       kind: "move",
@@ -313,7 +313,11 @@ describe("intentsOf", () => {
       draft: card({ id: cardId("c-2") }),
       slot: 7,
     }
-    const s = run([sent(take), sent(create), sent({ ...queueIt, id: "m-9" })])
+    const s = run([
+      sent(intoInventory),
+      sent(create),
+      sent({ ...queueIt, id: "m-9" }),
+    ])
     expect(intentsOf(s)).toEqual(
       new Map([
         [C1, 3],
@@ -328,18 +332,20 @@ describe("intentsOf", () => {
 
 describe("a move's decisions, before and after it is sent", () => {
   const inventory = { kind: "inventory", holder: ME } as const
-  const take = pendingOf(
+  const intoInventory = pendingOf(
     "m-1",
     { card: C1, from: drafting, to: inventory },
     { actedAt: { kind: "inventory" }, slot: 4 },
     null,
   )
 
-  test("an accepted take writes its slot; refused, or with no slot, nothing", () => {
+  test("an accepted take into the inventory writes its slot; refused, or with no slot, nothing", () => {
     const yes = { kind: "accepted", rev: 2 } as const
-    expect(slotOnAccept(take, yes)).toEqual({ card: C1, slot: 4 })
-    expect(slotOnAccept(take, { kind: "refused", refusal: null })).toBeNull()
-    expect(slotOnAccept({ ...take, slot: null }, yes)).toBeNull()
+    expect(slotOnAccept(intoInventory, yes)).toEqual({ card: C1, slot: 4 })
+    expect(
+      slotOnAccept(intoInventory, { kind: "refused", refusal: null }),
+    ).toBeNull()
+    expect(slotOnAccept({ ...intoInventory, slot: null }, yes)).toBeNull()
     expect(slotOnAccept(queueIt, yes)).toBeNull()
   })
 

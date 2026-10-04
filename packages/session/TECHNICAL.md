@@ -49,7 +49,7 @@ it.
 | `rootDocs` (`root-docs.ts`) | the roots held, the `pineta.roots` policy | `planHold` (`root-hold.ts`) |
 | `cardTexts` (`card-texts.ts`) | each card's text, and the copies to destroy | `hostLetGo`, `spentCards` (`card-copies.ts`) |
 | one `snapshotStore<LocalState>` | the host's records, this tab's moves, the cards drawn | `localStep` (`card-moves.ts`) |
-| `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `takeWrites`, `swapWrites` (`inventory.ts`) |
+| `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `takeIntoInventoryWrites`, `swapWrites` (`inventory.ts`) |
 | `attentionStore` (`attention-doc.ts`) | what you have dealt with, the read marks' alarm | `readStep` (`read-marks.ts`) |
 | `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
 | `hostLine` (`host-line.ts`) | the requests waiting for their replies | `encodeIntent`, `decodeReply` |
@@ -130,7 +130,7 @@ session or someone else's inventory throws before it is made.
   over the host's records, so a move shows at once. An accepted move stays
   drawn until the copy's `rev` reaches the one its reply carried: the reply
   and the change to the places reach the tab separately, in either order,
-  and a move can be overtaken (taken, moved back) before the copy catches
+  and a move can be overtaken (popped, moved back) before the copy catches
   up. Dropped at the reply, the card would jump back and a new card would
   leave its editor; dropped when the card looks moved, an overtaken move
   would be drawn for good. With nothing drawn, `withPending` returns the
@@ -179,15 +179,15 @@ session or someone else's inventory throws before it is made.
   `steadiness`, then `planSlots`).
 - **`settleSlots` is the one slot rule**: the page's panel draws it
   (`inventoryView`, `@pineta/client`), the repair writes towards it, and a
-  take lands by the same `firstEmpty`: the selected slot if empty, else the
+  take into the inventory lands by the same `firstEmpty`: the selected slot if empty, else the
   first empty.
 - **The repair waits for a card to be steady** (`steadiness`, S79): it
   places a card, or clears its slot, only once the card has been held, or
   not, for `STEADY_MS`, and looks again then. It reads the host's records,
   not the drawn ones, so a put in flight keeps its slot until accepted.
   It writes nothing when nothing differs.
-- **A take's slot is written at the answer** (`slotOnAccept`, then
-  `takeWrites`), before the answer is recorded: if the places reached the
+- **The slot a take into the inventory chose is written at the answer** (`slotOnAccept`, then
+  `takeIntoInventoryWrites`), before the answer is recorded: if the places reached the
   tab first, the answer drops the pending move at once, and a repair in
   between would place the card in the first empty slot. Until then the
   pending move's `slot` is an intent: drawn there, and left alone by the
@@ -231,7 +231,7 @@ the two merge (S101), so a writer asks `ready()` first.
 command `sent` in the `acting` store at once and records the answer when it
 comes; `nextActing` decides. A refusal or failure stays until your next
 command on that lane (or the line); an answer that carried it out clears
-it, since the record then says how things stand. A take names the offer
+it, since the record then says how things stand. An offer integration names the offer
 this tab's record shows as it sends (`offerSeen`, ADR-0065).
 
 ## Presence (`presence-seat.ts`, ADR-0024)

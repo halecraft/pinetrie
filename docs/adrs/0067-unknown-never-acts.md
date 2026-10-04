@@ -7,6 +7,8 @@ status per offer), ADR-0060 (a take that names no source makes its lane's
 start untraced; `pineta.base` records what catching up would change) and
 ADR-0065 (every named lane is still refreshed on a full observation, which
 this makes safe).
+Amended by ADR-0083: a take above the base is an *integrated-offer
+commit*.
 
 **Context.** On Pineta's own repo the page contradicted itself: vernal-pine's
 strip said "nothing to add yet" while its tab warned that archiving drops

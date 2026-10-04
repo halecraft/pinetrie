@@ -43,13 +43,13 @@ export function createLine(deps: {
   /** The integration line's names (ADR-0060). */
   readonly line: LineConfig
   /**
-   * Whether this host takes the owner's `line` commands: it admits no one
+   * Whether this host accepts the owner's `line` commands: it admits no one
    * else. Publishing is anyone's (ADR-0076).
    */
   readonly lineCommands: boolean
   readonly writeValues: (writes: readonly ValueWrite[]) => Promise<void>
   /** After the line moved (set up, or your work added): the base snapshot follows it. */
-  readonly taken: () => void
+  readonly lineMoved: () => void
 }): Line {
   const { owner, line } = deps
   const { session: doc } = deps.basics
@@ -82,7 +82,8 @@ export function createLine(deps: {
         await ops.execute(lineSteps(planned))
         await record(ops)
         // Updating your files and publishing leave the line where it was.
-        if (planned.kind === "setup" || planned.kind === "land") deps.taken()
+        if (planned.kind === "setup" || planned.kind === "land")
+          deps.lineMoved()
         return null
       }),
   }

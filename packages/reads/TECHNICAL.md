@@ -96,7 +96,7 @@ Kyneta has let go.
 - **`readLanes` reads two documents**: the session, and every card's record
   (`readPlaces` of the places document), passed in. A lane's `waiting` is its
   queued cards (`queuedOn`), so a lane with cards queued is busy (`isBusy`)
-  even between two takes. The client reads lanes with its cards, in `App`;
+  even between two pops. The client reads lanes with its cards, in `App`;
   a read that needs only runs and tips uses `readRunning` and
   `readLaneNames`, as `readAgentActivity` does.
 - **`readLanes`' `askedBy`** is the writer of the message a running lane is

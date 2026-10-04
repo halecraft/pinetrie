@@ -3,7 +3,7 @@
 //
 // Each decision is a value typed in `@pineta/core` (`core/offers.ts`) that
 // carries the facts its steps need: what a trigger does (`planRefresh`), a
-// take (`planOfferTake`), a split's stack or a squash rebuilt
+// offer integration (`planOfferIntegration`), a split's stack or a squash rebuilt
 // (`planStackEnded`, `planRebuild`), and a commit message (`planDescribeAsk`,
 // `planDescribeSettle`). `@pineta/repo` turns each into jj steps
 // (`offerEffects`), and the host only connects the two. What a record says
@@ -23,6 +23,8 @@ import {
   type LaneName,
   type OfferGather,
   type OfferInRepo,
+  type OfferIntegrationDecision,
+  type OfferIntegrationFacts,
   type OfferLedger,
   type OfferNow,
   type OfferRecord,
@@ -33,8 +35,6 @@ import {
   type RefreshFacts,
   type RevisionFacts,
   type StackFacts,
-  type TakeDecision,
-  type TakeFacts,
   type ThreadBase,
   type ThreadName,
 } from "@pineta/core"
@@ -53,7 +53,16 @@ const OfferRecordSchema = Type.Object({
   described: Type.Boolean(),
   edited: Type.Boolean(),
   bookmark: Type.String({ minLength: 1 }),
-  taken: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  // Optional only while records written before ADR-0083 hold `taken`
+  // instead; a record holds one of the two.
+  integratedAs: Type.Optional(
+    Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  ),
+  // Before ADR-0083: what `integratedAs` was called. Read, never written.
+  // Delete once every host has rewritten its offer records.
+  taken: Type.Optional(
+    Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  ),
   commits: Type.Array(CommitSchema),
   // Absent from a record written before it (ADR-0065): read as null.
   ledger: Type.Optional(
@@ -99,7 +108,9 @@ export const OFFER: RecordSpec<OfferRecord, LaneName, "session"> = {
       described: r.described,
       edited: r.edited,
       bookmark: r.bookmark,
-      taken: r.taken,
+      // A record written since ADR-0083 says `integratedAs`, null or not.
+      integratedAs:
+        r.integratedAs !== undefined ? r.integratedAs : (r.taken ?? null),
       commits: r.commits.map(commitId),
       ledger:
         r.ledger === undefined || r.ledger === null
@@ -156,7 +167,7 @@ const sameStart = (a: readonly CommitId[], b: readonly CommitId[]): boolean =>
  * immutable, so editing one is an expert's own act. An offer is built only
  * when the lane's work is known to change a file from a known start
  * (ADR-0067): one built from less would be empty, or bring back what you
- * took, and withdrawing it would repeat on every poll, since each step moves
+ * integrated, and withdrawing it would repeat on every poll, since each step moves
  * your repo's operation head. An unknown answer keeps what is there. An
  * untraced start withdraws an offer the host made, and touches nothing else.
  */
@@ -207,13 +218,13 @@ function acceptStack(input: {
   return { ok: true }
 }
 
-// ── where a take goes, and what a record says ────────────────────────────
+// ── where an offer integration goes, and what a record says ──────────────
 
 /**
- * Where a take may move a bookmark to the offer (ADR-0060): a forward move,
+ * Where an offer integration may move a bookmark to the offer (ADR-0060): a forward move,
  * never a rebase, so every destination gives the same tree.
  */
-export interface TakeDestination {
+export interface OfferIntegrationDestination {
   readonly bookmark: string
   readonly kind: "line" | "wip"
   /** Commits of yours that land with the offer: the WIP's, onto the line. */
@@ -223,21 +234,21 @@ export interface TakeDestination {
 }
 
 /**
- * The bookmarks a take may move to the offer, the default first (ADR-0060):
+ * The bookmarks an offer integration may move to the offer, the default first (ADR-0060):
  * the one the lane is based on, and, for a WIP, the line too, landing the
  * WIP's commits with it. Only a clean offer lands on the line: the line is
- * immutable, and a conflict taken onto it would stay in its history. A WIP
+ * immutable, and a conflict integrated into it would stay in its history. A WIP
  * gone without landing has none; one that landed is the line's. Pure.
  */
-export function takeDestinations(input: {
+export function offerIntegrationDestinations(input: {
   readonly base: ThreadBase
   readonly state: "ok" | "landed" | "gone"
   readonly onto: string
   readonly conflicted: boolean
   /** The WIP's commits above the line, for a WIP base. */
   readonly wipAhead: number
-}): readonly TakeDestination[] {
-  const line = (bringsAlong: number): TakeDestination[] =>
+}): readonly OfferIntegrationDestination[] {
+  const line = (bringsAlong: number): OfferIntegrationDestination[] =>
     input.conflicted
       ? []
       : [{ bookmark: input.onto, kind: "line", bringsAlong, final: true }]
@@ -258,7 +269,7 @@ export function takeDestinations(input: {
  * What a lane's `pineta.offer` record says, decoded once (ADR-0067): every
  * reader of the page switches on this, never on the record's fields.
  * - `none`: no record;
- * - `taken`: added to the project, as the change `as`;
+ * - `integrated`: added to the project, as the change `as`;
  * - `held`: open, but it brings no file: the line already holds its work,
  *   by a route the ledger does not record (S89), so there is nothing to add;
  * - `open`: work to add. One you edited is open whatever its files: it is
@@ -266,19 +277,20 @@ export function takeDestinations(input: {
  */
 export type OfferStatus =
   | { readonly kind: "none" }
-  | { readonly kind: "taken"; readonly as: string }
+  | { readonly kind: "integrated"; readonly as: string }
   | { readonly kind: "held"; readonly record: OfferRecord }
   | { readonly kind: "open"; readonly record: OfferRecord }
 
 export function offerStatus(record: OfferRecord | undefined): OfferStatus {
   if (record === undefined) return { kind: "none" }
-  if (record.taken !== null) return { kind: "taken", as: record.taken }
+  if (record.integratedAs !== null)
+    return { kind: "integrated", as: record.integratedAs }
   const held = record.files.length === 0 && !record.edited
   return { kind: held ? "held" : "open", record }
 }
 
-/** A record not yet taken: open, or held (`offerStatus`). */
-export const isUntaken = (
+/** A record not yet integrated: open, or held (`offerStatus`). */
+export const isNotYetIntegrated = (
   status: OfferStatus,
 ): status is Extract<OfferStatus, { readonly kind: "open" | "held" }> =>
   status.kind === "open" || status.kind === "held"
@@ -317,7 +329,7 @@ export function offerRecord(input: {
     described: !isWipLine(input.name, offer.firstLine),
     edited: offerEdited(offer),
     bookmark: offer.bookmark,
-    taken: null,
+    integratedAs: null,
     commits: offer.revisions.map(r => r.commit),
     ledger: offer.ledger,
     at: input.now,
@@ -325,7 +337,7 @@ export function offerRecord(input: {
 }
 
 /**
- * Only `@` moved: each untaken record with `yourEdits` its files that `@`
+ * Only `@` moved: each record not yet integrated with `yourEdits` its files that `@`
  * changes now. Unchanged ones come back too: the host writes only what
  * changed.
  */
@@ -334,12 +346,12 @@ export const planYourEdits = (
   editing: ReadonlySet<string>,
 ): OfferRecord[] =>
   [...records]
-    .filter(r => isUntaken(offerStatus(r)))
+    .filter(r => isNotYetIntegrated(offerStatus(r)))
     .map(r => ({ ...r, yourEdits: r.files.filter(f => editing.has(f)) }))
 
-// ── a take (ADR-0060, ADR-0065) ───────────────────────────────────────────
+// ── an offer integration (ADR-0060, ADR-0065) ─────────────────────────────
 
-/** A gather with an offer and the thread's name: what a take, a rebuild or a description acts on. */
+/** A gather with an offer and the thread's name: what an integration, a rebuild or a description acts on. */
 type NamedOffer = OfferGather & {
   readonly offer: OfferInRepo
   readonly name: ThreadName
@@ -355,67 +367,71 @@ const sameLedger = (a: OfferLedger | null, b: OfferLedger | null): boolean =>
     : a.source === b.source && sameStart(a.start, b.start)
 
 /**
- * Whether the offer is not the one a take was shown (ADR-0065): it brings
- * other work (another ledger), or it conflicts now and did not then. A
- * rebase onto a moved target keeps the ledger, and so does your edit: both
- * are taken.
+ * Whether the offer is not the one an integration was shown (ADR-0065): it
+ * brings other work (another ledger), or it conflicts now and did not then.
+ * A rebase onto a moved target keeps the ledger, and so does your edit: both
+ * are integrated.
  */
 const offerChanged = (offer: OfferNow, seen: OfferSeen): boolean =>
   !sameLedger(offer.ledger, seen.ledger) ||
   (offer.conflicts.length > 0 && !seen.conflicted)
 
 /**
- * A take (ADR-0060), decided from the offer read in its own command: the
- * destination asked for (`to`, else the default), which must be one of the
- * offer's destinations now (`takeDestinations`) and at or below its bottom's
- * parent, so the move is forward; and the record marked taken. What you have
- * of the lane is the offer's own `Pineta-Source`, which the take keeps.
+ * An offer integration (ADR-0060), decided from the offer read in its own
+ * command: the destination asked for (`to`, else the default), which must be
+ * one of the offer's destinations now (`offerIntegrationDestinations`) and at
+ * or below its bottom's parent, so the move is forward; and the record marked
+ * integrated. What you have of the lane is the offer's own `Pineta-Source`,
+ * which the integrated-offer commit keeps.
  * Refused, in this order: no offer, a WIP gone, nothing shown, a divergent
  * offer, other work than was shown, no such destination.
  */
-export function planOfferTake(input: {
+export function planOfferIntegration(input: {
   readonly lane: LaneName
   readonly gathered: OfferGather | null
-  /** What the take was shown (ADR-0065); null when it names none. */
+  /** What the integration was shown (ADR-0065); null when it names none. */
   readonly seen: OfferSeen | null
-  /** What only a take reads (`gatherTake`); null without an offer to take. */
-  readonly take: TakeFacts | null
-  /** Files `@` changes, for the taken record's `yourEdits`. */
+  /** What only an integration reads (`gatherOfferIntegration`); null without an offer to integrate. */
+  readonly integration: OfferIntegrationFacts | null
+  /** Files `@` changes, for the integrated record's `yourEdits`. */
   readonly editing: ReadonlySet<string>
   /** The line's bookmark. */
   readonly onto: string
   readonly to: string | null
   readonly now: number
-}): TakeDecision {
-  const refused = (code: ErrCode): TakeDecision => ({ kind: "refused", code })
-  const { gathered, seen, take } = input
+}): OfferIntegrationDecision {
+  const refused = (code: ErrCode): OfferIntegrationDecision => ({
+    kind: "refused",
+    code,
+  })
+  const { gathered, seen, integration } = input
   if (!namedOffer(gathered)) return refused(ERR.NO_OFFER)
   const { place, offer, name } = gathered
   if (place.kind === "gone") return refused(ERR.BAD_DESTINATION)
-  // A take that names no offer was shown none.
+  // An integration that names no offer was shown none.
   if (seen === null) return refused(ERR.OFFER_CHANGED)
   if (offer.kind === "divergent") return refused(ERR.NO_OFFER)
   const top = offer.revisions.at(-1)?.change
-  if (top === undefined || take === null) return refused(ERR.NO_OFFER)
+  if (top === undefined || integration === null) return refused(ERR.NO_OFFER)
   if (offerChanged(offer, seen)) return refused(ERR.OFFER_CHANGED)
-  const destinations = takeDestinations({
+  const destinations = offerIntegrationDestinations({
     base: place.base.base,
     state: place.state,
     onto: input.onto,
     conflicted: offer.conflicts.length > 0,
-    wipAhead: take.wipAhead,
+    wipAhead: integration.wipAhead,
   })
   const destination =
     input.to === null
       ? destinations[0]
       : destinations.find(d => d.bookmark === input.to)
-  if (destination === undefined || !take.below.has(destination.bookmark))
+  if (destination === undefined || !integration.below.has(destination.bookmark))
     return refused(ERR.BAD_DESTINATION)
   const record = offerRecord({
     lane: input.lane,
     name,
     offer,
-    // A take moves a bookmark and needs no start. An untraced start leaves
+    // An integration moves a bookmark and needs no start. An untraced start leaves
     // only an offer you edited; with none, a stack reads stale.
     place: {
       tip: place.tip,
@@ -425,12 +441,12 @@ export function planOfferTake(input: {
     now: input.now,
   })
   return {
-    kind: "take",
+    kind: "integrate",
     name,
     bookmark: record.bookmark,
     destination: destination.bookmark,
     top,
-    taken: { ...record, taken: top, at: input.now },
+    integrated: { ...record, integratedAs: top, at: input.now },
   }
 }
 
@@ -444,7 +460,7 @@ type RebuildDecision<Refusal> =
 /**
  * A split's run ended (ADR-0038): its stack replaces the offer when it holds
  * exactly the lane tip's files, built at the offer's place from the stack's
- * own start and tip, which its ledger names. An untraced place takes it: the
+ * own start and tip, which its ledger names. An untraced place accepts it: the
  * stack brings its own start. Why not, in words the agent reads.
  */
 export function planStackEnded(input: {

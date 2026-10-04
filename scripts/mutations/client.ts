@@ -172,12 +172,12 @@ export const mutations: readonly Mutation[] = [
     expect: "your offer command waits while it is out, and not once answered",
   },
   {
-    name: "a take in flight names the default destination, not the one chosen",
+    name: "an integration in flight names the default destination, not the one chosen",
     file: columnView,
     from: "  const to = destinations.find(d => d.bookmark === acting.to) ?? destinations[0]",
     to: "  const to = destinations[0]",
     command: unit,
-    expect: "your last command: a take from a WIP to the line",
+    expect: "your last command: an integration from a WIP into the line",
   },
   {
     name: "a prefill forgets where its agent works",
@@ -213,7 +213,7 @@ export const mutations: readonly Mutation[] = [
     to: '    case "unknown":\n      return ""\n',
     command: unit,
     expect:
-      "the jj facts are titles: which bookmark a take moves, and what catching up merges",
+      "the jj facts are titles: which bookmark an integration moves, and what catching up merges",
   },
   {
     name: "an offer's line says nothing of its base moving on",
@@ -295,13 +295,14 @@ export const mutations: readonly Mutation[] = [
     expect: "no line yet: set up at your @-, showing the heads it writes",
   },
   {
-    name: "a take does not say where it goes",
+    name: "an integration does not say where it goes",
     file: "packages/client/column-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '      first === undefined ? "" : ` to ${catchUpName(destinationBase(first))}`',
     to: '      ""',
     command: unit,
-    expect: "the labels follow the state, and name where a take adds the work",
+    expect:
+      "the labels follow the state, and name where an integration adds the work",
   },
   {
     name: "a thread whose WIP is gone is offered a plain update",
@@ -310,7 +311,7 @@ export const mutations: readonly Mutation[] = [
     to: "      bs",
     command: unit,
     expect:
-      "a WIP gone without landing offers no take, and continuing from the project",
+      "a WIP gone without landing offers no integration, and continuing from the project",
   },
   {
     name: "an edited offer hides its conflicts",
@@ -1085,8 +1086,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a read-only column offers no copy",
     file: tools,
-    from: "    return { copy, take: false, edit: undefined, branch: undefined }",
-    to: "    return { copy: false, take: false, edit: undefined, branch: undefined }",
+    from: "    return {\n      copy,\n      takeCopyIntoInventory: false,",
+    to: "    return {\n      copy: false,\n      takeCopyIntoInventory: false,",
     command: unit,
     expect: "a column that can't be written offers only copy",
   },
@@ -1747,7 +1748,7 @@ export const mutations: readonly Mutation[] = [
     name: "the header counts an offer the line already holds",
     file: "packages/client/app-view.ts",
     from: '    if (offerStatus(o).kind !== "open" || root === undefined) return []',
-    to: "    if (o.taken !== null || root === undefined) return []",
+    to: "    if (o.integratedAs !== null || root === undefined) return []",
     command: unit,
     expect:
       "the header's offers are the open ones, never one the line already holds",
@@ -1756,10 +1757,10 @@ export const mutations: readonly Mutation[] = [
     name: "a held offer reviews nothing, but the strip offers it",
     file: "packages/client/column-view.ts",
     from: '      offer.kind !== "open"\n        ? null',
-    to: '      offer.kind === "none" || offer.kind === "taken"\n        ? null',
+    to: '      offer.kind === "none" || offer.kind === "integrated"\n        ? null',
     command: unit,
     expect:
-      "an open offer with files can be reviewed, in every state; a taken or empty one cannot",
+      "an open offer with files can be reviewed, in every state; an integrated or empty one cannot",
   },
   {
     name: "a new tab has no rail",
@@ -2244,10 +2245,10 @@ export const mutations: readonly Mutation[] = [
     expect: "stepSlot moves through the 3 × 6 grid and stops at its edges",
   },
   {
-    name: "a take ignores the selection",
+    name: "a take into the inventory ignores the selection",
     file: "packages/client/card-intents.ts",
-    from: "  return takeAt(now, facts.selected, state)",
-    to: "  return takeAt(now, 0, state)",
+    from: "  return takeIntoInventoryAt(now, facts.selected, state)",
+    to: "  return takeIntoInventoryAt(now, 0, state)",
     command: unit,
     expect: "into the selected slot when it is empty, else the first empty",
   },
@@ -2336,12 +2337,12 @@ export const mutations: readonly Mutation[] = [
     expect: "snapTo: the nearest third",
   },
   {
-    name: "a take copies a selection outside the message",
-    file: "packages/client/take-text.ts",
+    name: "a copy into the inventory copies a selection outside the message",
+    file: "packages/client/copy-into-inventory-text.ts",
     from: '  selection?.inside === true && selection.text.trim() !== ""',
     to: '  selection !== null && selection.text.trim() !== ""',
     command: unit,
-    expect: "takeText: a selection inside the message",
+    expect: "copyIntoInventoryText: a selection inside the message",
   },
   {
     name: "a keep closes whatever its answers",

@@ -19,7 +19,7 @@ import {
   repairStep,
   type Slots,
   type SlotWrites,
-  takeWrites,
+  takeIntoInventoryWrites,
 } from "./inventory.ts"
 import { personDoc } from "./person-doc.ts"
 import type { Readable } from "./store.ts"
@@ -33,8 +33,8 @@ export interface InventorySlots {
   repair(): void
   /** Write `writes` in one batch; nothing for none. */
   write(writes: SlotWrites): void
-  /** An accepted take: `card` into `slot`, and out of any other. */
-  take(card: CardId, slot: number): void
+  /** An accepted take into the inventory: `card` into `slot`, and out of any other. */
+  takeIntoInventory(card: CardId, slot: number): void
   dispose(): void
 }
 
@@ -49,7 +49,7 @@ export function inventorySlots(
      * and a refused put finds it there.
      */
     readonly held: () => readonly CardId[]
-    /** The slots this tab's takes in flight chose (`intentsOf`). */
+    /** The slots this tab's takes into the inventory in flight chose (`intentsOf`). */
     readonly intents: () => Intents
   },
 ): InventorySlots {
@@ -93,7 +93,8 @@ export function inventorySlots(
     stored: () => readSlots(inventory),
     repair,
     write,
-    take: (card, slot) => write(takeWrites(readSlots(inventory), card, slot)),
+    takeIntoInventory: (card, slot) =>
+      write(takeIntoInventoryWrites(readSlots(inventory), card, slot)),
     dispose() {
       own.dispose()
       if (wake !== null) clearTimeout(wake)

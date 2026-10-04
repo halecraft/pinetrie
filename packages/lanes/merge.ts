@@ -3,10 +3,11 @@
 // The lane merges the line's commit, or a fresh copy of its WIP (`planMerge`),
 // into itself, in its own repo: jj records conflicts in the merge rather than
 // failing (S36 item 11), and the agent resolves them there, never in your
-// repo. A take on the line is a copy of a lane's work, so each take the lane
-// holds a source of is first joined to it (`planJoins`, S102): merged as
-// history says, the lane's own work would come in twice. The merge is committed at once, so it is a revision even when it
-// merged cleanly: an empty merge would stay the working copy, which every
+// repo. An integrated-offer commit on the line is a copy of a lane's work, so
+// each one the lane holds a source of is first joined to it (`planJoins`,
+// S102): merged as history says, the lane's own work would come in twice.
+// The merge is committed at once, so it is a revision even when it merged
+// cleanly: an empty merge would stay the working copy, which every
 // snapshot rewrites. The lane's work comes back to you as its offer, never by
 // this merge.
 
@@ -21,18 +22,18 @@ import { executeOrThrow, type Runners } from "./execute.ts"
 import {
   bookmarkName,
   bookmarkRevset,
+  type IntegratedOfferCommitAbove,
   type Join,
   type MergePlan,
   planJoins,
-  type TakeAbove,
 } from "./plan.ts"
 import {
   changedPaths,
   commitsOf,
   commitToBookmark,
   conflictedFilesAt,
-  parseTakes,
-  TAKE_ROW,
+  INTEGRATED_OFFER_COMMIT_ROW,
+  parseIntegratedOfferCommits,
   titlesOf,
 } from "./revisions.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
@@ -72,17 +73,17 @@ async function commitOn(
 }
 
 /**
- * What `planJoins` decides from: the takes in `from`'s history the lane at
+ * What `planJoins` decides from: the integrated-offer commits in `from`'s history the lane at
  * `ours` lacks, oldest first, each with the sources its message names; and
  * which of those sources the lane holds. A source is read with `present()`:
  * one may never have reached the lane (S102).
  */
-async function takesAbove(
+async function integratedOfferCommitsAbove(
   jj: Runner,
   ours: CommitId,
   from: CommitId,
 ): Promise<{
-  readonly takes: readonly TakeAbove[]
+  readonly integrated: readonly IntegratedOfferCommitAbove[]
   readonly held: ReadonlySet<CommitId>
 }> {
   const ran = await jj([
@@ -93,30 +94,31 @@ async function takesAbove(
     "-r",
     `(::${from} ~ ::${ours}) & ${trailerRevset(["source"])}`,
     "-T",
-    TAKE_ROW,
+    INTEGRATED_OFFER_COMMIT_ROW,
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  const takes = parseTakes(ran.stdout).map(t => ({
-    take: t.commit,
+  const integrated = parseIntegratedOfferCommits(ran.stdout).map(t => ({
+    integratedOfferCommit: t.commit,
     sources: sourcesOf(t.description),
   }))
-  const named = [...new Set(takes.flatMap(t => t.sources))]
-  if (named.length === 0) return { takes, held: new Set() }
+  const named = [...new Set(integrated.flatMap(t => t.sources))]
+  if (named.length === 0) return { integrated, held: new Set() }
   const held = await commitsOf(
     jj,
     `(${named.map(s => `present(${s})`).join(" | ")}) & ::${ours}`,
   )
-  return { takes, held: new Set(held) }
+  return { integrated, held: new Set(held) }
 }
 
 /**
  * Each join made in the lane, in order, each on the last one kept: a merge of
- * the take with the sources the lane holds. A join that conflicts (a take of
- * an offer you edited where the lane wrote) is abandoned, and that take is
- * merged as before. jj says a join conflicts only once it is made, so this is
- * decided here, after it. Returns the last join kept, and the takes joined.
+ * the integrated-offer commit with the sources the lane holds. A join that
+ * conflicts (an integration of an offer you edited where the lane wrote) is
+ * abandoned, and that integrated-offer commit is merged as before. jj says a
+ * join conflicts only once it is made, so this is decided here, after it.
+ * Returns the last join kept, and the integrated-offer commits joined.
  */
-async function joinTakes(
+async function joinIntegratedOfferCommits(
   jj: Runner,
   joins: readonly Join[],
 ): Promise<{
@@ -128,7 +130,11 @@ async function joinTakes(
   for (const join of joins) {
     const at = await newOn(
       jj,
-      [...join.sources, join.take, ...(last === null ? [] : [last])],
+      [
+        ...join.sources,
+        join.integratedOfferCommit,
+        ...(last === null ? [] : [last]),
+      ],
       join.message,
     )
     if ((await commitsOf(jj, `${at} & conflicts()`)).length > 0) {
@@ -137,7 +143,7 @@ async function joinTakes(
       continue
     }
     last = at
-    joined.push(join.take)
+    joined.push(join.integratedOfferCommit)
   }
   return { last, joined }
 }
@@ -145,13 +151,13 @@ async function joinTakes(
 /**
  * Merge `from` (the line's commit, a WIP's copy, or the parent's newest) into
  * the lane at its bookmark, described `message`, and commit the merge. `jj`
- * is the lane's, and must already hold `from`. Each take in `from`'s history
+ * is the lane's, and must already hold `from`. Each integrated-offer commit in `from`'s history
  * that names a source the lane holds is first joined to it (`planJoins`,
  * S102), and the merge is one commit on the lane, the last join if any,
  * and `from`.
  * Returns the lane's revision before the merge (`ours`), the merge, or null
- * when `from` is already in the lane (nothing to merge), and the takes
- * joined.
+ * when `from` is already in the lane (nothing to merge), and the
+ * integrated-offer commits joined.
  */
 export async function mergeBase(
   jj: Runner,
@@ -167,11 +173,11 @@ export async function mergeBase(
   const ours = await laneHead(jj, lane)
   const missing = await commitsOf(jj, `${from} ~ ::${ours}`)
   if (missing.length === 0) return { ours, merge: null, joined: [] }
-  const { takes, held } = await takesAbove(jj, ours, from)
+  const { integrated, held } = await integratedOfferCommitsAbove(jj, ours, from)
   // plan
-  const joins = planJoins(takes, held)
+  const joins = planJoins(integrated, held)
   // execute
-  const { last, joined } = await joinTakes(jj, joins)
+  const { last, joined } = await joinIntegratedOfferCommits(jj, joins)
   const parents = [ours, ...(last === null ? [] : [last]), from]
   return { ours, merge: await commitOn(jj, lane, parents, message), joined }
 }
@@ -334,7 +340,7 @@ export type Merged =
       readonly merge: CommitId
       /** The files the merge changed under the lane. */
       readonly files: readonly string[]
-      /** The titles of the commits that came in (`MergePlan.came`), without the takes joined. */
+      /** The titles of the commits that came in (`MergePlan.came`), without the integrated-offer commits joined. */
       readonly commits: readonly string[]
     }
   | {
@@ -347,24 +353,27 @@ export type Merged =
       }[]
       /**
        * The revisions on each side that touched any conflicted file, oldest
-       * first; `theirs` without the takes joined.
+       * first; `theirs` without the integrated-offer commits joined.
        */
       readonly ours: readonly TouchedRevision[]
       readonly theirs: readonly TouchedRevision[]
     }
 
 /**
- * `range` without the takes an update joined: each is the lane's own work, as
- * a copy, so it did not come in. Only the takes themselves go: the line's
+ * `range` without the integrated-offer commits an update joined: each is the
+ * lane's own work, as a copy, so it did not come in. Only those commits go: the line's
  * commits under them did come in, which `(<ours> | <join>)..<to>` would also
  * drop (S102 item 9).
  */
-const withoutTakes = (range: string, joined: readonly CommitId[]): string =>
+const withoutIntegratedOfferCommits = (
+  range: string,
+  joined: readonly CommitId[],
+): string =>
   joined.length === 0 ? range : `(${range}) ~ (${joined.join(" | ")})`
 
 /**
  * An update in a lane, after its edits are committed (ADR-0060): `plan`'s
- * steps, the takes it holds joined and the merge (`mergeBase`), a mark when
+ * steps, the integrated-offer commits it holds joined and the merge (`mergeBase`), a mark when
  * the plan asks and nothing merged, then what the merge left. The caller
  * runs it on the lane's queue.
  */
@@ -409,7 +418,10 @@ export async function mergeUpdate(
       files: await changedPaths(jj, ours, merge),
       commits: await titlesOf(
         jj,
-        withoutTakes(`${plan.came.from ?? ours}..${plan.came.to}`, joined),
+        withoutIntegratedOfferCommits(
+          `${plan.came.from ?? ours}..${plan.came.to}`,
+          joined,
+        ),
       ),
     }
   const contents: { path: string; content: string }[] = []
@@ -422,7 +434,7 @@ export async function mergeUpdate(
     ours: await revisionsIn(jj, `${from}..${ours}`, conflicted),
     theirs: await revisionsIn(
       jj,
-      withoutTakes(`${ours}..${from}`, joined),
+      withoutIntegratedOfferCommits(`${ours}..${from}`, joined),
       conflicted,
     ),
   }

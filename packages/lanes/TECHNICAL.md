@@ -23,8 +23,10 @@ containers, disks and the helper.
   lane.
 - `run.ts`, `bookmarks.ts`, `revisions.ts`, `merge.ts`: jj and git as
   `Runner`s, and the jj logic over them. `revisions.ts` holds the reader
-  of a take's row (`TAKE_ROW`, `parseTakes`), which your repo's reads use
-  too. `planJoins` (`plan.ts`) decides which takes an update joins.
+  of an integrated-offer commit's row (`INTEGRATED_OFFER_COMMIT_ROW`,
+  `parseIntegratedOfferCommits`), which your repo's reads use too.
+  `planJoins` (`plan.ts`) decides which integrated-offer commits an update
+  joins.
 - `host.ts`: startup facts, lane configs and shared directories. Its reads
   of your repo (`jjIn`, git from its root) are the one exception to "only
   `@pineta/repo` runs jj on your repo": they only read, at startup, before
@@ -75,7 +77,7 @@ containers, disks and the helper.
   its base. The base disk is the line's, so a WIP whose lockfile differs
   from the line's installs (`installIfLockMoved`).
 - **The base snapshot is the line's commit** (`refreshBase`), and
-  refreshes after a take or a land. A fork from it first waits for a
+  refreshes after an offer integration or a land. A fork from it first waits for a
   refresh (`baseAtLine`): the line may have been set up or moved since.
 - **`jj new` runs first in a fork** (`planForkSetup`). A clone carries its
   parent's working-copy change. Without `jj new`, the fork's first turn reuses
@@ -346,25 +348,27 @@ containers, disks and the helper.
   where its offers start. `laneBase` reads it in the lane's own repo too
   (`bookmarkRevset`), where a lane with none is null: that repo has no
   line bookmark to find a start on.
-- **A take the lane holds is joined to its source first** (`planJoins`,
-  `mergeBase`, S102, ADR-0079). A take is a copy of a lane's work on the
-  line, naming the commit it copies (`Pineta-Source`). Merged as history
-  says, its base is the take's `Pineta-Start`, from before that work, so
-  the work came in twice: any edit the line made to it since conflicted.
-  So a join, a commit merging the source with the take (the same changes,
+- **An integrated-offer commit the lane holds is joined to its source
+  first** (`planJoins`, `mergeBase`, S102, ADR-0079). An integrated-offer
+  commit is a copy of a lane's work on the line, naming the commit it
+  copies (`Pineta-Source`). Merged as history says, its base is that
+  commit's `Pineta-Start`, from before that work, so the work came in
+  twice: any edit the line made to it since conflicted. So a join, a commit
+  merging the source with the integrated-offer commit (the same changes,
   so clean), goes first, and the update merges the lane, the last join and
   the base in one commit.
-  - **Which takes:** those in `::<from> ~ ::<ours>` (`TAKE_ROW`, one `jj
+  - **Which integrated-offer commits:** those in `::<from> ~ ::<ours>` (`INTEGRATED_OFFER_COMMIT_ROW`, one `jj
     log`) naming any source the lane holds, a squash's included (S77 item
     6), read with `present()`.
-  - **The order:** oldest first, each join on the last, so a later take's
+  - **The order:** oldest first, each join on the last, so a later one's
     base holds the earlier ones.
-  - **A conflicted join is abandoned:** a take of an offer you edited where
+  - **A conflicted join is abandoned:** an integration of an offer you edited where
     the lane wrote, merged as before.
-  - **A join carries no trailer:** bases and takes are found by theirs.
-  - **The update's titles and a conflict's `theirs` leave the takes out**
-    (`withoutTakes`), and keep the line's commits under them.
-  - **A WIP's copy has no take in its history,** so a WIP thread joins
+  - **A join carries no trailer:** bases and integrated-offer commits are
+    found by theirs.
+  - **The update's titles and a conflict's `theirs` leave the integrated-offer commits out**
+    (`withoutIntegratedOfferCommits`), and keep the line's commits under them.
+  - **A WIP's copy has no integrated-offer commit in its history,** so a WIP thread joins
     nothing.
 - **`mergeUpdate` is an update's whole run in a lane** after its edits,
   on the lane's queue: `planMerge`'s steps (a fetch of the line's commit,

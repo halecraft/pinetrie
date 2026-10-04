@@ -99,7 +99,7 @@ async function run(check: Checks["check"]): Promise<void> {
       `${seen.at(-1)?.slice(-80)}`,
     )
 
-    // 4. A card queued for its lane carries its images when it is taken.
+    // 4. A card queued for its lane carries its images when it is popped.
     const green = await upload(GREEN_PNG)
     const replyId = idOfIn(ih, "a red one")
     const paused = script.pause("hold on")

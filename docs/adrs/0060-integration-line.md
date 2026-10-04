@@ -25,6 +25,9 @@ it; `pineta.base` records what catching up would change, and where it was
 read.
 Amended by ADR-0079: a catch-up first joins each take the lane holds to
 its source, so the lane's work is not merged twice.
+Amended by ADR-0083: a take is an *offer integration*, and the commit it
+leaves on the line an *integrated-offer commit*; the record's `taken` is
+`integratedAs`.
 
 **Context.**
 

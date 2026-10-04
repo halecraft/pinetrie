@@ -104,10 +104,14 @@ test("the header's offers are the open ones, never one the line already holds: a
   const C = laneNameForThread("c")
   const D = laneNameForThread("d")
   const E = laneNameForThread("e")
-  const offer = (lane: LaneName, taken: string | null, files = ["a.txt"]) =>
+  const offer = (
+    lane: LaneName,
+    integratedAs: string | null,
+    files = ["a.txt"],
+  ) =>
     ({
       lane,
-      taken,
+      integratedAs,
       files,
       edited: false,
       ledger: lane === A ? { source: "c-a", start: [] } : null,
@@ -118,7 +122,7 @@ test("the header's offers are the open ones, never one the line already holds: a
     input({
       offers: new Map([
         [A, offer(A, null)],
-        [B, offer(B, "taken")],
+        [B, offer(B, "integrated")],
         [C, offer(C, null)],
         [D, offer(D, null)],
         [E, offer(E, null, [])],

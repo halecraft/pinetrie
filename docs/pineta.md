@@ -158,7 +158,7 @@ with `isLaneName()`, dropping one that fails.
 **ADR-0020 — lanes belong to threads and never move; people own none.** A lane
 is created where agent work is first wanted in a thread, and its tip is always
 the thread's end. Conversation threads have no lane. A running lane is never
-written: a message for it is a queued card (ADR-0048), and the host takes
+written: a message for it is a queued card (ADR-0048), and the host pops
 queued cards in order when the lane is idle. A compelled reply another writer
 raced is a `conflict`; the sender chooses to queue or branch. Supersedes
 ADR-0011.
@@ -177,8 +177,8 @@ message.
 **ADR-0048 — everything unsent is a card.** What you type is a card on its
 thread: its text in a Yjs document, which clients write, and its record in
 the places document, which only the host writes (ADR-0059); the host places
-and moves cards on request, spends one when it is sent, takes queued ones,
-and sweeps empty ones. Everyone at a thread's end sees and can edit its
+and moves cards on request, spends one when it is sent, pops queued ones to
+send them, and sweeps empty ones. Everyone at a thread's end sees and can edit its
 cards. Who wrote in one comes from its `clientID`s, through the host's
 `pineta.seat` records. Text undo is Kyneta's stack, one per tab; moves are undone
 by the host's stacks (ADR-0066). Built
@@ -195,9 +195,9 @@ it, and a trace where your card was when someone else moved it while you
 were away, deleted once seen (who contributed waits for Kyneta). A send
 to a busy thread queues your
 card above the line, in the host's step that found the lane busy, where
-anyone can edit it or unqueue it until the host takes it; the take and an
+anyone can edit it or unqueue it until the host pops it; the pop and an
 unqueue are steps on the host's one serial executor, so an unqueue after
-the take is refused and its client says "already sent" (S69).
+the pop is refused and its client says "already sent" (S69).
 `pineta.outbox` is gone.
 
 **ADR-0059 — a card's place has one owner at a time.** Built for every
@@ -214,7 +214,7 @@ Texts stay CRDTs. Queue and unqueue are handoffs too, a card's command is in
 its place record, and the cards document is gone.
 
 **ADR-0055 — a command acts on a card, and is named last.** A card's
-`command` is how it is sent; the host carries it out when it takes the card.
+`command` is how it is sent; the host carries it out when it pops the card.
 The first is "bring up to date": the project's work comes into the thread's
 own copy (ADR-0038's update), then the card's text is sent, or carries into
 the resolution run when it conflicts. Its button sets the command on your
@@ -258,20 +258,21 @@ extensions' providers are applied). Replies and tool output are one kind of
 stream, written as text edits; pi's checkpoints are stored the same way. Stop
 ends a thread's turn. The session persists in `.pineta/pineta.db`.
 
-**ADR-0060 — takes stack on an integration line; the repo is the ledger**
-(built). A take moves one bookmark forward to the offer,
+**ADR-0060 — integrated offers stack on an integration line; the repo is the
+ledger** (built). Integrating an offer moves one bookmark forward to it,
 never your `@`: the line (`pineta-onto`, immutable) or a `wip/` bookmark a
-thread forked from, each named on the take button; only a clean offer
+thread forked from, each named on the add button; only a clean offer
 lands on the line. A thread's base is the line, or a WIP chosen at its
 first message (a copy of it, so the WIP stays mutable); "bring up to date"
 is always with that base. Pineta keeps what it needs as trailers on the
 commits it makes, and finds yours by ancestry and change id; the session
 document becomes a cache. It answers S73 and S74, and replaces
-ADR-0038's take, offer start and `pineta.have`.
+ADR-0038's take (now an integration, ADR-0083), offer start and
+`pineta.have`.
 
 **ADR-0061 — the integration line is "the project"** (built). The page names places by what they are for:
 the project, your files, a thread's own copy, your unfinished work; jj names
-go in titles. A take is "add to the project", bringing up to date is
+go in titles. An offer integration is "add to the project", bringing up to date is
 "catch up", and a thread whose base moved on says so, with catching up
 beside its offer. The composer says what a send does to your files.
 Archiving a root withdraws its threads' offers. "Update my files" rebases
@@ -306,15 +307,15 @@ image (S88). The agent's `grep` and `find` are Pineta's own, run through the
 lane's `env`, so pi's "use bash … rg" rule is gone; a direct lane uses pi's
 `ensureTool`. The default image also has python3.
 
-**ADR-0065 — one owner for your repo** (built). Takes waited 13–18 s behind
+**ADR-0065 — one owner for your repo** (built). Offer integrations waited 13–18 s behind
 a queue of duplicate refreshes fed by a self-overlapping poll, and held
 everyone's chats (S89). Now `@pineta/repo`'s owner is the one writer of your
 repo: commands before keyed upkeep (`@pineta/keeper`), reads pinned to the
 head it last observed (S87), its heads watched instead of polled, shared
-facts read once per operation and one `jj log` per lane. A take names the
+facts read once per operation and one `jj log` per lane. An integration names the
 offer it was shown (`offer_changed`), one person's commands keep their order
 by a chain, offer commands and an archive's teardown hold no other command,
-and the strip shows a command in flight and why it was refused. A take now
+and the strip shows a command in flight and why it was refused. An integration now
 answers in under half a second, a chat beside it at once.
 
 **ADR-0066 — the host undoes moves, one Kyneta stack per person and root**
@@ -331,10 +332,10 @@ retired 7 days after their root is archived.
 
 **ADR-0067 — what the host cannot tell, it does not act on** (built). The
 page counted empty offers, and the host built them, or replayed work you
-took before offers carried `Pineta-Source` (S97). Now whether a lane's work
+integrated before offers carried `Pineta-Source` (S97). Now whether a lane's work
 changes a file is `none`, `some` or `unknown`, from the diff a build
-restores, and only a known change from a known start builds an offer. A take
-that names no source makes the lane's start untraced until it catches up.
+restores, and only a known change from a known start builds an offer. An
+integrated-offer commit that names no source makes the lane's start untraced until it catches up.
 The page reads one `offerStatus` per offer, so one the line already holds
 (`held`) is never counted or warned about. `pineta.base` records what
 catching up would change, at the tip and base commit it was read at: catch
@@ -401,12 +402,13 @@ page. A subject is a name, never data (`paneView` decides what it draws and
 when it is gone), and nothing about it is stored. Under 76rem the pane is
 a modal dialog over the page, the first piece of the narrow layout.
 
-**ADR-0079 — a catch-up joins each take the lane holds to its source**
-(built). A thread whose work you took conflicted when it caught up, on any
-edit you made to that work on the line, its own work merged twice: a take
-is a copy, and the merge's base was from before it (S102). A branch holding
-its parent's taken work did the same. Now each take the lane holds a source
-of is first joined to it, and the catch-up is clean; a conflict both sides
+**ADR-0079 — a catch-up joins each integrated-offer commit the lane holds to
+its source** (built). A thread whose work you integrated conflicted when it
+caught up, on any edit you made to that work on the line, its own work
+merged twice: an integrated-offer commit is a copy, and the merge's base was
+from before it (S102). A branch holding its parent's integrated work did the
+same. Now each integrated-offer commit the lane holds a source of is first
+joined to it, and the catch-up is clean; a conflict both sides
 made still conflicts, on that hunk alone.
 
 **ADR-0082 — after a Stop, Resume carries on with a new turn** (built).
@@ -417,6 +419,16 @@ with a host-written carry-on message, an ask of its own. Anything written
 at the thread's end hides it. One rule (`carryOnState`) decides it for the
 host and the page.
 
+**ADR-0083 — every domain term names what it acts on and where that goes**
+(built). "Take" had meant five things, three of them acts: a card into your
+inventory, an offer onto the line or a WIP, and the host's removal of a
+lane's next queued card to send it; `planTake` and `Taken` were each
+defined twice. Now a person **takes a card into the inventory**, an offer is
+**integrated** into the line or a WIP and leaves an **integrated-offer
+commit**, and the host **pops the next queued card**. A lane **catches up
+with** its base, and an id already used is **in use**. The page keeps its
+short labels ("take", "add to the project"). An offer record written
+before reads its old `taken` as `integratedAs`.
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold
@@ -793,16 +805,17 @@ context.**
   offer in your repo, one commit on your `@-` under the bookmark
   `pineta-offer/<name>`. While the thread works, the offer reads
   `WIP (<name>): <its first message>` and grows in place; when a run ends,
-  an agent writes its commit message. Before you take it, press the offer's
+  an agent writes its commit message. Before you add it, press the offer's
   line in the work strip: the column's pane shows its message, its files
   (flagging those that conflict with your committed work, and those you are
   editing) and every file's diff. Or find its bookmark, which a press
-  copies, in jj or jjui. **take**, in the work
-  strip at its column's foot, puts it under your uncommitted edits. Reword,
-  squash or split it like any commit of yours; the host then leaves it
-  alone. **split into a stack** has the agent rewrite it as reviewable
+  copies, in jj or jjui. **add to the project** (or **add to wip/…**), in
+  the work strip at its column's foot, integrates it: that bookmark moves
+  forward to it, and your `@` stays where it is (ADR-0060). Reword, squash
+  or split the offer like any commit of yours before then; the host then
+  leaves it alone. **split into a stack** has the agent rewrite it as reviewable
   revisions. Set the bookmark `pineta-onto` to have offers land on another
-  commit instead, such as a branch you are not on; each take moves it up.
+  commit instead, such as a branch you are not on; each integration moves it up.
   `jj git push --all` would push it: push by name.
 - **Sending your work to a thread:** the work strip's `⋯` offers **update
   from my work**: your `@`, uncommitted edits included, merged into the

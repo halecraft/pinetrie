@@ -81,13 +81,17 @@ import { createNames } from "./names.ts"
 import { createPinned } from "./pinned.ts"
 import { hostPolicy, resolveDoc } from "./policy.ts"
 import { createProvenance } from "./provenance.ts"
+import {
+  chatOfPoppedQueuedCard,
+  createBehind,
+  drain as drainQueue,
+} from "./queued-card-pop.ts"
 import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
 import { createSettle } from "./settle.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { recover } from "./startup.ts"
 import { openStore } from "./store.ts"
-import { createBehind, drain as drainQueue, takenChat } from "./take.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
 
@@ -477,8 +481,12 @@ export async function startHost({
         texts: cardPort,
         work,
         start: runs.start,
-        send: taken =>
-          commands.sendTaken(taken.card.place.by, newId(), takenChat(taken)),
+        send: popped =>
+          commands.sendPoppedQueuedCard(
+            popped.card.place.by,
+            newId(),
+            chatOfPoppedQueuedCard(popped),
+          ),
         behind,
         provenance,
       },
@@ -513,7 +521,7 @@ export async function startHost({
     if (prompt !== null && root !== null)
       void digests.ended(root, lane, prompt, digestFailed(lane))
   })
-  // A card queued on a lane that is not running is taken at once (ADR-0059):
+  // A card queued on a lane that is not running is popped at once (ADR-0059):
   // the move that queued it asks for a drain. A lane's drain is the keeper's
   // `once`: queued once until its step starts, and a move while it runs
   // queues one more, which finds what that one missed. It keeps its place

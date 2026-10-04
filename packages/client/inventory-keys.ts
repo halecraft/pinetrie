@@ -1,9 +1,9 @@
-// client/inventory-keys — the keys that take, put, undo and redo moves, and
-// move through the inventory's grid (ADR-0048 step 4). Pure: one table, from
-// a key and where focus is to an intent or nothing. The key-system redesign
-// replaces this file.
+// client/inventory-keys — the keys that take into the inventory, put, undo
+// and redo moves, and move through the inventory's grid (ADR-0048 step 4).
+// Pure: one table, from a key and where focus is to an intent or nothing.
+// The key-system redesign replaces this file.
 //
-// Take is Ctrl+Shift+I and put Ctrl+Shift+O, with Ctrl on a Mac too, where
+// Take into the inventory is Ctrl+Shift+I and put Ctrl+Shift+O, with Ctrl on a Mac too, where
 // it is not Cmd and clashes with nothing. Elsewhere a browser may keep them
 // for itself; the panel's buttons and drag still work. Undo and redo of a
 // move are Cmd or Ctrl with Z (Shift+Z, or Ctrl+Y, to redo), only outside a
@@ -53,7 +53,9 @@ export function keyAct(event: KeyLike, focus: KeyFocus): Intent | null {
   const chord =
     event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey
   if (chord && key === "i")
-    return focus.card === null ? null : { kind: "take", card: focus.card }
+    return focus.card === null
+      ? null
+      : { kind: "takeIntoInventory", card: focus.card }
   if (chord && key === "o")
     return focus.selectedCard === null || focus.column === null
       ? null

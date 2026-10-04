@@ -281,13 +281,16 @@ describe("parentNow and planParentUpdate: the thread a lane branched from (ADR-0
       lane: P,
       name: "amber-fox",
       newest: C(4),
-      taken: C(2),
+      caughtUpWith: C(2),
       conflicts: ["a.txt"],
     })
   })
-  test("a catch-up's merged commit is what it took", () => {
-    expect(now("4-u", "6-m")?.taken).toBe(C(3))
-    expect(now("4-u", "5-m")).toMatchObject({ newest: C(3), taken: C(3) })
+  test("a catch-up's merged commit is what it caught up with", () => {
+    expect(now("4-u", "6-m")?.caughtUpWith).toBe(C(3))
+    expect(now("4-u", "5-m")).toMatchObject({
+      newest: C(3),
+      caughtUpWith: C(3),
+    })
   })
   test("no parent: a lane that began at its base, or a parent with no name", () => {
     expect(
@@ -308,7 +311,7 @@ describe("parentNow and planParentUpdate: the thread a lane branched from (ADR-0
       lane: P,
       name: "amber-fox",
       commit: C(4),
-      taken: C(2),
+      caughtUpWith: C(2),
     })
     expect(planParentUpdate(now("4-u", "5-m"), false)).toEqual({
       kind: "nothing",

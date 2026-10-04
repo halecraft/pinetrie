@@ -37,13 +37,13 @@ const offer: OfferRecord = {
   described: true,
   edited: false,
   bookmark: "pineta-offer/t-1",
-  taken: null,
+  integratedAs: null,
   commits: [commitId("w1")],
   ledger: null,
   at: 10,
 }
 
-test("offerSeen: what a take was shown is the record's ledger and whether it conflicted; no record shows none", () => {
+test("offerSeen: what an offer integration was shown is the record's ledger and whether it conflicted; no record shows none", () => {
   const ledger = { source: TIP, start: [BASE] }
   expect(offerSeen({ ...offer, ledger, conflicts: ["a.txt"] })).toEqual({
     ledger,
@@ -98,10 +98,10 @@ describe("offerView: ADR-0038's table", () => {
     expect(at(view(offer, "split"))).toEqual(["busy", [], []])
     expect(at(view(offer))).toEqual([
       "ready",
-      ["take", "split"],
+      ["integrate", "split"],
       ["describe", "update"],
     ])
-    // Only a clean offer lands on the line (ADR-0060): no take on a line thread.
+    // Only a clean offer lands on the line (ADR-0060): no integration on a line thread.
     expect(at(view({ ...offer, conflicts: ["a.txt"] }))).toEqual([
       "conflicts",
       ["update"],
@@ -109,21 +109,21 @@ describe("offerView: ADR-0038's table", () => {
     ])
     expect(at(view({ ...offer, size: 2 }))).toEqual([
       "stack",
-      ["take", "squash"],
+      ["integrate", "squash"],
       ["update"],
     ])
     expect(at(view({ ...offer, size: 2, stale: true }))).toEqual([
       "stale",
-      ["split", "take"],
+      ["split", "integrate"],
       ["update"],
     ])
     expect(at(view({ ...offer, edited: true }))).toEqual([
       "edited",
-      ["take", "refresh"],
+      ["integrate", "refresh"],
       ["update"],
     ])
-    expect(at(view({ ...offer, taken: "zz12345678" }))).toEqual([
-      "taken",
+    expect(at(view({ ...offer, integratedAs: "zz12345678" }))).toEqual([
+      "integrated",
       [],
       ["update"],
     ])
@@ -132,12 +132,12 @@ describe("offerView: ADR-0038's table", () => {
     const v = view({ ...offer, yourEdits: ["b.txt"] })
     expect([v.state, v.buttons, v.facts.touchesYourEdits]).toEqual([
       "ready",
-      ["take", "split"],
+      ["integrate", "split"],
       true,
     ])
     expect(view(offer).facts.touchesYourEdits).toBe(false)
   })
-  test("the facts: an untaken offer's bookmark, files and size", () => {
+  test("the facts: an offer's bookmark, files and size, until it is integrated", () => {
     expect(view({ ...offer, size: 2 }).facts).toEqual({
       activity: "idle",
       files: 2,
@@ -146,7 +146,7 @@ describe("offerView: ADR-0038's table", () => {
       touchesYourEdits: false,
       bookmark: "pineta-offer/t-1",
       held: false,
-      taken: null,
+      integratedAs: null,
       base: { kind: "line" },
       onto: "pineta-onto",
       catchUp: { kind: "current" },
@@ -157,14 +157,18 @@ describe("offerView: ADR-0038's table", () => {
     })
     expect(view(offer, "turn").facts.files).toBe(2)
     const none = view(undefined).facts
-    expect([none.files, none.bookmark, none.taken]).toEqual([0, null, null])
-    const taken = view({ ...offer, taken: "zz12345678" }).facts
-    expect([taken.files, taken.bookmark, taken.taken]).toEqual([
+    expect([none.files, none.bookmark, none.integratedAs]).toEqual([
       0,
       null,
-      "zz12345678",
+      null,
     ])
-    // Held: its bookmark is a fact in jj, and nothing in it is to take.
+    const integrated = view({ ...offer, integratedAs: "zz12345678" }).facts
+    expect([
+      integrated.files,
+      integrated.bookmark,
+      integrated.integratedAs,
+    ]).toEqual([0, null, "zz12345678"])
+    // Held: its bookmark is a fact in jj, and nothing in it is to integrate.
     const held = view({ ...offer, files: [] })
     expect([held.facts.held, held.facts.bookmark, held.destinations]).toEqual([
       true,
@@ -174,21 +178,21 @@ describe("offerView: ADR-0038's table", () => {
   })
   test("offerStatus: one decoding of a record, which every reader shares (ADR-0067)", () => {
     expect(offerStatus(undefined)).toEqual({ kind: "none" })
-    expect(offerStatus({ ...offer, taken: "zz" })).toEqual({
-      kind: "taken",
+    expect(offerStatus({ ...offer, integratedAs: "zz" })).toEqual({
+      kind: "integrated",
       as: "zz",
     })
     expect(offerStatus({ ...offer, files: [] }).kind).toBe("held")
     expect(offerStatus({ ...offer, files: [], edited: true }).kind).toBe("open")
     expect(offerStatus(offer).kind).toBe("open")
   })
-  test("behind its base, catching up stands beside the offer; with nothing to take, alone", () => {
+  test("behind its base, catching up stands beside the offer; with nothing to integrate, alone", () => {
     const behind = {
       catchUp: { kind: "brings", move: MOVE, files: 2 },
     } as const
     expect(at(view(offer, "idle", undefined, behind))).toEqual([
       "ready",
-      ["take", "split", "update"],
+      ["integrate", "split", "update"],
       ["describe"],
     ])
     expect(at(view(undefined, "idle", undefined, behind))).toEqual([
@@ -229,11 +233,11 @@ describe("offerView: ADR-0038's table", () => {
     })
     expect([gone.menu, gone.quiet]).toEqual([["continue"], []])
   })
-  test("an untraced thread's offer you edited can be taken, never rebuilt (S97)", () => {
+  test("an untraced thread's offer you edited can be integrated, never rebuilt (S97)", () => {
     const edited = view({ ...offer, edited: true }, "idle", undefined, {
       untraced: true,
     })
-    expect(at(edited)).toEqual(["edited", ["take", "update"], []])
+    expect(at(edited)).toEqual(["edited", ["integrate", "update"], []])
   })
   test("an untraced thread offers nothing, and catching up beside it, never quiet (S97)", () => {
     const untraced = view(undefined, "idle", undefined, { untraced: true })
@@ -256,7 +260,7 @@ describe("offerView: ADR-0038's table", () => {
       view(offer, "turn", undefined, { catchingUp: true }).facts.activity,
     ).toBe("turn")
   })
-  test("catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)", () => {
+  test("catchUpOf: moved from the commit a lane last caught up with in its base to the base's now, and what the host read of it there (S97)", () => {
     const moved = (...args: Parameters<typeof catchUpOf>) =>
       catchUpOf(...args).kind !== "current"
     const L1 = commitId("l1")
@@ -367,7 +371,7 @@ describe("a conflict that came with the copy, and the thread it branched from (A
     lane: P,
     name: "amber-fox" as ThreadName,
     newest: T2,
-    taken: TIP,
+    caughtUpWith: TIP,
     conflicts: [],
     ...over,
   })

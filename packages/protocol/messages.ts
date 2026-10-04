@@ -49,8 +49,8 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     clears its title.
  *   - `retitle` asks a model for the root `root`'s title (ADR-0074).
  *   - `offer` acts on that lane's offer in your repo; `mode` names the
- *     action: `take`, `split`, `squash`, `describe` or `refresh`. A take
- *     names its destination bookmark in `targetId`, `""` for the default,
+ *     action: `integrate`, `split`, `squash`, `describe` or `refresh`. An
+ *     integration names its destination bookmark in `targetId`, `""` for the default,
  *     and what it was shown in `seen`.
  *   - `line` sets up the integration line (`mode` `setup`) or lands your
  *     work on it (`land`), ADR-0060.
@@ -126,7 +126,7 @@ export interface Command {
   readonly workKind: string
   readonly workDir: string
   /**
-   * `archive`: the root; `mark`: the entry; `offer` `take`: the destination
+   * `archive`: the root; `mark`: the entry; `offer` `integrate`: the destination
    * bookmark, `""` for the default. Separate from `parentId` on purpose.
    */
   readonly targetId: string
@@ -134,8 +134,8 @@ export interface Command {
   readonly cardId: string
   /**
    * `chat`: the card's text version as the sender had it (S96), or `""`.
-   * `offer` `take`: what the take was shown (`OfferSeen`, ADR-0065), as JSON;
-   * a take without it is refused.
+   * `offer` `integrate`: what the integration was shown (`OfferSeen`,
+   * ADR-0065), as JSON; an integration without it is refused.
    */
   readonly seen: string
   /**
@@ -177,7 +177,7 @@ export const OUTCOME_KINDS = [
   "restored",
   "marked",
   "retitling",
-  "taken",
+  "integrated",
   "offered",
   "reserved",
   "seen",
@@ -201,7 +201,7 @@ export interface Reply {
   /** Set only when a chat message was appended: its entry id. */
   readonly entryId: string
   /**
-   * `conflict`: the writer id of who took the slot; `unmoved`: who put the
+   * `conflict`: the writer id of who wrote at the slot first; `unmoved`: who put the
    * card where it is now. "" when none is known, or for any other outcome.
    * The client names it, and can tell it is itself.
    */

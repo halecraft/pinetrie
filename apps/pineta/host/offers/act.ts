@@ -1,18 +1,22 @@
-// host/offers/act — an offer action other than a split (ADR-0038): take,
-// squash, refresh, or describe again. Each is one owner command: gather
-// (`gatherOffer`, and `gatherTake` for a take), decide (`planOfferTake`,
-// `planRebuild`), translate and execute. A take moves one bookmark forward
-// to the offer (ADR-0060).
+// host/offers/act — an offer action other than a split (ADR-0038):
+// integrate, squash, refresh, or describe again. Each is one owner command:
+// gather (`gatherOffer`, and `gatherOfferIntegration` for an integration),
+// decide (`planOfferIntegration`, `planRebuild`), translate and execute. An
+// offer integration moves one bookmark forward to the offer (ADR-0060).
 
 import type { ErrCode, LaneName, OfferSeen, WriterId } from "@pineta/core"
 import { readThreadName } from "@pineta/reads"
 import {
   gatherOffer,
-  gatherTake,
+  gatherOfferIntegration,
+  offerIntegrationEffects,
   type RepoOps,
-  takeEffects,
 } from "@pineta/repo"
-import { planDescribeAgain, planOfferTake, planRebuild } from "@pineta/rules"
+import {
+  planDescribeAgain,
+  planOfferIntegration,
+  planRebuild,
+} from "@pineta/rules"
 import { describe } from "./describe.ts"
 import { executeOffer } from "./execute.ts"
 import type { Refresh } from "./refresh.ts"
@@ -25,7 +29,7 @@ export async function act(
   > & { readonly describing: Set<LaneName> },
   refresh: Pick<Refresh, "rebuild" | "ports">,
   lane: LaneName,
-  action: "take" | "squash" | "describe" | "refresh",
+  action: "integrate" | "squash" | "describe" | "refresh",
   by: WriterId,
   to: string | null = null,
   seen: OfferSeen | null = null,
@@ -49,30 +53,35 @@ export async function act(
       const refused = planDescribeAgain(gathered)
       return refused === null ? { code: null, describe: true } : code(refused)
     }
-    if (action === "take") {
-      const take =
-        gathered === null ? null : await gatherTake(ops, gathered, line)
+    if (action === "integrate") {
+      const integration =
+        gathered === null
+          ? null
+          : await gatherOfferIntegration(ops, gathered, line)
       const { editing } = await ops.shared()
       // plan
-      const planned = planOfferTake({
+      const planned = planOfferIntegration({
         lane,
         gathered,
         seen,
-        take,
+        integration,
         editing,
         onto: line.onto,
         to,
         now: basics.now(),
       })
       if (planned.kind === "refused") return code(planned.code)
-      // execute: the lane's base record first, as the take found it.
+      // execute: the lane's base record first, as the integration found it.
       await executeOffer(
         refresh.ports(ops, lane, planned.name),
-        { base: gathered?.base ?? null, effects: takeEffects(planned) },
+        {
+          base: gathered?.base ?? null,
+          effects: offerIntegrationEffects(planned),
+        },
         null,
       )
       basics.log(
-        `[host] ${readThreadName(basics.session, lane)}: offer taken by ${by} as ${planned.top.slice(0, 8)}`,
+        `[host] ${readThreadName(basics.session, lane)}: offer integrated by ${by} as ${planned.top.slice(0, 8)}`,
       )
       return code(null)
     }

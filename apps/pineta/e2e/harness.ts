@@ -87,14 +87,14 @@ export async function waitFor(
   return -1
 }
 
-/** No card is queued on any lane (ADR-0048): nothing waits to be taken. */
+/** No card is queued on any lane (ADR-0048): nothing waits to be popped. */
 export const noQueued = (host: Pick<RunningHost, "places">): boolean =>
   readPlaces(host.places).every(c => c.place.kind !== "queued")
 
 /**
  * The host has nothing to do: no lane runs, and no card waits for one. A card
- * queued under a run is taken only as it ends, so "no run" alone can hold
- * between a run's end and the take.
+ * queued under a run is popped only as it ends, so "no run" alone can hold
+ * between a run's end and the pop.
  */
 export const idleNow = (host: Pick<RunningHost, "live" | "places">): boolean =>
   Object.keys(host.live.activeRuns()).length === 0 && noQueued(host)

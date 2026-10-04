@@ -49,8 +49,8 @@ import {
   planPin,
   planPut,
   planRemove,
-  planTake,
-  planTakeCopy,
+  planTakeCopyIntoInventory,
+  planTakeIntoInventory,
   planUndoMove,
   planUnpin,
   queueMove,
@@ -77,7 +77,7 @@ export type ColumnAct =
    */
   | { readonly kind: "keep"; readonly cards: readonly CardId[] }
   /** Take a card in this column into your inventory (ADR-0048). */
-  | { readonly kind: "take"; readonly card: CardId }
+  | { readonly kind: "takeIntoInventory"; readonly card: CardId }
   /** Move the column to index `to`. */
   | { readonly kind: "move"; readonly to: number }
   /** Read the column at `density` (ADR-0056). */
@@ -131,7 +131,7 @@ export type ColumnAct =
       readonly lane: LaneName
       readonly at: Position
     }
-  /** Act on the lane's offer in your repo; a take names its destination (ADR-0060). */
+  /** Act on the lane's offer in your repo; an integration names its destination (ADR-0060). */
   | {
       readonly kind: "offer"
       readonly lane: LaneName
@@ -179,8 +179,8 @@ export type Intent =
   | { readonly kind: "openIn"; readonly entry: EntryId; readonly root: EntryId }
   | { readonly kind: "signOut" }
   /** Take `card` into your inventory: by key, wherever it is. */
-  | { readonly kind: "take"; readonly card: CardId }
-  /** Put `card` at `target`: a column's end, or a slot (a swap, or a take there). */
+  | { readonly kind: "takeIntoInventory"; readonly card: CardId }
+  /** Put `card` at `target`: a column's end, or a slot (a swap, or a take into the inventory there). */
   | { readonly kind: "put"; readonly card: CardId; readonly target: PutTarget }
   /** Remove a card from your inventory: final, as a discard is. */
   | { readonly kind: "remove"; readonly card: CardId }
@@ -228,7 +228,7 @@ export type Effect =
       readonly text: string
       readonly how: MoveHow
     }
-  /** A move (ADR-0059): a take, a put, a queue, an unqueue, a discard. */
+  /** A move (ADR-0059): a take into the inventory, a put, a queue, an unqueue, a discard. */
   | {
       readonly kind: "moveCard"
       readonly move: Move
@@ -262,7 +262,7 @@ export type Effect =
   | { readonly kind: "undoSwap"; readonly direction: MoveDirection }
   /** Keep a refusal made before anything was sent. */
   | { readonly kind: "refuse"; readonly refusal: CardRefusal }
-  /** Open the inventory; `brief`: only for a take's flight, if it was closed. */
+  /** Open the inventory; `brief`: only for the flight of a take into it, if it was closed. */
   | { readonly kind: "showInventory"; readonly brief: boolean }
   | { readonly kind: "select"; readonly slot: number }
   /** An offer action, which the session tracks (`acting`). */
@@ -384,8 +384,8 @@ export function planIntent(
       return planOpenIn(intent.entry, intent.root, state, fresh)
     case "signOut":
       return [{ kind: "forgetIdentity" }, { kind: "reload" }]
-    case "take":
-      return planTake(intent.card, state)
+    case "takeIntoInventory":
+      return planTakeIntoInventory(intent.card, state)
     case "put":
       return planPut(intent.card, intent.target, state)
     case "remove":
@@ -530,10 +530,10 @@ function planColumn(
     }
     case "keep":
       return planKeep(act.cards, key, closing(), state)
-    case "take":
-      return planTake(act.card, state)
-    case "takeCopy":
-      return planTakeCopy(act.card, act.text, state)
+    case "takeIntoInventory":
+      return planTakeIntoInventory(act.card, state)
+    case "takeCopyIntoInventory":
+      return planTakeCopyIntoInventory(act.card, act.text, state)
     case "move":
       return onRoot({ kind: "move", from: position, to: act.to })
     case "density":
@@ -551,7 +551,7 @@ function planColumn(
       return move === null ? [] : [moveCard(move, IN_COLUMN(key), false)]
     }
     case "unqueue": {
-      // If the host took the card first, the refusal says it was sent.
+      // If the host popped the card first, the refusal says it was sent.
       const now = cardOf(state.cards, act.card)
       if (now?.place.kind !== "queued") return []
       const move = moveOf(now, draftingOf(now.place))
@@ -571,7 +571,7 @@ function planColumn(
     case "bringUpToDate": {
       const queued = queueMove(act.create, act, state.cards)
       // Made, then queued: the host sets the command before the queue's
-      // move, so the drain that move starts takes it with its command.
+      // move, so the drain that move starts pops it with its command.
       return [
         {
           kind: "createCard",

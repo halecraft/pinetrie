@@ -43,7 +43,7 @@ written by this client, and kept on its thread.
 - **A write names its root**: `chat` and `mark` find it from the held
   document with the entry (`rootOf`), and a send at the root mints one
   (`newRootId`); a card's place at an entry carries it. A queued card
-  takes its lane's root (`queueRoot`, in core), since the host takes it
+  takes its lane's root (`queueRoot`, in core), since the host pops it
   into a chat in `place.root`; only a lane with no record yet falls back to
   the card's own root.
 
@@ -800,33 +800,34 @@ became of its files (`strip`).
   column whose next send creates a lane of its own, at a commit whose
   records carry conflicts (`conflictsAt` of `nearestRevision`'s commit),
   shows `.where-fork-conflict` under the where line.
-- **A take names the offer this tab shows** (ADR-0065): `SessionClient.offer`
+- **An offer integration names the offer this tab shows** (ADR-0065): `SessionClient.offer`
   reads the lane's record from its session document as it sends, the one
   the strip was drawn from, and sends `offerSeen` of it (its ledger, and
-  whether it conflicted). The host refuses the take `offer_changed` when the
+  whether it conflicted). The host refuses the integration `offer_changed` when the
   offer now brings other work.
 - **Your offer and line commands are tracked per tab** (`acting.ts`,
   `@pineta/session`): `SessionClient.offer` and `.line` mark the command
   `sent` at once and record the answer when it comes. A refusal or failure
   stays until your next command on that lane (or the line); an answer that
-  carried it out (`taken`, `offered`, a split's `started`, `line-moved`)
+  carried it out (`integrated`, `offered`, a split's `started`, `line-moved`)
   clears it, since the record then says how things stand. Each send has an
   id, so the answer to a send since replaced changes nothing. The page's
   `offer` effect (`perform.ts`) only calls the session. `columnView` takes
   the lane's entry as `ColumnFacts.acting`: the strip's `waiting` disables
   its buttons and menu rows while it is `sent`, and `offerWords` words it
   as the strip's `note` (`.offer-note`, `role="status"`, `data-acting`
-  `sent` or `said`). A take in flight names its destination by
+  `sent` or `said`). An integration in flight names its destination by
   `catchUpName`; a refusal or failure is `outcomeWords`, shared with the
   project menu.
 - **`offerView` (`@pineta/rules`) decides an offer; `offerWords`
   words it**: its line and each button's label and title, by state. An
-  offer that conflicts says so even when it is `edited` (S73), and its take
-  reads "add anyway" whatever the state, as it does when a resolution asked
-  for you. Each take names where the work goes (ADR-0060, ADR-0061): "add to
+  offer that conflicts says so even when it is `edited` (S73), and its
+  integrate button reads "add anyway" whatever the state, as it does when a
+  resolution asked for you. Each integrate button names where the work goes
+  (ADR-0060, ADR-0061, ADR-0083): "add to
   the project", "add to wip/search", and, from a WIP thread's menu, "add to
   the project, with your 2 commits beneath it". A conflicted offer on the
-  line offers "resolve in the thread", never a take onto it. The bookmark is
+  line offers "resolve in the thread", never an integration into it. The bookmark is
   a fact of its own, drawn apart (`.offer-bookmark`), never in the line.
   `workStrip` hands `offerView` the record decoded (`offerStatus`): a `held`
   offer says "nothing to add: the project already has this thread's work",
@@ -850,7 +851,7 @@ became of its files (`strip`).
   project…").
 - **A thread's base** shows in its header only when it is not the line
   (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
-  update becomes "continue from the project" and no take is offered.
+  update becomes "continue from the project" and no integration is offered.
   Catching up says its base: "catch up with wip/search". Two known limits,
   both in words only:
   - until a lane has a base record, the page names the line as its base
@@ -1190,7 +1191,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `Column` for its composer and for everyone else's cards at its end, since
   sending any of them here creates this column's lane.
 - **The queue names who queued the last card,** not who the agent is
-  answering: the host takes queued cards in order, so a new one waits behind
+  answering: the host pops queued cards in order, so a new one waits behind
   the last (`LaneView.lastWaiting`). `queuePlace`
   tells yours from someone else's by the column's `session.writer`;
   `queueWords` says it, with a `title` counting the queue when more than one
@@ -1212,7 +1213,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   the message before it failed. The profile form words a failed rename with
   the same function, through `renameProblem` (`identity.ts`).
 - **Queued cards** (ADR-0048) are drawn after the thread's last message and
-  its working line, above the line, in the order the host takes them
+  its working line, above the line, in the order the host pops them
   (`queuedOn`), each a `QueuedCardEditor`: always bound, editable by anyone
   here, with `queuedWords`, its command's `commandNote` and **unqueue**. They
   are not in the tree yet. Below the line, the column shows every drafting
@@ -1220,13 +1221,13 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   a card of yours someone unqueued while you typed another shows there.
 - **A queue sends the text's version too** (`seen`, `textVersion`), in the
   queued key, and so does a chat sent from a card (`SentCard`), which the
-  host queues when the lane is busy: the host takes the card only once it
+  host queues when the lane is busy: the host pops the card only once it
   holds that much of the text, since the request can reach it first (S96).
 - **Queue, unqueue and a command are requests to the host, outside the
   card's own undo** (`moveCard`, and `request` with `set-command`): a
   card's box undoes only its text (ADR-0052). A queue and an unqueue are
   moves, so the host records them in the root's history of your moves, and
-  the page undoes them, not a box (ADR-0066). An unqueue the host's take got
+  the page undoes them, not a box (ADR-0066). An unqueue the host's pop got
   to first is refused `gone` (S69, ADR-0059); `session.moves` holds the
   refusal, read by the column through `useSyncExternalStore`, until your
   next send, queue or unqueue in its lane, and the column says "already
@@ -1397,14 +1398,14 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **Catching up is a card queued at once** (ADR-0055, ADR-0061): the button
   is the `bringUpToDate` act, which creates a card at the thread's end with
   the command and no text, then queues it, two effects in that order. The
-  host takes them in order, so the command is set before the queue's move
-  starts the drain that takes the card. Your card in the composer is not
+  host handles the two in order, so the command is set before the queue's
+  move starts the drain that pops the card. Your card in the composer is not
   touched. A card that carries a command anyway (one unqueued) says above its box what
   sending it does first (`commandNote`), its placeholder says its text is
   optional, and its button names the command (`commandSendWords`: "catch
   up", "catch up and send"), its queue place in the title. The card is
   then queued like any other (`planSend`, which carries the command), and
-  the host carries the command out when it takes it.
+  the host carries the command out when it pops it.
 - **Land, update, stack and carry-on messages** show as one line each,
   roles `land` ("catching up"), `update` ("caught up"), `stack` and
   `carry-on` ("resumed"). The update's line
@@ -1421,8 +1422,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `data-state` (`ready`, `conflicts`, `stack`, and the rest of
   `offerView`'s states); its line is `.offer-line` (a button when the offer
   can be reviewed; its caret is CSS, so its text is the words alone), its
-  bookmark `.offer-bookmark`, and each button `.offer-<action>`, Take being
-  `.offer-take`. The review is `.review`, with `.review-list` (rows
+  bookmark `.offer-bookmark`, and each button `.offer-<button>`, the add
+  button being `.offer-integrate`. The review is `.review`, with `.review-list` (rows
   `.review-list-file`, titled with the display path) and `.review-diffs`;
   each file is `.review-file[data-key][data-letter][data-state]`, its head
   `.review-file-head`, its diff `.review-diff` of `[data-kind]` lines. The
@@ -1614,7 +1615,7 @@ the session sends moves and draws them until its copy holds them
   `moveOf` (an unqueue's target is `draftingOf`, a queue's root
   `queueRoot`), from the cards as drawn, and the session sends it.
 - **Refusals are worded here** (`refusalWords`), from the session's
-  `CardRefusal`: an unqueue the take beat says "already sent", a move
+  `CardRefusal`: an unqueue the pop beat says "already sent", a move
   someone made first names them. A column draws its own, and the panel the
   inventory's.
 
@@ -1699,7 +1700,7 @@ stays in view; the strip scrolls past 30vh.
   thread's end, and a fresh column has none until its first send.
 - **Each is a `PinnedCardEditor`** (`card-editor.tsx`), a `BoundCardEditor`
   with its size (`tokensOf`, four characters a token, as pi estimates),
-  its status, **unpin** and **take**. It has no send: Enter is a new line.
+  its status, **unpin** and **take** (into your inventory). It has no send: Enter is a new line.
   A drafting card's editor gains **pin**. Pin and unpin are moves
   (`planPin`, `planUnpin`, `card-intents.ts`), so the host records them and
   the undo key outside a box reverses them; `revealOf` shows a pinned place
@@ -1817,8 +1818,9 @@ state, never stored.
   inventory's slots").
 - **`settleSlots` is the one slot rule** (`@pineta/session`): the panel
   draws it (`inventoryView`, `inventory-view.ts`), the session's repair
-  writes towards it, and a take lands by the same `firstEmpty`. `App`
-  computes it once, with the takes in flight as intents (`intentsOf`), and
+  writes towards it, and a take into the inventory lands by the same
+  `firstEmpty`. `App` computes it once, with the takes into the inventory in
+  flight as intents (`intentsOf`), and
   both the panel and the intents read that.
 - **The history of moves is the host's** (ADR-0066): one per person and
   root, which the host chooses for each move (`historyOf`). The page keeps
@@ -1853,8 +1855,9 @@ state, never stored.
   where a put can. A column's pinned strip carries `data-put-pinned`: it
   lands where the column's composer would create a card, pinned (`pinnedOf`),
   and a fresh column's strip, which has no thread, lands nowhere. A slot as the target swaps a card already in your
-  inventory, and takes any other into that slot.
-- **Take, put, keep, remove, select and undo are intents** (`intent.ts`,
+  inventory, and takes any other into the inventory at that slot.
+- **Take into the inventory, put, keep, remove, select and undo are
+  intents** (`intent.ts`,
   `card-intents.ts`), planned from `IntentState.cards` (`CardFacts`: the
   drawn cards, the lanes, the drawn slots, the selection and the composer
   places), carried out by `perform`. A keep sends one move of every card
@@ -1862,25 +1865,26 @@ state, never stored.
   refusals, and closes the column once accepted (`afterKeep`).
 - **Drag** is HTML drag and drop, not the column drag's pointer events: it
   crosses elements and tabs. A card's drag carries its id under
-  `CARD_MIME`; its handle is its take button, or a slot. `App` listens on
+  `CARD_MIME`; its handle is its take button (`TakeIntoInventoryButton`), or a slot. `App` listens on
   the document for `dragover` and `drop`; a drag held over a root's tab for
   `TAB_HOVER_MS` opens it. `NOT_A_HANDLE` includes `[draggable='true']`, so
   a card's drag never starts a column's.
 - **Keys** (`inventory-keys.ts`, `keyAct`): one table, read by one
   `keydown` listener in `App` that decides nothing. Ctrl+Shift+I takes the
-  focused card (`data-card` on the focused element, a box's included);
+  focused card into the inventory (`data-card` on the focused element, a box's included);
   Ctrl+Shift+O puts the selected one in the column whose element last held
   focus; Cmd or Ctrl with Z, Shift+Z, or Ctrl+Y undo and redo a move, only
   outside a text box, where the box's own text undo has them; arrows and
   `hjkl` move through the grid while the panel has focus.
 - **A move flies** (`use-flight.ts`): `perform` measures the card's element
   before the move (`ports.fly`), and once it is drawn elsewhere that
-  element animates from the old box. A take while the panel is closed opens
-  it briefly.
+  element animates from the old box. A take into the inventory while the
+  panel is closed opens it briefly.
 - **Selectors for the browser suite:** `.inventory` (the panel),
   `.inventory .slot[data-slot][data-card]` and `.slot-line`, `.inventory
-  .put`, `.inventory .remove`, `#top .inventory-toggle`, a card's `.take`, a
-  message's `.take-copy`, and a fresh column's `.close-keep`,
+  .put`, `.inventory .remove`, `#top .inventory-toggle`, a card's
+  `.take-into-inventory`, a message's `.take-copy-into-inventory`, and a
+  fresh column's `.close-keep`,
   `.close-discard` and `.close-cancel`.
 
 ## Selectors in the browser suite

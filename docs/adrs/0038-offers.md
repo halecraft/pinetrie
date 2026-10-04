@@ -35,6 +35,8 @@ observes a move it depends on (the watched heads), not on a 2 s poll; a
 refresh is keyed upkeep, and every write to your repo is the owner's.
 Amended by ADR-0061: archiving a root withdraws its threads' offers, and a
 refresh that finds no offer and none to build removes its record.
+Amended by ADR-0083: in code and docs, taking an offer is *integrating*
+it, into the line or a WIP; the page still says "add".
 
 **Context.** Taking a thread's work today rebases your `@` onto the lane's
 merge (ADR-0034). Every turn commit the lane made becomes an ancestor of your

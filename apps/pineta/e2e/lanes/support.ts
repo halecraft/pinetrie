@@ -45,7 +45,7 @@ export const at = (id: string | null): Position =>
 /**
  * Bring a thread up to date (ADR-0055), as its button and a send do: a card
  * at the lane's tip with the command and `text`, queued. On an idle lane the
- * host takes it at once.
+ * host pops it at once.
  */
 export function bringUpToDate(
   session: SessionClient,

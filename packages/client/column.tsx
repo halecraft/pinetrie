@@ -391,11 +391,11 @@ export function Column(p: ColumnProps) {
   // sight (ADR-0056). Outline draws each ask's line under its message.
   const atTop = useAskBar(body, density !== "outline")
   // The cards queued for this thread's lane, above the line, in the order the
-  // host takes them (ADR-0048).
+  // host pops them (ADR-0048).
   const queued = lane.kind === "lane" ? queuedOn(p.cards, lane.name) : []
-  // What you did here that was refused: an unqueue the host had taken the
+  // What you did here that was refused: an unqueue the host had popped the
   // card before (S69), a move someone else made first (ADR-0059), a put the
-  // host would not take, or a keep without room.
+  // host would not accept, or a keep without room.
   const refused = useSyncExternalStore(
     p.session.moves.subscribe,
     p.session.moves.current,
@@ -515,8 +515,8 @@ export function Column(p: ColumnProps) {
   }
   // The column's pane (ADR-0078): what you opened beside the thread, kept
   // only while the column is mounted. One subject at a time, named, so
-  // `paneView` can tell when it is gone: the offer's review after a take or
-  // a withdrawal, a table or an image whose message this column no longer
+  // `paneView` can tell when it is gone: the offer's review after an
+  // integration or a withdrawal, a table or an image whose message this column no longer
   // draws. The thread's next offer does not open it with nobody asking.
   const [pane, setPane] = useState<PaneSubject | null>(null)
   const openPane = useStable((subject: PaneSubject) =>
@@ -545,22 +545,22 @@ export function Column(p: ColumnProps) {
   const paneId = `pane-${p.column.key}`
   const toggleReview = useStable(() => openPane({ kind: "offer" }))
   // Catching up is a card with the command and no text, queued at once
-  // (ADR-0055, ADR-0061): the host takes it when the lane is free.
-  // A take names its destination: the default, or the line (ADR-0060).
+  // (ADR-0055, ADR-0061): the host pops it when the lane is free.
+  // An integration names its destination: the default, or the line (ADR-0060).
   const actOnOffer = (button: OfferButton) => {
     if (lane.kind !== "lane") return
-    if (button === "take" || button === "take-line") {
+    if (button === "integrate" || button === "integrate-into-line") {
       const destinations =
         shows.strip.kind === "offer" ? shows.strip.destinations : []
       const to =
-        button === "take"
+        button === "integrate"
           ? destinations[0]
           : destinations.find(d => d.kind === "line")
       if (to === undefined) return
       return act({
         kind: "offer",
         lane: lane.name,
-        action: "take",
+        action: "integrate",
         to: to.bookmark,
       })
     }
@@ -973,8 +973,8 @@ export function Column(p: ColumnProps) {
             CSS hides it while a row the work opened runs, and in outline,
             where the running ask's own line pulses. */}
               {running && <div aria-hidden className="working-line" />}
-              {/* Cards queued for this thread's lane, in the order the host takes
-            them: not in the tree yet, and editable by anyone until taken. */}
+              {/* Cards queued for this thread's lane, in the order the host pops
+            them: not in the tree yet, and editable by anyone until popped. */}
               {queued.map((c, n) => (
                 <QueuedCardEditor
                   card={c}
@@ -1466,7 +1466,9 @@ function WorkStripView({
           aria-expanded={review.open}
           className="offer-line"
           onClick={review.toggle}
-          title={review.open ? "close the review" : "review what a take brings"}
+          title={
+            review.open ? "close the review" : "review what adding it brings"
+          }
           type="button"
         >
           {words.line}

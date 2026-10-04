@@ -1271,8 +1271,8 @@ async function run(
         ])
         await say("write two files")
         await toolIdle()
-        const takeShown = await appears(
-          `${col(0)} .work.offer[data-state="ready"] .offer-take`,
+        const integrateShown = await appears(
+          `${col(0)} .work.offer[data-state="ready"] .offer-integrate`,
         )
         const line =
           (await tp
@@ -1289,8 +1289,8 @@ async function run(
             "the offer's line opens its review beside the thread, which keeps its 28rem: a row per file, and a file's diff",
             "typing beside an open review redraws none of it",
             "a file's head stays pinned while its diff scrolls, and the list brings a file to the top",
-            "the column's foot shows the thread's offer in words, its bookmark apart, and Take moves the line to it, leaving your working copy",
-            "the review closes, and after the take there is none to open",
+            "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves the line to it, leaving your working copy",
+            "the review closes, and after the integration there is none to open",
           ])
             skip(label, noContainers)
         else {
@@ -1299,7 +1299,7 @@ async function run(
           await waitFor(
             () =>
               [...readOffers(toolHost.session).values()].some(
-                o => o.taken === null && o.described,
+                o => o.integratedAs === null && o.described,
               ),
             15_000,
           )
@@ -1393,8 +1393,8 @@ async function run(
             .click(`${col(0)} > .pane .pane-close`, { timeout: 5_000 })
             .catch(() => {})
           const closed = await appears(`${col(0)}:not(:has(.review))`, 5_000)
-          if (takeShown) await tp.click(`${col(0)} .work .offer-take`)
-          // The take moves the line forward to the offer (ADR-0060).
+          if (integrateShown) await tp.click(`${col(0)} .work .offer-integrate`)
+          // The integration moves the line forward to the offer (ADR-0060).
           const onLine = () => {
             try {
               return execFileSync(
@@ -1414,15 +1414,15 @@ async function run(
               return false
             }
           }
-          const took =
+          const integrated =
             (await waitFor(onLine, 10_000)) >= 0 &&
             !existsSync(path.join(work, "from-lane.txt"))
           check(
-            "the column's foot shows the thread's offer in words, its bookmark apart, and Take moves the line to it, leaving your working copy",
-            takeShown &&
+            "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves the line to it, leaving your working copy",
+            integrateShown &&
               bookmark.startsWith("pineta-offer/") &&
               !line.includes("`") &&
-              took,
+              integrated,
             `${line} · ${bookmark}`,
           )
           const settled = await tp
@@ -1440,7 +1440,7 @@ async function run(
             )
           const noReview = (await tp.$(review)) === null
           check(
-            "the review closes, and after the take there is none to open",
+            "the review closes, and after the integration there is none to open",
             closed && settled && noReview,
             `closed ${closed}, line not a button ${settled}, no review ${noReview}`,
           )

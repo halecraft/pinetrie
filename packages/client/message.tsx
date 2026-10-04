@@ -11,11 +11,12 @@ import { StoredImage } from "./blob-image.tsx"
 import {
   pinnedMarkerWords,
   retiredWords,
-  TAKE,
-  TAKE_COPY,
+  TAKE_COPY_INTO_INVENTORY,
+  TAKE_INTO_INVENTORY,
 } from "./card-words.ts"
 import { joinWords } from "./column-view.ts"
 import { COPIED, useCopy } from "./copy.ts"
+import { copyIntoInventoryText } from "./copy-into-inventory-text.ts"
 import { copyText } from "./copy-text.ts"
 import { plural } from "./counts.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
@@ -30,7 +31,6 @@ import { MessageSource } from "./pane-context.ts"
 import { nameFor } from "./presence.tsx"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import type { ScreenMemory } from "./screen-memory.ts"
-import { takeText } from "./take-text.ts"
 import {
   CALL_MARK,
   callStatus,
@@ -174,10 +174,10 @@ function Tools({
   return (
     <div className="tools">
       {tools.copy && <CopyButton node={node} />}
-      {tools.take && (
+      {tools.takeCopyIntoInventory && (
         <button
-          aria-label={TAKE_COPY}
-          className="take-copy"
+          aria-label={TAKE_COPY_INTO_INVENTORY}
+          className="take-copy-into-inventory"
           onClick={e => {
             const msg = e.currentTarget.closest(".msg")
             const selection = window.getSelection()
@@ -186,9 +186,9 @@ function Tools({
                 ? null
                 : selection.getRangeAt(0)
             onAct({
-              kind: "takeCopy",
+              kind: "takeCopyIntoInventory",
               card: newCardId(),
-              text: takeText(
+              text: copyIntoInventoryText(
                 node,
                 range === null || selection === null
                   ? null
@@ -200,10 +200,10 @@ function Tools({
               ),
             })
           }}
-          title={TAKE_COPY}
+          title={TAKE_COPY_INTO_INVENTORY}
           type="button"
         >
-          {TAKE}
+          {TAKE_INTO_INVENTORY}
         </button>
       )}
       {edit?.kind === "branch" && (

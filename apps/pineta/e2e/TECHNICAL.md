@@ -105,14 +105,14 @@ They share `checks.ts` (recording a check, and stopping at one),
 ## Gotchas
 
 - **An idle wait checks the queue as well as the runs** (`idleNow`): a
-  card queued while a run goes is taken only when it ends, so "no run" alone
-  can return between a run's end and the take. A card a client has just
+  card queued while a run goes is popped only when it ends, so "no run" alone
+  can return between a run's end and the pop. A card a client has just
   queued may not have reached the host yet, so a step that queues waits for
-  what the take makes (a message, a landing) before it waits for idle.
+  what the pop makes (a message, a landing) before it waits for idle.
 - **A card queued for the restart in `host/tools` is queued under a run
   that is only the document's record** (`beginRun`). Queued on an idle lane,
-  the move's drain would take it before the restart; the record is what a
-  stopping host leaves, and the next host's startup clears it, then takes
+  the move's drain would pop it before the restart; the record is what a
+  stopping host leaves, and the next host's startup clears it, then pops
   the card.
 - **The places are the host's alone** (ADR-0059): read them through
   `RunningHost.places` (`readPlaces`), and move cards through a session's

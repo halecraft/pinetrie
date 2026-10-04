@@ -37,20 +37,24 @@ export async function commitsOf(
 }
 
 /**
- * A take on the line as `TAKE_ROW` prints it: its commit, and its message
- * whole. Your repo reads the takes on the line with it (`@pineta/repo`), and
- * a lane the takes it lacks before it catches up (`takesAbove`).
+ * An integrated-offer commit on the line as `INTEGRATED_OFFER_COMMIT_ROW`
+ * prints it: its commit, and its message whole. Your repo reads the
+ * integrated-offer commits on the line with it (`@pineta/repo`), and a lane
+ * those it lacks before it catches up (`integratedOfferCommitsAbove`).
  */
-export interface TakeRow {
+export interface IntegratedOfferCommitRow {
   readonly commit: CommitId
   readonly description: string
 }
 
-/** One take a line: its commit, a tab, and its message as a JSON string. */
-export const TAKE_ROW = 'commit_id ++ "\\t" ++ json(description) ++ "\\n"'
+/** One integrated-offer commit a line: its commit, a tab, and its message as a JSON string. */
+export const INTEGRATED_OFFER_COMMIT_ROW =
+  'commit_id ++ "\\t" ++ json(description) ++ "\\n"'
 
-/** `TAKE_ROW`'s output, read back. */
-export function parseTakes(stdout: string): TakeRow[] {
+/** `INTEGRATED_OFFER_COMMIT_ROW`'s output, read back. */
+export function parseIntegratedOfferCommits(
+  stdout: string,
+): IntegratedOfferCommitRow[] {
   return lines(stdout).map(row => {
     const tab = row.indexOf("\t")
     return {

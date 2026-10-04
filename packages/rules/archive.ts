@@ -202,7 +202,7 @@ export function writesIn(
     case "reserve":
     // The line is your repo's, in no root.
     case "line":
-    // A command acts only when its card is taken, behind the take's own check.
+    // A command acts only when its card is popped, behind the pop's own check.
     case "set-command":
     // Traces are the session's, in no root.
     case "traces-seen":

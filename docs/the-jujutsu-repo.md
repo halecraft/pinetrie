@@ -14,7 +14,8 @@ touch the repo: their threads' agents work in lanes of their own, and their
 work reaches the repo as offers.
 
 The page names these things by what they are for, not by their jj names
-(ADR-0061): the line is **the project**, a take is **add to the project**,
+(ADR-0061): the line is **the project**, integrating an offer is **add to
+the project**,
 bringing a thread up to date is **catch up**, and landing your work is
 **add my work to the project**. The jj names are in the page's titles.
 
@@ -22,10 +23,10 @@ bringing a thread up to date is **catch up**, and landing your work is
 
 | bookmark | whose | what it is |
 |---|---|---|
-| `pineta-onto` | the owner's, moved by the host on a take | **The integration line**: where finished work lands. It only moves forward. Immutable once set up. |
+| `pineta-onto` | the owner's, moved by the host on an offer integration | **The integration line**: where finished work lands. It only moves forward. Immutable once set up. |
 | `pineta-offer/<name>` | the host's | **An offer**: a thread's work as one revision, or a stack, on the thread's base. Immutable while it sits on the line. `<name>` is the thread's two-word name. |
 | `main` | the owner's, moved by the host on a publish | **Where the project is published**: moved forward to `pineta-onto`, never anywhere else. |
-| `wip/*` | the owner's | **A work in progress** a thread may start from, chosen at its first message. Never touched by the host, except a take into it. |
+| `wip/*` | the owner's | **A work in progress** a thread may start from, chosen at its first message. Never touched by the host, except an offer integration into it. |
 | `tip@pineta-<lane>` | the host's | **A lane's history**, fetched from the lane. A remote bookmark, untracked, so jj treats it as immutable and leaves it out of the default log. Archiving a thread deletes its lane's, and abandons its offer; restoring brings both back. |
 
 The names `pineta-onto`, `main` and `wip/` are the defaults. A project sets its own
@@ -36,11 +37,12 @@ project's wins:
 { "offers": { "onto": "trunk", "wipPrefix": "wip/", "publish": "master" } }
 ```
 
-**A take** moves one bookmark forward to an offer: `pineta-onto`, or the
-thread's `wip/` bookmark. It never rebases, and never touches `@`. jj itself
-refuses a move that is not forward, so a stale take fails instead of
-dropping commits. Only an offer with no conflicts can be taken onto the
-line.
+**An offer integration** moves one bookmark forward to an offer:
+`pineta-onto`, or the thread's `wip/` bookmark. It never rebases, and never
+touches `@`. jj itself refuses a move that is not forward, so a stale
+integration fails instead of dropping commits. Only an offer with no
+conflicts can be integrated into the line. The commit it leaves there is an
+**integrated-offer commit** (ADR-0083).
 
 **Publish** ("publish to main", in the page's project menu) moves `main`
 forward to `pineta-onto`, as `pineta-host`: `jj bookmark move main --to
@@ -117,7 +119,7 @@ and jj's `trailers` template reads only the last.
 | trailer | on | says |
 |---|---|---|
 | `Pineta-Base: <bookmark>@<commit>` | a lane's start, and each update | the thread's base: the line, or a `wip/` bookmark, at that commit |
-| `Pineta-Source: <commit>` | every revision of an offer | the lane tip the offer holds; on the line, that work has been taken |
+| `Pineta-Source: <commit>` | every revision of an offer | the lane tip the offer holds; on the line, that work has been integrated |
 | `Pineta-Start: <commit>` | every revision of an offer | where the offer starts |
 | `Pineta-Thread`, `Pineta-Lane`, `Pineta-Entry` | every revision of an offer | the thread, its lane, and the newest entry its work came from |
 
@@ -126,7 +128,7 @@ believes:
 
 - **A squash that keeps one message** (`jj squash -u`, or a message written
   by hand) drops the other commit's `Pineta-Source`. Pineta then reads that
-  work as not taken, and offers it again.
+  work as not integrated, and offers it again.
 - **An offer's message rewritten without `Pineta-Thread`** still has its
   top found by its bookmark, but a stack's lower revisions are no longer
   recognised as the offer's, so the offer reads as edited.
@@ -134,7 +136,7 @@ believes:
 ## Rewriting under Pineta
 
 - **The line is immutable on purpose.** Rewriting it takes
-  `--ignore-immutable`, which is the point: taken work is final unless it
+  `--ignore-immutable`, which is the point: integrated work is final unless it
   is rewritten deliberately.
 - **Rewording or rewriting a commit under an offer is safe.** jj rebases
   the offer as part of that operation. The host sees a version it did not
@@ -144,7 +146,7 @@ believes:
   host never touches that offer again. The evolog says who made each
   version, so this holds across a host restart.
 - **Abandoning an offer, or deleting its bookmark,** discards it: the host
-  builds a new one when the thread has work not taken. To be rid of a
+  builds a new one when the thread has work not integrated. To be rid of a
   thread's offer, archive the thread: the host abandons the offer, and
   builds it again if the thread is restored.
 - **A `wip/` bookmark** is the owner's to rebase, amend or move. A thread

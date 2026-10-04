@@ -35,8 +35,8 @@ import {
   planMove,
   planMoveCommand,
   planMoves,
+  planNextQueuedCardPop,
   planSetCommand,
-  planTake,
   planUnsent,
   type QueuedCard,
   queuedOn,
@@ -284,16 +284,18 @@ describe("the queue", () => {
     expect(first < second && second < third).toBe(true)
   })
 
-  test("planTake: nothing while the lane runs; else its top queued card", () => {
+  test("planNextQueuedCardPop: nothing while the lane runs; else its top queued card", () => {
     const cards = [queued("c-2", "b"), queued("c-1", "a")]
-    expect(planTake(cards, LANE, true)).toEqual({ kind: "idle" })
-    expect(planTake(cards, LANE, false)).toEqual({
-      kind: "take",
+    expect(planNextQueuedCardPop(cards, LANE, true)).toEqual({ kind: "idle" })
+    expect(planNextQueuedCardPop(cards, LANE, false)).toEqual({
+      kind: "pop",
       card: cards[1],
     })
-    expect(planTake(cards, laneNameForThread("y"), false)).toEqual({
-      kind: "idle",
-    })
+    expect(planNextQueuedCardPop(cards, laneNameForThread("y"), false)).toEqual(
+      {
+        kind: "idle",
+      },
+    )
   })
 
   test("planUnsent: the whole record, drafting where it was queued, saying why, its command and placer kept", () => {
@@ -334,7 +336,7 @@ describe("handoffs (ADR-0059)", () => {
     seen: "",
   } as const
 
-  test("a creation: the sender owns and placed it, with no command; refused when the id is taken", () => {
+  test("a creation: the sender owns and placed it, with no command; refused when the id is in use", () => {
     expect(planMove([], { card: C1, from: null, to: drafting }, BEA)).toEqual({
       kind: "write",
       record: {
@@ -798,7 +800,7 @@ describe("historyOf: the root a move enters the sender's history in (ADR-0066)",
   const at = (place: CardPlace): CardRecord[] => [card({ place })]
   test.each<[string, Move[], CardRecord[], RootId | null]>([
     [
-      "a take: the root it left",
+      "a take into the inventory: the root it left",
       [{ card: C1, from: draftingIn(TEST_ROOT), to: inv }],
       at(draftingIn(TEST_ROOT)),
       TEST_ROOT,
@@ -853,7 +855,7 @@ describe("historyOf: the root a move enters the sender's history in (ADR-0066)",
     ],
     // The start is the record's: the host accepts a move only from there.
     [
-      "a take, its start read from the record",
+      "a take into the inventory, its start read from the record",
       [{ card: C1, from: inv, to: inv }],
       at(draftingIn(OTHER)),
       OTHER,

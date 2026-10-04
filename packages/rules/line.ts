@@ -188,7 +188,7 @@ export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
 /**
  * The line's record, the page's cache, from what the host read of it
  * (ADR-0060): what setting it up would write to your repo's config
- * (`proposed`, `lineProposal`), and whether this host takes the `line`
+ * (`proposed`, `lineProposal`), and whether this host accepts the `line`
  * commands that act on the repo as its owner.
  */
 export function planLineRecord(input: {
@@ -316,7 +316,7 @@ export function lineRefusal(
         case "land":
           return "your @- is not above the project: rebase onto it first"
         case "follow":
-          return "your files have nothing to take from the project, or share no commit with it"
+          return "your files have nothing to bring in from the project, or share no commit with it"
         case "publish":
           return `everything in the project is on ${publish} already`
       }
@@ -324,7 +324,7 @@ export function lineRefusal(
 }
 
 /**
- * The base a thread is brought up to date with and taken to (ADR-0060): its
+ * The base a thread is brought up to date with and integrated into (ADR-0060): its
  * WIP while the WIP is there, else the line: for a line thread, a WIP that
  * landed, and one gone (which only "continue on the line" moves). Null, the
  * lane's base not yet read, is the line.
@@ -336,7 +336,7 @@ export const effectiveBase = (
     ? base.base
     : { kind: "line" }
 
-/** Where a thread's base moved since its lane last took from it (`baseMoved`). */
+/** Where a thread's base moved since its lane last caught up with it (`baseMoved`). */
 interface BaseMove {
   readonly base: ThreadBase
   /** The base's bookmark: the line's, or the WIP's. */
@@ -372,13 +372,13 @@ function baseMoved(
 
 /**
  * What catching up would do to a thread, as the page can tell (S97):
- * - `current`: its base has not moved since the lane last took from it, or
- *   there is no line to catch up with;
+ * - `current`: its base has not moved since the lane last caught up with
+ *   it, or there is no line to catch up with;
  * - `unknown`: it moved, and the host has not yet read what that changes;
  *   or the host has never read the lane at all (no `pineta.base`): a lane
  *   whose turns changed no file never reached your repo;
  * - `nothing-new`: it moved, but by work the lane already holds, as after
- *   you took its own offer: catching up changes no file;
+ *   you integrated its own offer: catching up changes no file;
  * - `brings`: catching up changes `files` files in the lane. Only this one
  *   says the move, for the header's ↓ (`behindMark`).
  */
@@ -510,7 +510,7 @@ export interface ParentNow extends ParentThread {
   /** Its newest commit: the nearest above its thread's end. */
   readonly newest: CommitId
   /** The newest of its commits this lane holds: its fork commit, or what a catch-up merged. */
-  readonly taken: CommitId
+  readonly caughtUpWith: CommitId
   /** The files conflicted in `newest` (`conflictsAt`). */
   readonly conflicts: readonly string[]
 }
@@ -519,7 +519,7 @@ export interface ParentNow extends ParentThread {
  * The thread `lane` branched from (`forkParent`) and where both stand, read
  * from the document alone: a lane's commits only move forward along its
  * bookmark, so the parent is ahead exactly when its newest commit is not the
- * one this lane last took. What it took is the fork commit, or the newest
+ * one this lane last caught up with. That is the fork commit, or the newest
  * commit of the parent's that an update or a resolution below the lane's
  * first prompt merged. Null for a lane that began at its base, or a parent
  * with no name or no commit yet. Pure.
@@ -551,11 +551,11 @@ export function parentNow(input: {
     ),
   )
   const first = firstPromptOf(index, revisions, input.lane, tip)
-  let taken = fork.commit
+  let caughtUpWith = fork.commit
   for (const id of ancestry(index, tip).path) {
     const merged = messageAt(index, id)?.merged?.find(c => parents.has(c))
     if (merged !== undefined) {
-      taken = merged
+      caughtUpWith = merged
       break
     }
     if (id === first) break
@@ -565,7 +565,7 @@ export function parentNow(input: {
     lane: fork.lane,
     name,
     newest,
-    taken,
+    caughtUpWith,
     conflicts: conflictsAt(revisions, newest),
   }
 }
@@ -591,7 +591,7 @@ export function planParentUpdate(
     lane: parent.lane,
     name: parent.name,
     commit: parent.newest,
-    taken: parent.taken,
+    caughtUpWith: parent.caughtUpWith,
   }
 }
 
@@ -616,6 +616,6 @@ export const catchUpName = (from: CatchUpFrom): string =>
       ? from.bookmark
       : from.name
 
-/** The parent's newest commit is not the one the lane last took (`ParentNow`). */
+/** The parent's newest commit is not the one the lane last caught up with (`ParentNow`). */
 export const parentAhead = (parent: ParentNow): boolean =>
-  parent.newest !== parent.taken
+  parent.newest !== parent.caughtUpWith

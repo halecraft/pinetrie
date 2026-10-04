@@ -1,9 +1,10 @@
-// host/take — taking a lane's queued cards, top first (ADR-0048, ADR-0055).
+// host/queued-card-pop — popping a lane's queued cards, top first, to send
+// them (ADR-0048, ADR-0055, ADR-0083).
 //
-// People queue and unqueue cards through handoffs (ADR-0059); the host takes
+// People queue and unqueue cards through handoffs (ADR-0059); the host pops
 // them, and only when the lane is not running, since a lane is never written
-// while it runs (S21). The take is where the cards people still edit meet
-// the tree.
+// while it runs (S21). Popping the next queued card is where the cards
+// people still edit meet the tree.
 
 import { subscribe } from "@kyneta/schema"
 import {
@@ -14,7 +15,12 @@ import {
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
 import { readPlaces, readRunning, readThreadName } from "@pineta/reads"
-import { planTake, planUnsent, type QueuedCard, queuedOn } from "@pineta/rules"
+import {
+  planNextQueuedCardPop,
+  planUnsent,
+  type QueuedCard,
+  queuedOn,
+} from "@pineta/rules"
 import type { PlacesDocHandle } from "@pineta/schema"
 import { type Basics, messageOf } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
@@ -24,67 +30,67 @@ import type { Provenance } from "./provenance.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
-/** A card the host took: its record as it was, and its text at the take. */
-export interface Taken {
+/** A queued card the host popped: its record as it was, and its text at the pop. */
+export interface PoppedQueuedCard {
   readonly card: QueuedCard
   readonly text: string
 }
 
-/** What a take found: nothing to take, a top card whose text is behind, or a card taken. */
-export type TakeTop =
+/** What a pop found: nothing to pop, a top card whose text is behind, or a card popped. */
+export type NextQueuedCardPop =
   | { readonly kind: "idle" }
   | { readonly kind: "behind"; readonly card: QueuedCard }
-  | { readonly kind: "taken"; readonly taken: Taken }
+  | { readonly kind: "popped"; readonly popped: PoppedQueuedCard }
 
 /**
- * Take a lane's top queued card: read that it is queued and on top, read its
+ * Pop a lane's next queued card: read that it is queued and on top, read its
  * text, and remove its record. Synchronous: an unqueue is a step on the same
- * keeper as the drain, so it runs before the take or after it, never
+ * keeper as the drain, so it runs before the pop or after it, never
  * between, and one after it is refused as gone. Idle when the lane runs or
  * nothing is queued. A card whose text the host does not yet hold as its
  * queuer had it is `behind`, and stays: Kyneta keeps no order between
  * documents, so its record can arrive before its text (S96). `texts` must
  * answer from texts already loaded.
  */
-export function takeTop(
+export function popNextQueuedCard(
   places: PlacesDocHandle,
   lane: LaneName,
   running: boolean,
   texts: Pick<CardPort, "textNow" | "holds">,
-): TakeTop {
-  const step = planTake(readPlaces(places), lane, running)
+): NextQueuedCardPop {
+  const step = planNextQueuedCardPop(readPlaces(places), lane, running)
   if (step.kind === "idle") return { kind: "idle" }
   const { card } = step
   if (!texts.holds(card.id, card.place.seen)) return { kind: "behind", card }
   const text = texts.textNow(card.id)
   applyPlaceSteps(places, [{ kind: "remove", id: card.id }])
-  return { kind: "taken", taken: { card, text } }
+  return { kind: "popped", popped: { card, text } }
 }
 
-/** A taken card's text as its queuer's message, in the queue's own mode. */
-export const takenChat = (taken: Taken): Chat => ({
-  text: taken.text,
-  root: taken.card.place.root,
-  at: taken.card.place.at,
+/** A popped card's text as its queuer's message, in the queue's own mode. */
+export const chatOfPoppedQueuedCard = (popped: PoppedQueuedCard): Chat => ({
+  text: popped.text,
+  root: popped.card.place.root,
+  at: popped.card.place.at,
   mode: "queue",
-  lane: taken.card.place.lane,
+  lane: popped.card.place.lane,
   asksAgent: false,
-  mentions: parseMentions(taken.text),
+  mentions: parseMentions(popped.text),
   work: null,
-  card: { id: taken.card.id, seen: taken.card.place.seen },
-  // Its thread's pinned cards were edited long before it was taken.
+  card: { id: popped.card.id, seen: popped.card.place.seen },
+  // Its thread's pinned cards were edited long before it was popped.
   pinned: [],
   reserved: null,
   base: null,
 })
 
-export interface TakeDeps {
+export interface QueuedCardPopDeps {
   readonly basics: Pick<Basics, "session" | "live" | "places" | "log">
   readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds" | "destroy">
   readonly work: Pick<LaneWork, "prepareUpdate">
   readonly start: Runs["start"]
-  /** Send a taken card's text as its queuer's message, through `sendChat`. */
-  readonly send: (taken: Taken) => Promise<Outcome>
+  /** Send a popped card's text as its queuer's message, through `sendChat`. */
+  readonly send: (popped: PoppedQueuedCard) => Promise<Outcome>
   /** The top card's text is behind: drain the lane again once the host holds it. */
   readonly behind: (card: QueuedCard) => void
   /** Each card's history (ADR-0048 step 6). */
@@ -92,14 +98,17 @@ export interface TakeDeps {
 }
 
 /**
- * Take a lane's queued cards in order until one starts a run or none is
- * left. Each card's text is loaded before the take, so the take reads it
- * whole. A taken card is spent once its message is written or running;
+ * Pop a lane's queued cards in order until one starts a run or none is
+ * left. Each card's text is loaded before the pop, so the pop reads it
+ * whole. A popped card is spent once its message is written or running;
  * one that could not be sent goes back below the line, saying why
  * (`planUnsent`, S69 answer 5). A run's end, startup and a move that queues
  * a card on an idle lane each drain again.
  */
-export async function drain(deps: TakeDeps, lane: LaneName): Promise<void> {
+export async function drain(
+  deps: QueuedCardPopDeps,
+  lane: LaneName,
+): Promise<void> {
   const { places } = deps.basics
   const loaded = new Set<CardId>()
   for (;;) {
@@ -111,9 +120,9 @@ export async function drain(deps: TakeDeps, lane: LaneName): Promise<void> {
       for (const id of loading) loaded.add(id)
       continue
     }
-    // No await between the check above and the take.
+    // No await between the check above and the pop.
     const before = deps.provenance.before()
-    const top = takeTop(
+    const top = popNextQueuedCard(
       places,
       lane,
       readRunning(deps.basics.live, lane),
@@ -122,24 +131,24 @@ export async function drain(deps: TakeDeps, lane: LaneName): Promise<void> {
     if (top.kind === "idle") return
     // The queue waits for its top card: those behind it keep their turn.
     if (top.kind === "behind") return deps.behind(top.card)
-    const done = await carryOut(deps, lane, top.taken)
-    // Taken, written back or below the line again: the host's own write.
+    const done = await carryOut(deps, lane, top.popped)
+    // Popped, written back or below the line again: the host's own write.
     await deps.provenance.after({ kind: "host" }, before)
     if (done === "ran") return
   }
 }
 
 /**
- * One taken card, sent through its command. "ran": a run started, whose end
- * drains again. The take deleted its record, so a throw while it is carried
+ * One popped card, sent through its command. "ran": a run started, whose end
+ * drains again. The pop deleted its record, so a throw while it is carried
  * out writes it back too, or the card would be lost.
  */
 async function carryOut(
-  deps: TakeDeps,
+  deps: QueuedCardPopDeps,
   lane: LaneName,
-  taken: Taken,
+  popped: PoppedQueuedCard,
 ): Promise<"ran" | "next"> {
-  const { card } = taken
+  const { card } = popped
   let sending = card
   const hostFailed = (error: unknown) => {
     unsent(deps, sending, `the host failed: ${messageOf(error)}`)
@@ -147,7 +156,7 @@ async function carryOut(
   }
   if (card.command !== null) {
     const prepared = await deps.work
-      .prepareUpdate(lane, card.place.by, taken.text, card.command)
+      .prepareUpdate(lane, card.place.by, popped.text, card.command)
       .catch(hostFailed)
     if (prepared === null) return "next"
     if (prepared.kind === "refused") {
@@ -166,11 +175,11 @@ async function carryOut(
     // Brought up to date: what is left is a plain message.
     sending = { ...card, command: null }
   }
-  if (taken.text.trim() === "") {
+  if (popped.text.trim() === "") {
     await deps.texts.destroy(card.id)
     return "next"
   }
-  const sent = await deps.send(taken).catch(hostFailed)
+  const sent = await deps.send(popped).catch(hostFailed)
   if (sent === null) return "next"
   switch (sent.kind) {
     case "appended":
@@ -178,7 +187,7 @@ async function carryOut(
       await deps.texts.destroy(card.id)
       return sent.kind === "started" ? "ran" : "next"
     case "busy":
-      // A run started under the take: the card goes back on top, as it was.
+      // A run started under the pop: the card goes back on top, as it was.
       applyPlaceSteps(deps.basics.places, [{ kind: "write", record: sending }])
       return "ran"
     case "refused":
@@ -197,7 +206,11 @@ async function carryOut(
 }
 
 /** Write a card the host could not send back below the line, whole, saying why. */
-function unsent(deps: TakeDeps, card: QueuedCard, reason: string): void {
+function unsent(
+  deps: QueuedCardPopDeps,
+  card: QueuedCard,
+  reason: string,
+): void {
   const { session, places, log } = deps.basics
   applyPlaceSteps(places, [planUnsent(card, reason)])
   log(
@@ -207,9 +220,9 @@ function unsent(deps: TakeDeps, card: QueuedCard, reason: string): void {
 
 /**
  * The waits for a queued card's text to give up (`behind`): each awaited
- * card no longer queued. The take removed it, someone unqueued, took or
- * discarded it, or its lane went: its text will not be taken, so nothing is
- * left to wait for. Pure.
+ * card no longer queued. The pop removed it, someone unqueued it, took it
+ * into an inventory or discarded it, or its lane went: it will not be
+ * popped, so nothing is left to wait for. Pure.
  */
 export const givenUp = (
   awaited: Iterable<CardId>,
@@ -224,7 +237,7 @@ export const givenUp = (
 /**
  * The drain's `behind`: wait once per card for its text as its queuer had
  * it, then drain its lane again. A wait is given up when its card leaves
- * the queue (`givenUp`), so no subscription outlives a card the take will
+ * the queue (`givenUp`), so no subscription outlives a card the pop will
  * never reach. The places are watched only while a wait is out.
  */
 export function createBehind(deps: {

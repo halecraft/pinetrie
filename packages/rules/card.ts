@@ -4,8 +4,8 @@
 // clients; its record is in the places document (`PlacesDoc` in
 // @pineta/schema), which only the host writes, through handoffs it applies
 // or refuses (`planMove`). This module decodes a record, and decides where a
-// card sits now, which moves the host accepts, which queued card is taken
-// next, and which are swept. Who wrote in it is `writersOfClients`
+// card sits now, which moves the host accepts, which queued card is popped
+// next to be sent, and which are swept. Who wrote in it is `writersOfClients`
 // (`seat.ts`).
 
 import {
@@ -236,7 +236,7 @@ const isPinned = (
   readonly place: Extract<CardPlace, { kind: "pinned" }>
 } => c.place.kind === "pinned"
 
-/** A lane's queued cards, in the order they are taken: by `order`, then id. */
+/** A lane's queued cards, in the order they are popped: by `order`, then id. */
 export function queuedOn(
   cards: readonly CardRecord[],
   lane: LaneName,
@@ -275,25 +275,25 @@ export function orderAfter(
 }
 
 /** What an idle lane's queue gives up next. */
-type TakeStep =
+type NextQueuedCardPopStep =
   | { readonly kind: "idle" }
-  | { readonly kind: "take"; readonly card: QueuedCard }
+  | { readonly kind: "pop"; readonly card: QueuedCard }
 
-/** The next card to take for a lane: none while it runs, else its top one. Pure. */
-export function planTake(
+/** The next queued card to pop for a lane: none while it runs, else its top one. Pure. */
+export function planNextQueuedCardPop(
   cards: readonly CardRecord[],
   lane: LaneName,
   running: boolean,
-): TakeStep {
+): NextQueuedCardPopStep {
   if (running) return { kind: "idle" }
   const top = queuedOn(cards, lane)[0]
-  return top === undefined ? { kind: "idle" } : { kind: "take", card: top }
+  return top === undefined ? { kind: "idle" } : { kind: "pop", card: top }
 }
 
 /**
- * A taken card the host could not send, written back: drafting where it was
- * queued, saying why, its command and placer kept, since the host's own
- * write is nobody's move. Never queued again, or the next drain would take
+ * A popped card the host could not send, written back: drafting where it
+ * was queued, saying why, its command and placer kept, since the host's own
+ * write is nobody's move. Never queued again, or the next drain would pop
  * it and fail the same way (S69, answer 5).
  */
 export const planUnsent = (card: QueuedCard, reason: string): PlaceStep => ({
@@ -537,9 +537,10 @@ const rootOfPlace = (place: CardPlace | PlaceKey): RootId | null =>
  * none (ADR-0066). A creation or a removal enters none: a composer's new
  * card, a copy, a discard, a send. Otherwise the root the card goes to,
  * when it goes to one, else the root it leaves, read from its record, since
- * the host accepts a move only from where the card is. So a take is recorded
- * where it left, a put where it went, and a drag across roots where it
- * went. Of several, the first that names a root names the step's. Pure.
+ * the host accepts a move only from where the card is. So a take into the
+ * inventory is recorded where it left, a put where it went, and a drag
+ * across roots where it went. Of several, the first that names a root names
+ * the step's. Pure.
  */
 export function historyOf(
   moves: readonly Move[],

@@ -39,8 +39,8 @@ export {
   planFreshFollow,
   planHistorySweep,
   planMoveCommand,
+  planNextQueuedCardPop,
   planSetCommand,
-  planTake,
   planUnsent,
   type QueuedCard,
   queuedOn,
@@ -139,19 +139,19 @@ export {
 export { MARK, planMark } from "./mark.ts"
 export { NAME, planNames, planReserve, type ReservePlan } from "./names.ts"
 export {
-  isUntaken,
+  isNotYetIntegrated,
   OFFER,
+  type OfferIntegrationDestination,
   offerRecord,
   offerStatus,
   planDescribeAgain,
   planDescribeAsk,
   planDescribeSettle,
-  planOfferTake,
+  planOfferIntegration,
   planRebuild,
   planRefresh,
   planStackEnded,
   planYourEdits,
-  type TakeDestination,
 } from "./offer.ts"
 export {
   type OfferActivity,

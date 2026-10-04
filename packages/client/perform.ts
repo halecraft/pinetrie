@@ -26,7 +26,7 @@ export interface AppPorts {
   >
   /** Your attention document: what "not needed" marks (ADR-0077). */
   readonly attention: Pick<AttentionStore, "dismiss" | "dismissOffer">
-  /** The inventory panel: opened (briefly, for a take's flight), and its selection. */
+  /** The inventory panel: opened (briefly, for the flight of a take into it), and its selection. */
   readonly inventory: {
     readonly show: (brief: boolean) => void
     readonly select: (slot: number) => void

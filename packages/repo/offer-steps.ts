@@ -1,7 +1,7 @@
 // repo/offer-steps — what a decision about an offer runs on your repo, and
 // what the host does after (ADR-0038, ADR-0060).
 //
-// `@pineta/rules` decides (`planRefresh`, `planOfferTake`, `planStackEnded`,
+// `@pineta/rules` decides (`planRefresh`, `planOfferIntegration`, `planStackEnded`,
 // `planRebuild`, `planDescribeSettle`); these turn each decision into
 // `RepoStep`s, pure. Every decision carries the facts its steps need, so
 // each kind has exactly one translation, and none that runs nothing because
@@ -12,13 +12,13 @@ import {
   changesOf,
   type DescribeDecision,
   type LaneName,
+  type OfferIntegrationDecision,
   type OfferRecord,
   type OfferSource,
   offerMessage,
   type Placed,
   type Rebuild,
   type RefreshDecision,
-  type TakeDecision,
   type ThreadName,
 } from "@pineta/core"
 import {
@@ -26,8 +26,8 @@ import {
   planDescribe,
   planFollowOffer,
   planOffer,
+  planOfferIntegrationSteps,
   planRefreshOffer,
-  planTakeOffer,
 } from "./plan.ts"
 import type { RepoStep } from "./step.ts"
 
@@ -61,8 +61,8 @@ export interface OfferEffects {
         readonly changes: readonly string[]
       }
     | { readonly kind: "remove" }
-    /** A take: write the record marked taken. */
-    | { readonly kind: "taken"; readonly record: OfferRecord }
+    /** An offer integration: write the record marked integrated. */
+    | { readonly kind: "integrated"; readonly record: OfferRecord }
   /** The offer's content changed: it is described once the lane stops. */
   readonly built: boolean
 }
@@ -195,16 +195,16 @@ export function offerEffects(
   }
 }
 
-/** A take (ADR-0060): the destination moved forward to the offer's top, the offer's bookmark deleted, then its record marked taken. */
-export const takeEffects = (
-  decision: Extract<TakeDecision, { readonly kind: "take" }>,
+/** An offer integration (ADR-0060): the destination moved forward to the offer's top, the offer's bookmark deleted, then its record marked integrated. */
+export const offerIntegrationEffects = (
+  decision: Extract<OfferIntegrationDecision, { readonly kind: "integrate" }>,
 ): OfferEffects => ({
-  steps: planTakeOffer({
+  steps: planOfferIntegrationSteps({
     bookmark: decision.bookmark,
     top: decision.top,
     destination: decision.destination,
   }),
-  after: { kind: "taken", record: decision.taken },
+  after: { kind: "integrated", record: decision.integrated },
   built: false,
 })
 

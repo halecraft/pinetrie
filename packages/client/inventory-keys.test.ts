@@ -31,7 +31,7 @@ const chord = { ctrlKey: true, shiftKey: true }
 describe("keyAct", () => {
   test("Ctrl+Shift+I takes the focused card, in a text box too; Ctrl+Shift+O puts the selected one in the last focused column", () => {
     expect(keyAct(key("I", chord), focus({ card: C1, inText: true }))).toEqual({
-      kind: "take",
+      kind: "takeIntoInventory",
       card: C1,
     })
     expect(keyAct(key("I", chord), focus())).toBeNull()

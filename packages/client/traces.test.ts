@@ -65,7 +65,7 @@ test("traceGroups: one line per person and verb, in the order each first happene
   ])
   expect(groups.map(g => [g.by, g.verb, g.traces.map(t => t.id)])).toEqual([
     [BEA, "queued", ["1", "3"]],
-    [CAL, "took", ["2"]],
+    [CAL, "took-into-inventory", ["2"]],
     [BEA, "sent", ["4"]],
   ])
 })

@@ -760,7 +760,7 @@ export interface MergePlan {
   readonly mark: boolean
   /**
    * The commits whose titles the update lists, `<from>..<to>` without the
-   * takes it joined (`mergeUpdate`); `from` null is the lane before the merge.
+   * integrated-offer commits it joined (`mergeUpdate`); `from` null is the lane before the merge.
    */
   readonly came: { readonly from: CommitId | null; readonly to: CommitId }
 }
@@ -789,7 +789,7 @@ export function planMerge(from: BaseMerge): MergePlan {
       source: from.commit,
       message: `update: ${from.name}`,
       mark: false,
-      came: { from: from.taken, to: from.commit },
+      came: { from: from.caughtUpWith, to: from.commit },
     }
   return {
     steps: [fetchById([from.commit]), ...planWipCopy(from, from.on)],
@@ -800,46 +800,48 @@ export function planMerge(from: BaseMerge): MergePlan {
   }
 }
 
-/** A take on the line the lane lacks, and the sources its message names (`sourcesOf`). */
-export interface TakeAbove {
-  readonly take: CommitId
+/** An integrated-offer commit on the line the lane lacks, and the sources its message names (`sourcesOf`). */
+export interface IntegratedOfferCommitAbove {
+  readonly integratedOfferCommit: CommitId
   readonly sources: readonly CommitId[]
 }
 
-/** A take to join to the sources the lane holds, before an update's merge (S102). */
+/** An integrated-offer commit to join to the sources the lane holds, before an update's merge (S102). */
 export interface Join {
-  readonly take: CommitId
+  readonly integratedOfferCommit: CommitId
   /** Of its sources, those in the lane's history: a squash may name others (S77 item 6). */
   readonly sources: readonly CommitId[]
   /**
-   * The join's message. It carries no trailer: the host finds bases and takes
-   * by their trailers (`newestBase`, `takenRevset`), and a join is neither.
+   * The join's message. It carries no trailer: the host finds bases and
+   * integrated-offer commits by their trailers (`newestBase`,
+   * `integratedOfferCommitsRevset`), and a join is neither.
    */
   readonly message: string
 }
 
 /**
- * The takes an update joins to their sources before it merges (S102,
- * ADR-0079), oldest first as `takes` come: each that names a source the lane
- * holds. A take is a copy of the lane's work on the line, and the join says
- * so in history, so the merge does not bring that work in twice. One naming a
- * source the lane lacks too, a squash's, is joined all the same: the rest of
- * it is the line's. Each join is made on the one before, so a later take's
- * base holds the earlier ones. Pure.
+ * The integrated-offer commits an update joins to their sources before it
+ * merges (S102, ADR-0079), oldest first as they come: each that names a
+ * source the lane holds. An integrated-offer commit is a copy of the lane's
+ * work on the line, and the join says so in history, so the merge does not
+ * bring that work in twice. One naming a source the lane lacks too, a
+ * squash's, is joined all the same: the rest of it is the line's. Each join
+ * is made on the one before, so a later one's base holds the earlier ones.
+ * Pure.
  */
 export function planJoins(
-  takes: readonly TakeAbove[],
+  integrated: readonly IntegratedOfferCommitAbove[],
   held: ReadonlySet<CommitId>,
 ): readonly Join[] {
-  return takes.flatMap(({ take, sources }) => {
+  return integrated.flatMap(({ integratedOfferCommit, sources }) => {
     const ours = sources.filter(s => held.has(s))
     return ours.length === 0
       ? []
       : [
           {
-            take,
+            integratedOfferCommit,
             sources: ours,
-            message: `join: ${take} holds ${ours.join(" ")}`,
+            message: `join: ${integratedOfferCommit} holds ${ours.join(" ")}`,
           },
         ]
   })

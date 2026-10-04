@@ -129,7 +129,7 @@ export interface ThreadLaneHandle {
 export interface ThreadLanes {
   /**
    * Create a thread's lane at `at`, named `lane` (the host decides the id,
-   * ADR-0057). Called only where no lane is; refused `lane_taken` for an id
+   * ADR-0057). Called only where no lane is; refused `lane_id_in_use` for an id
    * pi holds, since `harness.lane` would return that lane instead.
    */
   createThreadLane(at: Position, lane: LaneName): Promise<CreateOutcome>
@@ -215,7 +215,7 @@ export function threadLanes(input: {
 
     async createThreadLane(at, name) {
       if (held.has(name) || hasLaneRecord(doc, name))
-        return { kind: "refused", code: ERR.LANE_TAKEN }
+        return { kind: "refused", code: ERR.LANE_ID_IN_USE }
       return orRefused(async () => {
         held.set(name, await harness.lane(name, { createAt: toPi(at) }, CTX))
         return { kind: "created", lane: name } as const

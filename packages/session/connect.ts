@@ -215,13 +215,13 @@ export interface SessionClient {
    */
   createCard(card: NewCard, text: string, how?: MoveHow): Promise<MoveAnswer>
   /**
-   * Ask the host to move a card (ADR-0059), as the page planned it: a take,
-   * a put, a queue, an unqueue, or a discard (`to` null). A move into a
+   * Ask the host to move a card (ADR-0059), as the page planned it: a take
+   * into the inventory, a put, a queue, an unqueue, or a discard (`to` null). A move into a
    * queue is sent with its text's version as this client has it then (S96).
    * Into your inventory with `how.slot`, the slot is written once the host
    * accepts, before the answer is recorded, so the repair never sees the
    * card held without its slot. `queuedBy`, for an unqueue, is who queued
-   * the card: if the host took it first, the refusal says it was sent, as
+   * the card: if the host popped it first, the refusal says it was sent, as
    * theirs. Resolves with the host's answer.
    */
   moveCard(
@@ -259,7 +259,8 @@ export interface SessionClient {
   /**
    * Your inventory's slots as your document holds them, repaired from the
    * host's record on every change (`repairStep`). Written only by your own
-   * tabs: the repair, a take's answer, and `swapSlots`.
+   * tabs: the repair, the answer to a take into the inventory, and
+   * `swapSlots`.
    */
   readonly slots: Readable<Slots>
   /**
@@ -279,7 +280,7 @@ export interface SessionClient {
    */
   retitle(root: EntryId): Promise<Outcome>
   /**
-   * An offer action on a lane's offer in your repo; a take names its
+   * An offer action on a lane's offer in your repo; an integration names its
    * destination bookmark, null for the default, and the offer as this tab's
    * record shows it (`offerSeen`). Tracked in `acting`.
    */
@@ -451,8 +452,8 @@ export async function connectSession(
    * Send a request that moves cards: each drawn at once as one of `pending`,
    * which share its id, until this tab's copy holds what the host did, and
    * answered as the host answers it. `queuedBy`: who queued the card a
-   * refusal is about, if it is queued. An accepted take writes its slot
-   * before its answer is stepped.
+   * refusal is about, if it is queued. An accepted take into the inventory
+   * writes its slot before its answer is stepped.
    */
   function tracked(
     intent: Intent,
@@ -468,8 +469,9 @@ export async function connectSession(
         actedAt: first.actedAt,
       })
       for (const p of pending) {
-        const take = slotOnAccept(p, answer)
-        if (take !== null) inventory.take(take.card, take.slot)
+        const slotted = slotOnAccept(p, answer)
+        if (slotted !== null)
+          inventory.takeIntoInventory(slotted.card, slotted.slot)
       }
       step({ kind: "answered", id: first.id, answer })
       return { outcome, answer }
@@ -478,7 +480,7 @@ export async function connectSession(
 
   /**
    * A card's text version as this client has it now: what a queued card's
-   * take, and a run's pinned cards, wait for the host to hold (S96). It opens
+   * pop, and a run's pinned cards, wait for the host to hold (S96). It opens
    * a card's document this client does not hold yet, so it is called while
    * gathering, never from a plan.
    */
@@ -487,7 +489,7 @@ export async function connectSession(
   /**
    * A move, tracked; with `draft`, a creation, drawn as that record. A move
    * into a queue carries its text's version as this client has it now: the
-   * host takes the card only once it holds that much (S96).
+   * host pops the card only once it holds that much (S96).
    */
   function sendMove(
     planned: Move,
@@ -623,10 +625,10 @@ export async function connectSession(
       step({ kind: "refused", refusal })
     },
     offer(lane, action, to = null) {
-      // A take names the offer this tab shows now: its record, as the strip
+      // An integration names the offer this tab shows now: its record, as the strip
       // drew it (ADR-0065).
       const seen =
-        action === "take" ? offerSeen(readOffers(session).get(lane)) : null
+        action === "integrate" ? offerSeen(readOffers(session).get(lane)) : null
       return sendActing(acting, { kind: "offer", lane, action, to }, () =>
         send({ kind: "offer", lane, action, to, seen }),
       )

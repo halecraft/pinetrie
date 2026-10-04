@@ -244,7 +244,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "createThreadLane returns a lane it holds",
     file: "packages/pi/thread-lanes.ts",
-    from: '      if (held.has(name) || hasLaneRecord(doc, name))\n        return { kind: "refused", code: ERR.LANE_TAKEN }\n',
+    from: '      if (held.has(name) || hasLaneRecord(doc, name))\n        return { kind: "refused", code: ERR.LANE_ID_IN_USE }\n',
     to: "",
     command: unit,
     expect: "creates the lane under the id it is given",

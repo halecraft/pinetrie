@@ -1,5 +1,5 @@
 // host/offers/execute — carrying out an offer step's effects
-// (`@pineta/repo`'s `offerEffects`, `takeEffects`, `rebuildEffects`,
+// (`@pineta/repo`'s `offerEffects`, `offerIntegrationEffects`, `rebuildEffects`,
 // `describeEffects`) over ports, so a test can check what each makes the
 // host write, and in what order.
 
@@ -18,8 +18,8 @@ export interface OfferPorts {
   /** Repair each divergent change (`repairOffer`). */
   repair(changes: readonly string[]): Promise<void>
   remove(): Promise<void>
-  /** Write the record marked taken, then let the base snapshot follow the line. */
-  taken(record: OfferRecord): Promise<void>
+  /** Write the record marked integrated, then let the base snapshot follow the bookmark it moved. */
+  integrated(record: OfferRecord): Promise<void>
 }
 
 /**
@@ -52,8 +52,8 @@ export async function executeOffer(
     case "remove":
       await ports.remove()
       break
-    case "taken":
-      await ports.taken(after.record)
+    case "integrated":
+      await ports.integrated(after.record)
       break
   }
   return effects.built ? "built" : "other"

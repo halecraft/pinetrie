@@ -761,7 +761,8 @@ export function App({
     identity: stores.identity,
     reload: () => location.reload(),
     inventory: {
-      // A take while the panel is closed shows it for the card's flight.
+      // A take into the inventory while the panel is closed shows it for the
+      // card's flight.
       show: brief => {
         if (brief && openNow.current) return
         setInventoryOpen(true)

@@ -547,18 +547,18 @@ const pairAt = (index: number): string =>
 
 /**
  * A lane's name: the pair its id hashes to, or the next free one after it,
- * wrapping. Throws only when all 65,536 are taken.
+ * wrapping. Throws only when all 65,536 are in use.
  */
 export function threadNameFor(
   lane: LaneName,
-  taken: ReadonlySet<string>,
+  inUse: ReadonlySet<string>,
 ): ThreadName {
   const first = fnv1a(lane) % PAIRS
   for (let step = 0; step < PAIRS; step += 1) {
     const name = pairAt((first + step) % PAIRS)
-    if (!taken.has(name)) return name as ThreadName
+    if (!inUse.has(name)) return name as ThreadName
   }
-  throw new Error("every thread name is taken")
+  throw new Error("every thread name is in use")
 }
 
 /**
@@ -571,13 +571,13 @@ export function planNames(
   names: ReadonlyMap<LaneName, ThreadName>,
   now: number,
 ): readonly NameRecord[] {
-  const taken = new Set<string>(names.values())
+  const inUse = new Set<string>(names.values())
   const named = new Set<LaneName>(names.keys())
   const planned: NameRecord[] = []
   for (const { lane } of [...lanes].sort((a, b) => a.createdAt - b.createdAt)) {
     if (named.has(lane)) continue
-    const name = threadNameFor(lane, taken)
-    taken.add(name)
+    const name = threadNameFor(lane, inUse)
+    inUse.add(name)
     named.add(lane)
     planned.push({ lane, name, at: now })
   }

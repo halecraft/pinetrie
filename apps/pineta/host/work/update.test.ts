@@ -193,7 +193,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
       lane: laneNameForThread("p"),
       name: "amber-fox" as ThreadName,
       commit: LINE,
-      taken: OURS,
+      caughtUpWith: OURS,
     }
     const clean = planSettle(
       {

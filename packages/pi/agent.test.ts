@@ -97,7 +97,7 @@ describe("createThreadLane (ADR-0057)", () => {
       await agent.createThreadLane({ root: ONE_ROOT, at: ROOT }, lane),
     ).toEqual({
       kind: "refused",
-      code: ERR.LANE_TAKEN,
+      code: ERR.LANE_ID_IN_USE,
     })
     await agent.close()
     // A later process holds it only in the document.
@@ -106,7 +106,7 @@ describe("createThreadLane (ADR-0057)", () => {
       await later.createThreadLane({ root: ONE_ROOT, at: ROOT }, lane),
     ).toEqual({
       kind: "refused",
-      code: ERR.LANE_TAKEN,
+      code: ERR.LANE_ID_IN_USE,
     })
     expect(readLaneNames(doc)).toEqual([lane])
     await later.close()

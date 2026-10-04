@@ -118,7 +118,7 @@ that tab's. While the page syncs, "syncing…" leads the right end.
 - **A menu you opened stays open until you close it.** The header's avatars
   and counts come from live data, but when what one stands for goes while
   its menu is open (a person leaves, the agent finishes, the last offer is
-  taken), the menu says so ("The agent has finished") and its trigger stays
+  integrated), the menu says so ("The agent has finished") and its trigger stays
   until you close it (principle 6).
 - **The inbox**, activity's mentions: the messages that mention you, newest first, each
   with who, the thread, and the start of the message. A row opens that thread
@@ -290,15 +290,16 @@ so it is the one behind the menu. What each does is under "Starting" below.
   button names where the work goes (ADR-0060, ADR-0061): "add to the
   project", or "add to wip/search" for a thread on a WIP, whose menu also
   offers "add to the project, with your 2 commits beneath it"; its title
-  names the bookmark it moves. A take moves that bookmark forward to the
-  offer and never touches your working copy. From the click to the host's
+  names the bookmark it moves. Adding the offer (an *integration*,
+  ADR-0083) moves that bookmark forward to the offer and never touches your
+  working copy. From the click to the host's
   answer the strip says what your command is doing ("adding to the
   project…", "adding to wip/search…", "squashing to one…", "splitting into
   a stack…", "rewriting the description…", "refreshing…"), and its buttons
   wait. A command refused or failed says so there, as the project menu does
   ("not done: …", "it failed, and may be part done: …"), until your next
   one on that thread; one carried out says nothing, as the offer then shows
-  it. A take adds the offer the strip showed: if it now brings other work
+  it. An integration adds the offer the strip showed: if it now brings other work
   (the lane moved on), or conflicts where it did not, it is not done ("not
   done: the offer changed since you looked at it: review it again"), and
   the strip shows the new offer. A rebase onto a moved project, or your own
@@ -328,12 +329,12 @@ so it is the one behind the menu. What each does is under "Starting" below.
   the menu, enabled, and claims nothing. An offer whose work the project already has says "nothing to
   add: the project already has this thread's work": the header does not
   count it, and archiving its thread warns of nothing. A thread whose
-  earlier add was made before Pineta recorded what an add took says "an
+  earlier add was made before Pineta recorded what an add brought says "an
   earlier add of this thread can't be traced: catch up with the project to
   offer what's new", with catching up beside it. Every catch-up button does
   it at once
   (ADR-0061): each queues a new card holding the command and no text, which
-  the host takes when the lane is free, and your composer is left as it
+  the host pops when the lane is free, and your composer is left as it
   was. The queued card says "↓ catches up with the project first", and the
   strip "catching up with the project…". A card that already carries a
   command (one unqueued, say) says so above its box, with a × that sends it
@@ -550,7 +551,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   place, and a column at its end does not get shorter while the agent works
   (ADR-0044).
   **Stop** ends the turn, and records who pressed it under the ask
-  (ADR-0056); cards queued are then taken. Once it has stopped, **Resume**
+  (ADR-0056); cards queued are then sent. Once it has stopped, **Resume**
   takes its place: it starts a new turn with a message from the host,
   "↻ resumed by <name>" (ADR-0082), until anything else is written at the
   thread's end.
@@ -626,10 +627,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   once and is the host's to make (ADR-0059). A queued card is drawn
   after the thread's last message, headed "queued by Bea · 1st in line", with
   what its command does first when it has one, and **unqueue**. Anyone here
-  can edit it until the host takes it, when the lane is free, in order. An
-  unqueued card goes back below the line. Unqueue a card the host had already
-  taken and your column says "already sent as Bea's message: it was taken
-  before you unqueued it". A move someone else made first is undone on your
+  can edit it until the host pops it to send it, when the lane is free, in
+  order. An unqueued card goes back below the line. Unqueue a card the host
+  had already popped and your column says "already sent as Bea's message:
+  it was sent before you unqueued it". A move someone else made first is undone on your
   screen, saying "not moved: Bea moved it first". A card the host could not
   send is back below the line saying "not sent: …" until it is queued again.
 - **Cmd+Z in a box undoes only that box's card**, never anything in another
@@ -676,7 +677,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   send reaches that run.
 - **A branch starts with no pinned cards.** Its agent is told its parent's
   no longer apply, quietly: the branch's column shows nothing for that. To
-  keep a direction, take a copy of the card and pin it in the branch.
+  keep a direction, take a copy of the card into your inventory and pin it
+  in the branch.
 - **Pinned cards are not unsent work:** they mark no tab and no rail dot.
 
 ### History and traces (ADR-0048 step 6)
@@ -707,10 +709,11 @@ The rail is E; the column is T. Seeing both at once is the product.
   selected card is shown whole beside the grid, and editable. Cards keep
   their slots, gaps included, on every device. Dropping a card on a slot
   that holds one swaps the two.
-- **Take** moves a card into your inventory: Ctrl+Shift+I in its box, its
-  **take** button, or a drag onto the panel. It lands in the selected slot
-  if that is empty, else the first empty one, and flies there; a take while
-  the panel is closed shows it briefly. A message's **take** copies its
+- **Take** moves a card into your inventory (a *take into the inventory*,
+  ADR-0083): Ctrl+Shift+I in its box, its **take** button, or a drag onto
+  the panel. It lands in the selected slot if that is empty, else the first
+  empty one, and flies there; a take into the inventory while the panel is
+  closed shows it briefly. A message's **take** copies its
   text, or your selection in it, as a new card: the message keeps it. Full
   means full: the nineteenth card is refused with "inventory full".
 - **Put** moves the selected card below the line at the end of the column
@@ -731,7 +734,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   undone, and are forgotten 7 days after it was archived.
 - **Undo a swap** with the same keys while the panel has focus: this tab's
   newest swap goes back, unless those slots have changed since.
-- **A refusal is said where you acted**: in the panel for a take, in the
+- **A refusal is said where you acted**: in the panel for a take into the
+  inventory, in the
   column you aimed at for a put, and where an undo showed.
 
 ## What goes away

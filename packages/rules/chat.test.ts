@@ -264,12 +264,12 @@ describe("planChat: a compelled message", () => {
       kind: "conflict",
       by: BO,
     })
-    // Idle for a moment between taken cards is still busy.
+    // Idle for a moment between popped cards is still busy.
     expect(kind(plan({ mentions: ASK, lane: lane({ waiting: 1 }) }))).toBe(
       "conflict",
     )
   })
-  test("queue, the host's take: the cards behind it do not make the lane busy, a run does", () => {
+  test("queue, the host's pop: the cards behind it do not make the lane busy, a run does", () => {
     expect(
       kind(plan({ mentions: ASK, mode: "queue", lane: lane({ waiting: 2 }) })),
     ).toBe("run")

@@ -6,7 +6,7 @@ import {
   type Placed,
   type ThreadName,
 } from "@pineta/core"
-import { offerEffects, takeEffects } from "@pineta/repo"
+import { offerEffects, offerIntegrationEffects } from "@pineta/repo"
 import { offerRecord } from "@pineta/rules"
 import { describe, expect, test } from "vitest"
 import { methods, record } from "../fakes.ts"
@@ -68,7 +68,7 @@ const ports = () =>
     record: async () => {},
     repair: async () => {},
     remove: async () => {},
-    taken: async () => {},
+    integrated: async () => {},
   })
 
 describe("executeOffer", () => {
@@ -130,8 +130,8 @@ describe("executeOffer", () => {
   })
 })
 
-test("a take writes the lane's base record, runs its steps, then marks the offer taken", async () => {
-  const taken = {
+test("an offer integration writes the lane's base record, runs its steps, then marks the offer integrated", async () => {
+  const integrated = {
     ...offerRecord({
       lane: LANE,
       name: NAME,
@@ -140,19 +140,19 @@ test("a take writes the lane's base record, runs its steps, then marks the offer
       editing: new Set(),
       now: 1,
     }),
-    taken: "kxyz",
+    integratedAs: "kxyz",
   }
   const p = ports()
-  const effects = takeEffects({
-    kind: "take",
+  const effects = offerIntegrationEffects({
+    kind: "integrate",
     name: NAME,
-    bookmark: taken.bookmark,
+    bookmark: integrated.bookmark,
     destination: "pineta-onto",
     top: "kxyz",
-    taken,
+    integrated,
   })
   await executeOffer(p.port, { base: BASE, effects }, null)
-  expect(methods(p.calls)).toEqual(["writeBase", "run", "taken"])
+  expect(methods(p.calls)).toEqual(["writeBase", "run", "integrated"])
   expect(p.calls[1]?.args[0]).toEqual(effects.steps)
-  expect(p.calls[2]?.args[0]).toBe(taken)
+  expect(p.calls[2]?.args[0]).toBe(integrated)
 })

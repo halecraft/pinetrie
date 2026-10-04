@@ -10,7 +10,7 @@ import {
   settleSlots,
   steadiness,
   swapWrites,
-  takeWrites,
+  takeIntoInventoryWrites,
 } from "./inventory.ts"
 
 const _ADA = writerId("ada@x.io")
@@ -82,7 +82,7 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
       [C, 9],
     ])
     // C's other slot, 4, is the intent A chose: C is drawn only where its
-    // own take put it.
+    // own take into the inventory put it.
     expect(settleSlots([A, B, C], slots, intents)).toEqual({
       "0": B,
       "4": A,
@@ -145,8 +145,10 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
     ])
   })
 
-  test("a take writes its slot, and clears any other slot holding the card", () => {
-    expect(takeWrites(slotsOf({ "2": "c-a", "3": "c-b" }), A, 6)).toEqual({
+  test("a take into the inventory writes its slot, and clears any other slot holding the card", () => {
+    expect(
+      takeIntoInventoryWrites(slotsOf({ "2": "c-a", "3": "c-b" }), A, 6),
+    ).toEqual({
       set: { "6": A },
       clear: ["2"],
     })

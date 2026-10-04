@@ -29,7 +29,7 @@ import { describe, expect, test } from "vitest"
 import { applyWrites, basics, record, row } from "../fakes.ts"
 import { applyPlaceSteps } from "../places.ts"
 import { createProvenance } from "../provenance.ts"
-import { takeTop } from "../take.ts"
+import { popNextQueuedCard } from "../queued-card-pop.ts"
 import { type CardCommandDeps, createCardCommands } from "./cards.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -123,7 +123,7 @@ function setUp() {
   }
 }
 
-describe("moves on the documents' keeper: the take and an unqueue in either order (ADR-0059)", () => {
+describe("moves on the documents' keeper: the next queued card's pop and an unqueue in either order (ADR-0059)", () => {
   test("a queue on an idle lane asks for its drain, and answers with the rev of its write", async () => {
     const { b, drains, commands, put } = setUp()
     put()
@@ -142,12 +142,12 @@ describe("moves on the documents' keeper: the take and an unqueue in either orde
     })
   })
 
-  test("the take, then an unqueue: answered gone, with the current rev", async () => {
+  test("the pop, then an unqueue: answered gone, with the current rev", async () => {
     const { b, commands, put } = setUp()
     put()
     await commands.move(BEA, [{ card: C1, from: drafting, to: queuedKey }])
-    const top = takeTop(b.places, LANE, false, held)
-    expect(top.kind === "taken" ? top.taken.card.id : top.kind).toBe(C1)
+    const top = popNextQueuedCard(b.places, LANE, false, held)
+    expect(top.kind === "popped" ? top.popped.card.id : top.kind).toBe(C1)
     const done = await commands.move(ADA, [
       {
         card: C1,
@@ -161,12 +161,12 @@ describe("moves on the documents' keeper: the take and an unqueue in either orde
     })
   })
 
-  test("an unqueue, then the take: nothing is taken", async () => {
+  test("an unqueue, then the pop: nothing is popped", async () => {
     const { b, commands, put } = setUp()
     put()
     await commands.move(BEA, [{ card: C1, from: drafting, to: queuedKey }])
     await commands.move(ADA, [{ card: C1, from: queuedKey, to: drafting }])
-    expect(takeTop(b.places, LANE, false, held).kind).toBe("idle")
+    expect(popNextQueuedCard(b.places, LANE, false, held).kind).toBe("idle")
   })
 
   test("a move someone else made first: answered moved, naming them", async () => {
@@ -214,7 +214,7 @@ describe("moves on the documents' keeper: the take and an unqueue in either orde
 describe("moves' history (ADR-0066)", () => {
   const inventory = { kind: "inventory", holder: ADA } as const
 
-  test("a take is one step of the taker's history in the root it left; a creation is in none", async () => {
+  test("a take into the inventory is one step of the taker's history in the root it left; a creation is in none", async () => {
     const { commands, put, recorded } = setUp()
     put()
     await commands.move(ADA, [{ card: C1, from: drafting, to: inventory }])

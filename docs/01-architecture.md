@@ -129,7 +129,7 @@ Unit tests sit beside the code they test. `workspace.test.ts` at the root is
 the one exception: it checks the manifests.
 
 The host's shell, `apps/pineta/host/`, is split by responsibility: runs, the
-queue's take, settling, startup, each command, HTTP. Each module takes its
+popping queued cards, settling, startup, each command, HTTP. Each module takes its
 dependencies as a parameter, and `index.ts` alone wires them. Its order rules
 (a run's end, startup) are in `apps/pineta/host/TECHNICAL.md`.
 

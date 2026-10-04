@@ -223,7 +223,7 @@ async function run(check: Checks["check"]): Promise<void> {
         e.message.content === "@Ada the plan is ready",
     )?.message
     check(
-      "a send that finds its lane busy queues its card in one step, and the card is taken when the run ends: its queuer's message, with the edits made while it waited",
+      "a send that finds its lane busy queues its card in one step, and the card is popped when the run ends: its queuer's message, with the edits made while it waited",
       busy.kind === "queued" &&
         sent3?.writer === bea.writer &&
         sent3.contributors?.join() === ada.writer &&
@@ -242,13 +242,13 @@ async function run(check: Checks["check"]): Promise<void> {
       `${neverSent}; ${onHost(c5)?.place.kind}`,
     )
 
-    // 4b. A card queued on an idle thread is taken at once. It is queued as
+    // 4b. A card queued on an idle thread is popped at once. It is queued as
     // soon as it is made, as the bring-up-to-date button's card can be: its
-    // record can reach the host before its text (S96), and the take waits.
+    // record can reach the host before its text (S96), and the pop waits.
     const idleEnd = tipOf()
     const c6 = newCard(ada, idleEnd, "@Bea while it is quiet")
     void queueCard(ada, c6, { lane, at: at(idleEnd) })
-    const taken = await waitFor(
+    const popped = await waitFor(
       () =>
         Object.values(treeOf(ch).entries).some(
           e =>
@@ -258,14 +258,14 @@ async function run(check: Checks["check"]): Promise<void> {
       5_000,
     )
     check(
-      "a card queued on an idle thread is taken at once, with all its text, though its record can reach the host before its text",
-      taken >= 0 && onHost(c6) === undefined,
-      `${taken} ms`,
+      "a card queued on an idle thread is popped at once, with all its text, though its record can reach the host before its text",
+      popped >= 0 && onHost(c6) === undefined,
+      `${popped} ms`,
     )
     await ch.quiet()
 
     // 4c. An unqueue sent right behind a queue on an idle thread: the queue's
-    // step queued the drain, so the take is on the documents' keeper first, and
+    // step queued the drain, so the pop is on the documents' keeper first, and
     // the unqueue is refused as gone (ADR-0059). Ada's client says it was sent.
     const quickEnd = tipOf()
     const c7 = newCard(ada, quickEnd, "@Bea too quick")
@@ -284,7 +284,7 @@ async function run(check: Checks["check"]): Promise<void> {
       e => e.message?.role === "chat" && e.message.content === "@Bea too quick",
     )
     check(
-      "an unqueue the take got to first is refused as gone, and its client says it was sent",
+      "an unqueue the pop got to first is refused as gone, and its client says it was sent",
       told >= 0 && sent7 && onHost(c7) === undefined,
       `${told}; sent ${sent7}`,
     )
@@ -480,21 +480,21 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     await mallory.close()
 
-    // 4e. Your inventory (ADR-0059): a take reaches your other session's
-    // inventory and nobody else's; nobody else moves a card out of it; and it
-    // holds 18 cards. Each move is a client's request over the wire.
+    // 4e. Your inventory (ADR-0059): a take into it reaches your other
+    // session's inventory and nobody else's; nobody else moves a card out of
+    // it; and it holds 18 cards. Each move is a client's request over the wire.
     const ada2 = await join(ch, "ada", "cards")
     const mine = { kind: "inventory", holder: ada.writer } as const
     const into = (slot: number) =>
       ({ actedAt: { kind: "inventory" }, slot }) as const
-    const taking = newCard(ada, tipOf(), "for later")
-    await waitFor(() => onHost(taking) !== undefined, 5_000)
-    const took = await ada.moveCard(
-      { card: taking, from: drafting(tipOf()), to: mine },
+    const forLater = newCard(ada, tipOf(), "for later")
+    await waitFor(() => onHost(forLater) !== undefined, 5_000)
+    const tookIntoInventory = await ada.moveCard(
+      { card: forLater, from: drafting(tipOf()), to: mine },
       into(3),
     )
     const otherSession = await waitFor(
-      () => ada2.slots.current()["3"] === taking,
+      () => ada2.slots.current()["3"] === forLater,
       5_000,
     )
     const beaView = bea.exchange.get(
@@ -510,13 +510,13 @@ async function run(check: Checks["check"]): Promise<void> {
       ada.slots.current()["7"] === undefined &&
       ada2.slots.current()["7"] === undefined
     check(
-      "a take reaches your other session's inventory and nobody else's, and nobody else writes it",
-      took.kind === "accepted" && otherSession >= 0 && hidden,
-      `${took.kind}; other session ${otherSession}; Bea refused ${beaRefused}, sees ${JSON.stringify(beaView.slots())}`,
+      "a take into the inventory reaches your other session's inventory and nobody else's, and nobody else writes it",
+      tookIntoInventory.kind === "accepted" && otherSession >= 0 && hidden,
+      `${tookIntoInventory.kind}; other session ${otherSession}; Bea refused ${beaRefused}, sees ${JSON.stringify(beaView.slots())}`,
     )
     const stolen = await bea.moveCard(
       {
-        card: taking,
+        card: forLater,
         from: mine,
         to: { kind: "inventory", holder: bea.writer },
       },
@@ -526,27 +526,30 @@ async function run(check: Checks["check"]): Promise<void> {
       "a move out of someone else's inventory is refused, as not theirs",
       stolen.kind === "refused" &&
         stolen.refusal?.code === "not-yours" &&
-        onHost(taking)?.place.kind === "inventory",
+        onHost(forLater)?.place.kind === "inventory",
       JSON.stringify(stolen),
     )
 
     // 4f. Moves' history (ADR-0066): one per person and root, on the host.
-    // Ada's second session undoes, in this root, the take her first session
-    // made here; her take in another root stays. An undo after Bea moved the
+    // Ada's second session undoes, in this root, the take into the inventory
+    // her first session made here; her take in another root stays. An undo after Bea moved the
     // card is refused, naming Bea. A keep of three cards is one move.
     const here = rootAt(ch, at(tipOf()))
     const other = await ada.chat("a root of its own", ROOT, { mode: "branch" })
     const otherEnd = other.kind === "appended" ? other.id : null
-    const takeOf = (card: CardId, end: string | null, slot: number) =>
-      ada.moveCard({ card, from: drafting(end), to: mine }, into(slot))
+    const takeIntoInventory = (
+      card: CardId,
+      end: string | null,
+      slot: number,
+    ) => ada.moveCard({ card, from: drafting(end), to: mine }, into(slot))
     const a1 = newCard(ada, tipOf(), "taken here")
     const b1 = newCard(ada, otherEnd, "taken there")
     await waitFor(
       () => onHost(a1) !== undefined && onHost(b1) !== undefined,
       5_000,
     )
-    await takeOf(a1, tipOf(), 4)
-    await takeOf(b1, otherEnd, 5)
+    await takeIntoInventory(a1, tipOf(), 4)
+    await takeIntoInventory(b1, otherEnd, 5)
     const undoneHere = await ada2.undoMoves(here, "undo")
     const a1Back = onHost(a1)?.place.kind === "drafting"
     const b1Stays = onHost(b1)?.place.kind === "inventory"
@@ -646,7 +649,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
 
     const filled = await Promise.all(
-      // Every slot but the take's (3) and the other root's (5).
+      // Every slot but the first take's (3) and the other root's (5).
       Array.from({ length: 18 }, (_, n) => n)
         .filter(slot => slot !== 3 && slot !== 5)
         .map(slot =>

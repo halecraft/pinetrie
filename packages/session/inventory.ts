@@ -5,10 +5,10 @@
 // repairs it from the host's record, writing only what differs (S76). One
 // rule, `settleSlots`, says what the slots should be: the repair writes it,
 // the page's panel draws it (`inventoryView`, `@pineta/client`), and a take
-// lands by the same `firstEmpty`, so what is drawn and what is written
-// cannot differ. A take this tab has in flight is an intent: drawn in the
-// slot it chose, and left alone by the repair until the host answers and the
-// take writes its own slot.
+// into the inventory lands by the same `firstEmpty`, so what is drawn and
+// what is written cannot differ. A take into the inventory this tab has in
+// flight is an intent: drawn in the slot it chose, and left alone by the
+// repair until the host answers and the take writes its own slot.
 
 import {
   type CardId,
@@ -26,7 +26,7 @@ export interface SlotWrites {
   readonly clear: readonly string[]
 }
 
-/** Card to the slot this tab's take in flight chose for it. */
+/** Card to the slot this tab's take into the inventory in flight chose for it. */
 export type Intents = ReadonlyMap<CardId, number>
 
 export const NO_INTENTS: Intents = new Map()
@@ -92,10 +92,11 @@ export function settleSlots(
 }
 
 /**
- * The repair (ADR-0059, S76): the writes that take `slots` to `settleSlots`.
- * An intent's slot, and a slot holding an intent's card, are left alone: the
- * take writes them itself once the host accepts it. Nothing to do gives no
- * writes, so two tabs never write back and forth.
+ * The repair (ADR-0059, S76): the writes that bring `slots` to
+ * `settleSlots`. An intent's slot, and a slot holding an intent's card, are
+ * left alone: the take into the inventory writes them itself once the host
+ * accepts it. Nothing to do gives no writes, so two tabs never write back
+ * and forth.
  *
  * A card is placed, or its slot cleared, only once it is `steady`: held, or
  * not, for a while. The host's record and another tab's slot write reach
@@ -175,8 +176,8 @@ export function steadiness(
   }
 }
 
-/** The slots a take writes: the card in `slot`, and out of any other. */
-export function takeWrites(
+/** The slots a take into the inventory writes: the card in `slot`, and out of any other. */
+export function takeIntoInventoryWrites(
   slots: Slots,
   card: CardId,
   slot: number,

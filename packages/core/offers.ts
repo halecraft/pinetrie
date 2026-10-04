@@ -48,9 +48,9 @@ export interface OfferLedger {
 }
 
 /**
- * What a take was shown (ADR-0065): the offer's ledger, and whether it
- * conflicted. A take whose offer now brings other work, or newly conflicts,
- * is refused (`OFFER_CHANGED`).
+ * What an offer integration was shown (ADR-0065): the offer's ledger, and
+ * whether it conflicted. An integration whose offer now brings other work,
+ * or newly conflicts, is refused (`OFFER_CHANGED`).
  */
 export interface OfferSeen {
   readonly ledger: OfferLedger | null
@@ -95,14 +95,17 @@ export type OfferInRepo =
 export type WorkChanges = "none" | "some" | "unknown"
 
 /**
- * Where a lane's offer starts (ADR-0060), or `untraced`: a take of this
- * lane above its base names no source (`untracedLanes`), so no start can
- * leave out what it brought, and nothing is offered until the lane catches
- * up past it (ADR-0067).
+ * Where a lane's offer starts (ADR-0060), or `untraced`: an integrated-offer
+ * commit of this lane above its base names no source (`untracedLanes`), so
+ * no start can leave out what it brought, and nothing is offered until the
+ * lane catches up past it (ADR-0067).
  */
 export type StartRead =
   | { readonly kind: "known"; readonly start: readonly CommitId[] }
-  | { readonly kind: "untraced"; readonly takes: readonly CommitId[] }
+  | {
+      readonly kind: "untraced"
+      readonly integratedOfferCommits: readonly CommitId[]
+    }
 
 /** One revision of an offer: the lane commit whose files it has, and its message. */
 export interface OfferSource {
@@ -143,9 +146,9 @@ export type OfferPlace =
   /** A WIP gone without landing: nothing sits anywhere, and nothing moves. */
   | { readonly kind: "gone"; readonly tip: CommitId; readonly base: LaneBase }
   /**
-   * A take of the lane names no source (S97): nothing is built here, but an
-   * offer that is here can be taken, since a take moves a bookmark and needs
-   * no start.
+   * An integrated-offer commit of the lane names no source (S97): nothing is
+   * built here, but an offer that is here can be integrated, since an
+   * integration moves a bookmark and needs no start.
    */
   | {
       readonly kind: "untraced"
@@ -164,7 +167,7 @@ export interface OfferGather {
   readonly offer: OfferInRepo | null
   /**
    * The lane's base record as the repo says it now, what catching up would
-   * change and its untraced takes with it: the host writes it when it
+   * change and its untraced integrated-offer commits with it: the host writes it when it
    * differs from the page's (ADR-0060).
    */
   readonly base: BaseRecord
@@ -174,7 +177,7 @@ export interface OfferGather {
 export type RefreshFacts =
   /** The thread's root is archived (ADR-0029): the offer alone, read against the line. */
   | { readonly kind: "archived"; readonly offer: OfferInRepo | null }
-  /** A take of the lane names no source (S97). */
+  /** An integrated-offer commit of the lane names no source (S97). */
   | { readonly kind: "untraced"; readonly offer: OfferInRepo | null }
   | {
       readonly kind: "placed"
@@ -184,8 +187,8 @@ export type RefreshFacts =
       readonly offer: OfferInRepo | null
     }
 
-/** What only a take reads; the rest is in its gather's place. */
-export interface TakeFacts {
+/** What only an offer integration reads; the rest is in its gather's place. */
+export interface OfferIntegrationFacts {
   /** The WIP's commits above the line; 0 for a lane on the line. */
   readonly wipAhead: number
   /**
@@ -248,21 +251,22 @@ export type RefreshDecision =
   /**
    * Untraced, and divergent or yours: nothing runs, and the record stays as
    * it is. A gap ADR-0067's untraced start leaves: such an offer is neither
-   * repaired nor recorded until the lane catches up past the take.
+   * repaired nor recorded until the lane catches up past the integrated-offer
+   * commit.
    */
   | { readonly kind: "untouched" }
 
-/** A take (`planOfferTake`): the bookmark it moves and the revision it moves to, or why not. */
-export type TakeDecision =
+/** An offer integration (`planOfferIntegration`): the bookmark it moves and the revision it moves to, or why not. */
+export type OfferIntegrationDecision =
   | {
-      readonly kind: "take"
+      readonly kind: "integrate"
       readonly name: ThreadName
       readonly bookmark: string
       readonly destination: string
       /** The offer's top's change id. */
       readonly top: string
-      /** Its record, marked taken. */
-      readonly taken: OfferRecord
+      /** Its record, marked integrated. */
+      readonly integrated: OfferRecord
     }
   | { readonly kind: "refused"; readonly code: ErrCode }
 

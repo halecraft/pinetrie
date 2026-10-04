@@ -467,36 +467,41 @@ test("planForkSetup: a WIP's copy on the line commit under it, never the WIP's o
   expect(steps.at(-1)).toBe("lane: sh -c pnpm i")
 })
 
-describe("planJoins: the takes a lane holds, joined before it catches up (S102)", () => {
+describe("planJoins: the integrated-offer commits a lane holds, joined before it catches up (S102)", () => {
   const T1 = commitId("t1")
   const T2 = commitId("t2")
   const S1 = commitId("s1")
   const S2 = commitId("s2")
   const X = commitId("x1")
-  test("a take whose sources the lane lacks is not joined", () => {
-    expect(planJoins([{ take: T1, sources: [X] }], new Set([S1]))).toEqual([])
+  test("an integrated-offer commit whose sources the lane lacks is not joined", () => {
+    expect(
+      planJoins([{ integratedOfferCommit: T1, sources: [X] }], new Set([S1])),
+    ).toEqual([])
   })
   test("a squash naming one source held and one not is joined, with the held one alone (S77 item 6)", () => {
     expect(
-      planJoins([{ take: T1, sources: [S1, X] }], new Set([S1])).map(j => [
-        j.take,
-        j.sources,
-      ]),
+      planJoins(
+        [{ integratedOfferCommit: T1, sources: [S1, X] }],
+        new Set([S1]),
+      ).map(j => [j.integratedOfferCommit, j.sources]),
     ).toEqual([[T1, [S1]]])
   })
-  test("several takes keep their order, oldest first", () => {
+  test("several integrated-offer commits keep their order, oldest first", () => {
     expect(
       planJoins(
         [
-          { take: T1, sources: [S1] },
-          { take: T2, sources: [S2] },
+          { integratedOfferCommit: T1, sources: [S1] },
+          { integratedOfferCommit: T2, sources: [S2] },
         ],
         new Set([S1, S2]),
-      ).map(j => j.take),
+      ).map(j => j.integratedOfferCommit),
     ).toEqual([T1, T2])
   })
-  test("a join's message names the take and its sources, and carries no trailer", () => {
-    const [join] = planJoins([{ take: T1, sources: [S1] }], new Set([S1]))
+  test("a join's message names the integrated-offer commit and its sources, and carries no trailer", () => {
+    const [join] = planJoins(
+      [{ integratedOfferCommit: T1, sources: [S1] }],
+      new Set([S1]),
+    )
     expect(join?.message).toBe("join: t1 holds s1")
     expect(join?.message).not.toMatch(/^Pineta-/m)
   })
@@ -547,7 +552,7 @@ describe("planMerge: an update's steps (ADR-0060)", () => {
         lane: laneNameForThread("p"),
         name: "amber-fox" as ThreadName,
         commit: C2,
-        taken: C1,
+        caughtUpWith: C1,
       }),
     ).toEqual({
       steps: [fetchById([C2])],

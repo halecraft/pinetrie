@@ -32,7 +32,7 @@ export interface Refresh {
 const newNonce = () => `pineta-offer-${crypto.randomUUID()}`
 
 export function createRefresh(
-  deps: Pick<OfferDeps, "basics" | "docs" | "records" | "taken">,
+  deps: Pick<OfferDeps, "basics" | "docs" | "records" | "bookmarkMoved">,
 ): Refresh {
   const { basics, docs, records } = deps
   const { session, log } = basics
@@ -65,9 +65,9 @@ export function createRefresh(
         )
       },
       remove: () => records.remove(lane),
-      async taken(record) {
-        await records.writeTaken(record)
-        deps.taken()
+      async integrated(record) {
+        await records.writeIntegratedOffer(record)
+        deps.bookmarkMoved()
       },
     }
   }

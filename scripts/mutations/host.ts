@@ -30,12 +30,12 @@ export const mutations: readonly Mutation[] = [
     expect: "an undo, whose revert Kyneta writes",
   },
   {
-    name: "a take leaves its card's history behind",
-    file: "apps/pineta/host/take.ts",
+    name: "a popped queued card leaves its history behind",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: '    await deps.provenance.after({ kind: "host" }, before)\n',
     to: "",
     command: unit,
-    expect: "a card taken and sent leaves no history",
+    expect: "a card popped and sent leaves no history",
   },
   {
     name: "before reads ends from a root not loaded",
@@ -88,7 +88,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (chat.at.kind === "root" && readRoots(session).has(chat.root) && false)',
     command: unit,
     expect:
-      "a thread at the root under a taken root's id is refused, and nothing is written",
+      "a thread at the root under a root id in use is refused, and nothing is written",
   },
   {
     name: "an archived root is unloaded at startup",
@@ -305,8 +305,8 @@ export const mutations: readonly Mutation[] = [
     expect: "a compelled chat pi refuses to run is appended",
   },
   {
-    name: "takeTop deletes after a microtask",
-    file: "apps/pineta/host/take.ts",
+    name: "popNextQueuedCard deletes after a microtask",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: '  applyPlaceSteps(places, [{ kind: "remove", id: card.id }])',
     to: '  queueMicrotask(() => applyPlaceSteps(places, [{ kind: "remove", id: card.id }]))',
     command: unit,
@@ -314,16 +314,16 @@ export const mutations: readonly Mutation[] = [
       "reads the top queued card and deletes its record before it returns",
   },
   {
-    name: "the drain takes before a card's text is loaded",
-    file: "apps/pineta/host/take.ts",
+    name: "the drain pops before a card's text is loaded",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: "    if (loading.length > 0) {",
     to: "    if (loading.length > 0 && loaded.size === 0) {",
     command: unit,
-    expect: "a card queued while texts load is loaded before it is taken",
+    expect: "a card queued while texts load is loaded before it is popped",
   },
   {
     name: "a refusal destroys the card's text",
-    file: "apps/pineta/host/take.ts",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: '    case "refused":\n      unsent(deps, sending, sent.message)',
     to: '    case "refused":\n      await deps.texts.destroy(card.id)\n      unsent(deps, sending, sent.message)',
     command: unit,
@@ -332,7 +332,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a card that brings the thread up to date is sent as a plain one",
-    file: "apps/pineta/host/take.ts",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: "  if (card.command !== null) {",
     to: "  if (false) {",
     command: unit,
@@ -340,7 +340,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a conflicted update goes on to the text",
-    file: "apps/pineta/host/take.ts",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: '        pinnedSeen: [],\n      })\n      return "ran"',
     to: "        pinnedSeen: [],\n      })",
     command: unit,
@@ -349,15 +349,15 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a card with no text is sent",
-    file: "apps/pineta/host/take.ts",
-    from: '  if (taken.text.trim() === "") {',
+    file: "apps/pineta/host/queued-card-pop.ts",
+    from: '  if (popped.text.trim() === "") {',
     to: "  if (false) {",
     command: unit,
     expect: "clean with no text: the update alone, and no run",
   },
   {
     name: "a command carried out is kept on a card sent back",
-    file: "apps/pineta/host/take.ts",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: "    sending = { ...card, command: null }",
     to: "    sending = card",
     command: unit,
@@ -434,7 +434,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the drain goes on after a run starts",
-    file: "apps/pineta/host/take.ts",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: '    if (done === "ran") return',
     to: "",
     command: unit,
@@ -836,17 +836,17 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a send that throws loses its card",
-    file: "apps/pineta/host/take.ts",
-    from: "  const sent = await deps.send(taken).catch(hostFailed)",
-    to: "  const sent = await deps.send(taken)",
+    file: "apps/pineta/host/queued-card-pop.ts",
+    from: "  const sent = await deps.send(popped).catch(hostFailed)",
+    to: "  const sent = await deps.send(popped)",
     command: unit,
     expect: "a send that throws writes the card back below the line",
   },
   {
     name: "an update that throws loses its card",
-    file: "apps/pineta/host/take.ts",
-    from: "      .prepareUpdate(lane, card.place.by, taken.text, card.command)\n      .catch(hostFailed)",
-    to: "      .prepareUpdate(lane, card.place.by, taken.text, card.command)",
+    file: "apps/pineta/host/queued-card-pop.ts",
+    from: "      .prepareUpdate(lane, card.place.by, popped.text, card.command)\n      .catch(hostFailed)",
+    to: "      .prepareUpdate(lane, card.place.by, popped.text, card.command)",
     command: unit,
     expect: "an update that throws writes the card back with its command",
   },
@@ -875,16 +875,16 @@ export const mutations: readonly Mutation[] = [
     expect: "spendsCard: written or running takes the card",
   },
   {
-    name: "the take skips the archive gate",
+    name: "a popped queued card skips the archive gate",
     file: "apps/pineta/host/commands/index.ts",
     from: '        refuseInArchive(\n          deps.basics,\n          chat.at.kind === "root" ? [] : [chat.root],\n        ) ??',
     to: "        null ??",
     command: unit,
-    expect: "a taken card in an archived root is refused",
+    expect: "a popped queued card in an archived root is refused",
   },
   {
-    name: "the take ignores whether the host holds the text",
-    file: "apps/pineta/host/take.ts",
+    name: "the pop ignores whether the host holds the text",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: '  if (!texts.holds(card.id, card.place.seen)) return { kind: "behind", card }',
     to: '  if (false) return { kind: "behind", card }',
     command: unit,
@@ -1039,7 +1039,7 @@ export const mutations: readonly Mutation[] = [
     to: '      return carry(step, drain, { kind: "move", by: writer })',
     command: unit,
     expect:
-      "a take is one step of the taker's history in the root it left; a creation is in none",
+      "a take into the inventory is one step of the taker's history in the root it left; a creation is in none",
   },
   {
     name: "an undo raises no rev",
@@ -1108,13 +1108,13 @@ export const mutations: readonly Mutation[] = [
     expect: "the records the host writes from your repo",
   },
   {
-    name: "the base record leaves out the untraced takes",
+    name: "the base record leaves out the untraced integrated-offer commits",
     file: "packages/repo/offer-gather.ts",
-    from: '  untraced: input.start.kind === "untraced" ? input.start.takes : [],\n',
+    from: '  untraced:\n    input.start.kind === "untraced" ? input.start.integratedOfferCommits : [],\n',
     to: "  untraced: [],\n",
     command: unit,
     expect:
-      "a take of the lane with no Pineta-Source builds nothing until the lane catches up past it; then only what is new (S97)",
+      "an integrated-offer commit of the lane with no Pineta-Source builds nothing until the lane catches up past it; then only what is new (S97)",
   },
   {
     name: "the base record leaves out what catching up changes",
@@ -1134,12 +1134,13 @@ export const mutations: readonly Mutation[] = [
     expect: "a lane's fetch is imported by the owner of your repo",
   },
   {
-    name: "a take holds the documents' keeper",
+    name: "an offer integration holds the documents' keeper",
     file: "apps/pineta/host/commands/index.ts",
     from: '      return intent.action === "split" ? "documents" : "repo"',
     to: '      return "documents"',
     command: unit,
-    expect: "a chat completes while a take is held open on your repo's owner",
+    expect:
+      "a chat completes while an offer integration is held open on your repo's owner",
   },
   {
     name: "an archive's teardown holds the documents' keeper",
@@ -1284,7 +1285,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a wait for a card's text is never given up",
-    file: "apps/pineta/host/take.ts",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: "  return [...awaited].filter(id => !queued.has(id))",
     to: "  return []",
     command: unit,
@@ -1292,7 +1293,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a card leaving the queue aborts no wait",
-    file: "apps/pineta/host/take.ts",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: "        awaiting.get(id)?.abort()",
     to: "        void id",
     command: unit,
@@ -1300,7 +1301,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a wait given up drains its lane anyway",
-    file: "apps/pineta/host/take.ts",
+    file: "apps/pineta/host/queued-card-pop.ts",
     from: "        if (!stop.signal.aborted) deps.drain(card.place.lane)",
     to: "        deps.drain(card.place.lane)",
     command: unit,

@@ -4,6 +4,8 @@
 `PLAN-2026-10-04-catch-up-past-take`. Amends ADR-0060 (how a thread
 catches up with the line), and with it ADR-0072's catch-up with a parent,
 which merges the same way.
+Amended by ADR-0083: each take the lane holds is an *integrated-offer
+commit*; the code joins those.
 
 **Context.** A thread catches up by merging the line's commit into its lane
 (ADR-0060), and jj chooses the merge's base from history. A take puts a

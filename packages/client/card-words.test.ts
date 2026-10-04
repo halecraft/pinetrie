@@ -106,14 +106,14 @@ describe("card words", () => {
     ],
     ["unsentWords", unsentWords("no such image"), "not sent: no such image"],
     [
-      "refusalWords, an unqueue the take beat, yours",
+      "refusalWords, an unqueue the pop beat, yours",
       refusalWords(refusal({ by: ME }), READER),
-      "already sent as your message: it was taken before you unqueued it",
+      "already sent as your message: it was sent before you unqueued it",
     ],
     [
-      "refusalWords, an unqueue the take beat, Bea's",
+      "refusalWords, an unqueue the pop beat, Bea's",
       refusalWords(refusal({ by: BEA }), READER),
-      "already sent as Bea's message: it was taken before you unqueued it",
+      "already sent as Bea's message: it was sent before you unqueued it",
     ],
     [
       "refusalWords, gone from a drafting place",
@@ -239,7 +239,10 @@ describe("history and traces (ADR-0048 step 6)", () => {
   test.each([
     [{ by: BEA, verb: "queued", traces: [trace(queued)] }, "Bea queued this"],
     [{ by: BEA, verb: "sent", traces: [trace(null)] }, "Bea sent this →"],
-    [{ by: BEA, verb: "took", traces: [trace(null)] }, "Bea took this"],
+    [
+      { by: BEA, verb: "took-into-inventory", traces: [trace(null)] },
+      "Bea took this",
+    ],
     [
       {
         by: BEA,

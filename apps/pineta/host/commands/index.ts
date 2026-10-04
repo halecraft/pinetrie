@@ -97,10 +97,14 @@ export interface Commands {
     wire: WireCommand,
   ): Promise<void>
   /**
-   * A queued card the host took, sent as its queuer's message: the archive
+   * A queued card the host popped, sent as its queuer's message: the archive
    * gate, then `sendChat`, as a `chat` command goes.
    */
-  sendTaken(writer: WriterId, sendId: string, chat: Chat): Promise<Outcome>
+  sendPoppedQueuedCard(
+    writer: WriterId,
+    sendId: string,
+    chat: Chat,
+  ): Promise<Outcome>
 }
 
 export function createCommands(deps: CommandDeps): Commands {
@@ -212,7 +216,7 @@ export function createCommands(deps: CommandDeps): Commands {
           (await deps.names.reserve(intent.lane)) === "held"
             ? {
                 kind: "refused",
-                code: ERR.LANE_TAKEN,
+                code: ERR.LANE_ID_IN_USE,
                 message: "that thread has started",
               }
             : { kind: "reserved" },
@@ -222,7 +226,7 @@ export function createCommands(deps: CommandDeps): Commands {
 
   return {
     handle,
-    async sendTaken(writer, sendId, chat) {
+    async sendPoppedQueuedCard(writer, sendId, chat) {
       return (
         refuseInArchive(
           deps.basics,
@@ -236,9 +240,9 @@ export function createCommands(deps: CommandDeps): Commands {
 /**
  * A command that would write in an archived root is refused, naming who
  * archived it (ADR-0029). `sendChat`'s only callers are this dispatcher and
- * `sendTaken`, both behind it, so it needs no check of its own. `root` is
- * the roots the command writes in (`writesIn`), which names them, so no
- * root's document is opened to check. Null when the command may go on.
+ * `sendPoppedQueuedCard`, both behind it, so it needs no check of its own.
+ * `root` is the roots the command writes in (`writesIn`), which names them,
+ * so no root's document is opened to check. Null when the command may go on.
  */
 function refuseInArchive(
   basics: Pick<Basics, "session">,

@@ -107,7 +107,7 @@ function setUp(
 }
 
 test.each([
-  ["a take", { kind: "offer", action: "take" }, "repo"],
+  ["an offer integration", { kind: "offer", action: "integrate" }, "repo"],
   ["a squash", { kind: "offer", action: "squash" }, "repo"],
   [
     "a split, which starts a run",
@@ -123,25 +123,25 @@ test.each([
   expect(placeOfCommand(intent as Intent)).toBe(place)
 })
 
-test("a chat completes while a take is held open on your repo's owner", async () => {
+test("a chat completes while an offer integration is held open on your repo's owner", async () => {
   const held = Promise.withResolvers<null>()
   const { commands, replies, sender, chat } = setUp({
     offers: record<NonNullable<Offers>>({ act: () => held.promise }).port,
   })
-  const take = commands.handle(sender, ALICE, {
+  const integration = commands.handle(sender, ALICE, {
     id: "t-1",
     kind: "offer",
     lane: HELD,
-    mode: "take",
+    mode: "integrate",
     seen: JSON.stringify({ ledger: null, conflicted: false }),
   })
   await commands.handle(sender, ALICE, chat("c-1"))
   expect(replies.map(r => r.id)).toEqual(["c-1"])
   held.resolve(null)
-  await take
+  await integration
   expect(replies.map(r => [r.id, r.outcome])).toEqual([
     ["c-1", "appended"],
-    ["t-1", "taken"],
+    ["t-1", "integrated"],
   ])
 })
 
@@ -238,7 +238,7 @@ test("a chat command spends its card once written, record then text, answering w
   ).toEqual(["card-1"])
 })
 
-test("a taken card in an archived root is refused, and the agent is never called", async () => {
+test("a popped queued card in an archived root is refused, and the agent is never called", async () => {
   const { b, agent, commands } = setUp()
   putValue(
     b,
@@ -249,7 +249,7 @@ test("a taken card in an archived root is refused, and the agent is never called
       at: 1,
     }),
   )
-  const out = await commands.sendTaken(ALICE, "s-1", {
+  const out = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
     text: "from the queue",
     root: ROOT_ID,
     at: atEntry(ROOT_ENTRY),
@@ -302,7 +302,7 @@ test("a reservation is answered reserved, and refused for a lane pi holds (ADR-0
   await reserve("c-5", HELD)
   expect(replies.map(r => [r.id, r.outcome, r.errorCode])).toEqual([
     ["c-4", "reserved", ""],
-    ["c-5", "refused", "lane_taken"],
+    ["c-5", "refused", "lane_id_in_use"],
   ])
 })
 

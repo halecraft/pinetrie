@@ -13,10 +13,10 @@ export { fileDiff, readOffer, revisionRead, startOfOffer } from "./offer.ts"
 export {
   gatherDescribe,
   gatherOffer,
+  gatherOfferIntegration,
   gatherPlace,
   gatherRefresh,
   gatherStack,
-  gatherTake,
   type OfferInput,
 } from "./offer-gather.ts"
 export { repairOffer } from "./offer-repair.ts"
@@ -24,8 +24,8 @@ export {
   describeEffects,
   type OfferEffects,
   offerEffects,
+  offerIntegrationEffects,
   rebuildEffects,
-  takeEffects,
 } from "./offer-steps.ts"
 export {
   type RepoOps,

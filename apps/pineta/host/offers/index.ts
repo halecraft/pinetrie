@@ -33,7 +33,7 @@ import {
 import {
   answerDiff,
   answerReview,
-  isUntaken,
+  isNotYetIntegrated,
   type OfferAnswer,
   type OfferAsk,
   offerStatus,
@@ -64,12 +64,12 @@ export interface Offers {
   /** A run on `lane` ended: refresh its offer, then describe it if it is still a WIP. */
   runEnded(lane: LaneName): void
   /**
-   * An offer action other than a split; a take names its destination, null
+   * An offer action other than a split; an integration names its destination, null
    * for the default, and what it was shown (ADR-0065).
    */
   act(
     lane: LaneName,
-    action: "take" | "squash" | "describe" | "refresh",
+    action: "integrate" | "squash" | "describe" | "refresh",
     by: WriterId,
     to?: string | null,
     seen?: OfferSeen | null,
@@ -107,8 +107,8 @@ export function startOffers(input: {
   readonly agent: () => Agent
   /** Whether a lane is running now: an offer is described once it stops. */
   readonly running: (lane: LaneName) => boolean
-  /** After a take: the base snapshot follows the line. */
-  readonly taken: () => void
+  /** After an offer integration: the base snapshot follows the bookmark it moved. */
+  readonly bookmarkMoved: () => void
   /** The line's record and commands (`host/work/line.ts`): its record is rewritten when the owner observes the line or your `@` move. */
   readonly lineWork: Line
 }): Offers {
@@ -167,7 +167,7 @@ export function startOffers(input: {
       moved,
       names: readNames(basics.session),
       open: [...readOffers(basics.session).values()]
-        .filter(o => isUntaken(offerStatus(o)))
+        .filter(o => isNotYetIntegrated(offerStatus(o)))
         .map(o => o.lane),
     })
     if (planned.line) markLine()

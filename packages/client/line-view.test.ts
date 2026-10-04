@@ -263,8 +263,8 @@ describe("update my files, and resolving what conflicts (ADR-0061)", () => {
     ],
     [
       "a refusal",
-      { kind: "refused", action: "land", message: "nothing to take" },
-      "not done: nothing to take",
+      { kind: "refused", action: "land", message: "nothing to land" },
+      "not done: nothing to land",
     ],
     [
       "a failure",

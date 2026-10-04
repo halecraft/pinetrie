@@ -38,14 +38,14 @@ export const mutations: readonly Mutation[] = [
       "a trace its placer has seen is deleted on the host, for every device",
   },
   {
-    name: "the take button takes nowhere",
+    name: "the add button integrates nowhere",
     file: "packages/client/column.tsx",
     from: "          ? destinations[0]\n",
     to: "          ? destinations[1]\n",
     suite: "browser",
     scenario: "tools",
     expect:
-      "the column's foot shows the thread's offer in words, its bookmark apart, and Take moves the line to it, leaving your working copy",
+      "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves the line to it, leaving your working copy",
   },
   {
     name: "a column you open does not take focus",
@@ -180,7 +180,7 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "tools",
     expect:
-      "after a restart the session is all there, and the queued card was taken",
+      "after a restart the session is all there, and the queued card was popped",
   },
   {
     name: "the host binds every interface by default",
@@ -1376,14 +1376,14 @@ export const mutations: readonly Mutation[] = [
       "an ask is open while it runs, and folds at its end above the view, the column at its end and the last word in view",
   },
   {
-    name: "the take sends as the card's owner, not who queued it",
+    name: "a popped queued card is sent as the card's owner, not who queued it",
     file: "apps/pineta/host/index.ts",
-    from: "          commands.sendTaken(taken.card.place.by, newId(), takenChat(taken)),",
-    to: "          commands.sendTaken(taken.card.owner, newId(), takenChat(taken)),",
+    from: "            popped.card.place.by,\n            newId(),",
+    to: "            popped.card.owner,\n            newId(),",
     suite: "host",
     scenario: "cards",
     expect:
-      "a send that finds its lane busy queues its card in one step, and the card is taken when the run ends: its queuer's message, with the edits made while it waited",
+      "a send that finds its lane busy queues its card in one step, and the card is popped when the run ends: its queuer's message, with the edits made while it waited",
   },
   {
     name: "a queue move asks for no drain",
@@ -1393,7 +1393,7 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "cards",
     expect:
-      "a card queued on an idle thread is taken at once, with all its text, though its record can reach the host before its text",
+      "a card queued on an idle thread is popped at once, with all its text, though its record can reach the host before its text",
   },
   {
     name: "an unqueue is never sent",
@@ -1423,7 +1423,7 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "cards",
     expect:
-      "a card queued on an idle thread is taken at once, with all its text, though its record can reach the host before its text",
+      "a card queued on an idle thread is popped at once, with all its text, though its record can reach the host before its text",
   },
   {
     name: "a column's outline does not move as the column scrolls",
@@ -1492,7 +1492,7 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "cards",
     expect:
-      "an unqueue the take got to first is refused as gone, and its client says it was sent",
+      "an unqueue the pop got to first is refused as gone, and its client says it was sent",
   },
   {
     name: "anyone may write the places",
@@ -1513,7 +1513,7 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "cards",
     expect:
-      "a take reaches your other session's inventory and nobody else's, and nobody else writes it",
+      "a take into the inventory reaches your other session's inventory and nobody else's, and nobody else writes it",
   },
   {
     name: "the wire carries no holder",

@@ -2,7 +2,7 @@
 //
 // The one way a run starts. It announces its end and knows nothing of what
 // follows: `startHost` wires the drain and hot reload to `onEnded`, which is
-// what keeps the queue's take and the commands out of this module. What a
+// what keeps the queue's pops and the commands out of this module. What a
 // run reads of its pinned cards is `readPinned`'s (`pinned.ts`).
 
 import {
@@ -39,8 +39,8 @@ export type RunStart =
       readonly message: PromptMessage
       /**
        * The thread's pinned cards as the sender had them, which the run
-       * waits for (ADR-0048, S96): a chat's; none for a take, a landing or
-       * a stack.
+       * waits for (ADR-0048, S96): a chat's; none for a popped queued card,
+       * a landing or a stack.
        */
       readonly pinnedSeen: readonly SentCard[]
     }

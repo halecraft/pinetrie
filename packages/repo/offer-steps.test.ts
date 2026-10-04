@@ -11,16 +11,16 @@ import { describe, expect, test } from "vitest"
 import {
   describeEffects,
   offerEffects,
+  offerIntegrationEffects,
   rebuildEffects,
-  takeEffects,
 } from "./offer-steps.ts"
 import {
   planAbandonOffer,
   planDescribe,
   planFollowOffer,
   planOffer,
+  planOfferIntegrationSteps,
   planRefreshOffer,
-  planTakeOffer,
 } from "./plan.ts"
 
 const LANE = laneNameForThread("0123456789abcdef")
@@ -178,8 +178,8 @@ test("rebuildEffects: the old revisions abandoned, then each source on the start
   ])
 })
 
-test("takeEffects and describeEffects: the take's bookmark move, and the message with the offer's ledger", () => {
-  const taken = {
+test("offerIntegrationEffects and describeEffects: the integration's bookmark move, and the message with the offer's ledger", () => {
+  const integrated = {
     lane: LANE,
     size: 1,
     stale: false,
@@ -190,27 +190,27 @@ test("takeEffects and describeEffects: the take's bookmark move, and the message
     described: false,
     edited: false,
     bookmark: `pineta-offer/${NAME}`,
-    taken: "ktop",
+    integratedAs: "ktop",
     commits: [],
     ledger: null,
     at: 1,
   }
   expect(
-    takeEffects({
-      kind: "take",
+    offerIntegrationEffects({
+      kind: "integrate",
       name: NAME,
-      bookmark: taken.bookmark,
+      bookmark: integrated.bookmark,
       destination: "pineta-onto",
       top: "ktop",
-      taken,
+      integrated,
     }),
   ).toEqual({
-    steps: planTakeOffer({
-      bookmark: taken.bookmark,
+    steps: planOfferIntegrationSteps({
+      bookmark: integrated.bookmark,
       top: "ktop",
       destination: "pineta-onto",
     }),
-    after: { kind: "taken", record: taken },
+    after: { kind: "integrated", record: integrated },
     built: false,
   })
   const ledger = { source: TIP, start: [START] }

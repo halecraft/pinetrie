@@ -1,11 +1,11 @@
-// client/card-intents — what take, put, keep, remove and undo do (ADR-0048
-// step 4, ADR-0052, ADR-0059, ADR-0066), as effects. Pure: `planIntent` calls
-// these, and `perform` carries out what they return.
+// client/card-intents — what take into the inventory, put, keep, remove and
+// undo do (ADR-0048 step 4, ADR-0052, ADR-0059, ADR-0066), as effects. Pure:
+// `planIntent` calls these, and `perform` carries out what they return.
 //
 // Every input makes the same moves: a key, a button and a drop each become
-// one of these intents. A take lands in the selected slot when it is empty,
-// else the first empty one (`firstEmpty`); a put lands where the target's
-// composer would create a card (`placeOfTarget`). Each move says where it was
+// one of these intents. A take into the inventory lands in the selected
+// slot when it is empty, else the first empty one (`firstEmpty`); a put
+// lands where the target's composer would create a card (`placeOfTarget`). Each move says where it was
 // made, so a refusal is said there. Which history a move enters is the
 // host's to decide (`historyOf`); an undo names only the root you are on.
 
@@ -81,7 +81,7 @@ export const cardOf = (
   card: CardId,
 ): CardRecord | undefined => facts.cards.find(c => c.id === card)
 
-/** A take refused before it is sent: your inventory is full, as the host would say. */
+/** A take into the inventory refused before it is sent: it is full, as the host would say. */
 const full = (card: CardId): CardRefusal => ({
   card,
   actedAt: AT_INVENTORY,
@@ -91,7 +91,11 @@ const full = (card: CardId): CardRefusal => ({
 })
 
 /** A handoff into your inventory, at `slot`. */
-const takeInto = (card: CardRecord, slot: number, me: CardFacts["me"]) =>
+const moveIntoInventorySlot = (
+  card: CardRecord,
+  slot: number,
+  me: CardFacts["me"],
+) =>
   moveCard(
     moveOf(card, { kind: "inventory", holder: me }),
     {
@@ -105,14 +109,17 @@ const takeInto = (card: CardRecord, slot: number, me: CardFacts["me"]) =>
  * Take `card` into your inventory: the selected slot if it is empty, else
  * the first empty one. Full, it is refused here, as the host would.
  */
-export function planTake(card: CardId, state: IntentState): readonly Effect[] {
+export function planTakeIntoInventory(
+  card: CardId,
+  state: IntentState,
+): readonly Effect[] {
   const facts = state.cards
   const now = cardOf(facts, card)
   if (now === undefined || now.place.kind === "inventory") return []
-  return takeAt(now, facts.selected, state)
+  return takeIntoInventoryAt(now, facts.selected, state)
 }
 
-function takeAt(
+function takeIntoInventoryAt(
   now: CardRecord,
   start: number,
   state: IntentState,
@@ -120,14 +127,14 @@ function takeAt(
   const slot = firstEmpty(state.cards.slots, start)
   const show: Effect = { kind: "showInventory", brief: true }
   if (slot === null) return [show, { kind: "refuse", refusal: full(now.id) }]
-  return [show, takeInto(now, slot, state.cards.me)]
+  return [show, moveIntoInventorySlot(now, slot, state.cards.me)]
 }
 
 /**
  * A copy of a message's text, or of a selection in it, as a new card in your
  * inventory. A creation, so it enters no history: discarding removes it.
  */
-export function planTakeCopy(
+export function planTakeCopyIntoInventory(
   card: CardId,
   text: string,
   state: IntentState,
@@ -157,7 +164,8 @@ export function planTakeCopy(
 /**
  * Put `card` at `target`. A column: where its composer would create a card,
  * below the line. A slot: a card already in your inventory swaps with what
- * is there; any other card is taken, into that slot if it is empty.
+ * is there; any other card is taken into the inventory, into that slot if
+ * it is empty.
  */
 export function planPut(
   card: CardId,
@@ -170,7 +178,7 @@ export function planPut(
   if (target.kind === "inventory") {
     const from = slotOf(facts.slots, card)
     if (from === null || now.place.kind !== "inventory")
-      return takeAt(now, target.slot, state)
+      return takeIntoInventoryAt(now, target.slot, state)
     if (from === target.slot) return []
     return [{ kind: "swapSlots", a: from, b: target.slot }]
   }

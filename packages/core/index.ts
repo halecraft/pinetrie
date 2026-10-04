@@ -279,21 +279,21 @@ export const ERR = {
   /** A title with a line break, or longer than `MAX_TITLE` (ADR-0045). */
   INVALID_TITLE: "invalid_title",
   /** A new thread's lane id that names a lane pi already holds (ADR-0057). */
-  LANE_TAKEN: "lane_taken",
+  LANE_ID_IN_USE: "lane_id_in_use",
   /** A new root's id that names a root the session already holds (ADR-0063). */
-  ROOT_TAKEN: "root_taken",
+  ROOT_ID_IN_USE: "root_id_in_use",
   /**
    * A command that acts on the repo as its owner (set up the line, land your
    * work) from a host that admits others: it has an invite key (ADR-0060).
    */
   NOT_YOURS: "not_yours",
-  /** An offer taken, or work landed, before the line is set up (ADR-0060). */
+  /** An offer integrated, or work landed, before the line is set up (ADR-0060). */
   NO_LINE: "no_line",
   /** Publishing in a repo with no publish bookmark (ADR-0076). */
   NO_PUBLISH: "no_publish",
   /** Publishing while the publish bookmark has commits the line lacks (ADR-0076). */
   NOT_FAST_FORWARD: "not_fast_forward",
-  /** A take to a bookmark that is not one of the offer's destinations now. */
+  /** An offer integration into a bookmark that is not one of the offer's destinations now. */
   BAD_DESTINATION: "bad_destination",
   /** A new thread's base that is not a WIP bookmark above the line. */
   BAD_BASE: "bad_base",
@@ -304,7 +304,7 @@ export const ERR = {
   /** Catching up with the thread it branched from while that thread's agent runs (ADR-0072). */
   PARENT_RUNNING: "parent_running",
   /**
-   * A take of an offer that now brings other work than the one it was shown
+   * An offer integration that now brings other work than the one it was shown
    * (another ledger), or now conflicts where it did not (ADR-0065).
    */
   OFFER_CHANGED: "offer_changed",
@@ -377,7 +377,7 @@ export const CHAT_MODES: readonly ChatMode[] = ["reply", "branch"]
 
 /**
  * How the host plans a message: a client's mode, or `queue`, for a queued
- * card it takes (ADR-0048). The lane's queue has already decided that card's
+ * card it pops (ADR-0048). The lane's queue has already decided that card's
  * turn, so only a run makes the lane busy, and a race does not count. A
  * client never sends it: it queues a card instead.
  */
@@ -458,7 +458,7 @@ export type Intent =
   /** Ask a model for a root's title, from its messages (ADR-0074). */
   | { readonly kind: "retitle"; readonly root: RootId }
   /**
-   * Act on a lane's offer in your repo (ADR-0038). A take names its
+   * Act on a lane's offer in your repo (ADR-0038). An integration names its
    * destination bookmark, null for the default (ADR-0060), and what it was
    * shown (`seen`, ADR-0065); every other action, null.
    */
@@ -496,13 +496,19 @@ export type Intent =
   | { readonly kind: "traces-seen"; readonly traces: readonly string[] }
 
 /**
- * What can be done with an offer: take it into your repo, have the agent split
- * it into a stack, squash a stack back to one revision, have the agent write
- * its description again, or rebuild it, discarding your edits (ADR-0038).
+ * What can be done with an offer: integrate it into the line or a WIP
+ * (ADR-0060, ADR-0083), have the agent split it into a stack, squash a stack
+ * back to one revision, have the agent write its description again, or
+ * rebuild it, discarding your edits (ADR-0038).
  */
-export type OfferAction = "take" | "split" | "squash" | "describe" | "refresh"
+export type OfferAction =
+  | "integrate"
+  | "split"
+  | "squash"
+  | "describe"
+  | "refresh"
 export const OFFER_ACTIONS: readonly OfferAction[] = [
-  "take",
+  "integrate",
   "split",
   "squash",
   "describe",
@@ -656,7 +662,8 @@ export interface VerdictRecord {
   readonly ask: EntryId
   /**
    * The run's last entry, from its asks (`AskIndex.last`), never the lane's
-   * tip: a card taken at the run's end can move the tip before this is read.
+   * tip: a queued card popped at the run's end can move the tip before this
+   * is read.
    */
   readonly end: EntryId
   readonly verdict: Verdict
@@ -897,9 +904,9 @@ export interface LandingRecord {
  * keyed by lane: the page's cache, written from the repo after each of the
  * host's steps (`offerRecord`, `@pineta/rules`). The host never decides from it: it reads the
  * offer from your repo (`OfferInRepo`), so a record lost or stale changes
- * nothing. What a take would
- * bring, each revision's description, files and diffs, is not stored: the page
- * reads it by commit when it asks (`RevisionReview`, ADR-0047).
+ * nothing. What integrating it would bring, each revision's description,
+ * files and diffs, is not stored: the page reads it by commit when it asks
+ * (`RevisionReview`, ADR-0047).
  */
 export interface OfferRecord {
   readonly lane: LaneName
@@ -925,8 +932,11 @@ export interface OfferRecord {
   readonly edited: boolean
   /** Its bookmark in your repo, as jjui shows it. */
   readonly bookmark: string
-  /** The change id its top became when you took it; null while it is open. */
-  readonly taken: string | null
+  /**
+   * The change id its top became when you integrated it; null while it is
+   * open. Stored as `taken` before ADR-0083: `offerRecord` still reads that.
+   */
+  readonly integratedAs: string | null
   /**
    * Each revision's commit as the host last read it, bottom first: what a
    * review may read. It follows a rebase jj made under the offer, and your
@@ -935,7 +945,8 @@ export interface OfferRecord {
   readonly commits: readonly CommitId[]
   /**
    * What it brings, as its top's message says (`offerLedger`): the lane tip
-   * it holds and where it starts. A take names it (`OfferSeen`, ADR-0065).
+   * it holds and where it starts. An integration names it (`OfferSeen`,
+   * ADR-0065).
    * Null for an offer whose message carries none, and for a record written
    * before the field, until the owner's first observation writes it again.
    */
@@ -1038,8 +1049,8 @@ export type BaseMerge =
   | (ParentThread & {
       /** The parent's newest commit (`ParentNow.newest`). */
       readonly commit: CommitId
-      /** What the lane last took from it: where the commits that came in start. */
-      readonly taken: CommitId
+      /** The parent commit the lane last caught up with: where the commits that came in start. */
+      readonly caughtUpWith: CommitId
     })
 
 declare const threadNameBrand: unique symbol
@@ -1134,7 +1145,7 @@ export interface LineRecord {
     }
   }
   /**
-   * Whether this host takes the `line` commands that act on the repo as its
+   * Whether this host accepts the `line` commands that act on the repo as its
    * owner (set up, land, update your files): only when it admits no one but
    * this machine (no invite key). Publishing is anyone's (ADR-0076).
    */
@@ -1160,8 +1171,9 @@ export interface BaseRecord {
    */
   readonly catchUp: CatchUpRead | null
   /**
-   * Takes of this thread on the line, above its base, that name no source
-   * (`untracedLanes`, S97): nothing is offered until it catches up past them.
+   * Integrated-offer commits of this thread on the line, above its base,
+   * that name no source (`untracedLanes`, S97): nothing is offered until it
+   * catches up past them.
    */
   readonly untraced: readonly CommitId[]
 }
@@ -1198,7 +1210,7 @@ export const CARD_COMMANDS: readonly CardCommand[] = [
  * `threadOf` whenever it is needed, so it follows its thread as the thread
  * grows. Pinned: at the top of a thread's column, kept and resolved as a
  * drafting card is; the agent reads it on every run. Queued: above the line, waiting for its thread's lane, until the
- * host takes it or someone unqueues it. Fresh: an unsent branch or new tab,
+ * host pops it or someone unqueues it. Fresh: an unsent branch or new tab,
  * by its column's key, in the root it will start or branch in. Inventory: in its holder's inventory; which slot holds
  * it is the holder's own document (`InventoryDoc`), not the host's (ADR-0059).
  */
@@ -1232,7 +1244,7 @@ export type CardPlace =
       readonly by: WriterId
       /**
        * The text's version as its queuer had it (`textVersion`), "" for none:
-       * the host takes the card only once it holds that much (S96).
+       * the host pops the card only once it holds that much (S96).
        */
       readonly seen: string
     }
@@ -1257,7 +1269,7 @@ export const INVENTORY_COLUMNS = 6
 
 /**
  * The card a chat is sent from, with its text's version as its sender had it
- * (`textVersion`): queued, the host takes it only once it holds that much
+ * (`textVersion`): queued, the host pops it only once it holds that much
  * of the text (S96).
  */
 export interface SentCard {
@@ -1370,8 +1382,8 @@ export const pinnedOf = (place: CardPlace | PlaceKey): PlaceKey | null =>
     : null
 
 /**
- * The root a card queued on `lane` takes: its lane's, since the host takes
- * it into a chat there (ADR-0063); else, for a lane with no record yet, the
+ * The root a card queued on `lane` belongs to: its lane's, since the host
+ * pops it into a chat there (ADR-0063); else, for a lane with no record yet, the
  * root the card drafts or queues in. Undefined for a card at no thread.
  */
 export function queueRoot(
@@ -1392,7 +1404,7 @@ export type MoveRefusal =
   | "moved"
   /** The card has no record: sent, or discarded. */
   | "gone"
-  /** A creation whose id is taken. */
+  /** A creation whose id is in use. */
   | "exists"
   /** A removal of a card in neither a fresh column nor the sender's inventory. */
   | "not-fresh"
@@ -1591,11 +1603,12 @@ export interface CardRecord {
   readonly place: CardPlace
   /**
    * Who put it where it is: the sender of the last move the host accepted.
-   * A write the host makes itself (a refused take written back) keeps it.
+   * A write the host makes itself (a popped card written back when refused)
+   * keeps it.
    * When someone else moves the card, the trace is for them (ADR-0048).
    */
   readonly placer: WriterId
-  /** What it is sent through when taken (ADR-0055); null for a plain message. */
+  /** What it is sent through when popped (ADR-0055); null for a plain message. */
   readonly command: CardCommand | null
   /** Why the host could not send it, until it is queued again; null when it never failed. */
   readonly unsent: string | null
@@ -1603,8 +1616,8 @@ export interface CardRecord {
 
 /**
  * One change to a living card's place (ADR-0048 step 6): who made it, from
- * where to where, and when. What the change was called (queued, took,
- * pinned) is read from the two places when it is worded (`verbOf`).
+ * where to where, and when. What the change was called (queued, took into
+ * the inventory, pinned) is read from the two places when it is worded (`verbOf`).
  */
 export interface CardEvent {
   readonly kind:

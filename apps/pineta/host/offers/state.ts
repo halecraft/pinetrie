@@ -59,8 +59,8 @@ export interface OfferDocs {
 export interface OfferRecords {
   /** An offer's record, when it changed. */
   write(record: OfferRecord): Promise<void>
-  /** A taken offer's record, written whatever is there. */
-  writeTaken(record: OfferRecord): Promise<void>
+  /** An integrated offer's record, written whatever is there. */
+  writeIntegratedOffer(record: OfferRecord): Promise<void>
   /** Remove an offer's record, when there is one. */
   remove(lane: LaneName): Promise<void>
   /** The lane's base record as the repo says it, when it differs from the page's; none for null. */
@@ -68,7 +68,7 @@ export interface OfferRecords {
   writeValues(writes: readonly ValueWrite[]): Promise<void>
 }
 
-/** Everything an offer module may take; each takes the `Pick` it needs. */
+/** Everything an offer module may use; each names the `Pick` it needs. */
 export interface OfferDeps {
   /** The one writer of your repo: commands, refreshes as upkeep, pinned reads. */
   readonly owner: RepoOwner
@@ -78,8 +78,8 @@ export interface OfferDeps {
   readonly agent: () => Agent
   /** Whether a lane is running now: an offer is described once it stops. */
   readonly running: (lane: LaneName) => boolean
-  /** After a take or a land: the base snapshot follows the line. */
-  readonly taken: () => void
+  /** After an offer integration: the base snapshot follows the bookmark it moved. */
+  readonly bookmarkMoved: () => void
   readonly docs: OfferDocs
   readonly records: OfferRecords
 }
@@ -90,7 +90,7 @@ export function createOfferDeps(input: {
   readonly basics: Basics
   readonly agent: () => Agent
   readonly running: (lane: LaneName) => boolean
-  readonly taken: () => void
+  readonly bookmarkMoved: () => void
 }): OfferDeps {
   const { basics, line } = input
   const { session: doc, docs } = basics
@@ -135,7 +135,7 @@ export function createOfferDeps(input: {
       writeValues(
         setIfChanged(OFFER, record, readOffers(doc).get(record.lane)),
       ),
-    writeTaken: record => writeValues([setRecord(OFFER, record)]),
+    writeIntegratedOffer: record => writeValues([setRecord(OFFER, record)]),
     remove: lane =>
       readOffers(doc).has(lane)
         ? writeValues([deleteRecord(OFFER, lane)])
@@ -151,7 +151,7 @@ export function createOfferDeps(input: {
     basics,
     agent: input.agent,
     running: input.running,
-    taken: input.taken,
+    bookmarkMoved: input.bookmarkMoved,
     docs: offerDocs,
     records,
   }

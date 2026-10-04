@@ -142,7 +142,7 @@ Four facts from pi's source and the probes shape it:
 - **`harness.lane(name, { createAt })` returns a lane it holds**, and ignores
   `createAt` (`dist/harness/runtime/harness.js`, `lane()`, in
   `@earendil-works/pi-agent-core` 0.87.1). So `createThreadLane` refuses an
-  id pi holds, in memory or in the document, with `lane_taken`, before it
+  id pi holds, in memory or in the document, with `lane_id_in_use`, before it
   asks: otherwise a chosen id could write into another thread.
 - **A foreign-written entry is not navigable** (`unknown_target`): pi's session
   never saw it created. The Node e2e keeps a `writeEntry` fixture for that S3
@@ -166,7 +166,7 @@ the alternative a second host would need: read the thread's end inside
 - **Not while it runs.** A message appended to a running lane lands by timing:
   inside the agent's turn, as a prompt the agent answers, or after the reply
   while a queued question is never answered (S21 Q3). A message for a busy
-  lane is a queued card instead (ADR-0048), which the host takes when the
+  lane is a queued card instead (ADR-0048), which the host pops when the
   lane is idle; see `apps/pineta/host/TECHNICAL.md`.
 - **A pi run can only start with `prompt`**, so a compelled chat is passed to
   `ThreadLaneHandle.run` as the prompt itself: a pi `CustomMessage`, which pi's

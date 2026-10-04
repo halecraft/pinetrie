@@ -264,7 +264,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
 
     // 6. Restart over the same store: everything is there, and a card queued
-    // while the lane ran is taken by the new host's startup, since no run's
+    // while the lane ran is popped by the new host's startup, since no run's
     // end will. The run is the document's record alone, which a stopping
     // host leaves and a starting one clears (`clearStreams`).
     const before = {
@@ -321,7 +321,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await th.shutdown()
     await u.close()
     // The session loads late, so a host that did not wait for it would start
-    // from an empty session, and leave the queued card untaken.
+    // from an empty session, and leave the queued card unpopped.
     opened = openStore(dbFile)
     stored = opened.store
     th = await open(() => {}, slowToLoad(stored, SESSION_DOC_ID, LATE_LOAD_MS))
@@ -348,7 +348,7 @@ async function run(check: Checks["check"]): Promise<void> {
       names: [...readParticipantNames(th.session).values()].sort(),
     }
     check(
-      "after a restart the session is all there, and the queued card was taken",
+      "after a restart the session is all there, and the queued card was popped",
       JSON.stringify(after.names) ===
         JSON.stringify(
           before.names.map(n => (n === "Uma" ? "Uma, again" : n)).sort(),

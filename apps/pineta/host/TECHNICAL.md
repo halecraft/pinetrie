@@ -18,16 +18,16 @@ wires them.
 | `shutdown.ts` | the order a host stops in (`planShutdown`) |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`) |
 | `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
-| `take.ts` | taking a lane's queued cards (ADR-0048): `takeTop`, and `drain`, which sends each through its command (ADR-0055) |
+| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which sends each through its command (ADR-0055) |
 | `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
 | `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pineta:live`), deleting images nothing shows, and retiring histories of moves (`sweepHistories`) |
 | `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for; `planLoads` |
 | `directory.ts` | each root's directory record, refreshed as its document changes |
-| `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the take and a run's pinned cards, waiting until a text holds a version (`whenHolds`, which an `AbortSignal` gives up), and the texts of given cards gathered for the sweeps; where the shell opens card documents |
+| `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the queue's pops and a run's pinned cards, waiting until a text holds a version (`whenHolds`, which an `AbortSignal` gives up), and the texts of given cards gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
-| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, carry on, offer: each finds its lane through `laneAt`), `cards` (a move, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a taken card behind the same check (`sendTaken`) |
+| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, carry on, offer: each finds its lane through `laneAt`), `cards` (a move, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a popped queued card behind the same check (`sendPoppedQueuedCard`) |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
@@ -95,8 +95,8 @@ wires them.
 ## A run's start
 
 - **A prompt's run reads its pinned cards first** (`readPinned`,
-  `pinned.ts`): a chat's, a take's, a resolution's, a split's and a
-  carry-on's. It
+  `pinned.ts`): a chat's, a popped queued card's, a resolution's, a split's
+  and a carry-on's. It
   gathers the thread's pinned cards at the lane's tip (`cardsAt`), loads
   their texts, waits for each as the chat's sender had it (`seen`, at most
   `PINNED_WAIT_MS`, 2 s), gathers again (a card may have been pinned or
@@ -138,10 +138,10 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 - **`ended` is one function, set once** in `startHost`: hot reload, then
   `settle`, banners, and the verdict with the final digest. It breaks a cycle: a run's end
   drains, the drain may run an update, and an update may start a run.
-  `runs.ts` imports neither the take nor the commands.
+  `runs.ts` imports neither the queue's pop nor the commands.
 - **`ended` is given the run's prompt**, read at the start of `end()`,
   before any step. A listener uses it, never the lane's tip: `settle`'s
-  drain is queued first, and takes a queued card or starts the next run
+  drain is queued first, and pops a queued card or starts the next run
   before any step queued after it reads the lane. pi reports no prompt id,
   and the lookup gives the same answer as pi's own end tip (S71).
 
@@ -174,7 +174,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   one's log.
 - **A command names its root** (`Command.root`, ADR-0063): a chat or a mark
   writes in it, and a chat at the root starts it, under the id the sender's
-  tab minted, refused `root_taken` when the directory holds it already.
+  tab minted, refused `root_id_in_use` when the directory holds it already.
 
 ## Startup
 
@@ -248,7 +248,7 @@ rejects `shutdown()`.
 - **A command's id is its send's id.** The column that sent a chat finds its
   message by it (`TreeIndex.bySend`).
 - **The archive gate is in the dispatcher** (`refuseInArchive`). Only the
-  `chat` command and `sendTaken` call `sendChat`, both behind the gate, so
+  `chat` command and `sendPoppedQueuedCard` call `sendChat`, both behind the gate, so
   `sendChat` has no gate of its own.
 - **A message sent from a card spends it** (ADR-0048): `sendChat` names the
   card's other writers as contributors, through the card port, and spends
@@ -257,13 +257,13 @@ rejects `shutdown()`.
   then the text, and the reply carries the places' `rev`. Sent from a fresh
   column, the spend first moves the column's other cards to drafting at the
   message it wrote (`planFreshFollow`, found by the send's id), in the same
-  step, so no move gets between. The take destroys
-  a taken card's text itself, since it removed the record. The command's
+  step, so no move gets between. The drain destroys
+  a popped card's text itself, since the pop removed the record. The command's
   text is what is sent: the text its sender saw.
 - **A chat carries its sender's pinned versions** (`pinned`, each card
   pinned at the sender's thread end with its text version): `executeChat`
   passes them to `start` for a `run` or `createAndRun`, and the run waits
-  for them. A taken card's chat (`takenChat`) carries none: its thread's
+  for them. A popped queued card's chat (`chatOfPoppedQueuedCard`) carries none: its thread's
   cards were edited long before.
 - **A busy lane answers a chat from a card `queued`** (ADR-0059): the
   dispatcher queues the card behind the others in the same step
@@ -293,7 +293,7 @@ rejects `shutdown()`.
   `commands/cards.ts`, `carry` is the one path for a move, a busy chat's
   queue and a spend, each with its cause; a command moves no card and has
   none. `undoMove` calls both itself, since Kyneta writes the revert. The
-  drain does too, around each take (`take.ts`), with `takeTop` still
+  drain does too, around each pop (`queued-card-pop.ts`), with `popNextQueuedCard` still
   synchronous (S69). The presence it reads is `readReading`'s pairs: a
   placer with a column open at the card's end saw it go.
 - **`traces-seen` deletes the sender's own traces**, ignoring any other
@@ -333,7 +333,7 @@ rejects `shutdown()`.
 - **Which history a move enters is the host's** (`historyOf`): the root the
   card goes to, else the one it leaves, read from its record; a creation or
   a removal enters none. `move` writes inside that stack's `gesture`. The
-  host's own writes (a take, a spend, an unsent card, a fresh column's
+  host's own writes (a queued card's pop, a spend, an unsent card, a fresh column's
   followers, the sweep) are outside every gesture, so every stack rebases
   over them, and an undo of a move the host overtook is refused.
 - **Every undo is `whole`.** Without it a step someone else's move broke is
@@ -352,43 +352,43 @@ rejects `shutdown()`.
 - **Shutdown disposes them, then flushes,** so a stack's open step is
   stored before the Exchange stops.
 
-## The queue (`take.ts`, ADR-0048, ADR-0055)
+## The queue (`queued-card-pop.ts`, ADR-0048, ADR-0055)
 
-- **The take is one synchronous step** (`takeTop`): read that the card is
+- **Popping the next queued card is one synchronous step** (`popNextQueuedCard`): read that the card is
   queued and on top, read its text, remove its record (raising `rev`). A
   move and a drain are steps on one keeper, so an unqueue lands before the
-  take or after it, never between: before, the card is not taken; after, the
+  pop or after it, never between: before, the card is not popped; after, the
   unqueue is refused `gone`, and its client says "already sent" (S69).
-- **`drain` loads each queued card's text before the take** (`hydrate`),
+- **`drain` loads each queued card's text before the pop** (`hydrate`),
   and checks again after every wait, so a card queued while texts load is
   loaded too. `textNow` then reads a text with no wait.
-- **The take waits for the text its queuer had** (S96). Kyneta keeps no
+- **The pop waits for the text its queuer had** (S96). Kyneta keeps no
   order between documents, so a card's record can arrive before its text.
   The record carries the text's version (`seen`); a top card the host's
   copy does not yet hold is `behind`, and stays on top, and the host drains
   the lane again once it holds it (`createBehind`, one wait per card). A
-  wait whose card leaves the queue, taken, unqueued or discarded, is given
+  wait whose card leaves the queue, popped, unqueued or discarded, is given
   up (`givenUp`), so it neither stays subscribed nor drains; the places are
   watched only while a wait is out.
-- **A taken card is sent through its command.** `bring-up-to-date` runs
+- **A popped queued card is sent through its command.** `bring-up-to-date` runs
   `prepareUpdate` first: clean, the update is written, then the text, if
   any, is sent; conflicted, the resolution run carries the text; nothing
   new, the text alone; refused, the card goes back. The text is sent through
-  `sendTaken` in mode `queue`, as its queuer (`by`), with the card's other
+  `sendPoppedQueuedCard` in mode `queue`, as its queuer (`by`), with the card's other
   writers as contributors. A card with no text starts no run.
 - **A card the host could not send goes back below the line, whole**
   (`planUnsent`): drafting where it was queued, saying why, and never queued
   again, or the next drain would fail the same way (S69, answer 5). Its text
   is kept. After a clean update its command is cleared: it was carried out.
   An update or a send that throws writes the card back the same way, saying
-  the host failed: the take has deleted its record, so nothing else would.
+  the host failed: the pop has deleted its record, so nothing else would.
 - **Three things drain a lane:** a run's end (`settle`), startup
   (`recover`), and a move that leaves a card queued on it while it is not
   running (`queueDrain` in `index.ts`). All three are the keeper's `once`
   (`drain:<lane>`): queued once until its step starts, the same step for
   all three; a move while it runs queues one more, which finds what the
   running one missed, or nothing. `runs.start` marks a lane
-  running at once (`beginRun`), so a drain behind a started run takes
+  running at once (`beginRun`), so a drain behind a started run pops
   nothing.
 - **`executeChat` still checks a new lane's directory and asks pi for the
   lane.** Both are ports that may refuse, not facts to gather. The directory
@@ -398,7 +398,7 @@ rejects `shutdown()`.
   the lanes pi holds, and a spare made with `newId`. pi makes no ids.
 - **`reserve` is answered `reserved`** whether it named the id or the id
   had a name already, so a column may send it again; an id pi holds is
-  refused `lane_taken`.
+  refused `lane_id_in_use`.
 - **Stop records who pressed it before it aborts** (ADR-0056): `planStop`
   (`@pineta/rules`) gives the `pineta.stop` record for the running ask's prompt, unless one is
   there, and `handleStop` writes it, then asks pi to abort, in one step. So
@@ -444,7 +444,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   and the prompt each run's end is given. The ask is `promptOf` that entry,
   which never changes: entries are written once (ADR-0004). No step reads
   a lane's tip. At a run's end the tip is already past the ask: a plain
-  queued card taken there would lose the ask its final digest, and a next
+  queued card popped there would lose the ask its final digest, and a next
   run with work would take it, which then refuses that run every later
   digest.
 - **`planDigest` decides** in one step, from the stored digest, the request
@@ -549,7 +549,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 - **An update is one step on the lane's `LaneQueue`** (`updateOnQueue`):
   the lane's base from its own history, the line and the WIP from your
   repo (pinned), `planUpdateFrom`, the edits committed and `mergeUpdate`
-  (which first joins each take the lane holds to its source, ADR-0079), so nothing
+  (which first joins each integrated-offer commit the lane holds to its source, ADR-0079), so nothing
   changes the lane between what is read and what is merged. Then
   `planSettle`, pure, decides what the thread gets, the land message
   included, and `applySettle` writes it. `Settle.fetch` alone decides
@@ -596,17 +596,17 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   nothing. Every named lane, not only those with an offer, so each lane's
   `pineta.base` follows the line, and with it what catching up would
   change. That is safe because an untraced start, or what jj cannot say,
-  builds nothing (ADR-0067): a thread taken before offers carried
+  builds nothing (ADR-0067): a thread integrated before offers carried
   `Pineta-Source` is not offered again (S97).
 - **Reads are pinned and never queued:** a page's review or diff
   (`Offers.read`), a description's gather, and lane work's reads of your
-  repo run at the head the owner last observed (`owner.read`). A take
-  gathers in its own command, unpinned, so it acts on the repo as it is.
+  repo run at the head the owner last observed (`owner.read`). An offer
+  integration gathers in its own command, unpinned, so it acts on the repo as it is.
 - **The host decides nothing and runs no jj on an offer.** Each step is a
-  gather (`@pineta/repo`: `gatherRefresh`, `gatherOffer`, `gatherTake`,
+  gather (`@pineta/repo`: `gatherRefresh`, `gatherOffer`, `gatherOfferIntegration`,
   `gatherStack`, `gatherDescribe`), a decision (`@pineta/rules`: `planRefresh`,
-  `planOfferTake`, `planRebuild`, `planStackEnded`, `planDescribeSettle`),
-  a translation into steps (`@pineta/repo`: `offerEffects`, `takeEffects`,
+  `planOfferIntegration`, `planRebuild`, `planStackEnded`, `planDescribeSettle`),
+  a translation into steps (`@pineta/repo`: `offerEffects`, `offerIntegrationEffects`,
   `rebuildEffects`, `describeEffects`), and `executeOffer` (`execute.ts`),
   which carries out every action over ports: the lane's base record first,
   when it differs from the page's, then the steps, then what comes after
@@ -622,12 +622,14 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   Everything else is read from your repo (ADR-0060), and where an offer
   sits is decided once there (`OfferPlace`): a WIP gone moves nothing and
   writes only its base record; an untraced start builds nothing, so squash,
-  refresh, describe and a split's span refuse it, while a take, a bookmark
-  move, can still take an offer you edited there.
+  refresh, describe and a split's span refuse it, while an integration, a
+  bookmark move, can still integrate an offer you edited there.
 - **The records are written from the repo after each step**
   (`OfferRecords`): an offer's from the read made before planning when the
   step ran no steps (the common `none` reads nothing more), else from a new
-  read; `withdraw` and `forget` remove it; a take writes it marked taken.
+  read; `withdraw` and `forget` remove it; an integration writes it marked
+  integrated (`integratedAs`; a record from before ADR-0083 says `taken`,
+  read as the same).
   Each write is skipped when it changes nothing, and the records are read
   only for that.
 - `refresh.ts` carries out a refresh and a rebuild, and gives the ports;
@@ -639,16 +641,16 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   command** (`Offers.moveLanes`, called by `work/archive.ts`), then marks
   each lane: an archived thread's offer is withdrawn, a restored one's built
   again (ADR-0061).
-- **A take names the offer it was shown** (`OfferSeen`, ADR-0065): the
+- **An offer integration names the offer it was shown** (`OfferSeen`, ADR-0065): the
   ledger its record carried, and whether it conflicted, which the page's
   session client reads from the record as it sends (`offerSeen`).
-  `planOfferTake` refuses `offer_changed` when the ledger now differs (its source, or its
+  `planOfferIntegration` refuses `offer_changed` when the ledger now differs (its source, or its
   start as a set), or the offer conflicts now and did not then. A rebase
-  onto a moved target and your edit keep the ledger, and are taken.
-- **A take names its destination** (`planOfferTake`): one of
-  `takeDestinations`, and refused (`bad_destination`) unless the bookmark is
+  onto a moved target and your edit keep the ledger, and are integrated.
+- **An offer integration names its destination** (`planOfferIntegration`): one of
+  `offerIntegrationDestinations`, and refused (`bad_destination`) unless the bookmark is
   at or below the offer's bottom's parent, read in the same command
-  (`gatherTake`). jj's
+  (`gatherOfferIntegration`). jj's
   refusal of a backwards move is the second guard (S77 item 1).
 - **The `line` command** (`work/line.ts`, created by `startLaneWork` beside
   the offers, which rewrite its record when the owner observes the line or

@@ -139,7 +139,7 @@ export function sendable(
  */
 /**
  * What a composer's send does: a chat in its mode, or `queue`, which asks
- * the host to queue the card and sends no chat: the host takes it when its
+ * the host to queue the card and sends no chat: the host pops it when its
  * lane is free (ADR-0059).
  */
 export type ComposerMode = ChatMode | "queue"
@@ -171,7 +171,7 @@ export interface SendPlan {
  *
  * - A fresh column sends `branch`. Elsewhere, a send to a busy lane, plain or
  *   asking the agent, queues its card behind the others; so does a card with
- *   a command, even on an idle lane, since only the host's take carries a
+ *   a command, even on an idle lane, since only the host's pop carries a
  *   command out (ADR-0055).
  * - A send that asks the agent creates a lane where there is none, and in a
  *   fresh column always, since a branch never continues a lane: then a chip
@@ -296,7 +296,7 @@ export const placeholderWords = (plan: SendPlan): string =>
 
 /** Where a message queued now would wait: what the queue button says. */
 export type QueuePlace =
-  /** Nothing waits: it is taken when the run ends. */
+  /** Nothing waits: it is popped when the run ends. */
   | { readonly kind: "next" }
   /** Behind `ahead` queued cards, the last of them yours. */
   | { readonly kind: "afterYours"; readonly ahead: number }
@@ -305,7 +305,7 @@ export type QueuePlace =
 
 /**
  * Where a card queued on `lane` would wait: behind the last card in its
- * queue, since the host takes them in order.
+ * queue, since the host pops them in order.
  */
 export function queuePlace(lane: ThreadLane, reader: Reader): QueuePlace {
   if (lane.kind === "none") return { kind: "next" }

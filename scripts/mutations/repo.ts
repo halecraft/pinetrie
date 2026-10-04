@@ -130,43 +130,45 @@ export const mutations: readonly Mutation[] = [
     expect: "added to jj's builtin when the repo defines none, with present()",
   },
   {
-    name: "an offer starts at its base, ignoring what you took",
+    name: "an offer starts at its base, ignoring what you integrated",
     file: "packages/repo/plan.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  const had = sources === "" ? input.start : `${input.start} | ::(${sources})`',
     to: "  const had = input.start",
     command: unit,
     expect:
-      "offerStart: the base's commit, and the history of each taken source",
+      "offerStart: the base's commit, and the history of each integrated source",
   },
   {
-    name: "a source taken below the base still starts the offer",
+    name: "a source integrated below the base still starts the offer",
     file: "packages/repo/plan.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: " ~ ::present(${input.base.source})) & ${TAKES}",
+    from: " ~ ::present(${input.base.source})) & ${INTEGRATED_OFFER_COMMITS}",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: ") & ${TAKES}",
+    to: ") & ${INTEGRATED_OFFER_COMMITS}",
     command: unit,
     expect:
-      "an offer after a catch-up starts at the line it merged, not at what you took below it",
+      "an offer after a catch-up starts at the line it merged, not at what you integrated below it",
   },
   {
     name: "a WIP lane holds its copy",
     file: "packages/repo/plan.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: " ~ ::present(${input.base.source})) & ${TAKES}",
+    from: " ~ ::present(${input.base.source})) & ${INTEGRATED_OFFER_COMMITS}",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: " ~ ::present(${input.base.start})) & ${TAKES}",
+    to: " ~ ::present(${input.base.start})) & ${INTEGRATED_OFFER_COMMITS}",
     command: unit,
-    expect: "takenRevset: taken sources above the commit the base holds",
+    expect:
+      "integratedOfferCommitsRevset: integrated sources above the commit the base holds",
   },
   {
-    name: "a take may move the line backwards",
+    name: "an offer integration may move the line backwards",
     file: "packages/repo/plan.ts",
     from: '  (as === "host" ? host : you)("bookmark", "move", bookmark, "--to", to)',
     to: '  (as === "host" ? host : you)("bookmark", "move", "--allow-backwards", bookmark, "--to", to)',
     command: unit,
-    expect: "planTakeOffer: the destination moved forward to the top",
+    expect:
+      "planOfferIntegrationSteps: the destination moved forward to the top",
   },
   {
     name: "a publish moves nothing",
@@ -204,9 +206,9 @@ export const mutations: readonly Mutation[] = [
     expect: "the publish bookmark moved: the line's record alone",
   },
   {
-    name: "taken offers' sources are not read",
+    name: "integrated offers' sources are not read",
     file: "packages/repo/offer.ts",
-    from: "    sources: [...new Set(takes.flatMap(t => sourcesOf(t.description)))],\n",
+    from: "    sources: [...new Set(integrated.flatMap(t => sourcesOf(t.description)))],\n",
     to: "    sources: [] as CommitId[],\n",
     command: unit,
     expect: "an offer on the line (ADR-0060)",
@@ -251,15 +253,15 @@ export const mutations: readonly Mutation[] = [
     to: "  const parents = [ours, from]",
     command: repoTest,
     expect:
-      "your own take, then your edit to it on the line: clean, and the take is not listed as come in",
+      "your own integration, then your edit to it on the line: clean, and the integrated-offer commit is not listed as come in",
   },
   {
-    name: "only the newest take is joined",
+    name: "only the newest integrated-offer commit is joined",
     file: "packages/lanes/merge.ts",
-    from: "  const joins = planJoins(takes, held)",
-    to: "  const joins = planJoins(takes, held).slice(-1)",
+    from: "  const joins = planJoins(integrated, held)",
+    to: "  const joins = planJoins(integrated, held).slice(-1)",
     command: repoTest,
-    expect: "two takes, your edit to the first between them: clean",
+    expect: "two integrations, your edit to the first between them: clean",
   },
   {
     name: "a conflicted join is kept",
@@ -272,14 +274,14 @@ export const mutations: readonly Mutation[] = [
       "an offer you edited where the lane wrote: its join conflicts, and is left out",
   },
   {
-    name: "an update lists the takes it joined as come in",
+    name: "an update lists the integrated-offer commits it joined as come in",
     file: "packages/lanes/merge.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  joined.length === 0 ? range : `(${range}) ~ (${joined.join(" | ")})`',
     to: "  range",
     command: repoTest,
     expect:
-      "your own take, then your edit to it on the line: clean, and the take is not listed as come in",
+      "your own integration, then your edit to it on the line: clean, and the integrated-offer commit is not listed as come in",
   },
   {
     name: "an update's merge is left uncommitted",
@@ -511,13 +513,13 @@ export const mutations: readonly Mutation[] = [
     expect: "your jj describe is observed through the watch, with no timer",
   },
   {
-    name: "a taken source under the lane's base starts its offer",
+    name: "an integrated source under the lane's base starts its offer",
     file: "packages/repo/lane-read.ts",
-    from: "    rows.filter(r => r.taken && !r.underBase).map(r => r.commit),",
-    to: "    rows.filter(r => r.taken).map(r => r.commit),",
+    from: "    rows.filter(r => r.integrated && !r.underBase).map(r => r.commit),",
+    to: "    rows.filter(r => r.integrated).map(r => r.commit),",
     command: unit,
     expect:
-      "a taken source above the base makes the start a read; one under it does not",
+      "an integrated source above the base makes the start a read; one under it does not",
   },
   {
     name: "a divergent offer reads as one",
@@ -550,7 +552,7 @@ export const mutations: readonly Mutation[] = [
     to: "    false\n",
     command: offersRefresh,
     expect:
-      "a catch-up that merged your take of the lane's work leaves nothing to offer: an empty offer built before is withdrawn (S97)",
+      "a catch-up that merged your integration of the lane's work leaves nothing to offer: an empty offer built before is withdrawn (S97)",
   },
   {
     name: "a range jj refuses reads as a change",
@@ -562,22 +564,22 @@ export const mutations: readonly Mutation[] = [
       "a lane whose work undoes itself changes no file, over a range jj diffs as one",
   },
   {
-    name: "an untraced take is left out of the separate reads",
+    name: "an untraced integrated-offer commit is left out of the separate reads",
     file: "packages/repo/offer.ts",
-    from: '  if (untraced.length > 0) return { kind: "untraced", takes: untraced }\n',
+    from: '  if (untraced.length > 0)\n    return { kind: "untraced", integratedOfferCommits: untraced }\n',
     to: "",
     command: repoTest,
     expect:
-      "a take of the lane that names no source makes its start untraced, read either way, until it catches up past it (S97)",
+      "an integrated-offer commit of the lane that names no source makes its start untraced, read either way, until it catches up past it (S97)",
   },
   {
-    name: "an untraced take is left out of the one read",
+    name: "an untraced integrated-offer commit is left out of the one read",
     file: "packages/repo/lane-read.ts",
     from: "    untraced.length > 0\n",
     to: "    false\n",
     command: unit,
     expect:
-      "a take of the lane that names no source, above the base, makes the start untraced; one under it does not (S97)",
+      "an integrated-offer commit of the lane that names no source, above the base, makes the start untraced; one under it does not (S97)",
   },
   {
     name: "catching up counts every file the base changed",
@@ -586,7 +588,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return lines(moved.stdout)\n",
     command: repoTest,
     expect:
-      "catching up with your own take of the lane's work changes no file, as catchUpFiles says (S97)",
+      "catching up with your own integration of the lane's work changes no file, as catchUpFiles says (S97)",
   },
   {
     name: "what catching up changes is read on every refresh",
@@ -713,7 +715,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a thread on a WIP starts from its copy",
   },
   {
-    name: "a take counts none of the WIP's commits",
+    name: "an offer integration counts none of the WIP's commits",
     file: "packages/repo/offer-gather.ts",
     from: "        ).length\n      : 0",
     to: "        ).length * 0\n      : 0",

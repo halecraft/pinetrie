@@ -4,8 +4,8 @@
 //
 // Where a card is lives in the places document, which `places.ts` writes;
 // this port is about texts alone: who wrote in one, loading them for the
-// take and a run's pinned cards, whether they hold what a queuer or a sender
-// had, destroying a spent one, and gathering them for the sweeps, so no text
+// queue's pops and a run's pinned cards, whether they hold what a queuer or
+// a sender had, destroying a spent one, and gathering them for the sweeps, so no text
 // is read twice.
 
 import { type Exchange, type Store, whenHydrated } from "@kyneta/exchange"

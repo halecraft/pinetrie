@@ -23,7 +23,7 @@ export type Gesture = <T>(write: () => T) => T
 /**
  * Carry out `steps` on the places document, inside `gesture` when one is
  * given, and return its `rev` after: raised once, or unchanged for no
- * steps. Synchronous, so the take reads a card and removes it with nothing
+ * steps. Synchronous, so a queued card's pop reads it and removes it with nothing
  * between. A removed card's text is its caller's to destroy, after this:
  * record first, then text (S64).
  */

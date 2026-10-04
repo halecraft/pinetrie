@@ -233,7 +233,7 @@ describe("sendChat", () => {
     return { b, agent, cards, started, seen, deps }
   }
 
-  test("a thread at the root under a taken root's id is refused, and nothing is written", async () => {
+  test("a thread at the root under a root id in use is refused, and nothing is written", async () => {
     const { b, agent, started, deps } = setUp()
     writeDirectory(b)
     const out = await sendChat(deps, ALICE, "s-1", {
@@ -241,7 +241,7 @@ describe("sendChat", () => {
       at: ROOT,
       mode: "branch",
     })
-    expect(out).toMatchObject({ kind: "refused", code: ERR.ROOT_TAKEN })
+    expect(out).toMatchObject({ kind: "refused", code: ERR.ROOT_ID_IN_USE })
     expect([agent.calls, started]).toEqual([[], []])
   })
 

@@ -19,15 +19,15 @@ import type { CardPort } from "./cards.ts"
 import { applyWrites, basics, putValue, record } from "./fakes.ts"
 import { createProvenance } from "./provenance.ts"
 import {
+  chatOfPoppedQueuedCard,
   createBehind,
   drain,
   givenUp,
-  type TakeDeps,
-  type Taken,
-  type TakeTop,
-  takenChat,
-  takeTop,
-} from "./take.ts"
+  type NextQueuedCardPop,
+  type PoppedQueuedCard,
+  popNextQueuedCard,
+  type QueuedCardPopDeps,
+} from "./queued-card-pop.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
@@ -70,31 +70,31 @@ const held = (
   textNow: textOf,
   holds: id => !behind.includes(id),
 })
-const takenOf = (top: TakeTop): Taken | null =>
-  top.kind === "taken" ? top.taken : null
+const poppedOf = (top: NextQueuedCardPop): PoppedQueuedCard | null =>
+  top.kind === "popped" ? top.popped : null
 
-describe("takeTop", () => {
+describe("popNextQueuedCard", () => {
   test("reads the top queued card and deletes its record before it returns", () => {
     const cards = newPlacesDoc()
     queue(cards, "c-2", "b")
     queue(cards, "c-1", "a")
-    const taken = takenOf(
-      takeTop(
+    const popped = poppedOf(
+      popNextQueuedCard(
         cards,
         LANE,
         false,
         held(id => `text of ${id}`),
       ),
     )
-    expect(taken?.card.id).toBe("c-1")
-    expect(taken?.text).toBe("text of c-1")
+    expect(popped?.card.id).toBe("c-1")
+    expect(popped?.text).toBe("text of c-1")
     expect(readPlaces(cards).map(c => c.id)).toEqual(["c-2"])
   })
 
   test("its removal raises the places document's rev, so a client whose unqueue it beat settles (ADR-0059)", () => {
     const cards = newPlacesDoc()
     queue(cards, "c-1", "a")
-    takeTop(
+    popNextQueuedCard(
       cards,
       LANE,
       false,
@@ -103,11 +103,11 @@ describe("takeTop", () => {
     expect(readPlacesRev(cards)).toBe(1)
   })
 
-  test("takes nothing while the lane runs, or when nothing is queued", () => {
+  test("pops nothing while the lane runs, or when nothing is queued", () => {
     const cards = newPlacesDoc()
     queue(cards, "c-1", "a")
     expect(
-      takeTop(
+      popNextQueuedCard(
         cards,
         LANE,
         true,
@@ -118,7 +118,7 @@ describe("takeTop", () => {
     })
     expect(readPlaces(cards)).toHaveLength(1)
     expect(
-      takeTop(
+      popNextQueuedCard(
         newPlacesDoc(),
         LANE,
         false,
@@ -129,13 +129,13 @@ describe("takeTop", () => {
     })
   })
 
-  test("an unqueued card is not taken", () => {
+  test("an unqueued card is not popped", () => {
     const cards = newPlacesDoc()
     queue(cards, "c-1", "a")
     const row = cards.cards()["c-1"]
     if (row !== undefined) cards.cards.set("c-1", { ...row, kind: "drafting" })
     expect(
-      takeTop(
+      popNextQueuedCard(
         cards,
         LANE,
         false,
@@ -148,7 +148,7 @@ describe("takeTop", () => {
     const cards = newPlacesDoc()
     queue(cards, "c-1", "a")
     queue(cards, "c-2", "b")
-    const top = takeTop(
+    const top = popNextQueuedCard(
       cards,
       LANE,
       false,
@@ -159,31 +159,33 @@ describe("takeTop", () => {
   })
 })
 
-test("takenChat: the queuer's message, in the queue's mode, from the card", () => {
+test("chatOfPoppedQueuedCard: the queuer's message, in the queue's mode, from the card", () => {
   const cards = newPlacesDoc()
   queue(cards, "c-1", "a")
-  const taken = takenOf(
-    takeTop(
+  const popped = poppedOf(
+    popNextQueuedCard(
       cards,
       LANE,
       false,
       held(() => "@agent go"),
     ),
   )
-  expect(taken === null ? null : takenChat(taken)).toMatchObject({
-    text: "@agent go",
-    at: atEntry(E1),
-    mode: "queue",
-    lane: LANE,
-    card: { id: "c-1", seen: "" },
-    mentions: [{ kind: "agent" }],
-  })
+  expect(popped === null ? null : chatOfPoppedQueuedCard(popped)).toMatchObject(
+    {
+      text: "@agent go",
+      at: atEntry(E1),
+      mode: "queue",
+      lane: LANE,
+      card: { id: "c-1", seen: "" },
+      mentions: [{ kind: "agent" }],
+    },
+  )
 })
 
 function setUp(
   texts: Record<string, string>,
   answers: readonly Outcome[],
-  prepared: Awaited<ReturnType<TakeDeps["work"]["prepareUpdate"]>> = {
+  prepared: Awaited<ReturnType<QueuedCardPopDeps["work"]["prepareUpdate"]>> = {
     kind: "nothing",
   },
   behind: readonly string[] = [],
@@ -191,9 +193,9 @@ function setUp(
   const b = basics()
   const events: string[] = []
   const sends = [...answers]
-  const deps: TakeDeps = {
+  const deps: QueuedCardPopDeps = {
     basics: b,
-    texts: record<TakeDeps["texts"]>({
+    texts: record<QueuedCardPopDeps["texts"]>({
       hydrate: async ids => {
         events.push(`hydrate ${ids.join(",")}`)
       },
@@ -203,7 +205,7 @@ function setUp(
         events.push(`destroy ${id}`)
       },
     }).port,
-    work: record<TakeDeps["work"]>({
+    work: record<QueuedCardPopDeps["work"]>({
       prepareUpdate: async (_lane, by, intent) => {
         events.push(`update by ${by}: ${intent}`)
         return prepared
@@ -213,8 +215,8 @@ function setUp(
       events.push(`start ${s.kind === "prompt" ? s.message.customType : ""}`)
       return runId("r-1")
     },
-    send: async (taken: Taken) => {
-      events.push(`send ${taken.card.id}: ${taken.text}`)
+    send: async (popped: PoppedQueuedCard) => {
+      events.push(`send ${popped.card.id}: ${popped.text}`)
       return sends.shift() ?? { kind: "appended", id: entryId("e-9") }
     },
     behind: card => {
@@ -266,7 +268,7 @@ describe("drain", () => {
     expect(readPlaces(b.places).map(c => c.id)).toEqual(["c-3"])
   })
 
-  test("a card taken and sent leaves no history (ADR-0048 step 6)", async () => {
+  test("a card popped and sent leaves no history (ADR-0048 step 6)", async () => {
     const { b, deps } = setUp({ "c-1": "first" }, [])
     queue(b.places, "c-1", "a")
     putValue(b, setRecord(CARD_HISTORY, { card: cardId("c-1"), events: [] }))
@@ -274,7 +276,7 @@ describe("drain", () => {
     expect(readCardHistories(b.session).size).toBe(0)
   })
 
-  test("takes nothing while the lane runs", async () => {
+  test("pops nothing while the lane runs", async () => {
     const { b, events, deps } = setUp({ "c-1": "first" }, [])
     queue(b.places, "c-1", "a")
     beginRun(b.live, LANE, runId("r-0"))
@@ -283,12 +285,12 @@ describe("drain", () => {
     expect(readPlaces(b.places)).toHaveLength(1)
   })
 
-  test("a card queued while texts load is loaded before it is taken", async () => {
+  test("a card queued while texts load is loaded before it is popped", async () => {
     const { b, events, deps } = setUp({ "c-1": "first", "c-2": "second" }, [])
     queue(b.places, "c-1", "a")
     const hydrate = deps.texts.hydrate
     let once = false
-    const late: TakeDeps = {
+    const late: QueuedCardPopDeps = {
       ...deps,
       texts: {
         hydrate: async ids => {
@@ -340,20 +342,20 @@ describe("drain", () => {
     expect(b.lines.some(l => l.includes("no such image"))).toBe(true)
   })
 
-  test("busy under the take: the card goes back on top as it was, and the drain stops", async () => {
+  test("busy under the pop: the card goes back on top as it was, and the drain stops", async () => {
     const { b, deps } = setUp({ "c-1": "x" }, [{ kind: "busy" }])
     queue(b.places, "c-1", "a")
     await drain(deps, LANE)
     expect(readPlaces(b.places)[0]?.place.kind).toBe("queued")
   })
 
-  test("a send that throws writes the card back below the line, saying the host failed, and the next is taken", async () => {
+  test("a send that throws writes the card back below the line, saying the host failed, and the next is popped", async () => {
     const { b, events, deps } = setUp({ "c-1": "first", "c-2": "second" }, [])
-    const throwing: TakeDeps = {
+    const throwing: QueuedCardPopDeps = {
       ...deps,
-      send: async taken => {
-        if (taken.card.id === "c-1") throw new Error("store closed")
-        return deps.send(taken)
+      send: async popped => {
+        if (popped.card.id === "c-1") throw new Error("store closed")
+        return deps.send(popped)
       },
     }
     queue(b.places, "c-1", "a")
@@ -439,7 +441,7 @@ describe("drain: bring up to date (ADR-0055)", () => {
     expect(readPlaces(b.places).map(c => c.id)).toEqual(["c-2"])
   })
 
-  test("refused: back below the line with its command, saying why, and the next card is taken", async () => {
+  test("refused: back below the line with its command, saying why, and the next card is popped", async () => {
     const { b, events, deps } = setUp({ "c-1": "x", "c-2": "next" }, [], {
       kind: "refused",
       reason: "the lane has no copy of its own",
@@ -465,7 +467,7 @@ describe("drain: bring up to date (ADR-0055)", () => {
 
   test("an update that throws writes the card back with its command, saying the host failed", async () => {
     const { b, deps } = setUp({ "c-1": "x" }, [])
-    const throwing: TakeDeps = {
+    const throwing: QueuedCardPopDeps = {
       ...deps,
       work: {
         prepareUpdate: async () => {
@@ -533,7 +535,7 @@ describe("waiting for a queued card's text (behind)", () => {
     // Asked twice, a card is waited for once.
     behind(queuedCard(places, "c-1"))
     expect([...waits.keys()]).toEqual(["c-1", "c-2"])
-    // Someone takes c-1 out of the queue: its wait is given up.
+    // c-1 leaves the queue: its wait is given up.
     places.cards.delete("c-1")
     await Promise.resolve()
     expect(waits.get("c-1")?.signal?.aborted).toBe(true)

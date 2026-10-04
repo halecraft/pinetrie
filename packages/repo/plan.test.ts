@@ -6,6 +6,7 @@ import { wipState } from "./line.ts"
 import { type Fingerprint, parseFingerprint, planObserve } from "./observe.ts"
 import {
   immutableHeads,
+  integratedOfferCommitsRevset,
   laneRefSteps,
   logRevset,
   nonceRevset,
@@ -17,9 +18,8 @@ import {
   planLand,
   planLineSetup,
   planOffer,
+  planOfferIntegrationSteps,
   planPublish,
-  planTakeOffer,
-  takenRevset,
   walkToHost,
 } from "./plan.ts"
 import { repoCommand } from "./run.ts"
@@ -66,7 +66,7 @@ describe("offers (ADR-0038)", () => {
   const op = (...args: string[]) => `jj as host: ${args.join(" ")}`
   /** A rewrite of an offer, which may be immutable on the line (ADR-0060). */
   const rw = (...args: string[]) => op("--ignore-immutable", ...args)
-  test("offerStart: the base's commit, and the history of each taken source (ADR-0060)", () => {
+  test("offerStart: the base's commit, and the history of each integrated source (ADR-0060)", () => {
     expect(offerStart({ tip: C1, start: C2, sources: [] })).toBe(
       "heads(::c1 & (c2))",
     )
@@ -78,18 +78,19 @@ describe("offers (ADR-0038)", () => {
       }),
     ).toBe("heads(::c1 & (c2 | ::(present(t1) | present(t2))))")
   })
-  test("takenRevset: taken sources above the commit the base holds, never a WIP's copy (S81)", () => {
-    const taken = 'description(regex:"(?m)^(Pineta-Source|Pineta-Thread): ")'
+  test("integratedOfferCommitsRevset: integrated sources above the commit the base holds, never a WIP's copy (S81)", () => {
+    const integrated =
+      'description(regex:"(?m)^(Pineta-Source|Pineta-Thread): ")'
     expect(
-      takenRevset({
+      integratedOfferCommitsRevset({
         line: DEFAULT_LINE,
         base: { base: { kind: "line" }, start: C1, source: C1 },
       }),
-    ).toBe(`(::(present("pineta-onto")) ~ ::present(c1)) & ${taken}`)
-    // A WIP lane starts at its copy, which holds no taken commit: what it
+    ).toBe(`(::(present("pineta-onto")) ~ ::present(c1)) & ${integrated}`)
+    // A WIP lane starts at its copy, which holds no integrated-offer commit: what it
     // holds is the WIP's commit the copy was made from.
     expect(
-      takenRevset({
+      integratedOfferCommitsRevset({
         line: DEFAULT_LINE,
         base: {
           base: { kind: "wip", bookmark: "wip/a" },
@@ -98,7 +99,7 @@ describe("offers (ADR-0038)", () => {
         },
       }),
     ).toBe(
-      `(::(present("pineta-onto") | present("wip/a")) ~ ::present(c2)) & ${taken}`,
+      `(::(present("pineta-onto") | present("wip/a")) ~ ::present(c2)) & ${integrated}`,
     )
   })
   test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {
@@ -154,10 +155,10 @@ describe("offers (ADR-0038)", () => {
       rw("describe", "-r", "ch", "-m", "WIP (amber-fox): x"),
     )
   })
-  test("planTakeOffer: the destination moved forward to the top, as the host, never with --allow-backwards (ADR-0060)", () => {
+  test("planOfferIntegrationSteps: the destination moved forward to the top, as the host, never with --allow-backwards (ADR-0060)", () => {
     expect(
       argvs(
-        planTakeOffer({
+        planOfferIntegrationSteps({
           bookmark: "pineta-offer/amber-fox",
           top: "t",
           destination: "pineta-onto",
@@ -426,7 +427,7 @@ describe("planLaneRead: what one lane's rows say", () => {
     base: false,
     line: false,
     underBase: false,
-    taken: false,
+    integrated: false,
     untraced: false,
     divergent: false,
     conflict: false,
@@ -448,12 +449,12 @@ describe("planLaneRead: what one lane's rows say", () => {
   })
   const read = (
     rows: LaneRow[],
-    taken: { commit: string; sources: string[] }[] = [],
+    integrated: { commit: string; sources: string[] }[] = [],
   ) =>
     planLaneRead(rows, {
       name: NAME,
       line: DEFAULT_LINE,
-      taken: taken.map(t => ({
+      integratedOfferCommits: integrated.map(t => ({
         commit: commitId(t.commit),
         sources: t.sources.map(commitId),
       })),
@@ -478,9 +479,9 @@ describe("planLaneRead: what one lane's rows say", () => {
       read([tip, { ...based, description: "s\n\nPineta-Base: wip/x@c9\n" }]),
     ).toEqual({ kind: "wip" })
   })
-  test("a taken source above the base makes the start a read; one under it does not", () => {
-    const above = row("t1", { taken: true })
-    const under = row("t2", { taken: true, underBase: true })
+  test("an integrated source above the base makes the start a read; one under it does not", () => {
+    const above = row("t1", { integrated: true })
+    const under = row("t2", { integrated: true, underBase: true })
     expect(
       read(
         [tip, based, above, under],
@@ -494,16 +495,18 @@ describe("planLaneRead: what one lane's rows say", () => {
       read([tip, based, under], [{ commit: "t2", sources: ["s2"] }]),
     ).toMatchObject({ start: { kind: "known", start: ["c0"] } })
   })
-  test("a take of the lane that names no source, above the base, makes the start untraced; one under it does not (S97)", () => {
+  test("an integrated-offer commit of the lane that names no source, above the base, makes the start untraced; one under it does not (S97)", () => {
     const above = row("u1", { untraced: true })
     const under = row("u2", { untraced: true, underBase: true })
-    const taken = row("t1", { taken: true })
+    const integrated = row("t1", { integrated: true })
     expect(
       read(
-        [tip, based, above, under, taken],
+        [tip, based, above, under, integrated],
         [{ commit: "t1", sources: ["s1"] }],
       ),
-    ).toMatchObject({ start: { kind: "untraced", takes: ["u1"] } })
+    ).toMatchObject({
+      start: { kind: "untraced", integratedOfferCommits: ["u1"] },
+    })
     expect(read([tip, based, under])).toMatchObject({
       start: { kind: "known", start: ["c0"] },
     })

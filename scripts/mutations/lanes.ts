@@ -8,15 +8,16 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "a take naming no source the lane holds is joined",
+    name: "an integrated-offer commit naming no source the lane holds is joined",
     file: plan,
     from: "    return ours.length === 0\n      ? []",
     to: "    return false\n      ? []",
     command: unit,
-    expect: "a take whose sources the lane lacks is not joined",
+    expect:
+      "an integrated-offer commit whose sources the lane lacks is not joined",
   },
   {
-    name: "a take is joined only when the lane holds every source it names",
+    name: "an integrated-offer commit is joined only when the lane holds every source it names",
     file: plan,
     from: "    return ours.length === 0\n      ? []",
     to: "    return ours.length < sources.length\n      ? []",
@@ -24,7 +25,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a squash naming one source held and one not is joined",
   },
   {
-    name: "a take finds no destination below the offer",
+    name: "an offer integration finds no destination below the offer",
     file: "packages/repo/offer-gather.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "          `present(${revsetName(bookmark)}) & ::parents(${bottom.commit})`,",
@@ -33,7 +34,7 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "main",
     expect:
-      "taking the offer moves the line to it, on your landed commit; your working copy is untouched",
+      "integrating the offer moves the line to it, on your landed commit; your working copy is untouched",
   },
   {
     name: "the user's line name wins over the project's",

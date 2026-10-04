@@ -1,7 +1,7 @@
 // client/attention — what needs you, and where (ADR-0077), decided. A
 // thread's followers are everyone who has written on its path; what it
 // raises for them is how its last run ended (its verdict), and its open
-// offer. A verdict clears by reading past it, an offer by taking or
+// offer. A verdict clears by reading past it, an offer by integrating or
 // withdrawing it, and either by "not needed". Status belongs on the tab:
 // working while its root's agent works or its verdict is pending, else the
 // highest of what its threads raise. Worded in `attentionWords`. Pure.

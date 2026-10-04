@@ -32,7 +32,7 @@ const OFFER: OfferRecord = {
   described: false,
   edited: false,
   bookmark: "pineta-offer/amber-fox",
-  taken: null,
+  integratedAs: null,
   commits: [commitId("c1")],
   ledger: null,
   at: 1,
@@ -49,7 +49,7 @@ test("the records the host writes from your repo: only what changed, and only a 
     basics: b,
     agent: () => agent.port,
     running: () => false,
-    taken: () => {},
+    bookmarkMoved: () => {},
   })
   await records.remove(LANE)
   await records.writeBase(null)
@@ -60,9 +60,9 @@ test("the records the host writes from your repo: only what changed, and only a 
   await records.write(OFFER)
   expect(agent.calls).toHaveLength(2)
   expect(readBases(b.session).get(LANE)).toEqual(BASE)
-  // A take's record is written whatever is there.
-  await records.writeTaken({ ...OFFER, taken: "kt" })
-  expect(readOffers(b.session).get(LANE)?.taken).toBe("kt")
+  // An integrated offer's record is written whatever is there.
+  await records.writeIntegratedOffer({ ...OFFER, integratedAs: "kt" })
+  expect(readOffers(b.session).get(LANE)?.integratedAs).toBe("kt")
   await records.remove(LANE)
   expect(readOffers(b.session).has(LANE)).toBe(false)
   expect(agent.calls).toHaveLength(4)

@@ -79,8 +79,8 @@ export const planLineSetup = (input: {
 ]
 
 /**
- * `bookmark` moved forward to `to`: a take, a land and a publish are each
- * one. Never `--allow-backwards`: jj refuses a move that is not forward, so
+ * `bookmark` moved forward to `to`: an offer integration, a land and a
+ * publish are each one. Never `--allow-backwards`: jj refuses a move that is not forward, so
  * a move planned on stale facts fails rather than dropping commits (S77
  * item 1).
  */
@@ -203,16 +203,17 @@ export const laneRefSteps = (
         IMPORT,
       ]
 
-/** The commits a take made: its offer's trailers name a source or a thread. */
-export const TAKES = trailerRevset(["source", "thread"])
+/** The commits an offer integration made: its offer's trailers name a source or a thread. */
+export const INTEGRATED_OFFER_COMMITS = trailerRevset(["source", "thread"])
 
 /**
  * Where an offer starts, as a revset (ADR-0060): the newest ancestors of the
  * lane's tip you already have. That is the commit the lane's base names
  * (`start`: the line's commit, or the WIP's copy), and every lane commit a
- * taken offer's `Pineta-Source` names above what the base holds
- * (`takenRevset`), with their history: a parent lane's work taken after this
- * lane forked, or a branch of this lane taken whole. Each source is
+ * integrated offer's `Pineta-Source` names above what the base holds
+ * (`integratedOfferCommitsRevset`), with their history: a parent lane's work
+ * integrated after this lane forked, or a branch of this lane integrated
+ * whole. Each source is
  * `present()`: one not fetched here names nothing you have. Several heads
  * start the offer from their merge.
  */
@@ -227,16 +228,16 @@ export function offerStart(input: {
 }
 
 /**
- * The takes `offerStart` reads, by their `Pineta-Source` or `Pineta-Thread`
- * trailers: a take's sources, or none for a take made before offers carried
- * them (`untracedLanes`, S97). Those in `::<onto>`, and in `::<wip>` for a
+ * The integrated-offer commits `offerStart` reads, by their `Pineta-Source`
+ * or `Pineta-Thread` trailers: an integrated offer's sources, or none for an
+ * offer integrated before offers carried them (`untracedLanes`, S97). Those in `::<onto>`, and in `::<wip>` for a
  * lane on a WIP, but not in the history of the base's `source` (S81). The lane merged that commit, so it holds
- * what was taken below it. An offer keeps the diff from the merge of its
+ * what was integrated below it. An offer keeps the diff from the merge of its
  * start to the tip, so a source the target holds as another commit would be
  * subtracted from the target, and conflict where the line changed it since.
  * The source is `present()`: a commit gone from your repo excludes nothing.
  */
-export function takenRevset(input: {
+export function integratedOfferCommitsRevset(input: {
   readonly line: LineConfig
   readonly base: LaneBase
 }): string {
@@ -245,7 +246,7 @@ export function takenRevset(input: {
     `present(${revsetName(input.line.onto)})`,
     ...(base.kind === "wip" ? [`present(${revsetName(base.bookmark)})`] : []),
   ].join(" | ")
-  return `(::(${heads}) ~ ::present(${input.base.source})) & ${TAKES}`
+  return `(::(${heads}) ~ ::present(${input.base.source})) & ${INTEGRATED_OFFER_COMMITS}`
 }
 
 /** One version of a commit in `jj evolog`: who made it, and from what. */
@@ -456,15 +457,15 @@ export const planRepair = (input: {
 ]
 
 /**
- * Take an offer (ADR-0060): its destination bookmark moved forward to its
+ * Integrate an offer (ADR-0060): its destination bookmark moved forward to its
  * top (`moveForward`), as the host, then the offer's bookmark deleted. Never
  * a rebase, and never your `@`.
  */
-export function planTakeOffer(input: {
+export function planOfferIntegrationSteps(input: {
   /** The offer's bookmark, as its record holds it. */
   readonly bookmark: string
   readonly top: string
-  /** The bookmark the take moves: the line, or a WIP. */
+  /** The bookmark the integration moves: the line, or a WIP. */
   readonly destination: string
 }): RepoStep[] {
   return [

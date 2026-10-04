@@ -69,22 +69,22 @@ export const mutations: readonly Mutation[] = [
     expect: "isLongAsk: a run of MIN_STRETCH agent messages, not one fewer",
   },
   {
-    name: "a take that names a source reads as untraced",
+    name: "an integrated-offer commit that names a source reads as untraced",
     file: trailers,
     from: "        trailerValues(p, TRAILERS.source).length === 0,\n",
     to: "        true,\n",
     command: unit,
     expect:
-      "untracedLanes: a take's paragraph naming a thread and a lane but no source; never a turn's, nor a traced take's (S97)",
+      "untracedLanes: an integrated offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced integrated offer's (S97)",
   },
   {
-    name: "a turn reads as an untraced take",
+    name: "a turn reads as an untraced integrated-offer commit",
     file: trailers,
     from: "        trailerValues(p, TRAILERS.thread).length > 0 &&\n",
     to: "        true &&\n",
     command: unit,
     expect:
-      "untracedLanes: a take's paragraph naming a thread and a lane but no source; never a turn's, nor a traced take's (S97)",
+      "untracedLanes: an integrated offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced integrated offer's (S97)",
   },
   {
     name: "a chat at the root may name any root",
@@ -683,7 +683,7 @@ export const mutations: readonly Mutation[] = [
     expect: "an unqueue puts a card back where it was queued, in its root",
   },
   {
-    name: "a queue takes its card's root over its lane's",
+    name: "a queue uses its card's root over its lane's",
     file: core,
     from: "  return lanes.get(lane)?.root ?? own",
     to: "  return own ?? lanes.get(lane)?.root",
@@ -709,13 +709,13 @@ export const mutations: readonly Mutation[] = [
     expect: "toolLabel names what the call touches",
   },
   {
-    name: "a take need not say what it was shown",
+    name: "an offer integration need not say what it was shown",
     file: "packages/protocol/codec.ts",
     from: "    const seen = offerSeenFromWire(text(wire?.seen))\n",
     to: "    const seen = offerSeenFromWire(text(wire?.seen)) ?? { ledger: null, conflicted: false }\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
-      "a take that does not say which offer it was shown, well formed, is refused",
+      "an offer integration that does not say which offer it was shown, well formed, is refused",
   },
   {
     name: "a retitle may name anything as its root",

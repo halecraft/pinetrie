@@ -87,7 +87,7 @@ export type Outcome =
       readonly by: WriterId | null
     }
   /**
-   * Someone took the slot first: `by` is their writer, the sender's own when
+   * Someone wrote at the slot first: `by` is their writer, the sender's own when
    * the host falls back to the lane's asker, or null when no one can be named
    * (two lanes just started at one point).
    */
@@ -101,8 +101,8 @@ export type Outcome =
   | { readonly kind: "marked" }
   /** A model is asked for a root's title, which arrives as its mark (ADR-0074). */
   | { readonly kind: "retitling" }
-  /** The lane's offer is in your history now (ADR-0038). */
-  | { readonly kind: "taken" }
+  /** The lane's offer is integrated into the line or a WIP now (ADR-0060). */
+  | { readonly kind: "integrated" }
   /** An offer action was carried out (squash, describe, refresh). */
   | { readonly kind: "offered" }
   /** A thread is named before its lane exists, or already was (ADR-0057). */
@@ -269,10 +269,14 @@ export function decodeCommand(
     const to = text(wire?.targetId)
     if (!isOfferAction(action))
       return refused(ERR.UNKNOWN_KIND, `unknown offer action: ${action}`)
-    if (action !== "take") return { kind, lane, action, to: null, seen: null }
+    if (action !== "integrate")
+      return { kind, lane, action, to: null, seen: null }
     const seen = offerSeenFromWire(text(wire?.seen))
     return seen === null
-      ? refused(ERR.REFUSED, "a take must say which offer it was shown")
+      ? refused(
+          ERR.REFUSED,
+          "an offer integration must say which offer it was shown",
+        )
       : { kind, lane, action, to: to === "" ? null : to, seen }
   }
   if (kind === "archive") {
@@ -316,14 +320,14 @@ export function decodeCommand(
 const notNewLane = (lane: string): Refusal =>
   refused(ERR.UNKNOWN_TARGET, `not a new thread's lane: ${lane}`)
 
-/** What a take was shown, as the wire carries it in `seen`: JSON. */
+/** What an offer integration was shown, as the wire carries it in `seen`: JSON. */
 export const offerSeenToWire = (seen: OfferSeen | null): string =>
   seen === null ? "" : JSON.stringify(seen)
 
 const isCommit = (v: unknown): v is string =>
   typeof v === "string" && /^[0-9a-f]+$/.test(v)
 
-/** The wire's `seen` for a take -> what it was shown; null when malformed. */
+/** The wire's `seen` for an offer integration -> what it was shown; null when malformed. */
 function offerSeenFromWire(wire: string): OfferSeen | null {
   let parsed: unknown
   try {
@@ -651,8 +655,8 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "marked" })
     case "retitling":
       return reply({ id, outcome: "retitling" })
-    case "taken":
-      return reply({ id, outcome: "taken" })
+    case "integrated":
+      return reply({ id, outcome: "integrated" })
     case "offered":
       return reply({ id, outcome: "offered" })
     case "reserved":
@@ -719,8 +723,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "marked" }
     case "retitling":
       return { kind: "retitling" }
-    case "taken":
-      return { kind: "taken" }
+    case "integrated":
+      return { kind: "integrated" }
     case "offered":
       return { kind: "offered" }
     case "reserved":

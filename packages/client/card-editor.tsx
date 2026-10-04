@@ -57,8 +57,8 @@ import {
   pinnedWords,
   queuedWords,
   sizeWords,
-  TAKE,
-  TAKE_TITLE,
+  TAKE_INTO_INVENTORY,
+  TAKE_INTO_INVENTORY_TITLE,
   UNPIN,
   UNQUEUE,
 } from "./card-words.ts"
@@ -141,7 +141,7 @@ export interface Where {
  * Either way, and after a refusal, the card is still there: nothing is put
  * back, because nothing was taken away. A send to a busy lane, or of a card
  * with a command, queues the card instead: this client asks the host to, and
- * the host takes it in turn (ADR-0055, ADR-0059).
+ * the host pops it in turn (ADR-0055, ADR-0059).
  *
  * A box whose `place` is pinned is the one "+ pin" opens: it makes a pinned
  * card at the first keystroke worth keeping and goes on editing it, the same
@@ -701,9 +701,11 @@ export function CardEditor(p: {
           )}
           {card !== undefined && <CardHistory card={card.id} />}
           {card !== undefined && (
-            <TakeButton
+            <TakeIntoInventoryButton
               card={card.id}
-              onTake={id => p.onAct({ kind: "take", card: id })}
+              onTakeIntoInventory={id =>
+                p.onAct({ kind: "takeIntoInventory", card: id })
+              }
             />
           )}
           <button
@@ -732,24 +734,24 @@ export const dragCard = (
 }
 
 /**
- * A card's take button: a press takes it into your inventory, and a drag
+ * A card's "take" button: a press takes it into your inventory, and a drag
  * moves it wherever it is dropped (ADR-0048).
  */
-export function TakeButton(p: {
+export function TakeIntoInventoryButton(p: {
   card: CardId
-  onTake: (card: CardId) => void
+  onTakeIntoInventory: (card: CardId) => void
 }) {
   return (
     <button
-      className="take"
+      className="take-into-inventory"
       data-card={p.card}
       draggable
-      onClick={() => p.onTake(p.card)}
+      onClick={() => p.onTakeIntoInventory(p.card)}
       onDragStart={e => dragCard(e, p.card)}
-      title={TAKE_TITLE}
+      title={TAKE_INTO_INVENTORY_TITLE}
       type="button"
     >
-      {TAKE}
+      {TAKE_INTO_INVENTORY}
     </button>
   )
 }
@@ -810,8 +812,9 @@ export function BoundCardEditor(p: {
 
 /**
  * A queued card above the line (ADR-0048): its text, which anyone here may
- * edit until the host takes it, who queued it and its place in line, its
- * command, a button that unqueues it, and one that takes it.
+ * edit until the host pops it, who queued it and its place in line, its
+ * command, a button that unqueues it, and one that takes it into your
+ * inventory.
  */
 export function QueuedCardEditor(p: {
   session: SessionClient
@@ -862,9 +865,11 @@ export function QueuedCardEditor(p: {
           >
             {UNQUEUE}
           </button>
-          <TakeButton
+          <TakeIntoInventoryButton
             card={card.id}
-            onTake={id => p.onAct({ kind: "take", card: id })}
+            onTakeIntoInventory={id =>
+              p.onAct({ kind: "takeIntoInventory", card: id })
+            }
           />
         </>
       )}
@@ -876,7 +881,7 @@ export function QueuedCardEditor(p: {
  * A pinned card at the top of its column (ADR-0048): its text, which anyone
  * here may edit, who pinned it, its size, how it stands against what the
  * agent last read (`inView`), a button that unpins it, and one that takes
- * it. It has no send: Enter is a new line.
+ * it into your inventory. It has no send: Enter is a new line.
  */
 export function PinnedCardEditor(p: {
   session: SessionClient
@@ -918,9 +923,11 @@ export function PinnedCardEditor(p: {
           >
             {UNPIN}
           </button>
-          <TakeButton
+          <TakeIntoInventoryButton
             card={card.id}
-            onTake={id => p.onAct({ kind: "take", card: id })}
+            onTakeIntoInventory={id =>
+              p.onAct({ kind: "takeIntoInventory", card: id })
+            }
           />
         </>
       )}

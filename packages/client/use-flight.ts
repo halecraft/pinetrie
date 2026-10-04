@@ -6,7 +6,7 @@
 import type { CardId } from "@pineta/core"
 import { useStable } from "./use-stable.ts"
 
-/** How long a flight takes, and how long a take keeps a closed inventory open. */
+/** How long a flight lasts, and how long a take into a closed inventory keeps it open. */
 export const FLIGHT_MS = 450
 
 /** How many frames to wait for the card to be drawn in its new place. */

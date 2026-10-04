@@ -60,7 +60,7 @@ const offer: OfferRecord = {
   described: true,
   edited: false,
   bookmark: "pineta-offer/x",
-  taken: null,
+  integratedAs: null,
   commits: [C],
   ledger: null,
   at: 1,
@@ -296,6 +296,18 @@ test("an offer record with no ledger reads back with none, and so does one writt
   expect(OFFER.decode(stored, L)).toEqual(offer)
   const { ledger: _, ...before } = stored
   expect(OFFER.decode(before, L)).toEqual(offer)
+})
+
+test("an offer record written before ADR-0083 reads its `taken` as `integratedAs`; one written since keeps its own, null too", () => {
+  const stored = OFFER.encode(offer) as Record<string, unknown>
+  const { integratedAs: _, ...rest } = stored
+  expect(OFFER.decode({ ...rest, taken: "ktop" }, L)).toEqual({
+    ...offer,
+    integratedAs: "ktop",
+  })
+  expect(OFFER.decode({ ...rest, taken: null }, L)).toEqual(offer)
+  expect(OFFER.decode({ ...stored, taken: "ktop" }, L)).toEqual(offer)
+  expect("taken" in stored).toBe(false)
 })
 
 test("a root record written before its threads reads with none, so a starting host still opens it (ADR-0077)", () => {

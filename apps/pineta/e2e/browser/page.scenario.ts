@@ -1131,7 +1131,8 @@ async function run(check: Checks["check"]): Promise<void> {
       const tops = row.map(b => b.top)
       check(
         "a message's tools are one row: copy, take, edit, →",
-        row.map(b => b.name).join(" ") === "copy take-copy edit branch" &&
+        row.map(b => b.name).join(" ") ===
+          "copy take-copy-into-inventory edit branch" &&
           Math.max(...tops) - Math.min(...tops) <= 1,
         `${JSON.stringify(row)}`,
       )
@@ -2842,7 +2843,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       await page.click("#top .inventory-toggle")
       await page.waitForSelector(".inventory", { timeout: 5_000 })
-      // Take: Ctrl+Shift+I in a composer's box takes its card.
+      // Take into the inventory: Ctrl+Shift+I in a composer's box takes its card.
       const downBox = `${col(1)} .composer .input`
       await page.click(downBox)
       await page.keyboard.type("for later: a plan")
@@ -2851,13 +2852,13 @@ async function run(check: Checks["check"]): Promise<void> {
         downBox,
         { timeout: 10_000 },
       )
-      const taken = (await page.getAttribute(downBox, "data-card")) ?? ""
+      const parked = (await page.getAttribute(downBox, "data-card")) ?? ""
       await page.keyboard.press("Control+Shift+I")
-      const inSlot = await appears(slotOf(taken))
+      const inSlot = await appears(slotOf(parked))
       const lineShown = await page
         .waitForFunction(
           s => document.querySelector(s)?.textContent === "for later: a plan",
-          `${slotOf(taken)} .slot-line`,
+          `${slotOf(parked)} .slot-line`,
           { timeout: 10_000 },
         )
         .then(
@@ -2865,49 +2866,49 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       const firstLine = await page
-        .textContent(`${slotOf(taken)} .slot-line`)
+        .textContent(`${slotOf(parked)} .slot-line`)
         .catch(() => "")
       const boxEmptied = await valueIs(downBox, "")
-      await waitFor(() => placeOf(taken)?.kind === "inventory", 5_000)
+      await waitFor(() => placeOf(parked)?.kind === "inventory", 5_000)
       check(
         "Ctrl+Shift+I takes the composer's card into your inventory, which shows its first line, and the composer empties",
         inSlot &&
           lineShown &&
           boxEmptied &&
-          placeOf(taken)?.kind === "inventory",
-        `slot ${inSlot}, line ${firstLine}, emptied ${boxEmptied}, ${placeOf(taken)?.kind}`,
+          placeOf(parked)?.kind === "inventory",
+        `slot ${inSlot}, line ${firstLine}, emptied ${boxEmptied}, ${placeOf(parked)?.kind}`,
       )
       // Swap: dropped on an empty slot, the card moves there; with the panel
       // focused, the undo key swaps it back (ADR-0066, this tab's own stack).
-      const takenSlot =
-        (await page.getAttribute(slotOf(taken), "data-slot")) ?? ""
-      const emptySlot = takenSlot === "9" ? "10" : "9"
+      const inventorySlot =
+        (await page.getAttribute(slotOf(parked), "data-slot")) ?? ""
+      const emptySlot = inventorySlot === "9" ? "10" : "9"
       const slotAt = (n: string) => `.inventory .slot[data-slot="${n}"]`
-      await page.dragAndDrop(slotOf(taken), slotAt(emptySlot))
+      await page.dragAndDrop(slotOf(parked), slotAt(emptySlot))
       const swapped = await appears(
-        `${slotAt(emptySlot)}[data-card="${taken}"]`,
+        `${slotAt(emptySlot)}[data-card="${parked}"]`,
       )
       await page.focus(slotAt(emptySlot))
       await page.keyboard.press("ControlOrMeta+z")
       const swappedBack = await appears(
-        `${slotAt(takenSlot)}[data-card="${taken}"]`,
+        `${slotAt(inventorySlot)}[data-card="${parked}"]`,
       )
       check(
         "with the panel focused, the undo key swaps back",
         swapped && swappedBack,
-        `to ${emptySlot}: ${swapped}; back to ${takenSlot}: ${swappedBack}`,
+        `to ${emptySlot}: ${swapped}; back to ${inventorySlot}: ${swappedBack}`,
       )
       // Put: Ctrl+Shift+O puts the selected card in the column last focused.
-      const slotIndex = await page.getAttribute(slotOf(taken), "data-slot")
+      const slotIndex = await page.getAttribute(slotOf(parked), "data-slot")
       await page.click(downBox)
-      await page.click(slotOf(taken))
+      await page.click(slotOf(parked))
       await page.keyboard.press("Control+Shift+O")
       const putBack = await valueIs(downBox, "for later: a plan")
-      await waitFor(() => placeOf(taken)?.kind === "drafting", 5_000)
+      await waitFor(() => placeOf(parked)?.kind === "drafting", 5_000)
       check(
         "Ctrl+Shift+O puts the selected card below the line in the column you were in, and its composer holds it again",
-        putBack && placeOf(taken)?.kind === "drafting",
-        `${await boxText(downBox)}; ${placeOf(taken)?.kind}`,
+        putBack && placeOf(parked)?.kind === "drafting",
+        `${await boxText(downBox)}; ${placeOf(parked)?.kind}`,
       )
       // Undo, outside a box: the put is undone, and the card is back in its
       // slot. The host records a move as it applies it (ADR-0066), so the key
@@ -2917,32 +2918,32 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       await page.keyboard.press("ControlOrMeta+z")
       const undone = await appears(
-        `.inventory .slot[data-slot="${slotIndex}"][data-card="${taken}"]`,
+        `.inventory .slot[data-slot="${slotIndex}"][data-card="${parked}"]`,
       )
-      await waitFor(() => placeOf(taken)?.kind === "inventory", 5_000)
+      await waitFor(() => placeOf(parked)?.kind === "inventory", 5_000)
       check(
         "the undo key outside a box undoes the put: the card is back in its slot",
-        undone && placeOf(taken)?.kind === "inventory",
-        `slot ${slotIndex}: ${undone}; ${placeOf(taken)?.kind}`,
+        undone && placeOf(parked)?.kind === "inventory",
+        `slot ${slotIndex}: ${undone}; ${placeOf(parked)?.kind}`,
       )
       // Drag: a slot droppedThere on another column's foot puts its card there.
-      const agentBox = `${col(0)} textarea[data-card="${taken}"]`
-      await page.dragAndDrop(slotOf(taken), `${col(0)} .composer`)
+      const agentBox = `${col(0)} textarea[data-card="${parked}"]`
+      await page.dragAndDrop(slotOf(parked), `${col(0)} .composer`)
       const droppedThere = await valueIs(agentBox, "for later: a plan")
-      await waitFor(() => placeOf(taken)?.kind === "drafting", 5_000)
+      await waitFor(() => placeOf(parked)?.kind === "drafting", 5_000)
       check(
         "dragging a slot onto another column's foot puts its card there",
-        droppedThere && placeOf(taken)?.kind === "drafting",
-        `${await boxText(agentBox)}; ${placeOf(taken)?.kind}`,
+        droppedThere && placeOf(parked)?.kind === "drafting",
+        `${await boxText(agentBox)}; ${placeOf(parked)?.kind}`,
       )
       // Undone, and removed: what follows starts from no card of this one.
       await page.evaluate(() =>
         (document.activeElement as HTMLElement | null)?.blur(),
       )
       await page.keyboard.press("ControlOrMeta+z")
-      await page.click(slotOf(taken))
+      await page.click(slotOf(parked))
       await page.click(".inventory .remove")
-      await waitFor(() => placeOf(taken) === undefined, 5_000)
+      await waitFor(() => placeOf(parked) === undefined, 5_000)
       const columnsBefore = await page.locator(".column").count()
       // Closing a fresh column with text keeps its card, in the slot selected.
       const branchable = page

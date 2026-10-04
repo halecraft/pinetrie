@@ -8,12 +8,12 @@
 // that `rev` holds the move and everything before it, whatever happened to
 // the card since. Dropped at the answer alone, the card would jump back for
 // a moment; dropped when the card looks moved, a move overtaken before the
-// copy caught up (taken, or moved back) would never show, and would be drawn
+// copy caught up (popped from its queue, or moved back) would never show, and would be drawn
 // for good. A send is a move of its card too: out of the composer.
 //
-// The history of moves is the host's (ADR-0066), not kept here. A take's
-// chosen slot is an intent until the take is answered (`intentsOf`): the
-// repair leaves it alone (`inventory.ts`).
+// The history of moves is the host's (ADR-0066), not kept here. The slot a
+// take into the inventory chose is an intent until the take is answered
+// (`intentsOf`): the repair leaves it alone (`inventory.ts`).
 
 import type {
   CardId,
@@ -45,7 +45,7 @@ const sameActedAt = (a: ActedAt, b: ActedAt): boolean =>
     ? b.kind === "column" && a.key === b.key
     : a.kind === b.kind
 
-/** What a move carries besides its target: where it was made, and a take's slot. */
+/** What a move carries besides its target: where it was made, and the slot a take into the inventory chose. */
 export interface MoveHow {
   readonly actedAt: ActedAt
   /** The slot a move into your inventory takes; null for any other move. */
@@ -79,7 +79,7 @@ export type Answer =
 interface Sent {
   readonly id: string
   readonly answer: Answer
-  /** A take's chosen slot in your inventory; null for any other move. */
+  /** The slot a take into your inventory chose; null for any other move. */
   readonly slot: number | null
   readonly actedAt: ActedAt
 }
@@ -236,7 +236,7 @@ export function pendingOf(
 
 /**
  * The slot an accepted move writes: one into your inventory, at the slot
- * its take chose. Null for any other move, or answer.
+ * its take into the inventory chose. Null for any other move, or answer.
  */
 export function slotOnAccept(
   p: Pending,
@@ -251,14 +251,14 @@ export function slotOnAccept(
 }
 
 /**
- * `move` with its queue's text version as this client has it: the host takes
+ * `move` with its queue's text version as this client has it: the host pops
  * a queued card only once it holds that much (S96). Any other move is
  * returned as it is.
  */
 export const stampSeen = (move: Move, seen: string): Move =>
   move.to?.kind === "queued" ? { ...move, to: { ...move.to, seen } } : move
 
-/** The slot each take this tab has in flight chose, by card. */
+/** The slot each take into the inventory this tab has in flight chose, by card. */
 export function intentsOf(state: MovesState): Intents {
   const intents = new Map<CardId, number>()
   for (const p of state.pending) {

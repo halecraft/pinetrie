@@ -9,6 +9,8 @@ and ADR-0034 (a lane's fetch is imported by the owner).
 offer, so refreshing every named lane on a full observation wakes none from
 before `Pineta-Source`; a lane whose base moved runs two more jj processes,
 once per move.
+Amended by ADR-0083: a take is an *offer integration*; it names what it
+was shown.
 
 **Context.** A take ("add to the project") sometimes took 30–60 s, and the
 page showed nothing meanwhile. S89 measured it on a clone of Pineta's repo:

@@ -106,11 +106,11 @@ const inColumn = (
   key = "f-1",
 ): Intent => ({ kind: "column", position: 1, key, act })
 
-describe("take (ADR-0048 step 4)", () => {
+describe("take into the inventory (ADR-0048 step 4)", () => {
   test("into the selected slot when it is empty, else the first empty", () => {
     const s = state({ cards: [card(C1, drafting)], selected: 4 })
     const move = { card: C1, from: drafting, to: inventory }
-    expect(plan({ kind: "take", card: C1 }, s)).toEqual([
+    expect(plan({ kind: "takeIntoInventory", card: C1 }, s)).toEqual([
       { kind: "showInventory", brief: true },
       {
         kind: "moveCard",
@@ -120,11 +120,11 @@ describe("take (ADR-0048 step 4)", () => {
         fly: true,
       },
     ])
-    const taken = plan(
-      { kind: "take", card: C1 },
+    const intoInventory = plan(
+      { kind: "takeIntoInventory", card: C1 },
       state({ cards: [card(C1, drafting)], selected: 4, slots: { "4": C2 } }),
     )
-    expect(taken[1]).toMatchObject({ how: { slot: 0 } })
+    expect(intoInventory[1]).toMatchObject({ how: { slot: 0 } })
   })
 
   test("full: refused at once, in the inventory", () => {
@@ -133,7 +133,7 @@ describe("take (ADR-0048 step 4)", () => {
     )
     expect(
       plan(
-        { kind: "take", card: C1 },
+        { kind: "takeIntoInventory", card: C1 },
         state({ cards: [card(C1, drafting)], slots }),
       )[1],
     ).toEqual({
@@ -150,7 +150,10 @@ describe("take (ADR-0048 step 4)", () => {
 
   test("a copy of a message's text is a new card in your inventory", () => {
     expect(
-      plan(inColumn({ kind: "takeCopy", card: C2, text: "hello" }), state())[1],
+      plan(
+        inColumn({ kind: "takeCopyIntoInventory", card: C2, text: "hello" }),
+        state(),
+      )[1],
     ).toEqual({
       kind: "createCard",
       card: {
@@ -187,7 +190,7 @@ describe("put", () => {
     ])
   })
 
-  test("to a slot: a swap within your inventory, or a take into it", () => {
+  test("to a slot: a swap within your inventory, or a take into the inventory there", () => {
     const s = state({
       cards: [card(C1, inventory), card(C2, drafting)],
       slots: { "3": C1 },

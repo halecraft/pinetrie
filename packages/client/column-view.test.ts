@@ -549,7 +549,7 @@ describe("columnView: the work strip", () => {
     const sent = {
       kind: "sent",
       id: "s1",
-      action: "take",
+      action: "integrate",
       to: null,
     } as const
     expect(columnView(own({ acting: sent })).strip).toMatchObject({
@@ -559,12 +559,12 @@ describe("columnView: the work strip", () => {
     expect(
       columnView(
         own({
-          acting: { kind: "refused", action: "take", message: "no" },
+          acting: { kind: "refused", action: "integrate", message: "no" },
         }),
       ).strip,
     ).toMatchObject({ waiting: false, words: { note: "not done: no" } })
   })
-  test("an open offer with files can be reviewed, in every state; a taken or empty one cannot", () => {
+  test("an open offer with files can be reviewed, in every state; an integrated or empty one cannot", () => {
     const open: OfferRecord = {
       lane: B,
       size: 1,
@@ -576,7 +576,7 @@ describe("columnView: the work strip", () => {
       described: true,
       edited: false,
       bookmark: "pineta-offer/copper-owl",
-      taken: null,
+      integratedAs: null,
       commits: [commitId("c1")],
       ledger: null,
       at: 1,
@@ -606,7 +606,9 @@ describe("columnView: the work strip", () => {
       state: "conflicts",
       review: { ...target, conflicts: ["a.txt"] },
     })
-    expect(strip({ ...open, taken: "t1" })).toMatchObject({ review: null })
+    expect(strip({ ...open, integratedAs: "t1" })).toMatchObject({
+      review: null,
+    })
     expect(strip({ ...open, files: [] })).toMatchObject({ review: null })
     expect(columnView(own()).strip).toMatchObject({
       state: "nothing",
@@ -684,7 +686,7 @@ describe("offerWords", () => {
     described: true,
     edited: false,
     bookmark: "pineta-offer/amber-fox",
-    taken: null,
+    integratedAs: null,
     commits: [commitId("w")],
     ledger: null,
     at: 10,
@@ -766,13 +768,18 @@ describe("offerWords", () => {
       "idle",
       "you edited this offer \u00b7 conflicts with the project in 2 files",
     ],
-    ["taken", { ...offer, taken: "zz12345678ab" }, "idle", "added as zz123456"],
+    [
+      "integrated",
+      { ...offer, integratedAs: "zz12345678ab" },
+      "idle",
+      "added as zz123456",
+    ],
   ] as const)("%s", (_, o, activity, line) => {
     const w = words(o, activity)
     expect(w.line).toBe(line)
     expect(w.line).not.toMatch(/`|pineta-offer/)
   })
-  test("the labels follow the state, and name where a take adds the work", () => {
+  test("the labels follow the state, and name where an integration adds the work", () => {
     const labels = (
       o: OfferRecord,
       base = LINE_BASE as Parameters<typeof words>[2],
@@ -801,7 +808,7 @@ describe("offerWords", () => {
     from: commitId("a"),
     to: commitId("b"),
   } as const
-  test("the jj facts are titles: which bookmark a take moves, and what catching up merges", () => {
+  test("the jj facts are titles: which bookmark an integration moves, and what catching up merges", () => {
     const w = words(offer, "idle", LINE_BASE, {
       catchUp: { kind: "unknown" },
     })
@@ -896,7 +903,7 @@ describe("offerWords", () => {
       lane: B,
       name: "copper-owl" as ThreadName,
       newest: commitId("p2"),
-      taken: commitId("p1"),
+      caughtUpWith: commitId("p1"),
       conflicts: [],
     }
     const fromStart = {
@@ -945,12 +952,22 @@ describe("offerWords", () => {
   ): OfferActing => ({ kind: "sent", id: "s1", action, to })
   test.each([
     ["nothing out", LINE_BASE, null, null],
-    ["a take to the line", LINE_BASE, sent("take"), "adding to the project…"],
-    ["a take to its WIP", WIP_BASE, sent("take"), "adding to wip/search…"],
     [
-      "a take from a WIP to the line",
+      "an integration into the line",
+      LINE_BASE,
+      sent("integrate"),
+      "adding to the project…",
+    ],
+    [
+      "an integration into its WIP",
       WIP_BASE,
-      sent("take", "pineta-onto"),
+      sent("integrate"),
+      "adding to wip/search…",
+    ],
+    [
+      "an integration from a WIP into the line",
+      WIP_BASE,
+      sent("integrate", "pineta-onto"),
       "adding to the project…",
     ],
     ["a split", LINE_BASE, sent("split"), "splitting into a stack…"],
@@ -960,8 +977,8 @@ describe("offerWords", () => {
     [
       "a refusal",
       LINE_BASE,
-      { kind: "refused", action: "take", message: "nothing to take" },
-      "not done: nothing to take",
+      { kind: "refused", action: "integrate", message: "nothing to integrate" },
+      "not done: nothing to integrate",
     ],
     [
       "a failure",
@@ -972,7 +989,7 @@ describe("offerWords", () => {
   ] as const)("your last command: %s", (_, base, acting, note) => {
     expect(words(offer, "idle", base, {}, acting).note).toBe(note)
   })
-  test("a WIP gone without landing offers no take, and continuing from the project", () => {
+  test("a WIP gone without landing offers no integration, and continuing from the project", () => {
     const w = words(offer, "idle", { ...WIP_BASE, state: "gone" })
     expect(w.buttons.map(b => b.label)).toEqual(["split into a stack"])
     expect(w.menu.map(b => b.label)).toEqual([

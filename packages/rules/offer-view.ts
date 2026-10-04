@@ -21,19 +21,20 @@ import {
   parentAhead,
 } from "./line.ts"
 import {
+  type OfferIntegrationDestination,
   type OfferStatus,
-  type TakeDestination,
-  takeDestinations,
+  offerIntegrationDestinations,
 } from "./offer.ts"
 
 /**
- * A button beside the offer, or in its menu. `take` takes it to its default
- * destination; `take-line` onto the line, from a WIP thread; `continue`
+ * A button beside the offer, or in its menu. `integrate` integrates it into
+ * its default destination; `integrate-into-line` into the line, from a WIP
+ * thread; `continue`
  * moves a thread whose WIP is gone to the line (ADR-0060).
  */
 export type OfferButton =
-  | "take"
-  | "take-line"
+  | "integrate"
+  | "integrate-into-line"
   | "continue"
   | "split"
   | "squash"
@@ -44,7 +45,7 @@ export type OfferButton =
 
 /**
  * What the lane is running now, as far as the offer cares; `catch-up`: a
- * card that brings it up to date is queued, and taken before anything else.
+ * card that brings it up to date is queued, and popped before anything else.
  */
 export type OfferActivity =
   | "idle"
@@ -69,37 +70,37 @@ export interface OfferView {
     | "stack"
     | "stale"
     | "edited"
-    | "taken"
+    | "integrated"
   /** Buttons beside the offer, the first the primary one. */
   readonly buttons: readonly OfferButton[]
   /** Buttons in the offer's menu. */
   readonly menu: readonly OfferButton[]
   /** Of those, the ones that would change nothing now: drawn, but disabled. */
   readonly quiet: readonly OfferButton[]
-  /** Where `take` (the first) and `take-line` (the line, from a WIP) go. */
-  readonly destinations: readonly TakeDestination[]
+  /** Where `integrate` (the first) and `integrate-into-line` (the line, from a WIP) go. */
+  readonly destinations: readonly OfferIntegrationDestination[]
   readonly facts: OfferFacts
 }
 
 /** What an offer's words are made from. */
 interface OfferFacts {
   readonly activity: OfferActivity
-  /** Files in the untaken offer; 0 with none. */
+  /** Files in the offer not yet integrated; 0 with none. */
   readonly files: number
-  /** Revisions in the untaken offer: more than one is a stack. */
+  /** Revisions in the offer not yet integrated: more than one is a stack. */
   readonly size: number
   /** Files that conflict with your work. */
   readonly conflicts: number
   /** It touches files you have uncommitted edits in. */
   readonly touchesYourEdits: boolean
-  /** Its bookmark, to find it in jj; null with no untaken offer. */
+  /** Its bookmark, to find it in jj; null with no offer not yet integrated. */
   readonly bookmark: string | null
-  /** An untaken offer the line already holds the work of (`held`). */
+  /** An offer not yet integrated whose work the line already holds (`held`). */
   readonly held: boolean
-  /** The change id it was taken as, or null. */
-  readonly taken: string | null
+  /** The change id it was integrated as, or null. */
+  readonly integratedAs: string | null
   /**
-   * The thread's base, as it is brought up to date and taken (ADR-0060): its
+   * The thread's base, as it is brought up to date and integrated into (ADR-0060): its
    * WIP, or the line once the WIP landed or for a line thread.
    */
   readonly base: ThreadBase
@@ -107,11 +108,11 @@ interface OfferFacts {
   readonly onto: string
   /** What catching up would do (`catchUpOf`). */
   readonly catchUp: CatchUpNow
-  /** A take of this thread names no source: nothing is offered until it catches up (S97). */
+  /** An integrated-offer commit of this thread names no source: nothing is offered until it catches up (S97). */
   readonly untraced: boolean
   /** Where its conflict comes from (`conflictCause`); `work` with none. */
   readonly conflictCause: ConflictCause
-  /** The thread this one branched from, while it is ahead of what this lane took (ADR-0072). */
+  /** The thread this one branched from, while it is ahead of what this lane last caught up with (ADR-0072). */
   readonly parent: ParentThread | null
   /** That parent's newest commit holds every file of the offer's conflict resolved. */
   readonly parentResolves: boolean
@@ -135,8 +136,8 @@ export function conflictCause(
  * The offer's state and buttons. `landing` is the lane's latest resolution;
  * it asks for you only when newer than the offer. `base` is the lane's
  * (`pineta.base`), null before the host read it, as the line; `onto` and
- * `wipAhead` come from the line's record. A take is offered only with a
- * destination (`takeDestinations`).
+ * `wipAhead` come from the line's record. An integration is offered only with a
+ * destination (`offerIntegrationDestinations`).
  */
 export function offerView(input: {
   readonly offer: OfferStatus
@@ -147,7 +148,7 @@ export function offerView(input: {
   readonly wipAhead: number
   /** What catching up would do (`catchUpOf`). */
   readonly catchUp: CatchUpNow
-  /** Takes of this thread that name no source (`BaseRecord.untraced`). */
+  /** Integrated-offer commits of this thread that name no source (`BaseRecord.untraced`). */
   readonly untraced: boolean
   /** A card bringing the thread up to date is queued on its lane. */
   readonly catchingUp: boolean
@@ -159,7 +160,7 @@ export function offerView(input: {
   const { offer, landing } = input
   const activity: OfferActivity =
     input.activity === "idle" && input.catchingUp ? "catch-up" : input.activity
-  const untaken =
+  const notYetIntegrated =
     offer.kind === "open" || offer.kind === "held" ? offer.record : undefined
   const open = offer.kind === "open" ? offer.record : undefined
   const ahead =
@@ -174,9 +175,9 @@ export function offerView(input: {
     size: open?.size ?? 0,
     conflicts: open?.conflicts.length ?? 0,
     touchesYourEdits: (open?.yourEdits.length ?? 0) > 0,
-    bookmark: untaken?.bookmark ?? null,
+    bookmark: notYetIntegrated?.bookmark ?? null,
     held: offer.kind === "held",
-    taken: offer.kind === "taken" ? offer.as : null,
+    integratedAs: offer.kind === "integrated" ? offer.as : null,
     base: effectiveBase(input.base),
     onto: input.onto,
     catchUp: input.catchUp,
@@ -188,7 +189,7 @@ export function offerView(input: {
   const destinations =
     open === undefined
       ? []
-      : takeDestinations({
+      : offerIntegrationDestinations({
           base: input.base?.base ?? { kind: "line" },
           state: input.base?.state ?? "ok",
           onto: input.onto,
@@ -196,8 +197,10 @@ export function offerView(input: {
           wipAhead: input.wipAhead,
         })
   const gone = input.base?.state === "gone"
-  const takes = (buttons: readonly OfferButton[]): readonly OfferButton[] =>
-    destinations.length === 0 ? buttons.filter(b => b !== "take") : buttons
+  const integrable = (
+    buttons: readonly OfferButton[],
+  ): readonly OfferButton[] =>
+    destinations.length === 0 ? buttons.filter(b => b !== "integrate") : buttons
   const view = (
     state: OfferView["state"],
     buttons: readonly OfferButton[],
@@ -239,10 +242,10 @@ export function offerView(input: {
       !input.untraced || (b !== "refresh" && b !== "squash" && b !== "split")
     return {
       state,
-      buttons: takes(toLine(shown.buttons)).filter(rebuilds),
+      buttons: integrable(toLine(shown.buttons)).filter(rebuilds),
       menu: [
         ...shown.menu.filter(rebuilds),
-        ...(destinations.length > 1 ? (["take-line"] as const) : []),
+        ...(destinations.length > 1 ? (["integrate-into-line"] as const) : []),
       ],
       quiet,
       destinations,
@@ -252,12 +255,12 @@ export function offerView(input: {
   if (activity === "turn") return view("running", [], [])
   if (activity !== "idle") return view("busy", [], [])
   if (offer.kind === "none") return view("nothing", [], ["update"])
-  if (offer.kind === "taken") return view("taken", [], ["update"])
+  if (offer.kind === "integrated") return view("integrated", [], ["update"])
   const { record } = offer
   if (landing?.state === "needs_you" && landing.at > record.at)
-    return view("needs_you", ["take"], ["update"])
+    return view("needs_you", ["integrate"], ["update"])
   if (offer.kind === "held") return view("nothing", [], ["update"])
-  if (record.edited) return view("edited", ["take", "refresh"], ["update"])
+  if (record.edited) return view("edited", ["integrate", "refresh"], ["update"])
   // A conflict that came with the lane's copy, which the parent has since
   // resolved, is settled by catching up with the parent; any other by
   // catching up with the base and resolving (ADR-0072).
@@ -265,19 +268,19 @@ export function offerView(input: {
     return view(
       "conflicts",
       cause === "start" && parentResolves
-        ? ["catch-up-parent", "take"]
-        : ["update", "take"],
+        ? ["catch-up-parent", "integrate"]
+        : ["update", "integrate"],
       [],
     )
   if (record.size > 1)
     return record.stale
-      ? view("stale", ["split", "take"], ["update"])
-      : view("stack", ["take", "squash"], ["update"])
-  return view("ready", ["take", "split"], ["describe", "update"])
+      ? view("stale", ["split", "integrate"], ["update"])
+      : view("stack", ["integrate", "squash"], ["update"])
+  return view("ready", ["integrate", "split"], ["describe", "update"])
 }
 
 /**
- * What a take was shown (ADR-0065), from the record the page drew: the
+ * What an offer integration was shown (ADR-0065), from the record the page drew: the
  * offer's ledger, and whether it conflicted. With no record, it was shown no
  * offer.
  */

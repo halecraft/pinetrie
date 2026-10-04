@@ -3,7 +3,7 @@
 // sent card spent, and traces seen (ADR-0048 step 6).
 //
 // Each runs inside one step of the documents' keeper, as every command does, so
-// it is ordered with the take and with every other move: gather the places,
+// it is ordered with a queued card's pop and with every other move: gather the places,
 // plan purely, then write through `applyPlaceSteps`. Nothing else writes the
 // places while a step awaits a stack loading, or an undo's write landing.
 // Every answer that wrote the places document, or refused a move, carries

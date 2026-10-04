@@ -34,7 +34,8 @@ export const mutations: readonly Mutation[] = [
     from: '        sent.kind === "offer" ? { ...sent, event } : { kind: "line", event },',
     to: "        sent,",
     command: unit,
-    expect: "sent at once, the refusal on reply, per lane; a take clears it",
+    expect:
+      "sent at once, the refusal on reply, per lane; an integration clears it",
   },
   {
     name: "hostLetGo counts a card the host never reached",
@@ -126,12 +127,12 @@ export const mutations: readonly Mutation[] = [
     expect: "accepted, the answer before the places",
   },
   {
-    name: "an unqueue the take beat names its placer, not its queuer",
+    name: "an unqueue the pop beat names its placer, not its queuer",
     file: "packages/session/card-moves.ts",
     from: '          by: outcome.code === "gone" ? context.queuedBy : outcome.by,',
     to: "          by: outcome.by,",
     command: unit,
-    expect: "an unqueue the take beat",
+    expect: "an unqueue the pop beat",
   },
   {
     name: "a store tells its listeners of the same value",
@@ -142,7 +143,7 @@ export const mutations: readonly Mutation[] = [
     expect: "snapshotStore: a new value tells every listener",
   },
   {
-    name: "a take ignores the selected slot",
+    name: "a take into the inventory ignores the selected slot",
     file: "packages/session/inventory.ts",
     from: "    start !== undefined &&\n    isSlot(start) &&",
     to: "    false &&\n    isSlot(start) &&",
@@ -174,7 +175,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a slot naming a card not held is cleared",
   },
   {
-    name: "the repair writes over a take's chosen slot",
+    name: "the repair writes over the slot a take into the inventory chose",
     file: "packages/session/inventory.ts",
     from: "    if (!chosen.has(slot) && slots[slot] !== card && steady(card))",
     to: "    if (slots[slot] !== card && steady(card))",
@@ -207,21 +208,21 @@ export const mutations: readonly Mutation[] = [
     expect: "steadiness: a card held, or not, for STEADY_MS",
   },
   {
-    name: "a take leaves the card in its other slot",
+    name: "a take into the inventory leaves the card in its other slot",
     file: "packages/session/inventory.ts",
     from: "    .filter(([s, c]) => c === card && s !== String(slot))",
     to: "    .filter(() => false)",
     command: unit,
     expect:
-      "a take writes its slot, and clears any other slot holding the card",
+      "a take into the inventory writes its slot, and clears any other slot holding the card",
   },
   {
-    name: "a creation's take is no intent",
+    name: "a creation's take into the inventory is no intent",
     file: "packages/session/card-moves.ts",
     from: '  p.kind === "create" ? p.draft.id : p.move.card',
     to: '  p.kind === "create" ? ("" as CardId) : p.move.card',
     command: unit,
-    expect: "each take in flight's slot, a creation's too",
+    expect: "each take into the inventory in flight's slot, a creation's too",
   },
   {
     name: "a send leaves out its column's reservation",
@@ -267,13 +268,13 @@ export const mutations: readonly Mutation[] = [
     expect: "the repair writes nothing until a card is steady",
   },
   {
-    name: "a take writes its slot whatever the answer",
+    name: "a take into the inventory writes its slot whatever the answer",
     file: "packages/session/card-moves.ts",
     from: '  return answer.kind === "accepted" &&',
     to: '  return answer.kind !== "busy" &&',
     command: unit,
     expect:
-      "an accepted take writes its slot; refused, or with no slot, nothing",
+      "an accepted take into the inventory writes its slot; refused, or with no slot, nothing",
   },
   {
     name: "a queue is sent without its text's version",

@@ -38,7 +38,7 @@ const TEST_ROOT = rootIdFor("test-root")
 const NEW_ROOT = rootIdFor("01a0f9eb-86e1-77ad-a822-2a3067862240")
 
 const NEW_LANE = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
-/** What a take was shown: a ledger, conflicting. */
+/** What an offer integration was shown: a ledger, conflicting. */
 const SEEN = {
   ledger: { source: commitId("a1"), start: [commitId("b2"), commitId("c3")] },
   conflicted: true,
@@ -205,14 +205,14 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "offer",
       lane: laneNameForThread("abc"),
-      action: "take",
+      action: "integrate",
       to: null,
       seen: { ledger: null, conflicted: false },
     },
     {
       kind: "offer",
       lane: laneNameForThread("abc"),
-      action: "take",
+      action: "integrate",
       to: "wip/search",
       seen: SEEN,
     },
@@ -326,13 +326,13 @@ test("a chat's malformed pinned cards are refused", () => {
   assert.equal(chat("").kind, "chat")
 })
 
-test("a take that does not say which offer it was shown, well formed, is refused", () => {
-  const take = (seen: string) =>
+test("an offer integration that does not say which offer it was shown, well formed, is refused", () => {
+  const integrate = (seen: string) =>
     decodeCommand({
       ...EMPTY_COMMAND,
       kind: "offer",
       lane: laneNameForThread("abc"),
-      mode: "take",
+      mode: "integrate",
       seen,
     })
   for (const bad of [
@@ -343,11 +343,11 @@ test("a take that does not say which offer it was shown, well formed, is refused
     '{"ledger":{"source":"a1","start":[]},"conflicted":false}',
     '{"ledger":{"source":"not a commit","start":["a1"]},"conflicted":false}',
   ])
-    assert.equal((take(bad) as { kind: string }).kind, "refused", bad)
-  assert.deepEqual(take(JSON.stringify(SEEN)), {
+    assert.equal((integrate(bad) as { kind: string }).kind, "refused", bad)
+  assert.deepEqual(integrate(JSON.stringify(SEEN)), {
     kind: "offer",
     lane: laneNameForThread("abc"),
-    action: "take",
+    action: "integrate",
     to: null,
     seen: SEEN,
   })
@@ -366,7 +366,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "restored" },
     { kind: "marked" },
     { kind: "retitling" },
-    { kind: "taken" },
+    { kind: "integrated" },
     { kind: "offered" },
     { kind: "reserved" },
     { kind: "seen" },

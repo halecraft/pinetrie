@@ -1,7 +1,8 @@
 // host/commands/chat — a human message, from a `chat` command or a queued
-// card the host took: the one send path, so a busy lane, conflicts and who a
+// card the host popped: the one send path, so a busy lane, conflicts and who a
 // message is for are decided once. Who spends the card is the caller's:
-// the dispatcher for a `chat` command, the take for a queued card (ADR-0048).
+// the dispatcher for a `chat` command, the drain for a popped queued card
+// (ADR-0048).
 
 import {
   type BlobStore,
@@ -47,7 +48,7 @@ import type { Runs } from "../runs.ts"
 import type { Titles } from "../titles.ts"
 import type { LaneWork } from "../work/index.ts"
 
-/** A chat to send: a `chat` command's, or a taken card's, in mode `queue`. */
+/** A chat to send: a `chat` command's, or a popped queued card's, in mode `queue`. */
 export type Chat = Omit<Extract<Intent, { kind: "chat" }>, "kind" | "mode"> & {
   readonly mode: PlanMode
 }
@@ -111,8 +112,8 @@ export async function sendChat(
   if (chat.at.kind === "root" && readRoots(session).has(chat.root))
     return {
       kind: "refused",
-      code: ERR.ROOT_TAKEN,
-      message: "that root's id is taken",
+      code: ERR.ROOT_ID_IN_USE,
+      message: "that root's id is in use",
     }
   // gather
   const view: RootView = {

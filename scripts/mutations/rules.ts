@@ -109,7 +109,7 @@ export const mutations: readonly Mutation[] = [
     to: '      input.untraced && menu.includes("update")',
     command: unit,
     expect:
-      "behind its base, catching up stands beside the offer; with nothing to take, alone",
+      "behind its base, catching up stands beside the offer; with nothing to integrate, alone",
   },
   {
     name: "a queued catch-up is no activity",
@@ -127,7 +127,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return true\n",
     command: unit,
     expect:
-      "catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)",
+      "catchUpOf: moved from the commit a lane last caught up with in its base to the base's now, and what the host read of it there (S97)",
   },
   {
     name: "a lane the host has not read is caught up",
@@ -136,7 +136,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (base === undefined) return { kind: "current" }',
     command: unit,
     expect:
-      "catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)",
+      "catchUpOf: moved from the commit a lane last caught up with in its base to the base's now, and what the host read of it there (S97)",
   },
   {
     name: "a WIP thread is measured against the line",
@@ -145,7 +145,7 @@ export const mutations: readonly Mutation[] = [
     to: "    true\n      ? { bookmark: line.onto, commit }",
     command: unit,
     expect:
-      "catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)",
+      "catchUpOf: moved from the commit a lane last caught up with in its base to the base's now, and what the host read of it there (S97)",
   },
   {
     name: "the line is named by its bookmark",
@@ -166,12 +166,30 @@ export const mutations: readonly Mutation[] = [
       "an update round-trips, shows one line, and tells the model what changed",
   },
   {
-    name: "an offer of no files can be taken",
+    name: "an offer of no files can be integrated",
     file: "packages/rules/offer-view.ts",
     from: '  if (offer.kind === "held") return view("nothing", [], ["update"])\n',
     to: "",
     command: unit,
     expect: "every state, with its buttons",
+  },
+  {
+    name: "an offer record from before ADR-0083 forgets its integration",
+    file: "packages/rules/offer.ts",
+    from: "        r.integratedAs !== undefined ? r.integratedAs : (r.taken ?? null),",
+    to: "        r.integratedAs !== undefined ? r.integratedAs : null,",
+    command: unit,
+    expect:
+      "an offer record written before ADR-0083 reads its `taken` as `integratedAs`",
+  },
+  {
+    name: "an old `taken` overrides an offer record's own null",
+    file: "packages/rules/offer.ts",
+    from: "        r.integratedAs !== undefined ? r.integratedAs : (r.taken ?? null),",
+    to: "        r.integratedAs ?? r.taken ?? null,",
+    command: unit,
+    expect:
+      "an offer record written before ADR-0083 reads its `taken` as `integratedAs`",
   },
   {
     name: "an offer of no files is open",
@@ -189,7 +207,7 @@ export const mutations: readonly Mutation[] = [
     to: "      true\n",
     command: unit,
     expect:
-      "an untraced thread's offer you edited can be taken, never rebuilt (S97)",
+      "an untraced thread's offer you edited can be integrated, never rebuilt (S97)",
   },
   {
     name: "an untraced thread keeps catching up in the menu",
@@ -216,7 +234,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (read === null) return { kind: "unknown" }',
     command: unit,
     expect:
-      "catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)",
+      "catchUpOf: moved from the commit a lane last caught up with in its base to the base's now, and what the host read of it there (S97)",
   },
   {
     name: "a record left from a gone offer is kept",
@@ -225,7 +243,7 @@ export const mutations: readonly Mutation[] = [
     to: '      ? { kind: "untouched" }\n      : { kind: "build", place }',
     command: unit,
     expect:
-      "no offer in your repo (never built, taken, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten",
+      "no offer in your repo (never built, integrated, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten",
   },
   {
     name: "a lane whose work undoes itself is offered",
@@ -346,7 +364,7 @@ export const mutations: readonly Mutation[] = [
     expect: "always a new lane there",
   },
   {
-    name: "an idle lane with cards queued takes a message at once",
+    name: "an idle lane with cards queued accepts a message at once",
     file: "packages/rules/chat.ts",
     from: '  const busy = input.mode === "queue" ? lane.running : isBusy(lane)',
     to: "  const busy = lane.running",
@@ -354,13 +372,13 @@ export const mutations: readonly Mutation[] = [
     expect: "one with cards queued: busy",
   },
   {
-    name: "the take waits behind the cards it heads",
+    name: "the pop waits behind the cards it heads",
     file: "packages/rules/chat.ts",
     from: '  const busy = input.mode === "queue" ? lane.running : isBusy(lane)',
     to: "  const busy = isBusy(lane)",
     command: unit,
     expect:
-      "queue, the host's take: the cards behind it do not make the lane busy",
+      "queue, the host's pop: the cards behind it do not make the lane busy",
   },
   {
     name: "a branch at a lane's tip continues the lane",
@@ -528,12 +546,12 @@ export const mutations: readonly Mutation[] = [
       "refused, in words the agent reads: no top, no revisions, other files",
   },
   {
-    name: "a taken name is handed out again",
+    name: "a name in use is handed out again",
     file: "packages/rules/names.ts",
-    from: "    if (!taken.has(name)) return name as ThreadName",
+    from: "    if (!inUse.has(name)) return name as ThreadName",
     to: "    return name as ThreadName",
     command: unit,
-    expect: "a taken name moves to the next free pair",
+    expect: "a name in use moves to the next free pair",
   },
   {
     name: "a lane without a name is skipped",
@@ -562,7 +580,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the bookmark is left out",
     file: "packages/rules/offer-view.ts",
-    from: "    bookmark: untaken?.bookmark ?? null,",
+    from: "    bookmark: notYetIntegrated?.bookmark ?? null,",
     to: "    bookmark: null,",
     command: unit,
     expect: "the facts",
@@ -624,7 +642,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a mark: its root",
   },
   {
-    name: "a taken offer's commit is read",
+    name: "an integrated offer's commit is read",
     file: "packages/rules/review.ts",
     from: '      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))',
     to: "      .flatMap(o => o.commits)",
@@ -635,7 +653,7 @@ export const mutations: readonly Mutation[] = [
     name: "a held offer's commit is read",
     file: "packages/rules/review.ts",
     from: '      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))',
-    to: "      .flatMap(o => (o.taken === null ? o.commits : []))",
+    to: "      .flatMap(o => (o.integratedAs === null ? o.commits : []))",
     command: unit,
     expect: "planOfferRead: only a commit an open offer holds now",
   },
@@ -802,7 +820,7 @@ export const mutations: readonly Mutation[] = [
     expect: "yourCard: of two of yours at one end, the newest",
   },
   {
-    name: "planTake ignores order",
+    name: "planNextQueuedCardPop ignores order",
     file: "packages/rules/card.ts",
     from: "  if (x !== y) return x < y ? -1 : 1\n",
     to: "\n",
@@ -810,12 +828,12 @@ export const mutations: readonly Mutation[] = [
     expect: "queuedOn: a lane's queued cards by order key, then id",
   },
   {
-    name: "planTake takes while running",
+    name: "planNextQueuedCardPop pops while running",
     file: "packages/rules/card.ts",
     from: '  if (running) return { kind: "idle" }',
     to: "  void running",
     command: unit,
-    expect: "planTake: nothing while the lane runs",
+    expect: "planNextQueuedCardPop: nothing while the lane runs",
   },
   {
     name: "planUnsent writes queued",
@@ -1036,7 +1054,7 @@ export const mutations: readonly Mutation[] = [
     expect: "the compare: gone when there is no record, moved when",
   },
   {
-    name: "a creation overwrites a taken id",
+    name: "a creation overwrites an id in use",
     file: "packages/rules/card.ts",
     from: '    if (now !== undefined) return { kind: "refused", code: "exists", now }',
     to: "",
@@ -1233,12 +1251,12 @@ export const mutations: readonly Mutation[] = [
       "a root archived 7 days and a second ago is retired; one archived 6 days ago",
   },
   {
-    name: "a take is never shown a conflict",
+    name: "an offer integration is never shown a conflict",
     file: "packages/rules/offer-view.ts",
     from: "  conflicted: (record?.conflicts.length ?? 0) > 0,",
     to: "  conflicted: false,",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
-    expect: "offerSeen: what a take was shown",
+    expect: "offerSeen: what an offer integration was shown",
   },
   {
     name: "an offer record's ledger is dropped as it is read",
@@ -1503,10 +1521,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a catch-up with the parent is forgotten",
     file: "packages/rules/line.ts",
-    from: "    if (merged !== undefined) {\n      taken = merged",
-    to: "    if (merged !== undefined) {\n      taken = fork.commit",
+    from: "    if (merged !== undefined) {\n      caughtUpWith = merged",
+    to: "    if (merged !== undefined) {\n      caughtUpWith = fork.commit",
     command: unit,
-    expect: "a catch-up's merged commit is what it took",
+    expect: "a catch-up's merged commit is what it caught up with",
   },
   {
     name: "the parent is offered whatever it still has conflicted",
@@ -1593,20 +1611,20 @@ export const mutations: readonly Mutation[] = [
     expect: "the owner's three stay the host's alone",
   },
   {
-    name: "a take moves a bookmark that is not below the offer",
+    name: "an offer integration moves a bookmark that is not below the offer",
     file: "packages/rules/offer.ts",
-    from: "  if (destination === undefined || !take.below.has(destination.bookmark))",
+    from: "  if (destination === undefined || !integration.below.has(destination.bookmark))",
     to: "  if (destination === undefined)",
     command: unit,
     expect: "no such destination",
   },
   {
-    name: "a take ignores what it was shown",
+    name: "an offer integration ignores what it was shown",
     file: "packages/rules/offer.ts",
     from: "  if (offerChanged(offer, seen)) return refused(ERR.OFFER_CHANGED)",
     to: "  if (false) return refused(ERR.OFFER_CHANGED)",
     command: unit,
-    expect: "a take of the offer it was shown: another ledger",
+    expect: "an integration of the offer it was shown: another ledger",
   },
   {
     name: "a ledger's start is compared in order",
@@ -1615,15 +1633,15 @@ export const mutations: readonly Mutation[] = [
     to: "  a.length === b.length && a.every((c, i) => b[i] === c)",
     command: unit,
     expect:
-      "a take of the offer it was shown: the same start, in another order",
+      "an integration of the offer it was shown: the same start, in another order",
   },
   {
-    name: "a newly conflicting offer is taken",
+    name: "a newly conflicting offer is integrated",
     file: "packages/rules/offer.ts",
     from: "  (offer.conflicts.length > 0 && !seen.conflicted)",
     to: "  false",
     command: unit,
-    expect: "a take of the offer it was shown: newly conflicting",
+    expect: "an integration of the offer it was shown: newly conflicting",
   },
   {
     name: "every file of an offer is your edit",
@@ -1634,7 +1652,7 @@ export const mutations: readonly Mutation[] = [
     expect: "your edits are its files that @ changes, and only those",
   },
   {
-    name: "a conflicted offer is taken onto the line",
+    name: "a conflicted offer is integrated into the line",
     file: "packages/rules/offer.ts",
     from: "    conflicted: offer.conflicts.length > 0,",
     to: "    conflicted: false,",
@@ -1650,7 +1668,7 @@ export const mutations: readonly Mutation[] = [
     expect: "planDescribeSettle: written only to the commit it was asked for",
   },
   {
-    name: "every file of an untaken offer is your edit when @ moves",
+    name: "every file of an offer not yet integrated is your edit when @ moves",
     file: "packages/rules/offer.ts",
     from: "    .map(r => ({ ...r, yourEdits: r.files.filter(f => editing.has(f)) }))",
     to: "    .map(r => ({ ...r, yourEdits: r.files }))",
@@ -1658,9 +1676,9 @@ export const mutations: readonly Mutation[] = [
     expect: "planYourEdits",
   },
   {
-    name: "a taken offer's record is rewritten when @ moves",
+    name: "an integrated offer's record is rewritten when @ moves",
     file: "packages/rules/offer.ts",
-    from: "    .filter(r => isUntaken(offerStatus(r)))\n",
+    from: "    .filter(r => isNotYetIntegrated(offerStatus(r)))\n",
     to: "",
     command: unit,
     expect: "planYourEdits",

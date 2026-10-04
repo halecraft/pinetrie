@@ -78,7 +78,7 @@ export async function startLaneWork(input: {
   /** Name every lane that has none (`host/names.ts`): a new lane, before its first run. */
   readonly ensureNames: () => Promise<void>
   /**
-   * Whether `line` commands are taken (ADR-0060): they act on the repo as its
+   * Whether `line` commands are accepted (ADR-0060): they act on the repo as its
    * owner, so only on a host that admits no one but this machine.
    */
   readonly lineCommands: boolean
@@ -101,7 +101,7 @@ export async function startLaneWork(input: {
           line: lineConfig,
           lineCommands: input.lineCommands,
           writeValues: writes => input.agent().writeValues(writes),
-          taken: () => setup.refreshBaseSoon(),
+          lineMoved: () => setup.refreshBaseSoon(),
         })
   /** Each lane's offer in your repo (ADR-0038); none without lanes of their own. */
   const offers: Offers | null =
@@ -113,7 +113,7 @@ export async function startLaneWork(input: {
           basics,
           agent: input.agent,
           running: lane => readRunning(basics.live, lane),
-          taken: () => setup.refreshBaseSoon(),
+          bookmarkMoved: () => setup.refreshBaseSoon(),
           lineWork: line,
         })
   const containers = createContainers({

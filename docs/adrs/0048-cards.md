@@ -55,6 +55,8 @@ and card history implemented by `PLAN-2026-10-05-card-history-traces`, with
 *Other people* amended in place (2026-10-05): where history and traces
 live, an unpin treated as an unqueue, "on your screen" as an open column,
 a trace seen as deleted by the host, and the 30-day sweep.
+Amended by ADR-0083: a person *takes a card into the inventory*, and the
+host *pops the next queued card* to send it; "take" alone names neither.
 
 **Context.**
 

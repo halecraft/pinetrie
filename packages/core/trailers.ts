@@ -171,7 +171,7 @@ export const withTrailers = (
  * A message with the offer's ledger (ADR-0060): the lane commit it holds
  * (`Pineta-Source`) and where it starts (`Pineta-Start`, one per commit).
  * Added to the host's trailer paragraph when the message ends in one, else
- * as a paragraph of its own. Taken, the offer keeps them: they say what you
+ * as a paragraph of its own. Integrated, the offer keeps them: they say what you
  * have of the lane, wherever its commit goes.
  */
 export function withLedger(message: string, ledger: OfferLedger): string {
@@ -189,7 +189,7 @@ export function withLedger(message: string, ledger: OfferLedger): string {
  * trailers, then the offer's ledger, in one trailer paragraph. Every revision
  * carries both: the thread's trailer is how the host finds the offer's
  * revisions in your repo, and the ledger names the lane tip the whole offer
- * holds, so a taken stack says you have that tip (ADR-0060).
+ * holds, so an integrated stack says you have that tip (ADR-0060).
  */
 export const offerMessage = (
   message: string,
@@ -231,20 +231,22 @@ export function offerLedger(message: string): OfferLedger | null {
   return { source: commitId(source), start: start.map(commitId) }
 }
 
-// ── a take on the line (ADR-0060, S97) ────────────────────────────────────
+// ── an integrated-offer commit on the line (ADR-0060, S97) ────────────────
 
 /**
- * Every `Pineta-Source` a take's message names, from every paragraph, once
- * each: a squash of two taken offers keeps both ledgers (S77 item 6).
+ * Every `Pineta-Source` an integrated-offer commit's message names, from
+ * every paragraph, once each: a squash of two integrated offers keeps both
+ * ledgers (S77 item 6).
  */
 export const sourcesOf = (message: string): CommitId[] =>
   [...new Set(trailerValues(message, TRAILERS.source))].map(commitId)
 
 /**
- * The lanes a message's takes name with no source (S97): each paragraph
- * carrying `Pineta-Thread` and `Pineta-Lane` but no `Pineta-Source`, as the
- * takes made before offers carried their ledger did. What such a take brought
- * cannot be placed in its lane's history. A turn's commit carries no
+ * The lanes a message's integrated offers name with no source (S97): each
+ * paragraph carrying `Pineta-Thread` and `Pineta-Lane` but no
+ * `Pineta-Source`, as the offers integrated before offers carried their
+ * ledger did. What such an integration brought cannot be placed in its
+ * lane's history. A turn's commit carries no
  * `Pineta-Thread`, so it is never one.
  */
 export function untracedLanes(message: string): LaneName[] {

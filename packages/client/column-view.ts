@@ -43,6 +43,7 @@ import {
   displayName,
   type OfferActivity,
   type OfferButton,
+  type OfferIntegrationDestination,
   type OfferView,
   offerStatus,
   offerView,
@@ -51,7 +52,6 @@ import {
   parentNow,
   pinnedDiff,
   pinnedReads,
-  type TakeDestination,
 } from "@pineta/rules"
 import type { OfferActing } from "@pineta/session"
 import { commandWords } from "./card-words.ts"
@@ -263,7 +263,7 @@ export type WorkStrip =
       readonly waiting: boolean
       readonly bookmark: string | null
       readonly review: ReviewTarget | null
-      /** Where `take` and `take-line` go (ADR-0060). */
+      /** Where `integrate` and `integrate-into-line` go (ADR-0060). */
       readonly destinations: OfferView["destinations"]
     }
   | {
@@ -664,7 +664,7 @@ export const runWords = (
   run.kind === "stop"
     ? {
         label: "Stop",
-        title: "end the agent's turn here; cards queued are then taken",
+        title: "end the agent's turn here; cards queued are then sent",
         className: "stop",
       }
     : {
@@ -677,7 +677,11 @@ export const runWords = (
 const BUTTON_LABEL: Record<
   Exclude<
     OfferButton,
-    "take" | "take-line" | "update" | "continue" | "catch-up-parent"
+    | "integrate"
+    | "integrate-into-line"
+    | "update"
+    | "continue"
+    | "catch-up-parent"
   >,
   string
 > = {
@@ -687,14 +691,14 @@ const BUTTON_LABEL: Record<
   refresh: "refresh (discards your edits)",
 }
 
-/** A take's destination as a base, to be named by `catchUpName`. */
-const destinationBase = (d: TakeDestination) =>
+/** An offer integration's destination as a base, to be named by `catchUpName`. */
+const destinationBase = (d: OfferIntegrationDestination) =>
   d.kind === "line"
     ? ({ kind: "line" } as const)
     : ({ kind: "wip", bookmark: d.bookmark } as const)
 
 /** What an offer command in flight says, until the host answers. */
-const SENDING: Record<Exclude<OfferActing["action"], "take">, string> = {
+const SENDING: Record<Exclude<OfferActing["action"], "integrate">, string> = {
   split: "splitting into a stack…",
   squash: "squashing to one…",
   describe: "rewriting the description…",
@@ -702,7 +706,7 @@ const SENDING: Record<Exclude<OfferActing["action"], "take">, string> = {
 }
 
 /**
- * Your last offer command, worded: a take in flight names where it adds
+ * Your last offer command, worded: an integration in flight names where it adds
  * ("adding to the project…"), the rest their own words; a refusal or a
  * failure as every command's (`outcomeWords`).
  */
@@ -712,7 +716,7 @@ function actingWords(
 ): string | null {
   if (acting === null) return null
   if (acting.kind !== "sent") return outcomeWords(acting)
-  if (acting.action !== "take") return SENDING[acting.action]
+  if (acting.action !== "integrate") return SENDING[acting.action]
   const to = destinations.find(d => d.bookmark === acting.to) ?? destinations[0]
   return `adding to ${catchUpName(to === undefined ? { kind: "line" } : destinationBase(to))}…`
 }
@@ -758,8 +762,8 @@ export function offerWords(
             : facts.activity === "resolution"
               ? `resolving ${base}'s new work into this thread`
               : "splitting the offer into a stack"
-          : state === "taken"
-            ? `added as ${(facts.taken ?? "").slice(0, 8)}`
+          : state === "integrated"
+            ? `added as ${(facts.integratedAs ?? "").slice(0, 8)}`
             : state === "needs_you"
               ? "the agent has a question about your edits · see the thread"
               : state === "edited"
@@ -777,12 +781,12 @@ export function offerWords(
       : said
   const [first] = view.destinations
   const toLine = view.destinations.find(d => d.kind === "line")
-  /** The bookmark a take moves, and to what: the jj facts, as a title. */
+  /** The bookmark an integration moves, and to what: the jj facts, as a title. */
   const moves = (bookmark: string) =>
     facts.bookmark === null
       ? undefined
       : `moves ${bookmark} forward to ${facts.bookmark}`
-  const take = (): string => {
+  const integrateLabel = (): string => {
     const where =
       first === undefined ? "" : ` to ${catchUpName(destinationBase(first))}`
     return state === "stack"
@@ -797,13 +801,13 @@ export function offerWords(
     facts.base.kind === "line" ? facts.onto : facts.base.bookmark
   const labelled = (button: OfferButton): LabelledButton => {
     switch (button) {
-      case "take":
+      case "integrate":
         return {
           button,
-          label: take(),
+          label: integrateLabel(),
           ...titled(first === undefined ? undefined : moves(first.bookmark)),
         }
-      case "take-line":
+      case "integrate-into-line":
         return {
           button,
           label:

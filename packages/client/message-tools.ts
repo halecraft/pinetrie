@@ -36,9 +36,9 @@ export interface MessageTools {
   readonly copy: boolean
   /**
    * Take a copy into your inventory (ADR-0048): what copy offers, where the
-   * column can be written. Built on a press too (`takeText`).
+   * column can be written. Built on a press too (`copyIntoInventoryText`).
    */
-  readonly take: boolean
+  readonly takeCopyIntoInventory: boolean
   /** Send it again: a sibling at its parent, or a root's first message in a new tab. */
   readonly edit: Extract<MessageAct, { kind: "branch" | "newTab" }> | undefined
   /** `→`: a branch at the message. */
@@ -67,7 +67,11 @@ export type MessageAct =
    * Take a copy of the message's text, or of your selection in it, into your
    * inventory as a new card, `card` (ADR-0048: taking from the past copies).
    */
-  | { readonly kind: "takeCopy"; readonly card: CardId; readonly text: string }
+  | {
+      readonly kind: "takeCopyIntoInventory"
+      readonly card: CardId
+      readonly text: string
+    }
 
 export function messageTools(
   node: TranscriptMessage,
@@ -83,10 +87,15 @@ export function messageTools(
   // Copying only reads, so a column that can't be written offers it too.
   const copy = node.text !== "" || (node.toolCalls?.length ?? 0) > 0
   if (!at.writable)
-    return { copy, take: false, edit: undefined, branch: undefined }
+    return {
+      copy,
+      takeCopyIntoInventory: false,
+      edit: undefined,
+      branch: undefined,
+    }
   return {
     copy,
-    take: copy,
+    takeCopyIntoInventory: copy,
     edit: node.role === "chat" ? editOf(node, at.parentId) : undefined,
     // Below a conversation's last message, a branch would be the same as
     // replying. Agent work follows its lane, so there a branch at the end is

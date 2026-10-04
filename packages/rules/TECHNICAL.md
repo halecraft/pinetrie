@@ -165,10 +165,10 @@ are the only code that builds or reads the shape.
   | plain | `appendToTree` at the end | `appendToLane` | `busy` |
   | compelled `reply`, not raced | `createAndRun` at the end | `run` | `conflict` |
   | compelled `reply`, raced | `conflict` | `conflict` | `conflict` |
-  | `queue` (the host's take) | as `reply` | as `reply` | as `reply` when only cards are queued; `busy` while it runs |
+  | `queue` (the host's pop) | as `reply` | as `reply` | as `reply` when only cards are queued; `busy` while it runs |
 
   `busy` writes nothing: the dispatcher queues the chat's card in the same step, and answers `queued` (ADR-0059).
-  `queue` is the host's own mode (`PlanMode`; a client sends a `ChatMode`), for a card it takes, which heads the queue
+  `queue` is the host's own mode (`PlanMode`; a client sends a `ChatMode`), for a card it pops, which heads the queue
   it is in: so only a run makes the lane busy, and a race does not count.
   | `branch` | plain: `appendToTree` at `at`; compelled: `createAndRun` at `at` | the same: a branch never continues a lane | the same |
 
@@ -250,7 +250,7 @@ are the only code that builds or reads the shape.
 What you type is a card. Its text is a `TextDoc`, written by clients; its
 record is in the places document (`PlacesDoc` in `@pineta/schema`), which
 only the host writes. This module decodes a record, decides where a card
-sits, which moves the host accepts, which queued card is taken next, and
+sits, which moves the host accepts, which queued card is popped next, and
 which are swept.
 
 - **The stored record is flat strings**, "" for none (`encodeCard`,
@@ -284,8 +284,8 @@ which are swept.
 - **An inventory is its holder's alone** (`ownsPlace`): a move into or out
   of someone else's is refused `not-yours`, checked on both ends, and a
   move into yours `full` once it holds `INVENTORY_SLOTS` cards, the card
-  itself not counted. A creation obeys both. A taken card keeps its owner:
-  a take moves its place, not who wrote it.
+  itself not counted. A creation obeys both. A card taken into the
+  inventory keeps its owner: the take moves its place, not who wrote it.
 - **A fresh column's first send carries its other cards**
   (`planFreshFollow`): each card fresh in the sent card's column goes to
   drafting at the message the send wrote, when that message is in the
@@ -335,9 +335,9 @@ which are swept.
   a lane's queued cards by `order`, then id. `orderAfter` keys are
   fixed-width base-36 integers, started mid-range and stepped, so string
   order is numeric order and there is room before and between. Only the
-  host assigns them now (`planMove`). `planTake` takes nothing while the
-  lane runs, else its top card. `planUnsent` is the step a refused take
-  writes back: drafting where it was queued, saying why, never queued.
+  host assigns them now (`planMove`). `planNextQueuedCardPop` pops nothing
+  while the lane runs, else its top card. `planUnsent` is the step a
+  refused pop writes back: drafting where it was queued, saying why, never queued.
 - **`planCardSweep`**: records whose text is empty and that carry no
   command, and stored `card:` documents with no record, a spent or empty
   card's among them.
@@ -369,7 +369,8 @@ read is dropped, not its history.
   - **A trace whose card is back at its `from`** is deleted.
   - Histories keep `HISTORY_EVENTS` (50): the first event and the newest.
 - **`verbOf(from, to)`** is the one rule for what a change is called: sent,
-  queued, unqueued, pinned, unpinned, took, put, moved or created. The
+  queued, unqueued, pinned, unpinned, took-into-inventory, put, moved or
+  created. The
   page's words read it; nothing stores a verb.
 - **`movedBackBy`**: who unqueued or unpinned a card, when that is the last
   thing that happened to it and it was not its owner.
@@ -428,7 +429,7 @@ is hidden and made read-only, never removed, and restoring keeps the record.
   (`apps/pineta/host/commands/index.ts`); `sendChat` needs no copy, since
   only the `chat` command calls it. No card moves into an archived root,
   a fresh column's included (ADR-0066); a command on a card writes nowhere,
-  and the take's own gate stops a card with one.
+  and the pop's own gate stops a card with one.
 - **Yjs writes are not refused for archiving.** A card's text in an archived
   root stays writable to the host's policy (a refused write cannot be
   recovered from, S28); the composer there is read-only.
@@ -639,7 +640,7 @@ repo. Its record is `OFFER` (`offer.ts`):
 
 | record | namespace | key | written |
 |---|---|---|---|
-| a lane's offer in your repo | `pineta.offer` | the lane | when a trigger changed it, or it was taken |
+| a lane's offer in your repo | `pineta.offer` | the lane | when a trigger changed it, or it was integrated |
 
 What the host decides about it is `offer.ts`'s, from the facts
 `@pineta/repo` gathers, as decisions typed in `@pineta/core`
@@ -660,7 +661,7 @@ commit-message request `request.ts` (`describeRequest`).
   holds it (`OfferInRepo`); for an untraced start or a thread whose root is
   archived (ADR-0061), the offer alone. Each decision carries what its
   steps need: `build` (none: never built,
-  taken, or gone), `follow` (the lane, or where the offer starts, moved under a single
+  integrated, or gone), `follow` (the lane, or where the offer starts, moved under a single
   offer: updated in place, ADR-0039), `withdraw` (where it starts reached the
   tip, the lane's work changes no file, its start is untraced and the host
   made it, or the thread is archived, edited or not), `forget` (no offer and none to build: a record left from one
@@ -670,7 +671,7 @@ commit-message request `request.ts` (`describeRequest`).
   edited, or one divergent, which nothing touches until the lane catches up
   (a gap ADR-0067's untraced start leaves). Only work known to change a file, from a known
   start, is built (ADR-0067): one built from less would be empty, or bring
-  back what you took, and withdrawn after a build it would be built again on
+  back what you integrated, and withdrawn after a build it would be built again on
   the next poll. `unknown` keeps an offer that is there, and builds none. Where it starts is compared as a set
   (`sameStart`): a merge's parents come in any order. `follow` is not `update`, which is "update from
   my work" (`planUpdate`). An offer is edited (`offerEdited`) when its
@@ -687,23 +688,24 @@ commit-message request `request.ts` (`describeRequest`).
   `@` changes), described (its first line no longer the WIP line), edited,
   stale (a stack whose lane moved past its ledger), its bookmark (as the
   gather found it) and its commits. **`planYourEdits`**: only `@` moved, so
-  each untaken record's `yourEdits` is rewritten from one shared read.
-- **`planOfferTake`** decides a take from the offer read in its own command
-  and what only a take reads (`TakeFacts`: the WIP's commits above the line,
+  each record not yet integrated has its `yourEdits` rewritten from one
+  shared read.
+- **`planOfferIntegration`** decides an offer integration from the offer
+  read in its own command and what only an integration reads (`OfferIntegrationFacts`: the WIP's commits above the line,
   and which bookmarks sit below the offer). Refused, in this order: no
   offer (`no_offer`), a WIP gone (`bad_destination`), nothing shown
   (`offer_changed`), a divergent offer (`no_offer`), other work than was
   shown or a new conflict (`offer_changed`, ADR-0065), and a destination
   that is not one of the offer's or not below it (`bad_destination`). Its
-  destinations are `takeDestinations`': the thread's WIP, then the line,
+  destinations are `offerIntegrationDestinations`': the thread's WIP, then the line,
   with how many of the WIP's commits land along. A conflicted offer never
   lands on the line: the line is immutable, and the conflict would stay in
-  its history. A gone WIP has none. An untraced place can be taken: a take
-  moves a bookmark and needs no start.
+  its history. A gone WIP has none. An untraced place can be integrated: an
+  integration moves a bookmark and needs no start.
 - **`planStackEnded`**: a split's stack replaces the offer only when its
   top has exactly the tip's files (`acceptStack`, private), built at the
   offer's place from the stack's own start and tip, which its ledger names;
-  an untraced place takes it. **`planRebuild`**, for squash and refresh,
+  an untraced place accepts it. **`planRebuild`**, for squash and refresh,
   rebuilds from the lane's tip as one revision on its WIP line, from a known
   start only. Both are a `Rebuild`, as a build is, with the thread's name.
 - **`describeWanted`** says an offer is one to ask a message for: one
@@ -714,14 +716,14 @@ commit-message request `request.ts` (`describeRequest`).
   without one). **`planDescribeAgain`** refuses `describe` without a named
   offer.
 - **`offerStatus`** decodes a `pineta.offer` record once (ADR-0067): `none`,
-  `taken`, `held` or `open`. Every reader on the page switches on it, never
+  `integrated`, `held` or `open`. Every reader on the page switches on it, never
   on the record's fields: the strip, the header's activity badge and the tab's Archive
   item (`openOffers`, client), and the review read (`planOfferRead`). An
-  untaken record with no files that you did not edit is `held`: its work is
+  record not yet integrated, with no files, that you did not edit is `held`: its work is
   already where it sits, by a route the ledger does not record (S89), so
-  nothing counts it, warns about it, reviews it or takes it. One you edited
+  nothing counts it, warns about it, reviews it or integrates it. One you edited
   is `open` whatever its files.
-  The host's untaken records, open or held, are `isUntaken`: the lanes it
+  The host's records not yet integrated, open or held, are `isNotYetIntegrated`: the lanes it
   marks on a full observation, and the records `@` rewrites.
 - **An offer's record is the page's cache** (ADR-0060): written from the
   repo after each of the host's steps, never read back to decide. Its
@@ -754,21 +756,21 @@ commit-message request `request.ts` (`describeRequest`).
   else `work` (ADR-0072).
 - **`parentNow`** (`line.ts`) is the thread a lane branched from, read from
   the document alone: `forkParent` (core) names it and the fork commit; its
-  newest commit is the nearest above its thread's end; what the lane took
-  is the newest of the parent's commits that an update or land message
+  newest commit is the nearest above its thread's end; what the lane last
+  caught up with (`caughtUpWith`) is the newest of the parent's commits that an update or land message
   below the lane's first prompt merged (`TranscriptMessage.merged`), else
   the fork commit. A lane's commits only move forward, so the parent is
   ahead when the two differ (`parentAhead`). `planParentUpdate` merges its
   newest commit, or nothing, or refuses `no_parent` and `parent_running`.
 - **`catchUpOf`** (`line.ts`) says what catching up would do, from `pineta.base` and
-  the line's record: `current` (the base has not moved since the lane took
-  from it, or no line is set up), `unknown` (it moved, and the host's
-  `catchUp` was not read at the commit it is at now; or there is no
+  the line's record: `current` (the base has not moved since the lane last
+  caught up with it, or no line is set up), `unknown` (it moved, and the
+  host's `catchUp` was not read at the commit it is at now; or there is no
   `pineta.base` at all: the host has never read the lane, as for a lane
   whose turns never committed, so never reached your repo), `nothing-new`
-  (it moved by work the lane holds, as after you took its own offer) or
-  `brings`, with the file count and the move, the one kind that carries it.
-  `catchUpOf` owns those checks; the commit comparison under them
+  (it moved by work the lane holds, as after you integrated its own offer)
+  or `brings`, with the file count and the move, the one kind that carries
+  it. `catchUpOf` owns those checks; the commit comparison under them
   (`baseMoved`) is private to it.
 - **`catchUpName`** (`line.ts`) is the one wording of what a catch-up
   merges (`CatchUpFrom`): "the project" for the line, the bookmark for a
@@ -804,13 +806,13 @@ commit-message request `request.ts` (`describeRequest`).
 
 | record | namespace | key | written |
 |---|---|---|---|
-| the integration line: its commit, the WIP bookmarks above it, your `@-` against it, and whether this host takes `line` commands | `pineta.line` | `line` | when your repo's operation head moves |
-| a lane's base, as its newest `Pineta-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced takes (S97) | `pineta.base` | the lane | when a refresh reads the lane |
+| the integration line: its commit, the WIP bookmarks above it, your `@-` against it, and whether this host accepts `line` commands | `pineta.line` | `line` | when your repo's operation head moves |
+| a lane's base, as its newest `Pineta-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced integrated-offer commits (S97) | `pineta.base` | the lane | when a refresh reads the lane |
 
 - **`planLineRecord`** is the line's record from what the host read
   (`LineFacts`), beside what setting the line up would write to your
   repo's config, which `@pineta/repo` words (`lineProposal`: jj's config
-  text), and whether this host takes `line` commands.
+  text), and whether this host accepts `line` commands.
 - **`planLineAction`** decides a `line` command from the record read in
   its own step (`LineDecision`): refused on a host that admits others
   (`not_yours`), with no line (`no_line`), or with nothing to do

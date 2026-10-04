@@ -1,5 +1,5 @@
 // host/work/update — a thread's base, or the thread it branched from,
-// merged into its lane, when the host takes a card with a command
+// merged into its lane, when the host pops a queued card with a command
 // (ADR-0055, ADR-0060, ADR-0072), and the resolution run's outcome when it
 // conflicts (ADR-0033). One step on the lane's queue gathers, plans and merges; then
 // `planSettle` decides what the thread gets, and `applySettle` writes it.
@@ -100,7 +100,7 @@ export function reasonOf(index: TreeIndex, description: string): string {
 }
 
 /**
- * What taking an update's card comes to (ADR-0055): the update written in
+ * What popping an update's card comes to (ADR-0055): the update written in
  * the thread, a resolution run's prompt, nothing new, or why not.
  */
 export type Prepared =

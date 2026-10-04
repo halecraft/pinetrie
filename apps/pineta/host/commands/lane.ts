@@ -174,14 +174,14 @@ export async function actOnOffer(
   const refused = await offers.act(lane, action, by, to, seen)
   if (refused !== null)
     return { kind: "refused", code: refused, message: offerRefusal(refused) }
-  return action === "take" ? { kind: "taken" } : { kind: "offered" }
+  return action === "integrate" ? { kind: "integrated" } : { kind: "offered" }
 }
 
 /** Why an offer action was refused, worded once. */
 export function offerRefusal(code: ErrCode): string {
   switch (code) {
     case ERR.BAD_DESTINATION:
-      return "the offer cannot be taken there now: a conflicted offer goes only into a WIP, and the destination must sit below it"
+      return "the offer cannot be added there now: a conflicted offer goes only into a WIP, and the destination must sit below it"
     case ERR.OFFER_CHANGED:
       return "the offer changed since you looked at it: review it again"
     default:

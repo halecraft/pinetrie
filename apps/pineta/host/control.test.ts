@@ -82,10 +82,10 @@ test("one seat's command held open holds no other seat's", async () => {
   const done: string[] = []
   const held = Promise.withResolvers<void>()
   const send = seats(async (_sender, writer, wire) => {
-    if (wire.id === "take") await held.promise
+    if (wire.id === "slow") await held.promise
     done.push(`${writer} ${wire.id}`)
   })
-  send("seat-1", ["take", "after"])
+  send("seat-1", ["slow", "after"])
   send("seat-2", ["chat"])
   await new Promise(r => setTimeout(r, 20))
   expect(done).toEqual(["w-bea@example.com chat"])
@@ -93,7 +93,7 @@ test("one seat's command held open holds no other seat's", async () => {
   await new Promise(r => setTimeout(r, 20))
   expect(done).toEqual([
     "w-bea@example.com chat",
-    "w-ada@example.com take",
+    "w-ada@example.com slow",
     "w-ada@example.com after",
   ])
 })

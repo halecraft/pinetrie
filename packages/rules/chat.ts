@@ -331,7 +331,7 @@ export type ChatDecision =
    * client queues its card behind them (ADR-0048).
    */
   | { readonly kind: "busy" }
-  /** Another writer took the slot. Nothing is written; the sender chooses. */
+  /** Another writer wrote at the slot first. Nothing is written; the sender chooses. */
   | { readonly kind: "conflict"; readonly by: WriterId | null }
   /** Nothing is written: a `/package:name` that names no command. */
   | Refusal
@@ -388,7 +388,7 @@ export function addressChat(input: {
  * - A compelled `reply` that another writer raced, or that finds the lane busy,
  *   is a conflict: the sender chooses to queue or to branch. Plain chat never
  *   conflicts.
- * - `queue` is the host taking a queued card: it is the queue's turn, so
+ * - `queue` is the host popping a queued card: it is the queue's turn, so
  *   only a run makes the lane busy.
  */
 export function planChat(input: {

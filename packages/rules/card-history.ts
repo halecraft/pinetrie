@@ -152,7 +152,7 @@ export type Verb =
   | "unqueued"
   | "pinned"
   | "unpinned"
-  | "took"
+  | "took-into-inventory"
   | "put"
   | "moved"
 
@@ -191,7 +191,7 @@ export function verbOf(from: PlaceKey | null, to: PlaceKey | null): Verb {
   if (back !== null) return back
   if (to.kind === "queued") return "queued"
   if (to.kind === "pinned") return "pinned"
-  if (to.kind === "inventory") return "took"
+  if (to.kind === "inventory") return "took-into-inventory"
   if (from.kind === "inventory") return "put"
   return "moved"
 }
@@ -225,7 +225,7 @@ export type Cause =
       readonly message: EntryId | null
     }
   | { readonly kind: "queued-busy"; readonly by: WriterId }
-  /** The host's own write: a take, an unsent card, followers, a sweep. */
+  /** The host's own write: a popped queued card, an unsent card, followers, a sweep. */
   | { readonly kind: "host" }
 
 /** A write to one of the two records, or its removal. */

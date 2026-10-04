@@ -60,11 +60,11 @@ export interface LaneRow {
   readonly base: boolean
   /** The newest line commit in the lane's history. */
   readonly line: boolean
-  /** In the history of that `base` commit: a taken source here is the base's already. */
+  /** In the history of that `base` commit: an integrated source here is the base's already. */
   readonly underBase: boolean
-  /** One of the taken commits the shared facts list. */
-  readonly taken: boolean
-  /** A take of this lane that names no source (`SharedFacts.untraced`). */
+  /** One of the integrated-offer commits the shared facts list. */
+  readonly integrated: boolean
+  /** An integrated-offer commit of this lane that names no source (`SharedFacts.untraced`). */
   readonly untraced: boolean
   readonly divergent: boolean
   readonly conflict: boolean
@@ -78,8 +78,8 @@ function laneRead(input: {
   readonly lane: LaneName
   readonly name: ThreadName | undefined
   readonly line: LineConfig
-  readonly taken: readonly CommitId[]
-  /** The takes of this lane that name no source. */
+  readonly integratedOfferCommits: readonly CommitId[]
+  /** The integrated-offer commits of this lane that name no source. */
   readonly untraced: readonly CommitId[]
 }): readonly string[] {
   const tip = `present(${laneTipName(input.lane)})`
@@ -91,10 +91,10 @@ function laneRead(input: {
       ? "none()"
       : `present(${bookmarkRevset(offerBookmark(input.name))})`
   const region = `(::${bookmark} ~ ::${onto})`
-  const taken =
-    input.taken.length === 0
+  const integrated =
+    input.integratedOfferCommits.length === 0
       ? "none()"
-      : `(${input.taken.map(c => `present(${c})`).join(" | ")})`
+      : `(${input.integratedOfferCommits.map(c => `present(${c})`).join(" | ")})`
   const untraced =
     input.untraced.length === 0
       ? "none()"
@@ -105,7 +105,7 @@ function laneRead(input: {
     "log",
     "--no-graph",
     "-r",
-    `${tip} | ${based} | ${line} | ${region} | ((${taken} | ${untraced}) ~ ::${based})`,
+    `${tip} | ${based} | ${line} | ${region} | ((${integrated} | ${untraced}) ~ ::${based})`,
     "-T",
     [
       'commit_id ++ "\\t" ++ change_id ++ "\\t"',
@@ -116,7 +116,7 @@ function laneRead(input: {
       flag("B", based),
       flag("L", line),
       flag("U", `::${based}`),
-      flag("K", taken),
+      flag("K", integrated),
       flag("X", untraced),
       'if(divergent, "D") ++ if(conflict, "C") ++ "\\t"',
       `if(self.contained_in(${JSON.stringify(region)}), "[" ++ self.diff().files().map(|f| json(f.path())).join(",") ++ "]", "[]") ++ "\\t"`,
@@ -143,7 +143,7 @@ function parseLaneRows(stdout: string): LaneRow[] {
       base: flags.includes("B"),
       line: flags.includes("L"),
       underBase: flags.includes("U"),
-      taken: flags.includes("K"),
+      integrated: flags.includes("K"),
       untraced: flags.includes("X"),
       divergent: flags.includes("D"),
       conflict: flags.includes("C"),
@@ -164,9 +164,10 @@ export type LanePlan =
       readonly tip: CommitId
       readonly base: LaneBase
       /**
-       * Where the offer starts, when no taken source above the base names
-       * more than the base's own start; else the sources to start from too;
-       * or `untraced`, when a take of this lane above the base names none.
+       * Where the offer starts, when no integrated source above the base
+       * names more than the base's own start; else the sources to start from
+       * too; or `untraced`, when an integrated-offer commit of this lane
+       * above the base names none.
        */
       readonly start:
         | StartRead
@@ -201,7 +202,7 @@ export function planLaneRead(
   input: {
     readonly name: ThreadName | undefined
     readonly line: LineConfig
-    readonly taken: SharedFacts["taken"]
+    readonly integratedOfferCommits: SharedFacts["integratedOfferCommits"]
   },
 ): LanePlan {
   const tip = rows.find(r => r.tip)
@@ -223,16 +224,21 @@ export function planLaneRead(
   }
   const untraced = rows.filter(r => r.untraced && !r.underBase)
   const applying = new Set(
-    rows.filter(r => r.taken && !r.underBase).map(r => r.commit),
+    rows.filter(r => r.integrated && !r.underBase).map(r => r.commit),
   )
   const sources = [
     ...new Set(
-      input.taken.filter(t => applying.has(t.commit)).flatMap(t => t.sources),
+      input.integratedOfferCommits
+        .filter(t => applying.has(t.commit))
+        .flatMap(t => t.sources),
     ),
   ]
   const start =
     untraced.length > 0
-      ? { kind: "untraced" as const, takes: untraced.map(r => r.commit) }
+      ? {
+          kind: "untraced" as const,
+          integratedOfferCommits: untraced.map(r => r.commit),
+        }
       : sources.length === 0
         ? { kind: "known" as const, start: [base.start] }
         : { kind: "read" as const, sources }
@@ -301,7 +307,7 @@ export interface LaneGather {
 /**
  * One lane's refresh facts: one `jj log`, then each revision's evolog
  * (`sinceHost`), and only when the rows cannot say it, where the offer
- * starts (taken sources above its base), a stack's files, and the top's
+ * starts (integrated sources above its base), a stack's files, and the top's
  * conflicted files; whether the lane's work changes any file, unless its
  * start is untraced; and, once the line has moved past its base, what
  * catching up would change, unless `known` says it at the same tip and line.
@@ -325,7 +331,9 @@ export async function gatherLane(
       lane: input.lane,
       name: input.name,
       line: input.line,
-      taken: input.shared.taken.map(t => t.commit),
+      integratedOfferCommits: input.shared.integratedOfferCommits.map(
+        t => t.commit,
+      ),
       untraced: input.shared.untraced
         .filter(u => u.lanes.includes(input.lane))
         .map(u => u.commit),
@@ -335,7 +343,7 @@ export async function gatherLane(
   const planned = planLaneRead(parseLaneRows(ran.stdout), {
     name: input.name,
     line: input.line,
-    taken: input.shared.taken,
+    integratedOfferCommits: input.shared.integratedOfferCommits,
   })
   if (planned.kind !== "line") return planned.kind
   const { tip, base } = planned

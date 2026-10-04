@@ -233,7 +233,7 @@ export interface Agent extends CommandFiles, Banners {
   readonly modelLabel: string
   /**
    * Create a thread's lane at `spot`, in its root, named `lane` (the host
-   * decides the id, ADR-0057). Refused `lane_taken` for an id pi holds.
+   * decides the id, ADR-0057). Refused `lane_id_in_use` for an id pi holds.
    */
   createThreadLane(spot: Spot, lane: LaneName): Promise<CreateOutcome>
   /** A thread's lane, in the root its record names. */

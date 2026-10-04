@@ -37,7 +37,7 @@ const offer: OfferRecord = {
   described: true,
   edited: false,
   bookmark: "pineta-offer/t-1",
-  taken: null,
+  integratedAs: null,
   commits: [commitId("w1")],
   ledger: null,
   at: 10,
@@ -77,8 +77,8 @@ describe("the review (ADR-0047)", () => {
     // A commit the offer no longer is, and one it never was.
     expect(status(offers, "w1")).toBe(404)
     expect(status(offers, "ffff")).toBe(404)
-    const taken = new Map([[LANE, { ...open, taken: "t" }]])
-    expect(status(taken, C1)).toBe(404)
+    const integrated = new Map([[LANE, { ...open, integratedAs: "t" }]])
+    expect(status(integrated, C1)).toBe(404)
     // One the line already holds brings nothing to review.
     const held = new Map([[LANE, { ...open, files: [] }]])
     expect(status(held, C1)).toBe(404)

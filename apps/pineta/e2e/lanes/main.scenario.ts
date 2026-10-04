@@ -488,7 +488,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       `${left} left`,
     )
 
-    // ── 6. Offers: the thread's work as one commit you take (ADR-0038) ────
+    // ── 6. Offers: the thread's work as one commit you integrate (ADR-0038) ─
     const offerOf = () =>
       two === undefined ? undefined : readOffers(wh.session).get(two.name)
     const defaultLog = () =>
@@ -579,7 +579,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         .filter((l, i, all) => l !== all[i - 1])
     // You change the same line, commit, land it on the line, and keep
     // editing: the offer follows the line and shows the conflict before you
-    // take it (ADR-0060).
+    // integrate it (ADR-0060).
     writeFileSync(path.join(project, "shared.txt"), "one\ntwo (you)\nthree\n")
     jj(project, "commit", "-m", "you edit line two")
     const landed = await wu.line("land")
@@ -597,7 +597,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     // until you say otherwise: jj rebases the offer, not the host, whose next
     // trigger plans `none` and writes nothing to your repo. The record's
     // `commits` names the offer as it is now, which is what a review reads
-    // (ADR-0047). The first line stays, for the take below.
+    // (ADR-0047). The first line stays, for the integration below.
     // Landing moved every open offer: their writes are done first.
     await wh.quiet()
     const commitsBefore = JSON.stringify(offerOf()?.commits)
@@ -727,7 +727,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         history.length % 2 === 0,
       `${JSON.stringify(history)}`,
     )
-    // Take: the line moves forward to the offer, which stays one commit on
+    // Integrate: the line moves forward to the offer, which stays one commit on
     // your landed one; your working copy is untouched (ADR-0060).
     const atBefore = jj(
       project,
@@ -738,8 +738,10 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       "-T",
       "commit_id",
     )
-    const taken =
-      two === undefined ? null : await wu.offer(two.name, "take", "pineta-onto")
+    const integrated =
+      two === undefined
+        ? null
+        : await wu.offer(two.name, "integrate", "pineta-onto")
     const lineLog = jj(
       project,
       "log",
@@ -750,8 +752,8 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       'description.first_line() ++ "\n"',
     )
     check(
-      "taking the offer moves the line to it, on your landed commit; your working copy is untouched",
-      taken?.kind === "taken" &&
+      "integrating the offer moves the line to it, on your landed commit; your working copy is untouched",
+      integrated?.kind === "integrated" &&
         lineLog === "offer: scripted\nyou edit line two\n" &&
         jj(project, "log", "--no-graph", "-r", "@", "-T", "commit_id") ===
           atBefore &&
@@ -759,7 +761,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
           "one\ntwo (you)\nthree\n" &&
         readFileSync(path.join(project, "still-editing.txt"), "utf8") ===
           "wip\n",
-      `${JSON.stringify(taken)}, line: ${lineLog}`,
+      `${JSON.stringify(integrated)}, line: ${lineLog}`,
     )
     // The next turn's offer holds only what came after.
     script.use([
@@ -776,18 +778,18 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     await idle()
     const next = await waitFor(
       () =>
-        offerOf()?.taken === null &&
+        offerOf()?.integratedAs === null &&
         JSON.stringify(offerOf()?.files) === JSON.stringify(["after.txt"]),
       30_000,
     )
     check(
-      "after a take, the next offer holds only the new work",
+      "after an integration, the next offer holds only the new work",
       next >= 0,
       `${JSON.stringify(offerOf()?.files)}`,
     )
     // A clean update: a fact in the thread, then the card's text, sent. Your
     // work goes on the line first: "update my files" rebases it onto what you
-    // took, as you, after the line's record previews it (ADR-0061); then it
+    // integrated, as you, after the line's record previews it (ADR-0061); then it
     // is landed.
     writeFileSync(path.join(project, "yours.txt"), "yours\n")
     jj(project, "commit", "-m", "you add yours.txt")
@@ -973,9 +975,10 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       `${seenUnsaved.join(" | ").slice(0, 80)}`,
     )
 
-    // A branch's offer holds its parent's work you lack, with its own. Taking
-    // the parent's shrinks it to its own, in place; taking a branch that holds
-    // all of its parent's withdraws the parent's (ADR-0039).
+    // A branch's offer holds its parent's work you lack, with its own.
+    // Integrating the parent's shrinks it to its own, in place; integrating a
+    // branch that holds all of its parent's withdraws the parent's
+    // (ADR-0039).
     const offerFor = (lane: LaneName | undefined) =>
       lane === undefined ? undefined : readOffers(wh.session).get(lane)
     const filesOf = (lane: LaneName | undefined) =>
@@ -1008,14 +1011,14 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     }
     const branchA = await branchWriting("@agent branch a", "branch-a.txt")
     const aBefore = { files: filesOf(branchA), change: changeOf(branchA) }
-    await wu.offer(lane2 ?? ("" as LaneName), "take", "pineta-onto")
+    await wu.offer(lane2 ?? ("" as LaneName), "integrate", "pineta-onto")
     const shrunk = await waitFor(
       () => filesOf(branchA) === JSON.stringify(["branch-a.txt"]),
       30_000,
     )
     await wh.quiet()
     check(
-      "taking a parent's offer shrinks its branch's offer to its own work, in place",
+      "integrating a parent's offer shrinks its branch's offer to its own work, in place",
       aBefore.files === JSON.stringify(["after.txt", "branch-a.txt"]) &&
         shrunk >= 0 &&
         changeOf(branchA) === aBefore.change,
@@ -1036,15 +1039,15 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     await waitFor(() => offerOf()?.files.includes("more.txt") === true, 30_000)
     const branchB = await branchWriting("@agent branch b", "branch-b.txt")
     await wh.quiet()
-    const takenB = await wu.offer(
+    const integratedB = await wu.offer(
       branchB ?? ("" as LaneName),
-      "take",
+      "integrate",
       "pineta-onto",
     )
     const withdrawn = await waitFor(() => offerOf() === undefined, 30_000)
     check(
-      "taking a branch that holds all its parent's work withdraws the parent's offer: no record, no bookmark",
-      takenB.kind === "taken" &&
+      "integrating a branch that holds all its parent's work withdraws the parent's offer: no record, no bookmark",
+      integratedB.kind === "integrated" &&
         withdrawn >= 0 &&
         jj(
           project,
@@ -1055,7 +1058,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
           "-T",
           "commit_id",
         ) === "",
-      `${JSON.stringify({ takenB, parent: offerOf()?.files })}`,
+      `${JSON.stringify({ integratedB, parent: offerOf()?.files })}`,
     )
 
     // ── 7. Archiving keeps each lane's newest snapshot; restoring runs again ─
@@ -1078,7 +1081,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       .filter(o => {
         const tip = laneTip(o.lane)
         return (
-          o.taken === null &&
+          o.integratedAs === null &&
           rootOne !== null &&
           tip !== null &&
           rootOf(tree(), tip) === rootOne
