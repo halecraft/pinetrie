@@ -1,4 +1,4 @@
-// client/inventory-slots — your inventory document's slots, repaired from
+// session/inventory-slots — your inventory document's slots, repaired from
 // the host's record (ADR-0059, S76, S79). Runs in a browser and in Node
 // alike: it touches only the Exchange and the clock.
 //

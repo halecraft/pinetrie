@@ -10,7 +10,8 @@ The end-to-end suites, each a directory of scenarios:
 
 They share `checks.ts` (recording a check, and stopping at one),
 `scenario.ts` (choosing, skipping and running scenarios) and `harness.ts`
-(waiting, `idleNow`, throwaway projects, joining a host, `withHost`, the scripted model,
+(waiting, `idleNow`, throwaway projects, joining a host through `@pineta/session`'s
+`connectSession`, `withHost`, the scripted model,
 `containerProblem`). A suite's own helpers are beside its scenarios:
 `host/support.ts`, `lanes/support.ts`, `browser/page.ts`.
 

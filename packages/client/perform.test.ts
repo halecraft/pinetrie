@@ -7,8 +7,8 @@ import {
   writerId,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
+import type { MoveAnswer, MoveHow } from "@pineta/session"
 import { expect, test, vi } from "vitest"
-import type { MoveAnswer, MoveHow } from "./card-moves.ts"
 import { TEST_ROOT } from "./fixtures.ts"
 import type { Effect } from "./intent.ts"
 import { type AppPorts, perform } from "./perform.ts"
@@ -177,7 +177,7 @@ test("a keep is one move of every card, and closes its column only once accepted
   const moves = [
     { move, slot: 1 },
     { move: { ...move, card: cardId("d") }, slot: 2 },
-  ]
+  ] as const
   const actedAt = { kind: "column", key: "f" } as const
   const keep: Effect = { kind: "keep", moves, actedAt, close: [close] }
   const p = ports()

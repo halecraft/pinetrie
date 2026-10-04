@@ -86,6 +86,24 @@ test("reads declares only core, schema and rules: no pi, no transport", () => {
   ])
 })
 
+test("session declares only Kyneta's exchange and WebSocket transport, core, protocol, reads, rules and schema: no React", () => {
+  // It runs unchanged in a browser and in Node: the page draws from it, and
+  // the suites drive a host through it. Declaring no React, it cannot draw.
+  assert.deepEqual(deps(read("packages/session")).sort(), [
+    "@kyneta/changefeed",
+    "@kyneta/exchange",
+    "@kyneta/machine",
+    "@kyneta/schema",
+    "@kyneta/transport",
+    "@kyneta/websocket-transport",
+    "@pineta/core",
+    "@pineta/protocol",
+    "@pineta/reads",
+    "@pineta/rules",
+    "@pineta/schema",
+  ])
+})
+
 test("lanes declares only core: it runs container, jj and git, never pi or the document", () => {
   assert.deepEqual(deps(read("packages/lanes")), ["@pineta/core"])
 })

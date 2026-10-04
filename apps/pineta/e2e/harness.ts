@@ -13,11 +13,6 @@ import path from "node:path"
 import { NotAWriterError } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import {
-  type ConnectOptions,
-  connectSession,
-  type SessionClient,
-} from "@pineta/client/session"
-import {
   type CardId,
   type CardRecord,
   draftingOf,
@@ -52,6 +47,11 @@ import {
   type SessionDocHandle,
   type StoredEntryRow,
 } from "@pineta/schema"
+import {
+  type ConnectOptions,
+  connectSession,
+  type SessionClient,
+} from "@pineta/session"
 import {
   type RunningHost,
   type StartHostOptions,

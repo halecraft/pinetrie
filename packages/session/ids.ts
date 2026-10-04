@@ -1,4 +1,4 @@
-// client/ids — ids this client mints: uuidv7, so they sort oldest first and
+// session/ids — ids this client mints: uuidv7, so they sort oldest first and
 // no two writers mint one key (ADR-0016).
 
 import {

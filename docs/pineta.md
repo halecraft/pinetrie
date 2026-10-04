@@ -121,11 +121,12 @@ packages/reads/        @pineta/reads        document reads shared by host and cl
 packages/lanes/        @pineta/lanes        a lane's container and disk, and jj and git in it (ADR-0032–0034)
 packages/keeper/       @pineta/keeper       declares NOTHING; one step at a time on a resource
 packages/repo/         @pineta/repo         your repo: reads, steps, the owner (ADR-0038, 0060, 0065)
+packages/session/      @pineta/session      one client's connection to a host; no React
 packages/client/       @pineta/client       browser UI; owns its Vite build
 (root)                                      development tooling only
 ```
 
-Dependency direction is physical: **core → schema, protocol → pi, client → app**.
+Dependency direction is physical: **core → schema, protocol → pi, session → client → app**.
 The root declares only tooling, so a package can import only what it declares.
 
 ---
@@ -554,7 +555,7 @@ parameter properties, or decorators.
 ## 6. What to do next
 
 **The stack is complete.** `packages/client/app.tsx` is React, rendering from the same
-Exchange `connectSession` already owns (handed to `ExchangeProvider`), so Node
+Exchange `connectSession` (`@pineta/session`) already owns (handed to `ExchangeProvider`), so Node
 and browser still share one connection story and `e2e` drives the real thing.
 Hook names, verified against source: **`useTracked(thunk)`** for a derived
 read — *not* `useValue`, which takes a `CallableRef`; `useDocStatus` returns the

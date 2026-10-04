@@ -27,6 +27,7 @@
     "@pineta/repo": "workspace:*",
     "@pineta/rules": "workspace:*",
     "@pineta/schema": "workspace:*",
+    "@pineta/session": "workspace:*",
     "vite": "7.1.11",
     "ws": "^8.18.0"
   },

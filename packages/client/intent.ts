@@ -27,6 +27,15 @@ import {
   type WriterId,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
+import {
+  type ActedAt,
+  type CardRefusal,
+  type HostRequest,
+  IN_COLUMN,
+  type MoveHow,
+  type SlotMove,
+  type Slots,
+} from "@pineta/session"
 import type { Density } from "./ask-words.ts"
 import {
   afterUndo,
@@ -42,15 +51,8 @@ import {
   planUnpin,
   queueMove,
 } from "./card-intents.ts"
-import {
-  type ActedAt,
-  IN_COLUMN,
-  type MoveHow,
-  type Refusal,
-} from "./card-moves.ts"
 import type { Pending, Prefill, ReaderAction } from "./columns.ts"
 import type { Identity, NameStep } from "./identity.ts"
-import type { Slots } from "./inventory.ts"
 import {
   type ActiveTab,
   type Layout,
@@ -59,7 +61,6 @@ import {
 } from "./layout.ts"
 import type { MessageAct } from "./message-tools.ts"
 import type { ComposerPlaces, PutTarget } from "./put-target.ts"
-import type { HostRequest } from "./session-view.ts"
 
 /** What a reader asks of one column. A message's acts are among them. */
 export type ColumnAct =
@@ -223,10 +224,8 @@ export type Effect =
    */
   | {
       readonly kind: "keep"
-      readonly moves: readonly {
-        readonly move: Move
-        readonly slot: number | null
-      }[]
+      /** At least one: a keep with no card left closes at once (`planKeep`). */
+      readonly moves: readonly [SlotMove, ...SlotMove[]]
       readonly actedAt: ActedAt
       readonly close: readonly Effect[]
     }
@@ -239,7 +238,7 @@ export type Effect =
   /** Undo or redo this tab's newest swap in your inventory. */
   | { readonly kind: "undoSwap"; readonly direction: MoveDirection }
   /** Keep a refusal made before anything was sent. */
-  | { readonly kind: "refuse"; readonly refusal: Refusal }
+  | { readonly kind: "refuse"; readonly refusal: CardRefusal }
   /** Open the inventory; `brief`: only for a take's flight, if it was closed. */
   | { readonly kind: "showInventory"; readonly brief: boolean }
   | { readonly kind: "select"; readonly slot: number }

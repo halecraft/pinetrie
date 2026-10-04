@@ -1,4 +1,4 @@
-// client/store — a value that changes, and who hears it: the shape
+// session/store — a value that changes, and who hears it: the shape
 // `useSyncExternalStore` reads.
 
 export interface SnapshotStore<T> {

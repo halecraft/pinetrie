@@ -6,7 +6,6 @@ import { execFileSync } from "node:child_process"
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import type { SessionClient } from "@pineta/client/session"
 import {
   ancestry,
   atEntry,
@@ -22,6 +21,7 @@ import {
 import { scriptedModel } from "@pineta/pi"
 import { readLaneRecords, readPlaces } from "@pineta/reads"
 import { rowMessage } from "@pineta/schema"
+import type { SessionClient } from "@pineta/session"
 import {
   committedProject,
   entriesOf,

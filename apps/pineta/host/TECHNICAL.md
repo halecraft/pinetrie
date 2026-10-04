@@ -263,7 +263,7 @@ rejects `shutdown()`.
 - **Every write to the places goes through `applyPlaceSteps`** (`places.ts`):
   every record in one batch, then `rev` raised in a batch of its own. A
   client draws a move it sent until its copy reaches the `rev` the reply
-  carried (`packages/client/card-moves.ts`), so a write that skipped `rev`
+  carried (`packages/session/card-moves.ts`), so a write that skipped `rev`
   would leave a move drawn over a record that had changed. `rev` stays out
   of the records' batch because that batch may be an undo step, and a value
   every later write changes would refuse every whole undo of it (S82).
@@ -294,7 +294,7 @@ rejects `shutdown()`.
   session and the places only the host; an inventory its person, and the
   host, which relays it between that person's tabs (Kyneta judges the
   sender, not the author). The host registers it beside `hostPolicy`, and
-  `connectSession` on every client, so a client's write to a document it
+  `connectSession` (`@pineta/session`) on every client, so a client's write to a document it
   may not write throws before it is made, rather than forking its copy
   (S28, S76). `hostPolicy` keeps what is the host's alone: which peers may
   hold a document, and which writes it takes from presence and cards.

@@ -9,9 +9,9 @@
 
 import { subscribe } from "@kyneta/schema"
 import type { CardId, CardRecord } from "@pineta/core"
+import type { SessionClient } from "@pineta/session"
 import { useEffect, useState } from "react"
 import { holdsText, withFilled } from "./card-marks.ts"
-import type { SessionClient } from "./session-view.ts"
 
 /**
  * The ids of `mine` whose text holds something typed (`holdsText`). A card's

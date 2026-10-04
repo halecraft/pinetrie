@@ -16,6 +16,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
+import type { SessionClient } from "@pineta/session"
 import { useMemo, useState, useSyncExternalStore } from "react"
 import {
   type ActivitySection,
@@ -44,7 +45,6 @@ import {
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, nameFor } from "./presence.tsx"
 import { type Me, Profile } from "./profile.tsx"
-import type { SessionClient } from "./session-view.ts"
 import type { InboxView } from "./use-inbox.ts"
 import { useReadingAt, useReadingRoots } from "./use-presence.ts"
 

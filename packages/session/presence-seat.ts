@@ -1,4 +1,4 @@
-// client/presence-seat — what this seat says about where it is (ADR-0024,
+// session/presence-seat — what this seat says about where it is (ADR-0024,
 // ADR-0037). Runs in a browser and in Node alike: it touches only the
 // Exchange.
 //

@@ -26,8 +26,8 @@ import {
   offerView,
   type ParentNow,
 } from "@pineta/rules"
+import type { OfferActing } from "@pineta/session"
 import { describe, expect, test } from "vitest"
-import type { OfferActing } from "./acting.ts"
 import {
   behindMark,
   type ColumnFacts,

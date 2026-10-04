@@ -1,7 +1,9 @@
 # `@pineta/client` — technical notes
 
 The browser interface: a tab per root, each a rail beside a strip of columns
-(`docs/06-interface.md`, ADR-0029). Everything drawn is a read of the session
+(`docs/06-interface.md`, ADR-0029). Its connection to the host is
+`@pineta/session` (`packages/session/TECHNICAL.md`), which declares no React:
+this package draws and words, and decides what the page asks the session for. Everything drawn is a read of the session
 document through `@pineta/reads` and `projection.ts`; the only state kept here
 is the layout (which tab you are on, and each root's columns), kept per
 browser tab. What is typed is a card (ADR-0048): a document of its own,
@@ -14,14 +16,9 @@ written by this client, and kept on its thread.
   preview. `SessionClient.holdRoots` opens what is new and `destroy`s what
   is not, which leaves the host's copy (S86). A root this client starts is
   held from its first send until the page asks for it, and after that only
-  while the page does. `planHold` (`held-roots.ts`, pure) decides what
-  opens and goes; `rootDocs` (`root-docs.ts`) carries it out.
-- **It declines every other root.** Kyneta takes in every announced document
-  whose schema a client knows, and every root's is the session's, so a
-  `canShare` policy refuses a `root:` document the client does not want.
-  Kyneta asks it as `get` opens a document, and not again, so `rootDocs`
-  records a root as `wanted` before it calls `get` (S86): a root allowed
-  only after would be opened and never asked for.
+  while the page does. What opens and goes, and why every other root is
+  declined, is the session's (`planHold`, `root-hold.ts`, and `rootDocs`,
+  `packages/session/TECHNICAL.md`).
 - **Every cross-root fact comes from the directory** (`readRoots`): the tab
   bar's labels and summaries (`summariesOf`, `firstLinesOf`, `labelsOf`), the
   Archive tab's rows, `prune`'s known roots, the inbox's mentions, the
@@ -743,10 +740,9 @@ became of its files (`strip`).
   the strip was drawn from, and sends `offerSeen` of it (its ledger, and
   whether it conflicted). The host refuses the take `offer_changed` when the
   offer now brings other work.
-- **Your offer and line commands are tracked per tab** (`acting.ts`).
-  `SessionClient.offer` and `.line` go through `sendActing`, which marks
-  the command `sent` in the session's `acting` store at once and records
-  the answer when it comes; `nextActing` decides. A refusal or failure
+- **Your offer and line commands are tracked per tab** (`acting.ts`,
+  `@pineta/session`): `SessionClient.offer` and `.line` mark the command
+  `sent` at once and record the answer when it comes. A refusal or failure
   stays until your next command on that lane (or the line); an answer that
   carried it out (`taken`, `offered`, a split's `started`, `line-moved`)
   clears it, since the record then says how things stand. Each send has an
@@ -854,7 +850,7 @@ became of its files (`strip`).
 - **The thread to come is named before the send** (ADR-0057). `headLane` is
   the lane the header names and draws the banner of: the thread's, or the
   column's reserved one while `createsLane`. `columnView` decides the
-  `reserve` step: `mint` a lane id (`newLaneName`, `ids.ts`) for a column
+  `reserve` step: `mint` a lane id (`newLaneName`, `@pineta/session`) for a column
   with none, `ask` the host to name it, else `none`. `Column` carries it out
   in an effect keyed on the step. Asking again (a remount, StrictMode) is
   harmless: the host does nothing for an id it has named.
@@ -1499,77 +1495,29 @@ pipeline keeps the tree a pure function, testable without a DOM.
   colour, class `initial`. `Avatar` is an `Initial` with class `avatar`,
   which means a person shown here (Gotchas).
 
-## The session's parts (`session-view.ts`)
+## The session (`@pineta/session`)
 
-`connectSession` connects, builds its parts, and subscribes them to each
-other. Each part is a small shell with nothing in it specific to the browser
-or to Node, so the e2e suites run the same code the page does. Its decisions
-are pure functions beside it.
-
-| part | owns | decides with |
-|---|---|---|
-| `rootDocs` (`root-docs.ts`) | the roots held, the `pineta.roots` policy | `planHold` |
-| `cardTexts` (`card-texts.ts`) | each card's text, and the copies to destroy | `hostLetGo`, `spentCards` |
-| one `snapshotStore<LocalState>` | the host's records, this tab's moves, the cards drawn | `localStep` |
-| `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `takeWrites`, `swapWrites` |
-| `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
-| `hostLine` (`host-line.ts`) | the requests waiting for their replies | `encodeIntent`, `decodeReply` |
-
-- **Order matters to Kyneta.** `writersPolicy` is registered before the
-  transport is ready, and `rootDocs` registers its `canShare` policy before
-  any root's `get` (S86). The inventory repairs only once the host's copy
-  has reached this one (`readyFor`).
-- **A request waiting when the host leaves, or when the client closes, is
-  answered `failed`** (`settleAll`): a client does not reconnect, so it
-  would otherwise wait for good. Failed, not refused: the host may have
-  acted on it.
-- **`close` lets go of each part on its own**, so one that throws stops no
-  other; the last clears this seat's typing. Then it shuts the Exchange
-  down.
+The page's one connection to a host is `SessionClient`, from
+`@pineta/session`; its parts, and the order they are made in, are in
+`packages/session/TECHNICAL.md`. `main.tsx` connects and hands its
+`exchange` to `ExchangeProvider`, so React renders from the same connection.
 
 ## Drafting cards (ADR-0048)
 
 What you type is a card: a record in the places document, which only the
 host writes (ADR-0059), and a `TextDoc` of its own (`session.cardText`),
-which this client writes. The page reads the records as `session.cards`, a
-snapshot store; it never holds the places document itself. `connectSession`
-registers `writersPolicy` (`@pineta/protocol/writers`), so a write to the
-places, the session or someone else's inventory throws before it is made.
+which this client writes. The page reads the records as `session.cards`; how
+the session sends moves and draws them until its copy holds them
+(`card-moves.ts`), and when it destroys a spent card's copy, is in
+`packages/session/TECHNICAL.md`.
 
-- **Every move is a request to the host**: creating a card (its text in one
-  undo step, then a `move` from nowhere, then its command), queueing,
-  unqueueing, discarding, and setting a command. The host applies each in
-  arrival order or refuses it.
 - **A move is planned once.** `planIntent` builds each `Move` with core's
   `moveOf` (an unqueue's target is `draftingOf`, a queue's root
-  `queueRoot`), from the cards as drawn. `SessionClient.moveCard` changes
-  it in one way only: a move into a queue gets its text's version as this
-  client has it as it is sent (`stampSeen`, S96).
-- **The tab's moves are one pure reducer** (`card-moves.ts`, `movesStep`):
-  sent, answered, the copy changed, the host left. `localStep` holds it
-  with the host's records and the cards drawn from the two, in one store, so
-  a change to the places moves the `rev` and the drawn cards together and
-  tells each listener once. `withPending` draws each
-  move the copy does not yet hold over the host's records, so a move shows
-  at once. An accepted move stays drawn until the copy's `rev` reaches the
-  one its reply carried: the reply and the change to the places reach the tab
-  separately, in either order, and a move can be overtaken (taken, moved
-  back) before the copy catches up. Dropped at the reply, the card would
-  jump back and a new card would leave its editor; dropped when the card
-  looks moved, an overtaken move would be drawn for good. With nothing drawn,
-  `withPending` returns the host's records array itself.
-- **A send is a move of its card**: out of the composer until the copy holds
-  what the host did with it, spent or queued. Without it, the composer's
-  `yourCard` finds the card still drafting at the thread's end between the
-  reply and the change, and takes it back.
-- **Refusals are values** (`Refusal`, kept by `movesStep` until your next
-  move where you acted), worded by `refusalWords`: an unqueue the take beat
-  says "already sent", a move someone made first names them. Each move
-  carries where you were looking when you made it (`ActedAt`: a column's
-  key, or the inventory), and its refusal is drawn there: a column draws
-  its own, and the panel the inventory's.
-- **The store** is `snapshotStore` (`store.ts`): a new value tells its
-  listeners, the same value does not, as `useSyncExternalStore` needs.
+  `queueRoot`), from the cards as drawn, and the session sends it.
+- **Refusals are worded here** (`refusalWords`), from the session's
+  `CardRefusal`: an unqueue the take beat says "already sent", a move
+  someone made first names them. A column draws its own, and the panel the
+  inventory's.
 
 - **Where the column's cards are.** `Column` resolves its thread's end with
   `threadOf`, as a reply would go, and finds your card there with `yourCard`
@@ -1621,25 +1569,12 @@ places, the session or someone else's inventory throws before it is made.
 - **A card gone while bound** (someone else sent it) detaches the box. Gone
   counts only once the card was seen in the records: a card just created is
   not there until the records redraw.
-- **Undo** is the tab's Kyneta stack (`session.undo`, `createUndoStack`), in
-  memory, over every `card:` document. A box undoes
-  only its own card (ADR-0052): `attach` sends Cmd+Z, Cmd+Shift+Z and Ctrl+Y
-  to `session.undoFor(card)`, which passes Kyneta the card's text document
-  (`undo({ docs })`), so it takes that card's newest step even under newer
-  steps in other cards. `SessionClient` exposes only `undoFor`: the stack's
-  own `undo()` takes its top step, which can be anywhere.
-  Creating a card is one step with its first text, so undoing past it empties
+- **Undo** in a box reaches only its card (ADR-0052): `attach` sends Cmd+Z,
+  Cmd+Shift+Z and Ctrl+Y to `session.undoFor(card)` (the session's notes say
+  how). Creating a card is one step with its first text, so undoing past it empties
   the card; its record, which only the host writes, stays, so the box stays
   bound to it, and Cmd+Shift+Z there brings the text back. Typing is grouped
   by word.
-- **A card the host spent is destroyed on every client holding it** (S64),
-  so no step on it stands, and no undo or redo in its box can write into it.
-  The host's `dismiss` leaves a receiver's copy, so `cardTexts`
-  (`card-texts.ts`) watches each card document `cardText` opens, the client's one opener of
-  them: `hostLetGo` says the host left it while connected, and `spentCards`
-  destroys the copy once the record is gone too. The two arrive in either
-  order, and a copy whose record is live is never destroyed: a render could
-  still read its text and make a new, empty copy.
 - **The editor's unmount clears its binding's handle** as well as detaching:
   StrictMode mounts twice, and a stale handle leaves the second mount
   unbound.
@@ -1674,7 +1609,7 @@ stays in view; the strip scrolls past 30vh.
   comparison the host plans a run's entry from, so the strip and the run
   agree on what the agent read. A card with no text yet has none.
 - **"+ pin" opens a box at the strip's end** that makes a pinned card. It
-  is a `CardEditor` whose `place` is pinned (`drawnPlace(pinnedOf(…))`):
+  is a `CardEditor` whose `place` is pinned (`drawnPlace(pinnedOf(…))`, `@pineta/session`):
   the composer's create-on-first-keystroke rule, and the same element goes
   on editing the card, so nothing typed between the create and the binding
   is lost, which a hand-over to a `PinnedCardEditor` would. It never sends:
@@ -1688,9 +1623,9 @@ stays in view; the strip scrolls past 30vh.
   or drop, and the CSS shows `.pinned-strip[data-empty]` then. An empty strip
   that always took room moved where a column shown again puts its reader.
 - **A send carries the pinned cards' versions.** `Column` puts the strip's
-  card ids in `how.pinned`, and `chatIntent` stamps each with its version as
-  this client has it (`versionOf`, `session-view.ts`, the one reading of
-  "the version I had", as a queue's `seen` is); the run waits for them.
+  card ids in `how.pinned`, and the session sends each with its version as
+  this client has it (`versionOf`, `@pineta/session`); the run waits for
+  them.
 - **The marker above a run's prompt** is `pinnedMarkers(index, nodes)`,
   computed in `MessageList` from the index: a node whose parent is a cards
   entry gets `pinnedMarker(entry, pinnedInView(index, parentOf(entry)))`.
@@ -1746,34 +1681,22 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
 selected card whole beside it (`BoundCardEditor`). Open or closed is `App`'s
 state, never stored.
 
-- **Two layers.** The host's records say which cards are in your inventory
-  (`CardPlace` `inventory`, `heldBy`); your inventory document
-  (`inventory:<you>`, `InventoryDoc`) says which slot holds each. The
-  session opens it and repairs it on every change (`inventory-slots.ts`,
-  `repairStep`: `steadiness`, then `planSlots`).
-- **`settleSlots` is the one slot rule** (`inventory.ts`): the panel draws
-  it (`inventoryView`), the repair writes towards it, and a take lands by the
-  same `firstEmpty`: the selected slot if empty, else the first empty.
-  `App` computes it once, with the takes in flight as intents
-  (`intentsOf`), and both the panel and the intents read that.
-- **The repair waits for a card to be steady** (`steadiness`, S79): it
-  places a card, or clears its slot, only once the card has been held, or
-  not, for `STEADY_MS`, and looks again then. It reads the host's records,
-  not the drawn ones, so a put in flight keeps its slot until accepted.
-  It writes nothing when nothing differs.
-- **A take's slot is written at the answer** (`slotOnAccept`, then
-  `takeWrites`), before the answer is recorded: if the
-  places reached the tab first, the answer drops the pending move at once,
-  and a repair in between would place the card in the first empty slot.
-  Until then the pending move's `slot` is an intent: drawn there, and left
-  alone by the repair.
+- **Two layers**: the host's records say which cards are in your
+  inventory, and your inventory document which slot holds each. The session
+  keeps the slots and repairs them (`packages/session/TECHNICAL.md`, "Your
+  inventory's slots").
+- **`settleSlots` is the one slot rule** (`@pineta/session`): the panel
+  draws it (`inventoryView`, `inventory-view.ts`), the session's repair
+  writes towards it, and a take lands by the same `firstEmpty`. `App`
+  computes it once, with the takes in flight as intents (`intentsOf`), and
+  both the panel and the intents read that.
 - **The history of moves is the host's** (ADR-0066): one per person and
   root, which the host chooses for each move (`historyOf`). The page keeps
   none, and names no history when it moves a card. `undoMove` names the
   root of the tab you are on (`planUndoMove`: its `RootId` from the
   directory, `IntentState.rootEntries`, or a new tab's `fresh.root`); the
-  Archive tab has none. The session sends `undo-move` and waits for its copy
-  of the places to reach the reply's `rev`.
+  Archive tab has none. The session sends `undo-move` and answers once its
+  copy of the places reaches the reply's `rev` (`whenRev`).
 - **The answer is planned afresh** (`undoAnswered`, `afterUndo`): each place
   a card went back to, once, brought into view (`revealOf`, `reveal.ts`):
   the panel, a thread's end through `openAt`, a fresh column's tab, or a
@@ -1782,13 +1705,11 @@ state, never stored.
   card where it is now and says who moved it there. An undo shows its place
   as it acts, not before, and flies nothing: the reply comes after the copy
   already has the move.
-- **A swap is undone by this tab's own stack** (`swaps` in
-  `session-view.ts`, key `slots` on the tab's undo document, scope your
-  inventory), while the panel has focus (`keyAct`'s `inPanel`).
-  `swapSlots` writes inside its gesture; the repair writes outside any, so
-  an undo of a swap whose slot the repair changed is refused,
-  `slots-changed` (S90). The text stack, on the same document under
-  `cards`, never takes a swap step.
+- **A swap is undone by this tab's own stack** (the session's `swaps`)
+  while the panel has focus (`keyAct`'s `inPanel`); one whose slot the
+  repair changed since is refused, `slots-changed` (S90).
+- **The grid's keys** step through it by `stepSlot` (`inventory-keys.ts`),
+  stopping at its edges.
 - **A card an undo puts back in your inventory takes its old slot while the
   repair has not cleared it** (`steadiness`), else the first empty one: the
   host knows no slots.
@@ -1879,11 +1800,11 @@ the email is the only thing Pineta chooses.
 - **Not you? Sign in as someone else**, in the profile, clears the stored
   identity and reloads. Every tab subscribes to it, and reloads when another
   clears it or stores another email, so no tab goes on as the old person.
-- **Presence is per seat** (`seatKey(writer, exchange.peerId)`, in
-  `presence-seat.ts`), so your tabs never overwrite or clear each other's;
-  `core/presence.ts` shows each person once, and never you.
-- **The host is found by principal** (`HOST_PRINCIPAL`, `whenPeer`), since
-  its seat is Kyneta's to issue: a Line is addressed by seat.
+- **Presence is per seat** (`presence-seat.ts`, `@pineta/session`), so
+  your tabs never overwrite or clear each other's; `core/presence.ts` shows
+  each person once, and never you.
+- **The host is found by principal** (`@pineta/session`): its seat is
+  Kyneta's to issue.
 
 ## Names
 

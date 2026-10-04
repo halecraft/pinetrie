@@ -15,7 +15,7 @@ import {
   lineActionState,
   lineRefusal,
 } from "@pineta/rules"
-import type { LineActing } from "./acting.ts"
+import type { LineActing } from "@pineta/session"
 import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"
 import { outcomeWords } from "./outcome-words.ts"

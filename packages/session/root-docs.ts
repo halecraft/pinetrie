@@ -1,9 +1,9 @@
-// client/root-docs — the roots' documents this client holds (ADR-0063, S86).
+// session/root-docs — the roots' documents this client holds (ADR-0063, S86).
 // Runs in a browser and in Node alike: it touches only the Exchange.
 //
 // Kyneta takes in every announced document whose schema a client knows, and
 // every root's is the session's, so a `canShare` policy declines each root
-// this client does not hold. `planHold` (`held-roots.ts`) decides what to
+// this client does not hold. `planHold` (`root-hold.ts`) decides what to
 // open and let go of; this module carries it out.
 
 import type { Exchange } from "@kyneta/exchange"
@@ -17,8 +17,8 @@ import {
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
 import { asRootDoc, type RootDocHandle, StorageDoc } from "@pineta/schema"
-import { planHold } from "./held-roots.ts"
 import { newRootId } from "./ids.ts"
+import { planHold } from "./root-hold.ts"
 import { type Readable, readable, snapshotStore } from "./store.ts"
 
 /** A write at an entry in no root this tab holds: refused before it is sent. */

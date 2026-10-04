@@ -1,8 +1,7 @@
-import { type CardRecord, cardId, writerId } from "@pineta/core"
+import { cardId, writerId } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   firstEmpty,
-  inventoryView,
   NO_INTENTS,
   planSlots,
   repairStep,
@@ -10,12 +9,11 @@ import {
   STEADY_MS,
   settleSlots,
   steadiness,
-  stepSlot,
   swapWrites,
   takeWrites,
 } from "./inventory.ts"
 
-const ADA = writerId("ada@x.io")
+const _ADA = writerId("ada@x.io")
 const A = cardId("c-a")
 const B = cardId("c-b")
 const C = cardId("c-c")
@@ -174,58 +172,4 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
     expect(then.writes).toEqual({ set: { "0": A }, clear: [] })
     expect(then.wake).toBeNull()
   })
-})
-
-describe("inventoryView", () => {
-  const record = (id: typeof A): CardRecord => ({
-    id,
-    owner: ADA,
-    placer: ADA,
-    place: { kind: "inventory", holder: ADA },
-    command: null,
-    unsent: null,
-  })
-
-  test("draws exactly settleSlots, with labels 1–9, the selection, and first lines", () => {
-    const held = [record(A), record(B)]
-    const slots = slotsOf({ "10": "c-b" })
-    const view = inventoryView({
-      held,
-      slots,
-      intents: NO_INTENTS,
-      selected: 10,
-      texts: new Map([[B, "\n  plan: ship it\nsecond line"]]),
-    })
-    const drawn = Object.fromEntries(
-      view.slots.flatMap(s =>
-        s.card === null ? [] : [[String(s.index), s.card.id]],
-      ),
-    )
-    expect(drawn).toEqual(
-      settleSlots(
-        held.map(c => c.id),
-        slots,
-        NO_INTENTS,
-      ),
-    )
-    expect(view.slots.map(s => s.label)).toEqual([
-      ..."123456789".split(""),
-      ...Array(9).fill(null),
-    ])
-    expect(view.card?.id).toBe(B)
-    expect(view.slots[10]).toMatchObject({
-      firstLine: "plan: ship it",
-      selected: true,
-    })
-    expect(view.free).toBe(16)
-  })
-})
-
-test("stepSlot moves through the 3 × 6 grid and stops at its edges", () => {
-  expect(stepSlot(0, "left")).toBe(0)
-  expect(stepSlot(0, "right")).toBe(1)
-  expect(stepSlot(5, "right")).toBe(5)
-  expect(stepSlot(1, "down")).toBe(7)
-  expect(stepSlot(13, "down")).toBe(13)
-  expect(stepSlot(7, "up")).toBe(1)
 })

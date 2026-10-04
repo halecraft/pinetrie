@@ -5,6 +5,7 @@
 import { useSelector } from "@kyneta/react"
 import type { ToolCallView, TranscriptMessage } from "@pineta/core"
 import { type LiveDocHandle, readStreamText } from "@pineta/schema"
+import { newCardId } from "@pineta/session"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
 import {
@@ -17,7 +18,6 @@ import { joinWords } from "./column-view.ts"
 import { COPIED, useCopy } from "./copy.ts"
 import { copyText } from "./copy-text.ts"
 import { plural } from "./counts.ts"
-import { newCardId } from "./ids.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 import { MessageText } from "./message-text.tsx"
 import {

@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./session": "./session-view.ts",
     "./identity": "./identity.ts",
     "./send": "./send.ts",
     "./column-view": "./column-view.ts",
@@ -14,21 +13,19 @@
   "scripts": {
     "build": "vite build"
   },
-  "//dependencies": "@kyneta/changefeed, @kyneta/reactive, @kyneta/machine and @kyneta/transport are never imported here. They are PEER dependencies of @kyneta/react and @kyneta/websocket-transport, and pnpm's strict tree requires them declared. Removing them because nothing imports them will break the browser client at resolution time.",
+  "//dependencies": "@kyneta/changefeed and @kyneta/reactive are never imported here. They are PEER dependencies of @kyneta/react, and pnpm's strict tree requires them declared. Removing them because nothing imports them will break the browser client at resolution time.",
   "dependencies": {
     "@kyneta/changefeed": "link:../../../kyneta/workspace/pineta/packages/changefeed",
     "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
-    "@kyneta/machine": "link:../../../kyneta/workspace/pineta/packages/machine",
     "@kyneta/react": "link:../../../kyneta/workspace/pineta/packages/react",
     "@kyneta/reactive": "link:../../../kyneta/workspace/pineta/packages/reactive",
     "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
-    "@kyneta/transport": "link:../../../kyneta/workspace/pineta/packages/transport",
-    "@kyneta/websocket-transport": "link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket",
     "@pineta/core": "workspace:*",
     "@pineta/protocol": "workspace:*",
     "@pineta/reads": "workspace:*",
     "@pineta/rules": "workspace:*",
     "@pineta/schema": "workspace:*",
+    "@pineta/session": "workspace:*",
     "hast-util-to-jsx-runtime": "2.3.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",

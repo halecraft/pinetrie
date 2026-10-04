@@ -6,17 +6,11 @@
 import {
   type Address,
   type CardCommand,
-  type CardId,
   type ChatMode,
-  type Intent,
   isBusy,
-  type LaneName,
   type LineRecord,
-  type Position,
   type ProjectRecord,
   parseMentions,
-  type RootId,
-  type SentCard,
   type ThreadLane,
   type WorkSetting,
   type WriterId,
@@ -28,35 +22,8 @@ import {
   displayName,
   parseCommand,
 } from "@pineta/rules"
+import type { ChatHow } from "@pineta/session"
 import type { Prefill } from "./columns.ts"
-
-/** How a chat is sent: its mode, its column's lane, and its send id. */
-export interface ChatHow {
-  readonly mode?: ChatMode
-  /** The lane the sender's column is bound to. */
-  readonly lane?: LaneName
-  /** A Start Agent column. */
-  readonly asksAgent?: boolean
-  /** Where a lane this send creates works; absent, the lane above's setting (ADR-0032). */
-  readonly work?: WorkSetting
-  /** The send's id, minted by a fresh column so it can find its message. */
-  readonly id?: string
-  /** The card the text is sent from, which the host spends once it is sent. */
-  readonly card?: CardId
-  /**
-   * The cards pinned at the column's thread end: the run waits for each as
-   * this client has it (ADR-0048).
-   */
-  readonly pinned?: readonly CardId[]
-  /** The column it is sent from, where a refusal of its card's move is said. */
-  readonly column?: string
-  /** The lane id the column reserved: what a lane this send creates is called (ADR-0057). */
-  readonly reserved?: LaneName
-  /** The root a new tab minted as it opened: where its first send starts (ADR-0066). */
-  readonly root?: RootId
-  /** The WIP bookmark a lane this send creates starts from; absent, the line (ADR-0060). */
-  readonly base?: string
-}
 
 /** What every send from one column carries, whichever card it is sent from. */
 export type ColumnHow = Pick<
@@ -65,37 +32,6 @@ export type ColumnHow = Pick<
 > & {
   readonly asksAgent: boolean
   readonly column: string
-}
-
-/**
- * A chat as the host is asked for it: `how`'s defaults filled in, and its
- * card and the column's pinned cards each with its text version as this
- * client has it (`versionOf`), which the host waits for (S96).
- */
-export function chatIntent(
-  text: string,
-  at: Position,
-  how: ChatHow,
-  root: RootId,
-  card: CardId | null,
-  versionOf: (card: CardId) => string,
-): Extract<Intent, { kind: "chat" }> {
-  const sent = (id: CardId): SentCard => ({ id, seen: versionOf(id) })
-  return {
-    kind: "chat",
-    text,
-    root,
-    at,
-    mode: how.mode ?? "reply",
-    lane: how.lane ?? null,
-    asksAgent: how.asksAgent === true,
-    mentions: parseMentions(text),
-    work: how.work ?? null,
-    card: card === null ? null : sent(card),
-    pinned: (how.pinned ?? []).map(sent),
-    reserved: how.reserved ?? null,
-    base: how.base ?? null,
-  }
 }
 
 /**

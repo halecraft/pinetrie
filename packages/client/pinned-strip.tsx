@@ -8,6 +8,7 @@
 // strip after; the box it opens is drawn last in the strip.
 
 import type { CardRecord, PinnedView } from "@pineta/core"
+import type { SessionClient } from "@pineta/session"
 import type { ReactElement } from "react"
 import type { ReadOnly } from "./app-view.ts"
 import { PinnedCardEditor } from "./card-editor.tsx"
@@ -15,7 +16,6 @@ import { NEW_PIN, NEW_PIN_TITLE, PINNED_EMPTY } from "./card-words.ts"
 import type { ColumnAct } from "./intent.ts"
 import { dropProps } from "./put-target.ts"
 import type { Reader } from "./send.ts"
-import type { SessionClient } from "./session-view.ts"
 
 export function PinnedStrip(p: {
   session: SessionClient

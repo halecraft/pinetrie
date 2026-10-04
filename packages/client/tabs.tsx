@@ -9,6 +9,7 @@
 
 import { MAX_TITLE, type TreeIndex, type WriterId } from "@pineta/core"
 import { ROOT_BUSY_REASON } from "@pineta/rules"
+import type { SessionClient } from "@pineta/session"
 import {
   type KeyboardEvent,
   useEffect,
@@ -23,7 +24,6 @@ import type { Intent } from "./intent.ts"
 import { Menu } from "./menu.tsx"
 import { Avatars } from "./presence.tsx"
 import { planTitle, renameKey } from "./root-label.ts"
-import type { SessionClient } from "./session-view.ts"
 import { dropsWords, renameIntent, type TabsView } from "./tabs-view.ts"
 import { useReadingAt, useReadingRoots } from "./use-presence.ts"
 

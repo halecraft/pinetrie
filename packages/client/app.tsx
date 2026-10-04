@@ -38,6 +38,13 @@ import {
   readRoots,
 } from "@pineta/reads"
 import {
+  heldBy,
+  intentsOf,
+  newRootId,
+  type SessionClient,
+  settleSlots,
+} from "@pineta/session"
+import {
   type ComponentProps,
   useCallback,
   useEffect,
@@ -60,7 +67,6 @@ import { ArchiveTab } from "./archive.tsx"
 import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
 import { foldMemory } from "./ask-fold.ts"
 import { cardMarks, ownCards } from "./card-marks.ts"
-import { intentsOf } from "./card-moves.ts"
 import { Column, type ColumnProps } from "./column.tsx"
 import {
   type Column as ColumnSpec,
@@ -72,7 +78,6 @@ import { Header } from "./header.tsx"
 import { planHeldRoots, rootEntriesOf } from "./held-roots.ts"
 import { runsHere } from "./here.ts"
 import { type Identity, reconcileName } from "./identity.ts"
-import { newRootId } from "./ids.ts"
 import { type Inbox, mentionsOf } from "./inbox.ts"
 import {
   claimFocus,
@@ -83,7 +88,6 @@ import {
   planIntent,
   readerAction,
 } from "./intent.ts"
-import { heldBy, settleSlots } from "./inventory.ts"
 import type { Dock } from "./inventory-dock.ts"
 import { keyAct } from "./inventory-keys.ts"
 import { InventoryPanel } from "./inventory-panel.tsx"
@@ -116,7 +120,6 @@ import {
   summariesOf,
 } from "./root-label.ts"
 import { screenMemory } from "./screen-memory.ts"
-import type { SessionClient } from "./session-view.ts"
 import type { DeviceState, TabState } from "./tab-state.ts"
 import { TabBar } from "./tabs.tsx"
 import { offeredByRoot, tabsView } from "./tabs-view.ts"

@@ -1,4 +1,4 @@
-// client/acting — your offer and line commands while they are out, and what
+// session/acting — your offer and line commands while they are out, and what
 // the host answered. An entry is `sent` from the click to the reply,
 // then the refusal or failure, until your next command there. An answer that
 // carried the command out clears the entry: the record then says how things
@@ -7,8 +7,13 @@
 
 import type { LaneName, LineAction, OfferAction } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
-import type { Unsuccessful } from "./outcome-words.ts"
 import type { SnapshotStore } from "./store.ts"
+
+/** A command's answer the page says (`outcomeWords`): refused, or failed. */
+export interface Unsuccessful {
+  readonly kind: "refused" | "failed"
+  readonly message: string
+}
 
 /** One command of yours, until your next one on the same thing. */
 export type Acting<A> =
@@ -65,7 +70,7 @@ export interface ActingState {
 export const NO_ACTING: ActingState = { offers: new Map(), line: null }
 
 /** What a command is on: a lane's offer, or the line. */
-export type ActingOn =
+type ActingOn =
   | {
       readonly kind: "offer"
       readonly lane: LaneName
@@ -74,7 +79,7 @@ export type ActingOn =
   | { readonly kind: "line"; readonly event: ActingEvent<LineAction> }
 
 /** Pure: the state after one event. */
-export function actingStep(state: ActingState, on: ActingOn): ActingState {
+function actingStep(state: ActingState, on: ActingOn): ActingState {
   if (on.kind === "line")
     return { ...state, line: nextActing(state.line, on.event) }
   const next = nextActing(state.offers.get(on.lane) ?? null, on.event)

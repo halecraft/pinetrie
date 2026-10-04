@@ -1,22 +1,24 @@
-// client/session-view — connect to a host and expose a renderable view.
+// session/connect — connect to a host and expose what the page and the e2e
+// suites read and send.
 //
-// Runs unmodified in a browser AND in Node (the e2e check), because the only
-// environment-specific value is the WebSocket constructor. No pi.
+// Runs unmodified in a browser and in Node, because the only
+// environment-specific value is the WebSocket constructor. No pi, no React.
 //
 // `connectSession` connects, then wires its parts to each other: the roots
 // held (`root-docs.ts`), the cards' texts (`card-texts.ts`), this tab's moves
 // over the host's records (`localStep`), your inventory's slots
 // (`inventory-slots.ts`), this seat's presence (`presence-seat.ts`), and the
 // requests to the host (`host-line.ts`). Each part's decisions are pure
-// functions: `planHold`, `localStep`, `repairStep`, `chatIntent`.
+// functions: `planHold` (`root-hold.ts`), `localStep`, `repairStep`,
+// `planChatRequest` (`chat.ts`).
 
 import {
   createUndoStack,
   Exchange,
   type Undone,
+  type UndoStack,
   whenPeer,
 } from "@kyneta/exchange"
-import type { UndoTarget } from "@kyneta/react"
 import { type CommitOptions, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 import {
@@ -29,7 +31,6 @@ import {
   type LineAction,
   type Move,
   type MoveDirection,
-  moveOf,
   type OfferAction,
   type Position,
   type RootId,
@@ -54,6 +55,7 @@ import {
   LiveDoc,
   type LiveDocHandle,
   PlacesDoc,
+  type PlacesDocHandle,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
@@ -68,8 +70,8 @@ import {
   type ActedAt,
   AT_INVENTORY,
   answerOf,
+  type CardRefusal,
   cardOfPending,
-  IN_COLUMN,
   intentsOf,
   type LocalEvent,
   type LocalState,
@@ -81,17 +83,17 @@ import {
   OFF_PAGE,
   type Pending,
   pendingOf,
-  type Refusal,
+  type SlotMove,
   slotOnAccept,
   stampSeen,
 } from "./card-moves.ts"
 import { cardTexts } from "./card-texts.ts"
+import { type ChatHow, planChatRequest } from "./chat.ts"
 import { hostLine } from "./host-line.ts"
 import { heldBy, type Slots, swapWrites } from "./inventory.ts"
 import { inventorySlots } from "./inventory-slots.ts"
 import { presenceSeat } from "./presence-seat.ts"
 import { NO_ROOT, rootDocs } from "./root-docs.ts"
-import { type ChatHow, chatIntent } from "./send.ts"
 import { type Readable, readable, select, snapshotStore } from "./store.ts"
 
 /**
@@ -225,7 +227,7 @@ export interface SessionClient {
    * whole (a keep, ADR-0066), each with the slot it takes.
    */
   moveCards(
-    moves: readonly { readonly move: Move; readonly slot: number | null }[],
+    moves: readonly [SlotMove, ...SlotMove[]],
     actedAt: ActedAt,
   ): Promise<MoveAnswer>
   /**
@@ -244,7 +246,7 @@ export interface SessionClient {
    */
   undoSwap(direction: MoveDirection): Promise<void>
   /** Keep a refusal: one made before anything was sent, or an undo's. */
-  refuse(refusal: Refusal): void
+  refuse(refusal: CardRefusal): void
   /** This tab's moves: in flight and refused (`card-moves.ts`). */
   readonly moves: Readable<MovesState>
   /**
@@ -277,6 +279,7 @@ export interface SessionClient {
   line(action: LineAction): Promise<Outcome>
   /** Your offer and line commands out now, or refused or failed (`acting.ts`). */
   readonly acting: Readable<ActingState>
+  /** Let go of every part, then shut the exchange down; rejects only when that fails. */
   close(): Promise<void>
 }
 
@@ -284,7 +287,7 @@ export interface SessionClient {
  * What the host is asked for that is neither tracked nor needs a root found:
  * a chat and a move are tracked in `moves`, an undo of moves waits for this
  * tab's copy of the places, an offer action and a line action are tracked
- * in `acting`, and a mark and a retitle need their entry's root.
+ * in `acting`, and a mark and a retitle need their entry's root (`inRootOf`).
  */
 export type HostRequest = Exclude<
   Intent,
@@ -296,8 +299,11 @@ export type HostRequest = Exclude<
 /** A card to create: the session makes you its owner and placer. */
 export type NewCard = Pick<CardRecord, "id" | "place" | "command" | "unsent">
 
-/** One card's undo, as its box binds it, saying what each undo and redo did. */
-export type CardUndo = Omit<UndoTarget, "undo" | "redo"> & {
+/**
+ * One card's undo, as its box binds it (`@kyneta/react`'s `attach`), saying
+ * what each undo and redo did.
+ */
+export type CardUndo = Pick<UndoStack, "typing"> & {
   undo(options?: CommitOptions): Promise<Undone>
   redo(options?: CommitOptions): Promise<Undone>
 }
@@ -398,15 +404,28 @@ export async function connectSession(
     texts.sweep()
   })
   // A client does not reconnect: once the host has gone, nothing this tab
-  // sent will be answered.
+  // sent or sends will be answered. The moves the host accepted are dropped
+  // too (`hostLeft`): no copy of the places will reach their `rev`.
   const unsubscribePeers = exchange.peers.subscribe(() => {
     if (exchange.peers.current.has(host.peerId)) return
     step({ kind: "hostLeft" })
-    line.settleAll("the host left before answering")
+    line.close("the host left")
   })
 
   const send = (intent: Intent): Promise<Outcome> =>
     line.request(intent).then(r => r.outcome)
+
+  /**
+   * Send what names `entry` in the held root that has it; refused before
+   * anything is sent when no held root does.
+   */
+  const inRootOf = (
+    entry: EntryId,
+    intent: (root: RootId) => Intent,
+  ): Promise<Outcome> => {
+    const root = roots.rootOf(entry)
+    return root === undefined ? Promise.resolve(NO_ROOT) : send(intent(root))
+  }
 
   /**
    * Send a request that moves cards: each drawn at once as one of `pending`,
@@ -417,11 +436,10 @@ export async function connectSession(
    */
   function tracked(
     intent: Intent,
-    pending: readonly Pending[],
+    pending: readonly [Pending, ...Pending[]],
     queuedBy: WriterId | null,
   ): Promise<{ readonly outcome: Outcome; readonly answer: MoveAnswer }> {
     const [first] = pending
-    if (first === undefined) throw new Error("a move with no cards")
     step({ kind: "sent", pending })
     return line.request(intent, first.id).then(({ outcome, rev }) => {
       const answer = answerOf(outcome, rev, {
@@ -440,7 +458,9 @@ export async function connectSession(
 
   /**
    * A card's text version as this client has it now: what a queued card's
-   * take, and a run's pinned cards, wait for the host to hold (S96).
+   * take, and a run's pinned cards, wait for the host to hold (S96). It opens
+   * a card's document this client does not hold yet, so it is called while
+   * gathering, never from a plan.
    */
   const versionOf = (id: CardId): string => textVersion(texts.text(id))
 
@@ -492,52 +512,34 @@ export async function connectSession(
       }
     },
     chat(text, at, how = {}) {
-      const card =
+      // gather: the root (minted and held for a send at the root), the card
+      // as drawn, and each card's text version as this client has it.
+      const root = roots.rootFor(at, how.root)
+      if (root === undefined) return Promise.resolve(NO_ROOT)
+      const record =
         how.card === undefined
           ? undefined
           : cards.current().find(c => c.id === how.card)
-      const root = roots.rootFor(at, how.root)
-      if (root === undefined) return Promise.resolve(NO_ROOT)
-      const intent = chatIntent(
+      const plan = planChatRequest({
         text,
         at,
         how,
         root,
-        card?.id ?? null,
-        versionOf,
-      )
-      // A chat's request id is stored as its message's `sendId`.
-      const id = how.id ?? crypto.randomUUID()
-      // A send takes its card out of the composer: drawn gone until the copy
-      // holds what the host did with it, spent or queued.
+        card:
+          record === undefined ? null : { record, seen: versionOf(record.id) },
+        pinned: (how.pinned ?? []).map(id => ({ id, seen: versionOf(id) })),
+        freshId: crypto.randomUUID(),
+      })
       const sent =
-        card === undefined
-          ? line.request(intent, id)
-          : tracked(
-              intent,
-              [
-                pendingOf(
-                  id,
-                  moveOf(card, null),
-                  IN_COLUMN(how.column ?? ""),
-                  null,
-                ),
-              ],
-              null,
-            )
+        plan.pending === null
+          ? line.request(plan.intent, plan.id)
+          : tracked(plan.intent, [plan.pending], null)
       return sent.then(r => r.outcome)
     },
     request: send,
-    mark(entry, title) {
-      const root = roots.rootOf(entry)
-      if (root === undefined) return Promise.resolve(NO_ROOT)
-      return send({ kind: "mark", root, entry, title })
-    },
-    retitle(entry) {
-      const root = roots.rootOf(entry)
-      if (root === undefined) return Promise.resolve(NO_ROOT)
-      return send({ kind: "retitle", root })
-    },
+    mark: (entry, title) =>
+      inRootOf(entry, root => ({ kind: "mark", root, entry, title })),
+    retitle: entry => inRootOf(entry, root => ({ kind: "retitle", root })),
     createCard(card, text, how = OFF_PAGE) {
       undo.gesture(() => {
         texts.text(card.id).text.insert(0, text)
@@ -557,13 +559,12 @@ export async function connectSession(
     },
     moveCards(moves, actedAt) {
       const id = crypto.randomUUID()
-      if (moves.length === 0)
-        return Promise.resolve({ kind: "accepted", rev: places.rev() })
+      const pending = ({ move, slot }: SlotMove) =>
+        pendingOf(id, move, { actedAt, slot }, null)
+      const [first, ...rest] = moves
       return tracked(
         { kind: "move", moves: moves.map(m => m.move) },
-        moves.map(({ move, slot }) =>
-          pendingOf(id, move, { actedAt, slot }, null),
-        ),
+        [pending(first), ...rest.map(pending)],
         null,
       ).then(r => r.answer)
     },
@@ -574,14 +575,7 @@ export async function connectSession(
         direction,
       })
       // Drawn as the host left it: wait for this tab's copy to hold the undo.
-      if (rev !== null && readPlacesRev(places) < rev)
-        await new Promise<void>(resolve => {
-          const stop = subscribe(places, () => {
-            if (readPlacesRev(places) < rev) return
-            stop()
-            resolve()
-          })
-        })
+      if (rev !== null) await whenRev(places, rev)
       return outcome
     },
     swapSlots(a, b) {
@@ -623,7 +617,9 @@ export async function connectSession(
     },
     acting: readable(acting),
     async close() {
-      // Each is let go of on its own, so one that throws stops no other.
+      // Each part is let go of on its own, so one that throws stops no other,
+      // as the host's own shutdown runs its steps; the exchange's shutdown,
+      // last, rejects `close()` when it fails.
       for (const dispose of [
         unsubscribePlaces,
         unsubscribePeers,
@@ -631,17 +627,27 @@ export async function connectSession(
         texts.dispose,
         () => undo.dispose(),
         () => swaps.dispose(),
-        () => line.settleAll("the client closed before the host answered"),
+        () => line.close("the client closed"),
         presence.dispose,
       ])
         try {
           dispose()
         } catch {}
-      try {
-        await exchange.shutdown()
-      } catch {}
+      await exchange.shutdown()
     },
   }
+}
+
+/** Resolves once this copy of the places has reached `rev`. */
+function whenRev(places: PlacesDocHandle, rev: number): Promise<void> {
+  if (readPlacesRev(places) >= rev) return Promise.resolve()
+  return new Promise<void>(resolve => {
+    const stop = subscribe(places, () => {
+      if (readPlacesRev(places) < rev) return
+      stop()
+      resolve()
+    })
+  })
 }
 
 /** `promise`, or a rejection with `message` after `ms`. */

@@ -1,4 +1,4 @@
-// client/card-texts — each card's text document, and the end of this
+// session/card-texts — each card's text document, and the end of this
 // client's copy once the host has spent the card (S64). Runs in a browser and
 // in Node alike: it touches only the Exchange.
 //
@@ -6,13 +6,13 @@
 // it, and then this client's copy is destroyed too, so no step on it stands
 // and no undo or redo in its box can write into it. The host's `dismiss`
 // leaves a receiver's copy in place, so the copy watches for the host to let
-// go of it (`hostLetGo`), and goes once its record has gone too
-// (`spentCards`).
+// go of it, and goes once its record has gone too (`hostLetGo` and
+// `spentCards`, `card-copies.ts`).
 
 import { type Exchange, sync } from "@kyneta/exchange"
 import type { CardId } from "@pineta/core"
 import { cardDocId, TextDoc, type TextDocHandle } from "@pineta/schema"
-import { hostLetGo, spentCards } from "./card-state.ts"
+import { hostLetGo, spentCards } from "./card-copies.ts"
 
 export interface CardTexts {
   /** A card's text: the same document for every caller. */

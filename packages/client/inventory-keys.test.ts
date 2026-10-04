@@ -1,6 +1,11 @@
 import { cardId } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { type KeyFocus, type KeyLike, keyAct } from "./inventory-keys.ts"
+import {
+  type KeyFocus,
+  type KeyLike,
+  keyAct,
+  stepSlot,
+} from "./inventory-keys.ts"
 
 const C1 = cardId("c-1")
 const C2 = cardId("c-2")
@@ -74,4 +79,13 @@ describe("keyAct", () => {
     expect(keyAct(key("l"), focus())).toBeNull()
     expect(keyAct(key("l"), focus({ inPanel: true, inText: true }))).toBeNull()
   })
+})
+
+test("stepSlot moves through the 3 × 6 grid and stops at its edges", () => {
+  expect(stepSlot(0, "left")).toBe(0)
+  expect(stepSlot(0, "right")).toBe(1)
+  expect(stepSlot(5, "right")).toBe(5)
+  expect(stepSlot(1, "down")).toBe(7)
+  expect(stepSlot(13, "down")).toBe(13)
+  expect(stepSlot(7, "up")).toBe(1)
 })

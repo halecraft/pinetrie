@@ -7,9 +7,14 @@
 import { subscribe } from "@kyneta/schema"
 import type { CardId, CardRecord, WriterId } from "@pineta/core"
 import { displayName } from "@pineta/rules"
+import type {
+  CardRefusal,
+  Intents,
+  SessionClient,
+  Slots,
+} from "@pineta/session"
 import { useEffect, useRef, useState } from "react"
 import { BoundCardEditor, dragCard } from "./card-editor.tsx"
-import type { Refusal } from "./card-moves.ts"
 import {
   INVENTORY,
   PUT,
@@ -19,11 +24,10 @@ import {
   refusalWords,
 } from "./card-words.ts"
 import type { Intent } from "./intent.ts"
-import { type Intents, inventoryView, type Slots } from "./inventory.ts"
 import { type Dock, snapTo } from "./inventory-dock.ts"
+import { inventoryView } from "./inventory-view.ts"
 import { dropProps } from "./put-target.ts"
 import type { Reader } from "./send.ts"
-import type { SessionClient } from "./session-view.ts"
 
 /**
  * The text of each card in `ids`, read from its document and kept current.
@@ -64,7 +68,7 @@ export function InventoryPanel(p: {
   selected: number
   dock: Dock
   onDock: (dock: Dock) => void
-  refusals: readonly Refusal[]
+  refusals: readonly CardRefusal[]
   reader: Reader
   colorOf: (writer: WriterId) => string
   /** The column a put lands in: the one last focused, if any. */

@@ -1019,7 +1019,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a client keeps its copy of a spent card",
-    file: "packages/client/card-texts.ts",
+    file: "packages/session/card-texts.ts",
     from: "      void exchange.destroy(cardDocId(id))",
     to: "      void cardDocId(id)",
     suite: "host",
@@ -1029,7 +1029,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a client destroys a card whenever its host's state changes",
-    file: "packages/client/card-state.ts",
+    file: "packages/session/card-copies.ts",
     from: "}): boolean => input.hadHost && !input.hasHost && input.hostConnected",
     to: "}): boolean => input.hadHost && input.hostConnected",
     suite: "host",
@@ -1039,7 +1039,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "undoFor undoes the tab's last step",
-    file: "packages/client/session-view.ts",
+    file: "packages/session/connect.ts",
     from: "        undo: options => undo.undo({ ...options, docs }),",
     to: "        undo: options => undo.undo({ ...options }),",
     suite: "host",
@@ -1049,7 +1049,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "undoFor undoes the tab's last step, in the browser",
-    file: "packages/client/session-view.ts",
+    file: "packages/session/connect.ts",
     from: "        undo: options => undo.undo({ ...options, docs }),",
     to: "        undo: options => undo.undo({ ...options }),",
     suite: "browser",
@@ -1096,7 +1096,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column's reading is never written",
-    file: "packages/client/presence-seat.ts",
+    file: "packages/session/presence-seat.ts",
     from: "        d.reading.set(key, end)\n",
     to: "",
     suite: "host",
@@ -1105,7 +1105,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a closed column's reading is left to decay",
-    file: "packages/client/presence-seat.ts",
+    file: "packages/session/presence-seat.ts",
     from: "          d.reading.delete(key)\n",
     to: "",
     suite: "host",
@@ -1114,7 +1114,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a client declares no writers",
-    file: "packages/client/session-view.ts",
+    file: "packages/session/connect.ts",
     from: "  exchange.register(writersPolicy)",
     to: "  void writersPolicy",
     suite: "host",
@@ -1335,7 +1335,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an unqueue is never sent",
-    file: "packages/client/session-view.ts",
+    file: "packages/session/connect.ts",
     from: "      return sendMove(move, how, queuedBy, null)",
     to: '      return move.from?.kind === "queued" ? Promise.resolve({ kind: "refused", refusal: null }) : sendMove(move, how, queuedBy, null)',
     suite: "host",
@@ -1355,7 +1355,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a queued card carries no version of its text",
-    file: "packages/client/session-view.ts",
+    file: "packages/session/connect.ts",
     from: "        ? stampSeen(planned, versionOf(planned.card))",
     to: '        ? stampSeen(planned, "")',
     suite: "host",
@@ -1530,7 +1530,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a root is shared only once it is held",
-    file: "packages/client/root-docs.ts",
+    file: "packages/session/root-docs.ts",
     from: "      return root === undefined ? undefined : wanted.has(root)",
     to: "      return root === undefined ? undefined : roots.current().has(root)",
     suite: "browser",
@@ -1539,7 +1539,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a session's undo of moves redoes",
-    file: "packages/client/session-view.ts",
+    file: "packages/session/connect.ts",
     from: '        kind: "undo-move",\n        root,\n        direction,',
     to: '        kind: "undo-move",\n        root,\n        direction: "redo",',
     suite: "host",
@@ -1549,7 +1549,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a keep sends its first card only",
-    file: "packages/client/session-view.ts",
+    file: "packages/session/connect.ts",
     from: '        { kind: "move", moves: moves.map(m => m.move) },',
     to: '        { kind: "move", moves: moves.slice(0, 1).map(m => m.move) },',
     suite: "host",
@@ -1569,7 +1569,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a swap is written outside this tab's swaps",
-    file: "packages/client/session-view.ts",
+    file: "packages/session/connect.ts",
     from: "      swaps.gesture(() =>\n        inventory.write(",
     to: "      void swaps, ((f: () => void) => f())(() =>\n        inventory.write(",
     suite: "browser",
@@ -1607,9 +1607,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a client's retitle never reaches the host",
-    file: "packages/client/session-view.ts",
-    from: '      return send({ kind: "retitle", root })',
-    to: '      return Promise.resolve({ kind: "retitling" as const })',
+    file: "packages/session/connect.ts",
+    from: '    retitle: entry => inRootOf(entry, root => ({ kind: "retitle", root })),',
+    to: '    retitle: () => Promise.resolve({ kind: "retitling" as const }),',
     suite: "host",
     scenario: "titles",
     expect:

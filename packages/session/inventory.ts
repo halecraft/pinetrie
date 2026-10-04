@@ -1,18 +1,18 @@
-// client/inventory — your inventory's slots (ADR-0048 step 4, ADR-0059). Pure.
+// session/inventory — your inventory's slots (ADR-0048 step 4, ADR-0059). Pure.
 //
 // The host says which cards are in your inventory; your inventory document
 // says which slot holds each. Your tabs write that document at once, so each
 // repairs it from the host's record, writing only what differs (S76). One
 // rule, `settleSlots`, says what the slots should be: the repair writes it,
-// the panel draws it, and a take lands by the same `firstEmpty`, so what is
-// drawn and what is written cannot differ. A take this tab has in flight is
-// an intent: drawn in the slot it chose, and left alone by the repair until
-// the host answers and the take writes its own slot.
+// the page's panel draws it (`inventoryView`, `@pineta/client`), and a take
+// lands by the same `firstEmpty`, so what is drawn and what is written
+// cannot differ. A take this tab has in flight is an intent: drawn in the
+// slot it chose, and left alone by the repair until the host answers and the
+// take writes its own slot.
 
 import {
   type CardId,
   type CardRecord,
-  INVENTORY_COLUMNS,
   INVENTORY_SLOTS,
   type WriterId,
 } from "@pineta/core"
@@ -241,80 +241,3 @@ export const heldBy = (
   me: WriterId,
 ): readonly CardRecord[] =>
   cards.filter(c => c.place.kind === "inventory" && c.place.holder === me)
-
-export interface SlotView {
-  readonly index: number
-  readonly card: CardRecord | null
-  /** The card's first line, "" for none. */
-  readonly firstLine: string
-  /** "1"–"9" for the first nine slots, else null. */
-  readonly label: string | null
-  readonly selected: boolean
-}
-
-export interface InventoryView {
-  readonly slots: readonly SlotView[]
-  readonly selected: number
-  /** The selected slot's card, shown whole beside the grid. */
-  readonly card: CardRecord | null
-  /** How many slots are empty. */
-  readonly free: number
-}
-
-const firstLineOf = (text: string): string =>
-  text.trimStart().split("\n", 1)[0]?.trim() ?? ""
-
-/** What the panel draws: `settleSlots`, each slot with its card. */
-export function inventoryView(input: {
-  readonly held: readonly CardRecord[]
-  readonly slots: Slots
-  readonly intents: Intents
-  readonly selected: number
-  /** Each card's text, by id; one not yet read is "". */
-  readonly texts: ReadonlyMap<CardId, string>
-}): InventoryView {
-  const byId = new Map(input.held.map(c => [c.id, c] as const))
-  const settled = settleSlots(
-    input.held.map(c => c.id),
-    input.slots,
-    input.intents,
-  )
-  const slots = SLOT_INDICES.map(index => {
-    const id = settled[String(index)]
-    const card = id === undefined ? null : (byId.get(id) ?? null)
-    return {
-      index,
-      card,
-      firstLine:
-        card === null ? "" : firstLineOf(input.texts.get(card.id) ?? ""),
-      label: index < 9 ? String(index + 1) : null,
-      selected: index === input.selected,
-    }
-  })
-  return {
-    slots,
-    selected: input.selected,
-    card: slots[input.selected]?.card ?? null,
-    free: slots.filter(s => s.card === null).length,
-  }
-}
-
-/** A grid move by arrow or `hjkl`. */
-export type GridStep = "left" | "right" | "up" | "down"
-
-/** The slot a grid move selects from `from`; it stops at the grid's edge. */
-export function stepSlot(from: number, step: GridStep): number {
-  const row = Math.floor(from / INVENTORY_COLUMNS)
-  const col = from % INVENTORY_COLUMNS
-  const rows = INVENTORY_SLOTS / INVENTORY_COLUMNS
-  switch (step) {
-    case "left":
-      return row * INVENTORY_COLUMNS + Math.max(0, col - 1)
-    case "right":
-      return row * INVENTORY_COLUMNS + Math.min(INVENTORY_COLUMNS - 1, col + 1)
-    case "up":
-      return Math.max(0, row - 1) * INVENTORY_COLUMNS + col
-    case "down":
-      return Math.min(rows - 1, row + 1) * INVENTORY_COLUMNS + col
-  }
-}

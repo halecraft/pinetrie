@@ -51,7 +51,7 @@ import {
   pinnedReads,
   type TakeDestination,
 } from "@pineta/rules"
-import type { OfferActing } from "./acting.ts"
+import type { OfferActing } from "@pineta/session"
 import { commandWords } from "./card-words.ts"
 import type { Column } from "./columns.ts"
 import { ago, count } from "./counts.ts"

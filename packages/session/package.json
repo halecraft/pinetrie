@@ -1,0 +1,23 @@
+{
+  "name": "@pineta/session",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "//dependencies": "@kyneta/changefeed, @kyneta/machine and @kyneta/transport are never imported here. They are PEER dependencies of @kyneta/exchange and @kyneta/websocket-transport, and pnpm's strict tree requires them declared. Removing them because nothing imports them will break the session at resolution time.",
+  "dependencies": {
+    "@kyneta/changefeed": "link:../../../kyneta/workspace/pineta/packages/changefeed",
+    "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
+    "@kyneta/machine": "link:../../../kyneta/workspace/pineta/packages/machine",
+    "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
+    "@kyneta/transport": "link:../../../kyneta/workspace/pineta/packages/transport",
+    "@kyneta/websocket-transport": "link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket",
+    "@pineta/core": "workspace:*",
+    "@pineta/protocol": "workspace:*",
+    "@pineta/reads": "workspace:*",
+    "@pineta/rules": "workspace:*",
+    "@pineta/schema": "workspace:*"
+  }
+}

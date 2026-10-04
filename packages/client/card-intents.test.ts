@@ -292,6 +292,18 @@ describe("keep on close (ADR-0066)", () => {
     })
   })
 
+  test("a keep whose cards have all gone closes its column and sends no move", () => {
+    const s = state({ cards: [], slots: {} })
+    const effects = plan(inColumn({ kind: "keep", cards: [C1, C2] }), s)
+    expect(effects).toHaveLength(1)
+    expect(effects).toMatchObject([
+      {
+        kind: "layout",
+        action: { kind: "columns", action: { kind: "close", index: 1 } },
+      },
+    ])
+  })
+
   test("afterKeep closes only when the keep was accepted", () => {
     const close = [{ kind: "reload" }] as const
     expect(afterKeep({ kind: "accepted", rev: 1 }, close)).toBe(close)

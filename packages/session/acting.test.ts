@@ -9,7 +9,6 @@ import {
   nextActing,
   sendActing,
 } from "./acting.ts"
-import { outcomeWords } from "./outcome-words.ts"
 import { snapshotStore } from "./store.ts"
 
 const A = laneNameForThread("a")
@@ -81,15 +80,6 @@ describe("nextActing: what is said of your last command on one thing", () => {
     ],
   ] as const)("%s", (_, prev, event, next) => {
     expect(nextActing<OfferAction>(prev, event)).toEqual(next)
-  })
-})
-
-describe("outcomeWords: one wording for every command the page waits on", () => {
-  test.each([
-    ["refused", "not done: no room"],
-    ["failed", "it failed, and may be part done: no room"],
-  ] as const)("a command %s is worded as such", (kind, words) => {
-    expect(outcomeWords({ kind, message: "no room" })).toBe(words)
   })
 })
 

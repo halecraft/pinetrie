@@ -233,7 +233,7 @@ writes it, through `applyPlaceSteps` (`apps/pineta/host/places.ts`).
   `SessionClient.cards`.
 - **`rev` is raised after every write, in a batch of its own.** A reply to
   a move carries it, and a client draws its move until its copy's `rev`
-  reaches it (`packages/client/card-moves.ts`). A write that skipped `rev`
+  reaches it (`packages/session/card-moves.ts`). A write that skipped `rev`
   would leave a client drawing a move over a record that had changed.
   Raised inside an undo step, every later write would change it, and every
   whole undo of the step would be refused (S82).

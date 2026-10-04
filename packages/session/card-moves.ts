@@ -1,4 +1,4 @@
-// client/card-moves — the moves this tab sent, drawn until its copy of the
+// session/card-moves — the moves this tab sent, drawn until its copy of the
 // places document holds them (ADR-0059). Pure.
 //
 // The host writes every place and answers each move. The answer travels on
@@ -29,7 +29,7 @@ import type { Intents } from "./inventory.ts"
 
 /**
  * Where you were looking when you acted: a column, by key, or the inventory.
- * A refusal is drawn there (`Refusal`).
+ * A refusal is drawn there (`CardRefusal`).
  */
 export type ActedAt =
   | { readonly kind: "column"; readonly key: string }
@@ -40,7 +40,7 @@ export const AT_INVENTORY: ActedAt = { kind: "inventory" }
 /** Column `key`, where a move was made. */
 export const atColumn = (key: string): ActedAt => ({ kind: "column", key })
 
-export const sameActedAt = (a: ActedAt, b: ActedAt): boolean =>
+const sameActedAt = (a: ActedAt, b: ActedAt): boolean =>
   a.kind === "column"
     ? b.kind === "column" && a.key === b.key
     : a.kind === b.kind
@@ -49,6 +49,12 @@ export const sameActedAt = (a: ActedAt, b: ActedAt): boolean =>
 export interface MoveHow {
   readonly actedAt: ActedAt
   /** The slot a move into your inventory takes; null for any other move. */
+  readonly slot: number | null
+}
+
+/** One card of several moved as one (a keep), with the slot it takes in your inventory. */
+export interface SlotMove {
+  readonly move: Move
   readonly slot: number | null
 }
 
@@ -87,7 +93,7 @@ export type Pending =
  * Something of yours refused, kept to be worded where you acted: a move or
  * an undo the host refused, or an undone swap whose slots changed since.
  */
-export type Refusal = {
+export type CardRefusal = {
   /** The card it was about; null when no one card is named. */
   readonly card: CardId | null
   readonly actedAt: ActedAt
@@ -108,7 +114,7 @@ export type Refusal = {
 
 export interface MovesState {
   readonly pending: readonly Pending[]
-  readonly refusals: readonly Refusal[]
+  readonly refusals: readonly CardRefusal[]
   /** This tab's copy of the places document's `rev`. */
   readonly rev: number
 }
@@ -119,7 +125,7 @@ export const NO_MOVES: MovesState = { pending: [], refusals: [], rev: 0 }
 export type MoveAnswer =
   | { readonly kind: "accepted"; readonly rev: number }
   /** Dropped; with a refusal to word, or null for an answer the sender words itself. */
-  | { readonly kind: "refused"; readonly refusal: Refusal | null }
+  | { readonly kind: "refused"; readonly refusal: CardRefusal | null }
 
 export type MovesEvent =
   /**
@@ -139,7 +145,7 @@ export type MovesEvent =
   /** You acted at `at` with no host to ask (a swap): the refusals there go. */
   | { readonly kind: "acted"; readonly at: ActedAt }
   /** Something refused before anything was sent, or by an undo. */
-  | { readonly kind: "refused"; readonly refusal: Refusal }
+  | { readonly kind: "refused"; readonly refusal: CardRefusal }
 
 const answered = (p: Pending, rev: number): Pending => ({
   ...p,
@@ -325,9 +331,6 @@ export type LocalEvent =
       readonly records: readonly CardRecord[]
       readonly rev: number
     }
-
-/** No records, no moves. */
-export const NO_LOCAL: LocalState = { records: [], moves: NO_MOVES, cards: [] }
 
 /**
  * The state after `event`. It is `state` itself when nothing changed, and

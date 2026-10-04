@@ -29,9 +29,9 @@ import type {
 } from "@pineta/core"
 import { type QueuedCard, writersOfClients } from "@pineta/rules"
 import { textClients } from "@pineta/schema"
+import { IN_COLUMN, newCardId, type SessionClient } from "@pineta/session"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import type { ReadOnly } from "./app-view.ts"
-import { IN_COLUMN } from "./card-moves.ts"
 import {
   type EditorEvent,
   type EditorState,
@@ -64,7 +64,6 @@ import {
 import { pinnedStatus, tokensOf } from "./column-view.ts"
 import type { Pending, Prefill } from "./columns.ts"
 import { matchCommands } from "./commands.ts"
-import { newCardId } from "./ids.ts"
 import type { ColumnAct, Intent } from "./intent.ts"
 import { Menu } from "./menu.tsx"
 import { cardHeading } from "./names.ts"
@@ -92,7 +91,6 @@ import {
   whereChoices,
   whereWords,
 } from "./send.ts"
-import type { SessionClient } from "./session-view.ts"
 import { useStable } from "./use-stable.ts"
 
 /**

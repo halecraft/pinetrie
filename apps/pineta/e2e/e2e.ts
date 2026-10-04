@@ -1,8 +1,8 @@
 // e2e — drive the whole system without a browser: the scenarios in `host/`.
 //
-// It uses client/session-view.ts unmodified, the same module the browser
-// bundle uses, and reads the document through `@pineta/reads`, the same reads
-// the host decides from. Node's global WebSocket stands in for the browser's.
+// It connects through `@pineta/session` unmodified, the same package the
+// browser bundle uses, and reads the document through `@pineta/reads`, the
+// same reads the host decides from. Node's global WebSocket stands in for the browser's.
 //
 //   pnpm run e2e        every scenario on a scripted model; `live` skips
 //   pnpm run e2e:live   the `live` scenario alone, on a real model

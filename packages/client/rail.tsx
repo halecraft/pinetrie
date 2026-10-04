@@ -21,6 +21,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
+import type { SessionClient } from "@pineta/session"
 import {
   type ComponentProps,
   type CSSProperties,
@@ -43,7 +44,6 @@ import {
   stretchWords,
   type Tick,
 } from "./rail-view.ts"
-import type { SessionClient } from "./session-view.ts"
 import { useReadingAt } from "./use-presence.ts"
 import { railScroll, type ViewportStore } from "./viewport.ts"
 

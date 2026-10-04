@@ -119,7 +119,8 @@ packages/     libraries; their boundaries are enforced by resolution
   lanes/         @pineta/lanes        a lane's container and disk, and jj and git in it (TECHNICAL.md)
   keeper/        @pineta/keeper       declares NOTHING; one step at a time on a resource (TECHNICAL.md)
   repo/          @pineta/repo         your repo: reads, steps, the owner; offers, the line, lanes' refs (TECHNICAL.md)
-  client/        @pineta/client       browser UI and session client; owns its Vite build
+  session/       @pineta/session      one client's connection to a host; no React (TECHNICAL.md)
+  client/        @pineta/client       browser UI; owns its Vite build
 
 (root)        a bare workspace: development tooling only, no dependencies
 ```
@@ -167,17 +168,19 @@ declared them.
 `workspace.test.ts` checks the manifest rules resolution cannot express: the
 root's tooling allowlist, that only `packages/pi` and `apps/conformance` declare
 pi, that `core` declares nothing, that `protocol` declares only Kyneta and core,
-that `client` declares no server package, that nothing depends on an app. It
-also re-measures the resolution claim itself in a child process. Each rule has
-been shown to fail when violated.
+that `client` declares no server package, that `session` declares no React,
+that nothing depends on an app. It also re-measures the resolution claim
+itself in a child process. Each rule has been shown to fail when violated.
 
 **Residue, stated rather than hidden.** None of these is structural:
 
 - Every package can reach the root's development tooling (Biome, TypeScript,
   Vitest, Playwright). The test holds that list to an exact allowlist.
 - `client` can reach `vite`, its own devDependency for the build.
-- Nothing stops the client importing `node:*`; builtins always resolve. The
-  browser build and `e2e:browser` catch it.
+- Nothing stops the client or the session importing `node:*`; builtins
+  always resolve. The browser build and `e2e:browser` catch it. For the
+  session only they do: the host and lanes suites run it in Node, where such
+  an import works.
 - **Under Vitest, anything resolves.** It runs under a pnpm shim that sets
   `NODE_PATH` to pnpm's hidden hoist, so a unit test could import an
   undeclared package and still run. `typecheck`, which is in `verify`, still
@@ -185,9 +188,9 @@ been shown to fail when violated.
 - Per-file rules are gone. `messages.ts` "imports nothing" became "the protocol
   package declares only Kyneta and core".
 
-Dependency direction is physical: `core → schema → pi → app`. A package cannot
-reach up into the app, which is what forced `core` and `schema` to become
-packages — pi depends on them.
+Dependency direction is physical: `core → schema → pi → app`, and
+`session → client → app`. A package cannot reach up into the app, which is
+what forced `core` and `schema` to become packages — pi depends on them.
 
 ### Writers, lanes and the host
 

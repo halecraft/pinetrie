@@ -1,4 +1,4 @@
-// client/host-line — requests to the host, each answered by the reply that
+// session/host-line — requests to the host, each answered by the reply that
 // carries its id. Runs in a browser and in Node alike: it is given the
 // Line's two ends, and touches nothing else.
 
@@ -25,18 +25,26 @@ export interface HostLine {
    */
   request(intent: Intent, id?: string): Promise<Answered>
   /**
-   * Answer every request still waiting as `failed`, with `message`: the host
-   * left, or this client closed. Failed, not refused, since the host may
-   * have acted on it.
+   * Answer every request still waiting as `failed`, with `message`, and
+   * every later one at once with the first message given, sending nothing:
+   * the host left, or this client closed, and a client does not reconnect.
+   * Failed, not refused, since the host may have acted on one waiting.
    */
-  settleAll(message: string): void
+  close(message: string): void
 }
+
+const failed = (message: string): Answered => ({
+  outcome: { kind: "failed", message },
+  rev: null,
+})
 
 export function hostLine(ports: {
   readonly send: (command: Command) => void
   readonly replies: AsyncIterable<Reply>
 }): HostLine {
   const waiting = new Map<string, (answered: Answered) => void>()
+  /** Why the line closed; null while it is open. */
+  let closed: string | null = null
   void (async () => {
     for await (const reply of ports.replies) {
       waiting.get(reply.id)?.({
@@ -48,17 +56,18 @@ export function hostLine(ports: {
   })()
   return {
     request(intent, id = crypto.randomUUID()) {
+      if (closed !== null) return Promise.resolve(failed(closed))
       const answered = new Promise<Answered>(resolve =>
         waiting.set(id, resolve),
       )
       ports.send(encodeIntent(id, intent))
       return answered
     },
-    settleAll(message) {
+    close(message) {
+      closed ??= message
       const settle = [...waiting.values()]
       waiting.clear()
-      for (const resolve of settle)
-        resolve({ outcome: { kind: "failed", message }, rev: null })
+      for (const resolve of settle) resolve(failed(message))
     },
   }
 }

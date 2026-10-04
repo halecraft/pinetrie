@@ -40,6 +40,12 @@ import {
   type StreamRecord,
 } from "@pineta/schema"
 import {
+  drawnPlace,
+  newCardId,
+  newLaneName,
+  type SessionClient,
+} from "@pineta/session"
+import {
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -52,7 +58,6 @@ import type { ReadOnly } from "./app-view.ts"
 import type { FoldMemory } from "./ask-fold.ts"
 import { askWords, DENSITIES, type Density, densityWords } from "./ask-words.ts"
 import { CardEditor, QueuedCardEditor } from "./card-editor.tsx"
-import { drawnPlace } from "./card-moves.ts"
 import { type EditorState, shownBelow, shownBy } from "./card-state.ts"
 import {
   type CatchUps,
@@ -88,7 +93,6 @@ import type { Column as ColumnSpec, Pending } from "./columns.ts"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { behind, type SeenEnd } from "./follow.ts"
-import { newCardId, newLaneName } from "./ids.ts"
 import type { ColumnAct, Intent } from "./intent.ts"
 import { type Left, leftLine } from "./left.ts"
 import type { LiveWork } from "./live.ts"
@@ -111,7 +115,6 @@ import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import type { ScreenMemory } from "./screen-memory.ts"
 import type { ColumnHow } from "./send.ts"
-import type { SessionClient } from "./session-view.ts"
 import type { DeviceState } from "./tab-state.ts"
 import type { RowMemory } from "./tool-row.ts"
 import { useAskBar } from "./use-ask-bar.ts"

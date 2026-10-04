@@ -9,9 +9,8 @@
 // move are Cmd or Ctrl with Z (Shift+Z, or Ctrl+Y, to redo), only outside a
 // text box, where they are the box's own text undo (ADR-0052).
 
-import type { CardId } from "@pineta/core"
+import { type CardId, INVENTORY_COLUMNS, INVENTORY_SLOTS } from "@pineta/core"
 import type { Intent } from "./intent.ts"
-import { type GridStep, stepSlot } from "./inventory.ts"
 
 /** The part of a `KeyboardEvent` read here. */
 export interface KeyLike {
@@ -77,4 +76,24 @@ export function keyAct(event: KeyLike, focus: KeyFocus): Intent | null {
   if (!focus.inPanel || step === undefined || event.ctrlKey || event.metaKey)
     return null
   return { kind: "selectSlot", slot: stepSlot(focus.selected, step) }
+}
+
+/** A grid move by arrow or `hjkl`. */
+export type GridStep = "left" | "right" | "up" | "down"
+
+/** The slot a grid move selects from `from`; it stops at the grid's edge. */
+export function stepSlot(from: number, step: GridStep): number {
+  const row = Math.floor(from / INVENTORY_COLUMNS)
+  const col = from % INVENTORY_COLUMNS
+  const rows = INVENTORY_SLOTS / INVENTORY_COLUMNS
+  switch (step) {
+    case "left":
+      return row * INVENTORY_COLUMNS + Math.max(0, col - 1)
+    case "right":
+      return row * INVENTORY_COLUMNS + Math.min(INVENTORY_COLUMNS - 1, col + 1)
+    case "up":
+      return Math.max(0, row - 1) * INVENTORY_COLUMNS + col
+    case "down":
+      return Math.min(rows - 1, row + 1) * INVENTORY_COLUMNS + col
+  }
 }

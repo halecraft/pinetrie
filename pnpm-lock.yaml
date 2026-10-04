@@ -77,6 +77,9 @@ importers:
       '@pineta/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@pineta/session':
+        specifier: workspace:*
+        version: link:../../packages/session
       vite:
         specifier: 7.1.11
         version: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
@@ -99,9 +102,6 @@ importers:
       '@kyneta/exchange':
         specifier: link:../../../kyneta/workspace/pineta/packages/exchange
         version: link:../../../kyneta/workspace/pineta/packages/exchange
-      '@kyneta/machine':
-        specifier: link:../../../kyneta/workspace/pineta/packages/machine
-        version: link:../../../kyneta/workspace/pineta/packages/machine
       '@kyneta/react':
         specifier: link:../../../kyneta/workspace/pineta/packages/react
         version: link:../../../kyneta/workspace/pineta/packages/react
@@ -111,12 +111,6 @@ importers:
       '@kyneta/schema':
         specifier: link:../../../kyneta/workspace/pineta/packages/schema
         version: link:../../../kyneta/workspace/pineta/packages/schema
-      '@kyneta/transport':
-        specifier: link:../../../kyneta/workspace/pineta/packages/transport
-        version: link:../../../kyneta/workspace/pineta/packages/transport
-      '@kyneta/websocket-transport':
-        specifier: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
-        version: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
@@ -132,6 +126,9 @@ importers:
       '@pineta/schema':
         specifier: workspace:*
         version: link:../schema
+      '@pineta/session':
+        specifier: workspace:*
+        version: link:../session
       hast-util-to-jsx-runtime:
         specifier: 2.3.6
         version: 2.3.6
@@ -278,6 +275,42 @@ importers:
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/session:
+    dependencies:
+      '@kyneta/changefeed':
+        specifier: link:../../../kyneta/workspace/pineta/packages/changefeed
+        version: link:../../../kyneta/workspace/pineta/packages/changefeed
+      '@kyneta/exchange':
+        specifier: link:../../../kyneta/workspace/pineta/packages/exchange
+        version: link:../../../kyneta/workspace/pineta/packages/exchange
+      '@kyneta/machine':
+        specifier: link:../../../kyneta/workspace/pineta/packages/machine
+        version: link:../../../kyneta/workspace/pineta/packages/machine
+      '@kyneta/schema':
+        specifier: link:../../../kyneta/workspace/pineta/packages/schema
+        version: link:../../../kyneta/workspace/pineta/packages/schema
+      '@kyneta/transport':
+        specifier: link:../../../kyneta/workspace/pineta/packages/transport
+        version: link:../../../kyneta/workspace/pineta/packages/transport
+      '@kyneta/websocket-transport':
+        specifier: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
+        version: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
+      '@pineta/core':
+        specifier: workspace:*
+        version: link:../core
+      '@pineta/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@pineta/reads':
+        specifier: workspace:*
+        version: link:../reads
+      '@pineta/rules':
+        specifier: workspace:*
+        version: link:../rules
+      '@pineta/schema':
+        specifier: workspace:*
+        version: link:../schema
 
 packages:
 

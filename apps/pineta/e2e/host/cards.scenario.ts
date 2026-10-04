@@ -3,7 +3,6 @@
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import type { SessionClient } from "@pineta/client/session"
 import { type CardId, cardId, entryId, type LaneName, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import { PLACES_DOC_ID } from "@pineta/protocol/messages"
@@ -11,6 +10,7 @@ import { inventoryDocId } from "@pineta/protocol/writers"
 import { readPlaces, readSeats } from "@pineta/reads"
 import { yourCard } from "@pineta/rules"
 import { cardDocId, InventoryDoc, PlacesDoc } from "@pineta/schema"
+import type { SessionClient } from "@pineta/session"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
@@ -29,7 +29,6 @@ import {
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
-
 import { at, LATE_LOAD_MS, START_AGENT, sleep, slowToLoad } from "./support.ts"
 
 export const scenario: Scenario = {
@@ -534,14 +533,15 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     await waitFor(() => three.every(id => onHost(id) !== undefined), 5_000)
     const [k1, k2, k3] = three as [CardId, CardId, CardId]
+    const keepAt = (card: CardId, slot: number) => ({
+      move: { card, from: keeping, to: mine },
+      slot,
+    })
     const keep3 = () =>
-      ada.moveCards(
-        three.map((card, n) => ({
-          move: { card, from: keeping, to: mine },
-          slot: 6 + n,
-        })),
-        { kind: "column", key: "k-keep" },
-      )
+      ada.moveCards([keepAt(k1, 6), keepAt(k2, 7), keepAt(k3, 8)], {
+        kind: "column",
+        key: "k-keep",
+      })
     // Bea moves one first: the keep is refused whole.
     await waitFor(() => bea.cards.current().some(c => c.id === k3), 5_000)
     await bea.moveCard(

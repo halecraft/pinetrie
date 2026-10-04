@@ -41,9 +41,21 @@ test("a reply answers the request that carries its id, with its rev", async () =
 test("a request still waiting when the host leaves fails, saying so", async () => {
   const w = wire()
   const waiting = w.line.request({ kind: "name", name: "Ada" })
-  w.line.settleAll("the host left before answering")
+  w.line.close("the host left")
   expect(await waiting).toEqual({
-    outcome: { kind: "failed", message: "the host left before answering" },
+    outcome: { kind: "failed", message: "the host left" },
+    rev: null,
+  })
+})
+
+test("a request after the line closed fails at once, and sends nothing", async () => {
+  const w = wire()
+  w.line.close("the host left")
+  w.line.close("the client closed")
+  const late = w.line.request({ kind: "name", name: "Ada" })
+  expect(w.sent).toEqual([])
+  expect(await late).toEqual({
+    outcome: { kind: "failed", message: "the host left" },
     rev: null,
   })
 })

@@ -4,8 +4,8 @@ import {
   type ThreadName,
   writerId,
 } from "@pineta/core"
+import type { CardRefusal } from "@pineta/session"
 import { describe, expect, test } from "vitest"
-import type { Refusal } from "./card-moves.ts"
 import {
   cardStatus,
   commandNote,
@@ -23,8 +23,8 @@ import {
 const ME = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
-type MoveRefused = Extract<Refusal, { fromQueue: boolean }>
-const refusal = (over: Partial<MoveRefused>): Refusal => ({
+type MoveRefused = Extract<CardRefusal, { fromQueue: boolean }>
+const refusal = (over: Partial<MoveRefused>): CardRefusal => ({
   card: cardId("c-1"),
   actedAt: { kind: "inventory" },
   code: "gone",

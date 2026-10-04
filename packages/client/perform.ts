@@ -2,11 +2,11 @@
 // The shell: one port call per effect, and nothing decided here.
 
 import type { CardId, EntryId } from "@pineta/core"
+import type { SessionClient } from "@pineta/session"
 import { afterKeep } from "./card-intents.ts"
 import type { Identity } from "./identity.ts"
 import { afterRestore, type Effect, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
-import type { SessionClient } from "./session-view.ts"
 
 export interface AppPorts {
   readonly dispatch: (action: LayoutAction) => void

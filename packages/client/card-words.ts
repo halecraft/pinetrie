@@ -9,7 +9,7 @@ import type {
   WriterId,
 } from "@pineta/core"
 import { catchUpName, displayName, type PinnedStatus } from "@pineta/rules"
-import type { Refusal } from "./card-moves.ts"
+import type { CardRefusal } from "@pineta/session"
 import type { PinnedMarker } from "./column-view.ts"
 import { lineWords, type Reader } from "./send.ts"
 
@@ -80,7 +80,7 @@ export const unsentWords = (reason: string): string => `not sent: ${reason}`
  * host had taken the card first (S69), so it was sent as its queuer's
  * message; moved, someone else moved it first.
  */
-export function refusalWords(refusal: Refusal, reader: Reader): string {
+export function refusalWords(refusal: CardRefusal, reader: Reader): string {
   if (refusal.code === "slots-changed")
     return "not undone: those slots have changed since"
   const { by } = refusal
@@ -141,7 +141,7 @@ export const closeAskWords = (n: number): string =>
     : `keep the ${n} cards here in your inventory?`
 
 /** A refusal's React key: what it is about, and why. */
-export const refusalKey = (refusal: Refusal): string =>
+export const refusalKey = (refusal: CardRefusal): string =>
   `${refusal.code}:${refusal.card ?? ""}`
 
 // ── pinned cards (ADR-0048 step 5) ────────────────────────────────────────

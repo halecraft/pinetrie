@@ -30,13 +30,14 @@ import type { Outcome } from "@pineta/protocol/codec"
 import {
   AT_INVENTORY,
   atColumn,
+  type CardRefusal,
+  firstEmpty,
   IN_COLUMN,
   type MoveAnswer,
   type MoveHow,
-  type Refusal,
-} from "./card-moves.ts"
+  type Slots,
+} from "@pineta/session"
 import type { CardFacts, Effect, IntentState } from "./intent.ts"
-import { firstEmpty, type Slots } from "./inventory.ts"
 import { type PutTarget, placeOfTarget } from "./put-target.ts"
 import { revealOf } from "./reveal.ts"
 
@@ -75,7 +76,7 @@ export const cardOf = (
 ): CardRecord | undefined => facts.cards.find(c => c.id === card)
 
 /** A take refused before it is sent: your inventory is full, as the host would say. */
-const full = (card: CardId): Refusal => ({
+const full = (card: CardId): CardRefusal => ({
   card,
   actedAt: AT_INVENTORY,
   code: "full",
@@ -237,7 +238,12 @@ export function planKeep(
     const move = moveOf(now, { kind: "inventory", holder: facts.me })
     return [{ move, slot }]
   })
-  return [{ kind: "keep", moves, actedAt: atColumn(key), close }]
+  const [first, ...rest] = moves
+  // Every card already gone: nothing to ask the host, so the column closes.
+  if (first === undefined) return close
+  return [
+    { kind: "keep", moves: [first, ...rest], actedAt: atColumn(key), close },
+  ]
 }
 
 /** After a keep's answer: the column closes only if the keep was accepted. */
