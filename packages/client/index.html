@@ -323,7 +323,11 @@
       .text pre { padding: .45rem; overflow-x: auto; white-space: pre; background: #11141a;
         border: 1px solid #23272e; }
       .text pre code { padding: 0; font-size: .78rem; background: none; }
-      .text table { border-collapse: collapse; display: block; overflow-x: auto; }
+      /* `break-word`, not the text's `anywhere`: `anywhere` lets a word break
+         when the table sizes its columns, so a narrow column splits its words
+         ("Wo/rki/ng") rather than the table scrolling. */
+      .text table { border-collapse: collapse; display: block; overflow-x: auto;
+        overflow-wrap: break-word; }
       .text th, .text td { padding: .15rem .45rem; border: 1px solid #23272e; }
       .text a { color: #9ecbff; }
       .text hr { border: 0; border-top: 1px solid #23272e; }
