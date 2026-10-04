@@ -487,11 +487,14 @@ export function offerView(input: {
       !input.untraced && (kind === "current" || kind === "nothing-new")
         ? (["update"] as const).filter(b => shown.menu.includes(b))
         : []
+    // An untraced start rebuilds nothing: only your edited offer is left.
+    const rebuilds = (b: OfferButton) =>
+      !input.untraced || (b !== "refresh" && b !== "squash" && b !== "split")
     return {
       state,
-      buttons: takes(shown.buttons),
+      buttons: takes(shown.buttons).filter(rebuilds),
       menu: [
-        ...shown.menu,
+        ...shown.menu.filter(rebuilds),
         ...(destinations.length > 1 ? (["take-line"] as const) : []),
       ],
       quiet,

@@ -496,8 +496,9 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   archived, only its offer, read against the line; else `offerNow`'s facts
   and whether the lane's work changes any file (`workChanges`). A place
   whose start is untraced, or whose WIP is gone, is no `Placed`
-  (`placedOf`): nothing is built from it, and act, describe and a split's
-  span refuse it. Archived
+  (`placedOf`): nothing is built from it, so squash, refresh, describe and
+  a split's span refuse it. A take needs no start (a bookmark move), so an
+  offer you edited on an untraced lane can still be taken. Archived
   is read from the archive record, not from the lane's tip being missing:
   a tip missing for one import (S78) must not withdraw a live offer. One gather,
   `offerNow`, reads where it sits and starts (`placeOf`: its base from the

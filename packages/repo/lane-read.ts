@@ -342,10 +342,7 @@ export async function gatherLane(
   // are its diff against the target, empty once the line holds the lane's
   // work, while the work itself still changes files. Read from the offer, an
   // empty one was withdrawn and then built again, without end (S89).
-  const work =
-    start.kind === "known"
-      ? await workChanges(jj, { start: start.start, tip })
-      : "unknown"
+  const work = await workChanges(jj, { start, tip })
   const catchUp = await readCatchUp(jj, {
     start: base.start,
     to: onto,

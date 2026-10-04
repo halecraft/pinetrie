@@ -69,7 +69,7 @@ export async function laneTipIn(
  * not already hold, read from every paragraph of each message (S77 item 6);
  * and the takes of `lane` that name none (`untracedLanes`, S97).
  */
-export async function takenFacts(
+async function takenFacts(
   jj: Runner,
   input: {
     readonly line: LineConfig
@@ -138,23 +138,20 @@ export async function startOfOffer(
  * diff from it to the tip: what a build restores, so the two agree. From
  * several, one diff over `start..tip`, from its roots' parents, merged, to
  * the tip. jj refuses a range with gaps, as after a catch-up merged a take
- * (S97): that, or no start, is `unknown`.
+ * (S97): that, no start, or an untraced one is `unknown`.
  */
 export async function workChanges(
   jj: Runner,
-  input: { readonly start: readonly CommitId[]; readonly tip: CommitId },
+  input: { readonly start: StartRead; readonly tip: CommitId },
 ): Promise<WorkChanges> {
-  const [only, ...more] = input.start
+  if (input.start.kind === "untraced") return "unknown"
+  const { start } = input.start
+  const [only, ...more] = start
   if (only === undefined) return "unknown"
   const ran = await jj(
     more.length === 0
       ? ["diff", "--from", only, "--to", input.tip, "--name-only"]
-      : [
-          "diff",
-          "-r",
-          `(${input.start.join(" | ")})..${input.tip}`,
-          "--name-only",
-        ],
+      : ["diff", "-r", `(${start.join(" | ")})..${input.tip}`, "--name-only"],
   )
   if (!ran.ok) return "unknown"
   return lines(ran.stdout).length === 0 ? "none" : "some"

@@ -50,9 +50,6 @@ export async function act(
     if (action === "describe") return { code: null, describe: true }
     const { place, name, offer } = now
     if (place.target === null) return code(ERR.BAD_DESTINATION)
-    // An untraced start builds nothing, and leaves only an offer you edited.
-    const at = placedOf(place)
-    if (at === null) return code(ERR.NO_OFFER)
     if (action === "take") {
       // A take that names no offer was shown none.
       if (seen === null) return code(ERR.OFFER_CHANGED)
@@ -98,7 +95,12 @@ export async function act(
           lane,
           name,
           offer,
-          place: at,
+          // A take moves a bookmark and needs no start. An untraced start
+          // leaves only an offer you edited; with none, a stack reads stale.
+          place: {
+            tip: place.tip,
+            start: place.start.kind === "known" ? place.start.start : [],
+          },
           editing,
           now: takenAt,
         }),
@@ -126,7 +128,10 @@ export async function act(
       )
       return code(null)
     }
-    // squash and refresh: the offer rebuilt from the lane's tip, as one.
+    // squash and refresh: the offer rebuilt from the lane's tip, as one,
+    // which an untraced start cannot do.
+    const at = placedOf(place)
+    if (at === null) return code(ERR.NO_OFFER)
     await refresh.rebuild(ops, lane, name, at, changesOf(offer), [
       {
         commit: place.tip,

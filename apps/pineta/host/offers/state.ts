@@ -314,10 +314,7 @@ export function createOfferState(input: {
           archived,
           tip,
           start,
-          work:
-            start.kind === "known"
-              ? await workChanges(ops.jj, { start: start.start, tip })
-              : "unknown",
+          work: await workChanges(ops.jj, { start, tip }),
           offer: await readOffer(ops.jj, { name, target }),
         },
       }

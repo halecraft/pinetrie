@@ -1054,10 +1054,7 @@ describe("a lane's repo, with jj", () => {
         target,
         start,
         offer: await readOffer(ops, { name: NAME, target }),
-        work:
-          start.kind === "known"
-            ? await workChanges(ops, { start: start.start, tip })
-            : "unknown",
+        work: await workChanges(ops, { start, tip }),
         catchUp: await readCatchUp(ops, {
           start: base.start,
           to: target,
@@ -1753,19 +1750,45 @@ describe("a lane's repo, with jj", () => {
     await fetch(base)
     const first = await laneTipIn(ops, LANE)
     if (first === null) throw new Error("no tip")
-    expect(await workChanges(ops, { start: base, tip: first })).toBe("some")
+    expect(
+      await workChanges(ops, {
+        start: { kind: "known", start: base },
+        tip: first,
+      }),
+    ).toBe("some")
     await rm(path.join(laneDir, "a.txt"))
     await turn()
     await fetch(base)
     const undone = await laneTipIn(ops, LANE)
     if (undone === null) throw new Error("no tip")
-    expect(await workChanges(ops, { start: base, tip: undone })).toBe("none")
-    expect(await workChanges(ops, { start: [first], tip: undone })).toBe("some")
-    expect(await workChanges(ops, { start: [], tip: undone })).toBe("unknown")
+    expect(
+      await workChanges(ops, {
+        start: { kind: "known", start: base },
+        tip: undone,
+      }),
+    ).toBe("none")
+    expect(
+      await workChanges(ops, {
+        start: { kind: "known", start: [first] },
+        tip: undone,
+      }),
+    ).toBe("some")
+    expect(
+      await workChanges(ops, {
+        start: { kind: "known", start: [] },
+        tip: undone,
+      }),
+    ).toBe("unknown")
     // A range jj refuses, here for a commit it does not have, is not a change.
     expect(
       await workChanges(ops, {
-        start: [first, commitId("1".repeat(40))],
+        start: { kind: "known", start: [first, commitId("1".repeat(40))] },
+        tip: undone,
+      }),
+    ).toBe("unknown")
+    expect(
+      await workChanges(ops, {
+        start: { kind: "untraced", takes: [first] },
         tip: undone,
       }),
     ).toBe("unknown")

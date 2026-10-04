@@ -466,8 +466,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the offer's own files say whether the lane's work changes any",
     file: "packages/repo/lane-read.ts",
-    from: '  const work =\n    start.kind === "known"\n',
-    to: '  const work =\n    offer?.kind === "offer"\n      ? offer.files.length === 0\n        ? "none"\n        : "some"\n      : start.kind === "known"\n',
+    from: "  const work = await workChanges(jj, { start, tip })\n",
+    to: '  const work =\n    offer?.kind === "offer"\n      ? offer.files.length === 0\n        ? "none"\n        : "some"\n      : await workChanges(jj, { start, tip })\n',
     command: repoTest,
     expect: "an offer the line already holds is empty",
   },

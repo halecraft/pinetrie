@@ -77,6 +77,15 @@ export const mutations: readonly Mutation[] = [
       "offerStatus: one decoding of a record, which every reader shares (ADR-0067)",
   },
   {
+    name: "an untraced thread's edited offer offers a rebuild",
+    file: "packages/marginalia/offer.ts",
+    from: '      !input.untraced || (b !== "refresh" && b !== "squash" && b !== "split")\n',
+    to: "      true\n",
+    command: unit,
+    expect:
+      "an untraced thread's offer you edited can be taken, never rebuilt (S97)",
+  },
+  {
     name: "an untraced thread keeps catching up in the menu",
     file: "packages/marginalia/offer.ts",
     from: '      (kind === "brings" || input.untraced) && menu.includes("update")',

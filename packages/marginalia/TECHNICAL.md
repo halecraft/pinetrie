@@ -521,8 +521,9 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   destinations. When catching up `brings`, or the thread is untraced,
   catching up moves from the menu to the buttons; when it is `current` or
   `nothing-new` it stays in the menu, quiet; `unknown` leaves it there,
-  enabled. A card with the command queued makes the offer busy
-  (`catch-up`).
+  enabled. An untraced thread offers no refresh, squash or split: each
+  rebuilds from a start it does not have. A card with the command queued
+  makes the offer busy (`catch-up`).
 - **`baseName`** (`work.ts`) is the one wording of a base: "the project"
   for the line, the bookmark for a WIP (ADR-0061). `updateLine` uses it
   through the update's stored `line` flag; an update stored before the flag

@@ -255,6 +255,12 @@ describe("offerView: ADR-0038's table", () => {
     })
     expect([gone.menu, gone.quiet]).toEqual([["continue"], []])
   })
+  test("an untraced thread's offer you edited can be taken, never rebuilt (S97)", () => {
+    const edited = view({ ...offer, edited: true }, "idle", undefined, {
+      untraced: true,
+    })
+    expect(at(edited)).toEqual(["edited", ["take", "update"], []])
+  })
   test("an untraced thread offers nothing, and catching up beside it, never quiet (S97)", () => {
     const untraced = view(undefined, "idle", undefined, { untraced: true })
     expect([...at(untraced), untraced.quiet, untraced.facts.untraced]).toEqual([
